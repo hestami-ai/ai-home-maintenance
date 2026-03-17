@@ -90,7 +90,7 @@ export class ClaudeCodeRoleCLIProvider implements RoleCLIProvider {
 
 			const args = buildArgs(outputFormat, options);
 
-			const raw = await spawnCLIWithStdin(claudePath, args, cwd, timeout, options.stdinContent);
+			const raw = await spawnCLIWithStdin(claudePath, args, cwd, timeout, options.stdinContent, options.signal);
 			const executionTime = Date.now() - startTime;
 
 			const parsed = parseClaudeCodeOutput(raw.stdout, outputFormat);
@@ -167,7 +167,8 @@ export class ClaudeCodeRoleCLIProvider implements RoleCLIProvider {
 					for (const event of events) {
 						onEvent(event);
 					}
-				}
+				},
+				options.signal,
 			);
 
 			const executionTime = Date.now() - startTime;

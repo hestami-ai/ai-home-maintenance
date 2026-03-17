@@ -45,6 +45,8 @@ export interface CompiledContextPack extends ContextPack {
 	};
 	/** Optional workspace file content injected into context */
 	workspaceContext?: string;
+	/** Optional architecture document summary injected into context */
+	architectureContext?: string;
 }
 
 /**
@@ -404,21 +406,21 @@ function retrieveHistoricalFindings(
 		const turns = db
 			.prepare(
 				`
-				SELECT dt.content_ref, dt.speech_act, dt.phase
-				FROM dialogue_turns dt
+				SELECT dt.content, dt.summary, dt.speech_act, dt.phase
+				FROM dialogue_events dt
 				WHERE dt.dialogue_id = ?
 				  AND dt.role = 'HISTORIAN'
-				ORDER BY dt.turn_id DESC
+				ORDER BY dt.event_id DESC
 				LIMIT ?
 			`
 			)
-			.all(dialogueId, limit) as { content_ref: string; speech_act: string; phase: string }[];
+			.all(dialogueId, limit) as { content: string | null; summary: string; speech_act: string; phase: string }[];
 
 		for (const turn of turns) {
 			// Try to parse JSON content into readable text
-			let readable = turn.content_ref;
+			let readable = turn.content ?? turn.summary;
 			try {
-				const parsed = JSON.parse(turn.content_ref);
+				const parsed = JSON.parse(turn.content ?? turn.summary);
 				if (typeof parsed === 'string') {
 					readable = parsed;
 				} else if (typeof parsed === 'object' && parsed !== null) {
@@ -444,8 +446,7 @@ function retrieveHistoricalFindings(
 			.all(dialogueId, limit) as { verdict: string; rationale: string; statement: string }[];
 
 		for (const v of verdicts) {
-			const preview = v.rationale.length > 150 ? v.rationale.substring(0, 150) + '…' : v.rationale;
-			findings.push(`Verdict [${v.verdict}] on "${v.statement}": ${preview}`);
+			findings.push(`Verdict [${v.verdict}] on "${v.statement}": ${v.rationale}`);
 		}
 
 		// 3. Include human decisions with rationale
@@ -637,32 +638,31 @@ function retrieveIntakeSummary(
 		const intakeTurns = db
 			.prepare(
 				`
-				SELECT turn_number, human_message, expert_response
-				FROM intake_turns
+				SELECT event_id, summary, content, detail
+				FROM dialogue_events
 				WHERE dialogue_id = ?
-				ORDER BY turn_number ASC
+				  AND event_type IN ('intake_turn', 'intake_analysis', 'intake_clarification', 'intake_gathering')
+				ORDER BY event_id ASC
 				LIMIT 10
 			`
 			)
 			.all(dialogueId) as {
-			turn_number: number;
-			human_message: string;
-			expert_response: string;
+			event_id: number;
+			summary: string;
+			content: string | null;
+			detail: string | null;
 		}[];
 
 		for (const t of intakeTurns) {
-			const humanPreview = t.human_message.length > 300
-				? t.human_message.substring(0, 300) + '...'
-				: t.human_message;
-			const expertPreview = t.expert_response.length > 300
-				? t.expert_response.substring(0, 300) + '...'
-				: t.expert_response;
+			const detail = t.detail ? JSON.parse(t.detail) : {};
+			const humanMsg = detail.humanMessage ?? '';
+			const expertText = t.content ?? t.summary;
 			findings.push(
-				`Intake [Turn ${t.turn_number}]: Human: ${humanPreview} | Expert: ${expertPreview}`
+				`Intake [Event ${t.event_id}]: Human: ${humanMsg} | Expert: ${expertText}`
 			);
 		}
 	} catch {
-		// intake_turns table may not exist — skip silently
+		// dialogue_events query may fail — skip silently
 	}
 }
 

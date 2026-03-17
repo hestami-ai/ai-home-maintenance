@@ -8,10 +8,10 @@ import * as vscode from 'vscode';
 import { getEventBus, emitDialogueResumed } from '../../integration/eventBus';
 import { aggregateStreamState, type GovernedStreamState } from './dataAggregator';
 import { processHumanGateDecision, type HumanGateDecisionInput } from '../../workflow/humanGateHandling';
-import { HumanAction, Role, ClaimEventType, Phase, ClaimStatus } from '../../types';
+import { HumanAction, Role, ClaimEventType, Phase, ClaimStatus, GateStatus } from '../../types';
 import { getStyles } from './html/styles';
-import { renderStickyHeader, renderStream, renderInputArea, renderEmptyState, renderRichCard, renderSettingsPanel } from './html/components';
-import { getDialogueTurnById, getClaims } from '../../events/reader';
+import { renderStickyHeader, renderStream, renderInputArea, renderEmptyState, renderRichCard, renderSettingsPanel, setSpeechEnabled, setSoxAvailable } from './html/components';
+import { getDialogueEventById, getClaims, getOrCreateIntakeConversation } from '../../events/reader';
 import { getSecretKeyManager } from '../../config/secretKeyManager';
 import { getProviderForRole } from '../../config/manager';
 import { clearRoleProviderCache } from '../../llm/roleManager';
@@ -26,14 +26,12 @@ import { generateDialogueTitle } from '../../llm/titleGenerator';
 import { getConfig } from '../../config';
 import { subscribeCommandPersistence, completeCommand, appendCommandOutput as appendCommandOutputToDB } from '../../workflow/commandStore';
 import { IntakeSubState, IntakeMode } from '../../types/intake';
-import { updateIntakeConversation, writeClaimEvent, writeQaExchange } from '../../events/writer';
-import { getOrCreateIntakeConversation } from '../../events/reader';
+import { updateIntakeConversation, writeClaimEvent, writeQaExchange, writeDialogueEvent } from '../../events/writer';
 import { getCoverageGaps, getPartialDomains, DOMAIN_SEQUENCE } from '../../workflow/domainCoverageTracker';
 import { getWorkflowState, updateWorkflowMetadata, transitionWorkflow, TransitionTrigger } from '../../workflow/stateMachine';
 import { resolveGate, getGate, getGatesForDialogue } from '../../workflow/gates';
-import { GateStatus } from '../../types';
 import { getDatabase } from '../../database';
-import { parseTextCommand, interpretInput, escalateQuery, assessRetryableActions, type ParsedCommand, type RetryableAction, type InterpreterAction, type QaProgressCallback } from './textCommands';
+import { parseTextCommand, interpretInput, escalateQuery, assessRetryableActions, type ParsedCommand, type RetryableAction, type QaProgressCallback } from './textCommands';
 import { killAllActiveProcesses } from '../../cli/spawnUtils';
 import { getActivePermissionBridge, setActivePermissionBridge } from '../../mcp/permissionBridge';
 import { runNarrativeCuration } from '../../curation/narrativeCurator';
@@ -41,7 +39,6 @@ import { CurationMode } from '../../types/narrativeCurator';
 import { askClarification } from '../../clarification/clarificationExpert';
 import { saveClarificationThread, getClarificationThreads } from '../../clarification/clarificationStore';
 import { SpeechToTextService, resolveSpeechConfig } from '../../speech/speechToTextService';
-import { setSpeechEnabled, setSoxAvailable } from './html/components';
 
 /**
  * WebviewViewProvider for the Governed Stream sidebar view.
@@ -54,15 +51,18 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	private _activeDialogueId: string | null = null;
 	private _settingsPanelVisible = false;
 	private _isProcessing = false;
+	private _disposed = false;
 	private _thinkingCancelled = false;
 	private _processingPhase = '';
 	private _processingDetail = '';
 	private _activeCLICommandId: string | null = null;
-	private _pendingToolCalls: Map<string, import('../../cli/types').CLIActivityEvent> = new Map();
+	private readonly _pendingToolCalls: Map<string, import('../../cli/types').CLIActivityEvent> = new Map();
 	/** Suppress the next dialogue:turn_added event (the initial turn is already included in the dialogue:started full re-render) */
 	private _suppressNextTurnAdded = false;
 	private _speechService: SpeechToTextService | null = null;
 	private _speechTargetInputId: string | null = null;
+	/** AbortController for the current workflow cycle — aborted on cancel/dispose */
+	private _workflowAbortController: AbortController | null = null;
 	constructor(private readonly _extensionUri: vscode.Uri) {}
 
 	/**
@@ -73,6 +73,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		_context: vscode.WebviewViewResolveContext,
 		_token: vscode.CancellationToken
 	): void {
+		console.log('[GovernedStream] resolveWebviewView called');
 		this._view = webviewView;
 
 		webviewView.webview.options = {
@@ -81,13 +82,23 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		};
 
 		// Restore active dialogue from database (survives VS Code restart)
-		const activeResult = getActiveDialogue();
-		if (activeResult.success && activeResult.value) {
-			this._activeDialogueId = activeResult.value.dialogue_id;
+		try {
+			const activeResult = getActiveDialogue();
+			if (activeResult.success && activeResult.value) {
+				this._activeDialogueId = activeResult.value.dialogue_id;
+				console.log('[GovernedStream] Restored active dialogue:', this._activeDialogueId);
+			}
+		} catch (e) {
+			console.error('[GovernedStream] Error restoring active dialogue:', e);
 		}
 
 		// Set initial HTML
-		this._update();
+		try {
+			this._update();
+			console.log('[GovernedStream] Initial render complete');
+		} catch (e) {
+			console.error('[GovernedStream] Error in initial _update():', e);
+		}
 
 		// Handle visibility changes
 		// Note: with retainContextWhenHidden, the DOM stays alive — no need to re-render.
@@ -115,6 +126,14 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				this._sendSpeechCapability();
 			}
 		});
+	}
+
+	/**
+	 * Send a message to the webview to open the find widget
+	 */
+	public openFindWidget(): void {
+		if (!this._view) { return; }
+		this._view.webview.postMessage({ type: 'openFindWidget' });
 	}
 
 	/**
@@ -301,7 +320,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		this._eventUnsubscribers.push(
 			bus.on('workflow:command', (payload) => {
 				// Track active CLI command ID so cli:activity events route correctly
-				if (payload.commandType === 'cli_invocation' && payload.action === 'start') {
+				if ((payload.commandType === 'cli_invocation' || payload.commandType === 'role_invocation')
+					&& payload.action === 'start') {
 					this._activeCLICommandId = payload.commandId;
 				}
 				this._view?.webview.postMessage({
@@ -593,20 +613,20 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			return;
 		}
 
-		const turnResult = getDialogueTurnById(turnId);
-		if (!turnResult.success || !turnResult.value) {
+		const eventResult = getDialogueEventById(turnId);
+		if (!eventResult.success || !eventResult.value) {
 			// Fallback to full update
 			this._update();
 			return;
 		}
 
-		const turn = turnResult.value;
-		const claimsResult = getClaims({ dialogue_id: turn.dialogue_id });
+		const event = eventResult.value;
+		const claimsResult = getClaims({ dialogue_id: event.dialogue_id });
 		const turnClaims = claimsResult.success
 			? claimsResult.value.filter((c) => c.turn_id === turnId)
 			: [];
 
-		const html = renderRichCard(turn, turnClaims);
+		const html = renderRichCard(event, turnClaims);
 
 		this._view.webview.postMessage({
 			type: 'turnAdded',
@@ -617,22 +637,39 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	/**
 	 * Handle messages from the webview
 	 */
+	/**
+	 * Safely run an async handler from _handleMessage. Catches rejections
+	 * so they don't become unhandled (common during extension shutdown).
+	 */
+	private _safeAsync(fn: () => Promise<unknown> | void): void {
+		if (this._disposed) return;
+		Promise.resolve(fn()).catch(err => {
+			// Suppress "Canceled" and "Channel has been closed" errors during disposal
+			if (this._disposed) return;
+			const msg = err instanceof Error ? err.message : String(err);
+			if (msg.includes('Canceled') || msg.includes('Channel has been closed')) return;
+			console.error('[GovernedStream] Unhandled async error:', msg);
+		});
+	}
+
 	private _handleMessage(message: { type: string; [key: string]: unknown }): void {
+		if (this._disposed) return;
+
 		switch (message.type) {
 			case 'refresh':
 				this._update();
 				break;
 
 			case 'submitInput':
-				this._handleSubmitInput(message.text as string);
+				this._safeAsync(() => this._handleSubmitInput(message.text as string));
 				break;
 
 			case 'gateDecision':
-				this._handleGateDecisionAndResume(
+				this._safeAsync(() => this._handleGateDecisionAndResume(
 					message.gateId as string,
 					message.action as string,
 					message.rationale as string
-				);
+				));
 				break;
 
 			case 'copySessionId':
@@ -641,63 +678,63 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				break;
 
 			case 'requestKeyStatus':
-				this._sendKeyStatus();
+				this._safeAsync(() => this._sendKeyStatus());
 				break;
 
 			case 'setApiKey':
-				this._handleSetApiKey(message.role as string);
+				this._safeAsync(() => this._handleSetApiKey(message.role as string));
 				break;
 
 			case 'clearApiKey':
-				this._handleClearApiKey(message.role as string);
+				this._safeAsync(() => this._handleClearApiKey(message.role as string));
 				break;
 
 			case 'pickFile':
-				this._handlePickFile();
+				this._safeAsync(() => this._handlePickFile());
 				break;
 
 			case 'requestMentionSuggestions':
-				this._handleMentionSuggestions(message.query as string);
+				this._safeAsync(() => this._handleMentionSuggestions(message.query as string));
 				break;
 
 			case 'retryPhase':
-				this._handleRetryPhase();
+				this._safeAsync(() => this._handleRetryPhase());
 				break;
 
 			case 'intakeFinalizePlan':
-				this._handleIntakeFinalize();
+				this._safeAsync(() => this._handleIntakeFinalize());
 				break;
 
 			case 'intakeApprovePlan':
-				this._handleIntakeApprove();
+				this._safeAsync(() => this._handleIntakeApprove());
 				break;
 
 			case 'intakeContinueDiscussing':
-				this._handleIntakeContinueDiscussing();
+				this._safeAsync(() => this._handleIntakeContinueDiscussing());
 				break;
 
 			case 'intakeSkipGathering':
-				this._handleIntakeSkipGathering();
+				this._safeAsync(() => this._handleIntakeSkipGathering());
 				break;
 
 			case 'intakeModeSelected':
-				this._handleIntakeModeSelected(message.mode as string);
+				this._safeAsync(() => this._handleIntakeModeSelected(message.mode as string));
 				break;
 
 			case 'resumeDialogue':
-				this._handleResumeDialogue(message.dialogueId as string);
+				this._safeAsync(() => this._handleResumeDialogue(message.dialogueId as string));
 				break;
 
 			case 'switchDialogue':
-				this._handleSwitchDialogue(message.dialogueId as string);
+				this._safeAsync(() => this._handleSwitchDialogue(message.dialogueId as string));
 				break;
 
 			case 'clearDatabase':
-				this._handleClearDatabase();
+				this._safeAsync(() => this._handleClearDatabase());
 				break;
 
 			case 'exportStream':
-				this._handleExportStream();
+				this._safeAsync(() => this._handleExportStream());
 				break;
 
 			case 'settingsVisibilityChanged':
@@ -705,48 +742,67 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				break;
 
 			case 'verificationGateDecision':
-				this._handleVerificationGateDecision(
+				this._safeAsync(() => this._handleVerificationGateDecision(
 					message.gateId as string,
 					message.action as string,
 					message.claimRationales as Record<string, string> | undefined
-				);
+				));
 				break;
 
 			case 'reviewGateDecision':
-				this._handleReviewGateDecision(
+				this._safeAsync(() => this._handleReviewGateDecision(
 					message.gateId as string,
 					message.action as string,
 					message.itemRationales as Record<string, string> | undefined,
 					message.overallFeedback as string | undefined
-				);
+				));
 				break;
 
 			case 'executeRetryAction':
-				this._executeRetryAction({
+				this._safeAsync(() => this._executeRetryAction({
 					kind: message.kind as RetryableAction['kind'],
 					label: message.kind as string,
 					description: '',
 					gateId: (message.gateId as string) || undefined,
-				});
+				}));
 				break;
 
 			case 'clarificationMessage':
-				this._handleClarificationMessage(message);
+				this._safeAsync(() => this._handleClarificationMessage(message));
 				break;
 
 			case 'permissionDecision':
-				this._handlePermissionDecision(message);
+				this._safeAsync(() => this._handlePermissionDecision(message));
 				break;
 
 			case 'cancelWorkflow':
-				this._handleCancel();
+				this._safeAsync(() => this._handleCancel());
 				break;
 
 			case 'cancelThinking':
 				this._thinkingCancelled = true;
 				this._postInputThinking(false);
-				// If a thinking Q&A card is visible, finalize it
 				this._postQaThinkingComplete('*(Cancelled)*');
+				break;
+
+			case 'mmpPartialSave':
+				this._handleMmpPartialSave(message);
+				break;
+
+			case 'architectureGateDecision':
+				this._safeAsync(() => this._handleArchitectureGateDecision(message));
+				break;
+
+			case 'architectureDecomposeDeeper':
+				this._safeAsync(() => this._handleArchitectureDecomposeDeeper(message));
+				break;
+
+			case 'mmpSubmit':
+				this._safeAsync(() => this._handleMMPSubmit(message));
+				break;
+
+			case 'reviewMmpDecision':
+				this._safeAsync(() => this._handleReviewMmpDecision(message));
 				break;
 
 			case 'speechStart':
@@ -825,6 +881,9 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 					} else if (action.action === 'cancel') {
 						await this._handleCancel();
 						return;
+					} else if (action.action === 'navigate') {
+						const handled = await this._handleNavigateCommand(action.target);
+						if (handled) { return; }
 					} else if (action.action === 'save_output') {
 						const handled = await this._handleSaveOutputCommand(action.filePath);
 						if (handled) { return; }
@@ -839,6 +898,35 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 						if (handled) { return; }
 					}
 					// freetext or unhandled action — fall through to normal submission
+				}
+			}
+
+			// ── Tier 2.5: LLM Orchestrator ──────────────────────────────
+			// If Tier 2 returned freetext and we have an active dialogue, try
+			// composing a plan from primitives before falling to Tier 3/freetext.
+			if (this._activeDialogueId) {
+				try {
+					const { generatePlan } = await import('../../orchestrator/planner.js');
+					const { executePlan } = await import('../../orchestrator/executor.js');
+					const plan = await generatePlan(
+						text,
+						this._activeDialogueId,
+						(_msg: string) => this._postInputThinking(true),
+					);
+					if (plan && plan.steps.length > 0) {
+						const result = await executePlan(
+							plan,
+							this._activeDialogueId,
+							this._createUIChannel(),
+						);
+						if (result.success) {
+							this._update();
+							return;
+						}
+						// Plan failed — fall through to Tier 3 / freetext guard
+					}
+				} catch {
+					// Orchestrator unavailable — fall through silently
 				}
 			}
 
@@ -891,6 +979,18 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 					updateWorkflowMetadata(this._activeDialogueId, {
 						pendingIntakeInput: text,
 					});
+
+					// Write human_message event immediately so the prompt is visible during processing
+					writeDialogueEvent({
+						dialogue_id: this._activeDialogueId,
+						event_type: 'human_message',
+						role: 'HUMAN',
+						phase: 'INTAKE',
+						speech_act: 'DECISION',
+						summary: text.length > 120 ? text.substring(0, 120) + '...' : text,
+						content: text,
+					});
+
 					this._postProcessing(true, 'Planning', 'Discussing with Technical Expert');
 					await this._runWorkflowCycle();
 				} else {
@@ -929,6 +1029,17 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 				this._activeDialogueId = result.value.dialogue.dialogue_id;
 
+				// Write human_message event immediately so the prompt is visible during processing
+				writeDialogueEvent({
+					dialogue_id: this._activeDialogueId,
+					event_type: 'human_message',
+					role: 'HUMAN',
+					phase: 'INTAKE',
+					speech_act: 'DECISION',
+					summary: text.length > 120 ? text.substring(0, 120) + '...' : text,
+					content: text,
+				});
+
 				// Fire-and-forget title generation
 				generateDialogueTitle(this._activeDialogueId, text).catch(() => {});
 
@@ -946,33 +1057,48 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * Run the async workflow cycle
 	 */
 	private async _runWorkflowCycle(): Promise<void> {
-		if (!this._activeDialogueId) {
+		if (!this._activeDialogueId || this._disposed) {
 			return;
 		}
 
-		const config = await getConfig();
-		const result = await executeWorkflowCycle(
-			this._activeDialogueId,
-			config.llmConfig,
-			config.tokenBudget,
-			20
-		);
+		// Create a fresh AbortController for this cycle — aborted on cancel/dispose
+		this._workflowAbortController?.abort();
+		this._workflowAbortController = new AbortController();
 
-		if (!result.success) {
-			vscode.window.showErrorMessage(`Workflow error: ${result.error.message}`);
+		// Set module-level signal so all spawn functions auto-inherit it
+		const { setWorkflowAbortSignal } = await import('../../cli/spawnUtils.js');
+		setWorkflowAbortSignal(this._workflowAbortController.signal);
+
+		try {
+			const config = await getConfig();
+			const result = await executeWorkflowCycle(
+				this._activeDialogueId,
+				config.llmConfig,
+				config.tokenBudget,
+				20
+			);
+
+			if (this._disposed) return;
+
+			if (!result.success) {
+				// Suppress abort errors during disposal
+				if (result.error.message === 'Aborted') return;
+				vscode.window.showErrorMessage(`Workflow error: ${result.error.message}`);
+				this._update();
+				return;
+			}
+
+			if (result.value.completed) {
+				this._activeDialogueId = null;
+				vscode.window.showInformationMessage('Workflow completed successfully.');
+			}
+
+			// Always refresh the view after a workflow cycle completes
 			this._update();
-			return;
+		} finally {
+			setWorkflowAbortSignal(undefined);
+			this._workflowAbortController = null;
 		}
-
-		if (result.value.completed) {
-			this._activeDialogueId = null;
-			vscode.window.showInformationMessage('Workflow completed successfully.');
-		}
-
-		// Always refresh the view after a workflow cycle completes — ensures
-		// gate cards (review, verification) appear even if the event-based
-		// _update() fired too early or the gate creation event wasn't emitted.
-		this._update();
 	}
 
 	/**
@@ -1092,7 +1218,11 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * resets the UI processing state, and shows a cancellation message.
 	 */
 	private async _handleCancel(): Promise<void> {
-		// Kill all active CLI child processes
+		// Abort the workflow cycle — this kills CLI processes via AbortSignal
+		this._workflowAbortController?.abort();
+		this._workflowAbortController = null;
+
+		// Also kill any processes not covered by the signal (e.g. started before this cycle)
 		const killed = killAllActiveProcesses();
 
 		// Stop permission bridge if active
@@ -1150,15 +1280,22 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 		this._isProcessing = true;
 		this._postInputEnabled(false);
-		this._postProcessing(true, 'Approving', 'Approving plan and advancing to PROPOSE');
+		this._postProcessing(true, 'Approving', 'Approving plan and advancing to Architecture');
 
 		try {
-			// Sub-state should already be AWAITING_APPROVAL, just run the cycle
+			console.log('[GovernedStream] _handleIntakeApprove: starting workflow cycle');
+			// Sub-state should already be AWAITING_APPROVAL — cycle runs approval + transitions to ARCHITECTURE
 			await this._runWorkflowCycle();
+			console.log('[GovernedStream] _handleIntakeApprove: workflow cycle complete');
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			console.error('[GovernedStream] _handleIntakeApprove error:', msg);
+			vscode.window.showErrorMessage(`Plan approval error: ${msg}`);
 		} finally {
 			this._isProcessing = false;
 			this._postProcessing(false);
 			this._postInputEnabled(true);
+			this._update();
 		}
 	}
 
@@ -1232,10 +1369,344 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		bus.emit('intake:mode_selected', {
 			dialogueId: this._activeDialogueId,
 			mode: mode as IntakeMode,
-			source: 'user_selection',
+			source: 'user' as const,
 		});
 
 		this._update();
+	}
+
+	/**
+	 * Handle an architecture gate decision (Approve / Revise / Skip) from the webview buttons.
+	 */
+	private async _handleArchitectureGateDecision(message: { type: string; [key: string]: unknown }): Promise<void> {
+		if (!this._activeDialogueId || this._isProcessing) {
+			return;
+		}
+
+		const action = message.action as string;
+		const dialogueId = message.dialogueId as string;
+		const docId = message.docId as string;
+		const feedback = message.feedback as string | undefined;
+
+		if (!action || !dialogueId) {
+			return;
+		}
+
+		// Find the architecture gate for this dialogue
+		const gates = getGatesForDialogue(dialogueId);
+		if (!gates.success) {
+			vscode.window.showErrorMessage('Failed to find architecture gate');
+			return;
+		}
+		const pendingGate = gates.value.find(g => g.status === GateStatus.OPEN);
+		if (!pendingGate) {
+			vscode.window.showErrorMessage('No pending architecture gate found');
+			return;
+		}
+
+		// Record human decision for audit trail and resolvedAction tracking
+		const { captureHumanDecision } = await import('../../roles/human.js');
+		const humanAction = action === 'APPROVE' ? HumanAction.APPROVE
+			: action === 'SKIP' ? HumanAction.OVERRIDE
+			: HumanAction.REFRAME;
+		const rationale = action === 'REVISE'
+			? (feedback || 'Requested architecture changes')
+			: `Architecture ${action.toLowerCase()}`;
+		const decisionResult = captureHumanDecision({
+			gateId: pendingGate.gate_id,
+			action: humanAction,
+			rationale,
+			decisionMaker: 'human-user',
+		});
+
+		// Resolve the gate
+		const decisionId = decisionResult.success ? decisionResult.value.decision_id : `arch-${action.toLowerCase()}-${Date.now()}`;
+		resolveGate({
+			gateId: pendingGate.gate_id,
+			decisionId,
+			resolution: action === 'APPROVE' ? 'approved'
+				: action === 'SKIP' ? 'skipped'
+				: `revision requested: ${feedback?.substring(0, 100) ?? ''}`,
+		});
+
+		// Call the architecture-specific handler
+		const { handleArchitectureGateResolution } = await import('../../workflow/architecturePhase.js');
+		const result = handleArchitectureGateResolution(
+			dialogueId,
+			action as 'APPROVE' | 'REVISE' | 'SKIP',
+			feedback
+		);
+
+		if (!result.success) {
+			vscode.window.showErrorMessage(`Architecture gate decision failed: ${result.error.message}`);
+			return;
+		}
+
+		const { nextPhase } = result.value;
+
+		this._update();
+
+		// If transitioning to PROPOSE or staying in ARCHITECTURE, resume workflow
+		if (nextPhase) {
+			// Transition to the next phase
+			transitionWorkflow(dialogueId, nextPhase, TransitionTrigger.GATE_RESOLVED);
+			await this._resumeAfterGate();
+		} else {
+			// Staying in ARCHITECTURE (REVISE → loop back to DESIGNING)
+			await this._resumeAfterGate();
+		}
+	}
+
+	/**
+	 * Handle a "Decompose Deeper" request from the webview.
+	 * Resolves the current architecture gate and sets up the deeper decomposition pass.
+	 */
+	private async _handleArchitectureDecomposeDeeper(message: { type: string; [key: string]: unknown }): Promise<void> {
+		if (!this._activeDialogueId || this._isProcessing) {
+			return;
+		}
+
+		const dialogueId = message.dialogueId as string;
+
+		if (!dialogueId) {
+			return;
+		}
+
+		// Find and resolve the pending architecture gate
+		const gates = getGatesForDialogue(dialogueId);
+		if (!gates.success) {
+			vscode.window.showErrorMessage('Failed to find architecture gate');
+			return;
+		}
+		const pendingGate = gates.value.find(g => g.status === GateStatus.OPEN);
+		if (!pendingGate) {
+			vscode.window.showErrorMessage('No pending architecture gate found');
+			return;
+		}
+
+		// Record human decision
+		const { captureHumanDecision } = await import('../../roles/human.js');
+		const decisionResult = captureHumanDecision({
+			gateId: pendingGate.gate_id,
+			action: HumanAction.REFRAME,
+			rationale: 'Requested deeper decomposition',
+			decisionMaker: 'human-user',
+		});
+
+		const decisionId = decisionResult.success ? decisionResult.value.decision_id : `arch-deepen-${Date.now()}`;
+		resolveGate({
+			gateId: pendingGate.gate_id,
+			decisionId,
+			resolution: 'decompose deeper requested',
+		});
+
+		// Set up the deeper decomposition
+		const { handleArchitectureDecomposeDeeper } = await import('../../workflow/architecturePhase.js');
+		const result = handleArchitectureDecomposeDeeper(dialogueId);
+
+		if (!result.success) {
+			vscode.window.showErrorMessage(`Decompose deeper failed: ${result.error.message}`);
+			return;
+		}
+
+		this._update();
+		await this._resumeAfterGate();
+	}
+
+	/**
+	 * Handle partial MMP save — persists in-progress decisions to SQLite
+	 * so they survive VS Code restarts.
+	 */
+	private _handleMmpPartialSave(message: { type: string; [key: string]: unknown }): void {
+		if (!this._activeDialogueId) return;
+		try {
+			const { savePendingMmpDecisions } = require('../../database/pendingMmpStore');
+			savePendingMmpDecisions(
+				this._activeDialogueId,
+				message.cardId as string,
+				{
+					mirrorDecisions: message.mirrorDecisions as Record<string, { status: string; editedText?: string }> || {},
+					menuSelections: message.menuSelections as Record<string, { selectedOptionId: string; customResponse?: string }> || {},
+					preMortemDecisions: message.preMortemDecisions as Record<string, { status: string; rationale?: string }> || {},
+					productEdits: message.productEdits as Record<string, string> || {},
+				}
+			);
+		} catch { /* non-critical — fail silently */ }
+	}
+
+	/**
+	 * Handle MMP (Mirror & Menu Protocol) submission from the webview.
+	 * Formats decisions as structured text and feeds them back into the INTAKE cycle.
+	 */
+	private async _handleMMPSubmit(message: { type: string; [key: string]: unknown }): Promise<void> {
+		if (!this._activeDialogueId || this._isProcessing) {
+			return;
+		}
+
+		const mirrorDecisions = message.mirrorDecisions as Record<string, { status: string; editedText?: string; text?: string }> || {};
+		const menuSelections = message.menuSelections as Record<string, { selectedOptionId: string; customResponse?: string; question?: string; selectedLabel?: string }> || {};
+		const preMortemDecisions = message.preMortemDecisions as Record<string, { status: string; rationale?: string; assumption?: string }> || {};
+
+		// Format decisions as structured text for the next conversation turn.
+		// Include the human-readable text so the agent can interpret decisions without
+		// needing to look up opaque IDs.
+		const lines: string[] = ['[MMP Decisions]'];
+
+		// Mirror decisions
+		const mirrorEntries = Object.entries(mirrorDecisions);
+		if (mirrorEntries.length > 0) {
+			for (const [id, decision] of mirrorEntries) {
+				const text = decision.text ? `"${decision.text}"` : id;
+				if (decision.status === 'accepted') {
+					lines.push(`ACCEPTED: ${text}`);
+				} else if (decision.status === 'rejected') {
+					lines.push(`REJECTED: ${text}`);
+				} else if (decision.status === 'deferred') {
+					lines.push(`DEFERRED: ${text}`);
+				} else if (decision.status === 'edited' && decision.editedText) {
+					lines.push(`EDITED: ${text} → "${decision.editedText}"`);
+				}
+			}
+		}
+
+		// Menu selections
+		const menuEntries = Object.entries(menuSelections);
+		if (menuEntries.length > 0) {
+			for (const [id, selection] of menuEntries) {
+				const question = selection.question ? `"${selection.question}"` : id;
+				if (selection.selectedOptionId === 'OTHER' && selection.customResponse) {
+					lines.push(`SELECTED: ${question} → OTHER: "${selection.customResponse}"`);
+				} else {
+					const label = selection.selectedLabel || selection.selectedOptionId;
+					lines.push(`SELECTED: ${question} → "${label}"`);
+				}
+			}
+		}
+
+		// Pre-Mortem decisions
+		const pmEntries = Object.entries(preMortemDecisions);
+		if (pmEntries.length > 0) {
+			for (const [id, decision] of pmEntries) {
+				const text = decision.assumption ? `"${decision.assumption}"` : id;
+				if (decision.status === 'accepted') {
+					lines.push(`RISK_ACCEPTED: ${text}`);
+				} else if (decision.status === 'rejected') {
+					lines.push(`RISK_REJECTED: ${text}${decision.rationale ? ' — Reason: "' + decision.rationale + '"' : ''}`);
+				}
+			}
+		}
+
+		// Product discovery inline edits (vision/description corrections)
+		const productEdits = message.productEdits as Record<string, string> | undefined;
+		if (productEdits) {
+			for (const [field, value] of Object.entries(productEdits)) {
+				if (value) {
+					lines.push(`PRODUCT_EDIT (${field}): "${value}"`);
+				}
+			}
+		}
+
+		const formattedText = lines.join('\n');
+
+		// Delete pending partial decisions now that the user has committed
+		try {
+			const { deletePendingMmpDecisions } = require('../../database/pendingMmpStore');
+			const cardId = message.cardId as string;
+			if (cardId) { deletePendingMmpDecisions(this._activeDialogueId, cardId); }
+		} catch { /* non-critical */ }
+
+		// Route through the normal INTAKE submission path
+		this._isProcessing = true;
+		this._postInputEnabled(false);
+		this._postProcessing(true, 'Planning', 'Processing your decisions');
+
+		try {
+			updateWorkflowMetadata(this._activeDialogueId, {
+				pendingIntakeInput: formattedText,
+			});
+
+			writeDialogueEvent({
+				dialogue_id: this._activeDialogueId,
+				event_type: 'human_message',
+				role: 'HUMAN',
+				phase: 'INTAKE',
+				speech_act: 'DECISION',
+				summary: `MMP decisions: ${mirrorEntries.length} mirror, ${menuEntries.length} menu, ${pmEntries.length} risk`,
+				content: formattedText,
+			});
+
+			this._postProcessing(true, 'Planning', 'Discussing with Technical Expert');
+			await this._runWorkflowCycle();
+		} finally {
+			this._isProcessing = false;
+			this._postProcessing(false);
+			this._postInputEnabled(true);
+		}
+	}
+
+	/**
+	 * Handle MMP decisions submitted from a review gate context.
+	 * Converts MMP pre-mortem/menu/mirror decisions into the itemRationales
+	 * format expected by _handleReviewGateDecision.
+	 */
+	private async _handleReviewMmpDecision(
+		message: { type: string; [key: string]: unknown },
+	): Promise<void> {
+		const gateId = message.gateId as string;
+		if (!gateId || !this._activeDialogueId) { return; }
+
+		// Delete pending partial decisions
+		try {
+			const { deletePendingMmpDecisions } = require('../../database/pendingMmpStore');
+			const cardId = message.cardId as string;
+			if (cardId) { deletePendingMmpDecisions(this._activeDialogueId, cardId); }
+		} catch { /* non-critical */ }
+
+		const preMortemDecisions = (message.preMortemDecisions ?? {}) as Record<
+			string, { status: string; rationale?: string; assumption?: string }
+		>;
+		const menuSelections = (message.menuSelections ?? {}) as Record<
+			string, { selectedOptionId: string; customResponse?: string; question?: string; selectedLabel?: string }
+		>;
+
+		// Convert MMP decisions to itemRationales keyed by claim_id
+		const itemRationales: Record<string, string> = {};
+		let hasRejectedRisks = false;
+
+		// Pre-mortem items: REV-RISK-{claim_id} → extract claim_id
+		for (const [id, decision] of Object.entries(preMortemDecisions)) {
+			const claimId = id.startsWith('REV-RISK-') ? id.substring('REV-RISK-'.length) : null;
+			if (!claimId || claimId.startsWith('FINDING-')) { continue; }
+
+			if (decision.status === 'accepted') {
+				itemRationales[claimId] = `[MMP] Risk accepted: ${decision.assumption ?? 'claim risk acknowledged'}`;
+			} else {
+				hasRejectedRisks = true;
+				const reason = decision.rationale ? ` — ${decision.rationale}` : '';
+				itemRationales[claimId] = `[MMP] Risk rejected: ${decision.assumption ?? 'claim risk blocked'}${reason}`;
+			}
+		}
+
+		// Menu items: REV-MENU-{claim_id} → extract claim_id
+		for (const [id, selection] of Object.entries(menuSelections)) {
+			const claimId = id.startsWith('REV-MENU-') ? id.substring('REV-MENU-'.length) : null;
+			if (!claimId) { continue; }
+
+			const label = selection.selectedLabel || selection.selectedOptionId;
+			if (label === 'Block on this') { hasRejectedRisks = true; }
+			itemRationales[claimId] = `[MMP] Decision: ${label}`;
+		}
+
+		// Build overall feedback summary
+		const overallParts = Object.entries(itemRationales).map(
+			([key, rationale]) => `${key}: ${rationale}`
+		);
+		const overallFeedback = overallParts.length > 0
+			? `[MMP Review Decisions]\n${overallParts.join('\n')}`
+			: 'MMP review decisions submitted';
+
+		const action = hasRejectedRisks ? 'REFRAME' : 'APPROVE';
+		await this._handleReviewGateDecision(gateId, action, itemRationales, overallFeedback);
 	}
 
 	/**
@@ -1392,8 +1863,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 		// Reset the failed unit to READY before resolving the gate
 		if (isRepairEscalation && repairUnitId) {
-			const { updateTaskUnitStatus } = await import('../../database/makerStore');
-			const { TaskUnitStatus } = await import('../../types/maker');
+			const { updateTaskUnitStatus } = await import('../../database/makerStore.js');
+			const { TaskUnitStatus } = await import('../../types/maker.js');
 			updateTaskUnitStatus(repairUnitId, TaskUnitStatus.READY);
 		}
 
@@ -1792,6 +2263,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		switch (parsed.command) {
 			case 'retry':
 				return this._handleRetryCommand();
+			case 'resume':
+				return this._handleResumeCommand();
 			case 'approve':
 				return this._handleApproveCommand(parsed.args);
 			case 'reframe':
@@ -1800,6 +2273,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				return this._handleOverrideCommand(parsed.args);
 			case 'save-output':
 				return this._handleSaveOutputCommand(parsed.args);
+			case 'navigate':
+				return this._handleNavigateCommand(parsed.args);
 			default:
 				return false;
 		}
@@ -1826,6 +2301,110 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		// Multiple retry options — show clickable chips
 		this._postCommandOptions('retry', 'Multiple retry options available:', actions);
 		return true;
+	}
+
+	/**
+	 * Handle the "resume" command — resume workflow from where it stopped.
+	 * Detects phase checkpoints, failed phases, gates, and stalled workflows.
+	 */
+	private async _handleResumeCommand(): Promise<boolean> {
+		if (!this._activeDialogueId) { return false; }
+
+		const wsResult = getWorkflowState(this._activeDialogueId);
+		if (!wsResult.success) {
+			this._postSystemMessage('No active workflow to resume.');
+			return true;
+		}
+
+		const metadata = JSON.parse(wsResult.value.metadata);
+		const currentPhase = wsResult.value.current_phase;
+
+		// Case 1: Phase checkpoint with a failed step — resume from that step
+		if (metadata.phaseCheckpoint?.phase === currentPhase) {
+			const steps = metadata.phaseCheckpoint.steps as Record<string, { status: string }>;
+			const failedStep = Object.entries(steps).find(([, s]) => s.status === 'failed');
+			const completedCount = Object.values(steps).filter(s => s.status === 'completed').length;
+
+			if (failedStep) {
+				this._postSystemMessage(
+					`Resuming ${currentPhase} from step: ${failedStep[0]} (${completedCount} steps already completed)`
+				);
+			} else {
+				this._postSystemMessage(
+					`Resuming ${currentPhase} (${completedCount} steps completed)`
+				);
+			}
+
+			// Clear failure flags — PhaseRunner will handle step skipping
+			updateWorkflowMetadata(this._activeDialogueId, {
+				lastFailedPhase: undefined,
+				lastError: undefined,
+			});
+			await this._resumeWorkflow();
+			return true;
+		}
+
+		// Case 2: Failed phase recorded — resume the failed phase
+		if (metadata.lastFailedPhase) {
+			this._postSystemMessage(
+				`Resuming from failed phase: ${metadata.lastFailedPhase}` +
+				(metadata.lastError ? ` (${metadata.lastError})` : '')
+			);
+			updateWorkflowMetadata(this._activeDialogueId, {
+				lastFailedPhase: undefined,
+				lastError: undefined,
+			});
+			await this._resumeWorkflow();
+			return true;
+		}
+
+		// Case 3: Open gates — need a decision, not resume
+		const gatesResult = getGatesForDialogue(this._activeDialogueId, GateStatus.OPEN);
+		const openGates = gatesResult.success ? gatesResult.value : [];
+		if (openGates.length > 0) {
+			this._postSystemMessage(
+				'Workflow is waiting for a gate decision. Use "approve", "reframe", or "override".'
+			);
+			return true;
+		}
+
+		// Case 4: INTAKE phase — waiting for user input
+		if (currentPhase === Phase.INTAKE) {
+			this._postSystemMessage(
+				'Workflow is in INTAKE phase, waiting for your input. Type your requirements or goals.'
+			);
+			return true;
+		}
+
+		// Case 5: Workflow at COMMIT — already completed
+		if (currentPhase === Phase.COMMIT) {
+			this._postSystemMessage('Workflow already completed.');
+			return true;
+		}
+
+		// Case 6: Idle at a non-terminal, non-gated phase — try to advance
+		this._postSystemMessage(`Resuming workflow from ${currentPhase} phase.`);
+		await this._resumeWorkflow();
+		return true;
+	}
+
+	/**
+	 * Resume the workflow cycle with processing state management.
+	 */
+	private async _resumeWorkflow(): Promise<void> {
+		if (!this._activeDialogueId || this._isProcessing) { return; }
+
+		this._isProcessing = true;
+		this._postInputEnabled(false);
+		this._postProcessing(true, 'Resuming', 'Resuming workflow');
+
+		try {
+			await this._runWorkflowCycle();
+		} finally {
+			this._isProcessing = false;
+			this._postProcessing(false);
+			this._postInputEnabled(true);
+		}
 	}
 
 	/**
@@ -1992,6 +2571,111 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	/**
+	 * Handle a navigation command — resolve the target, assess safety, and execute.
+	 */
+	private async _handleNavigateCommand(targetText: string): Promise<boolean> {
+		if (!this._activeDialogueId || !targetText.trim()) return false;
+
+		const { resolveNavigationTarget, assessNavigation, getAvailableTargets } = await import('../../workflow/navigationResolver.js');
+		const { transitionWorkflow, updateWorkflowMetadata, getWorkflowState } = await import('../../workflow/stateMachine.js');
+		const { TransitionTrigger } = await import('../../types/index.js');
+
+		const wsResult = getWorkflowState(this._activeDialogueId);
+		if (!wsResult.success) return false;
+		const currentPhase = wsResult.value.current_phase as Phase;
+		const metadata = wsResult.value.metadata ? JSON.parse(wsResult.value.metadata) : {};
+
+		// Resolve fuzzy target
+		const target = resolveNavigationTarget(targetText, currentPhase, metadata);
+		if (!target) {
+			this._postSystemMessage(
+				`Could not resolve "${targetText}" to a known phase or sub-phase.\n${getAvailableTargets(currentPhase)}`
+			);
+			return true;
+		}
+
+		// Assess safety
+		const assessment = assessNavigation(target, currentPhase, this._activeDialogueId);
+
+		// Show warning for forward skips
+		if (assessment.warning) {
+			this._postSystemMessage(assessment.warning);
+		}
+
+		// Clean up open gates if going backward
+		if (assessment.requiresGateCleanup) {
+			try {
+				const db = (await import('../../database/index.js')).getDatabase();
+				if (db) {
+					db.prepare(
+						`UPDATE gates SET status = 'RESOLVED', resolution = ?, updated_at = datetime('now') WHERE dialogue_id = ? AND status = 'OPEN'`
+					).run(`Superseded by navigation to ${target.majorPhase}${target.subPhase ? '/' + target.subPhase : ''}`, this._activeDialogueId);
+				}
+			} catch { /* non-critical */ }
+
+			// Clear error metadata
+			updateWorkflowMetadata(this._activeDialogueId, {
+				lastFailedPhase: undefined,
+				lastError: undefined,
+			});
+		}
+
+		// Execute transition
+		if (target.subPhase && target.subPhaseOwner) {
+			// Ensure we're in the right major phase first
+			if (currentPhase !== target.majorPhase) {
+				transitionWorkflow(this._activeDialogueId, target.majorPhase, TransitionTrigger.MANUAL_OVERRIDE, {
+					source: 'navigation',
+				});
+			}
+			// Set the sub-phase
+			if (target.subPhaseOwner === 'INTAKE') {
+				const { updateIntakeConversation } = await import('../../events/writer.js');
+				updateIntakeConversation(this._activeDialogueId, { subState: target.subPhase as import('../../types/intake').IntakeSubState });
+			} else if (target.subPhaseOwner === 'ARCHITECTURE') {
+				// If navigating to DECOMPOSING, clear existing architecture document
+				// to avoid UNIQUE constraint violations on re-decomposition
+				if (target.subPhase === 'DECOMPOSING' && metadata.architectureDocId) {
+					try {
+						const { deleteArchitectureDocument } = await import('../../database/architectureStore.js');
+						deleteArchitectureDocument(metadata.architectureDocId);
+					} catch { /* non-critical — document may not exist */ }
+				}
+				updateWorkflowMetadata(this._activeDialogueId, {
+					architectureSubState: target.subPhase,
+					architectureDocId: target.subPhase === 'DECOMPOSING' ? null : metadata.architectureDocId,
+					humanFeedback: null,
+					validationAttempts: 0,
+				});
+			}
+		} else {
+			// Major phase transition
+			transitionWorkflow(this._activeDialogueId, target.majorPhase, TransitionTrigger.MANUAL_OVERRIDE, {
+				source: 'navigation',
+			});
+		}
+
+		const label = target.subPhase
+			? `${target.majorPhase} \u2192 ${target.subPhase}`
+			: target.majorPhase;
+		this._postSystemMessage(`Navigating to ${label}...`);
+
+		this._isProcessing = true;
+		this._postInputEnabled(false);
+		this._postProcessing(true, 'Navigating', `Moving to ${label}`);
+
+		try {
+			await this._runWorkflowCycle();
+		} finally {
+			this._isProcessing = false;
+			this._postProcessing(false);
+			this._postInputEnabled(true);
+		}
+
+		return true;
+	}
+
+	/**
 	 * Execute a specific retry action by dispatching to existing handler methods.
 	 */
 	private async _executeRetryAction(action: RetryableAction): Promise<void> {
@@ -2006,8 +2690,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				if (action.gateId) {
 					// Reset the failed unit to READY so it gets picked up for re-execution
 					if (action.unitId) {
-						const { updateTaskUnitStatus } = await import('../../database/makerStore');
-						const { TaskUnitStatus } = await import('../../types/maker');
+						const { updateTaskUnitStatus } = await import('../../database/makerStore.js');
+						const { TaskUnitStatus } = await import('../../types/maker.js');
 						updateTaskUnitStatus(action.unitId, TaskUnitStatus.READY);
 					}
 					this._handleGateDecision(
@@ -2023,6 +2707,20 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				await this._handleRetryPhase();
 				break;
 		}
+	}
+
+	/**
+	 * Create a UIChannel bridge for the orchestrator executor.
+	 * Adapts panel methods to the UIChannel interface without direct coupling.
+	 */
+	private _createUIChannel(): import('../../primitives/types').UIChannel {
+		return {
+			postSystemMessage: (msg) => this._postSystemMessage(msg),
+			postProcessing: (active, phase?, detail?) => this._postProcessing(active, phase, detail),
+			postInputEnabled: (enabled) => this._postInputEnabled(enabled),
+			update: () => this._update(),
+			runWorkflowCycle: () => this._runWorkflowCycle(),
+		};
 	}
 
 	/**
@@ -2232,6 +2930,26 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 		// Restore persisted clarification threads
 		this._postClarificationThreads();
+
+		// Restore pending MMP decisions from SQLite
+		this._postPendingMmpDecisions();
+	}
+
+	/**
+	 * Load pending MMP decisions from SQLite and send to webview for DOM restoration.
+	 */
+	private _postPendingMmpDecisions(): void {
+		if (!this._activeDialogueId || !this._view) return;
+		try {
+			const { getPendingMmpDecisions } = require('../../database/pendingMmpStore');
+			const result = getPendingMmpDecisions(this._activeDialogueId);
+			if (result.success && Object.keys(result.value).length > 0) {
+				this._view.webview.postMessage({
+					type: 'pendingMmpDecisionsLoaded',
+					decisions: result.value,
+				});
+			}
+		} catch { /* table may not exist yet */ }
 	}
 
 	/**
@@ -2282,15 +3000,34 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 		const headerHtml = renderStickyHeader(state);
 
+		// Load pending MMP decisions from SQLite for server-side rendering
+		let pendingDecisions: Record<string, import('./html/components').PendingMmpSnapshot> | undefined;
+		if (this._activeDialogueId) {
+			try {
+				const { getPendingMmpDecisions } = require('../../database/pendingMmpStore');
+				const result = getPendingMmpDecisions(this._activeDialogueId);
+				if (result.success && Object.keys(result.value).length > 0) {
+					pendingDecisions = {};
+					for (const [cardId, pending] of Object.entries(result.value)) {
+						pendingDecisions[cardId] = {
+							mirrorDecisions: (pending as { mirrorDecisions: Record<string, { status: string; editedText?: string }> }).mirrorDecisions,
+							menuSelections: (pending as { menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }> }).menuSelections,
+							preMortemDecisions: (pending as { preMortemDecisions: Record<string, { status: string; rationale?: string }> }).preMortemDecisions,
+						};
+					}
+				}
+			} catch { /* table may not exist yet */ }
+		}
+
 		const streamHtml = state.streamItems.length > 0
-			? renderStream(state.streamItems, state.intakeState)
+			? renderStream(state.streamItems, state.intakeState, pendingDecisions)
 			: renderEmptyState();
 		const gateContext = state.currentPhase === 'VERIFY' && state.openGates.length > 0
 			? 'Review verification results above and choose an action'
 			: state.currentPhase === 'REVIEW' && state.openGates.length > 0
 			? 'Review the summary above and approve or request changes'
 			: undefined;
-		const inputHtml = renderInputArea(state.currentPhase, state.openGates.length > 0, gateContext);
+		const inputHtml = renderInputArea(state.currentPhase, state.openGates.length > 0, gateContext, this._isProcessing);
 
 		const settingsPanelHtml = renderSettingsPanel();
 
@@ -2307,6 +3044,13 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
 	<div class="governed-stream-container">
+		<div class="find-widget" id="find-widget">
+			<input type="text" class="find-input" id="find-input" placeholder="Find" spellcheck="false" autocomplete="off" />
+			<span class="find-match-count" id="find-match-count"></span>
+			<button class="find-btn" id="find-prev-btn" title="Previous match (Shift+Enter)">&#x2191;</button>
+			<button class="find-btn" id="find-next-btn" title="Next match (Enter)">&#x2193;</button>
+			<button class="find-btn" id="find-close-btn" data-action="close-find" title="Close (Escape)">&times;</button>
+		</div>
 		${headerHtml}
 		<div class="stream-area">
 			<div id="stream-content">
@@ -2432,6 +3176,11 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	// ==================== CLEANUP ====================
 
 	private _cleanup(): void {
+		this._disposed = true;
+		this._isProcessing = false;
+		// Abort any in-flight workflow cycle — kills CLI processes via signal
+		this._workflowAbortController?.abort();
+		this._workflowAbortController = null;
 		this._getSpeechService().cancel();
 		for (const unsub of this._eventUnsubscribers) {
 			unsub();

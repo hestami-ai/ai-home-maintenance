@@ -1,50 +1,98 @@
 /**
  * Database Schema Definition
- * Implements Phase 1.3: Core Data Model
- * Based on Technical Specification Section 5.1
+ * Consolidated clean schema (greenfield — no incremental migrations).
+ *
+ * Tables (38):
+ *  1. dialogue_events     — Unified event log (replaces dialogue_turns + intake_turns)
+ *  2. dialogues           — Dialogue lifecycle tracking
+ *  3. claims              — Claim tracking with status lifecycle
+ *  4. claim_events        — Append-only claim status change log
+ *  5. verdicts            — Verifier verdicts on claims
+ *  6. gates               — Human-in-the-loop decision points
+ *  7. human_decisions     — Logged human actions at gates
+ *  8. constraint_manifests — Versioned constraint documents
+ *  9. artifacts           — Content-addressed blob storage
+ * 10. artifact_references — File system and metadata tracking
+ * 11. cli_activity_events — CLI streaming event audit trail
+ * 12. workflow_commands   — Command invocation blocks
+ * 13. workflow_command_outputs — Streaming output for commands
+ * 14. intake_conversations — INTAKE conversation state machine
+ * 15. narrative_memories  — Narrative Curator memories
+ * 16. decision_traces     — Decision trace artifacts
+ * 17. open_loops          — Open loop tracking
+ * 18. embeddings          — Vector embeddings for semantic search
+ * 19–30. MAKER Agent tables (intent, task graph, claims, validation, etc.)
+ * 31. clarification_threads — Ask More conversations
+ * 32. fts_stream_content  — FTS5 full-text search
+ * 33. architecture_documents — Architecture phase JSON snapshots
+ * 34. arch_capabilities   — Normalized capability lookup
+ * 35. arch_domain_mappings — Domain→capability traceability
+ * 36. arch_workflows      — Workflow lookup
+ * 37. arch_components     — Component lookup (hierarchical)
+ * 38. arch_implementation_steps — Implementation steps (→ MAKER TaskUnits)
+ * + schema_metadata
  */
 
 /**
- * Initial schema creation SQL (Migration v1)
- * Creates all 9 core tables:
- * 1. dialogue_turns
- * 2. claims
- * 3. claim_events
- * 4. verdicts
- * 5. gates
- * 6. human_decisions
- * 7. constraint_manifests
- * 8. artifacts
- * 9. artifact_references
+ * Migration interface
+ */
+export interface Migration {
+	version: number;
+	description: string;
+	sql: string;
+	appliedAt?: string;
+}
+
+/**
+ * Consolidated schema V1 — all tables created in a single pass.
+ * Since this is a greenfield extension, we delete and recreate the DB
+ * rather than running incremental migrations.
  */
 export const SCHEMA_V1 = `
 -- ==================== DIALOGUE SYSTEM ====================
 
--- Dialogue turns table (Section 5.1)
--- Append-only log of all dialogue turns
-CREATE TABLE IF NOT EXISTS dialogue_turns (
-    turn_id INTEGER PRIMARY KEY AUTOINCREMENT,
+-- Dialogue events table (replaces dialogue_turns + intake_turns)
+-- Unified append-only event log for all phases and roles.
+-- event_type categorizes the event; summary is always human-readable;
+-- content holds full content; detail holds phase-specific JSON enrichment.
+CREATE TABLE IF NOT EXISTS dialogue_events (
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
     dialogue_id TEXT NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('EXECUTOR', 'TECHNICAL_EXPERT', 'VERIFIER', 'HISTORIAN', 'HUMAN')),
-    phase TEXT NOT NULL CHECK(phase IN ('INTAKE', 'PROPOSE', 'ASSUMPTION_SURFACING', 'VERIFY', 'HISTORICAL_CHECK', 'REVIEW', 'EXECUTE', 'VALIDATE', 'COMMIT', 'REPLAN')),
-    speech_act TEXT NOT NULL CHECK(speech_act IN ('CLAIM', 'ASSUMPTION', 'EVIDENCE', 'VERDICT', 'DECISION')),
-    content_ref TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    role TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    speech_act TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    content TEXT,
+    detail TEXT,
     timestamp TEXT NOT NULL DEFAULT (datetime('now')),
-
-    -- Indexes for common queries
     CONSTRAINT fk_dialogue_id CHECK(length(dialogue_id) = 36)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_dialogue_turns_dialogue_turn ON dialogue_turns(dialogue_id, turn_id);
-CREATE INDEX IF NOT EXISTS idx_dialogue_turns_dialogue_id ON dialogue_turns(dialogue_id);
-CREATE INDEX IF NOT EXISTS idx_dialogue_turns_role ON dialogue_turns(role);
-CREATE INDEX IF NOT EXISTS idx_dialogue_turns_phase ON dialogue_turns(phase);
-CREATE INDEX IF NOT EXISTS idx_dialogue_turns_timestamp ON dialogue_turns(timestamp);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dialogue_events_dialogue_event ON dialogue_events(dialogue_id, event_id);
+CREATE INDEX IF NOT EXISTS idx_dialogue_events_dialogue_id ON dialogue_events(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_dialogue_events_event_type ON dialogue_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_dialogue_events_role ON dialogue_events(role);
+CREATE INDEX IF NOT EXISTS idx_dialogue_events_phase ON dialogue_events(phase);
+CREATE INDEX IF NOT EXISTS idx_dialogue_events_timestamp ON dialogue_events(timestamp);
+
+-- Dialogues lifecycle table
+-- Tracks dialogue status (active, completed, abandoned) for multi-dialogue stream support.
+CREATE TABLE IF NOT EXISTS dialogues (
+    dialogue_id TEXT PRIMARY KEY CHECK(length(dialogue_id) = 36),
+    goal TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('ACTIVE', 'COMPLETED', 'ABANDONED')) DEFAULT 'ACTIVE',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    completed_at TEXT,
+    title TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_dialogues_status ON dialogues(status);
+CREATE INDEX IF NOT EXISTS idx_dialogues_created_at ON dialogues(created_at);
 
 -- ==================== CLAIMS SYSTEM ====================
 
--- Claims table (Section 5.1)
--- Tracks all claims made during dialogue with their status
+-- Claims table — tracks all claims made during dialogue with their status
 CREATE TABLE IF NOT EXISTS claims (
     claim_id TEXT PRIMARY KEY CHECK(length(claim_id) = 36),
     statement TEXT NOT NULL,
@@ -53,9 +101,10 @@ CREATE TABLE IF NOT EXISTS claims (
     status TEXT NOT NULL CHECK(status IN ('OPEN', 'VERIFIED', 'CONDITIONAL', 'DISPROVED', 'UNKNOWN')) DEFAULT 'OPEN',
     dialogue_id TEXT NOT NULL,
     turn_id INTEGER NOT NULL,
+    assumption_type TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
 
-    FOREIGN KEY (dialogue_id, turn_id) REFERENCES dialogue_turns(dialogue_id, turn_id)
+    FOREIGN KEY (dialogue_id, turn_id) REFERENCES dialogue_events(dialogue_id, event_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_claims_dialogue_id ON claims(dialogue_id);
@@ -63,8 +112,7 @@ CREATE INDEX IF NOT EXISTS idx_claims_status ON claims(status);
 CREATE INDEX IF NOT EXISTS idx_claims_criticality ON claims(criticality);
 CREATE INDEX IF NOT EXISTS idx_claims_introduced_by ON claims(introduced_by);
 
--- Claim events table (Section 5.1)
--- Append-only log of claim status changes
+-- Claim events table — append-only log of claim status changes
 CREATE TABLE IF NOT EXISTS claim_events (
     event_id TEXT PRIMARY KEY CHECK(length(event_id) = 36),
     claim_id TEXT NOT NULL,
@@ -81,8 +129,7 @@ CREATE INDEX IF NOT EXISTS idx_claim_events_timestamp ON claim_events(timestamp)
 
 -- ==================== VERIFICATION SYSTEM ====================
 
--- Verdicts table (Section 5.1)
--- Verifier verdicts on claims
+-- Verdicts table — Verifier verdicts on claims
 CREATE TABLE IF NOT EXISTS verdicts (
     verdict_id TEXT PRIMARY KEY CHECK(length(verdict_id) = 36),
     claim_id TEXT NOT NULL,
@@ -90,6 +137,7 @@ CREATE TABLE IF NOT EXISTS verdicts (
     constraints_ref TEXT,
     evidence_ref TEXT,
     rationale TEXT NOT NULL,
+    novel_dependency INTEGER NOT NULL DEFAULT 0,
     timestamp TEXT NOT NULL DEFAULT (datetime('now')),
 
     FOREIGN KEY (claim_id) REFERENCES claims(claim_id)
@@ -101,14 +149,13 @@ CREATE INDEX IF NOT EXISTS idx_verdicts_timestamp ON verdicts(timestamp);
 
 -- ==================== GATE SYSTEM ====================
 
--- Gates table (Section 5.1)
--- Human-in-the-loop decision points
+-- Gates table — human-in-the-loop decision points
 CREATE TABLE IF NOT EXISTS gates (
     gate_id TEXT PRIMARY KEY CHECK(length(gate_id) = 36),
     dialogue_id TEXT NOT NULL,
     reason TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('OPEN', 'RESOLVED')) DEFAULT 'OPEN',
-    blocking_claims TEXT NOT NULL, -- JSON array of claim IDs
+    blocking_claims TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     resolved_at TEXT,
 
@@ -119,8 +166,7 @@ CREATE INDEX IF NOT EXISTS idx_gates_dialogue_id ON gates(dialogue_id);
 CREATE INDEX IF NOT EXISTS idx_gates_status ON gates(status);
 CREATE INDEX IF NOT EXISTS idx_gates_created_at ON gates(created_at);
 
--- Human decisions table (Section 5.1)
--- All human actions at gates with rationale
+-- Human decisions table — all human actions at gates with rationale
 CREATE TABLE IF NOT EXISTS human_decisions (
     decision_id TEXT PRIMARY KEY CHECK(length(decision_id) = 36),
     gate_id TEXT NOT NULL,
@@ -138,8 +184,7 @@ CREATE INDEX IF NOT EXISTS idx_human_decisions_timestamp ON human_decisions(time
 
 -- ==================== CONSTRAINT SYSTEM ====================
 
--- Constraint manifests table (Section 5.1)
--- Versioned constraint documents
+-- Constraint manifests table — versioned constraint documents
 CREATE TABLE IF NOT EXISTS constraint_manifests (
     manifest_id TEXT PRIMARY KEY CHECK(length(manifest_id) = 36),
     version INTEGER NOT NULL,
@@ -152,8 +197,7 @@ CREATE INDEX IF NOT EXISTS idx_constraint_manifests_timestamp ON constraint_mani
 
 -- ==================== ARTIFACT SYSTEM ====================
 
--- Artifacts table (Phase 3: Artifact Management)
--- Content-addressed blob storage
+-- Artifacts table — content-addressed blob storage
 CREATE TABLE IF NOT EXISTS artifacts (
     artifact_id TEXT PRIMARY KEY CHECK(length(artifact_id) = 36),
     content_hash TEXT NOT NULL UNIQUE,
@@ -166,18 +210,16 @@ CREATE TABLE IF NOT EXISTS artifacts (
 CREATE INDEX IF NOT EXISTS idx_artifacts_content_hash ON artifacts(content_hash);
 CREATE INDEX IF NOT EXISTS idx_artifacts_created_at ON artifacts(created_at);
 
--- Artifact references table (Phase 3: Artifact Management)
--- File system and metadata tracking
+-- Artifact references table — file system and metadata tracking
 CREATE TABLE IF NOT EXISTS artifact_references (
     reference_id TEXT PRIMARY KEY CHECK(length(reference_id) = 36),
     artifact_type TEXT NOT NULL CHECK(artifact_type IN ('BLOB', 'FILE', 'EVIDENCE')),
     file_path TEXT,
     content_hash TEXT,
     git_commit TEXT,
-    metadata TEXT NOT NULL DEFAULT '{}', -- JSON metadata
+    metadata TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
 
-    -- Either file_path or content_hash must be present
     CONSTRAINT chk_artifact_ref CHECK(
         (artifact_type = 'FILE' AND file_path IS NOT NULL) OR
         (artifact_type IN ('BLOB', 'EVIDENCE') AND content_hash IS NOT NULL)
@@ -188,57 +230,9 @@ CREATE INDEX IF NOT EXISTS idx_artifact_references_type ON artifact_references(a
 CREATE INDEX IF NOT EXISTS idx_artifact_references_file_path ON artifact_references(file_path);
 CREATE INDEX IF NOT EXISTS idx_artifact_references_content_hash ON artifact_references(content_hash);
 
--- ==================== METADATA TABLE ====================
+-- ==================== CLI ACTIVITY ====================
 
--- Schema metadata table
--- Tracks schema version and migration history
-CREATE TABLE IF NOT EXISTS schema_metadata (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- Insert initial schema version
-INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '1')
-    ON CONFLICT(key) DO NOTHING;
-`;
-
-/**
- * Migration history
- */
-export interface Migration {
-	version: number;
-	description: string;
-	sql: string;
-	appliedAt?: string;
-}
-
-/**
- * All migrations in order
- */
-/**
- * Migration V3: Dialogues lifecycle table
- * Tracks dialogue lifecycle (active, completed, abandoned) for multi-dialogue stream support.
- */
-export const SCHEMA_V3 = `
-CREATE TABLE IF NOT EXISTS dialogues (
-    dialogue_id TEXT PRIMARY KEY CHECK(length(dialogue_id) = 36),
-    goal TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('ACTIVE', 'COMPLETED', 'ABANDONED')) DEFAULT 'ACTIVE',
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    completed_at TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_dialogues_status ON dialogues(status);
-CREATE INDEX IF NOT EXISTS idx_dialogues_created_at ON dialogues(created_at);
-`;
-
-/**
- * Migration V4: CLI activity events table
- * Persists all CLI streaming events for audit trail (Level 3 data).
- * Always written regardless of UI display level.
- */
-export const SCHEMA_V4 = `
+-- CLI activity events table — audit trail for all CLI streaming events
 CREATE TABLE IF NOT EXISTS cli_activity_events (
     event_id INTEGER PRIMARY KEY AUTOINCREMENT,
     dialogue_id TEXT NOT NULL,
@@ -258,14 +252,10 @@ CREATE INDEX IF NOT EXISTS idx_cli_activity_dialogue_id ON cli_activity_events(d
 CREATE INDEX IF NOT EXISTS idx_cli_activity_timestamp ON cli_activity_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_cli_activity_event_type ON cli_activity_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_cli_activity_role ON cli_activity_events(role);
-`;
 
-/**
- * Migration V5: Workflow command blocks
- * Persists command invocations and their streaming output so they
- * survive webview re-renders and appear in the scrollable history.
- */
-export const SCHEMA_V5 = `
+-- ==================== WORKFLOW COMMANDS ====================
+
+-- Workflow command blocks — persists command invocations and streaming output
 CREATE TABLE IF NOT EXISTS workflow_commands (
     command_id TEXT PRIMARY KEY,
     dialogue_id TEXT NOT NULL,
@@ -283,99 +273,49 @@ CREATE INDEX IF NOT EXISTS idx_wf_commands_started_at ON workflow_commands(start
 CREATE TABLE IF NOT EXISTS workflow_command_outputs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     command_id TEXT NOT NULL,
-    line_type TEXT NOT NULL CHECK(line_type IN ('summary', 'detail', 'error')) DEFAULT 'summary',
-    content TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
-    FOREIGN KEY (command_id) REFERENCES workflow_commands(command_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_wf_cmd_outputs_command_id ON workflow_command_outputs(command_id);
-CREATE INDEX IF NOT EXISTS idx_wf_cmd_outputs_timestamp ON workflow_command_outputs(timestamp);
-`;
-
-/**
- * Migration V6: INTAKE conversation tables
- * Supports the conversational planning phase where Human and Technical Expert
- * collaborate to produce a structured implementation plan.
- */
-export const SCHEMA_V6 = `
--- INTAKE conversation state (one per dialogue)
--- Tracks the evolving plan, sub-state, and accumulated context summaries.
-CREATE TABLE IF NOT EXISTS intake_conversations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    dialogue_id TEXT NOT NULL,
-    sub_state TEXT NOT NULL CHECK(sub_state IN ('DISCUSSING', 'SYNTHESIZING', 'AWAITING_APPROVAL')) DEFAULT 'DISCUSSING',
-    turn_count INTEGER NOT NULL DEFAULT 0,
-    draft_plan TEXT NOT NULL DEFAULT '{}',
-    accumulations TEXT NOT NULL DEFAULT '[]',
-    finalized_plan TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    CONSTRAINT fk_dialogue_id CHECK(length(dialogue_id) = 36)
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_conv_dialogue_id ON intake_conversations(dialogue_id);
-
--- INTAKE conversation turns (paired human message + expert response)
--- Stores the full content of each turn plus a plan snapshot for history/debugging.
-CREATE TABLE IF NOT EXISTS intake_turns (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    dialogue_id TEXT NOT NULL,
-    turn_number INTEGER NOT NULL,
-    human_message TEXT NOT NULL,
-    expert_response TEXT NOT NULL,
-    plan_snapshot TEXT NOT NULL,
-    token_count INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    CONSTRAINT fk_dialogue_id CHECK(length(dialogue_id) = 36)
-);
-
-CREATE INDEX IF NOT EXISTS idx_intake_turns_dialogue_id ON intake_turns(dialogue_id);
-CREATE INDEX IF NOT EXISTS idx_intake_turns_turn_number ON intake_turns(dialogue_id, turn_number);
-`;
-
-/**
- * Migration V7: Dialogue titles
- * Adds a nullable title column for LLM-generated human-readable dialogue labels.
- */
-export const SCHEMA_V7 = `
-ALTER TABLE dialogues ADD COLUMN title TEXT DEFAULT NULL;
-`;
-
-/**
- * Migration V8: Widen workflow_command_outputs line_type CHECK constraint
- * Adds 'stdin', 'tool_input', 'tool_output' to allowed line_type values.
- * Adds tool_name column for efficient tool-type filtering.
- * SQLite cannot ALTER CHECK constraints, so we recreate the table.
- */
-export const SCHEMA_V8 = `
-CREATE TABLE workflow_command_outputs_v2 (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    command_id TEXT NOT NULL,
     line_type TEXT NOT NULL CHECK(line_type IN ('summary', 'detail', 'error', 'stdin', 'tool_input', 'tool_output')) DEFAULT 'summary',
     tool_name TEXT DEFAULT NULL,
     content TEXT NOT NULL,
     timestamp TEXT NOT NULL,
     FOREIGN KEY (command_id) REFERENCES workflow_commands(command_id)
 );
-INSERT INTO workflow_command_outputs_v2 (id, command_id, line_type, content, timestamp)
-    SELECT id, command_id, line_type, content, timestamp FROM workflow_command_outputs;
-DROP TABLE workflow_command_outputs;
-ALTER TABLE workflow_command_outputs_v2 RENAME TO workflow_command_outputs;
+
 CREATE INDEX IF NOT EXISTS idx_wf_cmd_outputs_command_id ON workflow_command_outputs(command_id);
 CREATE INDEX IF NOT EXISTS idx_wf_cmd_outputs_timestamp ON workflow_command_outputs(timestamp);
-`;
 
-/**
- * Migration V9: Narrative Curator artifact tables
- * Stores structured memory artifacts produced by the Narrative Curator:
- * narrative memories, decision traces, and open loops.
- */
-export const SCHEMA_V9 = `
+-- ==================== INTAKE CONVERSATIONS ====================
+
+-- INTAKE conversation state (one per dialogue)
+-- Tracks the evolving plan, sub-state, domain coverage, and accumulated context summaries.
+CREATE TABLE IF NOT EXISTS intake_conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id TEXT NOT NULL,
+    sub_state TEXT NOT NULL CHECK(sub_state IN ('GATHERING','DISCUSSING','SYNTHESIZING','AWAITING_APPROVAL','ANALYZING','PRODUCT_REVIEW','PROPOSING','CLARIFYING','PROPOSING_DOMAINS','PROPOSING_JOURNEYS','PROPOSING_ENTITIES','PROPOSING_INTEGRATIONS')) DEFAULT 'DISCUSSING',
+    turn_count INTEGER NOT NULL DEFAULT 0,
+    draft_plan TEXT NOT NULL DEFAULT '{}',
+    accumulations TEXT NOT NULL DEFAULT '[]',
+    finalized_plan TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    intake_mode TEXT DEFAULT NULL,
+    domain_coverage TEXT DEFAULT NULL,
+    current_domain TEXT DEFAULT NULL,
+    checkpoints TEXT DEFAULT NULL,
+    classifier_result TEXT DEFAULT NULL,
+    clarification_round INTEGER NOT NULL DEFAULT 0,
+    mmp_history TEXT DEFAULT NULL,
+    CONSTRAINT fk_dialogue_id CHECK(length(dialogue_id) = 36)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_conv_dialogue_id ON intake_conversations(dialogue_id);
+
+-- ==================== NARRATIVE CURATOR ====================
+
+-- Narrative memories — structured memory artifacts from Narrative Curator
 CREATE TABLE IF NOT EXISTS narrative_memories (
     memory_id TEXT PRIMARY KEY,
     dialogue_id TEXT NOT NULL,
-    curation_mode TEXT NOT NULL CHECK(curation_mode IN ('INTENT', 'OUTCOME', 'FAILURE')),
+    curation_mode TEXT NOT NULL,
     agent_frame TEXT NOT NULL,
     goal TEXT NOT NULL,
     causal_sequence TEXT NOT NULL,
@@ -387,19 +327,21 @@ CREATE TABLE IF NOT EXISTS narrative_memories (
 CREATE INDEX IF NOT EXISTS idx_narrative_memories_dialogue_id ON narrative_memories(dialogue_id);
 CREATE INDEX IF NOT EXISTS idx_narrative_memories_mode ON narrative_memories(curation_mode);
 
+-- Decision traces
 CREATE TABLE IF NOT EXISTS decision_traces (
     trace_id TEXT PRIMARY KEY,
     dialogue_id TEXT NOT NULL,
-    curation_mode TEXT NOT NULL CHECK(curation_mode IN ('INTENT', 'OUTCOME', 'FAILURE')),
+    curation_mode TEXT NOT NULL,
     decision_points TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_decision_traces_dialogue_id ON decision_traces(dialogue_id);
 
+-- Open loops — unresolved items tracked across dialogues
 CREATE TABLE IF NOT EXISTS open_loops (
     loop_id TEXT PRIMARY KEY,
     dialogue_id TEXT NOT NULL,
-    curation_mode TEXT NOT NULL CHECK(curation_mode IN ('INTENT', 'OUTCOME', 'FAILURE')),
+    curation_mode TEXT NOT NULL,
     category TEXT NOT NULL CHECK(category IN ('blocker', 'deferred_decision', 'missing_info', 'risk', 'follow_up')),
     description TEXT NOT NULL,
     related_claim_ids TEXT NOT NULL DEFAULT '[]',
@@ -409,19 +351,15 @@ CREATE TABLE IF NOT EXISTS open_loops (
 CREATE INDEX IF NOT EXISTS idx_open_loops_dialogue_id ON open_loops(dialogue_id);
 CREATE INDEX IF NOT EXISTS idx_open_loops_category ON open_loops(category);
 CREATE INDEX IF NOT EXISTS idx_open_loops_priority ON open_loops(priority);
-`;
 
-/**
- * Migration V10: Embeddings table for vector search
- * Stores vector embeddings for semantic retrieval across all queryable artifacts.
- * Used with sqlite-vector extension for KNN cosine similarity search.
- */
-export const SCHEMA_V10 = `
+-- ==================== EMBEDDINGS ====================
+
+-- Embeddings table for vector search / semantic retrieval
 CREATE TABLE IF NOT EXISTS embeddings (
     embedding_id TEXT PRIMARY KEY,
     source_type TEXT NOT NULL CHECK(source_type IN (
         'narrative_memory', 'decision_trace', 'open_loop',
-        'dialogue_turn', 'claim', 'verdict'
+        'dialogue_event', 'claim', 'verdict'
     )),
     source_id TEXT NOT NULL,
     dialogue_id TEXT NOT NULL,
@@ -435,81 +373,10 @@ CREATE TABLE IF NOT EXISTS embeddings (
 CREATE INDEX IF NOT EXISTS idx_embeddings_source ON embeddings(source_type, source_id);
 CREATE INDEX IF NOT EXISTS idx_embeddings_dialogue ON embeddings(dialogue_id);
 CREATE INDEX IF NOT EXISTS idx_embeddings_hash ON embeddings(content_hash);
-`;
 
-/**
- * Migration V12: Add FEEDBACK curation mode + assumption_type on claims.
- *
- * - Recreates narrative_memories, decision_traces, open_loops WITHOUT the
- *   CHECK(curation_mode IN (...)) constraint so the TypeScript CurationMode
- *   enum is the single source of truth for valid modes. This enables the new
- *   FEEDBACK mode (and any future modes) without further migrations.
- * - Adds optional assumption_type column to claims for categorising assumptions
- *   as architectural, compatibility, structural, scoping, or intent.
- */
-export const SCHEMA_V12 = `
--- Recreate narrative_memories without CHECK constraint on curation_mode
-CREATE TABLE IF NOT EXISTS narrative_memories_v2 (
-    memory_id TEXT PRIMARY KEY,
-    dialogue_id TEXT NOT NULL,
-    curation_mode TEXT NOT NULL,
-    agent_frame TEXT NOT NULL,
-    goal TEXT NOT NULL,
-    causal_sequence TEXT NOT NULL,
-    conflicts TEXT NOT NULL DEFAULT '[]',
-    resolution_status TEXT NOT NULL,
-    lessons TEXT NOT NULL DEFAULT '[]',
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-INSERT OR IGNORE INTO narrative_memories_v2 SELECT * FROM narrative_memories;
-DROP TABLE IF EXISTS narrative_memories;
-ALTER TABLE narrative_memories_v2 RENAME TO narrative_memories;
-CREATE INDEX IF NOT EXISTS idx_narrative_memories_dialogue_id ON narrative_memories(dialogue_id);
-CREATE INDEX IF NOT EXISTS idx_narrative_memories_mode ON narrative_memories(curation_mode);
+-- ==================== MAKER AGENT INTEGRATION ====================
 
--- Recreate decision_traces without CHECK constraint on curation_mode
-CREATE TABLE IF NOT EXISTS decision_traces_v2 (
-    trace_id TEXT PRIMARY KEY,
-    dialogue_id TEXT NOT NULL,
-    curation_mode TEXT NOT NULL,
-    decision_points TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-INSERT OR IGNORE INTO decision_traces_v2 SELECT * FROM decision_traces;
-DROP TABLE IF EXISTS decision_traces;
-ALTER TABLE decision_traces_v2 RENAME TO decision_traces;
-CREATE INDEX IF NOT EXISTS idx_decision_traces_dialogue_id ON decision_traces(dialogue_id);
-
--- Recreate open_loops without CHECK constraint on curation_mode
-CREATE TABLE IF NOT EXISTS open_loops_v2 (
-    loop_id TEXT PRIMARY KEY,
-    dialogue_id TEXT NOT NULL,
-    curation_mode TEXT NOT NULL,
-    category TEXT NOT NULL CHECK(category IN ('blocker', 'deferred_decision', 'missing_info', 'risk', 'follow_up')),
-    description TEXT NOT NULL,
-    related_claim_ids TEXT NOT NULL DEFAULT '[]',
-    priority TEXT NOT NULL CHECK(priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-INSERT OR IGNORE INTO open_loops_v2 SELECT * FROM open_loops;
-DROP TABLE IF EXISTS open_loops;
-ALTER TABLE open_loops_v2 RENAME TO open_loops;
-CREATE INDEX IF NOT EXISTS idx_open_loops_dialogue_id ON open_loops(dialogue_id);
-CREATE INDEX IF NOT EXISTS idx_open_loops_category ON open_loops(category);
-CREATE INDEX IF NOT EXISTS idx_open_loops_priority ON open_loops(priority);
-
--- Add assumption_type to claims (nullable — only set for Executor-surfaced assumptions)
-ALTER TABLE claims ADD COLUMN assumption_type TEXT;
-`;
-
-/**
- * Migration V11: MAKER Agent Integration Control Plane tables
- * Adds structured internal objects for intent capture, task graph decomposition,
- * per-unit execution, bounded repair, and outcome tracking.
- */
-export const SCHEMA_V11 = `
--- ==================== INTENT & CONTRACT ====================
-
+-- Intent & Contract
 CREATE TABLE IF NOT EXISTS intent_records (
     intent_id TEXT PRIMARY KEY,
     dialogue_id TEXT NOT NULL,
@@ -538,8 +405,7 @@ CREATE TABLE IF NOT EXISTS acceptance_contracts (
 CREATE INDEX IF NOT EXISTS idx_acceptance_contracts_dialogue ON acceptance_contracts(dialogue_id);
 CREATE INDEX IF NOT EXISTS idx_acceptance_contracts_intent ON acceptance_contracts(intent_id);
 
--- ==================== TASK GRAPH ====================
-
+-- Task Graph
 CREATE TABLE IF NOT EXISTS task_graphs (
     graph_id TEXT PRIMARY KEY,
     dialogue_id TEXT NOT NULL,
@@ -595,8 +461,7 @@ CREATE INDEX IF NOT EXISTS idx_task_edges_graph ON task_edges(graph_id);
 CREATE INDEX IF NOT EXISTS idx_task_edges_from ON task_edges(from_unit_id);
 CREATE INDEX IF NOT EXISTS idx_task_edges_to ON task_edges(to_unit_id);
 
--- ==================== CLAIMS & EVIDENCE ====================
-
+-- Claims & Evidence (MAKER)
 CREATE TABLE IF NOT EXISTS claim_units (
     claim_id TEXT PRIMARY KEY,
     unit_id TEXT NOT NULL,
@@ -621,8 +486,7 @@ CREATE TABLE IF NOT EXISTS evidence_packets (
 );
 CREATE INDEX IF NOT EXISTS idx_evidence_packets_unit ON evidence_packets(unit_id);
 
--- ==================== VALIDATION & REPAIR ====================
-
+-- Validation & Repair
 CREATE TABLE IF NOT EXISTS validation_packets (
     validation_id TEXT PRIMARY KEY,
     unit_id TEXT NOT NULL,
@@ -653,8 +517,7 @@ CREATE TABLE IF NOT EXISTS repair_packets (
 );
 CREATE INDEX IF NOT EXISTS idx_repair_packets_unit ON repair_packets(unit_id);
 
--- ==================== HISTORICAL INVARIANTS ====================
-
+-- Historical Invariants
 CREATE TABLE IF NOT EXISTS historical_invariant_packets (
     packet_id TEXT PRIMARY KEY,
     unit_id TEXT,
@@ -669,8 +532,7 @@ CREATE TABLE IF NOT EXISTS historical_invariant_packets (
 CREATE INDEX IF NOT EXISTS idx_hist_invariant_dialogue ON historical_invariant_packets(dialogue_id);
 CREATE INDEX IF NOT EXISTS idx_hist_invariant_unit ON historical_invariant_packets(unit_id);
 
--- ==================== OUTCOME TRACKING ====================
-
+-- Outcome Tracking
 CREATE TABLE IF NOT EXISTS outcome_snapshots (
     snapshot_id TEXT PRIMARY KEY,
     dialogue_id TEXT NOT NULL,
@@ -689,8 +551,7 @@ CREATE TABLE IF NOT EXISTS outcome_snapshots (
 CREATE INDEX IF NOT EXISTS idx_outcome_snapshots_dialogue ON outcome_snapshots(dialogue_id);
 CREATE INDEX IF NOT EXISTS idx_outcome_snapshots_graph ON outcome_snapshots(graph_id);
 
--- ==================== TOOLCHAIN DETECTION ====================
-
+-- Toolchain Detection
 CREATE TABLE IF NOT EXISTS toolchain_detections (
     detection_id TEXT PRIMARY KEY,
     workspace_root TEXT NOT NULL,
@@ -704,14 +565,10 @@ CREATE TABLE IF NOT EXISTS toolchain_detections (
     confidence REAL NOT NULL DEFAULT 0.0
 );
 CREATE INDEX IF NOT EXISTS idx_toolchain_workspace ON toolchain_detections(workspace_root);
-`;
 
-/**
- * Migration V13: Clarification threads table
- * Persists inline "Ask More" conversations so they survive re-renders
- * and are available as context for future agents and human review.
- */
-export const SCHEMA_V13 = `
+-- ==================== CLARIFICATION ====================
+
+-- Clarification threads — inline "Ask More" conversations
 CREATE TABLE IF NOT EXISTS clarification_threads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     dialogue_id TEXT NOT NULL,
@@ -723,9 +580,9 @@ CREATE TABLE IF NOT EXISTS clarification_threads (
 );
 CREATE INDEX IF NOT EXISTS idx_clarification_dialogue ON clarification_threads(dialogue_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_clarification_item ON clarification_threads(dialogue_id, item_id);
-`;
 
-export const SCHEMA_V14 = `
+-- ==================== FULL-TEXT SEARCH ====================
+
 -- FTS5 virtual table for full-text search over governed stream content
 CREATE VIRTUAL TABLE IF NOT EXISTS fts_stream_content USING fts5(
     content,
@@ -734,62 +591,250 @@ CREATE VIRTUAL TABLE IF NOT EXISTS fts_stream_content USING fts5(
     dialogue_id UNINDEXED,
     tokenize = 'porter unicode61'
 );
-`;
 
-/**
- * Migration V15: Adaptive Deep INTAKE — domain coverage tracking
- * Adds columns to intake_conversations for INTAKE mode, domain coverage,
- * checkpoints, and classifier result. All DEFAULT NULL for backward compatibility.
- */
-export const SCHEMA_V15 = `
-ALTER TABLE intake_conversations ADD COLUMN intake_mode TEXT DEFAULT NULL;
-ALTER TABLE intake_conversations ADD COLUMN domain_coverage TEXT DEFAULT NULL;
-ALTER TABLE intake_conversations ADD COLUMN current_domain TEXT DEFAULT NULL;
-ALTER TABLE intake_conversations ADD COLUMN checkpoints TEXT DEFAULT NULL;
-ALTER TABLE intake_conversations ADD COLUMN classifier_result TEXT DEFAULT NULL;
-`;
+-- ==================== ARCHITECTURE PHASE ====================
 
-/**
- * Migration V16: INTAKE GATHERING sub-state
- * - Recreate intake_conversations with GATHERING added to sub_state CHECK constraint
- *   (SQLite cannot ALTER CHECK constraints, so table must be recreated)
- * - Add is_gathering flag to intake_turns to distinguish gathering from discussion turns
- */
-export const SCHEMA_V16 = `
--- Recreate intake_conversations with GATHERING in CHECK constraint
-CREATE TABLE IF NOT EXISTS intake_conversations_new (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+-- Architecture document snapshots (full JSON + normalized lookup tables)
+CREATE TABLE IF NOT EXISTS architecture_documents (
+    doc_id TEXT PRIMARY KEY,
     dialogue_id TEXT NOT NULL,
-    sub_state TEXT NOT NULL CHECK(sub_state IN ('GATHERING', 'DISCUSSING', 'SYNTHESIZING', 'AWAITING_APPROVAL')) DEFAULT 'DISCUSSING',
-    turn_count INTEGER NOT NULL DEFAULT 0,
-    draft_plan TEXT NOT NULL DEFAULT '{}',
-    accumulations TEXT NOT NULL DEFAULT '[]',
-    finalized_plan TEXT,
+    version INTEGER NOT NULL DEFAULT 1,
+    document TEXT NOT NULL,
+    goal_alignment_score REAL,
+    validation_findings TEXT,
+    status TEXT NOT NULL CHECK(status IN ('DRAFT', 'VALIDATED', 'APPROVED', 'SUPERSEDED')) DEFAULT 'DRAFT',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    intake_mode TEXT DEFAULT NULL,
-    domain_coverage TEXT DEFAULT NULL,
-    current_domain TEXT DEFAULT NULL,
-    checkpoints TEXT DEFAULT NULL,
-    classifier_result TEXT DEFAULT NULL,
-    CONSTRAINT fk_dialogue_id CHECK(length(dialogue_id) = 36)
+    FOREIGN KEY (dialogue_id) REFERENCES dialogues(dialogue_id)
 );
-INSERT OR IGNORE INTO intake_conversations_new SELECT * FROM intake_conversations;
-DROP INDEX IF EXISTS idx_intake_conv_dialogue_id;
-DROP TABLE IF EXISTS intake_conversations;
-ALTER TABLE intake_conversations_new RENAME TO intake_conversations;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_conv_dialogue_id ON intake_conversations(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_arch_docs_dialogue ON architecture_documents(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_arch_docs_status ON architecture_documents(status);
 
--- Add is_gathering flag to intake_turns
-ALTER TABLE intake_turns ADD COLUMN is_gathering INTEGER DEFAULT 0;
+-- Capabilities (normalized lookup)
+CREATE TABLE IF NOT EXISTS arch_capabilities (
+    capability_id TEXT PRIMARY KEY,
+    doc_id TEXT NOT NULL,
+    dialogue_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    description TEXT NOT NULL,
+    source_requirements TEXT NOT NULL DEFAULT '[]',
+    parent_capability_id TEXT DEFAULT NULL,
+    FOREIGN KEY (doc_id) REFERENCES architecture_documents(doc_id),
+    FOREIGN KEY (dialogue_id) REFERENCES dialogues(dialogue_id)
+);
+CREATE INDEX IF NOT EXISTS idx_arch_cap_doc ON arch_capabilities(doc_id);
+CREATE INDEX IF NOT EXISTS idx_arch_cap_dialogue ON arch_capabilities(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_arch_cap_parent ON arch_capabilities(parent_capability_id);
+
+-- Domain → capability mapping (traceability layer)
+CREATE TABLE IF NOT EXISTS arch_domain_mappings (
+    mapping_id TEXT PRIMARY KEY,
+    doc_id TEXT NOT NULL,
+    domain TEXT NOT NULL,
+    capability_id TEXT NOT NULL,
+    requirement_ids TEXT NOT NULL DEFAULT '[]',
+    coverage_contribution TEXT NOT NULL CHECK(coverage_contribution IN ('PRIMARY', 'SECONDARY')) DEFAULT 'PRIMARY',
+    FOREIGN KEY (doc_id) REFERENCES architecture_documents(doc_id),
+    FOREIGN KEY (capability_id) REFERENCES arch_capabilities(capability_id)
+);
+CREATE INDEX IF NOT EXISTS idx_arch_dm_doc ON arch_domain_mappings(doc_id);
+CREATE INDEX IF NOT EXISTS idx_arch_dm_cap ON arch_domain_mappings(capability_id);
+CREATE INDEX IF NOT EXISTS idx_arch_dm_domain ON arch_domain_mappings(domain);
+
+-- Workflows (normalized lookup)
+CREATE TABLE IF NOT EXISTS arch_workflows (
+    workflow_id TEXT PRIMARY KEY,
+    doc_id TEXT NOT NULL,
+    capability_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    description TEXT NOT NULL,
+    actors TEXT NOT NULL DEFAULT '[]',
+    FOREIGN KEY (doc_id) REFERENCES architecture_documents(doc_id),
+    FOREIGN KEY (capability_id) REFERENCES arch_capabilities(capability_id)
+);
+CREATE INDEX IF NOT EXISTS idx_arch_wf_doc ON arch_workflows(doc_id);
+CREATE INDEX IF NOT EXISTS idx_arch_wf_cap ON arch_workflows(capability_id);
+
+-- Components (normalized lookup)
+CREATE TABLE IF NOT EXISTS arch_components (
+    component_id TEXT PRIMARY KEY,
+    doc_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    responsibility TEXT NOT NULL,
+    rationale TEXT NOT NULL DEFAULT '',
+    workflows_served TEXT NOT NULL DEFAULT '[]',
+    dependencies TEXT NOT NULL DEFAULT '[]',
+    interaction_patterns TEXT NOT NULL DEFAULT '[]',
+    file_scope TEXT,
+    parent_component_id TEXT,
+    FOREIGN KEY (doc_id) REFERENCES architecture_documents(doc_id),
+    FOREIGN KEY (parent_component_id) REFERENCES arch_components(component_id)
+);
+CREATE INDEX IF NOT EXISTS idx_arch_comp_doc ON arch_components(doc_id);
+CREATE INDEX IF NOT EXISTS idx_arch_comp_parent ON arch_components(parent_component_id);
+
+-- Implementation steps (bridges to MAKER TaskUnits)
+CREATE TABLE IF NOT EXISTS arch_implementation_steps (
+    step_id TEXT PRIMARY KEY,
+    doc_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    description TEXT NOT NULL,
+    components_involved TEXT NOT NULL DEFAULT '[]',
+    dependencies TEXT NOT NULL DEFAULT '[]',
+    estimated_complexity TEXT NOT NULL CHECK(estimated_complexity IN ('LOW', 'MEDIUM', 'HIGH')) DEFAULT 'MEDIUM',
+    verification_method TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (doc_id) REFERENCES architecture_documents(doc_id)
+);
+CREATE INDEX IF NOT EXISTS idx_arch_step_doc ON arch_implementation_steps(doc_id);
+
+-- ==================== METADATA ====================
+
+-- Schema metadata table — tracks schema version and migration history
+CREATE TABLE IF NOT EXISTS schema_metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Insert initial schema version
+INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '1')
+    ON CONFLICT(key) DO NOTHING;
 `;
 
-export const SCHEMA_V17 = `
--- Recreate intake_conversations with inverted flow sub-states (ANALYZING, PROPOSING, CLARIFYING)
-CREATE TABLE IF NOT EXISTS intake_conversations_new (
+// V2: Architecture Phase tables (also included in SCHEMA_V1 for fresh databases)
+const SCHEMA_V2 = `
+CREATE TABLE IF NOT EXISTS architecture_documents (
+    doc_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    document TEXT NOT NULL,
+    goal_alignment_score REAL,
+    validation_findings TEXT,
+    status TEXT NOT NULL CHECK(status IN ('DRAFT', 'VALIDATED', 'APPROVED', 'SUPERSEDED')) DEFAULT 'DRAFT',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (dialogue_id) REFERENCES dialogues(dialogue_id)
+);
+CREATE INDEX IF NOT EXISTS idx_arch_docs_dialogue ON architecture_documents(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_arch_docs_status ON architecture_documents(status);
+
+CREATE TABLE IF NOT EXISTS arch_capabilities (
+    capability_id TEXT PRIMARY KEY,
+    doc_id TEXT NOT NULL,
+    dialogue_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    description TEXT NOT NULL,
+    source_requirements TEXT NOT NULL DEFAULT '[]',
+    parent_capability_id TEXT DEFAULT NULL,
+    FOREIGN KEY (doc_id) REFERENCES architecture_documents(doc_id),
+    FOREIGN KEY (dialogue_id) REFERENCES dialogues(dialogue_id)
+);
+CREATE INDEX IF NOT EXISTS idx_arch_cap_doc ON arch_capabilities(doc_id);
+CREATE INDEX IF NOT EXISTS idx_arch_cap_dialogue ON arch_capabilities(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_arch_cap_parent ON arch_capabilities(parent_capability_id);
+
+CREATE TABLE IF NOT EXISTS arch_domain_mappings (
+    mapping_id TEXT PRIMARY KEY,
+    doc_id TEXT NOT NULL,
+    domain TEXT NOT NULL,
+    capability_id TEXT NOT NULL,
+    requirement_ids TEXT NOT NULL DEFAULT '[]',
+    coverage_contribution TEXT NOT NULL CHECK(coverage_contribution IN ('PRIMARY', 'SECONDARY')) DEFAULT 'PRIMARY',
+    FOREIGN KEY (doc_id) REFERENCES architecture_documents(doc_id),
+    FOREIGN KEY (capability_id) REFERENCES arch_capabilities(capability_id)
+);
+CREATE INDEX IF NOT EXISTS idx_arch_dm_doc ON arch_domain_mappings(doc_id);
+CREATE INDEX IF NOT EXISTS idx_arch_dm_cap ON arch_domain_mappings(capability_id);
+CREATE INDEX IF NOT EXISTS idx_arch_dm_domain ON arch_domain_mappings(domain);
+
+CREATE TABLE IF NOT EXISTS arch_workflows (
+    workflow_id TEXT PRIMARY KEY,
+    doc_id TEXT NOT NULL,
+    capability_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    description TEXT NOT NULL,
+    actors TEXT NOT NULL DEFAULT '[]',
+    FOREIGN KEY (doc_id) REFERENCES architecture_documents(doc_id),
+    FOREIGN KEY (capability_id) REFERENCES arch_capabilities(capability_id)
+);
+CREATE INDEX IF NOT EXISTS idx_arch_wf_doc ON arch_workflows(doc_id);
+CREATE INDEX IF NOT EXISTS idx_arch_wf_cap ON arch_workflows(capability_id);
+
+CREATE TABLE IF NOT EXISTS arch_components (
+    component_id TEXT PRIMARY KEY,
+    doc_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    responsibility TEXT NOT NULL,
+    rationale TEXT NOT NULL DEFAULT '',
+    workflows_served TEXT NOT NULL DEFAULT '[]',
+    dependencies TEXT NOT NULL DEFAULT '[]',
+    interaction_patterns TEXT NOT NULL DEFAULT '[]',
+    file_scope TEXT,
+    parent_component_id TEXT,
+    FOREIGN KEY (doc_id) REFERENCES architecture_documents(doc_id),
+    FOREIGN KEY (parent_component_id) REFERENCES arch_components(component_id)
+);
+CREATE INDEX IF NOT EXISTS idx_arch_comp_doc ON arch_components(doc_id);
+CREATE INDEX IF NOT EXISTS idx_arch_comp_parent ON arch_components(parent_component_id);
+
+CREATE TABLE IF NOT EXISTS arch_implementation_steps (
+    step_id TEXT PRIMARY KEY,
+    doc_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    description TEXT NOT NULL,
+    components_involved TEXT NOT NULL DEFAULT '[]',
+    dependencies TEXT NOT NULL DEFAULT '[]',
+    estimated_complexity TEXT NOT NULL CHECK(estimated_complexity IN ('LOW', 'MEDIUM', 'HIGH')) DEFAULT 'MEDIUM',
+    verification_method TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (doc_id) REFERENCES architecture_documents(doc_id)
+);
+CREATE INDEX IF NOT EXISTS idx_arch_step_doc ON arch_implementation_steps(doc_id);
+`;
+
+export const MIGRATIONS: Migration[] = [
+	{
+		version: 1,
+		description:
+			'Consolidated schema — dialogue_events, intake_conversations, MAKER, FTS',
+		sql: SCHEMA_V1,
+	},
+	{
+		version: 2,
+		description:
+			'Architecture phase — architecture_documents + lookup tables',
+		sql: SCHEMA_V2,
+	},
+	{
+		version: 3,
+		description:
+			'Mirror & Menu Protocol — mmp_history column on intake_conversations',
+		sql: `ALTER TABLE intake_conversations ADD COLUMN mmp_history TEXT DEFAULT NULL;`,
+	},
+	{
+		version: 4,
+		description:
+			'Architecture enrichment — rationale, interaction_patterns on arch_components',
+		sql: `
+ALTER TABLE arch_components ADD COLUMN rationale TEXT NOT NULL DEFAULT '';
+ALTER TABLE arch_components ADD COLUMN interaction_patterns TEXT NOT NULL DEFAULT '[]';
+`,
+	},
+	{
+		version: 5,
+		description: 'Novel dependency detection flag on verdicts',
+		sql: `ALTER TABLE verdicts ADD COLUMN novel_dependency INTEGER NOT NULL DEFAULT 0;`,
+	},
+	{
+		version: 6,
+		description: 'Widen sub_state CHECK constraint for PRODUCT_REVIEW',
+		sql: `
+-- SQLite cannot ALTER CHECK constraints; recreate the table.
+CREATE TABLE intake_conversations_v6 (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     dialogue_id TEXT NOT NULL,
-    sub_state TEXT NOT NULL CHECK(sub_state IN ('GATHERING', 'DISCUSSING', 'SYNTHESIZING', 'AWAITING_APPROVAL', 'ANALYZING', 'PROPOSING', 'CLARIFYING')) DEFAULT 'DISCUSSING',
+    sub_state TEXT NOT NULL CHECK(sub_state IN ('GATHERING','DISCUSSING','SYNTHESIZING','AWAITING_APPROVAL','ANALYZING','PRODUCT_REVIEW','PROPOSING','CLARIFYING')) DEFAULT 'DISCUSSING',
     turn_count INTEGER NOT NULL DEFAULT 0,
     draft_plan TEXT NOT NULL DEFAULT '{}',
     accumulations TEXT NOT NULL DEFAULT '[]',
@@ -802,103 +847,81 @@ CREATE TABLE IF NOT EXISTS intake_conversations_new (
     checkpoints TEXT DEFAULT NULL,
     classifier_result TEXT DEFAULT NULL,
     clarification_round INTEGER NOT NULL DEFAULT 0,
+    mmp_history TEXT DEFAULT NULL,
     CONSTRAINT fk_dialogue_id CHECK(length(dialogue_id) = 36)
 );
-INSERT OR IGNORE INTO intake_conversations_new
-    SELECT id, dialogue_id, sub_state, turn_count, draft_plan, accumulations,
-           finalized_plan, created_at, updated_at, intake_mode, domain_coverage,
-           current_domain, checkpoints, classifier_result, 0
-    FROM intake_conversations;
-DROP INDEX IF EXISTS idx_intake_conv_dialogue_id;
-DROP TABLE IF EXISTS intake_conversations;
-ALTER TABLE intake_conversations_new RENAME TO intake_conversations;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_conv_dialogue_id ON intake_conversations(dialogue_id);
-`;
 
-export const MIGRATIONS: Migration[] = [
-	{
-		version: 1,
-		description: 'Initial schema - Core data model',
-		sql: SCHEMA_V1,
-	},
-	{
-		version: 2,
-		description: 'Add composite unique index on dialogue_turns for FK support',
-		sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_dialogue_turns_dialogue_turn ON dialogue_turns(dialogue_id, turn_id);`,
-	},
-	{
-		version: 3,
-		description: 'Add dialogues lifecycle table for multi-dialogue stream',
-		sql: SCHEMA_V3,
-	},
-	{
-		version: 4,
-		description: 'Add CLI activity events table for multi-CLI audit trail',
-		sql: SCHEMA_V4,
-	},
-	{
-		version: 5,
-		description: 'Add workflow command blocks for persistent stream history',
-		sql: SCHEMA_V5,
-	},
-	{
-		version: 6,
-		description: 'Add INTAKE conversation tables for conversational planning phase',
-		sql: SCHEMA_V6,
+INSERT INTO intake_conversations_v6 (id, dialogue_id, sub_state, turn_count, draft_plan, accumulations, finalized_plan, created_at, updated_at, intake_mode, domain_coverage, current_domain, checkpoints, classifier_result, clarification_round, mmp_history)
+    SELECT id, dialogue_id, sub_state, turn_count, draft_plan, accumulations, finalized_plan, created_at, updated_at, intake_mode, domain_coverage, current_domain, checkpoints, classifier_result, clarification_round, mmp_history
+    FROM intake_conversations;
+
+DROP TABLE intake_conversations;
+ALTER TABLE intake_conversations_v6 RENAME TO intake_conversations;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_conv_dialogue_id ON intake_conversations(dialogue_id);
+`,
 	},
 	{
 		version: 7,
-		description: 'Add title column to dialogues for LLM-generated titles',
-		sql: SCHEMA_V7,
+		description:
+			'Capability hierarchy — parent_capability_id on arch_capabilities',
+		sql: `
+ALTER TABLE arch_capabilities ADD COLUMN parent_capability_id TEXT DEFAULT NULL;
+CREATE INDEX IF NOT EXISTS idx_arch_cap_parent ON arch_capabilities(parent_capability_id);
+`,
 	},
 	{
 		version: 8,
-		description: 'Widen command output line_type for tool cards; add tool_name column',
-		sql: SCHEMA_V8,
+		description:
+			'Proposer-Validator sub-states + proposer_phase column on intake_conversations',
+		sql: `
+-- SQLite cannot ALTER CHECK constraints; recreate the table.
+CREATE TABLE intake_conversations_v8 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id TEXT NOT NULL,
+    sub_state TEXT NOT NULL CHECK(sub_state IN ('GATHERING','DISCUSSING','SYNTHESIZING','AWAITING_APPROVAL','ANALYZING','PRODUCT_REVIEW','PROPOSING','CLARIFYING','PROPOSING_DOMAINS','PROPOSING_JOURNEYS','PROPOSING_ENTITIES','PROPOSING_INTEGRATIONS')) DEFAULT 'DISCUSSING',
+    turn_count INTEGER NOT NULL DEFAULT 0,
+    draft_plan TEXT NOT NULL DEFAULT '{}',
+    accumulations TEXT NOT NULL DEFAULT '[]',
+    finalized_plan TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    intake_mode TEXT DEFAULT NULL,
+    domain_coverage TEXT DEFAULT NULL,
+    current_domain TEXT DEFAULT NULL,
+    checkpoints TEXT DEFAULT NULL,
+    classifier_result TEXT DEFAULT NULL,
+    clarification_round INTEGER NOT NULL DEFAULT 0,
+    mmp_history TEXT DEFAULT NULL,
+    proposer_phase INTEGER DEFAULT NULL,
+    CONSTRAINT fk_dialogue_id CHECK(length(dialogue_id) = 36)
+);
+
+INSERT INTO intake_conversations_v8 (id, dialogue_id, sub_state, turn_count, draft_plan, accumulations, finalized_plan, created_at, updated_at, intake_mode, domain_coverage, current_domain, checkpoints, classifier_result, clarification_round, mmp_history)
+    SELECT id, dialogue_id, sub_state, turn_count, draft_plan, accumulations, finalized_plan, created_at, updated_at, intake_mode, domain_coverage, current_domain, checkpoints, classifier_result, clarification_round, mmp_history
+    FROM intake_conversations;
+
+DROP TABLE intake_conversations;
+ALTER TABLE intake_conversations_v8 RENAME TO intake_conversations;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_conv_dialogue_id ON intake_conversations(dialogue_id);
+`,
 	},
 	{
 		version: 9,
-		description: 'Add Narrative Curator artifact tables (narrative_memories, decision_traces, open_loops)',
-		sql: SCHEMA_V9,
-	},
-	{
-		version: 10,
-		description: 'Add embeddings table for vector semantic search',
-		sql: SCHEMA_V10,
-	},
-	{
-		version: 11,
-		description: 'MAKER Agent Integration Control Plane — intent, task graph, claims, validation, repair, outcome tables',
-		sql: SCHEMA_V11,
-	},
-	{
-		version: 12,
-		description: 'Add FEEDBACK curation mode, assumption_type on claims',
-		sql: SCHEMA_V12,
-	},
-	{
-		version: 13,
-		description: 'Add clarification threads table for Ask More conversations',
-		sql: SCHEMA_V13,
-	},
-	{
-		version: 14,
-		description: 'Add FTS5 full-text search over governed stream content',
-		sql: SCHEMA_V14,
-	},
-	{
-		version: 15,
-		description: 'Adaptive Deep INTAKE — domain coverage tracking columns',
-		sql: SCHEMA_V15,
-	},
-	{
-		version: 16,
-		description: 'INTAKE GATHERING sub-state — updated sub_state CHECK, is_gathering flag on turns',
-		sql: SCHEMA_V16,
-	},
-	{
-		version: 17,
-		description: 'INTAKE inverted flow — ANALYZING/PROPOSING/CLARIFYING sub-states, clarification_round column',
-		sql: SCHEMA_V17,
+		description:
+			'Pending MMP decisions — persists partial user decisions across restarts',
+		sql: `
+CREATE TABLE IF NOT EXISTS pending_mmp_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id TEXT NOT NULL,
+    card_id TEXT NOT NULL,
+    mirror_decisions TEXT NOT NULL DEFAULT '{}',
+    menu_selections TEXT NOT NULL DEFAULT '{}',
+    premortem_decisions TEXT NOT NULL DEFAULT '{}',
+    product_edits TEXT NOT NULL DEFAULT '{}',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(dialogue_id, card_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pending_mmp_dialogue ON pending_mmp_decisions(dialogue_id);
+`,
 	},
 ];

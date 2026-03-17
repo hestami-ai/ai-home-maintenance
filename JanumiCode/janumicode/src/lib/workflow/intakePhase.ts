@@ -14,6 +14,7 @@
 
 import type { Result, Phase } from '../types';
 import { Role, SpeechAct } from '../types';
+import type { MMPPayload, MirrorItem, MenuItem, MenuOption } from '../types/mmp';
 import type { PhaseExecutionResult } from './orchestrator';
 import type {
 	IntakePlanDocument,
@@ -23,18 +24,22 @@ import type {
 	DomainCoverageMap,
 	IntakeGatheringTurnResponse,
 } from '../types/intake';
-import { IntakeSubState, IntakeMode, EngineeringDomain, isGatheringResponse } from '../types/intake';
+import {
+	IntakeSubState, IntakeMode, EngineeringDomain, isGatheringResponse,
+	ProposerPhase,
+} from '../types/intake';
+import type {
+	DomainProposal, EntityProposal, WorkflowProposal, IntegrationProposal,
+} from '../types/intake';
 import {
 	getOrCreateIntakeConversation,
-	getRecentIntakeTurns,
 	getIntakeTurnsInRange,
 	getGatheringTurns,
 } from '../events/reader';
 import {
-	writeIntakeTurn,
+	writeDialogueEvent,
 	updateIntakeConversation,
 } from '../events/writer';
-import { writeDialogueTurn } from '../events/writer';
 import { resolveProviderForRole } from '../cli/providerResolver';
 import {
 	invokeIntakeTechnicalExpert,
@@ -45,7 +50,6 @@ import {
 	MAX_CLARIFICATION_ROUNDS,
 } from '../roles/technicalExpertIntake';
 import {
-	getWorkflowState,
 	updateWorkflowMetadata,
 	transitionWorkflow,
 	TransitionTrigger,
@@ -59,6 +63,7 @@ import {
 	emitWorkflowCommand,
 	emitCLIActivity,
 } from '../integration/eventBus';
+import type { CLIActivityEvent } from '../cli/types';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { randomUUID } from 'node:crypto';
 import {
@@ -177,18 +182,26 @@ export async function executeIntakeConversationTurn(
 
 		const response = expertResult.value;
 
-		// 4. Store turn and update conversation state
-		const turnWriteResult = writeIntakeTurn({
-			dialogueId,
-			turnNumber,
-			humanMessage,
-			expertResponse: response,
-			planSnapshot: response.updatedPlan,
-			tokenCount: estimateTokenCount(humanMessage, response.conversationalResponse),
+		// 4. Store unified event (replaces dual writeIntakeTurn + writeDialogueTurn)
+		const eventResult = writeDialogueEvent({
+			dialogue_id: dialogueId,
+			event_type: 'intake_turn',
+			role: Role.TECHNICAL_EXPERT,
+			phase: 'INTAKE',
+			speech_act: SpeechAct.EVIDENCE,
+			summary: response.conversationalResponse.substring(0, 120),
+			content: response.conversationalResponse,
+			detail: {
+				humanMessage,
+				expertResponse: response,
+				planSnapshot: response.updatedPlan,
+				turnNumber,
+				tokenCount: estimateTokenCount(humanMessage, response.conversationalResponse),
+			},
 		});
 
-		if (!turnWriteResult.success) {
-			return turnWriteResult as unknown as Result<PhaseExecutionResult>;
+		if (!eventResult.success) {
+			return eventResult as unknown as Result<PhaseExecutionResult>;
 		}
 
 		// 4b. Update domain coverage if mode is set
@@ -218,15 +231,6 @@ export async function executeIntakeConversationTurn(
 		const modeMetadata = handleModeSpecificPostTurn(
 			dialogueId, conv, coverageUpdates, turnNumber,
 		);
-
-		// 5. Record audit trail in dialogue_turns
-		writeDialogueTurn({
-			dialogue_id: dialogueId,
-			role: Role.TECHNICAL_EXPERT,
-			phase: 'INTAKE' as Phase,
-			speech_act: SpeechAct.EVIDENCE,
-			content_ref: `intake_turn:${turnNumber}`,
-		});
 
 		// 6. Trigger accumulation if needed
 		await maybeAccumulateOlderTurns(dialogueId, turnNumber);
@@ -373,6 +377,26 @@ export async function executeIntakePlanFinalization(
 			}
 		}
 
+		// 2c. Carry forward proposer artifacts that synthesis may not have populated
+		const dp = conv.draftPlan;
+		if (dp.proposerPhase != null) {
+			// Map quality attributes → uxRequirements if synthesis didn't populate them
+			if ((!finalizedPlan.uxRequirements || finalizedPlan.uxRequirements.length === 0) && dp.qualityAttributes && dp.qualityAttributes.length > 0) {
+				finalizedPlan.uxRequirements = dp.qualityAttributes;
+			}
+			// Carry forward proposer-specific fields for downstream phases
+			if (!finalizedPlan.domainProposals && dp.domainProposals) { finalizedPlan.domainProposals = dp.domainProposals; }
+			if (!finalizedPlan.entityProposals && dp.entityProposals) { finalizedPlan.entityProposals = dp.entityProposals; }
+			if (!finalizedPlan.workflowProposals && dp.workflowProposals) { finalizedPlan.workflowProposals = dp.workflowProposals; }
+			if (!finalizedPlan.integrationProposals && dp.integrationProposals) { finalizedPlan.integrationProposals = dp.integrationProposals; }
+			if (!finalizedPlan.qualityAttributes && dp.qualityAttributes) { finalizedPlan.qualityAttributes = dp.qualityAttributes; }
+			// Carry forward product artifacts if synthesis didn't regenerate them
+			if (!finalizedPlan.personas && dp.personas) { finalizedPlan.personas = dp.personas; }
+			if (!finalizedPlan.userJourneys && dp.userJourneys) { finalizedPlan.userJourneys = dp.userJourneys; }
+			if (!finalizedPlan.phasingStrategy && dp.phasingStrategy) { finalizedPlan.phasingStrategy = dp.phasingStrategy; }
+			if ((!finalizedPlan.successMetrics || finalizedPlan.successMetrics.length === 0) && dp.successMetrics) { finalizedPlan.successMetrics = dp.successMetrics; }
+		}
+
 		// 3. Store finalized plan
 		const updateResult = updateIntakeConversation(dialogueId, {
 			subState: IntakeSubState.AWAITING_APPROVAL,
@@ -383,13 +407,16 @@ export async function executeIntakePlanFinalization(
 			return updateResult as unknown as Result<PhaseExecutionResult>;
 		}
 
-		// 4. Record audit trail
-		writeDialogueTurn({
+		// 4. Record synthesis event
+		writeDialogueEvent({
 			dialogue_id: dialogueId,
+			event_type: 'intake_synthesis',
 			role: Role.TECHNICAL_EXPERT,
-			phase: 'INTAKE' as Phase,
+			phase: 'INTAKE',
 			speech_act: SpeechAct.EVIDENCE,
-			content_ref: `intake_finalized_plan:v${finalizedPlan.version}`,
+			summary: `Plan finalized v${finalizedPlan.version}`,
+			content: JSON.stringify(finalizedPlan),
+			detail: { finalizedPlan },
 		});
 
 		// 5. Transition: INTAKE → INTAKE (with PLAN_FINALIZED trigger)
@@ -435,10 +462,10 @@ export async function executeIntakePlanFinalization(
  *
  * 1. Get finalized plan from intake_conversations
  * 2. Store in workflow metadata as approvedIntakePlan
- * 3. Return { nextPhase: PROPOSE } to advance workflow
+ * 3. Return { nextPhase: ARCHITECTURE } to advance workflow
  *
  * @param dialogueId Dialogue ID
- * @returns PhaseExecutionResult with nextPhase: PROPOSE
+ * @returns PhaseExecutionResult with nextPhase: ARCHITECTURE
  */
 export function executeIntakePlanApproval(
 	dialogueId: string
@@ -469,25 +496,26 @@ export function executeIntakePlanApproval(
 			approvedIntakePlan: planForMetadata,
 		});
 
-		// 3. Record audit trail
-		writeDialogueTurn({
+		// 3. Record approval event
+		writeDialogueEvent({
 			dialogue_id: dialogueId,
+			event_type: 'intake_approval',
 			role: Role.HUMAN,
-			phase: 'INTAKE' as Phase,
+			phase: 'INTAKE',
 			speech_act: SpeechAct.DECISION,
-			content_ref: `intake_plan_approved:v${conv.finalizedPlan.version}`,
+			summary: `Plan v${conv.finalizedPlan.version} approved`,
 		});
 
 		// 4. Emit event
 		emitIntakePlanApproved(dialogueId);
 
-		// Return nextPhase: PROPOSE to advance workflow
+		// Return nextPhase: ARCHITECTURE to advance workflow
 		return {
 			success: true,
 			value: {
 				phase: 'INTAKE' as Phase,
 				success: true,
-				nextPhase: 'PROPOSE' as Phase,
+				nextPhase: 'ARCHITECTURE' as Phase,
 				metadata: {
 					approvedPlanVersion: conv.finalizedPlan.version,
 					approvedPlanTitle: conv.finalizedPlan.title,
@@ -619,26 +647,32 @@ function createLocalAccumulation(
 		summaryParts.push(`Turn ${turn.turnNumber}: Human asked: "${humanSummary}"`);
 
 		// Extract key response points (first 200 chars of expert response)
+		const resp = turn.expertResponse;
+		const respText = 'conversationalResponse' in resp
+			? resp.conversationalResponse
+			: ('analysisSummary' in resp ? resp.analysisSummary : '');
 		const expertSummary =
-			turn.expertResponse.conversationalResponse.length > 200
-				? turn.expertResponse.conversationalResponse.substring(0, 200) + '...'
-				: turn.expertResponse.conversationalResponse;
+			respText.length > 200
+				? respText.substring(0, 200) + '...'
+				: respText;
 		summaryParts.push(`  Expert: ${expertSummary}`);
 
 		// Carry forward any extracted items from the plan snapshot
-		for (const item of turn.planSnapshot.requirements) {
-			if (item.extractedFromTurnId === turn.turnNumber) {
-				extractedItems.push(item);
+		if (turn.planSnapshot) {
+			for (const item of turn.planSnapshot.requirements) {
+				if (item.extractedFromTurnId === turn.turnNumber) {
+					extractedItems.push(item);
+				}
 			}
-		}
-		for (const item of turn.planSnapshot.decisions) {
-			if (item.extractedFromTurnId === turn.turnNumber) {
-				extractedItems.push(item);
+			for (const item of turn.planSnapshot.decisions) {
+				if (item.extractedFromTurnId === turn.turnNumber) {
+					extractedItems.push(item);
+				}
 			}
-		}
-		for (const item of turn.planSnapshot.constraints) {
-			if (item.extractedFromTurnId === turn.turnNumber) {
-				extractedItems.push(item);
+			for (const item of turn.planSnapshot.constraints) {
+				if (item.extractedFromTurnId === turn.turnNumber) {
+					extractedItems.push(item);
+				}
 			}
 		}
 	}
@@ -942,19 +976,27 @@ export async function executeIntakeGatheringTurn(
 
 		const response = expertResult.value;
 
-		// 6. Store gathering turn (planSnapshot = null, isGathering = true)
-		const turnWriteResult = writeIntakeTurn({
-			dialogueId,
-			turnNumber,
-			humanMessage,
-			expertResponse: response,
-			planSnapshot: null,
-			tokenCount: estimateTokenCount(humanMessage, response.conversationalResponse),
-			isGathering: true,
+		// 6. Store unified gathering event
+		const eventResult = writeDialogueEvent({
+			dialogue_id: dialogueId,
+			event_type: 'intake_gathering',
+			role: Role.TECHNICAL_EXPERT,
+			phase: 'INTAKE',
+			speech_act: SpeechAct.EVIDENCE,
+			summary: `Gathering: ${DOMAIN_INFO[conv.currentDomain].label}`,
+			content: response.conversationalResponse,
+			detail: {
+				humanMessage,
+				expertResponse: response,
+				turnNumber,
+				focusDomain: conv.currentDomain,
+				domainNotes: response.domainNotes,
+				tokenCount: estimateTokenCount(humanMessage, response.conversationalResponse),
+			},
 		});
 
-		if (!turnWriteResult.success) {
-			return turnWriteResult as unknown as Result<PhaseExecutionResult>;
+		if (!eventResult.success) {
+			return eventResult as unknown as Result<PhaseExecutionResult>;
 		}
 
 		// 7. Update domain coverage from human text + expert response + expert tags
@@ -1004,15 +1046,6 @@ export async function executeIntakeGatheringTurn(
 				dialogueId,
 			});
 		}
-
-		// 12. Record audit trail
-		writeDialogueTurn({
-			dialogue_id: dialogueId,
-			role: Role.TECHNICAL_EXPERT,
-			phase: 'INTAKE' as Phase,
-			speech_act: SpeechAct.EVIDENCE,
-			content_ref: 'gathering_turn:' + turnNumber,
-		});
 
 		// 13. Emit turn completed event
 		emitIntakeTurnCompleted(
@@ -1159,6 +1192,149 @@ function checkGatheringComplete(
 	return false; // HYBRID_CHECKPOINTS never enters GATHERING
 }
 
+// ==================== PRODUCT DISCOVERY MMP ====================
+
+/**
+ * Deterministically extract MMP from product artifacts in the initial plan.
+ * Creates Mirror items for personas, user journeys, and UX assumptions
+ * so the human can accept/reject/edit them — not just view static text.
+ *
+ * Only generates MMP for product_or_feature requests with actual product artifacts.
+ */
+export function extractProductDiscoveryMMP(plan: IntakePlanDocument): MMPPayload | undefined {
+	if (plan.requestCategory !== 'product_or_feature') { return undefined; }
+
+	const mirrorItems: MirrorItem[] = [];
+	const menuItems: MenuItem[] = [];
+	let mirrorIdx = 0;
+
+	// Mirror: persona assumptions
+	if (plan.personas && plan.personas.length > 0) {
+		for (const p of plan.personas.slice(0, 5)) {
+			mirrorIdx++;
+			mirrorItems.push({
+				id: `PD-MIR-${mirrorIdx}`,
+				text: `${p.name}: ${p.description}`,
+				category: 'persona',
+				rationale: (p.goals ?? []).length > 0
+					? `Goals: ${p.goals.join('; ')}. Pain points: ${(p.painPoints ?? []).join('; ')}`
+					: 'Identified from the project description',
+				status: 'pending',
+			});
+		}
+	}
+
+	// Mirror: user journey assumptions (top 5)
+	if (plan.userJourneys && plan.userJourneys.length > 0) {
+		for (const j of plan.userJourneys.slice(0, 5)) {
+			mirrorIdx++;
+			// Build steps preview — guard against LLM returning stub step objects
+			const validSteps = (j.steps ?? []).filter(
+				s => s.actor || s.action
+			);
+			const stepsPreview = validSteps.length > 0
+				? validSteps.slice(0, 3).map(s => {
+					const actor = s.actor || 'User';
+					const action = s.action || s.expectedOutcome || '(step)';
+					return `${actor}: ${action}`;
+				}).join(' → ')
+				: j.scenario || j.title;
+			mirrorItems.push({
+				id: `PD-MIR-${mirrorIdx}`,
+				text: `[${j.priority}] ${j.title}: ${stepsPreview}`,
+				category: 'journey',
+				rationale: (j.acceptanceCriteria && j.acceptanceCriteria.length > 0)
+					? `Acceptance: ${j.acceptanceCriteria.slice(0, 2).join('; ')}`
+					: j.scenario || j.title,
+				status: 'pending',
+			});
+		}
+	}
+
+	// Mirror: UX requirements
+	if (plan.uxRequirements && plan.uxRequirements.length > 0) {
+		for (const ux of plan.uxRequirements.slice(0, 3)) {
+			mirrorIdx++;
+			mirrorItems.push({
+				id: `PD-MIR-${mirrorIdx}`,
+				text: ux,
+				category: 'ux',
+				rationale: 'Inferred from the project description and codebase analysis',
+				status: 'pending',
+			});
+		}
+	}
+
+	// Mirror: product vision
+	if (plan.productVision) {
+		mirrorIdx++;
+		mirrorItems.push({
+			id: `PD-MIR-${mirrorIdx}`,
+			text: plan.productVision,
+			category: 'intent',
+			rationale: 'Synthesized from the project description as the core value proposition',
+			status: 'pending',
+		});
+	}
+
+	// Menu: phasing decisions (if journeys exist but phasing is ambiguous)
+	if (plan.userJourneys && plan.userJourneys.length > 2) {
+		const mvpJourneys = plan.userJourneys.filter(j => j.priority === 'MVP');
+		const v2Journeys = plan.userJourneys.filter(j => j.priority === 'V2');
+		const futureJourneys = plan.userJourneys.filter(j => j.priority === 'FUTURE');
+
+		if (mvpJourneys.length > 0) {
+			const options: MenuOption[] = [];
+			if (mvpJourneys.length > 0) {
+				options.push({
+					optionId: 'MENU-PD-1-A',
+					label: `MVP only (${mvpJourneys.length} journeys)`,
+					description: mvpJourneys.map(j => j.title).join(', '),
+					tradeoffs: 'Fastest to ship, focused scope',
+					recommended: true,
+				});
+			}
+			if (v2Journeys.length > 0) {
+				options.push({
+					optionId: 'MENU-PD-1-B',
+					label: `MVP + V2 (${mvpJourneys.length + v2Journeys.length} journeys)`,
+					description: [...mvpJourneys, ...v2Journeys].map(j => j.title).join(', '),
+					tradeoffs: 'Broader scope, longer timeline',
+				});
+			}
+			if (options.length >= 2) {
+				menuItems.push({
+					id: 'MENU-PD-1',
+					question: 'Which user journeys should be in the initial release?',
+					context: 'This defines the launch scope and development timeline',
+					options,
+				});
+			}
+		}
+	}
+
+	if (mirrorItems.length === 0 && menuItems.length === 0) {
+		return undefined;
+	}
+
+	const result: MMPPayload = {};
+
+	if (mirrorItems.length > 0) {
+		result.mirror = {
+			steelMan: plan.productDescription
+				|| plan.productVision
+				|| 'Product discovery assumptions based on the analysis',
+			items: mirrorItems,
+		};
+	}
+
+	if (menuItems.length > 0) {
+		result.menu = { items: menuItems };
+	}
+
+	return result;
+}
+
 // ==================== ANALYZING PHASE (INVERTED FLOW) ====================
 
 /** Higher token budget for comprehensive analysis */
@@ -1236,24 +1412,52 @@ export async function executeIntakeAnalysis(
 		const coverageMap = conv.domainCoverage ?? initializeCoverageMap();
 		const seededCoverage = seedCoverageFromAnalysis(coverageMap, analysis.domainAssessment);
 
-		// 5. Store as turn 0 (analysis turn)
-		const turnWriteResult = writeIntakeTurn({
-			dialogueId,
-			turnNumber: 0,
-			humanMessage,
-			expertResponse: analysis,
-			planSnapshot: analysis.initialPlan,
-			tokenCount: estimateTokenCount(humanMessage, analysis.analysisSummary),
-			isGathering: false,
+		// 4b. Extract product discovery MMP for human review (if product/feature request)
+		const productMMP = extractProductDiscoveryMMP(analysis.initialPlan);
+
+		// 5. Store analysis event
+		const eventResult = writeDialogueEvent({
+			dialogue_id: dialogueId,
+			event_type: 'intake_analysis',
+			role: Role.TECHNICAL_EXPERT,
+			phase: 'INTAKE',
+			speech_act: SpeechAct.EVIDENCE,
+			summary: 'Analysis complete',
+			content: analysis.analysisSummary,
+			detail: {
+				humanMessage,
+				expertResponse: analysis,
+				initialPlan: analysis.initialPlan,
+				codebaseFindings: analysis.codebaseFindings,
+				domainAssessment: analysis.domainAssessment,
+				productDiscoveryMMP: productMMP ? JSON.stringify(productMMP) : undefined,
+				turnNumber: 0,
+				tokenCount: estimateTokenCount(humanMessage, analysis.analysisSummary),
+			},
 		});
 
-		if (!turnWriteResult.success) {
-			return turnWriteResult as unknown as Result<PhaseExecutionResult>;
+		if (!eventResult.success) {
+			return eventResult as unknown as Result<PhaseExecutionResult>;
 		}
 
-		// 6. Update conversation: seed plan, coverage, transition to PROPOSING
+		// 6. Update conversation: seed plan, coverage, transition based on request type
+		// Proposer-Validator flow: product_or_feature (STATE_DRIVEN or DOMAIN_GUIDED) → PROPOSING_DOMAINS
+		// Technical tasks: → PROPOSING (no product review)
+		let targetSubState: IntakeSubState;
+		if (analysis.initialPlan.requestCategory === 'product_or_feature'
+			&& (conv.intakeMode === IntakeMode.STATE_DRIVEN || conv.intakeMode === IntakeMode.DOMAIN_GUIDED)) {
+			// Enter Proposer-Validator loop — ANALYZING homework seeds the proposer rounds
+			targetSubState = IntakeSubState.PROPOSING_DOMAINS;
+			analysis.initialPlan.proposerPhase = ProposerPhase.DOMAIN_MAPPING;
+		} else if (productMMP !== undefined) {
+			// Fallback: HYBRID_CHECKPOINTS with product artifacts → legacy PRODUCT_REVIEW
+			targetSubState = IntakeSubState.PRODUCT_REVIEW;
+		} else {
+			targetSubState = IntakeSubState.PROPOSING;
+		}
+
 		const updateResult = updateIntakeConversation(dialogueId, {
-			subState: IntakeSubState.PROPOSING,
+			subState: targetSubState,
 			turnCount: 1,
 			draftPlan: analysis.initialPlan,
 			domainCoverage: seededCoverage,
@@ -1281,16 +1485,7 @@ export async function executeIntakeAnalysis(
 		);
 		emitIntakePlanUpdated(dialogueId, analysis.initialPlan);
 
-		// 8. Record audit trail
-		writeDialogueTurn({
-			dialogue_id: dialogueId,
-			role: Role.TECHNICAL_EXPERT,
-			phase: 'INTAKE' as Phase,
-			speech_act: SpeechAct.EVIDENCE,
-			content_ref: 'intake_analysis:0',
-		});
-
-		// 9. Self-loop transition
+		// 8. Self-loop transition
 		transitionWorkflow(
 			dialogueId,
 			'INTAKE' as Phase,
@@ -1410,19 +1605,27 @@ export async function executeIntakeClarificationTurn(
 
 		const response = expertResult.value;
 
-		// 4. Store turn
-		const turnWriteResult = writeIntakeTurn({
-			dialogueId,
-			turnNumber,
-			humanMessage,
-			expertResponse: response,
-			planSnapshot: response.updatedPlan,
-			tokenCount: estimateTokenCount(humanMessage, response.conversationalResponse),
-			isGathering: false,
+		// 4. Store clarification event
+		const eventResult = writeDialogueEvent({
+			dialogue_id: dialogueId,
+			event_type: 'intake_clarification',
+			role: Role.TECHNICAL_EXPERT,
+			phase: 'INTAKE',
+			speech_act: SpeechAct.EVIDENCE,
+			summary: `Clarification round ${currentRound}`,
+			content: response.conversationalResponse,
+			detail: {
+				humanMessage,
+				expertResponse: response,
+				planSnapshot: response.updatedPlan,
+				turnNumber,
+				clarificationRound: currentRound,
+				tokenCount: estimateTokenCount(humanMessage, response.conversationalResponse),
+			},
 		});
 
-		if (!turnWriteResult.success) {
-			return turnWriteResult as unknown as Result<PhaseExecutionResult>;
+		if (!eventResult.success) {
+			return eventResult as unknown as Result<PhaseExecutionResult>;
 		}
 
 		// 5. Update domain coverage
@@ -1475,16 +1678,7 @@ export async function executeIntakeClarificationTurn(
 		);
 		emitIntakePlanUpdated(dialogueId, response.updatedPlan);
 
-		// 9. Record audit trail
-		writeDialogueTurn({
-			dialogue_id: dialogueId,
-			role: Role.TECHNICAL_EXPERT,
-			phase: 'INTAKE' as Phase,
-			speech_act: SpeechAct.EVIDENCE,
-			content_ref: 'intake_clarification:' + turnNumber,
-		});
-
-		// 10. Self-loop transition
+		// 9. Self-loop transition
 		transitionWorkflow(
 			dialogueId,
 			'INTAKE' as Phase,
@@ -1540,4 +1734,602 @@ export async function executeIntakeClarificationTurn(
  */
 function estimateTokenCount(humanMessage: string, expertResponse: string): number {
 	return Math.ceil((humanMessage.length + expertResponse.length) / 4);
+}
+
+// ==================== PROPOSER-VALIDATOR FLOW ====================
+
+/**
+ * Extract MMP for domain proposals — each domain and persona becomes a Mirror item.
+ * Menu item for MVP/V2/Future prioritization.
+ */
+export function extractDomainMMP(
+	domains: DomainProposal[],
+	personas: Array<{ id: string; name: string; description: string }>,
+): MMPPayload | undefined {
+	const mirrorItems: MirrorItem[] = [];
+	let idx = 0;
+
+	for (const d of domains) {
+		idx++;
+		mirrorItems.push({
+			id: `PV-DOM-${idx}`,
+			text: `${d.name}: ${d.description}`,
+			category: 'domain',
+			rationale: d.rationale,
+			status: 'pending',
+		});
+	}
+
+	for (const p of personas) {
+		idx++;
+		mirrorItems.push({
+			id: `PV-PER-${idx}`,
+			text: `${p.name}: ${p.description}`,
+			category: 'persona',
+			rationale: 'Identified from domain analysis',
+			status: 'pending',
+		});
+	}
+
+	if (mirrorItems.length === 0) return undefined;
+
+	const menuItems: MenuItem[] = [];
+	if (domains.length > 2) {
+		const options: MenuOption[] = [
+			{
+				optionId: 'PV-SCOPE-ALL',
+				label: `All domains (${domains.length})`,
+				description: 'Include every proposed domain in MVP scope',
+				tradeoffs: 'Broadest scope, longest timeline',
+			},
+			{
+				optionId: 'PV-SCOPE-CORE',
+				label: 'Core domains only',
+				description: 'Focus MVP on the most essential domains. Mark others as V2/Future during review.',
+				tradeoffs: 'Focused scope, faster to ship',
+				recommended: true,
+			},
+		];
+		menuItems.push({
+			id: 'PV-MENU-SCOPE',
+			question: 'What should the initial release scope include?',
+			context: 'Accept/reject individual domains above, then choose the overall scoping strategy',
+			options,
+		});
+	}
+
+	return {
+		mirror: {
+			steelMan: 'Based on your request and available context, here are the proposed business domains and personas for this product.',
+			items: mirrorItems,
+		},
+		...(menuItems.length > 0 ? { menu: { items: menuItems } } : {}),
+	};
+}
+
+/**
+ * Extract MMP for journey/workflow proposals.
+ */
+export function extractJourneyWorkflowMMP(
+	journeys: Array<{ id: string; title: string; scenario: string; priority?: string }>,
+	workflows: WorkflowProposal[],
+): MMPPayload | undefined {
+	const mirrorItems: MirrorItem[] = [];
+	let idx = 0;
+
+	for (const j of journeys) {
+		idx++;
+		mirrorItems.push({
+			id: `PV-JRN-${idx}`,
+			text: `[${j.priority ?? 'MVP'}] ${j.title}: ${j.scenario}`,
+			category: 'journey',
+			rationale: 'Proposed for accepted domains',
+			status: 'pending',
+		});
+	}
+
+	for (const w of workflows) {
+		idx++;
+		mirrorItems.push({
+			id: `PV-WF-${idx}`,
+			text: `${w.name}: ${w.description}`,
+			category: 'workflow',
+			rationale: `Domain: ${w.domainId}. Steps: ${w.steps.length}. Actors: ${w.actors.join(', ')}`,
+			status: 'pending',
+		});
+	}
+
+	if (mirrorItems.length === 0) return undefined;
+
+	return {
+		mirror: {
+			steelMan: 'Here are the proposed user journeys and system workflows for the accepted domains.',
+			items: mirrorItems,
+		},
+	};
+}
+
+/**
+ * Extract MMP for entity proposals.
+ */
+export function extractEntityMMP(
+	entities: EntityProposal[],
+): MMPPayload | undefined {
+	const mirrorItems: MirrorItem[] = [];
+
+	for (let i = 0; i < entities.length; i++) {
+		const e = entities[i];
+		mirrorItems.push({
+			id: `PV-ENT-${i + 1}`,
+			text: `${e.name}: ${e.description}`,
+			category: 'entity',
+			rationale: `Domain: ${e.domainId}. Attributes: ${e.keyAttributes.join(', ')}. Relationships: ${e.relationships.join(', ')}`,
+			status: 'pending',
+		});
+	}
+
+	if (mirrorItems.length === 0) return undefined;
+
+	return {
+		mirror: {
+			steelMan: 'Here are the proposed data entities for the accepted domains and workflows.',
+			items: mirrorItems,
+		},
+	};
+}
+
+/**
+ * Extract MMP for integration proposals.
+ */
+export function extractIntegrationMMP(
+	integrations: IntegrationProposal[],
+	qualityAttributes: string[],
+): MMPPayload | undefined {
+	const mirrorItems: MirrorItem[] = [];
+	let idx = 0;
+
+	for (const int of integrations) {
+		idx++;
+		mirrorItems.push({
+			id: `PV-INT-${idx}`,
+			text: `${int.name} (${int.category}): ${int.description}`,
+			category: 'integration',
+			rationale: `Providers: ${int.standardProviders.join(', ')}. Ownership: ${int.ownershipModel}. ${int.rationale}`,
+			status: 'pending',
+		});
+	}
+
+	for (const qa of qualityAttributes) {
+		idx++;
+		mirrorItems.push({
+			id: `PV-QA-${idx}`,
+			text: qa,
+			category: 'ux',
+			rationale: 'Quality attribute for the platform',
+			status: 'pending',
+		});
+	}
+
+	if (mirrorItems.length === 0) return undefined;
+
+	const menuItems: MenuItem[] = [];
+	// Ownership model menu for integrations that have alternatives
+	const ownableIntegrations = integrations.filter(i => i.category !== 'other');
+	if (ownableIntegrations.length > 0) {
+		menuItems.push({
+			id: 'PV-MENU-OWNERSHIP',
+			question: 'What is the default data ownership strategy for integrations?',
+			context: 'This sets the default — individual integrations can override via Mirror edits above',
+			options: [
+				{ optionId: 'PV-OWN-OWNED', label: 'Owned (System of Record)', description: 'Platform owns the data, integrations sync outbound', tradeoffs: 'Maximum control, more to build', recommended: true },
+				{ optionId: 'PV-OWN-SYNCED', label: 'Synced (Bidirectional)', description: 'Data flows both ways between platform and external systems', tradeoffs: 'Balanced, conflict resolution needed' },
+				{ optionId: 'PV-OWN-DELEGATED', label: 'Delegated (System of Action)', description: 'Platform orchestrates but external systems own the data', tradeoffs: 'Fastest integration, less control' },
+			],
+		});
+	}
+
+	return {
+		mirror: {
+			steelMan: 'Here are the proposed integrations and quality attributes for the platform.',
+			items: mirrorItems,
+		},
+		...(menuItems.length > 0 ? { menu: { items: menuItems } } : {}),
+	};
+}
+
+// ==================== PROPOSER EXECUTION FUNCTIONS ====================
+
+/**
+ * Proposer Round 1: Propose business domains + personas.
+ * Uses ANALYZING findings as seed context.
+ */
+export async function executeProposerDomains(
+	dialogueId: string,
+	humanMessage: string,
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		const convResult = getOrCreateIntakeConversation(dialogueId);
+		if (!convResult.success) return convResult as unknown as Result<PhaseExecutionResult>;
+		const conv = convResult.value;
+
+		const providerResult = await resolveProviderForRole(Role.TECHNICAL_EXPERT);
+		if (!providerResult.success) return providerResult as Result<PhaseExecutionResult>;
+
+		const commandId = randomUUID();
+		emitWorkflowCommand({
+			dialogueId, commandId, action: 'start',
+			commandType: 'cli_invocation',
+			label: 'Proposer — Domain Mapping',
+			summary: 'Proposing business domains and personas',
+			status: 'running',
+			timestamp: new Date().toISOString(),
+		});
+
+		const { invokeProposerDomains } = await import('../roles/technicalExpertIntake.js');
+		const result = await invokeProposerDomains({
+			dialogueId,
+			humanMessage,
+			provider: providerResult.value,
+			draftPlan: conv.draftPlan,
+			tokenBudget: INTAKE_ANALYSIS_TOKEN_BUDGET,
+			onEvent: (event: CLIActivityEvent) => {
+				emitCLIActivity(dialogueId, {
+					...event,
+					role: Role.TECHNICAL_EXPERT,
+					phase: 'INTAKE' as Phase,
+				});
+			},
+		});
+
+		emitWorkflowCommand({
+			dialogueId, commandId,
+			action: result.success ? 'complete' : 'error',
+			commandType: 'cli_invocation',
+			label: 'Proposer — Domain Mapping',
+			summary: result.success
+				? `Proposed ${result.value.domains.length} domains, ${result.value.personas.length} personas`
+				: `Error: ${result.error?.message ?? 'Unknown'}`,
+			timestamp: new Date().toISOString(),
+		});
+
+		if (!result.success) return result as unknown as Result<PhaseExecutionResult>;
+
+		const { domains, personas } = result.value;
+		const mmp = extractDomainMMP(domains, personas);
+
+		// Store on draft plan
+		const updatedPlan = {
+			...conv.draftPlan,
+			proposerPhase: ProposerPhase.DOMAIN_MAPPING,
+			domainProposals: domains,
+			personas,
+		};
+
+		writeDialogueEvent({
+			dialogue_id: dialogueId,
+			event_type: 'intake_proposer_domains',
+			role: Role.TECHNICAL_EXPERT,
+			phase: 'INTAKE',
+			speech_act: SpeechAct.CLAIM,
+			summary: `Proposed ${domains.length} domains, ${personas.length} personas`,
+			content: JSON.stringify({ domains, personas }),
+			detail: {
+				proposerPhase: ProposerPhase.DOMAIN_MAPPING,
+				productDiscoveryMMP: mmp ? JSON.stringify(mmp) : undefined,
+			},
+		});
+
+		updateIntakeConversation(dialogueId, {
+			subState: IntakeSubState.PRODUCT_REVIEW,
+			draftPlan: updatedPlan,
+		});
+
+		transitionWorkflow(dialogueId, 'INTAKE' as Phase, TransitionTrigger.INTAKE_TURN_COMPLETE);
+
+		return {
+			success: true,
+			value: {
+				phase: 'INTAKE' as Phase,
+				success: true,
+				awaitingInput: true,
+				timestamp: new Date().toISOString(),
+				metadata: {},
+			},
+		};
+	} catch (error) {
+		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
+	}
+}
+
+/**
+ * Proposer Round 2: Propose user journeys + system workflows for accepted domains.
+ */
+export async function executeProposerJourneys(
+	dialogueId: string,
+	humanMessage: string,
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		const convResult = getOrCreateIntakeConversation(dialogueId);
+		if (!convResult.success) return convResult as unknown as Result<PhaseExecutionResult>;
+		const conv = convResult.value;
+
+		const providerResult = await resolveProviderForRole(Role.TECHNICAL_EXPERT);
+		if (!providerResult.success) return providerResult as Result<PhaseExecutionResult>;
+
+		const commandId = randomUUID();
+		emitWorkflowCommand({
+			dialogueId, commandId, action: 'start',
+			commandType: 'cli_invocation',
+			label: 'Proposer — Journeys & Workflows',
+			summary: 'Proposing user journeys and system workflows',
+			status: 'running',
+			timestamp: new Date().toISOString(),
+		});
+
+		const { invokeProposerJourneys } = await import('../roles/technicalExpertIntake.js');
+		const result = await invokeProposerJourneys({
+			dialogueId,
+			humanMessage,
+			provider: providerResult.value,
+			draftPlan: conv.draftPlan,
+			tokenBudget: INTAKE_ANALYSIS_TOKEN_BUDGET,
+			onEvent: (event: CLIActivityEvent) => {
+				emitCLIActivity(dialogueId, {
+					...event,
+					role: Role.TECHNICAL_EXPERT,
+					phase: 'INTAKE' as Phase,
+				});
+			},
+		});
+
+		emitWorkflowCommand({
+			dialogueId, commandId,
+			action: result.success ? 'complete' : 'error',
+			commandType: 'cli_invocation',
+			label: 'Proposer — Journeys & Workflows',
+			summary: result.success
+				? `Proposed ${result.value.userJourneys.length} journeys, ${result.value.workflows.length} workflows`
+				: `Error: ${result.error?.message ?? 'Unknown'}`,
+			timestamp: new Date().toISOString(),
+		});
+
+		if (!result.success) return result as unknown as Result<PhaseExecutionResult>;
+
+		const { userJourneys, workflows } = result.value;
+		const mmp = extractJourneyWorkflowMMP(userJourneys, workflows);
+
+		const updatedPlan = {
+			...conv.draftPlan,
+			proposerPhase: ProposerPhase.JOURNEY_WORKFLOW,
+			userJourneys,
+			workflowProposals: workflows,
+		};
+
+		writeDialogueEvent({
+			dialogue_id: dialogueId,
+			event_type: 'intake_proposer_journeys',
+			role: Role.TECHNICAL_EXPERT,
+			phase: 'INTAKE',
+			speech_act: SpeechAct.CLAIM,
+			summary: `Proposed ${userJourneys.length} journeys, ${workflows.length} workflows`,
+			content: JSON.stringify({ userJourneys, workflows }),
+			detail: {
+				proposerPhase: ProposerPhase.JOURNEY_WORKFLOW,
+				productDiscoveryMMP: mmp ? JSON.stringify(mmp) : undefined,
+			},
+		});
+
+		updateIntakeConversation(dialogueId, {
+			subState: IntakeSubState.PRODUCT_REVIEW,
+			draftPlan: updatedPlan,
+		});
+
+		transitionWorkflow(dialogueId, 'INTAKE' as Phase, TransitionTrigger.INTAKE_TURN_COMPLETE);
+
+		return {
+			success: true,
+			value: {
+				phase: 'INTAKE' as Phase,
+				success: true,
+				awaitingInput: true,
+				timestamp: new Date().toISOString(),
+				metadata: {},
+			},
+		};
+	} catch (error) {
+		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
+	}
+}
+
+/**
+ * Proposer Round 3: Propose entities + data model for accepted domains/workflows.
+ */
+export async function executeProposerEntities(
+	dialogueId: string,
+	humanMessage: string,
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		const convResult = getOrCreateIntakeConversation(dialogueId);
+		if (!convResult.success) return convResult as unknown as Result<PhaseExecutionResult>;
+		const conv = convResult.value;
+
+		const providerResult = await resolveProviderForRole(Role.TECHNICAL_EXPERT);
+		if (!providerResult.success) return providerResult as Result<PhaseExecutionResult>;
+
+		const commandId = randomUUID();
+		emitWorkflowCommand({
+			dialogueId, commandId, action: 'start',
+			commandType: 'cli_invocation',
+			label: 'Proposer — Data Model',
+			summary: 'Proposing entities and data model',
+			status: 'running',
+			timestamp: new Date().toISOString(),
+		});
+
+		const { invokeProposerEntities } = await import('../roles/technicalExpertIntake.js');
+		const result = await invokeProposerEntities({
+			dialogueId,
+			humanMessage,
+			provider: providerResult.value,
+			draftPlan: conv.draftPlan,
+			tokenBudget: INTAKE_ANALYSIS_TOKEN_BUDGET,
+			onEvent: (event: CLIActivityEvent) => {
+				emitCLIActivity(dialogueId, {
+					...event,
+					role: Role.TECHNICAL_EXPERT,
+					phase: 'INTAKE' as Phase,
+				});
+			},
+		});
+
+		emitWorkflowCommand({
+			dialogueId, commandId,
+			action: result.success ? 'complete' : 'error',
+			commandType: 'cli_invocation',
+			label: 'Proposer — Data Model',
+			summary: result.success
+				? `Proposed ${result.value.entities.length} entities`
+				: `Error: ${result.error?.message ?? 'Unknown'}`,
+			timestamp: new Date().toISOString(),
+		});
+
+		if (!result.success) return result as unknown as Result<PhaseExecutionResult>;
+
+		const { entities } = result.value;
+		const mmp = extractEntityMMP(entities);
+
+		const updatedPlan = {
+			...conv.draftPlan,
+			proposerPhase: ProposerPhase.ENTITY_DATA_MODEL,
+			entityProposals: entities,
+		};
+
+		writeDialogueEvent({
+			dialogue_id: dialogueId,
+			event_type: 'intake_proposer_entities',
+			role: Role.TECHNICAL_EXPERT,
+			phase: 'INTAKE',
+			speech_act: SpeechAct.CLAIM,
+			summary: `Proposed ${entities.length} entities`,
+			content: JSON.stringify({ entities }),
+			detail: {
+				proposerPhase: ProposerPhase.ENTITY_DATA_MODEL,
+				productDiscoveryMMP: mmp ? JSON.stringify(mmp) : undefined,
+			},
+		});
+
+		updateIntakeConversation(dialogueId, {
+			subState: IntakeSubState.PRODUCT_REVIEW,
+			draftPlan: updatedPlan,
+		});
+
+		transitionWorkflow(dialogueId, 'INTAKE' as Phase, TransitionTrigger.INTAKE_TURN_COMPLETE);
+
+		return {
+			success: true,
+			value: {
+				phase: 'INTAKE' as Phase,
+				success: true,
+				awaitingInput: true,
+				timestamp: new Date().toISOString(),
+				metadata: {},
+			},
+		};
+	} catch (error) {
+		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
+	}
+}
+
+/**
+ * Proposer Round 4: Propose integrations + quality attributes.
+ */
+export async function executeProposerIntegrations(
+	dialogueId: string,
+	humanMessage: string,
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		const convResult = getOrCreateIntakeConversation(dialogueId);
+		if (!convResult.success) return convResult as unknown as Result<PhaseExecutionResult>;
+		const conv = convResult.value;
+
+		const providerResult = await resolveProviderForRole(Role.TECHNICAL_EXPERT);
+		if (!providerResult.success) return providerResult as Result<PhaseExecutionResult>;
+
+		const commandId = randomUUID();
+		emitWorkflowCommand({
+			dialogueId, commandId, action: 'start',
+			commandType: 'cli_invocation',
+			label: 'Proposer — Integrations & Quality',
+			summary: 'Proposing integrations and quality attributes',
+			status: 'running',
+			timestamp: new Date().toISOString(),
+		});
+
+		const { invokeProposerIntegrations } = await import('../roles/technicalExpertIntake.js');
+		const result = await invokeProposerIntegrations({
+			dialogueId,
+			humanMessage,
+			provider: providerResult.value,
+			draftPlan: conv.draftPlan,
+			tokenBudget: INTAKE_ANALYSIS_TOKEN_BUDGET,
+			onEvent: (event: CLIActivityEvent) => {
+				emitCLIActivity(dialogueId, {
+					...event,
+					role: Role.TECHNICAL_EXPERT,
+					phase: 'INTAKE' as Phase,
+				});
+			},
+		});
+
+		emitWorkflowCommand({
+			dialogueId, commandId,
+			action: result.success ? 'complete' : 'error',
+			commandType: 'cli_invocation',
+			label: 'Proposer — Integrations & Quality',
+			summary: result.success
+				? `Proposed ${result.value.integrations.length} integrations, ${result.value.qualityAttributes.length} quality attributes`
+				: `Error: ${result.error?.message ?? 'Unknown'}`,
+			timestamp: new Date().toISOString(),
+		});
+
+		if (!result.success) return result as unknown as Result<PhaseExecutionResult>;
+
+		const { integrations, qualityAttributes } = result.value;
+		const mmp = extractIntegrationMMP(integrations, qualityAttributes);
+
+		const updatedPlan = {
+			...conv.draftPlan,
+			proposerPhase: ProposerPhase.INTEGRATION_QUALITY,
+			integrationProposals: integrations,
+			qualityAttributes,
+		};
+
+		writeDialogueEvent({
+			dialogue_id: dialogueId,
+			event_type: 'intake_proposer_integrations',
+			role: Role.TECHNICAL_EXPERT,
+			phase: 'INTAKE',
+			speech_act: SpeechAct.CLAIM,
+			summary: `Proposed ${integrations.length} integrations, ${qualityAttributes.length} quality attributes`,
+			content: JSON.stringify({ integrations, qualityAttributes }),
+			detail: {
+				proposerPhase: ProposerPhase.INTEGRATION_QUALITY,
+				productDiscoveryMMP: mmp ? JSON.stringify(mmp) : undefined,
+			},
+		});
+
+		updateIntakeConversation(dialogueId, {
+			subState: IntakeSubState.PRODUCT_REVIEW,
+			draftPlan: updatedPlan,
+		});
+
+		transitionWorkflow(dialogueId, 'INTAKE' as Phase, TransitionTrigger.INTAKE_TURN_COMPLETE);
+
+		return {
+			success: true,
+			value: { phase: 'INTAKE' as Phase, success: true, awaitingInput: true, timestamp: new Date().toISOString(), metadata: {} },
+		};
+	} catch (error) {
+		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
+	}
 }

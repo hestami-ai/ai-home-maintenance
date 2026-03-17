@@ -63,6 +63,9 @@ export interface RoleCLIInvocationOptions {
 
 	/** MCP tool name for permission prompt handling (--permission-prompt-tool) */
 	permissionPromptTool?: string;
+
+	/** AbortSignal for cancelling the CLI process on extension disposal */
+	signal?: AbortSignal;
 }
 
 /**
@@ -182,4 +185,32 @@ export function splitStdinContent(stdinContent: string): [string, string] {
  */
 export function buildStdinContent(systemPrompt: string, context: string): string {
 	return `${systemPrompt}${STDIN_SEPARATOR}${context}`;
+}
+
+/**
+ * Extract the final model response from a streaming JSONL output.
+ * Walks backward through lines to find the result event (emitted last by most CLIs).
+ * Works with Claude Code, Codex, and Gemini stream formats.
+ */
+export function extractFinalResponseFromStream(rawOutput: string): string {
+	const lines = rawOutput.split('\n').filter((l) => l.trim());
+	for (let i = lines.length - 1; i >= 0; i--) {
+		try {
+			const event = JSON.parse(lines[i]);
+			// Claude Code result event
+			if (event.type === 'result' && typeof event.result === 'string') {
+				return event.result;
+			}
+			// Codex result event
+			if (event.type === 'item.completed' && event.item?.type === 'agent_message' && event.item.text) {
+				return event.item.text;
+			}
+			// Generic response field
+			if (event.type === 'result' && typeof event.response === 'string') {
+				return event.response;
+			}
+		} catch { /* skip non-JSON lines */ }
+	}
+	// Fallback: return raw output stripped of obvious JSON noise
+	return rawOutput;
 }

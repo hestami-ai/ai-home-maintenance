@@ -20,6 +20,23 @@ const IS_WINDOWS = process.platform === 'win32';
 const activeProcesses = new Set<ChildProcess>();
 
 /**
+ * Module-level AbortSignal for the current workflow cycle.
+ * Set by the panel before starting a cycle, cleared after completion.
+ * Spawn functions read this automatically when no explicit signal is provided.
+ */
+let _workflowSignal: AbortSignal | undefined;
+
+/** Set the module-level workflow abort signal. */
+export function setWorkflowAbortSignal(signal: AbortSignal | undefined): void {
+	_workflowSignal = signal;
+}
+
+/** Get the current workflow abort signal. */
+export function getWorkflowAbortSignal(): AbortSignal | undefined {
+	return _workflowSignal;
+}
+
+/**
  * Kill all active CLI child processes.
  * Called when the user cancels/aborts a running workflow.
  * @returns Number of processes that were sent kill signals.
@@ -45,6 +62,25 @@ export function killAllActiveProcesses(): number {
 /** Get count of currently active CLI processes. */
 export function getActiveProcessCount(): number {
 	return activeProcesses.size;
+}
+
+/**
+ * Wire an AbortSignal to kill a child process.
+ * Returns an unsubscribe function to call on process close/error.
+ */
+function wireAbortSignal(proc: ChildProcess, signal?: AbortSignal): () => void {
+	if (!signal) return () => {};
+	const onAbort = () => {
+		try {
+			if (IS_WINDOWS && proc.pid) {
+				spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { shell: true });
+			} else {
+				proc.kill('SIGTERM');
+			}
+		} catch { /* process may already be dead */ }
+	};
+	signal.addEventListener('abort', onAbort, { once: true });
+	return () => signal.removeEventListener('abort', onAbort);
 }
 
 /**
@@ -120,7 +156,8 @@ export function spawnCLIWithStdin(
 	args: string[],
 	cwd: string,
 	timeout: number,
-	stdinContent: string
+	stdinContent: string,
+	signal?: AbortSignal,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
 	if (isLoggerInitialized()) {
 		getLogger().child({ component: 'cli-spawn' }).debug('Spawning CLI process', {
@@ -133,9 +170,15 @@ export function spawnCLIWithStdin(
 	}
 
 	return new Promise((resolve, reject) => {
+		const effectiveSignal = signal ?? _workflowSignal;
+		if (effectiveSignal?.aborted) {
+			return reject(new Error('Aborted'));
+		}
+
 		const opts = buildSpawnOptions(cwd, timeout);
 		const proc = spawn(command, args, opts);
 		activeProcesses.add(proc);
+		const unwireAbort = wireAbortSignal(proc, effectiveSignal);
 
 		const stdoutChunks: Buffer[] = [];
 		const stderrChunks: Buffer[] = [];
@@ -144,6 +187,7 @@ export function spawnCLIWithStdin(
 		proc.stderr!.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 
 		proc.on('close', (code) => {
+			unwireAbort();
 			activeProcesses.delete(proc);
 			const stdout = Buffer.concat(stdoutChunks).toString('utf-8').trim();
 			const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
@@ -161,6 +205,7 @@ export function spawnCLIWithStdin(
 		});
 
 		proc.on('error', (err) => {
+			unwireAbort();
 			activeProcesses.delete(proc);
 			reject(enrichSpawnError(err, command, cwd));
 		});
@@ -180,7 +225,8 @@ export function spawnCLIStreamingWithStdin(
 	cwd: string,
 	timeout: number,
 	stdinContent: string,
-	onLine: (line: string) => void
+	onLine: (line: string) => void,
+	signal?: AbortSignal,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
 	if (isLoggerInitialized()) {
 		getLogger().child({ component: 'cli-spawn' }).debug('Spawning streaming CLI process', {
@@ -192,9 +238,15 @@ export function spawnCLIStreamingWithStdin(
 	}
 
 	return new Promise((resolve, reject) => {
+		const effectiveSignal = signal ?? _workflowSignal;
+		if (effectiveSignal?.aborted) {
+			return reject(new Error('Aborted'));
+		}
+
 		const opts = buildSpawnOptions(cwd, timeout);
 		const proc = spawn(command, args, opts);
 		activeProcesses.add(proc);
+		const unwireAbort = wireAbortSignal(proc, effectiveSignal);
 
 		const stderrChunks: Buffer[] = [];
 		let fullStdout = '';
@@ -218,6 +270,7 @@ export function spawnCLIStreamingWithStdin(
 		proc.stderr!.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 
 		proc.on('close', (code) => {
+			unwireAbort();
 			activeProcesses.delete(proc);
 			if (lineBuffer.trim()) {
 				onLine(lineBuffer.trim());
@@ -230,6 +283,7 @@ export function spawnCLIStreamingWithStdin(
 		});
 
 		proc.on('error', (err) => {
+			unwireAbort();
 			activeProcesses.delete(proc);
 			reject(enrichSpawnError(err, command, cwd));
 		});

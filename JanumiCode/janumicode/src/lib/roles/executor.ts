@@ -16,6 +16,8 @@ import { buildExecutorContext, formatExecutorContext } from '../context';
 import type { CompiledContextPack } from '../context/compiler';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
+import type { CLIActivityEvent } from '../cli/types';
+import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { randomUUID } from 'node:crypto';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { emitWorkflowCommand, emitCLIActivity, getEventBus } from '../integration/eventBus';
@@ -46,6 +48,7 @@ export interface ExecutorInvocationOptions {
 	temperature?: number;
 	includeHistoricalFindings?: boolean;
 	commandId?: string;
+	onEvent?: (event: CLIActivityEvent) => void;
 }
 
 /**
@@ -271,12 +274,12 @@ export async function invokeExecutor(
 			});
 		}
 
-		// Invoke via RoleCLIProvider (CLI tool or API adapter)
-		let cliResult;
+		let cliResult: Result<import('../cli/types').RoleCLIResult>;
 		try {
-			cliResult = await options.provider.invoke({
+			cliResult = await invokeRoleStreaming({
+				provider: options.provider,
 				stdinContent,
-				outputFormat: 'json',
+				onEvent: options.onEvent,
 				mcpConfigPaths: mcpConfigPath ? [mcpConfigPath] : undefined,
 			});
 		} finally {
@@ -836,22 +839,20 @@ export async function invokeExecutorForUnit(
 			console.log(`[PermissionBridge] MCP server log file = ${mcpLogPath}`);
 
 			// Invoke with streaming for real-time progress
-			const executionResult = await provider.invokeStreaming(
-				{
-					stdinContent,
-					outputFormat: 'stream-json',
-					allowedTools,
-					mcpConfigPaths,
-					permissionPromptTool: 'mcp__janumicode-permission__decide_permission',
-				},
-				(event) => {
+			const executionResult = await invokeRoleStreaming({
+				provider,
+				stdinContent,
+				allowedTools,
+				mcpConfigPaths,
+				permissionPromptTool: 'mcp__janumicode-permission__decide_permission',
+				onEvent: (event) => {
 					emitCLIActivity(dialogueId, {
 						...event,
 						role: 'EXECUTOR' as Role,
 						phase: 'EXECUTE' as import('../types').Phase,
 					});
-				}
-			);
+				},
+			});
 
 			const elapsedMs = Date.now() - startMs;
 

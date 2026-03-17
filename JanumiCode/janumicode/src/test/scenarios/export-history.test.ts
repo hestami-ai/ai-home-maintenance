@@ -56,7 +56,9 @@ describe('Scenario: Export History', () => {
 			phases: [Phase.INTAKE, Phase.PROPOSE, Phase.ASSUMPTION_SURFACING, Phase.VERIFY, Phase.REVIEW],
 			dialogueList: [],
 			intakeState: null,
+			architectureState: null,
 			humanFacingState: null,
+			taskGraphProgress: null,
 		};
 
 		const markdown = exportDialogueMarkdown(dialogueId, state);

@@ -21,6 +21,7 @@ export enum Role {
  */
 export enum Phase {
 	INTAKE = 'INTAKE',
+	ARCHITECTURE = 'ARCHITECTURE',
 	PROPOSE = 'PROPOSE',
 	ASSUMPTION_SURFACING = 'ASSUMPTION_SURFACING',
 	VERIFY = 'VERIFY',
@@ -129,15 +130,19 @@ export interface DialogueEnvelope {
 }
 
 /**
- * Dialogue turn record (Section 5.1)
+ * Unified dialogue event record.
+ * Every phase writes events to the `dialogue_events` table through this shape.
  */
-export interface DialogueTurn {
-	turn_id: number;
+export interface DialogueEvent {
+	event_id: number;
 	dialogue_id: string;
-	role: Role;
+	event_type: string;
+	role: Role | 'SYSTEM';
 	phase: Phase;
 	speech_act: SpeechAct;
-	content_ref: string;
+	summary: string;
+	content: string | null;
+	detail: string | null;
 	timestamp: string;
 }
 
@@ -185,6 +190,7 @@ export interface Verdict {
 	constraints_ref: string | null; // Reference to constraint manifest
 	evidence_ref: string | null; // Reference to evidence
 	rationale: string; // Explanation for the verdict
+	novel_dependency: boolean; // Technology not currently in the project
 	timestamp: string; // ISO-8601
 }
 
@@ -395,6 +401,15 @@ export {
 	type DomainCoverageMap,
 	type IntakeModeRecommendation,
 	type IntakeCheckpoint,
+	type PersonaDefinition,
+	type UserJourney,
+	type UserJourneyStep,
+	type PhasingEntry,
+	ProposerPhase,
+	type DomainProposal,
+	type EntityProposal,
+	type WorkflowProposal,
+	type IntegrationProposal,
 	createEmptyPlanDocument,
 	isGatheringResponse,
 } from './intake';

@@ -14,6 +14,8 @@ import {
 } from '../context';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
+import type { CLIActivityEvent } from '../cli/types';
+import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { nanoid } from 'nanoid';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { emitWorkflowCommand } from '../integration/eventBus';
@@ -31,6 +33,7 @@ export interface HistorianInterpreterInvocationOptions {
 	temperature?: number;
 	timeWindowDays?: number;
 	commandId?: string;
+	onEvent?: (event: CLIActivityEvent) => void;
 }
 
 /**
@@ -384,10 +387,11 @@ export async function invokeHistorianInterpreter(
 			});
 		}
 
-		// Invoke via RoleCLIProvider (CLI tool or API adapter)
-		const cliResult = await options.provider.invoke({
+		// Invoke via RoleCLIProvider — streaming when onEvent provided
+		const cliResult = await invokeRoleStreaming({
+			provider: options.provider,
 			stdinContent,
-			outputFormat: 'json',
+			onEvent: options.onEvent,
 		});
 
 		if (!cliResult.success) {
@@ -724,6 +728,7 @@ export interface HistorianAdjudicationOptions {
 	tokenBudget: number;
 	provider: RoleCLIProvider;
 	commandId?: string;
+	onEvent?: (event: CLIActivityEvent) => void;
 }
 
 /**
@@ -772,10 +777,11 @@ export async function invokeHistorianAdjudication(
 			});
 		}
 
-		// Invoke via provider (single LLM call for all claims)
-		const cliResult = await options.provider.invoke({
+		// Invoke via provider — streaming when onEvent provided
+		const cliResult = await invokeRoleStreaming({
+			provider: options.provider,
 			stdinContent,
-			outputFormat: 'json',
+			onEvent: options.onEvent,
 		});
 
 		if (!cliResult.success) {

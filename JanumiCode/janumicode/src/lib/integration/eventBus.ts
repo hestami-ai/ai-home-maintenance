@@ -40,7 +40,10 @@ export type JanumiCodeEventType =
 	| 'intake:checkpoint_triggered'
 	| 'intake:domain_transition'
 	| 'intake:classifier_result'
-	| 'intake:gathering_skipped';
+	| 'intake:gathering_skipped'
+	| 'intake:gathering_complete'
+	| 'intake:analysis_complete'
+	| 'intake:clarification_round_complete';
 
 /**
  * Event data payloads
@@ -190,6 +193,18 @@ export interface EventPayloads {
 	};
 	'intake:gathering_skipped': {
 		dialogueId: string;
+	};
+	'intake:gathering_complete': {
+		dialogueId: string;
+	};
+	'intake:analysis_complete': {
+		dialogueId: string;
+		domainAssessment: Array<{ domain: string; level: string; evidence: string }>;
+	};
+	'intake:clarification_round_complete': {
+		dialogueId: string;
+		round: number;
+		isComplete: boolean;
 	};
 }
 

@@ -6,12 +6,12 @@
 
 import type {
 	DialogueEnvelope,
-	DialogueTurn,
+	DialogueEvent,
 	Result,
 	ContentRef,
 } from '../types';
 import { Role, Phase, SpeechAct } from '../types';
-import { writeDialogueTurn, getDialogueTurns } from '../events';
+import { writeDialogueTurn, getDialogueEvents } from '../events';
 import {
 	createEnvelope,
 	createDialogueId,
@@ -125,7 +125,7 @@ export function getDialogueSession(
 		}
 
 		// Load from database
-		const turnsResult = getDialogueTurns({ dialogue_id, limit: 1 });
+		const turnsResult = getDialogueEvents({ dialogue_id, limit: 1 });
 		if (!turnsResult.success) {
 			return {
 				success: false,
@@ -138,7 +138,7 @@ export function getDialogueSession(
 		}
 
 		// Reconstruct session from database
-		const allTurnsResult = getDialogueTurns({ dialogue_id });
+		const allTurnsResult = getDialogueEvents({ dialogue_id });
 		if (!allTurnsResult.success) {
 			return {
 				success: false,
@@ -152,7 +152,7 @@ export function getDialogueSession(
 		const session: DialogueSession = {
 			dialogue_id,
 			created_at: turns[0].timestamp,
-			last_turn_id: lastTurn.turn_id,
+			last_turn_id: lastTurn.event_id,
 			last_updated: lastTurn.timestamp,
 			current_phase: lastTurn.phase,
 			turn_count: turns.length,
@@ -180,7 +180,7 @@ export function getDialogueSession(
  */
 export function addTurn(
 	envelope: DialogueEnvelope
-): Result<DialogueTurn> {
+): Result<DialogueEvent> {
 	try {
 		// Validate envelope
 		const envelopeValidation = validateEnvelope(envelope);
@@ -255,7 +255,7 @@ export function addTurn(
 		}
 
 		// Update session
-		session.last_turn_id = turnResult.value.turn_id;
+		session.last_turn_id = turnResult.value.event_id;
 		session.last_updated = turnResult.value.timestamp;
 		session.current_phase = envelope.phase;
 		session.turn_count++;
@@ -318,7 +318,7 @@ export function createAndAddTurn(params: {
 	speech_act: SpeechAct;
 	content_ref: ContentRef;
 	related_claims?: string[];
-}): Result<DialogueTurn> {
+}): Result<DialogueEvent> {
 	try {
 		// Get session to determine next turn_id
 		const sessionResult = getDialogueSession(params.dialogue_id);
@@ -485,8 +485,8 @@ export function getSessionTurns(
 	dialogue_id: string,
 	limit?: number,
 	offset?: number
-): Result<DialogueTurn[]> {
-	return getDialogueTurns({
+): Result<DialogueEvent[]> {
+	return getDialogueEvents({
 		dialogue_id,
 		limit,
 		offset,
@@ -505,7 +505,7 @@ export function getDialogueStats(dialogue_id: string): Result<{
 	speech_act_distribution: Record<string, number>;
 }> {
 	try {
-		const turnsResult = getDialogueTurns({ dialogue_id });
+		const turnsResult = getDialogueEvents({ dialogue_id });
 		if (!turnsResult.success) {
 			return {
 				success: false,

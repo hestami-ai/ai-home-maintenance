@@ -6,6 +6,7 @@
 
 import type { Result, Gate, HumanDecision } from '../types';
 import { GateStatus, HumanAction } from '../types';
+import { TaskUnitStatus } from '../types/maker';
 import {
 	getWorkflowState,
 	transitionWorkflow,
@@ -689,7 +690,7 @@ function handleRepairEscalationDecision(
 		case HumanAction.APPROVE: {
 			// Skip the failed unit and continue
 			if (unitId) {
-				updateTaskUnitStatus(unitId, 'SKIPPED');
+				updateTaskUnitStatus(unitId, TaskUnitStatus.SKIPPED);
 				logger?.info('Repair escalation: skipping failed unit', { unitId, failureType });
 			}
 
@@ -706,7 +707,7 @@ function handleRepairEscalationDecision(
 		case HumanAction.OVERRIDE: {
 			// Allow one more repair attempt — reset unit to READY
 			if (unitId) {
-				updateTaskUnitStatus(unitId, 'READY');
+				updateTaskUnitStatus(unitId, TaskUnitStatus.READY);
 				logger?.info('Repair escalation: retrying unit', { unitId, failureType });
 			}
 
@@ -723,7 +724,7 @@ function handleRepairEscalationDecision(
 		case HumanAction.REFRAME: {
 			// Trigger REPLAN with unit-specific feedback
 			if (unitId) {
-				updateTaskUnitStatus(unitId, 'FAILED');
+				updateTaskUnitStatus(unitId, TaskUnitStatus.FAILED);
 			}
 
 			// Store replan rationale in metadata

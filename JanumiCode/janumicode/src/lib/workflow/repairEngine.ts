@@ -26,6 +26,8 @@ import {
 } from '../types/maker';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
+import type { CLIActivityEvent } from '../cli/types';
+import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { createRepairPacket, getRepairPacketsForUnit } from '../database/makerStore';
 
 const IS_WINDOWS = process.platform === 'win32';
@@ -117,7 +119,8 @@ export async function attemptRepair(
 	validation: ValidationPacket,
 	classification: RepairClassification,
 	provider: RoleCLIProvider,
-	workspaceRoot: string
+	workspaceRoot: string,
+	onEvent?: (event: CLIActivityEvent) => void,
 ): Promise<Result<RepairPacket>> {
 	const startTime = Date.now();
 
@@ -141,10 +144,11 @@ export async function attemptRepair(
 			300000 // 5 min max per single repair invocation
 		);
 
-		const invokeResult = await provider.invoke({
+		const invokeResult = await invokeRoleStreaming({
+			provider,
 			stdinContent,
+			onEvent,
 			workingDirectory: workspaceRoot,
-			outputFormat: 'text',
 			timeout,
 		});
 

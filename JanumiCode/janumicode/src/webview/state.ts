@@ -50,6 +50,11 @@ export const state = {
 	mentionActive: false,
 	mentionAtIndex: -1,
 
+	// MMP (Mirror & Menu Protocol) state
+	mmpMirrorDecisions: {} as Record<string, { status: string; editedText?: string }>,
+	mmpMenuSelections: {} as Record<string, { selectedOptionId: string; customResponse?: string }>,
+	mmpPreMortemDecisions: {} as Record<string, { status: string; rationale?: string }>,
+
 	// Command block state
 	cmdBlockLineCounts: {} as Record<string, number>,
 	cmdMaxLines: 50,
@@ -63,3 +68,71 @@ export const state = {
 	speechEnabled: false,
 	soxAvailable: false,
 };
+
+// ===== MMP State Persistence =====
+// Survives webview re-renders and extension restarts within the same VS Code session.
+
+import { vscode } from './types';
+
+interface PersistedMmpState {
+	mmpMirrorDecisions: typeof state.mmpMirrorDecisions;
+	mmpMenuSelections: typeof state.mmpMenuSelections;
+	mmpPreMortemDecisions: typeof state.mmpPreMortemDecisions;
+}
+
+/**
+ * Save current MMP decisions to both VS Code webview state (survives re-renders)
+ * and SQLite via the extension host (survives VS Code restarts).
+ * @param cardId When provided, also posts mmpPartialSave to the extension host for durable persistence.
+ */
+export function persistMmpState(cardId?: string): void {
+	// In-session persistence (webview state API)
+	const existing = (vscode.getState() as Record<string, unknown>) || {};
+	vscode.setState({
+		...existing,
+		mmpMirrorDecisions: state.mmpMirrorDecisions,
+		mmpMenuSelections: state.mmpMenuSelections,
+		mmpPreMortemDecisions: state.mmpPreMortemDecisions,
+	});
+
+	// Durable persistence (SQLite via extension host)
+	if (cardId) {
+		const prefix = cardId + ':';
+		const mirrorDecisions: Record<string, { status: string; editedText?: string }> = {};
+		const menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }> = {};
+		const preMortemDecisions: Record<string, { status: string; rationale?: string }> = {};
+
+		for (const [key, val] of Object.entries(state.mmpMirrorDecisions)) {
+			if (key.startsWith(prefix)) { mirrorDecisions[key] = val; }
+		}
+		for (const [key, val] of Object.entries(state.mmpMenuSelections)) {
+			if (key.startsWith(prefix)) { menuSelections[key] = val; }
+		}
+		for (const [key, val] of Object.entries(state.mmpPreMortemDecisions)) {
+			if (key.startsWith(prefix)) { preMortemDecisions[key] = val; }
+		}
+
+		vscode.postMessage({
+			type: 'mmpPartialSave',
+			cardId,
+			mirrorDecisions,
+			menuSelections,
+			preMortemDecisions,
+		});
+	}
+}
+
+/** Restore MMP decisions from VS Code webview state. Call on script initialization. */
+export function restoreMmpState(): void {
+	const saved = vscode.getState() as PersistedMmpState | null;
+	if (!saved) return;
+	if (saved.mmpMirrorDecisions && typeof saved.mmpMirrorDecisions === 'object') {
+		Object.assign(state.mmpMirrorDecisions, saved.mmpMirrorDecisions);
+	}
+	if (saved.mmpMenuSelections && typeof saved.mmpMenuSelections === 'object') {
+		Object.assign(state.mmpMenuSelections, saved.mmpMenuSelections);
+	}
+	if (saved.mmpPreMortemDecisions && typeof saved.mmpPreMortemDecisions === 'object') {
+		Object.assign(state.mmpPreMortemDecisions, saved.mmpPreMortemDecisions);
+	}
+}

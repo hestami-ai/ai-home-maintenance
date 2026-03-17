@@ -6,7 +6,7 @@
 import type { GovernedStreamState, StreamItem, ReviewItem } from '../ui/governedStream/dataAggregator';
 import { Phase } from '../types/index';
 import { GateStatus, ClaimStatus } from '../types/index';
-import type { DialogueTurn, Claim, Verdict, Gate } from '../types/index';
+import type { DialogueEvent, Claim, Verdict, Gate } from '../types/index';
 import type { WorkflowCommandRecord, WorkflowCommandOutput } from '../workflow/commandStore';
 import type { IntakeConversationTurn, IntakePlanDocument } from '../types/intake';
 
@@ -190,18 +190,19 @@ function exportStreamItem(item: StreamItem, options: ExportOptions): string[] {
 /**
  * Export a dialogue turn
  */
-function exportTurn(turn: DialogueTurn, claims: Claim[], verdict?: Verdict): string[] {
+function exportTurn(turn: DialogueEvent, claims: Claim[], verdict?: Verdict): string[] {
 	const lines: string[] = [];
 	const roleIcon = turn.role === 'HUMAN' ? '👤' : turn.role === 'EXECUTOR' ? '🤖' : '⚙️';
 
-	lines.push(`#### Turn ${turn.turn_id} (${turn.role})`);
+	lines.push(`#### Turn ${turn.event_id} (${turn.role})`);
 	lines.push('');
 	lines.push(`**Phase:** ${turn.phase} | **Speech Act:** ${turn.speech_act}`);
 	lines.push(`**Timestamp:** ${turn.timestamp}`);
 	lines.push('');
 
 	// Content
-	lines.push('> ' + escapeMd(turn.content_ref).split('\n').join('\n> '));
+	const contentRef = turn.content ?? turn.summary;
+	lines.push('> ' + escapeMd(contentRef).split('\n').join('\n> '));
 	lines.push('');
 
 	// Claims introduced
@@ -555,10 +556,18 @@ function exportIntakeTurn(
 	lines.push('> ' + escapeMd(turn.humanMessage).split('\n').join('\n> '));
 	lines.push('');
 
-	// Expert response
-	if (turn.expertResponse?.conversationalResponse) {
+	// Expert response — IntakeTurnResponse/IntakeGatheringTurnResponse have conversationalResponse,
+	// IntakeAnalysisTurnResponse has analysisSummary instead
+	const resp = turn.expertResponse;
+	let respText: string | undefined;
+	if (resp && 'conversationalResponse' in resp) {
+		respText = (resp as { conversationalResponse: string }).conversationalResponse;
+	} else if (resp && 'analysisSummary' in resp) {
+		respText = (resp as { analysisSummary: string }).analysisSummary;
+	}
+	if (respText) {
 		lines.push(`**Technical Expert:**`);
-		lines.push('> ' + escapeMd(turn.expertResponse.conversationalResponse).split('\n').join('\n> '));
+		lines.push('> ' + escapeMd(respText).split('\n').join('\n> '));
 		lines.push('');
 	}
 

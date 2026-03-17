@@ -8,7 +8,7 @@
 
 import { vscode } from './types';
 import type { IncomingMessage } from './types';
-import { state } from './state';
+import { state, restoreMmpState } from './state';
 import { scrollToBottom, scrollToClaimsByStatus, copySessionId } from './utils';
 import {
 	handleFullUpdate,
@@ -56,6 +56,17 @@ import { handleCommandActivity, handleToolCallActivity, toggleCommandBlock, togg
 import { handleRationaleInput, handleClaimRationaleInput, handleReviewItemRationaleInput, handleReviewOverallInput } from './gates';
 import { handleIntakeQuestionInput } from './intake';
 import {
+	handleMirrorDecision,
+	handleMirrorEdit,
+	handleMirrorRationale,
+	handleMenuSelect,
+	handleMenuCustomInput,
+	handlePreMortemDecision,
+	handlePreMortemRationale,
+	handleMMPSubmit,
+	applyPendingMmpDecisions,
+} from './mmp';
+import {
 	handleSpeechToggle,
 	handleSpeechRecordingStarted,
 	handleSpeechTranscribing,
@@ -63,6 +74,14 @@ import {
 	handleSpeechError,
 	handleSpeechCapability,
 } from './speech';
+import {
+	toggleFindWidget,
+	closeFindWidget,
+	openFindWidget,
+	onFindInput,
+	findNext,
+	findPrev,
+} from './findWidget';
 
 // ===== MESSAGE HANDLING =====
 
@@ -141,6 +160,10 @@ window.addEventListener('message', function (event: MessageEvent) {
 		case 'clarificationThreadsLoaded':
 			restoreClarificationThreads(msg.threads);
 			break;
+		case 'pendingMmpDecisionsLoaded':
+			// Merge pending decisions into JS state (visual state handled by server-side rendering)
+			applyPendingMmpDecisions(msg.decisions);
+			break;
 		case 'mentionSuggestions':
 			state.cachedFileList = msg.files || [];
 			if (state.mentionActive && state.mentionAtIndex >= 0) {
@@ -168,6 +191,9 @@ window.addEventListener('message', function (event: MessageEvent) {
 		case 'speechCapability':
 			handleSpeechCapability(msg.data.enabled, msg.data.soxAvailable);
 			break;
+		case 'openFindWidget':
+			openFindWidget();
+			break;
 	}
 });
 
@@ -175,6 +201,10 @@ window.addEventListener('message', function (event: MessageEvent) {
 
 // Click delegation — handles all data-action clicks
 document.addEventListener('click', function (event: MouseEvent) {
+	// Don't intercept clicks on form elements — they have their own input handlers
+	const clickedEl = event.target as HTMLElement;
+	if (clickedEl.tagName === 'TEXTAREA' || clickedEl.tagName === 'INPUT' || clickedEl.tagName === 'SELECT') { return; }
+
 	let target = event.target as HTMLElement | null;
 	// Walk up to find the nearest element with data-action
 	while (target && target !== document.documentElement && !(target.dataset && target.dataset.action)) {
@@ -211,6 +241,12 @@ document.addEventListener('click', function (event: MouseEvent) {
 		}
 		case 'toggle-settings':
 			toggleSettingsPanel();
+			break;
+		case 'toggle-find':
+			toggleFindWidget();
+			break;
+		case 'close-find':
+			closeFindWidget();
 			break;
 		case 'set-key':
 			requestSetKey(target.dataset.role || '');
@@ -380,9 +416,144 @@ document.addEventListener('click', function (event: MouseEvent) {
 				}
 			}
 			break;
+		// MMP (Mirror & Menu Protocol) actions
+		case 'mirror-accept':
+			if (target.dataset.mmpItem && target.dataset.mmpCard) {
+				handleMirrorDecision(target.dataset.mmpItem, target.dataset.mmpCard, 'accepted');
+			}
+			break;
+		case 'mirror-reject':
+			if (target.dataset.mmpItem && target.dataset.mmpCard) {
+				handleMirrorDecision(target.dataset.mmpItem, target.dataset.mmpCard, 'rejected');
+			}
+			break;
+		case 'mirror-defer':
+			if (target.dataset.mmpItem && target.dataset.mmpCard) {
+				handleMirrorDecision(target.dataset.mmpItem, target.dataset.mmpCard, 'deferred');
+			}
+			break;
+		case 'mirror-edit':
+			if (target.dataset.mmpItem && target.dataset.mmpCard) {
+				handleMirrorEdit(target.dataset.mmpItem, target.dataset.mmpCard);
+			}
+			break;
+		case 'mirror-rationale':
+			if (target.dataset.mmpItem && target.dataset.mmpCard) {
+				handleMirrorRationale(target.dataset.mmpItem, target.dataset.mmpCard);
+			}
+			break;
+		case 'menu-select':
+			if (target.dataset.mmpMenuId && target.dataset.mmpOptionId && target.dataset.mmpCard) {
+				handleMenuSelect(target.dataset.mmpMenuId, target.dataset.mmpOptionId, target.dataset.mmpCard);
+			}
+			break;
+		case 'premortem-accept':
+			if (target.dataset.mmpItem && target.dataset.mmpCard) {
+				handlePreMortemDecision(target.dataset.mmpItem, target.dataset.mmpCard, 'accepted');
+			}
+			break;
+		case 'premortem-reject':
+			if (target.dataset.mmpItem && target.dataset.mmpCard) {
+				handlePreMortemDecision(target.dataset.mmpItem, target.dataset.mmpCard, 'rejected');
+			}
+			break;
+		case 'mmp-submit':
+			if (target.dataset.mmpCard) {
+				handleMMPSubmit(target.dataset.mmpCard);
+			}
+			break;
 		case 'toggle-speech':
 			if (target.dataset.speechTarget) {
 				handleSpeechToggle(target.dataset.speechTarget);
+			}
+			break;
+		// Architecture gate actions
+		case 'architecture-approve':
+			if (target.dataset.dialogueId && target.dataset.docId) {
+				vscode.postMessage({
+					type: 'architectureGateDecision',
+					action: 'APPROVE',
+					dialogueId: target.dataset.dialogueId,
+					docId: target.dataset.docId,
+				});
+				// Disable all gate buttons
+				const approveCard = target.closest('.architecture-gate');
+				if (approveCard) {
+					approveCard.querySelectorAll('.gate-btn').forEach(function (btn) {
+						(btn as HTMLButtonElement).disabled = true;
+					});
+				}
+			}
+			break;
+		case 'architecture-revise': {
+			if (target.dataset.dialogueId && target.dataset.docId) {
+				// Toggle feedback textarea visibility
+				const reviseCard = target.closest('.architecture-gate');
+				const feedbackArea = reviseCard?.querySelector('.architecture-feedback-area') as HTMLElement | null;
+				if (feedbackArea) {
+					const isVisible = feedbackArea.classList.contains('visible');
+					if (isVisible) {
+						// Submit the feedback
+						const textarea = feedbackArea.querySelector('textarea') as HTMLTextAreaElement | null;
+						const feedback = textarea?.value.trim() || '';
+						if (feedback.length < 10) {
+							// Flash the textarea to indicate more input needed
+							feedbackArea.classList.add('shake');
+							setTimeout(function () { feedbackArea.classList.remove('shake'); }, 500);
+							break;
+						}
+						vscode.postMessage({
+							type: 'architectureGateDecision',
+							action: 'REVISE',
+							dialogueId: target.dataset.dialogueId,
+							docId: target.dataset.docId,
+							feedback: feedback,
+						});
+						// Disable all gate buttons
+						reviseCard?.querySelectorAll('.gate-btn').forEach(function (btn) {
+							(btn as HTMLButtonElement).disabled = true;
+						});
+					} else {
+						feedbackArea.classList.add('visible');
+						const textarea = feedbackArea.querySelector('textarea') as HTMLTextAreaElement | null;
+						if (textarea) { textarea.focus(); }
+						// Change button text to indicate submit
+						target.textContent = 'Submit Feedback';
+					}
+				}
+			}
+			break;
+		}
+		case 'architecture-skip':
+			if (target.dataset.dialogueId && target.dataset.docId) {
+				vscode.postMessage({
+					type: 'architectureGateDecision',
+					action: 'SKIP',
+					dialogueId: target.dataset.dialogueId,
+					docId: target.dataset.docId,
+				});
+				const skipCard = target.closest('.architecture-gate');
+				if (skipCard) {
+					skipCard.querySelectorAll('.gate-btn').forEach(function (btn) {
+						(btn as HTMLButtonElement).disabled = true;
+					});
+				}
+			}
+			break;
+		case 'architecture-decompose-deeper':
+			if (target.dataset.dialogueId && target.dataset.docId) {
+				vscode.postMessage({
+					type: 'architectureDecomposeDeeper',
+					dialogueId: target.dataset.dialogueId,
+					docId: target.dataset.docId,
+				});
+				const deeperCard = target.closest('.architecture-gate');
+				if (deeperCard) {
+					deeperCard.querySelectorAll('.gate-btn').forEach(function (btn) {
+						(btn as HTMLButtonElement).disabled = true;
+					});
+				}
+				target.textContent = 'Decomposing...';
 			}
 			break;
 		case 'cancel-workflow':
@@ -457,6 +628,13 @@ document.addEventListener('input', function (event: Event) {
 	}
 	if (target.dataset && target.dataset.intakeQuestionId && target.classList.contains('intake-question-textarea')) {
 		handleIntakeQuestionInput(target.dataset.intakeQuestionId, (target as HTMLTextAreaElement).value);
+	}
+	// MMP textarea inputs
+	if (target.dataset && target.dataset.mmpCustomTextarea && target.dataset.mmpCard) {
+		handleMenuCustomInput(target.dataset.mmpCustomTextarea, target.dataset.mmpCard, (target as HTMLTextAreaElement).value);
+	}
+	if (target.dataset && target.dataset.mmpPmRationale && target.dataset.mmpCard) {
+		handlePreMortemRationale(target.dataset.mmpPmRationale, target.dataset.mmpCard, (target as HTMLTextAreaElement).value);
 	}
 	if (target.id === 'user-input') {
 		updateComposerEmpty(target);
@@ -602,6 +780,41 @@ if (submitBtn) {
 		}
 	});
 }
+
+// ===== FIND WIDGET WIRING =====
+
+// Find input: live search on typing, Enter/Shift+Enter for next/prev, Escape to close
+const findInput = document.getElementById('find-input') as HTMLInputElement | null;
+if (findInput) {
+	findInput.addEventListener('input', onFindInput);
+	findInput.addEventListener('keydown', function (event: KeyboardEvent) {
+		if (event.key === 'Enter' && event.shiftKey) {
+			event.preventDefault();
+			findPrev();
+		} else if (event.key === 'Enter') {
+			event.preventDefault();
+			findNext();
+		}
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			closeFindWidget();
+		}
+	});
+}
+
+const findNextBtn = document.getElementById('find-next-btn');
+if (findNextBtn) { findNextBtn.addEventListener('click', findNext); }
+
+const findPrevBtn = document.getElementById('find-prev-btn');
+if (findPrevBtn) { findPrevBtn.addEventListener('click', findPrev); }
+
+const findCloseBtn = document.getElementById('find-close-btn');
+if (findCloseBtn) { findCloseBtn.addEventListener('click', closeFindWidget); }
+
+// ===== RESTORE MMP STATE INTO JS =====
+// Restore decision state from webview state API so click handlers can toggle correctly.
+// Visual state is handled by server-side rendering (classes baked into HTML).
+restoreMmpState();
 
 // ===== INITIAL SCROLL =====
 setTimeout(scrollToBottom, 100);

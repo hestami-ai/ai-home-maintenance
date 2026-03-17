@@ -202,6 +202,17 @@ export function handleSetInputEnabled(data: SetInputEnabledData): void {
 
 export function handleSetProcessing(data: SetProcessingData): void {
 	const existing = document.getElementById('processing-indicator');
+
+	// Toggle stream-processing class to disable all interactive elements during processing
+	const streamContainer = document.querySelector('.governed-stream-container');
+	if (streamContainer) {
+		if (data.active) {
+			streamContainer.classList.add('stream-processing');
+		} else {
+			streamContainer.classList.remove('stream-processing');
+		}
+	}
+
 	if (!data.active) {
 		if (existing) { existing.remove(); }
 		return;

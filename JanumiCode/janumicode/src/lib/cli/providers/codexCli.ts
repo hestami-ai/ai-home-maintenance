@@ -74,7 +74,7 @@ export class CodexCLIProvider implements RoleCLIProvider {
 			const timeout = options.timeout || 300000;
 
 			const args = buildCodexArgs(options);
-			const raw = await spawnCLIWithStdin(codexPath, args, cwd, timeout, options.stdinContent);
+			const raw = await spawnCLIWithStdin(codexPath, args, cwd, timeout, options.stdinContent, options.signal);
 			const executionTime = Date.now() - startTime;
 
 			const parsed = parseCodexOutput(raw.stdout);
@@ -142,15 +142,17 @@ export class CodexCLIProvider implements RoleCLIProvider {
 					if (event) {
 						onEvent(event);
 					}
-				}
+				},
+				options.signal,
 			);
 
 			const executionTime = Date.now() - startTime;
 
+			const stderrText = raw.stderr?.trim() || '';
 			onEvent({
 				timestamp: new Date().toISOString(),
 				eventType: 'complete',
-				summary: `Completed (exit code ${raw.exitCode})`,
+				summary: `Completed (exit code ${raw.exitCode})` + (stderrText ? ` — ${stderrText.substring(0, 200)}` : ''),
 				status: raw.exitCode === 0 ? 'success' : 'error',
 			});
 
@@ -160,7 +162,7 @@ export class CodexCLIProvider implements RoleCLIProvider {
 			return {
 				success: true,
 				value: {
-					response: parsed.response,
+					response: parsed.response || stderrText,
 					exitCode: raw.exitCode,
 					executionTime,
 					tokenUsage: parsed.tokenUsage,

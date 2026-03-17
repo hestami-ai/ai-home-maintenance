@@ -30,6 +30,17 @@ import { ClaudeCodeRoleCLIProvider } from './lib/cli/providers/claudeCode';
 import { GeminiCLIProvider } from './lib/cli/providers/geminiCli';
 import { CodexCLIProvider } from './lib/cli/providers/codexCli';
 import { initializeLogger, getLogger, parseLogLevel } from './lib/logging';
+import { killAllActiveProcesses, getActiveProcessCount } from './lib/cli/spawnUtils';
+import { resetEventBus } from './lib/integration/eventBus';
+import { getActivePermissionBridge } from './lib/mcp/permissionBridge';
+import { shutdownEmbeddingProvider } from './lib/embedding/factory';
+import { unsubscribeCommandPersistence } from './lib/workflow/commandStore';
+
+/**
+ * Module-level state for graceful shutdown
+ */
+let cleanupDone = false;
+let activeProcessStatusBarItem: vscode.StatusBarItem | undefined;
 
 /**
  * Load environment variables from a .env file in the extension root.
@@ -118,32 +129,40 @@ export async function activate(
 
 	// Initialize database
 	const dbLog = logger.child({ component: 'database' });
-	dbLog.info('Initializing database...');
+	dbLog.info('Initializing database...', { path: config.databasePath });
+	console.log('[JanumiCode] DB init starting, path:', config.databasePath);
 	const dbInitResult = initializeDatabase({
 		path: config.databasePath,
 	});
 
 	if (!dbInitResult.success) {
-		dbLog.error('Failed to initialize database', { error: dbInitResult.error.message });
-		vscode.window.showErrorMessage(`JanumiCode: Failed to initialize database: ${dbInitResult.error.message}`);
+		const msg = `Failed to initialize database: ${dbInitResult.error.message}`;
+		dbLog.error(msg);
+		console.error('[JanumiCode]', msg);
+		vscode.window.showErrorMessage(`JanumiCode: ${msg}`);
 		return;
 	}
 
 	const db = dbInitResult.value;
 	dbLog.info('Database connection established');
+	console.log('[JanumiCode] DB connection OK');
 
 	// Run migrations (initialize schema)
 	dbLog.info('Running database migrations...');
+	console.log('[JanumiCode] Running migrations...');
 	const schemaResult = initializeSchema(db);
 
 	if (!schemaResult.success) {
-		dbLog.error('Failed to initialize schema', { error: schemaResult.error.message });
-		vscode.window.showErrorMessage(`JanumiCode: Failed to initialize schema: ${schemaResult.error.message}`);
+		const msg = `Failed to initialize schema: ${schemaResult.error.message}`;
+		dbLog.error(msg);
+		console.error('[JanumiCode]', msg);
+		vscode.window.showErrorMessage(`JanumiCode: ${msg}`);
 		closeDatabase();
 		return;
 	}
 
 	dbLog.info('Database schema initialized successfully');
+	console.log('[JanumiCode] Schema OK');
 
 	// Get and log database stats
 	const stats = getDatabaseStats();
@@ -181,16 +200,50 @@ export async function activate(
 	context.subscriptions.push(configWatcher);
 
 	// Register webview providers
+	console.log('[JanumiCode] Registering webview providers...');
 	const governedStreamProvider = registerWebviewProviders(context);
+	console.log('[JanumiCode] Webview providers registered');
 
 	// Register commands
 	registerCommands(context, governedStreamProvider);
+	console.log('[JanumiCode] Commands registered');
 
 	// Setup status bar
 	setupStatusBar(context);
 
+	// Active process status bar monitor
+	setupActiveProcessMonitor(context);
+
+	// Register terminate processes command
+	const terminateCmd = vscode.commands.registerCommand(
+		'janumicode.confirmTerminateProcesses',
+		async () => {
+			const count = getActiveProcessCount();
+			if (count === 0) {
+				vscode.window.showInformationMessage('JanumiCode: No active CLI processes.');
+				return;
+			}
+
+			const choice = await vscode.window.showWarningMessage(
+				`JanumiCode: ${count} CLI process${count > 1 ? 'es' : ''} currently running. Terminate all?`,
+				{ modal: true },
+				'Terminate All',
+				'Let Them Finish'
+			);
+
+			if (choice === 'Terminate All') {
+				const killed = killAllActiveProcesses();
+				vscode.window.showInformationMessage(
+					`JanumiCode: Terminated ${killed} CLI process${killed > 1 ? 'es' : ''}.`
+				);
+			}
+		}
+	);
+	context.subscriptions.push(terminateCmd);
+
 	// Show activation success
 	logger.info('Extension activated successfully');
+	console.log('[JanumiCode] Extension activated successfully');
 	vscode.window.showInformationMessage('JanumiCode: Ready');
 }
 
@@ -242,6 +295,51 @@ function setupStatusBar(context: vscode.ExtensionContext): void {
 }
 
 /**
+ * Setup active process status bar monitor.
+ * Shows a status bar item when CLI subprocesses are running.
+ * Clicking it opens a confirmation dialog to terminate processes.
+ */
+function setupActiveProcessMonitor(context: vscode.ExtensionContext): void {
+	activeProcessStatusBarItem = vscode.window.createStatusBarItem(
+		vscode.StatusBarAlignment.Right,
+		50
+	);
+	activeProcessStatusBarItem.command = 'janumicode.confirmTerminateProcesses';
+	activeProcessStatusBarItem.backgroundColor = new vscode.ThemeColor(
+		'statusBarItem.warningBackground'
+	);
+	context.subscriptions.push(activeProcessStatusBarItem);
+
+	const updateProcessCount = () => {
+		const count = getActiveProcessCount();
+		if (count > 0 && activeProcessStatusBarItem) {
+			activeProcessStatusBarItem.text = `$(debug-stop) ${count} CLI`;
+			activeProcessStatusBarItem.tooltip = `${count} active JanumiCode CLI process${count > 1 ? 'es' : ''} — click to terminate`;
+			activeProcessStatusBarItem.show();
+		} else if (activeProcessStatusBarItem) {
+			activeProcessStatusBarItem.hide();
+		}
+	};
+
+	// Subscribe to event bus for process activity changes
+	try {
+		const { getEventBus } = require('./lib/integration/eventBus');
+		const bus = getEventBus();
+		bus.on('cli:activity', updateProcessCount);
+		bus.on('workflow:command', updateProcessCount);
+	} catch {
+		// Event bus not yet initialized — polling fallback is sufficient
+	}
+
+	// Polling fallback (event bus may not fire on process exit)
+	const pollInterval = setInterval(updateProcessCount, 5000);
+	context.subscriptions.push({ dispose: () => clearInterval(pollInterval) });
+
+	// Initial check
+	updateProcessCount();
+}
+
+/**
  * Register extension commands
  */
 function registerCommands(context: vscode.ExtensionContext, streamProvider: GovernedStreamViewProvider): void {
@@ -282,6 +380,15 @@ function registerCommands(context: vscode.ExtensionContext, streamProvider: Gove
 		}
 	);
 	context.subscriptions.push(openSettingsCmd);
+
+	// Find in stream command — opens the find widget in the Governed Stream sidebar
+	const findInStreamCmd = vscode.commands.registerCommand(
+		'janumicode.findInStream',
+		() => {
+			streamProvider.openFindWidget();
+		}
+	);
+	context.subscriptions.push(findInStreamCmd);
 
 	// Validate configuration command
 	const validateConfigCmd = vscode.commands.registerCommand(
@@ -476,25 +583,127 @@ function registerCommands(context: vscode.ExtensionContext, streamProvider: Gove
 }
 
 /**
+ * Graceful shutdown — shared cleanup function called by both
+ * onWillShutdown and deactivate(). Idempotent via cleanupDone flag.
+ *
+ * Cleanup order (each step wrapped in its own try/catch):
+ * 1. Kill active CLI subprocesses (highest priority — external resources)
+ * 2. Stop permission bridge HTTP server
+ * 3. Shut down embedding provider (VoyageRPC child process)
+ * 4. Unsubscribe command persistence event listener
+ * 5. Reset event bus (clear all remaining listeners)
+ * 6. Close database (last — prior steps may need to log/write)
+ */
+async function performGracefulShutdown(): Promise<void> {
+	if (cleanupDone) {
+		return;
+	}
+	cleanupDone = true;
+
+	// Suppress expected unhandled rejections during shutdown.
+	// When CLI processes are killed and channels close, pending promises reject
+	// with "Canceled" or "Channel has been closed" after deactivate() returns.
+	// These are expected and harmless — suppress them to avoid debug console noise.
+	const shutdownRejectionHandler = (reason: unknown) => {
+		const msg = reason instanceof Error ? reason.message : String(reason);
+		if (msg.includes('Canceled') || msg.includes('Channel has been closed') || msg.includes('client not ready')) {
+			// Expected during shutdown — swallow silently
+			return;
+		}
+		// Unexpected rejection during shutdown — log but don't crash
+		console.error('[JanumiCode] Unexpected rejection during shutdown:', msg);
+	};
+	process.on('unhandledRejection', shutdownRejectionHandler);
+
+	const logger = (() => {
+		try { return getLogger(); }
+		catch { return null; }
+	})();
+
+	logger?.info('Performing graceful shutdown...');
+
+	// 1. Abort workflow signal + kill active CLI subprocesses
+	try {
+		const { setWorkflowAbortSignal } = await import('./lib/cli/spawnUtils.js');
+		setWorkflowAbortSignal(undefined); // Clear module-level signal so no new processes start
+		const killed = killAllActiveProcesses();
+		if (killed > 0) {
+			logger?.info('Killed active CLI processes', { count: killed });
+		}
+	} catch (err) {
+		logger?.error('Error killing CLI processes', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+
+	// 2. Stop permission bridge HTTP server
+	try {
+		const bridge = getActivePermissionBridge();
+		if (bridge) {
+			await bridge.stop();
+			logger?.info('Permission bridge stopped');
+		}
+	} catch (err) {
+		logger?.error('Error stopping permission bridge', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+
+	// 3. Shut down embedding provider (VoyageRPC child process)
+	try {
+		await shutdownEmbeddingProvider();
+		logger?.info('Embedding provider shut down');
+	} catch (err) {
+		logger?.error('Error shutting down embedding provider', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+
+	// 4. Unsubscribe command persistence event listener
+	try {
+		unsubscribeCommandPersistence();
+	} catch (err) {
+		logger?.error('Error unsubscribing command persistence', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+
+	// 5. Reset event bus (clear all remaining listeners)
+	try {
+		resetEventBus();
+		logger?.info('Event bus reset');
+	} catch (err) {
+		logger?.error('Error resetting event bus', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+
+	// 6. Close database (last)
+	try {
+		const closeResult = closeDatabase();
+		if (closeResult.success) {
+			logger?.info('Database connection closed');
+		} else {
+			logger?.error('Error closing database', { error: closeResult.error.message });
+		}
+	} catch (err) {
+		logger?.error('Error closing database', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+
+	logger?.info('Graceful shutdown complete');
+}
+
+/**
  * Extension deactivation
  * Called when the extension is deactivated
  */
-export function deactivate(): void {
+export async function deactivate(): Promise<void> {
 	try {
-		const logger = getLogger();
-		logger.info('Deactivating extension...');
-
-		// Close database connection
-		const closeResult = closeDatabase();
-		if (closeResult.success) {
-			logger.info('Database connection closed');
-		} else {
-			logger.error('Error closing database', { error: closeResult.error.message });
-		}
-
-		logger.info('Extension deactivated');
+		await performGracefulShutdown();
 	} catch {
-		// Logger may not be initialized if activation failed
-		closeDatabase();
+		// Last resort — at least close the database
+		try { closeDatabase(); } catch { /* swallow */ }
 	}
 }

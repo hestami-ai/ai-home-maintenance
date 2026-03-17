@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { getLogger, isLoggerInitialized } from '../logging';
 import type {
 	Result,
-	DialogueTurn,
+	DialogueEvent,
 	Claim,
 	ClaimEvent,
 	Verdict,
@@ -18,18 +18,16 @@ import type {
 	Artifact,
 	ArtifactReference,
 	IntakeConversationState,
-	IntakeConversationTurn,
 	IntakePlanDocument,
 	IntakeAccumulation,
-	IntakeTurnResponse,
-	IntakeGatheringTurnResponse,
 	DomainCoverageMap,
 	IntakeModeRecommendation,
 	IntakeCheckpoint,
 } from '../types';
-import { createEmptyPlanDocument } from '../types/intake';
 import {
 	Role,
+	Phase,
+	SpeechAct,
 	ClaimEventType,
 	VerdictType,
 	IntakeSubState,
@@ -39,13 +37,21 @@ import {
 import { getDatabase } from '../database';
 
 /**
- * Write a dialogue turn to the database
- * @param turn Partial turn data (turn_id will be auto-generated)
- * @returns Result containing the created turn or error
+ * Write a unified dialogue event to the `dialogue_events` table.
+ *
+ * Every phase (INTAKE, PROPOSE, EXECUTE, etc.) writes through this single function.
+ * `detail` is automatically JSON-stringified if an object is passed.
  */
-export function writeDialogueTurn(
-	turn: Omit<DialogueTurn, 'turn_id' | 'timestamp'>
-): Result<DialogueTurn> {
+export function writeDialogueEvent(event: {
+	dialogue_id: string;
+	event_type: string;
+	role: string;
+	phase: string;
+	speech_act: string;
+	summary: string;
+	content?: string | null;
+	detail?: unknown;
+}): Result<DialogueEvent> {
 	const db = getDatabase();
 	if (!db) {
 		return {
@@ -55,34 +61,61 @@ export function writeDialogueTurn(
 	}
 
 	try {
+		const detailStr =
+			event.detail === null || event.detail === undefined
+				? null
+				: typeof event.detail === 'string'
+					? event.detail
+					: JSON.stringify(event.detail);
+
 		const stmt = db.prepare(`
-            INSERT INTO dialogue_turns (dialogue_id, role, phase, speech_act, content_ref, timestamp)
-            VALUES (?, ?, ?, ?, ?, datetime('now'))
+            INSERT INTO dialogue_events (dialogue_id, event_type, role, phase, speech_act, summary, content, detail, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `);
 
 		const info = stmt.run(
-			turn.dialogue_id,
-			turn.role,
-			turn.phase,
-			turn.speech_act,
-			turn.content_ref
+			event.dialogue_id,
+			event.event_type,
+			event.role,
+			event.phase,
+			event.speech_act,
+			event.summary,
+			event.content ?? null,
+			detailStr
 		);
 
-		// Retrieve the created turn
-		const createdTurn = db
-			.prepare('SELECT * FROM dialogue_turns WHERE turn_id = ?')
-			.get(info.lastInsertRowid) as DialogueTurn;
+		const created = db
+			.prepare('SELECT * FROM dialogue_events WHERE event_id = ?')
+			.get(info.lastInsertRowid) as DialogueEvent;
 
-		return { success: true, value: createdTurn };
+		return { success: true, value: created };
 	} catch (error) {
 		return {
 			success: false,
 			error:
 				error instanceof Error
 					? error
-					: new Error('Failed to write dialogue turn'),
+					: new Error('Failed to write dialogue event'),
 		};
 	}
+}
+
+/**
+ * Write a dialogue turn to the database.
+ * Thin wrapper over writeDialogueEvent() that accepts the legacy field names.
+ */
+export function writeDialogueTurn(
+	turn: { dialogue_id: string; role: string; phase: string; speech_act: string; content_ref: string }
+): Result<DialogueEvent> {
+	return writeDialogueEvent({
+		dialogue_id: turn.dialogue_id,
+		event_type: 'legacy',
+		role: turn.role,
+		phase: turn.phase,
+		speech_act: turn.speech_act,
+		summary: turn.content_ref.substring(0, 120),
+		content: turn.content_ref,
+	});
 }
 
 /**
@@ -231,8 +264,8 @@ export function writeVerdict(
 		const verdictId = randomUUID();
 
 		const stmt = db.prepare(`
-            INSERT INTO verdicts (verdict_id, claim_id, verdict, constraints_ref, evidence_ref, rationale, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            INSERT OR IGNORE INTO verdicts (verdict_id, claim_id, verdict, constraints_ref, evidence_ref, rationale, novel_dependency, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `);
 
 		stmt.run(
@@ -241,7 +274,8 @@ export function writeVerdict(
 			verdict.verdict,
 			verdict.constraints_ref,
 			verdict.evidence_ref,
-			verdict.rationale
+			verdict.rationale,
+			verdict.novel_dependency ? 1 : 0
 		);
 
 		// Update claim status based on verdict
@@ -274,10 +308,11 @@ export function writeVerdict(
 			});
 		}
 
-		// Retrieve the created verdict
-		const createdVerdict = db
+		// Retrieve the created verdict (coerce SQLite integer → boolean)
+		const rawVerdict = db
 			.prepare('SELECT * FROM verdicts WHERE verdict_id = ?')
-			.get(verdictId) as Verdict;
+			.get(verdictId) as Omit<Verdict, 'novel_dependency'> & { novel_dependency: number };
+		const createdVerdict: Verdict = { ...rawVerdict, novel_dependency: !!rawVerdict.novel_dependency };
 
 		// Incremental FTS indexing (best-effort)
 		if (verdict.rationale?.trim()) {
@@ -565,95 +600,6 @@ export function writeArtifactReference(
 // ==================== INTAKE CONVERSATION WRITERS ====================
 
 /**
- * Write a new INTAKE conversation turn to the database.
- * Stores the paired human message + expert response + plan snapshot.
- * @returns The created turn record
- */
-export function writeIntakeTurn(options: {
-	dialogueId: string;
-	turnNumber: number;
-	humanMessage: string;
-	expertResponse: IntakeTurnResponse | IntakeGatheringTurnResponse;
-	planSnapshot: IntakePlanDocument | null;
-	tokenCount: number;
-	isGathering?: boolean;
-}): Result<IntakeConversationTurn> {
-	const db = getDatabase();
-	if (!db) {
-		return {
-			success: false,
-			error: new Error('Database not initialized'),
-		};
-	}
-
-	try {
-		const expertResponseJson = JSON.stringify(options.expertResponse);
-		// During gathering, planSnapshot is null — store empty plan doc (column is NOT NULL)
-		const planSnapshotJson = JSON.stringify(
-			options.planSnapshot ?? createEmptyPlanDocument()
-		);
-
-		const stmt = db.prepare(
-			`INSERT INTO intake_turns (dialogue_id, turn_number, human_message, expert_response, plan_snapshot, token_count, is_gathering, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
-		);
-
-		const info = stmt.run(
-			options.dialogueId,
-			options.turnNumber,
-			options.humanMessage,
-			expertResponseJson,
-			planSnapshotJson,
-			options.tokenCount,
-			options.isGathering ? 1 : 0,
-		);
-
-		const created = db
-			.prepare('SELECT * FROM intake_turns WHERE id = ?')
-			.get(info.lastInsertRowid) as {
-			id: number;
-			dialogue_id: string;
-			turn_number: number;
-			human_message: string;
-			expert_response: string;
-			plan_snapshot: string;
-			token_count: number;
-			is_gathering: number;
-			created_at: string;
-		};
-
-		const parsedPlan = JSON.parse(created.plan_snapshot) as IntakePlanDocument;
-
-		return {
-			success: true,
-			value: {
-				id: created.id,
-				dialogueId: created.dialogue_id,
-				turnNumber: created.turn_number,
-				humanMessage: created.human_message,
-				expertResponse: JSON.parse(
-					created.expert_response
-				) as IntakeTurnResponse | IntakeGatheringTurnResponse,
-				planSnapshot: parsedPlan.version === 0 && !parsedPlan.title
-					? null
-					: parsedPlan,
-				tokenCount: created.token_count,
-				isGathering: created.is_gathering === 1,
-				createdAt: created.created_at,
-			},
-		};
-	} catch (error) {
-		return {
-			success: false,
-			error:
-				error instanceof Error
-					? error
-					: new Error('Failed to write intake turn'),
-		};
-	}
-}
-
-/**
  * Update the INTAKE conversation state.
  * Supports partial updates — only provided fields are changed.
  */
@@ -673,6 +619,8 @@ export function updateIntakeConversation(
 		classifierResult?: IntakeModeRecommendation | null;
 		// V17 Inverted flow
 		clarificationRound?: number;
+		// MMP history
+		mmpHistory?: import('../types/mmp').MMPHistoryEntry[];
 	}
 ): Result<IntakeConversationState> {
 	const db = getDatabase();
@@ -745,6 +693,11 @@ export function updateIntakeConversation(
 			setClauses.push('clarification_round = ?');
 			params.push(updates.clarificationRound);
 		}
+		// MMP history
+		if (updates.mmpHistory !== undefined) {
+			setClauses.push('mmp_history = ?');
+			params.push(JSON.stringify(updates.mmpHistory));
+		}
 
 		params.push(dialogueId);
 
@@ -772,6 +725,8 @@ export function updateIntakeConversation(
 			current_domain: string | null;
 			checkpoints: string | null;
 			classifier_result: string | null;
+			clarification_round: number;
+			mmp_history: string | null;
 		};
 
 		if (!row) {
@@ -811,6 +766,12 @@ export function updateIntakeConversation(
 				classifierResult: row.classifier_result
 					? (JSON.parse(row.classifier_result) as IntakeModeRecommendation)
 					: null,
+				// V17 Inverted flow
+				clarificationRound: row.clarification_round ?? 0,
+				// MMP history
+				mmpHistory: row.mmp_history
+					? (JSON.parse(row.mmp_history) as import('../types/mmp').MMPHistoryEntry[])
+					: [],
 			},
 		};
 	} catch (error) {
@@ -822,6 +783,130 @@ export function updateIntakeConversation(
 					: new Error('Failed to update intake conversation'),
 		};
 	}
+}
+
+// ==================== ARCHITECTURE EVENT WRITERS ====================
+
+/**
+ * Write an architecture decomposition event (DECOMPOSING sub-state output).
+ */
+export function writeArchitectureDecompositionEvent(
+	dialogueId: string,
+	capabilityCount: number,
+	workflowCount: number,
+	content: string
+): Result<DialogueEvent> {
+	return writeDialogueEvent({
+		dialogue_id: dialogueId,
+		event_type: 'architecture_decomposition',
+		role: Role.TECHNICAL_EXPERT,
+		phase: Phase.ARCHITECTURE,
+		speech_act: SpeechAct.CLAIM,
+		summary: `Identified ${capabilityCount} capabilities, ${workflowCount} workflows`,
+		content,
+		detail: { subState: 'DECOMPOSING', capabilityCount, workflowCount },
+	});
+}
+
+/**
+ * Write an architecture design event (DESIGNING sub-state output).
+ */
+export function writeArchitectureDesignEvent(
+	dialogueId: string,
+	componentCount: number,
+	dataModelCount: number,
+	interfaceCount: number,
+	iteration: number,
+	content: string
+): Result<DialogueEvent> {
+	return writeDialogueEvent({
+		dialogue_id: dialogueId,
+		event_type: 'architecture_design',
+		role: Role.TECHNICAL_EXPERT,
+		phase: Phase.ARCHITECTURE,
+		speech_act: SpeechAct.CLAIM,
+		summary: `Designed ${componentCount} components, ${dataModelCount} data models, ${interfaceCount} interfaces`,
+		content,
+		detail: { subState: 'DESIGNING', iteration, componentCount, dataModelCount, interfaceCount },
+	});
+}
+
+/**
+ * Write an architecture validation event (VALIDATING sub-state output).
+ */
+export function writeArchitectureValidationEvent(
+	dialogueId: string,
+	goalAlignmentScore: number | null,
+	findings: string[]
+): Result<DialogueEvent> {
+	return writeDialogueEvent({
+		dialogue_id: dialogueId,
+		event_type: 'architecture_validation',
+		role: Role.HISTORIAN,
+		phase: Phase.ARCHITECTURE,
+		speech_act: SpeechAct.EVIDENCE,
+		summary: `Goal alignment: ${goalAlignmentScore !== null ? Math.round(goalAlignmentScore * 100) + '%' : 'N/A'}, ${findings.length} findings`,
+		content: JSON.stringify({ goalAlignmentScore, findings }),
+		detail: { goalAlignmentScore, findings },
+	});
+}
+
+/**
+ * Write an architecture presentation event (ready for human review).
+ */
+export function writeArchitecturePresentationEvent(
+	dialogueId: string,
+	docId: string,
+	version: number,
+	summary: string
+): Result<DialogueEvent> {
+	return writeDialogueEvent({
+		dialogue_id: dialogueId,
+		event_type: 'architecture_presentation',
+		role: Role.TECHNICAL_EXPERT,
+		phase: Phase.ARCHITECTURE,
+		speech_act: SpeechAct.CLAIM,
+		summary: `Architecture v${version} ready for review`,
+		content: summary,
+		detail: { docId, version },
+	});
+}
+
+/**
+ * Write an architecture approval event.
+ */
+export function writeArchitectureApprovalEvent(
+	dialogueId: string,
+	docId: string,
+	version: number
+): Result<DialogueEvent> {
+	return writeDialogueEvent({
+		dialogue_id: dialogueId,
+		event_type: 'architecture_approval',
+		role: Role.HUMAN,
+		phase: Phase.ARCHITECTURE,
+		speech_act: SpeechAct.DECISION,
+		summary: `Architecture v${version} approved`,
+		detail: { docId, version },
+	});
+}
+
+/**
+ * Write an architecture revision request event.
+ */
+export function writeArchitectureRevisionEvent(
+	dialogueId: string,
+	feedback: string
+): Result<DialogueEvent> {
+	return writeDialogueEvent({
+		dialogue_id: dialogueId,
+		event_type: 'architecture_revision',
+		role: Role.HUMAN,
+		phase: Phase.ARCHITECTURE,
+		speech_act: SpeechAct.DECISION,
+		summary: `Requested changes to architecture`,
+		content: feedback,
+	});
 }
 
 // ==================== Q&A EXCHANGE WRITER ====================

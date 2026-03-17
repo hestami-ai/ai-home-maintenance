@@ -95,6 +95,20 @@ export function clearEmbeddingProviderCache(): void {
 	cachedProviderName = null;
 }
 
+/**
+ * Shut down the cached embedding provider if it supports graceful shutdown.
+ * Called during extension deactivation to clean up long-lived child processes
+ * (e.g., VoyageRPCClient's ONNX inference process).
+ */
+export async function shutdownEmbeddingProvider(): Promise<void> {
+	if (cachedProvider && 'shutdown' in cachedProvider
+		&& typeof (cachedProvider as any).shutdown === 'function') {
+		await (cachedProvider as any).shutdown();
+	}
+	cachedProvider = null;
+	cachedProviderName = null;
+}
+
 // ==================== Register built-in providers ====================
 
 registerEmbeddingProvider('voyage-api', () => {

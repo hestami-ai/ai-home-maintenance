@@ -220,6 +220,9 @@ export function formatIntakeTechnicalExpertContext(
 function formatPlanSection(plan: IntakePlanDocument): string {
 	const parts: string[] = ['# Current Draft Plan (v' + plan.version + ')'];
 
+	if (plan.requestCategory) {
+		parts.push(`**Request Category:** ${plan.requestCategory}`);
+	}
 	if (plan.title) {
 		parts.push(`**Title:** ${plan.title}`);
 	}
@@ -227,43 +230,99 @@ function formatPlanSection(plan: IntakePlanDocument): string {
 		parts.push(`**Summary:** ${plan.summary}`);
 	}
 
-	if (plan.requirements.length > 0) {
+	const requirements = plan.requirements ?? [];
+	const decisions = plan.decisions ?? [];
+	const constraints = plan.constraints ?? [];
+	const openQuestions = plan.openQuestions ?? [];
+	const technicalNotes = plan.technicalNotes ?? [];
+
+	if (requirements.length > 0) {
 		parts.push('## Requirements');
-		for (const item of plan.requirements) {
+		for (const item of requirements) {
 			parts.push(`- [${item.id}] ${item.text}`);
 		}
 	}
 
-	if (plan.decisions.length > 0) {
+	if (decisions.length > 0) {
 		parts.push('## Decisions');
-		for (const item of plan.decisions) {
+		for (const item of decisions) {
 			parts.push(`- [${item.id}] ${item.text}`);
 		}
 	}
 
-	if (plan.constraints.length > 0) {
+	if (constraints.length > 0) {
 		parts.push('## Constraints');
-		for (const item of plan.constraints) {
+		for (const item of constraints) {
 			parts.push(`- [${item.id}] ${item.text}`);
 		}
 	}
 
-	if (plan.openQuestions.length > 0) {
+	if (openQuestions.length > 0) {
 		parts.push('## Open Questions');
-		for (const item of plan.openQuestions) {
+		for (const item of openQuestions) {
 			parts.push(`- [${item.id}] ${item.text}`);
 		}
 	}
 
-	if (plan.technicalNotes.length > 0) {
+	if (technicalNotes.length > 0) {
 		parts.push('## Technical Notes');
-		for (const note of plan.technicalNotes) {
+		for (const note of technicalNotes) {
 			parts.push(`- ${note}`);
 		}
 	}
 
 	if (plan.proposedApproach) {
 		parts.push(`## Proposed Approach\n\n${plan.proposedApproach}`);
+	}
+
+	// Product artifacts
+	if (plan.productVision) {
+		parts.push(`## Product Vision\n\n${plan.productVision}`);
+	}
+	if (plan.productDescription) {
+		parts.push(`## Product Description\n\n${plan.productDescription}`);
+	}
+	if (plan.personas && plan.personas.length > 0) {
+		parts.push('## Personas');
+		for (const p of plan.personas) {
+			parts.push(`- [${p.id}] **${p.name}**: ${p.description}`);
+			if ((p.goals ?? []).length > 0) parts.push(`  Goals: ${p.goals.join('; ')}`);
+			if ((p.painPoints ?? []).length > 0) parts.push(`  Pain points: ${p.painPoints.join('; ')}`);
+		}
+	}
+	if (plan.userJourneys && plan.userJourneys.length > 0) {
+		parts.push('## User Journeys');
+		for (const j of plan.userJourneys) {
+			parts.push(`- [${j.id}] **${j.title}** (${j.personaId}, ${j.priority}): ${j.scenario}`);
+			const steps = (j.steps ?? []).filter(s => s.actor || s.action);
+			if (steps.length > 0) {
+				for (const s of steps) {
+					parts.push(`  ${s.stepNumber ?? 0}. ${s.actor || ''} → ${s.action || ''} → ${s.expectedOutcome || ''}`);
+				}
+			}
+			if ((j.acceptanceCriteria ?? []).length > 0) {
+				parts.push(`  Acceptance: ${j.acceptanceCriteria.join('; ')}`);
+			}
+		}
+	}
+	if (plan.phasingStrategy && plan.phasingStrategy.length > 0) {
+		parts.push('## Phasing Strategy');
+		for (const ph of plan.phasingStrategy) {
+			const journeyList = (ph.journeyIds ?? []).length > 0 ? ` (journeys: ${ph.journeyIds.join(', ')})` : '';
+			parts.push(`- **${ph.phase ?? ''}**: ${ph.description ?? ''}${journeyList} — ${ph.rationale ?? ''}`);
+		}
+	}
+	if (plan.successMetrics && plan.successMetrics.length > 0) {
+		parts.push('## Success Metrics');
+		for (const m of plan.successMetrics) {
+			parts.push(`- ${m}`);
+		}
+	}
+	if (plan.uxRequirements && plan.uxRequirements.length > 0) {
+		parts.push('## UX Requirements');
+		for (const ux of plan.uxRequirements) {
+			parts.push(`- ${ux}`);
+		}
 	}
 
 	return parts.join('\n\n');

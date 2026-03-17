@@ -304,12 +304,18 @@ export function clearAllData(): Result<void> {
 				'acceptance_contracts',          // FK → intent_records
 				'intent_records',
 				'toolchain_detections',
+				// Architecture phase tables (children before parents)
+				'arch_implementation_steps',  // FK → architecture_documents
+				'arch_components',            // FK → architecture_documents, self-ref
+				'arch_workflows',             // FK → architecture_documents, arch_capabilities
+				'arch_domain_mappings',       // FK → architecture_documents, arch_capabilities
+				'arch_capabilities',          // FK → architecture_documents
+				'architecture_documents',     // FK → dialogues
 				// Schema-managed tables (children before parents)
 				'embeddings',
 				'narrative_memories',
 				'decision_traces',
 				'open_loops',
-				'intake_turns',
 				'intake_conversations',
 				'workflow_command_outputs',
 				'workflow_commands',
@@ -322,7 +328,7 @@ export function clearAllData(): Result<void> {
 				'artifact_references',
 				'artifacts',
 				'constraint_manifests',
-				'dialogue_turns',
+				'dialogue_events',
 				'dialogues',
 			];
 

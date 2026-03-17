@@ -4,7 +4,7 @@
  * This is NOT an LLM-backed agent - it's a pure data layer for event sourcing
  */
 
-import type { Result, DialogueTurn, Claim, Verdict, HumanDecision } from '../types';
+import type { Result, Claim, Verdict, HumanDecision } from '../types';
 import { getDatabase } from '../database';
 
 /**
@@ -169,7 +169,7 @@ function queryDialogueTurns(
 	}
 
 	if (options.turnId) {
-		conditions.push('turn_id = ?');
+		conditions.push('event_id = ?');
 		params.push(options.turnId);
 	}
 
@@ -184,22 +184,33 @@ function queryDialogueTurns(
 	}
 
 	const query = `
-		SELECT turn_id, dialogue_id, role, phase, speech_act,
-		       content_ref, artifact_refs, timestamp
-		FROM dialogue_turns
+		SELECT event_id, dialogue_id, role, phase, speech_act,
+		       summary, content, timestamp
+		FROM dialogue_events
 		WHERE ${conditions.join(' AND ')}
 		ORDER BY timestamp ASC
 	`;
 
-	const rows = db.prepare(query).all(...params) as DialogueTurn[];
+	const rows = db.prepare(query).all(...params) as Array<{
+		event_id: number; dialogue_id: string; role: string; phase: string;
+		speech_act: string; summary: string; content: string | null; timestamp: string;
+	}>;
 
 	const events: HistoryEvent[] = rows.map((row) => ({
-		event_id: row.turn_id.toString(),
+		event_id: row.event_id.toString(),
 		event_type: HistoryEventType.DIALOGUE_TURN,
 		timestamp: row.timestamp,
 		dialogue_id: row.dialogue_id,
-		turn_id: row.turn_id.toString(),
-		data: row,
+		turn_id: row.event_id.toString(),
+		data: {
+			turn_id: row.event_id,
+			dialogue_id: row.dialogue_id,
+			role: row.role,
+			phase: row.phase,
+			speech_act: row.speech_act,
+			content_ref: row.content ?? row.summary,
+			timestamp: row.timestamp,
+		},
 	}));
 
 	return { success: true, value: events };

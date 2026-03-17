@@ -31,6 +31,8 @@ export enum HistorianQueryType {
 	PRECEDENT_SEARCH = 'PRECEDENT_SEARCH',
 	INVARIANT_VIOLATION = 'INVARIANT_VIOLATION',
 	GENERAL_HISTORY = 'GENERAL_HISTORY',
+	GOAL_ALIGNMENT_CHECK = 'GOAL_ALIGNMENT_CHECK',
+	ARCHITECTURE_DRIFT_CHECK = 'ARCHITECTURE_DRIFT_CHECK',
 }
 
 /**
@@ -280,9 +282,9 @@ async function enhanceForGeneralHistory(
 
 	if (turnsResult.success && turnsResult.value.length > 0) {
 		const turnNotes = turnsResult.value.map((t) => {
-			const meta = `Turn ${t.item.turn_id}: ${t.item.role} - ${t.item.phase} - ${t.item.speech_act}`;
+			const meta = `Turn ${t.item.event_id}: ${t.item.role} - ${t.item.phase} - ${t.item.speech_act}`;
 			// Include content summary (truncated) so the historian has actual substance
-			const content = t.item.content_ref;
+			const content = t.item.content ?? t.item.summary;
 			if (!content) { return meta; }
 			// Try to extract readable text from JSON-stringified content
 			let readable = content;

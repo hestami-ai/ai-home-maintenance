@@ -6,7 +6,7 @@
 
 import type {
 	Result,
-	DialogueTurn,
+	DialogueEvent,
 	Claim,
 	ClaimEvent,
 	Verdict,
@@ -26,8 +26,6 @@ import type {
 	IntakeConversationTurn,
 	IntakePlanDocument,
 	IntakeAccumulation,
-	IntakeTurnResponse,
-	IntakeGatheringTurnResponse,
 	DomainCoverageMap,
 	IntakeModeRecommendation,
 	IntakeCheckpoint,
@@ -37,8 +35,9 @@ import { getDatabase } from '../database';
 
 // ==================== FILTER TYPES ====================
 
-export interface DialogueTurnFilter {
+export interface DialogueEventFilter {
 	dialogue_id?: string;
+	event_type?: string;
 	role?: Role;
 	phase?: Phase;
 	since?: string; // ISO-8601 timestamp
@@ -93,16 +92,15 @@ export interface HumanDecisionFilter {
 	offset?: number;
 }
 
-// ==================== DIALOGUE TURN READERS ====================
+// ==================== DIALOGUE EVENT READERS ====================
 
 /**
- * Get all dialogue turns with optional filtering
- * @param filter Optional filter criteria
- * @returns Array of dialogue turns
+ * Get dialogue events with optional filtering.
+ * Queries the unified `dialogue_events` table.
  */
-export function getDialogueTurns(
-	filter?: DialogueTurnFilter
-): Result<DialogueTurn[]> {
+export function getDialogueEvents(
+	filter?: DialogueEventFilter
+): Result<DialogueEvent[]> {
 	const db = getDatabase();
 	if (!db) {
 		return {
@@ -112,12 +110,17 @@ export function getDialogueTurns(
 	}
 
 	try {
-		let sql = 'SELECT * FROM dialogue_turns WHERE 1=1';
+		let sql = 'SELECT * FROM dialogue_events WHERE 1=1';
 		const params: unknown[] = [];
 
 		if (filter?.dialogue_id) {
 			sql += ' AND dialogue_id = ?';
 			params.push(filter.dialogue_id);
+		}
+
+		if (filter?.event_type) {
+			sql += ' AND event_type = ?';
+			params.push(filter.event_type);
 		}
 
 		if (filter?.role) {
@@ -140,7 +143,7 @@ export function getDialogueTurns(
 			params.push(filter.until);
 		}
 
-		sql += ' ORDER BY turn_id ASC';
+		sql += ' ORDER BY event_id ASC';
 
 		if (filter?.limit) {
 			sql += ' LIMIT ?';
@@ -152,28 +155,26 @@ export function getDialogueTurns(
 			params.push(filter.offset);
 		}
 
-		const turns = db.prepare(sql).all(...params) as DialogueTurn[];
+		const events = db.prepare(sql).all(...params) as DialogueEvent[];
 
-		return { success: true, value: turns };
+		return { success: true, value: events };
 	} catch (error) {
 		return {
 			success: false,
 			error:
 				error instanceof Error
 					? error
-					: new Error('Failed to get dialogue turns'),
+					: new Error('Failed to get dialogue events'),
 		};
 	}
 }
 
 /**
- * Get a single dialogue turn by turn_id
- * @param turn_id Turn ID
- * @returns Dialogue turn or null
+ * Get a single dialogue event by event_id.
  */
-export function getDialogueTurnById(
-	turn_id: number
-): Result<DialogueTurn | null> {
+export function getDialogueEventById(
+	eventId: number
+): Result<DialogueEvent | null> {
 	const db = getDatabase();
 	if (!db) {
 		return {
@@ -183,18 +184,18 @@ export function getDialogueTurnById(
 	}
 
 	try {
-		const turn = db
-			.prepare('SELECT * FROM dialogue_turns WHERE turn_id = ?')
-			.get(turn_id) as DialogueTurn | undefined;
+		const event = db
+			.prepare('SELECT * FROM dialogue_events WHERE event_id = ?')
+			.get(eventId) as DialogueEvent | undefined;
 
-		return { success: true, value: turn || null };
+		return { success: true, value: event || null };
 	} catch (error) {
 		return {
 			success: false,
 			error:
 				error instanceof Error
 					? error
-					: new Error('Failed to get dialogue turn'),
+					: new Error('Failed to get dialogue event'),
 		};
 	}
 }
@@ -416,7 +417,8 @@ export function getVerdicts(filter?: VerdictFilter): Result<Verdict[]> {
 			params.push(filter.offset);
 		}
 
-		const verdicts = db.prepare(sql).all(...params) as Verdict[];
+		const rawVerdicts = db.prepare(sql).all(...params) as (Omit<Verdict, 'novel_dependency'> & { novel_dependency: number })[];
+		const verdicts = rawVerdicts.map(v => ({ ...v, novel_dependency: !!v.novel_dependency }));
 
 		return { success: true, value: verdicts };
 	} catch (error) {
@@ -707,21 +709,28 @@ interface IntakeConversationRow {
 	classifier_result: string | null;
 	// V17 Inverted flow
 	clarification_round: number;
+	// MMP history
+	mmp_history: string | null;
 }
 
 /**
- * Raw row shape from the intake_turns table (JSON fields are strings)
+ * Parse a dialogue_events row (with INTAKE event_type) into IntakeConversationTurn.
+ * The `detail` JSON contains: humanMessage, expertResponse, planSnapshot, turnNumber,
+ * isGathering, tokenCount (and possibly other fields depending on event_type).
  */
-interface IntakeTurnRow {
-	id: number;
-	dialogue_id: string;
-	turn_number: number;
-	human_message: string;
-	expert_response: string;
-	plan_snapshot: string;
-	token_count: number;
-	is_gathering: number;
-	created_at: string;
+function parseDialogueEventToIntakeTurn(row: DialogueEvent): IntakeConversationTurn {
+	const detail = row.detail ? JSON.parse(row.detail) : {};
+	return {
+		id: row.event_id,
+		dialogueId: row.dialogue_id,
+		turnNumber: detail.turnNumber ?? 0,
+		humanMessage: detail.humanMessage ?? '',
+		expertResponse: detail.expertResponse,
+		planSnapshot: detail.planSnapshot ?? detail.initialPlan ?? null,
+		tokenCount: detail.tokenCount ?? 0,
+		isGathering: row.event_type === 'intake_gathering',
+		createdAt: row.timestamp,
+	};
 }
 
 /**
@@ -756,29 +765,10 @@ function parseIntakeConversationRow(
 			: null,
 		// V17 Inverted flow
 		clarificationRound: row.clarification_round ?? 0,
-	};
-}
-
-/**
- * Parse a raw intake_turns row into typed IntakeConversationTurn
- */
-function parseIntakeTurnRow(row: IntakeTurnRow): IntakeConversationTurn {
-	const isGathering = row.is_gathering === 1;
-	const parsedPlan = JSON.parse(row.plan_snapshot) as IntakePlanDocument;
-	return {
-		id: row.id,
-		dialogueId: row.dialogue_id,
-		turnNumber: row.turn_number,
-		humanMessage: row.human_message,
-		expertResponse: JSON.parse(row.expert_response) as
-			IntakeTurnResponse | IntakeGatheringTurnResponse,
-		// Gathering turns store an empty plan doc — return null instead
-		planSnapshot: isGathering || (parsedPlan.version === 0 && !parsedPlan.title)
-			? null
-			: parsedPlan,
-		tokenCount: row.token_count,
-		isGathering,
-		createdAt: row.created_at,
+		// MMP history
+		mmpHistory: row.mmp_history
+			? (JSON.parse(row.mmp_history) as import('../types/mmp').MMPHistoryEntry[])
+			: [],
 	};
 }
 
@@ -876,9 +866,13 @@ export function getOrCreateIntakeConversation(
 	}
 }
 
+/** Event types that represent INTAKE expert responses */
+const INTAKE_EVENT_TYPES = "('intake_turn', 'intake_analysis', 'intake_clarification', 'intake_gathering')";
+
 /**
- * Get INTAKE conversation turns for a dialogue, ordered by turn number.
- * Supports limit and offset for pagination / sliding window queries.
+ * Get INTAKE conversation turns for a dialogue, ordered by event_id.
+ * Queries `dialogue_events` with INTAKE event types, parses `detail` JSON
+ * to reconstruct the IntakeConversationTurn shape.
  */
 export function getIntakeTurns(
 	dialogueId: string,
@@ -894,7 +888,7 @@ export function getIntakeTurns(
 
 	try {
 		let sql =
-			'SELECT * FROM intake_turns WHERE dialogue_id = ? ORDER BY turn_number ASC';
+			`SELECT * FROM dialogue_events WHERE dialogue_id = ? AND event_type IN ${INTAKE_EVENT_TYPES} ORDER BY event_id ASC`;
 		const params: unknown[] = [dialogueId];
 
 		if (options?.limit) {
@@ -907,11 +901,11 @@ export function getIntakeTurns(
 			params.push(options.offset);
 		}
 
-		const rows = db.prepare(sql).all(...params) as IntakeTurnRow[];
+		const rows = db.prepare(sql).all(...params) as DialogueEvent[];
 
 		return {
 			success: true,
-			value: rows.map(parseIntakeTurnRow),
+			value: rows.map((r) => parseDialogueEventToIntakeTurn(r)),
 		};
 	} catch (error) {
 		return {
@@ -925,7 +919,7 @@ export function getIntakeTurns(
 }
 
 /**
- * Get INTAKE gathering turns for a dialogue (is_gathering = 1).
+ * Get INTAKE gathering turns for a dialogue.
  * Returns turns in chronological order.
  */
 export function getGatheringTurns(
@@ -942,13 +936,13 @@ export function getGatheringTurns(
 	try {
 		const rows = db
 			.prepare(
-				'SELECT * FROM intake_turns WHERE dialogue_id = ? AND is_gathering = 1 ORDER BY turn_number ASC'
+				`SELECT * FROM dialogue_events WHERE dialogue_id = ? AND event_type = 'intake_gathering' ORDER BY event_id ASC`
 			)
-			.all(dialogueId) as IntakeTurnRow[];
+			.all(dialogueId) as DialogueEvent[];
 
 		return {
 			success: true,
-			value: rows.map(parseIntakeTurnRow),
+			value: rows.map((r) => parseDialogueEventToIntakeTurn(r)),
 		};
 	} catch (error) {
 		return {
@@ -982,17 +976,18 @@ export function getRecentIntakeTurns(
 		const rows = db
 			.prepare(
 				`SELECT * FROM (
-					SELECT * FROM intake_turns
+					SELECT * FROM dialogue_events
 					WHERE dialogue_id = ?
-					ORDER BY turn_number DESC
+					AND event_type IN ${INTAKE_EVENT_TYPES}
+					ORDER BY event_id DESC
 					LIMIT ?
-				) ORDER BY turn_number ASC`
+				) ORDER BY event_id ASC`
 			)
-			.all(dialogueId, count) as IntakeTurnRow[];
+			.all(dialogueId, count) as DialogueEvent[];
 
 		return {
 			success: true,
-			value: rows.map(parseIntakeTurnRow),
+			value: rows.map((r) => parseDialogueEventToIntakeTurn(r)),
 		};
 	} catch (error) {
 		return {
@@ -1007,43 +1002,25 @@ export function getRecentIntakeTurns(
 
 /**
  * Get INTAKE turns within a specific turn number range (for accumulation).
- * Returns turns in chronological order.
+ * Since turnNumber is stored in JSON detail, we load all INTAKE events
+ * and filter in JS. This is acceptable for INTAKE conversations (< 30 turns).
  */
 export function getIntakeTurnsInRange(
 	dialogueId: string,
 	fromTurnNumber: number,
 	toTurnNumber: number
 ): Result<IntakeConversationTurn[]> {
-	const db = getDatabase();
-	if (!db) {
-		return {
-			success: false,
-			error: new Error('Database not initialized'),
-		};
+	const result = getIntakeTurns(dialogueId);
+	if (!result.success) {
+		return result;
 	}
 
-	try {
-		const rows = db
-			.prepare(
-				`SELECT * FROM intake_turns
-				 WHERE dialogue_id = ? AND turn_number > ? AND turn_number <= ?
-				 ORDER BY turn_number ASC`
-			)
-			.all(dialogueId, fromTurnNumber, toTurnNumber) as IntakeTurnRow[];
-
-		return {
-			success: true,
-			value: rows.map(parseIntakeTurnRow),
-		};
-	} catch (error) {
-		return {
-			success: false,
-			error:
-				error instanceof Error
-					? error
-					: new Error('Failed to get intake turns in range'),
-		};
-	}
+	return {
+		success: true,
+		value: result.value.filter(
+			(t) => t.turnNumber > fromTurnNumber && t.turnNumber <= toTurnNumber
+		),
+	};
 }
 
 /**
@@ -1074,6 +1051,66 @@ export function getLatestConstraintManifest(): Result<ConstraintManifest | null>
 				error instanceof Error
 					? error
 					: new Error('Failed to get latest constraint manifest'),
+		};
+	}
+}
+
+// ==================== ARCHITECTURE EVENT READERS ====================
+
+/** Architecture event types for filtering */
+const ARCHITECTURE_EVENT_TYPES = "('architecture_decomposition', 'architecture_design', 'architecture_validation', 'architecture_presentation', 'architecture_approval', 'architecture_revision')";
+
+/**
+ * Get all architecture-phase dialogue events for a dialogue, ordered chronologically.
+ */
+export function getArchitectureEvents(
+	dialogueId: string
+): Result<DialogueEvent[]> {
+	const db = getDatabase();
+	if (!db) {
+		return { success: false, error: new Error('Database not initialized') };
+	}
+
+	try {
+		const rows = db.prepare(
+			`SELECT * FROM dialogue_events
+			 WHERE dialogue_id = ? AND event_type IN ${ARCHITECTURE_EVENT_TYPES}
+			 ORDER BY event_id ASC`
+		).all(dialogueId) as DialogueEvent[];
+
+		return { success: true, value: rows };
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error : new Error('Failed to get architecture events'),
+		};
+	}
+}
+
+/**
+ * Get the latest architecture validation event for a dialogue.
+ * Useful for checking goal alignment score before transitioning.
+ */
+export function getLatestArchitectureValidation(
+	dialogueId: string
+): Result<DialogueEvent | null> {
+	const db = getDatabase();
+	if (!db) {
+		return { success: false, error: new Error('Database not initialized') };
+	}
+
+	try {
+		const row = db.prepare(
+			`SELECT * FROM dialogue_events
+			 WHERE dialogue_id = ? AND event_type = 'architecture_validation'
+			 ORDER BY event_id DESC LIMIT 1`
+		).get(dialogueId) as DialogueEvent | undefined;
+
+		return { success: true, value: row ?? null };
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error : new Error('Failed to get architecture validation'),
 		};
 	}
 }

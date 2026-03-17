@@ -221,7 +221,9 @@ export type IncomingMessage =
 	| { type: 'speechTranscribing'; data: SpeechTranscribingData }
 	| { type: 'speechResult'; data: SpeechResultData }
 	| { type: 'speechError'; data: SpeechErrorData }
-	| { type: 'speechCapability'; data: SpeechCapabilityData };
+	| { type: 'speechCapability'; data: SpeechCapabilityData }
+	| { type: 'openFindWidget' }
+	| { type: 'pendingMmpDecisionsLoaded'; decisions: Record<string, { mirrorDecisions: Record<string, { status: string; editedText?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string }>; productEdits: Record<string, string> }> };
 
 // ===== Outgoing Messages (Webview → Extension Host) =====
 
@@ -252,6 +254,11 @@ export type OutgoingMessage =
 	| { type: 'cancelWorkflow' }
 	| { type: 'cancelThinking' }
 	| { type: 'intakeSkipGathering' }
+	| { type: 'reviewMmpDecision'; gateId: string; cardId: string; mirrorDecisions: Record<string, { status: string; editedText?: string; text?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string; question?: string; selectedLabel?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string; assumption?: string }> }
+	| { type: 'mmpSubmit'; cardId: string; mirrorDecisions: Record<string, { status: string; editedText?: string; text?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string; question?: string; selectedLabel?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string; assumption?: string }>; productEdits?: Record<string, string> }
+	| { type: 'architectureGateDecision'; action: string; dialogueId: string; docId: string; feedback?: string }
+	| { type: 'architectureDecomposeDeeper'; dialogueId: string; docId: string }
+	| { type: 'mmpPartialSave'; cardId: string; mirrorDecisions: Record<string, { status: string; editedText?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string }> }
 	| { type: 'speechStart'; targetInputId: string }
 	| { type: 'speechStop' }
 	| { type: 'speechCancel' };

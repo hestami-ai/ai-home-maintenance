@@ -174,6 +174,7 @@ export function executeSafeQuery(
 	// Execute
 	try {
 		const db = getDatabase();
+		if (!db) { return { success: false, rows: [], rowCount: 0, truncated: false, formattedResult: '', error: 'Database not initialized' }; }
 		const rows = db.prepare(limitedSql).all() as Record<string, unknown>[];
 
 		log?.debug('SQL query executed', { rowCount: rows.length, sql: limitedSql.substring(0, 200) });

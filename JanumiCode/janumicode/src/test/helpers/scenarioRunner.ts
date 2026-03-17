@@ -17,7 +17,7 @@ import { createDialogueRecord } from '../../lib/dialogue/lifecycle';
 import { initializeWorkflowState, transitionWorkflow, getWorkflowState, TransitionTrigger } from '../../lib/workflow/stateMachine';
 import { createGate, resolveGate, hasOpenGates } from '../../lib/workflow/gates';
 import { writeDialogueTurn, writeClaim, writeVerdict, writeHumanDecision } from '../../lib/events/writer';
-import { Phase, Role, SpeechAct, ClaimCriticality, ClaimStatus, VerdictType, GateStatus } from '../../lib/types';
+import { Phase, Role, SpeechAct, ClaimCriticality, ClaimStatus, VerdictType, GateStatus, HumanAction } from '../../lib/types';
 
 /**
  * Scenario definition — describes a governed workflow to simulate.
@@ -195,7 +195,7 @@ export async function runScenario(scenario: GovernedScenario): Promise<ScenarioR
 				introduced_by: Role.EXECUTOR,
 				criticality: claimDef.criticality,
 				status: ClaimStatus.OPEN,
-				turn_id: proposalTurn.value.turn_id,
+				turn_id: proposalTurn.value.event_id,
 			});
 
 			if (claimResult.success) {
@@ -225,6 +225,7 @@ export async function runScenario(scenario: GovernedScenario): Promise<ScenarioR
 					constraints_ref: null,
 					evidence_ref: null,
 					rationale: `Automated test verdict: ${claim.verdict}`,
+					novel_dependency: false,
 				});
 
 				if (verdictResult.success) {
@@ -275,8 +276,9 @@ export async function runScenario(scenario: GovernedScenario): Promise<ScenarioR
 					if (resolution) {
 						const decisionResult = writeHumanDecision({
 							gate_id: gateResult.value.gate_id,
-							action: resolution.action,
+							action: resolution.action as HumanAction,
 							rationale: resolution.rationale,
+							attachments_ref: null,
 						});
 
 						if (decisionResult.success) {

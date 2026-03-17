@@ -5,7 +5,7 @@
  */
 
 import * as vscode from 'vscode';
-import type { DialogueTurn, Claim } from '../types';
+import type { DialogueEvent, Claim } from '../types';
 import { getDatabase } from '../database';
 
 /**
@@ -87,14 +87,14 @@ export class DialogueViewProvider implements vscode.WebviewViewProvider {
 		const turns = db
 			.prepare(
 				`
-			SELECT turn_id, dialogue_id, role, phase, speech_act,
-			       content_ref, timestamp
-			FROM dialogue_turns
+			SELECT event_id AS turn_id, dialogue_id, role, phase, speech_act,
+			       event_type, summary, COALESCE(content, summary) AS content_ref, timestamp
+			FROM dialogue_events
 			ORDER BY timestamp DESC
 			LIMIT 100
 		`
 			)
-			.all() as DialogueTurn[];
+			.all() as (DialogueEvent & { content_ref: string })[];
 
 		// Get recent claims
 		const claims = db

@@ -39,7 +39,7 @@ describe('Event Writer', () => {
 			expect(result.value.dialogue_id).toBe(DLG_ID);
 			expect(result.value.role).toBe(Role.EXECUTOR);
 			expect(result.value.phase).toBe(Phase.PROPOSE);
-			expect(result.value.turn_id).toBeGreaterThan(0);
+			expect(result.value.event_id).toBeTruthy();
 			expect(result.value.timestamp).toBeTruthy();
 		}
 	});
@@ -62,7 +62,7 @@ describe('Event Writer', () => {
 			introduced_by: Role.EXECUTOR,
 			criticality: ClaimCriticality.CRITICAL,
 			status: ClaimStatus.OPEN,
-			turn_id: turnResult.value.turn_id,
+			turn_id: turnResult.value.event_id,
 		});
 		expect(result.success).toBe(true);
 		if (result.success) {
@@ -92,7 +92,7 @@ describe('Event Writer', () => {
 			introduced_by: Role.EXECUTOR,
 			criticality: ClaimCriticality.NON_CRITICAL,
 			status: ClaimStatus.OPEN,
-			turn_id: turnResult.value.turn_id,
+			turn_id: turnResult.value.event_id,
 		});
 		expect(claimResult.success).toBe(true);
 		if (!claimResult.success) { return; }
@@ -103,6 +103,7 @@ describe('Event Writer', () => {
 			constraints_ref: null,
 			evidence_ref: null,
 			rationale: 'tsconfig.json found in workspace root',
+			novel_dependency: false,
 		});
 		expect(verdictResult.success).toBe(true);
 		if (verdictResult.success) {

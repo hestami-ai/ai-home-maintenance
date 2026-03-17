@@ -11,6 +11,8 @@ import {
 } from '../context';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
+import type { CLIActivityEvent } from '../cli/types';
+import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { nanoid } from 'nanoid';
 import { getLogger, isLoggerInitialized } from '../logging';
 
@@ -25,6 +27,7 @@ export interface TechnicalExpertInvocationOptions {
 	provider: RoleCLIProvider;
 	temperature?: number;
 	includeHistoricalEvidence?: boolean;
+	onEvent?: (event: CLIActivityEvent) => void;
 }
 
 /**
@@ -152,10 +155,10 @@ export async function invokeTechnicalExpert(
 		// Build stdin content: system prompt + formatted context
 		const stdinContent = buildStdinContent(TECHNICAL_EXPERT_SYSTEM_PROMPT, formattedContext);
 
-		// Invoke via RoleCLIProvider (CLI tool or API adapter)
-		const cliResult = await options.provider.invoke({
+		const cliResult = await invokeRoleStreaming({
+			provider: options.provider,
 			stdinContent,
-			outputFormat: 'json',
+			onEvent: options.onEvent,
 		});
 
 		if (!cliResult.success) {

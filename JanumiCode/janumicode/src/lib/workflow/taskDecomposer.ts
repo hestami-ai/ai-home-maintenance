@@ -18,9 +18,12 @@ import type {
 import { TASK_GRAPH_LIMITS } from '../types/maker';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
+import type { CLIActivityEvent } from '../cli/types';
+import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { createTaskGraph } from '../database/makerStore';
 import { buildTaskGraphFromResponse, checkDecompositionQuality } from './taskGraph';
 import type { RawTaskUnit, RawTaskEdge } from './taskGraph';
+import type { ArchitectureDocument } from '../types/architecture';
 
 // ==================== DECOMPOSITION PROMPT ====================
 
@@ -107,18 +110,24 @@ export interface DecompositionResult {
 	edges: TaskEdge[];
 }
 
+export interface DecomposeOptions {
+	intentRecord: IntentRecord;
+	contract: AcceptanceContract;
+	historicalContext: string;
+	dialogueId: string;
+	provider: RoleCLIProvider;
+	workspaceRoot: string;
+	maxAttempts?: number;
+	architectureDoc?: ArchitectureDocument;
+}
+
 /**
  * Decompose a goal into a task graph via LLM.
  * Invokes the provided CLI provider with the decomposition prompt.
  * Validates decomposition quality before returning.
  *
- * @param intentRecord The captured intent
- * @param contract The acceptance contract
- * @param historicalContext Pre-formatted historical context string (invariants, failure motifs)
- * @param dialogueId Current dialogue ID
- * @param provider CLI provider to use for decomposition
- * @param workspaceRoot Workspace root path
- * @param maxAttempts Maximum decomposition attempts on quality failure (default 2)
+ * When an ArchitectureDocument is provided, its ImplementationSteps seed the
+ * task graph and ComponentSpec.file_scope informs TaskUnit.max_change_scope.
  */
 export async function decomposeGoalIntoTaskGraph(
 	intentRecord: IntentRecord,
@@ -127,22 +136,34 @@ export async function decomposeGoalIntoTaskGraph(
 	dialogueId: string,
 	provider: RoleCLIProvider,
 	workspaceRoot: string,
-	maxAttempts = 2
+	optsOrMaxAttempts?: number | DecomposeOptions,
+	onEvent?: (event: CLIActivityEvent) => void,
 ): Promise<Result<DecompositionResult>> {
+	// Support both old call signature (maxAttempts: number) and new options object
+	let maxAttempts = 2;
+	let architectureDoc: ArchitectureDocument | undefined;
+	if (typeof optsOrMaxAttempts === 'number') {
+		maxAttempts = optsOrMaxAttempts;
+	} else if (optsOrMaxAttempts && typeof optsOrMaxAttempts === 'object') {
+		maxAttempts = optsOrMaxAttempts.maxAttempts ?? 2;
+		architectureDoc = optsOrMaxAttempts.architectureDoc;
+	}
+
 	let lastQualityFeedback = '';
 
 	for (let attempt = 0; attempt < maxAttempts; attempt++) {
 		const userPrompt = buildDecompositionUserPrompt(
-			intentRecord, contract, historicalContext, lastQualityFeedback
+			intentRecord, contract, historicalContext, lastQualityFeedback, architectureDoc
 		);
 
 		const stdinContent = buildStdinContent(DECOMPOSITION_SYSTEM_PROMPT, userPrompt);
 
-		const invokeResult = await provider.invoke({
+		const invokeResult = await invokeRoleStreaming({
+			provider,
 			stdinContent,
+			onEvent,
 			workingDirectory: workspaceRoot,
-			outputFormat: 'json',
-			timeout: 180000, // 3 minutes for decomposition
+			timeout: 180000,
 		});
 
 		if (!invokeResult.success) {
@@ -206,7 +227,8 @@ function buildDecompositionUserPrompt(
 	intent: IntentRecord,
 	contract: AcceptanceContract,
 	historicalContext: string,
-	qualityFeedback: string
+	qualityFeedback: string,
+	architectureDoc?: ArchitectureDocument
 ): string {
 	const sections: string[] = [];
 
@@ -226,6 +248,49 @@ ${contract.required_validations.map((v) => `- ${v.type}: ${v.description}${v.com
 
 Non-Goals:
 ${contract.non_goals.map((n) => `- ${n}`).join('\n') || '- (none specified)'}`);
+
+	// Architecture document — provides pre-structured implementation steps,
+	// component scopes, and data models to seed the task graph
+	if (architectureDoc) {
+		sections.push('# Approved Architecture Document');
+
+		if (architectureDoc.implementation_sequence.length > 0) {
+			sections.push('## Implementation Steps (use these to seed task units)');
+			for (const step of architectureDoc.implementation_sequence) {
+				const deps = step.dependencies.length > 0 ? ` (depends on: ${step.dependencies.join(', ')})` : '';
+				sections.push(`- **${step.step_id}**: ${step.label} [${step.estimated_complexity}]${deps}`);
+				sections.push(`  ${step.description}`);
+				if (step.components_involved.length > 0) {
+					sections.push(`  Components: ${step.components_involved.join(', ')}`);
+				}
+				sections.push(`  Verify: ${step.verification_method}`);
+			}
+		}
+
+		if (architectureDoc.components.length > 0) {
+			sections.push('## Components (use file_scope for max_change_scope)');
+			for (const comp of architectureDoc.components) {
+				sections.push(`- **${comp.component_id}**: ${comp.label} — ${comp.responsibility}`);
+				if (comp.file_scope) {
+					sections.push(`  File scope: ${comp.file_scope}`);
+				}
+			}
+		}
+
+		if (architectureDoc.data_models.length > 0) {
+			sections.push('## Data Models');
+			for (const model of architectureDoc.data_models) {
+				sections.push(`- **${model.model_id}**: ${model.entity_name} (${model.fields.length} fields)`);
+			}
+		}
+
+		if (architectureDoc.interfaces.length > 0) {
+			sections.push('## Interfaces');
+			for (const iface of architectureDoc.interfaces) {
+				sections.push(`- **${iface.interface_id}**: ${iface.label} (${iface.type}) — ${iface.contract}`);
+			}
+		}
+	}
 
 	if (historicalContext) {
 		sections.push(`# Historical Context (failure motifs, invariants, precedent patterns)

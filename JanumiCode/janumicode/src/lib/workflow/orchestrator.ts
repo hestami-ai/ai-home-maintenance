@@ -6,13 +6,12 @@
 
 import type {
 	Result,
-	Phase,
 	Claim,
 	Verdict,
 	LLMProviderInterface,
 	RoleLLMConfig,
 } from '../types';
-import { Role } from '../types';
+import { Role, Phase } from '../types';
 import {
 	emitDialogueTurnAdded,
 	emitWorkflowPhaseChanged,
@@ -38,11 +37,15 @@ import {
 	executeIntakePlanApproval,
 	executeIntakeAnalysis,
 	executeIntakeClarificationTurn,
+	executeProposerDomains,
+	executeProposerJourneys,
+	executeProposerEntities,
+	executeProposerIntegrations,
 } from './intakePhase';
-import { IntakeSubState, IntakeMode } from '../types';
+import { IntakeSubState, IntakeMode, ProposerPhase } from '../types';
 import type { DomainCoverageMap } from '../types';
 import { getOrCreateIntakeConversation } from '../events/reader';
-import { updateIntakeConversation } from '../events/writer';
+import { writeDialogueEvent, updateIntakeConversation } from '../events/writer';
 import { classifyIntakeInput } from './intakeClassifier';
 import {
 	initializeCoverageMap,
@@ -74,13 +77,14 @@ import {
 	type ProposalBranch,
 } from './responseEvaluator';
 import { getLogger, isLoggerInitialized } from '../logging';
+import { createPhaseRunner } from './phaseRunner';
 import { runNarrativeCuration } from '../curation/narrativeCurator';
 import { CurationMode } from '../types/narrativeCurator';
 import { embedAndStore, isEmbeddingAvailable } from '../embedding/service';
 
 // ── MAKER imports ──
 import type { TaskUnit, IntentRecord, AcceptanceContract, ValidationPacket, ToolchainDetection, RepairPacket } from '../types/maker';
-import { RepairClassification } from '../types/maker';
+import { RepairClassification, TaskGraphStatus, TaskUnitStatus, TaskCategory, ClaimScope, RiskPosture, ValidationType } from '../types/maker';
 import {
 	createIntentRecord,
 	createAcceptanceContract,
@@ -106,6 +110,9 @@ import { buildMakerPlannerContext } from '../context/builders/makerPlanner';
 import { invokeExecutorForUnit } from '../roles/executor';
 import { createEnrichedRepairEscalationGate } from './gates';
 import { getWorkspaceRoot } from '../context/workspaceReader';
+
+// ── Architecture phase imports ──
+import { executeArchitecturePhase } from './architecturePhase';
 
 /**
  * Provider instances for workflow execution (actual LLM providers, not config)
@@ -243,6 +250,60 @@ export async function executeIntakePhase(
 			case IntakeSubState.ANALYZING:
 				return await executeIntakeAnalysis(dialogueId, humanInput);
 
+			case IntakeSubState.PRODUCT_REVIEW: {
+				// User submitted MMP decisions — route based on which proposer round completed
+				const proposerPhase = conv.draftPlan?.proposerPhase as ProposerPhase | null | undefined;
+				let nextSubState: IntakeSubState;
+				if (proposerPhase === ProposerPhase.DOMAIN_MAPPING) {
+					nextSubState = IntakeSubState.PROPOSING_JOURNEYS;
+				} else if (proposerPhase === ProposerPhase.JOURNEY_WORKFLOW) {
+					nextSubState = IntakeSubState.PROPOSING_ENTITIES;
+				} else if (proposerPhase === ProposerPhase.ENTITY_DATA_MODEL) {
+					nextSubState = IntakeSubState.PROPOSING_INTEGRATIONS;
+				} else if (proposerPhase === ProposerPhase.INTEGRATION_QUALITY) {
+					nextSubState = IntakeSubState.SYNTHESIZING;
+				} else {
+					// Legacy flow (no proposer) or DOMAIN_GUIDED → PROPOSING
+					nextSubState = IntakeSubState.PROPOSING;
+				}
+				updateIntakeConversation(dialogueId, { subState: nextSubState });
+
+				// If transitioning to a proposer round, execute it immediately
+				if (nextSubState === IntakeSubState.PROPOSING_JOURNEYS) {
+					return await executeProposerJourneys(dialogueId, humanInput);
+				} else if (nextSubState === IntakeSubState.PROPOSING_ENTITIES) {
+					return await executeProposerEntities(dialogueId, humanInput);
+				} else if (nextSubState === IntakeSubState.PROPOSING_INTEGRATIONS) {
+					return await executeProposerIntegrations(dialogueId, humanInput);
+				} else if (nextSubState === IntakeSubState.SYNTHESIZING) {
+					return await executeIntakePlanFinalization(dialogueId);
+				}
+
+				return {
+					success: true,
+					value: {
+						phase: Phase.INTAKE,
+						success: true,
+						awaitingInput: true,
+						metadata: {},
+						timestamp: new Date().toISOString(),
+					},
+				};
+			}
+
+			// === Proposer-Validator sub-states ===
+			case IntakeSubState.PROPOSING_DOMAINS:
+				return await executeProposerDomains(dialogueId, humanInput);
+
+			case IntakeSubState.PROPOSING_JOURNEYS:
+				return await executeProposerJourneys(dialogueId, humanInput);
+
+			case IntakeSubState.PROPOSING_ENTITIES:
+				return await executeProposerEntities(dialogueId, humanInput);
+
+			case IntakeSubState.PROPOSING_INTEGRATIONS:
+				return await executeProposerIntegrations(dialogueId, humanInput);
+
 			case IntakeSubState.PROPOSING:
 				// User responded to the proposal — transition to CLARIFYING
 				updateIntakeConversation(dialogueId, {
@@ -287,18 +348,20 @@ export async function executeIntakePhase(
 			case IntakeSubState.AWAITING_APPROVAL: {
 				const approvalResult = executeIntakePlanApproval(dialogueId);
 				// Narrative Curator: intent snapshot after plan approval
+				// MUST await — fire-and-forget spawns a concurrent CLI process that
+				// conflicts with the ARCHITECTURE phase CLI call in the next loop iteration.
 				if (approvalResult.success && approvalResult.value.nextPhase) {
-					runNarrativeCuration(dialogueId, CurationMode.INTENT).catch(
-						(err) => {
-							if (isLoggerInitialized()) {
-								getLogger()
-									.child({ component: 'curator' })
-									.warn('Curator INTENT snapshot failed', {
-										error: err instanceof Error ? err.message : String(err),
-									});
-							}
+					try {
+						await runNarrativeCuration(dialogueId, CurationMode.INTENT);
+					} catch (err) {
+						if (isLoggerInitialized()) {
+							getLogger()
+								.child({ component: 'curator' })
+								.warn('Curator INTENT snapshot failed (non-blocking)', {
+									error: err instanceof Error ? err.message : String(err),
+								});
 						}
-					);
+					}
 
 					// ── MAKER: Create IntentRecord + AcceptanceContract from approved plan ──
 					createMakerIntentAndContract(dialogueId);
@@ -347,6 +410,8 @@ export async function executeProposePhase(
 			};
 		}
 
+		const runner = createPhaseRunner(dialogueId, 'PROPOSE', 1);
+
 		// Resolve CLI provider for Executor role
 		const providerResult = await resolveProviderForRole(Role.EXECUTOR);
 		if (!providerResult.success) {
@@ -370,36 +435,31 @@ export async function executeProposePhase(
 		// Shared command ID for proposal command block
 		const proposeCommandId = randomUUID();
 
-		// ── Retry cache check ──
-		// If previous invocation failed and raw output was cached, try re-parsing first
-		let response: ExecutorResponse | undefined;
-		if (metadata.cachedRawCliOutput && metadata.lastFailedPhase === 'PROPOSE') {
-			const reparseResult = reparseExecutorResponse(metadata.cachedRawCliOutput);
-			if (reparseResult.success) {
-				response = reparseResult.value;
-				// Clear cache flags — re-parse succeeded
-				updateWorkflowMetadata(dialogueId, {
-					cachedRawCliOutput: undefined,
-					lastFailedPhase: undefined,
-				});
-
-				// Emit a command block for the successful re-parse
-				emitWorkflowCommand({
-					dialogueId,
-					commandId: proposeCommandId,
-					action: 'start',
-					commandType: 'role_invocation',
-					label: 'Executor — Re-parsed Cached Response',
-					summary: 'Successfully re-parsed cached CLI output (no LLM re-invocation)',
-					status: 'running',
-					timestamp: new Date().toISOString(),
-				});
+		// Step 1: Invoke executor (EXPENSIVE — includes retry cache check)
+		const response = await runner.step('invoke_executor', async () => {
+			// Retry cache check: try re-parsing cached raw output first
+			if (metadata.cachedRawCliOutput && metadata.lastFailedPhase === 'PROPOSE') {
+				const reparseResult = reparseExecutorResponse(metadata.cachedRawCliOutput);
+				if (reparseResult.success) {
+					updateWorkflowMetadata(dialogueId, {
+						cachedRawCliOutput: undefined,
+						lastFailedPhase: undefined,
+					});
+					emitWorkflowCommand({
+						dialogueId,
+						commandId: proposeCommandId,
+						action: 'start',
+						commandType: 'role_invocation',
+						label: 'Executor — Re-parsed Cached Response',
+						summary: 'Successfully re-parsed cached CLI output (no LLM re-invocation)',
+						status: 'running',
+						timestamp: new Date().toISOString(),
+					});
+					return reparseResult.value;
+				}
 			}
-			// If re-parse fails, fall through to fresh CLI invocation below
-		}
 
-		// ── Fresh CLI invocation (skipped if cache re-parse succeeded) ──
-		if (!response) {
+			// Fresh CLI invocation
 			const proposeProvider = providerResult.value;
 			const proposeCmdPreview = proposeProvider.getCommandPreview({ stdinContent: '<goal + context>', outputFormat: 'json' });
 			emitWorkflowCommand({
@@ -444,122 +504,91 @@ export async function executeProposePhase(
 					status: 'error',
 					timestamp: new Date().toISOString(),
 				});
-				updateWorkflowMetadata(dialogueId, {
-					lastFailedPhase: 'PROPOSE',
-				});
-				emitWorkflowPhaseFailed(dialogueId, 'PROPOSE', executorResult.error.message);
-				return executorResult as Result<PhaseExecutionResult>;
+				throw executorResult.error;
 			}
 
-			response = executorResult.value;
-		}
+			return executorResult.value;
+		});
 		const now = new Date().toISOString();
 
-		// Emit full input
-		emitWorkflowCommand({
-			dialogueId,
-			commandId: proposeCommandId,
-			action: 'output',
-			commandType: 'role_invocation',
-			label: 'Executor',
-			summary: '── Input ──',
-			detail: goal,
-			timestamp: now,
-		});
-
-		// Emit full output: proposal
-		emitWorkflowCommand({
-			dialogueId,
-			commandId: proposeCommandId,
-			action: 'output',
-			commandType: 'role_invocation',
-			label: 'Executor',
-			summary: '── Proposal ──',
-			detail: response.proposal,
-			timestamp: now,
-		});
-
-		// Emit assumptions
-		if (response.assumptions.length > 0) {
-			const assumptionLines = response.assumptions
-				.map((a, i) => `${i + 1}. [${a.criticality}] ${a.statement}`)
-				.join('\n');
+		// Step 2: Write proposal event and cache for downstream
+		const turnId = await runner.step('write_proposal_event', async () => {
+			// Emit command block details (cheap, re-run safe via INSERT OR IGNORE in commandStore)
 			emitWorkflowCommand({
-				dialogueId,
-				commandId: proposeCommandId,
-				action: 'output',
-				commandType: 'role_invocation',
-				label: 'Executor',
-				summary: `── Assumptions (${response.assumptions.length}) ──`,
-				detail: assumptionLines,
-				timestamp: now,
+				dialogueId, commandId: proposeCommandId,
+				action: 'output', commandType: 'role_invocation',
+				label: 'Executor', summary: '── Input ──',
+				detail: goal, timestamp: now,
 			});
-		}
-
-		// Emit constraint adherence notes
-		if (response.constraint_adherence_notes.length > 0) {
 			emitWorkflowCommand({
-				dialogueId,
-				commandId: proposeCommandId,
-				action: 'output',
-				commandType: 'role_invocation',
-				label: 'Executor',
-				summary: `── Constraint Notes (${response.constraint_adherence_notes.length}) ──`,
-				detail: response.constraint_adherence_notes.join('\n'),
-				timestamp: now,
+				dialogueId, commandId: proposeCommandId,
+				action: 'output', commandType: 'role_invocation',
+				label: 'Executor', summary: '── Proposal ──',
+				detail: response.proposal, timestamp: now,
 			});
-		}
+			if (response.assumptions.length > 0) {
+				const assumptionLines = response.assumptions
+					.map((a, i) => `${i + 1}. [${a.criticality}] ${a.statement}`)
+					.join('\n');
+				emitWorkflowCommand({
+					dialogueId, commandId: proposeCommandId,
+					action: 'output', commandType: 'role_invocation',
+					label: 'Executor',
+					summary: `── Assumptions (${response.assumptions.length}) ──`,
+					detail: assumptionLines, timestamp: now,
+				});
+			}
+			if (response.constraint_adherence_notes.length > 0) {
+				emitWorkflowCommand({
+					dialogueId, commandId: proposeCommandId,
+					action: 'output', commandType: 'role_invocation',
+					label: 'Executor',
+					summary: `── Constraint Notes (${response.constraint_adherence_notes.length}) ──`,
+					detail: response.constraint_adherence_notes.join('\n'),
+					timestamp: now,
+				});
+			}
+			emitWorkflowCommand({
+				dialogueId, commandId: proposeCommandId,
+				action: 'complete', commandType: 'role_invocation',
+				label: 'Executor — Proposal Complete',
+				summary: `Proposal generated with ${response.assumptions.length} assumption(s), ${response.artifacts.length} artifact(s)`,
+				status: 'success', timestamp: now,
+			});
 
-		emitWorkflowCommand({
-			dialogueId,
-			commandId: proposeCommandId,
-			action: 'complete',
-			commandType: 'role_invocation',
-			label: 'Executor — Proposal Complete',
-			summary: `Proposal generated with ${response.assumptions.length} assumption(s), ${response.artifacts.length} artifact(s)`,
-			status: 'success',
-			timestamp: now,
+			// Store proposal as dialogue event
+			const proposeEventResult = writeDialogueEvent({
+				dialogue_id: dialogueId,
+				event_type: 'proposal',
+				role: Role.EXECUTOR,
+				phase: 'PROPOSE',
+				speech_act: 'CLAIM',
+				summary: `Proposal with ${response.assumptions.length} assumption(s)`,
+				content: JSON.stringify(response.proposal),
+			});
+			if (!proposeEventResult.success) { throw proposeEventResult.error; }
+			const tid = proposeEventResult.value.event_id;
+			emitDialogueTurnAdded(dialogueId, tid, Role.EXECUTOR);
+
+			if (isEmbeddingAvailable()) {
+				embedAndStore('dialogue_turn', String(tid), dialogueId, JSON.stringify(response.proposal)).catch(() => {});
+			}
+
+			// Cache executor response for ASSUMPTION_SURFACING (cross-phase)
+			updateWorkflowMetadata(dialogueId, {
+				turnCount: tid,
+				cachedExecutorResponse: {
+					proposal: response.proposal,
+					assumptions: response.assumptions,
+					artifacts: response.artifacts,
+					constraint_adherence_notes: response.constraint_adherence_notes,
+				},
+			});
+
+			return tid;
 		});
-		const turnId = await getNextTurnId(dialogueId);
 
-		// Store proposal as dialogue turn
-		db.prepare(
-			`
-			INSERT INTO dialogue_turns (
-				turn_id, dialogue_id, role, phase, speech_act,
-				content_ref, timestamp
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
-		`
-		).run(
-			turnId,
-			dialogueId,
-			Role.EXECUTOR,
-			'PROPOSE',
-			'CLAIM',
-			JSON.stringify(response.proposal),
-			now
-		);
-		emitDialogueTurnAdded(dialogueId, turnId, Role.EXECUTOR);
-
-		// Fire-and-forget: embed proposal for semantic search
-		if (isEmbeddingAvailable()) {
-			embedAndStore('dialogue_turn', String(turnId), dialogueId, JSON.stringify(response.proposal)).catch(() => {});
-		}
-
-		// Cache executor response in workflow metadata for ASSUMPTION_SURFACING
-		updateWorkflowMetadata(dialogueId, {
-			turnCount: turnId,
-			cachedExecutorResponse: {
-				proposal: response.proposal,
-				assumptions: response.assumptions,
-				artifacts: response.artifacts,
-				constraint_adherence_notes: response.constraint_adherence_notes,
-			},
-		});
-
-		// ── Response Evaluator sub-step ──
-		// Classify the executor's response before proceeding.
-		// Build enriched context so the evaluator sees proposal + structured metadata.
+		// Step 3: Evaluate executor response (EXPENSIVE — LLM call)
 		const assumptionSummary = response.assumptions.length > 0
 			? `\n\nAssumptions surfaced (${response.assumptions.length}):\n${response.assumptions.map((a, i) => `${i + 1}. [${a.criticality}] ${a.statement}`).join('\n')}`
 			: '';
@@ -567,7 +596,9 @@ export async function executeProposePhase(
 			? `\n\nArtifacts generated (${response.artifacts.length}):\n${response.artifacts.map((a, i) => `${i + 1}. [${a.type}] ${a.description}`).join('\n')}`
 			: '';
 		const enrichedResponse = response.proposal + assumptionSummary + artifactSummary;
-		const evaluation = await evaluateExecutorResponse(goal, enrichedResponse, dialogueId);
+		const evaluation = await runner.step('evaluate_response', async () => {
+			return evaluateExecutorResponse(goal, enrichedResponse, dialogueId);
+		});
 
 		const evalLogger = isLoggerInitialized()
 			? getLogger().child({ component: 'evaluator', dialogueId })
@@ -587,6 +618,7 @@ export async function executeProposePhase(
 				}
 				// Narrative Curator: lightweight failure trace
 				runNarrativeCuration(dialogueId, CurationMode.FAILURE).catch(() => {});
+				runner.clear();
 				return {
 					success: true,
 					value: {
@@ -617,6 +649,7 @@ export async function executeProposePhase(
 				}
 				// Narrative Curator: lightweight failure trace
 				runNarrativeCuration(dialogueId, CurationMode.FAILURE).catch(() => {});
+				runner.clear();
 				return {
 					success: true,
 					value: {
@@ -663,6 +696,7 @@ export async function executeProposePhase(
 					},
 				});
 
+				runner.clear();
 				return {
 					success: true,
 					value: {
@@ -689,6 +723,7 @@ export async function executeProposePhase(
 		// ── MAKER: Task graph decomposition (if intent record exists) ──
 		const decompositionResult = await attemptMakerDecomposition(dialogueId, goal, providerResult.value);
 		if (decompositionResult.gateTriggered) {
+			runner.clear();
 			return {
 				success: true,
 				value: {
@@ -705,6 +740,7 @@ export async function executeProposePhase(
 			};
 		}
 
+		runner.clear();
 		return {
 			success: true,
 			value: {
@@ -753,110 +789,99 @@ export async function executeAssumptionSurfacingPhase(
 			};
 		}
 
-		const stateResult = getWorkflowState(dialogueId);
-		if (!stateResult.success) {
-			return stateResult as Result<PhaseExecutionResult>;
-		}
+		const runner = createPhaseRunner(dialogueId, 'ASSUMPTION_SURFACING', 1);
 
-		const metadata = JSON.parse(stateResult.value.metadata);
+		// Step 1: Get executor response (cached from PROPOSE, or fallback re-invoke)
+		const response = await runner.step('get_executor_response', async () => {
+			const stateResult = getWorkflowState(dialogueId);
+			if (!stateResult.success) { throw stateResult.error; }
+			const meta = JSON.parse(stateResult.value.metadata);
 
-		// Use cached executor response from PROPOSE phase if available
-		let response: ExecutorResponse;
-		if (metadata.cachedExecutorResponse) {
-			response = {
-				...metadata.cachedExecutorResponse,
-				raw_response: '(cached from PROPOSE phase)',
-			};
-		} else {
-			// Fallback: re-invoke Executor if no cached response
-			const executorProviderResult = await resolveProviderForRole(Role.EXECUTOR);
-			if (!executorProviderResult.success) {
-				return executorProviderResult as Result<PhaseExecutionResult>;
+			if (meta.cachedExecutorResponse) {
+				return {
+					...meta.cachedExecutorResponse,
+					raw_response: '(cached from PROPOSE phase)',
+				} as ExecutorResponse;
 			}
-			const goal = metadata.lastIntakeGoal ?? metadata.goal ?? '';
+
+			// Fallback: re-invoke Executor
+			const executorProviderResult = await resolveProviderForRole(Role.EXECUTOR);
+			if (!executorProviderResult.success) { throw executorProviderResult.error; }
+			const goal = meta.lastIntakeGoal ?? meta.goal ?? '';
 			const executorResult = await invokeExecutor({
 				dialogueId,
 				goal,
 				tokenBudget,
 				provider: executorProviderResult.value,
 			});
+			if (!executorResult.success) { throw executorResult.error; }
+			return executorResult.value;
+		});
 
-			if (!executorResult.success) {
-				return executorResult as Result<PhaseExecutionResult>;
-			}
-			response = executorResult.value;
-		}
+		// Step 2: Store assumption surfacing event (claims reference it via FK)
+		const turnId = await runner.step('write_assumption_event', async () => {
+			const assumptionEventResult = writeDialogueEvent({
+				dialogue_id: dialogueId,
+				event_type: 'assumption_surfacing',
+				role: Role.EXECUTOR,
+				phase: 'ASSUMPTION_SURFACING',
+				speech_act: 'ASSUMPTION',
+				summary: `Surfaced ${response.assumptions.length} assumption(s)`,
+				content: JSON.stringify(response.assumptions),
+			});
+			if (!assumptionEventResult.success) { throw assumptionEventResult.error; }
+			emitDialogueTurnAdded(dialogueId, assumptionEventResult.value.event_id, Role.EXECUTOR);
+			return assumptionEventResult.value.event_id;
+		});
 
-		const turnId = await getNextTurnId(dialogueId);
-		const now = new Date().toISOString();
+		// Step 3: Convert assumptions to claims and store
+		const claimIds = await runner.step('store_claims', async () => {
+			const claims = assumptionsToClaims(response.assumptions, dialogueId, turnId);
 
-		// Store dialogue turn FIRST (claims reference it via FK)
-		db.prepare(
-			`
-			INSERT INTO dialogue_turns (
-				turn_id, dialogue_id, role, phase, speech_act,
-				content_ref, timestamp
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
-		`
-		).run(
-			turnId,
-			dialogueId,
-			Role.EXECUTOR,
-			'ASSUMPTION_SURFACING',
-			'ASSUMPTION',
-			JSON.stringify(response.assumptions),
-			now
-		);
-		emitDialogueTurnAdded(dialogueId, turnId, Role.EXECUTOR);
-
-		// Convert assumptions to claims
-		const claims = assumptionsToClaims(
-			response.assumptions,
-			dialogueId,
-			turnId
-		);
-
-		// Store claims (after turn exists for FK)
-		for (const claim of claims) {
-			db.prepare(
+			for (const claim of claims) {
+				db.prepare(
+					`
+					INSERT OR IGNORE INTO claims (
+						claim_id, statement, introduced_by, criticality,
+						status, dialogue_id, turn_id, created_at, assumption_type
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 				`
-				INSERT INTO claims (
-					claim_id, statement, introduced_by, criticality,
-					status, dialogue_id, turn_id, created_at, assumption_type
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-			`
-			).run(
-				claim.claim_id,
-				claim.statement,
-				claim.introduced_by,
-				claim.criticality,
-				claim.status,
-				claim.dialogue_id,
-				claim.turn_id,
-				claim.created_at,
-				claim.assumption_type ?? null
-			);
-			emitClaimCreated(dialogueId, claim.claim_id, claim.statement);
+				).run(
+					claim.claim_id, claim.statement, claim.introduced_by,
+					claim.criticality, claim.status, claim.dialogue_id,
+					claim.turn_id, claim.created_at, claim.assumption_type ?? null
+				);
+				emitClaimCreated(dialogueId, claim.claim_id, claim.statement);
 
-			// Fire-and-forget: embed claim for semantic search
-			if (isEmbeddingAvailable()) {
-				embedAndStore('claim', claim.claim_id, dialogueId, claim.statement).catch(() => {});
+				if (isEmbeddingAvailable()) {
+					embedAndStore('claim', claim.claim_id, dialogueId, claim.statement).catch(() => {});
+				}
 			}
-		}
 
-		// ── Branch tracking ──
-		// If in multi-option mode, store this branch's claim IDs
-		const claimIds = claims.map((c) => c.claim_id);
-		const branches: ProposalBranch[] | undefined = metadata.proposalBranches;
-		const branchIdx: number | undefined = metadata.currentBranchIndex;
-		if (branches && branchIdx !== undefined && branches[branchIdx]) {
-			branches[branchIdx].assumptions = response.assumptions;
-			branches[branchIdx].claim_ids = claimIds;
-			updateWorkflowMetadata(dialogueId, { proposalBranches: branches });
-		}
+			// Branch tracking
+			const ids = claims.map((c) => c.claim_id);
+			const stateResult2 = getWorkflowState(dialogueId);
+			if (stateResult2.success) {
+				const meta2 = JSON.parse(stateResult2.value.metadata);
+				const branches: ProposalBranch[] | undefined = meta2.proposalBranches;
+				const branchIdx: number | undefined = meta2.currentBranchIndex;
+				if (branches && branchIdx !== undefined && branches[branchIdx]) {
+					branches[branchIdx].assumptions = response.assumptions;
+					branches[branchIdx].claim_ids = ids;
+					updateWorkflowMetadata(dialogueId, { proposalBranches: branches });
+				}
+			}
 
-		// ── MAKER: Extract ClaimUnits from task graph units ──
-		extractMakerClaimUnits(dialogueId);
+			return ids;
+		});
+
+		// Step 4: Extract MAKER claim units from task graph
+		await runner.step('extract_maker_claims', async () => {
+			extractMakerClaimUnits(dialogueId);
+		}, { cache: false });
+
+		// Phase complete — clear checkpoint
+		runner.clear();
 
 		return {
 			success: true,
@@ -865,10 +890,10 @@ export async function executeAssumptionSurfacingPhase(
 				success: true,
 				nextPhase: 'VERIFY' as Phase,
 				metadata: {
-					claimCount: claims.length,
+					claimCount: claimIds.length,
 					claimIds,
 				},
-				timestamp: now,
+				timestamp: new Date().toISOString(),
 			},
 		};
 	} catch (error) {
@@ -910,19 +935,22 @@ export async function executeVerifyPhase(
 			return verifierProviderResult as Result<PhaseExecutionResult>;
 		}
 
-		// Get all open claims
-		const openClaims = db
-			.prepare(
+		const runner = createPhaseRunner(dialogueId, 'VERIFY', 1);
+
+		// Get all open claims (cached for stable iteration on resume)
+		const openClaims = await runner.step('query_open_claims', () => {
+			return db.prepare(
 				`
 			SELECT claim_id, statement, introduced_by, criticality,
 			       status, dialogue_id, turn_id, created_at
 			FROM claims
 			WHERE dialogue_id = ? AND status = 'OPEN'
 		`
-			)
-			.all(dialogueId) as Claim[];
+			).all(dialogueId) as Claim[];
+		});
 
 		if (openClaims.length === 0) {
+			runner.clear();
 			return {
 				success: true,
 				value: {
@@ -961,8 +989,9 @@ export async function executeVerifyPhase(
 			});
 		}
 
-		const verificationResults = [];
-		for (const claim of openClaims) {
+		const verificationResults: any[] = [];
+		for (let i = 0; i < openClaims.length; i++) {
+			const claim = openClaims[i];
 			const claimPreview = claim.statement.length > 120
 				? claim.statement.substring(0, 120) + '…'
 				: claim.statement;
@@ -977,18 +1006,26 @@ export async function executeVerifyPhase(
 				timestamp: new Date().toISOString(),
 			});
 
-			const result = await executeVerification({
-				dialogueId,
-				claim,
-				provider: verifierProviderResult.value,
-				tokenBudget: Math.max(2000, Math.floor(tokenBudget / openClaims.length)),
-				includeHistoricalVerdicts: true,
-				checkForContradictions: true,
-				commandId: verifyCommandId,
+			// Step per claim — EXPENSIVE CLI call, cached on resume
+			const cached = await runner.step(`verify_claim_${i}`, async () => {
+				const r = await executeVerification({
+					dialogueId,
+					claim,
+					provider: verifierProviderResult.value,
+					tokenBudget: Math.max(2000, Math.floor(tokenBudget / openClaims.length)),
+					includeHistoricalVerdicts: true,
+					checkForContradictions: true,
+					commandId: verifyCommandId,
+				});
+				// Normalize for JSON serialization (Error objects don't serialize)
+				if (r.success) {
+					return { ok: true as const, value: r.value };
+				}
+				return { ok: false as const, errorMessage: r.error?.message ?? 'Unknown error' };
 			});
 
-			if (result.success) {
-				verificationResults.push(result.value);
+			if (cached.ok) {
+				verificationResults.push(cached.value);
 				const verdictPreview = claim.statement.length > 100
 					? claim.statement.substring(0, 100) + '…'
 					: claim.statement;
@@ -998,12 +1035,11 @@ export async function executeVerifyPhase(
 					action: 'output',
 					commandType: 'role_invocation',
 					label: 'Verifier',
-					summary: `→ ${result.value.verdict.verdict}: ${verdictPreview}`,
-					detail: result.value.verdict.rationale,
+					summary: `→ ${cached.value.verdict.verdict}: ${verdictPreview}`,
+					detail: cached.value.verdict.rationale,
 					timestamp: new Date().toISOString(),
 				});
 			} else {
-				const errorMsg = result.error?.message ?? 'Unknown error';
 				emitWorkflowCommand({
 					dialogueId,
 					commandId: verifyCommandId,
@@ -1011,7 +1047,7 @@ export async function executeVerifyPhase(
 					commandType: 'role_invocation',
 					label: 'Verifier',
 					summary: `→ ERROR (invocation failed): ${claimPreview}`,
-					detail: errorMsg,
+					detail: cached.errorMessage,
 					timestamp: new Date().toISOString(),
 				});
 			}
@@ -1055,6 +1091,7 @@ export async function executeVerifyPhase(
 		// not proceed to EXECUTE with entirely unverified assumptions.
 		const failedCount = openClaims.length - verificationResults.length;
 		if (verificationResults.length === 0 && openClaims.length > 0) {
+			runner.clear();
 			const failGateResult = createGate({
 				dialogueId,
 				reason:
@@ -1089,6 +1126,7 @@ export async function executeVerifyPhase(
 		// Verification results are surfaced at the REVIEW phase where the human
 		// can see full context (verification + historian findings) before deciding.
 		// No gate is created here — the workflow flows through HISTORICAL_CHECK to REVIEW.
+		runner.clear();
 		return {
 			success: true,
 			value: {
@@ -1161,38 +1199,51 @@ export async function executeHistoricalCheckPhase(
 			});
 		}
 
-		// ── Read claims + verdicts from DB for per-claim adjudication ──
+		const runner = createPhaseRunner(dialogueId, 'HISTORICAL_CHECK', 1);
+
+		// ── Read claims + verdicts from DB for per-claim adjudication (cached for stable iteration) ──
 		const db = getDatabase();
-		const claims: Claim[] = db
-			? (db.prepare('SELECT * FROM claims WHERE dialogue_id = ?').all(dialogueId) as Claim[])
-			: [];
-		const verdicts: Verdict[] = db
-			? (db.prepare(
-				'SELECT v.* FROM verdicts v JOIN claims c ON v.claim_id = c.claim_id WHERE c.dialogue_id = ?'
-			).all(dialogueId) as Verdict[])
-			: [];
+		const { claims, verdicts } = await runner.step('query_claims_and_verdicts', () => {
+			const clms: Claim[] = db
+				? (db.prepare('SELECT * FROM claims WHERE dialogue_id = ?').all(dialogueId) as Claim[])
+				: [];
+			const vdcts: Verdict[] = db
+				? (db.prepare(
+					'SELECT v.* FROM verdicts v JOIN claims c ON v.claim_id = c.claim_id WHERE c.dialogue_id = ?'
+				).all(dialogueId) as Verdict[])
+				: [];
+			return { claims: clms, verdicts: vdcts };
+		});
 
 		// ── Try per-claim adjudication first, fallback to generic query ──
 		let findings: string[] = [];
 		let adjudicationData: any = null;
 
 		if (claims.length > 0) {
-			const adjResult = await invokeHistorianAdjudication({
-				dialogueId,
-				claims,
-				verdicts,
-				tokenBudget,
-				provider: historianProviderResult.value,
-				commandId: histCheckCommandId,
+			// Step: adjudicate — EXPENSIVE LLM call, cached on resume
+			const adjCached = await runner.step('adjudicate', async () => {
+				const r = await invokeHistorianAdjudication({
+					dialogueId,
+					claims,
+					verdicts,
+					tokenBudget,
+					provider: historianProviderResult.value,
+					commandId: histCheckCommandId,
+				});
+				// Normalize for JSON serialization (Error objects don't serialize)
+				if (r.success) {
+					return { ok: true as const, value: r.value };
+				}
+				return { ok: false as const, errorMessage: r.error?.message ?? 'Unknown error' };
 			});
 
-			if (adjResult.success) {
-				adjudicationData = adjResult.value;
-				findings = adjResult.value.general_findings ?? [];
+			if (adjCached.ok) {
+				adjudicationData = adjCached.value;
+				findings = adjCached.value.general_findings ?? [];
 
 				// Emit adjudication summary
-				const adjCount = adjResult.value.claim_adjudications.length;
-				const verdictCounts = adjResult.value.claim_adjudications.reduce((acc, a) => {
+				const adjCount = adjCached.value.claim_adjudications.length;
+				const verdictCounts = adjCached.value.claim_adjudications.reduce((acc: Record<string, number>, a: any) => {
 					acc[a.verdict] = (acc[a.verdict] || 0) + 1;
 					return acc;
 				}, {} as Record<string, number>);
@@ -1207,7 +1258,7 @@ export async function executeHistoricalCheckPhase(
 					commandType: 'role_invocation',
 					label: 'Historian',
 					summary: `── Adjudication (${adjCount} claims: ${verdictSummary}) ──`,
-					detail: adjResult.value.summary,
+					detail: adjCached.value.summary,
 					timestamp: new Date().toISOString(),
 				});
 			}
@@ -1215,30 +1266,37 @@ export async function executeHistoricalCheckPhase(
 
 		// Fallback to generic query if adjudication failed or no claims
 		if (!adjudicationData) {
-			const historianResult = await invokeHistorianInterpreter({
-				dialogueId,
-				query: 'Check for contradictions and relevant precedents',
-				queryType: HistorianQueryType.GENERAL_HISTORY,
-				tokenBudget,
-				provider: historianProviderResult.value,
-				commandId: histCheckCommandId,
+			// Step: interpret findings — EXPENSIVE fallback LLM query, cached on resume
+			const histCached = await runner.step('interpret_findings', async () => {
+				const r = await invokeHistorianInterpreter({
+					dialogueId,
+					query: 'Check for contradictions and relevant precedents',
+					queryType: HistorianQueryType.GENERAL_HISTORY,
+					tokenBudget,
+					provider: historianProviderResult.value,
+					commandId: histCheckCommandId,
+				});
+				if (r.success) {
+					return { ok: true as const, value: r.value };
+				}
+				return { ok: false as const, errorMessage: r.error?.message ?? 'Unknown error' };
 			});
 
-			if (!historianResult.success) {
+			if (!histCached.ok) {
 				emitWorkflowCommand({
 					dialogueId,
 					commandId: histCheckCommandId,
 					action: 'error',
 					commandType: 'role_invocation',
 					label: 'Historian — Checking Precedents',
-					summary: `Failed: ${historianResult.error.message}`,
+					summary: `Failed: ${histCached.errorMessage}`,
 					status: 'error',
 					timestamp: new Date().toISOString(),
 				});
-				return historianResult as Result<PhaseExecutionResult>;
+				return { success: false, error: new Error(histCached.errorMessage) };
 			}
 
-			findings = historianResult.value.findings ?? [];
+			findings = histCached.value.findings ?? [];
 		}
 
 		// Emit general findings as output
@@ -1289,7 +1347,7 @@ export async function executeHistoricalCheckPhase(
 				branches[currentIdx].status = 'analyzed';
 				branches[currentIdx].historical_findings = findings;
 				if (adjudicationData) {
-					branches[currentIdx].historian_adjudication = adjudicationData;
+					(branches[currentIdx] as ProposalBranch & { historian_adjudication?: unknown }).historian_adjudication = adjudicationData;
 				}
 
 				const nextIdx = currentIdx + 1;
@@ -1314,6 +1372,7 @@ export async function executeHistoricalCheckPhase(
 						},
 					});
 
+					runner.clear();
 					return {
 						success: true,
 						value: {
@@ -1353,6 +1412,7 @@ export async function executeHistoricalCheckPhase(
 		// ── MAKER: Create HistoricalInvariantPacket from findings ──
 		createMakerHistoricalPacket(dialogueId, findings);
 
+		runner.clear();
 		return {
 			success: true,
 			value: {
@@ -1360,7 +1420,7 @@ export async function executeHistoricalCheckPhase(
 				success: true,
 				nextPhase: 'REVIEW' as Phase,
 				metadata: {
-					findings: historianResult.value.findings,
+					findings,
 				},
 				timestamp: new Date().toISOString(),
 			},
@@ -1475,6 +1535,8 @@ export async function executeExecutePhase(
 		}
 
 		// ── Legacy monolithic execution path ──
+		const runner = createPhaseRunner(dialogueId, 'EXECUTE', 1);
+
 		// Retrieve the cached proposal from workflow metadata
 		const stateResult = getWorkflowState(dialogueId);
 		if (!stateResult.success) {
@@ -1549,31 +1611,43 @@ export async function executeExecutePhase(
 			timestamp: new Date().toISOString(),
 		});
 
-		// Invoke with streaming for real-time progress in governed stream UI
-		const executionResult = await provider.invokeStreaming(
-			{
+		// Step: invoke streaming — EXPENSIVE CLI execution, cached on resume
+		const execCached = await runner.step('invoke_streaming', async () => {
+			const { invokeRoleStreaming } = await import('../cli/roleInvoker.js');
+			const r = await invokeRoleStreaming({
+				provider,
 				stdinContent,
-				outputFormat: 'stream-json',
-			},
-			(event) => {
-				emitCLIActivity(dialogueId, {
-					...event,
-					role: Role.EXECUTOR,
-					phase: 'EXECUTE' as Phase,
-				});
+				onEvent: (event) => {
+					emitCLIActivity(dialogueId, {
+						...event,
+						role: Role.EXECUTOR,
+						phase: 'EXECUTE' as Phase,
+					});
+				},
+			});
+			// Normalize for JSON serialization (Error objects don't serialize)
+			if (r.success) {
+				return {
+					ok: true as const,
+					exitCode: r.value.exitCode,
+					executionTime: r.value.executionTime,
+					response: r.value.response?.substring(0, 3000) || '(no response text)',
+				};
 			}
-		);
+			return {
+				ok: false as const,
+				errorMessage: r.error?.message ?? 'Unknown error',
+			};
+		});
 
-		const turnId = await getNextTurnId(dialogueId);
 		const completionTimestamp = new Date().toISOString();
 
 		let executionSummary: string;
-		if (executionResult.success) {
-			const exitCode = executionResult.value.exitCode;
-			const timeSeconds = (executionResult.value.executionTime / 1000).toFixed(1);
-			executionSummary = exitCode === 0
+		if (execCached.ok) {
+			const timeSeconds = (execCached.executionTime / 1000).toFixed(1);
+			executionSummary = execCached.exitCode === 0
 				? `Execution completed successfully (exit code 0, ${timeSeconds}s).`
-				: `Execution completed with non-zero exit code ${exitCode} (${timeSeconds}s).`;
+				: `Execution completed with non-zero exit code ${execCached.exitCode} (${timeSeconds}s).`;
 			// Emit execution result output
 			emitWorkflowCommand({
 				dialogueId,
@@ -1581,12 +1655,12 @@ export async function executeExecutePhase(
 				action: 'output',
 				commandType: 'cli_invocation',
 				label: 'Executor CLI',
-				summary: `── Result: exit ${exitCode} (${executionResult.value.executionTime}ms) ──`,
-				detail: executionResult.value.response?.substring(0, 3000) || '(no response text)',
+				summary: `── Result: exit ${execCached.exitCode} (${execCached.executionTime}ms) ──`,
+				detail: execCached.response,
 				timestamp: completionTimestamp,
 			});
 		} else {
-			executionSummary = `Execution failed: ${executionResult.error.message}`;
+			executionSummary = `Execution failed: ${execCached.errorMessage}`;
 			emitWorkflowCommand({
 				dialogueId,
 				commandId: executeCommandId,
@@ -1594,14 +1668,14 @@ export async function executeExecutePhase(
 				commandType: 'cli_invocation',
 				label: 'Executor CLI',
 				summary: `── Error ──`,
-				detail: executionResult.error.message,
+				detail: execCached.errorMessage,
 				timestamp: completionTimestamp,
 			});
 		}
 
 		// Determine if execution actually succeeded (process ran AND exit code 0)
-		const cliExitCode = executionResult.success ? executionResult.value.exitCode : -1;
-		const executionSucceeded = executionResult.success && cliExitCode === 0;
+		const cliExitCode = execCached.ok ? execCached.exitCode : -1;
+		const executionSucceeded = execCached.ok && cliExitCode === 0;
 
 		// Emit final command block status so the UI shows Retry button on failure
 		emitWorkflowCommand({
@@ -1617,31 +1691,29 @@ export async function executeExecutePhase(
 			timestamp: completionTimestamp,
 		});
 
-		// Use phaseStartTimestamp for the dialogue turn so the milestone divider
-		// (derived from the first turn in this phase) sorts before command blocks.
-		db.prepare(
-			`
-			INSERT INTO dialogue_turns (
-				turn_id, dialogue_id, role, phase, speech_act,
-				content_ref, timestamp
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
-		`
-		).run(
-			turnId,
-			dialogueId,
-			Role.EXECUTOR,
-			'EXECUTE',
-			'DECISION',
-			executionSummary,
-			phaseStartTimestamp
-		);
+		// Step: write execution event — cached to prevent duplicate events on resume
+		const turnId = await runner.step('write_execute_event', () => {
+			const result = writeDialogueEvent({
+				dialogue_id: dialogueId,
+				event_type: 'execution',
+				role: Role.EXECUTOR,
+				phase: 'EXECUTE',
+				speech_act: 'DECISION',
+				summary: executionSummary,
+				content: executionSummary,
+			});
+			if (!result.success) {
+				throw result.error;
+			}
+			return result.value.event_id;
+		});
 		emitDialogueTurnAdded(dialogueId, turnId, Role.EXECUTOR);
 
 		// Store execution result in metadata for VALIDATE phase
 		updateWorkflowMetadata(dialogueId, {
-			executionResult: executionResult.success
+			executionResult: execCached.ok
 				? { success: executionSucceeded, exitCode: cliExitCode }
-				: { success: false, error: executionResult.error.message },
+				: { success: false, error: execCached.errorMessage },
 		});
 
 		// Narrative Curator: outcome snapshot after execution
@@ -1658,6 +1730,7 @@ export async function executeExecutePhase(
 		// Only advance to VALIDATE if execution succeeded.
 		// On failure (non-zero exit code), stay in EXECUTE so the user can retry.
 		// Set awaitingInput on failure to stop the workflow cycle loop.
+		runner.clear();
 		return {
 			success: true,
 			value: {
@@ -1784,25 +1857,20 @@ export async function executeCommitPhase(
 			};
 		}
 
-		const turnId = await getNextTurnId(dialogueId);
 		const now = new Date().toISOString();
 
-		db.prepare(
-			`
-			INSERT INTO dialogue_turns (
-				turn_id, dialogue_id, role, phase, speech_act,
-				content_ref, timestamp
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
-		`
-		).run(
-			turnId,
-			dialogueId,
-			'SYSTEM' as any,
-			'COMMIT',
-			'DECISION',
-			'Workflow completed',
-			now
-		);
+		const commitEventResult = writeDialogueEvent({
+			dialogue_id: dialogueId,
+			event_type: 'commit',
+			role: 'SYSTEM',
+			phase: 'COMMIT',
+			speech_act: 'DECISION',
+			summary: 'Workflow completed',
+		});
+		if (!commitEventResult.success) {
+			return { success: false, error: commitEventResult.error };
+		}
+		const turnId = commitEventResult.value.event_id;
 		emitDialogueTurnAdded(dialogueId, turnId, 'SYSTEM');
 
 		// ── MAKER: Record OutcomeSnapshot ──
@@ -1831,8 +1899,9 @@ export async function executeCommitPhase(
 }
 
 /**
- * Get next turn ID
- * Generates the next turn ID for a dialogue
+ * Get next event ID for a dialogue.
+ * @deprecated Only needed for legacy callers that pre-allocate IDs.
+ * Prefer using writeDialogueEvent() which auto-assigns event_id.
  */
 async function getNextTurnId(dialogueId: string): Promise<number> {
 	const db = getDatabase();
@@ -1843,8 +1912,8 @@ async function getNextTurnId(dialogueId: string): Promise<number> {
 	const result = db
 		.prepare(
 			`
-		SELECT MAX(turn_id) as maxTurnId
-		FROM dialogue_turns
+		SELECT MAX(event_id) as maxTurnId
+		FROM dialogue_events
 		WHERE dialogue_id = ?
 	`
 		)
@@ -1967,6 +2036,7 @@ async function initializeAdaptiveIntake(
 			classifierResult: recommendation,
 			subState: initialSubState,
 			clarificationRound: 0,
+			mmpHistory: [],
 		});
 
 		// Emit events
@@ -2038,7 +2108,7 @@ function createMakerIntentAndContract(dialogueId: string): void {
 			scope_in: scopeIn,
 			scope_out: scopeOut,
 			priority_axes: [],
-			risk_posture: 'BALANCED',
+			risk_posture: RiskPosture.BALANCED,
 		});
 
 		if (!intentResult.success) {
@@ -2048,7 +2118,7 @@ function createMakerIntentAndContract(dialogueId: string): void {
 
 		// Detect toolchains for validation requirements
 		const workspaceRoot = getWorkspaceRoot();
-		let validationReqs: Array<{ type: string; command?: string; description: string }> = [];
+		let validationReqs: Array<{ type: ValidationType; command?: string; description: string }> = [];
 		if (workspaceRoot) {
 			// Fire-and-forget: detect toolchains async (don't block plan approval)
 			detectToolchains(workspaceRoot).then((tcResult) => {
@@ -2059,8 +2129,8 @@ function createMakerIntentAndContract(dialogueId: string): void {
 
 			// Build basic validation requirements from common commands
 			validationReqs = [
-				{ type: 'TYPE_CHECK', description: 'Type checking passes' },
-				{ type: 'BUILD', description: 'Build succeeds' },
+				{ type: ValidationType.TYPE_CHECK, description: 'Type checking passes' },
+				{ type: ValidationType.BUILD, description: 'Build succeeds' },
 			];
 		}
 
@@ -2159,7 +2229,7 @@ async function attemptMakerDecomposition(
 		const { graph, units, edges } = decompResult.value;
 
 		// Quality check
-		const qualityReport = checkDecompositionQuality(units, edges);
+		const qualityReport = checkDecompositionQuality(graph.graph_id, units, edges);
 		if (!qualityReport.is_acceptable) {
 			logger?.warn('Decomposition quality failed', {
 				issues: qualityReport.issues,
@@ -2216,7 +2286,7 @@ function extractMakerClaimUnits(dialogueId: string): void {
 		for (const unit of taskUnitsResult.value) {
 			// Observables → ATOMIC claims
 			for (const observable of unit.observables) {
-				createClaimUnit(unit.unit_id, observable, 'ATOMIC', unit.falsifiers, []);
+				createClaimUnit(unit.unit_id, observable, ClaimScope.ATOMIC, unit.falsifiers, []);
 				claimCount++;
 			}
 		}
@@ -2259,7 +2329,7 @@ function createMakerHistoricalPacket(dialogueId: string, findings: unknown[]): v
 			}
 		}
 
-		createHistoricalInvariantPacket(dialogueId, {
+		createHistoricalInvariantPacket(dialogueId, null, {
 			relevant_invariants: invariants,
 			prior_failure_motifs: failureMotifs,
 			precedent_patterns: patterns,
@@ -2294,7 +2364,7 @@ async function executeMakerExecutePhase(
 	const workspaceRoot = getWorkspaceRoot() ?? '.';
 	const overridesMap: Record<string, import('../cli/providerCapabilities').ProviderCapabilityOverrides | null> = {};
 	for (const pid of ['claude-code', 'codex-cli', 'gemini-cli']) {
-		overridesMap[pid] = getProviderCapabilityOverrides(pid);
+		overridesMap[pid] = getProviderCapabilityOverrides(pid) as import('../cli/providerCapabilities').ProviderCapabilityOverrides | null;
 	}
 	const profiles = getAllProviderProfiles(overridesMap);
 
@@ -2307,7 +2377,7 @@ async function executeMakerExecutePhase(
 	const contract: AcceptanceContract | null = contractResult.success ? contractResult.value : null;
 
 	// Update graph status
-	updateTaskGraphStatus(graphId, 'IN_PROGRESS');
+	updateTaskGraphStatus(graphId, TaskGraphStatus.IN_PROGRESS);
 
 	// Reset any units stuck in IN_PROGRESS/VALIDATING/REPAIRING from a prior
 	// killed or cancelled execution. Without this, those units would be invisible
@@ -2323,13 +2393,13 @@ async function executeMakerExecutePhase(
 		// Check if graph is already complete
 		const completeResult = isGraphComplete(graphId);
 		if (completeResult.success && completeResult.value) {
-			updateTaskGraphStatus(graphId, 'COMPLETED');
+			updateTaskGraphStatus(graphId, TaskGraphStatus.COMPLETED);
 			return {
 				success: true,
 				value: {
-					phase: 'EXECUTE' as Phase,
+					phase: Phase.EXECUTE,
 					success: true,
-					nextPhase: 'VALIDATE' as Phase,
+					nextPhase: Phase.VALIDATE,
 					metadata: { makerPath: true, graphComplete: true },
 					timestamp: new Date().toISOString(),
 				},
@@ -2360,7 +2430,7 @@ async function executeMakerExecutePhase(
 		});
 
 		// Mark unit as IN_PROGRESS
-		updateTaskUnitStatus(unit.unit_id, 'IN_PROGRESS');
+		updateTaskUnitStatus(unit.unit_id, TaskUnitStatus.IN_PROGRESS);
 		updateWorkflowMetadata(dialogueId, { current_unit_id: unit.unit_id });
 
 		// Route to best provider
@@ -2372,7 +2442,7 @@ async function executeMakerExecutePhase(
 			// Fallback to default executor provider
 			const fallbackProvider = await resolveProviderForRole(Role.EXECUTOR);
 			if (!fallbackProvider.success) {
-				updateTaskUnitStatus(unit.unit_id, 'FAILED');
+				updateTaskUnitStatus(unit.unit_id, TaskUnitStatus.FAILED);
 				continue;
 			}
 			unitProvider = fallbackProvider.value;
@@ -2414,23 +2484,23 @@ async function executeMakerExecutePhase(
 				status: 'error',
 				timestamp: new Date().toISOString(),
 			});
-			updateTaskUnitStatus(unit.unit_id, 'FAILED');
+			updateTaskUnitStatus(unit.unit_id, TaskUnitStatus.FAILED);
 			gateTriggered = true;
 			await createEnrichedRepairEscalationGate(
 				dialogueId, unit.unit_id, 'runtime_error',
 				`Unit execution failed: ${errorMsg}`, unit.label,
-				execResult.value?.response ?? '', unit.goal,
+				(execResult.success ? execResult.value?.response : '') ?? '', unit.goal,
 			);
 			break;
 		}
 
 		// Validate unit output
-		updateTaskUnitStatus(unit.unit_id, 'VALIDATING');
+		updateTaskUnitStatus(unit.unit_id, TaskUnitStatus.VALIDATING);
 		const validationResult = await runUnitValidation(unit, toolchains, contract, workspaceRoot);
 
-		if (validationResult.success && validationResult.value.pass_fail) {
+		if (validationResult.success && validationResult.value.pass_fail === 'PASS') {
 			// Validation passed
-			updateTaskUnitStatus(unit.unit_id, 'COMPLETED');
+			updateTaskUnitStatus(unit.unit_id, TaskUnitStatus.COMPLETED);
 			completeUnitAndPropagate(graphId, unit.unit_id);
 			unitsCompleted++;
 
@@ -2457,12 +2527,12 @@ async function executeMakerExecutePhase(
 			const canRepair = canAttemptRepair(unit, existingRepairs, Date.parse(phaseStartTimestamp));
 
 			if (classification === RepairClassification.AUTO_REPAIR_SAFE && canRepair.allowed) {
-				updateTaskUnitStatus(unit.unit_id, 'REPAIRING');
+				updateTaskUnitStatus(unit.unit_id, TaskUnitStatus.REPAIRING);
 				updateWorkflowMetadata(dialogueId, { repair_active: true });
 
 				const repairResult = await attemptRepair(
 					unit,
-					validationResult.success ? validationResult.value : { validation_id: '', unit_id: unit.unit_id, checks: [], expected_observables: [], actual_observables: [], pass_fail: false, created_at: '' } as ValidationPacket,
+					validationResult.success ? validationResult.value : { validation_id: '', unit_id: unit.unit_id, checks: [], expected_observables: [], actual_observables: [], pass_fail: 'FAIL' as const, failure_type: null, created_at: '' } as ValidationPacket,
 					classification,
 					unitProvider,
 					workspaceRoot
@@ -2473,8 +2543,8 @@ async function executeMakerExecutePhase(
 				if (repairResult.success && repairResult.value.result === 'FIXED') {
 					// Re-validate after repair
 					const revalidation = await runUnitValidation(unit, toolchains, contract, workspaceRoot);
-					if (revalidation.success && revalidation.value.pass_fail) {
-						updateTaskUnitStatus(unit.unit_id, 'COMPLETED');
+					if (revalidation.success && revalidation.value.pass_fail === 'PASS') {
+						updateTaskUnitStatus(unit.unit_id, TaskUnitStatus.COMPLETED);
 						completeUnitAndPropagate(graphId, unit.unit_id);
 						unitsCompleted++;
 						emitWorkflowCommand({
@@ -2491,16 +2561,16 @@ async function executeMakerExecutePhase(
 					}
 				}
 				// Repair failed or re-validation failed — escalate
-				updateTaskUnitStatus(unit.unit_id, 'FAILED');
+				updateTaskUnitStatus(unit.unit_id, TaskUnitStatus.FAILED);
 				gateTriggered = true;
 				await createEnrichedRepairEscalationGate(
 					dialogueId, unit.unit_id, failureType,
 					`Auto-repair failed for unit "${unit.label}"`, unit.label,
-					execResult.value?.response ?? '', unit.goal,
+					(execResult.success ? execResult.value?.response : '') ?? '', unit.goal,
 				);
 			} else {
 				// Cannot auto-repair — escalate immediately
-				updateTaskUnitStatus(unit.unit_id, 'FAILED');
+				updateTaskUnitStatus(unit.unit_id, TaskUnitStatus.FAILED);
 				gateTriggered = true;
 				const reason = classification === RepairClassification.ESCALATE_REQUIRED
 					? `Failure type "${failureType}" requires human intervention`
@@ -2508,7 +2578,7 @@ async function executeMakerExecutePhase(
 				await createEnrichedRepairEscalationGate(
 					dialogueId, unit.unit_id, failureType,
 					`${reason} (unit: "${unit.label}")`, unit.label,
-					execResult.value?.response ?? '', unit.goal,
+					(execResult.success ? execResult.value?.response : '') ?? '', unit.goal,
 				);
 			}
 
@@ -2528,7 +2598,7 @@ async function executeMakerExecutePhase(
 	// Check if entire graph is complete
 	const graphComplete = isGraphComplete(graphId);
 	if (graphComplete.success && graphComplete.value) {
-		updateTaskGraphStatus(graphId, 'COMPLETED');
+		updateTaskGraphStatus(graphId, TaskGraphStatus.COMPLETED);
 	}
 
 	const progress = getGraphProgress(graphId);
@@ -2542,10 +2612,10 @@ async function executeMakerExecutePhase(
 	return {
 		success: true,
 		value: {
-			phase: 'EXECUTE' as Phase,
+			phase: Phase.EXECUTE,
 			success: !gateTriggered,
 			nextPhase: (!gateTriggered && graphComplete.success && graphComplete.value)
-				? 'VALIDATE' as Phase
+				? Phase.VALIDATE
 				: undefined,
 			gateTriggered,
 			awaitingInput: gateTriggered,
@@ -2591,18 +2661,18 @@ async function runMakerContractValidation(
 			graph_id: '',
 			label: 'Acceptance Contract Validation',
 			goal: 'Validate acceptance contract conditions',
-			category: 'TEST',
+			category: TaskCategory.TEST,
 			inputs: [],
 			outputs: [],
 			preconditions: [],
 			postconditions: contract.success_conditions,
 			allowed_tools: [],
 			preferred_provider: null,
-			max_change_scope: null,
+			max_change_scope: '',
 			observables: contract.success_conditions,
 			falsifiers: [],
 			verification_method: 'automated',
-			status: 'IN_PROGRESS',
+			status: TaskUnitStatus.IN_PROGRESS,
 			parent_unit_id: null,
 			sort_order: 0,
 			created_at: new Date().toISOString(),
@@ -2611,7 +2681,7 @@ async function runMakerContractValidation(
 
 		const validationResult = await runUnitValidation(syntheticUnit, toolchains, contract, workspaceRoot);
 
-		if (!validationResult.success || !validationResult.value.pass_fail) {
+		if (!validationResult.success || validationResult.value.pass_fail !== 'PASS') {
 			const failedChecks = validationResult.success
 				? validationResult.value.checks.filter((c) => !c.passed).map((c) => `${c.check_type}: ${c.stdout_excerpt}`).join('; ')
 				: validationResult.error.message;
@@ -2729,6 +2799,12 @@ export async function advanceWorkflow(
 				}
 				break;
 			}
+			case 'ARCHITECTURE':
+				phaseResult = await executeArchitecturePhase(
+					dialogueId,
+					tokenBudget
+				);
+				break;
 			case 'PROPOSE':
 				phaseResult = await executeProposePhase(
 					dialogueId,
@@ -2798,8 +2874,23 @@ export async function advanceWorkflow(
 		}
 
 		if (!phaseResult.success) {
+			// Central failure tracking: record for retry/resume detection
+			const errorMsg = phaseResult.error instanceof Error
+				? phaseResult.error.message
+				: String(phaseResult.error ?? 'Unknown error');
+			updateWorkflowMetadata(dialogueId, {
+				lastFailedPhase: currentPhase,
+				lastError: errorMsg,
+			});
+			emitWorkflowPhaseFailed(dialogueId, currentPhase, errorMsg);
 			return phaseResult;
 		}
+
+		// Phase succeeded — clear any stale failure flags
+		updateWorkflowMetadata(dialogueId, {
+			lastFailedPhase: undefined,
+			lastError: undefined,
+		});
 
 		// Transition to next phase if specified
 		if (

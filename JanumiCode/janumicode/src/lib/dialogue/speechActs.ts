@@ -7,10 +7,9 @@
 import type {
 	Result,
 	Claim,
-	ClaimEvent,
 	Verdict,
 	HumanDecision,
-	DialogueTurn,
+	DialogueEvent,
 	ContentRef,
 } from '../types';
 import {
@@ -36,7 +35,7 @@ export function handleClaimSpeechAct(params: {
 	criticality: ClaimCriticality;
 	content_ref: ContentRef;
 	phase: Phase;
-}): Result<{ claim: Claim; turn: DialogueTurn }> {
+}): Result<{ claim: Claim; turn: DialogueEvent }> {
 	try {
 		// First, create the dialogue turn
 		const turnResult = createAndAddTurn({
@@ -63,7 +62,7 @@ export function handleClaimSpeechAct(params: {
 			criticality: params.criticality,
 			status: ClaimStatus.OPEN,
 			dialogue_id: params.dialogue_id,
-			turn_id: turn.turn_id,
+			turn_id: turn.event_id,
 		});
 
 		if (!claimResult.success) {
@@ -103,7 +102,7 @@ export function handleAssumptionSpeechAct(params: {
 	introduced_by: Role;
 	content_ref: ContentRef;
 	phase: Phase;
-}): Result<{ claim: Claim; turn: DialogueTurn }> {
+}): Result<{ claim: Claim; turn: DialogueEvent }> {
 	// Assumptions are always CRITICAL as they must be verified
 	return handleClaimSpeechAct({
 		dialogue_id: params.dialogue_id,
@@ -127,7 +126,7 @@ export function handleEvidenceSpeechAct(params: {
 	phase: Phase;
 	content_ref: ContentRef;
 	related_claims: string[];
-}): Result<DialogueTurn> {
+}): Result<DialogueEvent> {
 	try {
 		// Create dialogue turn with evidence
 		const turnResult = createAndAddTurn({
@@ -175,7 +174,7 @@ export function handleVerdictSpeechAct(params: {
 	constraints_ref?: string | null;
 	evidence_ref?: string | null;
 	content_ref: ContentRef;
-}): Result<{ verdict: Verdict; turn: DialogueTurn }> {
+}): Result<{ verdict: Verdict; turn: DialogueEvent }> {
 	try {
 		// Create dialogue turn
 		const turnResult = createAndAddTurn({
@@ -203,6 +202,7 @@ export function handleVerdictSpeechAct(params: {
 			rationale: params.rationale,
 			constraints_ref: params.constraints_ref || null,
 			evidence_ref: params.evidence_ref || null,
+			novel_dependency: false,
 		});
 
 		if (!verdictResult.success) {
@@ -245,7 +245,7 @@ export function handleDecisionSpeechAct(params: {
 	content_ref: ContentRef;
 	phase: Phase;
 	related_claims: string[];
-}): Result<{ decision: HumanDecision; turn: DialogueTurn }> {
+}): Result<{ decision: HumanDecision; turn: DialogueEvent }> {
 	try {
 		// Create dialogue turn
 		const turnResult = createAndAddTurn({

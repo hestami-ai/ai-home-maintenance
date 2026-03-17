@@ -63,6 +63,19 @@
         "command": "janumicode.clearApiKey",
         "title": "Clear API Key",
         "category": "JanumiCode"
+      },
+      {
+        "command": "janumicode.findInStream",
+        "title": "Find in Stream",
+        "category": "JanumiCode"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "janumicode.findInStream",
+        "key": "ctrl+f",
+        "mac": "cmd+f",
+        "when": "focusedView == 'janumicode.governedStream'"
       }
     ],
     "menus": {

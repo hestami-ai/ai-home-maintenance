@@ -8,7 +8,7 @@ import {
 	resolveGate,
 	hasOpenGates,
 } from '../../../lib/workflow/gates';
-import { GateStatus } from '../../../lib/types';
+import { GateStatus, HumanAction } from '../../../lib/types';
 import { getDatabase } from '../../../lib/database/init';
 import { writeHumanDecision } from '../../../lib/events/writer';
 
@@ -99,8 +99,9 @@ describe('Gate Management', () => {
 		// Write a human decision (use REJECT so it doesn't auto-resolve the gate)
 		const decisionResult = writeHumanDecision({
 			gate_id: createResult.value.gate_id,
-			action: 'REJECT',
+			action: HumanAction.REJECT,
 			rationale: 'Needs changes',
+			attachments_ref: null,
 		});
 		expect(decisionResult.success).toBe(true);
 		if (!decisionResult.success) { return; }

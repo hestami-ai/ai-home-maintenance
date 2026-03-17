@@ -25,8 +25,8 @@ const TABLE_CATALOG: TableEntry[] = [
 		primary: true,
 	},
 	{
-		name: 'dialogue_turns',
-		ddl: 'dialogue_turns(turn_id INT PK, dialogue_id, role[EXECUTOR/TECHNICAL_EXPERT/VERIFIER/HISTORIAN/HUMAN], phase[INTAKE/PROPOSE/ASSUMPTION_SURFACING/VERIFY/HISTORICAL_CHECK/REVIEW/EXECUTE/VALIDATE/COMMIT/REPLAN], speech_act[CLAIM/ASSUMPTION/EVIDENCE/VERDICT/DECISION], content_ref, timestamp)',
+		name: 'dialogue_events',
+		ddl: 'dialogue_events(event_id INT PK, dialogue_id, event_type, role, phase, speech_act, summary, content, detail JSON, timestamp)',
 		keywords: [],
 		primary: true,
 	},
@@ -38,7 +38,7 @@ const TABLE_CATALOG: TableEntry[] = [
 	},
 	{
 		name: 'verdicts',
-		ddl: 'verdicts(verdict_id PK, claim_id FK→claims, verdict[VERIFIED/CONDITIONAL/DISPROVED/UNKNOWN], constraints_ref, evidence_ref, rationale, timestamp)',
+		ddl: 'verdicts(verdict_id PK, claim_id FK→claims, verdict[VERIFIED/CONDITIONAL/DISPROVED/UNKNOWN], constraints_ref, evidence_ref, rationale, novel_dependency INT, timestamp)',
 		keywords: [],
 		primary: true,
 	},
@@ -90,12 +90,6 @@ const TABLE_CATALOG: TableEntry[] = [
 	{
 		name: 'intake_conversations',
 		ddl: 'intake_conversations(id INT PK, dialogue_id, sub_state[DISCUSSING/SYNTHESIZING/AWAITING_APPROVAL], turn_count INT, draft_plan JSON, accumulations JSON, finalized_plan JSON, created_at)',
-		keywords: ['intake', 'plan', 'planning', 'discuss', 'conversation'],
-		primary: false,
-	},
-	{
-		name: 'intake_turns',
-		ddl: 'intake_turns(id INT PK, dialogue_id, turn_number INT, human_message, expert_response, plan_snapshot JSON, created_at)',
 		keywords: ['intake', 'plan', 'planning', 'discuss', 'conversation'],
 		primary: false,
 	},

@@ -45,6 +45,8 @@ export enum GateTriggerCondition {
 	ACCEPTANCE_CONTRACT_FAILURE = 'ACCEPTANCE_CONTRACT_FAILURE',
 	DECOMPOSITION_REJECTED = 'DECOMPOSITION_REJECTED',
 	VERIFICATION_FAILURE = 'VERIFICATION_FAILURE',
+	// Architecture phase gate triggers
+	ARCHITECTURE_REVIEW = 'ARCHITECTURE_REVIEW',
 }
 
 /**
@@ -677,7 +679,7 @@ export async function createEnrichedRepairEscalationGate(
 	// Attempt LLM evaluation of the failure
 	let evaluation: import('./failureEvaluator').FailureEvaluation | undefined;
 	try {
-		const { evaluateUnitFailure } = await import('./failureEvaluator');
+		const { evaluateUnitFailure } = await import('./failureEvaluator.js');
 		const evalResult = await evaluateUnitFailure(
 			unitLabel, unitGoal, executorOutput, reason, failureType
 		);

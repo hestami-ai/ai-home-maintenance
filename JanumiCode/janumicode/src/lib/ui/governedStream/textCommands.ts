@@ -22,7 +22,7 @@ import {
 	getRepairPacketsForUnit, getLatestValidationForUnit,
 	getOutcomeSnapshotsForDialogue,
 } from '../../database/makerStore';
-import { getDialogueTurns, getClaims, getVerdicts, getHumanDecisions } from '../../events/reader';
+import { getDialogueEvents, getClaims, getVerdicts, getHumanDecisions } from '../../events/reader';
 import { executeSafeQuery } from '../../database/sqlQueryExecutor';
 import { buildSchemaPrompt } from '../../database/schemaPrompt';
 
@@ -48,12 +48,19 @@ const COMMAND_ALIASES: Record<string, string> = {
 	'replan': 'reframe',
 	'override': 'override',
 	'skip': 'override',
+	'resume': 'resume',
+	'continue': 'resume',
+	'proceed': 'resume',
 	'cancel': 'cancel',
 	'stop': 'cancel',
 	'abort': 'cancel',
 	'save': 'save-output',
 	'save-output': 'save-output',
 	'write-output': 'save-output',
+	'goto': 'navigate',
+	'navigate': 'navigate',
+	'jump': 'navigate',
+	'restart': 'navigate',
 };
 
 /**
@@ -218,10 +225,12 @@ function readGateMetadata(gateId: string): Record<string, unknown> | null {
 export type InterpreterAction =
 	| { action: 'retry'; rationale?: string }
 	| { action: 'approve'; rationale?: string }
+	| { action: 'resume'; rationale?: string }
 	| { action: 'reframe'; rationale?: string }
 	| { action: 'override'; rationale?: string }
 	| { action: 'save_output'; filePath: string }
 	| { action: 'answer'; response: string; needsEscalation?: boolean }
+	| { action: 'navigate'; target: string; direction?: 'forward' | 'backward' | 'restart' }
 	| { action: 'freetext' }
 	| { action: 'cancel' };
 
@@ -237,7 +246,8 @@ Given the current workflow state and the user's message, determine the appropria
 
 Return a JSON object with one of these shapes:
 - {"action":"retry","rationale":"..."} — User wants to retry, redo, rerun, or try again.
-- {"action":"approve","rationale":"..."} — User wants to approve, accept, confirm, proceed, or continue.
+- {"action":"resume","rationale":"..."} — User wants to resume, continue, or proceed from where the workflow stopped.
+- {"action":"approve","rationale":"..."} — User wants to approve, accept, or confirm.
 - {"action":"reframe","rationale":"..."} — User wants to reframe, rethink, replan, or take a different approach.
 - {"action":"override","rationale":"..."} — User wants to override, skip, bypass, or force past the current checkpoint.
 - {"action":"save_output","filePath":"..."} — User wants to save/write executor output to a specific file path. Extract the path from their message.
@@ -254,6 +264,7 @@ Rules:
 - "rethink", "different approach", "change the plan" → reframe.
 - If the message mentions a file path with "save", "write", or "export" → save_output with the extracted path.
 - If ambiguous between a command action and freetext, prefer freetext — don't misclassify regular input as a command.
+- Phase navigation requests like "go back to verify", "re-run from architecture", "skip to review", "jump to execute", "restart intake", "goto decompose" → {"action":"navigate","target":"<phase or sub-phase name as the user expressed it>","direction":"backward|forward|restart"}. Use "backward" for going back, "forward" for skipping ahead, "restart" for starting a phase from scratch. Do NOT normalize the target — pass the user's words directly.
 - The "rationale" field should capture the user's reasoning if present, or be omitted.
 - Respond ONLY with valid JSON. No markdown, no explanation.`;
 
@@ -402,12 +413,12 @@ export async function interpretInput(
 			config.get<string>('evaluator.provider', 'GEMINI')
 		);
 
-		const { LLMProvider: LLMProviderEnum } = await import('../../types');
+		const { LLMProvider: LLMProviderEnum } = await import('../../types/index.js');
 		const providerEnum =
 			LLMProviderEnum[providerName as keyof typeof LLMProviderEnum] ??
 			LLMProviderEnum.GEMINI;
 
-		const { getSecretKeyManager } = await import('../../config/secretKeyManager');
+		const { getSecretKeyManager } = await import('../../config/secretKeyManager.js');
 		const apiKey = await getSecretKeyManager().getApiKey('curator', providerEnum);
 		if (!apiKey?.trim()) {
 			log?.warn('Tier 2: no API key for curator role');
@@ -419,8 +430,8 @@ export async function interpretInput(
 			config.get<string>('evaluator.model', 'gemini-3-flash-lite')
 		);
 
-		const { createProvider } = await import('../../llm/providerFactory');
-		const { MessageRole } = await import('../../llm/provider');
+		const { createProvider } = await import('../../llm/providerFactory.js');
+		const { MessageRole } = await import('../../llm/provider.js');
 
 		const providerResult = createProvider(providerEnum, {
 			apiKey: apiKey.trim(),
@@ -513,10 +524,11 @@ function tryParseAction(json: string): InterpreterAction | null {
 		switch (action) {
 			case 'retry':
 			case 'approve':
+			case 'resume':
 			case 'reframe':
 			case 'override':
 				return {
-					action: action as 'retry' | 'approve' | 'reframe' | 'override',
+					action: action as 'retry' | 'approve' | 'resume' | 'reframe' | 'override',
 					rationale: typeof obj.rationale === 'string' ? obj.rationale : undefined,
 				};
 			case 'save_output':
@@ -527,6 +539,13 @@ function tryParseAction(json: string): InterpreterAction | null {
 				return { action: 'answer', response: obj.response, needsEscalation: obj.needsEscalation === true ? true : undefined };
 			case 'cancel':
 				return { action: 'cancel' };
+			case 'navigate':
+				if (!obj.target || typeof obj.target !== 'string') { return null; }
+				return {
+					action: 'navigate',
+					target: obj.target,
+					direction: typeof obj.direction === 'string' ? obj.direction as 'forward' | 'backward' | 'restart' : undefined,
+				};
 			case 'freetext':
 				return { action: 'freetext' };
 			default:
@@ -588,12 +607,12 @@ export function buildDeepContext(dialogueId: string): string {
 					}
 
 					// Validation results for completed/failed units
-					if (unit.status === 'DONE' || unit.status === 'FAILED') {
+					if (unit.status === 'COMPLETED' || unit.status === 'FAILED') {
 						try {
 							const valResult = getLatestValidationForUnit(unit.unit_id);
 							if (valResult.success && valResult.value) {
 								const v = valResult.value;
-								const checkSummary = v.checks.map(c => `${c.name}:${c.pass ? 'PASS' : 'FAIL'}`).join(', ');
+								const checkSummary = v.checks.map((c: { check_type: string; passed: boolean }) => `${c.check_type}:${c.passed ? 'PASS' : 'FAIL'}`).join(', ');
 								lines.push(`     Validation: ${v.pass_fail} — ${checkSummary}`);
 							}
 						} catch { /* optional */ }
@@ -684,13 +703,14 @@ export function buildDeepContext(dialogueId: string): string {
 
 	// 8. Recent dialogue turns (last 5)
 	try {
-		const turnsResult = getDialogueTurns({ dialogue_id: dialogueId, limit: 5 });
+		const turnsResult = getDialogueEvents({ dialogue_id: dialogueId, limit: 5 });
 		if (turnsResult.success && turnsResult.value.length > 0) {
 			lines.push('');
 			lines.push('Recent dialogue turns:');
 			for (const turn of turnsResult.value.slice(-5)) {
-				const contentExcerpt = turn.content_ref
-					? turn.content_ref.substring(0, 120)
+				const contentRef = turn.content ?? turn.summary;
+				const contentExcerpt = contentRef
+					? contentRef.substring(0, 120)
 					: '(no content)';
 				lines.push(`  [${turn.role}/${turn.phase}] ${contentExcerpt}`);
 			}
@@ -728,9 +748,9 @@ function isFilesystemQuestion(text: string): boolean {
 async function queryWorkspace(question: string, _dialogueId: string): Promise<string | null> {
 	try {
 		const vscode = await import('vscode');
-		const { resolveProviderForRole } = await import('../../cli/providerResolver');
-		const { Role } = await import('../../types');
-		const { buildStdinContent } = await import('../../cli/types');
+		const { resolveProviderForRole } = await import('../../cli/providerResolver.js');
+		const { Role } = await import('../../types/index.js');
+		const { buildStdinContent } = await import('../../cli/types.js');
 
 		const config = vscode.workspace.getConfiguration('janumicode');
 		const preferredProvider = config.get<string>('interpreter.workspaceQuery.provider', 'auto');
@@ -752,10 +772,11 @@ async function queryWorkspace(question: string, _dialogueId: string): Promise<st
 		const cwd = workspaceFolders?.[0]?.uri.fsPath;
 		if (!cwd) { return null; }
 
-		const result = await provider.invoke({
+		const { invokeRoleStreaming } = await import('../../cli/roleInvoker.js');
+		const result = await invokeRoleStreaming({
+			provider,
 			stdinContent: buildStdinContent(systemPrompt, question),
 			workingDirectory: cwd,
-			outputFormat: 'text',
 			timeout: 30000,
 			allowedTools: ['Read', 'Glob', 'Grep'],
 			sandboxMode: 'read-only',
@@ -856,11 +877,11 @@ export async function escalateQuery(
 	if (ftsEnabled) {
 		onProgress?.('Searching dialogue history...');
 		try {
-			const { searchStreamContent } = await import('../../database/ftsSync');
+			const { searchStreamContent } = await import('../../database/ftsSync.js');
 			const results = searchStreamContent(text, dialogueId, 5);
 			if (results.length > 0) {
 				ftsContext = '\n\nRelevant content from stream history:\n' +
-					results.map(r => `[${r.sourceTable}] ${r.snippet}`).join('\n');
+					results.map((r: { sourceTable: string; snippet: string }) => `[${r.sourceTable}] ${r.snippet}`).join('\n');
 			}
 		} catch {
 			diagnostics.push('Full-text search unavailable — run database migration to enable FTS5 indexing.');
@@ -892,12 +913,12 @@ export async function escalateQuery(
 			config.get<string>('evaluator.provider', 'GEMINI')
 		);
 
-		const { LLMProvider: LLMProviderEnum } = await import('../../types');
+		const { LLMProvider: LLMProviderEnum } = await import('../../types/index.js');
 		const providerEnum =
 			LLMProviderEnum[providerName as keyof typeof LLMProviderEnum] ??
 			LLMProviderEnum.GEMINI;
 
-		const { getSecretKeyManager } = await import('../../config/secretKeyManager');
+		const { getSecretKeyManager } = await import('../../config/secretKeyManager.js');
 		const apiKey = await getSecretKeyManager().getApiKey('curator', providerEnum);
 		if (!apiKey?.trim()) {
 			log?.warn('Tier 3: no API key for curator role');
@@ -909,8 +930,8 @@ export async function escalateQuery(
 			config.get<string>('evaluator.model', 'gemini-3-flash-lite')
 		);
 
-		const { createProvider } = await import('../../llm/providerFactory');
-		const { MessageRole } = await import('../../llm/provider');
+		const { createProvider } = await import('../../llm/providerFactory.js');
+		const { MessageRole } = await import('../../llm/provider.js');
 
 		const providerResult = createProvider(providerEnum, {
 			apiKey: apiKey.trim(),

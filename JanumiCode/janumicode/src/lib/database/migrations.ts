@@ -181,7 +181,7 @@ export function validateSchema(db: Database.Database): Result<boolean> {
 	try {
 		// Check that all expected tables exist
 		const expectedTables = [
-			'dialogue_turns',
+			'dialogue_events',
 			'claims',
 			'claim_events',
 			'verdicts',
@@ -210,6 +210,13 @@ export function validateSchema(db: Database.Database): Result<boolean> {
 			'toolchain_detections',
 			// V13: Clarification threads
 			'clarification_threads',
+			// Architecture phase tables
+			'architecture_documents',
+			'arch_capabilities',
+			'arch_domain_mappings',
+			'arch_workflows',
+			'arch_components',
+			'arch_implementation_steps',
 		];
 
 		const existingTablesResult = db
@@ -267,25 +274,43 @@ export function validateSchema(db: Database.Database): Result<boolean> {
  * @returns Result indicating success or failure
  */
 export function initializeSchema(db: Database.Database): Result<void> {
+	const log = (...args: unknown[]) => {
+		try {
+			const { getLogger } = require('../logging');
+			getLogger().child({ component: 'migrations' }).info(args[0], args[1]);
+		} catch { /* logger not ready */ }
+	};
+
 	try {
+		const currentVersion = getCurrentSchemaVersion(db);
+		log('Schema init starting', { currentVersion, totalMigrations: MIGRATIONS.length, latestVersion: Math.max(...MIGRATIONS.map(m => m.version)) });
+
 		const result = runMigrations(db);
 
 		if (!result.success) {
+			log('runMigrations FAILED', { error: result.error.message });
 			return result;
 		}
+
+		log('Migrations applied', { count: result.value.length, applied: result.value.map(m => `v${m.version}`) });
 
 		// Validate schema after initialization
 		const validationResult = validateSchema(db);
 
 		if (!validationResult.success) {
+			log('validateSchema FAILED', { error: validationResult.error.message });
 			return {
 				success: false,
 				error: validationResult.error,
 			};
 		}
 
+		const finalVersion = getCurrentSchemaVersion(db);
+		log('Schema init complete', { finalVersion });
+
 		return { success: true, value: undefined };
 	} catch (error) {
+		log('Schema init EXCEPTION', { error: error instanceof Error ? error.message : String(error) });
 		return {
 			success: false,
 			error:

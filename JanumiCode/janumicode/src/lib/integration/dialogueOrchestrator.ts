@@ -4,7 +4,7 @@
  * Coordinates dialogue turns with workflow phase execution
  */
 
-import type { Result, Dialogue, DialogueTurn, RoleLLMConfig } from '../types';
+import type { Result, Dialogue, DialogueEvent, RoleLLMConfig } from '../types';
 import { CodedError, Phase, Role, SpeechAct } from '../types';
 import { createDialogueSession, getDialogueSession, createAndAddTurn, createDialogueRecord, completeDialogue } from '../dialogue';
 import { initializeWorkflowState, getWorkflowState } from '../workflow';
@@ -39,7 +39,7 @@ export interface StartDialogueWithWorkflowResult {
 	/** Created dialogue */
 	dialogue: Dialogue;
 	/** Initial dialogue turn */
-	turn: DialogueTurn;
+	turn: DialogueEvent;
 	/** Whether workflow was initialized */
 	workflowInitialized: boolean;
 }
@@ -67,7 +67,7 @@ export interface AdvanceDialogueWithWorkflowOptions {
  */
 export interface AdvanceDialogueWithWorkflowResult {
 	/** Created dialogue turn */
-	turn: DialogueTurn;
+	turn: DialogueEvent;
 	/** Whether workflow was advanced */
 	workflowAdvanced: boolean;
 	/** Current workflow phase (if advanced) */
@@ -130,7 +130,7 @@ export function startDialogueWithWorkflow(
 
 		// Emit events so UI subscribers update
 		emitDialogueStarted(dialogue.dialogue_id, options.goal);
-		emitDialogueTurnAdded(dialogue.dialogue_id, turn.turn_id, Role.HUMAN);
+		emitDialogueTurnAdded(dialogue.dialogue_id, turn.event_id, Role.HUMAN);
 
 		return {
 			success: true,
@@ -185,7 +185,7 @@ export async function advanceDialogueWithWorkflow(
 		}
 
 		const turn = turnResult.value;
-		emitDialogueTurnAdded(options.dialogueId, turn.turn_id, options.role);
+		emitDialogueTurnAdded(options.dialogueId, turn.event_id, options.role);
 
 		// Optionally advance the workflow
 		if (options.advanceWorkflow) {

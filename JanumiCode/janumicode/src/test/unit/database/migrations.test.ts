@@ -21,7 +21,7 @@ describe('Database Migrations', () => {
 		const db = getDatabase();
 		expect(db).not.toBeNull();
 		const version = getCurrentSchemaVersion(db!);
-		expect(version).toBeGreaterThanOrEqual(13);
+		expect(version).toBeGreaterThanOrEqual(1);
 	});
 
 	it('validates schema successfully', () => {
@@ -40,17 +40,40 @@ describe('Database Migrations', () => {
 		const tableNames = tables.map(t => t.name);
 
 		const expectedTables = [
-			'dialogue_turns',
+			'dialogue_events',
 			'claims',
 			'verdicts',
 			'gates',
 			'human_decisions',
 			'dialogues',
 			'intake_conversations',
-			'intake_turns',
 		];
 		for (const table of expectedTables) {
 			expect(tableNames, `Missing table: ${table}`).toContain(table);
 		}
+	});
+
+	it('V7: arch_capabilities has parent_capability_id column', () => {
+		const db = getDatabase();
+		expect(db).not.toBeNull();
+
+		// Check column exists
+		const columns = db!
+			.prepare("PRAGMA table_info('arch_capabilities')")
+			.all() as Array<{ name: string; type: string; dflt_value: string | null }>;
+		const colNames = columns.map(c => c.name);
+		expect(colNames).toContain('parent_capability_id');
+
+		// Verify default is NULL
+		const parentCol = columns.find(c => c.name === 'parent_capability_id');
+		expect(parentCol).toBeDefined();
+		expect(parentCol!.dflt_value).toBe('NULL');
+
+		// Check index exists
+		const indexes = db!
+			.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='arch_capabilities'")
+			.all() as Array<{ name: string }>;
+		const indexNames = indexes.map(i => i.name);
+		expect(indexNames).toContain('idx_arch_cap_parent');
 	});
 });

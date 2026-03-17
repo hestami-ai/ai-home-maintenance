@@ -53,7 +53,12 @@
       "Bash(node:*)",
       "Bash(pnpm run test:unit:*)",
       "Bash(npx node-gyp rebuild:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(cat:*)",
+      "Bash(sqlite3:*)",
+      "Bash(pnpm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

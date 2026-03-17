@@ -8,23 +8,21 @@
 
 
 
-import type { DialogueTurn, Claim, Verdict, Gate } from '../../../types';
-
-import { Role, Phase, ClaimStatus, GateStatus, SpeechAct } from '../../../types';
+import type { DialogueEvent, Claim, Verdict, Gate, IntakeModeRecommendation, DomainCoverageMap, IntakeCheckpoint } from '../../../types';
+import { Role, Phase, ClaimStatus, GateStatus, SpeechAct, IntakeMode, DomainCoverageLevel } from '../../../types';
 
 import type { GovernedStreamState, ClaimHealthSummary, StreamItem, DialogueSummary, ReviewItem, ReviewSummary } from '../dataAggregator';
 
-import { WORKFLOW_PHASES } from '../dataAggregator';
+import { WORKFLOW_PHASES, synthesizeReviewMMP } from '../dataAggregator';
 
 import { getHumanFacingStateClass } from '../../../workflow/humanFacingState';
 
 import type { WorkflowCommandRecord, WorkflowCommandOutput } from '../../../workflow/commandStore';
 
-import type { IntakePlanDocument, IntakeConversationTurn, IntakeGatheringTurnResponse } from '../../../types/intake';
+import type { IntakePlanDocument, IntakeConversationTurn, IntakeGatheringTurnResponse, IntakeTurnResponse } from '../../../types/intake';
 import { isGatheringResponse } from '../../../types/intake';
-import type { IntakeModeRecommendation, DomainCoverageMap, IntakeCheckpoint } from '../../../types';
-import { IntakeMode, DomainCoverageLevel } from '../../../types';
 import { DOMAIN_INFO, DOMAIN_SEQUENCE } from '../../../workflow/domainCoverageTracker';
+import type { MMPPayload } from '../../../types/mmp';
 
 
 
@@ -34,17 +32,19 @@ import { DOMAIN_INFO, DOMAIN_SEQUENCE } from '../../../workflow/domainCoverageTr
 
 function escapeHtml(str: string): string {
 
+	if (typeof str !== 'string') { str = String(str ?? ''); }
+
 	return str
 
-		.replace(/&/g, '&amp;')
+		.replaceAll('&', '&amp;')
 
-		.replace(/</g, '&lt;')
+		.replaceAll('<', '&lt;')
 
-		.replace(/>/g, '&gt;')
+		.replaceAll('>', '&gt;')
 
-		.replace(/"/g, '&quot;')
+		.replaceAll('"', '&quot;')
 
-		.replace(/'/g, '&#039;');
+		.replaceAll("'", '&#039;');
 
 }
 
@@ -80,7 +80,7 @@ export function setSoxAvailable(available: boolean): void {
 /** Render a mic button for a specific input area. Returns empty string if speech is disabled. */
 function renderMicButton(targetInputId: string): string {
 	if (!_speechEnabled) { return ''; }
-	const disabled = !_soxAvailable ? ' disabled' : '';
+	const disabled = _soxAvailable ? '' : ' disabled';
 	const title = _soxAvailable
 		? 'Click to record voice input'
 		: 'Speech-to-text requires SoX. Install the SoX &quot;rec&quot; command to enable.';
@@ -169,13 +169,13 @@ function simpleMarkdownToHtml(md: string): string {
 function applyInlineFormatting(text: string): string {
 	return text
 		// Inline code: `code`
-		.replace(/`([^`]+)`/g, '<code>$1</code>')
+		.replaceAll(/`([^`]+)`/g, '<code>$1</code>')
 		// Bold: **text** or __text__
-		.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-		.replace(/__([^_]+)__/g, '<strong>$1</strong>')
+		.replaceAll(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+		.replaceAll(/__([^_]+)__/g, '<strong>$1</strong>')
 		// Italic: *text* or _text_
-		.replace(/\*([^*]+)\*/g, '<em>$1</em>')
-		.replace(/\b_([^_]+)_\b/g, '<em>$1</em>');
+		.replaceAll(/\*([^*]+)\*/g, '<em>$1</em>')
+		.replaceAll(/\b_([^_]+)_\b/g, '<em>$1</em>');
 }
 
 function formatTimestamp(iso: string): string {
@@ -210,7 +210,7 @@ function formatTimestamp(iso: string): string {
 
 function formatPhaseLabel(phase: Phase): string {
 
-	return phase.replace(/_/g, ' ');
+	return phase.replaceAll('_', ' ');
 
 }
 
@@ -355,7 +355,7 @@ export function renderStickyHeader(state: GovernedStreamState): string {
 
 	const phaseSteps = renderPhaseSteps(state.currentPhase);
 
-	const healthBar = renderClaimHealthBar(state.claimHealth);
+	const subPhaseHtml = renderSubPhaseProgress(state);
 
 	const switcherHtml = state.dialogueList.length > 0
 
@@ -375,6 +375,8 @@ export function renderStickyHeader(state: GovernedStreamState): string {
 
 				<span class="header-title">Governed Stream</span>
 
+				<button class="header-find-btn" data-action="toggle-find" title="Find (Ctrl+F)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg></button>
+
 				${humanStateHtml}
 
 				${switcherHtml}
@@ -385,7 +387,7 @@ export function renderStickyHeader(state: GovernedStreamState): string {
 
 			${taskProgressHtml}
 
-			<div class="claim-health-bar">${healthBar}</div>
+			<div class="subphase-progress-row">${subPhaseHtml}</div>
 
 		</div>
 
@@ -415,7 +417,9 @@ function renderDialogueSwitcher(dialogues: DialogueSummary[], activeDialogueId: 
 
 		const selected = d.dialogueId === activeDialogueId ? ' selected' : '';
 
-		const statusIcon = d.status === 'ACTIVE' ? '&#x1F7E2;' : d.status === 'COMPLETED' ? '&#x2705;' : '&#x23F9;';
+		const statusIcon = d.status === 'ACTIVE' ? '&#x1F7E2;'
+			: d.status === 'COMPLETED' ? '&#x2705;'
+			: '&#x23F9;';
 
 		const title = escapeHtml((d.title ?? d.goal).substring(0, 40));
 
@@ -524,51 +528,168 @@ function renderPhaseSteps(currentPhase: Phase): string {
 
 
 function renderClaimHealthBar(health: ClaimHealthSummary): string {
+	return '<div class="health-item" data-action="scroll-to-status" data-status="VERIFIED">' +
+		'<span class="health-dot verified"></span>' +
+		'<span class="health-count">' + health.verified + '</span>' +
+		'<span class="health-label">Verified</span></div>' +
+		'<div class="health-item" data-action="scroll-to-status" data-status="UNKNOWN">' +
+		'<span class="health-dot unknown"></span>' +
+		'<span class="health-count">' + health.unknown + '</span>' +
+		'<span class="health-label">Unknown</span></div>' +
+		'<div class="health-item" data-action="scroll-to-status" data-status="DISPROVED">' +
+		'<span class="health-dot disproved"></span>' +
+		'<span class="health-count">' + health.disproved + '</span>' +
+		'<span class="health-label">Disproved</span></div>' +
+		'<div class="health-item" data-action="scroll-to-status" data-status="OPEN">' +
+		'<span class="health-dot open"></span>' +
+		'<span class="health-count">' + health.open + '</span>' +
+		'<span class="health-label">Open</span></div>';
+}
 
-	return `
+// ==================== SUB-PHASE PROGRESS DIAGRAM ====================
 
-		<div class="health-item" data-action="scroll-to-status" data-status="VERIFIED">
+/** Sub-phase step definition for the progress diagram */
+interface SubPhaseStep {
+	id: string;
+	label: string;
+	state: 'completed' | 'active' | 'pending' | 'retry';
+	retryCount?: number;
+}
 
-			<span class="health-dot verified"></span>
+/**
+ * Render a contextual sub-phase progress diagram based on the current major phase.
+ * Shows a branch-and-merge style flow with completed/active/pending indicators.
+ */
+function renderSubPhaseProgress(state: GovernedStreamState): string {
+	const { currentPhase } = state;
 
-			<span class="health-count">${health.verified}</span>
+	if (currentPhase === Phase.INTAKE && state.intakeState) {
+		return renderSubPhaseDiagram(buildIntakeSubPhases(state.intakeState.subState, state.intakeState.intakeMode));
+	}
+	if (currentPhase === Phase.ARCHITECTURE && state.architectureState) {
+		return renderSubPhaseDiagram(buildArchitectureSubPhases(state.architectureState));
+	}
+	if ((currentPhase === Phase.VERIFY || currentPhase === Phase.HISTORICAL_CHECK) && state.claimHealth.total > 0) {
+		return renderClaimHealthBar(state.claimHealth);
+	}
+	if (currentPhase === Phase.EXECUTE && state.taskGraphProgress) {
+		return renderTaskSubPhases(state.taskGraphProgress);
+	}
+	// No sub-phase info available for this phase
+	return '';
+}
 
-			<span class="health-label">Verified</span>
+function buildIntakeSubPhases(subState: string, intakeMode: string | null): SubPhaseStep[] {
+	// Proposer-Validator flow
+	const isPV = subState.startsWith('PROPOSING_');
+	if (isPV || intakeMode === 'STATE_DRIVEN') {
+		const steps = [
+			{ id: 'ANALYZING', label: 'Analyze' },
+			{ id: 'PROPOSING_DOMAINS', label: 'Domains' },
+			{ id: 'PROPOSING_JOURNEYS', label: 'Journeys' },
+			{ id: 'PROPOSING_ENTITIES', label: 'Entities' },
+			{ id: 'PROPOSING_INTEGRATIONS', label: 'Integrations' },
+			{ id: 'PROPOSING', label: 'Propose' },
+			{ id: 'CLARIFYING', label: 'Clarify' },
+			{ id: 'SYNTHESIZING', label: 'Synthesize' },
+			{ id: 'AWAITING_APPROVAL', label: 'Approve' },
+		];
+		return assignSubPhaseStates(steps, subState);
+	}
+	// Standard inverted flow
+	const steps = [
+		{ id: 'ANALYZING', label: 'Analyze' },
+		{ id: 'PRODUCT_REVIEW', label: 'Product Review' },
+		{ id: 'PROPOSING', label: 'Propose' },
+		{ id: 'CLARIFYING', label: 'Clarify' },
+		{ id: 'SYNTHESIZING', label: 'Synthesize' },
+		{ id: 'AWAITING_APPROVAL', label: 'Approve' },
+	];
+	return assignSubPhaseStates(steps, subState);
+}
 
-		</div>
+function buildArchitectureSubPhases(
+	archState: NonNullable<GovernedStreamState['architectureState']>
+): SubPhaseStep[] {
+	const ordered = ['DECOMPOSING', 'MODELING', 'DESIGNING', 'SEQUENCING', 'VALIDATING', 'PRESENTING'];
+	const labels: Record<string, string> = {
+		DECOMPOSING: 'Decompose', MODELING: 'Model', DESIGNING: 'Design',
+		SEQUENCING: 'Sequence', VALIDATING: 'Validate', PRESENTING: 'Review',
+	};
+	const steps = assignSubPhaseStates(
+		ordered.map(id => ({ id, label: labels[id] || id })),
+		archState.subState
+	);
+	// Mark retry on VALIDATING or DESIGNING if validation has been attempted
+	if (archState.validationAttempts > 0) {
+		for (const step of steps) {
+			if (step.id === 'VALIDATING' && step.state !== 'pending') {
+				step.retryCount = archState.validationAttempts;
+			}
+			if (step.id === 'DESIGNING' && archState.validationAttempts > 0 && step.state === 'active') {
+				step.state = 'retry';
+				step.retryCount = archState.designIterations;
+			}
+			if (step.id === 'DECOMPOSING' && archState.validationAttempts > 0 && step.state === 'active') {
+				step.state = 'retry';
+			}
+		}
+	}
+	return steps;
+}
 
-		<div class="health-item" data-action="scroll-to-status" data-status="UNKNOWN">
+function renderTaskSubPhases(progress: NonNullable<GovernedStreamState['taskGraphProgress']>): string {
+	const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
+	return '<div class="subphase-task-progress">' +
+		'<div class="subphase-task-bar">' +
+		'<div class="subphase-task-fill" style="width:' + pct + '%"></div>' +
+		'</div>' +
+		'<span class="subphase-task-label">' + progress.completed + '/' + progress.total + ' tasks' +
+		(progress.failed > 0 ? ' <span class="subphase-task-failed">(' + progress.failed + ' failed)</span>' : '') +
+		(progress.in_progress > 0 ? ' <span class="subphase-task-active">(' + progress.in_progress + ' running)</span>' : '') +
+		'</span></div>';
+}
 
-			<span class="health-dot unknown"></span>
+/** Assign completed/active/pending states based on current sub-state position in ordered list */
+function assignSubPhaseStates(
+	steps: Array<{ id: string; label: string }>,
+	currentSubState: string
+): SubPhaseStep[] {
+	const currentIdx = steps.findIndex(s => s.id === currentSubState);
+	return steps.map((step, idx) => ({
+		...step,
+		state: (idx < currentIdx ? 'completed'
+			: idx === currentIdx ? 'active'
+			: 'pending') as SubPhaseStep['state'],
+	}));
+}
 
-			<span class="health-count">${health.unknown}</span>
-
-			<span class="health-label">Unknown</span>
-
-		</div>
-
-		<div class="health-item" data-action="scroll-to-status" data-status="DISPROVED">
-
-			<span class="health-dot disproved"></span>
-
-			<span class="health-count">${health.disproved}</span>
-
-			<span class="health-label">Disproved</span>
-
-		</div>
-
-		<div class="health-item" data-action="scroll-to-status" data-status="OPEN">
-
-			<span class="health-dot open"></span>
-
-			<span class="health-count">${health.open}</span>
-
-			<span class="health-label">Open</span>
-
-		</div>
-
-	`;
-
+/** Render the sub-phase diagram as a horizontal step flow */
+function renderSubPhaseDiagram(steps: SubPhaseStep[]): string {
+	let html = '<div class="subphase-diagram">';
+	for (let i = 0; i < steps.length; i++) {
+		const s = steps[i];
+		const stateClass = s.state;
+		const icon = s.state === 'completed' ? '&#x2713;'
+			: s.state === 'active' ? '&#x25CF;'
+			: s.state === 'retry' ? '&#x21BB;'
+			: '&#x25CB;';
+		html += '<div class="subphase-step ' + stateClass + '">' +
+			'<span class="subphase-icon">' + icon + '</span>' +
+			'<span class="subphase-label">' + escapeHtml(s.label) + '</span>';
+		if (s.retryCount !== undefined && s.retryCount > 0) {
+			html += '<span class="subphase-retry-badge">R' + s.retryCount + '</span>';
+		}
+		html += '</div>';
+		if (i < steps.length - 1) {
+			// Connector line — use retry style if going backward
+			const nextStep = steps[i + 1];
+			const connClass = nextStep.state === 'retry' ? 'subphase-connector retry' : 'subphase-connector';
+			html += '<div class="' + connClass + '"></div>';
+		}
+	}
+	html += '</div>';
+	return html;
 }
 
 
@@ -648,7 +769,7 @@ export function renderMilestoneDivider(phase: Phase, timestamp: string): string 
 
 
 
-export function renderRichCard(turn: DialogueTurn, claims: Claim[], verdict?: Verdict): string {
+export function renderRichCard(turn: DialogueEvent, claims: Claim[], verdict?: Verdict): string {
 
 	const rc = roleClass(turn.role);
 
@@ -682,7 +803,7 @@ export function renderRichCard(turn: DialogueTurn, claims: Claim[], verdict?: Ve
 
 	return `
 
-		<div class="rich-card ${rc} collapsible-card expanded" data-turn-id="${turn.turn_id}">
+		<div class="rich-card ${rc} collapsible-card expanded" data-turn-id="${turn.event_id}">
 
 			<div class="collapsible-card-header card-header" data-action="toggle-card">
 
@@ -732,11 +853,13 @@ export function renderRichCard(turn: DialogueTurn, claims: Claim[], verdict?: Ve
 
  */
 
-function renderTurnContent(turn: DialogueTurn): string {
+function renderTurnContent(turn: DialogueEvent): string {
+
+	const contentRef = turn.content ?? turn.summary;
 
 	if (turn.speech_act === SpeechAct.ASSUMPTION) {
 
-		return renderAssumptionContent(turn.content_ref);
+		return renderAssumptionContent(contentRef);
 
 	}
 
@@ -744,13 +867,13 @@ function renderTurnContent(turn: DialogueTurn): string {
 
 	if (turn.speech_act === SpeechAct.CLAIM && turn.phase === Phase.PROPOSE) {
 
-		return renderProposalContent(turn.content_ref);
+		return renderProposalContent(contentRef);
 
 	}
 
 
 
-	return renderContentWithMarkdown(turn.content_ref);
+	return renderContentWithMarkdown(contentRef);
 
 }
 
@@ -1005,7 +1128,7 @@ function renderGateEvaluation(metadata?: Record<string, unknown>): string {
 	};
 
 	const status = evaluation.completionStatus || 'failed';
-	const statusClass = status.replace(/_/g, '-');
+	const statusClass = status.replaceAll('_', '-');
 	const icon = statusIcons[status] || '&#x2753;';
 	const label = statusLabels[status] || status;
 	const summary = evaluation.summary ? escapeHtml(evaluation.summary) : '';
@@ -1403,50 +1526,76 @@ export function renderReviewGateCard(
 	const awareness = reviewItems.filter((i) => i.category === 'awareness');
 	const allClear = reviewItems.filter((i) => i.category === 'all_clear');
 
-	// Needs Your Decision group (always open)
-	const needsDecisionHtml = needsDecision.length > 0
-		? `
-			<div class="review-group needs-decision">
-				<div class="review-group-header" data-action="toggle-review-group">
-					<span class="card-chevron">&#x25B6;</span>
-					&#x26A0; NEEDS YOUR DECISION (${needsDecision.length} item${needsDecision.length !== 1 ? 's' : ''})
-				</div>
-				<div class="review-group-body">
-					${needsDecision.map((item) => renderReviewItemRow(item, true)).join('')}
-				</div>
-			</div>
-		`
-		: '';
+	// Synthesize MMP from review findings (must be before hasMmpInteraction check)
+	const reviewMMP = synthesizeReviewMMP(reviewItems, summary, _historianFindings);
+	const mmpCardId = 'REV-' + gateId.substring(0, 8);
 
-	// For Your Awareness group (collapsed by default)
-	const awarenessHtml = awareness.length > 0
-		? `
-			<div class="review-group awareness collapsed">
-				<div class="review-group-header" data-action="toggle-review-group">
-					<span class="card-chevron">&#x25B6;</span>
-					&#x2139; FOR YOUR AWARENESS (${awareness.length} item${awareness.length !== 1 ? 's' : ''})
-				</div>
-				<div class="review-group-body">
-					${awareness.map((item) => renderReviewItemRow(item, true)).join('')}
-				</div>
-			</div>
-		`
-		: '';
+	// When MMP is active and interactive, it becomes the primary interaction —
+	// suppress duplicate review group rows and show a collapsed evidence detail section.
+	const hasMmpInteraction = !!reviewMMP && !isResolved;
 
-	// All Clear group (collapsed by default)
-	const allClearHtml = allClear.length > 0
-		? `
-			<div class="review-group all-clear collapsed">
-				<div class="review-group-header" data-action="toggle-review-group">
-					<span class="card-chevron">&#x25B6;</span>
-					&#x2705; ALL CLEAR (${allClear.length} item${allClear.length !== 1 ? 's' : ''})
+	let reviewGroupsHtml: string;
+	if (hasMmpInteraction) {
+		// Collapsed evidence detail section (MMP cards are primary above)
+		reviewGroupsHtml = reviewItems.length > 0
+			? `
+				<div class="review-group evidence-detail collapsed">
+					<div class="review-group-header" data-action="toggle-review-group">
+						<span class="card-chevron">&#x25B6;</span>
+						Detailed Evidence (${reviewItems.length} item${reviewItems.length !== 1 ? 's' : ''})
+					</div>
+					<div class="review-group-body">
+						${reviewItems.map((item) => renderReviewItemRow(item, false)).join('')}
+					</div>
 				</div>
-				<div class="review-group-body">
-					${allClear.map((item) => renderReviewItemRow(item, false)).join('')}
+			`
+			: '';
+	} else {
+		// Full review groups (no MMP or resolved state)
+		const needsDecisionHtml = needsDecision.length > 0
+			? `
+				<div class="review-group needs-decision">
+					<div class="review-group-header" data-action="toggle-review-group">
+						<span class="card-chevron">&#x25B6;</span>
+						&#x26A0; NEEDS YOUR DECISION (${needsDecision.length} item${needsDecision.length !== 1 ? 's' : ''})
+					</div>
+					<div class="review-group-body">
+						${needsDecision.map((item) => renderReviewItemRow(item, true)).join('')}
+					</div>
 				</div>
-			</div>
-		`
-		: '';
+			`
+			: '';
+
+		const awarenessHtml = awareness.length > 0
+			? `
+				<div class="review-group awareness collapsed">
+					<div class="review-group-header" data-action="toggle-review-group">
+						<span class="card-chevron">&#x25B6;</span>
+						&#x2139; FOR YOUR AWARENESS (${awareness.length} item${awareness.length !== 1 ? 's' : ''})
+					</div>
+					<div class="review-group-body">
+						${awareness.map((item) => renderReviewItemRow(item, true)).join('')}
+					</div>
+				</div>
+			`
+			: '';
+
+		const allClearHtml = allClear.length > 0
+			? `
+				<div class="review-group all-clear collapsed">
+					<div class="review-group-header" data-action="toggle-review-group">
+						<span class="card-chevron">&#x25B6;</span>
+						&#x2705; ALL CLEAR (${allClear.length} item${allClear.length !== 1 ? 's' : ''})
+					</div>
+					<div class="review-group-body">
+						${allClear.map((item) => renderReviewItemRow(item, false)).join('')}
+					</div>
+				</div>
+			`
+			: '';
+
+		reviewGroupsHtml = needsDecisionHtml + awarenessHtml + allClearHtml;
+	}
 
 	// Overall feedback / decision history section
 	const needsCount = needsDecision.length;
@@ -1554,6 +1703,10 @@ export function renderReviewGateCard(
 		? 'This review has been completed. The decision is recorded below for reference.'
 		: 'Review findings from verification and historical analysis before proceeding to execution.';
 
+	const reviewMmpHtml = reviewMMP
+		? renderMMPSection(reviewMMP, mmpCardId, !isResolved, { type: 'review', gateId }, undefined)
+		: '';
+
 	return `
 		<div class="review-gate-card${isResolved ? ' resolved' : ''}" data-gate-id="${gateId}">
 			<div class="review-gate-header">
@@ -1564,9 +1717,8 @@ export function renderReviewGateCard(
 				${subtitle}
 			</div>
 			${dashboardHtml}
-			${needsDecisionHtml}
-			${awarenessHtml}
-			${allClearHtml}
+			${reviewMmpHtml}
+			${reviewGroupsHtml}
 			${overallHtml}
 			${actionsHtml}
 		</div>
@@ -1662,6 +1814,7 @@ export function renderWarningCard(message: string): string {
 
 const PHASE_PLACEHOLDERS: Record<Phase, string> = {
 	[Phase.INTAKE]: 'Discuss your requirements...',
+	[Phase.ARCHITECTURE]: 'Review architecture or wait for decomposition...',
 	[Phase.PROPOSE]: 'Ask a question or wait for the proposal...',
 	[Phase.ASSUMPTION_SURFACING]: 'Ask about assumptions or wait...',
 	[Phase.VERIFY]: 'Ask about results, approve, retry, or override...',
@@ -1675,7 +1828,7 @@ const PHASE_PLACEHOLDERS: Record<Phase, string> = {
 
 
 
-export function renderInputArea(currentPhase: Phase, hasOpenGates: boolean, gateContext?: string): string {
+export function renderInputArea(currentPhase: Phase, hasOpenGates: boolean, gateContext?: string, isProcessing?: boolean): string {
 
 	const placeholder = PHASE_PLACEHOLDERS[currentPhase] ?? 'Enter your message...';
 
@@ -1685,6 +1838,7 @@ export function renderInputArea(currentPhase: Phase, hasOpenGates: boolean, gate
 
 		<div class="input-area">
 
+			${isProcessing ? '<div class="input-actions processing-cancel-bar"><span class="processing-cancel-label"><span class="processing-spinner-inline"></span> Processing&hellip;</span><button class="cancel-btn" data-action="cancel-workflow" title="Cancel current operation">Cancel</button></div>' : ''}
 			${hasOpenGates ? `<div class="input-actions"><span style="font-size: 11px; color: var(--vscode-charts-yellow);">&#x1F6A7; ${escapeHtml(gateContext || 'Gate is blocking \u2014 resolve above to continue')}</span></div>` : ''}
 
 			<div class="input-attachments" id="input-attachments" style="display:none;"></div>
@@ -2475,6 +2629,316 @@ export function renderCommandBlock(
 
 
 
+// ==================== MIRROR & MENU PROTOCOL (MMP) COMPONENTS ====================
+
+/**
+ * Render a complete MMP section (Mirror + Menu + Pre-Mortem cards + submit bar).
+ * Used by both intake turn cards and gate cards.
+ * @param mmp The MMP payload to render
+ * @param cardId Unique identifier for this MMP instance (e.g., "T3" for turn 3)
+ * @param isLatest Whether this is the latest (interactive) turn — false renders read-only
+ */
+/** Pending MMP decisions loaded from SQLite — baked into HTML at render time. */
+export interface PendingMmpSnapshot {
+	mirrorDecisions: Record<string, { status: string; editedText?: string }>;
+	menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }>;
+	preMortemDecisions: Record<string, { status: string; rationale?: string }>;
+}
+
+function renderMMPSection(
+	mmp: MMPPayload,
+	cardId: string,
+	isLatest: boolean,
+	context?: { type: string; gateId?: string },
+	pending?: PendingMmpSnapshot,
+): string {
+	const parts: string[] = [];
+
+	if (mmp.mirror) {
+		parts.push(renderMirrorCard(mmp.mirror, cardId, isLatest, pending));
+	}
+
+	if (mmp.menu) {
+		if (parts.length > 0) { parts.push('<div class="mmp-section-separator"></div>'); }
+		parts.push(renderMenuCard(mmp.menu, cardId, isLatest, pending));
+	}
+
+	if (mmp.preMortem) {
+		if (parts.length > 0) { parts.push('<div class="mmp-section-separator"></div>'); }
+		parts.push(renderPreMortemCard(mmp.preMortem, cardId, isLatest, pending));
+	}
+
+	// Add submit bar for interactive MMP — with server-side progress
+	if (isLatest && parts.length > 0) {
+		parts.push(renderMMPSubmitBar(cardId, mmp, pending));
+	}
+
+	const contextAttrs = context
+		? ` data-mmp-context="${context.type}" data-mmp-gate-id="${context.gateId ?? ''}"`
+		: '';
+
+	return parts.length > 0
+		? '<div class="mmp-container" data-mmp-card-id="' + cardId + '"' + contextAttrs + '>' + parts.join('') + '</div>'
+		: '';
+}
+
+/**
+ * Render a Mirror card with per-item accept/reject/edit toggles.
+ */
+function renderMirrorCard(
+	mirror: NonNullable<MMPPayload['mirror']>,
+	cardId: string,
+	isLatest: boolean,
+	pending?: PendingMmpSnapshot,
+): string {
+	const itemsHtml = mirror.items.map((item) => {
+		const itemKey = cardId + ':' + item.id;
+		const categoryClass = item.category;
+		// Check pending decisions for this item (baked into HTML at render time)
+		const pendingDecision = pending?.mirrorDecisions[itemKey];
+		const effectiveStatus = pendingDecision?.status ?? (item.status !== 'pending' ? item.status : null);
+		const statusClass = effectiveStatus ? ' ' + effectiveStatus : '';
+		const resolvedClass = !isLatest && item.status !== 'pending' ? ' resolved' : '';
+
+		const resolvedBadge = !isLatest && item.status !== 'pending'
+			? '<span class="mmp-resolved-badge ' + item.status + '">' +
+				(item.status === 'accepted' ? '\u2713 Accepted' : item.status === 'rejected' ? '\u2717 Rejected' : item.status === 'deferred' ? '\u23F3 Deferred' : '\u270E Edited') +
+				'</span>'
+			: '';
+
+		const editedTextNote = item.status === 'edited' && item.editedText
+			? '<div class="mmp-mirror-item-edit-note" style="font-size:12px;color:var(--vscode-descriptionForeground);margin-top:4px;font-style:italic;">' +
+				'Edited: ' + escapeHtml(item.editedText) + '</div>'
+			: '';
+
+		return '<div class="mmp-mirror-item' + statusClass + resolvedClass + '" data-mmp-mirror-id="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '">' +
+			'<div class="mmp-mirror-item-header">' +
+				'<span class="mmp-category-badge ' + categoryClass + '">' + escapeHtml(item.category) + '</span>' +
+				'<span class="mmp-mirror-item-text">' + escapeHtml(item.text) + '</span>' +
+				resolvedBadge +
+			'</div>' +
+			(item.rationale
+				? '<div class="mmp-mirror-item-rationale" id="rationale-' + itemKey + '">' +
+					'<em>Rationale:</em> ' + escapeHtml(item.rationale) + '</div>'
+				: '') +
+			editedTextNote +
+			(isLatest
+				? '<div class="mmp-mirror-item-actions">' +
+					'<button class="mmp-btn mmp-accept' + (pendingDecision?.status === 'accepted' ? ' selected' : '') + '" data-action="mirror-accept" data-mmp-item="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '" title="Accept this assumption">\u2713 Accept</button>' +
+					'<button class="mmp-btn mmp-reject' + (pendingDecision?.status === 'rejected' ? ' selected' : '') + '" data-action="mirror-reject" data-mmp-item="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '" title="Reject this assumption">\u2717 Reject</button>' +
+					'<button class="mmp-btn mmp-defer' + (pendingDecision?.status === 'deferred' ? ' selected' : '') + '" data-action="mirror-defer" data-mmp-item="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '" title="Defer to a later phase">\u23F3 Defer</button>' +
+					'<button class="mmp-btn mmp-edit' + (pendingDecision?.status === 'edited' ? ' selected' : '') + '" data-action="mirror-edit" data-mmp-item="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '" title="Edit this assumption">\u270E Edit</button>' +
+					(item.rationale
+						? '<button class="mmp-btn mmp-rationale-toggle" data-action="mirror-rationale" data-mmp-item="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '" title="Show rationale">Why?</button>'
+						: '') +
+				  '</div>' +
+				  '<div class="mmp-mirror-item-edit-area" id="edit-area-' + itemKey + '">' +
+					'<textarea data-mmp-edit-textarea="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '" placeholder="Edit the assumption..." rows="2">' + escapeHtml(item.text) + '</textarea>' +
+				  '</div>'
+				: '') +
+		'</div>';
+	}).join('');
+
+	return '<div class="mmp-card mmp-mirror-card">' +
+		'<div class="mmp-card-header">' +
+			'<span class="mmp-card-header-icon">\uD83D\uDCAD</span>' +
+			'<span>Mirror: Here\'s what I understand</span>' +
+		'</div>' +
+		'<div class="mmp-card-body">' +
+			(mirror.steelMan
+				? '<div class="mmp-mirror-steelman">' + escapeHtml(mirror.steelMan) + '</div>'
+				: '') +
+			itemsHtml +
+		'</div>' +
+	'</div>';
+}
+
+/**
+ * Render a Menu card with selectable option cards.
+ */
+function renderMenuCard(
+	menu: NonNullable<MMPPayload['menu']>,
+	cardId: string,
+	isLatest: boolean,
+	pending?: PendingMmpSnapshot,
+): string {
+	const itemsHtml = menu.items.map((item) => {
+		const menuKey = cardId + ':' + item.id;
+		const pendingSelection = pending?.menuSelections[menuKey];
+		const resolvedClass = !isLatest && item.selectedOptionId ? ' resolved' : '';
+
+		const optionsHtml = item.options.map((opt) => {
+			const isSelected = (pendingSelection?.selectedOptionId === opt.optionId) || item.selectedOptionId === opt.optionId;
+			const selectedClass = isSelected ? ' selected' : '';
+			const recommendedClass = opt.recommended ? ' recommended' : '';
+
+			return '<div class="mmp-option-card' + selectedClass + recommendedClass + '" ' +
+				(isLatest ? 'data-action="menu-select" ' : '') +
+				'data-mmp-menu-id="' + escapeHtml(item.id) + '" ' +
+				'data-mmp-option-id="' + escapeHtml(opt.optionId) + '" ' +
+				'data-mmp-card="' + cardId + '">' +
+				'<div class="mmp-option-header">' +
+					'<span class="mmp-option-radio"></span>' +
+					'<span class="mmp-option-label">' + escapeHtml(opt.label) + '</span>' +
+					(opt.recommended ? '<span class="mmp-option-recommended-badge">\u2605 Recommended</span>' : '') +
+				'</div>' +
+				(opt.description ? '<div class="mmp-option-description">' + escapeHtml(opt.description) + '</div>' : '') +
+				(opt.tradeoffs ? '<div class="mmp-option-tradeoffs">Tradeoff: ' + escapeHtml(opt.tradeoffs) + '</div>' : '') +
+			'</div>';
+		}).join('');
+
+		// Add "Other" option for interactive items
+		const otherOption = isLatest
+			? '<div class="mmp-option-card other-option" ' +
+				'data-action="menu-select" ' +
+				'data-mmp-menu-id="' + escapeHtml(item.id) + '" ' +
+				'data-mmp-option-id="OTHER" ' +
+				'data-mmp-card="' + cardId + '">' +
+				'<div class="mmp-option-header">' +
+					'<span class="mmp-option-radio"></span>' +
+					'<span class="mmp-option-label">Other</span>' +
+				'</div>' +
+				'<textarea class="mmp-menu-custom-textarea" ' +
+					'data-mmp-custom-textarea="' + escapeHtml(item.id) + '" ' +
+					'data-mmp-card="' + cardId + '" ' +
+					'placeholder="Describe your preference..." rows="2"></textarea>' +
+			  '</div>'
+			: '';
+
+		// Show custom response for resolved items
+		const customNote = !isLatest && item.selectedOptionId === 'OTHER' && item.customResponse
+			? '<div style="font-size:12px;color:var(--vscode-descriptionForeground);margin-top:4px;font-style:italic;">Custom: ' +
+				escapeHtml(item.customResponse) + '</div>'
+			: '';
+
+		return '<div class="mmp-menu-item' + resolvedClass + '">' +
+			'<div class="mmp-menu-question">' + escapeHtml(item.question) + '</div>' +
+			(item.context ? '<div class="mmp-menu-context">' + escapeHtml(item.context) + '</div>' : '') +
+			'<div class="mmp-menu-options">' +
+				optionsHtml +
+				otherOption +
+			'</div>' +
+			customNote +
+		'</div>';
+	}).join('');
+
+	return '<div class="mmp-card mmp-menu-card">' +
+		'<div class="mmp-card-header">' +
+			'<span class="mmp-card-header-icon">\uD83D\uDCCB</span>' +
+			'<span>Menu: Decisions needed</span>' +
+		'</div>' +
+		'<div class="mmp-card-body">' +
+			itemsHtml +
+		'</div>' +
+	'</div>';
+}
+
+/**
+ * Render a Pre-Mortem card with risk items.
+ */
+function renderPreMortemCard(
+	preMortem: NonNullable<MMPPayload['preMortem']>,
+	cardId: string,
+	isLatest: boolean,
+	pending?: PendingMmpSnapshot,
+): string {
+	const itemsHtml = preMortem.items.map((item) => {
+		const itemKey = cardId + ':' + item.id;
+		const pendingDecision = pending?.preMortemDecisions[itemKey];
+		const effectiveStatus = pendingDecision?.status ?? (item.status !== 'pending' ? item.status : null);
+		const statusClass = effectiveStatus ? ' ' + effectiveStatus : '';
+		const resolvedClass = !isLatest && item.status !== 'pending' ? ' resolved' : '';
+
+		const resolvedBadge = !isLatest && item.status !== 'pending'
+			? '<span class="mmp-resolved-badge ' + item.status + '">' +
+				(item.status === 'accepted' ? '\u2713 Risk Accepted' : '\u2717 Unacceptable') +
+				'</span>'
+			: '';
+
+		return '<div class="mmp-premortem-item' + statusClass + resolvedClass + '" data-mmp-premortem-id="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '">' +
+			'<div class="mmp-premortem-item-header">' +
+				'<span class="mmp-severity-badge ' + item.severity + '">' + escapeHtml(item.severity) + '</span>' +
+				'<span class="mmp-premortem-assumption">' + escapeHtml(item.assumption) + '</span>' +
+				resolvedBadge +
+			'</div>' +
+			'<div class="mmp-premortem-failure">' +
+				'<strong>If this fails:</strong> ' + escapeHtml(item.failureScenario) +
+			'</div>' +
+			(item.mitigation
+				? '<div class="mmp-premortem-mitigation">' +
+					'<strong>Mitigation:</strong> ' + escapeHtml(item.mitigation) +
+				  '</div>'
+				: '') +
+			(isLatest
+				? '<div class="mmp-premortem-item-actions">' +
+					'<button class="mmp-btn mmp-accept' + (pendingDecision?.status === 'accepted' ? ' selected' : '') + '" data-action="premortem-accept" data-mmp-item="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '" title="Accept this risk">\u2713 Accept Risk</button>' +
+					'<button class="mmp-btn mmp-reject' + (pendingDecision?.status === 'rejected' ? ' selected' : '') + '" data-action="premortem-reject" data-mmp-item="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '" title="This risk is unacceptable">\u2717 Unacceptable</button>' +
+				  '</div>' +
+				  '<div class="mmp-premortem-rationale-area" id="pm-rationale-' + itemKey + '">' +
+					'<textarea data-mmp-pm-rationale="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '" placeholder="Why is this risk unacceptable?" rows="2"></textarea>' +
+				  '</div>'
+				: '') +
+			(item.rationale && !isLatest
+				? '<div style="font-size:12px;color:var(--vscode-descriptionForeground);margin-top:4px;font-style:italic;">Rationale: ' + escapeHtml(item.rationale) + '</div>'
+				: '') +
+		'</div>';
+	}).join('');
+
+	return '<div class="mmp-card mmp-premortem-card">' +
+		'<div class="mmp-card-header">' +
+			'<span class="mmp-card-header-icon">\u26A0\uFE0F</span>' +
+			'<span>Pre-Mortem: Risks to evaluate</span>' +
+		'</div>' +
+		'<div class="mmp-card-body">' +
+			(preMortem.summary
+				? '<div class="mmp-premortem-summary">' + escapeHtml(preMortem.summary) + '</div>'
+				: '') +
+			itemsHtml +
+		'</div>' +
+	'</div>';
+}
+
+/**
+ * Render the MMP submit bar with server-side progress tracking.
+ */
+function renderMMPSubmitBar(cardId: string, mmp?: MMPPayload, pending?: PendingMmpSnapshot): string {
+	// Compute progress server-side
+	const prefix = cardId + ':';
+	let mirrorTotal = 0, mirrorDone = 0;
+	let menuTotal = 0, menuDone = 0;
+	let pmTotal = 0, pmDone = 0;
+	if (mmp?.mirror) {
+		mirrorTotal = mmp.mirror.items.length;
+		for (const item of mmp.mirror.items) {
+			if (pending?.mirrorDecisions[prefix + item.id] || item.status !== 'pending') { mirrorDone++; }
+		}
+	}
+	if (mmp?.menu) {
+		const menuIds = new Set(mmp.menu.items.map(m => m.id));
+		menuTotal = menuIds.size;
+		for (const id of menuIds) {
+			if (pending?.menuSelections[prefix + id]) { menuDone++; }
+		}
+	}
+	if (mmp?.preMortem) {
+		pmTotal = mmp.preMortem.items.length;
+		for (const item of mmp.preMortem.items) {
+			if (pending?.preMortemDecisions[prefix + item.id] || item.status !== 'pending') { pmDone++; }
+		}
+	}
+	const progressParts: string[] = [];
+	if (mirrorTotal > 0) { progressParts.push('Mirror: ' + mirrorDone + '/' + mirrorTotal); }
+	if (menuTotal > 0) { progressParts.push('Menu: ' + menuDone + '/' + menuTotal); }
+	if (pmTotal > 0) { progressParts.push('Risks: ' + pmDone + '/' + pmTotal); }
+	const progressHtml = progressParts.join(' &middot; ');
+
+	return '<div class="mmp-submit-bar" data-mmp-submit-bar="' + cardId + '">' +
+		'<span class="mmp-submit-progress" data-mmp-progress="' + cardId + '">' + progressHtml + '</span>' +
+		'<button class="mmp-submit-btn" data-action="mmp-submit" data-mmp-card="' + cardId + '">Submit Decisions</button>' +
+	'</div>';
+}
+
+
 // ==================== INTAKE CONVERSATION COMPONENTS ====================
 
 
@@ -2505,14 +2969,21 @@ function renderGatheringTurnCard(
 			'</div>'
 		: '';
 
-	const followUpHtml = response.followUpQuestions && response.followUpQuestions.length > 0
+	// Prefer MMP over legacy followUpQuestions
+	const hasMMP = response.mmp && (response.mmp.mirror || response.mmp.menu || response.mmp.preMortem);
+	const mmpCardId = 'GT' + turn.turnNumber;
+	const mmpHtml = hasMMP
+		? renderMMPSection(response.mmp!, mmpCardId, !!isLatest)
+		: '';
+
+	const followUpHtml = !hasMMP && response.followUpQuestions && response.followUpQuestions.length > 0
 		? '<div class="intake-suggestions">' +
 			'<span class="intake-suggestions-label">Consider asking:</span>' +
 			'<ul>' + response.followUpQuestions.map((q, i) => {
 				const qId = 'GQ-T' + turn.turnNumber + '-' + (i + 1);
 				if (isLatest) {
 					return '<li class="question-item">' +
-						'<span class="question-item-text">' + escapeHtml(q) + '</span>' +
+						'<span class="question-item-text">' + applyInlineFormatting(escapeHtml(q)) + '</span>' +
 						'<div class="intake-question-response" data-clarification-item="' + qId + '">' +
 						'<div class="clarification-messages" id="clarification-messages-' + qId + '" style="display:none;"></div>' +
 						'<textarea class="intake-question-textarea" data-intake-question-id="' + qId + '" data-intake-question-text="' + escapeHtml(q) + '" placeholder="Type your response..." rows="2"></textarea>' +
@@ -2522,7 +2993,7 @@ function renderGatheringTurnCard(
 						renderAskMoreToggle(qId, q) +
 						'</div></div></li>';
 				}
-				return '<li class="question-item"><span class="question-item-text">' + escapeHtml(q) + '</span></li>';
+				return '<li class="question-item"><span class="question-item-text">' + applyInlineFormatting(escapeHtml(q)) + '</span></li>';
 			}).join('') +
 			'</ul></div>'
 		: '';
@@ -2556,6 +3027,7 @@ function renderGatheringTurnCard(
 		'</div></div>' +
 		'<div class="card-content">' + simpleMarkdownToHtml(response.conversationalResponse) + '</div>' +
 		domainNotesHtml +
+		mmpHtml +
 		followUpHtml +
 		findingsHtml +
 		'</div></div></div>';
@@ -2573,9 +3045,22 @@ export function renderIntakeTurnCard(
 		return renderGatheringTurnCard(turn, turn.expertResponse, timestamp, commandBlocks, isLatest);
 	}
 
-	const expertResponse = turn.expertResponse;
+	// After filtering out gathering responses above, the remaining type is
+	// IntakeTurnResponse | IntakeAnalysisTurnResponse. Analysis turns are rendered
+	// by renderIntakeAnalysisCard, not here, so narrow to IntakeTurnResponse.
+	const expertResponse = turn.expertResponse as IntakeTurnResponse;
 
-	const suggestionsHtml = expertResponse.suggestedQuestions && expertResponse.suggestedQuestions.length > 0
+	// Prefer MMP over legacy suggestedQuestions
+	const mmpSource = expertResponse.mmp;
+	const hasMMP = mmpSource && (mmpSource.mirror || mmpSource.menu || mmpSource.preMortem);
+	const mmpCardId = 'T' + turn.turnNumber;
+
+	const mmpHtml = hasMMP
+		? renderMMPSection(mmpSource!, mmpCardId, !!isLatest)
+		: '';
+
+	// Only render legacy suggestedQuestions if no MMP present
+	const suggestionsHtml = !hasMMP && expertResponse.suggestedQuestions && expertResponse.suggestedQuestions.length > 0
 
 		? `<div class="intake-suggestions">
 
@@ -2585,7 +3070,7 @@ export function renderIntakeTurnCard(
 					const qId = `SQ-T${turn.turnNumber}-${i + 1}`;
 					if (isLatest) {
 						return `<li class="question-item">
-							<span class="question-item-text">${escapeHtml(q)}</span>
+							<span class="question-item-text">${applyInlineFormatting(escapeHtml(q))}</span>
 							<div class="intake-question-response" data-clarification-item="${qId}">
 								<div class="clarification-messages" id="clarification-messages-${qId}" style="display:none;"></div>
 								<textarea class="intake-question-textarea"
@@ -2601,7 +3086,7 @@ export function renderIntakeTurnCard(
 							</div>
 						</li>`;
 					} else {
-						return `<li class="question-item"><span class="question-item-text">${escapeHtml(q)}</span></li>`;
+						return `<li class="question-item"><span class="question-item-text">${applyInlineFormatting(escapeHtml(q))}</span></li>`;
 					}
 				}).join('')}</ul>
 
@@ -2617,7 +3102,7 @@ export function renderIntakeTurnCard(
 
 				<span class="intake-findings-label">Codebase findings:</span>
 
-				<ul>${expertResponse.codebaseFindings.map((f) => `<li><code>${escapeHtml(f)}</code></li>`).join('')}</ul>
+				<ul>${expertResponse.codebaseFindings.map((f: string) => `<li><code>${escapeHtml(f)}</code></li>`).join('')}</ul>
 
 			</div>`
 
@@ -2687,6 +3172,8 @@ export function renderIntakeTurnCard(
 
 					<div class="card-content">${escapeHtml(expertResponse.conversationalResponse)}</div>
 
+					${mmpHtml}
+
 					${suggestionsHtml}
 
 					${findingsHtml}
@@ -2711,13 +3198,18 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 
 
 
-	const requirementsHtml = plan.requirements.length > 0
+	const requirements = plan.requirements ?? [];
+	const decisions = plan.decisions ?? [];
+	const constraints = plan.constraints ?? [];
+	const openQuestions = plan.openQuestions ?? [];
+
+	const requirementsHtml = requirements.length > 0
 
 		? `<div class="intake-plan-section">
 
-				<h5>Requirements (${plan.requirements.length})</h5>
+				<h5>Requirements (${requirements.length})</h5>
 
-				<ul>${plan.requirements.map((r) => `<li><strong>[${escapeHtml(r.id)}]</strong> ${escapeHtml(r.text)}</li>`).join('')}</ul>
+				<ul>${requirements.map((r) => `<li><strong>[${escapeHtml(r.id)}]</strong> ${escapeHtml(r.text)}</li>`).join('')}</ul>
 
 			</div>`
 
@@ -2725,13 +3217,13 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 
 
 
-	const decisionsHtml = plan.decisions.length > 0
+	const decisionsHtml = decisions.length > 0
 
 		? `<div class="intake-plan-section">
 
-				<h5>Decisions (${plan.decisions.length})</h5>
+				<h5>Decisions (${decisions.length})</h5>
 
-				<ul>${plan.decisions.map((d) => `<li><strong>[${escapeHtml(d.id)}]</strong> ${escapeHtml(d.text)}</li>`).join('')}</ul>
+				<ul>${decisions.map((d) => `<li><strong>[${escapeHtml(d.id)}]</strong> ${escapeHtml(d.text)}</li>`).join('')}</ul>
 
 			</div>`
 
@@ -2739,13 +3231,13 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 
 
 
-	const constraintsHtml = plan.constraints.length > 0
+	const constraintsHtml = constraints.length > 0
 
 		? `<div class="intake-plan-section">
 
-				<h5>Constraints (${plan.constraints.length})</h5>
+				<h5>Constraints (${constraints.length})</h5>
 
-				<ul>${plan.constraints.map((c) => `<li><strong>[${escapeHtml(c.id)}]</strong> ${escapeHtml(c.text)}</li>`).join('')}</ul>
+				<ul>${constraints.map((c) => `<li><strong>[${escapeHtml(c.id)}]</strong> ${escapeHtml(c.text)}</li>`).join('')}</ul>
 
 			</div>`
 
@@ -2756,10 +3248,10 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 	// When isLatest, open questions are suppressed here because they duplicate
 	// the "Consider Asking" section in the turn card above (which has interactive
 	// textareas for the user to respond). For historical plans, show them read-only.
-	const openQuestionsHtml = !isLatest && plan.openQuestions.length > 0
+	const openQuestionsHtml = !isLatest && openQuestions.length > 0
 		? `<div class="intake-plan-section">
-				<h5>Open Questions (${plan.openQuestions.length})</h5>
-				<ul>${plan.openQuestions.map((q) => {
+				<h5>Open Questions (${openQuestions.length})</h5>
+				<ul>${openQuestions.map((q) => {
 					return `<li class="question-item"><span class="question-item-text"><strong>[${escapeHtml(q.id)}]</strong> ${escapeHtml(q.text)}</span></li>`;
 				}).join('')}</ul>
 			</div>`
@@ -2779,7 +3271,78 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 
 		: '';
 
+	// Product artifacts
+	const visionHtml = plan.productVision
+		? `<div class="intake-plan-section">
+				<h5>Product Vision</h5>
+				<p>${escapeHtml(plan.productVision)}</p>
+			</div>`
+		: '';
 
+	const descriptionHtml = plan.productDescription
+		? `<div class="intake-plan-section">
+				<h5>Product Description</h5>
+				<p>${escapeHtml(plan.productDescription)}</p>
+			</div>`
+		: '';
+
+	const personasHtml = plan.personas && plan.personas.length > 0
+		? `<div class="intake-plan-section">
+				<h5>Personas (${plan.personas.length})</h5>
+				<ul>${plan.personas.map((p) =>
+					`<li><strong>[${escapeHtml(p.id)}] ${escapeHtml(p.name)}</strong>: ${escapeHtml(p.description)}`
+					+ ((p.goals ?? []).length > 0 ? `<br/><em>Goals:</em> ${p.goals.map(g => escapeHtml(g)).join('; ')}` : '')
+					+ ((p.painPoints ?? []).length > 0 ? `<br/><em>Pain points:</em> ${p.painPoints.map(pp => escapeHtml(pp)).join('; ')}` : '')
+					+ `</li>`
+				).join('')}</ul>
+			</div>`
+		: '';
+
+	const journeysHtml = plan.userJourneys && plan.userJourneys.length > 0
+		? `<div class="intake-plan-section">
+				<h5>User Journeys (${plan.userJourneys.length})</h5>
+				<ul>${plan.userJourneys.map((j) => {
+					const steps = (j.steps ?? []).filter(
+						(s: { actor?: string; action?: string; expectedOutcome?: string }) =>
+							s.actor || s.action || s.expectedOutcome
+					);
+					const ac = j.acceptanceCriteria ?? [];
+					return `<li><strong>[${escapeHtml(j.id)}] ${escapeHtml(j.title)}</strong> <span class="badge">${escapeHtml(j.priority)}</span>`
+					+ `<br/>${escapeHtml(j.scenario)}`
+					+ (steps.length > 0 ? `<ol>${steps.map((s: { actor?: string; action?: string; expectedOutcome?: string }) =>
+						`<li>${escapeHtml(s.actor || '')} → ${escapeHtml(s.action || '')} → ${escapeHtml(s.expectedOutcome || '')}</li>`
+					).join('')}</ol>` : '')
+					+ (ac.length > 0 ? `<em>Acceptance:</em> ${ac.map(a => escapeHtml(a)).join('; ')}` : '')
+					+ `</li>`;
+				}).join('')}</ul>
+			</div>`
+		: '';
+
+	const phasingHtml = plan.phasingStrategy && plan.phasingStrategy.length > 0
+		? `<div class="intake-plan-section">
+				<h5>Phasing Strategy</h5>
+				<ul>${plan.phasingStrategy.map((ph) =>
+					`<li><strong>${escapeHtml(ph.phase)}</strong>: ${escapeHtml(ph.description)}<br/><em>${escapeHtml(ph.rationale)}</em></li>`
+				).join('')}</ul>
+			</div>`
+		: '';
+
+	const metricsHtml = plan.successMetrics && plan.successMetrics.length > 0
+		? `<div class="intake-plan-section">
+				<h5>Success Metrics</h5>
+				<ul>${plan.successMetrics.map((m) => `<li>${escapeHtml(m)}</li>`).join('')}</ul>
+			</div>`
+		: '';
+
+	const uxHtml = plan.uxRequirements && plan.uxRequirements.length > 0
+		? `<div class="intake-plan-section">
+				<h5>UX Requirements</h5>
+				<ul>${plan.uxRequirements.map((u) => `<li>${escapeHtml(u)}</li>`).join('')}</ul>
+			</div>`
+		: '';
+
+	// Combine product sections — show them before technical details when present
+	const hasProductArtifacts = visionHtml || descriptionHtml || personasHtml || journeysHtml;
 
 	return `
 
@@ -2798,6 +3361,8 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 			<div class="intake-plan-body">
 
 				${plan.summary ? `<p class="intake-plan-summary">${escapeHtml(plan.summary)}</p>` : ''}
+
+				${hasProductArtifacts ? `${visionHtml}${descriptionHtml}${personasHtml}${journeysHtml}${phasingHtml}${metricsHtml}${uxHtml}` : ''}
 
 				${requirementsHtml}
 
@@ -2922,7 +3487,7 @@ function renderIntakeGatheringFooter(intakeState: NonNullable<GovernedStreamStat
 		const total = DOMAIN_SEQUENCE.length;
 		let covered = 0;
 		for (const key of Object.keys(coverage)) {
-			if (coverage[key as keyof typeof coverage] !== DomainCoverageLevel.NONE) {
+			if (coverage[key as keyof typeof coverage].level !== DomainCoverageLevel.NONE) {
 				covered++;
 			}
 		}
@@ -3310,6 +3875,285 @@ function renderIntakeAnalysisCard(
 	return html;
 }
 
+/**
+ * Render a Product Discovery card for PRODUCT_REVIEW sub-state.
+ * Shows product artifacts (vision, personas, journeys, phasing) with MMP
+ * for human review BEFORE the technical approach is shown.
+ */
+function renderIntakeProductDiscoveryCard(
+	productFields: {
+		requestCategory?: string;
+		productVision?: string;
+		productDescription?: string;
+		personas?: Array<{ id: string; name: string; description: string; goals: string[]; painPoints: string[] }>;
+		userJourneys?: Array<{ id: string; personaId: string; title: string; scenario: string; steps: Array<{ stepNumber: number; actor: string; action: string; expectedOutcome: string }>; acceptanceCriteria: string[]; priority: string }>;
+		phasingStrategy?: Array<{ phase: string; description: string; journeyIds: string[]; rationale: string }>;
+		successMetrics?: string[];
+		uxRequirements?: string[];
+	},
+	mmpJson?: string,
+	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
+): string {
+	let html = '<div class="intake-product-discovery-card">';
+
+	// Header
+	html += '<div class="intake-product-discovery-header">' +
+		'<span class="intake-product-discovery-icon">&#x1F4CB;</span>' +
+		'<span class="intake-product-discovery-title">Product Discovery</span>' +
+		'</div>';
+
+	// Intro text
+	html += '<div class="intake-product-discovery-intro">' +
+		'Review the product artifacts below. Accept, reject, or edit each assumption ' +
+		'before proceeding to the technical approach.' +
+		'</div>';
+
+	// Reuse existing product artifacts renderer
+	html += renderProposalProductArtifacts(productFields);
+
+	// MMP section for interactive review
+	if (mmpJson) {
+		try {
+			const mmp = JSON.parse(mmpJson) as MMPPayload;
+			if (mmp.mirror || mmp.menu || mmp.preMortem) {
+				const cardId = 'PD-REVIEW';
+				html += renderMMPSection(mmp, cardId, true, { type: 'intake' }, allPendingDecisions?.[cardId]);
+			}
+		} catch { /* ignore parse errors */ }
+	}
+
+	html += '</div>';
+	return html;
+}
+
+// ==================== PROPOSER-VALIDATOR CARDS ====================
+
+function renderProposerDomainsCard(
+	domains: Array<{ id: string; name: string; description: string; rationale: string; entityPreview: string[]; workflowPreview: string[] }>,
+	personas: Array<{ id: string; name: string; description: string }>,
+	mmpJson?: string,
+	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
+): string {
+	let html = '<div class="proposer-card proposer-domains-card">';
+	html += '<div class="proposer-card-header"><span class="proposer-card-icon">&#x1F30D;</span>' +
+		'<span class="proposer-card-title">Proposed Business Domains</span></div>';
+	html += '<div class="proposer-card-intro">Review the proposed business domains and personas. Accept, reject, or edit each one.</div>';
+
+	// Domains table
+	if (domains.length > 0) {
+		html += '<div class="proposer-section"><div class="proposer-section-label">Domains (' + domains.length + ')</div>';
+		for (const d of domains) {
+			html += '<div class="proposer-domain-item">' +
+				'<strong>' + escapeHtml(d.name) + '</strong> <code>' + escapeHtml(d.id) + '</code>' +
+				'<div class="proposer-domain-desc">' + escapeHtml(d.description) + '</div>' +
+				'<div class="proposer-domain-meta">Entities: ' + d.entityPreview.map(e => escapeHtml(e)).join(', ') +
+				' | Workflows: ' + d.workflowPreview.map(w => escapeHtml(w)).join(', ') + '</div>' +
+				'<div class="proposer-domain-rationale">' + escapeHtml(d.rationale) + '</div>' +
+				'</div>';
+		}
+		html += '</div>';
+	}
+
+	// Personas
+	if (personas.length > 0) {
+		html += '<div class="proposer-section"><div class="proposer-section-label">Personas (' + personas.length + ')</div>';
+		for (const p of personas) {
+			html += '<div class="proposer-persona-item"><strong>' + escapeHtml(p.name) + '</strong>: ' + escapeHtml(p.description) + '</div>';
+		}
+		html += '</div>';
+	}
+
+	// MMP
+	if (mmpJson) {
+		try {
+			const mmp = JSON.parse(mmpJson) as import('../../../types/mmp').MMPPayload;
+			if (mmp.mirror || mmp.menu || mmp.preMortem) {
+				html += renderMMPSection(mmp, 'PV-DOMAINS', true, { type: 'intake' }, allPendingDecisions?.['PV-DOMAINS']);
+			}
+		} catch { /* ignore */ }
+	}
+
+	html += '</div>';
+	return html;
+}
+
+function renderProposerJourneysCard(
+	journeys: Array<{ id: string; title: string; scenario: string; priority?: string }>,
+	workflows: Array<{ id: string; name: string; description: string; domainId: string }>,
+	mmpJson?: string,
+	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
+): string {
+	let html = '<div class="proposer-card proposer-journeys-card">';
+	html += '<div class="proposer-card-header"><span class="proposer-card-icon">&#x1F6A3;</span>' +
+		'<span class="proposer-card-title">Proposed Journeys & Workflows</span></div>';
+	html += '<div class="proposer-card-intro">Review the proposed user journeys and system workflows.</div>';
+
+	if (journeys.length > 0) {
+		html += '<div class="proposer-section"><div class="proposer-section-label">User Journeys (' + journeys.length + ')</div>';
+		for (const j of journeys) {
+			html += '<div class="proposer-journey-item">' +
+				'<strong>' + escapeHtml(j.title) + '</strong> ' +
+				'<span class="badge badge-' + (j.priority ?? 'mvp').toLowerCase() + '">' + escapeHtml(j.priority ?? 'MVP') + '</span>' +
+				'<div>' + escapeHtml(j.scenario) + '</div></div>';
+		}
+		html += '</div>';
+	}
+
+	if (workflows.length > 0) {
+		// Group workflows by domain
+		const wfByDomain = new Map<string, typeof workflows>();
+		for (const w of workflows) {
+			const group = wfByDomain.get(w.domainId) ?? [];
+			group.push(w);
+			wfByDomain.set(w.domainId, group);
+		}
+		html += '<div class="proposer-section"><div class="proposer-section-label">System Workflows (' + workflows.length + ' across ' + wfByDomain.size + ' domains)</div>';
+		for (const [domainId, domainWorkflows] of wfByDomain) {
+			html += '<details class="proposer-domain-group">' +
+				'<summary class="proposer-domain-group-header">' + escapeHtml(domainId) +
+				' <span class="proposer-domain-group-count">(' + domainWorkflows.length + ')</span></summary>' +
+				'<div class="proposer-domain-group-body">';
+			for (const w of domainWorkflows) {
+				html += '<div class="proposer-workflow-item">' +
+					'<strong>' + escapeHtml(w.name) + '</strong>' +
+					'<div>' + escapeHtml(w.description) + '</div></div>';
+			}
+			html += '</div></details>';
+		}
+		html += '</div>';
+	}
+
+	if (mmpJson) {
+		try {
+			const mmp = JSON.parse(mmpJson) as import('../../../types/mmp').MMPPayload;
+			if (mmp.mirror || mmp.menu || mmp.preMortem) {
+				html += renderMMPSection(mmp, 'PV-JOURNEYS', true, { type: 'intake' }, allPendingDecisions?.['PV-JOURNEYS']);
+			}
+		} catch { /* ignore */ }
+	}
+
+	html += '</div>';
+	return html;
+}
+
+function renderProposerEntitiesCard(
+	entities: Array<{ id: string; name: string; description: string; domainId: string; keyAttributes: string[]; relationships: string[] }>,
+	mmpJson?: string,
+	domainNames?: Record<string, string>,
+	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
+): string {
+	let html = '<div class="proposer-card proposer-entities-card">';
+	html += '<div class="proposer-card-header"><span class="proposer-card-icon">&#x1F4CA;</span>' +
+		'<span class="proposer-card-title">Proposed Data Model</span></div>';
+
+	// Group entities by domain
+	const byDomain = new Map<string, typeof entities>();
+	for (const e of entities) {
+		const group = byDomain.get(e.domainId) ?? [];
+		group.push(e);
+		byDomain.set(e.domainId, group);
+	}
+
+	html += '<div class="proposer-card-intro">Review the proposed data entities — ' +
+		entities.length + ' entities across ' + byDomain.size + ' domains.</div>';
+
+	// Render grouped by domain with collapsible sections
+	for (const [domainId, domainEntities] of byDomain) {
+		const domainName = domainNames?.[domainId] ?? domainId;
+		html += '<details class="proposer-domain-group">' +
+			'<summary class="proposer-domain-group-header">' +
+			escapeHtml(domainName) + ' <span class="proposer-domain-group-count">(' +
+			domainEntities.length + ' entit' + (domainEntities.length === 1 ? 'y' : 'ies') + ')</span></summary>' +
+			'<div class="proposer-domain-group-body">';
+		for (const e of domainEntities) {
+			html += '<div class="proposer-entity-item">' +
+				'<strong>' + escapeHtml(e.name) + '</strong>' +
+				'<div class="proposer-entity-desc">' + escapeHtml(e.description) + '</div>';
+			if (e.keyAttributes.length > 0) {
+				html += '<div class="proposer-entity-meta">Attributes: ' + e.keyAttributes.map(a => escapeHtml(a)).join(', ') + '</div>';
+			}
+			if (e.relationships.length > 0) {
+				html += '<div class="proposer-entity-meta">Relationships: ' + e.relationships.map(r => escapeHtml(r)).join(', ') + '</div>';
+			}
+			html += '</div>';
+		}
+		html += '</div></details>';
+	}
+
+	if (mmpJson) {
+		try {
+			const mmp = JSON.parse(mmpJson) as import('../../../types/mmp').MMPPayload;
+			if (mmp.mirror || mmp.menu || mmp.preMortem) {
+				html += renderMMPSection(mmp, 'PV-ENTITIES', true, { type: 'intake' }, allPendingDecisions?.['PV-ENTITIES']);
+			}
+		} catch { /* ignore */ }
+	}
+
+	html += '</div>';
+	return html;
+}
+
+function renderProposerIntegrationsCard(
+	integrations: Array<{ id: string; name: string; category: string; description: string; standardProviders: string[]; ownershipModel: string }>,
+	qualityAttributes: string[],
+	mmpJson?: string,
+	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
+): string {
+	let html = '<div class="proposer-card proposer-integrations-card">';
+	html += '<div class="proposer-card-header"><span class="proposer-card-icon">&#x1F517;</span>' +
+		'<span class="proposer-card-title">Proposed Integrations & Quality</span></div>';
+	html += '<div class="proposer-card-intro">Review the proposed integrations and quality attributes. Submit to generate the full product specification.</div>';
+
+	if (integrations.length > 0) {
+		// Group integrations by category
+		const byCategory = new Map<string, typeof integrations>();
+		for (const int of integrations) {
+			const group = byCategory.get(int.category) ?? [];
+			group.push(int);
+			byCategory.set(int.category, group);
+		}
+		html += '<div class="proposer-section"><div class="proposer-section-label">Integrations (' + integrations.length + ' across ' + byCategory.size + ' categories)</div>';
+		for (const [category, catIntegrations] of byCategory) {
+			const catLabel = category.charAt(0).toUpperCase() + category.slice(1);
+			html += '<details class="proposer-domain-group" open>' +
+				'<summary class="proposer-domain-group-header">' + escapeHtml(catLabel) +
+				' <span class="proposer-domain-group-count">(' + catIntegrations.length + ')</span></summary>' +
+				'<div class="proposer-domain-group-body">';
+			for (const int of catIntegrations) {
+				html += '<div class="proposer-integration-item">' +
+					'<strong>' + escapeHtml(int.name) + '</strong>' +
+					'<div>' + escapeHtml(int.description) + '</div>' +
+					'<div class="proposer-entity-meta">Providers: ' + int.standardProviders.map(p => escapeHtml(p)).join(', ') +
+					' | Ownership: ' + escapeHtml(int.ownershipModel) + '</div></div>';
+			}
+			html += '</div></details>';
+		}
+		html += '</div>';
+	}
+
+	if (qualityAttributes.length > 0) {
+		html += '<div class="proposer-section"><div class="proposer-section-label">Quality Attributes</div><ul>';
+		for (const qa of qualityAttributes) {
+			html += '<li>' + escapeHtml(qa) + '</li>';
+		}
+		html += '</ul></div>';
+	}
+
+	if (mmpJson) {
+		try {
+			const mmp = JSON.parse(mmpJson) as import('../../../types/mmp').MMPPayload;
+			if (mmp.mirror || mmp.menu || mmp.preMortem) {
+				html += renderMMPSection(mmp, 'PV-INTEGRATIONS', true, { type: 'intake' }, allPendingDecisions?.['PV-INTEGRATIONS']);
+			}
+		} catch { /* ignore */ }
+	}
+
+	html += '</div>';
+	return html;
+}
+
+// ==================== INTAKE PROPOSAL CARD ====================
+
 function renderIntakeProposalCard(
 	title: string,
 	summary: string,
@@ -3359,10 +4203,158 @@ function renderIntakeProposalCard(
 
 	// Footer prompt
 	html += '<div class="intake-proposal-footer">' +
-		'Review the proposal above. Share feedback, priorities, or questions to refine the approach.' +
+		'Review the approach above. Share feedback or questions to refine it.' +
 		'</div>';
 
 	html += '</div>';
+	return html;
+}
+
+/**
+ * Render product artifacts (vision, personas, user journeys, phasing) inside the proposal card.
+ */
+function renderProposalProductArtifacts(fields: {
+	productVision?: string;
+	productDescription?: string;
+	personas?: Array<{ id: string; name: string; description: string; goals: string[]; painPoints: string[] }>;
+	userJourneys?: Array<{ id: string; personaId: string; title: string; scenario: string; steps: Array<{ stepNumber: number; actor: string; action: string; expectedOutcome: string }>; acceptanceCriteria: string[]; priority: string }>;
+	phasingStrategy?: Array<{ phase: string; description: string; journeyIds: string[]; rationale: string }>;
+	successMetrics?: string[];
+	uxRequirements?: string[];
+}): string {
+	let html = '';
+	const hasAny = fields.productVision || fields.productDescription ||
+		(fields.personas && fields.personas.length > 0) ||
+		(fields.userJourneys && fields.userJourneys.length > 0);
+
+	if (!hasAny) { return ''; }
+
+	html += '<details class="intake-proposal-product" open>' +
+		'<summary class="intake-proposal-product-header">Product Discovery</summary>' +
+		'<div class="intake-proposal-product-body">';
+
+	if (fields.productVision) {
+		html += '<div class="intake-proposal-product-section">' +
+			'<div class="intake-proposal-product-label">Vision</div>' +
+			'<div class="intake-proposal-product-text">' + escapeHtml(fields.productVision) + '</div>' +
+			'<div class="pd-inline-edit">' +
+			'<textarea class="pd-inline-edit-area" data-pd-edit-field="vision" ' +
+			'placeholder="Suggest changes to the vision statement..." rows="2"></textarea>' +
+			'</div>' +
+			'</div>';
+	}
+
+	if (fields.productDescription) {
+		html += '<div class="intake-proposal-product-section">' +
+			'<div class="intake-proposal-product-label">Product Description</div>' +
+			'<div class="intake-proposal-product-text">' + escapeHtml(fields.productDescription) + '</div>' +
+			'<div class="pd-inline-edit">' +
+			'<textarea class="pd-inline-edit-area" data-pd-edit-field="description" ' +
+			'placeholder="Suggest changes to the product description..." rows="2"></textarea>' +
+			'</div>' +
+			'</div>';
+	}
+
+	if (fields.personas && fields.personas.length > 0) {
+		html += '<div class="intake-proposal-product-section">' +
+			'<div class="intake-proposal-product-label">Personas</div>';
+		for (let pIdx = 0; pIdx < fields.personas.length; pIdx++) {
+			const p = fields.personas[pIdx];
+			const pFieldId = 'persona:' + (p.name || 'Persona ' + (pIdx + 1));
+			html += '<div class="intake-proposal-persona">' +
+				'<strong>' + escapeHtml(p.name) + '</strong> ' +
+				'<span class="intake-proposal-persona-id">[' + escapeHtml(p.id) + ']</span>' +
+				'<div class="intake-proposal-persona-desc">' + escapeHtml(p.description) + '</div>';
+			if ((p.goals ?? []).length > 0) {
+				html += '<div class="intake-proposal-persona-goals">Goals: ' + p.goals.map(g => escapeHtml(g)).join('; ') + '</div>';
+			}
+			if ((p.painPoints ?? []).length > 0) {
+				html += '<div class="intake-proposal-persona-pains">Pain points: ' + p.painPoints.map(pp => escapeHtml(pp)).join('; ') + '</div>';
+			}
+			html += '<div class="pd-inline-edit">' +
+				'<textarea class="pd-inline-edit-area" data-pd-edit-field="' + escapeHtml(pFieldId) + '" ' +
+				'placeholder="Clarify or correct this persona..." rows="1"></textarea>' +
+				'</div>';
+			html += '</div>';
+		}
+		html += '</div>';
+	}
+
+	if (fields.userJourneys && fields.userJourneys.length > 0) {
+		html += '<div class="intake-proposal-product-section">' +
+			'<div class="intake-proposal-product-label">User Journeys</div>';
+		for (let jIdx = 0; jIdx < fields.userJourneys.length; jIdx++) {
+			const j = fields.userJourneys[jIdx];
+			const jFieldId = 'journey:' + (j.title || 'Journey ' + (jIdx + 1));
+			html += '<div class="intake-proposal-journey">' +
+				'<strong>' + escapeHtml(j.title) + '</strong> ' +
+				'<span class="intake-proposal-journey-priority badge-' + j.priority.toLowerCase() + '">' + escapeHtml(j.priority) + '</span>' +
+				'<div class="intake-proposal-journey-scenario">' + escapeHtml(j.scenario) + '</div>';
+			// Only render steps that have actual content (LLM may return stub objects)
+			const validSteps = (j.steps ?? []).filter(
+				(s: { actor?: string; action?: string; expectedOutcome?: string }) =>
+					s.actor || s.action || s.expectedOutcome
+			);
+			if (validSteps.length > 0) {
+				html += '<ol class="intake-proposal-journey-steps">';
+				for (const s of validSteps) {
+					html += '<li>';
+					if (s.actor) { html += '<strong>' + escapeHtml(s.actor) + '</strong>: '; }
+					html += escapeHtml(s.action || '');
+					if (s.expectedOutcome) { html += ' &rarr; ' + escapeHtml(s.expectedOutcome); }
+					html += '</li>';
+				}
+				html += '</ol>';
+			}
+			if (j.acceptanceCriteria && j.acceptanceCriteria.length > 0) {
+				html += '<div class="intake-proposal-journey-ac">Acceptance: ' +
+					j.acceptanceCriteria.map(ac => escapeHtml(ac)).join('; ') + '</div>';
+			}
+			html += '<div class="pd-inline-edit">' +
+				'<textarea class="pd-inline-edit-area" data-pd-edit-field="' + escapeHtml(jFieldId) + '" ' +
+				'placeholder="Clarify or correct this journey..." rows="1"></textarea>' +
+				'</div>';
+			html += '</div>';
+		}
+		html += '</div>';
+	}
+
+	if (fields.phasingStrategy && fields.phasingStrategy.length > 0) {
+		html += '<div class="intake-proposal-product-section">' +
+			'<div class="intake-proposal-product-label">Phasing Strategy</div>';
+		for (let phIdx = 0; phIdx < fields.phasingStrategy.length; phIdx++) {
+			const ph = fields.phasingStrategy[phIdx];
+			// Normalize phase label to sequential numbering (LLM may use arbitrary numbers)
+			const phaseLabel = `Phase ${phIdx + 1}`;
+			html += '<div class="intake-proposal-phasing">' +
+				'<strong>' + escapeHtml(phaseLabel) + '</strong>: ' + escapeHtml(ph.description) +
+				' <span class="intake-proposal-phasing-rationale">(' + escapeHtml(ph.rationale) + ')</span>' +
+				'<div class="pd-inline-edit">' +
+				'<textarea class="pd-inline-edit-area" data-pd-edit-field="' + escapeHtml('phase:' + phaseLabel) + '" ' +
+				'placeholder="Clarify or correct this phase..." rows="1"></textarea>' +
+				'</div>' +
+				'</div>';
+		}
+		html += '</div>';
+	}
+
+	if (fields.successMetrics && fields.successMetrics.length > 0) {
+		html += '<div class="intake-proposal-product-section">' +
+			'<div class="intake-proposal-product-label">Success Metrics</div>' +
+			'<ul>';
+		for (let mIdx = 0; mIdx < fields.successMetrics.length; mIdx++) {
+			const m = fields.successMetrics[mIdx];
+			html += '<li>' + escapeHtml(m) +
+				'<div class="pd-inline-edit">' +
+				'<textarea class="pd-inline-edit-area" data-pd-edit-field="metric:' + escapeHtml(m.substring(0, 60)) + '" ' +
+				'placeholder="Clarify or correct this metric..." rows="1"></textarea>' +
+				'</div>' +
+				'</li>';
+		}
+		html += '</ul></div>';
+	}
+
+	html += '</div></details>';
 	return html;
 }
 
@@ -3389,7 +4381,7 @@ function renderQaExchangeCard(question: string, answer: string, timestamp: strin
 
 
 
-export function renderStream(items: StreamItem[], intakeState?: GovernedStreamState['intakeState']): string {
+export function renderStream(items: StreamItem[], intakeState?: GovernedStreamState['intakeState'], allPendingDecisions?: Record<string, PendingMmpSnapshot>): string {
 
 	if (items.length === 0) {
 
@@ -3399,17 +4391,54 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 
 
-	// Pre-scan to find the last intake_turn and intake_plan_preview indices
-	let lastIntakeTurnIdx = -1;
+	// Pre-scan to find the last intake_plan_preview index
 	let lastIntakePlanIdx = -1;
 	items.forEach((item, idx) => {
-		if (item.type === 'intake_turn') lastIntakeTurnIdx = idx;
-		if (item.type === 'intake_plan_preview') lastIntakePlanIdx = idx;
+		if (item.type === 'intake_plan_preview') { lastIntakePlanIdx = idx; }
 	});
 
-	let html = items.map((item, idx) => {
+	// Helper to detect architecture-phase stream item types (including command blocks)
+	const isArchitectureItem = (item: StreamItem): boolean => {
+		if (item.type === 'architecture_capabilities' || item.type === 'architecture_design' ||
+			item.type === 'architecture_validation' || item.type === 'architecture_gate') {
+			return true;
+		}
+		if (item.type === 'command_block' && item.command.label.startsWith('Architect')) {
+			return true;
+		}
+		return false;
+	};
 
-		switch (item.type) {
+	let html = items.map((item, idx) => {
+		let prefix = '';
+		let suffix = '';
+
+		// Wrap consecutive architecture cards in a visual group container
+		if (isArchitectureItem(item)) {
+			const prevIsArch = idx > 0 && isArchitectureItem(items[idx - 1]);
+			const nextIsArch = idx < items.length - 1 && isArchitectureItem(items[idx + 1]);
+			if (!prevIsArch) {
+				prefix = '<div class="architecture-phase-group">' +
+					'<div class="architecture-phase-group-header">' +
+					'<span class="codicon codicon-layers"></span> Recursive Task Decomposition' +
+					'</div>';
+			}
+			if (!nextIsArch) {
+				suffix = '</div>';
+			}
+		}
+
+		const content = (() => { switch (item.type) {
+
+			case 'human_message':
+
+				return '<div class="intake-message intake-human">' +
+					'<div class="card-header"><div class="card-header-left">' +
+					'<span class="role-icon codicon codicon-account"></span>' +
+					'<span class="role-badge role-human">Human</span>' +
+					'</div></div>' +
+					'<div class="card-content">' + escapeHtml(item.text) + '</div>' +
+					'</div>';
 
 			case 'milestone':
 
@@ -3446,7 +4475,7 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 			case 'intake_turn':
 
-				return renderIntakeTurnCard(item.turn, item.timestamp, item.commandBlocks, idx === lastIntakeTurnIdx);
+				return renderIntakeTurnCard(item.turn, item.timestamp, item.commandBlocks, item.isLatest ?? false);
 
 			case 'intake_plan_preview':
 
@@ -3480,15 +4509,58 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 				return renderIntakeAnalysisCard(item.humanMessage, item.analysisSummary, item.codebaseFindings, item.commandBlocks);
 
+			case 'intake_product_discovery':
+
+				return renderIntakeProductDiscoveryCard({
+						requestCategory: item.requestCategory,
+						productVision: item.productVision,
+						productDescription: item.productDescription,
+						personas: item.personas,
+						userJourneys: item.userJourneys,
+						phasingStrategy: item.phasingStrategy,
+						successMetrics: item.successMetrics,
+						uxRequirements: item.uxRequirements,
+					}, item.mmpJson, allPendingDecisions);
+
 			case 'intake_proposal':
 
 				return renderIntakeProposalCard(item.title, item.summary, item.proposedApproach, item.domainCoverage);
+
+			case 'intake_proposer_domains':
+				return renderProposerDomainsCard(item.domains, item.personas, item.mmpJson, allPendingDecisions);
+
+			case 'intake_proposer_journeys':
+				return renderProposerJourneysCard(item.journeys, item.workflows, item.mmpJson, allPendingDecisions);
+
+			case 'intake_proposer_entities':
+				return renderProposerEntitiesCard(item.entities, item.mmpJson, item.domainNames, allPendingDecisions);
+
+			case 'intake_proposer_integrations':
+				return renderProposerIntegrationsCard(item.integrations, item.qualityAttributes, item.mmpJson, allPendingDecisions);
+
+			case 'architecture_capabilities':
+
+				return renderArchitectureCapabilitiesCard(item.capabilities, item.timestamp);
+
+			case 'architecture_design':
+
+				return renderArchitectureDesignCard(item.components, item.dataModels, item.interfaces, item.implementationSequence, item.timestamp);
+
+			case 'architecture_validation':
+
+				return renderArchitectureValidationCard(item.score, item.findings, item.validated, item.timestamp);
+
+			case 'architecture_gate':
+
+				return renderArchitectureGateCard(item.docId, item.version, item.capabilities, item.components, item.goalAlignmentScore, item.dialogueId, item.resolved, item.resolvedAction, item.mmpJson, item.decompositionDepth, allPendingDecisions);
 
 			default:
 
 				return '';
 
-		}
+		} })();
+
+		return prefix + content + suffix;
 
 	}).join('');
 
@@ -3509,6 +4581,23 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 			html += renderIntakeFinalizeButton();
 		} else if (intakeState.subState === 'SYNTHESIZING' || intakeState.subState === 'AWAITING_APPROVAL') {
 			html += renderIntakeFinalizeResolved();
+		} else if (intakeState.subState === 'ANALYZING') {
+			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Analyzing documents and codebase...</span></div>';
+		} else if (intakeState.subState === 'PROPOSING_DOMAINS') {
+			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Proposing business domains...</span></div>';
+		} else if (intakeState.subState === 'PROPOSING_JOURNEYS') {
+			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Proposing user journeys and workflows...</span></div>';
+		} else if (intakeState.subState === 'PROPOSING_ENTITIES') {
+			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Proposing data model...</span></div>';
+		} else if (intakeState.subState === 'PROPOSING_INTEGRATIONS') {
+			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Proposing integrations...</span></div>';
+		} else if (intakeState.subState === 'PRODUCT_REVIEW') {
+			// Product discovery: user reviews product artifacts via MMP before technical approach
+			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Review product artifacts above and submit your decisions to continue.</span></div>';
+		} else if (intakeState.subState === 'PROPOSING' || intakeState.subState === 'CLARIFYING') {
+			// Inverted flow: expert proposed or is clarifying — show finalize + submit bar
+			html += renderIntakeQuestionsSubmitBar();
+			html += renderIntakeFinalizeButton();
 		}
 	}
 
@@ -3516,5 +4605,388 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 	return html;
 
+}
+
+
+// ==================== ARCHITECTURE PHASE CARDS ====================
+
+function renderArchitectureCapabilitiesCard(
+	capabilities: Array<{ id: string; label: string; requirements: number; workflows: number; parentId: string | null }>,
+	timestamp: string
+): string {
+	if (!capabilities.length) { return ''; }
+
+	// Build hierarchy: top-level capabilities with children indented
+	const topLevel = capabilities.filter(c => !c.parentId);
+	const childrenByParent = new Map<string, typeof capabilities>();
+	for (const cap of capabilities) {
+		if (cap.parentId) {
+			const siblings = childrenByParent.get(cap.parentId) ?? [];
+			siblings.push(cap);
+			childrenByParent.set(cap.parentId, siblings);
+		}
+	}
+
+	let rows = '';
+	for (const cap of topLevel) {
+		rows += `<tr class="capability-top-level">
+			<td><code>${escapeHtml(cap.id)}</code></td>
+			<td><strong>${escapeHtml(cap.label)}</strong></td>
+			<td>${cap.requirements}</td>
+			<td>${cap.workflows}</td>
+		</tr>`;
+		const children = childrenByParent.get(cap.id) ?? [];
+		for (const child of children) {
+			rows += `<tr class="capability-child">
+				<td><code>&nbsp;&nbsp;├ ${escapeHtml(child.id)}</code></td>
+				<td>${escapeHtml(child.label)}</td>
+				<td>${child.requirements}</td>
+				<td>${child.workflows}</td>
+			</tr>`;
+		}
+	}
+
+	return `<div class="card architecture-card" data-timestamp="${escapeHtml(timestamp)}">
+		<div class="card-header">
+			<span class="role-badge role-architect">ARCHITECT</span>
+			<span class="card-title">Capability Decomposition</span>
+			<span class="card-meta">${topLevel.length} top-level, ${capabilities.length} total</span>
+		</div>
+		<div class="card-body">
+			<table class="architecture-table">
+				<thead><tr><th>ID</th><th>Capability</th><th>Reqs</th><th>Workflows</th></tr></thead>
+				<tbody>${rows}</tbody>
+			</table>
+		</div>
+	</div>`;
+}
+
+function renderArchitectureDesignCard(
+	components: Array<{ id: string; label: string; responsibility: string; rationale: string; parentId: string | null; workflowsServed: string[]; dependencies: string[]; interactionPatterns: string[]; technologyNotes: string; fileScope: string }>,
+	dataModels: Array<{ id: string; entity: string; description: string; fields: Array<{ name: string; type: string; required: boolean }>; relationships: Array<{ targetModel: string; type: string; description: string }>; invariants: string[] }>,
+	interfaces: Array<{ id: string; label: string; type: string; description: string; contract: string; providerComponent: string; consumerComponents: string[]; sourceWorkflows: string[] }>,
+	implementationSequence: Array<{ id: string; label: string; description: string; componentsInvolved: string[]; dependencies: string[]; complexity: string; verificationMethod: string; sortOrder: number }>,
+	timestamp: string
+): string {
+	// Build component hierarchy: group children under their parents
+	const topLevel = components.filter(c => !c.parentId);
+	const childrenByParent = new Map<string, typeof components>();
+	for (const c of components) {
+		if (c.parentId) {
+			const existing = childrenByParent.get(c.parentId) || [];
+			existing.push(c);
+			childrenByParent.set(c.parentId, existing);
+		}
+	}
+	const hasHierarchy = childrenByParent.size > 0;
+	const parentCount = topLevel.length;
+	const childCount = components.length - parentCount;
+
+	// --- Section 1: Components (rich cards) ---
+	function renderComponentCard(comp: typeof components[0], isChild: boolean): string {
+		const badges: string[] = [];
+		if (comp.workflowsServed.length > 0) {
+			badges.push(...comp.workflowsServed.map(w => `<span class="arch-badge arch-badge-workflow">${escapeHtml(w)}</span>`));
+		}
+		if (comp.dependencies.length > 0) {
+			badges.push(...comp.dependencies.map(d => `<span class="arch-badge arch-badge-dep">${escapeHtml(d)}</span>`));
+		}
+
+		const children = childrenByParent.get(comp.id) || [];
+		const childSection = children.length > 0
+			? `<details class="arch-sub-components">
+				<summary>Sub-components (${children.length})</summary>
+				<div class="arch-children">${children.map(ch => renderComponentCard(ch, true)).join('')}</div>
+			</details>`
+			: '';
+
+		return `<div class="arch-component-card${isChild ? ' arch-child-card' : ''}">
+			<div class="arch-comp-header">
+				<code class="arch-comp-id">${escapeHtml(comp.id)}</code>
+				<strong class="arch-comp-label">${escapeHtml(comp.label)}</strong>
+			</div>
+			<div class="arch-comp-body">
+				<div class="arch-comp-responsibility">${escapeHtml(comp.responsibility)}</div>
+				${comp.rationale ? `<div class="arch-comp-rationale"><span class="arch-rationale-label">Rationale:</span> ${escapeHtml(comp.rationale)}</div>` : ''}
+				${badges.length > 0 ? `<div class="arch-comp-badges">${badges.join('')}</div>` : ''}
+				${comp.technologyNotes ? `<div class="arch-comp-tech"><span class="arch-detail-label">Tech:</span> ${escapeHtml(comp.technologyNotes)}</div>` : ''}
+				${comp.fileScope ? `<div class="arch-comp-scope"><span class="arch-detail-label">Scope:</span> <code>${escapeHtml(comp.fileScope)}</code></div>` : ''}
+				${comp.interactionPatterns.length > 0 ? `<div class="arch-comp-interactions"><span class="arch-detail-label">Interactions:</span> ${comp.interactionPatterns.map(p => escapeHtml(p)).join('; ')}</div>` : ''}
+			</div>
+			${childSection}
+		</div>`;
+	}
+
+	const componentCards = topLevel.map(c => renderComponentCard(c, false)).join('');
+
+	// --- Section 2: Domain Model (entity cards with fields + relationships) ---
+	const domainModelCards = dataModels.map(m => {
+		const fieldRows = m.fields.map(f =>
+			`<tr>
+				<td><code>${escapeHtml(f.name)}</code></td>
+				<td>${escapeHtml(f.type)}</td>
+				<td>${f.required ? '<span class="arch-required">required</span>' : '<span class="arch-optional">optional</span>'}</td>
+			</tr>`
+		).join('');
+
+		const relRows = m.relationships.map(r =>
+			`<div class="arch-relationship">
+				<span class="arch-rel-arrow">&rarr;</span>
+				<strong>${escapeHtml(r.targetModel)}</strong>
+				<span class="arch-rel-type">(${escapeHtml(r.type)})</span>
+				<span class="arch-rel-desc">${escapeHtml(r.description)}</span>
+			</div>`
+		).join('');
+
+		const invariantList = m.invariants.length > 0
+			? `<div class="arch-invariants"><span class="arch-detail-label">Invariants:</span><ul>${m.invariants.map(inv => `<li>${escapeHtml(inv)}</li>`).join('')}</ul></div>`
+			: '';
+
+		return `<div class="arch-model-card">
+			<div class="arch-model-header">
+				<code class="arch-comp-id">${escapeHtml(m.id)}</code>
+				<strong>${escapeHtml(m.entity)}</strong>
+			</div>
+			${m.description ? `<div class="arch-model-desc">${escapeHtml(m.description)}</div>` : ''}
+			${m.fields.length > 0 ? `<table class="arch-fields-table">
+				<thead><tr><th>Field</th><th>Type</th><th></th></tr></thead>
+				<tbody>${fieldRows}</tbody>
+			</table>` : ''}
+			${relRows ? `<div class="arch-relationships">${relRows}</div>` : ''}
+			${invariantList}
+		</div>`;
+	}).join('');
+
+	// --- Section 3: Interfaces (contract cards) ---
+	const interfaceCards = interfaces.map(iface => {
+		const consumers = iface.consumerComponents.length > 0
+			? iface.consumerComponents.map(c => escapeHtml(c)).join(', ')
+			: 'none';
+		const workflows = iface.sourceWorkflows.length > 0
+			? iface.sourceWorkflows.map(w => `<span class="arch-badge arch-badge-workflow">${escapeHtml(w)}</span>`).join('')
+			: '';
+
+		return `<div class="arch-interface-card">
+			<div class="arch-iface-header">
+				<code class="arch-comp-id">${escapeHtml(iface.id)}</code>
+				<strong>${escapeHtml(iface.label)}</strong>
+				<span class="arch-badge arch-badge-type">${escapeHtml(iface.type)}</span>
+			</div>
+			${iface.description ? `<div class="arch-iface-desc">${escapeHtml(iface.description)}</div>` : ''}
+			${iface.contract ? `<div class="arch-contract"><pre>${escapeHtml(iface.contract)}</pre></div>` : ''}
+			<div class="arch-iface-endpoints">
+				<span class="arch-detail-label">Provider:</span> <code>${escapeHtml(iface.providerComponent)}</code>
+				<span class="arch-detail-label" style="margin-left:12px">Consumers:</span> ${consumers}
+			</div>
+			${workflows ? `<div class="arch-iface-workflows">${workflows}</div>` : ''}
+		</div>`;
+	}).join('');
+
+	// --- Section 4: Implementation Roadmap (phased steps) ---
+	const sortedSteps = [...implementationSequence].sort((a, b) => a.sortOrder - b.sortOrder);
+
+	// Group steps into phases by complexity or sequential chunks
+	const roadmapHtml = sortedSteps.map(step => {
+		const depText = step.dependencies.length > 0
+			? `<span class="arch-detail-label">Depends on:</span> ${step.dependencies.map(d => escapeHtml(d)).join(', ')}`
+			: '';
+		const compText = step.componentsInvolved.length > 0
+			? step.componentsInvolved.map(c => `<code>${escapeHtml(c)}</code>`).join(', ')
+			: '';
+		const complexityClass = step.complexity === 'HIGH' ? 'arch-complexity-high'
+			: step.complexity === 'MEDIUM' ? 'arch-complexity-medium'
+			: 'arch-complexity-low';
+
+		return `<div class="arch-roadmap-step">
+			<div class="arch-step-header">
+				<code class="arch-comp-id">${escapeHtml(step.id)}</code>
+				<strong>${escapeHtml(step.label)}</strong>
+				<span class="arch-badge ${complexityClass}">${escapeHtml(step.complexity)}</span>
+			</div>
+			<div class="arch-step-desc">${escapeHtml(step.description)}</div>
+			<div class="arch-step-meta">
+				${compText ? `<div><span class="arch-detail-label">Components:</span> ${compText}</div>` : ''}
+				${depText ? `<div>${depText}</div>` : ''}
+				${step.verificationMethod ? `<div><span class="arch-detail-label">Verify:</span> ${escapeHtml(step.verificationMethod)}</div>` : ''}
+			</div>
+		</div>`;
+	}).join('');
+
+	// --- Card meta ---
+	const metaText = hasHierarchy
+		? `${parentCount} top-level, ${childCount} sub-components, ${dataModels.length} models, ${interfaces.length} interfaces`
+		: `${components.length} components, ${dataModels.length} models, ${interfaces.length} interfaces`;
+
+	return `<div class="card architecture-card architecture-design-card" data-timestamp="${escapeHtml(timestamp)}">
+		<div class="card-header">
+			<span class="role-badge role-architect">ARCHITECT</span>
+			<span class="card-title">Architecture Design</span>
+			<span class="card-meta">${metaText}</span>
+		</div>
+		<div class="card-body">
+			<details open>
+				<summary class="arch-section-summary">Components (${components.length})</summary>
+				<div class="arch-section-content">${componentCards || '<p class="arch-empty">No components defined.</p>'}</div>
+			</details>
+			${dataModels.length ? `<details>
+				<summary class="arch-section-summary">Domain Model (${dataModels.length} entities)</summary>
+				<div class="arch-section-content">${domainModelCards}</div>
+			</details>` : ''}
+			${interfaces.length ? `<details>
+				<summary class="arch-section-summary">Interfaces (${interfaces.length})</summary>
+				<div class="arch-section-content">${interfaceCards}</div>
+			</details>` : ''}
+			${sortedSteps.length ? `<details>
+				<summary class="arch-section-summary">Implementation Roadmap (${sortedSteps.length} steps)</summary>
+				<div class="arch-section-content">${roadmapHtml}</div>
+			</details>` : ''}
+		</div>
+	</div>`;
+}
+
+function renderArchitectureValidationCard(
+	score: number | null,
+	findings: string[],
+	validated: boolean,
+	timestamp: string
+): string {
+	const scoreDisplay = score !== null ? `${Math.round(score * 100)}%` : 'N/A';
+	const scoreClass = score !== null
+		? (score >= 0.8 ? 'score-good' : score >= 0.5 ? 'score-warn' : 'score-bad')
+		: 'score-na';
+	const statusLabel = validated ? 'Passed' : 'Needs Revision';
+	const statusClass = validated ? 'status-pass' : 'status-fail';
+
+	const findingsList = findings.length
+		? `<ul class="validation-findings">${findings.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>`
+		: '<p class="no-findings">No findings — architecture looks good.</p>';
+
+	return `<div class="card architecture-card validation-card" data-timestamp="${escapeHtml(timestamp)}">
+		<div class="card-header">
+			<span class="role-badge role-historian">HISTORIAN</span>
+			<span class="card-title">Architecture Validation</span>
+			<span class="card-meta ${statusClass}">${statusLabel}</span>
+		</div>
+		<div class="card-body">
+			<div class="validation-score ${scoreClass}">
+				<span class="score-label">Goal Alignment</span>
+				<span class="score-value">${scoreDisplay}</span>
+			</div>
+			${findingsList}
+		</div>
+	</div>`;
+}
+
+function renderDecompositionBreadcrumb(depth: number): string {
+	const levels = [
+		{ label: 'Goal', level: -2 },
+		{ label: 'Capabilities', level: -1 },
+		{ label: 'Workflows', level: -1 },
+		{ label: 'Components', level: 0 },
+		{ label: 'Sub-components', level: 1 },
+		{ label: 'Atomic Tasks', level: 2 },
+	];
+
+	const spans = levels.map(function (l) {
+		let cls = 'decomposition-level';
+		if (l.level < depth) { cls += ' completed'; }
+		else if (l.level === depth) { cls += ' active'; }
+		return '<span class="' + cls + '">' + l.label + '</span>';
+	});
+
+	return '<div class="decomposition-breadcrumb">'
+		+ '<div class="decomposition-label">Decomposition Depth</div>'
+		+ '<div class="decomposition-levels">' + spans.join('<span class="decomposition-arrow">&#x2192;</span>') + '</div>'
+		+ '</div>';
+}
+
+function renderArchitectureGateCard(
+	docId: string,
+	version: number,
+	capabilityCount: number,
+	componentCount: number,
+	goalAlignmentScore: number | null,
+	dialogueId: string,
+	resolved?: boolean,
+	resolvedAction?: string,
+	mmpJson?: string,
+	decompositionDepth?: number,
+	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
+): string {
+	const scoreDisplay = goalAlignmentScore !== null ? `${Math.round(goalAlignmentScore * 100)}%` : 'N/A';
+	const depth = decompositionDepth ?? 0;
+
+	// Parse MMP payload if present — only for unresolved (active) gates.
+	// Resolved gates already had their decisions recorded; rendering their MMP items
+	// would create duplicate DOM elements that interfere with progress counters.
+	let mmpHtml = '';
+	if (mmpJson && !resolved) {
+		try {
+			const mmp = JSON.parse(mmpJson) as MMPPayload;
+			if (mmp.mirror || mmp.menu || mmp.preMortem) {
+				const cardId = 'ARC-' + docId.substring(0, 8) + '-v' + version;
+				mmpHtml = renderMMPSection(mmp, cardId, true, undefined, allPendingDecisions?.[cardId]);
+			}
+		} catch { /* ignore parse errors */ }
+	}
+
+	const breadcrumbHtml = renderDecompositionBreadcrumb(depth);
+
+	if (resolved) {
+		// resolvedAction comes from HumanAction enum: APPROVE, OVERRIDE (skip), REFRAME (revise/deepen)
+		const actionLabel = resolvedAction === 'APPROVE' ? 'Approved'
+			: resolvedAction === 'OVERRIDE' ? 'Skipped'
+			: resolvedAction === 'SUPERSEDED' ? 'Superseded by newer review'
+			: 'Revision Requested';
+		const actionClass = resolvedAction === 'APPROVE' ? 'gate-approved'
+			: resolvedAction === 'OVERRIDE' ? 'gate-skipped'
+			: resolvedAction === 'SUPERSEDED' ? 'gate-skipped'
+			: 'gate-revised';
+
+		return '<div class="card architecture-card architecture-gate ' + actionClass + '">'
+			+ '<div class="card-header">'
+			+ '<span class="role-badge role-human">HUMAN</span>'
+			+ '<span class="card-title">Architecture Review</span>'
+			+ '<span class="card-meta">' + actionLabel + '</span>'
+			+ '</div>'
+			+ '<div class="card-body">'
+			+ breadcrumbHtml
+			+ '<p>Architecture v' + version + ': ' + capabilityCount + ' capabilities, ' + componentCount + ' components, goal alignment ' + scoreDisplay + '</p>'
+			+ '</div>'
+			+ '</div>';
+	}
+
+	const maxDepthReached = depth >= 2;
+	const deeperBtnDisabled = maxDepthReached ? ' disabled' : '';
+	const deeperBtnLabel = maxDepthReached ? 'Max Depth Reached' : 'Decompose Deeper';
+	const deeperBtnTitle = maxDepthReached
+		? 'Maximum decomposition depth (2 additional levels) has been reached'
+		: 'Request one additional level of decomposition';
+
+	return '<div class="card architecture-card architecture-gate gate-pending">'
+		+ '<div class="card-header">'
+		+ '<span class="role-badge role-human">HUMAN</span>'
+		+ '<span class="card-title">Architecture Review Required</span>'
+		+ '</div>'
+		+ '<div class="card-body">'
+		+ '<p>Architecture v' + version + ' is ready for review.</p>'
+		+ '<ul>'
+		+ '<li><strong>Capabilities:</strong> ' + capabilityCount + '</li>'
+		+ '<li><strong>Components:</strong> ' + componentCount + '</li>'
+		+ '<li><strong>Goal Alignment:</strong> ' + scoreDisplay + '</li>'
+		+ '</ul>'
+		+ breadcrumbHtml
+		+ mmpHtml
+		+ '<div class="architecture-feedback-area">'
+		+ '<textarea placeholder="Describe what changes you want (min 10 characters)..." rows="3"></textarea>'
+		+ '</div>'
+		+ '<div class="gate-actions">'
+		+ '<button class="gate-btn gate-btn-approve" data-action="architecture-approve" data-dialogue-id="' + escapeHtml(dialogueId) + '" data-doc-id="' + escapeHtml(docId) + '">Approve</button>'
+		+ '<button class="gate-btn gate-btn-revise" data-action="architecture-revise" data-dialogue-id="' + escapeHtml(dialogueId) + '" data-doc-id="' + escapeHtml(docId) + '">Request Changes</button>'
+		+ '<button class="gate-btn gate-btn-skip" data-action="architecture-skip" data-dialogue-id="' + escapeHtml(dialogueId) + '" data-doc-id="' + escapeHtml(docId) + '">Skip</button>'
+		+ '<button class="gate-btn gate-btn-deeper" data-action="architecture-decompose-deeper" data-dialogue-id="' + escapeHtml(dialogueId) + '" data-doc-id="' + escapeHtml(docId) + '" title="' + deeperBtnTitle + '"' + deeperBtnDisabled + '>' + deeperBtnLabel + '</button>'
+		+ '</div>'
+		+ '</div>'
+		+ '</div>';
 }
 

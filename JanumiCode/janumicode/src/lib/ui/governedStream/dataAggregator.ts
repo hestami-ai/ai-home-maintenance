@@ -8,9 +8,9 @@
  * reflects only the active dialogue.
  */
 
-import type { DialogueTurn, Claim, Verdict, Gate } from '../../types';
+import type { DialogueEvent, Claim, Verdict, Gate } from '../../types';
 import { ClaimStatus, GateStatus, Phase } from '../../types';
-import { getDialogueTurns, getClaims, getVerdicts, getGates, getHumanDecisions, getIntakeConversation, getIntakeTurns, getQaExchanges } from '../../events/reader';
+import { getDialogueEvents, getClaims, getVerdicts, getGates, getHumanDecisions, getIntakeConversation, getQaExchanges } from '../../events/reader';
 import { getWorkflowState, type WorkflowState } from '../../workflow/stateMachine';
 import { getAllDialogues, type DialogueRecord } from '../../dialogue/lifecycle';
 import {
@@ -19,14 +19,16 @@ import {
 	type WorkflowCommandRecord,
 	type WorkflowCommandOutput,
 } from '../../workflow/commandStore';
-import type { IntakePlanDocument, IntakeConversationTurn, DomainCoverageMap, IntakeModeRecommendation, IntakeCheckpoint, IntakeGatheringTurnResponse } from '../../types/intake';
-import { IntakeSubState, DomainCoverageLevel, isGatheringResponse, isAnalysisResponse } from '../../types/intake';
-import { DOMAIN_INFO, DOMAIN_SEQUENCE, type EngineeringDomain } from '../../workflow/domainCoverageTracker';
+import type { IntakePlanDocument, IntakeConversationTurn, DomainCoverageMap, IntakeModeRecommendation, IntakeCheckpoint, EngineeringDomain } from '../../types/intake';
+import { IntakeSubState, DomainCoverageLevel, isGatheringResponse } from '../../types/intake';
+import { DOMAIN_INFO, DOMAIN_SEQUENCE } from '../../workflow/domainCoverageTracker';
 import type { HumanFacingStatus } from '../../types/maker';
+import { getArchitectureDocumentForDialogue } from '../../database/architectureStore';
 import { resolveHumanFacingState } from '../../workflow/humanFacingState';
 import { getTaskGraphForDialogue, getTaskUnitsForGraph } from '../../database/makerStore';
 import { getGraphProgress } from '../../workflow/taskGraph';
 import { getDatabase } from '../../database';
+import type { MMPPayload, MirrorItem, MenuItem, MenuOption, PreMortemItem } from '../../types/mmp';
 
 /**
  * Summary counts of claim statuses for the health bar
@@ -88,7 +90,8 @@ export interface ReviewSummary {
  * A stream item: dialogue turn, gate, milestone, or dialogue boundary marker
  */
 export type StreamItem =
-	| { type: 'turn'; turn: DialogueTurn; claims: Claim[]; verdict?: Verdict }
+	| { type: 'human_message'; text: string; timestamp: string }
+	| { type: 'turn'; turn: DialogueEvent; claims: Claim[]; verdict?: Verdict }
 	| { type: 'gate'; gate: Gate; blockingClaims: Claim[]; resolvedAction?: string; metadata?: Record<string, unknown> }
 	| { type: 'verification_gate'; gate: Gate; allClaims: Claim[]; verdicts: Verdict[]; blockingClaims: Claim[]; resolvedAction?: string }
 	| { type: 'review_gate'; gate: Gate; allClaims: Claim[]; verdicts: Verdict[];
@@ -97,7 +100,7 @@ export type StreamItem =
 	| { type: 'dialogue_start'; dialogueId: string; goal: string; title: string | null; timestamp: string }
 	| { type: 'dialogue_end'; dialogueId: string; status: string; timestamp: string }
 	| { type: 'command_block'; command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }
-	| { type: 'intake_turn'; turn: IntakeConversationTurn; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }> }
+	| { type: 'intake_turn'; turn: IntakeConversationTurn; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>; isLatest?: boolean }
 	| { type: 'intake_plan_preview'; plan: IntakePlanDocument; isFinal: boolean; timestamp: string }
 	| { type: 'intake_approval_gate'; plan: IntakePlanDocument; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string }
 	| { type: 'intake_mode_selector'; recommendation: IntakeModeRecommendation; timestamp: string; resolved?: boolean; selectedMode?: string }
@@ -105,8 +108,19 @@ export type StreamItem =
 	| { type: 'intake_domain_transition'; fromDomain: string; fromLabel: string; toDomain: string | null; toLabel: string | null; toDescription: string | null; timestamp: string }
 	| { type: 'intake_gathering_complete'; coverageSummary: { adequate: number; partial: number; none: number; percentage: number }; intakeMode: string | null; timestamp: string }
 	| { type: 'intake_analysis'; humanMessage: string; analysisSummary: string; codebaseFindings: string[]; domainAssessment: Array<{ domain: string; level: string; evidence: string }>; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }> }
+	| { type: 'intake_product_discovery'; requestCategory: string; productVision?: string; productDescription?: string; personas?: Array<{ id: string; name: string; description: string; goals: string[]; painPoints: string[] }>; userJourneys?: Array<{ id: string; personaId: string; title: string; scenario: string; steps: Array<{ stepNumber: number; actor: string; action: string; expectedOutcome: string }>; acceptanceCriteria: string[]; priority: string }>; phasingStrategy?: Array<{ phase: string; description: string; journeyIds: string[]; rationale: string }>; successMetrics?: string[]; uxRequirements?: string[]; mmpJson?: string; timestamp: string }
 	| { type: 'intake_proposal'; title: string; summary: string; proposedApproach: string; domainCoverage: { adequate: number; partial: number; none: number; percentage: number }; timestamp: string }
-	| { type: 'qa_exchange'; question: string; answer: string; timestamp: string };
+	// Proposer-Validator items
+	| { type: 'intake_proposer_domains'; domains: Array<{ id: string; name: string; description: string; rationale: string; entityPreview: string[]; workflowPreview: string[] }>; personas: Array<{ id: string; name: string; description: string }>; mmpJson?: string; timestamp: string }
+	| { type: 'intake_proposer_journeys'; journeys: Array<{ id: string; title: string; scenario: string; priority?: string }>; workflows: Array<{ id: string; name: string; description: string; domainId: string }>; mmpJson?: string; timestamp: string }
+	| { type: 'intake_proposer_entities'; entities: Array<{ id: string; name: string; description: string; domainId: string; keyAttributes: string[]; relationships: string[] }>; domainNames?: Record<string, string>; mmpJson?: string; timestamp: string }
+	| { type: 'intake_proposer_integrations'; integrations: Array<{ id: string; name: string; category: string; description: string; standardProviders: string[]; ownershipModel: string }>; qualityAttributes: string[]; mmpJson?: string; timestamp: string }
+	| { type: 'qa_exchange'; question: string; answer: string; timestamp: string }
+	// Architecture phase items
+	| { type: 'architecture_capabilities'; capabilities: Array<{ id: string; label: string; requirements: number; workflows: number; parentId: string | null }>; timestamp: string }
+	| { type: 'architecture_design'; components: Array<{ id: string; label: string; responsibility: string; rationale: string; parentId: string | null; workflowsServed: string[]; dependencies: string[]; interactionPatterns: string[]; technologyNotes: string; fileScope: string }>; dataModels: Array<{ id: string; entity: string; description: string; fields: Array<{ name: string; type: string; required: boolean }>; relationships: Array<{ targetModel: string; type: string; description: string }>; invariants: string[] }>; interfaces: Array<{ id: string; label: string; type: string; description: string; contract: string; providerComponent: string; consumerComponents: string[]; sourceWorkflows: string[] }>; implementationSequence: Array<{ id: string; label: string; description: string; componentsInvolved: string[]; dependencies: string[]; complexity: string; verificationMethod: string; sortOrder: number }>; timestamp: string }
+	| { type: 'architecture_validation'; score: number | null; findings: string[]; validated: boolean; timestamp: string }
+	| { type: 'architecture_gate'; docId: string; version: number; capabilities: number; components: number; goalAlignmentScore: number | null; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string; mmpJson?: string; decompositionDepth?: number };
 
 /**
  * Summary of a dialogue for the switcher dropdown
@@ -145,6 +159,14 @@ export interface GovernedStreamState {
 		currentDomain: string | null;
 		intakeMode: string | null;
 	} | null;
+	/** ARCHITECTURE phase sub-state for the active dialogue */
+	architectureState: {
+		subState: string;
+		validationAttempts: number;
+		maxValidationAttempts: number;
+		designIterations: number;
+		decompositionDepth: number;
+	} | null;
 	/** MAKER human-facing state for the active dialogue */
 	humanFacingState: HumanFacingStatus | null;
 	/** MAKER task graph progress for the active dialogue */
@@ -163,6 +185,7 @@ export interface GovernedStreamState {
  */
 export const WORKFLOW_PHASES: Phase[] = [
 	Phase.INTAKE,
+	Phase.ARCHITECTURE,
 	Phase.PROPOSE,
 	Phase.ASSUMPTION_SURFACING,
 	Phase.VERIFY,
@@ -210,10 +233,11 @@ export function computeClaimHealth(claims: Claim[]): ClaimHealthSummary {
 }
 
 /**
- * Build stream items for a single dialogue with phase milestone dividers
+ * Build stream items for a single dialogue with phase milestone dividers.
+ * Routes each DialogueEvent by event_type to produce the appropriate StreamItem.
  */
 function buildStreamItems(
-	turns: DialogueTurn[],
+	events: DialogueEvent[],
 	claims: Claim[],
 	verdicts: Verdict[],
 	gates: Gate[],
@@ -222,6 +246,7 @@ function buildStreamItems(
 	const items: StreamItem[] = [];
 
 	let lastPhase: Phase | null = null;
+	let lastPlanVersion = 0;
 
 	// Create lookup maps
 	const claimsByTurn = new Map<number, Claim[]>();
@@ -259,21 +284,21 @@ function buildStreamItems(
 
 	let gateIdx = 0;
 
-	for (const turn of turns) {
+	for (const event of events) {
 		// Insert milestone divider on phase change
-		if (turn.phase !== lastPhase) {
+		if (event.phase !== lastPhase) {
 			items.push({
 				type: 'milestone',
-				phase: turn.phase,
-				timestamp: turn.timestamp,
+				phase: event.phase,
+				timestamp: event.timestamp,
 			});
-			lastPhase = turn.phase;
+			lastPhase = event.phase;
 		}
 
-		// Insert any gates that were triggered before this turn
+		// Insert any gates that were triggered before this event
 		while (
 			gateIdx < gateTimeline.length &&
-			gateTimeline[gateIdx].timestamp <= turn.timestamp
+			gateTimeline[gateIdx].timestamp <= event.timestamp
 		) {
 			const gate = gateTimeline[gateIdx].gate;
 			const blockingClaims = claims.filter((c) =>
@@ -288,17 +313,392 @@ function buildStreamItems(
 			gateIdx++;
 		}
 
-		// Build the turn item
-		const turnClaims = claimsByTurn.get(turn.turn_id) ?? [];
-		const firstClaim = turnClaims[0];
-		const verdict = firstClaim ? verdictByClaim.get(firstClaim.claim_id) : undefined;
+		// Route by event_type to produce appropriate StreamItem
+		const eventType = event.event_type;
 
-		items.push({
-			type: 'turn',
-			turn,
-			claims: turnClaims,
-			verdict,
-		});
+		if (eventType === 'human_message') {
+			items.push({
+				type: 'human_message',
+				text: event.content ?? event.summary,
+				timestamp: event.timestamp,
+			});
+		} else if (eventType === 'intake_turn' || eventType === 'intake_clarification' || eventType === 'intake_gathering') {
+			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const intakeTurn: IntakeConversationTurn = {
+				id: event.event_id,
+				dialogueId: event.dialogue_id,
+				turnNumber: detail.turnNumber ?? 0,
+				humanMessage: detail.humanMessage ?? '',
+				expertResponse: detail.expertResponse,
+				planSnapshot: detail.planSnapshot ?? null,
+				tokenCount: detail.tokenCount ?? 0,
+				isGathering: eventType === 'intake_gathering',
+				createdAt: event.timestamp,
+			};
+			items.push({ type: 'intake_turn', turn: intakeTurn, timestamp: event.timestamp });
+
+			// Inject plan preview if plan version changed
+			const planVersion = intakeTurn.planSnapshot?.version ?? 0;
+			if (planVersion > 0 && planVersion !== lastPlanVersion) {
+				items.push({
+					type: 'intake_plan_preview',
+					plan: intakeTurn.planSnapshot!,
+					isFinal: false,
+					timestamp: event.timestamp,
+				});
+				lastPlanVersion = planVersion;
+			}
+		} else if (eventType === 'intake_analysis') {
+			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const expertResponse = detail.expertResponse;
+			items.push({
+				type: 'intake_analysis',
+				humanMessage: detail.humanMessage ?? '',
+				analysisSummary: expertResponse?.analysisSummary ?? event.summary,
+				codebaseFindings: expertResponse?.codebaseFindings ?? [],
+				domainAssessment: expertResponse?.domainAssessment ?? [],
+				timestamp: event.timestamp,
+			});
+
+			// Inject proposal card if analysis includes an initial plan
+			const plan = expertResponse?.initialPlan ?? detail.initialPlan;
+			if (plan) {
+				// Compute domain coverage from the domain assessment if available
+				const domainAssess: Array<{ domain: string; level: string }> = expertResponse?.domainAssessment ?? [];
+				let adequate = 0, partial = 0, none = 0;
+				for (const d of domainAssess) {
+					const lvl = (d.level ?? '').toUpperCase();
+					if (lvl === 'ADEQUATE') { adequate++; }
+					else if (lvl === 'PARTIAL') { partial++; }
+					else { none++; }
+				}
+				const total = adequate + partial + none;
+				const percentage = total > 0 ? Math.round(((adequate + partial * 0.5) / total) * 100) : 0;
+
+				// Emit product discovery card separately (only for product_or_feature with MMP)
+				if (plan.requestCategory === 'product_or_feature' && detail.productDiscoveryMMP) {
+					items.push({
+						type: 'intake_product_discovery',
+						requestCategory: plan.requestCategory,
+						productVision: plan.productVision,
+						productDescription: plan.productDescription,
+						personas: plan.personas,
+						userJourneys: plan.userJourneys,
+						phasingStrategy: plan.phasingStrategy,
+						successMetrics: plan.successMetrics,
+						uxRequirements: plan.uxRequirements,
+						mmpJson: detail.productDiscoveryMMP,
+						timestamp: event.timestamp,
+					});
+				}
+
+				// Technical proposal card (product fields removed — reviewed in PRODUCT_REVIEW)
+				items.push({
+					type: 'intake_proposal',
+					title: plan.title ?? '',
+					summary: plan.summary ?? '',
+					proposedApproach: plan.proposedApproach ?? '',
+					domainCoverage: { adequate, partial, none, percentage },
+					timestamp: event.timestamp,
+				});
+				lastPlanVersion = plan.version ?? 0;
+			}
+		} else if (eventType === 'intake_synthesis') {
+			const detail = event.detail ? JSON.parse(event.detail) : {};
+			if (detail.finalizedPlan) {
+				items.push({
+					type: 'intake_plan_preview',
+					plan: detail.finalizedPlan,
+					isFinal: true,
+					timestamp: event.timestamp,
+				});
+				lastPlanVersion = detail.finalizedPlan.version ?? 0;
+			}
+		} else if (eventType === 'intake_approval') {
+			// Handled by injectIntakeDerivedCards (approval gate card)
+		} else if (eventType === 'intake_proposer_domains') {
+			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const content = event.content ? JSON.parse(event.content) : {};
+			items.push({
+				type: 'intake_proposer_domains',
+				domains: content.domains ?? [],
+				personas: (content.personas ?? []).map((p: Record<string, unknown>) => ({
+					id: p.id as string ?? '', name: p.name as string ?? '', description: p.description as string ?? '',
+				})),
+				mmpJson: detail.productDiscoveryMMP,
+				timestamp: event.timestamp,
+			});
+		} else if (eventType === 'intake_proposer_journeys') {
+			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const content = event.content ? JSON.parse(event.content) : {};
+			items.push({
+				type: 'intake_proposer_journeys',
+				journeys: (content.userJourneys ?? []).map((j: Record<string, unknown>) => ({
+					id: j.id as string ?? '', title: j.title as string ?? '',
+					scenario: j.scenario as string ?? '', priority: j.priority as string ?? 'MVP',
+				})),
+				workflows: (content.workflows ?? []).map((w: Record<string, unknown>) => ({
+					id: w.id as string ?? '', name: w.name as string ?? '',
+					description: w.description as string ?? '', domainId: w.domainId as string ?? '',
+				})),
+				mmpJson: detail.productDiscoveryMMP,
+				timestamp: event.timestamp,
+			});
+		} else if (eventType === 'intake_proposer_entities') {
+			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const content = event.content ? JSON.parse(event.content) : {};
+			// Build domain name lookup from prior proposer_domains event
+			const domainNames: Record<string, string> = {};
+			for (const prior of items) {
+				if (prior.type === 'intake_proposer_domains') {
+					for (const d of prior.domains) {
+						domainNames[d.id] = d.name;
+					}
+				}
+			}
+			items.push({
+				type: 'intake_proposer_entities',
+				entities: (content.entities ?? []).map((e: Record<string, unknown>) => ({
+					id: e.id as string ?? '', name: e.name as string ?? '',
+					description: e.description as string ?? '', domainId: e.domainId as string ?? '',
+					keyAttributes: Array.isArray(e.keyAttributes) ? e.keyAttributes as string[] : [],
+					relationships: Array.isArray(e.relationships) ? e.relationships as string[] : [],
+				})),
+				domainNames: Object.keys(domainNames).length > 0 ? domainNames : undefined,
+				mmpJson: detail.productDiscoveryMMP,
+				timestamp: event.timestamp,
+			});
+		} else if (eventType === 'intake_proposer_integrations') {
+			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const content = event.content ? JSON.parse(event.content) : {};
+			items.push({
+				type: 'intake_proposer_integrations',
+				integrations: (content.integrations ?? []).map((int: Record<string, unknown>) => ({
+					id: int.id as string ?? '', name: int.name as string ?? '',
+					category: int.category as string ?? 'other', description: int.description as string ?? '',
+					standardProviders: Array.isArray(int.standardProviders) ? int.standardProviders as string[] : [],
+					ownershipModel: int.ownershipModel as string ?? 'owned',
+				})),
+				qualityAttributes: Array.isArray(content.qualityAttributes) ? content.qualityAttributes as string[] : [],
+				mmpJson: detail.productDiscoveryMMP,
+				timestamp: event.timestamp,
+			});
+		} else if (eventType === 'architecture_decomposition') {
+			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const content = event.content ? JSON.parse(event.content) : {};
+			const caps = (content.capabilities ?? []).map((c: Record<string, unknown>) => ({
+				id: c.capability_id as string ?? '',
+				label: c.label as string ?? '',
+				requirements: Array.isArray(c.source_requirements) ? (c.source_requirements as string[]).length : 0,
+				workflows: Array.isArray(c.workflows) ? (c.workflows as string[]).length : 0,
+				parentId: (c.parent_capability_id as string) || null,
+			}));
+			items.push({ type: 'architecture_capabilities', capabilities: caps, timestamp: event.timestamp });
+		} else if (eventType === 'architecture_design' || eventType === 'architecture_modeling' || eventType === 'architecture_sequencing') {
+			// Three events contribute to architecture_design StreamItems:
+			//   - architecture_design carries components + interfaces + data_models (from doc)
+			//   - architecture_modeling is visible via command blocks (data feeds into doc)
+			//   - architecture_sequencing triggers a full card from the complete document
+			//
+			// We emit the design card at two points:
+			//   1. After DESIGNING: components + interfaces + domain model
+			//   2. After SEQUENCING: full card with all 4 sections (from architecture document)
+
+			if (eventType === 'architecture_design') {
+				const content = event.content ? JSON.parse(event.content) : {};
+				items.push({
+					type: 'architecture_design',
+					components: (content.components ?? []).map((c: Record<string, unknown>) => ({
+						id: (c.component_id as string) ?? '',
+						label: (c.label as string) ?? '',
+						responsibility: (c.responsibility as string) ?? '',
+						rationale: (c.rationale as string) ?? '',
+						parentId: (c.parent_component_id as string) ?? null,
+						workflowsServed: Array.isArray(c.workflows_served) ? c.workflows_served as string[] : [],
+						dependencies: Array.isArray(c.dependencies) ? c.dependencies as string[] : [],
+						interactionPatterns: Array.isArray(c.interaction_patterns) ? c.interaction_patterns as string[] : [],
+						technologyNotes: (c.technology_notes as string) ?? '',
+						fileScope: (c.file_scope as string) ?? '',
+					})),
+					dataModels: (content.data_models ?? []).map((m: Record<string, unknown>) => ({
+						id: (m.model_id as string) ?? '',
+						entity: (m.entity_name as string) ?? '',
+						description: (m.description as string) ?? '',
+						fields: Array.isArray(m.fields) ? (m.fields as Record<string, unknown>[]).map(f => ({
+							name: (f.name as string) ?? '',
+							type: (f.type as string) ?? 'string',
+							required: Boolean(f.required),
+						})) : [],
+						relationships: Array.isArray(m.relationships) ? (m.relationships as Record<string, unknown>[]).map(r => ({
+							targetModel: (r.target_model as string) ?? '',
+							type: (r.type as string) ?? '',
+							description: (r.description as string) ?? '',
+						})) : [],
+						invariants: Array.isArray(m.invariants) ? m.invariants as string[] : [],
+					})),
+					interfaces: (content.interfaces ?? []).map((i: Record<string, unknown>) => ({
+						id: (i.interface_id as string) ?? '',
+						label: (i.label as string) ?? '',
+						type: (i.type as string) ?? '',
+						description: (i.description as string) ?? '',
+						contract: (i.contract as string) ?? '',
+						providerComponent: (i.provider_component as string) ?? '',
+						consumerComponents: Array.isArray(i.consumer_components) ? i.consumer_components as string[] : [],
+						sourceWorkflows: Array.isArray(i.source_workflows) ? i.source_workflows as string[] : [],
+					})),
+					implementationSequence: [],
+					timestamp: event.timestamp,
+				});
+			} else if (eventType === 'architecture_sequencing' && dialogueId) {
+				// After SEQUENCING, the document has all 4 artifact types.
+				// Emit a full design card from the complete architecture document.
+				const archDocResult = getArchitectureDocumentForDialogue(dialogueId);
+				if (archDocResult.success && archDocResult.value) {
+					const doc = archDocResult.value;
+					items.push({
+						type: 'architecture_design',
+						components: doc.components.map(c => ({
+							id: c.component_id,
+							label: c.label,
+							responsibility: c.responsibility,
+							rationale: c.rationale ?? '',
+							parentId: c.parent_component_id ?? null,
+							workflowsServed: c.workflows_served,
+							dependencies: c.dependencies,
+							interactionPatterns: c.interaction_patterns ?? [],
+							technologyNotes: c.technology_notes ?? '',
+							fileScope: c.file_scope ?? '',
+						})),
+						dataModels: doc.data_models.map(m => ({
+							id: m.model_id,
+							entity: m.entity_name,
+							description: m.description ?? '',
+							fields: m.fields.map(f => ({
+								name: f.name,
+								type: f.type,
+								required: f.required,
+							})),
+							relationships: m.relationships.map(r => ({
+								targetModel: r.target_model,
+								type: r.type,
+								description: r.description ?? '',
+							})),
+							invariants: m.invariants ?? [],
+						})),
+						interfaces: doc.interfaces.map(i => ({
+							id: i.interface_id,
+							label: i.label,
+							type: i.type,
+							description: i.description ?? '',
+							contract: i.contract ?? '',
+							providerComponent: i.provider_component,
+							consumerComponents: i.consumer_components,
+							sourceWorkflows: i.source_workflows,
+						})),
+						implementationSequence: doc.implementation_sequence.map(s => ({
+							id: s.step_id,
+							label: s.label,
+							description: s.description ?? '',
+							componentsInvolved: s.components_involved,
+							dependencies: s.dependencies,
+							complexity: s.estimated_complexity ?? 'MEDIUM',
+							verificationMethod: s.verification_method ?? '',
+							sortOrder: typeof s.sort_order === 'number' ? s.sort_order : 0,
+						})),
+						timestamp: event.timestamp,
+					});
+				}
+			}
+			// architecture_modeling events are visible via their command blocks.
+		} else if (eventType === 'architecture_validation') {
+			const detail = event.detail ? JSON.parse(event.detail) : {};
+			items.push({
+				type: 'architecture_validation',
+				score: detail.goalAlignmentScore ?? null,
+				findings: Array.isArray(detail.findings) ? detail.findings as string[] : [],
+				validated: !detail.findings?.length && (detail.goalAlignmentScore ?? 1) >= 0.6,
+				timestamp: event.timestamp,
+			});
+		} else if (eventType === 'architecture_presentation') {
+			const detail = event.detail ? JSON.parse(event.detail) : {};
+
+			// Look up the architecture gate to get resolved status, MMP, and decomposition depth.
+			// When "Decompose Deeper" is used, multiple gates share the same docId.
+			// Match the gate whose created_at is closest to (and >=) this presentation event's timestamp.
+			//
+			// IMPORTANT: Timestamps have different formats:
+			//   - dialogue_events.timestamp: "YYYY-MM-DD HH:MM:SS" (SQLite datetime('now'))
+			//   - gates.created_at: "YYYY-MM-DDTHH:MM:SS.mmmZ" (JS toISOString())
+			// Normalize both to "YYYY-MM-DD HH:MM:SS" for comparison.
+			let archResolved = false;
+			let archResolvedAction: string | undefined;
+			let archMmpJson: string | undefined;
+			let archDecompositionDepth: number | undefined;
+			let bestGateMatch: typeof gateTimeline[0] | null = null;
+			const normalizeTs = (ts: string) => ts.replace('T', ' ').replace(/\.\d+Z$/, '').replace('Z', '');
+			const eventTimeNorm = normalizeTs(event.timestamp);
+			for (const entry of gateTimeline) {
+				try {
+					const db = getDatabase();
+					if (!db) { continue; }
+					const metaRow = db.prepare(
+						'SELECT metadata FROM gate_metadata WHERE gate_id = ?'
+					).get(entry.gate.gate_id) as { metadata: string } | undefined;
+					if (metaRow) {
+						const meta = JSON.parse(metaRow.metadata);
+						if (meta.triggerCondition === 'ARCHITECTURE_REVIEW' && meta.architectureDocId === detail.docId) {
+							const gateTimeNorm = normalizeTs(entry.gate.created_at);
+							// Gate must be created at or after this presentation event
+							if (gateTimeNorm >= eventTimeNorm) {
+								bestGateMatch = entry;
+								// Store metadata from this gate
+								archMmpJson = typeof meta.mmp === 'string' ? meta.mmp : undefined;
+								archDecompositionDepth = typeof meta.decompositionDepth === 'number' ? meta.decompositionDepth : undefined;
+								break; // First gate at/after event time is the closest match
+							}
+							// If no gate is at/after event time yet, keep the last one seen
+							// (handles case where gate and event have identical timestamps)
+							bestGateMatch = entry;
+							archMmpJson = typeof meta.mmp === 'string' ? meta.mmp : undefined;
+							archDecompositionDepth = typeof meta.decompositionDepth === 'number' ? meta.decompositionDepth : undefined;
+						}
+					}
+				} catch { /* ignore metadata lookup errors */ }
+			}
+			if (bestGateMatch) {
+				if (bestGateMatch.gate.status === GateStatus.RESOLVED) {
+					archResolved = true;
+					archResolvedAction = resolvedActions.get(bestGateMatch.gate.gate_id);
+				}
+			}
+
+			items.push({
+				type: 'architecture_gate',
+				docId: detail.docId ?? '',
+				version: detail.version ?? 1,
+				capabilities: detail.capabilities ?? 0,
+				components: detail.components ?? 0,
+				goalAlignmentScore: detail.goalAlignmentScore ?? null,
+				dialogueId: event.dialogue_id,
+				timestamp: event.timestamp,
+				resolved: archResolved || undefined,
+				resolvedAction: archResolvedAction,
+				mmpJson: archMmpJson,
+				decompositionDepth: archDecompositionDepth,
+			});
+		} else {
+			// Non-INTAKE events (proposal, assumption_surfacing, execution, commit, etc.)
+			const turnClaims = claimsByTurn.get(event.event_id) ?? [];
+			const firstClaim = turnClaims[0];
+			const verdict = firstClaim ? verdictByClaim.get(firstClaim.claim_id) : undefined;
+
+			items.push({
+				type: 'turn',
+				turn: event,
+				claims: turnClaims,
+				verdict,
+			});
+		}
 	}
 
 	// Append any remaining gates
@@ -371,6 +771,11 @@ function pushGateOrReviewGate(
 			}
 		}
 	} catch { /* metadata read failed — render without enrichment */ }
+
+	// Skip generic gate for architecture review — already rendered by architecture_gate stream item
+	if (metadata?.triggerCondition === 'ARCHITECTURE_REVIEW') {
+		return;
+	}
 
 	items.push({ type: 'gate', gate, blockingClaims, resolvedAction, metadata });
 }
@@ -485,6 +890,9 @@ function buildReviewGateData(
 		} else if (adjudication?.verdict === 'CONDITIONAL') {
 			category = 'awareness';
 			categoryReason = 'Historian: CONDITIONAL — conditions must be verified';
+		} else if (status === ClaimStatus.VERIFIED && verdict?.novel_dependency) {
+			category = 'needs_decision';
+			categoryReason = 'Verified — but introduces a new dependency not currently in the project';
 		} else if (status === ClaimStatus.VERIFIED) {
 			category = 'all_clear';
 			categoryReason = 'Verified successfully';
@@ -537,8 +945,8 @@ function buildDialogueStreamItems(record: DialogueRecord): StreamItem[] {
 	});
 
 	// Get this dialogue's data
-	const turnsResult = getDialogueTurns({ dialogue_id: record.dialogue_id, limit: 200 });
-	const turns = turnsResult.success ? turnsResult.value : [];
+	const eventsResult = getDialogueEvents({ dialogue_id: record.dialogue_id, limit: 200 });
+	const events = eventsResult.success ? eventsResult.value : [];
 
 	const claimsResult = getClaims({ dialogue_id: record.dialogue_id });
 	const claims = claimsResult.success ? claimsResult.value : [];
@@ -552,26 +960,28 @@ function buildDialogueStreamItems(record: DialogueRecord): StreamItem[] {
 	const gatesResult = getGates({ dialogue_id: record.dialogue_id });
 	const gates = gatesResult.success ? gatesResult.value : [];
 
-	// Build the inner stream items (turns, milestones, gates)
-	const turnItems = buildStreamItems(turns, claims, verdicts, gates, record.dialogue_id);
+	// Build the inner stream items (events, milestones, gates)
+	const eventItems = buildStreamItems(events, claims, verdicts, gates, record.dialogue_id);
 
 	// Fetch persisted command blocks and Q&A exchanges for this dialogue
 	const commandItems = buildCommandBlockItems(record.dialogue_id);
 	const qaItems = buildQaExchangeItems(record.dialogue_id);
 
-	// Merge turn-based items, command blocks, and Q&A exchanges by timestamp
+	// Merge event-based items, command blocks, and Q&A exchanges by timestamp
 	const mergedItems = mergeStreamItemsByTimestamp(
-		mergeStreamItemsByTimestamp(turnItems, commandItems), qaItems
+		mergeStreamItemsByTimestamp(eventItems, commandItems), qaItems
 	);
 
-	// Apply intake processing: if this dialogue has intake conversation data,
-	// filter out INTAKE-phase audit dialogue_turns and inject proper intake_turn
-	// cards with per-version plan previews. This ensures historical dialogues
-	// also render intake conversations correctly.
-	applyIntakeStreamProcessing(record.dialogue_id, mergedItems);
+	// Inject derived INTAKE cards (mode selector, checkpoints, domain transitions,
+	// gathering-complete, approval gate) from intake_conversations state
+	injectIntakeDerivedCards(record.dialogue_id, mergedItems);
 
-	// Re-sort after intake processing (it pushes new items to the end)
+	// Sort after derived card injection
 	sortStreamItemsByTimestamp(mergedItems);
+
+	// Deduplicate architecture gates: only the last unresolved gate should be interactive.
+	// Earlier unresolved gates are marked as superseded to prevent duplicate MMP sections.
+	deduplicateArchitectureGates(mergedItems);
 
 	items.push(...mergedItems);
 
@@ -629,12 +1039,12 @@ function resolveDomainEnum(raw: string): EngineeringDomain | null {
 		return raw as EngineeringDomain;
 	}
 	// Normalize: strip common filler words, collapse separators
-	const normalized = raw.toUpperCase().replace(/\bAND\b/g, '').replace(/[_\s]+/g, '_').replace(/^_|_$/g, '');
+	const normalized = raw.toUpperCase().replaceAll(/\bAND\b/g, '').replaceAll(/[_\s]+/g, '_').replaceAll(/(?:^_|_$)/g, '');
 	for (const domain of DOMAIN_SEQUENCE) {
 		if (domain === normalized) { return domain; }
 	}
 	// Fallback: match by label
-	const lowerRaw = raw.toLowerCase().replace(/_/g, ' ');
+	const lowerRaw = raw.toLowerCase().replaceAll('_', ' ');
 	for (const domain of DOMAIN_SEQUENCE) {
 		if (DOMAIN_INFO[domain].label.toLowerCase() === lowerRaw) { return domain; }
 	}
@@ -650,10 +1060,14 @@ function resolveDomainEnum(raw: string): EngineeringDomain | null {
  */
 function normalizeTimestamp(ts: string): string {
 	if (!ts) { return ''; }
-	// Already has 'T' separator — normalize by ensuring Z suffix
-	if (ts.includes('T')) { return ts; }
+	// Strip fractional seconds (.123Z → Z) so ISO and SQLite timestamps
+	// compare at second granularity — the sort-priority tiebreaker handles
+	// ordering within the same second.
+	const stripped = ts.replace(/\.\d+Z$/, 'Z');
+	// Already has 'T' separator — return as-is
+	if (stripped.includes('T')) { return stripped; }
 	// SQLite format "YYYY-MM-DD HH:MM:SS" → "YYYY-MM-DDTHH:MM:SSZ"
-	return ts.replace(' ', 'T') + 'Z';
+	return stripped.replace(' ', 'T') + 'Z';
 }
 
 /**
@@ -662,6 +1076,7 @@ function normalizeTimestamp(ts: string): string {
 function getStreamItemTimestamp(item: StreamItem): string {
 	let raw: string;
 	switch (item.type) {
+		case 'human_message': raw = item.timestamp; break;
 		case 'turn': raw = item.turn.timestamp; break;
 		case 'gate': raw = item.gate.created_at; break;
 		case 'verification_gate': raw = item.gate.created_at; break;
@@ -678,8 +1093,17 @@ function getStreamItemTimestamp(item: StreamItem): string {
 		case 'intake_domain_transition': raw = item.timestamp; break;
 		case 'intake_gathering_complete': raw = item.timestamp; break;
 		case 'intake_analysis': raw = item.timestamp; break;
+		case 'intake_product_discovery': raw = item.timestamp; break;
+		case 'intake_proposer_domains': raw = item.timestamp; break;
+		case 'intake_proposer_journeys': raw = item.timestamp; break;
+		case 'intake_proposer_entities': raw = item.timestamp; break;
+		case 'intake_proposer_integrations': raw = item.timestamp; break;
 		case 'intake_proposal': raw = item.timestamp; break;
 		case 'qa_exchange': raw = item.timestamp; break;
+		case 'architecture_capabilities': raw = item.timestamp; break;
+		case 'architecture_design': raw = item.timestamp; break;
+		case 'architecture_validation': raw = item.timestamp; break;
+		case 'architecture_gate': raw = item.timestamp; break;
 		default: raw = ''; break;
 	}
 	return normalizeTimestamp(raw);
@@ -722,6 +1146,7 @@ function getStreamItemSortPriority(item: StreamItem): number {
 	switch (item.type) {
 		case 'milestone': return 0;
 		case 'dialogue_start': return 1;
+		case 'human_message': return 1.5;
 		case 'intake_turn': return 2;
 		case 'command_block': return 3;
 		case 'intake_plan_preview': return 4;
@@ -732,11 +1157,20 @@ function getStreamItemSortPriority(item: StreamItem): number {
 		case 'intake_approval_gate': return 8;
 		case 'intake_mode_selector': return 3;
 		case 'intake_analysis': return 1.5;    // After dialogue_start, before intake_turn
-		case 'intake_proposal': return 1.8;    // After analysis, before turns
+		case 'intake_product_discovery': return 1.6;  // After analysis, before proposal
+		case 'intake_proposer_domains': return 1.61;
+		case 'intake_proposer_journeys': return 1.62;
+		case 'intake_proposer_entities': return 1.63;
+		case 'intake_proposer_integrations': return 1.64;
+		case 'intake_proposal': return 1.8;    // After product discovery, before turns
 		case 'intake_domain_transition': return 5;
 		case 'intake_gathering_complete': return 6;
 		case 'intake_checkpoint': return 7;
 		case 'qa_exchange': return 4;
+		case 'architecture_capabilities': return 2;
+		case 'architecture_design': return 3;
+		case 'architecture_validation': return 4;
+		case 'architecture_gate': return 8;
 		case 'dialogue_end': return 9;
 		default: return 10;
 	}
@@ -755,6 +1189,33 @@ function sortStreamItemsByTimestamp(items: StreamItem[]): void {
 		// Tiebreaker: milestones/turns before command blocks at same timestamp
 		return getStreamItemSortPriority(a) - getStreamItemSortPriority(b);
 	});
+}
+
+/**
+ * Deduplicate architecture gates: when multiple unresolved gates exist for the same
+ * docId (from validation re-iterations or "Decompose Deeper"), only the latest one
+ * should be interactive. Earlier ones are marked as resolved/superseded to prevent
+ * duplicate MMP sections and double-counted progress.
+ */
+function deduplicateArchitectureGates(items: StreamItem[]): void {
+	// Collect indices of all unresolved architecture_gate items
+	const unresolvedIndices: number[] = [];
+	for (let i = 0; i < items.length; i++) {
+		if (items[i].type === 'architecture_gate') {
+			const gate = items[i] as Extract<StreamItem, { type: 'architecture_gate' }>;
+			if (!gate.resolved) {
+				unresolvedIndices.push(i);
+			}
+		}
+	}
+	// Mark all but the last unresolved gate as superseded
+	if (unresolvedIndices.length > 1) {
+		for (let k = 0; k < unresolvedIndices.length - 1; k++) {
+			const gate = items[unresolvedIndices[k]] as Extract<StreamItem, { type: 'architecture_gate' }>;
+			gate.resolved = true;
+			gate.resolvedAction = 'SUPERSEDED';
+		}
+	}
 }
 
 /**
@@ -782,6 +1243,7 @@ export function aggregateStreamState(activeDialogueId?: string): GovernedStreamS
 		phases: WORKFLOW_PHASES,
 		dialogueList: [],
 		intakeState: null,
+		architectureState: null,
 		humanFacingState: null,
 		taskGraphProgress: null,
 	};
@@ -874,6 +1336,9 @@ function aggregateFromDialogueRecords(
 		? buildMakerState(effectiveActiveId, currentPhase, openGates.length > 0, intakeState?.subState)
 		: null;
 
+	// Extract architecture sub-state from workflow metadata
+	const architectureState = extractArchitectureState(workflowState);
+
 	return {
 		activeDialogueId: effectiveActiveId,
 		sessionId: effectiveActiveId,
@@ -886,6 +1351,7 @@ function aggregateFromDialogueRecords(
 		phases: WORKFLOW_PHASES,
 		dialogueList,
 		intakeState,
+		architectureState,
 		humanFacingState: makerState?.humanFacingState ?? null,
 		taskGraphProgress: makerState?.taskGraphProgress ?? null,
 	};
@@ -898,15 +1364,15 @@ function aggregateLegacySingleDialogue(
 	dialogueId: string | undefined,
 	emptyState: GovernedStreamState
 ): GovernedStreamState {
-	const turnsResult = getDialogueTurns(
+	const eventsResult = getDialogueEvents(
 		dialogueId ? { dialogue_id: dialogueId, limit: 200 } : { limit: 200 }
 	);
-	if (!turnsResult.success || turnsResult.value.length === 0) {
+	if (!eventsResult.success || eventsResult.value.length === 0) {
 		return emptyState;
 	}
 
-	const turns = turnsResult.value;
-	const effectiveDialogueId = dialogueId ?? turns[0].dialogue_id;
+	const events = eventsResult.value;
+	const effectiveDialogueId = dialogueId ?? events[0].dialogue_id;
 
 	const claimsResult = getClaims({ dialogue_id: effectiveDialogueId });
 	const claims = claimsResult.success ? claimsResult.value : [];
@@ -926,16 +1392,18 @@ function aggregateLegacySingleDialogue(
 		currentPhase = workflowState.current_phase;
 	}
 
-	const turnItems = buildStreamItems(turns, claims, verdicts, allGates);
+	const eventItems = buildStreamItems(events, claims, verdicts, allGates);
 	const commandItems = buildCommandBlockItems(effectiveDialogueId);
 	const qaItems = buildQaExchangeItems(effectiveDialogueId);
 	const streamItems = mergeStreamItemsByTimestamp(
-		mergeStreamItemsByTimestamp(turnItems, commandItems), qaItems
+		mergeStreamItemsByTimestamp(eventItems, commandItems), qaItems
 	);
 	const claimHealth = computeClaimHealth(claims);
 
-	// Apply intake processing (filter audit turns, inject proper cards)
-	applyIntakeStreamProcessing(effectiveDialogueId, streamItems);
+	// Inject derived INTAKE cards from intake_conversations state
+	injectIntakeDerivedCards(effectiveDialogueId, streamItems);
+	sortStreamItemsByTimestamp(streamItems);
+	deduplicateArchitectureGates(streamItems);
 	const intakeState = buildIntakeState(effectiveDialogueId, currentPhase, streamItems);
 
 	// Build MAKER state
@@ -953,22 +1421,21 @@ function aggregateLegacySingleDialogue(
 		phases: WORKFLOW_PHASES,
 		dialogueList: [],
 		intakeState,
+		architectureState: extractArchitectureState(workflowState),
 		humanFacingState: makerState.humanFacingState,
 		taskGraphProgress: makerState.taskGraphProgress,
 	};
 }
 
 /**
- * Apply intake stream processing to a dialogue's stream items.
- * If the dialogue has intake conversation data, this:
- *   1. Filters out INTAKE-phase audit dialogue_turns (they duplicate richer intake cards)
- *   2. Injects proper intake_turn cards with per-version plan previews
- *   3. Appends a finalized-plan card if one exists
+ * Inject derived INTAKE cards from intake_conversations state.
+ * These cards are not backed by dialogue_events — they're computed from
+ * the intake conversation's metadata (mode selector, checkpoints,
+ * domain transitions, gathering-complete, approval gate).
  *
- * Called from buildDialogueStreamItems so it applies to ALL dialogues,
- * not just the active one.
+ * Called from buildDialogueStreamItems so it applies to ALL dialogues.
  */
-function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem[]): void {
+function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[]): void {
 	const convResult = getIntakeConversation(dialogueId);
 	if (!convResult.success || !convResult.value) {
 		return;
@@ -976,162 +1443,21 @@ function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem
 
 	const conv = convResult.value;
 
-	// Remove INTAKE-phase audit dialogue_turns — they are lightweight audit
-	// entries ({role, phase, content_ref}) with no message text. The richer
-	// intake_turn / intake_analysis cards replace them with full content.
-	for (let i = streamItems.length - 1; i >= 0; i--) {
-		const item = streamItems[i];
-		if (item.type === 'turn' && item.turn.phase === Phase.INTAKE) {
-			streamItems.splice(i, 1);
-		}
-	}
-
-	// Inject intake turn cards with associated command blocks embedded inside.
-	// Each intake turn is persisted AFTER its CLI command completes, so its
-	// createdAt is later than the command_block started_at. We:
-	//   1. Associate command_blocks with the intake turn they belong to
-	//   2. Embed them in the intake_turn StreamItem (rendered between human/expert)
-	//   3. Remove them from the main stream to avoid duplication
-	//   4. Adjust the intake_turn timestamp to the earliest associated command_block
-	const turnsResult = getIntakeTurns(dialogueId);
-	let lastPlanVersion = 0;
-	let firstIntakeTurnTimestamp: string | null = null;
-	if (turnsResult.success) {
-		// Collect command_block items sorted chronologically
-		const cmdBlockItems = streamItems
-			.filter((item): item is Extract<StreamItem, { type: 'command_block' }> => item.type === 'command_block')
-			.sort((a, b) => normalizeTimestamp(a.command.started_at).localeCompare(normalizeTimestamp(b.command.started_at)));
-
-		// Track which command_block IDs are consumed by intake turns
-		const consumedCommandIds = new Set<string>();
-
-		let previousTurnNormalized = '';
-		for (const turn of turnsResult.value) {
-			const normalizedTurnTs = normalizeTimestamp(turn.createdAt);
-
-			// Find command_blocks between the previous turn and this turn
-			const associatedCmds = cmdBlockItems.filter((cmd) => {
-				const cmdTs = normalizeTimestamp(cmd.command.started_at);
-				return cmdTs < normalizedTurnTs &&
-					(!previousTurnNormalized || cmdTs > previousTurnNormalized) &&
-					!consumedCommandIds.has(cmd.command.command_id);
-			});
-			for (const cmd of associatedCmds) {
-				consumedCommandIds.add(cmd.command.command_id);
-			}
-
-			// Use the earliest associated command_block timestamp for ordering
-			const effectiveTimestamp = associatedCmds.length > 0
-				? associatedCmds[0].command.started_at
-				: turn.createdAt;
-
-			if (!firstIntakeTurnTimestamp) {
-				firstIntakeTurnTimestamp = effectiveTimestamp;
-			}
-
-			// Build the embedded command block data
-			const embeddedBlocks = associatedCmds.map((cmd) => ({
-				command: cmd.command,
-				outputs: cmd.outputs,
-			}));
-
-			// Check if this is an analysis turn (inverted flow)
-			if (isAnalysisResponse(turn.expertResponse)) {
-				const analysis = turn.expertResponse;
-				streamItems.push({
-					type: 'intake_analysis',
-					humanMessage: turn.humanMessage,
-					analysisSummary: analysis.analysisSummary,
-					codebaseFindings: analysis.codebaseFindings ?? [],
-					domainAssessment: analysis.domainAssessment ?? [],
-					timestamp: effectiveTimestamp,
-					commandBlocks: embeddedBlocks.length > 0 ? embeddedBlocks : undefined,
-				});
-				// Add proposal card derived from the analysis
-				const plan = analysis.initialPlan;
-				if (plan) {
-					const coverage = conv.domainCoverage;
-					let adequate = 0, partial = 0, none = 0;
-					if (coverage) {
-						for (const domain of DOMAIN_SEQUENCE) {
-							switch (coverage[domain]?.level) {
-								case DomainCoverageLevel.ADEQUATE: adequate++; break;
-								case DomainCoverageLevel.PARTIAL: partial++; break;
-								default: none++; break;
-							}
-						}
-					}
-					const total = DOMAIN_SEQUENCE.length;
-					const percentage = Math.round(((adequate * 100) + (partial * 50)) / total);
-					streamItems.push({
-						type: 'intake_proposal',
-						title: plan.title,
-						summary: plan.summary,
-						proposedApproach: plan.proposedApproach,
-						domainCoverage: { adequate, partial, none, percentage },
-						timestamp: turn.createdAt,
-					});
-					lastPlanVersion = plan.version;
-				}
-			} else {
-				streamItems.push({
-					type: 'intake_turn',
-					turn,
-					timestamp: effectiveTimestamp,
-					commandBlocks: embeddedBlocks.length > 0 ? embeddedBlocks : undefined,
-				});
-
-				const turnPlanVersion = turn.planSnapshot?.version ?? 0;
-				// Skip plan preview for gathering turns (version 0) or unchanged versions
-				if (turnPlanVersion > 0 && turnPlanVersion !== lastPlanVersion) {
-					streamItems.push({
-						type: 'intake_plan_preview',
-						plan: turn.planSnapshot,
-						isFinal: false,
-						timestamp: turn.createdAt,
-					});
-					lastPlanVersion = turnPlanVersion;
-				}
-			}
-
-			previousTurnNormalized = normalizedTurnTs;
-		}
-
-		// Remove consumed command_blocks from the main stream
-		if (consumedCommandIds.size > 0) {
-			for (let i = streamItems.length - 1; i >= 0; i--) {
-				const item = streamItems[i];
-				if (item.type === 'command_block' && consumedCommandIds.has(item.command.command_id)) {
-					streamItems.splice(i, 1);
-				}
+	// Find earliest INTAKE content timestamp for ordering derived cards
+	let firstIntakeTimestamp: string | null = null;
+	for (const item of streamItems) {
+		if (item.type === 'intake_turn' || item.type === 'intake_analysis' || item.type === 'human_message') {
+			const ts = item.timestamp;
+			if (!firstIntakeTimestamp || normalizeTimestamp(ts) < normalizeTimestamp(firstIntakeTimestamp)) {
+				firstIntakeTimestamp = ts;
 			}
 		}
-	}
-
-	// Fix INTAKE milestone timestamp to sort before all INTAKE content.
-	if (firstIntakeTurnTimestamp) {
-		for (const item of streamItems) {
-			if (item.type === 'milestone' && item.phase === Phase.INTAKE) {
-				item.timestamp = firstIntakeTurnTimestamp;
-			}
-		}
-	}
-
-	// Append finalized plan if it differs from the last draft version
-	if (conv.finalizedPlan && conv.finalizedPlan.version !== lastPlanVersion) {
-		streamItems.push({
-			type: 'intake_plan_preview',
-			plan: conv.finalizedPlan,
-			isFinal: true,
-			timestamp: conv.updatedAt,
-		});
 	}
 
 	// Inject mode selector card if classifier result exists
 	if (conv.classifierResult) {
 		const isResolved = !!conv.intakeMode;
-		// Use the earliest intake content timestamp for ordering
-		const selectorTimestamp = firstIntakeTurnTimestamp || conv.createdAt;
+		const selectorTimestamp = firstIntakeTimestamp || conv.createdAt;
 		streamItems.push({
 			type: 'intake_mode_selector',
 			recommendation: conv.classifierResult,
@@ -1153,70 +1479,64 @@ function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem
 		}
 	}
 
-	// Inject domain transition and gathering-complete cards from gathering turn data
-	if (turnsResult.success) {
-		const gatheringTurns = turnsResult.value.filter(
-			(t) => isGatheringResponse(t.expertResponse),
-		);
-
-		// Domain transitions: detect consecutive gathering turns with different focusDomain
-		for (let gi = 1; gi < gatheringTurns.length; gi++) {
-			const prev = gatheringTurns[gi - 1].expertResponse as IntakeGatheringTurnResponse;
-			const curr = gatheringTurns[gi].expertResponse as IntakeGatheringTurnResponse;
-			// Normalize domain strings to canonical enum values for comparison
-			const prevResolved = resolveDomainEnum(prev.focusDomain);
-			const currResolved = resolveDomainEnum(curr.focusDomain);
+	// Inject domain transition cards from consecutive gathering turns in the stream
+	const gatheringItems = streamItems.filter(
+		(item): item is Extract<StreamItem, { type: 'intake_turn' }> =>
+			item.type === 'intake_turn' && (item.turn.isGathering ?? false)
+	);
+	for (let gi = 1; gi < gatheringItems.length; gi++) {
+		const prevResp = gatheringItems[gi - 1].turn.expertResponse;
+		const currResp = gatheringItems[gi].turn.expertResponse;
+		if (prevResp && currResp && isGatheringResponse(prevResp) && isGatheringResponse(currResp)) {
+			const prevResolved = resolveDomainEnum(prevResp.focusDomain);
+			const currResolved = resolveDomainEnum(currResp.focusDomain);
 			if (prevResolved !== currResolved) {
 				const fromInfo = prevResolved ? DOMAIN_INFO[prevResolved] : undefined;
 				const toInfo = currResolved ? DOMAIN_INFO[currResolved] : undefined;
 				streamItems.push({
 					type: 'intake_domain_transition',
-					fromDomain: prev.focusDomain,
-					fromLabel: fromInfo?.label ?? prev.focusDomain,
-					toDomain: curr.focusDomain,
-					toLabel: toInfo?.label ?? curr.focusDomain,
+					fromDomain: prevResp.focusDomain,
+					fromLabel: fromInfo?.label ?? prevResp.focusDomain,
+					toDomain: currResp.focusDomain,
+					toLabel: toInfo?.label ?? currResp.focusDomain,
 					toDescription: toInfo?.description ?? null,
-					timestamp: gatheringTurns[gi].createdAt,
+					timestamp: gatheringItems[gi].timestamp,
 				});
 			}
 		}
-
-		// Gathering complete: if there are gathering turns and subState advanced past GATHERING
-		if (gatheringTurns.length > 0 && conv.subState !== IntakeSubState.GATHERING) {
-			const coverage = conv.domainCoverage;
-			let adequate = 0;
-			let partial = 0;
-			let none = 0;
-			if (coverage) {
-				for (const domain of DOMAIN_SEQUENCE) {
-					switch (coverage[domain].level) {
-						case DomainCoverageLevel.ADEQUATE: adequate++; break;
-						case DomainCoverageLevel.PARTIAL: partial++; break;
-						default: none++; break;
-					}
-				}
-			}
-			const total = DOMAIN_SEQUENCE.length;
-			const percentage = Math.round(((adequate * 100) + (partial * 50)) / total);
-			streamItems.push({
-				type: 'intake_gathering_complete',
-				coverageSummary: { adequate, partial, none, percentage },
-				intakeMode: conv.intakeMode ?? null,
-				timestamp: gatheringTurns[gatheringTurns.length - 1].createdAt,
-			});
-		}
 	}
 
-	// Inject approval gate as a persistent stream artifact:
-	// - AWAITING_APPROVAL: active card with approve/continue buttons
-	// - DISCUSSING with finalized plan: user chose "Continue Discussing" → resolved
-	// - Phase past INTAKE: plan was approved → resolved
+	// Gathering complete: if there are gathering turns and subState advanced past GATHERING
+	if (gatheringItems.length > 0 && conv.subState !== IntakeSubState.GATHERING) {
+		const coverage = conv.domainCoverage;
+		let adequate = 0;
+		let partial = 0;
+		let none = 0;
+		if (coverage) {
+			for (const domain of DOMAIN_SEQUENCE) {
+				switch (coverage[domain]?.level) {
+					case DomainCoverageLevel.ADEQUATE: adequate++; break;
+					case DomainCoverageLevel.PARTIAL: partial++; break;
+					default: none++; break;
+				}
+			}
+		}
+		const total = DOMAIN_SEQUENCE.length;
+		const percentage = Math.round(((adequate * 100) + (partial * 50)) / total);
+		streamItems.push({
+			type: 'intake_gathering_complete',
+			coverageSummary: { adequate, partial, none, percentage },
+			intakeMode: conv.intakeMode ?? null,
+			timestamp: gatheringItems.at(-1)!.timestamp,
+		});
+	}
+
+	// Inject approval gate as a persistent stream artifact
 	if (conv.finalizedPlan) {
 		const wsResult = getWorkflowState(dialogueId);
 		const currentPhase = wsResult.success ? wsResult.value.current_phase : Phase.INTAKE;
 
 		if (conv.subState === IntakeSubState.AWAITING_APPROVAL) {
-			// Active: awaiting user decision
 			streamItems.push({
 				type: 'intake_approval_gate',
 				plan: conv.finalizedPlan,
@@ -1224,7 +1544,6 @@ function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem
 				timestamp: conv.updatedAt,
 			});
 		} else if (currentPhase !== Phase.INTAKE) {
-			// Phase has moved past INTAKE → plan was approved
 			streamItems.push({
 				type: 'intake_approval_gate',
 				plan: conv.finalizedPlan,
@@ -1234,7 +1553,6 @@ function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem
 				resolvedAction: 'Approved',
 			});
 		} else if (conv.subState === IntakeSubState.DISCUSSING) {
-			// Back to discussing after seeing the finalized plan → user chose to continue
 			streamItems.push({
 				type: 'intake_approval_gate',
 				plan: conv.finalizedPlan,
@@ -1243,6 +1561,42 @@ function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem
 				resolved: true,
 				resolvedAction: 'Continued Discussing',
 			});
+		}
+	}
+
+	// Compute isLatest for the last intake_turn: only interactive when workflow
+	// is in INTAKE phase AND conversation subState expects user input
+	const wsResult2 = getWorkflowState(dialogueId);
+	const phase = wsResult2.success ? wsResult2.value.current_phase : Phase.INTAKE;
+	const awaitingInput = phase === Phase.INTAKE && (
+		conv.subState === IntakeSubState.DISCUSSING ||
+		conv.subState === IntakeSubState.CLARIFYING ||
+		conv.subState === IntakeSubState.PROPOSING ||
+		conv.subState === IntakeSubState.GATHERING ||
+		conv.subState === IntakeSubState.PRODUCT_REVIEW
+	);
+
+	// During proposer rounds or PRODUCT_REVIEW, hide the technical proposal
+	// and old product discovery card. The proposer cards replace them.
+	// The intake_analysis card (homework) stays visible.
+	const isProposerActive = conv.subState === IntakeSubState.PRODUCT_REVIEW
+		|| conv.subState === IntakeSubState.PROPOSING_DOMAINS
+		|| conv.subState === IntakeSubState.PROPOSING_JOURNEYS
+		|| conv.subState === IntakeSubState.PROPOSING_ENTITIES
+		|| conv.subState === IntakeSubState.PROPOSING_INTEGRATIONS;
+
+	if (isProposerActive) {
+		for (let i = streamItems.length - 1; i >= 0; i--) {
+			const t = streamItems[i].type;
+			if (t === 'intake_proposal' || t === 'intake_product_discovery') {
+				streamItems.splice(i, 1);
+			}
+		}
+	}
+	for (let i = streamItems.length - 1; i >= 0; i--) {
+		if (streamItems[i].type === 'intake_turn') {
+			(streamItems[i] as Extract<StreamItem, { type: 'intake_turn' }>).isLatest = awaitingInput;
+			break;
 		}
 	}
 }
@@ -1277,6 +1631,27 @@ function buildIntakeState(
 		currentDomain: conv.currentDomain ?? null,
 		intakeMode: conv.intakeMode ?? null,
 	};
+}
+
+/**
+ * Extract architecture sub-state from workflow metadata.
+ * Returns null if not in ARCHITECTURE phase or metadata is missing.
+ */
+function extractArchitectureState(
+	workflowState: WorkflowState | null
+): GovernedStreamState['architectureState'] {
+	if (!workflowState) return null;
+	try {
+		const meta = workflowState.metadata ? JSON.parse(workflowState.metadata) : null;
+		if (!meta?.architectureSubState) return null;
+		return {
+			subState: meta.architectureSubState,
+			validationAttempts: meta.validationAttempts ?? 0,
+			maxValidationAttempts: meta.maxValidationAttempts ?? 2,
+			designIterations: meta.designIterations ?? 0,
+			decompositionDepth: meta.decompositionDepth ?? 0,
+		};
+	} catch { return null; }
 }
 
 /**
@@ -1332,4 +1707,151 @@ function buildMakerState(
 	});
 
 	return { humanFacingState, taskGraphProgress };
+}
+
+// ==================== REVIEW MMP SYNTHESIS ====================
+
+/**
+ * Synthesize review findings into an MMP payload for the review gate.
+ * - needs_decision items → Pre-Mortem (critical risks)
+ * - awareness items → Menu (with accept-as-is / add-safeguard / block options)
+ * - all_clear items → Mirror (confirmed assumptions, read-only)
+ */
+export function synthesizeReviewMMP(
+	reviewItems: ReviewItem[],
+	summary: ReviewSummary,
+	historianFindings: string[],
+): MMPPayload | undefined {
+	const mirrorItems: MirrorItem[] = [];
+	const menuItems: MenuItem[] = [];
+	const preMortemItems: PreMortemItem[] = [];
+
+	let mirrorIdx = 0;
+	let menuIdx = 0;
+	let pmIdx = 0;
+
+	for (const item of reviewItems) {
+		const claimText = item.claim?.statement ?? item.findingText ?? '';
+		const verdictStatus = item.verdict?.verdict ?? item.claim?.status ?? '';
+		const rationale = item.verdict?.rationale ?? item.categoryReason;
+
+		switch (item.category) {
+			case 'all_clear': {
+				mirrorIdx++;
+				const mirId = item.claim?.claim_id
+					? `REV-MIR-${item.claim.claim_id}`
+					: `REV-MIR-${mirrorIdx}`;
+				mirrorItems.push({
+					id: mirId,
+					text: claimText,
+					category: 'intent',
+					rationale: rationale || `Verified by ${verdictStatus}`,
+					status: 'accepted', // Pre-accepted (confirmed)
+				});
+				break;
+			}
+
+			case 'awareness': {
+				menuIdx++;
+				const menuId = item.claim?.claim_id
+					? `REV-MENU-${item.claim.claim_id}`
+					: `REV-MENU-${menuIdx}`;
+				const options: MenuOption[] = [
+					{
+						optionId: `${menuId}-A`,
+						label: 'Accept as-is',
+						description: 'Proceed despite the uncertainty',
+						tradeoffs: 'Risk remains unmitigated',
+						recommended: true,
+					},
+					{
+						optionId: `${menuId}-B`,
+						label: 'Add safeguard',
+						description: 'Add a verification step or fallback',
+						tradeoffs: 'Additional implementation effort',
+					},
+					{
+						optionId: `${menuId}-C`,
+						label: 'Block on this',
+						description: 'Do not proceed until resolved',
+						tradeoffs: 'Delays the workflow',
+					},
+				];
+				menuItems.push({
+					id: menuId,
+					question: claimText,
+					context: rationale || `Status: ${verdictStatus}`,
+					options,
+				});
+				break;
+			}
+
+			case 'needs_decision': {
+				pmIdx++;
+				const pmId = item.claim?.claim_id
+					? `REV-RISK-${item.claim.claim_id}`
+					: `REV-RISK-FINDING-${pmIdx}`;
+				const isNovelDep = item.verdict?.novel_dependency === true;
+				const severity = isNovelDep ? 'medium' as const
+					: verdictStatus === 'DISPROVED' ? 'critical' as const
+					: verdictStatus === 'UNKNOWN' ? 'high' as const
+					: 'medium' as const;
+				const failureScenario = isNovelDep
+					? 'New dependency not currently in the project. Adopting carries risk: maintenance burden, security surface, learning curve, and potential lock-in.'
+					: rationale || `This claim is ${verdictStatus.toLowerCase()} and requires your attention`;
+				const mitigation = isNovelDep
+					? 'Evaluate whether the benefits justify adding this to your stack. Consider alternatives already in use.'
+					: undefined;
+				preMortemItems.push({
+					id: pmId,
+					assumption: claimText,
+					failureScenario,
+					severity,
+					mitigation,
+					status: 'pending',
+				});
+				break;
+			}
+		}
+	}
+
+	// Add historian findings as pre-mortem items
+	for (const finding of historianFindings) {
+		pmIdx++;
+		preMortemItems.push({
+			id: `REV-HIST-${pmIdx}`,
+			assumption: finding,
+			failureScenario: 'Historical analysis identified this concern',
+			severity: 'medium',
+			mitigation: 'Review the finding and decide whether to proceed',
+			status: 'pending',
+		});
+	}
+
+	// Only return MMP if we have items beyond the read-only mirror
+	if (menuItems.length === 0 && preMortemItems.length === 0 && mirrorItems.length === 0) {
+		return undefined;
+	}
+
+	const result: MMPPayload = {};
+
+	if (mirrorItems.length > 0) {
+		result.mirror = {
+			steelMan: `${summary.verified} claims verified, ${summary.disproved + summary.unknown} need attention`,
+			items: mirrorItems.slice(0, 10), // Cap at 10 to keep UI manageable
+		};
+	}
+
+	if (menuItems.length > 0) {
+		result.menu = { items: menuItems.slice(0, 5) };
+	}
+
+	if (preMortemItems.length > 0) {
+		result.preMortem = {
+			summary: `${preMortemItems.length} item(s) require your decision before proceeding`,
+			items: preMortemItems,
+		};
+	}
+
+	return result;
 }

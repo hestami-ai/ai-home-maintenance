@@ -59,6 +59,13 @@ export enum TransitionTrigger {
 	REPAIR_ATTEMPT = 'REPAIR_ATTEMPT', // Bounded repair attempted
 	REPAIR_ESCALATED = 'REPAIR_ESCALATED', // Repair escalated to human
 	GRAPH_COMPLETE = 'GRAPH_COMPLETE', // All task units complete
+	// Architecture phase triggers
+	ARCHITECTURE_DECOMPOSED = 'ARCHITECTURE_DECOMPOSED', // Capabilities + workflows produced
+	ARCHITECTURE_DESIGNED = 'ARCHITECTURE_DESIGNED', // Components + interfaces designed
+	ARCHITECTURE_VALIDATED = 'ARCHITECTURE_VALIDATED', // Goal alignment + structural checks passed
+	ARCHITECTURE_APPROVED = 'ARCHITECTURE_APPROVED', // Human approved the architecture
+	ARCHITECTURE_REVISION = 'ARCHITECTURE_REVISION', // Human requested changes
+	ARCHITECTURE_SKIPPED = 'ARCHITECTURE_SKIPPED', // Human chose to skip architecture
 }
 
 /**
@@ -83,6 +90,8 @@ export interface StateMetadata {
 	cachedRawCliOutput?: string;
 	/** Which phase last failed — signals retry should attempt cache re-parse first */
 	lastFailedPhase?: string;
+	/** Step-level checkpoint for resume within a phase */
+	phaseCheckpoint?: import('./phaseRunner').PhaseCheckpoint;
 	// MAKER metadata
 	graph_id?: string;
 	current_unit_id?: string;
@@ -97,7 +106,8 @@ export interface StateMetadata {
  * Defines the allowed state transition graph
  */
 const VALID_TRANSITIONS: Record<Phase, Phase[]> = {
-	[Phase.INTAKE]: [Phase.INTAKE, Phase.PROPOSE],
+	[Phase.INTAKE]: [Phase.INTAKE, Phase.ARCHITECTURE],
+	[Phase.ARCHITECTURE]: [Phase.ARCHITECTURE, Phase.PROPOSE, Phase.REPLAN],
 	[Phase.PROPOSE]: [Phase.ASSUMPTION_SURFACING, Phase.REPLAN],
 	[Phase.ASSUMPTION_SURFACING]: [Phase.VERIFY, Phase.REPLAN],
 	[Phase.VERIFY]: [Phase.HISTORICAL_CHECK, Phase.REVIEW, Phase.REPLAN],

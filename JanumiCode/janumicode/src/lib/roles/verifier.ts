@@ -15,6 +15,8 @@ import { buildVerifierContext, formatVerifierContext } from '../context';
 import { getDatabase } from '../database';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
+import type { CLIActivityEvent } from '../cli/types';
+import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { randomUUID } from 'node:crypto';
 import { nanoid } from 'nanoid';
 import { getLogger, isLoggerInitialized } from '../logging';
@@ -32,6 +34,7 @@ export interface VerifierInvocationOptions {
 	includeHistoricalVerdicts?: boolean;
 	checkForContradictions?: boolean;
 	commandId?: string;
+	onEvent?: (event: CLIActivityEvent) => void;
 }
 
 /**
@@ -75,6 +78,8 @@ export interface VerifierResponse {
 	claim_scope?: ClaimScopeClassification;
 	/** Whether the claim is too broad for verification and should be decomposed */
 	decompose_required?: boolean;
+	/** Whether this claim involves a technology/library not currently in the project */
+	novel_dependency?: boolean;
 	raw_response: string;
 }
 
@@ -110,6 +115,12 @@ const VERIFIER_SYSTEM_PROMPT = `You are the VERIFIER role in the JanumiCode auto
 - Test assumptions rigorously
 - Look for edge cases and exceptions
 - Be skeptical - claims are OPEN until proven
+
+## Web Research for Unfamiliar Technologies
+- When you encounter a technology, library, framework, or tool you don't have authoritative knowledge about, use WebSearch and WebFetch to research it
+- Official documentation, project repositories, and well-known technical references count as AUTHORITATIVE evidence
+- Technical blogs, high-vote Stack Overflow answers count as SUPPORTING evidence
+- If web research is inconclusive, the verdict remains UNKNOWN — do NOT fabricate findings
 
 # Verdict Criteria
 
@@ -164,7 +175,8 @@ Your response MUST be valid JSON with this exact structure:
   "constraints_ref": "Constraint manifest reference (if applicable)",
   "evidence_ref": "Primary evidence reference (if available)",
   "claim_scope": "ATOMIC" | "COMPOSITE" | "VAGUE",
-  "decompose_required": false
+  "decompose_required": false,
+  "novel_dependency": false
 }
 \`\`\`
 
@@ -187,7 +199,21 @@ Classify each claim's scope to help the workflow determine decomposition quality
 - **COMPOSITE**: Multiple assertions bundled together (e.g., "the auth system handles login, signup, and password reset correctly")
 - **VAGUE**: Too imprecise to verify meaningfully (e.g., "the code is good" or "performance is acceptable")
 
-Set "decompose_required" to true if the claim is COMPOSITE or VAGUE and cannot be meaningfully verified as a single unit. This signals that the claim should be broken down into smaller, verifiable sub-claims.`;
+Set "decompose_required" to true if the claim is COMPOSITE or VAGUE and cannot be meaningfully verified as a single unit. This signals that the claim should be broken down into smaller, verifiable sub-claims.
+
+# Novel Dependency Detection
+
+When verifying a claim about a technology, library, framework, or tool:
+1. Determine whether this technology is ALREADY present in the workspace (package.json, imports, existing code, or prior dialogue history).
+2. If the technology is NOT currently used in the project and is being NEWLY recommended by the architecture or executor, set "novel_dependency" to true.
+3. If the technology IS already part of the project's existing stack, set "novel_dependency" to false.
+
+Examples of novel dependencies:
+- Architecture recommends "Better Auth" but the project currently uses a different auth library or none
+- Architecture recommends "Drizzle ORM" but the project uses Prisma
+- Architecture adds Redis to the stack when it's not currently used
+
+This flag does NOT affect the verdict — a novel dependency can still be VERIFIED. It signals that the human should approve adopting a new dependency.`;
 
 /**
  * Invoke Verifier agent
@@ -236,10 +262,10 @@ export async function invokeVerifier(
 			});
 		}
 
-		// Invoke via RoleCLIProvider (CLI tool or API adapter)
-		const cliResult = await options.provider.invoke({
+		const cliResult = await invokeRoleStreaming({
+			provider: options.provider,
 			stdinContent,
-			outputFormat: 'json',
+			onEvent: options.onEvent,
 		});
 
 		if (!cliResult.success) {
@@ -375,6 +401,7 @@ function parseVerifierResponse(rawResponse: string): Result<VerifierResponse> {
 			evidence_ref: parsed.evidence_ref,
 			claim_scope: claimScope,
 			decompose_required: parsed.decompose_required === true,
+			novel_dependency: parsed.novel_dependency === true,
 			raw_response: rawResponse,
 		};
 
@@ -547,15 +574,16 @@ export function storeVerdict(
 			constraints_ref: response.constraints_ref ?? null,
 			evidence_ref: response.evidence_ref ?? null,
 			rationale: response.rationale,
+			novel_dependency: response.novel_dependency ?? false,
 			timestamp: new Date().toISOString(),
 		};
 
 		db.prepare(
 			`
-			INSERT INTO verdicts (
+			INSERT OR IGNORE INTO verdicts (
 				verdict_id, claim_id, verdict, constraints_ref,
-				evidence_ref, rationale, timestamp
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
+				evidence_ref, rationale, novel_dependency, timestamp
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		`
 		).run(
 			verdict.verdict_id,
@@ -564,6 +592,7 @@ export function storeVerdict(
 			verdict.constraints_ref,
 			verdict.evidence_ref,
 			verdict.rationale,
+			verdict.novel_dependency ? 1 : 0,
 			verdict.timestamp
 		);
 

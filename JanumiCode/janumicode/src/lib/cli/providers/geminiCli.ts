@@ -76,7 +76,7 @@ export class GeminiCLIProvider implements RoleCLIProvider {
 			const outputFormat = options.outputFormat || 'json';
 
 			const args = buildGeminiArgs(outputFormat, options);
-			const raw = await spawnCLIWithStdin(geminiPath, args, cwd, timeout, options.stdinContent);
+			const raw = await spawnCLIWithStdin(geminiPath, args, cwd, timeout, options.stdinContent, options.signal);
 			const executionTime = Date.now() - startTime;
 
 			const parsed = parseGeminiOutput(raw.stdout, outputFormat);
@@ -142,7 +142,8 @@ export class GeminiCLIProvider implements RoleCLIProvider {
 					if (event) {
 						onEvent(event);
 					}
-				}
+				},
+				options.signal,
 			);
 
 			const executionTime = Date.now() - startTime;

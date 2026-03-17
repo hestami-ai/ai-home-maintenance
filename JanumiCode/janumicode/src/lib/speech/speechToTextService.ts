@@ -280,7 +280,7 @@ export class SpeechToTextService {
 			response_format: 'text',
 		});
 
-		const text = typeof result === 'string' ? result : result.text;
+		const text = typeof result === 'string' ? result : (result as { text: string }).text;
 		this._log('debug', 'Whisper API transcription complete', { textLength: text.length });
 		return text.trim();
 	}

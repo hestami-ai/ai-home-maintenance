@@ -130,7 +130,7 @@ export async function resolveProviderForUnit(
 ): Promise<Result<RoleCLIProvider>> {
 	try {
 		// Import routeTaskToProvider to avoid circular dependency at module level
-		const { routeTaskToProvider } = await import('../workflow/taskRouter');
+		const { routeTaskToProvider } = await import('../workflow/taskRouter.js');
 		const routeResult = await routeTaskToProvider(unit, profiles);
 
 		if (routeResult.success) {

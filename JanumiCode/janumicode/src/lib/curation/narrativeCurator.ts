@@ -15,9 +15,6 @@
 import {
 	CurationMode,
 	type NarrativeCuratorResponse,
-	type NarrativeMemory,
-	type DecisionTrace,
-	type OpenLoop,
 	type OpenLoopCategory,
 	type OpenLoopPriority,
 } from '../types/narrativeCurator';
@@ -390,10 +387,10 @@ function gatherCurationContext(
 		const turns = db
 			.prepare(
 				`
-				SELECT role, phase, speech_act, content_ref, timestamp
-				FROM dialogue_turns
+				SELECT role, phase, speech_act, summary, content, timestamp
+				FROM dialogue_events
 				WHERE dialogue_id = ?
-				ORDER BY turn_id ASC
+				ORDER BY event_id ASC
 				LIMIT ?
 			`
 			)
@@ -401,14 +398,15 @@ function gatherCurationContext(
 			role: string;
 			phase: string;
 			speech_act: string;
-			content_ref: string;
+			summary: string;
+			content: string | null;
 			timestamp: string;
 		}[];
 
 		if (turns.length > 0) {
-			let turnsSection = '# Dialogue Turns\n\n';
+			let turnsSection = '# Dialogue Events\n\n';
 			for (const turn of turns) {
-				let content = turn.content_ref;
+				let content = turn.content ?? turn.summary;
 				// Truncate very long content
 				if (content.length > 500) {
 					content = content.substring(0, 500) + '…';
@@ -502,31 +500,36 @@ function gatherCurationContext(
 			const intakeTurns = db
 				.prepare(
 					`
-					SELECT turn_number, human_message, expert_response
-					FROM intake_turns
+					SELECT event_id, summary, content, detail
+					FROM dialogue_events
 					WHERE dialogue_id = ?
-					ORDER BY turn_number ASC
+					  AND event_type IN ('intake_turn', 'intake_analysis', 'intake_clarification', 'intake_gathering')
+					ORDER BY event_id ASC
 					LIMIT 10
 				`
 				)
 				.all(dialogueId) as {
-				turn_number: number;
-				human_message: string;
-				expert_response: string;
+				event_id: number;
+				summary: string;
+				content: string | null;
+				detail: string | null;
 			}[];
 
 			if (intakeTurns.length > 0) {
 				let intakeSection = '# INTAKE Conversation Detail\n\n';
 				for (const t of intakeTurns) {
+					const detail = t.detail ? JSON.parse(t.detail) : {};
+					const humanMsg = detail.humanMessage ?? '';
 					const humanPreview =
-						t.human_message.length > 300
-							? t.human_message.substring(0, 300) + '…'
-							: t.human_message;
+						humanMsg.length > 300
+							? humanMsg.substring(0, 300) + '…'
+							: humanMsg;
+					const expertText = t.content ?? t.summary;
 					const expertPreview =
-						t.expert_response.length > 500
-							? t.expert_response.substring(0, 500) + '…'
-							: t.expert_response;
-					intakeSection += `## Turn ${t.turn_number}\n\nHuman: ${humanPreview}\n\nExpert: ${expertPreview}\n\n`;
+						expertText.length > 500
+							? expertText.substring(0, 500) + '…'
+							: expertText;
+					intakeSection += `## Event ${t.event_id}\n\nHuman: ${humanPreview}\n\nExpert: ${expertPreview}\n\n`;
 				}
 				sections.push(intakeSection);
 			}

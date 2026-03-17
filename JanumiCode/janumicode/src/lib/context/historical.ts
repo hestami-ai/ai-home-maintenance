@@ -9,7 +9,7 @@ import type {
 	Claim,
 	Verdict,
 	HumanDecision,
-	DialogueTurn,
+	DialogueEvent,
 } from '../types';
 import { getDatabase } from '../database/init';
 import { countTokens } from '../llm/tokenCounter';
@@ -63,7 +63,7 @@ export interface HistoricalContext {
 	claims: HistoricalItem<Claim>[];
 	verdicts: HistoricalItem<Verdict>[];
 	decisions: HistoricalItem<HumanDecision>[];
-	turns: HistoricalItem<DialogueTurn>[];
+	turns: HistoricalItem<DialogueEvent>[];
 	tokenCount: number;
 }
 
@@ -290,7 +290,7 @@ export function retrieveRelevantDecisions(
 export function retrieveTurnsByTimeWindow(
 	dialogueId: string,
 	options: HistoricalQueryOptions = {}
-): Result<HistoricalItem<DialogueTurn>[]> {
+): Result<HistoricalItem<DialogueEvent>[]> {
 	try {
 		const opts = { ...DEFAULT_OPTIONS, ...options };
 		const db = getDatabase();
@@ -312,9 +312,9 @@ export function retrieveTurnsByTimeWindow(
 		const turns = db
 			.prepare(
 				`
-				SELECT dt.turn_id, dt.dialogue_id, dt.role, dt.phase,
-				       dt.speech_act, dt.content_ref, dt.timestamp
-				FROM dialogue_turns dt
+				SELECT dt.event_id, dt.dialogue_id, dt.role, dt.phase,
+				       dt.speech_act, dt.summary, dt.content, dt.timestamp
+				FROM dialogue_events dt
 				WHERE 1=1
 				${timeConstraint}
 				${dialogueConstraint}
@@ -322,10 +322,24 @@ export function retrieveTurnsByTimeWindow(
 				LIMIT ?
 			`
 			)
-			.all(opts.limit || 10) as DialogueTurn[];
+			.all(opts.limit || 10) as Array<{
+			event_id: number; dialogue_id: string; role: string; phase: string;
+			speech_act: string; summary: string; content: string | null; timestamp: string;
+		}>;
 
 		const scoredTurns = turns.map((turn) => ({
-			item: turn,
+			item: {
+				event_id: turn.event_id,
+				dialogue_id: turn.dialogue_id,
+				event_type: 'legacy',
+				role: turn.role,
+				phase: turn.phase,
+				speech_act: turn.speech_act,
+				summary: turn.summary,
+				content: turn.content,
+				detail: null,
+				timestamp: turn.timestamp,
+			} as DialogueEvent,
 			relevanceScore: 1.0, // Temporal relevance
 			timestamp: turn.timestamp,
 			dialogueId: turn.dialogue_id,
