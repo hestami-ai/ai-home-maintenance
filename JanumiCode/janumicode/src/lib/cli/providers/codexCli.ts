@@ -242,8 +242,12 @@ function buildCodexArgs(options: RoleCLIInvocationOptions): string[] {
 		args.push('--output-schema', options.outputSchemaPath);
 	}
 
-	if (options.model) {
-		args.push('--model', options.model);
+	// Model: explicit option > VS Code setting > Codex CLI default
+	const model = options.model
+		|| vscode.workspace.getConfiguration('janumicode').get<string>('cli.codex.model', '')
+		|| '';
+	if (model) {
+		args.push('--model', model);
 	}
 
 	if (options.workingDirectory) {

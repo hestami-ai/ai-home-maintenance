@@ -61,6 +61,10 @@ const COMMAND_ALIASES: Record<string, string> = {
 	'navigate': 'navigate',
 	'jump': 'navigate',
 	'restart': 'navigate',
+	'adopt': 'adopt',
+	'use output': 'adopt',
+	'use-output': 'adopt',
+	'accept output': 'adopt',
 };
 
 /**

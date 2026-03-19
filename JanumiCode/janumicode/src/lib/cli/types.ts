@@ -100,6 +100,12 @@ export interface RoleCLIResult {
 
 	/** Raw CLI output (for debugging) */
 	rawOutput: string;
+
+	/** Warning message when CLI exited non-zero but produced a usable response */
+	warning?: string;
+
+	/** Reasoning review results (if reviewer is enabled and found concerns) */
+	reasoningReview?: import('../review/reviewTypes').ReasoningReview;
 }
 
 /**
@@ -194,6 +200,8 @@ export function buildStdinContent(systemPrompt: string, context: string): string
  */
 export function extractFinalResponseFromStream(rawOutput: string): string {
 	const lines = rawOutput.split('\n').filter((l) => l.trim());
+
+	// Pass 1: Look for explicit result/completion events (backward scan)
 	for (let i = lines.length - 1; i >= 0; i--) {
 		try {
 			const event = JSON.parse(lines[i]);
@@ -211,6 +219,22 @@ export function extractFinalResponseFromStream(rawOutput: string): string {
 			}
 		} catch { /* skip non-JSON lines */ }
 	}
-	// Fallback: return raw output stripped of obvious JSON noise
+
+	// Pass 2: Concatenate Gemini CLI assistant message events (forward scan)
+	// Gemini emits type:'message' with role:'assistant' for model output chunks
+	const messageChunks: string[] = [];
+	for (const line of lines) {
+		try {
+			const event = JSON.parse(line);
+			if (event.type === 'message' && event.role === 'assistant' && event.content) {
+				messageChunks.push(String(event.content));
+			}
+		} catch { /* skip non-JSON lines */ }
+	}
+	if (messageChunks.length > 0) {
+		return messageChunks.join('');
+	}
+
+	// Fallback: return raw output
 	return rawOutput;
 }

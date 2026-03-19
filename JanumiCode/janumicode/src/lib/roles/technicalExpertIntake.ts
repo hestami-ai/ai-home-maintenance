@@ -29,10 +29,9 @@ import type { RoleCLIResult, CLIActivityEvent } from '../cli/types';
 import { buildStdinContent } from '../cli/types';
 import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { getLogger, isLoggerInitialized } from '../logging';
-import {
-	buildIntakeTechnicalExpertContext,
-	formatIntakeTechnicalExpertContext,
-} from '../context';
+import { assembleContext } from '../context';
+import { Phase, Role as RoleEnum } from '../types';
+import { updateWorkflowMetadata } from '../workflow/stateMachine';
 
 /**
  * INTAKE Technical Expert invocation options
@@ -302,21 +301,25 @@ export async function invokeIntakeTechnicalExpert(
 	options: IntakeTechnicalExpertOptions
 ): Promise<Result<IntakeTurnResponse>> {
 	try {
-		// Build INTAKE-specific context
-		const contextResult = await buildIntakeTechnicalExpertContext({
+		// Assemble INTAKE context via Context Engineer
+		const contextResult = await assembleContext({
 			dialogueId: options.dialogueId,
-			humanMessage: options.humanMessage,
-			currentPlan: options.currentPlan,
-			turnNumber: options.turnNumber,
+			role: RoleEnum.TECHNICAL_EXPERT,
+			phase: Phase.INTAKE,
 			tokenBudget: options.tokenBudget,
+			extras: {
+				humanMessage: options.humanMessage,
+				currentPlan: options.currentPlan,
+				turnNumber: options.turnNumber,
+			},
+			onEvent: options.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult;
 		}
 
-		// Format context for CLI consumption
-		const formattedContext = formatIntakeTechnicalExpertContext(contextResult.value);
+		const formattedContext = contextResult.value.briefing;
 
 		// Build stdin: system prompt (with optional domain coverage context) + formatted context
 		const systemPrompt = buildModeAwareSystemPrompt(
@@ -342,6 +345,11 @@ export async function invokeIntakeTechnicalExpert(
 		if (!cliResult.success) {
 			return cliResult;
 		}
+
+		// Cache raw output BEFORE parsing — enables adopt/retry on parse failure
+		updateWorkflowMetadata(options.dialogueId, {
+			cachedRawCliOutput: cliResult.value.response,
+		});
 
 		// Parse response
 		const parseResult = parseIntakeTurnResponse(
@@ -390,21 +398,26 @@ export async function invokeIntakePlanSynthesis(
 	options: IntakePlanSynthesisOptions
 ): Promise<Result<IntakeTurnResponse>> {
 	try {
-		// Build context with full conversation history for synthesis
-		const contextResult = await buildIntakeTechnicalExpertContext({
+		// Assemble context with full conversation history for synthesis
+		const contextResult = await assembleContext({
 			dialogueId: options.dialogueId,
-			humanMessage: '[SYSTEM] Synthesize the conversation into a final structured plan.',
-			currentPlan: options.currentPlan,
-			turnNumber: -1, // Sentinel: synthesis mode
+			role: RoleEnum.TECHNICAL_EXPERT,
+			phase: Phase.INTAKE,
 			tokenBudget: options.tokenBudget,
-			synthesisMode: true,
+			extras: {
+				humanMessage: '[SYSTEM] Synthesize the conversation into a final structured plan.',
+				currentPlan: options.currentPlan,
+				turnNumber: -1,
+				synthesisMode: true,
+			},
+			onEvent: options.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult;
 		}
 
-		const formattedContext = formatIntakeTechnicalExpertContext(contextResult.value);
+		const formattedContext = contextResult.value.briefing;
 
 		const synthesisPrompt = options.domainCoverageContext
 			? `${INTAKE_SYNTHESIS_SYSTEM_PROMPT}\n\n# Domain Coverage Analysis\n\n${options.domainCoverageContext}\n\nEnsure the finalized plan addresses coverage gaps. For domains that were not discussed, add explicit open questions tagged with [Domain Gap: DomainName].`
@@ -871,6 +884,11 @@ export async function invokeAnalyzingTechnicalExpert(
 			return cliResult;
 		}
 
+		// Cache raw output BEFORE parsing — enables adopt/retry on parse failure
+		updateWorkflowMetadata(options.dialogueId, {
+			cachedRawCliOutput: cliResult.value.response,
+		});
+
 		return parseAnalysisTurnResponse(cliResult.value.response);
 	} catch (error) {
 		return {
@@ -917,7 +935,9 @@ function normalizeUserJourneys(
 			scenario: j.scenario ?? '',
 			steps,
 			acceptanceCriteria: Array.isArray(j.acceptanceCriteria) ? j.acceptanceCriteria : [],
-			priority: j.priority ?? 'MVP',
+			implementationPhase: j.implementationPhase ?? j.priority ?? undefined,
+			source: j.source ?? undefined,
+			priority: j.priority ?? j.implementationPhase ?? undefined,
 		};
 	});
 }
@@ -991,33 +1011,17 @@ function parseAnalysisTurnResponse(
 		if (isLoggerInitialized()) {
 			getLogger()
 				.child({ component: 'role:technicalExpertIntake:analyzing' })
-				.warn('Failed to parse analysis response as JSON, using graceful degradation', {
+				.warn('Failed to parse analysis response as JSON — returning failure (use "adopt" to manually recover)', {
 					rawResponseLength: rawResponse.length,
 				});
 		}
 
-		const cleanedResponse = extractReadableContent(rawResponse);
-		const now = new Date().toISOString();
-
 		return {
-			success: true,
-			value: {
-				analysisSummary: cleanedResponse,
-				initialPlan: {
-					version: 1,
-					title: 'Analysis Draft',
-					summary: cleanedResponse.substring(0, 500),
-					requirements: [],
-					decisions: [],
-					constraints: [],
-					openQuestions: [],
-					technicalNotes: [],
-					proposedApproach: '',
-					lastUpdatedAt: now,
-				},
-				codebaseFindings: [],
-				domainAssessment: [],
-			},
+			success: false,
+			error: new Error(
+				'Failed to parse INTAKE analysis response as JSON. ' +
+				'The raw output has been cached — type "use output" or "adopt" to manually inject it.'
+			),
 		};
 	}
 }
@@ -1543,18 +1547,12 @@ function parseIntakeTurnResponse(
 				});
 		}
 
-		const cleanedResponse = extractReadableContent(rawResponse);
-
 		return {
-			success: true,
-			value: {
-				conversationalResponse: cleanedResponse,
-				updatedPlan: {
-					...previousPlan,
-					version: previousPlan.version + 1,
-					lastUpdatedAt: new Date().toISOString(),
-				},
-			},
+			success: false,
+			error: new Error(
+				'Failed to parse INTAKE turn response as JSON. ' +
+				'The raw output has been cached — type "use output" or "adopt" to manually inject it.'
+			),
 		};
 	}
 }
@@ -1810,25 +1808,35 @@ const DOMAIN_PROPOSER_PROMPT = `You are a PRODUCT DOMAIN PROPOSER in an autonomo
 
 # Your Task
 
-The user has described a product they want to build. Your job is to propose the business domains and personas that this product should encompass.
+The user has described a product they want to build. Your job is to propose ALL business domains and personas that this product should encompass.
+
+This is a PRODUCT VISION phase — your goal is comprehensive domain coverage, not MVP scoping.
+The user will prune domains via Accept/Reject decisions. Do NOT pre-filter by importance.
 
 You must:
 1. Research the user's request using all available tools and resources — workspace files, documentation, and any other configured knowledge sources.
-2. Propose 8-15 business domains that are standard for this type of product.
+2. Propose ALL business domains that the product should encompass. Extract every domain from source documents and supplement with standard domains for this industry.
 3. For each domain, provide a name, description, why it's relevant, and preview of typical entities and workflows.
-4. Propose 3-6 personas/stakeholders who will interact with this system.
+4. Propose ALL personas/stakeholders who will interact with this system — end users, administrators, and any other actors.
 
 # Seed + Expand
-- Extract domains the user explicitly mentioned in their prompt.
+- Extract ALL domains the user explicitly mentioned or that appear in source documents.
 - Supplement with additional domains your research identifies as relevant for this industry.
 - If the workspace has existing code, note which domains are "already implemented" vs "proposed new" in the rationale.
 - Mark each domain's source: "user-specified", "codebase-existing", or "ai-proposed".
+
+# Critical Rules
+- PROPOSE EXPANSIVELY. The user will Accept/Reject each domain individually.
+- Do NOT exclude domains because they seem low priority or future scope. Propose them ALL.
+- If source documents describe implementation phases or pillars, note that in the rationale but still propose every domain.
 
 # Context
 The ANALYZING phase has already read the codebase and produced findings. Those findings are included below as context. Use them to inform your proposals.
 
 # Response Format
-Your response MUST be valid JSON:
+Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
+explanatory text before or after the JSON. Do NOT use markdown code fences.
+Return ONLY the JSON object:
 
 \`\`\`json
 {
@@ -1864,6 +1872,12 @@ export async function invokeProposerDomains(
 		// Build context from draft plan findings
 		const contextParts: string[] = [];
 		contextParts.push(`# User Request\n\n${options.humanMessage}`);
+
+		// Include human feedback if this is a re-run with refinement
+		const humanFeedback = (options.draftPlan as unknown as Record<string, unknown>).humanFeedback;
+		if (humanFeedback && typeof humanFeedback === 'string') {
+			contextParts.push(`# Human Feedback (MUST incorporate this guidance)\n\n${humanFeedback}`);
+		}
 
 		if (options.draftPlan.proposedApproach) {
 			contextParts.push(`# Analysis Findings\n\n${options.draftPlan.proposedApproach}`);
@@ -1915,15 +1929,46 @@ const JOURNEY_WORKFLOW_PROPOSER_PROMPT = `You are a PRODUCT JOURNEY & WORKFLOW P
 
 # Your Task
 
-The user's product has been scoped to specific business domains and personas. Your job is to propose user journeys and system workflows for the accepted domains.
+You have accepted business domains and personas. Your job is to propose ALL user journeys
+and system workflows that these domains could encompass.
 
-You must:
-1. For each accepted domain and persona, propose concrete user journeys — end-to-end flows from the user's perspective.
-2. For each accepted domain, propose system workflows — internal process flows.
-3. Use all available tools and resources to research — examine existing code for implemented workflows, complement what exists.
+# Approach: Research Then Generate
+
+Step 1 — RESEARCH: Study your inputs thoroughly before generating anything:
+- Read the accepted domains' descriptions, entity previews, and workflow previews
+- If source documents are available in the workspace, read them for detailed workflow descriptions
+- Draw on your knowledge of standard journeys for each domain type (e.g., an Accounting domain
+  typically has: invoice processing, payment reconciliation, reporting, audit trail, etc.)
+- Identify ALL personas and how they interact with each domain
+
+Step 2 — GENERATE: For each accepted domain, propose:
+- User journeys: end-to-end flows from a persona's perspective
+- System workflows: internal process automations
+
+# Critical Rules
+
+- PROPOSE EXPANSIVELY. Include every journey the product could reasonably support.
+  The user will prune via Accept/Reject decisions. Do NOT pre-filter.
+- Do NOT apply MVP thinking. Do NOT exclude journeys because they seem "low priority"
+  or "future scope." Propose them ALL and let the user decide.
+- Cover EVERY accepted domain. If a domain has no journeys, explain why.
+- Cover EVERY persona. Each persona should appear in their relevant journeys.
+- Tag each item with its source: "document-specified" (found in source docs),
+  "domain-standard" (typical for this domain type), or "ai-proposed" (your inference).
+
+# Phasing (informational, not filtering)
+
+If the source document specifies implementation phases, pillars, or release ordering,
+reflect that in the implementationPhase field. If user feedback specifies phasing, use that.
+Otherwise, suggest phasing based on domain reasoning.
+
+IMPORTANT: Phasing is metadata for the user's reference. It must NOT cause you to exclude
+any item. A "Phase 3" journey is still proposed — just tagged as Phase 3.
 
 # Response Format
-Your response MUST be valid JSON:
+Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
+explanatory text before or after the JSON. Do NOT use markdown code fences.
+Return ONLY the JSON object:
 
 \`\`\`json
 {
@@ -1937,7 +1982,8 @@ Your response MUST be valid JSON:
         { "stepNumber": 1, "actor": "Persona or System", "action": "What happens", "expectedOutcome": "Result" }
       ],
       "acceptanceCriteria": ["Measurable success condition"],
-      "priority": "MVP or V2 or FUTURE"
+      "implementationPhase": "Source document phasing if specified, otherwise suggested phase",
+      "source": "document-specified | domain-standard | ai-proposed"
     }
   ],
   "workflows": [
@@ -1948,7 +1994,8 @@ Your response MUST be valid JSON:
       "description": "What this workflow accomplishes",
       "steps": ["Step 1 description", "Step 2 description"],
       "triggers": ["What starts this workflow"],
-      "actors": ["Who participates"]
+      "actors": ["Who participates"],
+      "source": "document-specified | domain-standard | ai-proposed"
     }
   ]
 }
@@ -1963,6 +2010,12 @@ export async function invokeProposerJourneys(
 	try {
 		const contextParts: string[] = [];
 		contextParts.push(`# User Request\n\n${options.humanMessage}`);
+
+		// Include human feedback if present
+		const humanFeedback = (options.draftPlan as unknown as Record<string, unknown>).humanFeedback;
+		if (humanFeedback && typeof humanFeedback === 'string') {
+			contextParts.push(`# Human Feedback (MUST incorporate this guidance)\n\n${humanFeedback}`);
+		}
 
 		// Include accepted domains
 		const domains = options.draftPlan.domainProposals ?? [];
@@ -2013,15 +2066,32 @@ const ENTITY_PROPOSER_PROMPT = `You are a PRODUCT DATA MODEL PROPOSER in an auto
 
 # Your Task
 
-The user's product has accepted business domains and workflows. Your job is to propose the core data entities for each accepted domain.
+The user's product has accepted business domains and workflows. Your job is to propose ALL data entities needed by these domains.
 
-You must:
-1. For each accepted domain, propose the key data entities with attributes and relationships.
-2. Read existing schema files, migration scripts, ORM models in the workspace. Propose entities that extend what exists, not duplicate.
-3. Use all available tools and resources to research.
+# Approach: Research Then Generate
+
+Step 1 — RESEARCH:
+- Study the accepted domains, their workflows, and user journeys
+- Read existing schema files, migration scripts, ORM models in the workspace
+- Identify every data object that flows through the accepted workflows
+- Draw on domain knowledge for standard entities in each domain type
+
+Step 2 — GENERATE:
+- Propose entities that extend what exists in the codebase, not duplicate
+- Include core entities, junction/relationship tables, audit/history entities, and configuration entities
+- Tag each entity with its source: "document-specified", "codebase-existing", "domain-standard", or "ai-proposed"
+
+# Critical Rules
+
+- PROPOSE EXPANSIVELY. Include all entities the product would need across all accepted domains.
+  The user will prune via Accept/Reject. Do NOT pre-filter by MVP or priority.
+- Cover EVERY accepted domain with its relevant entities.
+- If a workflow involves data flow between domains, propose the junction entities.
 
 # Response Format
-Your response MUST be valid JSON:
+Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
+explanatory text before or after the JSON. Do NOT use markdown code fences.
+Return ONLY the JSON object:
 
 \`\`\`json
 {
@@ -2032,7 +2102,8 @@ Your response MUST be valid JSON:
       "name": "Entity Name",
       "description": "What this entity represents",
       "keyAttributes": ["attribute1", "attribute2"],
-      "relationships": ["belongs_to OtherEntity", "has_many Items"]
+      "relationships": ["belongs_to OtherEntity", "has_many Items"],
+      "source": "document-specified | codebase-existing | domain-standard | ai-proposed"
     }
   ]
 }
@@ -2047,6 +2118,11 @@ export async function invokeProposerEntities(
 	try {
 		const contextParts: string[] = [];
 		contextParts.push(`# User Request\n\n${options.humanMessage}`);
+
+		const humanFeedback = (options.draftPlan as unknown as Record<string, unknown>).humanFeedback;
+		if (humanFeedback && typeof humanFeedback === 'string') {
+			contextParts.push(`# Human Feedback (MUST incorporate this guidance)\n\n${humanFeedback}`);
+		}
 
 		const domains = options.draftPlan.domainProposals ?? [];
 		if (domains.length > 0) {
@@ -2092,17 +2168,33 @@ const INTEGRATION_PROPOSER_PROMPT = `You are a PRODUCT INTEGRATION & QUALITY PRO
 
 # Your Task
 
-The user's product has accepted business domains, entities, and workflows. Your job is to propose integrations with external systems and quality attributes.
+The user's product has accepted business domains, entities, and workflows. Your job is to propose ALL integrations with external systems and quality attributes.
 
-You must:
-1. Based on accepted domains and entities, propose standard integrations (payment, communication, IoT, ERP, identity, storage).
-2. For each integration, suggest providers, ownership model (owned/synced/delegated), and rationale.
-3. Check existing package.json/requirements.txt for installed integrations. Propose additional ones.
-4. Propose quality attributes (performance, security, compliance, scalability, etc.).
-5. Use all available tools and resources to research.
+# Approach: Research Then Generate
+
+Step 1 — RESEARCH:
+- Study the accepted domains, entities, and workflows
+- For each domain, identify what external systems it would interact with
+- Check existing package.json/requirements.txt for installed integrations
+- Draw on domain knowledge for standard integration patterns
+
+Step 2 — GENERATE:
+- Propose ALL integration points: internal (between domains) and external (third-party APIs, services)
+- For each integration, suggest providers, ownership model, and rationale
+- Propose quality attributes (performance, security, compliance, scalability, etc.)
+- Tag each with its source: "document-specified", "codebase-existing", "domain-standard", or "ai-proposed"
+
+# Critical Rules
+
+- PROPOSE EXPANSIVELY. Include all integrations the product could need.
+  The user will prune via Accept/Reject. Do NOT pre-filter by MVP or priority.
+- Cover EVERY accepted domain with its relevant integration points.
+- Include both obvious integrations (payment, auth) and domain-specific ones.
 
 # Response Format
-Your response MUST be valid JSON:
+Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
+explanatory text before or after the JSON. Do NOT use markdown code fences.
+Return ONLY the JSON object:
 
 \`\`\`json
 {
@@ -2114,7 +2206,8 @@ Your response MUST be valid JSON:
       "description": "What this integration provides",
       "standardProviders": ["Provider1", "Provider2"],
       "ownershipModel": "owned|synced|delegated",
-      "rationale": "Why this integration is needed"
+      "rationale": "Why this integration is needed",
+      "source": "document-specified | codebase-existing | domain-standard | ai-proposed"
     }
   ],
   "qualityAttributes": [
@@ -2132,6 +2225,11 @@ export async function invokeProposerIntegrations(
 	try {
 		const contextParts: string[] = [];
 		contextParts.push(`# User Request\n\n${options.humanMessage}`);
+
+		const humanFeedback = (options.draftPlan as unknown as Record<string, unknown>).humanFeedback;
+		if (humanFeedback && typeof humanFeedback === 'string') {
+			contextParts.push(`# Human Feedback (MUST incorporate this guidance)\n\n${humanFeedback}`);
+		}
 
 		const domains = options.draftPlan.domainProposals ?? [];
 		if (domains.length > 0) {

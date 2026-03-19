@@ -116,6 +116,7 @@ export type StreamItem =
 	| { type: 'intake_proposer_entities'; entities: Array<{ id: string; name: string; description: string; domainId: string; keyAttributes: string[]; relationships: string[] }>; domainNames?: Record<string, string>; mmpJson?: string; timestamp: string }
 	| { type: 'intake_proposer_integrations'; integrations: Array<{ id: string; name: string; category: string; description: string; standardProviders: string[]; ownershipModel: string }>; qualityAttributes: string[]; mmpJson?: string; timestamp: string }
 	| { type: 'qa_exchange'; question: string; answer: string; timestamp: string }
+	| { type: 'reasoning_review'; concerns: Array<{ severity: string; summary: string; detail: string; location: string; recommendation: string }>; overallAssessment: string; reviewerModel: string; timestamp: string }
 	// Architecture phase items
 	| { type: 'architecture_capabilities'; capabilities: Array<{ id: string; label: string; requirements: number; workflows: number; parentId: string | null }>; timestamp: string }
 	| { type: 'architecture_design'; components: Array<{ id: string; label: string; responsibility: string; rationale: string; parentId: string | null; workflowsServed: string[]; dependencies: string[]; interactionPatterns: string[]; technologyNotes: string; fileScope: string }>; dataModels: Array<{ id: string; entity: string; description: string; fields: Array<{ name: string; type: string; required: boolean }>; relationships: Array<{ targetModel: string; type: string; description: string }>; invariants: string[] }>; interfaces: Array<{ id: string; label: string; type: string; description: string; contract: string; providerComponent: string; consumerComponents: string[]; sourceWorkflows: string[] }>; implementationSequence: Array<{ id: string; label: string; description: string; componentsInvolved: string[]; dependencies: string[]; complexity: string; verificationMethod: string; sortOrder: number }>; timestamp: string }
@@ -315,6 +316,17 @@ function buildStreamItems(
 
 		// Route by event_type to produce appropriate StreamItem
 		const eventType = event.event_type;
+
+		// Skip legacy turns — these are duplicates of human_message events
+		// written by the old createAndAddTurn() path in dialogueOrchestrator.
+		if (eventType === 'legacy') {
+			continue;
+		}
+
+		// reasoning_review events are now rendered as command block outputs (not standalone)
+		if (eventType === 'reasoning_review') {
+			continue;
+		}
 
 		if (eventType === 'human_message') {
 			items.push({

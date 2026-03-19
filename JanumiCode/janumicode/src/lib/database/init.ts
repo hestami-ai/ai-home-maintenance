@@ -311,6 +311,14 @@ export function clearAllData(): Result<void> {
 				'arch_domain_mappings',       // FK → architecture_documents, arch_capabilities
 				'arch_capabilities',          // FK → architecture_documents
 				'architecture_documents',     // FK → dialogues
+				// Context handoff + generated docs
+				'handoff_documents',         // FK → dialogues
+				'generated_documents',       // FK → dialogues
+				'pending_mmp_decisions',     // FK → dialogues
+				// Clarification threads
+				'clarification_threads',     // FK → dialogues
+				// FTS
+				'fts_stream_content',
 				// Schema-managed tables (children before parents)
 				'embeddings',
 				'narrative_memories',

@@ -16,6 +16,9 @@ import type { Result } from '../types';
 import type { RoleCLIProvider } from './roleCLIProvider';
 import type { RoleCLIResult, RoleCLIInvocationOptions, CLIActivityEvent } from './types';
 import { extractFinalResponseFromStream } from './types';
+import { reviewAgentReasoning } from '../review/reasoningReviewer';
+import * as vscode from 'vscode';
+import { getActiveDialogue } from '../dialogue/lifecycle';
 
 /** No-op event handler for invocations that don't need event forwarding. */
 const noop: (event: CLIActivityEvent) => void = () => {};
@@ -57,6 +60,9 @@ export interface RoleInvokeOptions {
 
 	/** AbortSignal for cancellation. */
 	signal?: AbortSignal;
+
+	/** Dialogue ID — if provided, reasoning review concerns are stored as dialogue events. */
+	dialogueId?: string;
 }
 
 /**
@@ -97,18 +103,121 @@ export async function invokeRoleStreaming(
 	if (result.success) {
 		result.value.response = extractFinalResponseFromStream(result.value.rawOutput);
 
-		// Treat non-zero exit code as failure — the CLI process ran but the model
-		// encountered an error (e.g., token limit, tool failure, invalid output).
+		// Non-zero exit code handling:
+		// If the CLI exited with a non-zero code but produced a response that looks
+		// like actual model output (contains JSON), treat as soft failure.
+		// Hard-fail if the response is empty, too short, or looks like a CLI error message.
 		if (result.value.exitCode !== 0 && result.value.exitCode !== undefined) {
-			return {
-				success: false,
-				error: new Error(
-					`CLI exited with code ${result.value.exitCode}` +
-					(result.value.response ? `: ${result.value.response.substring(0, 200)}` : '')
-				),
-			};
+			const resp = (result.value.response ?? '').trim();
+			const looksLikeModelOutput = resp.length > 50 && resp.includes('{') && !isCliErrorMessage(resp);
+
+			if (looksLikeModelOutput) {
+				// Response looks like actual model output — return it with a warning flag
+				result.value.warning = `CLI exited with code ${result.value.exitCode} but produced a response`;
+			} else {
+				return {
+					success: false,
+					error: new Error(
+						`CLI exited with code ${result.value.exitCode}` +
+						(resp ? `: ${resp.substring(0, 200)}` : '')
+					),
+				};
+			}
+		}
+	}
+
+	// Run reasoning review on successful results (non-blocking — attached to result)
+	if (result.success && result.value.response) {
+		try {
+			const minSev = vscode?.workspace?.getConfiguration('janumicode')
+				?.get<string>('reasoningReviewer.minSeverity', 'MEDIUM') as import('../review/reviewTypes').ReviewSeverity | undefined;
+
+			const review = await reviewAgentReasoning({
+				rawStreamOutput: result.value.rawOutput,
+				finalResponse: result.value.response,
+				role: options.provider?.id,
+				minSeverity: minSev,
+			});
+			if (review?.hasConcerns) {
+				result.value.reasoningReview = review;
+
+				// Persist as a command output on the most recent running/completed command.
+				// This ensures the review renders alongside the command block it reviewed,
+				// not as a standalone event at an unpredictable position.
+				try {
+					const dialogueId = options.dialogueId ?? getActiveDialogueId();
+					if (dialogueId) {
+						const db = (await import('../database/init.js')).getDatabase();
+						if (db) {
+							const cmd = db.prepare(`
+								SELECT command_id FROM workflow_commands
+								WHERE dialogue_id = ?
+								ORDER BY started_at DESC LIMIT 1
+							`).get(dialogueId) as { command_id: string } | undefined;
+
+							if (cmd) {
+								const { appendCommandOutput } = await import('../workflow/commandStore.js');
+								appendCommandOutput(
+									cmd.command_id,
+									'reasoning_review' as import('../workflow/commandStore.js').WorkflowCommandOutput['line_type'],
+									JSON.stringify({
+										concerns: review.concerns,
+										overallAssessment: review.overallAssessment,
+										reviewerModel: review.reviewerModel,
+										durationMs: review.reviewDurationMs,
+									}),
+									new Date().toISOString(),
+								);
+							}
+						}
+					}
+				} catch { /* non-fatal */ }
+			}
+		} catch {
+			// Reviewer failure is non-fatal — don't block the workflow
 		}
 	}
 
 	return result;
+}
+
+/** Resolve the active dialogue ID from the database (fallback when callers don't pass it). */
+function getActiveDialogueId(): string | null {
+	try {
+		const result = getActiveDialogue();
+		return result.success && result.value ? result.value.dialogue_id : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Detect CLI error messages that should NOT be treated as model output.
+ * These are infrastructure errors from the CLI tool itself, not LLM responses.
+ */
+function isCliErrorMessage(text: string): boolean {
+	const lower = text.toLowerCase();
+	const errorPatterns = [
+		'usage limit',
+		'rate limit',
+		'quota exceeded',
+		'upgrade to pro',
+		'api key',
+		'authentication',
+		'unauthorized',
+		'forbidden',
+		'connection refused',
+		'network error',
+		'timed out',
+		'econnrefused',
+		'enotfound',
+		'certificate',
+		'ssl',
+		'permission denied',
+		'not found',
+		'internal server error',
+		'502 bad gateway',
+		'503 service unavailable',
+	];
+	return errorPatterns.some(pattern => lower.includes(pattern));
 }

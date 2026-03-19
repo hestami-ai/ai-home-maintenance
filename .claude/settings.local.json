@@ -58,7 +58,8 @@
       "Bash(sqlite3:*)",
       "Bash(pnpm install:*)",
       "Bash(npm run build:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(gemini --help)"
     ]
   }
 }

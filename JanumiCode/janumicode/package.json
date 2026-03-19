@@ -180,6 +180,86 @@
           "default": "gemini-3.0-flash",
           "description": "Model name for Historian-Interpreter role"
         },
+        "janumicode.cli.roles.executor": {
+          "type": "string",
+          "enum": [
+            "claude-code",
+            "codex-cli",
+            "gemini-cli"
+          ],
+          "default": "claude-code",
+          "description": "CLI tool for Executor role (code generation, task execution)"
+        },
+        "janumicode.cli.roles.technicalExpert": {
+          "type": "string",
+          "enum": [
+            "claude-code",
+            "codex-cli",
+            "gemini-cli"
+          ],
+          "default": "codex-cli",
+          "description": "CLI tool for Technical Expert role (analysis, architecture, intake)"
+        },
+        "janumicode.cli.roles.verifier": {
+          "type": "string",
+          "enum": [
+            "claude-code",
+            "codex-cli",
+            "gemini-cli"
+          ],
+          "default": "gemini-cli",
+          "description": "CLI tool for Verifier role (claim verification)"
+        },
+        "janumicode.cli.roles.historianInterpreter": {
+          "type": "string",
+          "enum": [
+            "claude-code",
+            "codex-cli",
+            "gemini-cli"
+          ],
+          "default": "gemini-cli",
+          "description": "CLI tool for Historian-Interpreter role (historical analysis)"
+        },
+        "janumicode.cli.gemini.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model override for Gemini CLI (e.g., gemini-2.5-pro, gemini-2.5-flash). Leave empty for Gemini CLI default."
+        },
+        "janumicode.cli.codex.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model override for Codex CLI (e.g., o3, gpt-4.1). Leave empty for Codex CLI default."
+        },
+        "janumicode.reasoningReviewer.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automated reasoning review of agent outputs. The reviewer examines agent thinking for flawed assumptions, logical gaps, and reasoning risks."
+        },
+        "janumicode.reasoningReviewer.provider": {
+          "type": "string",
+          "enum": [
+            "GEMINI",
+            "CLAUDE",
+            "OPENAI"
+          ],
+          "default": "GEMINI",
+          "description": "LLM provider for the Reasoning Reviewer"
+        },
+        "janumicode.reasoningReviewer.model": {
+          "type": "string",
+          "default": "gemini-2.5-pro",
+          "description": "Model for the Reasoning Reviewer (needs strong analytical reasoning)"
+        },
+        "janumicode.reasoningReviewer.minSeverity": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "default": "MEDIUM",
+          "description": "Only surface reasoning concerns at or above this severity level"
+        },
         "janumicode.evaluator.provider": {
           "type": "string",
           "enum": [
@@ -194,6 +274,21 @@
           "type": "string",
           "default": "gemini-3-flash-preview",
           "description": "Model for the Response Evaluator (lightweight, fast model recommended)"
+        },
+        "janumicode.documentGenerator.provider": {
+          "type": "string",
+          "enum": [
+            "GEMINI",
+            "CLAUDE",
+            "OPENAI"
+          ],
+          "default": "GEMINI",
+          "description": "LLM provider for document generation (prose artifacts from dialogue state)"
+        },
+        "janumicode.documentGenerator.model": {
+          "type": "string",
+          "default": "gemini-2.5-flash",
+          "description": "Model for document generation"
         },
         "janumicode.logLevel": {
           "type": "string",

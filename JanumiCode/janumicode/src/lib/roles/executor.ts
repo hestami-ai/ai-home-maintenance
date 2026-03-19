@@ -11,9 +11,9 @@ import type {
 	ClaimCriticality,
 } from '../types';
 import type { TaskUnit } from '../types/maker';
-import { ClaimStatus } from '../types';
-import { buildExecutorContext, formatExecutorContext } from '../context';
-import type { CompiledContextPack } from '../context/compiler';
+import { ClaimStatus, Phase, Role as RoleEnum } from '../types';
+import { assembleContext } from '../context';
+import { getDatabase } from '../database/init';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
 import type { CLIActivityEvent } from '../cli/types';
@@ -206,22 +206,8 @@ export async function invokeExecutor(
 	options: ExecutorInvocationOptions
 ): Promise<Result<ExecutorResponse>> {
 	try {
-		// Build Executor context pack
-		const contextResult = await buildExecutorContext({
-			dialogueId: options.dialogueId,
-			goal: options.goal,
-			tokenBudget: options.tokenBudget,
-			includeHistoricalFindings: options.includeHistoricalFindings,
-		});
-
-		if (!contextResult.success) {
-			return contextResult;
-		}
-
-		const context = contextResult.value;
-
-		// Check for blocking conditions
-		const blockingCheck = checkBlockingConditions(context);
+		// Check for blocking conditions (direct DB query — safety check independent of LLM)
+		const blockingCheck = checkBlockingConditions(options.dialogueId);
 		if (!blockingCheck.canProceed) {
 			return {
 				success: false,
@@ -231,8 +217,21 @@ export async function invokeExecutor(
 			};
 		}
 
-		// Format context for CLI invocation
-		const formattedContext = formatExecutorContext(context);
+		// Assemble context via Context Engineer
+		const contextResult = await assembleContext({
+			dialogueId: options.dialogueId,
+			role: RoleEnum.EXECUTOR,
+			phase: Phase.EXECUTE,
+			tokenBudget: options.tokenBudget,
+			extras: { goal: options.goal },
+			onEvent: options.onEvent,
+		});
+
+		if (!contextResult.success) {
+			return contextResult;
+		}
+
+		const formattedContext = contextResult.value.briefing;
 
 		// ── Mobile specialist MCP injection ──
 		// Detect whether the goal involves mobile development and inject MCP tools
@@ -323,7 +322,7 @@ export async function invokeExecutor(
 		// Validate response
 		const validationResult = validateExecutorResponse(
 			parseResult.value,
-			context
+			options.dialogueId
 		);
 
 		if (!validationResult.success) {
@@ -380,32 +379,33 @@ export function reparseExecutorResponse(
 }
 
 /**
- * Check for blocking conditions
- * Executor MUST NOT proceed if critical claims are DISPROVED or UNKNOWN
+ * Check for blocking conditions via direct DB query.
+ * Executor MUST NOT proceed if critical claims are DISPROVED or UNKNOWN.
  */
-function checkBlockingConditions(context: CompiledContextPack): {
+function checkBlockingConditions(dialogueId: string): {
 	canProceed: boolean;
 	reason?: string;
 	blockingClaims: string[];
 } {
-	const blockingClaims = context.active_claims.filter(
-		(claim) =>
-			claim.criticality === 'CRITICAL' &&
-			(claim.status === 'DISPROVED' || claim.status === 'UNKNOWN')
-	);
+	try {
+		const db = getDatabase();
+		if (!db) { return { canProceed: true, blockingClaims: [] }; }
 
-	if (blockingClaims.length > 0) {
-		return {
-			canProceed: false,
-			reason: `Found ${blockingClaims.length} blocking critical claims (DISPROVED or UNKNOWN)`,
-			blockingClaims: blockingClaims.map((c) => c.claim_id),
-		};
-	}
+		const rows = db.prepare(`
+			SELECT claim_id FROM claims
+			WHERE dialogue_id = ? AND criticality = 'CRITICAL' AND status IN ('DISPROVED', 'UNKNOWN')
+		`).all(dialogueId) as Array<{ claim_id: string }>;
 
-	return {
-		canProceed: true,
-		blockingClaims: [],
-	};
+		if (rows.length > 0) {
+			return {
+				canProceed: false,
+				reason: `Found ${rows.length} blocking critical claims (DISPROVED or UNKNOWN)`,
+				blockingClaims: rows.map(r => r.claim_id),
+			};
+		}
+	} catch { /* DB not available — allow execution */ }
+
+	return { canProceed: true, blockingClaims: [] };
 }
 
 /**
@@ -569,34 +569,28 @@ function findMatchingBrace(text: string, start: number): number {
  */
 function validateExecutorResponse(
 	response: ExecutorResponse,
-	context: CompiledContextPack
+	dialogueId: string,
 ): Result<void> {
 	const errors: string[] = [];
 
-	// Check for constraint invention (references to non-existent constraints)
-	// constraint_manifest is optional — its absence is normal for new dialogues
-	const constraintManifest = context.constraint_manifest;
-	if (!constraintManifest) {
-		if (isLoggerInitialized()) {
-			getLogger().child({ component: 'role:executor' }).debug('No constraint manifest present — skipping adherence validation');
-		}
-	}
+	// Check that proposal doesn't challenge verifier verdicts (via DB query)
+	try {
+		const db = getDatabase();
+		if (db) {
+			const disproved = db.prepare(`
+				SELECT claim_id, statement FROM claims
+				WHERE dialogue_id = ? AND status = 'DISPROVED'
+			`).all(dialogueId) as Array<{ claim_id: string; statement: string }>;
 
-	// Check that proposal doesn't challenge verifier verdicts
-	const disproved = context.active_claims.filter(
-		(c) => c.status === 'DISPROVED'
-	);
-	for (const claim of disproved) {
-		// Check if proposal mentions this claim positively
-		if (
-			response.proposal.toLowerCase().includes(claim.statement.toLowerCase())
-		) {
-			// This is a simplified check - in production, would use more sophisticated NLP
-			errors.push(
-				`Proposal may be attempting to work around DISPROVED claim: ${claim.claim_id}`
-			);
+			for (const claim of disproved) {
+				if (response.proposal.toLowerCase().includes(claim.statement.toLowerCase())) {
+					errors.push(
+						`Proposal may be attempting to work around DISPROVED claim: ${claim.claim_id}`
+					);
+				}
+			}
 		}
-	}
+	} catch { /* DB not available — skip validation */ }
 
 	// Validate assumption structure
 	for (const assumption of response.assumptions) {

@@ -10,8 +10,8 @@ import type {
 	Verdict,
 	VerdictStatus,
 } from '../types';
-import { VerdictType } from '../types';
-import { buildVerifierContext, formatVerifierContext } from '../context';
+import { VerdictType, Phase, Role as RoleEnum } from '../types';
+import { assembleContext } from '../context';
 import { getDatabase } from '../database';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
@@ -227,22 +227,20 @@ export async function invokeVerifier(
 ): Promise<Result<VerifierResponse>> {
 	try {
 		// Build Verifier context pack
-		const contextResult = await buildVerifierContext({
+		const contextResult = await assembleContext({
 			dialogueId: options.dialogueId,
-			claimToVerify: options.claimToVerify,
+			role: RoleEnum.VERIFIER,
+			phase: Phase.VERIFY,
 			tokenBudget: options.tokenBudget,
-			includeHistoricalVerdicts: options.includeHistoricalVerdicts,
-			checkForContradictions: options.checkForContradictions,
+			extras: { claimToVerify: options.claimToVerify, checkForContradictions: options.checkForContradictions },
+			onEvent: options.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult;
 		}
 
-		const context = contextResult.value;
-
-		// Format context for CLI invocation
-		const formattedContext = formatVerifierContext(context);
+		const formattedContext = contextResult.value.briefing;
 
 		// Build stdin content: system prompt + formatted context
 		const stdinContent = buildStdinContent(VERIFIER_SYSTEM_PROMPT, formattedContext);

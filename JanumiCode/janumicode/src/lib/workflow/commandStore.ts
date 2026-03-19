@@ -31,7 +31,7 @@ export interface WorkflowCommandRecord {
 export interface WorkflowCommandOutput {
 	id: number;
 	command_id: string;
-	line_type: 'summary' | 'detail' | 'error' | 'stdin' | 'tool_input' | 'tool_output';
+	line_type: 'summary' | 'detail' | 'error' | 'stdin' | 'tool_input' | 'tool_output' | 'reasoning_review';
 	tool_name: string | null;
 	content: string;
 	timestamp: string;

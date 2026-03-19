@@ -737,6 +737,14 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				this._safeAsync(() => this._handleExportStream());
 				break;
 
+			case 'generateDocument':
+				this._safeAsync(() => this._handleGenerateDocument());
+				break;
+
+			case 'reviewRerun':
+				this._safeAsync(() => this._handleReviewRerun(message.guidance as string | undefined));
+				break;
+
 			case 'settingsVisibilityChanged':
 				this._settingsPanelVisible = message.visible as boolean;
 				break;
@@ -1797,6 +1805,136 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	/**
+	 * Generate a prose document from the current dialogue's structured data.
+	 * Shows a QuickPick of available document types, calls the LLM, stores
+	 * the result in SQLite, and opens it in a read-only editor tab.
+	 */
+	private async _handleGenerateDocument(): Promise<void> {
+		const dialogueId = this._activeDialogueId;
+		if (!dialogueId) {
+			vscode.window.showWarningMessage('No active dialogue. Start a dialogue first.');
+			return;
+		}
+
+		// Lazy imports to avoid loading document modules at startup
+		const { getAvailableDocuments } = await import('../../documents/registry.js');
+		const { generateDocument } = await import('../../documents/generator.js');
+		const { upsertGeneratedDocument } = await import('../../documents/documentStore.js');
+
+		// Get available document types for this dialogue
+		const available = getAvailableDocuments(dialogueId);
+		if (available.length === 0) {
+			vscode.window.showInformationMessage(
+				'No document types are available for this dialogue yet. ' +
+				'The dialogue needs to progress past INTAKE before documents can be generated.'
+			);
+			return;
+		}
+
+		// Show multi-select QuickPick
+		const picked = await vscode.window.showQuickPick(
+			available.map(def => ({
+				label: def.label,
+				description: def.type,
+				detail: def.description,
+				definition: def,
+			})),
+			{
+				placeHolder: 'Select one or more document types to generate',
+				title: 'Generate Documents',
+				canPickMany: true,
+			}
+		);
+
+		if (!picked || picked.length === 0) {
+			return; // user cancelled
+		}
+
+		// Generate all selected documents with progress
+		const results = await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: `Generating ${picked.length} document(s)...`,
+				cancellable: false,
+			},
+			async (progress) => {
+				const generated: Array<{ title: string; content: string; label: string }> = [];
+				for (let i = 0; i < picked.length; i++) {
+					const item = picked[i];
+					progress.report({
+						message: `(${i + 1}/${picked.length}) ${item.label}`,
+						increment: (100 / picked.length),
+					});
+
+					try {
+						const result = await generateDocument(dialogueId, item.definition);
+
+						// Store in SQLite (upsert)
+						upsertGeneratedDocument(
+							dialogueId,
+							result.documentType,
+							result.title,
+							result.content,
+						);
+
+						generated.push({ title: result.title, content: result.content, label: item.label });
+					} catch (err) {
+						const msg = err instanceof Error ? err.message : String(err);
+						vscode.window.showErrorMessage(`Failed to generate ${item.label}: ${msg}`);
+					}
+				}
+				return generated;
+			}
+		);
+
+		if (results.length === 0) {
+			return;
+		}
+
+		// Open each generated document in an editor tab
+		for (const result of results) {
+			const doc = await vscode.workspace.openTextDocument({
+				content: result.content,
+				language: 'markdown',
+			});
+			await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
+		}
+
+		// Offer batch export
+		const labels = results.map(r => r.label).join(', ');
+		const exportChoice = await vscode.window.showInformationMessage(
+			`Generated: ${labels}`,
+			'Export All to Files',
+			'Dismiss'
+		);
+
+		if (exportChoice === 'Export All to Files') {
+			for (const result of results) {
+				await this._exportDocumentContent(result.title, result.content);
+			}
+		}
+	}
+
+	/**
+	 * Export a document's markdown content to a user-chosen file.
+	 */
+	private async _exportDocumentContent(title: string, content: string): Promise<void> {
+		const suggestedName = title.toLowerCase().replaceAll(/\s+/g, '-') + '.md';
+		const uri = await vscode.window.showSaveDialog({
+			defaultUri: vscode.Uri.file(suggestedName),
+			filters: { 'Markdown': ['md'] },
+			title: 'Export Document',
+		});
+
+		if (!uri) {
+			return;
+		}
+
+		await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf-8'));
+		vscode.window.showInformationMessage(`Document exported to ${uri.fsPath}`);
+	}
+
+	/**
 	 * Handle a gate decision from the webview
 	 */
 	private _handleGateDecision(gateId: string, action: string, rationale: string): void {
@@ -2275,6 +2413,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				return this._handleSaveOutputCommand(parsed.args);
 			case 'navigate':
 				return this._handleNavigateCommand(parsed.args);
+			case 'adopt':
+				return this._handleAdoptCommand();
 			default:
 				return false;
 		}
@@ -2571,14 +2711,97 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	/**
+	 * Handle a reasoning review re-run — re-invoke the last CLI agent with reviewer
+	 * concerns (and optional user guidance) injected as correction context.
+	 */
+	private async _handleReviewRerun(guidance?: string): Promise<void> {
+		if (!this._activeDialogueId) { return; }
+
+		// Build correction text from the most recent reasoning review event
+		const db = getDatabase();
+		if (!db) { return; }
+
+		const reviewEvent = db.prepare(`
+			SELECT content, detail FROM dialogue_events
+			WHERE dialogue_id = ? AND event_type = 'reasoning_review'
+			ORDER BY event_id DESC LIMIT 1
+		`).get(this._activeDialogueId) as { content: string; detail: string } | undefined;
+
+		if (!reviewEvent) {
+			this._postSystemMessage('No reasoning review found to re-run with.');
+			return;
+		}
+
+		const detail = JSON.parse(reviewEvent.detail ?? '{}');
+		const concerns = (detail.concerns ?? []) as Array<{ summary: string; recommendation: string }>;
+		const corrections = concerns.map((c: { summary: string; recommendation: string }) =>
+			`- ${c.summary}: ${c.recommendation}`
+		).join('\n');
+
+		const correctionText = [
+			'[Reasoning Review Corrections]',
+			corrections,
+			...(guidance ? [`\n[Human Guidance]\n${guidance}`] : []),
+		].join('\n');
+
+		// Feed the corrections as input and re-run the workflow cycle
+		updateWorkflowMetadata(this._activeDialogueId, {
+			pendingIntakeInput: correctionText,
+		});
+
+		this._postSystemMessage('Re-running with reasoning review corrections...');
+		this._isProcessing = true;
+		this._postInputEnabled(false);
+		this._postProcessing(true, 'Re-running', 'Applying reasoning corrections');
+
+		try {
+			await this._runWorkflowCycle();
+		} finally {
+			this._isProcessing = false;
+			this._postProcessing(false);
+			this._postInputEnabled(true);
+		}
+	}
+
+	/**
+	 * Handle an adopt command — inject cached CLI output into DB and advance workflow.
+	 */
+	private async _handleAdoptCommand(): Promise<boolean> {
+		if (!this._activeDialogueId) { return false; }
+
+		const { adoptCachedOutput } = await import('../../workflow/outputAdopter.js');
+
+		this._postSystemMessage('Adopting cached CLI output...');
+
+		const result = await adoptCachedOutput(this._activeDialogueId);
+
+		if (!result.success) {
+			this._postSystemMessage(`Adopt failed: ${result.error.message}`);
+			return true;
+		}
+
+		const { parsedType, fieldsAdopted, warnings } = result.value;
+		const fieldsStr = fieldsAdopted.join(', ');
+		this._postSystemMessage(
+			`Adopted ${parsedType}: ${fieldsStr}` +
+			(warnings.length > 0 ? `\nWarnings: ${warnings.join('; ')}` : '')
+		);
+
+		// Refresh UI and resume workflow
+		this._update();
+		await this._runWorkflowCycle();
+
+		return true;
+	}
+
+	/**
 	 * Handle a navigation command — resolve the target, assess safety, and execute.
 	 */
 	private async _handleNavigateCommand(targetText: string): Promise<boolean> {
 		if (!this._activeDialogueId || !targetText.trim()) return false;
 
 		const { resolveNavigationTarget, assessNavigation, getAvailableTargets } = await import('../../workflow/navigationResolver.js');
-		const { transitionWorkflow, updateWorkflowMetadata, getWorkflowState } = await import('../../workflow/stateMachine.js');
-		const { TransitionTrigger } = await import('../../types/index.js');
+		const { transitionWorkflow, updateWorkflowMetadata, getWorkflowState, TransitionTrigger } = await import('../../workflow/stateMachine.js');
 
 		const wsResult = getWorkflowState(this._activeDialogueId);
 		if (!wsResult.success) return false;

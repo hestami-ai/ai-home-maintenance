@@ -231,8 +231,17 @@ function buildGeminiArgs(outputFormat: string, options: RoleCLIInvocationOptions
 		args.push('--include-directories', options.includedDirectories.join(','));
 	}
 
-	if (options.model) {
-		args.push('--model', options.model);
+	// Model: explicit option > VS Code setting > Gemini CLI default
+	const model = options.model
+		|| vscode.workspace.getConfiguration('janumicode').get<string>('cli.gemini.model', '')
+		|| '';
+	if (model) {
+		args.push('--model', model);
+	}
+
+	// Sandbox mode: read-only → plan mode (prevents file writes) + yolo (auto-approve reads)
+	if (options.sandboxMode === 'read-only') {
+		args.push('--approval-mode', 'plan');
 	}
 
 	if (options.autoApprove) {

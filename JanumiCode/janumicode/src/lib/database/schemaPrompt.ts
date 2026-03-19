@@ -165,6 +165,12 @@ const TABLE_CATALOG: TableEntry[] = [
 		keywords: ['clarification', 'clarify', 'thread', 'question'],
 		primary: false,
 	},
+	{
+		name: 'handoff_documents',
+		ddl: 'handoff_documents(doc_id PK, dialogue_id, doc_type[INTAKE/ARCHITECTURE/EXECUTION/VERIFICATION/HISTORICAL], source_phase, content JSON, token_count INT, event_watermark INT, created_at)',
+		keywords: ['handoff', 'context', 'phase boundary', 'handoff document'],
+		primary: false,
+	},
 ];
 
 // ==================== RELATIONSHIPS ====================
@@ -181,7 +187,8 @@ const SCHEMA_RELATIONSHIPS = `
 -- evidence_packets.unit_id → task_units.unit_id
 -- outcome_snapshots.graph_id → task_graphs.graph_id
 -- workflow_command_outputs.command_id → workflow_commands.command_id
--- acceptance_contracts.intent_id → intent_records.intent_id`;
+-- acceptance_contracts.intent_id → intent_records.intent_id
+-- handoff_documents.dialogue_id → dialogues.dialogue_id (context handoff artifacts)`;
 
 // ==================== TABLE SELECTION ====================
 

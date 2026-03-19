@@ -78,8 +78,9 @@ import {
 } from './responseEvaluator';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { createPhaseRunner } from './phaseRunner';
-import { runNarrativeCuration } from '../curation/narrativeCurator';
+import { runNarrativeCuration, produceHandoffDocument } from '../curation/narrativeCurator';
 import { CurationMode } from '../types/narrativeCurator';
+import { HandoffDocType } from '../context/engineTypes';
 import { embedAndStore, isEmbeddingAvailable } from '../embedding/service';
 
 // ── MAKER imports ──
@@ -106,7 +107,7 @@ import { classifyRepairability, canAttemptRepair, attemptRepair } from './repair
 import { routeTaskToProvider } from './taskRouter';
 import { getAllProviderProfiles } from '../cli/providerCapabilities';
 import { getProviderCapabilityOverrides } from '../config/manager';
-import { buildMakerPlannerContext } from '../context/builders/makerPlanner';
+import { assembleContext } from '../context';
 import { invokeExecutorForUnit } from '../roles/executor';
 import { createEnrichedRepairEscalationGate } from './gates';
 import { getWorkspaceRoot } from '../context/workspaceReader';
@@ -251,8 +252,50 @@ export async function executeIntakePhase(
 				return await executeIntakeAnalysis(dialogueId, humanInput);
 
 			case IntakeSubState.PRODUCT_REVIEW: {
-				// User submitted MMP decisions — route based on which proposer round completed
 				const proposerPhase = conv.draftPlan?.proposerPhase as ProposerPhase | null | undefined;
+				const isMmpSubmission = humanInput.startsWith('[MMP Decisions]');
+
+				// Free text during PRODUCT_REVIEW = refinement feedback.
+				// Re-run the CURRENT proposer round with the feedback so the LLM
+				// can adjust its proposals (e.g., "focus on Pillar 1").
+				if (!isMmpSubmission && humanInput.trim().length > 0) {
+					// Determine which proposer to re-run based on current proposerPhase
+					let rerunSubState: IntakeSubState;
+					if (proposerPhase === ProposerPhase.DOMAIN_MAPPING) {
+						rerunSubState = IntakeSubState.PROPOSING_DOMAINS;
+					} else if (proposerPhase === ProposerPhase.JOURNEY_WORKFLOW) {
+						rerunSubState = IntakeSubState.PROPOSING_JOURNEYS;
+					} else if (proposerPhase === ProposerPhase.ENTITY_DATA_MODEL) {
+						rerunSubState = IntakeSubState.PROPOSING_ENTITIES;
+					} else if (proposerPhase === ProposerPhase.INTEGRATION_QUALITY) {
+						rerunSubState = IntakeSubState.PROPOSING_INTEGRATIONS;
+					} else {
+						rerunSubState = IntakeSubState.PROPOSING_DOMAINS;
+					}
+
+					// Store feedback in plan for the proposer to consume
+					const updatedPlan = { ...conv.draftPlan, humanFeedback: humanInput };
+					updateIntakeConversation(dialogueId, {
+						subState: rerunSubState,
+						draftPlan: updatedPlan as import('../types/intake').IntakePlanDocument,
+					});
+
+					// Re-run the proposer with feedback
+					switch (rerunSubState) {
+						case IntakeSubState.PROPOSING_DOMAINS:
+							return await executeProposerDomains(dialogueId, humanInput);
+						case IntakeSubState.PROPOSING_JOURNEYS:
+							return await executeProposerJourneys(dialogueId, humanInput);
+						case IntakeSubState.PROPOSING_ENTITIES:
+							return await executeProposerEntities(dialogueId, humanInput);
+						case IntakeSubState.PROPOSING_INTEGRATIONS:
+							return await executeProposerIntegrations(dialogueId, humanInput);
+						default:
+							return await executeProposerDomains(dialogueId, humanInput);
+					}
+				}
+
+				// MMP submission — advance to next proposer round
 				let nextSubState: IntakeSubState;
 				if (proposerPhase === ProposerPhase.DOMAIN_MAPPING) {
 					nextSubState = IntakeSubState.PROPOSING_JOURNEYS;
@@ -263,7 +306,6 @@ export async function executeIntakePhase(
 				} else if (proposerPhase === ProposerPhase.INTEGRATION_QUALITY) {
 					nextSubState = IntakeSubState.SYNTHESIZING;
 				} else {
-					// Legacy flow (no proposer) or DOMAIN_GUIDED → PROPOSING
 					nextSubState = IntakeSubState.PROPOSING;
 				}
 				updateIntakeConversation(dialogueId, { subState: nextSubState });
@@ -362,6 +404,15 @@ export async function executeIntakePhase(
 								});
 						}
 					}
+
+					// Produce canonical INTAKE handoff document for downstream phases
+					produceHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE').catch((err) => {
+						if (isLoggerInitialized()) {
+							getLogger().child({ component: 'handoff' }).warn('INTAKE handoff doc failed', {
+								error: err instanceof Error ? err.message : String(err),
+							});
+						}
+					});
 
 					// ── MAKER: Create IntentRecord + AcceptanceContract from approved plan ──
 					createMakerIntentAndContract(dialogueId);
@@ -2199,14 +2250,16 @@ async function attemptMakerDecomposition(
 		const intent = intentResult.value;
 		const contract = contractResult.value;
 
-		// Build historical context for decomposition
-		const historicalCtx = await buildMakerPlannerContext({
+		// Build historical context for decomposition via Context Engineer
+		const historicalCtx = await assembleContext({
 			dialogueId,
-			intentRecord: intent,
-			contract,
+			role: Role.EXECUTOR,
+			phase: Phase.EXECUTE,
+			intent: 'MAKER_PLANNER',
 			tokenBudget: 4000,
+			extras: { intentRecord: intent, acceptanceContract: contract },
 		});
-		const historicalContext = historicalCtx.success ? historicalCtx.value : '';
+		const historicalContext = historicalCtx.success ? historicalCtx.value.briefing : '';
 
 		const workspaceRoot = getWorkspaceRoot() ?? '.';
 
@@ -2452,13 +2505,15 @@ async function executeMakerExecutePhase(
 		const intentResult = getIntentRecordForDialogue(dialogueId);
 		let unitContext = '';
 		if (intentResult.success && intentResult.value && contract) {
-			const ctxResult = await buildMakerPlannerContext({
+			const ctxResult = await assembleContext({
 				dialogueId,
-				intentRecord: intentResult.value,
-				contract,
+				role: Role.EXECUTOR,
+				phase: Phase.EXECUTE,
+				intent: 'MAKER_PLANNER',
 				tokenBudget: 3000,
+				extras: { intentRecord: intentResult.value, acceptanceContract: contract },
 			});
-			unitContext = ctxResult.success ? ctxResult.value : '';
+			unitContext = ctxResult.success ? ctxResult.value.briefing : '';
 		}
 
 		// Execute unit
@@ -2892,6 +2947,20 @@ export async function advanceWorkflow(
 			lastError: undefined,
 		});
 
+		// Produce handoff documents at phase boundaries (fire-and-forget)
+		if (phaseResult.value.nextPhase) {
+			const handoffDocType = phaseToHandoffDocType(currentPhase);
+			if (handoffDocType) {
+				produceHandoffDocument(dialogueId, handoffDocType, currentPhase).catch((err) => {
+					if (isLoggerInitialized()) {
+						getLogger().child({ component: 'handoff' }).warn(`${handoffDocType} handoff doc failed`, {
+							error: err instanceof Error ? err.message : String(err),
+						});
+					}
+				});
+			}
+		}
+
 		// Transition to next phase if specified
 		if (
 			phaseResult.value.nextPhase &&
@@ -2920,5 +2989,22 @@ export async function advanceWorkflow(
 					? error
 					: new Error('Failed to advance workflow'),
 		};
+	}
+}
+
+// ==================== HANDOFF DOCUMENT HELPERS ====================
+
+/**
+ * Map a completed phase to its handoff document type.
+ * Returns null for phases that don't produce handoff docs
+ * (e.g., INTAKE is handled separately at plan approval, not phase completion).
+ */
+function phaseToHandoffDocType(phase: string): HandoffDocType | null {
+	switch (phase) {
+		case 'ARCHITECTURE': return HandoffDocType.ARCHITECTURE;
+		case 'EXECUTE': return HandoffDocType.EXECUTION;
+		case 'VERIFY': return HandoffDocType.VERIFICATION;
+		case 'HISTORICAL_CHECK': return HandoffDocType.HISTORICAL;
+		default: return null;
 	}
 }

@@ -32,6 +32,9 @@ export function getStyles(): string {
 			position: relative;
 		}
 
+		/* ===== RESIZABLE CARDS ===== */
+		/* Applied directly via .resizable-card on the card's own element */
+
 		/* ===== ZONE 1: STICKY HEADER ===== */
 		.sticky-header {
 			position: sticky;
@@ -3124,7 +3127,7 @@ export function getStyles(): string {
 			border: 2px solid var(--vscode-descriptionForeground);
 			border-top-color: transparent;
 			border-radius: 50%;
-			animation: spin 0.8s linear infinite;
+			animation: processingSpinnerRotate 0.8s linear infinite;
 		}
 
 		.processing-dots::after {
@@ -3637,6 +3640,7 @@ export function getStyles(): string {
 			line-height: 1.6;
 			word-wrap: break-word;
 			white-space: normal;
+			margin-bottom: 10px;
 		}
 
 		.intake-message + .intake-message {
@@ -5304,6 +5308,39 @@ export function getStyles(): string {
 		.proposer-domain-meta, .proposer-entity-meta { font-size: 12px; color: var(--vscode-descriptionForeground); margin-top: 2px; }
 		.proposer-domain-rationale { font-size: 12px; color: var(--vscode-descriptionForeground); font-style: italic; margin-top: 2px; }
 
+		/* Inline MMP buttons within proposer item cards */
+		.proposer-inline-mmp {
+			padding: 8px 0;
+			border-bottom: 1px solid var(--vscode-widget-border);
+		}
+		.proposer-inline-mmp .mmp-mirror-item-actions {
+			margin-top: 6px;
+		}
+		.proposer-inline-mmp .mmp-mirror-item-edit-area {
+			margin-top: 4px;
+		}
+		.proposer-inline-mmp .clarification-response-area {
+			display: none;
+			margin-top: 6px;
+			padding: 6px;
+			border-radius: 4px;
+			background: color-mix(in srgb, var(--vscode-charts-blue) 5%, var(--vscode-editor-background));
+			border: 1px solid var(--vscode-widget-border);
+		}
+		.proposer-inline-mmp .clarification-response-area.askmore-mode {
+			display: block;
+		}
+		.proposer-inline-mmp .clarification-messages {
+			display: none;
+			max-height: 200px;
+			overflow-y: auto;
+			margin-bottom: 6px;
+		}
+		.proposer-inline-mmp .mmp-askmore {
+			border-color: var(--vscode-charts-blue);
+			color: var(--vscode-charts-blue);
+		}
+
 		/* Collapsible domain group sections */
 		.proposer-domain-group {
 			margin-bottom: 6px;
@@ -5654,6 +5691,9 @@ export function getStyles(): string {
 			flex: 1;
 			font-size: 13px;
 			line-height: 1.4;
+		}
+		.mmp-hidden-text {
+			display: none !important;
 		}
 
 		.mmp-mirror-item-rationale {
@@ -6307,6 +6347,96 @@ export function getStyles(): string {
 			pointer-events: none !important;
 			opacity: 0.5 !important;
 			cursor: not-allowed !important;
+		}
+
+		/* ==================== REASONING REVIEW CARD ==================== */
+
+		.reasoning-review-card {
+			border-radius: 6px;
+			padding: 12px;
+			margin: 8px 0;
+			border-left: 3px solid var(--vscode-editorWarning-foreground, #cca700);
+			background: color-mix(in srgb, var(--vscode-editorWarning-foreground, #cca700) 6%, var(--vscode-editor-background));
+		}
+		.reasoning-review-card.review-severity-high {
+			border-left-color: var(--vscode-errorForeground, #f44747);
+			background: color-mix(in srgb, var(--vscode-errorForeground, #f44747) 6%, var(--vscode-editor-background));
+		}
+		.reasoning-review-card.review-severity-low {
+			border-left-color: var(--vscode-charts-blue, #3794ff);
+			background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 6%, var(--vscode-editor-background));
+		}
+		.review-header {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-bottom: 8px;
+		}
+		.review-icon { font-size: 16px; }
+		.review-title { font-weight: 600; font-size: 14px; }
+		.review-meta { margin-left: auto; font-size: 11px; color: var(--vscode-descriptionForeground); }
+		.review-assessment {
+			font-size: 13px;
+			color: var(--vscode-descriptionForeground);
+			margin-bottom: 10px;
+			font-style: italic;
+		}
+		.review-concern {
+			padding: 8px;
+			border-radius: 4px;
+			background: color-mix(in srgb, var(--vscode-widget-border) 30%, var(--vscode-editor-background));
+			margin-bottom: 6px;
+		}
+		.review-concern-header {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+		.review-severity-badge {
+			font-size: 10px;
+			font-weight: 700;
+			padding: 1px 6px;
+			border-radius: 3px;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+		.review-sev-high { background: var(--vscode-errorForeground, #f44747); color: #fff; }
+		.review-sev-medium { background: var(--vscode-editorWarning-foreground, #cca700); color: #000; }
+		.review-sev-low { background: var(--vscode-charts-blue, #3794ff); color: #fff; }
+		.review-concern-summary { font-size: 13px; font-weight: 500; }
+		.review-concern-details { margin-top: 6px; font-size: 12px; }
+		.review-concern-details summary { cursor: pointer; color: var(--vscode-textLink-foreground); }
+		.review-concern-detail, .review-concern-location, .review-concern-recommendation {
+			margin-top: 4px;
+			color: var(--vscode-descriptionForeground);
+			line-height: 1.5;
+		}
+		.review-actions {
+			display: flex;
+			gap: 8px;
+			margin-top: 10px;
+			padding-top: 8px;
+			border-top: 1px solid var(--vscode-widget-border);
+		}
+		.review-action-btn {
+			font-size: 12px;
+			padding: 4px 10px;
+		}
+		.review-guidance-area {
+			margin-top: 8px;
+			margin-bottom: 8px;
+		}
+		.review-guidance-input {
+			width: 100%;
+			padding: 6px 8px;
+			font-size: 12px;
+			font-family: var(--vscode-editor-font-family);
+			background: var(--vscode-input-background);
+			color: var(--vscode-input-foreground);
+			border: 1px solid var(--vscode-input-border);
+			border-radius: 4px;
+			resize: vertical;
+			margin-bottom: 6px;
 		}
 	`;
 }

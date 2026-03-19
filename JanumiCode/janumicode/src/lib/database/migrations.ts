@@ -62,10 +62,12 @@ function applyMigration(
 			// Execute the migration SQL
 			db.exec(migration.sql);
 
-			// Update schema version
+			// Update schema version — never downgrade (consolidated schemas may set it higher)
+			const currentInDb = getCurrentSchemaVersion(db);
+			const targetVersion = Math.max(currentInDb, migration.version);
 			db.prepare(
 				"UPDATE schema_metadata SET value = ?, updated_at = datetime('now') WHERE key = 'schema_version'"
-			).run(migration.version.toString());
+			).run(targetVersion.toString());
 		});
 
 		txn();
@@ -103,6 +105,13 @@ export function runMigrations(
 		const appliedMigrations: Migration[] = [];
 
 		for (const migration of pendingMigrations) {
+			// Re-check version: consolidated schemas (SCHEMA_V1) may have jumped
+			// the version past subsequent migrations, making them unnecessary.
+			const currentVer = getCurrentSchemaVersion(db);
+			if (migration.version <= currentVer) {
+				continue;
+			}
+
 			const result = applyMigration(db, migration);
 
 			if (!result.success) {
@@ -217,6 +226,8 @@ export function validateSchema(db: Database.Database): Result<boolean> {
 			'arch_workflows',
 			'arch_components',
 			'arch_implementation_steps',
+			// V10: Generated documents
+			'generated_documents',
 		];
 
 		const existingTablesResult = db

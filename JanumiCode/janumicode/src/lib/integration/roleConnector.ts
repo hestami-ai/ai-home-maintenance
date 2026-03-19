@@ -15,15 +15,14 @@ import type {
 	HistorianInterpreterResponse,
 	Claim,
 } from '../types';
-import { CodedError, Role } from '../types';
+import { CodedError, Role, Phase } from '../types';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import type { EvidencePacket } from '../roles/technicalExpert';
 import { invokeExecutor } from '../roles/executor';
 import { invokeVerifier } from '../roles/verifier';
 import { invokeTechnicalExpert } from '../roles/technicalExpert';
 import { invokeHistorianInterpreter } from '../roles/historianInterpreter';
-import { HistorianQueryType } from '../context';
-import { compileContextPack, type CompileContextOptions } from '../context';
+import { HistorianQueryType, assembleContext } from '../context';
 
 /**
  * Invoke executor with context compilation
@@ -175,21 +174,27 @@ export async function invokeHistorianInterpreterWithContext(
  * @param tokenBudget Token budget
  * @returns Result with compiled context pack
  */
-export function compileRoleContext(
+export async function compileRoleContext(
 	roleType: Role,
 	dialogueId: string,
 	tokenBudget: number = 10000
-): Result<string> {
+): Promise<Result<string>> {
 	try {
-		// Compile context pack for role
-		const contextOptions: CompileContextOptions = {
-			role: roleType,
-			dialogueId,
-			tokenBudget,
-			includeHistorical: roleType === Role.HISTORIAN,
+		// Determine phase based on role (best-effort mapping for generic connector)
+		const phaseMap: Record<string, Phase> = {
+			[Role.EXECUTOR]: Phase.EXECUTE,
+			[Role.VERIFIER]: Phase.VERIFY,
+			[Role.HISTORIAN]: Phase.HISTORICAL_CHECK,
+			[Role.TECHNICAL_EXPERT]: Phase.PROPOSE,
 		};
+		const phase = phaseMap[roleType] ?? Phase.PROPOSE;
 
-		const contextResult = compileContextPack(contextOptions);
+		const contextResult = await assembleContext({
+			dialogueId,
+			role: roleType,
+			phase,
+			tokenBudget,
+		});
 
 		if (!contextResult.success) {
 			return {
@@ -198,10 +203,9 @@ export function compileRoleContext(
 			};
 		}
 
-		// Serialize context pack to string
 		return {
 			success: true,
-			value: JSON.stringify(contextResult.value, null, 2),
+			value: contextResult.value.briefing,
 		};
 	} catch (error) {
 		return {

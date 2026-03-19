@@ -215,6 +215,9 @@ export function handleSetProcessing(data: SetProcessingData): void {
 
 	if (!data.active) {
 		if (existing) { existing.remove(); }
+		// Also remove server-rendered processing cancel bar (baked into HTML by renderInputArea)
+		const cancelBar = document.querySelector('.processing-cancel-bar');
+		if (cancelBar) { cancelBar.remove(); }
 		return;
 	}
 	const phase = escapeHtmlClient(data.phase || 'Processing');

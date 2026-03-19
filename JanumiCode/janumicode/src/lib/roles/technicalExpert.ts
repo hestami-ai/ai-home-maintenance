@@ -4,11 +4,8 @@
  * This is an LLM-backed agent that provides authoritative technical evidence
  */
 
-import type { Result } from '../types';
-import {
-	buildTechnicalExpertContext,
-	formatTechnicalExpertContext,
-} from '../context';
+import { type Result, Role, Phase } from '../types';
+import { assembleContext } from '../context';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
 import type { CLIActivityEvent } from '../cli/types';
@@ -134,23 +131,21 @@ export async function invokeTechnicalExpert(
 	options: TechnicalExpertInvocationOptions
 ): Promise<Result<EvidencePacket>> {
 	try {
-		// Build Technical Expert context pack
-		const contextResult = await buildTechnicalExpertContext({
+		// Assemble context via Context Engineer
+		const contextResult = await assembleContext({
 			dialogueId: options.dialogueId,
-			question: options.question,
-			relatedClaimIds: options.relatedClaimIds,
+			role: Role.TECHNICAL_EXPERT,
+			phase: Phase.PROPOSE,
 			tokenBudget: options.tokenBudget,
-			includeHistoricalEvidence: options.includeHistoricalEvidence,
+			extras: { question: options.question, relatedClaimIds: options.relatedClaimIds },
+			onEvent: options.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult;
 		}
 
-		const context = contextResult.value;
-
-		// Format context for CLI invocation
-		const formattedContext = formatTechnicalExpertContext(context);
+		const formattedContext = contextResult.value.briefing;
 
 		// Build stdin content: system prompt + formatted context
 		const stdinContent = buildStdinContent(TECHNICAL_EXPERT_SYSTEM_PROMPT, formattedContext);

@@ -17,18 +17,14 @@
  */
 
 import type { Result } from '../types';
-import { Role } from '../types';
+import { Role, Phase } from '../types';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { resolveProviderForRole } from '../cli/providerResolver';
 import { buildStdinContent } from '../cli/types';
 import type { CLIActivityEvent } from '../cli/types';
 import { invokeRoleStreaming } from '../cli/roleInvoker';
-import {
-	buildDecomposingContext,
-	buildDesigningContext,
-	buildModelingContext,
-	buildSequencingContext,
-} from '../context/builders/architecture';
+import { assembleContext } from '../context';
+import { updateWorkflowMetadata } from '../workflow/stateMachine';
 import type {
 	CapabilityNode,
 	WorkflowNode,
@@ -362,13 +358,15 @@ export async function invokeArchitectureDecomposition(
 			return providerResult as unknown as Result<DecompositionResult>;
 		}
 
-		// 2. Build context
-		const contextResult = buildDecomposingContext({
+		// 2. Assemble context via Context Engineer
+		const contextResult = await assembleContext({
 			dialogueId,
-			approvedPlan,
-			domainCoverage,
+			role: Role.TECHNICAL_EXPERT,
+			phase: Phase.ARCHITECTURE,
+			subPhase: 'DECOMPOSING',
 			tokenBudget,
-			humanFeedback: options?.humanFeedback,
+			extras: { approvedPlan, domainCoverage, humanFeedback: options?.humanFeedback },
+			onEvent: options?.onEvent,
 		});
 
 		if (!contextResult.success) {
@@ -376,7 +374,7 @@ export async function invokeArchitectureDecomposition(
 		}
 
 		// 3. Build stdin and invoke
-		const stdinContent = buildStdinContent(DECOMPOSING_SYSTEM_PROMPT, contextResult.value);
+		const stdinContent = buildStdinContent(DECOMPOSING_SYSTEM_PROMPT, contextResult.value.briefing);
 
 		// Emit stdin content for command block visibility
 		if (options?.commandId && options?.dialogueId) {
@@ -394,7 +392,7 @@ export async function invokeArchitectureDecomposition(
 		}
 
 		log?.info('Invoking architecture decomposition', {
-			contextLength: contextResult.value.length,
+			contextLength: contextResult.value.briefing.length,
 		});
 
 		const cliResult = await invokeRoleStreaming({
@@ -408,6 +406,9 @@ export async function invokeArchitectureDecomposition(
 		}
 
 		const rawResponse = cliResult.value.response;
+
+		// Cache raw output BEFORE parsing — enables adopt/retry on parse failure
+		updateWorkflowMetadata(dialogueId, { cachedRawCliOutput: rawResponse });
 
 		// 4. Parse response
 		const parsed = parseDecompositionResponse(rawResponse);
@@ -472,13 +473,15 @@ export async function invokeArchitectureDesign(
 			return providerResult as unknown as Result<DesignResult>;
 		}
 
-		// 2. Build context
-		const contextResult = buildDesigningContext({
+		// 2. Assemble context via Context Engineer
+		const contextResult = await assembleContext({
 			dialogueId,
-			architectureDoc,
-			decompositionConfig,
-			humanFeedback,
+			role: Role.TECHNICAL_EXPERT,
+			phase: Phase.ARCHITECTURE,
+			subPhase: 'DESIGNING',
 			tokenBudget,
+			extras: { architectureDoc, decompositionConfig, humanFeedback },
+			onEvent: options?.onEvent,
 		});
 
 		if (!contextResult.success) {
@@ -486,7 +489,7 @@ export async function invokeArchitectureDesign(
 		}
 
 		// 3. Build stdin and invoke
-		const stdinContent = buildStdinContent(DESIGNING_SYSTEM_PROMPT, contextResult.value);
+		const stdinContent = buildStdinContent(DESIGNING_SYSTEM_PROMPT, contextResult.value.briefing);
 
 		// Emit stdin content for command block visibility
 		if (options?.commandId && options?.dialogueId) {
@@ -504,7 +507,7 @@ export async function invokeArchitectureDesign(
 		}
 
 		log?.info('Invoking architecture design', {
-			contextLength: contextResult.value.length,
+			contextLength: contextResult.value.briefing.length,
 			iteration: humanFeedback ? 'revision' : 'initial',
 		});
 
@@ -519,6 +522,9 @@ export async function invokeArchitectureDesign(
 		}
 
 		const rawResponse = cliResult.value.response;
+
+		// Cache raw output BEFORE parsing
+		updateWorkflowMetadata(dialogueId, { cachedRawCliOutput: rawResponse });
 
 		// 4. Parse response
 		const parsed = parseDesignResponse(rawResponse);
@@ -783,17 +789,21 @@ export async function invokeArchitectureModeling(
 			return providerResult as unknown as Result<ModelingResult>;
 		}
 
-		const contextResult = buildModelingContext({
+		const contextResult = await assembleContext({
 			dialogueId,
-			architectureDoc,
+			role: Role.TECHNICAL_EXPERT,
+			phase: Phase.ARCHITECTURE,
+			subPhase: 'MODELING',
 			tokenBudget,
+			extras: { architectureDoc },
+			onEvent: options?.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult as unknown as Result<ModelingResult>;
 		}
 
-		const stdinContent = buildStdinContent(MODELING_SYSTEM_PROMPT, contextResult.value);
+		const stdinContent = buildStdinContent(MODELING_SYSTEM_PROMPT, contextResult.value.briefing);
 
 		if (options?.commandId && options?.dialogueId) {
 			emitWorkflowCommand({
@@ -810,7 +820,7 @@ export async function invokeArchitectureModeling(
 		}
 
 		log?.info('Invoking architecture modeling', {
-			contextLength: contextResult.value.length,
+			contextLength: contextResult.value.briefing.length,
 		});
 
 		const cliResult = await invokeRoleStreaming({
@@ -822,6 +832,9 @@ export async function invokeArchitectureModeling(
 		if (!cliResult.success) {
 			return cliResult as unknown as Result<ModelingResult>;
 		}
+
+		// Cache raw output BEFORE parsing
+		updateWorkflowMetadata(dialogueId, { cachedRawCliOutput: cliResult.value.response });
 
 		const parsed = parseModelingResponse(cliResult.value.response);
 		if (!parsed.success) {
@@ -858,17 +871,21 @@ export async function invokeArchitectureSequencing(
 			return providerResult as unknown as Result<SequencingResult>;
 		}
 
-		const contextResult = buildSequencingContext({
+		const contextResult = await assembleContext({
 			dialogueId,
-			architectureDoc,
+			role: Role.TECHNICAL_EXPERT,
+			phase: Phase.ARCHITECTURE,
+			subPhase: 'SEQUENCING',
 			tokenBudget,
+			extras: { architectureDoc },
+			onEvent: options?.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult as unknown as Result<SequencingResult>;
 		}
 
-		const stdinContent = buildStdinContent(SEQUENCING_SYSTEM_PROMPT, contextResult.value);
+		const stdinContent = buildStdinContent(SEQUENCING_SYSTEM_PROMPT, contextResult.value.briefing);
 
 		if (options?.commandId && options?.dialogueId) {
 			emitWorkflowCommand({
@@ -885,7 +902,7 @@ export async function invokeArchitectureSequencing(
 		}
 
 		log?.info('Invoking architecture sequencing', {
-			contextLength: contextResult.value.length,
+			contextLength: contextResult.value.briefing.length,
 		});
 
 		const cliResult = await invokeRoleStreaming({
@@ -897,6 +914,9 @@ export async function invokeArchitectureSequencing(
 		if (!cliResult.success) {
 			return cliResult as unknown as Result<SequencingResult>;
 		}
+
+		// Cache raw output BEFORE parsing
+		updateWorkflowMetadata(dialogueId, { cachedRawCliOutput: cliResult.value.response });
 
 		const parsed = parseSequencingResponse(cliResult.value.response);
 		if (!parsed.success) {

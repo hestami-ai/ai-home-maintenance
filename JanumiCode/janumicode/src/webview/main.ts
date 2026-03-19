@@ -362,6 +362,9 @@ document.addEventListener('click', function (event: MouseEvent) {
 		case 'export-stream':
 			vscode.postMessage({ type: 'exportStream' });
 			break;
+		case 'generate-document':
+			vscode.postMessage({ type: 'generateDocument' });
+			break;
 		case 'resume-dialogue':
 			if (target.dataset.dialogueId) {
 				vscode.postMessage({ type: 'resumeDialogue', dialogueId: target.dataset.dialogueId });
@@ -462,6 +465,47 @@ document.addEventListener('click', function (event: MouseEvent) {
 				handleMMPSubmit(target.dataset.mmpCard);
 			}
 			break;
+		// Reasoning Review actions
+		case 'review-acknowledge': {
+			const card = target.closest('.reasoning-review-card') as HTMLElement | null;
+			if (card) {
+				card.style.opacity = '0.4';
+				card.style.pointerEvents = 'none';
+				const actions = card.querySelector('.review-actions') as HTMLElement | null;
+				if (actions) { actions.innerHTML = '<span style="font-size:12px;color:var(--vscode-descriptionForeground)">Acknowledged</span>'; }
+			}
+			break;
+		}
+		case 'review-rerun':
+			vscode.postMessage({ type: 'reviewRerun' });
+			break;
+		case 'review-guidance': {
+			const card = target.closest('.reasoning-review-card') as HTMLElement | null;
+			if (card) {
+				let guidanceArea = card.querySelector('.review-guidance-area') as HTMLElement | null;
+				if (!guidanceArea) {
+					guidanceArea = document.createElement('div');
+					guidanceArea.className = 'review-guidance-area';
+					guidanceArea.innerHTML =
+						'<textarea class="review-guidance-input" placeholder="Add your guidance for the re-run..." rows="3"></textarea>' +
+						'<button class="mmp-btn review-action-btn" data-action="review-guidance-submit">Submit &amp; Re-run</button>';
+					const actions = card.querySelector('.review-actions');
+					if (actions) { actions.before(guidanceArea); }
+				} else {
+					guidanceArea.classList.toggle('visible');
+				}
+				const ta = guidanceArea.querySelector('textarea') as HTMLTextAreaElement | null;
+				if (ta) { ta.focus(); }
+			}
+			break;
+		}
+		case 'review-guidance-submit': {
+			const card = target.closest('.reasoning-review-card') as HTMLElement | null;
+			const ta = card?.querySelector('.review-guidance-input') as HTMLTextAreaElement | null;
+			const guidance = ta?.value?.trim() ?? '';
+			vscode.postMessage({ type: 'reviewRerun', guidance });
+			break;
+		}
 		case 'toggle-speech':
 			if (target.dataset.speechTarget) {
 				handleSpeechToggle(target.dataset.speechTarget);

@@ -1493,12 +1493,17 @@ export async function executeIntakeAnalysis(
 			{ turnNumber: 0, isAnalysis: true },
 		);
 
+		// Proposer sub-states auto-execute (no human input needed);
+		// PRODUCT_REVIEW and PROPOSING await human MMP decisions.
+		const needsInput = targetSubState === IntakeSubState.PRODUCT_REVIEW
+			|| targetSubState === IntakeSubState.PROPOSING;
+
 		return {
 			success: true,
 			value: {
 				phase: 'INTAKE' as Phase,
 				success: true,
-				awaitingInput: true,
+				awaitingInput: needsInput,
 				metadata: {
 					turnNumber: 0,
 					isAnalysis: true,
@@ -1747,12 +1752,10 @@ export function extractDomainMMP(
 	personas: Array<{ id: string; name: string; description: string }>,
 ): MMPPayload | undefined {
 	const mirrorItems: MirrorItem[] = [];
-	let idx = 0;
 
 	for (const d of domains) {
-		idx++;
 		mirrorItems.push({
-			id: `PV-DOM-${idx}`,
+			id: d.id,  // Use domain's own ID for 1:1 linking
 			text: `${d.name}: ${d.description}`,
 			category: 'domain',
 			rationale: d.rationale,
@@ -1761,9 +1764,8 @@ export function extractDomainMMP(
 	}
 
 	for (const p of personas) {
-		idx++;
 		mirrorItems.push({
-			id: `PV-PER-${idx}`,
+			id: p.id,  // Use persona's own ID for 1:1 linking
 			text: `${p.name}: ${p.description}`,
 			category: 'persona',
 			rationale: 'Identified from domain analysis',
@@ -1811,17 +1813,17 @@ export function extractDomainMMP(
  * Extract MMP for journey/workflow proposals.
  */
 export function extractJourneyWorkflowMMP(
-	journeys: Array<{ id: string; title: string; scenario: string; priority?: string }>,
+	journeys: Array<{ id: string; title: string; scenario: string; priority?: string; implementationPhase?: string; source?: string }>,
 	workflows: WorkflowProposal[],
 ): MMPPayload | undefined {
 	const mirrorItems: MirrorItem[] = [];
-	let idx = 0;
 
 	for (const j of journeys) {
-		idx++;
+		const phaseTag = j.implementationPhase ?? j.priority ?? '';
+		const sourceTag = j.source ? ` (${j.source})` : '';
 		mirrorItems.push({
-			id: `PV-JRN-${idx}`,
-			text: `[${j.priority ?? 'MVP'}] ${j.title}: ${j.scenario}`,
+			id: j.id,
+			text: `${phaseTag ? '[' + phaseTag + '] ' : ''}${j.title}: ${j.scenario}${sourceTag}`,
 			category: 'journey',
 			rationale: 'Proposed for accepted domains',
 			status: 'pending',
@@ -1829,9 +1831,8 @@ export function extractJourneyWorkflowMMP(
 	}
 
 	for (const w of workflows) {
-		idx++;
 		mirrorItems.push({
-			id: `PV-WF-${idx}`,
+			id: w.id,  // Use workflow's own ID
 			text: `${w.name}: ${w.description}`,
 			category: 'workflow',
 			rationale: `Domain: ${w.domainId}. Steps: ${w.steps.length}. Actors: ${w.actors.join(', ')}`,
@@ -1857,10 +1858,9 @@ export function extractEntityMMP(
 ): MMPPayload | undefined {
 	const mirrorItems: MirrorItem[] = [];
 
-	for (let i = 0; i < entities.length; i++) {
-		const e = entities[i];
+	for (const e of entities) {
 		mirrorItems.push({
-			id: `PV-ENT-${i + 1}`,
+			id: e.id,  // Use entity's own ID
 			text: `${e.name}: ${e.description}`,
 			category: 'entity',
 			rationale: `Domain: ${e.domainId}. Attributes: ${e.keyAttributes.join(', ')}. Relationships: ${e.relationships.join(', ')}`,
@@ -1886,12 +1886,10 @@ export function extractIntegrationMMP(
 	qualityAttributes: string[],
 ): MMPPayload | undefined {
 	const mirrorItems: MirrorItem[] = [];
-	let idx = 0;
 
 	for (const int of integrations) {
-		idx++;
 		mirrorItems.push({
-			id: `PV-INT-${idx}`,
+			id: int.id,  // Use integration's own ID
 			text: `${int.name} (${int.category}): ${int.description}`,
 			category: 'integration',
 			rationale: `Providers: ${int.standardProviders.join(', ')}. Ownership: ${int.ownershipModel}. ${int.rationale}`,
@@ -1899,11 +1897,10 @@ export function extractIntegrationMMP(
 		});
 	}
 
-	for (const qa of qualityAttributes) {
-		idx++;
+	for (let i = 0; i < qualityAttributes.length; i++) {
 		mirrorItems.push({
-			id: `PV-QA-${idx}`,
-			text: qa,
+			id: `PV-QA-${i + 1}`,  // No source ID for QA strings — keep synthetic
+			text: qualityAttributes[i],
 			category: 'ux',
 			rationale: 'Quality attribute for the platform',
 			status: 'pending',

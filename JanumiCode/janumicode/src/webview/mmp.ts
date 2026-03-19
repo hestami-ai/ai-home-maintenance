@@ -7,6 +7,25 @@
 import { vscode } from './types';
 import { state, persistMmpState } from './state';
 
+// ===== Scoped Query Helper =====
+
+/**
+ * Find the MMP card container by cardId, then query within it.
+ * This ensures we find elements in the CORRECT card when multiple
+ * MMP cards exist in the DOM (e.g., Domains card + Journeys card).
+ */
+function scopedQuery(cardId: string, selector: string): HTMLElement | null {
+	const container = document.querySelector('[data-mmp-card-id="' + cardId + '"]');
+	if (!container) return null;
+	return container.querySelector(selector) as HTMLElement | null;
+}
+
+function scopedQueryAll(cardId: string, selector: string): NodeListOf<Element> {
+	const container = document.querySelector('[data-mmp-card-id="' + cardId + '"]');
+	if (!container) return document.querySelectorAll('.nonexistent-guard');
+	return container.querySelectorAll(selector);
+}
+
 // ===== Mirror Handlers =====
 
 /**
@@ -27,10 +46,8 @@ export function handleMirrorDecision(
 		state.mmpMirrorDecisions[key] = { status: decision };
 	}
 
-	// Update UI
-	const item = document.querySelector(
-		'[data-mmp-mirror-id="' + mirrorId + '"][data-mmp-card="' + cardId + '"]'
-	) as HTMLElement | null;
+	// Update UI — scoped to the correct card container
+	const item = scopedQuery(cardId, '[data-mmp-mirror-id="' + mirrorId + '"]');
 	if (item) {
 		item.classList.remove('accepted', 'rejected', 'deferred', 'edited');
 		const stored = state.mmpMirrorDecisions[key];
@@ -53,9 +70,7 @@ export function handleMirrorDecision(
  */
 export function handleMirrorEdit(mirrorId: string, cardId: string): void {
 	const key = cardId + ':' + mirrorId;
-	const item = document.querySelector(
-		'[data-mmp-mirror-id="' + mirrorId + '"][data-mmp-card="' + cardId + '"]'
-	) as HTMLElement | null;
+	const item = scopedQuery(cardId, '[data-mmp-mirror-id="' + mirrorId + '"]');
 	if (!item) { return; }
 
 	const editArea = item.querySelector('.mmp-mirror-item-edit-area') as HTMLElement | null;
@@ -136,13 +151,9 @@ export function handleMenuSelect(menuId: string, optionId: string, cardId: strin
 		state.mmpMenuSelections[key] = { selectedOptionId: optionId };
 	}
 
-	// Update UI — highlight selected option, deselect others
-	const container = document.querySelector(
-		'[data-mmp-card="' + cardId + '"] .mmp-menu-item'
-	);
-	// Find the specific menu item (walk from the clicked option)
-	const allOptions = document.querySelectorAll(
-		'.mmp-option-card[data-mmp-menu-id="' + menuId + '"][data-mmp-card="' + cardId + '"]'
+	// Update UI — scoped to the correct card container
+	const allOptions = scopedQueryAll(cardId,
+		'.mmp-option-card[data-mmp-menu-id="' + menuId + '"]'
 	);
 	const stored = state.mmpMenuSelections[key];
 	allOptions.forEach((opt) => {
@@ -189,11 +200,8 @@ export function handlePreMortemDecision(
 		state.mmpPreMortemDecisions[key] = { status: decision };
 	}
 
-	// Update UI
-	// Find the premortem item wrapper
-	const item = document.querySelector(
-		'[data-mmp-premortem-id="' + riskId + '"][data-mmp-card="' + cardId + '"]'
-	) as HTMLElement | null;
+	// Update UI — scoped to correct card container
+	const item = scopedQuery(cardId, '[data-mmp-premortem-id="' + riskId + '"]');
 	if (item) {
 		item.classList.remove('accepted', 'rejected', 'deferred');
 		const stored = state.mmpPreMortemDecisions[key];
@@ -201,10 +209,9 @@ export function handlePreMortemDecision(
 			item.classList.add(stored.status);
 		}
 
-		// Find ALL buttons matching this item across the entire document
-		// (buttons may be siblings of the wrapper in some rendering paths)
-		const btns = document.querySelectorAll(
-			'.mmp-btn[data-mmp-item="' + riskId + '"][data-mmp-card="' + cardId + '"]'
+		// Find buttons within the card container (buttons may be siblings in some renderings)
+		const btns = scopedQueryAll(cardId,
+			'.mmp-btn[data-mmp-item="' + riskId + '"]'
 		);
 		btns.forEach((btn) => {
 			btn.classList.remove('selected');
@@ -278,8 +285,8 @@ export function handleMMPSubmit(cardId: string): void {
 		}
 	}
 
-	// Enrich mirror decisions with the assumption text from the DOM
-	document.querySelectorAll('.mmp-mirror-item[data-mmp-card="' + cardId + '"]').forEach((el) => {
+	// Enrich mirror decisions with the assumption text from the DOM — scoped to card
+	scopedQueryAll(cardId, '.mmp-mirror-item').forEach((el) => {
 		const item = el as HTMLElement;
 		const id = item.dataset.mmpMirrorId;
 		if (id && mirrorDecisions[id]) {
@@ -288,10 +295,9 @@ export function handleMMPSubmit(cardId: string): void {
 		}
 	});
 
-	// Enrich menu selections with the question text and selected option label
-	document.querySelectorAll('.mmp-menu-item').forEach((menuItem) => {
-		// Find the menu ID from the first option card inside this menu item
-		const firstOption = menuItem.querySelector('.mmp-option-card[data-mmp-card="' + cardId + '"]') as HTMLElement | null;
+	// Enrich menu selections with the question text and selected option label — scoped to card
+	scopedQueryAll(cardId, '.mmp-menu-item').forEach((menuItem) => {
+		const firstOption = menuItem.querySelector('.mmp-option-card') as HTMLElement | null;
 		if (!firstOption) { return; }
 		const menuId = firstOption.dataset.mmpMenuId;
 		if (!menuId || !menuSelections[menuId]) { return; }
@@ -312,8 +318,8 @@ export function handleMMPSubmit(cardId: string): void {
 		}
 	});
 
-	// Enrich pre-mortem decisions with the assumption text
-	document.querySelectorAll('.mmp-premortem-item[data-mmp-card="' + cardId + '"]').forEach((el) => {
+	// Enrich pre-mortem decisions with the assumption text — scoped to card
+	scopedQueryAll(cardId, '.mmp-premortem-item').forEach((el) => {
 		const item = el as HTMLElement;
 		const id = item.dataset.mmpPremortemId;
 		if (id && preMortemDecisions[id]) {
@@ -406,10 +412,8 @@ function updateMMPProgress(cardId: string): void {
 
 	const prefix = cardId + ':';
 
-	// Count mirror items and decisions
-	const mirrorItems = document.querySelectorAll(
-		'.mmp-mirror-item[data-mmp-card="' + cardId + '"]'
-	);
+	// Count mirror items and decisions — scoped to card
+	const mirrorItems = scopedQueryAll(cardId, '.mmp-mirror-item');
 	const mirrorTotal = mirrorItems.length;
 	let mirrorDone = 0;
 	mirrorItems.forEach((item) => {
@@ -418,10 +422,8 @@ function updateMMPProgress(cardId: string): void {
 		if (id && state.mmpMirrorDecisions[prefix + id]) { mirrorDone++; }
 	});
 
-	// Count menu items and selections
-	const menuItems = document.querySelectorAll(
-		'.mmp-menu-item [data-mmp-menu-id][data-mmp-card="' + cardId + '"]'
-	);
+	// Count menu items and selections — scoped to card
+	const menuItems = scopedQueryAll(cardId, '.mmp-option-card[data-mmp-menu-id]');
 	const menuIds = new Set<string>();
 	menuItems.forEach((el) => {
 		const menuId = (el as HTMLElement).dataset.mmpMenuId;
@@ -433,10 +435,8 @@ function updateMMPProgress(cardId: string): void {
 		if (state.mmpMenuSelections[prefix + id]) { menuDone++; }
 	});
 
-	// Count pre-mortem items and decisions
-	const pmItems = document.querySelectorAll(
-		'.mmp-premortem-item[data-mmp-card="' + cardId + '"]'
-	);
+	// Count pre-mortem items and decisions — scoped to card
+	const pmItems = scopedQueryAll(cardId, '.mmp-premortem-item');
 	const pmTotal = pmItems.length;
 	let pmDone = 0;
 	pmItems.forEach((item) => {
@@ -501,15 +501,14 @@ export function applyPendingMmpDecisions(
 /**
  * Apply the current MMP state to DOM elements — add CSS classes and button states.
  * Called after restoring from either webview state or SQLite.
+ * Uses scoped queries to find elements in the correct card container.
  */
 export function applyMmpStateToDom(): void {
 	for (const [key, val] of Object.entries(state.mmpMirrorDecisions)) {
 		const parts = key.split(':');
 		const cardId = parts[0];
 		const mirrorId = parts.slice(1).join(':');
-		const item = document.querySelector(
-			'[data-mmp-mirror-id="' + mirrorId + '"][data-mmp-card="' + cardId + '"]'
-		) as HTMLElement | null;
+		const item = scopedQuery(cardId, '[data-mmp-mirror-id="' + mirrorId + '"]');
 		if (item) {
 			item.classList.remove('accepted', 'rejected', 'deferred', 'edited');
 			item.classList.add(val.status);
@@ -529,9 +528,7 @@ export function applyMmpStateToDom(): void {
 		const parts = key.split(':');
 		const cardId = parts[0];
 		const menuId = parts.slice(1).join(':');
-		document.querySelectorAll(
-			'.mmp-option-card[data-mmp-menu-id="' + menuId + '"][data-mmp-card="' + cardId + '"]'
-		).forEach((opt) => {
+		scopedQueryAll(cardId, '.mmp-option-card[data-mmp-menu-id="' + menuId + '"]').forEach((opt) => {
 			const el = opt as HTMLElement;
 			if (el.dataset.mmpOptionId === val.selectedOptionId) {
 				el.classList.add('selected');
@@ -542,9 +539,7 @@ export function applyMmpStateToDom(): void {
 		const parts = key.split(':');
 		const cardId = parts[0];
 		const riskId = parts.slice(1).join(':');
-		const item = document.querySelector(
-			'[data-mmp-premortem-id="' + riskId + '"][data-mmp-card="' + cardId + '"]'
-		) as HTMLElement | null;
+		const item = scopedQuery(cardId, '[data-mmp-premortem-id="' + riskId + '"]');
 		if (item) {
 			item.classList.remove('accepted', 'rejected', 'deferred');
 			item.classList.add(val.status);

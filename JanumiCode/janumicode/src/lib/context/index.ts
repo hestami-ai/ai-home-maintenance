@@ -1,27 +1,38 @@
 /**
  * Context Management Module
- * Exports all context management functionality
- * Phase 5: Context Management & Compilation
+ *
+ * Contract-driven context handoff layer.
+ * The Context Engineer agent assembles optimally budgeted briefings
+ * for downstream LLM agents using declarative policies.
  */
 
-// Compiler
-export * from './compiler';
+// Context Engineer (main entry point — replaces compiler)
+export { assembleContext } from './contextEngineer';
 
-// Budget manager
-export * from './budgetManager';
+// Types
+export * from './engineTypes';
 
-// Truncation
-export * from './truncation';
+// Policy registry
+export { getPolicy, getAllPolicyKeys, CONTEXT_POLICIES } from './policyRegistry';
 
-// Historical retrieval
-export * from './historical';
+// Handoff document store
+export {
+	storeHandoffDocument,
+	getLatestHandoffDocument,
+	getHandoffDocuments,
+	getHandoffDocumentsSince,
+	deleteHandoffDocuments,
+} from './handoffDocStore';
 
-// Workspace file reader
+// Cache
+export {
+	computeFingerprint,
+	getCachedPacket,
+	cachePacket,
+	invalidateForDialogue,
+	clearContextCache,
+	getCacheSize,
+} from './contextCache';
+
+// Workspace file reader (still used by orchestrator.ts)
 export * from './workspaceReader';
-
-// Role-specific builders
-export * from './builders/executor';
-export * from './builders/technicalExpert';
-export * from './builders/intakeTechnicalExpert';
-export * from './builders/verifier';
-export * from './builders/historianInterpreter';

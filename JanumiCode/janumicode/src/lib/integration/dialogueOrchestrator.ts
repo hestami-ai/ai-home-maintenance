@@ -38,8 +38,6 @@ export interface StartDialogueWithWorkflowOptions {
 export interface StartDialogueWithWorkflowResult {
 	/** Created dialogue */
 	dialogue: Dialogue;
-	/** Initial dialogue turn */
-	turn: DialogueEvent;
 	/** Whether workflow was initialized */
 	workflowInitialized: boolean;
 }
@@ -94,21 +92,9 @@ export function startDialogueWithWorkflow(
 
 		const dialogue = dialogueResult.value;
 
-		// Add initial turn with user goal (HUMAN role only allows DECISION speech act)
-		const turnResult = createAndAddTurn({
-			dialogue_id: dialogue.dialogue_id,
-			role: Role.HUMAN,
-			phase: Phase.INTAKE,
-			speech_act: SpeechAct.DECISION,
-			content_ref: options.goal,
-			related_claims: [],
-		});
-
-		if (!turnResult.success) {
-			return turnResult;
-		}
-
-		const turn = turnResult.value;
+		// Note: The initial human turn is written as a 'human_message' event
+		// by GovernedStreamPanel after this function returns. We do NOT write
+		// a legacy turn here to avoid duplicate rendering.
 
 		// Initialize workflow state with goal in metadata
 		const workflowResult = initializeWorkflowState(dialogue.dialogue_id, {
@@ -130,13 +116,11 @@ export function startDialogueWithWorkflow(
 
 		// Emit events so UI subscribers update
 		emitDialogueStarted(dialogue.dialogue_id, options.goal);
-		emitDialogueTurnAdded(dialogue.dialogue_id, turn.event_id, Role.HUMAN);
 
 		return {
 			success: true,
 			value: {
 				dialogue,
-				turn,
 				workflowInitialized: true,
 			},
 		};

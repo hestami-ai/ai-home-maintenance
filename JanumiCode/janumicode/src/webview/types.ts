@@ -261,4 +261,6 @@ export type OutgoingMessage =
 	| { type: 'mmpPartialSave'; cardId: string; mirrorDecisions: Record<string, { status: string; editedText?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string }> }
 	| { type: 'speechStart'; targetInputId: string }
 	| { type: 'speechStop' }
-	| { type: 'speechCancel' };
+	| { type: 'speechCancel' }
+	| { type: 'generateDocument' }
+	| { type: 'reviewRerun'; guidance?: string };

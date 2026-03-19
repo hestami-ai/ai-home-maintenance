@@ -4,14 +4,9 @@
  * This is an LLM-backed agent that analyzes historical context without modifying it
  */
 
+import { Role, Phase } from '../types';
 import type { Result, Claim, Verdict } from '../types';
-import {
-	buildHistorianInterpreterContext,
-	formatHistorianInterpreterContext,
-	buildAdjudicationContext,
-	formatAdjudicationContext,
-	HistorianQueryType,
-} from '../context';
+import { assembleContext, HistorianQueryType } from '../context';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
 import type { CLIActivityEvent } from '../cli/types';
@@ -350,27 +345,23 @@ export async function invokeHistorianInterpreter(
 	options: HistorianInterpreterInvocationOptions
 ): Promise<Result<HistorianInterpreterResponse>> {
 	try {
-		// Build Historian-Interpreter context pack
-		const contextResult = await buildHistorianInterpreterContext({
+		// Build Historian-Interpreter context via Context Engineer
+		const contextResult = await assembleContext({
 			dialogueId: options.dialogueId,
-			query: options.query,
-			queryType: options.queryType,
-			relatedClaimIds: options.relatedClaimIds,
+			role: Role.HISTORIAN,
+			phase: Phase.HISTORICAL_CHECK,
+			intent: options.queryType,
 			tokenBudget: options.tokenBudget,
-			timeWindowDays: options.timeWindowDays,
+			extras: { query: options.query, queryType: options.queryType, relatedClaimIds: options.relatedClaimIds, timeWindowDays: options.timeWindowDays },
+			onEvent: options.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult;
 		}
 
-		const context = contextResult.value;
-
-		// Format context for CLI invocation
-		const formattedContext = formatHistorianInterpreterContext(context);
-
-		// Build stdin content: system prompt + formatted context
-		const stdinContent = buildStdinContent(HISTORIAN_INTERPRETER_SYSTEM_PROMPT, formattedContext);
+		// Build stdin content: system prompt + assembled briefing
+		const stdinContent = buildStdinContent(HISTORIAN_INTERPRETER_SYSTEM_PROMPT, contextResult.value.briefing);
 
 		// Emit full stdin content for observability (expandable in command block UI)
 		if (options.commandId) {
@@ -740,27 +731,23 @@ export async function invokeHistorianAdjudication(
 	options: HistorianAdjudicationOptions
 ): Promise<Result<HistorianAdjudicationResponse>> {
 	try {
-		// Build adjudication-specific context
-		const contextResult = await buildAdjudicationContext({
+		// Build adjudication-specific context via Context Engineer
+		const contextResult = await assembleContext({
 			dialogueId: options.dialogueId,
-			claims: options.claims,
-			verdicts: options.verdicts,
+			role: Role.HISTORIAN,
+			phase: Phase.HISTORICAL_CHECK,
+			subPhase: 'ADJUDICATION',
 			tokenBudget: options.tokenBudget,
+			extras: { conflictingVerdicts: options.verdicts, claims: options.claims },
+			onEvent: options.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult;
 		}
 
-		// Format context with claim-verdict pairs
-		const formattedContext = formatAdjudicationContext(
-			contextResult.value,
-			options.claims,
-			options.verdicts,
-		);
-
-		// Build stdin: adjudication prompt + formatted context
-		const stdinContent = buildStdinContent(HISTORIAN_ADJUDICATION_SYSTEM_PROMPT, formattedContext);
+		// Build stdin: adjudication prompt + assembled briefing
+		const stdinContent = buildStdinContent(HISTORIAN_ADJUDICATION_SYSTEM_PROMPT, contextResult.value.briefing);
 
 		// Emit stdin for observability
 		if (options.commandId) {

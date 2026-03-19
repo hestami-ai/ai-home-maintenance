@@ -275,8 +275,12 @@ export interface UserJourney {
 	steps: UserJourneyStep[];
 	/** Measurable success conditions */
 	acceptanceCriteria: string[];
-	/** Release priority */
-	priority: 'MVP' | 'V2' | 'FUTURE';
+	/** Implementation phasing — from source document, user feedback, or agent suggestion */
+	implementationPhase?: string;
+	/** Source attribution */
+	source?: 'document-specified' | 'domain-standard' | 'ai-proposed';
+	/** @deprecated Use implementationPhase instead */
+	priority?: string;
 }
 
 /**

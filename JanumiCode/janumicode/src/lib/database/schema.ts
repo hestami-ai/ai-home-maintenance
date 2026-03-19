@@ -30,6 +30,7 @@
  * 36. arch_workflows      — Workflow lookup
  * 37. arch_components     — Component lookup (hierarchical)
  * 38. arch_implementation_steps — Implementation steps (→ MAKER TaskUnits)
+ * 39. handoff_documents    — Canonical phase-boundary artifacts for context handoff
  * + schema_metadata
  */
 
@@ -273,7 +274,7 @@ CREATE INDEX IF NOT EXISTS idx_wf_commands_started_at ON workflow_commands(start
 CREATE TABLE IF NOT EXISTS workflow_command_outputs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     command_id TEXT NOT NULL,
-    line_type TEXT NOT NULL CHECK(line_type IN ('summary', 'detail', 'error', 'stdin', 'tool_input', 'tool_output')) DEFAULT 'summary',
+    line_type TEXT NOT NULL CHECK(line_type IN ('summary', 'detail', 'error', 'stdin', 'tool_input', 'tool_output', 'reasoning_review')) DEFAULT 'summary',
     tool_name TEXT DEFAULT NULL,
     content TEXT NOT NULL,
     timestamp TEXT NOT NULL,
@@ -688,6 +689,39 @@ CREATE TABLE IF NOT EXISTS arch_implementation_steps (
 );
 CREATE INDEX IF NOT EXISTS idx_arch_step_doc ON arch_implementation_steps(doc_id);
 
+-- ==================== CONTEXT HANDOFF ====================
+
+-- Canonical phase-boundary artifacts for context handoff.
+-- Produced by the Narrative Curator at phase transitions.
+-- Consumed by the Context Engineer for pre-invocation context assembly.
+CREATE TABLE IF NOT EXISTS handoff_documents (
+    doc_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    doc_type TEXT NOT NULL CHECK(doc_type IN ('INTAKE', 'ARCHITECTURE', 'EXECUTION', 'VERIFICATION', 'HISTORICAL')),
+    source_phase TEXT NOT NULL,
+    content TEXT NOT NULL,
+    token_count INTEGER NOT NULL DEFAULT 0,
+    event_watermark INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (dialogue_id) REFERENCES dialogues(dialogue_id)
+);
+CREATE INDEX IF NOT EXISTS idx_handoff_docs_dialogue ON handoff_documents(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_handoff_docs_type ON handoff_documents(doc_type, dialogue_id);
+
+-- ==================== GENERATED DOCUMENTS ====================
+
+CREATE TABLE IF NOT EXISTS generated_documents (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id   TEXT NOT NULL,
+    document_type TEXT NOT NULL,
+    title         TEXT NOT NULL,
+    content       TEXT NOT NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(dialogue_id, document_type),
+    FOREIGN KEY (dialogue_id) REFERENCES dialogues(dialogue_id)
+);
+CREATE INDEX IF NOT EXISTS idx_gen_docs_dialogue ON generated_documents(dialogue_id);
+
 -- ==================== METADATA ====================
 
 -- Schema metadata table — tracks schema version and migration history
@@ -698,7 +732,7 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
 );
 
 -- Insert initial schema version
-INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '1')
+INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '10')
     ON CONFLICT(key) DO NOTHING;
 `;
 
@@ -922,6 +956,24 @@ CREATE TABLE IF NOT EXISTS pending_mmp_decisions (
     UNIQUE(dialogue_id, card_id)
 );
 CREATE INDEX IF NOT EXISTS idx_pending_mmp_dialogue ON pending_mmp_decisions(dialogue_id);
+`,
+	},
+	{
+		version: 10,
+		description:
+			'Generated documents — ephemeral LLM-generated prose artifacts per dialogue',
+		sql: `
+CREATE TABLE IF NOT EXISTS generated_documents (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id   TEXT NOT NULL,
+    document_type TEXT NOT NULL,
+    title         TEXT NOT NULL,
+    content       TEXT NOT NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(dialogue_id, document_type),
+    FOREIGN KEY (dialogue_id) REFERENCES dialogues(dialogue_id)
+);
+CREATE INDEX IF NOT EXISTS idx_gen_docs_dialogue ON generated_documents(dialogue_id);
 `,
 	},
 ];

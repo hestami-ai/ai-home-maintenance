@@ -836,3 +836,403 @@ function getCuratorModel(): string {
 		config.get<string>('evaluator.model', 'gemini-3-flash-lite')
 	);
 }
+
+// ==================== HANDOFF DOCUMENT PRODUCTION ====================
+
+import { HandoffDocType } from '../context/engineTypes';
+import type {
+	HandoffDocContent,
+	IntakeHandoffContent,
+	ArchitectureHandoffContent,
+	ExecutionHandoffContent,
+	VerificationHandoffContent,
+	HistoricalHandoffContent,
+} from '../context/engineTypes';
+import { storeHandoffDocument } from '../context/handoffDocStore';
+import { countTokens } from '../llm/tokenCounter';
+
+/**
+ * Produce a canonical handoff document at a phase boundary.
+ *
+ * This is a deterministic DB-read operation (no LLM call).
+ * The document captures the canonical output of a completed phase,
+ * ready for consumption by the Context Engineer.
+ */
+export async function produceHandoffDocument(
+	dialogueId: string,
+	docType: HandoffDocType,
+	sourcePhase: string,
+): Promise<Result<void>> {
+	try {
+		const db = getDatabase();
+		if (!db) {
+			return { success: false, error: new Error('Database not initialized') };
+		}
+
+		// Materialize content based on document type
+		let content: HandoffDocContent;
+		switch (docType) {
+			case HandoffDocType.INTAKE:
+				content = materializeIntakeHandoff(db, dialogueId);
+				break;
+			case HandoffDocType.ARCHITECTURE:
+				content = materializeArchitectureHandoff(db, dialogueId);
+				break;
+			case HandoffDocType.EXECUTION:
+				content = materializeExecutionHandoff(db, dialogueId);
+				break;
+			case HandoffDocType.VERIFICATION:
+				content = materializeVerificationHandoff(db, dialogueId);
+				break;
+			case HandoffDocType.HISTORICAL:
+				content = materializeHistoricalHandoff(db, dialogueId);
+				break;
+			default:
+				return { success: false, error: new Error(`Unknown handoff doc type: ${docType}`) };
+		}
+
+		// Compute token count on serialized content
+		const serialized = JSON.stringify(content);
+		const tokenCount = countTokens(serialized);
+
+		// Get event watermark (latest event_id for this dialogue)
+		const watermarkRow = db.prepare(
+			'SELECT MAX(event_id) as max_id FROM dialogue_events WHERE dialogue_id = ?'
+		).get(dialogueId) as { max_id: number | null } | undefined;
+		const eventWatermark = watermarkRow?.max_id ?? 0;
+
+		// Store
+		const result = storeHandoffDocument(
+			dialogueId, docType, sourcePhase, content, tokenCount, eventWatermark
+		);
+
+		if (!result.success) {
+			return { success: false, error: result.error };
+		}
+
+		if (isLoggerInitialized()) {
+			getLogger().info(`Produced ${docType} handoff document for dialogue ${dialogueId} (${tokenCount} tokens)`);
+		}
+
+		return { success: true, value: undefined };
+	} catch (err) {
+		const error = err instanceof Error ? err : new Error(String(err));
+		if (isLoggerInitialized()) {
+			getLogger().warn(`Failed to produce ${docType} handoff document: ${error.message}`);
+		}
+		return { success: false, error };
+	}
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DB = any;
+
+function materializeIntakeHandoff(db: DB, dialogueId: string): IntakeHandoffContent {
+	// Goal
+	const dialogue = db.prepare(
+		'SELECT goal FROM dialogues WHERE dialogue_id = ?'
+	).get(dialogueId) as { goal: string } | undefined;
+
+	// Finalized plan
+	const intake = db.prepare(
+		'SELECT finalized_plan, draft_plan FROM intake_conversations WHERE dialogue_id = ?'
+	).get(dialogueId) as { finalized_plan: string | null; draft_plan: string | null } | undefined;
+
+	const planStr = intake?.finalized_plan ?? intake?.draft_plan ?? '{}';
+	let finalizedPlan: Record<string, unknown> = {};
+	try { finalizedPlan = JSON.parse(planStr); } catch { /* use empty */ }
+
+	// Human decisions
+	const decisions = db.prepare(`
+		SELECT hd.action, hd.rationale
+		FROM human_decisions hd
+		JOIN gates g ON hd.gate_id = g.gate_id
+		WHERE g.dialogue_id = ?
+		ORDER BY hd.timestamp ASC
+	`).all(dialogueId) as Array<{ action: string; rationale: string }>;
+
+	// Open loops
+	const loops = db.prepare(`
+		SELECT category, description, priority
+		FROM open_loops
+		WHERE dialogue_id = ?
+		ORDER BY priority ASC
+	`).all(dialogueId) as Array<{ category: string; description: string; priority: string }>;
+
+	return {
+		type: 'INTAKE',
+		goal: dialogue?.goal ?? '',
+		finalizedPlan,
+		humanDecisions: decisions,
+		openLoops: loops,
+		mmpDecisions: null,
+	};
+}
+
+function materializeArchitectureHandoff(db: DB, dialogueId: string): ArchitectureHandoffContent {
+	// Latest approved architecture document
+	const doc = db.prepare(`
+		SELECT document, version
+		FROM architecture_documents
+		WHERE dialogue_id = ? AND status = 'APPROVED'
+		ORDER BY version DESC
+		LIMIT 1
+	`).get(dialogueId) as { document: string; version: number } | undefined;
+
+	if (!doc) {
+		// Fall back to latest document regardless of status
+		const anyDoc = db.prepare(`
+			SELECT document, version
+			FROM architecture_documents
+			WHERE dialogue_id = ?
+			ORDER BY version DESC
+			LIMIT 1
+		`).get(dialogueId) as { document: string; version: number } | undefined;
+
+		if (!anyDoc) {
+			return {
+				type: 'ARCHITECTURE',
+				documentVersion: 0,
+				capabilities: [],
+				components: [],
+				interfaces: [],
+				implementationSequence: [],
+				validationFindings: [],
+			};
+		}
+		return parseArchitectureDocument(anyDoc.document, anyDoc.version);
+	}
+
+	return parseArchitectureDocument(doc.document, doc.version);
+}
+
+function parseArchitectureDocument(docJson: string, version: number): ArchitectureHandoffContent {
+	let parsed: Record<string, unknown> = {};
+	try { parsed = JSON.parse(docJson); } catch { /* use empty */ }
+
+	// Extract capabilities (may be nested)
+	const caps = (parsed.capabilities ?? []) as Array<Record<string, unknown>>;
+	const capabilities = caps.map(c => ({
+		id: String(c.id ?? ''),
+		label: String(c.label ?? ''),
+		requirements: (c.requirements ?? []) as string[],
+	}));
+
+	// Extract components
+	const comps = (parsed.components ?? []) as Array<Record<string, unknown>>;
+	const components = comps.map(c => ({
+		id: String(c.id ?? ''),
+		label: String(c.label ?? ''),
+		responsibility: String(c.responsibility ?? ''),
+		dependencies: (c.dependencies ?? []) as string[],
+	}));
+
+	// Extract interfaces
+	const ifaces = (parsed.interfaces ?? []) as Array<Record<string, unknown>>;
+	const interfaces = ifaces.map(i => ({
+		id: String(i.id ?? ''),
+		label: String(i.label ?? ''),
+		type: String(i.type ?? ''),
+		contract: i.contract ? String(i.contract) : null,
+	}));
+
+	// Extract implementation sequence
+	const steps = (parsed.implementationSequence ?? parsed.implementation_sequence ?? []) as Array<Record<string, unknown>>;
+	const implementationSequence = steps.map(s => ({
+		label: String(s.label ?? ''),
+		complexity: String(s.complexity ?? s.estimated_complexity ?? 'MEDIUM'),
+		components: (s.components ?? s.component_ids ?? []) as string[],
+	}));
+
+	// Validation findings (if any)
+	const findings = (parsed.validationFindings ?? parsed.validation_findings ?? []) as string[];
+
+	return {
+		type: 'ARCHITECTURE',
+		documentVersion: version,
+		capabilities,
+		components,
+		interfaces,
+		implementationSequence,
+		validationFindings: findings,
+	};
+}
+
+function materializeExecutionHandoff(db: DB, dialogueId: string): ExecutionHandoffContent {
+	// Task graph
+	const graph = db.prepare(`
+		SELECT graph_id, graph_status
+		FROM task_graphs
+		WHERE dialogue_id = ?
+		ORDER BY created_at DESC
+		LIMIT 1
+	`).get(dialogueId) as { graph_id: string; graph_status: string } | undefined;
+
+	if (!graph) {
+		return {
+			type: 'EXECUTION',
+			taskGraphStatus: 'NONE',
+			completedUnits: [],
+			failedUnits: [],
+			activeUnit: null,
+			repairHistory: [],
+		};
+	}
+
+	// Completed units
+	const completed = db.prepare(`
+		SELECT unit_id, label, goal
+		FROM task_units
+		WHERE graph_id = ? AND status = 'COMPLETED'
+		ORDER BY sort_order ASC
+	`).all(graph.graph_id) as Array<{ unit_id: string; label: string; goal: string }>;
+
+	// Failed units
+	const failed = db.prepare(`
+		SELECT unit_id, label, goal
+		FROM task_units
+		WHERE graph_id = ? AND status = 'FAILED'
+		ORDER BY sort_order ASC
+	`).all(graph.graph_id) as Array<{ unit_id: string; label: string; goal: string }>;
+
+	// Active unit
+	const active = db.prepare(`
+		SELECT unit_id, label, goal
+		FROM task_units
+		WHERE graph_id = ? AND status = 'IN_PROGRESS'
+		LIMIT 1
+	`).get(graph.graph_id) as { unit_id: string; label: string; goal: string } | undefined;
+
+	// Repair history
+	const repairs = db.prepare(`
+		SELECT rp.unit_id, rp.repair_strategy, rp.result
+		FROM repair_packets rp
+		JOIN task_units tu ON rp.unit_id = tu.unit_id
+		WHERE tu.graph_id = ?
+		ORDER BY rp.created_at ASC
+	`).all(graph.graph_id) as Array<{ unit_id: string; repair_strategy: string; result: string }>;
+
+	return {
+		type: 'EXECUTION',
+		taskGraphStatus: graph.graph_status,
+		completedUnits: completed.map(u => ({ id: u.unit_id, label: u.label, outcome: 'completed' })),
+		failedUnits: failed.map(u => ({ id: u.unit_id, label: u.label, failureMode: u.goal })),
+		activeUnit: active ? { id: active.unit_id, label: active.label, goal: active.goal } : null,
+		repairHistory: repairs.map(r => ({ unitId: r.unit_id, strategy: r.repair_strategy, result: r.result })),
+	};
+}
+
+function materializeVerificationHandoff(db: DB, dialogueId: string): VerificationHandoffContent {
+	// Claims summary
+	const claims = db.prepare(`
+		SELECT claim_id, statement, status, criticality
+		FROM claims
+		WHERE dialogue_id = ?
+		ORDER BY created_at ASC
+	`).all(dialogueId) as Array<{ claim_id: string; statement: string; status: string; criticality: string }>;
+
+	// Verdicts summary
+	const verdicts = db.prepare(`
+		SELECT v.claim_id, v.verdict, v.rationale
+		FROM verdicts v
+		JOIN claims c ON v.claim_id = c.claim_id
+		WHERE c.dialogue_id = ?
+		ORDER BY v.timestamp ASC
+	`).all(dialogueId) as Array<{ claim_id: string; verdict: string; rationale: string }>;
+
+	// Escalations (claims that were escalated)
+	const escalations = claims
+		.filter(c => c.status === 'UNKNOWN' && c.criticality === 'CRITICAL')
+		.map(c => c.statement);
+
+	return {
+		type: 'VERIFICATION',
+		claimsSummary: claims.map(c => ({
+			id: c.claim_id,
+			statement: c.statement,
+			status: c.status,
+			criticality: c.criticality,
+		})),
+		verdictsSummary: verdicts.map(v => ({
+			claimId: v.claim_id,
+			verdict: v.verdict,
+			rationale: v.rationale,
+		})),
+		escalations,
+	};
+}
+
+function materializeHistoricalHandoff(db: DB, dialogueId: string): HistoricalHandoffContent {
+	// Narrative memories
+	const memory = db.prepare(`
+		SELECT agent_frame, goal, causal_sequence, conflicts, resolution_status, lessons
+		FROM narrative_memories
+		WHERE dialogue_id = ?
+		ORDER BY created_at DESC
+		LIMIT 1
+	`).get(dialogueId) as {
+		agent_frame: string; goal: string; causal_sequence: string;
+		conflicts: string; resolution_status: string; lessons: string;
+	} | undefined;
+
+	let narrativeMemory: Record<string, unknown> | null = null;
+	if (memory) {
+		narrativeMemory = {
+			agent_frame: memory.agent_frame,
+			goal: memory.goal,
+			causal_sequence: JSON.parse(memory.causal_sequence),
+			conflicts: JSON.parse(memory.conflicts),
+			resolution_status: memory.resolution_status,
+			lessons: JSON.parse(memory.lessons),
+		};
+	}
+
+	// Decision traces
+	const trace = db.prepare(`
+		SELECT decision_points
+		FROM decision_traces
+		WHERE dialogue_id = ?
+		ORDER BY created_at DESC
+		LIMIT 1
+	`).get(dialogueId) as { decision_points: string } | undefined;
+
+	let decisionTrace: Record<string, unknown> | null = null;
+	if (trace) {
+		decisionTrace = { decision_points: JSON.parse(trace.decision_points) };
+	}
+
+	// Open loops
+	const loops = db.prepare(`
+		SELECT category, description, priority
+		FROM open_loops
+		WHERE dialogue_id = ?
+		ORDER BY priority ASC
+	`).all(dialogueId) as Array<{ category: string; description: string; priority: string }>;
+
+	// Prior dialogue lessons (from other dialogues, if any)
+	const lessons = db.prepare(`
+		SELECT lessons
+		FROM narrative_memories
+		WHERE dialogue_id != ?
+		ORDER BY created_at DESC
+		LIMIT 5
+	`).all(dialogueId) as Array<{ lessons: string }>;
+
+	const priorDialogueLessons: string[] = [];
+	for (const l of lessons) {
+		try {
+			const parsed = JSON.parse(l.lessons) as string[];
+			priorDialogueLessons.push(...parsed);
+		} catch { /* skip malformed */ }
+	}
+
+	return {
+		type: 'HISTORICAL',
+		narrativeMemory,
+		decisionTrace,
+		openLoops: loops,
+		priorDialogueLessons: priorDialogueLessons.slice(0, 20), // Cap at 20
+		failureMotifs: [],
+		invariants: [],
+	};
+}
