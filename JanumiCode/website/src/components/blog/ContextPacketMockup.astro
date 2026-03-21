@@ -1,0 +1,322 @@
+---
+// ContextPacket output visualization — structured JSON output of Deep Memory
+---
+
+<div class="cpm">
+  <div class="cpm__header">
+    <span class="cpm__dot"></span>
+    <span class="cpm__title">CONTEXT PACKET — STRUCTURED OUTPUT</span>
+    <span class="cpm__mode">MODE: RESEARCH</span>
+  </div>
+  <div class="cpm__body">
+    <div class="cpm__section">
+      <span class="cpm__section-label">MATERIAL MEMORIES</span>
+      <div class="cpm__items">
+        <div class="cpm__item">
+          <div class="cpm__item-header">
+            <span class="cpm__item-id">DEC-184</span>
+            <span class="cpm__item-type">approved_decision</span>
+            <span class="cpm__item-score">0.91</span>
+          </div>
+          <div class="cpm__item-text">"PostgreSQL selected for all persistent storage"</div>
+          <div class="cpm__item-evidence">Evidence: REQ-22, CHAT-991, POL-8</div>
+        </div>
+        <div class="cpm__item">
+          <div class="cpm__item-header">
+            <span class="cpm__item-id">CLM-042</span>
+            <span class="cpm__item-type">claim</span>
+            <span class="cpm__item-score">0.87</span>
+          </div>
+          <div class="cpm__item-text">"Auth service requires dedicated event bus for cross-domain flows"</div>
+          <div class="cpm__item-evidence">Evidence: ARCH-12, INT-003</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cpm__section">
+      <span class="cpm__section-label cpm__section-label--warn">BINDING CONSTRAINTS</span>
+      <div class="cpm__constraint">
+        <span class="cpm__constraint-badge">POLICY INVARIANT</span>
+        <span class="cpm__constraint-text">"No approval state may imply completeness until validation passes"</span>
+      </div>
+    </div>
+
+    <div class="cpm__section">
+      <span class="cpm__section-label cpm__section-label--red">CONTRADICTIONS</span>
+      <div class="cpm__conflict">
+        <div class="cpm__conflict-pair">
+          <span class="cpm__conflict-id">DEC-184</span>
+          <span class="cpm__conflict-vs">vs</span>
+          <span class="cpm__conflict-id">DEC-203</span>
+        </div>
+        <div class="cpm__conflict-text">"Soft approval allowed" contradicts "Approval requires full validation"</div>
+        <div class="cpm__conflict-governing">Current governing: <strong>DEC-203</strong></div>
+      </div>
+    </div>
+
+    <div class="cpm__section">
+      <span class="cpm__section-label cpm__section-label--purple">COVERAGE ASSESSMENT</span>
+      <div class="cpm__coverage">
+        <div class="cpm__cov-row">
+          <span class="cpm__cov-label">Areas searched</span>
+          <span class="cpm__cov-value">workflow, validation, approvals, architecture</span>
+        </div>
+        <div class="cpm__cov-row">
+          <span class="cpm__cov-label">Evidence types</span>
+          <span class="cpm__cov-value">claims, decisions, constraints, verdicts</span>
+        </div>
+        <div class="cpm__cov-row">
+          <span class="cpm__cov-label">Potential gaps</span>
+          <span class="cpm__cov-value cpm__cov-value--warn">implementation logs, user feedback</span>
+        </div>
+        <div class="cpm__cov-row">
+          <span class="cpm__cov-label">Confidence</span>
+          <div class="cpm__confidence">
+            <div class="cpm__confidence-bar"><div class="cpm__confidence-fill" style="width: 82%"></div></div>
+            <span class="cpm__confidence-pct">0.82</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .cpm {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .cpm__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .cpm__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-accent);
+  }
+
+  .cpm__title {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-text-muted);
+    flex: 1;
+  }
+
+  .cpm__mode {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--color-accent);
+    padding: 1px 6px;
+    border: 1px solid rgba(0, 255, 178, 0.25);
+    border-radius: 2px;
+  }
+
+  .cpm__body { padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-lg); }
+
+  .cpm__section-label {
+    display: block;
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--color-primary);
+    margin-bottom: var(--space-sm);
+  }
+
+  .cpm__section-label--warn { color: var(--color-warning); }
+  .cpm__section-label--red { color: var(--color-error); }
+  .cpm__section-label--purple { color: #A78BFA; }
+
+  /* Material memories */
+  .cpm__items { display: flex; flex-direction: column; gap: var(--space-sm); }
+
+  .cpm__item {
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+  }
+
+  .cpm__item-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: 4px;
+  }
+
+  .cpm__item-id {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  .cpm__item-type {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    padding: 1px 4px;
+    background: var(--color-bg-card);
+    border-radius: 2px;
+  }
+
+  .cpm__item-score {
+    margin-left: auto;
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--color-accent);
+  }
+
+  .cpm__item-text {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+  }
+
+  .cpm__item-evidence {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+  }
+
+  /* Constraints */
+  .cpm__constraint {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: rgba(255, 68, 102, 0.04);
+    border: 1px solid rgba(255, 184, 0, 0.15);
+    border-radius: var(--radius-sm);
+  }
+
+  .cpm__constraint-badge {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--color-error);
+    padding: 1px 5px;
+    border: 1px solid rgba(255, 68, 102, 0.25);
+    border-radius: 2px;
+    flex-shrink: 0;
+    background: rgba(255, 68, 102, 0.08);
+  }
+
+  .cpm__constraint-text {
+    font-size: 0.72rem;
+    color: var(--color-text-secondary);
+  }
+
+  /* Contradictions */
+  .cpm__conflict {
+    padding: var(--space-sm) var(--space-md);
+    background: rgba(255, 68, 102, 0.04);
+    border: 1px solid rgba(255, 68, 102, 0.15);
+    border-radius: var(--radius-sm);
+  }
+
+  .cpm__conflict-pair {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: 4px;
+  }
+
+  .cpm__conflict-id {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--color-error);
+  }
+
+  .cpm__conflict-vs {
+    font-size: 0.6rem;
+    color: var(--color-text-muted);
+  }
+
+  .cpm__conflict-text {
+    font-size: 0.72rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+  }
+
+  .cpm__conflict-governing {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+  }
+
+  .cpm__conflict-governing strong {
+    color: var(--color-accent);
+  }
+
+  /* Coverage */
+  .cpm__coverage { display: flex; flex-direction: column; gap: 4px; }
+
+  .cpm__cov-row {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+  }
+
+  .cpm__cov-label {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    min-width: 100px;
+    flex-shrink: 0;
+  }
+
+  .cpm__cov-value {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+  }
+
+  .cpm__cov-value--warn { color: var(--color-warning); }
+
+  .cpm__confidence {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 1;
+  }
+
+  .cpm__confidence-bar {
+    flex: 1;
+    max-width: 120px;
+    height: 4px;
+    background: var(--color-bg);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .cpm__confidence-fill {
+    height: 100%;
+    background: var(--color-accent);
+    border-radius: 2px;
+  }
+
+  .cpm__confidence-pct {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--color-accent);
+  }
+</style>

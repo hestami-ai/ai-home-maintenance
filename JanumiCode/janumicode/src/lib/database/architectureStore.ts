@@ -38,7 +38,7 @@ function db() {
 }
 
 function parseJSON<T>(value: string | null | undefined, fallback: T): T {
-	if (!value) return fallback;
+	if (!value) {return fallback;}
 	try {
 		return JSON.parse(value) as T;
 	} catch {
@@ -129,7 +129,7 @@ export function getArchitectureDocument(docId: string): Result<ArchitectureDocum
 		const row = db().prepare(
 			'SELECT * FROM architecture_documents WHERE doc_id = ?'
 		).get(docId) as Record<string, unknown> | undefined;
-		if (!row) return { success: false, error: new Error(`ArchitectureDocument not found: ${docId}`) };
+		if (!row) {return { success: false, error: new Error(`ArchitectureDocument not found: ${docId}`) };}
 		return { success: true, value: hydrateArchitectureDocument(row) };
 	} catch (error) {
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
@@ -162,7 +162,7 @@ export function updateArchitectureDocument(
 ): Result<ArchitectureDocument> {
 	try {
 		const existing = getArchitectureDocument(docId);
-		if (!existing.success) return existing;
+		if (!existing.success) {return existing;}
 
 		const merged: ArchitectureDocument = {
 			...existing.value,

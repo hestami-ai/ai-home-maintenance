@@ -112,7 +112,7 @@ function formatResultsAsTable(rows: Record<string, unknown>[], maxChars: number)
 	for (const row of rows) {
 		const values = columns.map(col => {
 			const val = row[col];
-			if (val === null || val === undefined) return '';
+			if (val === null || val === undefined) {return '';}
 			const str = String(val);
 			// Truncate individual cell values that are very long
 			return str.length > 200 ? str.substring(0, 197) + '...' : str;

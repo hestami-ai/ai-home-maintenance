@@ -29,6 +29,7 @@ import { registerRoleCLIProvider } from './lib/cli/roleCLIProvider';
 import { ClaudeCodeRoleCLIProvider } from './lib/cli/providers/claudeCode';
 import { GeminiCLIProvider } from './lib/cli/providers/geminiCli';
 import { CodexCLIProvider } from './lib/cli/providers/codexCli';
+import { OpenCodeCLIProvider } from './lib/cli/providers/opencodeCli';
 import { initializeLogger, getLogger, parseLogLevel } from './lib/logging';
 import { killAllActiveProcesses, getActiveProcessCount } from './lib/cli/spawnUtils';
 import { resetEventBus } from './lib/integration/eventBus';
@@ -85,6 +86,8 @@ function loadDotenv(extensionPath: string): void {
 export async function activate(
 	context: vscode.ExtensionContext
 ): Promise<void> {
+	console.warn('[JanumiCode] Extension activation started');
+
 	// Initialize the structured logger FIRST — all subsequent logging uses it
 	const outputChannel = vscode.window.createOutputChannel('JanumiCode');
 	const logger = initializeLogger(outputChannel);
@@ -130,7 +133,7 @@ export async function activate(
 	// Initialize database
 	const dbLog = logger.child({ component: 'database' });
 	dbLog.info('Initializing database...', { path: config.databasePath });
-	console.log('[JanumiCode] DB init starting, path:', config.databasePath);
+	console.warn('[JanumiCode] DB init starting, path:', config.databasePath);
 	const dbInitResult = initializeDatabase({
 		path: config.databasePath,
 	});
@@ -145,11 +148,11 @@ export async function activate(
 
 	const db = dbInitResult.value;
 	dbLog.info('Database connection established');
-	console.log('[JanumiCode] DB connection OK');
+	console.warn('[JanumiCode] DB connection OK');
 
 	// Run migrations (initialize schema)
 	dbLog.info('Running database migrations...');
-	console.log('[JanumiCode] Running migrations...');
+	console.warn('[JanumiCode] Running migrations...');
 	const schemaResult = initializeSchema(db);
 
 	if (!schemaResult.success) {
@@ -162,7 +165,7 @@ export async function activate(
 	}
 
 	dbLog.info('Database schema initialized successfully');
-	console.log('[JanumiCode] Schema OK');
+	console.warn('[JanumiCode] Schema OK');
 
 	// Get and log database stats
 	const stats = getDatabaseStats();
@@ -184,7 +187,8 @@ export async function activate(
 	registerRoleCLIProvider(new ClaudeCodeRoleCLIProvider());
 	registerRoleCLIProvider(new GeminiCLIProvider());
 	registerRoleCLIProvider(new CodexCLIProvider());
-	logger.info('CLI providers registered', { providers: ['claude-code', 'gemini-cli', 'codex-cli'] });
+	registerRoleCLIProvider(new OpenCodeCLIProvider());
+	logger.info('CLI providers registered', { providers: ['claude-code', 'gemini-cli', 'codex-cli', 'opencode-cli'] });
 
 	// Watch for configuration changes
 	const configWatcher = watchConfig((newConfig) => {
@@ -200,13 +204,13 @@ export async function activate(
 	context.subscriptions.push(configWatcher);
 
 	// Register webview providers
-	console.log('[JanumiCode] Registering webview providers...');
+	console.warn('[JanumiCode] Registering webview providers...');
 	const governedStreamProvider = registerWebviewProviders(context);
-	console.log('[JanumiCode] Webview providers registered');
+	console.warn('[JanumiCode] Webview providers registered');
 
 	// Register commands
 	registerCommands(context, governedStreamProvider);
-	console.log('[JanumiCode] Commands registered');
+	console.warn('[JanumiCode] Commands registered');
 
 	// Setup status bar
 	setupStatusBar(context);
@@ -243,7 +247,7 @@ export async function activate(
 
 	// Show activation success
 	logger.info('Extension activated successfully');
-	console.log('[JanumiCode] Extension activated successfully');
+	console.warn('[JanumiCode] Extension activated successfully');
 	vscode.window.showInformationMessage('JanumiCode: Ready');
 }
 
@@ -620,79 +624,97 @@ async function performGracefulShutdown(): Promise<void> {
 		catch { return null; }
 	})();
 
-	logger?.info('Performing graceful shutdown...');
+	// Safe logger wrapper — OutputChannel may be closed by the time shutdown steps run.
+	// "Channel has been closed" errors from logger calls must not abort shutdown.
+	const safeLog = (level: 'info' | 'error' | 'warn', msg: string, meta?: Record<string, unknown>) => {
+		try { logger?.[level](msg, meta as any); } catch { /* channel closed — swallow */ }
+	};
+
+	console.warn('[JanumiCode] Performing graceful shutdown...');
+	safeLog('info', 'Performing graceful shutdown...');
 
 	// 1. Abort workflow signal + kill active CLI subprocesses
 	try {
+		console.warn('[JanumiCode] Shutdown step 1: Killing CLI processes...');
 		const { setWorkflowAbortSignal } = await import('./lib/cli/spawnUtils.js');
-		setWorkflowAbortSignal(undefined); // Clear module-level signal so no new processes start
+		setWorkflowAbortSignal(undefined);
 		const killed = killAllActiveProcesses();
-		if (killed > 0) {
-			logger?.info('Killed active CLI processes', { count: killed });
-		}
+		console.warn(`[JanumiCode] Shutdown step 1: Killed ${killed} CLI process(es)`);
+		safeLog('info', 'Killed active CLI processes', { count: killed });
 	} catch (err) {
-		logger?.error('Error killing CLI processes', {
-			error: err instanceof Error ? err.message : String(err),
-		});
+		console.error('[JanumiCode] Shutdown step 1 failed:', err);
+		safeLog('error', 'Error killing CLI processes', { error: err instanceof Error ? err.message : String(err) });
 	}
 
 	// 2. Stop permission bridge HTTP server
 	try {
+		console.warn('[JanumiCode] Shutdown step 2: Stopping permission bridge...');
 		const bridge = getActivePermissionBridge();
 		if (bridge) {
 			await bridge.stop();
-			logger?.info('Permission bridge stopped');
+			console.warn('[JanumiCode] Shutdown step 2: Permission bridge stopped');
+			safeLog('info', 'Permission bridge stopped');
+		} else {
+			console.warn('[JanumiCode] Shutdown step 2: No active permission bridge');
 		}
 	} catch (err) {
-		logger?.error('Error stopping permission bridge', {
-			error: err instanceof Error ? err.message : String(err),
-		});
+		console.error('[JanumiCode] Shutdown step 2 failed:', err);
+		safeLog('error', 'Error stopping permission bridge', { error: err instanceof Error ? err.message : String(err) });
 	}
 
 	// 3. Shut down embedding provider (VoyageRPC child process)
 	try {
+		console.warn('[JanumiCode] Shutdown step 3: Shutting down embedding provider...');
 		await shutdownEmbeddingProvider();
-		logger?.info('Embedding provider shut down');
+		console.warn('[JanumiCode] Shutdown step 3: Embedding provider shut down');
+		safeLog('info', 'Embedding provider shut down');
 	} catch (err) {
-		logger?.error('Error shutting down embedding provider', {
-			error: err instanceof Error ? err.message : String(err),
-		});
+		console.error('[JanumiCode] Shutdown step 3 failed:', err);
+		safeLog('error', 'Error shutting down embedding provider', { error: err instanceof Error ? err.message : String(err) });
 	}
 
 	// 4. Unsubscribe command persistence event listener
 	try {
+		console.warn('[JanumiCode] Shutdown step 4: Unsubscribing command persistence...');
 		unsubscribeCommandPersistence();
+		console.warn('[JanumiCode] Shutdown step 4: Done');
 	} catch (err) {
-		logger?.error('Error unsubscribing command persistence', {
-			error: err instanceof Error ? err.message : String(err),
-		});
+		console.error('[JanumiCode] Shutdown step 4 failed:', err);
+		safeLog('error', 'Error unsubscribing command persistence', { error: err instanceof Error ? err.message : String(err) });
 	}
 
 	// 5. Reset event bus (clear all remaining listeners)
 	try {
+		console.warn('[JanumiCode] Shutdown step 5: Resetting event bus...');
 		resetEventBus();
-		logger?.info('Event bus reset');
+		console.warn('[JanumiCode] Shutdown step 5: Event bus reset');
+		safeLog('info', 'Event bus reset');
 	} catch (err) {
-		logger?.error('Error resetting event bus', {
-			error: err instanceof Error ? err.message : String(err),
-		});
+		console.error('[JanumiCode] Shutdown step 5 failed:', err);
+		safeLog('error', 'Error resetting event bus', { error: err instanceof Error ? err.message : String(err) });
 	}
 
 	// 6. Close database (last)
 	try {
+		console.warn('[JanumiCode] Shutdown step 6: Closing database...');
 		const closeResult = closeDatabase();
 		if (closeResult.success) {
-			logger?.info('Database connection closed');
+			console.warn('[JanumiCode] Shutdown step 6: Database closed');
+			safeLog('info', 'Database connection closed');
 		} else {
-			logger?.error('Error closing database', { error: closeResult.error.message });
+			console.error('[JanumiCode] Shutdown step 6: Database close failed:', closeResult.error.message);
+			safeLog('error', 'Error closing database', { error: closeResult.error.message });
 		}
 	} catch (err) {
-		logger?.error('Error closing database', {
-			error: err instanceof Error ? err.message : String(err),
-		});
+		console.error('[JanumiCode] Shutdown step 6 failed:', err);
+		safeLog('error', 'Error closing database', { error: err instanceof Error ? err.message : String(err) });
 	}
 
-	logger?.info('Graceful shutdown complete');
+	// 7. Remove the shutdown rejection handler to prevent process leak
+	process.removeListener('unhandledRejection', shutdownRejectionHandler);
+
+	console.warn('[JanumiCode] Graceful shutdown complete');
+	safeLog('info', 'Graceful shutdown complete');
 }
 
 /**
@@ -700,10 +722,13 @@ async function performGracefulShutdown(): Promise<void> {
  * Called when the extension is deactivated
  */
 export async function deactivate(): Promise<void> {
+	console.warn('[JanumiCode] Extension deactivation started');
 	try {
 		await performGracefulShutdown();
-	} catch {
+	} catch (err) {
+		console.error('[JanumiCode] Graceful shutdown threw:', err);
 		// Last resort — at least close the database
 		try { closeDatabase(); } catch { /* swallow */ }
 	}
+	console.warn('[JanumiCode] Extension deactivation finished');
 }

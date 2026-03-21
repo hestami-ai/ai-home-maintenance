@@ -188,9 +188,9 @@ import { computeCapabilityCoverage } from '../workflow/architecturePhase';
  */
 export function runRequirementsTraceabilityCheck(
 	doc: ArchitectureDocument,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	 
 	approvedPlan: any,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	 
 	domainCoverage: Record<string, any> | null,
 ): RequirementsTraceabilityResult {
 	// 1. Uncovered requirements: plan requirements not in any capability's source_requirements
@@ -359,7 +359,7 @@ function parseGoalAlignmentResponse(raw: string): GoalAlignmentResult | null {
 		const score = typeof parsed.score === 'number' ? Math.max(0, Math.min(1, parsed.score)) : null;
 		const findings = Array.isArray(parsed.findings) ? parsed.findings.filter((f: unknown) => typeof f === 'string') as string[] : [];
 
-		if (score === null) return null;
+		if (score === null) {return null;}
 
 		return { score, findings };
 	} catch {

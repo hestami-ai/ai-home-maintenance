@@ -4,12 +4,13 @@
  */
 
 import { vscode } from './types';
-import { state } from './state';
+import { state, persistDrafts } from './state';
 
 // ===== Generic Gate =====
 
 export function handleRationaleInput(gateId: string, text: string): void {
 	state.gateRationales[gateId] = text;
+	persistDrafts();
 	const charCount = document.getElementById('charcount-' + gateId);
 	if (charCount) {
 		charCount.textContent = text.length + ' / 10 min';
@@ -34,12 +35,16 @@ export function submitGateDecision(gateId: string, action: string): void {
 		action: action,
 		rationale: rationale,
 	});
+	// Clear consumed draft
+	delete state.gateRationales[gateId];
+	vscode.postMessage({ type: 'draftClear', category: 'gate_rationale' });
 }
 
 // ===== Verification Gate =====
 
 export function handleClaimRationaleInput(claimId: string, text: string): void {
 	state.verificationClaimRationales[claimId] = text;
+	persistDrafts();
 	const charCount = document.getElementById('vg-charcount-' + claimId);
 	if (charCount) {
 		charCount.textContent = text.length + ' / 10 min';
@@ -89,6 +94,7 @@ export function handleVerificationGateDecision(gateId: string, action: string): 
 
 export function handleReviewItemRationaleInput(itemKey: string, text: string): void {
 	state.reviewItemRationales[itemKey] = text;
+	persistDrafts();
 	const charCount = document.getElementById('review-charcount-' + itemKey);
 	if (charCount) {
 		charCount.textContent = text.length + ' / 10 min';
@@ -98,6 +104,7 @@ export function handleReviewItemRationaleInput(itemKey: string, text: string): v
 
 export function handleReviewOverallInput(gateId: string, text: string): void {
 	state.reviewOverallRationale = text;
+	persistDrafts();
 	const charCount = document.getElementById('review-overall-charcount-' + gateId);
 	if (charCount) {
 		charCount.textContent = text.length + ' characters';

@@ -69,7 +69,7 @@ export function handleGateResolved(data: GateResolvedData): void {
 		(gateCard as HTMLElement).style.pointerEvents = 'none';
 		const header = gateCard.querySelector('.gate-header');
 		if (header) {
-			header.innerHTML = '&#x2705; Gate Resolved: ' + (data.action || 'Decision made');
+			header.innerHTML = '&#x2705; Gate Resolved: ' + escapeHtmlClient(data.action || 'Decision made');
 		}
 		gateCard.querySelectorAll('.gate-btn').forEach(function (btn) {
 			(btn as HTMLButtonElement).disabled = true;

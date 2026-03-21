@@ -1,0 +1,180 @@
+---
+// Vertical flow: Intent → Reasoning → Execution
+---
+
+<div class="gs-flow">
+  <div class="gs-flow__node">
+    <div class="gs-flow__diamond"></div>
+    <div class="gs-flow__content">
+      <span class="gs-flow__label">Layer 1</span>
+      <h4 class="gs-flow__title">Intent</h4>
+      <ul class="gs-flow__items">
+        <li>Product vision &amp; requirements</li>
+        <li>Domain decomposition</li>
+        <li>Human decisions &amp; overrides</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="gs-flow__connector">
+    <div class="gs-flow__line"></div>
+    <div class="gs-flow__arrow-down">▾</div>
+  </div>
+
+  <div class="gs-flow__node">
+    <div class="gs-flow__diamond"></div>
+    <div class="gs-flow__content">
+      <span class="gs-flow__label">Layer 2</span>
+      <h4 class="gs-flow__title">Reasoning</h4>
+      <ul class="gs-flow__items">
+        <li>Agent analysis &amp; proposals</li>
+        <li>Claims &amp; evidence chains</li>
+        <li>Verification verdicts</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="gs-flow__connector">
+    <div class="gs-flow__line"></div>
+    <div class="gs-flow__arrow-down">▾</div>
+  </div>
+
+  <div class="gs-flow__node gs-flow__node--active">
+    <div class="gs-flow__diamond"></div>
+    <div class="gs-flow__content">
+      <span class="gs-flow__label">Layer 3</span>
+      <h4 class="gs-flow__title">Execution</h4>
+      <ul class="gs-flow__items">
+        <li>Bounded task units</li>
+        <li>Code generation &amp; modification</li>
+        <li>Audit trail &amp; traceability</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="gs-flow__footer">
+    <span class="gs-flow__badge">Append-only · Traceable · Governed</span>
+  </div>
+</div>
+
+<style>
+  .gs-flow {
+    margin: var(--space-2xl) 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .gs-flow__node {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-lg);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    width: 100%;
+    max-width: 520px;
+    position: relative;
+  }
+
+  .gs-flow__node--active {
+    border-color: var(--color-border-active);
+    box-shadow: 0 0 20px var(--color-primary-glow);
+  }
+
+  .gs-flow__diamond {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    transform: rotate(45deg);
+    border: 2px solid var(--color-primary);
+    border-radius: 3px;
+    margin-top: 4px;
+  }
+
+  .gs-flow__content {
+    flex: 1;
+  }
+
+  .gs-flow__label {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--color-primary);
+  }
+
+  .gs-flow__title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-top: var(--space-xs);
+    margin-bottom: var(--space-sm);
+  }
+
+  .gs-flow__items {
+    list-style: none;
+    padding: 0;
+  }
+
+  .gs-flow__items li {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    padding: var(--space-xs) 0;
+    padding-left: var(--space-md);
+    position: relative;
+  }
+
+  .gs-flow__items li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    transform: rotate(45deg) translateY(-50%);
+    border: 1px solid var(--color-primary);
+    border-radius: 1px;
+    opacity: 0.6;
+  }
+
+  .gs-flow__connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 40px;
+  }
+
+  .gs-flow__line {
+    width: 1px;
+    flex: 1;
+    background: linear-gradient(to bottom, var(--color-primary), transparent);
+    opacity: 0.4;
+  }
+
+  .gs-flow__arrow-down {
+    color: var(--color-primary);
+    font-size: 1rem;
+    opacity: 0.6;
+    line-height: 1;
+  }
+
+  .gs-flow__footer {
+    margin-top: var(--space-lg);
+  }
+
+  .gs-flow__badge {
+    display: inline-block;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-accent);
+    border: 1px solid rgba(0, 255, 178, 0.25);
+    border-radius: var(--radius-sm);
+    background: rgba(0, 255, 178, 0.05);
+  }
+</style>

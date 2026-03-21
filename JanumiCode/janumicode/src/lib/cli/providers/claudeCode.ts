@@ -333,7 +333,7 @@ function normalizeClaudeCodeStreamEvent(line: string): CLIActivityEvent[] {
 	}
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type StreamEventHandler = (event: any) => CLIActivityEvent | null;
 
 /** Dispatch table for stream-json event types. */
@@ -385,7 +385,7 @@ const STREAM_EVENT_HANDLERS: Record<string, StreamEventHandler> = {
 	}),
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function normalizeToolUse(event: any): CLIActivityEvent {
 	const toolName: string = event.tool || event.name || event.type;
 	const eventType = classifyToolEventType(toolName);
@@ -403,7 +403,7 @@ function normalizeToolUse(event: any): CLIActivityEvent {
 	};
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function normalizeToolResult(event: any): CLIActivityEvent {
 	let output: string | undefined;
 	if (typeof event.content === 'string') {
@@ -430,7 +430,7 @@ function normalizeToolResult(event: any): CLIActivityEvent {
  * Claude Code's stream-json format can embed tool_use content blocks alongside
  * text blocks in a single assistant message. We emit each as a separate event.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function normalizeAssistantMulti(event: any): CLIActivityEvent[] {
 	const msgContent = event.message?.content ?? event.content;
 	const events: CLIActivityEvent[] = [];
@@ -484,7 +484,7 @@ function classifyToolEventType(toolName: string): CLIActivityEvent['eventType'] 
 }
 
 /** Extract the most meaningful input string from a tool_use event's input object. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function extractToolInput(toolName: string, input: any): string | undefined {
 	if (!input) { return undefined; }
 	if (/bash|shell|command/i.test(toolName)) { return input.command ?? ''; }

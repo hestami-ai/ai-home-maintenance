@@ -147,18 +147,33 @@ export class GeminiCLIProvider implements RoleCLIProvider {
 			);
 
 			const executionTime = Date.now() - startTime;
+			const stderrText = raw.stderr?.trim() || '';
+
+			// Surface stderr as a diagnostic event when the CLI fails
+			if (raw.exitCode !== 0 && stderrText) {
+				onEvent({
+					timestamp: new Date().toISOString(),
+					eventType: 'error',
+					summary: 'CLI stderr output',
+					detail: stderrText,
+					status: 'error',
+				});
+			}
 
 			onEvent({
 				timestamp: new Date().toISOString(),
 				eventType: 'complete',
-				summary: `Completed (exit code ${raw.exitCode})`,
+				summary: `Completed (exit code ${raw.exitCode})` + (stderrText && raw.exitCode !== 0 ? ` — ${stderrText.substring(0, 200)}` : ''),
 				status: raw.exitCode === 0 ? 'success' : 'error',
 			});
+
+			// Use stderr as response text when stdout is empty and CLI failed
+			const responseText = raw.stdout || (raw.exitCode !== 0 ? stderrText : '');
 
 			return {
 				success: true,
 				value: {
-					response: raw.stdout,
+					response: responseText,
 					exitCode: raw.exitCode,
 					executionTime,
 					rawOutput: raw.stdout,
@@ -239,13 +254,12 @@ function buildGeminiArgs(outputFormat: string, options: RoleCLIInvocationOptions
 		args.push('--model', model);
 	}
 
-	// Sandbox mode: read-only → plan mode (prevents file writes) + yolo (auto-approve reads)
-	if (options.sandboxMode === 'read-only') {
-		args.push('--approval-mode', 'plan');
-	}
-
+	// Gemini CLI requires --approval-mode and --yolo to be mutually exclusive.
+	// Use --approval-mode=yolo to auto-approve all, or --approval-mode plan for read-only sandbox.
 	if (options.autoApprove) {
-		args.push('--yolo');
+		args.push('--approval-mode', 'yolo');
+	} else if (options.sandboxMode === 'read-only') {
+		args.push('--approval-mode', 'plan');
 	}
 
 	return args;

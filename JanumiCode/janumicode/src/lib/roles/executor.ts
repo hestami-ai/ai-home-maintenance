@@ -517,7 +517,7 @@ function tryDirectParse(text: string): string | null {
 
 /** Extract JSON from a markdown code fence, with balanced-brace fallback. */
 function tryFenceExtraction(text: string): string | null {
-	const m = /```(?:json)?\s*([\s\S]*?)\s*```/.exec(text);
+	const m = /```(?:json)?\s*([\s\S]*)\s*```/.exec(text);
 	if (!m) { return null; }
 
 	const content = m[1].trim();

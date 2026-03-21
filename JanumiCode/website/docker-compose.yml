@@ -1,0 +1,9 @@
+services:
+  janumicode-website:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: janumicode-website
+    ports:
+      - "3090:80"
+    restart: unless-stopped

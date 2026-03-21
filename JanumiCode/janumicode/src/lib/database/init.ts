@@ -315,6 +315,12 @@ export function clearAllData(): Result<void> {
 				'handoff_documents',         // FK → dialogues
 				'generated_documents',       // FK → dialogues
 				'pending_mmp_decisions',     // FK → dialogues
+				'webview_drafts',            // no FK, keyed by dialogue_id
+				// Deep Memory Agent tables (children before parents)
+				'memory_context_packets',    // no FK, keyed by dialogue_id
+				'memory_extraction_runs',    // no FK, keyed by dialogue_id
+				'memory_edges',              // FK → memory_objects
+				'memory_objects',            // FK → dialogues
 				// Clarification threads
 				'clarification_threads',     // FK → dialogues
 				// FTS

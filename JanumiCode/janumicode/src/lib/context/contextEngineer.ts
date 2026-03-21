@@ -34,6 +34,8 @@ import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { buildStdinContent } from '../cli/types';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { Role as RoleEnum } from '../types';
+import { randomUUID } from 'node:crypto';
+import { emitWorkflowCommand } from '../integration/eventBus';
 
 // ==================== SYSTEM PROMPT ====================
 
@@ -169,16 +171,45 @@ export async function assembleContext(
 		};
 	}
 
-	// 6. Invoke Context Engineer agent
+	// 6. Invoke Context Engineer agent as its own command block
 	const stdinContent = buildStdinContent(CONTEXT_ENGINEER_SYSTEM_PROMPT, agentStdin);
+	const contextCommandId = randomUUID();
+
+	emitWorkflowCommand({
+		dialogueId: options.dialogueId,
+		commandId: contextCommandId,
+		action: 'start',
+		commandType: 'role_invocation',
+		label: `Context Engineer — ${options.role}:${options.phase}`,
+		summary: `Assembling context for ${options.role} (${options.phase})`,
+		status: 'running',
+		timestamp: new Date().toISOString(),
+	});
 
 	const cliResult = await invokeRoleStreaming({
 		provider: providerResult.value,
 		stdinContent,
-		onEvent: options.onEvent,
+		onEvent: (event) => {
+			// Route Context Engineer CLI events through its own command block
+			options.onEvent?.(event);
+		},
 		sandboxMode: 'read-only',
 		signal: options.signal,
 		timeout: 120_000, // 2 minute timeout for context assembly
+		dialogueId: options.dialogueId,
+	});
+
+	emitWorkflowCommand({
+		dialogueId: options.dialogueId,
+		commandId: contextCommandId,
+		action: cliResult.success ? 'complete' : 'error',
+		commandType: 'role_invocation',
+		label: `Context Engineer — ${options.role}:${options.phase}`,
+		summary: cliResult.success
+			? `Context assembled (${Date.now() - startTime}ms)`
+			: `Context assembly failed: ${cliResult.error?.message ?? 'unknown'}`,
+		status: cliResult.success ? 'success' : 'error',
+		timestamp: new Date().toISOString(),
 	});
 
 	if (!cliResult.success) {
@@ -188,11 +219,16 @@ export async function assembleContext(
 		};
 	}
 
-	// 7. Parse response
+	// 7. Parse response — cache raw output for adopt/retry on parse failure
 	const response = cliResult.value.response ?? '';
 	const parseResult = parseAgentResponse(response, policy, fingerprint, startTime);
 
 	if (!parseResult.success) {
+		// Cache the raw CLI output so "adopt" / "use output" can re-attempt parsing
+		try {
+			const { updateWorkflowMetadata } = require('../workflow/stateMachine');
+			updateWorkflowMetadata(options.dialogueId, { cachedRawCliOutput: response });
+		} catch { /* non-critical */ }
 		return parseResult;
 	}
 
@@ -317,19 +353,18 @@ function parseAgentResponse(
 		// Try direct parse first
 		parsed = JSON.parse(response);
 	} catch {
-		// Try to extract JSON from markdown code blocks
-		const jsonMatch = response.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+		// Strategy 1: Extract JSON from markdown code blocks (greedy — matches last closing fence)
+		const jsonMatch = response.match(/```(?:json)?\s*\n?([\s\S]*)\n?```\s*$/);
 		if (jsonMatch) {
 			try {
 				parsed = JSON.parse(jsonMatch[1]);
 			} catch {
-				return {
-					success: false,
-					error: new Error(`Context Engineer returned invalid JSON in code block: ${response.substring(0, 200)}`),
-				};
+				// Code fence content wasn't valid JSON — fall through to brace extraction
 			}
-		} else {
-			// Try to find JSON object in the response
+		}
+
+		// Strategy 2: Extract outermost { ... } from the response
+		if (!parsed!) {
 			const braceStart = response.indexOf('{');
 			const braceEnd = response.lastIndexOf('}');
 			if (braceStart !== -1 && braceEnd > braceStart) {
@@ -338,13 +373,13 @@ function parseAgentResponse(
 				} catch {
 					return {
 						success: false,
-						error: new Error(`Context Engineer returned unparseable response: ${response.substring(0, 200)}`),
+						error: new Error(`Context Engineer returned unparseable JSON: ${response.substring(0, 500)}`),
 					};
 				}
 			} else {
 				return {
 					success: false,
-					error: new Error(`Context Engineer returned no JSON: ${response.substring(0, 200)}`),
+					error: new Error(`Context Engineer returned no JSON: ${response.substring(0, 500)}`),
 				};
 			}
 		}

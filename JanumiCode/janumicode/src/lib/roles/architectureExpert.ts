@@ -73,11 +73,14 @@ and produce a structured decomposition into CAPABILITIES and WORKFLOWS.
    Do NOT leave domain_mappings empty.
 6. Use parent_capability_id to create a hierarchy. Top-level capabilities should be broad functional
    areas. Sub-capabilities should be specific enough to map to concrete workflows.
+7. Do NOT write, create, or modify any files. Your output is JSON only.
+8. Do NOT execute shell commands or use tools to make changes to the codebase.
 
 # Response Format
-Your response MUST be valid JSON with this exact structure:
+Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
+explanatory text before or after the JSON. Do NOT use markdown code fences.
+Return ONLY the JSON object:
 
-\`\`\`json
 {
   "capabilities": [
     {
@@ -120,8 +123,7 @@ Your response MUST be valid JSON with this exact structure:
       "outputs": ["Created record"]
     }
   ]
-}
-\`\`\``;
+}`;
 
 // ── MODELING prompt: Domain Model document ──
 
@@ -149,11 +151,14 @@ relationships, constraints, and business invariants.
 3. Relationships MUST reference other entities in this model (no dangling references).
 4. Do NOT invent infrastructure entities (caches, queues, registries) unless
    requirements explicitly demand them.
+5. Do NOT write, create, or modify any files. Your output is JSON only.
+6. Do NOT execute shell commands or use tools to make changes to the codebase.
 
 # Response Format
-Your response MUST be valid JSON:
+Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
+explanatory text before or after the JSON. Do NOT use markdown code fences.
+Return ONLY the JSON object:
 
-\`\`\`json
 {
   "data_models": [
     {
@@ -171,8 +176,7 @@ Your response MUST be valid JSON:
       "source_requirements": ["REQ-1", "REQ-2"]
     }
   ]
-}
-\`\`\``;
+}`;
 
 // ── DESIGNING prompt: System Architecture + Interface Contract documents ──
 
@@ -221,6 +225,8 @@ Each interface must include a CONCRETE contract:
   one component implementing it.
 - Interface providers and consumers MUST reference components that exist in your output.
 - Focus on what the user asked to build, not what a generic architecture template suggests.
+- Do NOT write, create, or modify any files. Your output is JSON only.
+- Do NOT execute shell commands or use tools to make changes to the codebase.
 
 # Workspace Inspection
 Before finalizing components, examine the workspace for implementation context:
@@ -239,9 +245,10 @@ A component is well-decomposed when ALL are true:
 4. **Single Responsibility**: It serves ≤ the threshold number of workflows
 
 # Response Format
-Your response MUST be valid JSON:
+Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
+explanatory text before or after the JSON. Do NOT use markdown code fences.
+Return ONLY the JSON object:
 
-\`\`\`json
 {
   "components": [
     {
@@ -269,8 +276,7 @@ Your response MUST be valid JSON:
       "source_workflows": ["WF-<ID>"]
     }
   ]
-}
-\`\`\``;
+}`;
 
 // ── SEQUENCING prompt: Implementation Roadmap document ──
 
@@ -307,11 +313,14 @@ Before finalizing the implementation order, examine the workspace:
 3. Dependencies between steps must respect component dependency order.
 4. Verification methods should be concrete: "Run unit tests for X", "Verify API endpoint
    returns expected schema", not vague "Test it".
+5. Do NOT write, create, or modify any files. Your output is JSON only.
+6. Do NOT execute shell commands or use tools to make changes to the codebase.
 
 # Response Format
-Your response MUST be valid JSON:
+Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
+explanatory text before or after the JSON. Do NOT use markdown code fences.
+Return ONLY the JSON object:
 
-\`\`\`json
 {
   "implementation_sequence": [
     {
@@ -325,8 +334,7 @@ Your response MUST be valid JSON:
       "sort_order": 1
     }
   ]
-}
-\`\`\``;
+}`;
 
 // ==================== DECOMPOSING INVOCATION ====================
 
@@ -569,8 +577,8 @@ function extractJson(raw: string): string {
 	if (firstBrace >= 0) {
 		let depth = 0;
 		for (let i = firstBrace; i < trimmed.length; i++) {
-			if (trimmed[i] === '{') depth++;
-			else if (trimmed[i] === '}') depth--;
+			if (trimmed[i] === '{') {depth++;}
+			else if (trimmed[i] === '}') {depth--;}
 			if (depth === 0) {
 				return trimmed.substring(firstBrace, i + 1);
 			}

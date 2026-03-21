@@ -4,10 +4,11 @@
  */
 
 import { vscode } from './types';
-import { state } from './state';
+import { state, persistDrafts } from './state';
 
 export function handleIntakeQuestionInput(questionId: string, text: string): void {
 	state.intakeQuestionResponses[questionId] = text;
+	persistDrafts();
 	const charCount = document.querySelector('[data-charcount-for="' + questionId + '"]');
 	if (charCount) {
 		charCount.textContent = text.length + ' chars';
@@ -65,8 +66,11 @@ export function handleIntakeSubmitResponses(): void {
 		attachments: [],
 	});
 
-	// Freeze inputs — keep text visible but disable editing
+	// Clear consumed drafts
 	state.intakeQuestionResponses = {};
+	vscode.postMessage({ type: 'draftClear', category: 'intake_response' });
+
+	// Freeze inputs — keep text visible but disable editing
 	const textareas = document.querySelectorAll('.intake-question-textarea') as NodeListOf<HTMLTextAreaElement>;
 	textareas.forEach(function (ta) {
 		ta.readOnly = true;

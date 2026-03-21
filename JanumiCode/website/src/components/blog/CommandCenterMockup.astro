@@ -1,0 +1,841 @@
+---
+// Interactive Agent Command Center — switchable tabs with simulated activity
+---
+
+<div class="acc" id="acc-mockup">
+  <div class="acc__header">
+    <div class="acc__tabs">
+      <button class="acc__tab acc__tab--active" data-view="command-center">AGENT COMMAND CENTER</button>
+      <button class="acc__tab" data-view="governed-stream">GOVERNED STREAM</button>
+    </div>
+    <div class="acc__status">
+      <span class="acc__dot"></span>
+      <span class="acc__status-text">ACTIVE</span>
+    </div>
+  </div>
+
+  <!-- Command Center View -->
+  <div class="acc__view acc__view--active" data-view-content="command-center">
+    <div class="acc__body">
+      <div class="acc__panel" data-panel="mission">
+        <div class="acc__panel-header">
+          <span class="acc__panel-icon">🧭</span>
+          <span class="acc__panel-title">Mission Control</span>
+        </div>
+        <div class="acc__panel-content">
+          <div class="acc__kv"><span class="acc__kv-label">Phase</span><span class="acc__kv-value acc__kv-value--cyan">ARCHITECTURE</span></div>
+          <div class="acc__kv"><span class="acc__kv-label">Sub-phase</span><span class="acc__kv-value">Component Design</span></div>
+          <div class="acc__progress-row">
+            <div class="acc__progress-bar"><div class="acc__progress-fill" style="width: 62%"></div></div>
+            <span class="acc__progress-pct">62%</span>
+          </div>
+          <div class="acc__kv"><span class="acc__kv-label">Elapsed</span><span class="acc__kv-value">4m 12s</span></div>
+        </div>
+      </div>
+
+      <div class="acc__panel" data-panel="agents">
+        <div class="acc__panel-header">
+          <span class="acc__panel-icon">🤖</span>
+          <span class="acc__panel-title">Agent Roster</span>
+        </div>
+        <div class="acc__panel-content">
+          <div class="acc__agent">
+            <span class="acc__agent-dot acc__agent-dot--active"></span>
+            <span class="acc__agent-name">Technical Expert</span>
+            <span class="acc__agent-status">analyzing</span>
+          </div>
+          <div class="acc__agent">
+            <span class="acc__agent-dot acc__agent-dot--active"></span>
+            <span class="acc__agent-name">Context Engineer</span>
+            <span class="acc__agent-status">briefing</span>
+          </div>
+          <div class="acc__agent">
+            <span class="acc__agent-dot acc__agent-dot--idle"></span>
+            <span class="acc__agent-name">Verifier</span>
+            <span class="acc__agent-status acc__agent-status--dim">standby</span>
+          </div>
+          <div class="acc__agent">
+            <span class="acc__agent-dot acc__agent-dot--idle"></span>
+            <span class="acc__agent-name">Executor</span>
+            <span class="acc__agent-status acc__agent-status--dim">standby</span>
+          </div>
+          <div class="acc__agent">
+            <span class="acc__agent-dot acc__agent-dot--idle"></span>
+            <span class="acc__agent-name">Historian</span>
+            <span class="acc__agent-status acc__agent-status--dim">standby</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="acc__panel" data-panel="tasks">
+        <div class="acc__panel-header">
+          <span class="acc__panel-icon">🧩</span>
+          <span class="acc__panel-title">Task Graph</span>
+        </div>
+        <div class="acc__panel-content">
+          <div class="acc__task acc__task--done"><span class="acc__task-check">✓</span> Domain decomposition</div>
+          <div class="acc__task acc__task--done"><span class="acc__task-check">✓</span> Interface contracts</div>
+          <div class="acc__task acc__task--active"><span class="acc__task-spinner"></span> Component design</div>
+          <div class="acc__task acc__task--pending"><span class="acc__task-bullet"></span> Integration mapping</div>
+          <div class="acc__task acc__task--pending"><span class="acc__task-bullet"></span> Sequence planning</div>
+          <div class="acc__task acc__task--blocked"><span class="acc__task-block">⊘</span> Execution plan</div>
+        </div>
+      </div>
+
+      <div class="acc__panel" data-panel="artifacts">
+        <div class="acc__panel-header">
+          <span class="acc__panel-icon">📦</span>
+          <span class="acc__panel-title">Artifacts</span>
+        </div>
+        <div class="acc__panel-content">
+          <div class="acc__artifact">
+            <span class="acc__artifact-icon">📄</span>
+            <div>
+              <div class="acc__artifact-name">architecture_doc.json</div>
+              <div class="acc__artifact-meta">12 components · 3 verified</div>
+            </div>
+          </div>
+          <div class="acc__artifact">
+            <span class="acc__artifact-icon">📄</span>
+            <div>
+              <div class="acc__artifact-name">domain_model.json</div>
+              <div class="acc__artifact-meta">8 domains · all verified</div>
+            </div>
+          </div>
+          <div class="acc__artifact">
+            <span class="acc__artifact-icon">📄</span>
+            <div>
+              <div class="acc__artifact-name">interface_contracts.json</div>
+              <div class="acc__artifact-meta">24 interfaces · 18 verified</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="acc__panel" data-panel="adjudication">
+        <div class="acc__panel-header">
+          <span class="acc__panel-icon">⚖️</span>
+          <span class="acc__panel-title">Adjudication</span>
+        </div>
+        <div class="acc__panel-content">
+          <div class="acc__decision">
+            <span class="acc__decision-badge acc__decision-badge--pending">PENDING</span>
+            <span class="acc__decision-text">Auth provider: OAuth2 vs SAML</span>
+          </div>
+          <div class="acc__decision">
+            <span class="acc__decision-badge acc__decision-badge--pending">PENDING</span>
+            <span class="acc__decision-text">Cache layer: Redis vs in-memory</span>
+          </div>
+          <div class="acc__decision">
+            <span class="acc__decision-badge acc__decision-badge--resolved">RESOLVED</span>
+            <span class="acc__decision-text">DB engine: PostgreSQL</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="acc__panel" data-panel="stream-mini">
+        <div class="acc__panel-header">
+          <span class="acc__panel-icon">📜</span>
+          <span class="acc__panel-title">Stream</span>
+        </div>
+        <div class="acc__panel-content acc__mini-stream">
+          <div class="acc__event"><span class="acc__event-time">4:12</span><span class="acc__event-text">Technical Expert → Component analysis started</span></div>
+          <div class="acc__event"><span class="acc__event-time">4:08</span><span class="acc__event-text">Context Engineer → Briefing delivered (3.2k tokens)</span></div>
+          <div class="acc__event"><span class="acc__event-time">4:01</span><span class="acc__event-text">Gate APPROVED → Interface contracts</span></div>
+          <div class="acc__event"><span class="acc__event-time">3:54</span><span class="acc__event-text">Verifier → 24/24 interfaces validated</span></div>
+          <div class="acc__event"><span class="acc__event-time">3:41</span><span class="acc__event-text">Technical Expert → Interface extraction complete</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Governed Stream View -->
+  <div class="acc__view" data-view-content="governed-stream">
+    <div class="acc__stream" id="acc-stream">
+      <div class="acc__stream-item acc__stream-item--phase">
+        <div class="acc__stream-marker acc__stream-marker--phase"></div>
+        <div class="acc__stream-content">
+          <div class="acc__stream-label">PHASE TRANSITION</div>
+          <div class="acc__stream-title">ARCHITECTURE → Component Design</div>
+          <div class="acc__stream-time">4:01 elapsed</div>
+        </div>
+      </div>
+
+      <div class="acc__stream-item acc__stream-item--gate">
+        <div class="acc__stream-marker acc__stream-marker--gate"></div>
+        <div class="acc__stream-content">
+          <div class="acc__stream-label">HUMAN GATE</div>
+          <div class="acc__stream-title">Interface Contracts — Approved</div>
+          <div class="acc__stream-detail">24 interfaces validated. User approved at 4:01.</div>
+          <span class="acc__stream-badge acc__stream-badge--approved">APPROVED</span>
+        </div>
+      </div>
+
+      <div class="acc__stream-item acc__stream-item--agent">
+        <div class="acc__stream-marker acc__stream-marker--agent"></div>
+        <div class="acc__stream-content">
+          <div class="acc__stream-label">CONTEXT ENGINEER</div>
+          <div class="acc__stream-title">Briefing Assembly</div>
+          <div class="acc__stream-detail">Policy: architecture:component_design. Sources: 3 handoff docs, 1 historical query. Budget: 4,096 tokens. Delivered: 3,218 tokens.</div>
+        </div>
+      </div>
+
+      <div class="acc__stream-item acc__stream-item--agent">
+        <div class="acc__stream-marker acc__stream-marker--agent"></div>
+        <div class="acc__stream-content">
+          <div class="acc__stream-label">TECHNICAL EXPERT</div>
+          <div class="acc__stream-title">Component Analysis</div>
+          <div class="acc__stream-detail acc__stream-typing" id="acc-typing">Analyzing 12 components across 8 domains. Identifying shared services, dependency chains, and integration boundaries...</div>
+          <span class="acc__stream-badge acc__stream-badge--running">RUNNING</span>
+        </div>
+      </div>
+
+      <div class="acc__stream-item acc__stream-item--claim" id="acc-new-event" style="opacity: 0; transform: translateY(8px);">
+        <div class="acc__stream-marker acc__stream-marker--claim"></div>
+        <div class="acc__stream-content">
+          <div class="acc__stream-label">CLAIM GENERATED</div>
+          <div class="acc__stream-title">Auth Service requires dedicated event bus</div>
+          <div class="acc__stream-detail">Evidence: 3 cross-domain event flows identified. Confidence: 0.87. Pending verification.</div>
+          <span class="acc__stream-badge acc__stream-badge--pending">PENDING VERIFICATION</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function initCommandCenter() {
+    const mockup = document.getElementById('acc-mockup');
+    if (!mockup) return;
+
+    const tabs = mockup.querySelectorAll('.acc__tab');
+    const views = mockup.querySelectorAll('.acc__view');
+
+    // Tab switching
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = (tab as HTMLElement).dataset.view;
+        tabs.forEach(t => t.classList.remove('acc__tab--active'));
+        tab.classList.add('acc__tab--active');
+        views.forEach(v => {
+          const el = v as HTMLElement;
+          if (el.dataset.viewContent === target) {
+            el.classList.add('acc__view--active');
+          } else {
+            el.classList.remove('acc__view--active');
+          }
+        });
+        // Start stream animation when switching to governed stream
+        if (target === 'governed-stream') {
+          startStreamAnimation();
+        }
+      });
+    });
+
+    // Command center panel simulation
+    let simInterval: ReturnType<typeof setInterval> | null = null;
+    let progressVal = 62;
+
+    function startCommandCenterSim() {
+      if (simInterval) return;
+      const fill = mockup.querySelector('.acc__progress-fill') as HTMLElement;
+      const pct = mockup.querySelector('.acc__progress-pct');
+      const elapsed = mockup.querySelectorAll('.acc__kv-value')[3]; // 4th kv-value = elapsed
+      let seconds = 252; // 4:12
+
+      simInterval = setInterval(() => {
+        // Increment progress
+        if (progressVal < 78) {
+          progressVal += Math.random() < 0.3 ? 1 : 0;
+          if (fill) fill.style.width = progressVal + '%';
+          if (pct) pct.textContent = progressVal + '%';
+        }
+        // Increment elapsed
+        seconds++;
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        if (elapsed) elapsed.textContent = m + 'm ' + String(s).padStart(2, '0') + 's';
+      }, 1000);
+    }
+
+    // Stream animation
+    let streamAnimated = false;
+    function startStreamAnimation() {
+      if (streamAnimated) return;
+      streamAnimated = true;
+
+      // Typing animation on the running item
+      const typing = document.getElementById('acc-typing');
+      if (typing) {
+        const fullText = typing.textContent || '';
+        typing.textContent = '';
+        typing.classList.add('acc__stream-typing--active');
+        let i = 0;
+        const typeInterval = setInterval(() => {
+          if (i < fullText.length) {
+            typing.textContent += fullText[i];
+            i++;
+          } else {
+            clearInterval(typeInterval);
+            typing.classList.remove('acc__stream-typing--active');
+
+            // After typing completes, slide in the new claim event
+            setTimeout(() => {
+              const newEvent = document.getElementById('acc-new-event');
+              if (newEvent) {
+                newEvent.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                newEvent.style.opacity = '1';
+                newEvent.style.transform = 'translateY(0)';
+              }
+            }, 800);
+          }
+        }, 18);
+      }
+    }
+
+    // Auto-start command center simulation
+    startCommandCenterSim();
+
+    // Auto-demo: switch to stream tab after 6s, switch back after 14s
+    let autoDemo = true;
+    tabs.forEach(t => t.addEventListener('click', () => { autoDemo = false; }));
+
+    setTimeout(() => {
+      if (!autoDemo) return;
+      const streamTab = mockup.querySelector('[data-view="governed-stream"]') as HTMLElement;
+      streamTab?.click();
+
+      setTimeout(() => {
+        if (!autoDemo) return;
+        const ccTab = mockup.querySelector('[data-view="command-center"]') as HTMLElement;
+        ccTab?.click();
+      }, 10000);
+    }, 6000);
+  }
+
+  // Run on page load and after Astro page transitions
+  initCommandCenter();
+  document.addEventListener('astro:page-load', initCommandCenter);
+</script>
+
+<style>
+  .acc {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .acc__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    padding: 0 var(--space-md);
+  }
+
+  .acc__tabs {
+    display: flex;
+    gap: 0;
+  }
+
+  .acc__tab {
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: none;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+  }
+
+  .acc__tab:hover {
+    color: var(--color-text-secondary);
+  }
+
+  .acc__tab--active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+    background: var(--color-bg-card);
+  }
+
+  .acc__status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .acc__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    animation: pulse-dot 2s infinite;
+  }
+
+  .acc__status-text {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--color-accent);
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* View switching */
+  .acc__view {
+    display: none;
+  }
+  .acc__view--active {
+    display: block;
+    animation: view-fade 0.3s ease;
+  }
+
+  @keyframes view-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* ── Command Center Body ── */
+  .acc__body {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--color-border);
+    padding: 1px;
+  }
+
+  .acc__panel {
+    background: var(--color-bg-card);
+    padding: var(--space-lg);
+  }
+
+  .acc__panel-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .acc__panel-icon {
+    font-size: 0.85rem;
+  }
+
+  .acc__panel-title {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text);
+  }
+
+  /* Mission Control */
+  .acc__kv {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+  }
+
+  .acc__kv-label {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .acc__kv-value {
+    font-size: 0.7rem;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-weight: 500;
+  }
+
+  .acc__kv-value--cyan {
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+
+  .acc__progress-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 4px 0;
+  }
+
+  .acc__progress-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--color-bg);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .acc__progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .acc__progress-pct {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--color-primary);
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* Agent Roster */
+  .acc__agent {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 3px 0;
+  }
+
+  .acc__agent-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .acc__agent-dot--active {
+    background: var(--color-accent);
+    box-shadow: 0 0 6px rgba(0, 255, 178, 0.4);
+    animation: pulse-dot 2s infinite;
+  }
+
+  .acc__agent-dot--idle {
+    background: var(--color-text-muted);
+    opacity: 0.4;
+  }
+
+  .acc__agent-name {
+    font-size: 0.7rem;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    flex: 1;
+  }
+
+  .acc__agent-status {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-accent);
+    font-weight: 500;
+  }
+
+  .acc__agent-status--dim {
+    color: var(--color-text-muted);
+  }
+
+  /* Task Graph */
+  .acc__task {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 3px 0;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+  }
+
+  .acc__task--done {
+    color: var(--color-text-muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--color-text-muted);
+  }
+
+  .acc__task-check {
+    color: var(--color-accent);
+    font-size: 0.65rem;
+    width: 12px;
+    text-align: center;
+  }
+
+  .acc__task--active {
+    color: var(--color-primary);
+    font-weight: 500;
+  }
+
+  .acc__task-spinner {
+    width: 8px;
+    height: 8px;
+    border: 1.5px solid var(--color-primary);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+    margin: 0 2px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .acc__task--pending { color: var(--color-text-muted); }
+
+  .acc__task-bullet {
+    width: 5px;
+    height: 5px;
+    border: 1px solid var(--color-text-muted);
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin: 0 3.5px;
+  }
+
+  .acc__task--blocked { color: var(--color-warning); opacity: 0.7; }
+
+  .acc__task-block {
+    font-size: 0.7rem;
+    width: 12px;
+    text-align: center;
+    color: var(--color-warning);
+  }
+
+  /* Artifacts */
+  .acc__artifact {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    padding: 4px 0;
+  }
+
+  .acc__artifact-icon {
+    font-size: 0.75rem;
+    margin-top: 1px;
+  }
+
+  .acc__artifact-name {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  .acc__artifact-meta {
+    font-size: 0.6rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+  }
+
+  /* Adjudication */
+  .acc__decision {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 4px 0;
+  }
+
+  .acc__decision-badge {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    padding: 1px 5px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .acc__decision-badge--pending {
+    color: var(--color-warning);
+    background: rgba(255, 184, 0, 0.1);
+    border: 1px solid rgba(255, 184, 0, 0.25);
+  }
+
+  .acc__decision-badge--resolved {
+    color: var(--color-accent);
+    background: rgba(0, 255, 178, 0.08);
+    border: 1px solid rgba(0, 255, 178, 0.2);
+  }
+
+  .acc__decision-text {
+    font-size: 0.7rem;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+  }
+
+  /* Mini Stream */
+  .acc__mini-stream {
+    max-height: 140px;
+    overflow-y: auto;
+  }
+
+  .acc__event {
+    display: flex;
+    gap: var(--space-sm);
+    padding: 2px 0;
+  }
+
+  .acc__event-time {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    min-width: 26px;
+    flex-shrink: 0;
+  }
+
+  .acc__event-text {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+  }
+
+  /* ── Governed Stream View ── */
+  .acc__stream {
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    max-height: 420px;
+    overflow-y: auto;
+  }
+
+  .acc__stream-item {
+    display: flex;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .acc__stream-marker {
+    width: 10px;
+    height: 10px;
+    transform: rotate(45deg);
+    border-radius: 2px;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  .acc__stream-marker--phase {
+    border: 2px solid var(--color-primary);
+    background: var(--color-primary);
+  }
+
+  .acc__stream-marker--gate {
+    border: 2px solid var(--color-accent);
+    background: var(--color-accent);
+  }
+
+  .acc__stream-marker--agent {
+    border: 2px solid var(--color-primary);
+  }
+
+  .acc__stream-marker--claim {
+    border: 2px solid var(--color-warning);
+  }
+
+  .acc__stream-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .acc__stream-label {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-text-muted);
+    margin-bottom: 2px;
+  }
+
+  .acc__stream-item--phase .acc__stream-label { color: var(--color-primary); }
+  .acc__stream-item--gate .acc__stream-label { color: var(--color-accent); }
+  .acc__stream-item--claim .acc__stream-label { color: var(--color-warning); }
+
+  .acc__stream-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 2px;
+  }
+
+  .acc__stream-detail {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+    font-family: var(--font-mono);
+  }
+
+  .acc__stream-time {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+  }
+
+  .acc__stream-badge {
+    display: inline-block;
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-top: var(--space-xs);
+  }
+
+  .acc__stream-badge--approved {
+    color: var(--color-accent);
+    background: rgba(0, 255, 178, 0.08);
+    border: 1px solid rgba(0, 255, 178, 0.2);
+  }
+
+  .acc__stream-badge--running {
+    color: var(--color-primary);
+    background: rgba(0, 212, 255, 0.08);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    animation: pulse-badge 1.5s infinite;
+  }
+
+  .acc__stream-badge--pending {
+    color: var(--color-warning);
+    background: rgba(255, 184, 0, 0.08);
+    border: 1px solid rgba(255, 184, 0, 0.2);
+  }
+
+  @keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Typing animation */
+  .acc__stream-typing--active::after {
+    content: '▌';
+    color: var(--color-primary);
+    animation: blink-cursor 0.6s step-end infinite;
+  }
+
+  @keyframes blink-cursor {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  @media (max-width: 768px) {
+    .acc__body {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .acc__tabs {
+      overflow-x: auto;
+    }
+    .acc__stream {
+      max-height: 360px;
+    }
+  }
+</style>

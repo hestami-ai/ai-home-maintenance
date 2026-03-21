@@ -53,7 +53,7 @@ export class PrimitiveRegistry {
 			const primitives = this.getByCategory(cat).filter(
 				(p) => includeRestricted || p.safety !== PrimitiveSafety.RESTRICTED
 			);
-			if (primitives.length === 0) continue;
+			if (primitives.length === 0) {continue;}
 
 			lines.push(`## ${label}`);
 			for (const p of primitives) {

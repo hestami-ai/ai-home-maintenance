@@ -1,0 +1,380 @@
+---
+// Context Engineer assembly pipeline: Policy → Gather → Budget → Brief → Deliver
+---
+
+<div class="cep">
+  <div class="cep__title-bar">
+    <span class="cep__title-dot"></span>
+    <span class="cep__title-text">CONTEXT ENGINEER — ASSEMBLY PIPELINE</span>
+  </div>
+
+  <div class="cep__flow">
+    <div class="cep__stage cep__stage--input">
+      <div class="cep__diamond"></div>
+      <div class="cep__stage-body">
+        <span class="cep__stage-label">INPUT</span>
+        <h4 class="cep__stage-title">Role Invocation</h4>
+        <div class="cep__stage-items">
+          <div class="cep__kv"><span class="cep__k">role</span><span class="cep__v cep__v--cyan">EXECUTOR</span></div>
+          <div class="cep__kv"><span class="cep__k">phase</span><span class="cep__v">EXECUTE</span></div>
+          <div class="cep__kv"><span class="cep__k">budget</span><span class="cep__v">4,096 tokens</span></div>
+          <div class="cep__kv"><span class="cep__k">extras</span><span class="cep__v">goal, constraints</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cep__connector"><div class="cep__line"></div><span class="cep__arrow">▾</span></div>
+
+    <div class="cep__stage">
+      <div class="cep__diamond"></div>
+      <div class="cep__stage-body">
+        <span class="cep__stage-label">STAGE 1</span>
+        <h4 class="cep__stage-title">Policy Lookup</h4>
+        <div class="cep__detail">
+          <code>EXECUTOR:EXECUTE:*:*</code>
+          <div class="cep__block-list">
+            <span class="cep__block cep__block--required">architecture_doc</span>
+            <span class="cep__block cep__block--required">active_claims</span>
+            <span class="cep__block cep__block--required">goal</span>
+            <span class="cep__block cep__block--optional">historical_findings</span>
+            <span class="cep__block cep__block--optional">narrative_memory</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cep__connector"><div class="cep__line"></div><span class="cep__arrow">▾</span></div>
+
+    <div class="cep__stage">
+      <div class="cep__diamond"></div>
+      <div class="cep__stage-body">
+        <span class="cep__stage-label">STAGE 2</span>
+        <h4 class="cep__stage-title">Gather Sources</h4>
+        <div class="cep__sources">
+          <div class="cep__source">
+            <span class="cep__source-icon">📄</span>
+            <div>
+              <div class="cep__source-name">Handoff Documents</div>
+              <div class="cep__source-meta">Phase boundary snapshots — INTAKE, ARCHITECTURE, VERIFICATION</div>
+            </div>
+          </div>
+          <div class="cep__source">
+            <span class="cep__source-icon">🗄</span>
+            <div>
+              <div class="cep__source-name">Database Queries</div>
+              <div class="cep__source-meta">Claims, verdicts, dialogue events, workflow state</div>
+            </div>
+          </div>
+          <div class="cep__source">
+            <span class="cep__source-icon">🧠</span>
+            <div>
+              <div class="cep__source-name">Deep Memory Agent</div>
+              <div class="cep__source-meta">ContextPacket with evidence lineage + contradiction analysis</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cep__connector"><div class="cep__line"></div><span class="cep__arrow">▾</span></div>
+
+    <div class="cep__stage">
+      <div class="cep__diamond"></div>
+      <div class="cep__stage-body">
+        <span class="cep__stage-label">STAGE 3</span>
+        <h4 class="cep__stage-title">Token Budgeting</h4>
+        <div class="cep__budget">
+          <div class="cep__budget-row">
+            <span class="cep__budget-label">architecture_doc</span>
+            <div class="cep__budget-bar"><div class="cep__budget-fill" style="width: 35%"></div></div>
+            <span class="cep__budget-pct">35%</span>
+          </div>
+          <div class="cep__budget-row">
+            <span class="cep__budget-label">active_claims</span>
+            <div class="cep__budget-bar"><div class="cep__budget-fill" style="width: 20%"></div></div>
+            <span class="cep__budget-pct">20%</span>
+          </div>
+          <div class="cep__budget-row">
+            <span class="cep__budget-label">historical</span>
+            <div class="cep__budget-bar"><div class="cep__budget-fill cep__budget-fill--dim" style="width: 10%"></div></div>
+            <span class="cep__budget-pct">10%</span>
+          </div>
+          <div class="cep__budget-row">
+            <span class="cep__budget-label">other sections</span>
+            <div class="cep__budget-bar"><div class="cep__budget-fill cep__budget-fill--dim" style="width: 35%"></div></div>
+            <span class="cep__budget-pct">35%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cep__connector"><div class="cep__line"></div><span class="cep__arrow">▾</span></div>
+
+    <div class="cep__stage cep__stage--output">
+      <div class="cep__diamond cep__diamond--green"></div>
+      <div class="cep__stage-body">
+        <span class="cep__stage-label cep__stage-label--green">OUTPUT</span>
+        <h4 class="cep__stage-title">HandoffPacket</h4>
+        <div class="cep__output-grid">
+          <div class="cep__output-item"><span class="cep__output-key">briefing</span> Rendered markdown context</div>
+          <div class="cep__output-item"><span class="cep__output-key">manifest</span> What was included + source</div>
+          <div class="cep__output-item"><span class="cep__output-key">omissions</span> What was excluded + why</div>
+          <div class="cep__output-item"><span class="cep__output-key">sufficiency</span> Coverage assessment</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .cep {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .cep__title-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .cep__title-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-primary);
+  }
+
+  .cep__title-text {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-text-muted);
+  }
+
+  .cep__flow {
+    padding: var(--space-xl);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .cep__stage {
+    display: flex;
+    gap: var(--space-md);
+    width: 100%;
+    max-width: 520px;
+    padding: var(--space-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+  }
+
+  .cep__stage--input { border-color: var(--color-border-active); }
+  .cep__stage--output {
+    border-color: rgba(0, 255, 178, 0.3);
+    box-shadow: 0 0 16px rgba(0, 255, 178, 0.08);
+  }
+
+  .cep__diamond {
+    width: 20px;
+    height: 20px;
+    transform: rotate(45deg);
+    border: 2px solid var(--color-primary);
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  .cep__diamond--green { border-color: var(--color-accent); }
+
+  .cep__stage-body { flex: 1; min-width: 0; }
+
+  .cep__stage-label {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    color: var(--color-primary);
+    text-transform: uppercase;
+  }
+
+  .cep__stage-label--green { color: var(--color-accent); }
+
+  .cep__stage-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-top: 2px;
+    margin-bottom: var(--space-sm);
+  }
+
+  .cep__connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 32px;
+  }
+
+  .cep__line {
+    width: 1px;
+    flex: 1;
+    background: var(--color-primary);
+    opacity: 0.3;
+  }
+
+  .cep__arrow {
+    color: var(--color-primary);
+    font-size: 0.9rem;
+    opacity: 0.6;
+    line-height: 1;
+  }
+
+  /* Key-value pairs */
+  .cep__kv {
+    display: flex;
+    gap: var(--space-sm);
+    padding: 2px 0;
+  }
+
+  .cep__k {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    min-width: 50px;
+  }
+
+  .cep__v {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+  }
+
+  .cep__v--cyan { color: var(--color-primary); font-weight: 600; }
+
+  /* Block list */
+  .cep__detail code {
+    font-size: 0.7rem;
+    display: block;
+    margin-bottom: var(--space-sm);
+  }
+
+  .cep__block-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .cep__block {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-weight: 500;
+  }
+
+  .cep__block--required {
+    color: var(--color-primary);
+    background: rgba(0, 212, 255, 0.08);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+  }
+
+  .cep__block--optional {
+    color: var(--color-text-muted);
+    background: rgba(74, 94, 120, 0.1);
+    border: 1px solid rgba(74, 94, 120, 0.2);
+  }
+
+  /* Sources */
+  .cep__sources {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .cep__source {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: flex-start;
+  }
+
+  .cep__source-icon { font-size: 0.8rem; margin-top: 1px; }
+
+  .cep__source-name {
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  .cep__source-meta {
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+  }
+
+  /* Budget bars */
+  .cep__budget { display: flex; flex-direction: column; gap: 4px; }
+
+  .cep__budget-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .cep__budget-label {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    min-width: 100px;
+  }
+
+  .cep__budget-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--color-bg-card);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .cep__budget-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 2px;
+  }
+
+  .cep__budget-fill--dim { background: var(--color-text-muted); opacity: 0.4; }
+
+  .cep__budget-pct {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    min-width: 24px;
+    text-align: right;
+  }
+
+  /* Output */
+  .cep__output-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+
+  .cep__output-item {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .cep__output-key {
+    color: var(--color-accent);
+    font-weight: 600;
+    display: block;
+    font-size: 0.6rem;
+  }
+</style>

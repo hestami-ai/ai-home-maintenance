@@ -229,7 +229,7 @@ function navigatePath(obj: unknown, path: string): unknown {
 	let current: unknown = obj;
 
 	for (const seg of segments) {
-		if (current == null) return undefined;
+		if (current === null || current === undefined) {return undefined;}
 
 		if (typeof current === 'object') {
 			// Try numeric index for arrays
@@ -270,8 +270,8 @@ function evaluateCondition(condition: string, ctx: ExecutionContext): boolean {
 	const rhs = parseRhs(rhsRaw.trim());
 
 	switch (op) {
-		case '==': return lhs === rhs || (lhs == null && rhs == null);
-		case '!=': return lhs !== rhs && !(lhs == null && rhs == null);
+		case '==': return lhs === rhs || ((lhs === null || lhs === undefined) && (rhs === null || rhs === undefined));
+		case '!=': return lhs !== rhs && !((lhs === null || lhs === undefined) && (rhs === null || rhs === undefined));
 		case '>': return Number(lhs) > Number(rhs);
 		case '<': return Number(lhs) < Number(rhs);
 		case '>=': return Number(lhs) >= Number(rhs);
@@ -284,12 +284,12 @@ function evaluateCondition(condition: string, ctx: ExecutionContext): boolean {
  * Parse a right-hand-side literal from a condition expression.
  */
 function parseRhs(raw: string): unknown {
-	if (raw === 'null') return null;
-	if (raw === 'undefined') return undefined;
-	if (raw === 'true') return true;
-	if (raw === 'false') return false;
+	if (raw === 'null') {return null;}
+	if (raw === 'undefined') {return undefined;}
+	if (raw === 'true') {return true;}
+	if (raw === 'false') {return false;}
 	const num = Number(raw);
-	if (!isNaN(num)) return num;
+	if (!isNaN(num)) {return num;}
 	// Strip quotes
 	if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
 		return raw.slice(1, -1);

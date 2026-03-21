@@ -151,6 +151,39 @@ export function completeCommand(
 	}
 }
 
+/**
+ * Mark all commands with status='running' as 'error' (orphaned).
+ * Called on extension activation to clean up commands that were interrupted
+ * by a VS Code restart or extension host crash.
+ * @returns The number of orphaned commands that were reconciled.
+ */
+export function reconcileOrphanedCommands(): Result<number> {
+	const db = getDatabase();
+	if (!db) {
+		return { success: false, error: new Error('Database not initialized') };
+	}
+
+	try {
+		const now = new Date().toISOString();
+		const result = db.prepare(
+			`UPDATE workflow_commands
+			 SET status = 'error', label = label || ' (orphaned)', completed_at = ?
+			 WHERE status = 'running'`
+		).run(now);
+
+		const count = result.changes;
+		if (count > 0) {
+			console.log(`[CommandStore] Reconciled ${count} orphaned command(s)`);
+		}
+		return { success: true, value: count };
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error : new Error('Failed to reconcile orphaned commands'),
+		};
+	}
+}
+
 // ==================== READ OPERATIONS ====================
 
 /**

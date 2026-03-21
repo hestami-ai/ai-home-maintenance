@@ -115,11 +115,13 @@ export async function invokeRoleStreaming(
 				// Response looks like actual model output — return it with a warning flag
 				result.value.warning = `CLI exited with code ${result.value.exitCode} but produced a response`;
 			} else {
+				// Include both response and raw output for maximum diagnostic info
+				const diagnostic = resp || (result.value.rawOutput ?? '').trim();
 				return {
 					success: false,
 					error: new Error(
 						`CLI exited with code ${result.value.exitCode}` +
-						(resp ? `: ${resp.substring(0, 200)}` : '')
+						(diagnostic ? `: ${diagnostic.substring(0, 500)}` : '')
 					),
 				};
 			}
@@ -175,6 +177,33 @@ export async function invokeRoleStreaming(
 			}
 		} catch {
 			// Reviewer failure is non-fatal — don't block the workflow
+		}
+	}
+
+	// Soft pause for HIGH-severity reasoning reviews — gives user time to act
+	if (result.success && result.value.reasoningReview?.hasConcerns) {
+		const hasHighSeverity = result.value.reasoningReview.concerns.some(
+			(c: { severity: string }) => c.severity === 'HIGH'
+		);
+		if (hasHighSeverity) {
+			const pauseSec = vscode?.workspace?.getConfiguration('janumicode')
+				?.get<number>('reasoningReviewer.highSeverityPauseSeconds', 15) ?? 15;
+			if (pauseSec > 0) {
+				// Emit event so UI can show countdown
+				options.onEvent?.({
+					timestamp: new Date().toISOString(),
+					eventType: 'message',
+					summary: `Reasoning review found HIGH-severity concerns — pausing ${pauseSec}s for review`,
+				});
+				// Wait (interruptible via abort signal)
+				await new Promise<void>((resolve) => {
+					const timer = setTimeout(resolve, pauseSec * 1000);
+					options.signal?.addEventListener('abort', () => {
+						clearTimeout(timer);
+						resolve();
+					}, { once: true });
+				});
+			}
 		}
 	}
 

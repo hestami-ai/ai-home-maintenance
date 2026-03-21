@@ -1,0 +1,129 @@
+---
+// Authority levels — 9-tier hierarchy showing that not all memories vote equally
+const tiers = [
+  { level: 'Policy Invariant', weight: '1.0', color: '--color-error', example: 'No execution without gate approval' },
+  { level: 'Incident Evidence', weight: '0.9', color: '--color-warning', example: 'Production failure from cached auth tokens' },
+  { level: 'Test Evidence', weight: '0.85', color: '--color-warning', example: 'Integration test proving schema migration works' },
+  { level: 'Approved Decision', weight: '0.8', color: '--color-accent', example: 'User approved: PostgreSQL over MongoDB' },
+  { level: 'Approved Requirement', weight: '0.7', color: '--color-accent', example: 'Must support multi-tenant isolation' },
+  { level: 'Human Validated', weight: '0.6', color: '--color-primary', example: 'User confirmed: 3 microservices, not monolith' },
+  { level: 'Accepted Artifact', weight: '0.4', color: '--color-primary', example: 'Architecture document accepted at gate' },
+  { level: 'Agent Inference', weight: '0.2', color: '--color-text-muted', example: 'LLM concluded: REST is preferable to GraphQL' },
+  { level: 'Exploratory Discussion', weight: '0.1', color: '--color-text-muted', example: 'Early brainstorming about caching strategies' },
+];
+---
+
+<div class="at">
+  <div class="at__header">
+    <span class="at__header-label">AUTHORITY HIERARCHY</span>
+    <span class="at__header-note">Not all memories vote equally</span>
+  </div>
+  <div class="at__list">
+    {tiers.map((tier, i) => (
+      <div class="at__tier">
+        <div class="at__bar-container">
+          <div class="at__bar" style={`width: ${tier.weight === '1.0' ? 100 : parseFloat(tier.weight) * 100}%; background: var(${tier.color});`}></div>
+        </div>
+        <div class="at__info">
+          <div class="at__tier-header">
+            <span class="at__tier-name">{tier.level}</span>
+            <span class="at__tier-weight" style={`color: var(${tier.color})`}>{tier.weight}</span>
+          </div>
+          <div class="at__tier-example">{tier.example}</div>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+  .at {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+  }
+
+  .at__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .at__header-label {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-primary);
+  }
+
+  .at__header-note {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .at__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .at__tier {
+    display: flex;
+    gap: var(--space-md);
+    align-items: center;
+  }
+
+  .at__bar-container {
+    width: 80px;
+    height: 6px;
+    background: var(--color-bg);
+    border-radius: 3px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .at__bar {
+    height: 100%;
+    border-radius: 3px;
+    opacity: 0.7;
+  }
+
+  .at__info { flex: 1; min-width: 0; }
+
+  .at__tier-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .at__tier-name {
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  .at__tier-weight {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+  }
+
+  .at__tier-example {
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  @media (max-width: 768px) {
+    .at__bar-container { width: 50px; }
+  }
+</style>

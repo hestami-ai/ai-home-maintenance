@@ -1,0 +1,232 @@
+---
+title: "Context Engineering & Deep Memory: How JanumiCode Agents Know What They Need to Know"
+description: "A deep dive into JanumiCode's Context Engineer and Deep Memory Research Agent — the systems that ensure every AI agent has complete, correct, and conflict-aware context before making decisions."
+pubDate: 2026-03-26T12:00:00
+author: "JanumiCode Team"
+tags: ["context-engineering", "deep-memory", "architecture", "retrieval"]
+heroLabel: "BLOG // DEEP DIVE"
+readingTime: "14 min read"
+---
+
+import ContextEngineerPipeline from '../../components/blog/ContextEngineerPipeline.astro';
+import RetrievalPipeline from '../../components/blog/RetrievalPipeline.astro';
+import AuthorityTiers from '../../components/blog/AuthorityTiers.astro';
+import MemorySubstrate from '../../components/blog/MemorySubstrate.astro';
+import ContextPacketMockup from '../../components/blog/ContextPacketMockup.astro';
+
+Every AI coding tool faces the same fundamental bottleneck: **context**.
+
+It's not about how good your model is. It's about what your model *knows* when it makes a decision. Feed it incomplete context, and it hallucinates. Feed it stale context, and it contradicts earlier decisions. Feed it everything at once, and it drowns in noise.
+
+JanumiCode solves this with two interlocking systems: the **Context Engineer** and the **Deep Memory Research Agent**. Together, they ensure that every agent invocation — whether it's the Technical Expert proposing architecture, the Executor writing code, or the Verifier checking claims — receives precisely the context it needs. No more, no less.
+
+---
+
+## The Problem: Context Is Not Just "Stuff In the Prompt"
+
+Most AI coding tools treat context as a simple windowing problem: stuff the most recent files, the current conversation, maybe some documentation into the prompt. If it fits in the context window, ship it.
+
+This fails in three ways:
+
+- **Missing context**: The agent doesn't know about a decision made three phases ago that directly constrains the current task. It proposes something that contradicts an approved requirement.
+- **Stale context**: The agent cites a decision that was later overridden by a human correction. It builds on an assumption that no longer holds.
+- **Undifferentiated context**: The agent receives a 50,000-token dump with no indication of what matters. A policy invariant and an exploratory brainstorming note get equal weight.
+
+The result is the same in all three cases: the agent produces something *confident* and *wrong*, and nobody catches it until downstream.
+
+---
+
+## The Context Engineer: Policy-Driven Assembly
+
+The Context Engineer is a **CLI-backed agent** that runs before every role invocation in JanumiCode. It doesn't generate code. It doesn't make decisions. Its sole job is to assemble the right context for the agent that *will* make the decision.
+
+<ContextEngineerPipeline />
+
+### How It Works
+
+Every role/phase combination in JanumiCode has a **declarative context policy** — a contract that specifies exactly what information that role needs for that phase:
+
+```
+EXECUTOR:EXECUTE:*:*
+├── required: architecture_doc, active_claims, goal, constraints
+├── optional: historical_findings, narrative_memory, workspace_specs
+├── shedding_priority: workspace_specs → narrative_memory → historical_findings
+└── section_budgets: architecture_doc=35%, claims=20%, goal=5%, ...
+```
+
+The Context Engineer:
+
+1. **Looks up the policy** for the current `role:phase:subPhase:intent` tuple
+2. **Gathers sources** — handoff documents from phase boundaries, database queries, and when historical evidence is needed, invokes the Deep Memory Research Agent
+3. **Applies token budgets** — each section gets a fraction of the total budget, with a defined shedding priority for when content exceeds the limit
+4. **Delivers a HandoffPacket** — not just the context, but an audit trail of what was included, what was excluded and why, and a sufficiency assessment
+
+The HandoffPacket is the contract between the Context Engineer and the downstream role. If a required block is missing and the policy says `omissionStrategy: 'fail'`, the invocation stops. If it says `degrade_with_warning`, the agent proceeds with explicit warnings about what context is absent.
+
+### Why This Matters
+
+This isn't just engineering discipline. It's **error containment**.
+
+When the Executor gets a HandoffPacket, it knows: the architecture document was included (1,430 tokens, from handoff doc ARCH-12), the active claims were included (820 tokens, from 6 database queries), and the historical findings were omitted (budget exceeded, low impact). That omission is recorded. If the Executor produces something that contradicts historical precedent, the audit trail shows *why* — the context was knowingly incomplete in that area.
+
+No hidden failures. No silent omissions. Every gap is explicit.
+
+---
+
+## The Deep Memory Research Agent: Evidence, Not Recall
+
+The Context Engineer handles most context assembly through direct database queries and handoff documents. But some questions require more than lookup — they require **research**.
+
+Questions like:
+- "Has this architectural pattern been tried before in this project? What happened?"
+- "Are there any prior decisions that constrain this choice?"
+- "Does this proposal contradict anything that was previously approved?"
+
+These questions can't be answered by querying a single table. They require traversing a web of decisions, claims, corrections, and constraints across multiple dialogues and phases. That's the job of the **Deep Memory Research Agent**.
+
+### The Memory Substrate
+
+Before the agent can research, it needs something to research *in*. JanumiCode maintains a **typed memory substrate** — not a flat document store, but a graph of semantically typed objects connected by meaningful edges.
+
+<MemorySubstrate />
+
+Every object in the substrate has:
+- A **type** (claim, constraint, decision trace, correction, assumption, risk, open question, etc.)
+- An **authority level** — a 9-tier hierarchy that determines how much weight the object carries in conflict resolution
+- **Provenance** — which source table, source ID, and extraction method produced it
+- **Bi-temporal tracking** — when it was recorded, when the underlying event occurred, and when it's effective
+- **Supersession tracking** — if this object has been replaced by a newer one, which one and when
+
+The edges between objects are equally typed: `supports`, `contradicts`, `supersedes`, `derived_from`, `blocked_by`, `answers`, and more. This isn't a keyword index. It's a **knowledge graph** where the relationships carry meaning.
+
+---
+
+## Not All Memories Vote Equally
+
+This is perhaps the most important design principle in the entire system.
+
+A policy invariant like "no execution without gate approval" should outweigh an agent's inference that "REST is preferable to GraphQL." A human-approved decision should outweigh an early brainstorming note. Test evidence from a real integration test should outweigh a narrative summary.
+
+The authority hierarchy encodes this directly:
+
+<AuthorityTiers />
+
+When the Deep Memory Research Agent encounters conflicting evidence, authority level determines which position governs. When the Context Engineer assembles a briefing, higher-authority objects get priority in the token budget. This isn't a heuristic — it's a deliberate architectural decision that human judgment outranks machine inference at every level.
+
+---
+
+## The 6-Stage Retrieval Pipeline
+
+The Deep Memory Research Agent doesn't do simple similarity search. It executes a **6-stage pipeline** that progressively narrows, deepens, and validates its findings.
+
+<RetrievalPipeline />
+
+### Stage 1: Query Interpretation
+
+The agent decomposes the incoming question into structured retrieval targets: which topic entities are involved, what decision is being considered, which domains are relevant, what time period matters, and what authority level is needed.
+
+### Stage 2: Broad Candidate Harvest
+
+Using MCP tools (`search_memory_candidates`, `temporal_query`), the agent casts a wide net across the memory substrate. Full-text search, temporal filtering, type filtering. The goal is **recall** — don't miss anything material. Precision comes later.
+
+### Stage 3: Evidence Triage
+
+Each candidate is scored across **six composite dimensions** — not just semantic similarity, but also constraint relevance (does it impose an invariant?), authority relevance (was it human-approved?), temporal relevance (is it still active?), causal relevance (did it cause the current state?), and contradiction signal (does it conflict with other evidence?).
+
+The composite score uses weighted averaging: constraint relevance at 0.25 is the highest-weighted dimension, reflecting the principle that constraints are more important than general topical relevance.
+
+### Stage 4: Drill-down Expansion
+
+For high-scoring candidates, the agent traverses the memory graph using `expand_memory_neighbors`. It follows `supports`, `derived_from`, and `depends_on` edges up to 3 hops, rebuilding the full reasoning chain: what led to this decision, what assumptions supported it, was it later revised, did implementation expose counterevidence?
+
+When deeper evidence is needed, `load_evidence_span` retrieves the original source material — the actual dialogue event, claim, or verdict that the memory object was extracted from. This is how summaries serve as **entry points into deeper evidence**, never as truth themselves.
+
+### Stage 5: Conflict & Supersession Analysis
+
+This is the critical stage that most retrieval systems skip entirely.
+
+The agent walks `superseded_by` chains to detect stale decisions. It queries `contradicts` edges to surface unresolved conflicts. It determines the **current governing position** based on authority tiers and temporal ordering.
+
+The rule is absolute: **never cite an older decision without noting its supersession**. If a user approved PostgreSQL in round 2 but the architect proposed MongoDB in round 1, the Context Packet must show that PostgreSQL is the governing decision and MongoDB has been superseded.
+
+### Stage 6: Context Packet Synthesis
+
+Finally, the agent assembles everything into a structured **ContextPacket** — not a text blob, but a typed JSON document that downstream agents can consume programmatically.
+
+<ContextPacketMockup />
+
+The ContextPacket includes:
+- **Material memories** — the evidence that matters, with relevance scores and authority levels
+- **Binding constraints** — invariants that must not be violated
+- **Contradictions** — conflicts between evidence, with the current governing position identified
+- **Superseded items** — decisions that were once valid but have been replaced
+- **Open questions** — unresolved issues that may affect the current decision
+- **Evidence lineage** — for each item, the full chain of source material
+- **Coverage assessment** — what areas were searched, what evidence types were found, and what gaps remain
+
+---
+
+## Three Retrieval Modes
+
+Not every context request needs the full 6-stage pipeline. The Deep Memory Research Agent operates in three modes:
+
+**Fast Mode** — lightweight context stuffing. Returns top summaries, decision traces, and constraints. No deep drill-down. Used when the Context Engineer needs a quick historical check and the stakes are low.
+
+**Research Mode** — the default. Full candidate harvest, composite scoring, selective drill-down, conflict analysis. Used for architecture decisions, plan synthesis, and any context where incorrect assumptions could cascade downstream.
+
+**Audit Mode** — maximum assurance. Complete evidence packet with chronology, full contradiction report, unresolved ambiguities, citations, and human-review checkpoints. Used when correctness and governance are paramount — compliance reviews, incident analysis, or any decision that could affect production.
+
+---
+
+## The Integration: Context Engineer Calls Deep Memory
+
+The Context Engineer and Deep Memory Research Agent aren't independent systems. They're integrated through the context policy framework.
+
+When a context policy includes blocks with `source: 'agent_synthesized'` or blocks that reference historical evidence, the Context Engineer invokes the Deep Memory Research Agent as a tool. The query is derived from the policy key and the current dialogue context — solving the "chicken and egg" problem of knowing what to ask for.
+
+The resulting ContextPacket is incorporated into the HandoffPacket alongside handoff documents and database queries. The downstream role receives a unified briefing where historical evidence sits alongside current state, all within the token budget, all with provenance.
+
+---
+
+## Governed Ingestion: Closing the Loop
+
+Context retrieval is only as good as what's been indexed. JanumiCode's ingestion pipeline runs at **Narrative Curator crystallization points** — the moments when the Narrative Curator produces durable artifacts (narrative memories, decision traces, open loops) at phase boundaries.
+
+The ingestion pipeline:
+
+1. **Extracts typed objects** from source tables — claims become `CLAIM` objects, human gate decisions become `DECISION_TRACE` objects, verdicts become `CLAIM` or `CORRECTION` objects
+2. **Deduplicates** via deterministic IDs (e.g., `CLM-{claim_id}`) — re-extraction never creates duplicates
+3. **Proposes edges** via rule-based inference — verdicts supporting claims get `supports` edges, corrections get `supersedes` edges, human rejections get `invalidates` edges
+4. **Records provenance** — every object traces back to its source table and source ID
+
+This isn't a background job that runs silently. Ingestion is a **governed, visible operation** in the Governed Stream. It emits progress events, creates an extraction run audit record, and its outputs are subject to the same governance framework as any other agent action.
+
+---
+
+## Why This Architecture Matters
+
+Most AI systems treat memory as an afterthought — a vector database you throw embeddings into and hope for the best.
+
+JanumiCode treats memory as a **first-class engineering concern**:
+
+- **Typed objects** instead of text chunks — because a constraint is fundamentally different from a brainstorming note
+- **Authority tiers** instead of flat similarity — because human-approved decisions outweigh agent speculation
+- **Graph edges** instead of embedding distance — because "contradicts" and "supports" carry information that cosine similarity cannot
+- **Supersession tracking** instead of append-only — because old decisions get replaced and the system must know which position currently governs
+- **Structured output** instead of text blobs — because downstream agents need to consume evidence programmatically, not parse prose
+- **Coverage assessment** instead of confidence-in-a-vacuum — because knowing what you *didn't* find is as important as what you did
+
+The result: every agent in JanumiCode operates with **complete, correct, conflict-aware context** — or it knows precisely where the gaps are and says so.
+
+---
+
+## What's Next
+
+The Context Engineer and Deep Memory Research Agent are operational today. The roadmap includes:
+
+- **Vector search integration** — augmenting FTS5 with embedding-based semantic search for higher recall on conceptually related (but lexically different) evidence
+- **Cross-dialogue memory federation** — sharing evidence across related dialogues while maintaining provenance isolation
+- **Adaptive budget optimization** — learning from sufficiency assessments to tune section budgets per role/phase over time
+- **Human memory curation** — allowing users to directly annotate, promote, or demote memory objects, feeding back into authority tiers
+
+The goal remains the same: **AI agents that know what they need to know, know what they don't know, and never silently get it wrong.**

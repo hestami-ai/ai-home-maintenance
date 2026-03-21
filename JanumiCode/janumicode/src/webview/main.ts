@@ -8,7 +8,7 @@
 
 import { vscode } from './types';
 import type { IncomingMessage } from './types';
-import { state, restoreMmpState } from './state';
+import { state, restoreMmpState, restoreDrafts } from './state';
 import { scrollToBottom, scrollToClaimsByStatus, copySessionId } from './utils';
 import {
 	handleFullUpdate,
@@ -163,6 +163,9 @@ window.addEventListener('message', function (event: MessageEvent) {
 		case 'pendingMmpDecisionsLoaded':
 			// Merge pending decisions into JS state (visual state handled by server-side rendering)
 			applyPendingMmpDecisions(msg.decisions);
+			break;
+		case 'draftsLoaded':
+			restoreDrafts(msg.drafts);
 			break;
 		case 'mentionSuggestions':
 			state.cachedFileList = msg.files || [];

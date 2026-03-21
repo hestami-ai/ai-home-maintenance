@@ -105,7 +105,7 @@ export function validatePlanSafety(
 		for (const param of def.params) {
 			if (param.required && !(param.name in step.params)) {
 				// Allow if dialogueId — often supplied via $context.dialogueId
-				if (param.name === 'dialogueId') continue;
+				if (param.name === 'dialogueId') {continue;}
 				warnings.push(
 					`Step "${step.id}": missing required param "${param.name}" for ${step.primitiveId}`
 				);
@@ -157,7 +157,7 @@ function containsSubsequence(arr: string[], sub: string[]): boolean {
 				break;
 			}
 		}
-		if (match) return true;
+		if (match) {return true;}
 	}
 	return false;
 }

@@ -1,0 +1,93 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+
+const posts = (await getCollection('blog'))
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+function postUrl(post: { id: string; data: { pubDate: Date } }) {
+  const d = post.data.pubDate;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `/blog/${y}/${m}/${day}/${post.id}`;
+}
+---
+
+<Base title="Blog" description="Technical insights and product vision from the JanumiCode team.">
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Blog</span>
+        <h2>Technical insights &amp;<br />product vision</h2>
+        <p>Deep dives into governed AI development, agent architecture, and the future of software engineering tools.</p>
+      </div>
+
+      <div class="blog-grid">
+        {posts.map(post => (
+          <a href={postUrl(post)} class="blog-card card">
+            <div class="blog-card__meta">
+              <time datetime={post.data.pubDate.toISOString()}>
+                {post.data.pubDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+              </time>
+              {post.data.readingTime && (
+                <>
+                  <span class="blog-card__sep">·</span>
+                  <span>{post.data.readingTime}</span>
+                </>
+              )}
+            </div>
+            <h3 class="blog-card__title">{post.data.title}</h3>
+            <p class="card__text">{post.data.description}</p>
+            <div class="card__tags">
+              {post.data.tags.map((tag: string) => <span class="tag">{tag}</span>)}
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .blog-grid {
+    max-width: 800px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+  }
+
+  .blog-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .blog-card__meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-md);
+  }
+
+  .blog-card__sep {
+    opacity: 0.4;
+  }
+
+  .blog-card__title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-text);
+    margin-bottom: var(--space-sm);
+    transition: color 0.2s;
+  }
+
+  .blog-card:hover .blog-card__title {
+    color: var(--color-primary);
+  }
+</style>

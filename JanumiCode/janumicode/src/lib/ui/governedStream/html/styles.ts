@@ -3265,6 +3265,17 @@ export function getStyles(): string {
 			flex-shrink: 0;
 		}
 
+		.command-block-review-badge {
+			font-size: 10px;
+			padding: 1px 6px;
+			border-radius: 8px;
+			background: rgba(255, 180, 0, 0.2);
+			color: #ffb400;
+			border: 1px solid rgba(255, 180, 0, 0.3);
+			flex-shrink: 0;
+			white-space: nowrap;
+		}
+
 		.command-block-body {
 			display: none;
 			max-height: 300px;

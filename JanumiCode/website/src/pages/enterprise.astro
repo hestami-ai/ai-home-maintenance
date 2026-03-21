@@ -1,0 +1,134 @@
+---
+import Base from "../layouts/Base.astro";
+
+const marketplaceUrl = "https://marketplace.visualstudio.com/items?itemName=hestami.janumicode";
+
+const governanceItems = [
+  {
+    title: "Append-only audit trail",
+    text: "Every AI decision, human action, claim, verdict, and gate resolution is recorded in an immutable event log. Nothing is deleted or overwritten."
+  },
+  {
+    title: "Human-in-the-loop at every boundary",
+    text: "Phase transitions require explicit human approval. Approve, reject, override with rationale, or reframe entirely. Every gate decision is recorded with provenance."
+  },
+  {
+    title: "Independent verification layer",
+    text: "The Verifier and Historian operate independently of the Executor. A claim verified by execution is not trusted — it's checked against evidence and historical precedent."
+  },
+  {
+    title: "Separation of authority",
+    text: "No single agent can propose, execute, verify, and approve. The Technical Expert proposes. The Executor implements. The Verifier judges. The human decides."
+  }
+];
+
+const containmentItems = [
+  {
+    title: "Claims verified before execution",
+    text: "Every code change generates verifiable claims. The Verifier evaluates each claim independently. DISPROVED claims trigger correction workflows — they don't propagate."
+  },
+  {
+    title: "Bounded repair",
+    text: "When a task unit fails, the repair engine contains the failure to that unit. It doesn't cascade to the full task graph. Repair attempts are bounded and audited."
+  },
+  {
+    title: "Contradiction detection",
+    text: "The Historian cross-references every new decision against the full history. Contradictions with prior approved decisions are surfaced before they can cause damage."
+  },
+  {
+    title: "Supersession tracking",
+    text: "When a decision is superseded by a newer one, the old decision is flagged — not silently forgotten. The Deep Research Memory Agent tracks full supersession chains with provenance."
+  }
+];
+
+const complianceItems = [
+  {
+    title: "Full provenance chain",
+    text: "Every artifact traces back to its source: which agent produced it, which model was used, what prompt version, what evidence supported it, and whether a human validated it."
+  },
+  {
+    title: "Authority-tiered memory",
+    text: "Memory objects carry authority levels: exploratory discussion, agent inference, human-validated, approved decision, policy invariant. In conflict resolution, human-approved decisions outrank agent speculation."
+  },
+  {
+    title: "Configurable LLM providers",
+    text: "JanumiCode is provider-agnostic. Configure Claude Code, Gemini CLI, Codex CLI, or Deep Agents CLI per role. Bring your own API keys and model preferences."
+  },
+  {
+    title: "Local-first architecture",
+    text: "All data stays in your workspace. SQLite-based persistence with no external database dependencies. Your code, your decisions, your infrastructure."
+  }
+];
+---
+
+<Base title="Enterprise" description="Governance guarantees, error containment, and compliance readiness for enterprise software development.">
+  <!-- Governance -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Governance</span>
+        <h2>Every decision recorded.<br />Every action approved.</h2>
+        <p>Enterprise software development demands accountability. JanumiCode provides governance guarantees that AI coding assistants cannot offer.</p>
+      </div>
+      <div class="grid grid--2">
+        {governanceItems.map(item => (
+          <div class="card">
+            <h4 class="card__title">{item.title}</h4>
+            <p class="card__text">{item.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Error Containment -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Error Containment</span>
+        <h2>Failures are bounded.<br />Contradictions are surfaced.</h2>
+        <p>AI agents make mistakes. The question is whether those mistakes reach production. JanumiCode's verification and containment layers ensure they don't.</p>
+      </div>
+      <div class="grid grid--2">
+        {containmentItems.map(item => (
+          <div class="card">
+            <h4 class="card__title">{item.title}</h4>
+            <p class="card__text">{item.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Compliance -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Compliance Ready</span>
+        <h2>Built for regulated environments</h2>
+        <p>When auditors ask "who decided this and why?", JanumiCode has the answer — traced from human intent through AI analysis to verified execution.</p>
+      </div>
+      <div class="grid grid--2">
+        {complianceItems.map(item => (
+          <div class="card">
+            <h4 class="card__title">{item.title}</h4>
+            <p class="card__text">{item.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section section--alt">
+    <div class="container" style="text-align: center;">
+      <h2>Bring governance to your AI workflow</h2>
+      <p style="max-width: 600px; margin: var(--space-md) auto var(--space-xl);">
+        JanumiCode integrates directly into VS Code. No infrastructure changes. No external dependencies. Install and start governing.
+      </p>
+      <a href={marketplaceUrl} class="btn btn--primary" target="_blank" rel="noopener">
+        Install from VS Code Marketplace
+      </a>
+    </div>
+  </section>
+</Base>

@@ -105,6 +105,12 @@ export interface StateMetadata {
  * Valid phase transitions
  * Defines the allowed state transition graph
  */
+/**
+ * Version of the transition graph. Increment when VALID_TRANSITIONS changes.
+ * Stored in workflow_states so stale dialogues can be detected and remapped.
+ */
+export const TRANSITION_GRAPH_VERSION = 1;
+
 const VALID_TRANSITIONS: Record<Phase, Phase[]> = {
 	[Phase.INTAKE]: [Phase.INTAKE, Phase.ARCHITECTURE],
 	[Phase.ARCHITECTURE]: [Phase.ARCHITECTURE, Phase.PROPOSE, Phase.REPLAN],
@@ -173,6 +179,7 @@ export function initializeWorkflowState(
 				current_phase TEXT NOT NULL,
 				previous_phase TEXT,
 				metadata TEXT NOT NULL,
+				transition_graph_version INTEGER NOT NULL DEFAULT 1,
 				created_at TEXT NOT NULL,
 				updated_at TEXT NOT NULL
 			)
@@ -209,8 +216,8 @@ export function initializeWorkflowState(
 			`
 			INSERT INTO workflow_states (
 				state_id, dialogue_id, current_phase, previous_phase,
-				metadata, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
+				metadata, transition_graph_version, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		`
 		).run(
 			state.state_id,
@@ -218,6 +225,7 @@ export function initializeWorkflowState(
 			state.current_phase,
 			state.previous_phase,
 			state.metadata,
+			TRANSITION_GRAPH_VERSION,
 			state.created_at,
 			state.updated_at
 		);
@@ -455,48 +463,34 @@ export function transitionWorkflow(
 		}
 
 		const now = new Date().toISOString();
-
-		// Update workflow state
-		db.prepare(
-			`
-			UPDATE workflow_states
-			SET current_phase = ?,
-			    previous_phase = ?,
-			    updated_at = ?
-			WHERE dialogue_id = ?
-		`
-		).run(toPhase, fromPhase, now, dialogueId);
-
-		// Log transition
 		const transitionId = nanoid();
-		const transition: StateTransition = {
-			transition_id: transitionId,
-			workflow_state_id: currentState.state_id,
-			from_phase: fromPhase,
-			to_phase: toPhase,
-			trigger,
-			metadata: JSON.stringify(metadata),
-			timestamp: now,
-		};
 
-		db.prepare(
-			`
-			INSERT INTO state_transitions (
-				transition_id, workflow_state_id, from_phase, to_phase,
-				trigger, metadata, timestamp
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
-		`
-		).run(
-			transition.transition_id,
-			transition.workflow_state_id,
-			transition.from_phase,
-			transition.to_phase,
-			transition.trigger,
-			transition.metadata,
-			transition.timestamp
-		);
+		// Atomic: update phase + log transition in a single transaction
+		const txn = db.transaction(() => {
+			db.prepare(
+				`UPDATE workflow_states
+				 SET current_phase = ?, previous_phase = ?, transition_graph_version = ?, updated_at = ?
+				 WHERE dialogue_id = ?`
+			).run(toPhase, fromPhase, TRANSITION_GRAPH_VERSION, now, dialogueId);
 
-		// Get updated state
+			db.prepare(
+				`INSERT INTO state_transitions (
+					transition_id, workflow_state_id, from_phase, to_phase,
+					trigger, metadata, timestamp
+				) VALUES (?, ?, ?, ?, ?, ?, ?)`
+			).run(
+				transitionId,
+				currentState.state_id,
+				fromPhase,
+				toPhase,
+				trigger,
+				JSON.stringify(metadata),
+				now
+			);
+		});
+		txn();
+
+		// Get updated state (read-only, outside transaction)
 		return getWorkflowState(dialogueId);
 	} catch (error) {
 		return {
@@ -530,28 +524,26 @@ export function updateWorkflowMetadata(
 			};
 		}
 
-		// Get current state
-		const stateResult = getWorkflowState(dialogueId);
-		if (!stateResult.success) {
-			return stateResult;
-		}
-
-		const currentState = stateResult.value;
-		const currentMetadata = JSON.parse(currentState.metadata) as StateMetadata;
-
-		// Merge metadata
-		const updatedMetadata = { ...currentMetadata, ...metadata };
-
 		const now = new Date().toISOString();
 
-		db.prepare(
-			`
-			UPDATE workflow_states
-			SET metadata = ?,
-			    updated_at = ?
-			WHERE dialogue_id = ?
-		`
-		).run(JSON.stringify(updatedMetadata), now, dialogueId);
+		// Atomic read-modify-write in a single transaction to prevent concurrent overwrites
+		const txn = db.transaction(() => {
+			const row = db.prepare(
+				'SELECT metadata FROM workflow_states WHERE dialogue_id = ?'
+			).get(dialogueId) as { metadata: string } | undefined;
+
+			if (!row) {
+				throw new Error(`No workflow state found for dialogue ${dialogueId}`);
+			}
+
+			const currentMetadata = JSON.parse(row.metadata) as StateMetadata;
+			const updatedMetadata = { ...currentMetadata, ...metadata };
+
+			db.prepare(
+				`UPDATE workflow_states SET metadata = ?, updated_at = ? WHERE dialogue_id = ?`
+			).run(JSON.stringify(updatedMetadata), now, dialogueId);
+		});
+		txn();
 
 		return getWorkflowState(dialogueId);
 	} catch (error) {
@@ -610,6 +602,61 @@ export function getTransitionHistory(
 				error instanceof Error
 					? error
 					: new Error('Failed to get transition history'),
+		};
+	}
+}
+
+/**
+ * Reconcile dialogues whose transition_graph_version doesn't match the current code.
+ * Remaps unknown phases to INTAKE (safe fallback) and stamps the current version.
+ * Call on extension activation to prevent soft-locks from schema evolution.
+ * @returns Number of dialogues reconciled
+ */
+export function reconcileStaleTransitionGraphs(): Result<number> {
+	try {
+		const db = getDatabase();
+		if (!db) {
+			return { success: false, error: new Error('Database not initialized') };
+		}
+
+		const staleRows = db.prepare(
+			`SELECT dialogue_id, current_phase, transition_graph_version
+			 FROM workflow_states
+			 WHERE transition_graph_version != ?`
+		).all(TRANSITION_GRAPH_VERSION) as Array<{ dialogue_id: string; current_phase: string; transition_graph_version: number }>;
+
+		if (staleRows.length === 0) {
+			return { success: true, value: 0 };
+		}
+
+		const validPhases = new Set(Object.values(Phase));
+		const now = new Date().toISOString();
+
+		const txn = db.transaction(() => {
+			for (const row of staleRows) {
+				const phaseIsValid = validPhases.has(row.current_phase as Phase);
+				if (!phaseIsValid) {
+					// Remap unknown phase to INTAKE
+					console.warn(`[StateMachine] Dialogue ${row.dialogue_id} has unknown phase "${row.current_phase}" (graph v${row.transition_graph_version}). Remapping to INTAKE.`);
+					db.prepare(
+						`UPDATE workflow_states SET current_phase = ?, transition_graph_version = ?, updated_at = ? WHERE dialogue_id = ?`
+					).run(Phase.INTAKE, TRANSITION_GRAPH_VERSION, now, row.dialogue_id);
+				} else {
+					// Phase is valid in current graph, just stamp the version
+					console.log(`[StateMachine] Dialogue ${row.dialogue_id} upgraded from graph v${row.transition_graph_version} to v${TRANSITION_GRAPH_VERSION}`);
+					db.prepare(
+						`UPDATE workflow_states SET transition_graph_version = ?, updated_at = ? WHERE dialogue_id = ?`
+					).run(TRANSITION_GRAPH_VERSION, now, row.dialogue_id);
+				}
+			}
+		});
+		txn();
+
+		return { success: true, value: staleRows.length };
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error : new Error('Failed to reconcile transition graphs'),
 		};
 	}
 }

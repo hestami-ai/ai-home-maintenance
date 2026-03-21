@@ -722,6 +722,20 @@ CREATE TABLE IF NOT EXISTS generated_documents (
 );
 CREATE INDEX IF NOT EXISTS idx_gen_docs_dialogue ON generated_documents(dialogue_id);
 
+-- ==================== WEBVIEW DRAFTS ====================
+
+-- Persists in-progress user inputs (gate rationales, intake responses, etc.) across restarts
+CREATE TABLE IF NOT EXISTS webview_drafts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id TEXT NOT NULL,
+    category    TEXT NOT NULL,
+    item_key    TEXT NOT NULL DEFAULT '',
+    value       TEXT NOT NULL DEFAULT '',
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(dialogue_id, category, item_key)
+);
+CREATE INDEX IF NOT EXISTS idx_webview_drafts_dialogue ON webview_drafts(dialogue_id);
+
 -- ==================== METADATA ====================
 
 -- Schema metadata table — tracks schema version and migration history
@@ -732,7 +746,7 @@ CREATE TABLE IF NOT EXISTS schema_metadata (
 );
 
 -- Insert initial schema version
-INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '10')
+INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '12')
     ON CONFLICT(key) DO NOTHING;
 `;
 
@@ -974,6 +988,172 @@ CREATE TABLE IF NOT EXISTS generated_documents (
     FOREIGN KEY (dialogue_id) REFERENCES dialogues(dialogue_id)
 );
 CREATE INDEX IF NOT EXISTS idx_gen_docs_dialogue ON generated_documents(dialogue_id);
+`,
+	},
+	{
+		version: 11,
+		description:
+			'Webview drafts — persists in-progress user inputs (gate rationales, intake responses, etc.) across restarts',
+		sql: `
+CREATE TABLE IF NOT EXISTS webview_drafts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id TEXT NOT NULL,
+    category    TEXT NOT NULL,
+    item_key    TEXT NOT NULL DEFAULT '',
+    value       TEXT NOT NULL DEFAULT '',
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(dialogue_id, category, item_key)
+);
+CREATE INDEX IF NOT EXISTS idx_webview_drafts_dialogue ON webview_drafts(dialogue_id);
+`,
+	},
+	{
+		version: 12,
+		description:
+			'Transition graph versioning — tracks which version of the phase graph a dialogue was created under',
+		sql: `
+ALTER TABLE workflow_states ADD COLUMN transition_graph_version INTEGER NOT NULL DEFAULT 1;
+`,
+	},
+	{
+		version: 13,
+		description:
+			'Deep Memory Agent — typed memory objects, graph edges, extraction audit, context packet cache, embeddings source_type widening',
+		sql: `
+-- ==================== MEMORY OBJECTS ====================
+
+-- Typed memory objects — canonical representation of extracted knowledge
+CREATE TABLE IF NOT EXISTS memory_objects (
+    object_id TEXT PRIMARY KEY,
+    object_type TEXT NOT NULL CHECK(object_type IN (
+        'raw_record', 'narrative_summary', 'decision_trace',
+        'claim', 'constraint', 'assumption', 'correction',
+        'risk', 'open_question', 'derived_conclusion'
+    )),
+    dialogue_id TEXT NOT NULL,
+    workflow_id TEXT,
+    domain TEXT,
+    actor TEXT NOT NULL,
+    content TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 1.0,
+    authority_level TEXT NOT NULL CHECK(authority_level IN (
+        'exploratory_discussion', 'agent_inference', 'accepted_artifact',
+        'human_validated', 'approved_requirement', 'approved_decision',
+        'test_evidence', 'incident_evidence', 'policy_invariant'
+    )) DEFAULT 'agent_inference',
+    superseded_by TEXT,
+    superseded_at TEXT,
+    validation_status TEXT CHECK(validation_status IN (
+        'pending', 'validated', 'rejected', 'uncertain'
+    )) DEFAULT 'pending',
+    extraction_method TEXT,
+    extraction_run_id TEXT,
+    recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+    event_at TEXT,
+    effective_from TEXT,
+    effective_to TEXT,
+    source_table TEXT,
+    source_id TEXT,
+    source_segment TEXT,
+    model_id TEXT,
+    prompt_version TEXT,
+    parent_object_id TEXT,
+    FOREIGN KEY (dialogue_id) REFERENCES dialogues(dialogue_id)
+);
+CREATE INDEX IF NOT EXISTS idx_mo_dialogue ON memory_objects(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_mo_type ON memory_objects(object_type);
+CREATE INDEX IF NOT EXISTS idx_mo_authority ON memory_objects(authority_level);
+CREATE INDEX IF NOT EXISTS idx_mo_superseded ON memory_objects(superseded_by);
+CREATE INDEX IF NOT EXISTS idx_mo_source ON memory_objects(source_table, source_id);
+CREATE INDEX IF NOT EXISTS idx_mo_recorded ON memory_objects(recorded_at);
+CREATE INDEX IF NOT EXISTS idx_mo_event ON memory_objects(event_at);
+CREATE INDEX IF NOT EXISTS idx_mo_domain ON memory_objects(domain);
+
+-- ==================== MEMORY EDGES ====================
+
+-- Typed edges between memory objects — the memory graph
+CREATE TABLE IF NOT EXISTS memory_edges (
+    edge_id TEXT PRIMARY KEY,
+    edge_type TEXT NOT NULL CHECK(edge_type IN (
+        'supports', 'contradicts', 'supersedes', 'derived_from',
+        'implements', 'blocked_by', 'answers', 'raises',
+        'invalidates', 'depends_on'
+    )),
+    from_object_id TEXT NOT NULL,
+    to_object_id TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 1.0,
+    evidence TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (from_object_id) REFERENCES memory_objects(object_id),
+    FOREIGN KEY (to_object_id) REFERENCES memory_objects(object_id)
+);
+CREATE INDEX IF NOT EXISTS idx_me_type ON memory_edges(edge_type);
+CREATE INDEX IF NOT EXISTS idx_me_from ON memory_edges(from_object_id);
+CREATE INDEX IF NOT EXISTS idx_me_to ON memory_edges(to_object_id);
+
+-- ==================== EXTRACTION AUDIT ====================
+
+-- Extraction run audit trail — tracks each ingestion batch
+CREATE TABLE IF NOT EXISTS memory_extraction_runs (
+    run_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    mode TEXT NOT NULL CHECK(mode IN ('incremental', 'full', 'repair')),
+    model_id TEXT NOT NULL,
+    prompt_version TEXT NOT NULL,
+    objects_created INTEGER NOT NULL DEFAULT 0,
+    edges_created INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL DEFAULT (datetime('now')),
+    completed_at TEXT,
+    status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed')) DEFAULT 'running'
+);
+CREATE INDEX IF NOT EXISTS idx_mer_dialogue ON memory_extraction_runs(dialogue_id);
+
+-- ==================== CONTEXT PACKET CACHE ====================
+
+-- Caches previously generated ContextPackets for reuse
+CREATE TABLE IF NOT EXISTS memory_context_packets (
+    packet_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    query_hash TEXT NOT NULL,
+    mode TEXT NOT NULL CHECK(mode IN ('fast', 'research', 'audit')),
+    packet TEXT NOT NULL,
+    memory_object_ids TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_dialogue ON memory_context_packets(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_hash ON memory_context_packets(query_hash);
+
+-- ==================== EMBEDDINGS SOURCE_TYPE WIDENING ====================
+
+-- Widen source_type CHECK to include 'memory_object'
+-- SQLite cannot ALTER CHECK constraints; recreate the table.
+CREATE TABLE IF NOT EXISTS embeddings_v13 (
+    embedding_id TEXT PRIMARY KEY,
+    source_type TEXT NOT NULL CHECK(source_type IN (
+        'narrative_memory', 'decision_trace', 'open_loop',
+        'dialogue_event', 'claim', 'verdict', 'memory_object'
+    )),
+    source_id TEXT NOT NULL,
+    dialogue_id TEXT NOT NULL,
+    content_text TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    embedding BLOB NOT NULL,
+    model TEXT NOT NULL,
+    dimensions INTEGER NOT NULL DEFAULT 1024,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+INSERT INTO embeddings_v13 (embedding_id, source_type, source_id, dialogue_id, content_text, content_hash, embedding, model, dimensions, created_at)
+    SELECT embedding_id, source_type, source_id, dialogue_id, content_text, content_hash, embedding, model, dimensions, created_at
+    FROM embeddings;
+
+DROP TABLE embeddings;
+ALTER TABLE embeddings_v13 RENAME TO embeddings;
+CREATE INDEX IF NOT EXISTS idx_embeddings_source ON embeddings(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_embeddings_dialogue ON embeddings(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_embeddings_hash ON embeddings(content_hash);
 `,
 	},
 ];

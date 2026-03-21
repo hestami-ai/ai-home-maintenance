@@ -1,0 +1,616 @@
+---
+import Base from "../layouts/Base.astro";
+
+const marketplaceUrl = "https://marketplace.visualstudio.com/items?itemName=hestami.janumicode";
+
+const roles = [
+  { name: "Technical Expert", desc: "High-fidelity reasoning engine specialized in structural integrity and algorithmic consistency.", tags: ["FULL STACK AGENT", "MULTI-PHASE"] },
+  { name: "Executor", desc: "Isolated sandbox agent with write-authority for bounded codebase mutations and test execution.", tags: ["APPROVAL CONTROLLED", "SANDBOXED"] },
+  { name: "Verifier", desc: "Continuous audit loop that validates claims. Expert output against engine policy constraints.", tags: ["APPROVAL FREE", "READ-ONLY"] },
+  { name: "Historian", desc: "Manages narrative curation of dialogue events into persistent technical documentation.", tags: ["DECISION TRACKER", "READ-ONLY"] },
+  { name: "Context Engineer", desc: "Orchestrates context packets and briefing updates to keep agent latency sub-100ms.", tags: ["POLICY DRIVEN", "TOKEN BUDGETED"] },
+  { name: "Deep Research Memory", desc: "Semantic retrieval agent specialized in conflict-detecting massive repository histories.", tags: ["MULTI-STAGE", "GRAPH-AWARE"] },
+];
+
+const valueProps = [
+  { title: "Governed Workflow", text: "Every AI decision passes through human gates. No autonomous execution without explicit approval at every phase boundary." },
+  { title: "Auditable by Design", text: "Full decision trace from intent to execution. Every assumption surfaced, every verdict recorded, every correction tracked." },
+  { title: "Error Containment", text: "Claims verified before execution. Contradictions detected across dialogues. Failures bounded and repaired automatically." }
+];
+---
+
+<Base title="Governed AI-Assisted Development">
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container hero__layout">
+      <div class="hero__content">
+        <div class="hero__badges">
+          <span class="badge">VS CODE EXTENSION</span>
+          <span class="badge">MULTI-AGENT</span>
+          <span class="badge">GOVERNED WORKFLOW</span>
+        </div>
+        <h1 class="hero__title">Governed<br /><span class="hero__accent">Stream</span></h1>
+        <p class="hero__sub">
+          A multi-agent architecture designed for deterministic code
+          synthesis. Governed by a triple-verification loop and a narrative-driven memory engine.
+        </p>
+        <div class="hero__actions">
+          <a href={marketplaceUrl} class="btn btn--primary" target="_blank" rel="noopener">
+            Install Extension
+          </a>
+          <a href="/how-it-works" class="btn btn--secondary">
+            Learn More
+          </a>
+        </div>
+      </div>
+
+      <div class="hero__preview" id="hero-preview-trigger" role="button" tabindex="0" aria-label="View full screenshot">
+        <div class="hero__preview-frame">
+          <img src="/Governed Stream Demonstration.png" alt="JanumiCode Governed Stream UI" />
+        </div>
+      </div>
+
+      <!-- Lightbox -->
+      <div class="lightbox" id="hero-lightbox" aria-hidden="true">
+        <div class="lightbox__backdrop"></div>
+        <div class="lightbox__content">
+          <div class="lightbox__toolbar">
+            <button class="lightbox__tool" id="lb-zoom-out" aria-label="Zoom out">&minus;</button>
+            <span class="lightbox__zoom-level" id="lb-zoom-level">100%</span>
+            <button class="lightbox__tool" id="lb-zoom-in" aria-label="Zoom in">&plus;</button>
+            <button class="lightbox__tool" id="lb-zoom-fit" aria-label="Fit to screen">&#8862;</button>
+            <button class="lightbox__close" aria-label="Close">&times;</button>
+          </div>
+          <div class="lightbox__viewport" id="lb-viewport">
+            <img src="/Governed Stream Demonstration.png" alt="JanumiCode Governed Stream UI — full view" id="lb-image" draggable="false" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Agent Roles -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Agent Roles & Governance</span>
+      </div>
+      <div class="grid grid--3">
+        {roles.map(r => (
+          <div class="card">
+            <div class="card__icon--diamond"><span></span></div>
+            <h4 class="card__title">{r.name}</h4>
+            <p class="card__text">{r.desc}</p>
+            <div class="card__tags">
+              {r.tags.map(t => <span class="tag">{t}</span>)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Context Orchestration -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Context Orchestration</span>
+        <p>The JanumiCode workflow begins with high-level &lt;Policy Declarations&gt; which is then condensed into specialized &lt;HandoffPackets&gt; before being injected into the IntelAgent Flow. This ensures zero-drift between project goals and executed code.</p>
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-node">
+          <div class="flow-node__diamond"></div>
+          <span class="flow-node__label">POLICY</span>
+        </div>
+        <div class="flow-arrow">&#x2192;</div>
+        <div class="flow-node">
+          <div class="flow-node__diamond"></div>
+          <span class="flow-node__label">BRIEFING</span>
+        </div>
+        <div class="flow-arrow">&#x2192;</div>
+        <div class="flow-node">
+          <div class="flow-node__diamond"></div>
+          <span class="flow-node__label">AGENT</span>
+        </div>
+        <div class="flow-arrow">&#x2192;</div>
+        <div class="flow-node">
+          <div class="flow-node__diamond"></div>
+          <span class="flow-node__label">VERIFY</span>
+        </div>
+      </div>
+
+      <div class="indicators">
+        <span class="indicator">REAL-TIME BRIEFING INJECTION</span>
+        <span class="indicator">POLICY DRIFT DETECTION</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Governed Stream UI -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Governed Stream UI</span>
+        <p>Unified workspace for code execution and reasoning audit.</p>
+      </div>
+
+      <div class="code-editor">
+        <div class="code-editor__tabs">
+          <span class="code-editor__tab code-editor__tab--active">COMMANDS</span>
+          <span class="code-editor__tab">LOG</span>
+          <span class="code-editor__tab">STREAM</span>
+          <span class="code-editor__tab">AUDIT</span>
+        </div>
+        <div class="code-editor__body">
+          <div class="code-editor__line"><span class="code-editor__num"> 1</span><span class="code-editor__content"><span class="cm">// Performing automated refactor of the agents substrate, deploying a directed</span></span></div>
+          <div class="code-editor__line"><span class="code-editor__num"> 2</span><span class="code-editor__content"><span class="cm">// acyclic graph (DAG) to dialogue events for improved narrative execution</span></span></div>
+          <div class="code-editor__line"><span class="code-editor__num"> 3</span><span class="code-editor__content"></span></div>
+          <div class="code-editor__line"><span class="code-editor__num"> 4</span><span class="code-editor__content"><span class="kw">export async</span> <span class="kw">function</span> <span class="fn">initSubstrate</span>() &#123;</span></div>
+          <div class="code-editor__line"><span class="code-editor__num"> 5</span><span class="code-editor__content">  <span class="kw">const</span> substrate <span class="op">=</span> <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'api/substrate'</span>);</span></div>
+          <div class="code-editor__line"><span class="code-editor__num"> 6</span><span class="code-editor__content">  <span class="kw">const</span> data <span class="op">=</span> <span class="kw">await</span> substrate.<span class="fn">json</span>();</span></div>
+          <div class="code-editor__line"><span class="code-editor__num"> 7</span><span class="code-editor__content"></span></div>
+          <div class="code-editor__line"><span class="code-editor__num"> 8</span><span class="code-editor__content">  <span class="kw">return</span> substrate.<span class="fn">mapTo</span>(<span class="str">'nodes'</span>).<span class="fn">execute</span>();</span></div>
+          <div class="code-editor__line"><span class="code-editor__num"> 9</span><span class="code-editor__content">&#125;</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Memory & Dialogue Substrate -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Memory & Dialogue Substrate</span>
+      </div>
+      <div class="pipeline">
+        <div class="pipeline__card">
+          <div class="pipeline__label">Event Source</div>
+          <div class="pipeline__title">Dialogue Events</div>
+          <div class="pipeline__text">Append-only event log capturing all agent actions and human decisions</div>
+        </div>
+        <div class="pipeline__arrow">&#x2192;</div>
+        <div class="pipeline__card">
+          <div class="pipeline__label">Crystallization</div>
+          <div class="pipeline__title">Narrative Curation</div>
+          <div class="pipeline__text">Transforms raw events into durable memory artifacts with provenance</div>
+        </div>
+        <div class="pipeline__arrow">&#x2192;</div>
+        <div class="pipeline__card">
+          <div class="pipeline__label">Graph Store</div>
+          <div class="pipeline__title">Memory Substrate</div>
+          <div class="pipeline__text">Typed objects with authority levels, temporal tracking, and relation edges</div>
+        </div>
+        <div class="pipeline__arrow">&#x2192;</div>
+        <div class="pipeline__card">
+          <div class="pipeline__label">Output</div>
+          <div class="pipeline__title">Context Packets</div>
+          <div class="pipeline__text">Structured briefings with evidence lineage, contradictions, and coverage</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="section">
+    <div class="container" style="text-align: center;">
+      <h2>Ready for governed AI development?</h2>
+      <p style="max-width: 550px; margin: var(--space-md) auto var(--space-xl);">
+        Install JanumiCode from the VS Code Marketplace and bring accountability to your AI-assisted workflows.
+      </p>
+      <a href={marketplaceUrl} class="btn btn--primary" target="_blank" rel="noopener">
+        Install from VS Code Marketplace
+      </a>
+    </div>
+  </section>
+<script>
+  const trigger = document.getElementById('hero-preview-trigger');
+  const lightbox = document.getElementById('hero-lightbox');
+  const backdrop = lightbox?.querySelector('.lightbox__backdrop');
+  const closeBtn = lightbox?.querySelector('.lightbox__close');
+  const viewport = document.getElementById('lb-viewport');
+  const img = document.getElementById('lb-image') as HTMLImageElement | null;
+  const zoomIn = document.getElementById('lb-zoom-in');
+  const zoomOut = document.getElementById('lb-zoom-out');
+  const zoomFit = document.getElementById('lb-zoom-fit');
+  const zoomLabel = document.getElementById('lb-zoom-level');
+
+  const ZOOM_STEPS = [25, 50, 75, 100, 150, 200, 300, 400];
+  let zoomIndex = 3; // 100%
+  let isDragging = false;
+  let dragStart = { x: 0, y: 0, scrollX: 0, scrollY: 0 };
+
+  function getZoom() { return ZOOM_STEPS[zoomIndex]; }
+
+  function applyZoom() {
+    if (!img || !zoomLabel) return;
+    const pct = getZoom();
+    img.style.transform = `scale(${pct / 100})`;
+    // At >100%, let the image overflow so scrolling works
+    img.style.minWidth = pct > 100 ? `${pct}%` : '';
+    img.style.minHeight = pct > 100 ? `${pct}%` : '';
+    zoomLabel.textContent = `${pct}%`;
+  }
+
+  function resetZoom() {
+    zoomIndex = 3;
+    applyZoom();
+    if (viewport) { viewport.scrollTop = 0; viewport.scrollLeft = 0; }
+  }
+
+  function openLightbox() {
+    lightbox?.classList.add('is-open');
+    lightbox?.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    resetZoom();
+  }
+
+  function closeLightbox() {
+    lightbox?.classList.remove('is-open');
+    lightbox?.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  // Open / close
+  trigger?.addEventListener('click', openLightbox);
+  trigger?.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLightbox(); } });
+  backdrop?.addEventListener('click', closeLightbox);
+  closeBtn?.addEventListener('click', closeLightbox);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
+
+  // Zoom buttons
+  zoomIn?.addEventListener('click', () => {
+    if (zoomIndex < ZOOM_STEPS.length - 1) { zoomIndex++; applyZoom(); }
+  });
+  zoomOut?.addEventListener('click', () => {
+    if (zoomIndex > 0) { zoomIndex--; applyZoom(); }
+  });
+  zoomFit?.addEventListener('click', resetZoom);
+
+  // Mouse wheel zoom
+  viewport?.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (e.deltaY < 0 && zoomIndex < ZOOM_STEPS.length - 1) { zoomIndex++; }
+    else if (e.deltaY > 0 && zoomIndex > 0) { zoomIndex--; }
+    applyZoom();
+  }, { passive: false });
+
+  // Drag to pan
+  viewport?.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    dragStart = { x: e.clientX, y: e.clientY, scrollX: viewport.scrollLeft, scrollY: viewport.scrollTop };
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging || !viewport) return;
+    viewport.scrollLeft = dragStart.scrollX - (e.clientX - dragStart.x);
+    viewport.scrollTop = dragStart.scrollY - (e.clientY - dragStart.y);
+  });
+  document.addEventListener('mouseup', () => { isDragging = false; });
+
+  // Keyboard zoom
+  document.addEventListener('keydown', (e) => {
+    if (!lightbox?.classList.contains('is-open')) return;
+    if (e.key === '+' || e.key === '=') { if (zoomIndex < ZOOM_STEPS.length - 1) { zoomIndex++; applyZoom(); } }
+    if (e.key === '-' || e.key === '_') { if (zoomIndex > 0) { zoomIndex--; applyZoom(); } }
+    if (e.key === '0') { resetZoom(); }
+  });
+</script>
+</Base>
+
+<style>
+  .hero {
+    padding: var(--space-4xl) 0 var(--space-3xl);
+    overflow: hidden;
+  }
+
+  .hero__layout {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3xl);
+  }
+
+  .hero__content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .hero__badges {
+    display: flex;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+  }
+
+  .hero__title {
+    font-size: 4rem;
+    font-weight: 800;
+    line-height: 1.05;
+    margin-bottom: var(--space-lg);
+    letter-spacing: -0.03em;
+  }
+
+  .hero__accent {
+    color: var(--color-primary);
+  }
+
+  .hero__sub {
+    font-size: 1.05rem;
+    max-width: 550px;
+    margin-bottom: var(--space-2xl);
+    line-height: 1.7;
+  }
+
+  .hero__actions {
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+  }
+
+  /* Hero screenshot preview — partial view with faded edges */
+  .hero__preview {
+    flex: 0 0 420px;
+    position: relative;
+  }
+
+  .hero__preview-frame {
+    position: relative;
+    height: 480px;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4), 0 0 40px var(--color-primary-glow);
+    /* Fade edges: bottom and right */
+    -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%),
+                        linear-gradient(to right, transparent 0%, black 8%, black 85%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image: linear-gradient(to bottom, black 50%, transparent 100%),
+                linear-gradient(to right, transparent 0%, black 8%, black 85%, transparent 100%);
+    mask-composite: intersect;
+  }
+
+  .hero__preview-frame::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 24px;
+    height: 24px;
+    border-top: 2px solid var(--color-primary);
+    border-left: 2px solid var(--color-primary);
+    border-radius: var(--radius-lg) 0 0 0;
+    opacity: 0.6;
+    z-index: 1;
+  }
+
+  .hero__preview-frame img {
+    display: block;
+    width: 100%;
+    height: auto;
+    animation: hero-scroll 25s linear infinite;
+  }
+
+  @keyframes hero-scroll {
+    0%   { transform: translateY(0); }
+    90%  { transform: translateY(-60%); }
+    95%  { transform: translateY(-60%); }
+    100% { transform: translateY(0); }
+  }
+
+  .hero__preview {
+    cursor: pointer;
+  }
+
+  .hero__preview:hover .hero__preview-frame {
+    border-color: var(--color-border-active);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4), 0 0 50px var(--color-primary-glow);
+  }
+
+  /* ── Lightbox ── */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+  }
+
+  .lightbox.is-open {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .lightbox__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(4, 6, 12, 0.92);
+    backdrop-filter: blur(8px);
+  }
+
+  .lightbox__content {
+    position: relative;
+    width: 90vw;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    transform: scale(0.95);
+    transition: transform 0.3s;
+  }
+
+  .lightbox.is-open .lightbox__content {
+    transform: scale(1);
+  }
+
+  .lightbox__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-bottom: none;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    z-index: 1;
+  }
+
+  .lightbox__tool {
+    width: 30px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .lightbox__tool:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+
+  .lightbox__zoom-level {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--color-text-muted);
+    min-width: 42px;
+    text-align: center;
+  }
+
+  .lightbox__close {
+    width: 30px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, color 0.2s;
+    margin-left: auto;
+  }
+
+  .lightbox__close:hover {
+    border-color: var(--color-error);
+    color: var(--color-error);
+  }
+
+  .lightbox__viewport {
+    flex: 1;
+    overflow: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    background: #080c14;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lightbox__viewport:active {
+    cursor: grabbing;
+  }
+
+  .lightbox__viewport img {
+    display: block;
+    transform-origin: center center;
+    transition: transform 0.2s ease-out;
+    -webkit-user-select: none;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  @media (max-width: 900px) {
+    .hero__layout {
+      flex-direction: column;
+    }
+    .hero__preview {
+      flex: none;
+      width: 100%;
+      max-width: 400px;
+    }
+    .hero__preview-frame {
+      height: 360px;
+    }
+  }
+
+  /* Flow diagram */
+  .flow-diagram {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xl);
+    padding: var(--space-3xl) 0;
+  }
+
+  .flow-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .flow-node__diamond {
+    width: 48px;
+    height: 48px;
+    transform: rotate(45deg);
+    border: 2px solid var(--color-primary);
+    border-radius: 6px;
+    background: rgba(0, 212, 255, 0.05);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+
+  .flow-node:hover .flow-node__diamond {
+    background: rgba(0, 212, 255, 0.1);
+    box-shadow: 0 0 20px var(--color-primary-glow);
+  }
+
+  .flow-node__label {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+  }
+
+  .flow-arrow {
+    color: var(--color-primary);
+    font-size: 1.2rem;
+    opacity: 0.4;
+  }
+
+  .indicators {
+    display: flex;
+    gap: var(--space-xl);
+    justify-content: center;
+    padding-top: var(--space-lg);
+  }
+
+  @media (max-width: 768px) {
+    .hero__title {
+      font-size: 2.5rem;
+    }
+    .flow-diagram {
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+    .flow-arrow {
+      transform: rotate(90deg);
+    }
+    .indicators {
+      flex-direction: column;
+      align-items: center;
+    }
+  }
+</style>

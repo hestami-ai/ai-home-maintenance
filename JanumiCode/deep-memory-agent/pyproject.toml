@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "deep-memory-agent"
+version = "0.1.0"
+description = "Deep Research Memory Agent — multi-stage memory adjudication and reconstruction for JanumiCode"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "pydantic>=2.7",
+    "mcp>=1.9",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+cerebras = ["langchain-cerebras>=0.5"]
+
+[project.scripts]
+deep-memory-ingest = "deep_memory_agent.ingestion.cli:app"
+deep-memory-mcp = "deep_memory_agent.mcp_server.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deep_memory_agent"]

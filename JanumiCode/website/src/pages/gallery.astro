@@ -1,0 +1,1349 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base title="Governed Stream Gallery" description="Interactive CSS/HTML recreations of the JanumiCode Governed Stream UI.">
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">UI Gallery</span>
+        <h2>Governed Stream</h2>
+        <p>Interactive CSS/HTML recreations of the JanumiCode Governed Stream WebView — the real-time workspace inside VS Code where every agent action, human decision, and verification result is surfaced.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Screenshot 1: INTAKE Analysis Session -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Intake &mdash; Document Analysis</span>
+        <h2>Product description intake with<br />reasoning review</h2>
+        <p>A governed stream session showing JanumiCode analyzing the Hestami AI Real Property OS product description — from classification through mode selection, analysis, and reasoning review.</p>
+      </div>
+
+      <!-- ═══ Governed Stream Recreation ═══ -->
+      <div class="gs">
+        <!-- Top Bar -->
+        <div class="gs__topbar">
+          <div class="gs__topbar-left">
+            <span class="gs__topbar-title">GOVERNED STREAM TIMELINE</span>
+          </div>
+          <div class="gs__topbar-right">
+            <span class="gs__topbar-action">Supervisions</span>
+            <span class="gs__topbar-action">Reasoning Reviews (3)</span>
+          </div>
+        </div>
+
+        <!-- Phase Progress Bar -->
+        <div class="gs__phase-bar">
+          <div class="gs__phase-step gs__phase-step--active">
+            <span class="gs__phase-dot gs__phase-dot--active"></span>
+            <span>INTAKE</span>
+          </div>
+          <div class="gs__phase-step">
+            <span class="gs__phase-dot"></span>
+            <span>ARCHITECTURE</span>
+          </div>
+          <div class="gs__phase-step">
+            <span class="gs__phase-dot"></span>
+            <span>PROPOSE</span>
+          </div>
+          <div class="gs__phase-step">
+            <span class="gs__phase-dot"></span>
+            <span>EXECUTE</span>
+          </div>
+        </div>
+
+        <!-- Stream Content -->
+        <div class="gs__stream">
+
+          <!-- System message -->
+          <div class="gs__system-msg">
+            <span class="gs__system-icon">&#9670;</span>
+            <span>Review "<em>specifications in real-property-os/Hestami AI Real Property OS and Platform Product Description.md</em>" and prepare for implementation.</span>
+          </div>
+
+          <!-- Command Block: Intake Classifier -->
+          <div class="gs__cmd">
+            <div class="gs__cmd-header">
+              <span class="gs__cmd-icon">&#9670;</span>
+              <span class="gs__cmd-label">Intake &mdash; Classifier</span>
+              <span class="gs__badge gs__badge--cli">CLI</span>
+              <span class="gs__cmd-time">11:28:14 AM</span>
+            </div>
+          </div>
+
+          <!-- Status Card: INTAKE Mode -->
+          <div class="gs__status-card">
+            <div class="gs__status-card-header">
+              <span class="gs__status-icon gs__status-icon--info">&#9432;</span>
+              <span class="gs__status-title">INTAKE Mode: Document Based</span>
+            </div>
+            <div class="gs__status-card-body">
+              <p>Activating: Review "<em>specifications in real-property-os/Hestami AI Real Property OS and Platform Product Description.md</em>" for &lt;hint: property-os and platform product-description&gt; and prepare for implementation.</p>
+              <div class="gs__status-tags">
+                <span class="gs__tag gs__tag--cyan">Mode: DOCUMENT_BASED</span>
+                <span class="gs__tag gs__tag--dim">Turns: 0/8 for full analysis</span>
+                <span class="gs__tag gs__tag--dim">Confidence: safe-to-proceed level</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Command Block: Context Engineer -->
+          <div class="gs__cmd">
+            <div class="gs__cmd-header">
+              <span class="gs__cmd-icon">&#9670;</span>
+              <span class="gs__cmd-label">Context Engineer &mdash; TECHNICAL_EXPERT:INTAKE</span>
+              <span class="gs__badge gs__badge--cli">CLI</span>
+              <span class="gs__badge gs__badge--review">&#128270; Review</span>
+              <span class="gs__cmd-time">11:28:22 AM</span>
+            </div>
+            <div class="gs__cmd-body">
+              <div class="gs__cmd-output">Completed (success)</div>
+            </div>
+          </div>
+
+          <!-- Command Block: Technical Expert - INTAKE Analysis -->
+          <div class="gs__cmd gs__cmd--expanded">
+            <div class="gs__cmd-header">
+              <span class="gs__cmd-icon">&#9670;</span>
+              <span class="gs__cmd-label">Technical Expert &mdash; INTAKE (analysis)</span>
+              <span class="gs__badge gs__badge--cli">CLI</span>
+              <span class="gs__badge gs__badge--review">&#128270; Review</span>
+              <span class="gs__cmd-time">11:29:05 AM</span>
+            </div>
+            <div class="gs__cmd-body">
+              <div class="gs__cmd-content">
+                <h4 class="gs__analysis-title">Architecture Analysis</h4>
+                <p class="gs__analysis-text">
+                  You have provided a comprehensive product description for a very large scale platform named "Hestami AI Real Property OS and Platform." The system is designed as an integrated, end-to-end real-property and home services platform composed of three major pillars: (1) Hestami Home Real Property Assistant, (2) Hestami Service Provider Field Services Management, and (3) Hestami Community Association Management, modeled after ServiceTitan and Vantaca respectively.
+                </p>
+                <p class="gs__analysis-text">
+                  The product is built on a modern tech stack: SvelteKit frontend, Bun for the Node.js backend, PostgreSQL with Row-Level Security (RLS) for multi-tenant isolation, DBOS for durable versioned workflows, oRPC for the API layer, Cerbos for policy-based authorization, and Better-Auth for authentication. The document includes a 12-domain Common Data Model (CDM), persona definitions, user journeys, and a phased delivery strategy.
+                </p>
+                <p class="gs__analysis-text">
+                  While the document is comprehensive in scope, the strategic, vision and technical architecture are well defined. The document does however leave specific implementation details to be discovered and decided during the Architecture and Execution phases. This is appropriate for a document of this nature and scope.
+                </p>
+                <p class="gs__analysis-text gs__analysis-text--highlight">
+                  I recommend we take a systematic, building-block approach to implementation priorities and quality, and setting up the foundational infrastructure based on the prescribed technology stack.
+                </p>
+              </div>
+              <div class="gs__cmd-footer">
+                <span class="gs__status gs__status--success">Completed (success)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reasoning Review 1 -->
+          <div class="gs__review">
+            <div class="gs__review-header">
+              <span class="gs__review-icon">&#128270;</span>
+              <span class="gs__review-title">Reasoning Review</span>
+              <span class="gs__review-severity gs__review-severity--medium">MEDIUM</span>
+            </div>
+            <div class="gs__review-body">
+              <p class="gs__review-concern">The agent provides a solid, high-level summary of the overall product surface. However, it would be beneficial for the expert to also reference any specific prior context, in-repository code, infrastructure/tooling conventions, or similar existing artifacts so that its analysis anchors to observable evidence rather than only the submitted document.</p>
+            </div>
+            <div class="gs__review-footer">
+              <span class="gs__review-meta">Proposing business analysis and services</span>
+            </div>
+          </div>
+
+          <!-- Reasoning Review 2 -->
+          <div class="gs__review">
+            <div class="gs__review-header">
+              <span class="gs__review-icon">&#128270;</span>
+              <span class="gs__review-title">Reasoning Review</span>
+              <span class="gs__review-severity gs__review-severity--high">HIGH</span>
+            </div>
+            <div class="gs__review-body">
+              <div class="gs__review-concern-block">
+                <span class="gs__review-concern-icon gs__review-concern-icon--warn">&#9888;</span>
+                <p class="gs__review-concern">The agent failed to produce any domains, a primary requirement of the task.</p>
+              </div>
+              <div class="gs__review-concern-block">
+                <span class="gs__review-concern-icon gs__review-concern-icon--warn">&#9888;</span>
+                <p class="gs__review-concern">The agent omitted multiple domain elements from the source document instead of proposing them individually.</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!--  Screenshot 2: Proposed Business Domains           -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Intake &mdash; Proposer Round 1</span>
+        <h2>Proposed business domains</h2>
+        <p>The Domain Proposer analyzes the product description and generates business domain proposals, each tagged with its source attribution.</p>
+      </div>
+
+      <div class="gs">
+        <div class="gs__topbar">
+          <div class="gs__topbar-left"><span class="gs__topbar-title">GOVERNED STREAM TIMELINE</span></div>
+          <div class="gs__topbar-right"><span class="gs__topbar-action">Review Domains of Real Property OS</span></div>
+        </div>
+        <div class="gs__phase-bar">
+          <div class="gs__phase-step gs__phase-step--active"><span class="gs__phase-dot gs__phase-dot--active"></span><span>INTAKE</span></div>
+          <div class="gs__phase-step"><span class="gs__phase-dot"></span><span>ARCHITECTURE</span></div>
+          <div class="gs__phase-step"><span class="gs__phase-dot"></span><span>PROPOSE</span></div>
+          <div class="gs__phase-step"><span class="gs__phase-dot"></span><span>EXECUTE</span></div>
+        </div>
+
+        <div class="gs__stream">
+          <div class="gs__system-msg">
+            <span class="gs__system-icon">&#9670;</span>
+            <span><strong>Proposed Business Domains</strong> &mdash; Review each domain below, a draft plan</span>
+          </div>
+
+          <!-- Sub-phase indicator -->
+          <div class="gs__subphase-bar">
+            <span class="gs__subphase gs__subphase--active">Domains &amp; Personas</span>
+            <span class="gs__subphase">Journeys &amp; Workflows</span>
+            <span class="gs__subphase">Entity &amp; Data Model</span>
+            <span class="gs__subphase">Integrations &amp; Quality</span>
+          </div>
+
+          <!-- Domain list -->
+          <div class="gs__domain-list">
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">1</span>
+                <span class="gs__domain-name">Property & Association Model</span>
+                <span class="gs__source-tag gs__source-tag--doc">DOCUMENT-SPECIFIED</span>
+              </div>
+              <p class="gs__domain-desc">Defines the foundational structure and entity relationships, land associations, and their relationships: (I) owner/ownership, residence entity, common/social, legal parcels and organizations that own, manage or relate to and register their use, manage or enable their use.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">2</span>
+                <span class="gs__domain-name">Accounting & Financial</span>
+                <span class="gs__source-tag gs__source-tag--doc">DOCUMENT-SPECIFIED</span>
+              </div>
+              <p class="gs__domain-desc">Covers all financial operations including Chart of Accounts, General Ledger, Assessments, AR/AP, Payments, Journal Entries, Vendor W-9/1099 data, bank reconciliation, assessment charges, and financial reporting.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">3</span>
+                <span class="gs__domain-name">Workflow Automation</span>
+                <span class="gs__source-tag gs__source-tag--doc">DOCUMENT-SPECIFIED</span>
+              </div>
+              <p class="gs__domain-desc">Manages the lifecycle of all business processes. Covers task routing, SLA timers, event triggers, approval chains, and notification dispatch. Built on DBOS versioned workflows for durability and idempotent state transitions.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">4</span>
+                <span class="gs__domain-name">Compliance & Violations</span>
+                <span class="gs__source-tag gs__source-tag--doc">DOCUMENT-SPECIFIED</span>
+              </div>
+              <p class="gs__domain-desc">Manages HOA violation lifecycle including evidence capture (photos, videos), notice sequences, hearings, fine assessment with GL posting, and appeal workflows. Also covers statutory deadline tracking and voting rule compliance.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">5</span>
+                <span class="gs__domain-name">Architectural Review (ARC)</span>
+                <span class="gs__source-tag gs__source-tag--doc">DOCUMENT-SPECIFIED</span>
+              </div>
+              <p class="gs__domain-desc">Covers ARC requests, plan/document submission, committee review and conditional approvals, permit/BLDS integration for construction and modifications to the property, managing the submission, review, and decision process for architectural modifications.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">6</span>
+                <span class="gs__domain-name">Work Orders & Maintenance</span>
+                <span class="gs__source-tag gs__source-tag--doc">DOCUMENT-SPECIFIED</span>
+              </div>
+              <p class="gs__domain-desc">Manages the full lifecycle of maintenance and repair work. Covers work order creation, asset tracking, vendor assignment, bid/proposal management, scheduling, completion tracking, and invoice-to-AP workflow integration.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">7</span>
+                <span class="gs__domain-name">Communication & Notifications</span>
+                <span class="gs__source-tag gs__source-tag--doc">DOCUMENT-SPECIFIED</span>
+              </div>
+              <p class="gs__domain-desc">Manages all outbound communications: mass email, SMS, announcements, letter templates, calendar events, meeting notices, and role-based messaging. Integrates across all pillars for unified notification dispatch.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">8</span>
+                <span class="gs__domain-name">Governance & Board Management</span>
+                <span class="gs__source-tag gs__source-tag--doc">DOCUMENT-SPECIFIED</span>
+              </div>
+              <p class="gs__domain-desc">Manages the full lifecycle of association board governance: meetings, agendas, minutes, voting, resolutions, policy documents, board roles, and committee management.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">9</span>
+                <span class="gs__domain-name">Contractor Identity & Licensing</span>
+                <span class="gs__source-tag gs__source-tag--std">DOMAIN-STANDARD</span>
+              </div>
+              <p class="gs__domain-desc">Defines contractor legal/operational profiles: licensing, certifications, insurance, bonding, business classifications, operating hours, branch locations, approved vendor status. AI-driven license expiration and compliance monitoring.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">10</span>
+                <span class="gs__domain-name">Field Service Operations</span>
+                <span class="gs__source-tag gs__source-tag--std">DOMAIN-STANDARD</span>
+              </div>
+              <p class="gs__domain-desc">Covers dispatch, routing, scheduling, mobile technician operations, on-site estimate generation, payment acceptance, voice notes, before/after documentation, and offline-first capabilities for low-connectivity field work.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">11</span>
+                <span class="gs__domain-name">Pricebook & Commercial</span>
+                <span class="gs__source-tag gs__source-tag--std">DOMAIN-STANDARD</span>
+              </div>
+              <p class="gs__domain-desc">Defines the commercial catalog: service items, labor models (flat rate, hourly), materials, bundles, job templates, seasonal pricing, volume pricing, versioned pricebook updates. All estimates and invoices derive from pricebook definitions.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">12</span>
+                <span class="gs__domain-name">Document & Trust Ledger</span>
+                <span class="gs__source-tag gs__source-tag--doc">DOCUMENT-SPECIFIED</span>
+              </div>
+              <p class="gs__domain-desc">Covers document management (CC&Rs, bylaws, rules, contracts, reserve studies, inspection reports) with AI-driven extraction, classification, and summarization. Includes the Decision, Rationale & Trust Ledger for transparent recording of material decisions.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">13</span>
+                <span class="gs__domain-name">Platform Identity & Auth</span>
+                <span class="gs__source-tag gs__source-tag--ai">AI-PROPOSED</span>
+              </div>
+              <p class="gs__domain-desc">Cross-cutting authentication (Better-Auth) and policy-based authorization (Cerbos) layer. User accounts, role management (Owner, Tenant, Manager, Vendor, Board Member), session handling, and multi-tenant access control.</p>
+            </div>
+
+            <div class="gs__domain-item">
+              <div class="gs__domain-header">
+                <span class="gs__domain-num">14</span>
+                <span class="gs__domain-name">Media & Digital Assets</span>
+                <span class="gs__source-tag gs__source-tag--ai">AI-PROPOSED</span>
+              </div>
+              <p class="gs__domain-desc">Manages the media pipeline: resumable uploads (tusd), malware scanning (ClamAV), video processing (ffmpeg), image derivatives (libvips), metadata extraction (ExifTool), and object storage (SeaweedFS).</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!--  Screenshot 3: Proposed Data Model                 -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Intake &mdash; Proposer Round 3</span>
+        <h2>Proposed data model</h2>
+        <p>The Entity Proposer generates typed data entities with relationships, organized by domain. Each entity type is color-coded.</p>
+      </div>
+
+      <div class="gs">
+        <div class="gs__topbar">
+          <div class="gs__topbar-left"><span class="gs__topbar-title">GOVERNED STREAM TIMELINE</span></div>
+          <div class="gs__topbar-right"><span class="gs__topbar-action">Proposer &mdash; Data Model</span></div>
+        </div>
+        <div class="gs__phase-bar">
+          <div class="gs__phase-step gs__phase-step--active"><span class="gs__phase-dot gs__phase-dot--active"></span><span>INTAKE</span></div>
+          <div class="gs__phase-step"><span class="gs__phase-dot"></span><span>ARCHITECTURE</span></div>
+          <div class="gs__phase-step"><span class="gs__phase-dot"></span><span>PROPOSE</span></div>
+          <div class="gs__phase-step"><span class="gs__phase-dot"></span><span>EXECUTE</span></div>
+        </div>
+
+        <div class="gs__stream">
+          <div class="gs__system-msg">
+            <span class="gs__system-icon">&#9670;</span>
+            <span><strong>Proposed Data Model</strong> &mdash; Round 3 of 4 (Entities &amp; Relationships)</span>
+          </div>
+
+          <div class="gs__subphase-bar">
+            <span class="gs__subphase gs__subphase--done">Domains &amp; Personas</span>
+            <span class="gs__subphase gs__subphase--done">Journeys &amp; Workflows</span>
+            <span class="gs__subphase gs__subphase--active">Entity &amp; Data Model</span>
+            <span class="gs__subphase">Integrations &amp; Quality</span>
+          </div>
+
+          <!-- Domain: Property & Association Model -->
+          <div class="gs__entity-domain">
+            <div class="gs__entity-domain-header">
+              <span class="gs__entity-domain-name">Property & Association Model</span>
+              <span class="gs__entity-domain-count">8 entities</span>
+            </div>
+            <div class="gs__entity-list">
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--entity">Entity</span>
+                <span class="gs__entity-name">Organization</span>
+                <span class="gs__entity-desc">The highest-level legal entity, such as a Homeowners Association (HOA) or Community Association (COA), that governs a community.</span>
+              </div>
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--entity">Entity</span>
+                <span class="gs__entity-name">Property</span>
+                <span class="gs__entity-desc">A physical property unit within an association, such as a single-family home, condominium unit, or lot.</span>
+              </div>
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--entity">Entity</span>
+                <span class="gs__entity-name">Person</span>
+                <span class="gs__entity-desc">Represents an individual person, such as an owner, resident, board member or vendor contact.</span>
+              </div>
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--relationship">Relationship</span>
+                <span class="gs__entity-name">Ownership</span>
+                <span class="gs__entity-desc">A junction entity linking a Person (owner) to a Property within an Association, defining the ownership structure and rights.</span>
+              </div>
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--relationship">Relationship</span>
+                <span class="gs__entity-name">Management Contract</span>
+                <span class="gs__entity-desc">An association with a management company or individual.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Domain: Accounting -->
+          <div class="gs__entity-domain">
+            <div class="gs__entity-domain-header">
+              <span class="gs__entity-domain-name">Accounting & Financial</span>
+              <span class="gs__entity-domain-count">6 entities</span>
+            </div>
+            <div class="gs__entity-list">
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--entity">Entity</span>
+                <span class="gs__entity-name">Chart of Accounts</span>
+                <span class="gs__entity-desc">The root classification of a Chart of Accounts (e.g., 'Homeowner Accounts', 'Repair Expenses', 'Reserve Fund').</span>
+              </div>
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--entity">Entity</span>
+                <span class="gs__entity-name">Journal Entry</span>
+                <span class="gs__entity-desc">Represents double-entry bookkeeping transactions.</span>
+              </div>
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--entity">Entity</span>
+                <span class="gs__entity-name">Assessment</span>
+                <span class="gs__entity-desc">A charge levied against a property by its HOA (e.g., periodic, special). Generating a debit or credit to an account.</span>
+              </div>
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--enum">Enum</span>
+                <span class="gs__entity-name">Ledger Transaction</span>
+                <span class="gs__entity-desc">Discrete categories: Regular Assessment, Special Assessment, Fine, Vendor Payment, Refund.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Domain: Compliance -->
+          <div class="gs__entity-domain">
+            <div class="gs__entity-domain-header">
+              <span class="gs__entity-domain-name">Compliance & Violations</span>
+              <span class="gs__entity-domain-count">5 entities</span>
+            </div>
+            <div class="gs__entity-list">
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--entity">Entity</span>
+                <span class="gs__entity-name">Violation</span>
+                <span class="gs__entity-desc">A recorded violation of community rules or CC&Rs against a specific property.</span>
+              </div>
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--entity">Entity</span>
+                <span class="gs__entity-name">Statutory Deadline</span>
+                <span class="gs__entity-desc">A regulatory or statutory deadline that the association must comply with.</span>
+              </div>
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--relationship">Relationship</span>
+                <span class="gs__entity-name">Notice Sequence</span>
+                <span class="gs__entity-desc">An ordered set of notice steps that must be followed for a violation. Linked to workflow automation.</span>
+              </div>
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--entity">Entity</span>
+                <span class="gs__entity-name">Hearing</span>
+                <span class="gs__entity-desc">A formal communication and/or a meeting regarding a violation, often generated as a step in the violation workflow.</span>
+              </div>
+              <div class="gs__entity">
+                <span class="gs__entity-type gs__entity-type--relationship">Relationship</span>
+                <span class="gs__entity-name">Fine &rarr; GL</span>
+                <span class="gs__entity-desc">A specific rule, carryover of regulations from the association's governing documents.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!--  Screenshot 4: Domain Coverage                     -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Intake &mdash; Coverage Analysis</span>
+        <h2>Domain coverage assessment</h2>
+        <p>The intake analysis tracks coverage across twelve engineering domains. Each domain is rated ADEQUATE, PARTIAL, or NONE — with an overall percentage score.</p>
+      </div>
+
+      <div class="gs">
+        <div class="gs__stream" style="padding: 0;">
+          <div class="gs__coverage">
+            <div class="gs__coverage-header">
+              <span class="gs__coverage-title">DOMAIN COVERAGE</span>
+              <span class="gs__coverage-pct">71%</span>
+            </div>
+
+            <div class="gs__coverage-bar">
+              <div class="gs__coverage-bar-fill" style="width: 71%;"></div>
+            </div>
+
+            <div class="gs__coverage-summary">
+              <span class="gs__coverage-stat gs__coverage-stat--adequate">6 adequate</span>
+              <span class="gs__coverage-stat gs__coverage-stat--partial">5 partial</span>
+              <span class="gs__coverage-stat gs__coverage-stat--none">1 uncovered</span>
+            </div>
+
+            <div class="gs__coverage-list">
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--adequate"></span>
+                <span class="gs__coverage-name">Problem & Mission</span>
+                <span class="gs__coverage-level gs__coverage-level--adequate">ADEQUATE</span>
+              </div>
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--adequate"></span>
+                <span class="gs__coverage-name">Stakeholders</span>
+                <span class="gs__coverage-level gs__coverage-level--adequate">ADEQUATE</span>
+              </div>
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--adequate"></span>
+                <span class="gs__coverage-name">Scope</span>
+                <span class="gs__coverage-level gs__coverage-level--adequate">ADEQUATE</span>
+              </div>
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--partial"></span>
+                <span class="gs__coverage-name">Capabilities</span>
+                <span class="gs__coverage-level gs__coverage-level--partial">PARTIAL</span>
+              </div>
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--partial"></span>
+                <span class="gs__coverage-name">Workflows & Use Cases</span>
+                <span class="gs__coverage-level gs__coverage-level--partial">PARTIAL</span>
+              </div>
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--partial"></span>
+                <span class="gs__coverage-name">Data & Information</span>
+                <span class="gs__coverage-level gs__coverage-level--partial">PARTIAL</span>
+              </div>
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--partial"></span>
+                <span class="gs__coverage-name">Integration & Interfaces</span>
+                <span class="gs__coverage-level gs__coverage-level--partial">PARTIAL</span>
+              </div>
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--adequate"></span>
+                <span class="gs__coverage-name">Security & Compliance</span>
+                <span class="gs__coverage-level gs__coverage-level--adequate">ADEQUATE</span>
+              </div>
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--partial"></span>
+                <span class="gs__coverage-name">Quality Attributes</span>
+                <span class="gs__coverage-level gs__coverage-level--partial">PARTIAL</span>
+              </div>
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--adequate"></span>
+                <span class="gs__coverage-name">Environment & Operations</span>
+                <span class="gs__coverage-level gs__coverage-level--adequate">ADEQUATE</span>
+              </div>
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--adequate"></span>
+                <span class="gs__coverage-name">Architecture</span>
+                <span class="gs__coverage-level gs__coverage-level--adequate">ADEQUATE</span>
+              </div>
+              <div class="gs__coverage-row">
+                <span class="gs__coverage-dot gs__coverage-dot--none"></span>
+                <span class="gs__coverage-name">Verification & Delivery</span>
+                <span class="gs__coverage-level gs__coverage-level--none">NONE</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</Base>
+
+<style>
+  /* ══════════════════════════════════════════════════════
+     Governed Stream UI Recreation
+     Faithful CSS/HTML conversion of the VS Code WebView
+     ══════════════════════════════════════════════════════ */
+
+  .gs {
+    background: #0e1117;
+    border: 1px solid #1e2a3a;
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color: #b8c4d4;
+  }
+
+  /* ── Top Bar ── */
+  .gs__topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    background: #0a0e17;
+    border-bottom: 1px solid #1e2a3a;
+  }
+
+  .gs__topbar-title {
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: 0.12em;
+    color: #5a6a80;
+    text-transform: uppercase;
+  }
+
+  .gs__topbar-right {
+    display: flex;
+    gap: 16px;
+  }
+
+  .gs__topbar-action {
+    font-size: 11px;
+    color: #5a6a80;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  .gs__topbar-action:hover {
+    color: var(--color-primary);
+  }
+
+  /* ── Phase Progress Bar ── */
+  .gs__phase-bar {
+    display: flex;
+    gap: 24px;
+    padding: 10px 16px;
+    background: #0c1018;
+    border-bottom: 1px solid #1e2a3a;
+  }
+
+  .gs__phase-step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #3a4a5e;
+    text-transform: uppercase;
+  }
+
+  .gs__phase-step--active {
+    color: var(--color-primary);
+  }
+
+  .gs__phase-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #1e2a3a;
+    border: 1.5px solid #3a4a5e;
+  }
+
+  .gs__phase-dot--active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 6px rgba(0, 212, 255, 0.4);
+  }
+
+  /* ── Stream Body ── */
+  .gs__stream {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* ── System Message ── */
+  .gs__system-msg {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #111822;
+    border: 1px solid #1e2a3a;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #8a9ab4;
+  }
+
+  .gs__system-icon {
+    color: var(--color-primary);
+    font-size: 10px;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+
+  .gs__system-msg em {
+    color: var(--color-primary);
+    font-style: normal;
+  }
+
+  /* ── Command Block ── */
+  .gs__cmd {
+    background: #111822;
+    border: 1px solid #1e2a3a;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .gs__cmd-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #0d1420;
+    border-bottom: 1px solid #1e2a3a;
+    flex-wrap: wrap;
+  }
+
+  .gs__cmd-icon {
+    color: var(--color-primary);
+    font-size: 8px;
+  }
+
+  .gs__cmd-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #c8d4e4;
+  }
+
+  .gs__badge {
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+  }
+
+  .gs__badge--cli {
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 212, 255, 0.25);
+  }
+
+  .gs__badge--review {
+    background: rgba(0, 255, 178, 0.08);
+    color: var(--color-accent);
+    border: 1px solid rgba(0, 255, 178, 0.2);
+  }
+
+  .gs__cmd-time {
+    margin-left: auto;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: #4a5a70;
+  }
+
+  .gs__cmd-body {
+    padding: 0;
+  }
+
+  .gs__cmd-output {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--color-accent);
+  }
+
+  .gs__cmd-content {
+    padding: 16px;
+  }
+
+  .gs__cmd-footer {
+    padding: 8px 12px;
+    border-top: 1px solid #1e2a3a;
+  }
+
+  .gs__status {
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+
+  .gs__status--success {
+    color: var(--color-accent);
+  }
+
+  /* ── Analysis Content ── */
+  .gs__analysis-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #c8d4e4;
+    margin-bottom: 12px;
+  }
+
+  .gs__analysis-text {
+    font-size: 13px;
+    line-height: 1.7;
+    color: #8a9ab4;
+    margin-bottom: 12px;
+  }
+
+  .gs__analysis-text:last-child {
+    margin-bottom: 0;
+  }
+
+  .gs__analysis-text--highlight {
+    color: #a8b8cc;
+    border-left: 2px solid var(--color-primary);
+    padding-left: 12px;
+  }
+
+  /* ── Status Card ── */
+  .gs__status-card {
+    background: #111822;
+    border: 1px solid #1e2a3a;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .gs__status-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(0, 212, 255, 0.04);
+    border-bottom: 1px solid #1e2a3a;
+  }
+
+  .gs__status-icon {
+    font-size: 14px;
+  }
+
+  .gs__status-icon--info {
+    color: var(--color-primary);
+  }
+
+  .gs__status-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  .gs__status-card-body {
+    padding: 12px 14px;
+  }
+
+  .gs__status-card-body p {
+    font-size: 12px;
+    line-height: 1.6;
+    color: #7a8a9e;
+    margin-bottom: 10px;
+  }
+
+  .gs__status-card-body em {
+    color: #8a9ab4;
+    font-style: normal;
+  }
+
+  .gs__status-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .gs__tag {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+
+  .gs__tag--cyan {
+    background: rgba(0, 212, 255, 0.08);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+  }
+
+  .gs__tag--dim {
+    background: rgba(90, 106, 128, 0.08);
+    color: #5a6a80;
+    border: 1px solid rgba(90, 106, 128, 0.2);
+  }
+
+  /* ── Reasoning Review ── */
+  .gs__review {
+    background: #111822;
+    border: 1px solid #1e2a3a;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .gs__review-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #0d1420;
+    border-bottom: 1px solid #1e2a3a;
+  }
+
+  .gs__review-icon {
+    font-size: 12px;
+    color: var(--color-accent);
+  }
+
+  .gs__review-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #c8d4e4;
+  }
+
+  .gs__review-severity {
+    margin-left: auto;
+    padding: 1px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+  }
+
+  .gs__review-severity--high {
+    background: rgba(255, 68, 102, 0.12);
+    color: #ff4466;
+    border: 1px solid rgba(255, 68, 102, 0.25);
+  }
+
+  .gs__review-severity--medium {
+    background: rgba(255, 184, 0, 0.1);
+    color: #ffb800;
+    border: 1px solid rgba(255, 184, 0, 0.2);
+  }
+
+  .gs__review-severity--low {
+    background: rgba(0, 212, 255, 0.08);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+  }
+
+  .gs__review-body {
+    padding: 12px 14px;
+  }
+
+  .gs__review-concern {
+    font-size: 12px;
+    line-height: 1.65;
+    color: #8a9ab4;
+  }
+
+  .gs__review-concern-block {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .gs__review-concern-block:last-child {
+    margin-bottom: 0;
+  }
+
+  .gs__review-concern-icon {
+    flex-shrink: 0;
+    font-size: 12px;
+    margin-top: 1px;
+  }
+
+  .gs__review-concern-icon--warn {
+    color: #ffb800;
+  }
+
+  .gs__review-footer {
+    padding: 6px 12px;
+    border-top: 1px solid #1e2a3a;
+  }
+
+  .gs__review-meta {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: #4a5a70;
+  }
+
+  /* ── Sub-phase Progress Bar ── */
+  .gs__subphase-bar {
+    display: flex;
+    gap: 2px;
+    padding: 0 0 12px;
+  }
+
+  .gs__subphase {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    text-align: center;
+    color: #3a4a5e;
+    background: #0c1018;
+    border: 1px solid #1e2a3a;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+  }
+
+  .gs__subphase--active {
+    color: var(--color-primary);
+    background: rgba(0, 212, 255, 0.06);
+    border-color: rgba(0, 212, 255, 0.25);
+  }
+
+  .gs__subphase--done {
+    color: var(--color-accent);
+    background: rgba(0, 255, 178, 0.04);
+    border-color: rgba(0, 255, 178, 0.15);
+  }
+
+  /* ── Domain List ── */
+  .gs__domain-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .gs__domain-item {
+    background: #111822;
+    border: 1px solid #1e2a3a;
+    border-radius: 6px;
+    padding: 12px 14px;
+    transition: border-color 0.2s;
+  }
+
+  .gs__domain-item:hover {
+    border-color: #2a3a50;
+  }
+
+  .gs__domain-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+
+  .gs__domain-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    background: #0c1018;
+    border: 1px solid #2a3a50;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: #6a7a90;
+    flex-shrink: 0;
+  }
+
+  .gs__domain-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #c8d4e4;
+  }
+
+  .gs__source-tag {
+    margin-left: auto;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .gs__source-tag--doc {
+    background: rgba(0, 212, 255, 0.08);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+  }
+
+  .gs__source-tag--std {
+    background: rgba(167, 139, 250, 0.08);
+    color: #A78BFA;
+    border: 1px solid rgba(167, 139, 250, 0.2);
+  }
+
+  .gs__source-tag--ai {
+    background: rgba(255, 184, 0, 0.08);
+    color: #ffb800;
+    border: 1px solid rgba(255, 184, 0, 0.2);
+  }
+
+  .gs__domain-desc {
+    font-size: 12px;
+    line-height: 1.6;
+    color: #6a7a90;
+  }
+
+  /* ── Entity / Data Model ── */
+  .gs__entity-domain {
+    background: #0d1420;
+    border: 1px solid #1e2a3a;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .gs__entity-domain-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: #0a0e17;
+    border-bottom: 1px solid #1e2a3a;
+  }
+
+  .gs__entity-domain-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #c8d4e4;
+  }
+
+  .gs__entity-domain-count {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: #4a5a70;
+  }
+
+  .gs__entity-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gs__entity {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 14px;
+    border-bottom: 1px solid #152238;
+    transition: background 0.15s;
+  }
+
+  .gs__entity:last-child {
+    border-bottom: none;
+  }
+
+  .gs__entity:hover {
+    background: rgba(0, 212, 255, 0.02);
+  }
+
+  .gs__entity-type {
+    flex-shrink: 0;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    margin-top: 2px;
+  }
+
+  .gs__entity-type--entity {
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+  }
+
+  .gs__entity-type--relationship {
+    background: rgba(0, 255, 178, 0.08);
+    color: var(--color-accent);
+    border: 1px solid rgba(0, 255, 178, 0.2);
+  }
+
+  .gs__entity-type--enum {
+    background: rgba(255, 184, 0, 0.08);
+    color: #ffb800;
+    border: 1px solid rgba(255, 184, 0, 0.2);
+  }
+
+  .gs__entity-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #b8c8dc;
+    min-width: 140px;
+    flex-shrink: 0;
+  }
+
+  .gs__entity-desc {
+    font-size: 11px;
+    line-height: 1.5;
+    color: #5a6a80;
+  }
+
+  /* ── Domain Coverage ── */
+  .gs__coverage {
+    background: #0d1420;
+    border: 1px solid #1e2a3a;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .gs__coverage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px 4px;
+  }
+
+  .gs__coverage-title {
+    font-size: 12px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    color: #8a9ab4;
+  }
+
+  .gs__coverage-pct {
+    font-size: 16px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: #c8d4e4;
+  }
+
+  .gs__coverage-bar {
+    height: 4px;
+    margin: 8px 16px;
+    background: #1e2a3a;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .gs__coverage-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--color-accent), #ffb800, var(--color-error));
+  }
+
+  .gs__coverage-summary {
+    display: flex;
+    gap: 16px;
+    padding: 4px 16px 12px;
+    border-bottom: 1px solid #1e2a3a;
+  }
+
+  .gs__coverage-stat {
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+
+  .gs__coverage-stat--adequate { color: var(--color-accent); }
+  .gs__coverage-stat--partial { color: #ffb800; }
+  .gs__coverage-stat--none { color: var(--color-error); }
+
+  .gs__coverage-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gs__coverage-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 16px;
+    border-bottom: 1px solid #152238;
+    transition: background 0.15s;
+  }
+
+  .gs__coverage-row:last-child {
+    border-bottom: none;
+  }
+
+  .gs__coverage-row:hover {
+    background: rgba(0, 212, 255, 0.02);
+  }
+
+  .gs__coverage-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .gs__coverage-dot--adequate { background: var(--color-accent); }
+  .gs__coverage-dot--partial { background: #ffb800; }
+  .gs__coverage-dot--none { background: var(--color-error); }
+
+  .gs__coverage-name {
+    font-size: 12px;
+    color: #b8c8dc;
+    flex: 1;
+  }
+
+  .gs__coverage-level {
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+  }
+
+  .gs__coverage-level--adequate { color: var(--color-accent); }
+  .gs__coverage-level--partial { color: #ffb800; }
+  .gs__coverage-level--none { color: var(--color-error); }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .gs__phase-bar {
+      overflow-x: auto;
+    }
+    .gs__cmd-header {
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .gs__cmd-time {
+      width: 100%;
+      margin-left: 0;
+      margin-top: 4px;
+    }
+    .gs__subphase-bar {
+      flex-wrap: wrap;
+    }
+    .gs__domain-header {
+      flex-wrap: wrap;
+    }
+    .gs__source-tag {
+      margin-left: 0;
+    }
+    .gs__entity {
+      flex-direction: column;
+      gap: 4px;
+    }
+    .gs__entity-name {
+      min-width: auto;
+    }
+  }
+</style>

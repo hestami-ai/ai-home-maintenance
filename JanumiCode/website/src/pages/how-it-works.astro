@@ -1,0 +1,810 @@
+---
+import Base from "../layouts/Base.astro";
+
+const intakeSubPhases = [
+  { name: "ANALYZING", desc: "Expert silently analyzes documents, codebase, and user prompt. Classifies the goal and selects an adaptive intake mode." },
+  { name: "PRODUCT_REVIEW", desc: "User reviews product discovery artifacts (personas, journeys, phasing) via Mirror & Menu Protocol cards." },
+  { name: "DISCUSSING", desc: "Human and Technical Expert actively discuss requirements. Plan evolves turn-by-turn across three adaptive modes: state-driven, domain-guided, or hybrid checkpoints." },
+  { name: "PROPOSING_DOMAINS", desc: "AI proposes business domains and personas. User validates each via Mirror cards — accept, reject, or edit." },
+  { name: "PROPOSING_JOURNEYS", desc: "AI proposes user journeys and system workflows for accepted domains. User validates via MMP." },
+  { name: "PROPOSING_ENTITIES", desc: "AI proposes data entities with relationships and key attributes, cross-referencing accepted domains and workflows." },
+  { name: "PROPOSING_INTEGRATIONS", desc: "AI proposes external integrations and quality attributes. Each tagged with source: document-specified, codebase-existing, domain-standard, or AI-proposed." },
+  { name: "SYNTHESIZING", desc: "Technical Expert synthesizes all accepted proposals into a draft plan. Consolidates turns, decisions, and constraints." },
+  { name: "AWAITING_APPROVAL", desc: "Final plan presented for human approval. User approves, requests changes, or reframes the approach." },
+];
+
+const archSubPhases = [
+  { name: "DECOMPOSING", desc: "Approved plan decomposed into capabilities and workflows. Produces a Use Case Model mapping requirements to capabilities." },
+  { name: "MODELING", desc: "Capabilities mapped to data entities, fields, relationships, and business invariants. Produces a Domain Model." },
+  { name: "DESIGNING", desc: "Domain model transformed into concrete components with interface contracts (REST, Event, RPC, File, IPC). Max 2 repair cycles if validation fails." },
+  { name: "SEQUENCING", desc: "Components ordered into a phased implementation roadmap with complexity ratings and dependency tracking." },
+  { name: "VALIDATING", desc: "Historian checks goal alignment and structural consistency. Verifies requirements traceability — flags uncovered requirements and unbacked capabilities." },
+  { name: "PRESENTING", desc: "Architecture presented to human for approval. Approve advances to execution. Revise loops back to DESIGNING." },
+];
+
+const executeSubPhases = [
+  { name: "TASK DECOMPOSITION", desc: "Goal decomposed into a directed acyclic graph (DAG) of atomic task units with dependency edges and acceptance criteria." },
+  { name: "PER-UNIT EXECUTION", desc: "Each task unit executed independently. Toolchain detected per unit. Provider routed based on unit type. Outcome snapshot captured." },
+  { name: "PER-UNIT VALIDATION", desc: "Outputs checked against acceptance criteria. Failures classified by type (structural, semantic, environmental)." },
+  { name: "BOUNDED REPAIR", desc: "Failed units enter bounded repair. Repair attempts are counted. Unrecoverable failures escalate to human repair gate — not cascaded." },
+  { name: "GRAPH PROGRESSION", desc: "Completed units unlock dependent units. Graph advances until all units complete or a blocking failure escalates." },
+];
+
+const verifySubPhases = [
+  { name: "CLAIM EXTRACTION", desc: "Assumptions from the proposal converted to verifiable claims. Tagged by type: architectural, compatibility, structural, scoping, intent." },
+  { name: "PER-CLAIM VERIFICATION", desc: "Verifier independently evaluates each critical claim against evidence. Produces verdicts: VERIFIED, CONDITIONAL, DISPROVED, or UNKNOWN." },
+  { name: "GATE ON FAILURE", desc: "DISPROVED or CONDITIONAL verdicts on critical claims trigger a human gate. Workflow blocks until the human overrides, reframes, or rejects." },
+];
+
+const historySubPhases = [
+  { name: "PRECEDENT SEARCH", desc: "Historian searches for prior decisions, patterns, and constraints that are relevant to the current claims." },
+  { name: "CONTRADICTION CHECK", desc: "Current decisions cross-referenced against the full decision history. Contradictions with prior approved decisions are surfaced." },
+  { name: "ARCHITECTURE DRIFT CHECK", desc: "Verifies that current work aligns with the approved architecture document. Flags deviations from approved component designs." },
+  { name: "ADJUDICATION", desc: "When contradictory verdicts exist, the Historian adjudicates — evaluating each claim against historical precedent and constraint context." },
+];
+---
+
+<Base title="How It Works" description="The governed workflow — phases, sub-phases, decision gates, and the Mirror & Menu Protocol.">
+
+  <!-- Overview -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Workflow Overview</span>
+        <h2>A governed pipeline from<br />intent to execution</h2>
+        <p>Every AI action passes through structured phases with human oversight at every boundary. Each phase contains specialized sub-phases that break complex work into auditable steps.</p>
+      </div>
+
+      <!-- Animation controls -->
+      <div class="phase-anim-controls">
+        <button class="phase-anim-btn" id="phase-play-btn">&#9654; Walk Through</button>
+        <span class="phase-anim-status" id="phase-status"></span>
+      </div>
+
+      <!-- Phase Pipeline Visual with Sub-Phases -->
+      <div class="phase-overview" id="phase-overview">
+
+        <div class="po-phase">
+          <div class="po-phase__header po-phase__header--cyan">
+            <span class="po-phase__name">INTAKE</span>
+            <span class="po-phase__count">12 sub-states</span>
+          </div>
+          <div class="po-phase__subs">
+            <span class="po-sub">ANALYZING</span>
+            <span class="po-sub">PRODUCT_REVIEW</span>
+            <span class="po-sub">DISCUSSING</span>
+            <span class="po-sub">PROPOSING</span>
+            <span class="po-sub">CLARIFYING</span>
+            <span class="po-sub">PROPOSING_DOMAINS</span>
+            <span class="po-sub">PROPOSING_JOURNEYS</span>
+            <span class="po-sub">PROPOSING_ENTITIES</span>
+            <span class="po-sub">PROPOSING_INTEGRATIONS</span>
+            <span class="po-sub">GATHERING</span>
+            <span class="po-sub">SYNTHESIZING</span>
+            <span class="po-sub">AWAITING_APPROVAL</span>
+          </div>
+          <div class="po-phase__gate">&#9670; HUMAN GATE</div>
+        </div>
+
+        <div class="po-phase">
+          <div class="po-phase__header po-phase__header--purple">
+            <span class="po-phase__name">ARCHITECTURE</span>
+            <span class="po-phase__count">6 sub-phases</span>
+          </div>
+          <div class="po-phase__subs">
+            <span class="po-sub">DECOMPOSING</span>
+            <span class="po-sub">MODELING</span>
+            <span class="po-sub">DESIGNING</span>
+            <span class="po-sub">SEQUENCING</span>
+            <span class="po-sub">VALIDATING</span>
+            <span class="po-sub">PRESENTING</span>
+          </div>
+          <div class="po-phase__gate">&#9670; HUMAN GATE</div>
+        </div>
+
+        <div class="po-phase">
+          <div class="po-phase__header po-phase__header--cyan">
+            <span class="po-phase__name">PROPOSE</span>
+            <span class="po-phase__count">Single pass</span>
+          </div>
+          <div class="po-phase__subs">
+            <span class="po-sub">Proposal generation</span>
+            <span class="po-sub">Assumption extraction</span>
+            <span class="po-sub">Branch options</span>
+          </div>
+        </div>
+
+        <div class="po-phase">
+          <div class="po-phase__header po-phase__header--green">
+            <span class="po-phase__name">VERIFY</span>
+            <span class="po-phase__count">Per-claim loop</span>
+          </div>
+          <div class="po-phase__subs">
+            <span class="po-sub">CLAIM_EXTRACTION</span>
+            <span class="po-sub">PER_CLAIM_VERIFICATION</span>
+            <span class="po-sub">GATE_ON_FAILURE</span>
+          </div>
+          <div class="po-phase__gate">&#9670; GATE ON DISPROVED</div>
+        </div>
+
+        <div class="po-phase">
+          <div class="po-phase__header po-phase__header--purple">
+            <span class="po-phase__name">HISTORICAL CHECK</span>
+            <span class="po-phase__count">4 queries</span>
+          </div>
+          <div class="po-phase__subs">
+            <span class="po-sub">PRECEDENT_SEARCH</span>
+            <span class="po-sub">CONTRADICTION_CHECK</span>
+            <span class="po-sub">ARCH_DRIFT_CHECK</span>
+            <span class="po-sub">ADJUDICATION</span>
+          </div>
+        </div>
+
+        <div class="po-phase">
+          <div class="po-phase__header po-phase__header--amber">
+            <span class="po-phase__name">REVIEW</span>
+            <span class="po-phase__count">Human gate</span>
+          </div>
+          <div class="po-phase__subs">
+            <span class="po-sub">APPROVE</span>
+            <span class="po-sub">OVERRIDE</span>
+            <span class="po-sub">REFRAME</span>
+          </div>
+          <div class="po-phase__gate">&#9670; HUMAN GATE</div>
+        </div>
+
+        <div class="po-phase">
+          <div class="po-phase__header po-phase__header--cyan">
+            <span class="po-phase__name">EXECUTE</span>
+            <span class="po-phase__count">Task graph</span>
+          </div>
+          <div class="po-phase__subs">
+            <span class="po-sub">TASK_DECOMPOSITION</span>
+            <span class="po-sub">PER_UNIT_EXECUTION</span>
+            <span class="po-sub">PER_UNIT_VALIDATION</span>
+            <span class="po-sub">BOUNDED_REPAIR</span>
+            <span class="po-sub">GRAPH_PROGRESSION</span>
+          </div>
+          <div class="po-phase__gate">&#9670; REPAIR ESCALATION</div>
+        </div>
+
+        <div class="po-phase">
+          <div class="po-phase__header po-phase__header--green">
+            <span class="po-phase__name">VALIDATE</span>
+            <span class="po-phase__count">Post-exec</span>
+          </div>
+          <div class="po-phase__subs">
+            <span class="po-sub">Workspace state check</span>
+            <span class="po-sub">Proposal conformance</span>
+          </div>
+          <div class="po-phase__gate">&#9670; GATE ON FAILURE</div>
+        </div>
+
+        <div class="po-phase">
+          <div class="po-phase__header po-phase__header--green">
+            <span class="po-phase__name">COMMIT</span>
+            <span class="po-phase__count">Finalize</span>
+          </div>
+          <div class="po-phase__subs">
+            <span class="po-sub">Artifact finalization</span>
+            <span class="po-sub">Narrative curation</span>
+            <span class="po-sub">Loop to INTAKE</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-pipeline-note">
+        <span class="indicator">HUMAN GATE AT EVERY BOUNDARY</span>
+        <span class="indicator">REPLAN FALLBACK FROM ANY PHASE</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- INTAKE -->
+  <section class="section section--alt" id="intake">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Phase 1 &mdash; Intake</span>
+        <h2>From product vision to<br />structured plan</h2>
+        <p>The most complex phase. Twelve sub-states handle everything from silent analysis through four rounds of proposer-validator negotiation to final plan synthesis. Three adaptive modes ensure the conversation style matches the goal type.</p>
+      </div>
+
+      <div class="subphase-grid">
+        {intakeSubPhases.map((sp, i) => (
+          <div class="subphase-card">
+            <div class="subphase-card__header">
+              <span class="subphase-card__num">{i + 1}</span>
+              <span class="subphase-card__name">{sp.name}</span>
+            </div>
+            <p class="subphase-card__desc">{sp.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="indicators" style="margin-top: var(--space-xl);">
+        <span class="indicator">ADAPTIVE MODE: STATE-DRIVEN</span>
+        <span class="indicator">ADAPTIVE MODE: DOMAIN-GUIDED</span>
+        <span class="indicator">ADAPTIVE MODE: HYBRID CHECKPOINTS</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section class="section" id="architecture">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Phase 2 &mdash; Architecture</span>
+        <h2>Approved plan to<br />concrete architecture</h2>
+        <p>Six ordered sub-phases transform the approved intake plan into capabilities, domain models, component designs, and implementation sequences. A repair loop between DESIGNING and VALIDATING ensures structural integrity.</p>
+      </div>
+
+      <div class="subphase-grid">
+        {archSubPhases.map((sp, i) => (
+          <div class="subphase-card">
+            <div class="subphase-card__header">
+              <span class="subphase-card__num">{i + 1}</span>
+              <span class="subphase-card__name">{sp.name}</span>
+            </div>
+            <p class="subphase-card__desc">{sp.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="indicators" style="margin-top: var(--space-xl);">
+        <span class="indicator">MAX 2 REPAIR CYCLES</span>
+        <span class="indicator">HUMAN REVISION LOOP</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- VERIFY + ASSUMPTION SURFACING -->
+  <section class="section section--alt" id="verify">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Phases 3&ndash;4 &mdash; Propose & Verify</span>
+        <h2>Every assumption becomes<br />a verifiable claim</h2>
+        <p>The Executor's proposal generates assumptions. Each assumption is converted to a typed claim (architectural, compatibility, structural, scoping, intent) and independently verified by the Verifier. No claim passes unchecked.</p>
+      </div>
+
+      <div class="subphase-grid subphase-grid--narrow">
+        {verifySubPhases.map((sp, i) => (
+          <div class="subphase-card">
+            <div class="subphase-card__header">
+              <span class="subphase-card__num">{i + 1}</span>
+              <span class="subphase-card__name">{sp.name}</span>
+            </div>
+            <p class="subphase-card__desc">{sp.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="indicators" style="margin-top: var(--space-xl);">
+        <span class="indicator">PER-CLAIM ITERATION</span>
+        <span class="indicator">GATES ON DISPROVED CRITICAL CLAIMS</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- HISTORICAL CHECK -->
+  <section class="section" id="historical">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Phase 5 &mdash; Historical Check</span>
+        <h2>Cross-dialogue memory<br />and precedent analysis</h2>
+        <p>The Historian examines the full decision history across all dialogues. It searches for precedents, detects contradictions, checks architecture drift, and adjudicates conflicting verdicts.</p>
+      </div>
+
+      <div class="subphase-grid subphase-grid--narrow">
+        {historySubPhases.map((sp, i) => (
+          <div class="subphase-card">
+            <div class="subphase-card__header">
+              <span class="subphase-card__num">{i + 1}</span>
+              <span class="subphase-card__name">{sp.name}</span>
+            </div>
+            <p class="subphase-card__desc">{sp.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="indicators" style="margin-top: var(--space-xl);">
+        <span class="indicator">READ-ONLY: NEVER MODIFIES HISTORY</span>
+        <span class="indicator">INDEPENDENT FROM VERIFIER</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- REVIEW (Gate) -->
+  <section class="section section--alt" id="review">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Phase 6 &mdash; Human Review</span>
+        <h2>Nothing executes without<br />human approval</h2>
+        <p>A pure human gate. The full proposal — with verified claims, historical findings, and any identified contradictions — is presented for final review. If multiple proposal branches exist, the human selects which to execute.</p>
+      </div>
+
+      <div class="grid grid--3">
+        <div class="card">
+          <h4 class="card__title">Approve</h4>
+          <p class="card__text">Accept the proposal and advance to execution. All verified claims and accepted assumptions carry forward.</p>
+          <div class="card__tags"><span class="tag">ADVANCES WORKFLOW</span></div>
+        </div>
+        <div class="card">
+          <h4 class="card__title">Override</h4>
+          <p class="card__text">Proceed despite concerns, with documented rationale. The override is recorded in the audit trail with full provenance.</p>
+          <div class="card__tags"><span class="tag">DOCUMENTED EXCEPTION</span></div>
+        </div>
+        <div class="card">
+          <h4 class="card__title">Reframe</h4>
+          <p class="card__text">Redirect the approach entirely. The workflow loops back to an earlier phase with the reframe rationale preserved.</p>
+          <div class="card__tags"><span class="tag">LOOPS TO REPLAN</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EXECUTE -->
+  <section class="section" id="execute">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Phase 7 &mdash; Execute</span>
+        <h2>Task graph execution with<br />bounded repair</h2>
+        <p>The approved proposal is decomposed into a directed acyclic graph of atomic task units. Each unit is executed, validated, and repaired independently. Failures don't cascade — they're contained to individual units with bounded repair attempts.</p>
+      </div>
+
+      <div class="subphase-grid">
+        {executeSubPhases.map((sp, i) => (
+          <div class="subphase-card">
+            <div class="subphase-card__header">
+              <span class="subphase-card__num">{i + 1}</span>
+              <span class="subphase-card__name">{sp.name}</span>
+            </div>
+            <p class="subphase-card__desc">{sp.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="indicators" style="margin-top: var(--space-xl);">
+        <span class="indicator">BOUNDED REPAIR: MAX ATTEMPTS PER UNIT</span>
+        <span class="indicator">HUMAN ESCALATION ON UNRECOVERABLE FAILURE</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- VALIDATE + COMMIT -->
+  <section class="section section--alt" id="finalize">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Phases 8&ndash;9 &mdash; Validate & Commit</span>
+        <h2>Post-execution verification<br />and workflow completion</h2>
+        <p>After execution, the workspace state is validated against the proposal. On success, the workflow commits artifacts and can loop back to INTAKE for the next task — preserving the full decision history for future reference.</p>
+      </div>
+
+      <div class="grid grid--2">
+        <div class="card">
+          <h4 class="card__title">Validate</h4>
+          <p class="card__text">Post-execution check verifies workspace state matches the proposal. Blocks on validation failure with a human gate for review.</p>
+          <div class="card__tags"><span class="tag">POST-EXEC</span><span class="tag">BLOCKING</span></div>
+        </div>
+        <div class="card">
+          <h4 class="card__title">Commit</h4>
+          <p class="card__text">Finalizes artifacts. Narrative Curator crystallizes the full dialogue into durable memory. The workflow can loop back to INTAKE for the next goal.</p>
+          <div class="card__tags"><span class="tag">CURATION TRIGGER</span><span class="tag">LOOP TO INTAKE</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MMP Section -->
+  <section class="section" id="mmp">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Decision Protocol</span>
+        <h2>Mirror & Menu Protocol</h2>
+        <p>JanumiCode surfaces AI assumptions and decisions through structured cards — not chat messages. Used throughout INTAKE proposer rounds, ARCHITECTURE presentation, and REVIEW gates.</p>
+      </div>
+
+      <div class="grid grid--3">
+        <div class="card">
+          <div class="card__icon--diamond"><span></span></div>
+          <h4 class="card__title">Mirror Cards</h4>
+          <p class="card__text">Surface the AI's assumptions for you to accept, reject, or edit. Each assumption is named and traceable — no silent embedding in downstream work.</p>
+          <div class="card__tags"><span class="tag">ACCEPT</span><span class="tag">REJECT</span><span class="tag">EDIT</span></div>
+        </div>
+        <div class="card">
+          <div class="card__icon--diamond"><span></span></div>
+          <h4 class="card__title">Menu Cards</h4>
+          <p class="card__text">Present concrete decision points with options. Select your choice and the workflow proceeds with that decision recorded in the audit trail.</p>
+          <div class="card__tags"><span class="tag">SELECT</span><span class="tag">MULTI-OPTION</span></div>
+        </div>
+        <div class="card">
+          <div class="card__icon--diamond"><span></span></div>
+          <h4 class="card__title">Pre-Mortem Cards</h4>
+          <p class="card__text">Surface risks before they materialize. Accept the risk, reject the approach, or define mitigation. Risk decisions propagate to downstream phases.</p>
+          <div class="card__tags"><span class="tag">ACCEPT RISK</span><span class="tag">MITIGATE</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+<script>
+  const PHASE_NAMES = [
+    'INTAKE', 'ARCHITECTURE', 'PROPOSE', 'VERIFY',
+    'HISTORICAL CHECK', 'REVIEW', 'EXECUTE', 'VALIDATE', 'COMMIT'
+  ];
+  const BASE_DWELL_MS = 1200;   // minimum time on any phase
+  const PER_SUB_MS = 200;       // extra time per sub-phase
+
+  const overview = document.getElementById('phase-overview');
+  const btn = document.getElementById('phase-play-btn');
+  const status = document.getElementById('phase-status');
+  const phases = overview ? Array.from(overview.querySelectorAll('.po-phase')) : [];
+  let running = false;
+  let timer = 0;
+
+  function reset() {
+    overview?.classList.remove('is-animating');
+    phases.forEach(p => { p.classList.remove('po-phase--active', 'po-phase--done'); });
+    if (status) status.innerHTML = '';
+    if (btn) btn.innerHTML = '&#9654; Walk Through';
+    running = false;
+    clearTimeout(timer);
+  }
+
+  async function play() {
+    if (running) { reset(); return; }
+    running = true;
+    overview?.classList.add('is-animating');
+    if (btn) btn.innerHTML = '&#9632; Stop';
+
+    for (let i = 0; i < phases.length; i++) {
+      if (!running) return;
+
+      // Activate current
+      phases.forEach(p => p.classList.remove('po-phase--active'));
+      phases[i].classList.add('po-phase--active');
+      if (status) status.innerHTML = `Processing: <span class="active-name">${PHASE_NAMES[i]}</span> (${i + 1}/${phases.length})`;
+
+      // Scroll into view on mobile
+      phases[i].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+
+      // Wait — scale with sub-phase count so all items reveal before advancing
+      const subCount = phases[i].querySelectorAll('.po-sub').length;
+      const dwell = BASE_DWELL_MS + (subCount * PER_SUB_MS);
+      await new Promise(r => { timer = window.setTimeout(r, dwell); });
+      if (!running) return;
+
+      // Mark done
+      phases[i].classList.remove('po-phase--active');
+      phases[i].classList.add('po-phase--done');
+    }
+
+    // Complete
+    if (status) status.innerHTML = '<span class="active-name">Workflow complete</span> — all phases processed';
+    if (btn) btn.innerHTML = '&#8634; Replay';
+    running = false;
+  }
+
+  btn?.addEventListener('click', () => {
+    if (running) { reset(); }
+    else {
+      phases.forEach(p => p.classList.remove('po-phase--done'));
+      play();
+    }
+  });
+
+  // Auto-play once on page load after a brief delay
+  setTimeout(() => { play(); }, 600);
+</script>
+</Base>
+
+<style>
+  /* ── Phase Overview with Sub-Phases ── */
+  .phase-overview {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-md);
+    padding: var(--space-md) 0 var(--space-lg);
+    margin-bottom: var(--space-md);
+  }
+
+  .po-phase {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.4s, box-shadow 0.4s, opacity 0.4s;
+    opacity: 0.35;
+  }
+
+  .po-phase:hover {
+    border-color: var(--color-border-active);
+    opacity: 1;
+  }
+
+  /* Walk-through animation: each phase lights up in sequence */
+  .phase-overview.is-animating .po-phase {
+    opacity: 0.35;
+  }
+
+  .phase-overview.is-animating .po-phase.po-phase--active {
+    opacity: 1;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 24px var(--color-primary-glow), inset 0 0 12px rgba(0, 212, 255, 0.03);
+  }
+
+  .phase-overview.is-animating .po-phase.po-phase--done {
+    opacity: 0.7;
+    border-color: var(--color-border-active);
+  }
+
+  .phase-overview.is-animating .po-phase.po-phase--done .po-phase__header::after {
+    content: '✓';
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    font-size: 0.6rem;
+    color: var(--color-accent);
+  }
+
+  /* Pulse the active phase's gate indicator */
+  .phase-overview.is-animating .po-phase.po-phase--active .po-phase__gate {
+    animation: gate-pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes gate-pulse {
+    0%, 100% { background: rgba(255, 184, 0, 0.05); }
+    50% { background: rgba(255, 184, 0, 0.12); }
+  }
+
+  /* Hide sub-phases during animation until card activates */
+  .phase-overview.is-animating .po-sub {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+
+  /* Done cards show sub-phases statically */
+  .phase-overview.is-animating .po-phase.po-phase--done .po-sub {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  /* Active card: sub-phases cascade in one by one */
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub {
+    animation: sub-reveal 0.35s ease-out forwards;
+  }
+
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(1)  { animation-delay: 0.15s; }
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(2)  { animation-delay: 0.30s; }
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(3)  { animation-delay: 0.45s; }
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(4)  { animation-delay: 0.60s; }
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(5)  { animation-delay: 0.75s; }
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(6)  { animation-delay: 0.90s; }
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(7)  { animation-delay: 1.05s; }
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(8)  { animation-delay: 1.20s; }
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(9)  { animation-delay: 1.35s; }
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(10) { animation-delay: 1.50s; }
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(11) { animation-delay: 1.65s; }
+  .phase-overview.is-animating .po-phase.po-phase--active .po-sub:nth-child(12) { animation-delay: 1.80s; }
+
+  @keyframes sub-reveal {
+    from { opacity: 0; transform: translateX(-6px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Controls */
+  .phase-anim-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+  }
+
+  .phase-anim-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 0.4rem 0.9rem;
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    border: 1px solid var(--color-primary);
+    background: rgba(0, 212, 255, 0.06);
+    color: var(--color-primary);
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+
+  .phase-anim-btn:hover {
+    background: rgba(0, 212, 255, 0.12);
+    box-shadow: 0 0 12px var(--color-primary-glow);
+  }
+
+  .phase-anim-status {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+  }
+
+  .phase-anim-status .active-name {
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+
+  .po-arrow {
+    display: none;
+  }
+
+  .po-phase__header {
+    position: relative;
+    padding: var(--space-sm) var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .po-phase__header--cyan { border-top: 2px solid var(--color-primary); }
+  .po-phase__header--purple { border-top: 2px solid #A78BFA; }
+  .po-phase__header--green { border-top: 2px solid var(--color-accent); }
+  .po-phase__header--amber { border-top: 2px solid var(--color-warning); }
+
+  .po-phase__name {
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
+    color: var(--color-text);
+  }
+
+  .po-phase__count {
+    font-size: 0.55rem;
+    color: var(--color-text-muted);
+  }
+
+  .po-phase__subs {
+    padding: var(--space-sm) var(--space-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .po-sub {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--color-bg);
+    line-height: 1.3;
+  }
+
+  .po-sub::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    transform: rotate(45deg);
+    border: 1px solid var(--color-primary);
+    border-radius: 1px;
+    flex-shrink: 0;
+    opacity: 0.5;
+  }
+
+  .po-phase__gate {
+    padding: 4px var(--space-sm);
+    font-size: 0.5rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+    color: var(--color-warning);
+    background: rgba(255, 184, 0, 0.05);
+    border-top: 1px solid rgba(255, 184, 0, 0.15);
+    text-align: center;
+  }
+
+  .po-arrow {
+    flex-shrink: 0;
+    color: var(--color-primary);
+    font-size: 0.5rem;
+    opacity: 0.35;
+    padding: 0 3px;
+    align-self: center;
+    margin-top: 20px;
+  }
+
+  .phase-pipeline-note {
+    display: flex;
+    gap: var(--space-xl);
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 768px) {
+    .phase-overview {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .subphase-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-md);
+  }
+
+  .subphase-grid--narrow {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 800px;
+  }
+
+  .subphase-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    transition: border-color 0.3s;
+  }
+
+  .subphase-card:hover {
+    border-color: var(--color-border-active);
+  }
+
+  .subphase-card__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+  }
+
+  .subphase-card__num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    transform: rotate(45deg);
+    border: 1.5px solid var(--color-primary);
+    border-radius: 2px;
+    color: var(--color-primary);
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    flex-shrink: 0;
+  }
+
+  .subphase-card__name {
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-primary);
+  }
+
+  .subphase-card__desc {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+  }
+
+  .indicators {
+    display: flex;
+    gap: var(--space-xl);
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 768px) {
+    .subphase-grid,
+    .subphase-grid--narrow {
+      grid-template-columns: 1fr;
+    }
+    .indicators {
+      flex-direction: column;
+    }
+  }
+</style>

@@ -147,14 +147,14 @@ export function resolveNavigationTarget(
 	_metadata?: Record<string, unknown>,
 ): NavigationTarget | null {
 	const normalized = normalizeTarget(userTarget);
-	if (!normalized) return null;
+	if (!normalized) {return null;}
 
 	// 1. Check context-sensitive aliases first
 	const contextFn = CONTEXT_ALIASES[normalized];
-	if (contextFn) return contextFn(currentPhase);
+	if (contextFn) {return contextFn(currentPhase);}
 
 	// 2. Check static alias map (try multi-word first, then single word)
-	if (TARGET_ALIASES[normalized]) return TARGET_ALIASES[normalized];
+	if (TARGET_ALIASES[normalized]) {return TARGET_ALIASES[normalized];}
 
 	// 3. Try matching against Phase enum values directly (case-insensitive)
 	const upperTarget = normalized.toUpperCase().replace(/\s+/g, '_');

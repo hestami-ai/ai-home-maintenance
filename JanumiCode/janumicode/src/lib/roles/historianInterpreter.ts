@@ -434,7 +434,7 @@ function parseHistorianInterpreterResponse(
 		let jsonStr = rawResponse.trim();
 
 		// Remove markdown code blocks if present
-		const jsonMatch = jsonStr.match(/```json\s*([\s\S]*?)\s*```/);
+		const jsonMatch = jsonStr.match(/```json\s*([\s\S]*)\s*```/);
 		if (jsonMatch) {
 			jsonStr = jsonMatch[1];
 		} else {
@@ -812,7 +812,7 @@ function parseAdjudicationResponse(
 	try {
 		// Extract JSON from response (handle markdown code blocks)
 		let jsonStr = rawResponse.trim();
-		const jsonMatch = jsonStr.match(/```json\s*([\s\S]*?)\s*```/);
+		const jsonMatch = jsonStr.match(/```json\s*([\s\S]*)\s*```/);
 		if (jsonMatch) {
 			jsonStr = jsonMatch[1];
 		} else {

@@ -47,7 +47,7 @@ function db() {
 }
 
 function parseJSON<T>(value: string | null | undefined, fallback: T): T {
-	if (!value) return fallback;
+	if (!value) {return fallback;}
 	try {
 		return JSON.parse(value) as T;
 	} catch {
@@ -98,7 +98,7 @@ export function createIntentRecord(
 export function getIntentRecord(intentId: string): Result<IntentRecord> {
 	try {
 		const row = db().prepare('SELECT * FROM intent_records WHERE intent_id = ?').get(intentId) as Record<string, unknown> | undefined;
-		if (!row) return { success: false, error: new Error(`IntentRecord not found: ${intentId}`) };
+		if (!row) {return { success: false, error: new Error(`IntentRecord not found: ${intentId}`) };}
 		return { success: true, value: hydrateIntentRecord(row) };
 	} catch (error) {
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
@@ -117,7 +117,7 @@ export function getIntentRecordForDialogue(dialogueId: string): Result<IntentRec
 export function updateIntentRecord(intentId: string, updates: Partial<Pick<IntentRecord, 'human_goal' | 'scope_in' | 'scope_out' | 'priority_axes' | 'risk_posture' | 'clarifications_resolved'>>): Result<IntentRecord> {
 	try {
 		const existing = getIntentRecord(intentId);
-		if (!existing.success) return existing;
+		if (!existing.success) {return existing;}
 
 		const merged = { ...existing.value, ...updates, updated_at: new Date().toISOString() };
 		db().prepare(`
@@ -189,7 +189,7 @@ export function createAcceptanceContract(
 export function getAcceptanceContract(contractId: string): Result<AcceptanceContract> {
 	try {
 		const row = db().prepare('SELECT * FROM acceptance_contracts WHERE contract_id = ?').get(contractId) as Record<string, unknown> | undefined;
-		if (!row) return { success: false, error: new Error(`AcceptanceContract not found: ${contractId}`) };
+		if (!row) {return { success: false, error: new Error(`AcceptanceContract not found: ${contractId}`) };}
 		return { success: true, value: hydrateAcceptanceContract(row) };
 	} catch (error) {
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
@@ -248,7 +248,7 @@ export function createTaskGraph(dialogueId: string, intentId: string, rootGoal: 
 export function getTaskGraph(graphId: string): Result<TaskGraph> {
 	try {
 		const row = db().prepare('SELECT * FROM task_graphs WHERE graph_id = ?').get(graphId) as Record<string, unknown> | undefined;
-		if (!row) return { success: false, error: new Error(`TaskGraph not found: ${graphId}`) };
+		if (!row) {return { success: false, error: new Error(`TaskGraph not found: ${graphId}`) };}
 		return { success: true, value: hydrateTaskGraph(row) };
 	} catch (error) {
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
@@ -326,7 +326,7 @@ export function bulkCreateTaskUnits(
 		const txn = db().transaction(() => {
 			for (const unit of units) {
 				const result = createTaskUnit(graphId, unit);
-				if (!result.success) throw result.error;
+				if (!result.success) {throw result.error;}
 				results.push(result.value);
 			}
 		});
@@ -340,7 +340,7 @@ export function bulkCreateTaskUnits(
 export function getTaskUnit(unitId: string): Result<TaskUnit> {
 	try {
 		const row = db().prepare('SELECT * FROM task_units WHERE unit_id = ?').get(unitId) as Record<string, unknown> | undefined;
-		if (!row) return { success: false, error: new Error(`TaskUnit not found: ${unitId}`) };
+		if (!row) {return { success: false, error: new Error(`TaskUnit not found: ${unitId}`) };}
 		return { success: true, value: hydrateTaskUnit(row) };
 	} catch (error) {
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
@@ -614,7 +614,7 @@ export function getValidationPacketsForUnit(unitId: string): Result<ValidationPa
 export function getLatestValidationForUnit(unitId: string): Result<ValidationPacket | null> {
 	try {
 		const row = db().prepare('SELECT * FROM validation_packets WHERE unit_id = ? ORDER BY created_at DESC LIMIT 1').get(unitId) as Record<string, unknown> | undefined;
-		if (!row) return { success: true, value: null };
+		if (!row) {return { success: true, value: null };}
 		return {
 			success: true,
 			value: {

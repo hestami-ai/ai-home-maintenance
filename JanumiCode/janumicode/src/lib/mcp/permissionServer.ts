@@ -95,7 +95,7 @@ function sendResponse(response: unknown): void {
 
 // ==================== REQUEST HANDLING ====================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function handleMessage(raw: string): void {
 	let msg: { jsonrpc: string; id?: number | string; method: string; params?: unknown };
 	try {

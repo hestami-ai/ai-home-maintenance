@@ -4,17 +4,15 @@
  * Uses event bus for real-time updates instead of polling.
  */
 
+import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import { getEventBus, emitDialogueResumed } from '../../integration/eventBus';
 import { aggregateStreamState, type GovernedStreamState } from './dataAggregator';
-import { processHumanGateDecision, type HumanGateDecisionInput } from '../../workflow/humanGateHandling';
-import { HumanAction, Role, ClaimEventType, Phase, ClaimStatus, GateStatus } from '../../types';
+import { Role, Phase, GateStatus } from '../../types';
 import { getStyles } from './html/styles';
 import { renderStickyHeader, renderStream, renderInputArea, renderEmptyState, renderRichCard, renderSettingsPanel, setSpeechEnabled, setSoxAvailable } from './html/components';
-import { getDialogueEventById, getClaims, getOrCreateIntakeConversation } from '../../events/reader';
-import { getSecretKeyManager } from '../../config/secretKeyManager';
-import { getProviderForRole } from '../../config/manager';
-import { clearRoleProviderCache } from '../../llm/roleManager';
+import { getDialogueEventById, getClaims } from '../../events/reader';
+// getSecretKeyManager, getProviderForRole, clearRoleProviderCache moved to panelApiKeys.ts
 import {
 	startDialogueWithWorkflow,
 	executeWorkflowCycle,
@@ -25,20 +23,24 @@ import { clearAllData } from '../../database/init';
 import { generateDialogueTitle } from '../../llm/titleGenerator';
 import { getConfig } from '../../config';
 import { subscribeCommandPersistence, completeCommand, appendCommandOutput as appendCommandOutputToDB } from '../../workflow/commandStore';
-import { IntakeSubState, IntakeMode } from '../../types/intake';
-import { updateIntakeConversation, writeClaimEvent, writeQaExchange, writeDialogueEvent } from '../../events/writer';
-import { getCoverageGaps, getPartialDomains, DOMAIN_SEQUENCE } from '../../workflow/domainCoverageTracker';
-import { getWorkflowState, updateWorkflowMetadata, transitionWorkflow, TransitionTrigger } from '../../workflow/stateMachine';
-import { resolveGate, getGate, getGatesForDialogue } from '../../workflow/gates';
+import { writeQaExchange, writeDialogueEvent } from '../../events/writer';
+import { getWorkflowState, updateWorkflowMetadata } from '../../workflow/stateMachine';
+import { getGatesForDialogue } from '../../workflow/gates';
 import { getDatabase } from '../../database';
 import { parseTextCommand, interpretInput, escalateQuery, assessRetryableActions, type ParsedCommand, type RetryableAction, type QaProgressCallback } from './textCommands';
 import { killAllActiveProcesses } from '../../cli/spawnUtils';
 import { getActivePermissionBridge, setActivePermissionBridge } from '../../mcp/permissionBridge';
-import { runNarrativeCuration } from '../../curation/narrativeCurator';
-import { CurationMode } from '../../types/narrativeCurator';
 import { askClarification } from '../../clarification/clarificationExpert';
 import { saveClarificationThread, getClarificationThreads } from '../../clarification/clarificationStore';
-import { SpeechToTextService, resolveSpeechConfig } from '../../speech/speechToTextService';
+import * as apiKeys from './panelApiKeys';
+import * as fileAssist from './panelFileAssist';
+import { SpeechHandler } from './panelSpeech';
+import type { PanelContext } from './panelContext';
+import * as panelGates from './panelGates';
+import * as panelMmp from './panelMmp';
+import * as panelIntake from './panelIntake';
+import * as panelArchitecture from './panelArchitecture';
+import * as panelExport from './panelExport';
 
 /**
  * WebviewViewProvider for the Governed Stream sidebar view.
@@ -59,10 +61,35 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	private readonly _pendingToolCalls: Map<string, import('../../cli/types').CLIActivityEvent> = new Map();
 	/** Suppress the next dialogue:turn_added event (the initial turn is already included in the dialogue:started full re-render) */
 	private _suppressNextTurnAdded = false;
-	private _speechService: SpeechToTextService | null = null;
-	private _speechTargetInputId: string | null = null;
+	private readonly _speechHandler = new SpeechHandler();
+
+	/** Create a PanelContext adapter for delegating to extracted handler modules. */
+	private _ctx(): PanelContext {
+		 
+		const self = this;
+		return {
+			get activeDialogueId() { return self._activeDialogueId; },
+			set activeDialogueId(v) { self._activeDialogueId = v; },
+			get isProcessing() { return self._isProcessing; },
+			set isProcessing(v) { self._isProcessing = v; },
+			get view() { return self._view; },
+			postProcessing: (active, phase?, detail?) => this._postProcessing(active, phase, detail),
+			postInputEnabled: (enabled) => this._postInputEnabled(enabled),
+			update: () => this._update(),
+			runWorkflowCycle: () => this._runWorkflowCycle(),
+			resumeAfterGate: () => this._resumeAfterGate(),
+		};
+	}
 	/** AbortController for the current workflow cycle — aborted on cancel/dispose */
 	private _workflowAbortController: AbortController | null = null;
+	/** Debounce timer for coalescing rapid _update() calls */
+	private _pendingUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+	/** Highest event_id rendered in the stream — used for incremental appends */
+	private _lastRenderedEventId = 0;
+	/** Fingerprint of last rendered stream — used to skip redundant re-renders */
+	private _lastStreamFingerprint = '';
+	/** Disposable for the configuration change watcher */
+	private _configWatcherDisposable?: vscode.Disposable;
 	constructor(private readonly _extensionUri: vscode.Uri) {}
 
 	/**
@@ -90,6 +117,35 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			}
 		} catch (e) {
 			console.error('[GovernedStream] Error restoring active dialogue:', e);
+		}
+
+		// Reconcile orphaned CLI commands from previous session crash/restart
+		try {
+			const { reconcileOrphanedCommands } = require('../../workflow/commandStore');
+			const result = reconcileOrphanedCommands();
+			if (result.success && result.value > 0) {
+				console.log(`[GovernedStream] Reconciled ${result.value} orphaned command(s) from previous session`);
+			}
+		} catch (e) {
+			console.error('[GovernedStream] Error reconciling orphaned commands:', e);
+		}
+
+		// Reconcile stale transition graph versions from previous extension versions
+		try {
+			const { reconcileStaleTransitionGraphs } = require('../../workflow/stateMachine');
+			const result = reconcileStaleTransitionGraphs();
+			if (result.success && result.value > 0) {
+				console.log(`[GovernedStream] Reconciled ${result.value} dialogue(s) with stale transition graph version`);
+			}
+		} catch (e) {
+			console.error('[GovernedStream] Error reconciling transition graphs:', e);
+		}
+
+		// Clear stale phase checkpoints from active dialogue (prevents orphaned step cache from causing stale resume)
+		if (this._activeDialogueId) {
+			try {
+				updateWorkflowMetadata(this._activeDialogueId, { phaseCheckpoint: undefined });
+			} catch { /* non-critical */ }
 		}
 
 		// Set initial HTML
@@ -120,9 +176,9 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 		// Send speech capability status (checks SoX availability) and listen for config changes
 		this._sendSpeechCapability();
-		vscode.workspace.onDidChangeConfiguration((e) => {
+		this._configWatcherDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
 			if (e.affectsConfiguration('janumicode.speech')) {
-				this._getSpeechService().resetAvailabilityCache();
+				this._speechHandler.service.resetAvailabilityCache();
 				this._sendSpeechCapability();
 			}
 		});
@@ -147,15 +203,11 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		this._settingsPanelVisible = !this._settingsPanelVisible;
 
 		if (this._settingsPanelVisible) {
-			const keyStatus = await this._getKeyStatus();
 			this._view.webview.postMessage({
 				type: 'showSettings',
 				data: { visible: true },
 			});
-			this._view.webview.postMessage({
-				type: 'keyStatusUpdate',
-				data: { roles: keyStatus },
-			});
+			await this._sendKeyStatus();
 		} else {
 			this._view.webview.postMessage({
 				type: 'showSettings',
@@ -209,7 +261,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				// Full re-render includes the initial turn; suppress the
 				// immediately following dialogue:turn_added to avoid a duplicate
 				this._suppressNextTurnAdded = true;
-				this._update();
+				this._scheduleUpdate();
 			})
 		);
 
@@ -239,7 +291,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 					data: payload,
 				});
 				// Full update to refresh header stepper and insert milestone
-				this._update();
+				this._scheduleUpdate();
 			})
 		);
 
@@ -254,7 +306,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 					type: 'gateTriggered',
 					data: payload,
 				});
-				this._update();
+				this._scheduleUpdate();
 			})
 		);
 
@@ -275,7 +327,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 					data: { claimId: payload.claimId, status: 'VERIFIED' },
 				});
 				// Also update the health bar
-				this._update();
+				this._scheduleUpdate();
 			})
 		);
 
@@ -285,7 +337,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 					type: 'claimUpdated',
 					data: { claimId: payload.claimId, status: 'DISPROVED' },
 				});
-				this._update();
+				this._scheduleUpdate();
 			})
 		);
 
@@ -293,7 +345,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		this._eventUnsubscribers.push(
 			bus.on('workflow:completed', () => {
 				this._activeDialogueId = null;
-				this._update();
+				this._scheduleUpdate();
 			})
 		);
 
@@ -311,7 +363,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		this._eventUnsubscribers.push(
 			bus.on('workflow:phase_failed', (payload) => {
 				if (payload.dialogueId === this._activeDialogueId) {
-					this._update();
+					this._scheduleUpdate();
 				}
 			})
 		);
@@ -642,18 +694,18 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * so they don't become unhandled (common during extension shutdown).
 	 */
 	private _safeAsync(fn: () => Promise<unknown> | void): void {
-		if (this._disposed) return;
+		if (this._disposed) {return;}
 		Promise.resolve(fn()).catch(err => {
 			// Suppress "Canceled" and "Channel has been closed" errors during disposal
-			if (this._disposed) return;
+			if (this._disposed) {return;}
 			const msg = err instanceof Error ? err.message : String(err);
-			if (msg.includes('Canceled') || msg.includes('Channel has been closed')) return;
+			if (msg.includes('Canceled') || msg.includes('Channel has been closed')) {return;}
 			console.error('[GovernedStream] Unhandled async error:', msg);
 		});
 	}
 
 	private _handleMessage(message: { type: string; [key: string]: unknown }): void {
-		if (this._disposed) return;
+		if (this._disposed) {return;}
 
 		switch (message.type) {
 			case 'refresh':
@@ -795,6 +847,14 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 			case 'mmpPartialSave':
 				this._handleMmpPartialSave(message);
+				break;
+
+			case 'draftSave':
+				this._handleDraftSave(message);
+				break;
+
+			case 'draftClear':
+				this._handleDraftClear(message);
 				break;
 
 			case 'architectureGateDecision':
@@ -1086,11 +1146,11 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				20
 			);
 
-			if (this._disposed) return;
+			if (this._disposed) {return;}
 
 			if (!result.success) {
 				// Suppress abort errors during disposal
-				if (result.error.message === 'Aborted') return;
+				if (result.error.message === 'Aborted') {return;}
 				vscode.window.showErrorMessage(`Workflow error: ${result.error.message}`);
 				this._update();
 				return;
@@ -1194,9 +1254,20 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	/**
-	 * Handle INTAKE finalize plan request.
-	 * Sets sub-state to SYNTHESIZING and runs the workflow cycle.
+	 * Run an async function with processing indicator active.
+	 * Guarantees the indicator is cleared even if the function throws.
 	 */
+	private async _withProcessing<T>(phase: string, detail: string, fn: () => Promise<T>): Promise<T> {
+		this._isProcessing = true;
+		this._postProcessing(true, phase, detail);
+		try {
+			return await fn();
+		} finally {
+			this._isProcessing = false;
+			this._postProcessing(false);
+		}
+	}
+
 	/**
 	 * Handle retry of a failed workflow phase.
 	 * Re-runs the workflow cycle — the orchestrator will check for cached raw output
@@ -1256,400 +1327,49 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		this._update();
 	}
 
+	// INTAKE phase handlers — delegated to panelIntake.ts
 	private async _handleIntakeFinalize(): Promise<void> {
-		if (!this._activeDialogueId || this._isProcessing) {
-			return;
-		}
-
-		this._isProcessing = true;
-		this._postInputEnabled(false);
-		this._postProcessing(true, 'Finalizing', 'Synthesizing plan from conversation');
-
-		try {
-			updateIntakeConversation(this._activeDialogueId, {
-				subState: IntakeSubState.SYNTHESIZING,
-			});
-			await this._runWorkflowCycle();
-		} finally {
-			this._isProcessing = false;
-			this._postProcessing(false);
-			this._postInputEnabled(true);
-		}
+		await panelIntake.handleIntakeFinalize(this._ctx());
 	}
 
-	/**
-	 * Handle INTAKE plan approval.
-	 * Sets sub-state to AWAITING_APPROVAL and runs the workflow cycle to transition to PROPOSE.
-	 */
 	private async _handleIntakeApprove(): Promise<void> {
-		if (!this._activeDialogueId || this._isProcessing) {
-			return;
-		}
-
-		this._isProcessing = true;
-		this._postInputEnabled(false);
-		this._postProcessing(true, 'Approving', 'Approving plan and advancing to Architecture');
-
-		try {
-			console.log('[GovernedStream] _handleIntakeApprove: starting workflow cycle');
-			// Sub-state should already be AWAITING_APPROVAL — cycle runs approval + transitions to ARCHITECTURE
-			await this._runWorkflowCycle();
-			console.log('[GovernedStream] _handleIntakeApprove: workflow cycle complete');
-		} catch (err) {
-			const msg = err instanceof Error ? err.message : String(err);
-			console.error('[GovernedStream] _handleIntakeApprove error:', msg);
-			vscode.window.showErrorMessage(`Plan approval error: ${msg}`);
-		} finally {
-			this._isProcessing = false;
-			this._postProcessing(false);
-			this._postInputEnabled(true);
-			this._update();
-		}
+		await panelIntake.handleIntakeApprove(this._ctx());
 	}
-
-	/**
-	 * Handle reverting from AWAITING_APPROVAL back to DISCUSSING.
-	 * Allows the Human to continue refining the plan.
-	 */
 	private _handleIntakeContinueDiscussing(): void {
-		if (!this._activeDialogueId) {
-			return;
-		}
-
-		updateIntakeConversation(this._activeDialogueId, {
-			subState: IntakeSubState.DISCUSSING,
-		});
-		this._update();
+		panelIntake.handleIntakeContinueDiscussing(this._ctx());
 	}
-
-	/**
-	 * Handle skipping the GATHERING sub-state — transition directly to DISCUSSING.
-	 */
 	private _handleIntakeSkipGathering(): void {
-		if (!this._activeDialogueId) {
-			return;
-		}
-
-		updateIntakeConversation(this._activeDialogueId, {
-			subState: IntakeSubState.DISCUSSING,
-		});
-
-		getEventBus().emit('intake:gathering_skipped', {
-			dialogueId: this._activeDialogueId,
-		});
-
-		this._update();
+		panelIntake.handleIntakeSkipGathering(this._ctx());
 	}
-
 	private _handleIntakeModeSelected(mode: string): void {
-		if (!this._activeDialogueId) {
-			return;
-		}
-
-		// Validate mode string
-		const validModes = Object.values(IntakeMode) as string[];
-		if (!validModes.includes(mode)) {
-			return;
-		}
-
-		const updates: Record<string, unknown> = {
-			intakeMode: mode as IntakeMode,
-		};
-
-		// When switching to STATE_DRIVEN, set currentDomain to the first uncovered domain
-		if (mode === IntakeMode.STATE_DRIVEN) {
-			const convResult = getOrCreateIntakeConversation(this._activeDialogueId);
-			if (convResult.success && convResult.value.domainCoverage) {
-				const gaps = getCoverageGaps(convResult.value.domainCoverage);
-				const partials = getPartialDomains(convResult.value.domainCoverage);
-				const firstTarget = gaps.length > 0 ? gaps[0]
-					: partials.length > 0 ? partials[0]
-					: DOMAIN_SEQUENCE[0];
-				updates.currentDomain = firstTarget;
-			} else {
-				updates.currentDomain = DOMAIN_SEQUENCE[0];
-			}
-		}
-
-		updateIntakeConversation(this._activeDialogueId, updates);
-
-		const bus = getEventBus();
-		bus.emit('intake:mode_selected', {
-			dialogueId: this._activeDialogueId,
-			mode: mode as IntakeMode,
-			source: 'user' as const,
-		});
-
-		this._update();
+		panelIntake.handleIntakeModeSelected(this._ctx(), mode);
 	}
 
-	/**
-	 * Handle an architecture gate decision (Approve / Revise / Skip) from the webview buttons.
-	 */
+	// Architecture handlers — delegated to panelArchitecture.ts
 	private async _handleArchitectureGateDecision(message: { type: string; [key: string]: unknown }): Promise<void> {
-		if (!this._activeDialogueId || this._isProcessing) {
-			return;
-		}
-
-		const action = message.action as string;
-		const dialogueId = message.dialogueId as string;
-		const docId = message.docId as string;
-		const feedback = message.feedback as string | undefined;
-
-		if (!action || !dialogueId) {
-			return;
-		}
-
-		// Find the architecture gate for this dialogue
-		const gates = getGatesForDialogue(dialogueId);
-		if (!gates.success) {
-			vscode.window.showErrorMessage('Failed to find architecture gate');
-			return;
-		}
-		const pendingGate = gates.value.find(g => g.status === GateStatus.OPEN);
-		if (!pendingGate) {
-			vscode.window.showErrorMessage('No pending architecture gate found');
-			return;
-		}
-
-		// Record human decision for audit trail and resolvedAction tracking
-		const { captureHumanDecision } = await import('../../roles/human.js');
-		const humanAction = action === 'APPROVE' ? HumanAction.APPROVE
-			: action === 'SKIP' ? HumanAction.OVERRIDE
-			: HumanAction.REFRAME;
-		const rationale = action === 'REVISE'
-			? (feedback || 'Requested architecture changes')
-			: `Architecture ${action.toLowerCase()}`;
-		const decisionResult = captureHumanDecision({
-			gateId: pendingGate.gate_id,
-			action: humanAction,
-			rationale,
-			decisionMaker: 'human-user',
-		});
-
-		// Resolve the gate
-		const decisionId = decisionResult.success ? decisionResult.value.decision_id : `arch-${action.toLowerCase()}-${Date.now()}`;
-		resolveGate({
-			gateId: pendingGate.gate_id,
-			decisionId,
-			resolution: action === 'APPROVE' ? 'approved'
-				: action === 'SKIP' ? 'skipped'
-				: `revision requested: ${feedback?.substring(0, 100) ?? ''}`,
-		});
-
-		// Call the architecture-specific handler
-		const { handleArchitectureGateResolution } = await import('../../workflow/architecturePhase.js');
-		const result = handleArchitectureGateResolution(
-			dialogueId,
-			action as 'APPROVE' | 'REVISE' | 'SKIP',
-			feedback
-		);
-
-		if (!result.success) {
-			vscode.window.showErrorMessage(`Architecture gate decision failed: ${result.error.message}`);
-			return;
-		}
-
-		const { nextPhase } = result.value;
-
-		this._update();
-
-		// If transitioning to PROPOSE or staying in ARCHITECTURE, resume workflow
-		if (nextPhase) {
-			// Transition to the next phase
-			transitionWorkflow(dialogueId, nextPhase, TransitionTrigger.GATE_RESOLVED);
-			await this._resumeAfterGate();
-		} else {
-			// Staying in ARCHITECTURE (REVISE → loop back to DESIGNING)
-			await this._resumeAfterGate();
-		}
+		await panelArchitecture.handleArchitectureGateDecision(this._ctx(), message);
 	}
-
-	/**
-	 * Handle a "Decompose Deeper" request from the webview.
-	 * Resolves the current architecture gate and sets up the deeper decomposition pass.
-	 */
 	private async _handleArchitectureDecomposeDeeper(message: { type: string; [key: string]: unknown }): Promise<void> {
-		if (!this._activeDialogueId || this._isProcessing) {
-			return;
-		}
-
-		const dialogueId = message.dialogueId as string;
-
-		if (!dialogueId) {
-			return;
-		}
-
-		// Find and resolve the pending architecture gate
-		const gates = getGatesForDialogue(dialogueId);
-		if (!gates.success) {
-			vscode.window.showErrorMessage('Failed to find architecture gate');
-			return;
-		}
-		const pendingGate = gates.value.find(g => g.status === GateStatus.OPEN);
-		if (!pendingGate) {
-			vscode.window.showErrorMessage('No pending architecture gate found');
-			return;
-		}
-
-		// Record human decision
-		const { captureHumanDecision } = await import('../../roles/human.js');
-		const decisionResult = captureHumanDecision({
-			gateId: pendingGate.gate_id,
-			action: HumanAction.REFRAME,
-			rationale: 'Requested deeper decomposition',
-			decisionMaker: 'human-user',
-		});
-
-		const decisionId = decisionResult.success ? decisionResult.value.decision_id : `arch-deepen-${Date.now()}`;
-		resolveGate({
-			gateId: pendingGate.gate_id,
-			decisionId,
-			resolution: 'decompose deeper requested',
-		});
-
-		// Set up the deeper decomposition
-		const { handleArchitectureDecomposeDeeper } = await import('../../workflow/architecturePhase.js');
-		const result = handleArchitectureDecomposeDeeper(dialogueId);
-
-		if (!result.success) {
-			vscode.window.showErrorMessage(`Decompose deeper failed: ${result.error.message}`);
-			return;
-		}
-
-		this._update();
-		await this._resumeAfterGate();
+		await panelArchitecture.handleArchitectureDecomposeDeeper(this._ctx(), message);
 	}
 
 	/**
 	 * Handle partial MMP save — persists in-progress decisions to SQLite
 	 * so they survive VS Code restarts.
 	 */
+	// MMP/Draft handlers — delegated to panelMmp.ts
 	private _handleMmpPartialSave(message: { type: string; [key: string]: unknown }): void {
-		if (!this._activeDialogueId) return;
-		try {
-			const { savePendingMmpDecisions } = require('../../database/pendingMmpStore');
-			savePendingMmpDecisions(
-				this._activeDialogueId,
-				message.cardId as string,
-				{
-					mirrorDecisions: message.mirrorDecisions as Record<string, { status: string; editedText?: string }> || {},
-					menuSelections: message.menuSelections as Record<string, { selectedOptionId: string; customResponse?: string }> || {},
-					preMortemDecisions: message.preMortemDecisions as Record<string, { status: string; rationale?: string }> || {},
-					productEdits: message.productEdits as Record<string, string> || {},
-				}
-			);
-		} catch { /* non-critical — fail silently */ }
+		panelMmp.handleMmpPartialSave(this._activeDialogueId, message);
+	}
+	private _handleDraftSave(message: { type: string; drafts?: Array<{ category: string; itemKey: string; value: string }> }): void {
+		panelMmp.handleDraftSave(this._activeDialogueId, message);
+	}
+	private _handleDraftClear(message: { type: string; category?: string }): void {
+		panelMmp.handleDraftClear(this._activeDialogueId, message);
 	}
 
-	/**
-	 * Handle MMP (Mirror & Menu Protocol) submission from the webview.
-	 * Formats decisions as structured text and feeds them back into the INTAKE cycle.
-	 */
 	private async _handleMMPSubmit(message: { type: string; [key: string]: unknown }): Promise<void> {
-		if (!this._activeDialogueId || this._isProcessing) {
-			return;
-		}
-
-		const mirrorDecisions = message.mirrorDecisions as Record<string, { status: string; editedText?: string; text?: string }> || {};
-		const menuSelections = message.menuSelections as Record<string, { selectedOptionId: string; customResponse?: string; question?: string; selectedLabel?: string }> || {};
-		const preMortemDecisions = message.preMortemDecisions as Record<string, { status: string; rationale?: string; assumption?: string }> || {};
-
-		// Format decisions as structured text for the next conversation turn.
-		// Include the human-readable text so the agent can interpret decisions without
-		// needing to look up opaque IDs.
-		const lines: string[] = ['[MMP Decisions]'];
-
-		// Mirror decisions
-		const mirrorEntries = Object.entries(mirrorDecisions);
-		if (mirrorEntries.length > 0) {
-			for (const [id, decision] of mirrorEntries) {
-				const text = decision.text ? `"${decision.text}"` : id;
-				if (decision.status === 'accepted') {
-					lines.push(`ACCEPTED: ${text}`);
-				} else if (decision.status === 'rejected') {
-					lines.push(`REJECTED: ${text}`);
-				} else if (decision.status === 'deferred') {
-					lines.push(`DEFERRED: ${text}`);
-				} else if (decision.status === 'edited' && decision.editedText) {
-					lines.push(`EDITED: ${text} → "${decision.editedText}"`);
-				}
-			}
-		}
-
-		// Menu selections
-		const menuEntries = Object.entries(menuSelections);
-		if (menuEntries.length > 0) {
-			for (const [id, selection] of menuEntries) {
-				const question = selection.question ? `"${selection.question}"` : id;
-				if (selection.selectedOptionId === 'OTHER' && selection.customResponse) {
-					lines.push(`SELECTED: ${question} → OTHER: "${selection.customResponse}"`);
-				} else {
-					const label = selection.selectedLabel || selection.selectedOptionId;
-					lines.push(`SELECTED: ${question} → "${label}"`);
-				}
-			}
-		}
-
-		// Pre-Mortem decisions
-		const pmEntries = Object.entries(preMortemDecisions);
-		if (pmEntries.length > 0) {
-			for (const [id, decision] of pmEntries) {
-				const text = decision.assumption ? `"${decision.assumption}"` : id;
-				if (decision.status === 'accepted') {
-					lines.push(`RISK_ACCEPTED: ${text}`);
-				} else if (decision.status === 'rejected') {
-					lines.push(`RISK_REJECTED: ${text}${decision.rationale ? ' — Reason: "' + decision.rationale + '"' : ''}`);
-				}
-			}
-		}
-
-		// Product discovery inline edits (vision/description corrections)
-		const productEdits = message.productEdits as Record<string, string> | undefined;
-		if (productEdits) {
-			for (const [field, value] of Object.entries(productEdits)) {
-				if (value) {
-					lines.push(`PRODUCT_EDIT (${field}): "${value}"`);
-				}
-			}
-		}
-
-		const formattedText = lines.join('\n');
-
-		// Delete pending partial decisions now that the user has committed
-		try {
-			const { deletePendingMmpDecisions } = require('../../database/pendingMmpStore');
-			const cardId = message.cardId as string;
-			if (cardId) { deletePendingMmpDecisions(this._activeDialogueId, cardId); }
-		} catch { /* non-critical */ }
-
-		// Route through the normal INTAKE submission path
-		this._isProcessing = true;
-		this._postInputEnabled(false);
-		this._postProcessing(true, 'Planning', 'Processing your decisions');
-
-		try {
-			updateWorkflowMetadata(this._activeDialogueId, {
-				pendingIntakeInput: formattedText,
-			});
-
-			writeDialogueEvent({
-				dialogue_id: this._activeDialogueId,
-				event_type: 'human_message',
-				role: 'HUMAN',
-				phase: 'INTAKE',
-				speech_act: 'DECISION',
-				summary: `MMP decisions: ${mirrorEntries.length} mirror, ${menuEntries.length} menu, ${pmEntries.length} risk`,
-				content: formattedText,
-			});
-
-			this._postProcessing(true, 'Planning', 'Discussing with Technical Expert');
-			await this._runWorkflowCycle();
-		} finally {
-			this._isProcessing = false;
-			this._postProcessing(false);
-			this._postInputEnabled(true);
-		}
+		await panelMmp.handleMMPSubmit(this._ctx(), message);
 	}
 
 	/**
@@ -1657,64 +1377,11 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * Converts MMP pre-mortem/menu/mirror decisions into the itemRationales
 	 * format expected by _handleReviewGateDecision.
 	 */
-	private async _handleReviewMmpDecision(
-		message: { type: string; [key: string]: unknown },
-	): Promise<void> {
-		const gateId = message.gateId as string;
-		if (!gateId || !this._activeDialogueId) { return; }
-
-		// Delete pending partial decisions
-		try {
-			const { deletePendingMmpDecisions } = require('../../database/pendingMmpStore');
-			const cardId = message.cardId as string;
-			if (cardId) { deletePendingMmpDecisions(this._activeDialogueId, cardId); }
-		} catch { /* non-critical */ }
-
-		const preMortemDecisions = (message.preMortemDecisions ?? {}) as Record<
-			string, { status: string; rationale?: string; assumption?: string }
-		>;
-		const menuSelections = (message.menuSelections ?? {}) as Record<
-			string, { selectedOptionId: string; customResponse?: string; question?: string; selectedLabel?: string }
-		>;
-
-		// Convert MMP decisions to itemRationales keyed by claim_id
-		const itemRationales: Record<string, string> = {};
-		let hasRejectedRisks = false;
-
-		// Pre-mortem items: REV-RISK-{claim_id} → extract claim_id
-		for (const [id, decision] of Object.entries(preMortemDecisions)) {
-			const claimId = id.startsWith('REV-RISK-') ? id.substring('REV-RISK-'.length) : null;
-			if (!claimId || claimId.startsWith('FINDING-')) { continue; }
-
-			if (decision.status === 'accepted') {
-				itemRationales[claimId] = `[MMP] Risk accepted: ${decision.assumption ?? 'claim risk acknowledged'}`;
-			} else {
-				hasRejectedRisks = true;
-				const reason = decision.rationale ? ` — ${decision.rationale}` : '';
-				itemRationales[claimId] = `[MMP] Risk rejected: ${decision.assumption ?? 'claim risk blocked'}${reason}`;
-			}
+	private async _handleReviewMmpDecision(message: { type: string; [key: string]: unknown }): Promise<void> {
+		const result = panelMmp.buildReviewMmpDecision(this._activeDialogueId, message);
+		if (result) {
+			await panelGates.handleReviewGateDecision(this._ctx(), result.gateId, result.action, result.itemRationales, result.overallFeedback);
 		}
-
-		// Menu items: REV-MENU-{claim_id} → extract claim_id
-		for (const [id, selection] of Object.entries(menuSelections)) {
-			const claimId = id.startsWith('REV-MENU-') ? id.substring('REV-MENU-'.length) : null;
-			if (!claimId) { continue; }
-
-			const label = selection.selectedLabel || selection.selectedOptionId;
-			if (label === 'Block on this') { hasRejectedRisks = true; }
-			itemRationales[claimId] = `[MMP] Decision: ${label}`;
-		}
-
-		// Build overall feedback summary
-		const overallParts = Object.entries(itemRationales).map(
-			([key, rationale]) => `${key}: ${rationale}`
-		);
-		const overallFeedback = overallParts.length > 0
-			? `[MMP Review Decisions]\n${overallParts.join('\n')}`
-			: 'MMP review decisions submitted';
-
-		const action = hasRejectedRisks ? 'REFRAME' : 'APPROVE';
-		await this._handleReviewGateDecision(gateId, action, itemRationales, overallFeedback);
 	}
 
 	/**
@@ -1769,39 +1436,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * Export the governed stream to a markdown file for debugging
 	 */
 	private async _handleExportStream(): Promise<void> {
-		const { exportDialogueMarkdown } = await import('../../export/streamExporter.js');
-		const { aggregateStreamState } = await import('./dataAggregator.js');
-
-		const state = aggregateStreamState(this._activeDialogueId ?? undefined);
-		const dialogueId = this._activeDialogueId ?? 'all';
-
-		const markdown = exportDialogueMarkdown(dialogueId, state, {
-			scope: this._activeDialogueId ? 'current_dialogue' : 'all_dialogues',
-			includeStdin: true,
-			includeCommandOutput: true,
-		});
-
-		const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-').substring(0, 19);
-		const filename = `governed-stream-${dialogueId.substring(0, 8)}-${timestamp}.md`;
-
-		// Write to docs/exports directory
-		const workspaceFolders = vscode.workspace.workspaceFolders;
-		if (!workspaceFolders || workspaceFolders.length === 0) {
-			vscode.window.showErrorMessage('No workspace folder open. Cannot export stream.');
-			return;
-		}
-
-		const exportDir = vscode.Uri.joinPath(workspaceFolders[0].uri, 'docs', 'exports');
-		await vscode.workspace.fs.createDirectory(exportDir);
-
-		const filePath = vscode.Uri.joinPath(exportDir, filename);
-		await vscode.workspace.fs.writeFile(filePath, Buffer.from(markdown, 'utf-8'));
-
-		// Open the file
-		const doc = await vscode.workspace.openTextDocument(filePath);
-		await vscode.window.showTextDocument(doc);
-
-		vscode.window.showInformationMessage(`Exported governed stream to ${filename}`);
+		await panelExport.handleExportStream(this._activeDialogueId);
 	}
 
 	/**
@@ -1810,164 +1445,21 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * the result in SQLite, and opens it in a read-only editor tab.
 	 */
 	private async _handleGenerateDocument(): Promise<void> {
-		const dialogueId = this._activeDialogueId;
-		if (!dialogueId) {
-			vscode.window.showWarningMessage('No active dialogue. Start a dialogue first.');
-			return;
-		}
-
-		// Lazy imports to avoid loading document modules at startup
-		const { getAvailableDocuments } = await import('../../documents/registry.js');
-		const { generateDocument } = await import('../../documents/generator.js');
-		const { upsertGeneratedDocument } = await import('../../documents/documentStore.js');
-
-		// Get available document types for this dialogue
-		const available = getAvailableDocuments(dialogueId);
-		if (available.length === 0) {
-			vscode.window.showInformationMessage(
-				'No document types are available for this dialogue yet. ' +
-				'The dialogue needs to progress past INTAKE before documents can be generated.'
-			);
-			return;
-		}
-
-		// Show multi-select QuickPick
-		const picked = await vscode.window.showQuickPick(
-			available.map(def => ({
-				label: def.label,
-				description: def.type,
-				detail: def.description,
-				definition: def,
-			})),
-			{
-				placeHolder: 'Select one or more document types to generate',
-				title: 'Generate Documents',
-				canPickMany: true,
-			}
-		);
-
-		if (!picked || picked.length === 0) {
-			return; // user cancelled
-		}
-
-		// Generate all selected documents with progress
-		const results = await vscode.window.withProgress(
-			{
-				location: vscode.ProgressLocation.Notification,
-				title: `Generating ${picked.length} document(s)...`,
-				cancellable: false,
-			},
-			async (progress) => {
-				const generated: Array<{ title: string; content: string; label: string }> = [];
-				for (let i = 0; i < picked.length; i++) {
-					const item = picked[i];
-					progress.report({
-						message: `(${i + 1}/${picked.length}) ${item.label}`,
-						increment: (100 / picked.length),
-					});
-
-					try {
-						const result = await generateDocument(dialogueId, item.definition);
-
-						// Store in SQLite (upsert)
-						upsertGeneratedDocument(
-							dialogueId,
-							result.documentType,
-							result.title,
-							result.content,
-						);
-
-						generated.push({ title: result.title, content: result.content, label: item.label });
-					} catch (err) {
-						const msg = err instanceof Error ? err.message : String(err);
-						vscode.window.showErrorMessage(`Failed to generate ${item.label}: ${msg}`);
-					}
-				}
-				return generated;
-			}
-		);
-
-		if (results.length === 0) {
-			return;
-		}
-
-		// Open each generated document in an editor tab
-		for (const result of results) {
-			const doc = await vscode.workspace.openTextDocument({
-				content: result.content,
-				language: 'markdown',
-			});
-			await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
-		}
-
-		// Offer batch export
-		const labels = results.map(r => r.label).join(', ');
-		const exportChoice = await vscode.window.showInformationMessage(
-			`Generated: ${labels}`,
-			'Export All to Files',
-			'Dismiss'
-		);
-
-		if (exportChoice === 'Export All to Files') {
-			for (const result of results) {
-				await this._exportDocumentContent(result.title, result.content);
-			}
-		}
+		await panelExport.handleGenerateDocument(this._activeDialogueId);
 	}
 
 	/**
 	 * Export a document's markdown content to a user-chosen file.
 	 */
 	private async _exportDocumentContent(title: string, content: string): Promise<void> {
-		const suggestedName = title.toLowerCase().replaceAll(/\s+/g, '-') + '.md';
-		const uri = await vscode.window.showSaveDialog({
-			defaultUri: vscode.Uri.file(suggestedName),
-			filters: { 'Markdown': ['md'] },
-			title: 'Export Document',
-		});
-
-		if (!uri) {
-			return;
-		}
-
-		await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf-8'));
-		vscode.window.showInformationMessage(`Document exported to ${uri.fsPath}`);
+		await panelExport.exportDocumentContent(title, content);
 	}
 
 	/**
 	 * Handle a gate decision from the webview
 	 */
 	private _handleGateDecision(gateId: string, action: string, rationale: string): void {
-		if (rationale.length < 10) {
-			vscode.window.showWarningMessage('Rationale must be at least 10 characters.');
-			return;
-		}
-
-		const humanAction = action as HumanAction;
-		if (!Object.values(HumanAction).includes(humanAction)) {
-			vscode.window.showErrorMessage(`Invalid action: ${action}`);
-			return;
-		}
-
-		const input: HumanGateDecisionInput = {
-			gateId,
-			action: humanAction,
-			rationale,
-			decisionMaker: 'human-user',
-		};
-
-		const result = processHumanGateDecision(input);
-
-		if (result.success) {
-			vscode.window.showInformationMessage(`Gate ${action.toLowerCase()}d successfully.`);
-			this._update();
-			// Fire-and-forget: curate human feedback for future agent context
-			if (this._activeDialogueId) {
-				runNarrativeCuration(this._activeDialogueId, CurationMode.FEEDBACK).catch(() => {});
-			}
-		} else {
-			vscode.window.showErrorMessage(`Gate decision failed: ${result.error.message}`);
-		}
+		panelGates.handleGateDecision(this._ctx(), gateId, action, rationale);
 	}
 
 	/**
@@ -1975,338 +1467,22 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * Wraps the generic gate decision with repair-escalation awareness:
 	 * if the gate is a repair escalation, reset the failed unit to READY and resume.
 	 */
-	private async _handleGateDecisionAndResume(
-		gateId: string,
-		action: string,
-		rationale: string
-	): Promise<void> {
-		// Read gate metadata BEFORE resolving (so we know what kind of gate this is)
-		let isRepairEscalation = false;
-		let repairUnitId: string | undefined;
-		try {
-			const db = getDatabase();
-			if (db) {
-				const row = db.prepare(
-					'SELECT metadata FROM gate_metadata WHERE gate_id = ?'
-				).get(gateId) as { metadata: string } | undefined;
-				if (row) {
-					const meta = JSON.parse(row.metadata) as Record<string, unknown>;
-					if (meta.condition === 'REPAIR_ESCALATION') {
-						isRepairEscalation = true;
-						repairUnitId = meta.unit_id as string | undefined;
-					}
-				}
-			}
-		} catch { /* metadata read failed — proceed without repair handling */ }
-
-		// Reset the failed unit to READY before resolving the gate
-		if (isRepairEscalation && repairUnitId) {
-			const { updateTaskUnitStatus } = await import('../../database/makerStore.js');
-			const { TaskUnitStatus } = await import('../../types/maker.js');
-			updateTaskUnitStatus(repairUnitId, TaskUnitStatus.READY);
-		}
-
-		// Resolve the gate via the generic handler
-		this._handleGateDecision(gateId, action, rationale);
-
-		// Resume workflow if this was a repair escalation
-		if (isRepairEscalation) {
-			await this._resumeAfterGate();
-		}
+	private async _handleGateDecisionAndResume(gateId: string, action: string, rationale: string): Promise<void> {
+		await panelGates.handleGateDecisionAndResume(this._ctx(), gateId, action, rationale);
 	}
 
 	/**
 	 * Handle a verification gate decision from the webview
 	 */
-	private async _handleVerificationGateDecision(
-		gateId: string,
-		action: string,
-		claimRationales?: Record<string, string>
-	): Promise<void> {
-		if (!this._activeDialogueId) {
-			return;
-		}
-
-		switch (action) {
-			case 'OVERRIDE': {
-				// Store per-claim override events for audit trail
-				if (claimRationales) {
-					for (const [claimId, rationale] of Object.entries(claimRationales)) {
-						if (rationale && rationale.trim().length > 0) {
-							writeClaimEvent({
-								claim_id: claimId,
-								event_type: ClaimEventType.OVERRIDDEN,
-								source: Role.HUMAN,
-								evidence_ref: rationale.trim(),
-							});
-						}
-					}
-				}
-
-				// Build combined rationale from per-claim responses
-				const combinedRationale = Object.entries(claimRationales ?? {})
-					.filter(([, r]) => r.trim().length > 0)
-					.map(([id, r]) => `[${id}]: ${r.trim()}`)
-					.join('\n');
-
-				// Resolve gate via existing infrastructure
-				const input: HumanGateDecisionInput = {
-					gateId,
-					action: HumanAction.OVERRIDE,
-					rationale: combinedRationale || 'Risk accepted by human',
-					decisionMaker: 'human-user',
-				};
-				const result = processHumanGateDecision(input);
-
-				if (result.success) {
-					vscode.window.showInformationMessage('Verification risks accepted. Continuing workflow.');
-					await this._resumeAfterGate();
-				} else {
-					vscode.window.showErrorMessage(`Gate decision failed: ${result.error.message}`);
-				}
-				break;
-			}
-
-			case 'RETRY_VERIFY': {
-				// Resolve the gate so workflow can re-enter VERIFY
-				const gateResult = getGate(gateId);
-				if (!gateResult.success) {
-					vscode.window.showErrorMessage(`Failed to get gate: ${gateResult.error.message}`);
-					return;
-				}
-
-				// Capture decision for audit
-				const retryInput: HumanGateDecisionInput = {
-					gateId,
-					action: HumanAction.REJECT,
-					rationale: 'Retrying verification — claims reset to OPEN',
-					decisionMaker: 'human-user',
-				};
-				const decisionResult = processHumanGateDecision(retryInput);
-
-				// REJECT doesn't auto-resolve, so resolve manually
-				if (decisionResult.success) {
-					resolveGate({
-						gateId,
-						decisionId: decisionResult.value.decision_id,
-						resolution: 'Retrying verification',
-					});
-				}
-
-				// Reset blocking claims back to OPEN and delete old verdicts
-				const db = getDatabase();
-				if (db) {
-					for (const claimId of gateResult.value.blocking_claims) {
-						db.prepare('UPDATE claims SET status = ? WHERE claim_id = ?')
-							.run(ClaimStatus.OPEN, claimId);
-						db.prepare('DELETE FROM verdicts WHERE claim_id = ?')
-							.run(claimId);
-					}
-				}
-
-				// Re-run workflow cycle (stays in VERIFY since claims are OPEN again)
-				this._isProcessing = true;
-				this._postInputEnabled(false);
-				this._postProcessing(true, 'Retrying verification', 'Re-verifying claims');
-				try {
-					await this._runWorkflowCycle();
-				} finally {
-					this._isProcessing = false;
-					this._postProcessing(false);
-					this._postInputEnabled(true);
-				}
-				break;
-			}
-
-			case 'REFRAME': {
-				// Capture decision for audit
-				const reframeInput: HumanGateDecisionInput = {
-					gateId,
-					action: HumanAction.REFRAME,
-					rationale: 'User requested replanning after verification',
-					decisionMaker: 'human-user',
-				};
-				const reframeResult = processHumanGateDecision(reframeInput);
-
-				// REFRAME doesn't auto-resolve, so resolve manually
-				if (reframeResult.success) {
-					resolveGate({
-						gateId,
-						decisionId: reframeResult.value.decision_id,
-						resolution: 'Replanning after verification failure',
-					});
-				}
-
-				// Transition workflow to REPLAN
-				transitionWorkflow(
-					this._activeDialogueId,
-					Phase.REPLAN,
-					TransitionTrigger.REPLAN_REQUIRED,
-					{ reason: 'Verification gate reframe' }
-				);
-
-				this._update();
-				vscode.window.showInformationMessage('Workflow returned to replanning.');
-				break;
-			}
-		}
-
-		// Fire-and-forget: curate human feedback for future agent context
-		runNarrativeCuration(this._activeDialogueId, CurationMode.FEEDBACK).catch(() => {});
+	private async _handleVerificationGateDecision(gateId: string, action: string, claimRationales?: Record<string, string>): Promise<void> {
+		await panelGates.handleVerificationGateDecision(this._ctx(), gateId, action, claimRationales);
 	}
 
 	/**
 	 * Handle review gate decisions: APPROVE or REFRAME (request changes)
 	 */
-	private async _handleReviewGateDecision(
-		gateId: string,
-		action: string,
-		itemRationales?: Record<string, string>,
-		overallFeedback?: string
-	): Promise<void> {
-		if (!this._activeDialogueId) {
-			return;
-		}
-
-		switch (action) {
-			case 'APPROVE': {
-				// Build combined rationale from per-item responses + overall
-				const parts: string[] = [];
-				if (itemRationales) {
-					for (const [key, rationale] of Object.entries(itemRationales)) {
-						if (rationale && rationale.trim().length > 0) {
-							parts.push(`[${key}]: ${rationale.trim()}`);
-
-							// Write claim override events for claim-type keys (contain hyphens like UUIDs)
-							if (!key.startsWith('finding-')) {
-								writeClaimEvent({
-									claim_id: key,
-									event_type: ClaimEventType.OVERRIDDEN,
-									source: Role.HUMAN,
-									evidence_ref: rationale.trim(),
-								});
-							}
-						}
-					}
-				}
-				if (overallFeedback && overallFeedback.trim()) {
-					parts.push(`[Overall]: ${overallFeedback.trim()}`);
-				}
-
-				const combinedRationale = parts.join('\n') || 'Approved after review';
-
-				// Resolve gate via existing infrastructure
-				const input: HumanGateDecisionInput = {
-					gateId,
-					action: HumanAction.APPROVE,
-					rationale: combinedRationale,
-					decisionMaker: 'human-user',
-				};
-				const result = processHumanGateDecision(input);
-
-				if (result.success) {
-					// Transition from REVIEW → EXECUTE so the next workflow cycle
-					// runs executeExecutePhase instead of re-entering executeReviewPhase.
-					transitionWorkflow(
-						this._activeDialogueId!,
-						Phase.EXECUTE,
-						TransitionTrigger.PHASE_COMPLETE
-					);
-					vscode.window.showInformationMessage('Review approved. Continuing to execution.');
-					await this._resumeAfterGate();
-				} else {
-					vscode.window.showErrorMessage(`Review decision failed: ${result.error.message}`);
-				}
-				break;
-			}
-
-			case 'REFRAME': {
-				// Build combined rationale from per-item responses + overall feedback
-				const reframeParts: string[] = [];
-				if (itemRationales) {
-					for (const [key, rat] of Object.entries(itemRationales)) {
-						if (rat && rat.trim().length > 0) {
-							reframeParts.push(`[${key}]: ${rat.trim()}`);
-
-							// Record human feedback as claim events for audit trail
-							if (!key.startsWith('finding-')) {
-								writeClaimEvent({
-									claim_id: key,
-									event_type: ClaimEventType.OVERRIDDEN,
-									source: Role.HUMAN,
-									evidence_ref: `Review feedback (reframe): ${rat.trim()}`,
-								});
-							}
-						}
-					}
-				}
-				if (overallFeedback && overallFeedback.trim()) {
-					reframeParts.push(overallFeedback.trim());
-				}
-				const rationale = reframeParts.length > 0
-					? reframeParts.join('\n')
-					: 'Changes requested after review';
-
-				const reframeInput: HumanGateDecisionInput = {
-					gateId,
-					action: HumanAction.REFRAME,
-					rationale,
-					decisionMaker: 'human-user',
-				};
-				const reframeResult = processHumanGateDecision(reframeInput);
-
-				// REFRAME doesn't auto-resolve, so resolve manually
-				if (reframeResult.success) {
-					resolveGate({
-						gateId,
-						decisionId: reframeResult.value.decision_id,
-						resolution: 'Changes requested after review',
-					});
-				}
-
-				// Reset blocking CRITICAL claims to OPEN so the REPLAN → PROPOSE
-				// cycle can proceed. The new proposal will surface fresh assumptions
-				// that get re-verified, incorporating the human's review feedback.
-				const reframeDb = getDatabase();
-				if (reframeDb) {
-					const blockingClaims = reframeDb.prepare(
-						`SELECT claim_id FROM claims
-						 WHERE dialogue_id = ?
-						   AND criticality = 'CRITICAL'
-						   AND (status = 'DISPROVED' OR status = 'UNKNOWN')`
-					).all(this._activeDialogueId) as Array<{ claim_id: string }>;
-
-					for (const { claim_id } of blockingClaims) {
-						reframeDb.prepare('UPDATE claims SET status = ? WHERE claim_id = ?')
-							.run(ClaimStatus.OPEN, claim_id);
-						reframeDb.prepare('DELETE FROM verdicts WHERE claim_id = ?')
-							.run(claim_id);
-					}
-				}
-
-				// Store review feedback so the REPLAN → PROPOSE cycle can use it
-				updateWorkflowMetadata(this._activeDialogueId, {
-					replanRationale: rationale,
-				});
-
-				// Transition workflow to REPLAN
-				transitionWorkflow(
-					this._activeDialogueId,
-					Phase.REPLAN,
-					TransitionTrigger.REPLAN_REQUIRED,
-					{ reason: 'Review gate: changes requested' }
-				);
-
-				vscode.window.showInformationMessage('Changes requested — replanning proposal.');
-				await this._resumeAfterGate();
-				break;
-			}
-		}
-
-		// Fire-and-forget: curate human feedback for future agent context
-		if (this._activeDialogueId) {
-			runNarrativeCuration(this._activeDialogueId, CurationMode.FEEDBACK).catch(() => {});
-		}
+	private async _handleReviewGateDecision(gateId: string, action: string, itemRationales?: Record<string, string>, overallFeedback?: string): Promise<void> {
+		await panelGates.handleReviewGateDecision(this._ctx(), gateId, action, itemRationales, overallFeedback);
 	}
 
 	/**
@@ -2715,52 +1891,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * concerns (and optional user guidance) injected as correction context.
 	 */
 	private async _handleReviewRerun(guidance?: string): Promise<void> {
-		if (!this._activeDialogueId) { return; }
-
-		// Build correction text from the most recent reasoning review event
-		const db = getDatabase();
-		if (!db) { return; }
-
-		const reviewEvent = db.prepare(`
-			SELECT content, detail FROM dialogue_events
-			WHERE dialogue_id = ? AND event_type = 'reasoning_review'
-			ORDER BY event_id DESC LIMIT 1
-		`).get(this._activeDialogueId) as { content: string; detail: string } | undefined;
-
-		if (!reviewEvent) {
-			this._postSystemMessage('No reasoning review found to re-run with.');
-			return;
-		}
-
-		const detail = JSON.parse(reviewEvent.detail ?? '{}');
-		const concerns = (detail.concerns ?? []) as Array<{ summary: string; recommendation: string }>;
-		const corrections = concerns.map((c: { summary: string; recommendation: string }) =>
-			`- ${c.summary}: ${c.recommendation}`
-		).join('\n');
-
-		const correctionText = [
-			'[Reasoning Review Corrections]',
-			corrections,
-			...(guidance ? [`\n[Human Guidance]\n${guidance}`] : []),
-		].join('\n');
-
-		// Feed the corrections as input and re-run the workflow cycle
-		updateWorkflowMetadata(this._activeDialogueId, {
-			pendingIntakeInput: correctionText,
-		});
-
-		this._postSystemMessage('Re-running with reasoning review corrections...');
-		this._isProcessing = true;
-		this._postInputEnabled(false);
-		this._postProcessing(true, 'Re-running', 'Applying reasoning corrections');
-
-		try {
-			await this._runWorkflowCycle();
-		} finally {
-			this._isProcessing = false;
-			this._postProcessing(false);
-			this._postInputEnabled(true);
-		}
+		await panelExport.handleReviewRerun(this._activeDialogueId, this._view, guidance);
 	}
 
 	/**
@@ -2798,13 +1929,13 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * Handle a navigation command — resolve the target, assess safety, and execute.
 	 */
 	private async _handleNavigateCommand(targetText: string): Promise<boolean> {
-		if (!this._activeDialogueId || !targetText.trim()) return false;
+		if (!this._activeDialogueId || !targetText.trim()) {return false;}
 
 		const { resolveNavigationTarget, assessNavigation, getAvailableTargets } = await import('../../workflow/navigationResolver.js');
 		const { transitionWorkflow, updateWorkflowMetadata, getWorkflowState, TransitionTrigger } = await import('../../workflow/stateMachine.js');
 
 		const wsResult = getWorkflowState(this._activeDialogueId);
-		if (!wsResult.success) return false;
+		if (!wsResult.success) {return false;}
 		const currentPhase = wsResult.value.current_phase as Phase;
 		const metadata = wsResult.value.metadata ? JSON.parse(wsResult.value.metadata) : {};
 
@@ -2979,167 +2110,85 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		});
 	}
 
-	private static readonly ROLE_DISPLAY_NAMES: Record<string, string> = {
-		executor: 'Executor',
-		technicalExpert: 'Technical Expert',
-		verifier: 'Verifier',
-		historianInterpreter: 'Historian-Interpreter',
-	};
-
-	private static readonly ALL_ROLES = ['executor', 'technicalExpert', 'verifier', 'historianInterpreter'];
-
 	/**
-	 * Get the current key status for all roles
+	 * API key management — delegated to panelApiKeys.ts
 	 */
-	private async _getKeyStatus(): Promise<Array<{
-		role: string;
-		displayName: string;
-		provider: string;
-		hasKey: boolean;
-	}>> {
-		const manager = getSecretKeyManager();
-		const results = [];
-
-		for (const role of GovernedStreamViewProvider.ALL_ROLES) {
-			const provider = getProviderForRole(role);
-			const key = await manager.getApiKey(role, provider);
-			results.push({
-				role,
-				displayName: GovernedStreamViewProvider.ROLE_DISPLAY_NAMES[role] ?? role,
-				provider,
-				hasKey: !!key,
-			});
-		}
-
-		return results;
-	}
-
-	/**
-	 * Send current key status to the webview
-	 */
+	// API key management — delegated to panelApiKeys.ts
 	private async _sendKeyStatus(): Promise<void> {
-		const keyStatus = await this._getKeyStatus();
-		this._view?.webview.postMessage({
-			type: 'keyStatusUpdate',
-			data: { roles: keyStatus },
-		});
+		if (this._view) {await apiKeys.sendKeyStatus(this._view.webview);}
 	}
-
-	/**
-	 * Handle a set API key request from the webview
-	 */
 	private async _handleSetApiKey(role: string): Promise<void> {
-		const displayName = GovernedStreamViewProvider.ROLE_DISPLAY_NAMES[role] ?? role;
-		const provider = getProviderForRole(role);
-
-		const key = await vscode.window.showInputBox({
-			password: true,
-			prompt: `Enter ${provider} API key for ${displayName}`,
-			placeHolder: 'sk-...',
-			ignoreFocusOut: true,
-		});
-
-		if (!key) {
-			return; // User cancelled
-		}
-
-		const trimmedKey = key.trim();
-		if (!trimmedKey) {
-			vscode.window.showWarningMessage('API key cannot be empty.');
-			return;
-		}
-
-		const manager = getSecretKeyManager();
-		await manager.setApiKey(role, trimmedKey);
-		clearRoleProviderCache();
-
-		await this._sendKeyStatus();
-		vscode.window.showInformationMessage(`API key set for ${displayName}`);
+		if (this._view) {await apiKeys.handleSetApiKey(role, this._view.webview);}
 	}
-
-	/**
-	 * Handle a clear API key request from the webview
-	 */
 	private async _handleClearApiKey(role: string): Promise<void> {
-		const displayName = GovernedStreamViewProvider.ROLE_DISPLAY_NAMES[role] ?? role;
-		const manager = getSecretKeyManager();
-		await manager.deleteApiKey(role);
-		clearRoleProviderCache();
-
-		await this._sendKeyStatus();
-		vscode.window.showInformationMessage(`API key cleared for ${displayName}`);
+		if (this._view) {await apiKeys.handleClearApiKey(role, this._view.webview);}
 	}
 
-	/**
-	 * Handle file picker request from webview — opens VS Code file dialog
-	 */
+	// File picker and mention — delegated to panelFileAssist.ts
 	private async _handlePickFile(): Promise<void> {
-		const uris = await vscode.window.showOpenDialog({
-			canSelectMany: false,
-			openLabel: 'Attach File',
-			filters: {
-				'Documents': ['md', 'txt', 'json', 'yaml', 'yml', 'rst'],
-				'Code': ['ts', 'js', 'py', 'rs', 'go', 'java', 'tsx', 'jsx'],
-				'All Files': ['*'],
-			},
-		});
-
-		if (!uris || uris.length === 0) {
-			return;
-		}
-
-		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-		const filePath = uris[0].fsPath;
-		const relativePath = workspaceRoot
-			? filePath.replace(workspaceRoot, '').replace(/^[\\/]/, '')
-			: filePath;
-
-		this._view?.webview.postMessage({
-			type: 'fileAttached',
-			filePath: relativePath,
-		});
+		if (this._view) {await fileAssist.handlePickFile(this._view.webview);}
 	}
-
-	/**
-	 * Handle @-mention suggestion request from webview.
-	 * Returns a broad file list for client-side fuzzy filtering and caching.
-	 */
 	private async _handleMentionSuggestions(_query: string): Promise<void> {
-		const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-		if (!workspaceRoot) {
-			return;
-		}
-
-		const excludePattern = '{**/node_modules/**,**/dist/**,**/.git/**,**/out/**,**/.vscode/**}';
-
-		try {
-			// Return a broad set of mentionable files — client does fuzzy filtering
-			const files = await vscode.workspace.findFiles('**/*', excludePattern, 200);
-			const relativePaths = files
-				.map((f) => f.fsPath.replace(workspaceRoot, '').replace(/^[\\/]/, ''))
-				.sort((a, b) => a.localeCompare(b));
-
-			this._view?.webview.postMessage({
-				type: 'mentionSuggestions',
-				files: relativePaths,
-			});
-		} catch {
-			// Silently fail — mention suggestions are best-effort
-		}
+		if (this._view) {await fileAssist.handleMentionSuggestions(this._view.webview);}
 	}
 
 	/**
 	 * Full update: re-render the entire webview HTML
 	 */
+	/**
+	 * Schedule a debounced _update(). Coalesces rapid events (e.g., phase change + gate trigger)
+	 * into a single re-render. Use this for event-driven updates; use _update() directly
+	 * for user-initiated actions that need immediate feedback.
+	 */
+	private _scheduleUpdate(): void {
+		if (this._pendingUpdateTimer) {return;}
+		this._pendingUpdateTimer = setTimeout(() => {
+			this._pendingUpdateTimer = null;
+			this._incrementalOrFullUpdate();
+		}, 100);
+	}
+
+	/**
+	 * Try an incremental update: if the stream content hasn't changed since last render,
+	 * skip the expensive HTML regeneration. Falls back to full _update() if items changed.
+	 */
+	private _incrementalOrFullUpdate(): void {
+		if (!this._view || !this._activeDialogueId) {
+			this._update();
+			return;
+		}
+
+		const state = aggregateStreamState(this._activeDialogueId);
+		const itemCount = state.streamItems.length;
+		const lastType = itemCount > 0 ? state.streamItems[itemCount - 1].type : '';
+		const fingerprint = `${itemCount}:${lastType}:${state.currentPhase}:${state.openGates.length}`;
+
+		if (fingerprint === this._lastStreamFingerprint) {
+			// Stream unchanged — just refresh dynamic indicators without re-rendering
+			if (this._isProcessing) {
+				this._postProcessing(true, this._processingPhase, this._processingDetail);
+			}
+			return;
+		}
+
+		this._lastStreamFingerprint = fingerprint;
+		this._update();
+	}
+
 	private _update(): void {
 		if (!this._view) {
 			return;
 		}
 		const speechSetting = vscode.workspace.getConfiguration('janumicode.speech').get('enabled', true);
 		setSpeechEnabled(speechSetting);
-		setSoxAvailable(this._speechService?.soxAvailable ?? false);
+		setSoxAvailable(this._speechHandler.soxAvailable);
 		const state = aggregateStreamState(this._activeDialogueId ?? undefined);
 		this._view.webview.html = this._getHtmlForWebview(state, this._view.webview);
+
+		// Update fingerprint after full render
+		const itemCount = state.streamItems.length;
+		const lastType = itemCount > 0 ? state.streamItems[itemCount - 1].type : '';
+		this._lastStreamFingerprint = `${itemCount}:${lastType}:${state.currentPhase}:${state.openGates.length}`;
 
 		// Restore settings panel state if it was open before the re-render
 		if (this._settingsPanelVisible) {
@@ -3156,13 +2205,33 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 		// Restore pending MMP decisions from SQLite
 		this._postPendingMmpDecisions();
+
+		// Restore user input drafts from SQLite
+		this._postDrafts();
+	}
+
+	/**
+	 * Load user input drafts from SQLite and send to webview for DOM restoration.
+	 */
+	private _postDrafts(): void {
+		if (!this._activeDialogueId || !this._view) {return;}
+		try {
+			const { getDrafts } = require('../../database/draftStore');
+			const result = getDrafts(this._activeDialogueId);
+			if (result.success && Object.keys(result.value).length > 0) {
+				this._view.webview.postMessage({
+					type: 'draftsLoaded',
+					drafts: result.value,
+				});
+			}
+		} catch { /* table may not exist yet */ }
 	}
 
 	/**
 	 * Load pending MMP decisions from SQLite and send to webview for DOM restoration.
 	 */
 	private _postPendingMmpDecisions(): void {
-		if (!this._activeDialogueId || !this._view) return;
+		if (!this._activeDialogueId || !this._view) {return;}
 		try {
 			const { getPendingMmpDecisions } = require('../../database/pendingMmpStore');
 			const result = getPendingMmpDecisions(this._activeDialogueId);
@@ -3179,7 +2248,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * Load clarification threads from DB and send to the webview for restoration.
 	 */
 	private _postClarificationThreads(): void {
-		if (!this._activeDialogueId || !this._view) return;
+		if (!this._activeDialogueId || !this._view) {return;}
 		try {
 			const threads = getClarificationThreads(this._activeDialogueId);
 			if (threads.length > 0) {
@@ -3200,15 +2269,11 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		if (!this._settingsPanelVisible) {
 			return;
 		}
-		const keyStatus = await this._getKeyStatus();
 		this._view?.webview.postMessage({
 			type: 'showSettings',
 			data: { visible: true },
 		});
-		this._view?.webview.postMessage({
-			type: 'keyStatusUpdate',
-			data: { roles: keyStatus },
-		});
+		await this._sendKeyStatus();
 	}
 
 	/**
@@ -3292,124 +2357,45 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * Clean up event bus subscriptions
 	 */
 	// ==================== SPEECH-TO-TEXT ====================
-
-	private _getSpeechService(): SpeechToTextService {
-		if (!this._speechService) {
-			this._speechService = new SpeechToTextService();
-		}
-		return this._speechService;
-	}
+	// Delegated to panelSpeech.ts — SpeechHandler owns service lifecycle and recording state
 
 	private async _sendSpeechCapability(): Promise<void> {
-		const cfg = vscode.workspace.getConfiguration('janumicode.speech');
-		const enabled = cfg.get<boolean>('enabled', true);
-
-		if (!enabled) {
-			this._view?.webview.postMessage({ type: 'speechCapability', data: { enabled: false, soxAvailable: false } });
-			return;
-		}
-
-		// Check if SoX is actually installed
-		const recPath = cfg.get<string>('soxRecPath', 'rec');
-		const svc = this._getSpeechService();
-		const soxAvailable = await svc.checkSoxAvailable(recPath);
-
-		if (!soxAvailable) {
-			const hint = process.platform === 'win32'
-				? 'Install: choco install sox.portable (or download from https://sox.sourceforge.net/)'
-				: process.platform === 'darwin'
-					? 'Install: brew install sox'
-					: 'Install: sudo apt install sox';
-			vscode.window.showWarningMessage(
-				`Speech-to-text requires SoX but 'rec' was not found. ${hint}`,
-			);
-		}
-
-		this._view?.webview.postMessage({ type: 'speechCapability', data: { enabled, soxAvailable } });
+		if (this._view) {await this._speechHandler.sendCapability(this._view.webview);}
 	}
-
 	private async _handleSpeechStart(targetInputId: string): Promise<void> {
-		try {
-			const config = await resolveSpeechConfig();
-			const svc = this._getSpeechService();
-
-			if (svc.isRecording) {
-				// Already recording — stop first
-				await this._handleSpeechStop();
-				return;
-			}
-
-			this._speechTargetInputId = targetInputId;
-			await svc.startRecording(config);
-
-			this._view?.webview.postMessage({
-				type: 'speechRecordingStarted',
-				data: { targetInputId },
-			});
-		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			this._view?.webview.postMessage({
-				type: 'speechError',
-				data: { targetInputId, error: message },
-			});
-		}
+		if (this._view) {await this._speechHandler.handleStart(targetInputId, this._view.webview);}
 	}
-
 	private async _handleSpeechStop(): Promise<void> {
-		const svc = this._getSpeechService();
-		const targetInputId = this._speechTargetInputId || '';
-
-		try {
-			this._view?.webview.postMessage({
-				type: 'speechTranscribing',
-				data: { targetInputId },
-			});
-
-			const wavPath = await svc.stopRecording();
-			const config = await resolveSpeechConfig();
-			const text = await svc.transcribe(wavPath, config);
-
-			this._view?.webview.postMessage({
-				type: 'speechResult',
-				data: { targetInputId, text },
-			});
-		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			this._view?.webview.postMessage({
-				type: 'speechError',
-				data: { targetInputId, error: message },
-			});
-		} finally {
-			this._speechTargetInputId = null;
-		}
+		if (this._view) {await this._speechHandler.handleStop(this._view.webview);}
 	}
-
 	private _handleSpeechCancel(): void {
-		const svc = this._getSpeechService();
-		svc.cancel();
-		if (this._speechTargetInputId) {
-			this._view?.webview.postMessage({
-				type: 'speechError',
-				data: { targetInputId: this._speechTargetInputId, error: 'Recording cancelled' },
-			});
-			this._speechTargetInputId = null;
-		}
+		if (this._view) {this._speechHandler.handleCancel(this._view.webview);}
 	}
 
 	// ==================== CLEANUP ====================
 
 	private _cleanup(): void {
+		console.warn('[GovernedStream] Cleanup started');
 		this._disposed = true;
 		this._isProcessing = false;
+		// Clear pending debounce timer to prevent post-dispose firing
+		if (this._pendingUpdateTimer) {
+			clearTimeout(this._pendingUpdateTimer);
+			this._pendingUpdateTimer = null;
+		}
+		// Dispose configuration watcher
+		this._configWatcherDisposable?.dispose();
+		this._configWatcherDisposable = undefined;
 		// Abort any in-flight workflow cycle — kills CLI processes via signal
 		this._workflowAbortController?.abort();
 		this._workflowAbortController = null;
-		this._getSpeechService().cancel();
+		this._speechHandler.cancel();
 		for (const unsub of this._eventUnsubscribers) {
 			unsub();
 		}
 		this._eventUnsubscribers = [];
 		this._view = undefined;
+		console.warn('[GovernedStream] Cleanup complete');
 	}
 }
 
@@ -3417,10 +2403,5 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
  * Generate a random nonce for Content Security Policy
  */
 function getNonce(): string {
-	let text = '';
-	const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-	for (let i = 0; i < 32; i++) {
-		text += possible.charAt(Math.floor(Math.random() * possible.length));
-	}
-	return text;
+	return randomBytes(24).toString('base64url');
 }

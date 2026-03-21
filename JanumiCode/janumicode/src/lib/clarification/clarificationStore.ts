@@ -29,7 +29,7 @@ export function saveClarificationThread(
 ): void {
 	try {
 		const db = getDatabase();
-		if (!db) return;
+		if (!db) {return;}
 
 		const messagesJson = JSON.stringify(messages);
 
@@ -51,7 +51,7 @@ export function saveClarificationThread(
 export function getClarificationThreads(dialogueId: string): ClarificationThread[] {
 	try {
 		const db = getDatabase();
-		if (!db) return [];
+		if (!db) {return [];}
 
 		const rows = db.prepare(
 			'SELECT item_id, item_context, messages FROM clarification_threads WHERE dialogue_id = ?'

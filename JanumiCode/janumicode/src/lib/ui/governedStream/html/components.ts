@@ -48,6 +48,26 @@ function escapeHtml(str: string): string {
 
 }
 
+/** Safely convert a value to a display string. Handles objects that LLMs return instead of plain strings. */
+function stringifyItem(item: unknown): string {
+	if (typeof item === 'string') {return item;}
+	if (item === null || item === undefined) {return '';}
+	if (typeof item === 'object') {
+		// Try common field names LLMs use for single-value objects
+		const obj = item as Record<string, unknown>;
+		for (const key of ['text', 'description', 'metric', 'requirement', 'name', 'value', 'label', 'content']) {
+			if (typeof obj[key] === 'string') {return obj[key] as string;}
+		}
+		// Fall back to joining all string values
+		const parts = Object.entries(obj)
+			.filter(([, v]) => typeof v === 'string' || typeof v === 'number')
+			.map(([k, v]) => `${k}: ${v}`);
+		if (parts.length > 0) {return parts.join(' | ');}
+		return JSON.stringify(item);
+	}
+	return String(item);
+}
+
 
 
 /**
@@ -603,11 +623,16 @@ function buildIntakeSubPhases(subState: string, intakeMode: string | null, propo
 		// to the proposer step that just completed so the diagram stays stable.
 		let effectiveSubState = subState;
 		if (subState === 'PRODUCT_REVIEW' && proposerPhase) {
-			const phaseToStep: Record<string, string> = {
+			// ProposerPhase is a numeric enum (1-4) but may also arrive as string name
+			const phaseToStep: Record<string | number, string> = {
 				'DOMAIN_MAPPING': 'PROPOSING_DOMAINS',
 				'JOURNEY_WORKFLOW': 'PROPOSING_JOURNEYS',
 				'ENTITY_DATA_MODEL': 'PROPOSING_ENTITIES',
 				'INTEGRATION_QUALITY': 'PROPOSING_INTEGRATIONS',
+				1: 'PROPOSING_DOMAINS',
+				2: 'PROPOSING_JOURNEYS',
+				3: 'PROPOSING_ENTITIES',
+				4: 'PROPOSING_INTEGRATIONS',
 			};
 			effectiveSubState = phaseToStep[proposerPhase] ?? 'PROPOSING_DOMAINS';
 		}
@@ -2492,6 +2517,8 @@ export function renderCommandBlock(
 
 	outputs: WorkflowCommandOutput[],
 
+	hasReview?: boolean,
+
 ): string {
 
 	const blockId = `cmd-${escapeHtml(command.command_id)}`;
@@ -2596,17 +2623,8 @@ export function renderCommandBlock(
 
 
 
-		// Reasoning review output — render inline review card
+		// Reasoning reviews are now rendered as standalone stream items below the command block
 		if (o.line_type === 'reasoning_review') {
-			try {
-				const reviewData = JSON.parse(o.content);
-				outputLines += renderReasoningReviewCard(
-					reviewData.concerns ?? [],
-					reviewData.overallAssessment ?? '',
-					reviewData.reviewerModel ?? '',
-					o.timestamp,
-				);
-			} catch { /* skip malformed review */ }
 			i += 1;
 			continue;
 		}
@@ -2650,6 +2668,8 @@ export function renderCommandBlock(
 				<span class="command-block-type">${typeLabel}</span>
 
 				<span class="command-block-status ${command.status}">${statusIcon}</span>
+
+				${hasReview ? '<span class="command-block-review-badge">&#x1F50D; Review</span>' : ''}
 
 				<span class="command-block-time">${time}</span>
 
@@ -3436,14 +3456,14 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 	const metricsHtml = plan.successMetrics && plan.successMetrics.length > 0
 		? `<div class="intake-plan-section">
 				<h5>Success Metrics</h5>
-				<ul>${plan.successMetrics.map((m) => `<li>${escapeHtml(m)}</li>`).join('')}</ul>
+				<ul>${plan.successMetrics.map((m) => `<li>${escapeHtml(stringifyItem(m))}</li>`).join('')}</ul>
 			</div>`
 		: '';
 
 	const uxHtml = plan.uxRequirements && plan.uxRequirements.length > 0
 		? `<div class="intake-plan-section">
 				<h5>UX Requirements</h5>
-				<ul>${plan.uxRequirements.map((u) => `<li>${escapeHtml(u)}</li>`).join('')}</ul>
+				<ul>${plan.uxRequirements.map((u) => `<li>${escapeHtml(stringifyItem(u))}</li>`).join('')}</ul>
 			</div>`
 		: '';
 
@@ -4592,7 +4612,7 @@ function renderReasoningReviewCard(
 	reviewerModel: string,
 	timestamp: string,
 ): string {
-	if (concerns.length === 0) return '';
+	if (concerns.length === 0) {return '';}
 
 	const maxSeverity = concerns[0]?.severity ?? 'MEDIUM';
 	const severityClass = maxSeverity === 'HIGH' ? 'review-severity-high'
@@ -4748,7 +4768,7 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 			case 'command_block':
 
-				return wrapResizable(renderCommandBlock(item.command, item.outputs));
+				return wrapResizable(renderCommandBlock(item.command, item.outputs, item.hasReview));
 
 			case 'intake_turn':
 
@@ -4860,7 +4880,9 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 		} else if (intakeState.subState === 'DISCUSSING') {
 			html += renderIntakeQuestionsSubmitBar();
 			html += renderIntakeFinalizeButton();
-		} else if (intakeState.subState === 'SYNTHESIZING' || intakeState.subState === 'AWAITING_APPROVAL') {
+		} else if (intakeState.subState === 'SYNTHESIZING') {
+			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Synthesizing final plan...</span></div>';
+		} else if (intakeState.subState === 'AWAITING_APPROVAL') {
 			html += renderIntakeFinalizeResolved();
 		} else if (intakeState.subState === 'ANALYZING') {
 			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Analyzing documents and codebase...</span></div>';

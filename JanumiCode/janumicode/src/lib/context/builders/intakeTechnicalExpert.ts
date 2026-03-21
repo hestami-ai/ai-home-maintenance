@@ -286,8 +286,8 @@ function formatPlanSection(plan: IntakePlanDocument): string {
 		parts.push('## Personas');
 		for (const p of plan.personas) {
 			parts.push(`- [${p.id}] **${p.name}**: ${p.description}`);
-			if ((p.goals ?? []).length > 0) parts.push(`  Goals: ${p.goals.join('; ')}`);
-			if ((p.painPoints ?? []).length > 0) parts.push(`  Pain points: ${p.painPoints.join('; ')}`);
+			if ((p.goals ?? []).length > 0) {parts.push(`  Goals: ${p.goals.join('; ')}`);}
+			if ((p.painPoints ?? []).length > 0) {parts.push(`  Pain points: ${p.painPoints.join('; ')}`);}
 		}
 	}
 	if (plan.userJourneys && plan.userJourneys.length > 0) {

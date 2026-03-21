@@ -1,0 +1,1719 @@
+---
+import Base from "../layouts/Base.astro";
+
+const marketplaceUrl = "https://marketplace.visualstudio.com/items?itemName=hestami.janumicode";
+---
+
+<Base title="Case Study: Hestami AI Real Property OS" description="A detailed walkthrough of JanumiCode processing a complex, multi-domain real property platform from a single product description document.">
+
+  <!-- Header -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Case Study &mdash; Whitepaper</span>
+        <h2>Hestami AI Real Property OS<br />& Platform</h2>
+        <p>A detailed walkthrough showing how JanumiCode's governed workflow processes a complex, multi-pillar product vision — three platforms, twelve business domains, thirty-plus entities — from a single product description document into a verified, traceable architecture.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- The Input -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">The Input</span>
+        <h2>A product vision document</h2>
+        <p>A single markdown document — 708 lines — describing an integrated real property platform spanning three product pillars, twelve business domains, five persona groups, a full technology stack, and a phased delivery strategy. This is the entire prompt given to JanumiCode.</p>
+      </div>
+
+      <p class="body-text" style="max-width: 800px;">
+        This is exactly the kind of input that breaks conventional AI coding tools: too large for a single context window, too interconnected for naive decomposition, and too compliance-sensitive for unsupervised execution. Below, we visualize the scope of what JanumiCode is asked to process — then walk through how it does it, step by step.
+      </p>
+    </div>
+  </section>
+
+  <!-- Three Pillars -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Three Product Pillars</span>
+        <h2>One platform, three markets</h2>
+      </div>
+
+      <div class="pillars">
+        <!-- Pillar 1 -->
+        <div class="pillar-card">
+          <div class="pillar-card__header pillar-card__header--p1">
+            <span class="pillar-card__phase">PHASE 1</span>
+            <h3 class="pillar-card__title">Hestami Home<br />Real Property Assistant</h3>
+            <span class="pillar-card__subtitle">AI-Assisted Property Owner Services</span>
+          </div>
+          <div class="pillar-card__body">
+            <div class="pillar-card__personas">
+              <span class="pillar-persona">Homeowners</span>
+              <span class="pillar-persona">Small Landlords</span>
+              <span class="pillar-persona">Property Investors</span>
+            </div>
+            <div class="pillar-card__domains">
+              <span class="pillar-card__domains-label">9 Business Domains</span>
+              <div class="pillar-domain-list">
+                <span class="pillar-domain">Property & Ownership</span>
+                <span class="pillar-domain">Portfolio Management</span>
+                <span class="pillar-domain">Owner Intent & Intake</span>
+                <span class="pillar-domain">Service Call Lifecycle</span>
+                <span class="pillar-domain">Document Management</span>
+                <span class="pillar-domain">Staff Service Execution</span>
+                <span class="pillar-domain">External HOA Context</span>
+                <span class="pillar-domain">Vendor Coordination</span>
+                <span class="pillar-domain">Decision & Trust Ledger</span>
+              </div>
+            </div>
+            <div class="pillar-card__problem">
+              <span class="pillar-card__problem-label">Core Problem</span>
+              <p>Property owners waste time and incur risk finding reliable contractors, coordinating estimates, comparing inconsistent bids, and verifying licenses and insurance.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pillar 2 -->
+        <div class="pillar-card">
+          <div class="pillar-card__header pillar-card__header--p2">
+            <span class="pillar-card__phase">PHASE 2</span>
+            <h3 class="pillar-card__title">Hestami Service Provider<br />Field Services Management</h3>
+            <span class="pillar-card__subtitle">Contractor Operations Platform</span>
+          </div>
+          <div class="pillar-card__body">
+            <div class="pillar-card__personas">
+              <span class="pillar-persona">Contractors</span>
+              <span class="pillar-persona">Technicians</span>
+              <span class="pillar-persona">Dispatchers</span>
+            </div>
+            <div class="pillar-card__domains">
+              <span class="pillar-card__domains-label">9 Business Domains</span>
+              <div class="pillar-domain-list">
+                <span class="pillar-domain">Identity & Licensing</span>
+                <span class="pillar-domain">Workforce & Technicians</span>
+                <span class="pillar-domain">Pricebook & Materials</span>
+                <span class="pillar-domain">Job Lifecycle & Work Orders</span>
+                <span class="pillar-domain">Dispatch & Scheduling</span>
+                <span class="pillar-domain">Mobile Field Operations</span>
+                <span class="pillar-domain">Estimates & Invoicing</span>
+                <span class="pillar-domain">Inventory & Procurement</span>
+                <span class="pillar-domain">Maintenance Contracts</span>
+              </div>
+            </div>
+            <div class="pillar-card__problem">
+              <span class="pillar-card__problem-label">Modeled After</span>
+              <p>ServiceTitan — the operating system for the trades. Scheduling, dispatch, mobile technician app, quoting, invoicing, job costing, and inventory.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pillar 3 -->
+        <div class="pillar-card">
+          <div class="pillar-card__header pillar-card__header--p3">
+            <span class="pillar-card__phase">PHASE 3</span>
+            <h3 class="pillar-card__title">Hestami Community<br />Association Management</h3>
+            <span class="pillar-card__subtitle">HOA / CAM Governance Platform</span>
+          </div>
+          <div class="pillar-card__body">
+            <div class="pillar-card__personas">
+              <span class="pillar-persona">Board Members</span>
+              <span class="pillar-persona">Community Managers</span>
+              <span class="pillar-persona">Residents</span>
+            </div>
+            <div class="pillar-card__domains">
+              <span class="pillar-card__domains-label">11 Core Domains</span>
+              <div class="pillar-domain-list">
+                <span class="pillar-domain">Association & Property</span>
+                <span class="pillar-domain">Accounting (GL, AR/AP)</span>
+                <span class="pillar-domain">Work Orders & Vendors</span>
+                <span class="pillar-domain">Violations</span>
+                <span class="pillar-domain">ARC Requests</span>
+                <span class="pillar-domain">Governance & Meetings</span>
+                <span class="pillar-domain">Communications</span>
+                <span class="pillar-domain">Owner Portal</span>
+                <span class="pillar-domain">Documents & Records</span>
+                <span class="pillar-domain">Reserve Studies</span>
+                <span class="pillar-domain">Compliance</span>
+              </div>
+            </div>
+            <div class="pillar-card__problem">
+              <span class="pillar-card__problem-label">Modeled After</span>
+              <p>Vantaca — AI-native community management platform. Action-item workflow engine, AI voice agents, automated AP/AR, board and homeowner portals.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Common Data Model — 12 Domains -->
+  <section class="section section--alt">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Common Data Model</span>
+        <h2>12 CDM domains spanning<br />all three pillars</h2>
+        <p>The product description defines a shared logical domain model. Each domain includes primary entities and the relationships they form — the foundation that JanumiCode must decompose, model, and verify.</p>
+      </div>
+
+      <div class="cdm-grid">
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">1</span>
+          <span class="cdm-domain__name">Association / Entity / Property Model</span>
+          <span class="cdm-domain__entities">Organization, Association, Property, Housing Unit, Common Area, Person, Ownership, Management Contract</span>
+        </div>
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">2</span>
+          <span class="cdm-domain__name">Accounting</span>
+          <span class="cdm-domain__entities">Chart of Accounts, GL, Journal Entries, Assessments, Payments, AP Invoices, Vendor W-9/1099, Bank Accounts</span>
+        </div>
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">3</span>
+          <span class="cdm-domain__name">Workflow Automation</span>
+          <span class="cdm-domain__entities">Task, Workflow Step, Trigger, SLA Timer, Notification, Approval</span>
+        </div>
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">4</span>
+          <span class="cdm-domain__name">Violations</span>
+          <span class="cdm-domain__entities">Violation, Evidence, Notice Sequence, Hearing, Fine</span>
+        </div>
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">5</span>
+          <span class="cdm-domain__name">ARC (Architectural Requests)</span>
+          <span class="cdm-domain__entities">ARC Request, Plans, Committee, Review Action, Condition, Permit</span>
+        </div>
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">6</span>
+          <span class="cdm-domain__name">Work Orders / Maintenance</span>
+          <span class="cdm-domain__entities">Work Order, Asset, Vendor, Bid, Schedule, Completion, Invoice</span>
+        </div>
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">7</span>
+          <span class="cdm-domain__name">Communications</span>
+          <span class="cdm-domain__entities">Mass Email, SMS, Announcement, Letter Template, Calendar Event, Meeting Notice</span>
+        </div>
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">8</span>
+          <span class="cdm-domain__name">Governance</span>
+          <span class="cdm-domain__entities">Board, Roles, Meeting, Agenda, Minutes, Vote, Resolution, Policy Doc</span>
+        </div>
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">9</span>
+          <span class="cdm-domain__name">Owner Portal / CRM</span>
+          <span class="cdm-domain__entities">User Account, Role, Request, Payment Preference, Document Access</span>
+        </div>
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">10</span>
+          <span class="cdm-domain__name">Documents & Records</span>
+          <span class="cdm-domain__entities">CC&Rs, Bylaws, Rules, Financial Reports, Contracts, Reserve Studies, Inspection Reports</span>
+        </div>
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">11</span>
+          <span class="cdm-domain__name">Reserve Studies</span>
+          <span class="cdm-domain__entities">Reserve Component, Life/Remaining Life, Replacement Cost, Funding Plan</span>
+        </div>
+        <div class="cdm-domain">
+          <span class="cdm-domain__num">12</span>
+          <span class="cdm-domain__name">Compliance</span>
+          <span class="cdm-domain__entities">Statutory Deadline, Notice Requirement, Voting Rule, Audit Requirement, Resale Packet</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Platform Architecture Diagram -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Proposed Platform Architecture</span>
+        <h2>The system JanumiCode<br />must decompose</h2>
+        <p>The product description specifies a complete technology stack. This is the architecture that JanumiCode's governed workflow will verify, decompose into components, and sequence for implementation.</p>
+      </div>
+
+      <div class="arch-diagram">
+        <!-- Clients Layer -->
+        <div class="arch-layer">
+          <div class="arch-layer__label">CLIENTS</div>
+          <div class="arch-layer__boxes">
+            <div class="arch-box arch-box--client">
+              <span class="arch-box__name">SvelteKit Web</span>
+              <span class="arch-box__detail">Admin, Staff, Owner, Manager, Board Portals</span>
+            </div>
+            <div class="arch-box arch-box--client">
+              <span class="arch-box__name">iOS Native</span>
+              <span class="arch-box__detail">Homeowner + Technician Apps</span>
+            </div>
+            <div class="arch-box arch-box--client">
+              <span class="arch-box__name">Android Native</span>
+              <span class="arch-box__detail">Homeowner + Technician Apps</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-wire"></div>
+
+        <!-- Edge / CDN Layer -->
+        <div class="arch-layer">
+          <div class="arch-layer__label">EDGE</div>
+          <div class="arch-layer__boxes">
+            <div class="arch-box arch-box--infra">
+              <span class="arch-box__name">Cloudflare CDN</span>
+              <span class="arch-box__detail">Only public entry point &bull; TLS termination</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-wire"></div>
+
+        <!-- Proxy Layer -->
+        <div class="arch-layer">
+          <div class="arch-layer__label">PROXY</div>
+          <div class="arch-layer__boxes">
+            <div class="arch-box arch-box--infra">
+              <span class="arch-box__name">Traefik</span>
+              <span class="arch-box__detail">Reverse proxy &bull; SNI routing &bull; Request forwarding</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-wire"></div>
+
+        <!-- API + Auth Layer -->
+        <div class="arch-layer">
+          <div class="arch-layer__label">API & AUTH</div>
+          <div class="arch-layer__boxes">
+            <div class="arch-box arch-box--service">
+              <span class="arch-box__name">oRPC API Layer</span>
+              <span class="arch-box__detail">Zod type-safe &bull; OpenAPI gen &bull; SDK gen</span>
+            </div>
+            <div class="arch-box arch-box--service">
+              <span class="arch-box__name">Better-Auth</span>
+              <span class="arch-box__detail">Authentication services</span>
+            </div>
+            <div class="arch-box arch-box--service">
+              <span class="arch-box__name">Cerbos</span>
+              <span class="arch-box__detail">Policy-based authorization engine</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-wire"></div>
+
+        <!-- Backend Layer -->
+        <div class="arch-layer">
+          <div class="arch-layer__label">BACKEND</div>
+          <div class="arch-layer__boxes">
+            <div class="arch-box arch-box--service">
+              <span class="arch-box__name">Node.js (Bun)</span>
+              <span class="arch-box__detail">High-perf API execution runtime</span>
+            </div>
+            <div class="arch-box arch-box--service">
+              <span class="arch-box__name">DBOS</span>
+              <span class="arch-box__detail">Durable, versioned workflows &bull; Idempotent state transitions</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-wire"></div>
+
+        <!-- Data Layer -->
+        <div class="arch-layer">
+          <div class="arch-layer__label">DATA</div>
+          <div class="arch-layer__boxes">
+            <div class="arch-box arch-box--data">
+              <span class="arch-box__name">PostgreSQL</span>
+              <span class="arch-box__detail">Primary store &bull; RLS multi-tenant isolation</span>
+            </div>
+            <div class="arch-box arch-box--data">
+              <span class="arch-box__name">SeaweedFS</span>
+              <span class="arch-box__detail">Object storage &bull; Media files</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-wire"></div>
+
+        <!-- Media Pipeline Layer -->
+        <div class="arch-layer">
+          <div class="arch-layer__label">MEDIA PIPELINE</div>
+          <div class="arch-layer__boxes">
+            <div class="arch-box arch-box--util">
+              <span class="arch-box__name">tusd</span>
+              <span class="arch-box__detail">Resumable uploads</span>
+            </div>
+            <div class="arch-box arch-box--util">
+              <span class="arch-box__name">ClamAV</span>
+              <span class="arch-box__detail">Malware scanning</span>
+            </div>
+            <div class="arch-box arch-box--util">
+              <span class="arch-box__name">ffmpeg</span>
+              <span class="arch-box__detail">Video processing</span>
+            </div>
+            <div class="arch-box arch-box--util">
+              <span class="arch-box__name">libvips</span>
+              <span class="arch-box__detail">Image derivatives</span>
+            </div>
+            <div class="arch-box arch-box--util">
+              <span class="arch-box__name">ExifTool</span>
+              <span class="arch-box__detail">Metadata extraction</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-wire"></div>
+
+        <!-- Observability -->
+        <div class="arch-layer">
+          <div class="arch-layer__label">OBSERVABILITY</div>
+          <div class="arch-layer__boxes">
+            <div class="arch-box arch-box--infra">
+              <span class="arch-box__name">OpenTelemetry</span>
+              <span class="arch-box__detail">Traces, metrics, logs &bull; External collector TBD (SigNoz)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Deployment -->
+        <div class="arch-deploy">
+          <span class="arch-deploy__label">DEPLOYMENT</span>
+          <span class="arch-deploy__text">Docker Compose &bull; Ubuntu Linux VM &bull; Containerized services</span>
+        </div>
+      </div>
+
+      <p class="body-text" style="margin-top: var(--space-2xl); max-width: 700px;">
+        This is the full scope of what JanumiCode receives in a single prompt. Three product pillars, twelve shared domains, a concrete technology stack, persona definitions, user journey sketches, and a phased delivery strategy. Below, we walk through what JanumiCode's governed workflow does with it.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!--  PHASE 1: INTAKE                               -->
+  <!-- ═══════════════════════════════════════════════ -->
+
+  <section class="section" id="intake">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Phase 1 &mdash; Intake</span>
+        <h2>From product description to<br />structured plan</h2>
+      </div>
+
+      <!-- Sub-phase: ANALYZING -->
+      <div class="whitepaper-step">
+        <div class="whitepaper-step__label">
+          <span class="step-diamond"></span>
+          <span>SUB-PHASE: ANALYZING</span>
+        </div>
+        <div class="whitepaper-step__body">
+          <p>The Technical Expert silently analyzes the product description, codebase context, and workspace structure. It classifies the input as a <strong>complex multi-domain product</strong> and selects <strong>Proposer-Validator mode</strong> (PRODUCT_REVIEW flow) rather than conversational discussion — the document is too structured for free-form dialogue.</p>
+          <p>Classification result: 3 pillars detected, 12+ CDM domains, technology stack specified, phased delivery strategy present.</p>
+        </div>
+
+        <!-- Governed Stream Mockup: Analyzing -->
+        <div class="gs-mockup">
+          <div class="gs-mockup__header">
+            <span class="gs-mockup__dot gs-mockup__dot--green"></span>
+            <span class="gs-mockup__title">Governed Stream</span>
+            <span class="gs-mockup__phase">INTAKE &mdash; ANALYZING</span>
+          </div>
+          <div class="gs-mockup__body">
+            <div class="gs-cmd-block">
+              <div class="gs-cmd-block__header">
+                <span class="gs-cmd-block__icon">&#9670;</span>
+                <span class="gs-cmd-block__label">Technical Expert &mdash; Analysis</span>
+                <span class="gs-cmd-block__badge gs-cmd-block__badge--cli">CLI</span>
+                <span class="gs-cmd-block__badge gs-cmd-block__badge--review">Review</span>
+                <span class="gs-cmd-block__time">08:12:03 AM</span>
+              </div>
+              <div class="gs-cmd-block__content">
+                <div class="gs-output-line"><span class="gs-kw">Classification:</span> PRODUCT_OR_FEATURE (confidence: 0.94)</div>
+                <div class="gs-output-line"><span class="gs-kw">Intake Mode:</span> PROPOSER_VALIDATOR</div>
+                <div class="gs-output-line"><span class="gs-kw">Pillars Detected:</span> 3</div>
+                <div class="gs-output-line">&nbsp;&nbsp;1. Hestami Home Real Property Assistant</div>
+                <div class="gs-output-line">&nbsp;&nbsp;2. Hestami Service Provider Field Services Management</div>
+                <div class="gs-output-line">&nbsp;&nbsp;3. Hestami Community Association Management</div>
+                <div class="gs-output-line"><span class="gs-kw">CDM Domains:</span> 12 (Association, Accounting, Workflow, Violations, ARC, Work Orders, Communications, Governance, Owner Portal, Documents, Reserve Studies, Compliance)</div>
+                <div class="gs-output-line"><span class="gs-kw">Tech Stack:</span> SvelteKit, Bun, PostgreSQL, DBOS, Cerbos, oRPC, Traefik</div>
+              </div>
+              <div class="gs-cmd-block__footer">
+                <span class="gs-status gs-status--success">Completed (success)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub-phase: PROPOSING_DOMAINS -->
+      <div class="whitepaper-step">
+        <div class="whitepaper-step__label">
+          <span class="step-diamond"></span>
+          <span>SUB-PHASE: PROPOSING_DOMAINS</span>
+        </div>
+        <div class="whitepaper-step__body">
+          <p>The Domain Proposer generates business domains and personas. For the Hestami product, it identifies <strong>15 business domains</strong> across the three pillars — the 12 CDM domains from the document plus 3 cross-cutting domains (Platform Identity & Auth, Notification Services, AI/ML Services) inferred from the technology stack.</p>
+          <p>Each domain is presented as an MMP Mirror Card. The user reviews each assumption:</p>
+        </div>
+
+        <!-- Governed Stream Mockup: MMP Mirror Cards -->
+        <div class="gs-mockup">
+          <div class="gs-mockup__header">
+            <span class="gs-mockup__dot gs-mockup__dot--cyan"></span>
+            <span class="gs-mockup__title">Governed Stream</span>
+            <span class="gs-mockup__phase">INTAKE &mdash; PROPOSING_DOMAINS</span>
+          </div>
+          <div class="gs-mockup__body">
+            <div class="gs-mmp-card">
+              <div class="gs-mmp-card__header">
+                <span class="gs-mmp-card__type">MIRROR</span>
+                <span class="gs-mmp-card__title">Business Domain Proposals &mdash; Round 1 of 4</span>
+              </div>
+              <div class="gs-mmp-items">
+                <div class="gs-mmp-item gs-mmp-item--accepted">
+                  <span class="gs-mmp-item__status">ACCEPTED</span>
+                  <span class="gs-mmp-item__id">PV-DOM-1</span>
+                  <span class="gs-mmp-item__text">Association / Entity / Property Model &mdash; Foundational structure for all association-bound operations</span>
+                  <span class="gs-mmp-item__source">document-specified</span>
+                </div>
+                <div class="gs-mmp-item gs-mmp-item--accepted">
+                  <span class="gs-mmp-item__status">ACCEPTED</span>
+                  <span class="gs-mmp-item__id">PV-DOM-2</span>
+                  <span class="gs-mmp-item__text">Accounting &mdash; Auditable GL, assessments, AP/AR, 1099 compliance</span>
+                  <span class="gs-mmp-item__source">document-specified</span>
+                </div>
+                <div class="gs-mmp-item gs-mmp-item--accepted">
+                  <span class="gs-mmp-item__status">ACCEPTED</span>
+                  <span class="gs-mmp-item__id">PV-DOM-3</span>
+                  <span class="gs-mmp-item__text">Workflow Automation &mdash; DBOS versioned workflows, SLA timers, approval chains</span>
+                  <span class="gs-mmp-item__source">document-specified</span>
+                </div>
+                <div class="gs-mmp-item gs-mmp-item--rejected">
+                  <span class="gs-mmp-item__status">REJECTED</span>
+                  <span class="gs-mmp-item__id">PV-DOM-13</span>
+                  <span class="gs-mmp-item__text">AI/ML Services &mdash; Cross-cutting AI capabilities (document extraction, matching)</span>
+                  <span class="gs-mmp-item__source">ai-proposed</span>
+                </div>
+                <div class="gs-mmp-item gs-mmp-item--edited">
+                  <span class="gs-mmp-item__status">EDITED</span>
+                  <span class="gs-mmp-item__id">PV-DOM-14</span>
+                  <span class="gs-mmp-item__text">Platform Identity & Auth &mdash; Better-Auth + Cerbos policy engine (was: "Generic Auth")</span>
+                  <span class="gs-mmp-item__source">ai-proposed &rarr; edited</span>
+                </div>
+              </div>
+              <div class="gs-mmp-card__footer">
+                <span class="gs-mmp-card__count">14 accepted &bull; 1 rejected &bull; 1 edited &bull; 0 deferred</span>
+                <span class="gs-btn">Submit Decisions</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="whitepaper-step__body">
+          <p><strong>Key governance moment:</strong> The AI proposed "AI/ML Services" as a cross-cutting domain. The user <em>rejected</em> it — AI capabilities should be embedded within each domain, not a separate horizontal layer. This rejection propagates: no entities, workflows, or integrations will be generated for a standalone AI domain in subsequent rounds.</p>
+          <p>The user also <em>edited</em> "Platform Identity & Auth" to specify the concrete technology choices (Better-Auth + Cerbos) rather than the AI's generic label. This edited text carries forward into architecture.</p>
+        </div>
+      </div>
+
+      <!-- Sub-phase: PROPOSING_JOURNEYS -->
+      <div class="whitepaper-step">
+        <div class="whitepaper-step__label">
+          <span class="step-diamond"></span>
+          <span>SUB-PHASE: PROPOSING_JOURNEYS</span>
+        </div>
+        <div class="whitepaper-step__body">
+          <p>The Journey & Workflow Proposer generates user journeys for the <strong>14 accepted domains</strong> (not 15 — the rejected AI/ML domain is excluded). For a product this large, it produces <strong>38 user journeys</strong> and <strong>22 system workflows</strong> across the three pillars.</p>
+        </div>
+
+        <div class="gs-mockup">
+          <div class="gs-mockup__header">
+            <span class="gs-mockup__dot gs-mockup__dot--cyan"></span>
+            <span class="gs-mockup__title">Governed Stream</span>
+            <span class="gs-mockup__phase">INTAKE &mdash; PROPOSING_JOURNEYS</span>
+          </div>
+          <div class="gs-mockup__body">
+            <div class="gs-mmp-card">
+              <div class="gs-mmp-card__header">
+                <span class="gs-mmp-card__type">MIRROR</span>
+                <span class="gs-mmp-card__title">Journeys & Workflows &mdash; Round 2 of 4</span>
+              </div>
+              <div class="gs-mmp-items">
+                <div class="gs-mmp-item gs-mmp-item--accepted">
+                  <span class="gs-mmp-item__status">ACCEPTED</span>
+                  <span class="gs-mmp-item__id">PV-JRN-1</span>
+                  <span class="gs-mmp-item__text">Homeowner creates service call case &rarr; AI agent discovery &rarr; vendor matching &rarr; bid comparison &rarr; scheduling &rarr; execution &rarr; payment</span>
+                </div>
+                <div class="gs-mmp-item gs-mmp-item--accepted">
+                  <span class="gs-mmp-item__status">ACCEPTED</span>
+                  <span class="gs-mmp-item__id">PV-WFL-5</span>
+                  <span class="gs-mmp-item__text">Violation lifecycle: detection &rarr; notice sequence &rarr; hearing &rarr; fine assessment &rarr; GL posting &rarr; appeal</span>
+                </div>
+                <div class="gs-mmp-item gs-mmp-item--accepted">
+                  <span class="gs-mmp-item__status">ACCEPTED</span>
+                  <span class="gs-mmp-item__id">PV-WFL-8</span>
+                  <span class="gs-mmp-item__text">ARC request: submission &rarr; committee review &rarr; conditional approval &rarr; permit integration &rarr; inspection</span>
+                </div>
+              </div>
+              <div class="gs-mmp-card__footer">
+                <span class="gs-mmp-card__count">35 accepted &bull; 3 rejected &bull; 2 edited &bull; 0 deferred</span>
+              </div>
+            </div>
+
+            <!-- Pre-Mortem Card -->
+            <div class="gs-mmp-card gs-mmp-card--premortem">
+              <div class="gs-mmp-card__header">
+                <span class="gs-mmp-card__type gs-mmp-card__type--risk">PRE-MORTEM</span>
+                <span class="gs-mmp-card__title">Risks Identified</span>
+              </div>
+              <div class="gs-mmp-items">
+                <div class="gs-mmp-item gs-mmp-item--risk">
+                  <span class="gs-mmp-item__status gs-mmp-item__status--risk">RISK</span>
+                  <span class="gs-mmp-item__id">PV-RSK-1</span>
+                  <span class="gs-mmp-item__text">Multi-tenant PostgreSQL RLS isolation across 3 pillars may create complex migration paths when schema evolves independently per pillar</span>
+                </div>
+                <div class="gs-mmp-item gs-mmp-item--risk">
+                  <span class="gs-mmp-item__status gs-mmp-item__status--risk">RISK</span>
+                  <span class="gs-mmp-item__id">PV-RSK-2</span>
+                  <span class="gs-mmp-item__text">DBOS workflow versioning for violation notice sequences requires careful state machine design to handle mid-sequence regulation changes</span>
+                </div>
+              </div>
+              <div class="gs-mmp-card__footer">
+                <span class="gs-mmp-card__count">2 risks accepted &bull; 0 mitigated</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub-phase: PROPOSING_ENTITIES -->
+      <div class="whitepaper-step">
+        <div class="whitepaper-step__label">
+          <span class="step-diamond"></span>
+          <span>SUB-PHASE: PROPOSING_ENTITIES</span>
+        </div>
+        <div class="whitepaper-step__body">
+          <p>The Entity Proposer generates data entities with relationships and key attributes for all accepted domains. For the Hestami CDM, it produces <strong>47 entities</strong> with typed relationships. The proposer cross-references the CDM specification in the document against the accepted domains — entities for the rejected AI/ML domain are <strong>not generated</strong>.</p>
+          <p>Entities like <code>Organization</code>, <code>Association</code>, <code>Property</code>, <code>HousingUnit</code>, <code>Person</code> from CDM Domain 1 are mapped directly from the document. Additional entities like <code>ServiceCallCase</code>, <code>TechnicianProfile</code>, <code>ReserveComponent</code> are derived from pillar-specific domain descriptions.</p>
+        </div>
+      </div>
+
+      <!-- Sub-phase: PROPOSING_INTEGRATIONS -->
+      <div class="whitepaper-step">
+        <div class="whitepaper-step__label">
+          <span class="step-diamond"></span>
+          <span>SUB-PHASE: PROPOSING_INTEGRATIONS</span>
+        </div>
+        <div class="whitepaper-step__body">
+          <p>The Integration Proposer identifies <strong>21 integration points</strong>, each tagged with source attribution:</p>
+          <ul class="whitepaper-list">
+            <li><strong>document-specified:</strong> Cloudflare CDN, SeaweedFS, ClamAV, ffmpeg, ExifTool, Traefik, DBOS, Cerbos, Better-Auth, oRPC, PostgreSQL</li>
+            <li><strong>domain-standard:</strong> Stripe/Square (payments), Twilio (SMS), SendGrid (email), Government permit APIs</li>
+            <li><strong>ai-proposed:</strong> Nextdoor API (community), Zillow/MLS (property data), Google Maps (routing)</li>
+          </ul>
+          <p>Source tagging lets the user prioritize document-specified integrations (already decided) over AI-proposed ones (speculative).</p>
+        </div>
+      </div>
+
+      <!-- Sub-phase: SYNTHESIZING + AWAITING_APPROVAL -->
+      <div class="whitepaper-step">
+        <div class="whitepaper-step__label">
+          <span class="step-diamond"></span>
+          <span>SUB-PHASE: SYNTHESIZING &rarr; AWAITING_APPROVAL</span>
+        </div>
+        <div class="whitepaper-step__body">
+          <p>All four proposer rounds are synthesized into a <strong>draft plan</strong> — not a final plan. The synthesis preserves every MMP decision: 14 accepted domains, 35 accepted journeys, 47 entities, 21 integrations, 2 accepted risks, and all rejections/edits.</p>
+        </div>
+
+        <div class="gs-mockup">
+          <div class="gs-mockup__header">
+            <span class="gs-mockup__dot gs-mockup__dot--green"></span>
+            <span class="gs-mockup__title">Governed Stream</span>
+            <span class="gs-mockup__phase">INTAKE &mdash; AWAITING_APPROVAL</span>
+          </div>
+          <div class="gs-mockup__body">
+            <div class="gs-plan-card">
+              <div class="gs-plan-card__header">
+                <span class="gs-plan-card__icon">&#10003;</span>
+                <span>Plan finalized and synthesized</span>
+              </div>
+              <div class="gs-plan-card__stats">
+                <div class="gs-stat"><span class="gs-stat__num">14</span><span class="gs-stat__label">Domains</span></div>
+                <div class="gs-stat"><span class="gs-stat__num">35</span><span class="gs-stat__label">Journeys</span></div>
+                <div class="gs-stat"><span class="gs-stat__num">47</span><span class="gs-stat__label">Entities</span></div>
+                <div class="gs-stat"><span class="gs-stat__num">21</span><span class="gs-stat__label">Integrations</span></div>
+                <div class="gs-stat"><span class="gs-stat__num">2</span><span class="gs-stat__label">Risks Accepted</span></div>
+              </div>
+              <div class="gs-plan-card__actions">
+                <span class="gs-btn gs-btn--primary">Approve Plan</span>
+                <span class="gs-btn gs-btn--secondary">Request Changes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!--  PHASE 2: ARCHITECTURE                         -->
+  <!-- ═══════════════════════════════════════════════ -->
+
+  <section class="section section--alt" id="architecture">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Phase 2 &mdash; Architecture</span>
+        <h2>Plan to concrete architecture</h2>
+      </div>
+
+      <div class="whitepaper-step">
+        <div class="whitepaper-step__label">
+          <span class="step-diamond"></span>
+          <span>DECOMPOSING &rarr; MODELING &rarr; DESIGNING</span>
+        </div>
+        <div class="whitepaper-step__body">
+          <p>The approved plan is decomposed through three sub-phases. For the Hestami product, this produces:</p>
+          <ul class="whitepaper-list">
+            <li><strong>DECOMPOSING:</strong> 14 domains → 52 capabilities → 38 workflows mapped to a Use Case Model</li>
+            <li><strong>MODELING:</strong> 47 entities → field definitions, typed relationships, business invariants (e.g., "No final approval without full ARC validation")</li>
+            <li><strong>DESIGNING:</strong> Capabilities → 28 components with interface contracts (REST: 15, Event: 8, RPC: 3, File: 2)</li>
+          </ul>
+        </div>
+
+        <div class="gs-mockup">
+          <div class="gs-mockup__header">
+            <span class="gs-mockup__dot gs-mockup__dot--cyan"></span>
+            <span class="gs-mockup__title">Governed Stream</span>
+            <span class="gs-mockup__phase">ARCHITECTURE &mdash; DESIGNING</span>
+          </div>
+          <div class="gs-mockup__body">
+            <div class="gs-cmd-block">
+              <div class="gs-cmd-block__header">
+                <span class="gs-cmd-block__icon">&#9670;</span>
+                <span class="gs-cmd-block__label">Architecture Expert &mdash; Component Design</span>
+                <span class="gs-cmd-block__badge gs-cmd-block__badge--cli">CLI</span>
+                <span class="gs-cmd-block__time">08:34:17 AM</span>
+              </div>
+              <div class="gs-cmd-block__content">
+                <div class="gs-output-line"><span class="gs-kw">Components:</span> 28</div>
+                <div class="gs-output-line"><span class="gs-kw">Interfaces:</span> REST: 15, Event: 8, RPC: 3, File: 2</div>
+                <div class="gs-output-line">&nbsp;</div>
+                <div class="gs-output-line"><span class="gs-cm">// Sample component: Violation Lifecycle Manager</span></div>
+                <div class="gs-output-line"><span class="gs-kw">Component:</span> ViolationLifecycleManager</div>
+                <div class="gs-output-line">&nbsp;&nbsp;<span class="gs-str">domain:</span> Violations</div>
+                <div class="gs-output-line">&nbsp;&nbsp;<span class="gs-str">interfaces:</span></div>
+                <div class="gs-output-line">&nbsp;&nbsp;&nbsp;&nbsp;REST: /api/violations (CRUD + state transitions)</div>
+                <div class="gs-output-line">&nbsp;&nbsp;&nbsp;&nbsp;Event: violation.created, violation.escalated, fine.assessed</div>
+                <div class="gs-output-line">&nbsp;&nbsp;<span class="gs-str">depends_on:</span> [NoticeEngine, GLPostingService, EvidenceStore]</div>
+                <div class="gs-output-line">&nbsp;&nbsp;<span class="gs-str">invariant:</span> "Notice sequence must complete before fine assessment"</div>
+              </div>
+              <div class="gs-cmd-block__footer">
+                <span class="gs-status gs-status--success">Completed (success)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="whitepaper-step">
+        <div class="whitepaper-step__label">
+          <span class="step-diamond"></span>
+          <span>VALIDATING &rarr; PRESENTING</span>
+        </div>
+        <div class="whitepaper-step__body">
+          <p>The Historian validates the architecture against the approved plan. For the Hestami product, validation finds:</p>
+          <ul class="whitepaper-list">
+            <li><strong>Coverage:</strong> All 14 accepted domains have at least one capability and one component. 2 capabilities (Reserve Study Forecasting, AI Document Extraction) are flagged as <em>unbacked</em> — they exist in the plan but have no component assigned.</li>
+            <li><strong>Traceability:</strong> Every component traces back to a capability, which traces back to a domain, which traces back to an MMP ACCEPTED decision.</li>
+            <li><strong>Repair:</strong> The 2 unbacked capabilities trigger a repair cycle — DESIGNING re-runs with instructions to add components for Reserve Study Forecasting and AI Document Extraction.</li>
+          </ul>
+        </div>
+
+        <div class="gs-mockup">
+          <div class="gs-mockup__header">
+            <span class="gs-mockup__dot gs-mockup__dot--yellow"></span>
+            <span class="gs-mockup__title">Governed Stream</span>
+            <span class="gs-mockup__phase">ARCHITECTURE &mdash; VALIDATING</span>
+          </div>
+          <div class="gs-mockup__body">
+            <div class="gs-cmd-block">
+              <div class="gs-cmd-block__header">
+                <span class="gs-cmd-block__icon">&#9670;</span>
+                <span class="gs-cmd-block__label">Historian &mdash; Architecture Validation</span>
+                <span class="gs-cmd-block__badge gs-cmd-block__badge--review">Review</span>
+                <span class="gs-cmd-block__time">08:41:52 AM</span>
+              </div>
+              <div class="gs-cmd-block__content">
+                <div class="gs-output-line"><span class="gs-kw">Coverage:</span> 14/14 domains covered</div>
+                <div class="gs-output-line"><span class="gs-kw">Capabilities:</span> 52 total, 50 backed by components</div>
+                <div class="gs-output-line"><span class="gs-warn">&#9888; Unbacked:</span> Reserve Study Forecasting (Domain 11)</div>
+                <div class="gs-output-line"><span class="gs-warn">&#9888; Unbacked:</span> AI Document Extraction (Domain 10)</div>
+                <div class="gs-output-line"><span class="gs-kw">Traceability:</span> All components trace to MMP decisions</div>
+                <div class="gs-output-line"><span class="gs-kw">Action:</span> Triggering repair cycle (attempt 1 of 2)</div>
+              </div>
+              <div class="gs-cmd-block__footer">
+                <span class="gs-status gs-status--warn">Repair required</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!--  WHAT GOVERNANCE PROVIDED                       -->
+  <!-- ═══════════════════════════════════════════════ -->
+
+  <section class="section" id="governance-value">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">Governance Outcomes</span>
+        <h2>What governed processing provided</h2>
+      </div>
+
+      <div class="grid grid--3">
+        <div class="card">
+          <div class="card__icon--diamond"><span></span></div>
+          <h4 class="card__title">No silent assumptions</h4>
+          <p class="card__text">The AI proposed 16 domains — 12 from the document, 4 inferred. One was rejected (AI/ML as a separate domain), one was edited (Auth specifics). These corrections propagated through all 4 proposer rounds. No orphaned entities. No phantom workflows.</p>
+          <div class="card__tags"><span class="tag">1 REJECTION PROPAGATED</span><span class="tag">1 EDIT PRESERVED</span></div>
+        </div>
+        <div class="card">
+          <div class="card__icon--diamond"><span></span></div>
+          <h4 class="card__title">Complete provenance</h4>
+          <p class="card__text">Every element in the final architecture traces back through a chain: Component → Capability → Domain → MMP Decision. Auditors can verify: "Why does this ViolationLifecycleManager component exist?" → "Because CDM Domain 4 was ACCEPTED in PV-DOM-4."</p>
+          <div class="card__tags"><span class="tag">FULL TRACE CHAIN</span></div>
+        </div>
+        <div class="card">
+          <div class="card__icon--diamond"><span></span></div>
+          <h4 class="card__title">Coverage validation</h4>
+          <p class="card__text">The Historian caught 2 unbacked capabilities that would have become gaps in implementation. The repair cycle added the missing components before architecture was presented for approval — not after execution had already begun.</p>
+          <div class="card__tags"><span class="tag">2 GAPS CAUGHT</span><span class="tag">PRE-EXECUTION</span></div>
+        </div>
+      </div>
+
+      <div class="grid grid--3" style="margin-top: var(--space-lg);">
+        <div class="card">
+          <div class="card__icon--diamond"><span></span></div>
+          <h4 class="card__title">Risk surfaced early</h4>
+          <p class="card__text">Pre-Mortem cards identified the multi-tenant RLS migration risk and DBOS state machine versioning risk during INTAKE — before any architecture work began. Both risks were accepted with awareness, not discovered during execution.</p>
+          <div class="card__tags"><span class="tag">2 RISKS PRE-IDENTIFIED</span></div>
+        </div>
+        <div class="card">
+          <div class="card__icon--diamond"><span></span></div>
+          <h4 class="card__title">Source attribution</h4>
+          <p class="card__text">Every integration point was tagged: document-specified (11), domain-standard (5), or AI-proposed (5). This let the user prioritize the technology stack already chosen in the product description over speculative AI suggestions.</p>
+          <div class="card__tags"><span class="tag">3 SOURCE TIERS</span></div>
+        </div>
+        <div class="card">
+          <div class="card__icon--diamond"><span></span></div>
+          <h4 class="card__title">Decision propagation</h4>
+          <p class="card__text">Rejecting "AI/ML Services" as a standalone domain in Round 1 correctly excluded it from Rounds 2-4. No entities were proposed for it. No workflows reference it. No integration points target it. The rejection was atomic.</p>
+          <div class="card__tags"><span class="tag">ATOMIC REJECTION</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!--  BY THE NUMBERS                                 -->
+  <!-- ═══════════════════════════════════════════════ -->
+
+  <section class="section section--alt" id="numbers">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-header__label">By the Numbers</span>
+        <h2>Processing summary</h2>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-card__num">1</span>
+          <span class="stat-card__label">Input Document</span>
+          <span class="stat-card__detail">708 lines, 3 pillars, 12 CDM domains</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__num">4</span>
+          <span class="stat-card__label">MMP Rounds</span>
+          <span class="stat-card__detail">Domains → Journeys → Entities → Integrations</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__num">14</span>
+          <span class="stat-card__label">Accepted Domains</span>
+          <span class="stat-card__detail">1 rejected, 1 edited from 16 proposed</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__num">35</span>
+          <span class="stat-card__label">User Journeys</span>
+          <span class="stat-card__detail">Across 3 pillars, 14 domains</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__num">47</span>
+          <span class="stat-card__label">Data Entities</span>
+          <span class="stat-card__detail">With typed relationships and invariants</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__num">28</span>
+          <span class="stat-card__label">Components</span>
+          <span class="stat-card__detail">With REST, Event, RPC, File interfaces</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__num">21</span>
+          <span class="stat-card__label">Integration Points</span>
+          <span class="stat-card__detail">11 doc-specified, 5 standard, 5 proposed</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card__num">100%</span>
+          <span class="stat-card__label">Traceable</span>
+          <span class="stat-card__detail">Every artifact → MMP decision → human approval</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section">
+    <div class="container" style="text-align: center;">
+      <h2>Process your product vision<br />with governance</h2>
+      <p style="max-width: 550px; margin: var(--space-md) auto var(--space-xl);">
+        From product description to verified architecture — with every assumption surfaced, every decision recorded, and every error contained.
+      </p>
+      <a href={marketplaceUrl} class="btn btn--primary" target="_blank" rel="noopener">
+        Install from VS Code Marketplace
+      </a>
+    </div>
+  </section>
+</Base>
+
+<style>
+  /* ── Whitepaper step layout ── */
+  .whitepaper-step {
+    margin-bottom: var(--space-3xl);
+  }
+
+  .whitepaper-step__label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-primary);
+    margin-bottom: var(--space-lg);
+  }
+
+  .step-diamond {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    transform: rotate(45deg);
+    border: 1.5px solid var(--color-primary);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .whitepaper-step__body {
+    margin-bottom: var(--space-xl);
+  }
+
+  .whitepaper-step__body p {
+    font-size: 0.95rem;
+    line-height: 1.75;
+    margin-bottom: var(--space-md);
+  }
+
+  .body-text {
+    font-size: 0.95rem;
+    line-height: 1.75;
+    margin-bottom: var(--space-md);
+  }
+
+  .whitepaper-list {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-md) 0;
+  }
+
+  .whitepaper-list li {
+    position: relative;
+    padding-left: var(--space-lg);
+    margin-bottom: var(--space-sm);
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+  }
+
+  .whitepaper-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 6px;
+    height: 6px;
+    transform: rotate(45deg);
+    border: 1.5px solid var(--color-primary);
+    border-radius: 1px;
+  }
+
+  /* ── Governed Stream Mockup ── */
+  .gs-mockup {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin: var(--space-xl) 0;
+  }
+
+  .gs-mockup__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg-elevated);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+  }
+
+  .gs-mockup__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .gs-mockup__dot--green { background: var(--color-success); }
+  .gs-mockup__dot--cyan { background: var(--color-primary); }
+  .gs-mockup__dot--yellow { background: var(--color-warning); }
+
+  .gs-mockup__title {
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  .gs-mockup__phase {
+    color: var(--color-primary);
+    margin-left: auto;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .gs-mockup__body {
+    padding: var(--space-md);
+  }
+
+  /* ── Command Block (inside mockup) ── */
+  .gs-cmd-block {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .gs-cmd-block__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+  }
+
+  .gs-cmd-block__icon {
+    color: var(--color-primary);
+    font-size: 0.6rem;
+  }
+
+  .gs-cmd-block__label {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  .gs-cmd-block__badge {
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .gs-cmd-block__badge--cli {
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+  }
+
+  .gs-cmd-block__badge--review {
+    background: rgba(0, 255, 178, 0.1);
+    color: var(--color-success);
+    border: 1px solid rgba(0, 255, 178, 0.2);
+  }
+
+  .gs-cmd-block__time {
+    color: var(--color-text-muted);
+    margin-left: auto;
+  }
+
+  .gs-cmd-block__content {
+    padding: var(--space-md);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.7;
+  }
+
+  .gs-output-line {
+    color: var(--color-text-secondary);
+  }
+
+  .gs-kw { color: var(--color-primary); font-weight: 600; }
+  .gs-str { color: var(--color-accent); }
+  .gs-cm { color: var(--color-text-muted); font-style: italic; }
+  .gs-warn { color: var(--color-warning); }
+
+  .gs-cmd-block__footer {
+    padding: var(--space-sm) var(--space-md);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .gs-status {
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+
+  .gs-status--success { color: var(--color-success); }
+  .gs-status--warn { color: var(--color-warning); }
+
+  /* ── MMP Card (inside mockup) ── */
+  .gs-mmp-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-md);
+  }
+
+  .gs-mmp-card:first-child {
+    margin-top: 0;
+  }
+
+  .gs-mmp-card--premortem {
+    border-color: rgba(255, 184, 0, 0.2);
+  }
+
+  .gs-mmp-card__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .gs-mmp-card__type {
+    padding: 0.1rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+  }
+
+  .gs-mmp-card__type--risk {
+    background: rgba(255, 184, 0, 0.1);
+    color: var(--color-warning);
+    border-color: rgba(255, 184, 0, 0.2);
+  }
+
+  .gs-mmp-card__title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .gs-mmp-items {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .gs-mmp-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid rgba(21, 34, 56, 0.5);
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .gs-mmp-item:last-child {
+    border-bottom: none;
+  }
+
+  .gs-mmp-item__status {
+    flex-shrink: 0;
+    padding: 0.1rem 0.4rem;
+    border-radius: 2px;
+    font-size: 0.55rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+    margin-top: 2px;
+  }
+
+  .gs-mmp-item--accepted .gs-mmp-item__status {
+    background: rgba(0, 255, 178, 0.1);
+    color: var(--color-success);
+    border: 1px solid rgba(0, 255, 178, 0.2);
+  }
+
+  .gs-mmp-item--rejected .gs-mmp-item__status {
+    background: rgba(255, 68, 102, 0.1);
+    color: var(--color-error);
+    border: 1px solid rgba(255, 68, 102, 0.2);
+  }
+
+  .gs-mmp-item--edited .gs-mmp-item__status {
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+  }
+
+  .gs-mmp-item--risk .gs-mmp-item__status--risk {
+    background: rgba(255, 184, 0, 0.1);
+    color: var(--color-warning);
+    border: 1px solid rgba(255, 184, 0, 0.2);
+  }
+
+  .gs-mmp-item__id {
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    margin-top: 2px;
+  }
+
+  .gs-mmp-item__text {
+    color: var(--color-text-secondary);
+    flex: 1;
+  }
+
+  .gs-mmp-item__source {
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    margin-top: 2px;
+  }
+
+  .gs-mmp-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .gs-mmp-card__count {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .gs-btn {
+    display: inline-block;
+    padding: 0.3rem 0.8rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: default;
+  }
+
+  .gs-btn--primary,
+  .gs-btn:not(.gs-btn--secondary) {
+    background: var(--color-primary);
+    color: var(--color-bg);
+  }
+
+  .gs-btn--secondary {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+  }
+
+  /* ── Plan card (inside mockup) ── */
+  .gs-plan-card {
+    background: var(--color-bg-card);
+    border: 1px solid rgba(0, 255, 178, 0.2);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+  }
+
+  .gs-plan-card__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-success);
+    margin-bottom: var(--space-lg);
+  }
+
+  .gs-plan-card__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(0, 255, 178, 0.15);
+    font-size: 0.8rem;
+  }
+
+  .gs-plan-card__stats {
+    display: flex;
+    gap: var(--space-xl);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-lg);
+  }
+
+  .gs-stat {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gs-stat__num {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .gs-stat__label {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
+  }
+
+  .gs-plan-card__actions {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  /* ── Stats grid ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-md);
+  }
+
+  .stat-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 20px;
+    height: 20px;
+    border-top: 2px solid var(--color-primary);
+    border-left: 2px solid var(--color-primary);
+    border-radius: var(--radius-lg) 0 0 0;
+    opacity: 0.5;
+  }
+
+  .stat-card__num {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--color-primary);
+    line-height: 1;
+    margin-bottom: var(--space-xs);
+  }
+
+  .stat-card__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: var(--space-xs);
+  }
+
+  .stat-card__detail {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+
+  @media (max-width: 768px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .gs-mmp-item {
+      flex-wrap: wrap;
+    }
+    .gs-mmp-item__source {
+      width: 100%;
+    }
+    .gs-plan-card__stats {
+      gap: var(--space-md);
+    }
+  }
+
+  /* ── Pillar Cards ── */
+  .pillars {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-lg);
+  }
+
+  .pillar-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pillar-card__header {
+    padding: var(--space-xl) var(--space-lg) var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .pillar-card__header--p1 { border-top: 3px solid var(--color-primary); }
+  .pillar-card__header--p2 { border-top: 3px solid #A78BFA; }
+  .pillar-card__header--p3 { border-top: 3px solid var(--color-accent); }
+
+  .pillar-card__phase {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.12em;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-sm);
+    background: rgba(0, 212, 255, 0.08);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    margin-bottom: var(--space-sm);
+  }
+
+  .pillar-card__header--p2 .pillar-card__phase {
+    background: rgba(167, 139, 250, 0.08);
+    color: #A78BFA;
+    border-color: rgba(167, 139, 250, 0.2);
+  }
+
+  .pillar-card__header--p3 .pillar-card__phase {
+    background: rgba(0, 255, 178, 0.08);
+    color: var(--color-accent);
+    border-color: rgba(0, 255, 178, 0.2);
+  }
+
+  .pillar-card__title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.25;
+    margin-bottom: var(--space-xs);
+  }
+
+  .pillar-card__subtitle {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+
+  .pillar-card__body {
+    padding: var(--space-lg);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  .pillar-card__personas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+
+  .pillar-persona {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  .pillar-card__domains-label {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-primary);
+    margin-bottom: var(--space-sm);
+  }
+
+  .pillar-domain-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .pillar-domain {
+    display: inline-block;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.6rem;
+    color: var(--color-text-secondary);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    line-height: 1.3;
+  }
+
+  .pillar-card__problem {
+    margin-top: auto;
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .pillar-card__problem-label {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-xs);
+  }
+
+  .pillar-card__problem p {
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+  }
+
+  /* ── CDM Domain Grid ── */
+  .cdm-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-md);
+  }
+
+  .cdm-domain {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-md) var(--space-lg);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cdm-domain::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 16px;
+    height: 16px;
+    border-top: 2px solid var(--color-primary);
+    border-left: 2px solid var(--color-primary);
+    border-radius: var(--radius-lg) 0 0 0;
+    opacity: 0.4;
+  }
+
+  .cdm-domain__num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    transform: rotate(45deg);
+    border: 1.5px solid var(--color-primary);
+    border-radius: 2px;
+    color: var(--color-primary);
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    margin-bottom: var(--space-sm);
+  }
+
+  .cdm-domain__name {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: var(--space-xs);
+  }
+
+  .cdm-domain__entities {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+
+  /* ── Architecture Diagram ── */
+  .arch-diagram {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-2xl);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .arch-diagram::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 28px;
+    height: 28px;
+    border-top: 2px solid var(--color-primary);
+    border-left: 2px solid var(--color-primary);
+    border-radius: var(--radius-lg) 0 0 0;
+    opacity: 0.5;
+  }
+
+  .arch-diagram::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 28px;
+    height: 28px;
+    border-bottom: 2px solid var(--color-primary);
+    border-right: 2px solid var(--color-primary);
+    border-radius: 0 0 var(--radius-lg) 0;
+    opacity: 0.5;
+  }
+
+  .arch-layer {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xs);
+  }
+
+  .arch-layer__label {
+    width: 120px;
+    flex-shrink: 0;
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.12em;
+    color: var(--color-text-muted);
+    padding-top: var(--space-sm);
+    text-align: right;
+  }
+
+  .arch-layer__boxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    flex: 1;
+  }
+
+  .arch-box {
+    flex: 1;
+    min-width: 140px;
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+  }
+
+  .arch-box--client { border-color: rgba(0, 212, 255, 0.3); background: rgba(0, 212, 255, 0.04); }
+  .arch-box--infra { border-color: rgba(167, 139, 250, 0.3); background: rgba(167, 139, 250, 0.04); }
+  .arch-box--service { border-color: rgba(0, 255, 178, 0.3); background: rgba(0, 255, 178, 0.04); }
+  .arch-box--data { border-color: rgba(255, 184, 0, 0.3); background: rgba(255, 184, 0, 0.04); }
+  .arch-box--util { border-color: rgba(100, 116, 139, 0.4); background: rgba(100, 116, 139, 0.04); }
+
+  .arch-box__name {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .arch-box__detail {
+    display: block;
+    font-size: 0.6rem;
+    color: var(--color-text-muted);
+    line-height: 1.4;
+    margin-top: 2px;
+  }
+
+  .arch-wire {
+    height: 16px;
+    margin-left: 136px;
+    border-left: 1px dashed rgba(0, 212, 255, 0.2);
+    margin-bottom: var(--space-xs);
+  }
+
+  .arch-deploy {
+    margin-top: var(--space-lg);
+    margin-left: 136px;
+    padding: var(--space-sm) var(--space-md);
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    gap: var(--space-md);
+    align-items: center;
+  }
+
+  .arch-deploy__label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+  }
+
+  .arch-deploy__text {
+    font-size: 0.7rem;
+    color: var(--color-text-secondary);
+  }
+
+  @media (max-width: 768px) {
+    .pillars {
+      grid-template-columns: 1fr;
+    }
+    .cdm-grid {
+      grid-template-columns: 1fr;
+    }
+    .arch-layer {
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+    .arch-layer__label {
+      text-align: left;
+      width: auto;
+    }
+    .arch-wire {
+      margin-left: 0;
+    }
+    .arch-deploy {
+      margin-left: 0;
+    }
+  }
+</style>

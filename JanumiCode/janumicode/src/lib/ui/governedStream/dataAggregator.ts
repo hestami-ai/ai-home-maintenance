@@ -30,6 +30,52 @@ import { getGraphProgress } from '../../workflow/taskGraph';
 import { getDatabase } from '../../database';
 import type { MMPPayload, MirrorItem, MenuItem, MenuOption, PreMortemItem } from '../../types/mmp';
 
+// ==================== Parsed JSON Cache ====================
+// Events are immutable after write. Cache parsed detail/content by event_id
+// to avoid redundant JSON.parse on repeated aggregation calls.
+
+const PARSE_CACHE_MAX = 500;
+ 
+const _parsedDetailCache = new Map<number, any>();
+ 
+const _parsedContentCache = new Map<number, any>();
+
+ 
+function cachedParseDetail(event: DialogueEvent): any {
+	if (!event.detail) {return {};}
+	const id = event.event_id;
+	if (id && _parsedDetailCache.has(id)) {return _parsedDetailCache.get(id)!;}
+	try {
+		const parsed = JSON.parse(event.detail);
+		if (id) {
+			if (_parsedDetailCache.size >= PARSE_CACHE_MAX) {
+				const first = _parsedDetailCache.keys().next().value;
+				if (first !== undefined) {_parsedDetailCache.delete(first);}
+			}
+			_parsedDetailCache.set(id, parsed);
+		}
+		return parsed;
+	} catch { return {}; }
+}
+
+ 
+function cachedParseContent(event: DialogueEvent): any {
+	if (!event.content) {return {};}
+	const id = event.event_id;
+	if (id && _parsedContentCache.has(id)) {return _parsedContentCache.get(id)!;}
+	try {
+		const parsed = JSON.parse(event.content);
+		if (id) {
+			if (_parsedContentCache.size >= PARSE_CACHE_MAX) {
+				const first = _parsedContentCache.keys().next().value;
+				if (first !== undefined) {_parsedContentCache.delete(first);}
+			}
+			_parsedContentCache.set(id, parsed);
+		}
+		return parsed;
+	} catch { return {}; }
+}
+
 /**
  * Summary counts of claim statuses for the health bar
  */
@@ -99,7 +145,7 @@ export type StreamItem =
 	| PhaseMilestone
 	| { type: 'dialogue_start'; dialogueId: string; goal: string; title: string | null; timestamp: string }
 	| { type: 'dialogue_end'; dialogueId: string; status: string; timestamp: string }
-	| { type: 'command_block'; command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }
+	| { type: 'command_block'; command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[]; hasReview?: boolean }
 	| { type: 'intake_turn'; turn: IntakeConversationTurn; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>; isLatest?: boolean }
 	| { type: 'intake_plan_preview'; plan: IntakePlanDocument; isFinal: boolean; timestamp: string }
 	| { type: 'intake_approval_gate'; plan: IntakePlanDocument; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string }
@@ -335,7 +381,7 @@ function buildStreamItems(
 				timestamp: event.timestamp,
 			});
 		} else if (eventType === 'intake_turn' || eventType === 'intake_clarification' || eventType === 'intake_gathering') {
-			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const detail = cachedParseDetail(event);
 			const intakeTurn: IntakeConversationTurn = {
 				id: event.event_id,
 				dialogueId: event.dialogue_id,
@@ -361,7 +407,7 @@ function buildStreamItems(
 				lastPlanVersion = planVersion;
 			}
 		} else if (eventType === 'intake_analysis') {
-			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const detail = cachedParseDetail(event);
 			const expertResponse = detail.expertResponse;
 			items.push({
 				type: 'intake_analysis',
@@ -416,7 +462,7 @@ function buildStreamItems(
 				lastPlanVersion = plan.version ?? 0;
 			}
 		} else if (eventType === 'intake_synthesis') {
-			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const detail = cachedParseDetail(event);
 			if (detail.finalizedPlan) {
 				items.push({
 					type: 'intake_plan_preview',
@@ -429,8 +475,8 @@ function buildStreamItems(
 		} else if (eventType === 'intake_approval') {
 			// Handled by injectIntakeDerivedCards (approval gate card)
 		} else if (eventType === 'intake_proposer_domains') {
-			const detail = event.detail ? JSON.parse(event.detail) : {};
-			const content = event.content ? JSON.parse(event.content) : {};
+			const detail = cachedParseDetail(event);
+			const content = cachedParseContent(event);
 			items.push({
 				type: 'intake_proposer_domains',
 				domains: content.domains ?? [],
@@ -441,8 +487,8 @@ function buildStreamItems(
 				timestamp: event.timestamp,
 			});
 		} else if (eventType === 'intake_proposer_journeys') {
-			const detail = event.detail ? JSON.parse(event.detail) : {};
-			const content = event.content ? JSON.parse(event.content) : {};
+			const detail = cachedParseDetail(event);
+			const content = cachedParseContent(event);
 			items.push({
 				type: 'intake_proposer_journeys',
 				journeys: (content.userJourneys ?? []).map((j: Record<string, unknown>) => ({
@@ -457,8 +503,8 @@ function buildStreamItems(
 				timestamp: event.timestamp,
 			});
 		} else if (eventType === 'intake_proposer_entities') {
-			const detail = event.detail ? JSON.parse(event.detail) : {};
-			const content = event.content ? JSON.parse(event.content) : {};
+			const detail = cachedParseDetail(event);
+			const content = cachedParseContent(event);
 			// Build domain name lookup from prior proposer_domains event
 			const domainNames: Record<string, string> = {};
 			for (const prior of items) {
@@ -481,8 +527,8 @@ function buildStreamItems(
 				timestamp: event.timestamp,
 			});
 		} else if (eventType === 'intake_proposer_integrations') {
-			const detail = event.detail ? JSON.parse(event.detail) : {};
-			const content = event.content ? JSON.parse(event.content) : {};
+			const detail = cachedParseDetail(event);
+			const content = cachedParseContent(event);
 			items.push({
 				type: 'intake_proposer_integrations',
 				integrations: (content.integrations ?? []).map((int: Record<string, unknown>) => ({
@@ -496,8 +542,8 @@ function buildStreamItems(
 				timestamp: event.timestamp,
 			});
 		} else if (eventType === 'architecture_decomposition') {
-			const detail = event.detail ? JSON.parse(event.detail) : {};
-			const content = event.content ? JSON.parse(event.content) : {};
+			const detail = cachedParseDetail(event);
+			const content = cachedParseContent(event);
 			const caps = (content.capabilities ?? []).map((c: Record<string, unknown>) => ({
 				id: c.capability_id as string ?? '',
 				label: c.label as string ?? '',
@@ -517,7 +563,7 @@ function buildStreamItems(
 			//   2. After SEQUENCING: full card with all 4 sections (from architecture document)
 
 			if (eventType === 'architecture_design') {
-				const content = event.content ? JSON.parse(event.content) : {};
+				const content = cachedParseContent(event);
 				items.push({
 					type: 'architecture_design',
 					components: (content.components ?? []).map((c: Record<string, unknown>) => ({
@@ -623,7 +669,7 @@ function buildStreamItems(
 			}
 			// architecture_modeling events are visible via their command blocks.
 		} else if (eventType === 'architecture_validation') {
-			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const detail = cachedParseDetail(event);
 			items.push({
 				type: 'architecture_validation',
 				score: detail.goalAlignmentScore ?? null,
@@ -632,7 +678,7 @@ function buildStreamItems(
 				timestamp: event.timestamp,
 			});
 		} else if (eventType === 'architecture_presentation') {
-			const detail = event.detail ? JSON.parse(event.detail) : {};
+			const detail = cachedParseDetail(event);
 
 			// Look up the architecture gate to get resolved status, MMP, and decomposition depth.
 			// When "Decompose Deeper" is used, multiple gates share the same docId.
@@ -1019,11 +1065,37 @@ function buildCommandBlockItems(dialogueId: string): StreamItem[] {
 		return [];
 	}
 
-	return cmdsResult.value.map((cmd) => {
+	const items: StreamItem[] = [];
+	for (const cmd of cmdsResult.value) {
 		const outputsResult = getCommandOutputs(cmd.command_id);
-		const outputs = outputsResult.success ? outputsResult.value : [];
-		return { type: 'command_block' as const, command: cmd, outputs };
-	});
+		const allOutputs = outputsResult.success ? outputsResult.value : [];
+
+		// Separate reasoning_review outputs from regular command outputs
+		const regularOutputs = allOutputs.filter(o => o.line_type !== 'reasoning_review');
+		const reviewOutputs = allOutputs.filter(o => o.line_type === 'reasoning_review');
+
+		// Emit the command block (without reasoning reviews, but flagged if review exists)
+		const hasReview = reviewOutputs.length > 0;
+		items.push({ type: 'command_block' as const, command: cmd, outputs: regularOutputs, hasReview });
+
+		// Emit each reasoning review as a standalone StreamItem (appears after the command block)
+		for (const reviewOutput of reviewOutputs) {
+			try {
+				const reviewData = JSON.parse(reviewOutput.content);
+				const concerns = reviewData.concerns ?? [];
+				if (concerns.length > 0) {
+					items.push({
+						type: 'reasoning_review' as const,
+						concerns,
+						overallAssessment: reviewData.overallAssessment ?? '',
+						reviewerModel: reviewData.reviewerModel ?? '',
+						timestamp: reviewOutput.timestamp,
+					});
+				}
+			} catch { /* skip malformed review */ }
+		}
+	}
+	return items;
 }
 
 /**
@@ -1116,6 +1188,7 @@ function getStreamItemTimestamp(item: StreamItem): string {
 		case 'architecture_design': raw = item.timestamp; break;
 		case 'architecture_validation': raw = item.timestamp; break;
 		case 'architecture_gate': raw = item.timestamp; break;
+		case 'reasoning_review': raw = item.timestamp; break;
 		default: raw = ''; break;
 	}
 	return normalizeTimestamp(raw);
@@ -1183,6 +1256,7 @@ function getStreamItemSortPriority(item: StreamItem): number {
 		case 'architecture_design': return 3;
 		case 'architecture_validation': return 4;
 		case 'architecture_gate': return 8;
+		case 'reasoning_review': return 3.5; // Right after command_block (3) at the same timestamp
 		case 'dialogue_end': return 9;
 		default: return 10;
 	}
@@ -1652,10 +1726,10 @@ function buildIntakeState(
 function extractArchitectureState(
 	workflowState: WorkflowState | null
 ): GovernedStreamState['architectureState'] {
-	if (!workflowState) return null;
+	if (!workflowState) {return null;}
 	try {
 		const meta = workflowState.metadata ? JSON.parse(workflowState.metadata) : null;
-		if (!meta?.architectureSubState) return null;
+		if (!meta?.architectureSubState) {return null;}
 		return {
 			subState: meta.architectureSubState,
 			validationAttempts: meta.validationAttempts ?? 0,

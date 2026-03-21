@@ -1,0 +1,236 @@
+---
+// Memory Substrate — typed objects + graph edges visualization
+---
+
+<div class="ms">
+  <div class="ms__halves">
+    <div class="ms__half">
+      <span class="ms__half-label">TYPED MEMORY OBJECTS</span>
+      <div class="ms__objects">
+        <div class="ms__obj ms__obj--claim">
+          <span class="ms__obj-type">CLAIM</span>
+          <span class="ms__obj-text">"Auth service needs event bus"</span>
+          <div class="ms__obj-meta">
+            <span class="ms__obj-tag">confidence: 0.87</span>
+            <span class="ms__obj-tag">authority: accepted_artifact</span>
+          </div>
+        </div>
+        <div class="ms__obj ms__obj--constraint">
+          <span class="ms__obj-type">CONSTRAINT</span>
+          <span class="ms__obj-text">"No execution without gate approval"</span>
+          <div class="ms__obj-meta">
+            <span class="ms__obj-tag">authority: policy_invariant</span>
+          </div>
+        </div>
+        <div class="ms__obj ms__obj--decision">
+          <span class="ms__obj-type">DECISION TRACE</span>
+          <span class="ms__obj-text">"User chose PostgreSQL over MongoDB"</span>
+          <div class="ms__obj-meta">
+            <span class="ms__obj-tag">authority: approved_decision</span>
+          </div>
+        </div>
+        <div class="ms__obj ms__obj--correction">
+          <span class="ms__obj-type">CORRECTION</span>
+          <span class="ms__obj-text">"3 services, not 5 — user override"</span>
+          <div class="ms__obj-meta">
+            <span class="ms__obj-tag ms__obj-tag--warn">supersedes: ASM-014</span>
+          </div>
+        </div>
+        <div class="ms__obj ms__obj--question">
+          <span class="ms__obj-type">OPEN QUESTION</span>
+          <span class="ms__obj-text">"Multi-region deployment scope?"</span>
+          <div class="ms__obj-meta">
+            <span class="ms__obj-tag">status: unresolved</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ms__half">
+      <span class="ms__half-label">TYPED GRAPH EDGES</span>
+      <div class="ms__edges">
+        <div class="ms__edge">
+          <span class="ms__edge-from">CLM-042</span>
+          <span class="ms__edge-type ms__edge-type--supports">supports</span>
+          <span class="ms__edge-to">CLM-018</span>
+        </div>
+        <div class="ms__edge">
+          <span class="ms__edge-from">VRD-007</span>
+          <span class="ms__edge-type ms__edge-type--contradicts">contradicts</span>
+          <span class="ms__edge-to">CLM-042</span>
+        </div>
+        <div class="ms__edge">
+          <span class="ms__edge-from">COR-014</span>
+          <span class="ms__edge-type ms__edge-type--supersedes">supersedes</span>
+          <span class="ms__edge-to">ASM-014</span>
+        </div>
+        <div class="ms__edge">
+          <span class="ms__edge-from">DTC-203</span>
+          <span class="ms__edge-type ms__edge-type--derived">derived_from</span>
+          <span class="ms__edge-to">NAR-089</span>
+        </div>
+        <div class="ms__edge">
+          <span class="ms__edge-from">CLM-055</span>
+          <span class="ms__edge-type ms__edge-type--blocked">blocked_by</span>
+          <span class="ms__edge-to">OQL-003</span>
+        </div>
+        <div class="ms__edge">
+          <span class="ms__edge-from">COR-014</span>
+          <span class="ms__edge-type ms__edge-type--answers">answers</span>
+          <span class="ms__edge-to">OQL-001</span>
+        </div>
+      </div>
+
+      <div class="ms__legend">
+        <span class="ms__legend-title">10 edge types:</span>
+        <span class="ms__legend-item ms__legend-item--supports">supports</span>
+        <span class="ms__legend-item ms__legend-item--contradicts">contradicts</span>
+        <span class="ms__legend-item ms__legend-item--supersedes">supersedes</span>
+        <span class="ms__legend-item ms__legend-item--derived">derived_from</span>
+        <span class="ms__legend-item ms__legend-item--blocked">blocked_by</span>
+        <span class="ms__legend-item">answers · raises · invalidates · implements · depends_on</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .ms {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+  }
+
+  .ms__halves {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-xl);
+  }
+
+  .ms__half-label {
+    display: block;
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-primary);
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-xs);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* Objects */
+  .ms__objects { display: flex; flex-direction: column; gap: var(--space-sm); }
+
+  .ms__obj {
+    padding: var(--space-sm) var(--space-md);
+    border-left: 3px solid var(--color-border);
+    background: var(--color-bg);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+
+  .ms__obj--claim { border-left-color: var(--color-primary); }
+  .ms__obj--constraint { border-left-color: var(--color-error); }
+  .ms__obj--decision { border-left-color: var(--color-accent); }
+  .ms__obj--correction { border-left-color: var(--color-warning); }
+  .ms__obj--question { border-left-color: #A78BFA; }
+
+  .ms__obj-type {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .ms__obj-text {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .ms__obj-meta { display: flex; gap: 4px; flex-wrap: wrap; }
+
+  .ms__obj-tag {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    padding: 1px 5px;
+    background: var(--color-bg-card);
+    border-radius: 2px;
+  }
+
+  .ms__obj-tag--warn { color: var(--color-warning); }
+
+  /* Edges */
+  .ms__edges { display: flex; flex-direction: column; gap: 6px; }
+
+  .ms__edge {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+  }
+
+  .ms__edge-from, .ms__edge-to {
+    color: var(--color-text-muted);
+    min-width: 56px;
+  }
+
+  .ms__edge-type {
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 2px;
+    min-width: 80px;
+    text-align: center;
+  }
+
+  .ms__edge-type--supports { color: var(--color-accent); background: rgba(0, 255, 178, 0.08); border: 1px solid rgba(0, 255, 178, 0.2); }
+  .ms__edge-type--contradicts { color: var(--color-error); background: rgba(255, 68, 102, 0.08); border: 1px solid rgba(255, 68, 102, 0.2); }
+  .ms__edge-type--supersedes { color: var(--color-warning); background: rgba(255, 184, 0, 0.08); border: 1px solid rgba(255, 184, 0, 0.2); }
+  .ms__edge-type--derived { color: #A78BFA; background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.2); }
+  .ms__edge-type--blocked { color: var(--color-warning); background: rgba(255, 184, 0, 0.06); border: 1px solid rgba(255, 184, 0, 0.15); }
+  .ms__edge-type--answers { color: var(--color-primary); background: rgba(0, 212, 255, 0.06); border: 1px solid rgba(0, 212, 255, 0.15); }
+
+  /* Legend */
+  .ms__legend {
+    margin-top: var(--space-md);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .ms__legend-title {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    font-weight: 600;
+  }
+
+  .ms__legend-item {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    padding: 1px 4px;
+  }
+
+  .ms__legend-item--supports { color: var(--color-accent); }
+  .ms__legend-item--contradicts { color: var(--color-error); }
+  .ms__legend-item--supersedes { color: var(--color-warning); }
+  .ms__legend-item--derived { color: #A78BFA; }
+  .ms__legend-item--blocked { color: var(--color-warning); }
+
+  @media (max-width: 768px) {
+    .ms__halves { grid-template-columns: 1fr; }
+  }
+</style>

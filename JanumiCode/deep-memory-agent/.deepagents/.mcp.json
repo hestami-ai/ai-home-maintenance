@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "deep-memory": {
+      "command": "deep-memory-mcp",
+      "env": {
+        "DEEP_MEMORY_DB_PATH": "${DEEP_MEMORY_DB_PATH}"
+      }
+    }
+  }
+}

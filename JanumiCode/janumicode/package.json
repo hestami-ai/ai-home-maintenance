@@ -185,7 +185,8 @@
           "enum": [
             "claude-code",
             "codex-cli",
-            "gemini-cli"
+            "gemini-cli",
+            "opencode-cli"
           ],
           "default": "claude-code",
           "description": "CLI tool for Executor role (code generation, task execution)"
@@ -195,7 +196,8 @@
           "enum": [
             "claude-code",
             "codex-cli",
-            "gemini-cli"
+            "gemini-cli",
+            "opencode-cli"
           ],
           "default": "codex-cli",
           "description": "CLI tool for Technical Expert role (analysis, architecture, intake)"
@@ -205,7 +207,8 @@
           "enum": [
             "claude-code",
             "codex-cli",
-            "gemini-cli"
+            "gemini-cli",
+            "opencode-cli"
           ],
           "default": "gemini-cli",
           "description": "CLI tool for Verifier role (claim verification)"
@@ -215,7 +218,8 @@
           "enum": [
             "claude-code",
             "codex-cli",
-            "gemini-cli"
+            "gemini-cli",
+            "opencode-cli"
           ],
           "default": "gemini-cli",
           "description": "CLI tool for Historian-Interpreter role (historical analysis)"
@@ -229,6 +233,26 @@
           "type": "string",
           "default": "",
           "description": "Model override for Codex CLI (e.g., o3, gpt-4.1). Leave empty for Codex CLI default."
+        },
+        "janumicode.cli.providers.opencode.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable OpenCode CLI provider (requires WSL 2 with opencode installed)"
+        },
+        "janumicode.cli.providers.opencode.path": {
+          "type": "string",
+          "default": "opencode",
+          "description": "Path to the opencode executable inside WSL (default: 'opencode' on PATH)"
+        },
+        "janumicode.cli.providers.opencode.wslDistro": {
+          "type": "string",
+          "default": "Ubuntu-22.04",
+          "description": "WSL distribution where opencode is installed (e.g., Ubuntu-22.04, Ubuntu-24.04)"
+        },
+        "janumicode.cli.providers.opencode.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model override for OpenCode (e.g., mimo-v2-omni-free). Leave empty for OpenCode default."
         },
         "janumicode.reasoningReviewer.enabled": {
           "type": "boolean",
@@ -440,6 +464,44 @@
           },
           "default": null,
           "description": "Override strengths list for Gemini CLI provider"
+        },
+        "janumicode.providers.opencode-cli.capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "CODE_GENERATION",
+              "CODE_REVIEW",
+              "REFACTORING",
+              "TEST_GENERATION",
+              "DOCUMENTATION",
+              "ARCHITECTURE",
+              "FILE_MANIPULATION",
+              "VERIFICATION",
+              "REASONING"
+            ]
+          },
+          "default": null,
+          "markdownDescription": "Override capability list for OpenCode CLI provider. Leave empty to use defaults."
+        },
+        "janumicode.providers.opencode-cli.costTier": {
+          "type": "string",
+          "enum": [
+            "FREE",
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "default": null,
+          "description": "Override cost tier for OpenCode CLI provider"
+        },
+        "janumicode.providers.opencode-cli.strengths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": null,
+          "description": "Override strengths list for OpenCode CLI provider"
         },
         "janumicode.embedding.enabled": {
           "type": "boolean",

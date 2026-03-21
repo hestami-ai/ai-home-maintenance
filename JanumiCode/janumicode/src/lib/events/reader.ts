@@ -42,6 +42,7 @@ export interface DialogueEventFilter {
 	phase?: Phase;
 	since?: string; // ISO-8601 timestamp
 	until?: string; // ISO-8601 timestamp
+	sinceEventId?: number; // Only return events with event_id > this value
 	limit?: number;
 	offset?: number;
 }
@@ -131,6 +132,11 @@ export function getDialogueEvents(
 		if (filter?.phase) {
 			sql += ' AND phase = ?';
 			params.push(filter.phase);
+		}
+
+		if (filter?.sinceEventId) {
+			sql += ' AND event_id > ?';
+			params.push(filter.sinceEventId);
 		}
 
 		if (filter?.since) {

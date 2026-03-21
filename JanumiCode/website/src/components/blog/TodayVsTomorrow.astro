@@ -1,0 +1,119 @@
+---
+// Side-by-side comparison: Implicit (today) vs Explicit (tomorrow)
+---
+
+<div class="tvt grid grid--2">
+  <div class="card tvt__card tvt__card--today">
+    <span class="tvt__label">Today — Implicit Model</span>
+    <h4 class="tvt__title">You interact with:</h4>
+    <ul class="tvt__list">
+      <li>A stream of events</li>
+      <li>Embedded decisions</li>
+      <li>Structured outputs</li>
+    </ul>
+    <h4 class="tvt__subtitle">You <em>infer</em>:</h4>
+    <ul class="tvt__list tvt__list--dim">
+      <li>System state</li>
+      <li>Agent activity</li>
+      <li>Workflow progress</li>
+    </ul>
+  </div>
+
+  <div class="card tvt__card tvt__card--tomorrow">
+    <span class="tvt__label tvt__label--bright">Tomorrow — Explicit Model</span>
+    <h4 class="tvt__title">You interact with:</h4>
+    <ul class="tvt__list tvt__list--bright">
+      <li>Mission Control — phase &amp; progress</li>
+      <li>Agent Roster — who owns what</li>
+      <li>Task Graph — dependencies &amp; blockers</li>
+      <li>Artifacts — what was generated &amp; why</li>
+      <li>Adjudication — decisions pending</li>
+      <li>Stream — full audit layer</li>
+    </ul>
+  </div>
+</div>
+
+<style>
+  .tvt {
+    margin: var(--space-2xl) 0;
+  }
+
+  .tvt__card {
+    padding: var(--space-xl);
+  }
+
+  .tvt__card--today {
+    opacity: 0.7;
+  }
+
+  .tvt__card--tomorrow {
+    border-color: var(--color-border-active);
+    box-shadow: 0 0 24px var(--color-primary-glow);
+  }
+
+  .tvt__label {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--color-text-muted);
+    display: block;
+    margin-bottom: var(--space-md);
+  }
+
+  .tvt__label--bright {
+    color: var(--color-primary);
+  }
+
+  .tvt__title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: var(--space-sm);
+  }
+
+  .tvt__subtitle {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-top: var(--space-lg);
+    margin-bottom: var(--space-sm);
+  }
+
+  .tvt__list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .tvt__list li {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    padding: var(--space-xs) 0;
+    padding-left: var(--space-md);
+    position: relative;
+  }
+
+  .tvt__list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    transform: rotate(45deg) translateY(-50%);
+    border: 1px solid var(--color-text-muted);
+    border-radius: 1px;
+  }
+
+  .tvt__list--dim li {
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .tvt__list--bright li::before {
+    border-color: var(--color-primary);
+  }
+
+  .tvt__list--bright li {
+    color: var(--color-text);
+  }
+</style>

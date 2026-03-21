@@ -1,0 +1,39 @@
+---
+// System capabilities: 6 cards showing what JanumiCode already has
+const capabilities = [
+  { icon: '⚙', title: 'State Machine', desc: 'Explicit workflow states with transition rules. Every phase has defined entry conditions, execution logic, and exit criteria.' },
+  { icon: '🧩', title: 'Task Graph', desc: 'Hierarchical decomposition of work into bounded units. Dependencies tracked. Completion verified.' },
+  { icon: '🤖', title: 'Multi-Agent System', desc: 'Six specialized agents with constrained authority. No single agent acts without governance checks.' },
+  { icon: '✓', title: 'Verification Layer', desc: 'Independent claim verification with evidence chains. Contradictions detected. Verdicts recorded.' },
+  { icon: '📜', title: 'Audit Trail', desc: 'Append-only event log. Every decision, action, and artifact traces back to a source with full provenance.' },
+  { icon: '🧠', title: 'Context Engineering', desc: 'Policy-driven context assembly. Token-budgeted briefings. Deep research memory across sessions.' },
+];
+---
+
+<div class="cap-grid grid grid--3">
+  {capabilities.map(cap => (
+    <div class="card cap-card">
+      <div class="card__icon--diamond"><span>{cap.icon}</span></div>
+      <h4 class="card__title">{cap.title}</h4>
+      <p class="card__text">{cap.desc}</p>
+    </div>
+  ))}
+</div>
+
+<style>
+  .cap-grid {
+    margin: var(--space-2xl) 0;
+  }
+
+  .cap-card {
+    padding: var(--space-lg);
+  }
+
+  .cap-card .card__title {
+    font-size: 0.95rem;
+  }
+
+  .cap-card .card__text {
+    font-size: 0.82rem;
+  }
+</style>

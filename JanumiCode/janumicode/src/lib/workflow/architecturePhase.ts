@@ -82,7 +82,7 @@ const DEFAULT_METADATA: ArchitecturePhaseMetadata = {
 
 function getArchitectureMetadata(dialogueId: string): ArchitecturePhaseMetadata {
 	const stateResult = getWorkflowState(dialogueId);
-	if (!stateResult.success) return { ...DEFAULT_METADATA };
+	if (!stateResult.success) {return { ...DEFAULT_METADATA };}
 	const meta = JSON.parse(stateResult.value.metadata);
 	return {
 		architectureSubState: meta.architectureSubState ?? DEFAULT_METADATA.architectureSubState,
@@ -136,12 +136,12 @@ const DOMAIN_KEYWORDS: Record<string, string> = {
  */
 export function backfillDomainMappings(
 	capabilities: CapabilityNode[],
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	 
 	approvedPlan: any,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	 
 	domainCoverage: Record<string, any> | null,
 ): CapabilityNode[] {
-	if (!domainCoverage) return capabilities;
+	if (!domainCoverage) {return capabilities;}
 
 	// Build requirement ID → domain set map from turn number overlap
 	const reqToDomains = new Map<string, Set<string>>();
@@ -149,12 +149,12 @@ export function backfillDomainMappings(
 	for (const req of requirements) {
 		const reqId = req.id as string;
 		const turnId = req.extractedFromTurnId as number | undefined;
-		if (!reqId) continue;
+		if (!reqId) {continue;}
 
 		const domains = new Set<string>();
 		for (const [domain, entry] of Object.entries(domainCoverage)) {
 			const dEntry = entry as { level?: string; turnNumbers?: number[] };
-			if (dEntry.level === 'NONE') continue;
+			if (dEntry.level === 'NONE') {continue;}
 			if (turnId !== undefined && dEntry.turnNumbers && dEntry.turnNumbers.includes(turnId)) {
 				domains.add(domain);
 			}
@@ -165,14 +165,14 @@ export function backfillDomainMappings(
 	}
 
 	return capabilities.map(cap => {
-		if (cap.domain_mappings.length > 0) return cap; // LLM provided them
+		if (cap.domain_mappings.length > 0) {return cap;} // LLM provided them
 
 		// Strategy 1: Match via source_requirements → domain
 		const inferredDomains = new Set<string>();
 		for (const reqId of cap.source_requirements) {
 			const domains = reqToDomains.get(reqId);
 			if (domains) {
-				for (const d of domains) inferredDomains.add(d);
+				for (const d of domains) {inferredDomains.add(d);}
 			}
 		}
 
@@ -1754,7 +1754,7 @@ function runStructuralValidation(doc: ArchitectureDocument): string[] {
 	for (const comp of doc.components) {
 		for (const dep of comp.dependencies) {
 			// Skip parent-child relationships and non-component references
-			if (!componentIds.has(dep)) continue;
+			if (!componentIds.has(dep)) {continue;}
 			const edge = `${dep}->${comp.component_id}`;
 			const reverseEdge = `${comp.component_id}->${dep}`;
 			if (!interfaceEdges.has(edge) && !interfaceEdges.has(reverseEdge)) {
@@ -1789,7 +1789,7 @@ function detectCycleInSteps(steps: ImplementationStep[]): string | null {
 
 	const queue: string[] = [];
 	for (const [id, deg] of inDegree) {
-		if (deg === 0) queue.push(id);
+		if (deg === 0) {queue.push(id);}
 	}
 
 	let visited = 0;
@@ -1799,7 +1799,7 @@ function detectCycleInSteps(steps: ImplementationStep[]): string | null {
 		for (const neighbor of adj.get(current) ?? []) {
 			const newDeg = (inDegree.get(neighbor) ?? 1) - 1;
 			inDegree.set(neighbor, newDeg);
-			if (newDeg === 0) queue.push(neighbor);
+			if (newDeg === 0) {queue.push(neighbor);}
 		}
 	}
 

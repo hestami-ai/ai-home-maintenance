@@ -42,7 +42,7 @@ const stateGetWorkflowState: PrimitiveDefinition = {
 	returns: 'WorkflowState with current_phase and metadata (JSON object)',
 	execute: (params) => {
 		const result = getWorkflowState(params.dialogueId as string);
-		if (!result.success) return result;
+		if (!result.success) {return result;}
 		// Parse metadata JSON for downstream bind access
 		const state = result.value;
 		return {
@@ -109,7 +109,7 @@ const stateGetClaims: PrimitiveDefinition = {
 	returns: 'Array of Claim objects',
 	execute: (params) => {
 		const db = getDatabase();
-		if (!db) return { success: false, error: new Error('Database not initialized') };
+		if (!db) {return { success: false, error: new Error('Database not initialized') };}
 		let sql = 'SELECT * FROM claims WHERE dialogue_id = ?';
 		const sqlParams: unknown[] = [params.dialogueId];
 		if (params.status) {
@@ -136,7 +136,7 @@ const stateGetVerdicts: PrimitiveDefinition = {
 	returns: 'Array of Verdict objects with verdict_id, claim_id, verdict, rationale',
 	execute: (params) => {
 		const db = getDatabase();
-		if (!db) return { success: false, error: new Error('Database not initialized') };
+		if (!db) {return { success: false, error: new Error('Database not initialized') };}
 		const rows = db.prepare(
 			'SELECT v.* FROM verdicts v JOIN claims c ON v.claim_id = c.claim_id WHERE c.dialogue_id = ?'
 		).all(params.dialogueId);
@@ -185,8 +185,8 @@ const stateGetGraphProgress: PrimitiveDefinition = {
 	returns: 'Progress object with total, completed, failed, in_progress, pending counts',
 	execute: (params) => {
 		const graphResult = getTaskGraphForDialogue(params.dialogueId as string);
-		if (!graphResult.success) return graphResult as Result<unknown>;
-		if (!graphResult.value) return { success: true, value: null };
+		if (!graphResult.success) {return graphResult as Result<unknown>;}
+		if (!graphResult.value) {return { success: true, value: null };}
 		return getGraphProgress(graphResult.value.graph_id);
 	},
 };
@@ -226,7 +226,7 @@ const mutationProcessGateDecision: PrimitiveDefinition = {
 	preconditions: [
 		(params) => {
 			const result = getGate(params.gateId as string);
-			if (!result.success) return { ok: false, reason: `Gate not found: ${params.gateId}` };
+			if (!result.success) {return { ok: false, reason: `Gate not found: ${params.gateId}` };}
 			if (result.value.status !== GateStatus.OPEN) {
 				return { ok: false, reason: `Gate is not open (status: ${result.value.status})` };
 			}
@@ -264,7 +264,7 @@ const mutationResolveGate: PrimitiveDefinition = {
 	preconditions: [
 		(params) => {
 			const result = getGate(params.gateId as string);
-			if (!result.success) return { ok: false, reason: `Gate not found: ${params.gateId}` };
+			if (!result.success) {return { ok: false, reason: `Gate not found: ${params.gateId}` };}
 			if (result.value.status !== GateStatus.OPEN) {
 				return { ok: false, reason: `Gate is not open (status: ${result.value.status})` };
 			}
@@ -339,9 +339,9 @@ const mutationResetClaimsToOpen: PrimitiveDefinition = {
 	returns: 'Number of claims reset',
 	execute: (params) => {
 		const db = getDatabase();
-		if (!db) return { success: false, error: new Error('Database not initialized') };
+		if (!db) {return { success: false, error: new Error('Database not initialized') };}
 		const ids = params.claimIds as string[];
-		if (ids.length === 0) return { success: true, value: 0 };
+		if (ids.length === 0) {return { success: true, value: 0 };}
 		const placeholders = ids.map(() => '?').join(',');
 		db.prepare(
 			`UPDATE claims SET status = 'OPEN' WHERE claim_id IN (${placeholders}) AND status IN ('DISPROVED', 'UNKNOWN')`
@@ -365,7 +365,7 @@ const mutationResetAllClaimsToOpen: PrimitiveDefinition = {
 	returns: 'Object with claimsReset and verdictsDeleted counts',
 	execute: (params) => {
 		const db = getDatabase();
-		if (!db) return { success: false, error: new Error('Database not initialized') };
+		if (!db) {return { success: false, error: new Error('Database not initialized') };}
 		const dialogueId = params.dialogueId as string;
 
 		// Get all non-OPEN claim IDs for this dialogue
@@ -476,7 +476,7 @@ const controlTransitionToPhase: PrimitiveDefinition = {
 			TransitionTrigger.MANUAL_OVERRIDE,
 			{ source: 'orchestrator', reason: 'User-requested phase transition' },
 		);
-		if (!result.success) return result;
+		if (!result.success) {return result;}
 		// Auto-run the workflow cycle from the new phase
 		ctx.uiChannel.postSystemMessage(`Transitioned to ${params.toPhase} — starting execution...`);
 		await ctx.uiChannel.runWorkflowCycle();

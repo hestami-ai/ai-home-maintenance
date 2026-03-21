@@ -126,7 +126,7 @@ Skip this section entirely for technical_task requests. When discussing the prod
 - **Mirror (ux)**: State assumptions about the user experience and design principles.
   Example: { "id": "MIR-U1", "text": "The dashboard should surface urgent items first — overdue payments, pending violations", "category": "ux", "rationale": "Property managers are task-driven and need to prioritize" }
 - **Menu**: Present phasing and scope choices about user journeys.
-  Example: { "id": "MENU-P1", "question": "Which user journeys should be in MVP?", "context": "This determines what ships first and your launch scope", "options": [...] }
+  Example: { "id": "MENU-P1", "question": "Which implementation phase should this journey target?", "context": "This helps determine build sequencing and scope", "options": [...] }
 
 # Response Format
 
@@ -140,16 +140,16 @@ Your response MUST be valid JSON with this exact structure:
     "title": "Short plan title",
     "summary": "Executive summary of what is being built",
     "requirements": [
-      { "id": "REQ-1", "type": "REQUIREMENT", "text": "...", "extractedFromTurnId": <turnNumber>, "timestamp": "<ISO-8601>" }
+      { "id": "REQ-1", "type": "REQUIREMENT", "text": "...", "extractedFromTurnId": <turnNumber> }
     ],
     "decisions": [
-      { "id": "DEC-1", "type": "DECISION", "text": "...", "extractedFromTurnId": <turnNumber>, "timestamp": "<ISO-8601>" }
+      { "id": "DEC-1", "type": "DECISION", "text": "...", "extractedFromTurnId": <turnNumber> }
     ],
     "constraints": [
-      { "id": "CON-1", "type": "CONSTRAINT", "text": "...", "extractedFromTurnId": <turnNumber>, "timestamp": "<ISO-8601>" }
+      { "id": "CON-1", "type": "CONSTRAINT", "text": "...", "extractedFromTurnId": <turnNumber> }
     ],
     "openQuestions": [
-      { "id": "Q-1", "type": "OPEN_QUESTION", "text": "...", "extractedFromTurnId": <turnNumber>, "timestamp": "<ISO-8601>" }
+      { "id": "Q-1", "type": "OPEN_QUESTION", "text": "...", "extractedFromTurnId": <turnNumber> }
     ],
     "technicalNotes": ["Observation about the codebase..."],
     "proposedApproach": "High-level implementation approach based on discussion so far",
@@ -197,7 +197,7 @@ The \`mmp\` field is optional — include it when you have assumptions to valida
 - **(product_or_feature only) Personas**: Add new personas when discovered (PERSONA-1, PERSONA-2). Update existing ones with new goals/pain points.
 - **(product_or_feature only) User Journeys**: Add steps as the conversation reveals them. Link to personas via personaId. Set priority when the user decides phasing.
 - **(product_or_feature only) Product Vision/Description**: Refine as understanding deepens. Start with a hypothesis from the user's initial prompt.
-- **(product_or_feature only) Phasing**: Evolve as the user makes MVP/V2/future decisions about user journeys.
+- **(product_or_feature only) Phasing**: Evolve as the user makes phasing decisions about user journeys through MMP review.
 
 # Conversation Style
 
@@ -214,59 +214,65 @@ const INTAKE_SYNTHESIS_SYSTEM_PROMPT = `You are the TECHNICAL EXPERT role in the
 
 # Your Task
 
-You are synthesizing a conversation between a Human and yourself into a **final structured implementation plan**. You have the full conversation history and the current draft plan. Your job is to:
+You are synthesizing a conversation between a Human and yourself into a **comprehensive draft implementation plan**. You have the full conversation history, the current draft plan, and all proposer-generated artifacts. Your job is to:
 
-1. **Consolidate** all requirements, decisions, constraints, and notes into a clean final plan
+1. **Consolidate** all requirements, decisions, constraints, and notes into a complete draft plan
 2. **Resolve** any open questions that were answered during conversation (remove them, add as decisions)
 3. **Flag** any truly unresolved open questions that remain
 4. **Refine** the summary and proposed approach to be comprehensive and actionable
-5. **Ensure completeness** — nothing discussed should be lost
-6. **Finalize product artifacts** (only when requestCategory is "product_or_feature") — personas, user journeys, phasing, vision, and UX requirements. Skip this entirely for technical_task requests.
+5. **Ensure completeness** — NOTHING discussed or proposed should be lost. ALL domains, entities, workflows, integrations, and quality attributes from the proposer rounds MUST be preserved
+6. **Consolidate product artifacts** (only when requestCategory is "product_or_feature") — personas, user journeys, phasing, vision, and UX requirements. Skip this entirely for technical_task requests.
+
+CRITICAL: Do NOT apply MVP thinking or scope reduction. The Human will prioritize, defer, and descope items
+through the review process. Your job is to capture EVERYTHING comprehensively. If 33 entities were proposed,
+all 33 must appear in the plan. If 14 integrations were proposed, all 14 must appear.
 
 # Response Format
 
-Your response MUST be valid JSON with this exact structure:
+Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
+explanatory text before or after the JSON. Do NOT use markdown code fences.
+Return ONLY the JSON object:
 
-\`\`\`json
 {
   "conversationalResponse": "Summary of what was synthesized and any remaining concerns...",
   "updatedPlan": {
     "version": <number>,
-    "title": "Final plan title",
+    "title": "Draft plan title",
     "summary": "Comprehensive summary of what will be built",
     "requirements": [
-      { "id": "REQ-1", "type": "REQUIREMENT", "text": "Full requirement description...", "extractedFromTurnId": 1, "timestamp": "<ISO-8601>" }
+      { "id": "REQ-1", "type": "REQUIREMENT", "text": "Full requirement description...", "extractedFromTurnId": 1 }
     ],
     "decisions": [
-      { "id": "DEC-1", "type": "DECISION", "text": "Decision description with rationale...", "extractedFromTurnId": 1, "timestamp": "<ISO-8601>" }
+      { "id": "DEC-1", "type": "DECISION", "text": "Decision description with rationale...", "extractedFromTurnId": 1 }
     ],
     "constraints": [
-      { "id": "CON-1", "type": "CONSTRAINT", "text": "Constraint description...", "extractedFromTurnId": 1, "timestamp": "<ISO-8601>" }
+      { "id": "CON-1", "type": "CONSTRAINT", "text": "Constraint description...", "extractedFromTurnId": 1 }
     ],
     "openQuestions": [
-      { "id": "Q-1", "type": "OPEN_QUESTION", "text": "Unresolved question...", "extractedFromTurnId": 1, "timestamp": "<ISO-8601>" }
+      { "id": "Q-1", "type": "OPEN_QUESTION", "text": "Unresolved question...", "extractedFromTurnId": 1 }
     ],
-    "technicalNotes": [...],
+    "technicalNotes": [
+      { "id": "TN-1", "type": "TECHNICAL_NOTE", "text": "Note description...", "extractedFromTurnId": 1 }
+    ],
     "proposedApproach": "Detailed implementation approach",
     "lastUpdatedAt": "<ISO-8601>",
     "requestCategory": "product_or_feature OR technical_task (carry forward from plan)",
     "productVision": "(OMIT for technical_task) Crisp 1-2 sentence vision statement",
     "productDescription": "(OMIT for technical_task) Self-contained paragraph",
     "personas": "(OMIT for technical_task) [{ id, name, description, goals, painPoints }]",
-    "userJourneys": "(OMIT for technical_task) [{ id, personaId, title, scenario, steps, acceptanceCriteria, priority }]",
-    "successMetrics": "(OMIT for technical_task) [...]",
+    "userJourneys": "(OMIT for technical_task) [{ id, personaId, title, scenario, steps, acceptanceCriteria, implementationPhase, source }]",
+    "successMetrics": "(OMIT for technical_task) [\"Specific measurable outcome 1\", \"Specific measurable outcome 2\"]",
     "phasingStrategy": "(OMIT for technical_task) [{ phase, description, journeyIds, rationale }]",
-    "uxRequirements": "(OMIT for technical_task) [...]"
+    "uxRequirements": "(OMIT for technical_task) [\"Design principle or UX constraint 1\", \"Design principle or UX constraint 2\"]"
   },
   "suggestedQuestions": [],
   "codebaseFindings": []
 }
-\`\`\`
 
 # Synthesis Rules
 
 - The finalized plan should be **self-contained** — readable without the conversation
-- **Every item MUST be an object** with id, type, text, extractedFromTurnId, and timestamp fields — NOT a plain string
+- **Every item MUST be an object** with id, type, text, and extractedFromTurnId fields — NOT a plain string. Do NOT include a timestamp field — timestamps are assigned by the system.
 - The "text" field MUST contain the **full human-readable description** — never omit it
 - Preserve the REQ-/DEC-/CON-/Q- ID prefixes from the draft plan; do NOT renumber to R-/D-/C-
 - Requirements should be specific and testable where possible
@@ -281,14 +287,15 @@ Skip this entire section for technical_task requests — leave all product field
 
 In addition to consolidating requirements, decisions, and constraints:
 
-1. **Finalize personas**: Ensure each persona has complete goals and pain points. Remove duplicates. Use IDs PERSONA-1, PERSONA-2, etc.
-2. **Finalize user journeys**: Ensure each journey has complete steps and acceptance criteria. Link to personas via personaId. Assign priority (MVP/V2/FUTURE). Use IDs UJ-1, UJ-2, etc.
-3. **Finalize phasing**: Group journeys into phases (MVP, V2, Future) with rationale for each grouping.
+1. **Consolidate personas**: Ensure each persona has complete goals and pain points. Remove duplicates. Use IDs PERSONA-1, PERSONA-2, etc.
+2. **Consolidate user journeys**: Ensure each journey has complete steps and acceptance criteria. Link to personas via personaId. Carry forward the "implementationPhase" from proposer output (do NOT rename to MVP/V2/FUTURE). Use IDs UJ-1, UJ-2, etc.
+3. **Consolidate phasing**: Carry forward the phasingStrategy from the proposer rounds. Do NOT prune or collapse phases. The user will make phasing decisions during review.
 4. **Polish vision and description**: Make productVision (1-2 sentences) and productDescription (one paragraph) crisp and self-contained.
-5. **Consolidate success metrics**: Specific, measurable outcomes that prove the product works.
-6. **Consolidate UX requirements**: Design principles and experience constraints.
+5. **Consolidate success metrics**: Each metric MUST be a string (not an object). Specific, measurable outcomes that prove the product works.
+6. **Consolidate UX requirements**: Each requirement MUST be a string (not an object). Design principles and experience constraints.
+7. **Preserve ALL proposer artifacts**: Every domain, entity, workflow, integration, and quality attribute from the proposer rounds must appear in the plan — in technicalNotes, the proposedApproach, or dedicated sections. NEVER drop information because it seems redundant or low priority.
 
-For product_or_feature requests, the finalized plan should tell a complete product story: WHY (vision) → WHO (personas) → WHAT THEY DO (journeys) → WHAT SUCCESS LOOKS LIKE (acceptance criteria + metrics) → WHEN (phasing). For technical_task requests, the plan focuses on the technical problem, approach, and constraints.`;
+For product_or_feature requests, the draft plan should tell a complete product story: WHY (vision) → WHO (personas) → WHAT THEY DO (journeys) → WHAT SUCCESS LOOKS LIKE (acceptance criteria + metrics) → WHEN (phasing). The user will then review and prioritize through the MMP process. For technical_task requests, the plan focuses on the technical problem, approach, and constraints.`;
 
 /**
  * Invoke Technical Expert in INTAKE conversation mode
@@ -802,10 +809,10 @@ Your response MUST be valid JSON:
     "version": 1,
     "title": "Plan title based on analysis",
     "summary": "Executive summary synthesized from your analysis",
-    "requirements": [{ "id": "REQ-1", "type": "REQUIREMENT", "text": "...", "extractedFromTurnId": 0, "timestamp": "..." }],
-    "decisions": [{ "id": "DEC-1", "type": "DECISION", "text": "...", "extractedFromTurnId": 0, "timestamp": "..." }],
-    "constraints": [{ "id": "CON-1", "type": "CONSTRAINT", "text": "...", "extractedFromTurnId": 0, "timestamp": "..." }],
-    "openQuestions": [{ "id": "Q-1", "type": "OPEN_QUESTION", "text": "...", "extractedFromTurnId": 0, "timestamp": "..." }],
+    "requirements": [{ "id": "REQ-1", "type": "REQUIREMENT", "text": "...", "extractedFromTurnId": 0 }],
+    "decisions": [{ "id": "DEC-1", "type": "DECISION", "text": "...", "extractedFromTurnId": 0 }],
+    "constraints": [{ "id": "CON-1", "type": "CONSTRAINT", "text": "...", "extractedFromTurnId": 0 }],
+    "openQuestions": [{ "id": "Q-1", "type": "OPEN_QUESTION", "text": "...", "extractedFromTurnId": 0 }],
     "technicalNotes": ["Observation from codebase analysis..."],
     "proposedApproach": "Technical approach based on what you found",
     "lastUpdatedAt": "<ISO-8601>",
@@ -907,7 +914,7 @@ export async function invokeAnalyzingTechnicalExpert(
  * with only stepNumber. This ensures each step has actor/action/expectedOutcome.
  */
 function normalizeUserJourneys(
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	 
 	rawJourneys: any[]
 ): UserJourney[] {
 	return rawJourneys.map((j, jIdx) => {
@@ -947,7 +954,7 @@ function normalizeUserJourneys(
  * Ensures sequential Phase 1, Phase 2, ... numbering regardless of LLM output.
  */
 function normalizePhasingStrategy(
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	 
 	rawPhases: any[]
 ): PhasingEntry[] {
 	return rawPhases.map((ph, idx) => ({
@@ -1630,7 +1637,9 @@ function tryDirectParseIntake(text: string): string | null {
 }
 
 function tryFenceExtractionIntake(text: string): string | null {
-	const m = /```(?:json)?\s*([\s\S]*?)\s*```/.exec(text);
+	// Greedy match — grab everything up to the LAST closing fence.
+	// Lazy ([\s\S]*?) fails when JSON contains backticks or nested code fences.
+	const m = /```(?:json)?\s*([\s\S]*)\s*```/.exec(text);
 	if (!m) { return null; }
 
 	const content = m[1].trim();
@@ -1705,7 +1714,7 @@ function normalizeExtractedItems(
 				typeof item.extractedFromTurnId === 'number'
 					? item.extractedFromTurnId
 					: turnNumber,
-			timestamp: (item.timestamp as string) ?? new Date().toISOString(),
+			timestamp: new Date().toISOString(), // Always use real timestamp — LLMs hallucinate dates
 		};
 	});
 }
@@ -1833,12 +1842,21 @@ You must:
 # Context
 The ANALYZING phase has already read the codebase and produced findings. Those findings are included below as context. Use them to inform your proposals.
 
+# Processing Prior Decisions
+
+If the input contains [MMP Decisions], these are the user's verdicts on items from a previous round.
+You MUST process them:
+- ACCEPTED items: Keep these as-is in your output. They are your foundation — do not regenerate them.
+- REJECTED items: Exclude these from your output entirely.
+- EDITED items: Use the user's edited text instead of the original.
+- DEFERRED items: Include in output but note as deferred in the rationale.
+Build your proposal ON TOP OF the accepted items. Do not start from scratch.
+
 # Response Format
 Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
 explanatory text before or after the JSON. Do NOT use markdown code fences.
 Return ONLY the JSON object:
 
-\`\`\`json
 {
   "domains": [
     {
@@ -1859,8 +1877,7 @@ Return ONLY the JSON object:
       "painPoints": ["What frustrates them"]
     }
   ]
-}
-\`\`\``;
+}`;
 
 /**
  * Invoke the domain proposer — Round 1.
@@ -1871,7 +1888,11 @@ export async function invokeProposerDomains(
 	try {
 		// Build context from draft plan findings
 		const contextParts: string[] = [];
-		contextParts.push(`# User Request\n\n${options.humanMessage}`);
+		if (options.humanMessage.startsWith('[MMP Decisions]')) {
+			contextParts.push(`# Prior MMP Decisions (from user review)\n\n${options.humanMessage}`);
+		} else if (options.humanMessage.trim()) {
+			contextParts.push(`# User Request\n\n${options.humanMessage}`);
+		}
 
 		// Include human feedback if this is a re-run with refinement
 		const humanFeedback = (options.draftPlan as unknown as Record<string, unknown>).humanFeedback;
@@ -1895,7 +1916,7 @@ export async function invokeProposerDomains(
 			onEvent: options.onEvent,
 		});
 
-		if (!cliResult.success) return cliResult;
+		if (!cliResult.success) {return cliResult;}
 
 		const jsonStr = extractJsonFromIntakeResponse(cliResult.value.response);
 		const parsed = JSON.parse(jsonStr);
@@ -1965,12 +1986,21 @@ Otherwise, suggest phasing based on domain reasoning.
 IMPORTANT: Phasing is metadata for the user's reference. It must NOT cause you to exclude
 any item. A "Phase 3" journey is still proposed — just tagged as Phase 3.
 
+# Processing Prior Decisions
+
+If the input contains [MMP Decisions], these are the user's verdicts on items from a previous round.
+You MUST process them:
+- ACCEPTED items: Keep these as-is in your output. They are your foundation — do not regenerate them.
+- REJECTED items: Exclude these from your output entirely.
+- EDITED items: Use the user's edited text instead of the original.
+- DEFERRED items: Include in output but note as deferred in the implementationPhase field.
+Build your proposal ON TOP OF the accepted items. Do not start from scratch.
+
 # Response Format
 Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
 explanatory text before or after the JSON. Do NOT use markdown code fences.
 Return ONLY the JSON object:
 
-\`\`\`json
 {
   "userJourneys": [
     {
@@ -1998,8 +2028,7 @@ Return ONLY the JSON object:
       "source": "document-specified | domain-standard | ai-proposed"
     }
   ]
-}
-\`\`\``;
+}`;
 
 /**
  * Invoke the journey/workflow proposer — Round 2.
@@ -2009,7 +2038,11 @@ export async function invokeProposerJourneys(
 ): Promise<Result<{ userJourneys: UserJourney[]; workflows: WorkflowProposal[] }>> {
 	try {
 		const contextParts: string[] = [];
-		contextParts.push(`# User Request\n\n${options.humanMessage}`);
+		if (options.humanMessage.startsWith('[MMP Decisions]')) {
+			contextParts.push(`# Prior MMP Decisions (from user review)\n\n${options.humanMessage}`);
+		} else if (options.humanMessage.trim()) {
+			contextParts.push(`# User Request\n\n${options.humanMessage}`);
+		}
 
 		// Include human feedback if present
 		const humanFeedback = (options.draftPlan as unknown as Record<string, unknown>).humanFeedback;
@@ -2037,7 +2070,7 @@ export async function invokeProposerJourneys(
 			onEvent: options.onEvent,
 		});
 
-		if (!cliResult.success) return cliResult;
+		if (!cliResult.success) {return cliResult;}
 
 		const jsonStr = extractJsonFromIntakeResponse(cliResult.value.response);
 		const parsed = JSON.parse(jsonStr);
@@ -2088,12 +2121,21 @@ Step 2 — GENERATE:
 - Cover EVERY accepted domain with its relevant entities.
 - If a workflow involves data flow between domains, propose the junction entities.
 
+# Processing Prior Decisions
+
+If the input contains [MMP Decisions], these are the user's verdicts on items from a previous round.
+You MUST process them:
+- ACCEPTED items: Keep these as-is in your output. They are your foundation — do not regenerate them.
+- REJECTED items: Exclude these from your output entirely.
+- EDITED items: Use the user's edited text instead of the original.
+- DEFERRED items: Include in output but note as deferred.
+Build your proposal ON TOP OF the accepted items. Do not start from scratch.
+
 # Response Format
 Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
 explanatory text before or after the JSON. Do NOT use markdown code fences.
 Return ONLY the JSON object:
 
-\`\`\`json
 {
   "entities": [
     {
@@ -2106,8 +2148,7 @@ Return ONLY the JSON object:
       "source": "document-specified | codebase-existing | domain-standard | ai-proposed"
     }
   ]
-}
-\`\`\``;
+}`;
 
 /**
  * Invoke the entity proposer — Round 3.
@@ -2117,7 +2158,11 @@ export async function invokeProposerEntities(
 ): Promise<Result<{ entities: EntityProposal[] }>> {
 	try {
 		const contextParts: string[] = [];
-		contextParts.push(`# User Request\n\n${options.humanMessage}`);
+		if (options.humanMessage.startsWith('[MMP Decisions]')) {
+			contextParts.push(`# Prior MMP Decisions (from user review)\n\n${options.humanMessage}`);
+		} else if (options.humanMessage.trim()) {
+			contextParts.push(`# User Request\n\n${options.humanMessage}`);
+		}
 
 		const humanFeedback = (options.draftPlan as unknown as Record<string, unknown>).humanFeedback;
 		if (humanFeedback && typeof humanFeedback === 'string') {
@@ -2142,7 +2187,7 @@ export async function invokeProposerEntities(
 			onEvent: options.onEvent,
 		});
 
-		if (!cliResult.success) return cliResult;
+		if (!cliResult.success) {return cliResult;}
 
 		const jsonStr = extractJsonFromIntakeResponse(cliResult.value.response);
 		const parsed = JSON.parse(jsonStr);
@@ -2191,12 +2236,21 @@ Step 2 — GENERATE:
 - Cover EVERY accepted domain with its relevant integration points.
 - Include both obvious integrations (payment, auth) and domain-specific ones.
 
+# Processing Prior Decisions
+
+If the input contains [MMP Decisions], these are the user's verdicts on items from a previous round.
+You MUST process them:
+- ACCEPTED items: Keep these as-is in your output. They are your foundation — do not regenerate them.
+- REJECTED items: Exclude these from your output entirely.
+- EDITED items: Use the user's edited text instead of the original.
+- DEFERRED items: Include in output but note as deferred.
+Build your proposal ON TOP OF the accepted items. Do not start from scratch.
+
 # Response Format
 Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
 explanatory text before or after the JSON. Do NOT use markdown code fences.
 Return ONLY the JSON object:
 
-\`\`\`json
 {
   "integrations": [
     {
@@ -2213,8 +2267,7 @@ Return ONLY the JSON object:
   "qualityAttributes": [
     "Specific quality requirement or constraint"
   ]
-}
-\`\`\``;
+}`;
 
 /**
  * Invoke the integration proposer — Round 4.
@@ -2224,7 +2277,11 @@ export async function invokeProposerIntegrations(
 ): Promise<Result<{ integrations: IntegrationProposal[]; qualityAttributes: string[] }>> {
 	try {
 		const contextParts: string[] = [];
-		contextParts.push(`# User Request\n\n${options.humanMessage}`);
+		if (options.humanMessage.startsWith('[MMP Decisions]')) {
+			contextParts.push(`# Prior MMP Decisions (from user review)\n\n${options.humanMessage}`);
+		} else if (options.humanMessage.trim()) {
+			contextParts.push(`# User Request\n\n${options.humanMessage}`);
+		}
 
 		const humanFeedback = (options.draftPlan as unknown as Record<string, unknown>).humanFeedback;
 		if (humanFeedback && typeof humanFeedback === 'string') {
@@ -2254,7 +2311,7 @@ export async function invokeProposerIntegrations(
 			onEvent: options.onEvent,
 		});
 
-		if (!cliResult.success) return cliResult;
+		if (!cliResult.success) {return cliResult;}
 
 		const jsonStr = extractJsonFromIntakeResponse(cliResult.value.response);
 		const parsed = JSON.parse(jsonStr);

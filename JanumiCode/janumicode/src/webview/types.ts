@@ -223,7 +223,8 @@ export type IncomingMessage =
 	| { type: 'speechError'; data: SpeechErrorData }
 	| { type: 'speechCapability'; data: SpeechCapabilityData }
 	| { type: 'openFindWidget' }
-	| { type: 'pendingMmpDecisionsLoaded'; decisions: Record<string, { mirrorDecisions: Record<string, { status: string; editedText?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string }>; productEdits: Record<string, string> }> };
+	| { type: 'pendingMmpDecisionsLoaded'; decisions: Record<string, { mirrorDecisions: Record<string, { status: string; editedText?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string }>; productEdits: Record<string, string> }> }
+	| { type: 'draftsLoaded'; drafts: Record<string, Record<string, string>> };
 
 // ===== Outgoing Messages (Webview → Extension Host) =====
 
@@ -263,4 +264,6 @@ export type OutgoingMessage =
 	| { type: 'speechStop' }
 	| { type: 'speechCancel' }
 	| { type: 'generateDocument' }
-	| { type: 'reviewRerun'; guidance?: string };
+	| { type: 'reviewRerun'; guidance?: string }
+	| { type: 'draftSave'; drafts: Array<{ category: string; itemKey: string; value: string }> }
+	| { type: 'draftClear'; category?: string };

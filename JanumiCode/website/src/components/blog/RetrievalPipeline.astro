@@ -1,0 +1,291 @@
+---
+// Deep Memory Research Agent — 6-stage retrieval pipeline
+---
+
+<div class="rp">
+  <div class="rp__title-bar">
+    <span class="rp__title-dot"></span>
+    <span class="rp__title-text">DEEP MEMORY RESEARCH AGENT — 6-STAGE RETRIEVAL</span>
+  </div>
+
+  <div class="rp__stages">
+    <div class="rp__stage" data-stage="1">
+      <div class="rp__num">01</div>
+      <div class="rp__body">
+        <h4 class="rp__name">Query Interpretation</h4>
+        <p class="rp__desc">Decompose question into retrieval targets: topic entities, domains, constraints, time periods, authority needs.</p>
+      </div>
+    </div>
+
+    <div class="rp__wire"></div>
+
+    <div class="rp__stage" data-stage="2">
+      <div class="rp__num">02</div>
+      <div class="rp__body">
+        <h4 class="rp__name">Broad Candidate Harvest</h4>
+        <p class="rp__desc">FTS5 search + temporal filtering across memory objects. Optimize for recall — miss nothing material.</p>
+        <div class="rp__tool">
+          <span class="rp__tool-badge">MCP</span>
+          <code>search_memory_candidates</code>
+          <code>temporal_query</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="rp__wire"></div>
+
+    <div class="rp__stage" data-stage="3">
+      <div class="rp__num">03</div>
+      <div class="rp__body">
+        <h4 class="rp__name">Evidence Triage</h4>
+        <p class="rp__desc">Score candidates across 6 composite dimensions. Not just semantic similarity — authority, temporal validity, causal relevance, and contradiction signal.</p>
+        <div class="rp__scores">
+          <div class="rp__score-row">
+            <span class="rp__score-label">Semantic</span>
+            <div class="rp__score-bar"><div class="rp__score-fill" style="width: 20%"></div></div>
+            <span class="rp__score-wt">0.20</span>
+          </div>
+          <div class="rp__score-row">
+            <span class="rp__score-label">Constraint</span>
+            <div class="rp__score-bar"><div class="rp__score-fill rp__score-fill--warn" style="width: 25%"></div></div>
+            <span class="rp__score-wt">0.25</span>
+          </div>
+          <div class="rp__score-row">
+            <span class="rp__score-label">Authority</span>
+            <div class="rp__score-bar"><div class="rp__score-fill" style="width: 20%"></div></div>
+            <span class="rp__score-wt">0.20</span>
+          </div>
+          <div class="rp__score-row">
+            <span class="rp__score-label">Temporal</span>
+            <div class="rp__score-bar"><div class="rp__score-fill rp__score-fill--dim" style="width: 15%"></div></div>
+            <span class="rp__score-wt">0.15</span>
+          </div>
+          <div class="rp__score-row">
+            <span class="rp__score-label">Causal</span>
+            <div class="rp__score-bar"><div class="rp__score-fill rp__score-fill--dim" style="width: 10%"></div></div>
+            <span class="rp__score-wt">0.10</span>
+          </div>
+          <div class="rp__score-row">
+            <span class="rp__score-label">Contradiction</span>
+            <div class="rp__score-bar"><div class="rp__score-fill rp__score-fill--red" style="width: 10%"></div></div>
+            <span class="rp__score-wt">0.10</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rp__wire"></div>
+
+    <div class="rp__stage" data-stage="4">
+      <div class="rp__num">04</div>
+      <div class="rp__body">
+        <h4 class="rp__name">Drill-down Expansion</h4>
+        <p class="rp__desc">For high-value candidates: traverse memory graph to rebuild full reasoning chains. Follow supports, derived_from, depends_on edges up to 3 hops.</p>
+        <div class="rp__tool">
+          <span class="rp__tool-badge">MCP</span>
+          <code>expand_memory_neighbors</code>
+          <code>load_evidence_span</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="rp__wire"></div>
+
+    <div class="rp__stage rp__stage--warn" data-stage="5">
+      <div class="rp__num rp__num--warn">05</div>
+      <div class="rp__body">
+        <h4 class="rp__name">Conflict &amp; Supersession</h4>
+        <p class="rp__desc">Walk supersession chains. Detect contradictions. Determine current governing position. Never cite a stale decision without noting its replacement.</p>
+        <div class="rp__tool">
+          <span class="rp__tool-badge rp__tool-badge--warn">MCP</span>
+          <code>get_supersession_chain</code>
+          <code>get_conflict_set</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="rp__wire"></div>
+
+    <div class="rp__stage rp__stage--output" data-stage="6">
+      <div class="rp__num rp__num--green">06</div>
+      <div class="rp__body">
+        <h4 class="rp__name">Context Packet Synthesis</h4>
+        <p class="rp__desc">Assemble structured ContextPacket: material memories, binding constraints, contradictions, evidence lineage, coverage assessment. No text blobs — structured JSON for downstream agents.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .rp {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .rp__title-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .rp__title-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #A78BFA;
+  }
+
+  .rp__title-text {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-text-muted);
+  }
+
+  .rp__stages {
+    padding: var(--space-xl);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rp__stage {
+    display: flex;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+  }
+
+  .rp__stage--warn { border-color: rgba(255, 184, 0, 0.3); }
+  .rp__stage--output {
+    border-color: rgba(0, 255, 178, 0.3);
+    box-shadow: 0 0 16px rgba(0, 255, 178, 0.08);
+  }
+
+  .rp__num {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--color-primary);
+    border: 2px solid var(--color-primary);
+    border-radius: 4px;
+    transform: rotate(45deg);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .rp__num > * { transform: rotate(-45deg); }
+  .rp__num--warn { color: var(--color-warning); border-color: var(--color-warning); }
+  .rp__num--green { color: var(--color-accent); border-color: var(--color-accent); }
+
+  .rp__body { flex: 1; min-width: 0; }
+
+  .rp__name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .rp__desc {
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    line-height: 1.55;
+    margin-bottom: var(--space-sm);
+  }
+
+  .rp__wire {
+    width: 1px;
+    height: 20px;
+    background: var(--color-primary);
+    opacity: 0.25;
+    margin: 0 0 0 14px;
+  }
+
+  /* MCP tool badges */
+  .rp__tool {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  .rp__tool-badge {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 1px 5px;
+    border-radius: 2px;
+    color: #A78BFA;
+    background: rgba(167, 139, 250, 0.1);
+    border: 1px solid rgba(167, 139, 250, 0.25);
+  }
+
+  .rp__tool-badge--warn {
+    color: var(--color-warning);
+    background: rgba(255, 184, 0, 0.1);
+    border-color: rgba(255, 184, 0, 0.25);
+  }
+
+  .rp__tool code {
+    font-size: 0.65rem;
+    padding: 1px 5px;
+  }
+
+  /* Score bars */
+  .rp__scores { margin-top: var(--space-sm); }
+
+  .rp__score-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 2px 0;
+  }
+
+  .rp__score-label {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    min-width: 80px;
+  }
+
+  .rp__score-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--color-bg-card);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .rp__score-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 2px;
+  }
+
+  .rp__score-fill--warn { background: var(--color-warning); }
+  .rp__score-fill--dim { background: var(--color-text-muted); opacity: 0.5; }
+  .rp__score-fill--red { background: var(--color-error); }
+
+  .rp__score-wt {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    min-width: 24px;
+    text-align: right;
+  }
+</style>

@@ -69,7 +69,7 @@ export function getActiveProcessCount(): number {
  * Returns an unsubscribe function to call on process close/error.
  */
 function wireAbortSignal(proc: ChildProcess, signal?: AbortSignal): () => void {
-	if (!signal) return () => {};
+	if (!signal) {return () => {};}
 	const onAbort = () => {
 		try {
 			if (IS_WINDOWS && proc.pid) {

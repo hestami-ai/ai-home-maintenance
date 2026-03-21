@@ -16,13 +16,13 @@ import { state, persistMmpState } from './state';
  */
 function scopedQuery(cardId: string, selector: string): HTMLElement | null {
 	const container = document.querySelector('[data-mmp-card-id="' + cardId + '"]');
-	if (!container) return null;
+	if (!container) {return null;}
 	return container.querySelector(selector) as HTMLElement | null;
 }
 
 function scopedQueryAll(cardId: string, selector: string): NodeListOf<Element> {
 	const container = document.querySelector('[data-mmp-card-id="' + cardId + '"]');
-	if (!container) return document.querySelectorAll('.nonexistent-guard');
+	if (!container) {return document.querySelectorAll('.nonexistent-guard');}
 	return container.querySelectorAll(selector);
 }
 

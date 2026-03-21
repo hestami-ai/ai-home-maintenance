@@ -379,7 +379,7 @@ export async function executeIntakePlanFinalization(
 
 		// 2c. Carry forward proposer artifacts that synthesis may not have populated
 		const dp = conv.draftPlan;
-		if (dp.proposerPhase != null) {
+		if (dp.proposerPhase !== null && dp.proposerPhase !== undefined) {
 			// Map quality attributes → uxRequirements if synthesis didn't populate them
 			if ((!finalizedPlan.uxRequirements || finalizedPlan.uxRequirements.length === 0) && dp.qualityAttributes && dp.qualityAttributes.length > 0) {
 				finalizedPlan.uxRequirements = dp.qualityAttributes;
@@ -1773,7 +1773,7 @@ export function extractDomainMMP(
 		});
 	}
 
-	if (mirrorItems.length === 0) return undefined;
+	if (mirrorItems.length === 0) {return undefined;}
 
 	const menuItems: MenuItem[] = [];
 	if (domains.length > 2) {
@@ -1840,7 +1840,7 @@ export function extractJourneyWorkflowMMP(
 		});
 	}
 
-	if (mirrorItems.length === 0) return undefined;
+	if (mirrorItems.length === 0) {return undefined;}
 
 	return {
 		mirror: {
@@ -1868,7 +1868,7 @@ export function extractEntityMMP(
 		});
 	}
 
-	if (mirrorItems.length === 0) return undefined;
+	if (mirrorItems.length === 0) {return undefined;}
 
 	return {
 		mirror: {
@@ -1907,7 +1907,7 @@ export function extractIntegrationMMP(
 		});
 	}
 
-	if (mirrorItems.length === 0) return undefined;
+	if (mirrorItems.length === 0) {return undefined;}
 
 	const menuItems: MenuItem[] = [];
 	// Ownership model menu for integrations that have alternatives
@@ -1946,11 +1946,11 @@ export async function executeProposerDomains(
 ): Promise<Result<PhaseExecutionResult>> {
 	try {
 		const convResult = getOrCreateIntakeConversation(dialogueId);
-		if (!convResult.success) return convResult as unknown as Result<PhaseExecutionResult>;
+		if (!convResult.success) {return convResult as unknown as Result<PhaseExecutionResult>;}
 		const conv = convResult.value;
 
 		const providerResult = await resolveProviderForRole(Role.TECHNICAL_EXPERT);
-		if (!providerResult.success) return providerResult as Result<PhaseExecutionResult>;
+		if (!providerResult.success) {return providerResult as Result<PhaseExecutionResult>;}
 
 		const commandId = randomUUID();
 		emitWorkflowCommand({
@@ -1989,7 +1989,7 @@ export async function executeProposerDomains(
 			timestamp: new Date().toISOString(),
 		});
 
-		if (!result.success) return result as unknown as Result<PhaseExecutionResult>;
+		if (!result.success) {return result as unknown as Result<PhaseExecutionResult>;}
 
 		const { domains, personas } = result.value;
 		const mmp = extractDomainMMP(domains, personas);
@@ -2047,11 +2047,11 @@ export async function executeProposerJourneys(
 ): Promise<Result<PhaseExecutionResult>> {
 	try {
 		const convResult = getOrCreateIntakeConversation(dialogueId);
-		if (!convResult.success) return convResult as unknown as Result<PhaseExecutionResult>;
+		if (!convResult.success) {return convResult as unknown as Result<PhaseExecutionResult>;}
 		const conv = convResult.value;
 
 		const providerResult = await resolveProviderForRole(Role.TECHNICAL_EXPERT);
-		if (!providerResult.success) return providerResult as Result<PhaseExecutionResult>;
+		if (!providerResult.success) {return providerResult as Result<PhaseExecutionResult>;}
 
 		const commandId = randomUUID();
 		emitWorkflowCommand({
@@ -2090,7 +2090,7 @@ export async function executeProposerJourneys(
 			timestamp: new Date().toISOString(),
 		});
 
-		if (!result.success) return result as unknown as Result<PhaseExecutionResult>;
+		if (!result.success) {return result as unknown as Result<PhaseExecutionResult>;}
 
 		const { userJourneys, workflows } = result.value;
 		const mmp = extractJourneyWorkflowMMP(userJourneys, workflows);
@@ -2147,11 +2147,11 @@ export async function executeProposerEntities(
 ): Promise<Result<PhaseExecutionResult>> {
 	try {
 		const convResult = getOrCreateIntakeConversation(dialogueId);
-		if (!convResult.success) return convResult as unknown as Result<PhaseExecutionResult>;
+		if (!convResult.success) {return convResult as unknown as Result<PhaseExecutionResult>;}
 		const conv = convResult.value;
 
 		const providerResult = await resolveProviderForRole(Role.TECHNICAL_EXPERT);
-		if (!providerResult.success) return providerResult as Result<PhaseExecutionResult>;
+		if (!providerResult.success) {return providerResult as Result<PhaseExecutionResult>;}
 
 		const commandId = randomUUID();
 		emitWorkflowCommand({
@@ -2190,7 +2190,7 @@ export async function executeProposerEntities(
 			timestamp: new Date().toISOString(),
 		});
 
-		if (!result.success) return result as unknown as Result<PhaseExecutionResult>;
+		if (!result.success) {return result as unknown as Result<PhaseExecutionResult>;}
 
 		const { entities } = result.value;
 		const mmp = extractEntityMMP(entities);
@@ -2246,11 +2246,11 @@ export async function executeProposerIntegrations(
 ): Promise<Result<PhaseExecutionResult>> {
 	try {
 		const convResult = getOrCreateIntakeConversation(dialogueId);
-		if (!convResult.success) return convResult as unknown as Result<PhaseExecutionResult>;
+		if (!convResult.success) {return convResult as unknown as Result<PhaseExecutionResult>;}
 		const conv = convResult.value;
 
 		const providerResult = await resolveProviderForRole(Role.TECHNICAL_EXPERT);
-		if (!providerResult.success) return providerResult as Result<PhaseExecutionResult>;
+		if (!providerResult.success) {return providerResult as Result<PhaseExecutionResult>;}
 
 		const commandId = randomUUID();
 		emitWorkflowCommand({
@@ -2289,7 +2289,7 @@ export async function executeProposerIntegrations(
 			timestamp: new Date().toISOString(),
 		});
 
-		if (!result.success) return result as unknown as Result<PhaseExecutionResult>;
+		if (!result.success) {return result as unknown as Result<PhaseExecutionResult>;}
 
 		const { integrations, qualityAttributes } = result.value;
 		const mmp = extractIntegrationMMP(integrations, qualityAttributes);

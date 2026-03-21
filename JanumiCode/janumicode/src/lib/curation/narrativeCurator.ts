@@ -559,7 +559,7 @@ function parseNarrativeCuratorResponse(
 	try {
 		// Strip markdown code fences if present
 		let jsonStr = rawResponse.trim();
-		const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+		const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*)\s*```/);
 		if (jsonMatch) {
 			jsonStr = jsonMatch[1];
 		} else {
@@ -924,7 +924,7 @@ export async function produceHandoffDocument(
 	}
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type DB = any;
 
 function materializeIntakeHandoff(db: DB, dialogueId: string): IntakeHandoffContent {

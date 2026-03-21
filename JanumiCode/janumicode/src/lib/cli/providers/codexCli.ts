@@ -149,6 +149,15 @@ export class CodexCLIProvider implements RoleCLIProvider {
 			const executionTime = Date.now() - startTime;
 
 			const stderrText = raw.stderr?.trim() || '';
+			if (raw.exitCode !== 0 && stderrText) {
+				onEvent({
+					timestamp: new Date().toISOString(),
+					eventType: 'error',
+					summary: 'CLI stderr output',
+					detail: stderrText,
+					status: 'error',
+				});
+			}
 			onEvent({
 				timestamp: new Date().toISOString(),
 				eventType: 'complete',

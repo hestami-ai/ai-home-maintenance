@@ -291,7 +291,7 @@ export const CAPABILITY_TEMPLATES: CapabilityTemplate[] = [
  * Returns templates sorted by match strength (most trigger pattern matches first).
  */
 export function findMatchingTemplates(keywords: string[]): CapabilityTemplate[] {
-	if (keywords.length === 0) return [];
+	if (keywords.length === 0) {return [];}
 
 	const loweredKeywords = keywords.map(k => k.toLowerCase());
 

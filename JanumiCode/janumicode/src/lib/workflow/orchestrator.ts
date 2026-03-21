@@ -30,29 +30,14 @@ import {
 	TransitionTrigger,
 } from './stateMachine';
 import { hasOpenGates, createReviewGate, createGate, GateTriggerCondition } from './gates';
-import {
-	executeIntakeConversationTurn,
-	executeIntakeGatheringTurn,
-	executeIntakePlanFinalization,
-	executeIntakePlanApproval,
-	executeIntakeAnalysis,
-	executeIntakeClarificationTurn,
-	executeProposerDomains,
-	executeProposerJourneys,
-	executeProposerEntities,
-	executeProposerIntegrations,
-} from './intakePhase';
 import { IntakeSubState, IntakeMode, ProposerPhase } from '../types';
 import type { DomainCoverageMap } from '../types';
-import { getOrCreateIntakeConversation } from '../events/reader';
 import { writeDialogueEvent, updateIntakeConversation } from '../events/writer';
 import { classifyIntakeInput } from './intakeClassifier';
 import {
 	initializeCoverageMap,
-	formatUncoveredDomainsForPrompt,
 	getCoverageGaps,
 	DOMAIN_INFO,
-	DOMAIN_SEQUENCE,
 } from './domainCoverageTracker';
 import { getEventBus } from '../integration/eventBus';
 import { executeVerification } from './verification';
@@ -82,6 +67,29 @@ import { runNarrativeCuration, produceHandoffDocument } from '../curation/narrat
 import { CurationMode } from '../types/narrativeCurator';
 import { HandoffDocType } from '../context/engineTypes';
 import { embedAndStore, isEmbeddingAvailable } from '../embedding/service';
+
+// ── Workflow state cache ──
+// Avoids redundant synchronous SQLite reads during a single orchestration cycle.
+// Invalidated at cycle boundaries and after any state mutation.
+
+let _cachedWorkflowState: import('./stateMachine').WorkflowState | null = null;
+let _cacheDialogueId: string | null = null;
+
+function getCachedWorkflowState(dialogueId: string): import('./stateMachine').WorkflowState | null {
+	if (_cacheDialogueId === dialogueId && _cachedWorkflowState) {
+		return _cachedWorkflowState;
+	}
+	const result = getWorkflowState(dialogueId);
+	if (!result.success) {return null;}
+	_cachedWorkflowState = result.value;
+	_cacheDialogueId = dialogueId;
+	return result.value;
+}
+
+function invalidateWorkflowStateCache(): void {
+	_cachedWorkflowState = null;
+	_cacheDialogueId = null;
+}
 
 // ── MAKER imports ──
 import type { TaskUnit, IntentRecord, AcceptanceContract, ValidationPacket, ToolchainDetection, RepairPacket } from '../types/maker';
@@ -221,223 +229,9 @@ export function startWorkflow(
 	}
 }
 
-/**
- * Execute INTAKE phase
- * Conversational planning phase: Human discusses requirements with Technical Expert.
- * Dispatches to sub-state handlers based on the current IntakeSubState.
- *
- * Sub-states:
- *   DISCUSSING         → executeIntakeConversationTurn() → awaitingInput: true
- *   SYNTHESIZING       → executeIntakePlanFinalization() → gateTriggered: true
- *   AWAITING_APPROVAL  → executeIntakePlanApproval()     → nextPhase: PROPOSE
- *
- * @param dialogueId Dialogue ID
- * @param humanInput The human's latest message (or initial goal for first turn)
- * @returns Result containing phase execution result
- */
-export async function executeIntakePhase(
-	dialogueId: string,
-	humanInput: string
-): Promise<Result<PhaseExecutionResult>> {
-	try {
-		const convResult = getOrCreateIntakeConversation(dialogueId);
-		if (!convResult.success) {
-			return convResult as unknown as Result<PhaseExecutionResult>;
-		}
-
-		const conv = convResult.value;
-
-		switch (conv.subState) {
-			case IntakeSubState.ANALYZING:
-				return await executeIntakeAnalysis(dialogueId, humanInput);
-
-			case IntakeSubState.PRODUCT_REVIEW: {
-				const proposerPhase = conv.draftPlan?.proposerPhase as ProposerPhase | null | undefined;
-				const isMmpSubmission = humanInput.startsWith('[MMP Decisions]');
-
-				// Free text during PRODUCT_REVIEW = refinement feedback.
-				// Re-run the CURRENT proposer round with the feedback so the LLM
-				// can adjust its proposals (e.g., "focus on Pillar 1").
-				if (!isMmpSubmission && humanInput.trim().length > 0) {
-					// Determine which proposer to re-run based on current proposerPhase
-					let rerunSubState: IntakeSubState;
-					if (proposerPhase === ProposerPhase.DOMAIN_MAPPING) {
-						rerunSubState = IntakeSubState.PROPOSING_DOMAINS;
-					} else if (proposerPhase === ProposerPhase.JOURNEY_WORKFLOW) {
-						rerunSubState = IntakeSubState.PROPOSING_JOURNEYS;
-					} else if (proposerPhase === ProposerPhase.ENTITY_DATA_MODEL) {
-						rerunSubState = IntakeSubState.PROPOSING_ENTITIES;
-					} else if (proposerPhase === ProposerPhase.INTEGRATION_QUALITY) {
-						rerunSubState = IntakeSubState.PROPOSING_INTEGRATIONS;
-					} else {
-						rerunSubState = IntakeSubState.PROPOSING_DOMAINS;
-					}
-
-					// Store feedback in plan for the proposer to consume
-					const updatedPlan = { ...conv.draftPlan, humanFeedback: humanInput };
-					updateIntakeConversation(dialogueId, {
-						subState: rerunSubState,
-						draftPlan: updatedPlan as import('../types/intake').IntakePlanDocument,
-					});
-
-					// Re-run the proposer with feedback
-					switch (rerunSubState) {
-						case IntakeSubState.PROPOSING_DOMAINS:
-							return await executeProposerDomains(dialogueId, humanInput);
-						case IntakeSubState.PROPOSING_JOURNEYS:
-							return await executeProposerJourneys(dialogueId, humanInput);
-						case IntakeSubState.PROPOSING_ENTITIES:
-							return await executeProposerEntities(dialogueId, humanInput);
-						case IntakeSubState.PROPOSING_INTEGRATIONS:
-							return await executeProposerIntegrations(dialogueId, humanInput);
-						default:
-							return await executeProposerDomains(dialogueId, humanInput);
-					}
-				}
-
-				// MMP submission — advance to next proposer round
-				let nextSubState: IntakeSubState;
-				if (proposerPhase === ProposerPhase.DOMAIN_MAPPING) {
-					nextSubState = IntakeSubState.PROPOSING_JOURNEYS;
-				} else if (proposerPhase === ProposerPhase.JOURNEY_WORKFLOW) {
-					nextSubState = IntakeSubState.PROPOSING_ENTITIES;
-				} else if (proposerPhase === ProposerPhase.ENTITY_DATA_MODEL) {
-					nextSubState = IntakeSubState.PROPOSING_INTEGRATIONS;
-				} else if (proposerPhase === ProposerPhase.INTEGRATION_QUALITY) {
-					nextSubState = IntakeSubState.SYNTHESIZING;
-				} else {
-					nextSubState = IntakeSubState.PROPOSING;
-				}
-				updateIntakeConversation(dialogueId, { subState: nextSubState });
-
-				// If transitioning to a proposer round, execute it immediately
-				if (nextSubState === IntakeSubState.PROPOSING_JOURNEYS) {
-					return await executeProposerJourneys(dialogueId, humanInput);
-				} else if (nextSubState === IntakeSubState.PROPOSING_ENTITIES) {
-					return await executeProposerEntities(dialogueId, humanInput);
-				} else if (nextSubState === IntakeSubState.PROPOSING_INTEGRATIONS) {
-					return await executeProposerIntegrations(dialogueId, humanInput);
-				} else if (nextSubState === IntakeSubState.SYNTHESIZING) {
-					return await executeIntakePlanFinalization(dialogueId);
-				}
-
-				return {
-					success: true,
-					value: {
-						phase: Phase.INTAKE,
-						success: true,
-						awaitingInput: true,
-						metadata: {},
-						timestamp: new Date().toISOString(),
-					},
-				};
-			}
-
-			// === Proposer-Validator sub-states ===
-			case IntakeSubState.PROPOSING_DOMAINS:
-				return await executeProposerDomains(dialogueId, humanInput);
-
-			case IntakeSubState.PROPOSING_JOURNEYS:
-				return await executeProposerJourneys(dialogueId, humanInput);
-
-			case IntakeSubState.PROPOSING_ENTITIES:
-				return await executeProposerEntities(dialogueId, humanInput);
-
-			case IntakeSubState.PROPOSING_INTEGRATIONS:
-				return await executeProposerIntegrations(dialogueId, humanInput);
-
-			case IntakeSubState.PROPOSING:
-				// User responded to the proposal — transition to CLARIFYING
-				updateIntakeConversation(dialogueId, {
-					subState: IntakeSubState.CLARIFYING,
-					clarificationRound: 1,
-				});
-				return await executeIntakeClarificationTurn(dialogueId, humanInput);
-
-			case IntakeSubState.CLARIFYING:
-				return await executeIntakeClarificationTurn(dialogueId, humanInput);
-
-			case IntakeSubState.GATHERING:
-				return await executeIntakeGatheringTurn(dialogueId, humanInput);
-
-			case IntakeSubState.DISCUSSING:
-				// First turn: cache goal, run classifier, initialize coverage
-				if (conv.turnCount === 0) {
-					updateWorkflowMetadata(dialogueId, {
-						lastIntakeGoal: humanInput,
-					});
-					await initializeAdaptiveIntake(dialogueId, humanInput, []);
-
-					// Re-read conv after initialization to get mode-aware state
-					const freshResult = getOrCreateIntakeConversation(dialogueId);
-					if (freshResult.success) {
-						const fresh = freshResult.value;
-						// STATE_DRIVEN and DOMAIN_GUIDED now use inverted flow (ANALYZING)
-						if (fresh.intakeMode === IntakeMode.STATE_DRIVEN ||
-							fresh.intakeMode === IntakeMode.DOMAIN_GUIDED) {
-							return await executeIntakeAnalysis(dialogueId, humanInput);
-						}
-					}
-				}
-				return await executeIntakeConversationTurn(
-					dialogueId,
-					humanInput
-				);
-
-			case IntakeSubState.SYNTHESIZING:
-				return await executeIntakePlanFinalization(dialogueId);
-
-			case IntakeSubState.AWAITING_APPROVAL: {
-				const approvalResult = executeIntakePlanApproval(dialogueId);
-				// Narrative Curator: intent snapshot after plan approval
-				// MUST await — fire-and-forget spawns a concurrent CLI process that
-				// conflicts with the ARCHITECTURE phase CLI call in the next loop iteration.
-				if (approvalResult.success && approvalResult.value.nextPhase) {
-					try {
-						await runNarrativeCuration(dialogueId, CurationMode.INTENT);
-					} catch (err) {
-						if (isLoggerInitialized()) {
-							getLogger()
-								.child({ component: 'curator' })
-								.warn('Curator INTENT snapshot failed (non-blocking)', {
-									error: err instanceof Error ? err.message : String(err),
-								});
-						}
-					}
-
-					// Produce canonical INTAKE handoff document for downstream phases
-					produceHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE').catch((err) => {
-						if (isLoggerInitialized()) {
-							getLogger().child({ component: 'handoff' }).warn('INTAKE handoff doc failed', {
-								error: err instanceof Error ? err.message : String(err),
-							});
-						}
-					});
-
-					// ── MAKER: Create IntentRecord + AcceptanceContract from approved plan ──
-					createMakerIntentAndContract(dialogueId);
-				}
-				return approvalResult;
-			}
-
-			default:
-				return {
-					success: false,
-					error: new Error(
-						`Unknown intake sub-state: ${conv.subState}`
-					),
-				};
-		}
-	} catch (error) {
-		return {
-			success: false,
-			error:
-				error instanceof Error
-					? error
-					: new Error('Failed to execute INTAKE phase'),
-		};
-	}
-}
+// executeIntakePhase extracted to intakeRouter.ts
+import { executeIntakePhase } from './intakeRouter';
+export { executeIntakePhase };
 
 /**
  * Execute PROPOSE phase
@@ -2058,7 +1852,7 @@ function formatApprovedPlanForExecutor(
  * - Auto-select mode and initialize coverage map
  * - Emit classifier result and mode selection events
  */
-async function initializeAdaptiveIntake(
+export async function initializeAdaptiveIntake(
 	dialogueId: string,
 	humanInput: string,
 	attachments: string[],
@@ -2130,7 +1924,7 @@ async function initializeAdaptiveIntake(
  * Create IntentRecord + AcceptanceContract from approved INTAKE plan.
  * Called at the end of plan approval in INTAKE phase.
  */
-function createMakerIntentAndContract(dialogueId: string): void {
+export function createMakerIntentAndContract(dialogueId: string): void {
 	const logger = isLoggerInitialized()
 		? getLogger().child({ component: 'maker:intake', dialogueId })
 		: undefined;
@@ -2817,6 +2611,9 @@ export async function advanceWorkflow(
 	tokenBudget: number = 10000
 ): Promise<Result<PhaseExecutionResult>> {
 	try {
+		// Invalidate state cache at cycle start
+		invalidateWorkflowStateCache();
+
 		// Get current workflow state
 		const stateResult = getWorkflowState(dialogueId);
 		if (!stateResult.success) {
@@ -2927,6 +2724,11 @@ export async function advanceWorkflow(
 					error: new Error(`Unknown phase: ${currentPhase}`),
 				};
 		}
+
+		// Yield to event loop between phase execution and transition —
+		// prevents micro-stutters in VS Code UI during long orchestration cycles
+		await new Promise(r => setTimeout(r, 0));
+		invalidateWorkflowStateCache();
 
 		if (!phaseResult.success) {
 			// Central failure tracking: record for retry/resume detection

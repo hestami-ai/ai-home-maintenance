@@ -1,0 +1,170 @@
+---
+// Three-era evolution: Files → Prompts → Agents
+---
+
+<div class="evo">
+  <div class="evo__era evo__era--dim">
+    <div class="evo__label">Era 1</div>
+    <div class="evo__card">
+      <div class="evo__diamond"><span>01</span></div>
+      <h4 class="evo__title">The File Era</h4>
+      <ul class="evo__list">
+        <li>Files</li>
+        <li>Functions</li>
+        <li>Diffs</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="evo__arrow">▸</div>
+
+  <div class="evo__era evo__era--mid">
+    <div class="evo__label">Era 2</div>
+    <div class="evo__card">
+      <div class="evo__diamond"><span>02</span></div>
+      <h4 class="evo__title">The Copilot Era</h4>
+      <ul class="evo__list">
+        <li>Prompts</li>
+        <li>Responses</li>
+        <li>Copilots</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="evo__arrow">▸</div>
+
+  <div class="evo__era evo__era--bright">
+    <div class="evo__label">Era 3</div>
+    <div class="evo__card">
+      <div class="evo__diamond"><span>03</span></div>
+      <h4 class="evo__title">The Governed Era</h4>
+      <ul class="evo__list">
+        <li>Agents</li>
+        <li>Governance</li>
+        <li>Verification</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<style>
+  .evo {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: var(--space-2xl) 0;
+  }
+
+  .evo__era {
+    flex: 1;
+    text-align: center;
+  }
+
+  .evo__label {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-sm);
+  }
+
+  .evo__card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl) var(--space-lg);
+    position: relative;
+  }
+
+  .evo__diamond {
+    width: 28px;
+    height: 28px;
+    transform: rotate(45deg);
+    border: 2px solid var(--color-border);
+    border-radius: 3px;
+    margin: 0 auto var(--space-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .evo__diamond span {
+    display: block;
+    transform: rotate(-45deg);
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+
+  .evo__title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: var(--space-sm);
+    color: var(--color-text);
+  }
+
+  .evo__list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .evo__list li {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    padding: var(--space-xs) 0;
+    font-family: var(--font-mono);
+  }
+
+  .evo__arrow {
+    flex-shrink: 0;
+    width: 32px;
+    text-align: center;
+    color: var(--color-primary);
+    font-size: 1.4rem;
+    opacity: 0.5;
+  }
+
+  /* Era progression: dim → mid → bright */
+  .evo__era--dim .evo__card {
+    opacity: 0.5;
+  }
+
+  .evo__era--mid .evo__card {
+    opacity: 0.75;
+  }
+  .evo__era--mid .evo__diamond {
+    border-color: var(--color-text-muted);
+  }
+
+  .evo__era--bright .evo__card {
+    border-color: var(--color-border-active);
+    box-shadow: 0 0 24px var(--color-primary-glow);
+  }
+  .evo__era--bright .evo__diamond {
+    border-color: var(--color-primary);
+  }
+  .evo__era--bright .evo__diamond span {
+    color: var(--color-primary);
+  }
+  .evo__era--bright .evo__list li {
+    color: var(--color-text-secondary);
+  }
+  .evo__era--bright .evo__label {
+    color: var(--color-primary);
+  }
+
+  @media (max-width: 768px) {
+    .evo {
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+    .evo__arrow {
+      transform: rotate(90deg);
+      width: auto;
+      padding: var(--space-xs) 0;
+    }
+  }
+</style>

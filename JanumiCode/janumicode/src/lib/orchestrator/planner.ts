@@ -192,15 +192,15 @@ function parsePlanResponse(raw: string): Plan | null {
 		const parsed = JSON.parse(jsonStr);
 
 		// Validate structure
-		if (typeof parsed.intent !== 'string') return null;
-		if (!Array.isArray(parsed.steps)) return null;
-		if (typeof parsed.expectedOutcome !== 'string') return null;
+		if (typeof parsed.intent !== 'string') {return null;}
+		if (!Array.isArray(parsed.steps)) {return null;}
+		if (typeof parsed.expectedOutcome !== 'string') {return null;}
 
 		// Validate each step
 		for (const step of parsed.steps) {
-			if (typeof step.id !== 'string') return null;
-			if (typeof step.primitiveId !== 'string') return null;
-			if (typeof step.reason !== 'string') return null;
+			if (typeof step.id !== 'string') {return null;}
+			if (typeof step.primitiveId !== 'string') {return null;}
+			if (typeof step.reason !== 'string') {return null;}
 			if (!step.params || typeof step.params !== 'object') {
 				step.params = {};
 			}

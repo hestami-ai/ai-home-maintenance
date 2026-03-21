@@ -114,10 +114,10 @@ export function isAtomic(criteria: StoppingCriteria): boolean {
  */
 export function getViolationSummary(criteria: StoppingCriteria): string[] {
 	const violations: string[] = [];
-	if (!criteria.context_fit) violations.push('context_fit: scope exceeds token budget');
-	if (!criteria.verifiable_output) violations.push('verifiable_output: missing file_scope or responsibility');
-	if (!criteria.clear_inputs) violations.push('clear_inputs: dependencies may be implicit');
-	if (!criteria.single_responsibility) violations.push('single_responsibility: serves too many workflows');
+	if (!criteria.context_fit) {violations.push('context_fit: scope exceeds token budget');}
+	if (!criteria.verifiable_output) {violations.push('verifiable_output: missing file_scope or responsibility');}
+	if (!criteria.clear_inputs) {violations.push('clear_inputs: dependencies may be implicit');}
+	if (!criteria.single_responsibility) {violations.push('single_responsibility: serves too many workflows');}
 	return violations;
 }
 
