@@ -148,7 +148,7 @@ async function handleStartDialogue(payload: {
 		vscode.window.showInformationMessage(`Dialogue started: ${dialogueId}`);
 
 		// Fire-and-forget auto-advance so command palette path also runs the workflow
-		executeWorkflowCycle(dialogueId, llmConfig, config.tokenBudget, 20).catch(() => {});
+		executeWorkflowCycle(dialogueId, llmConfig, config.tokenBudget).catch(() => {});
 
 		return {
 			success: true,

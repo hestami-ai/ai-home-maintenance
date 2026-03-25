@@ -19,6 +19,8 @@ import type { EngineeringDomain } from './intake';
 // ==================== SUB-STATE ====================
 
 export enum ArchitectureSubState {
+	/** Codebase investigation: existing code, patterns, tech stack, constraints */
+	TECHNICAL_ANALYSIS = 'TECHNICAL_ANALYSIS',
 	/** Global decomposition: goal → capabilities → workflows */
 	DECOMPOSING = 'DECOMPOSING',
 	/** Domain modeling: workflows → entities, fields, relationships, invariants */

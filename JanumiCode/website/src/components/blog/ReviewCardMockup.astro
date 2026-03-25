@@ -1,0 +1,256 @@
+---
+// Mockup of a reasoning review card as it appears in the Governed Stream
+---
+
+<div class="rcm">
+  <div class="rcm__parent">
+    <div class="rcm__parent-header">
+      <span class="rcm__parent-icon">⚡</span>
+      <span class="rcm__parent-label">Technical Expert — ARCHITECTURE : Component Design</span>
+      <span class="rcm__parent-badge">🔍 Review</span>
+      <span class="rcm__parent-time">10:42 AM</span>
+    </div>
+    <div class="rcm__parent-body">
+      <code>Analyzing 12 components across 8 domains. Identified shared auth service, event bus, and API gateway as cross-cutting concerns...</code>
+    </div>
+  </div>
+
+  <div class="rcm__review">
+    <div class="rcm__review-header">
+      <span class="rcm__review-icon">🔍</span>
+      <span class="rcm__review-title">Reasoning Review</span>
+      <span class="rcm__review-meta">3 concerns · gemini-2.5-pro · 10:43 AM</span>
+    </div>
+    <div class="rcm__review-assessment">"Component decomposition is structurally sound but makes three assumptions that need validation before execution."</div>
+
+    <div class="rcm__concern rcm__concern--high">
+      <div class="rcm__concern-header">
+        <span class="rcm__concern-sev rcm__concern-sev--high">HIGH</span>
+        <span class="rcm__concern-summary">Auth service assumes single-tenant token scope</span>
+      </div>
+      <div class="rcm__concern-details">
+        <div class="rcm__detail-row"><span class="rcm__detail-label">Detail</span><span>The reasoning concludes auth tokens are tenant-scoped, but the architecture doc specifies multi-tenant with shared token pool. This contradicts PRD-SEC-4 which requires tenant isolation at the token level.</span></div>
+        <div class="rcm__detail-row"><span class="rcm__detail-label">Location</span><span>Step 3 → Auth service component definition</span></div>
+        <div class="rcm__detail-row"><span class="rcm__detail-label">Recommendation</span><span>Re-evaluate auth component with explicit tenant isolation requirement. Check against PRD-SEC-4 before proceeding.</span></div>
+      </div>
+    </div>
+
+    <div class="rcm__concern rcm__concern--medium">
+      <div class="rcm__concern-header">
+        <span class="rcm__concern-sev rcm__concern-sev--medium">MEDIUM</span>
+        <span class="rcm__concern-summary">Event bus throughput not validated against peak load</span>
+      </div>
+    </div>
+
+    <div class="rcm__concern rcm__concern--medium">
+      <div class="rcm__concern-header">
+        <span class="rcm__concern-sev rcm__concern-sev--medium">MEDIUM</span>
+        <span class="rcm__concern-summary">API gateway rate limiting assumes uniform request distribution</span>
+      </div>
+    </div>
+
+    <div class="rcm__actions">
+      <button class="rcm__btn rcm__btn--primary">Acknowledge</button>
+      <button class="rcm__btn">Re-run with corrections</button>
+      <button class="rcm__btn">Add guidance</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .rcm {
+    margin: var(--space-2xl) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  /* Parent command block */
+  .rcm__parent {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .rcm__parent-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .rcm__parent-icon { font-size: 0.75rem; }
+
+  .rcm__parent-label {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    flex: 1;
+  }
+
+  .rcm__parent-badge {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 2px;
+    color: var(--color-primary);
+    background: rgba(0, 212, 255, 0.08);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+  }
+
+  .rcm__parent-time {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+  }
+
+  .rcm__parent-body {
+    padding: var(--space-md);
+  }
+
+  .rcm__parent-body code {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    background: none;
+    padding: 0;
+  }
+
+  /* Review card */
+  .rcm__review {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-error);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+  }
+
+  .rcm__review-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+  }
+
+  .rcm__review-icon { font-size: 0.85rem; }
+
+  .rcm__review-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .rcm__review-meta {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    margin-left: auto;
+  }
+
+  .rcm__review-assessment {
+    font-size: 0.78rem;
+    color: var(--color-text-secondary);
+    font-style: italic;
+    margin-bottom: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border-radius: var(--radius-sm);
+  }
+
+  /* Concerns */
+  .rcm__concern {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-sm);
+    overflow: hidden;
+  }
+
+  .rcm__concern--high { border-left: 3px solid var(--color-error); }
+  .rcm__concern--medium { border-left: 3px solid var(--color-warning); }
+
+  .rcm__concern-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    cursor: default;
+  }
+
+  .rcm__concern-sev {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 1px 5px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .rcm__concern-sev--high { color: var(--color-error); background: rgba(255, 68, 102, 0.1); border: 1px solid rgba(255, 68, 102, 0.25); }
+  .rcm__concern-sev--medium { color: var(--color-warning); background: rgba(255, 184, 0, 0.1); border: 1px solid rgba(255, 184, 0, 0.25); }
+
+  .rcm__concern-summary {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  .rcm__concern-details {
+    padding: var(--space-sm) var(--space-md);
+    padding-left: calc(var(--space-md) + 3px);
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .rcm__detail-row {
+    display: flex;
+    gap: var(--space-sm);
+    padding: 3px 0;
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+
+  .rcm__detail-label {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.6rem;
+    color: var(--color-text-muted);
+    min-width: 90px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Actions */
+  .rcm__actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .rcm__btn {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
+    cursor: default;
+  }
+
+  .rcm__btn--primary {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: rgba(0, 212, 255, 0.3);
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+</style>

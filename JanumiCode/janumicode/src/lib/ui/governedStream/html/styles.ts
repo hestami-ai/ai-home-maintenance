@@ -691,6 +691,11 @@ export function getStyles(): string {
 			font-size: 13px;
 			line-height: 1.5;
 		}
+		.architecture-card .card-body ul {
+			margin: 4px 0;
+			padding-left: 20px;
+			list-style-position: inside;
+		}
 
 		/* Architecture gate — human review card within the architecture family */
 		.architecture-gate {
@@ -3823,6 +3828,8 @@ export function getStyles(): string {
 			padding: 12px;
 			background: var(--vscode-editor-background);
 			border-top: 1px solid var(--vscode-widget-border);
+			max-height: 60vh;
+			overflow-y: auto;
 		}
 
 		.intake-plan-preview.expanded .intake-plan-body {
@@ -5790,6 +5797,44 @@ export function getStyles(): string {
 			color: var(--vscode-charts-red);
 		}
 
+		/* --- Source Attribution Badges --- */
+		.badge-source {
+			display: inline-block;
+			padding: 1px 5px;
+			border-radius: 3px;
+			font-size: 9px;
+			font-weight: 700;
+			font-family: var(--vscode-editor-font-family, monospace);
+			letter-spacing: 0.5px;
+			text-transform: uppercase;
+			vertical-align: middle;
+			margin-right: 4px;
+		}
+
+		.badge-source-doc {
+			background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 20%, transparent);
+			color: var(--vscode-charts-blue, #3794ff);
+			border: 1px solid color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 30%, transparent);
+		}
+
+		.badge-source-user {
+			background: color-mix(in srgb, var(--vscode-charts-green, #89d185) 20%, transparent);
+			color: var(--vscode-charts-green, #89d185);
+			border: 1px solid color-mix(in srgb, var(--vscode-charts-green, #89d185) 30%, transparent);
+		}
+
+		.badge-source-standard {
+			background: color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 20%, transparent);
+			color: var(--vscode-charts-purple, #b180d7);
+			border: 1px solid color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 30%, transparent);
+		}
+
+		.badge-source-ai {
+			background: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 20%, transparent);
+			color: var(--vscode-charts-orange, #d18616);
+			border: 1px solid color-mix(in srgb, var(--vscode-charts-orange, #d18616) 30%, transparent);
+		}
+
 		/* --- MMP Toggle Buttons --- */
 		.mmp-btn {
 			padding: 2px 8px;
@@ -6215,7 +6260,36 @@ export function getStyles(): string {
 			padding: 8px 12px;
 			margin-top: 8px;
 			border-top: 1px solid var(--vscode-editorWidget-border);
+			flex-wrap: wrap;
 		}
+
+		.mmp-bulk-actions {
+			display: flex;
+			gap: 4px;
+			margin-right: auto;
+		}
+
+		.mmp-bulk-btn {
+			font-size: 11px;
+			padding: 2px 8px;
+			border-radius: 3px;
+			border: 1px solid var(--vscode-button-secondaryBackground, #333);
+			background: var(--vscode-button-secondaryBackground, #2a2a2a);
+			color: var(--vscode-button-secondaryForeground, #ccc);
+			cursor: pointer;
+			white-space: nowrap;
+		}
+
+		.mmp-bulk-btn:hover {
+			background: var(--vscode-button-secondaryHoverBackground, #444);
+		}
+
+		.mmp-bulk-accept, .mmp-bulk-accept-pm { border-color: rgba(0, 180, 0, 0.4); }
+		.mmp-bulk-accept:hover, .mmp-bulk-accept-pm:hover { background: rgba(0, 180, 0, 0.15); }
+		.mmp-bulk-reject, .mmp-bulk-reject-pm { border-color: rgba(220, 50, 50, 0.4); }
+		.mmp-bulk-reject:hover, .mmp-bulk-reject-pm:hover { background: rgba(220, 50, 50, 0.15); }
+		.mmp-bulk-defer { border-color: rgba(180, 180, 0, 0.4); }
+		.mmp-bulk-defer:hover { background: rgba(180, 180, 0, 0.15); }
 
 		.mmp-submit-progress {
 			font-size: 12px;
@@ -6377,6 +6451,11 @@ export function getStyles(): string {
 			border-left-color: var(--vscode-charts-blue, #3794ff);
 			background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 6%, var(--vscode-editor-background));
 		}
+
+		.reasoning-review-card.review-severity-clean {
+			border-left-color: var(--vscode-charts-green, #89d185);
+			background: color-mix(in srgb, var(--vscode-charts-green, #89d185) 6%, var(--vscode-editor-background));
+		}
 		.review-header {
 			display: flex;
 			align-items: center;
@@ -6422,6 +6501,33 @@ export function getStyles(): string {
 			color: var(--vscode-descriptionForeground);
 			line-height: 1.5;
 		}
+		.review-prompt-details {
+			margin-top: 10px;
+			border-top: 1px solid var(--vscode-widget-border);
+			padding-top: 8px;
+		}
+
+		.review-prompt-details summary {
+			cursor: pointer;
+			font-size: 12px;
+			color: var(--vscode-descriptionForeground);
+			user-select: none;
+		}
+
+		.review-prompt-content {
+			margin-top: 6px;
+			padding: 8px;
+			background: var(--vscode-textCodeBlock-background, rgba(0, 0, 0, 0.2));
+			border-radius: 4px;
+			font-size: 11px;
+			line-height: 1.4;
+			white-space: pre-wrap;
+			word-break: break-word;
+			max-height: 400px;
+			overflow-y: auto;
+			color: var(--vscode-editor-foreground);
+		}
+
 		.review-actions {
 			display: flex;
 			gap: 8px;

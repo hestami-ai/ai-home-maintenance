@@ -136,6 +136,16 @@ export async function reviewAgentReasoning(
 			options.minSeverity,
 		);
 
+		// Attach the full prompt for transparency in the UI.
+		// buildReviewInput() condenses/truncates for LLM token budgets, but the UI
+		// should show the complete raw inputs so the user can see what the reviewer had.
+		const fullUserMessage = [
+			options.role || options.phase ? `# Context\nRole: ${options.role ?? 'unknown'}, Phase: ${options.phase ?? 'unknown'}` : '',
+			options.rawStreamOutput ? `# Agent Reasoning Trace\n\n${options.rawStreamOutput}` : '',
+			options.finalResponse ? `# Final Response\n\n${options.finalResponse}` : '',
+		].filter(Boolean).join('\n\n---\n\n');
+		review.reviewPrompt = `[System Prompt]\n${REVIEWER_SYSTEM_PROMPT}\n\n[User Message — Full]\n${fullUserMessage}`;
+
 		if (review.hasConcerns) {
 			log?.info('Reasoning concerns found', {
 				role: options.role,
@@ -182,12 +192,10 @@ function buildReviewInput(options: ReviewOptions): string {
 
 	// Final response
 	if (options.finalResponse) {
-		// Truncate very long responses to keep review focused
-		const maxLen = 8000;
-		const response = options.finalResponse.length > maxLen
-			? options.finalResponse.substring(0, maxLen) + '\n\n[... truncated for review]'
-			: options.finalResponse;
-		sections.push(`# Final Response\n\n${response}`);
+		// Send the FULL final response — truncating it causes the reviewer to flag
+		// "missing" content that was actually present but cut off (e.g., personas at the
+		// end of a large JSON response). The reviewer LLM's context window handles sizing.
+		sections.push(`# Final Response\n\n${options.finalResponse}`);
 	}
 
 	return sections.join('\n\n---\n\n');
@@ -206,8 +214,10 @@ function condenseStreamingTrace(raw: string): string {
 		try {
 			const event = JSON.parse(line);
 
-			// Agent reasoning/messages — keep in full
+			// Agent reasoning/messages — keep in full, but skip streaming deltas
+			// (delta messages are fragments of the final response, which is included separately)
 			if (event.type === 'message' || event.type === 'agent_message') {
+				if (event.delta) { continue; } // Skip response deltas — included in Final Response section
 				const content = event.content ?? event.text ?? '';
 				if (content) {
 					parts.push(`[Reasoning] ${content}`);
@@ -225,12 +235,13 @@ function condenseStreamingTrace(raw: string): string {
 				const status = event.status ?? 'done';
 				parts.push(`[Tool result: ${status}]`);
 			}
-			// Codex-specific reasoning
+			// Codex-specific reasoning items (keep — these are actual thinking, not response deltas)
 			else if (event.type === 'item.created' && event.item?.type === 'reasoning') {
-				// Codex reasoning items
+				// Codex reasoning items — no content to extract at creation time
 			}
-			else if (event.type === 'content.delta' && event.delta?.text) {
-				parts.push(event.delta.text);
+			// Skip Codex content deltas — these are response fragments, included in Final Response
+			else if (event.type === 'content.delta') {
+				continue;
 			}
 		} catch {
 			// Non-JSON line — might be raw text output, include if short

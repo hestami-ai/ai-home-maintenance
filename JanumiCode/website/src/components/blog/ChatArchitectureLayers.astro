@@ -1,0 +1,90 @@
+---
+// Chat platform architecture layers: Chat → Commands → Threads → Panels → Backend
+const layers = [
+  { label: 'CHAT', title: 'Input + Notifications', desc: 'Events, alerts, agent messages', color: '--color-text-muted' },
+  { label: 'COMMANDS', title: 'Control Surface', desc: '/jnc status, approve, reject, explain', color: '--color-primary' },
+  { label: 'THREADS', title: 'Scoped Discussions', desc: 'Per-decision reasoning isolation', color: '--color-primary' },
+  { label: 'PANELS', title: 'Deep System Views', desc: 'Links to web-based command center', color: '--color-accent' },
+  { label: 'BACKEND', title: 'Real System State', desc: 'Governed Stream as source of truth', color: '--color-accent' },
+];
+---
+
+<div class="cal">
+  {layers.map((layer, i) => (
+    <div class="cal__layer">
+      <div class="cal__depth" style={`opacity: ${0.3 + i * 0.175}`}>
+        <div class="cal__bar" style={`background: var(${layer.color}); width: ${100 - i * 12}%`}></div>
+      </div>
+      <div class="cal__info">
+        <span class="cal__label" style={`color: var(${layer.color})`}>{layer.label}</span>
+        <span class="cal__title">{layer.title}</span>
+        <span class="cal__desc">{layer.desc}</span>
+      </div>
+    </div>
+  ))}
+</div>
+
+<style>
+  .cal {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .cal__layer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+  }
+
+  .cal__depth {
+    width: 120px;
+    flex-shrink: 0;
+    height: 6px;
+    background: var(--color-bg);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .cal__bar {
+    height: 100%;
+    border-radius: 3px;
+  }
+
+  .cal__info {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  .cal__label {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    min-width: 72px;
+  }
+
+  .cal__title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .cal__desc {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+  }
+
+  @media (max-width: 768px) {
+    .cal__depth { width: 60px; }
+    .cal__info { flex-direction: column; gap: 2px; }
+  }
+</style>

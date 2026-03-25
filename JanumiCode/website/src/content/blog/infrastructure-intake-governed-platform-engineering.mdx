@@ -1,0 +1,188 @@
+---
+title: "Infrastructure Intake: Bringing Governed Development to Platform Engineering"
+description: "JanumiCode's Intake phase works for product features. But platform engineers need different questions. Here's how INFRASTRUCTURE_GUIDED intake brings governed decomposition to Terraform, Kubernetes, and cloud infrastructure."
+pubDate: 2026-04-03T12:00:00
+author: "JanumiCode Team"
+tags: ["platform-engineering", "infrastructure", "intake", "terraform"]
+heroLabel: "BLOG // INFRASTRUCTURE"
+readingTime: "11 min read"
+---
+
+import IntakeModesComparison from '../../components/blog/IntakeModesComparison.astro';
+import InfraIntakeRounds from '../../components/blog/InfraIntakeRounds.astro';
+
+When a product manager says "build a multi-tenant billing system," JanumiCode's Intake phase knows exactly what to do. It decomposes the request into business domains, user journeys, data entities, and integration points. Four proposer rounds, each with Mirror & Menu Protocol decisions, and the result is a structured plan that the Architecture phase can act on.
+
+But when a platform engineer says "set up a new EKS cluster with Datadog monitoring and cross-account IAM roles" — the domain-guided decomposition doesn't fit. There are no user journeys. There are no personas. The entities aren't business objects — they're VPCs, subnets, IAM roles, and Terraform state files.
+
+The major workflow phases — Intake, Architecture, Execute, Verify — are universal. They work for any technical effort. But the *sub-phases within Intake* need to speak the language of the task. And infrastructure has its own language.
+
+---
+
+## The Problem: Wrong Questions for the Right Engineers
+
+JanumiCode's current `DOMAIN_GUIDED` intake mode asks questions oriented around product features:
+
+- "What business domains are involved?"
+- "Who are the personas and stakeholders?"
+- "What user journeys should be supported?"
+- "What data entities need to be modeled?"
+
+These are excellent questions for product development. They're the wrong questions for a platform engineer provisioning cloud infrastructure. An engineer setting up a Kubernetes cluster doesn't have user journeys. They have **topologies, blast-radius boundaries, IAM policies, and deployment pipelines**.
+
+Asking the wrong questions doesn't just slow things down — it produces the wrong artifacts. A domain decomposition of "set up EKS with Datadog" would generate entities like "Cluster" and "MonitoringDashboard" as if they were business objects. The actual decomposition should produce `EnvironmentProposals`, `NetworkBoundaryProposals`, `IAMRoleProposals`, and `ObservabilityProposals`.
+
+---
+
+## Two Modes, One Framework
+
+The solution is a parallel intake mode — `INFRASTRUCTURE_GUIDED` — that shares the same governance framework (Proposer-Validator flow, MMP decisions, human gates) but asks fundamentally different questions and produces different artifacts.
+
+<IntakeModesComparison />
+
+Both modes share:
+- **4 proposer rounds** with structured artifacts at each stage
+- **Mirror & Menu Protocol** for user decisions
+- **Human gates** between rounds
+- **Technical Expert** investigation and constraint discovery
+- **Synthesis** into a structured plan for the Architecture phase
+
+What differs is **what gets proposed, what gets questioned, and what gets validated**.
+
+---
+
+## The Infrastructure Proposer-Validator Flow
+
+When the intake classifier detects an infrastructure-related prompt, it routes to the `INFRASTRUCTURE_GUIDED` mode. The four rounds are designed to move from high-level topology down to operational concerns — the natural decomposition order for infrastructure work.
+
+<InfraIntakeRounds />
+
+### Round 1: Topology & Environments
+
+Before anything else, the system needs to know the shape of the deployment landscape. How many environments? What isolation model? Which regions and availability zones?
+
+The Technical Expert proposes `EnvironmentProposals` (dev, staging, prod, DR) and `NetworkBoundaryProposals` (VPCs, subnets, transit gateways, ingress/egress policies). The engineer validates whether the proposed isolation levels and blast-radius boundaries match compliance requirements.
+
+This is where MMP Mirror cards become particularly valuable. The system might assume a hub-and-spoke VPC model based on the prompt. The engineer can accept, reject, or edit that assumption — and the rejection propagates through all subsequent rounds. No compute resources will be proposed inside a VPC topology that was rejected.
+
+### Round 2: Compute & Storage
+
+With topology established, the system proposes the workloads and state-bearing resources that live within those boundaries.
+
+`ComputeResourceProposals` cover the execution layer — EKS clusters, Fargate profiles, Lambda functions, EC2 instances. `StorageResourceProposals` cover the data layer — RDS instances, DynamoDB tables, S3 buckets, ElastiCache clusters.
+
+The Technical Expert shifts to capacity and statefulness questions: "Is this cache ephemeral or must it survive restarts?" "What's the expected peak requests per second?" "Should we plan for IP exhaustion in the subnets?" These are infrastructure-native questions that a product-focused decomposition would never ask.
+
+### Round 3: Security & IAM
+
+This is the round that makes infrastructure governance non-negotiable.
+
+`IAMRoleProposals` define execution roles, cross-account trust policies, and service-linked roles. `SecurityGroupProposals` define firewall rules and internal network access controls.
+
+The Technical Expert actively probes for compliance scope: "Does this infrastructure process PII or PCI data?" "Do we need encrypted-at-rest volumes with customer-managed KMS keys?" "Are there cross-account trust relationships that require explicit approval?"
+
+The engineer validates that no overly permissive access has been proposed — the Principle of Least Privilege enforced through structured review, not hope.
+
+Pre-Mortem MMP cards are particularly important here. The system surfaces risks like "cross-account role with `sts:AssumeRole` on `*`" and the engineer must explicitly accept or reject each one.
+
+### Round 4: Operations & Delivery
+
+The final round addresses day-2 operations — the concerns that determine whether infrastructure is production-ready or just provisioned.
+
+`DeliveryPipelineProposals` cover deployment mechanisms: Terraform Cloud vs. GitHub Actions vs. Atlantis, Blue/Green vs. Canary deployment strategies, rollback procedures, and state management.
+
+`ObservabilityProposals` cover monitoring: SLIs/SLOs, alerting thresholds, logging strategies, dashboard configurations, and on-call integration.
+
+The engineer confirms that the deployment safety mechanisms are appropriate for the blast radius. A canary deployment for a stateless API is different from a blue/green cutover for a database migration.
+
+---
+
+## How the Technical Expert Shifts
+
+The same Technical Expert agent runs in both intake modes — but its investigation strategy adapts completely based on the mode.
+
+In `DOMAIN_GUIDED` mode, the Technical Expert focuses on:
+- Business requirements and success criteria
+- User experience and interaction patterns
+- Data relationships and domain boundaries
+- Integration contracts and API surfaces
+
+In `INFRASTRUCTURE_GUIDED` mode, the Technical Expert focuses on:
+
+| Focus Area | Typical Investigation |
+|---|---|
+| **Scale & Throughput** | Peak RPS, connection pool sizing, subnet IP capacity planning |
+| **State & Persistence** | Ephemeral vs. persistent, RPO/RTO requirements, backup strategies |
+| **Blast Radius & Compliance** | PII/PCI scope, encryption requirements, audit logging |
+| **Idempotency & State Management** | Terraform state locking, drift detection, import strategies |
+| **Cost & Capacity** | Reserved vs. on-demand, right-sizing, cost allocation tags |
+| **Failure Modes** | AZ failure handling, circuit breakers, graceful degradation |
+
+The constraint discovery is fundamentally different because the constraint landscape is different. Product constraints are about user experience and business logic. Infrastructure constraints are about physics — network latency, storage throughput, IAM policy evaluation order, and the hard limits of cloud provider APIs.
+
+---
+
+## Integration with Engineering Domains
+
+JanumiCode already has a concept of Engineering Domains — the classification system that determines which aspects of a system are relevant to a given task. The `INFRASTRUCTURE_GUIDED` mode doesn't replace this system — it shifts the weights.
+
+Domains that dominate in product intake get de-prioritized:
+- `WORKFLOWS_USE_CASES` — infrastructure doesn't have user workflows
+- `DATA_INFORMATION` — relevant but as state management, not business entities
+- `STAKEHOLDERS` — the stakeholder is the platform team, not end-users
+
+Domains that are secondary in product intake become primary:
+- `ENVIRONMENT_OPERATIONS` — the core of infrastructure work
+- `SECURITY_COMPLIANCE` — elevated from "also consider" to "first-class concern"
+- `QUALITY_ATTRIBUTES` — SLIs, SLOs, performance budgets, reliability targets
+- `VERIFICATION_DELIVERY` — CI/CD, deployment strategies, rollback mechanisms
+
+The same domain framework, dynamically reweighted for the task at hand.
+
+---
+
+## What This Means for Governed Infrastructure
+
+The key insight is that **infrastructure decisions need governance as much as product decisions — maybe more**.
+
+An overly permissive IAM role is a security incident waiting to happen. A misconfigured security group is a data breach vector. A Terraform state file without locking is a race condition that corrupts infrastructure. These aren't theoretical risks — they're the daily reality of platform engineering.
+
+JanumiCode's governance framework — the Proposer-Validator flow, Mirror & Menu Protocol, human gates, claim verification, and audit trail — is exactly what infrastructure provisioning needs:
+
+- **Every IAM role proposal is reviewed** before it's applied
+- **Every security group rule is validated** against compliance requirements
+- **Every deployment strategy is approved** with explicit acknowledgment of blast radius
+- **Every decision is recorded** with full provenance in the append-only audit trail
+
+The Verifier checks claims like "this security group only allows port 443 from the load balancer" against the actual proposed configuration. The Historian checks whether a similar topology was attempted before and what happened. The Context Engineer assembles briefings that include relevant compliance policies and prior infrastructure decisions.
+
+The same governance. Applied to the right domain. Asking the right questions.
+
+---
+
+## Automatic Routing
+
+The intake classifier detects the nature of the prompt and routes to the appropriate mode automatically. Prompts like:
+
+- "Set up a new EKS cluster with Datadog monitoring" → `INFRASTRUCTURE_GUIDED`
+- "Configure cross-account IAM roles for the data pipeline" → `INFRASTRUCTURE_GUIDED`
+- "Build a multi-tenant billing system with Stripe integration" → `DOMAIN_GUIDED`
+- "Add a workflow approval feature to the admin dashboard" → `DOMAIN_GUIDED`
+
+When the classification is ambiguous — "deploy the billing service to production" involves both product and infrastructure concerns — the system presents the choice as an MMP Menu card, letting the engineer decide which decomposition is more appropriate for this particular task.
+
+---
+
+## The Bigger Picture
+
+`INFRASTRUCTURE_GUIDED` is the first of what we expect to be multiple specialized intake modes. The framework is designed to be extensible:
+
+- **`DATA_PIPELINE_GUIDED`** — for ETL, streaming, and data engineering tasks where the decomposition is sources, transformations, sinks, and quality checks
+- **`MIGRATION_GUIDED`** — for system migration tasks where the decomposition is source analysis, mapping, execution waves, and verification
+- **`INCIDENT_RESPONSE_GUIDED`** — for post-incident work where the decomposition is root cause, blast radius, remediation, and prevention
+
+The major phases stay the same. The governance stays the same. What changes is how the Intake phase decomposes the problem — because different kinds of engineering work have fundamentally different structures.
+
+The governed workflow doesn't care whether you're building a feature or provisioning infrastructure. It cares that every decision is intentional, every assumption is surfaced, and every risk is acknowledged before execution begins.
+
+That's what governed development means — regardless of what you're building.

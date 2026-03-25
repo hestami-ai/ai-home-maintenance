@@ -16,9 +16,11 @@
  * and PRESENTING → DESIGNING on human revision requests.
  */
 
-import type { Result, Phase } from '../types';
-import { Role, SpeechAct } from '../types';
+import type { Result } from '../types';
+import { Phase, Role, SpeechAct } from '../types';
 import type { PhaseExecutionResult } from './orchestrator';
+import { initializeCoverageMap, seedCoverageFromAnalysis } from './domainCoverageTracker';
+import { updateIntakeConversation } from '../events/writer';
 import type { MMPPayload, MirrorItem, PreMortemItem } from '../types/mmp';
 import { ArchitectureSubState, ArchitectureDocumentStatus } from '../types/architecture';
 import type {
@@ -47,7 +49,20 @@ import { createGate, GateTriggerCondition } from './gates';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { emitWorkflowCommand, emitCLIActivity } from '../integration/eventBus';
 import { resolveProviderForRole } from '../cli/providerResolver';
+import { buildStdinContent } from '../cli/types';
+import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { randomUUID } from 'node:crypto';
+import { getWorkspaceStructureSummary } from '../context/workspaceReader';
+
+/** Cached workspace summary — read once per architecture phase execution, reused across sub-states. */
+let _cachedWorkspaceSummary: string | null | undefined;
+
+async function getWorkspaceSummaryForArchitecture(): Promise<string | null> {
+	if (_cachedWorkspaceSummary === undefined) {
+		_cachedWorkspaceSummary = await getWorkspaceStructureSummary();
+	}
+	return _cachedWorkspaceSummary;
+}
 
 // ==================== SUB-STATE MANAGEMENT ====================
 
@@ -69,7 +84,7 @@ interface ArchitecturePhaseMetadata {
 }
 
 const DEFAULT_METADATA: ArchitecturePhaseMetadata = {
-	architectureSubState: ArchitectureSubState.DECOMPOSING,
+	architectureSubState: ArchitectureSubState.TECHNICAL_ANALYSIS,
 	architectureDocId: null,
 	designIterations: 0,
 	validationAttempts: 0,
@@ -82,7 +97,7 @@ const DEFAULT_METADATA: ArchitecturePhaseMetadata = {
 
 function getArchitectureMetadata(dialogueId: string): ArchitecturePhaseMetadata {
 	const stateResult = getWorkflowState(dialogueId);
-	if (!stateResult.success) {return { ...DEFAULT_METADATA };}
+	if (!stateResult.success) { return { ...DEFAULT_METADATA }; }
 	const meta = JSON.parse(stateResult.value.metadata);
 	return {
 		architectureSubState: meta.architectureSubState ?? DEFAULT_METADATA.architectureSubState,
@@ -136,12 +151,12 @@ const DOMAIN_KEYWORDS: Record<string, string> = {
  */
 export function backfillDomainMappings(
 	capabilities: CapabilityNode[],
-	 
+
 	approvedPlan: any,
-	 
+
 	domainCoverage: Record<string, any> | null,
 ): CapabilityNode[] {
-	if (!domainCoverage) {return capabilities;}
+	if (!domainCoverage) { return capabilities; }
 
 	// Build requirement ID → domain set map from turn number overlap
 	const reqToDomains = new Map<string, Set<string>>();
@@ -149,12 +164,12 @@ export function backfillDomainMappings(
 	for (const req of requirements) {
 		const reqId = req.id as string;
 		const turnId = req.extractedFromTurnId as number | undefined;
-		if (!reqId) {continue;}
+		if (!reqId) { continue; }
 
 		const domains = new Set<string>();
 		for (const [domain, entry] of Object.entries(domainCoverage)) {
 			const dEntry = entry as { level?: string; turnNumbers?: number[] };
-			if (dEntry.level === 'NONE') {continue;}
+			if (dEntry.level === 'NONE') { continue; }
 			if (turnId !== undefined && dEntry.turnNumbers && dEntry.turnNumbers.includes(turnId)) {
 				domains.add(domain);
 			}
@@ -165,14 +180,14 @@ export function backfillDomainMappings(
 	}
 
 	return capabilities.map(cap => {
-		if (cap.domain_mappings.length > 0) {return cap;} // LLM provided them
+		if (cap.domain_mappings.length > 0) { return cap; } // LLM provided them
 
 		// Strategy 1: Match via source_requirements → domain
 		const inferredDomains = new Set<string>();
 		for (const reqId of cap.source_requirements) {
 			const domains = reqToDomains.get(reqId);
 			if (domains) {
-				for (const d of domains) {inferredDomains.add(d);}
+				for (const d of domains) { inferredDomains.add(d); }
 			}
 		}
 
@@ -279,6 +294,9 @@ export async function executeArchitecturePhase(
 		const meta = getArchitectureMetadata(dialogueId);
 
 		switch (meta.architectureSubState) {
+			case ArchitectureSubState.TECHNICAL_ANALYSIS:
+				return await executeTechnicalAnalysis(dialogueId, tokenBudget, meta);
+
 			case ArchitectureSubState.DECOMPOSING:
 				return await executeDecomposing(dialogueId, tokenBudget, meta);
 
@@ -311,6 +329,245 @@ export async function executeArchitecturePhase(
 	}
 }
 
+// ==================== TECHNICAL ANALYSIS (Codebase Investigation) ====================
+
+/**
+ * TECHNICAL_ANALYSIS sub-state: Investigate the existing codebase, workspace structure,
+ * technology stack, and patterns before decomposition begins.
+ *
+ * Input:  Approved IntakePlanDocument + workspace access
+ * Output: Technical findings stored in architecture metadata → auto-advances to DECOMPOSING
+ */
+async function executeTechnicalAnalysis(
+	dialogueId: string,
+	tokenBudget: number,
+	meta: ArchitecturePhaseMetadata
+): Promise<Result<PhaseExecutionResult>> {
+	const log = isLoggerInitialized()
+		? getLogger().child({ component: 'architecture', subState: 'TECHNICAL_ANALYSIS' })
+		: null;
+
+	log?.info('Starting technical analysis', { dialogueId });
+
+	// 1. Get the approved intake plan
+	const stateResult = getWorkflowState(dialogueId);
+	if (!stateResult.success) {
+		return { success: false, error: new Error('Failed to read workflow state') };
+	}
+	const workflowMeta = JSON.parse(stateResult.value.metadata);
+	const approvedPlan = workflowMeta.approvedIntakePlan;
+
+	if (!approvedPlan) {
+		return { success: false, error: new Error('No approved intake plan found') };
+	}
+
+	// 2. Resolve provider and invoke technical analysis
+	const providerResult = await resolveProviderForRole(Role.TECHNICAL_EXPERT);
+	if (!providerResult.success) {
+		return providerResult as unknown as Result<PhaseExecutionResult>;
+	}
+
+	const analysisCmdId = randomUUID();
+	const providerName = providerResult.value.name || 'LLM';
+
+	// 3. Build context: approved plan summary + workspace access instructions
+	const contextParts: string[] = [
+		'# Approved Implementation Plan',
+		`**Title:** ${approvedPlan.title || 'Untitled'}`,
+		`**Summary:** ${approvedPlan.summary || ''}`,
+	];
+
+	if (approvedPlan.requirements?.length) {
+		contextParts.push('## Requirements');
+		for (const r of approvedPlan.requirements) {
+			contextParts.push(`- [${r.id}] ${r.text}`);
+		}
+	}
+	if (approvedPlan.constraints?.length) {
+		contextParts.push('## Constraints');
+		for (const c of approvedPlan.constraints) {
+			contextParts.push(`- [${c.id}] ${c.text}`);
+		}
+	}
+	if (approvedPlan.decisions?.length) {
+		contextParts.push('## Decisions');
+		for (const d of approvedPlan.decisions) {
+			contextParts.push(`- [${d.id}] ${d.text}`);
+		}
+	}
+
+	const TECHNICAL_ANALYSIS_PROMPT = `You are the TECHNICAL EXPERT in the JanumiCode autonomous system, performing TECHNICAL ANALYSIS for the ARCHITECTURE phase.
+
+# Your Task
+
+An implementation plan has been approved. Before the system can decompose it into architecture, you must investigate the existing codebase and technical landscape. You must:
+
+1. **Explore the workspace**: List directories, read key files (package.json, tsconfig, configs, docker files, etc.)
+2. **Identify existing patterns**: What frameworks, libraries, design patterns, and conventions are already in use?
+3. **Map existing code structure**: What modules/components already exist? What's the directory layout?
+4. **Identify technical constraints**: What does the existing codebase impose on the architecture? (e.g., existing database schema, API contracts, auth patterns)
+5. **Assess build/deploy infrastructure**: What CI/CD, containerization, hosting is in place?
+
+# Critical Rules
+
+- DO NOT modify any files. This is read-only investigation.
+- DO NOT propose architecture decisions. That's the next phase's job.
+- DO NOT ask questions. Produce findings only.
+- Be thorough — read actual files, don't guess from names.
+
+# Response Format
+
+Your response MUST be valid JSON:
+
+{
+  "analysisSummary": "A comprehensive 2-4 paragraph summary of the technical landscape: what exists, what patterns are established, what the codebase state is.",
+  "codebaseFindings": [
+    "path/to/file - what was found and why it matters for architecture"
+  ],
+  "technicalNotes": [
+    "Observation about existing patterns, conventions, or constraints that architecture must respect"
+  ],
+  "existingStack": {
+    "languages": ["TypeScript", "Python"],
+    "frameworks": ["SvelteKit", "Express"],
+    "databases": ["PostgreSQL"],
+    "infrastructure": ["Docker Compose", "Cloudflare"],
+    "other": ["any other significant tech"]
+  },
+  "proposedApproach": "High-level technical approach informed by what exists in the codebase",
+  "domainAssessment": [
+    { "domain": "PROBLEM_MISSION", "level": "ADEQUATE", "evidence": "Clearly defined in specs and approved plan" },
+    { "domain": "DATA_INFORMATION", "level": "PARTIAL", "evidence": "Schema exists but migration strategy unclear" },
+    { "domain": "SECURITY_COMPLIANCE", "level": "NONE", "evidence": "No auth implementation found in codebase" }
+  ]
+}
+
+For domainAssessment, assess each of the 12 engineering domains based on what you find in the codebase AND the approved plan:
+1. PROBLEM_MISSION, 2. STAKEHOLDERS, 3. SCOPE, 4. CAPABILITIES, 5. WORKFLOWS_USE_CASES,
+6. DATA_INFORMATION, 7. INTEGRATION_INTERFACES, 8. SECURITY_COMPLIANCE, 9. QUALITY_ATTRIBUTES,
+10. ENVIRONMENT_OPERATIONS, 11. ARCHITECTURE, 12. VERIFICATION_DELIVERY
+
+Levels: ADEQUATE (well covered), PARTIAL (some coverage), NONE (not addressed).`;
+
+	const stdinContent = buildStdinContent(TECHNICAL_ANALYSIS_PROMPT, contextParts.join('\n\n'));
+
+	// 4. Emit command block and invoke
+	emitWorkflowCommand({
+		dialogueId,
+		commandId: analysisCmdId,
+		action: 'start',
+		commandType: 'role_invocation',
+		label: `Architect — Technical Analysis [${providerName}]`,
+		summary: 'Investigating codebase and technical landscape',
+		status: 'running',
+		timestamp: new Date().toISOString(),
+	});
+
+	const cliResult = await invokeRoleStreaming({
+		provider: providerResult.value,
+		stdinContent,
+		dialogueId,
+		onEvent: buildArchitectureOnEvent(dialogueId),
+	});
+
+	if (!cliResult.success) {
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: analysisCmdId,
+			action: 'error',
+			commandType: 'role_invocation',
+			label: `Architect — Technical Analysis [${providerName}]`,
+			summary: `Failed: ${cliResult.error.message}`,
+			status: 'error',
+			timestamp: new Date().toISOString(),
+		});
+		return cliResult as unknown as Result<PhaseExecutionResult>;
+	}
+
+	// 5. Parse results and store in metadata
+	let technicalFindings: Record<string, unknown> = {};
+	try {
+		const rawResponse = cliResult.value.response;
+		// Try direct parse, then brace extraction
+		try {
+			technicalFindings = JSON.parse(rawResponse);
+		} catch {
+			const braceStart = rawResponse.indexOf('{');
+			const braceEnd = rawResponse.lastIndexOf('}');
+			if (braceStart !== -1 && braceEnd > braceStart) {
+				technicalFindings = JSON.parse(rawResponse.substring(braceStart, braceEnd + 1));
+			}
+		}
+	} catch (err) {
+		log?.warn('Failed to parse technical analysis response', { error: err instanceof Error ? err.message : String(err) });
+	}
+
+	// Store findings in workflow metadata for downstream sub-phases
+	updateWorkflowMetadata(dialogueId, {
+		technicalAnalysis: technicalFindings,
+	});
+
+	// Seed domain coverage from the technical analysis domain assessment
+	const domainAssessment = Array.isArray(technicalFindings.domainAssessment)
+		? technicalFindings.domainAssessment as Array<{ domain: string; level: string; evidence: string }>
+		: [];
+	if (domainAssessment.length > 0) {
+		const coverageMap = initializeCoverageMap();
+		const seededCoverage = seedCoverageFromAnalysis(coverageMap, domainAssessment);
+		updateIntakeConversation(dialogueId, { domainCoverage: seededCoverage });
+		log?.info('Domain coverage seeded from technical analysis', {
+			adequate: domainAssessment.filter(d => d.level === 'ADEQUATE').length,
+			partial: domainAssessment.filter(d => d.level === 'PARTIAL').length,
+			none: domainAssessment.filter(d => d.level === 'NONE').length,
+		});
+	}
+
+	// Store as dialogue event for visibility
+	writeDialogueEvent({
+		dialogue_id: dialogueId,
+		event_type: 'architecture_technical_analysis',
+		role: Role.TECHNICAL_EXPERT,
+		phase: Phase.ARCHITECTURE,
+		speech_act: SpeechAct.EVIDENCE,
+		summary: (technicalFindings.analysisSummary as string)?.substring(0, 200) || 'Technical analysis complete',
+		content: JSON.stringify(technicalFindings),
+		detail: {
+			codebaseFindings: technicalFindings.codebaseFindings ?? [],
+			technicalNotes: technicalFindings.technicalNotes ?? [],
+			existingStack: technicalFindings.existingStack ?? {},
+		},
+	});
+
+	emitWorkflowCommand({
+		dialogueId,
+		commandId: analysisCmdId,
+		action: 'complete',
+		commandType: 'role_invocation',
+		label: `Architect — Technical Analysis [${providerName}]`,
+		summary: 'Technical analysis complete',
+		status: 'success',
+		timestamp: new Date().toISOString(),
+	});
+
+	log?.info('Technical analysis complete, advancing to DECOMPOSING', { dialogueId });
+
+	// 6. Auto-advance to DECOMPOSING
+	updateWorkflowMetadata(dialogueId, {
+		architectureSubState: ArchitectureSubState.DECOMPOSING,
+	});
+
+	// Return without awaitingInput — orchestrator will loop and execute DECOMPOSING
+	return {
+		success: true,
+		value: {
+			phase: Phase.ARCHITECTURE,
+			success: true,
+			metadata: { subState: 'TECHNICAL_ANALYSIS' },
+			timestamp: new Date().toISOString(),
+		},
+	};
+}
+
 // ==================== DECOMPOSING (Global Planner) ====================
 
 /**
@@ -329,7 +586,10 @@ async function executeDecomposing(
 		? getLogger().child({ component: 'architecture', subState: 'DECOMPOSING' })
 		: null;
 
-	log?.info('Starting architecture decomposition', { dialogueId });
+	const isRepairPass = meta.validationAttempts > 0;
+	log?.info(isRepairPass ? 'Starting architecture decomposition (REPAIR pass)' : 'Starting architecture decomposition', {
+		dialogueId, validationAttempts: meta.validationAttempts,
+	});
 
 	// 1. Get the approved intake plan from workflow metadata
 	const stateResult = getWorkflowState(dialogueId);
@@ -346,6 +606,15 @@ async function executeDecomposing(
 		};
 	}
 
+	// 1b. On repair passes, load the prior architecture doc so the agent can fix specific issues
+	let priorArchDoc: import('../types/architecture').ArchitectureDocument | null = null;
+	if (isRepairPass && meta.architectureDocId) {
+		const priorResult = getArchitectureDocumentForDialogue(dialogueId);
+		if (priorResult.success) {
+			priorArchDoc = priorResult.value;
+		}
+	}
+
 	// 2. Invoke Architecture Expert LLM for capability detection + workflow graph
 	const decomposeCmdId = randomUUID();
 
@@ -356,24 +625,18 @@ async function executeDecomposing(
 		if (pResult.success) { providerName = pResult.value.name; }
 	} catch { /* use fallback */ }
 
-	emitWorkflowCommand({
-		dialogueId,
-		commandId: decomposeCmdId,
-		action: 'start',
-		commandType: 'role_invocation',
-		label: `Architect — Capability Decomposition [${providerName}]`,
-		summary: `Analyzing approved plan: "${approvedPlan.title}"`,
-		status: 'running',
-		timestamp: new Date().toISOString(),
-	});
-
 	const { invokeArchitectureDecomposition } = await import('../roles/architectureExpert.js');
 	const decompositionResult = await invokeArchitectureDecomposition(
 		dialogueId,
 		approvedPlan,
 		approvedPlan.domainCoverage ?? null,
 		tokenBudget,
-		{ commandId: decomposeCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId), humanFeedback: meta.humanFeedback }
+		{
+			commandId: decomposeCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
+			humanFeedback: meta.humanFeedback,
+			priorArchitectureDoc: priorArchDoc,
+			commandBlock: { dialogueId, commandId: decomposeCmdId, label: `Architect — Capability Decomposition [${providerName}]${isRepairPass ? ' (Repair)' : ''}`, commandType: 'role_invocation' },
+		}
 	);
 
 	if (!decompositionResult.success) {
@@ -397,6 +660,20 @@ async function executeDecomposing(
 	const capabilities = backfillDomainMappings(
 		rawCapabilities, approvedPlan, approvedPlan.domainCoverage ?? null
 	);
+
+	// RC2: Remove dangling workflow references — capabilities may reference workflow IDs
+	// that the LLM didn't define. This prevents cascading validation failures downstream.
+	const definedWorkflowIds = new Set(workflows.map((w: { workflow_id: string }) => w.workflow_id));
+	for (const cap of capabilities) {
+		const before = cap.workflows.length;
+		cap.workflows = cap.workflows.filter((wfId: string) => definedWorkflowIds.has(wfId));
+		if (cap.workflows.length < before) {
+			log?.warn('Removed dangling workflow references from capability', {
+				capabilityId: cap.capability_id,
+				removed: before - cap.workflows.length,
+			});
+		}
+	}
 
 	const now = new Date().toISOString();
 	emitWorkflowCommand({
@@ -432,20 +709,41 @@ async function executeDecomposing(
 		timestamp: now,
 	});
 
-	// 3. Create the initial ArchitectureDocument
-	const docResult = createArchitectureDocument({
-		dialogue_id: dialogueId,
-		version: 1,
-		capabilities,
-		workflow_graph: workflows,
-		components: [],
-		data_models: [],
-		interfaces: [],
-		implementation_sequence: [],
-		goal_alignment_score: null,
-		validation_findings: [],
-		status: ArchitectureDocumentStatus.DRAFT,
-	});
+	// 3. Create or update the ArchitectureDocument
+	let docResult: import('../types').Result<import('../types/architecture').ArchitectureDocument>;
+
+	if (isRepairPass && priorArchDoc) {
+		// Repair pass: update the existing document, preserving data_models/components/interfaces
+		// from prior passes that aren't being re-decomposed
+		docResult = updateArchitectureDocument(priorArchDoc.doc_id, {
+			capabilities,
+			workflow_graph: workflows,
+			// Reset downstream artifacts — they'll be regenerated by MODELING/DESIGNING/SEQUENCING
+			components: [],
+			data_models: [],
+			interfaces: [],
+			implementation_sequence: [],
+			goal_alignment_score: null,
+			validation_findings: [],
+			status: ArchitectureDocumentStatus.DRAFT,
+		});
+		log?.info('Updated existing architecture document for repair pass', { docId: priorArchDoc.doc_id });
+	} else {
+		// First pass: create a new document
+		docResult = createArchitectureDocument({
+			dialogue_id: dialogueId,
+			version: 1,
+			capabilities,
+			workflow_graph: workflows,
+			components: [],
+			data_models: [],
+			interfaces: [],
+			implementation_sequence: [],
+			goal_alignment_score: null,
+			validation_findings: [],
+			status: ArchitectureDocumentStatus.DRAFT,
+		});
+	}
 
 	if (!docResult.success) {
 		return { success: false, error: docResult.error };
@@ -464,10 +762,12 @@ async function executeDecomposing(
 	});
 
 	// 5. Advance sub-state to MODELING
+	// Clear humanFeedback after repair pass so downstream sub-phases don't see stale findings
 	updateArchitectureMetadata(dialogueId, {
 		architectureSubState: ArchitectureSubState.MODELING,
 		architectureDocId: docResult.value.doc_id,
 		designIterations: 0,
+		humanFeedback: isRepairPass ? null : meta.humanFeedback,
 	});
 
 	log?.info('Decomposition complete, advancing to MODELING', {
@@ -536,23 +836,26 @@ async function executeModeling(
 		if (pResult.success) { providerName = pResult.value.name; }
 	} catch { /* use fallback */ }
 
-	emitWorkflowCommand({
-		dialogueId,
-		commandId: modelCmdId,
-		action: 'start',
-		commandType: 'role_invocation',
-		label: `Architect — Domain Modeling [${providerName}]`,
-		summary: `Modeling domain entities from ${doc.capabilities.length} capabilities, ${doc.workflow_graph.length} workflows`,
-		status: 'running',
-		timestamp: new Date().toISOString(),
-	});
+	// Get approved plan for entityProposals/domainProposals access
+	const modelStateResult = getWorkflowState(dialogueId);
+	const modelApprovedPlan = modelStateResult.success
+		? JSON.parse(modelStateResult.value.metadata).approvedIntakePlan ?? null
+		: null;
+
+	const modelWorkspaceSummary = await getWorkspaceSummaryForArchitecture();
 
 	const { invokeArchitectureModeling } = await import('../roles/architectureExpert.js');
 	const modelResult = await invokeArchitectureModeling(
 		dialogueId,
 		doc,
 		tokenBudget,
-		{ commandId: modelCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId) }
+		{
+			commandId: modelCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
+			humanFeedback: meta.humanFeedback,
+			approvedPlan: modelApprovedPlan,
+			workspaceSpecs: modelWorkspaceSummary,
+			commandBlock: { dialogueId, commandId: modelCmdId, label: `Architect — Domain Modeling [${providerName}]`, commandType: 'role_invocation' },
+		}
 	);
 
 	if (!modelResult.success) {
@@ -696,17 +999,6 @@ async function executeDesigning(
 			if (pResult.success) { deeperProviderName = pResult.value.name; }
 		} catch { /* use fallback */ }
 
-		emitWorkflowCommand({
-			dialogueId,
-			commandId: deeperCmdId,
-			action: 'start',
-			commandType: 'role_invocation',
-			label: `Architect — Deeper Decomposition [Depth ${meta.decompositionDepth}] [${deeperProviderName}]`,
-			summary: `Re-analyzing ${doc.components.length} components for meaningful sub-component boundaries`,
-			status: 'running',
-			timestamp: new Date().toISOString(),
-		});
-
 		// Re-invoke with explicit deeper decomposition feedback
 		const deeperFeedback = [
 			'The human has requested DEEPER DECOMPOSITION of the current component architecture.',
@@ -727,6 +1019,8 @@ async function executeDesigning(
 			'Keep components that are already well-scoped. Only decompose where it adds clarity.',
 		].join('\n');
 
+		const deeperWorkspaceSummary = await getWorkspaceSummaryForArchitecture();
+
 		const { invokeArchitectureDesign } = await import('../roles/architectureExpert.js');
 		const deeperResult = await invokeArchitectureDesign(
 			dialogueId,
@@ -734,7 +1028,11 @@ async function executeDesigning(
 			meta.decompositionConfig,
 			deeperFeedback,
 			tokenBudget,
-			{ commandId: deeperCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId) }
+			{
+				commandId: deeperCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
+				workspaceSpecs: deeperWorkspaceSummary,
+				commandBlock: { dialogueId, commandId: deeperCmdId, label: `Architect — Deeper Decomposition [Depth ${meta.decompositionDepth}] [${deeperProviderName}]`, commandType: 'role_invocation' as const },
+			}
 		);
 
 		if (!deeperResult.success) {
@@ -801,16 +1099,16 @@ async function executeDesigning(
 			if (pResult.success) { designProviderName = pResult.value.name; }
 		} catch { /* use fallback */ }
 
-		emitWorkflowCommand({
-			dialogueId,
-			commandId: designCmdId,
-			action: 'start',
-			commandType: 'role_invocation',
-			label: `Architect — Architecture Design${passLabel} [${designProviderName}]`,
-			summary: `Designing components from ${doc.capabilities.length} capabilities, ${doc.workflow_graph.length} workflows, ${doc.data_models.length} domain entities`,
-			status: 'running',
-			timestamp: new Date().toISOString(),
-		});
+		// Get constraints/decisions from approved plan for the DESIGNING agent
+		const designStateResult = getWorkflowState(dialogueId);
+		const designPlan = designStateResult.success
+			? JSON.parse(designStateResult.value.metadata).approvedIntakePlan ?? null
+			: null;
+		const constraintsAndDecisions = designPlan
+			? { constraints: designPlan.constraints, decisions: designPlan.decisions, technicalNotes: designPlan.technicalNotes }
+			: null;
+
+		const designWorkspaceSummary = await getWorkspaceSummaryForArchitecture();
 
 		const { invokeArchitectureDesign } = await import('../roles/architectureExpert.js');
 		const designResult = await invokeArchitectureDesign(
@@ -819,7 +1117,12 @@ async function executeDesigning(
 			meta.decompositionConfig,
 			meta.humanFeedback,
 			tokenBudget,
-			{ commandId: designCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId) }
+			{
+				commandId: designCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
+				constraintsAndDecisions,
+				workspaceSpecs: designWorkspaceSummary,
+				commandBlock: { dialogueId, commandId: designCmdId, label: `Architect — Architecture Design${passLabel} [${designProviderName}]`, commandType: 'role_invocation' as const },
+			}
 		);
 
 		if (!designResult.success) {
@@ -897,10 +1200,23 @@ async function executeDesigning(
 	const { invokeBatchDecomposition } = await import('../roles/architectureExpert.js');
 	type DecomposeFnType = import('./architectureRecursion').DecomposeFn;
 
+	// Get constraints/decisions for the batch decomposition agent (Intake context)
+	const rtdStateResult = getWorkflowState(dialogueId);
+	const rtdPlan = rtdStateResult.success
+		? JSON.parse(rtdStateResult.value.metadata).approvedIntakePlan ?? null
+		: null;
+	const rtdConstraints = rtdPlan
+		? { constraints: rtdPlan.constraints, decisions: rtdPlan.decisions, technicalNotes: rtdPlan.technicalNotes }
+		: null;
+
 	const decomposeFn: DecomposeFnType = async (violating) => {
 		const result = await invokeBatchDecomposition(
 			dialogueId, violating, doc,
-			{ commandId: recursionCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId) }
+			{
+				commandId: recursionCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
+				constraintsAndDecisions: rtdConstraints,
+				humanFeedback: meta.humanFeedback,
+			}
 		);
 		return result.success ? result.value : [];
 	};
@@ -932,6 +1248,29 @@ async function executeDesigning(
 		status: 'success',
 		timestamp: recursionNow,
 	});
+
+	// RC3: Repair empty workflows_served — if a component has empty workflows_served
+	// but its responsibility or dependencies link it to known workflows, auto-populate.
+	const allWorkflowIds = new Set(doc.workflow_graph.map(w => w.workflow_id));
+	const allWorkflowLabels = new Map(doc.workflow_graph.map(w => [w.label.toLowerCase(), w.workflow_id]));
+	for (const comp of finalComponents) {
+		if (comp.workflows_served.length === 0) {
+			// Heuristic: check if component responsibility text mentions any workflow labels
+			const respLower = (comp.responsibility || '').toLowerCase();
+			const matched: string[] = [];
+			for (const [label, wfId] of allWorkflowLabels) {
+				if (respLower.includes(label) || respLower.includes(wfId.toLowerCase())) {
+					matched.push(wfId);
+				}
+			}
+			if (matched.length > 0) {
+				comp.workflows_served = matched;
+				log?.info('Auto-populated workflows_served for orphan component', {
+					componentId: comp.component_id, matched,
+				});
+			}
+		}
+	}
 
 	// 4. Update the document with design output (components + interfaces only;
 	//    data_models from MODELING, implementation_sequence from SEQUENCING)
@@ -1033,23 +1372,26 @@ async function executeSequencing(
 		if (pResult.success) { providerName = pResult.value.name; }
 	} catch { /* use fallback */ }
 
-	emitWorkflowCommand({
-		dialogueId,
-		commandId: seqCmdId,
-		action: 'start',
-		commandType: 'role_invocation',
-		label: `Architect — Implementation Sequencing [${providerName}]`,
-		summary: `Planning implementation roadmap for ${doc.components.length} components`,
-		status: 'running',
-		timestamp: new Date().toISOString(),
-	});
+	// Get phasing strategy from approved plan for product-aligned sequencing
+	const seqStateResult = getWorkflowState(dialogueId);
+	const seqPlan = seqStateResult.success
+		? JSON.parse(seqStateResult.value.metadata).approvedIntakePlan ?? null
+		: null;
+
+	const seqWorkspaceSummary = await getWorkspaceSummaryForArchitecture();
 
 	const { invokeArchitectureSequencing } = await import('../roles/architectureExpert.js');
 	const seqResult = await invokeArchitectureSequencing(
 		dialogueId,
 		doc,
 		tokenBudget,
-		{ commandId: seqCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId) }
+		{
+			commandId: seqCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
+			humanFeedback: meta.humanFeedback,
+			phasingStrategy: seqPlan?.phasingStrategy ?? null,
+			workspaceSpecs: seqWorkspaceSummary,
+			commandBlock: { dialogueId, commandId: seqCmdId, label: `Architect — Implementation Sequencing [${providerName}]`, commandType: 'role_invocation' as const },
+		}
 	);
 
 	if (!seqResult.success) {
@@ -1300,14 +1642,19 @@ async function executeValidating(
 
 	// Classify blocking findings by owning phase:
 	// - Capability/workflow issues → DECOMPOSING
-	// - Component/interface/model issues → DESIGNING
+	// - Data model issues → MODELING
+	// - Component/interface issues → DESIGNING (default)
 	const decomposingKeywords = /\bCapability\b.*\bno workflows\b|\bno capability mapping\b|\bno backing requirements\b|\bDomain\b.*\bno capability\b/;
+	const modelingKeywords = /\bData model\b|\breferences unknown target\b|\bentity\b.*\bnot found\b|\brelationship\b.*\bunknown\b|\bdomain model\b/i;
 	const hasDecomposingFindings = blockingStructural.some(f => decomposingKeywords.test(f));
+	const hasModelingFindings = blockingStructural.some(f => modelingKeywords.test(f));
 
-	// Determine re-iteration target: route to the earliest phase that can fix the findings
+	// Route to the earliest phase that can fix the findings
 	const reiterationTarget = hasDecomposingFindings
 		? ArchitectureSubState.DECOMPOSING
-		: ArchitectureSubState.DESIGNING;
+		: hasModelingFindings
+			? ArchitectureSubState.MODELING
+			: ArchitectureSubState.DESIGNING;
 
 	const validated = !hasBlockingFindings;
 	const warningCount = structuralFindings.filter(f => f.startsWith('[WARN]')).length;
@@ -1640,6 +1987,13 @@ export function handleArchitectureDecomposeDeeper(
 function runStructuralValidation(doc: ArchitectureDocument): string[] {
 	const findings: string[] = [];
 
+	// Build ID→name lookup maps for human-readable validation messages
+	const compNameById = new Map(doc.components.map(c => [c.component_id, c.label]));
+	const modelNameById = new Map(doc.data_models.map(m => [m.model_id, m.entity_name]));
+	const workflowNameById = new Map(doc.workflow_graph.map(w => [w.workflow_id, w.label]));
+	const stepNameById = new Map(doc.implementation_sequence.map(s => [s.step_id, s.label]));
+	const resolveName = (id: string, lookup: Map<string, string>) => lookup.get(id) ?? id;
+
 	// 1. Orphan components: components that serve no workflow
 	for (const comp of doc.components) {
 		if (comp.workflows_served.length === 0) {
@@ -1652,7 +2006,7 @@ function runStructuralValidation(doc: ArchitectureDocument): string[] {
 	for (const step of doc.implementation_sequence) {
 		for (const dep of step.dependencies) {
 			if (!stepIds.has(dep)) {
-				findings.push(`Implementation step "${step.label}" depends on unknown step: ${dep}`);
+				findings.push(`Implementation step "${step.label}" depends on unknown step: "${resolveName(dep, stepNameById)}" (${dep})`);
 			}
 		}
 	}
@@ -1666,11 +2020,11 @@ function runStructuralValidation(doc: ArchitectureDocument): string[] {
 	const componentIds = new Set(doc.components.map(c => c.component_id));
 	for (const iface of doc.interfaces) {
 		if (!componentIds.has(iface.provider_component)) {
-			findings.push(`Interface "${iface.label}" references unknown provider: ${iface.provider_component}`);
+			findings.push(`Interface "${iface.label}" references unknown provider: "${resolveName(iface.provider_component, compNameById)}" (${iface.provider_component})`);
 		}
 		for (const consumer of iface.consumer_components) {
 			if (!componentIds.has(consumer)) {
-				findings.push(`Interface "${iface.label}" references unknown consumer: ${consumer}`);
+				findings.push(`Interface "${iface.label}" references unknown consumer: "${resolveName(consumer, compNameById)}" (${consumer})`);
 			}
 		}
 	}
@@ -1680,7 +2034,7 @@ function runStructuralValidation(doc: ArchitectureDocument): string[] {
 	for (const model of doc.data_models) {
 		for (const rel of model.relationships) {
 			if (!modelIds.has(rel.target_model)) {
-				findings.push(`Data model "${model.entity_name}" references unknown target: ${rel.target_model}`);
+				findings.push(`Data model "${model.entity_name}" references unknown target: "${resolveName(rel.target_model, modelNameById)}" (${rel.target_model})`);
 			}
 		}
 	}
@@ -1690,7 +2044,7 @@ function runStructuralValidation(doc: ArchitectureDocument): string[] {
 	for (const cap of doc.capabilities) {
 		for (const wfId of cap.workflows) {
 			if (!workflowIds.has(wfId)) {
-				findings.push(`Capability "${cap.label}" references unknown workflow: ${wfId}`);
+				findings.push(`Capability "${cap.label}" references unknown workflow: "${resolveName(wfId, workflowNameById)}" (${wfId})`);
 			}
 		}
 	}
@@ -1754,7 +2108,7 @@ function runStructuralValidation(doc: ArchitectureDocument): string[] {
 	for (const comp of doc.components) {
 		for (const dep of comp.dependencies) {
 			// Skip parent-child relationships and non-component references
-			if (!componentIds.has(dep)) {continue;}
+			if (!componentIds.has(dep)) { continue; }
 			const edge = `${dep}->${comp.component_id}`;
 			const reverseEdge = `${comp.component_id}->${dep}`;
 			if (!interfaceEdges.has(edge) && !interfaceEdges.has(reverseEdge)) {
@@ -1789,7 +2143,7 @@ function detectCycleInSteps(steps: ImplementationStep[]): string | null {
 
 	const queue: string[] = [];
 	for (const [id, deg] of inDegree) {
-		if (deg === 0) {queue.push(id);}
+		if (deg === 0) { queue.push(id); }
 	}
 
 	let visited = 0;
@@ -1799,7 +2153,7 @@ function detectCycleInSteps(steps: ImplementationStep[]): string | null {
 		for (const neighbor of adj.get(current) ?? []) {
 			const newDeg = (inDegree.get(neighbor) ?? 1) - 1;
 			inDegree.set(neighbor, newDeg);
-			if (newDeg === 0) {queue.push(neighbor);}
+			if (newDeg === 0) { queue.push(neighbor); }
 		}
 	}
 

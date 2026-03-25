@@ -15,6 +15,7 @@ import { Phase, Role, SpeechAct } from '../types';
 import { getWorkflowState, updateWorkflowMetadata } from './stateMachine';
 import { writeDialogueEvent } from '../events/writer';
 import { updateIntakeConversation } from '../events/writer';
+import { getOrCreateIntakeConversation } from '../events/reader';
 import { getDatabase } from '../database/init';
 import { getLogger, isLoggerInitialized } from '../logging';
 
@@ -175,17 +176,9 @@ export function extractJsonFromRawOutput(raw: string): Result<Record<string, unk
 			} catch { /* continue */ }
 		}
 
-		// Strategy 4: Try to repair truncated JSON
-		const partial = trimmed.substring(braceStart);
-		const repaired = repairTruncatedJson(partial);
-		if (repaired) {
-			try {
-				const parsed = JSON.parse(repaired);
-				if (typeof parsed === 'object' && parsed !== null) {
-					return { success: true, value: parsed };
-				}
-			} catch { /* continue */ }
-		}
+		// Note: truncated JSON repair was intentionally removed.
+		// Adopting a half-finished JSON object produces semantically incomplete data
+		// that corrupts downstream state. Better to fail cleanly and ask user to retry.
 	}
 
 	// Strategy 5: JSONL stream — look for the last complete JSON object
@@ -208,42 +201,6 @@ export function extractJsonFromRawOutput(raw: string): Result<Record<string, unk
 	};
 }
 
-/**
- * Attempt to repair truncated JSON by adding missing closing brackets.
- */
-function repairTruncatedJson(partial: string): string | null {
-	let open = 0;
-	let openArr = 0;
-	let inString = false;
-	let escape = false;
-
-	for (const ch of partial) {
-		if (escape) { escape = false; continue; }
-		if (ch === '\\' && inString) { escape = true; continue; }
-		if (ch === '"') { inString = !inString; continue; }
-		if (inString) { continue; }
-
-		if (ch === '{') { open++; }
-		else if (ch === '}') { open--; }
-		else if (ch === '[') { openArr++; }
-		else if (ch === ']') { openArr--; }
-	}
-
-	if (open <= 0 && openArr <= 0) { return null; } // Not truncated
-
-	// Add missing closers
-	let repaired = partial;
-
-	// Remove trailing comma or incomplete key-value
-	repaired = repaired.replace(/,\s*$/, '');
-	repaired = repaired.replace(/:\s*$/, ': null');
-	repaired = repaired.replace(/"[^"]*$/, '"');
-
-	for (let i = 0; i < openArr; i++) { repaired += ']'; }
-	for (let i = 0; i < open; i++) { repaired += '}'; }
-
-	return repaired;
-}
 
 // ==================== FALLBACK: COMMAND BLOCK OUTPUT ====================
 
@@ -288,58 +245,31 @@ function adoptIntakeOutput(
 	const warnings: string[] = [];
 	const fieldsAdopted: string[] = [];
 
-	// Determine if this is an analysis response or a conversation turn
+	// Route by sub-phase first — this prevents misclassification when output fields
+	// overlap across sub-phases (e.g., synthesis output has analysisSummary + updatedPlan)
+	switch (subPhase) {
+		case 'SYNTHESIZING':
+			return adoptIntakeSynthesisOutput(dialogueId, parsed, metadata);
+
+		case 'PROPOSING_DOMAINS':
+		case 'PROPOSING_JOURNEYS':
+		case 'PROPOSING_ENTITIES':
+		case 'PROPOSING_INTEGRATIONS':
+			return adoptIntakeProposerOutput(dialogueId, parsed, subPhase, metadata);
+
+		case 'INTENT_DISCOVERY':
+			return adoptIntakeAnalysisOutput(dialogueId, parsed, metadata);
+
+		default:
+			// Fall through to content-sniffing for legacy sub-phases (GATHERING, DISCUSSING, etc.)
+			break;
+	}
+
+	// Legacy content-sniffing fallback for sub-phases that don't have dedicated handlers
 	const isAnalysis = parsed.analysisSummary || parsed.initialPlan || parsed.codebaseFindings;
 
 	if (isAnalysis) {
-		// Adopt as intake_analysis
-		const analysisSummary = (parsed.analysisSummary as string) ?? '';
-		const initialPlan = (parsed.initialPlan as Record<string, unknown>) ?? {};
-		const codebaseFindings = (parsed.codebaseFindings as string[]) ?? [];
-		const domainAssessment = (parsed.domainAssessment as Array<Record<string, unknown>>) ?? [];
-
-		if (analysisSummary) { fieldsAdopted.push('analysisSummary'); }
-		if (Object.keys(initialPlan).length > 0) { fieldsAdopted.push('initialPlan'); }
-		if (codebaseFindings.length > 0) { fieldsAdopted.push('codebaseFindings'); }
-		if (domainAssessment.length > 0) { fieldsAdopted.push('domainAssessment'); }
-
-		// Store as dialogue event
-		writeDialogueEvent({
-			dialogue_id: dialogueId,
-			event_type: 'intake_analysis',
-			role: Role.TECHNICAL_EXPERT,
-			phase: 'INTAKE',
-			speech_act: SpeechAct.EVIDENCE,
-			summary: 'Analysis complete (adopted from cached output)',
-			content: analysisSummary,
-			detail: {
-				humanMessage: metadata.pendingIntakeInput ?? '[adopted]',
-				expertResponse: parsed,
-				initialPlan,
-				codebaseFindings,
-				domainAssessment,
-				turnNumber: 0,
-			},
-		});
-
-		// Update intake conversation with the plan
-		if (Object.keys(initialPlan).length > 0) {
-			updateIntakeConversation(dialogueId, {
-				draftPlan: initialPlan as unknown as import('../types/intake').IntakePlanDocument,
-				turnCount: 1,
-			});
-		}
-
-		return {
-			success: true,
-			value: {
-				phase: 'INTAKE',
-				subPhase: 'ANALYZING',
-				parsedType: 'IntakeAnalysisResponse',
-				fieldsAdopted,
-				warnings,
-			},
-		};
+		return adoptIntakeAnalysisOutput(dialogueId, parsed, metadata);
 	}
 
 	// Conversation turn response
@@ -376,6 +306,221 @@ function adoptIntakeOutput(
 			phase: 'INTAKE',
 			subPhase: subPhase,
 			parsedType: 'IntakeTurnResponse',
+			fieldsAdopted,
+			warnings,
+		},
+	};
+}
+
+/**
+ * Adopt output from the SYNTHESIZING sub-phase.
+ * Expects: conversationalResponse + updatedPlan (the finalized plan).
+ */
+function adoptIntakeSynthesisOutput(
+	dialogueId: string,
+	parsed: Record<string, unknown>,
+	metadata: Record<string, unknown>,
+): Result<AdoptResult> {
+	const fieldsAdopted: string[] = [];
+	const warnings: string[] = [];
+
+	const updatedPlan = parsed.updatedPlan as Record<string, unknown> | undefined;
+	const conversationalResponse = (parsed.conversationalResponse as string) ?? '';
+
+	if (!updatedPlan || Object.keys(updatedPlan).length === 0) {
+		return {
+			success: false,
+			error: new Error(
+				'Cannot adopt synthesis output: missing or empty "updatedPlan" field. ' +
+				'The LLM response may have been truncated. Retry the synthesis instead of adopting.'
+			),
+		};
+	}
+
+	if (conversationalResponse) { fieldsAdopted.push('conversationalResponse'); }
+	fieldsAdopted.push('updatedPlan');
+
+	// Validate the plan has minimum expected fields
+	const planKeys = Object.keys(updatedPlan);
+	const expectedKeys = ['title', 'summary', 'requirements'];
+	const missingKeys = expectedKeys.filter(k => !planKeys.includes(k));
+	if (missingKeys.length > 0) {
+		warnings.push(`Synthesized plan is missing expected fields: ${missingKeys.join(', ')}. Output may have been truncated.`);
+	}
+
+	// Carry forward proposer artifacts that synthesis may not have included
+	// (mirrors the same safety net in executeIntakePlanFinalization)
+	const convResult = getOrCreateIntakeConversation(dialogueId);
+	if (convResult.success) {
+		const dp = convResult.value.draftPlan;
+		if (dp?.proposerPhase !== null && dp?.proposerPhase !== undefined) {
+			const proposerFields = ['domainProposals', 'entityProposals', 'workflowProposals', 'integrationProposals', 'qualityAttributes'] as const;
+			for (const field of proposerFields) {
+				if (!updatedPlan[field] && dp[field]) {
+					updatedPlan[field] = dp[field] as unknown;
+					warnings.push(`Carried forward '${field}' from draft plan — synthesis output omitted it`);
+				}
+			}
+			// Product artifacts
+			for (const field of ['personas', 'userJourneys', 'phasingStrategy', 'successMetrics'] as const) {
+				if (!updatedPlan[field] && dp[field]) {
+					updatedPlan[field] = dp[field] as unknown;
+				}
+			}
+		}
+	}
+
+	writeDialogueEvent({
+		dialogue_id: dialogueId,
+		event_type: 'intake_turn',
+		role: Role.TECHNICAL_EXPERT,
+		phase: 'INTAKE',
+		speech_act: SpeechAct.EVIDENCE,
+		summary: 'Plan synthesis complete (adopted from cached output)',
+		content: conversationalResponse,
+		detail: {
+			humanMessage: metadata.pendingIntakeInput ?? '[SYSTEM] Synthesize the conversation into a final structured plan.',
+			expertResponse: parsed,
+			planSnapshot: updatedPlan,
+			turnNumber: 0,
+		},
+	});
+
+	updateIntakeConversation(dialogueId, {
+		draftPlan: updatedPlan as unknown as import('../types/intake').IntakePlanDocument,
+	});
+
+	return {
+		success: true,
+		value: {
+			phase: 'INTAKE',
+			subPhase: 'SYNTHESIZING',
+			parsedType: 'IntakeSynthesisResponse',
+			fieldsAdopted,
+			warnings,
+		},
+	};
+}
+
+/**
+ * Adopt output from the INTENT_DISCOVERY sub-phase.
+ * Expects: analysisSummary + initialPlan + codebaseFindings + domainAssessment.
+ */
+function adoptIntakeAnalysisOutput(
+	dialogueId: string,
+	parsed: Record<string, unknown>,
+	metadata: Record<string, unknown>,
+): Result<AdoptResult> {
+	const fieldsAdopted: string[] = [];
+
+	const analysisSummary = (parsed.analysisSummary as string) ?? '';
+	const initialPlan = (parsed.initialPlan as Record<string, unknown>) ?? {};
+	const codebaseFindings = (parsed.codebaseFindings as string[]) ?? [];
+	const domainAssessment = (parsed.domainAssessment as Array<Record<string, unknown>>) ?? [];
+
+	if (analysisSummary) { fieldsAdopted.push('analysisSummary'); }
+	if (Object.keys(initialPlan).length > 0) { fieldsAdopted.push('initialPlan'); }
+	if (codebaseFindings.length > 0) { fieldsAdopted.push('codebaseFindings'); }
+	if (domainAssessment.length > 0) { fieldsAdopted.push('domainAssessment'); }
+
+	writeDialogueEvent({
+		dialogue_id: dialogueId,
+		event_type: 'intake_analysis',
+		role: Role.TECHNICAL_EXPERT,
+		phase: 'INTAKE',
+		speech_act: SpeechAct.EVIDENCE,
+		summary: 'Analysis complete (adopted from cached output)',
+		content: analysisSummary,
+		detail: {
+			humanMessage: metadata.pendingIntakeInput ?? '[adopted]',
+			expertResponse: parsed,
+			initialPlan,
+			codebaseFindings,
+			domainAssessment,
+			turnNumber: 0,
+		},
+	});
+
+	if (Object.keys(initialPlan).length > 0) {
+		updateIntakeConversation(dialogueId, {
+			draftPlan: initialPlan as unknown as import('../types/intake').IntakePlanDocument,
+			turnCount: 1,
+		});
+	}
+
+	return {
+		success: true,
+		value: {
+			phase: 'INTAKE',
+			subPhase: 'INTENT_DISCOVERY',
+			parsedType: 'IntakeAnalysisResponse',
+			fieldsAdopted,
+			warnings: [],
+		},
+	};
+}
+
+/**
+ * Adopt output from proposer sub-phases (PROPOSING_DOMAINS, PROPOSING_JOURNEYS, etc.).
+ * These produce structured artifacts (domains, journeys, entities, integrations) with MMP.
+ */
+function adoptIntakeProposerOutput(
+	dialogueId: string,
+	parsed: Record<string, unknown>,
+	subPhase: string,
+	metadata: Record<string, unknown>,
+): Result<AdoptResult> {
+	const fieldsAdopted: string[] = [];
+	const warnings: string[] = [];
+
+	// Map sub-phase to expected output fields
+	const expectedFields: Record<string, string[]> = {
+		'PROPOSING_DOMAINS': ['domains', 'personas'],
+		'PROPOSING_JOURNEYS': ['userJourneys', 'workflows'],
+		'PROPOSING_ENTITIES': ['entities'],
+		'PROPOSING_INTEGRATIONS': ['integrations', 'qualityAttributes'],
+	};
+
+	const expected = expectedFields[subPhase] ?? [];
+	for (const field of expected) {
+		if (parsed[field]) {
+			fieldsAdopted.push(field);
+		}
+	}
+
+	if (fieldsAdopted.length === 0) {
+		return {
+			success: false,
+			error: new Error(
+				`Cannot adopt ${subPhase} output: none of the expected fields found (${expected.join(', ')}). ` +
+				'The LLM response may have been truncated or malformed.'
+			),
+		};
+	}
+
+	// Store the proposer output as a dialogue event
+	const eventType = 'intake_proposer_' + subPhase.replace('PROPOSING_', '').toLowerCase();
+	writeDialogueEvent({
+		dialogue_id: dialogueId,
+		event_type: eventType,
+		role: Role.TECHNICAL_EXPERT,
+		phase: 'INTAKE',
+		speech_act: SpeechAct.CLAIM,
+		summary: `${subPhase} proposer output adopted`,
+		content: JSON.stringify(parsed),
+		detail: {
+			humanMessage: metadata.pendingIntakeInput ?? '[adopted]',
+			expertResponse: parsed,
+			productDiscoveryMMP: parsed.mmp ? JSON.stringify(parsed.mmp) : undefined,
+		},
+	});
+
+	return {
+		success: true,
+		value: {
+			phase: 'INTAKE',
+			subPhase,
+			parsedType: `IntakeProposer_${subPhase}`,
 			fieldsAdopted,
 			warnings,
 		},

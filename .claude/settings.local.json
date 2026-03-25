@@ -85,7 +85,22 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3090/blog/ide-expanding-agent-command-center/)",
       "Bash(rm \"e:/Projects/hestami-ai/JanumiCode/website/src/pages/blog/[slug].astro\")",
       "Bash(mkdir -p \"e:/Projects/hestami-ai/JanumiCode/website/src/pages/blog/[year]/[month]/[day]\")",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3090/blog/2026/03/26/context-engineering-deep-memory/)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3090/blog/2026/03/26/context-engineering-deep-memory/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3090/blog/2026/04/02/governed-development-beyond-the-ide/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3090/blog/2026/02/02/sculpting-software-from-clay/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3090/blog/2026/04/03/infrastructure-intake-governed-platform-engineering/)",
+      "WebFetch(domain:arxiv.org)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3090/blog/2026/04/09/reasoning-review-strong-models-checking-strong-models/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3090/blog/2026/03/05/mirror-and-menu-protocol/)",
+      "Bash(gemini mcp:*)",
+      "Bash(GEMINI_API_KEY=dummy gemini mcp list)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(GEMINI_API_KEY=dummy gemini mcp list --help)",
+      "Bash(GEMINI_API_KEY=dummy gemini mcp add --help)",
+      "Bash(GEMINI_API_KEY=dummy gemini mcp add deep-memory node -- dist/memory/mcpServer.js --scope project --trust -e \"JANUMICODE_DB_PATH=.janumicode/janumicode.db\")",
+      "Bash(GEMINI_API_KEY=dummy gemini mcp remove deep-memory)",
+      "Bash(GEMINI_API_KEY=dummy gemini mcp add deep-memory node dist/memory/mcpServer.js --scope project --trust -e \"JANUMICODE_DB_PATH=.janumicode/janumicode.db\")",
+      "Bash(2)"
     ]
   }
 }

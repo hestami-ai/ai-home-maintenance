@@ -146,7 +146,7 @@ export type StreamItem =
 	| { type: 'dialogue_start'; dialogueId: string; goal: string; title: string | null; timestamp: string }
 	| { type: 'dialogue_end'; dialogueId: string; status: string; timestamp: string }
 	| { type: 'command_block'; command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[]; hasReview?: boolean }
-	| { type: 'intake_turn'; turn: IntakeConversationTurn; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>; isLatest?: boolean }
+	| { type: 'intake_turn'; turn: IntakeConversationTurn; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>; isLatest?: boolean; eventId?: number }
 	| { type: 'intake_plan_preview'; plan: IntakePlanDocument; isFinal: boolean; timestamp: string }
 	| { type: 'intake_approval_gate'; plan: IntakePlanDocument; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string }
 	| { type: 'intake_mode_selector'; recommendation: IntakeModeRecommendation; timestamp: string; resolved?: boolean; selectedMode?: string }
@@ -154,20 +154,20 @@ export type StreamItem =
 	| { type: 'intake_domain_transition'; fromDomain: string; fromLabel: string; toDomain: string | null; toLabel: string | null; toDescription: string | null; timestamp: string }
 	| { type: 'intake_gathering_complete'; coverageSummary: { adequate: number; partial: number; none: number; percentage: number }; intakeMode: string | null; timestamp: string }
 	| { type: 'intake_analysis'; humanMessage: string; analysisSummary: string; codebaseFindings: string[]; domainAssessment: Array<{ domain: string; level: string; evidence: string }>; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }> }
-	| { type: 'intake_product_discovery'; requestCategory: string; productVision?: string; productDescription?: string; personas?: Array<{ id: string; name: string; description: string; goals: string[]; painPoints: string[] }>; userJourneys?: Array<{ id: string; personaId: string; title: string; scenario: string; steps: Array<{ stepNumber: number; actor: string; action: string; expectedOutcome: string }>; acceptanceCriteria: string[]; priority: string }>; phasingStrategy?: Array<{ phase: string; description: string; journeyIds: string[]; rationale: string }>; successMetrics?: string[]; uxRequirements?: string[]; mmpJson?: string; timestamp: string }
+	| { type: 'intake_product_discovery'; requestCategory: string; productVision?: string; productDescription?: string; personas?: Array<{ id: string; name: string; description: string; goals: string[]; painPoints: string[] }>; userJourneys?: Array<{ id: string; personaId: string; title: string; scenario: string; steps: Array<{ stepNumber: number; actor: string; action: string; expectedOutcome: string }>; acceptanceCriteria: string[]; priority: string }>; phasingStrategy?: Array<{ phase: string; description: string; journeyIds: string[]; rationale: string }>; successMetrics?: string[]; uxRequirements?: string[]; mmpJson?: string; eventId?: number; timestamp: string }
 	| { type: 'intake_proposal'; title: string; summary: string; proposedApproach: string; domainCoverage: { adequate: number; partial: number; none: number; percentage: number }; timestamp: string }
 	// Proposer-Validator items
-	| { type: 'intake_proposer_domains'; domains: Array<{ id: string; name: string; description: string; rationale: string; entityPreview: string[]; workflowPreview: string[] }>; personas: Array<{ id: string; name: string; description: string }>; mmpJson?: string; timestamp: string }
-	| { type: 'intake_proposer_journeys'; journeys: Array<{ id: string; title: string; scenario: string; priority?: string }>; workflows: Array<{ id: string; name: string; description: string; domainId: string }>; mmpJson?: string; timestamp: string }
-	| { type: 'intake_proposer_entities'; entities: Array<{ id: string; name: string; description: string; domainId: string; keyAttributes: string[]; relationships: string[] }>; domainNames?: Record<string, string>; mmpJson?: string; timestamp: string }
-	| { type: 'intake_proposer_integrations'; integrations: Array<{ id: string; name: string; category: string; description: string; standardProviders: string[]; ownershipModel: string }>; qualityAttributes: string[]; mmpJson?: string; timestamp: string }
+	| { type: 'intake_proposer_domains'; domains: Array<{ id: string; name: string; description: string; rationale: string; entityPreview: string[]; workflowPreview: string[] }>; personas: Array<{ id: string; name: string; description: string }>; mmpJson?: string; eventId?: number; timestamp: string }
+	| { type: 'intake_proposer_journeys'; journeys: Array<{ id: string; title: string; scenario: string; priority?: string }>; workflows: Array<{ id: string; name: string; description: string; domainId: string }>; mmpJson?: string; eventId?: number; timestamp: string }
+	| { type: 'intake_proposer_entities'; entities: Array<{ id: string; name: string; description: string; domainId: string; keyAttributes: string[]; relationships: string[] }>; domainNames?: Record<string, string>; mmpJson?: string; eventId?: number; timestamp: string }
+	| { type: 'intake_proposer_integrations'; integrations: Array<{ id: string; name: string; category: string; description: string; standardProviders: string[]; ownershipModel: string }>; qualityAttributes: string[]; mmpJson?: string; eventId?: number; timestamp: string }
 	| { type: 'qa_exchange'; question: string; answer: string; timestamp: string }
-	| { type: 'reasoning_review'; concerns: Array<{ severity: string; summary: string; detail: string; location: string; recommendation: string }>; overallAssessment: string; reviewerModel: string; timestamp: string }
+	| { type: 'reasoning_review'; concerns: Array<{ severity: string; summary: string; detail: string; location: string; recommendation: string }>; overallAssessment: string; reviewerModel: string; reviewPrompt?: string; timestamp: string }
 	// Architecture phase items
 	| { type: 'architecture_capabilities'; capabilities: Array<{ id: string; label: string; requirements: number; workflows: number; parentId: string | null }>; timestamp: string }
 	| { type: 'architecture_design'; components: Array<{ id: string; label: string; responsibility: string; rationale: string; parentId: string | null; workflowsServed: string[]; dependencies: string[]; interactionPatterns: string[]; technologyNotes: string; fileScope: string }>; dataModels: Array<{ id: string; entity: string; description: string; fields: Array<{ name: string; type: string; required: boolean }>; relationships: Array<{ targetModel: string; type: string; description: string }>; invariants: string[] }>; interfaces: Array<{ id: string; label: string; type: string; description: string; contract: string; providerComponent: string; consumerComponents: string[]; sourceWorkflows: string[] }>; implementationSequence: Array<{ id: string; label: string; description: string; componentsInvolved: string[]; dependencies: string[]; complexity: string; verificationMethod: string; sortOrder: number }>; timestamp: string }
 	| { type: 'architecture_validation'; score: number | null; findings: string[]; validated: boolean; timestamp: string }
-	| { type: 'architecture_gate'; docId: string; version: number; capabilities: number; components: number; goalAlignmentScore: number | null; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string; mmpJson?: string; decompositionDepth?: number };
+	| { type: 'architecture_gate'; docId: string; version: number; capabilities: number; components: number; goalAlignmentScore: number | null; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string; mmpJson?: string; decompositionDepth?: number; eventId?: number };
 
 /**
  * Summary of a dialogue for the switcher dropdown
@@ -375,9 +375,15 @@ function buildStreamItems(
 		}
 
 		if (eventType === 'human_message') {
+			const text = event.content ?? event.summary;
+			// Skip MMP decision submissions — these are system-generated context
+			// fed to the next proposer round, not user-authored messages
+			if (text && text.startsWith('[MMP Decisions]')) {
+				continue;
+			}
 			items.push({
 				type: 'human_message',
-				text: event.content ?? event.summary,
+				text,
 				timestamp: event.timestamp,
 			});
 		} else if (eventType === 'intake_turn' || eventType === 'intake_clarification' || eventType === 'intake_gathering') {
@@ -393,7 +399,7 @@ function buildStreamItems(
 				isGathering: eventType === 'intake_gathering',
 				createdAt: event.timestamp,
 			};
-			items.push({ type: 'intake_turn', turn: intakeTurn, timestamp: event.timestamp });
+			items.push({ type: 'intake_turn', turn: intakeTurn, timestamp: event.timestamp, eventId: event.event_id });
 
 			// Inject plan preview if plan version changed
 			const planVersion = intakeTurn.planSnapshot?.version ?? 0;
@@ -434,6 +440,12 @@ function buildStreamItems(
 				const percentage = total > 0 ? Math.round(((adequate + partial * 0.5) / total) * 100) : 0;
 
 				// Emit product discovery card separately (only for product_or_feature with MMP)
+				console.log('[DataAgg] Product discovery check:', {
+					requestCategory: plan.requestCategory,
+					hasProductDiscoveryMMP: !!detail.productDiscoveryMMP,
+					mmpLength: detail.productDiscoveryMMP ? String(detail.productDiscoveryMMP).length : 0,
+					personasCount: plan.personas?.length ?? 0,
+				});
 				if (plan.requestCategory === 'product_or_feature' && detail.productDiscoveryMMP) {
 					items.push({
 						type: 'intake_product_discovery',
@@ -446,6 +458,7 @@ function buildStreamItems(
 						successMetrics: plan.successMetrics,
 						uxRequirements: plan.uxRequirements,
 						mmpJson: detail.productDiscoveryMMP,
+						eventId: event.event_id,
 						timestamp: event.timestamp,
 					});
 				}
@@ -484,6 +497,7 @@ function buildStreamItems(
 					id: p.id as string ?? '', name: p.name as string ?? '', description: p.description as string ?? '',
 				})),
 				mmpJson: detail.productDiscoveryMMP,
+				eventId: event.event_id,
 				timestamp: event.timestamp,
 			});
 		} else if (eventType === 'intake_proposer_journeys') {
@@ -500,6 +514,7 @@ function buildStreamItems(
 					description: w.description as string ?? '', domainId: w.domainId as string ?? '',
 				})),
 				mmpJson: detail.productDiscoveryMMP,
+				eventId: event.event_id,
 				timestamp: event.timestamp,
 			});
 		} else if (eventType === 'intake_proposer_entities') {
@@ -524,6 +539,7 @@ function buildStreamItems(
 				})),
 				domainNames: Object.keys(domainNames).length > 0 ? domainNames : undefined,
 				mmpJson: detail.productDiscoveryMMP,
+				eventId: event.event_id,
 				timestamp: event.timestamp,
 			});
 		} else if (eventType === 'intake_proposer_integrations') {
@@ -539,8 +555,12 @@ function buildStreamItems(
 				})),
 				qualityAttributes: Array.isArray(content.qualityAttributes) ? content.qualityAttributes as string[] : [],
 				mmpJson: detail.productDiscoveryMMP,
+				eventId: event.event_id,
 				timestamp: event.timestamp,
 			});
+		} else if (eventType === 'architecture_technical_analysis') {
+			// Suppressed — content is visible in the Technical Analysis command block card.
+			// The event is stored for audit/history but doesn't need its own stream card.
 		} else if (eventType === 'architecture_decomposition') {
 			const detail = cachedParseDetail(event);
 			const content = cachedParseContent(event);
@@ -743,6 +763,7 @@ function buildStreamItems(
 				resolvedAction: archResolvedAction,
 				mmpJson: archMmpJson,
 				decompositionDepth: archDecompositionDepth,
+				eventId: event.event_id,
 			});
 		} else {
 			// Non-INTAKE events (proposal, assumption_surfacing, execution, commit, etc.)
@@ -1078,20 +1099,22 @@ function buildCommandBlockItems(dialogueId: string): StreamItem[] {
 		const hasReview = reviewOutputs.length > 0;
 		items.push({ type: 'command_block' as const, command: cmd, outputs: regularOutputs, hasReview });
 
-		// Emit each reasoning review as a standalone StreamItem (appears after the command block)
+		// Emit each reasoning review as a standalone StreamItem.
+		// Use the command block's start timestamp so the review sorts alongside its command block,
+		// not after downstream content cards that share the completion timestamp.
+		const cmdTimestamp = cmd.started_at ?? cmd.completed_at ?? reviewOutputs[0]?.timestamp ?? '';
 		for (const reviewOutput of reviewOutputs) {
 			try {
 				const reviewData = JSON.parse(reviewOutput.content);
 				const concerns = reviewData.concerns ?? [];
-				if (concerns.length > 0) {
-					items.push({
-						type: 'reasoning_review' as const,
-						concerns,
-						overallAssessment: reviewData.overallAssessment ?? '',
-						reviewerModel: reviewData.reviewerModel ?? '',
-						timestamp: reviewOutput.timestamp,
-					});
-				}
+				items.push({
+					type: 'reasoning_review' as const,
+					concerns,
+					overallAssessment: reviewData.overallAssessment ?? '',
+					reviewerModel: reviewData.reviewerModel ?? '',
+					reviewPrompt: reviewData.reviewPrompt,
+					timestamp: cmdTimestamp,
+				});
 			} catch { /* skip malformed review */ }
 		}
 	}
@@ -1241,13 +1264,13 @@ function getStreamItemSortPriority(item: StreamItem): number {
 		case 'review_gate': return 7;
 		case 'intake_approval_gate': return 8;
 		case 'intake_mode_selector': return 3;
-		case 'intake_analysis': return 1.5;    // After dialogue_start, before intake_turn
-		case 'intake_product_discovery': return 1.6;  // After analysis, before proposal
-		case 'intake_proposer_domains': return 1.61;
-		case 'intake_proposer_journeys': return 1.62;
-		case 'intake_proposer_entities': return 1.63;
-		case 'intake_proposer_integrations': return 1.64;
-		case 'intake_proposal': return 1.8;    // After product discovery, before turns
+		case 'intake_analysis': return 4;      // After command_block (3) + reasoning_review (3.5)
+		case 'intake_product_discovery': return 4.1;  // After analysis
+		case 'intake_proposer_domains': return 4.2;
+		case 'intake_proposer_journeys': return 4.3;
+		case 'intake_proposer_entities': return 4.4;
+		case 'intake_proposer_integrations': return 4.5;
+		case 'intake_proposal': return 4.6;    // After product discovery
 		case 'intake_domain_transition': return 5;
 		case 'intake_gathering_complete': return 6;
 		case 'intake_checkpoint': return 7;
@@ -1617,24 +1640,36 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 		});
 	}
 
-	// Inject approval gate as a persistent stream artifact
+	// Inject approval gate as a persistent stream artifact.
+	// Use the intake_synthesis event timestamp as anchor — NOT conv.updatedAt which
+	// shifts as the conversation gets updated during downstream phases, causing
+	// the approval gate to sort after Architecture cards.
 	if (conv.finalizedPlan) {
 		const wsResult = getWorkflowState(dialogueId);
 		const currentPhase = wsResult.success ? wsResult.value.current_phase : Phase.INTAKE;
+
+		// Find the synthesis event timestamp as a stable anchor for the gate
+		let gateTimestamp = conv.updatedAt; // fallback
+		for (const item of streamItems) {
+			if (item.type === 'intake_plan_preview' && (item as { isFinal?: boolean }).isFinal) {
+				gateTimestamp = item.timestamp;
+				break;
+			}
+		}
 
 		if (conv.subState === IntakeSubState.AWAITING_APPROVAL) {
 			streamItems.push({
 				type: 'intake_approval_gate',
 				plan: conv.finalizedPlan,
 				dialogueId,
-				timestamp: conv.updatedAt,
+				timestamp: gateTimestamp,
 			});
 		} else if (currentPhase !== Phase.INTAKE) {
 			streamItems.push({
 				type: 'intake_approval_gate',
 				plan: conv.finalizedPlan,
 				dialogueId,
-				timestamp: conv.updatedAt,
+				timestamp: gateTimestamp,
 				resolved: true,
 				resolvedAction: 'Approved',
 			});
@@ -1643,7 +1678,7 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 				type: 'intake_approval_gate',
 				plan: conv.finalizedPlan,
 				dialogueId,
-				timestamp: conv.updatedAt,
+				timestamp: gateTimestamp,
 				resolved: true,
 				resolvedAction: 'Continued Discussing',
 			});
@@ -1672,9 +1707,12 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 		|| conv.subState === IntakeSubState.PROPOSING_INTEGRATIONS;
 
 	if (isProposerActive) {
+		// Remove the technical proposal card when proposer rounds are active
+		// (it's superseded by the proposer-validator cards).
+		// BUT keep intake_product_discovery — the user needs it during PRODUCT_REVIEW gate.
 		for (let i = streamItems.length - 1; i >= 0; i--) {
 			const t = streamItems[i].type;
-			if (t === 'intake_proposal' || t === 'intake_product_discovery') {
+			if (t === 'intake_proposal') {
 				streamItems.splice(i, 1);
 			}
 		}

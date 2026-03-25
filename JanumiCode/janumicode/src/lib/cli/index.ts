@@ -28,16 +28,7 @@ export {
 export { ClaudeCodeRoleCLIProvider } from './providers/claudeCode';
 export { GeminiCLIProvider } from './providers/geminiCli';
 export { CodexCLIProvider } from './providers/codexCli';
-export { OpenCodeCLIProvider } from './providers/opencodeCli';
 
-// WSL utilities (for WSL-dependent CLI providers)
-export {
-	detectWSL,
-	isRunningInWSL,
-	toWslPath,
-	buildWslCommand,
-	isCommandAvailableInWSL,
-} from './wslUtils';
 
 // Fallback adapter
 export { LLMProviderAdapter } from './llmProviderAdapter';

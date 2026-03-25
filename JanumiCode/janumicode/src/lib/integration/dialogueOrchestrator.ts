@@ -332,7 +332,7 @@ export async function executeWorkflowCycle(
 	dialogueId: string,
 	llmConfig: RoleLLMConfig,
 	tokenBudget: number = 10000,
-	maxPhases: number = 20
+	maxPhases: number = 50
 ): Promise<
 	Result<{
 		phasesExecuted: number;
@@ -340,6 +340,8 @@ export async function executeWorkflowCycle(
 		gateTriggered: boolean;
 		awaitingInput: boolean;
 		completed: boolean;
+		/** True when the cycle stopped because maxPhases was exhausted, not because of a natural stopping point. */
+		iterationLimitHit?: boolean;
 	}>
 > {
 	try {
@@ -439,6 +441,15 @@ export async function executeWorkflowCycle(
 			}
 		}
 
+		// When max iterations limit is hit without a natural stopping point,
+		// auto-continue rather than silently stopping.
+		const iterationLimitHit = !gateTriggered && !awaitingInput && !completed && phasesExecuted >= maxPhases;
+		if (iterationLimitHit) {
+			const stateResult = getWorkflowState(dialogueId);
+			const currentPhase = stateResult.success ? stateResult.value.current_phase : 'UNKNOWN';
+			emitError('WORKFLOW_MAX_PHASES_REACHED', `Workflow paused after ${phasesExecuted} iterations in phase ${currentPhase}. Type "continue" to resume, or the workflow will auto-continue shortly.`, { dialogueId, currentPhase, phasesExecuted });
+		}
+
 		return {
 			success: true,
 			value: {
@@ -447,6 +458,7 @@ export async function executeWorkflowCycle(
 				gateTriggered,
 				awaitingInput,
 				completed,
+				iterationLimitHit,
 			},
 		};
 	} catch (error) {

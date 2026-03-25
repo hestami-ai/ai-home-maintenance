@@ -1,0 +1,114 @@
+---
+// Agent roles mapped to sculptor roles
+const roles = [
+  { sculptor: 'Rough Sculptor', agent: 'Technical Expert', desc: 'High-level decomposition. Shapes the broad form from raw intent.', phase: 'INTAKE' },
+  { sculptor: 'Detail Sculptor', agent: 'Executor', desc: 'Precision refinement. Generates code, designs components, fills gaps.', phase: 'EXECUTE' },
+  { sculptor: 'Critic / Judge', agent: 'Verifier', desc: 'Independent evaluation. Tests claims against evidence. Rejects invalid shapes.', phase: 'VERIFY' },
+  { sculptor: 'Historian', agent: 'Historian', desc: 'Checks precedent. Surfaces contradictions with prior work. Ensures consistency.', phase: 'HISTORICAL' },
+  { sculptor: 'Materials Engineer', agent: 'Context Engineer', desc: 'Prepares the workspace. Ensures every tool and reference is available before work begins.', phase: 'ALL' },
+  { sculptor: 'Kiln Master', agent: 'Governance Layer', desc: 'Deterministic reality. Tests, validation, compliance, security. Survives the fire or doesn\'t ship.', phase: 'VERIFY' },
+];
+---
+
+<div class="ars">
+  {roles.map(r => (
+    <div class="ars__role">
+      <div class="ars__sculptor">
+        <span class="ars__sculptor-label">SCULPTOR</span>
+        <span class="ars__sculptor-name">{r.sculptor}</span>
+      </div>
+      <div class="ars__arrow">→</div>
+      <div class="ars__agent">
+        <div class="ars__agent-header">
+          <span class="ars__agent-name">{r.agent}</span>
+          <span class="ars__phase">{r.phase}</span>
+        </div>
+        <span class="ars__agent-desc">{r.desc}</span>
+      </div>
+    </div>
+  ))}
+</div>
+
+<style>
+  .ars {
+    margin: var(--space-2xl) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .ars__role {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-md) var(--space-lg);
+  }
+
+  .ars__sculptor {
+    min-width: 130px;
+    flex-shrink: 0;
+  }
+
+  .ars__sculptor-label {
+    display: block;
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-text-muted);
+  }
+
+  .ars__sculptor-name {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    font-style: italic;
+  }
+
+  .ars__arrow {
+    color: var(--color-primary);
+    font-size: 0.9rem;
+    opacity: 0.5;
+    flex-shrink: 0;
+  }
+
+  .ars__agent { flex: 1; min-width: 0; }
+
+  .ars__agent-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: 2px;
+  }
+
+  .ars__agent-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  .ars__phase {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    padding: 1px 5px;
+    border-radius: 2px;
+    color: var(--color-text-muted);
+    background: rgba(74, 94, 120, 0.1);
+    border: 1px solid rgba(74, 94, 120, 0.2);
+  }
+
+  .ars__agent-desc {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    line-height: 1.45;
+  }
+
+  @media (max-width: 768px) {
+    .ars__sculptor { min-width: 90px; }
+    .ars__sculptor-name { font-size: 0.72rem; }
+  }
+</style>

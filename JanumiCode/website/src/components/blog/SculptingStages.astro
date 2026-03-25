@@ -1,0 +1,217 @@
+---
+// Progressive Constraint Sculpting — S₀ through S₆ with visual representation
+const stages = [
+  { id: 'S₀', label: 'RAW INTENT', title: 'High Entropy', desc: 'A high-level prompt. Maximum possibility space.', fill: 5, color: '--color-text-muted', shape: 'amorphous' },
+  { id: 'S₁', label: 'STRUCTURED INTENT', title: 'Product Requirements', desc: 'Domains identified. Goals clarified. Constraints emerging.', fill: 20, color: '--color-text-muted', shape: 'rough' },
+  { id: 'S₂', label: 'SYSTEM CONSTRAINTS', title: 'Invariants + Policies', desc: 'Non-negotiable rules applied. Invalid possibilities removed.', fill: 38, color: '--color-primary', shape: 'blocked' },
+  { id: 'S₃', label: 'ARCHITECTURE', title: 'Graph + Contracts', desc: 'Components designed. Interfaces defined. Dependencies mapped.', fill: 55, color: '--color-primary', shape: 'formed' },
+  { id: 'S₄', label: 'IMPLEMENTATION PLAN', title: 'Task Graph', desc: 'Bounded work units. Execution sequence. Verification points.', fill: 72, color: '--color-primary', shape: 'detailed' },
+  { id: 'S₅', label: 'CODE + INFRA', title: 'Executable System', desc: 'Generated, reviewed, claim-verified code and infrastructure.', fill: 88, color: '--color-accent', shape: 'refined' },
+  { id: 'S₆', label: 'VERIFIED SYSTEM', title: 'Production-Grade', desc: 'Tested. Validated. Compliant. Survived the kiln.', fill: 100, color: '--color-accent', shape: 'finished' },
+];
+---
+
+<div class="ss">
+  <div class="ss__header">
+    <span class="ss__header-label">PROGRESSIVE CONSTRAINT SCULPTING</span>
+    <span class="ss__header-note">Sₙ → Sₙ₊₁ = ApplyConstraints(Sₙ, Cₙ)</span>
+  </div>
+  <div class="ss__stages">
+    {stages.map((s, i) => (
+      <div class="ss__stage">
+        <div class="ss__visual">
+          <div class="ss__shape" data-shape={s.shape}>
+            <div class="ss__fill" style={`height: ${s.fill}%; background: var(${s.color}); opacity: ${0.15 + s.fill * 0.005}`}></div>
+          </div>
+          <span class="ss__id" style={`color: var(${s.color})`}>{s.id}</span>
+        </div>
+        <div class="ss__info">
+          <span class="ss__label" style={`color: var(${s.color})`}>{s.label}</span>
+          <span class="ss__title">{s.title}</span>
+          <span class="ss__desc">{s.desc}</span>
+        </div>
+        {i < stages.length - 1 && <div class="ss__arrow">→</div>}
+      </div>
+    ))}
+  </div>
+  <div class="ss__entropy">
+    <div class="ss__entropy-label">ENTROPY</div>
+    <div class="ss__entropy-bar">
+      <div class="ss__entropy-gradient"></div>
+    </div>
+    <div class="ss__entropy-ends">
+      <span>Maximum possibility</span>
+      <span>Single valid system</span>
+    </div>
+  </div>
+</div>
+
+<style>
+  .ss {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+  }
+
+  .ss__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .ss__header-label {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-primary);
+  }
+
+  .ss__header-note {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .ss__stages {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: var(--space-md);
+  }
+
+  .ss__stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 100px;
+    flex: 1;
+    position: relative;
+  }
+
+  .ss__visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: var(--space-sm);
+  }
+
+  .ss__shape {
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    position: relative;
+  }
+
+  .ss__shape[data-shape="amorphous"] { border-radius: 40% 60% 50% 45%; }
+  .ss__shape[data-shape="rough"] { border-radius: 35% 50% 40% 55%; }
+  .ss__shape[data-shape="blocked"] { border-radius: 20% 30% 25% 20%; }
+  .ss__shape[data-shape="formed"] { border-radius: 15% 15% 12% 12%; }
+  .ss__shape[data-shape="detailed"] { border-radius: 10% 10% 8% 8%; }
+  .ss__shape[data-shape="refined"] { border-radius: 6%; }
+  .ss__shape[data-shape="finished"] { border-radius: 4%; }
+
+  .ss__fill {
+    width: 100%;
+    transition: height 0.3s;
+  }
+
+  .ss__id {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    margin-top: 4px;
+  }
+
+  .ss__info {
+    text-align: center;
+    padding: 0 var(--space-xs);
+  }
+
+  .ss__label {
+    display: block;
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+
+  .ss__title {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 2px 0;
+  }
+
+  .ss__desc {
+    display: block;
+    font-size: 0.6rem;
+    color: var(--color-text-muted);
+    line-height: 1.35;
+  }
+
+  .ss__arrow {
+    position: absolute;
+    right: -6px;
+    top: 22px;
+    color: var(--color-primary);
+    font-size: 0.8rem;
+    opacity: 0.4;
+    z-index: 1;
+  }
+
+  /* Entropy bar */
+  .ss__entropy {
+    margin-top: var(--space-md);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .ss__entropy-label {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    margin-bottom: 4px;
+  }
+
+  .ss__entropy-bar {
+    height: 4px;
+    background: var(--color-bg);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .ss__entropy-gradient {
+    height: 100%;
+    background: linear-gradient(to right, var(--color-error), var(--color-warning), var(--color-primary), var(--color-accent));
+    opacity: 0.5;
+  }
+
+  .ss__entropy-ends {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    margin-top: 2px;
+  }
+
+  @media (max-width: 768px) {
+    .ss__stages { flex-wrap: wrap; }
+    .ss__stage { min-width: 80px; }
+    .ss__arrow { display: none; }
+    .ss__header { flex-direction: column; gap: 4px; }
+  }
+</style>

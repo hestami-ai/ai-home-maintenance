@@ -86,6 +86,11 @@ interface PersistedMmpState {
  * @param cardId When provided, also posts mmpPartialSave to the extension host for durable persistence.
  */
 export function persistMmpState(cardId?: string): void {
+	console.log('[MMP:Persist] Saving state. cardId:', cardId ?? 'ALL',
+		'| mirror keys:', Object.keys(state.mmpMirrorDecisions),
+		'| menu keys:', Object.keys(state.mmpMenuSelections),
+		'| pm keys:', Object.keys(state.mmpPreMortemDecisions));
+
 	// In-session persistence (webview state API)
 	const existing = (vscode.getState() as Record<string, unknown>) || {};
 	vscode.setState({
@@ -122,18 +127,76 @@ export function persistMmpState(cardId?: string): void {
 	}
 }
 
-/** Restore MMP decisions from VS Code webview state. Call on script initialization. */
+/** Restore MMP decisions from VS Code webview state. Call on script initialization.
+ *  Only restores keys that match current DOM card containers to prevent stale accumulation.
+ */
 export function restoreMmpState(): void {
 	const saved = vscode.getState() as PersistedMmpState | null;
-	if (!saved) {return;}
+	console.log('[MMP:RestoreState] From webview state:', saved ? 'found' : 'empty');
+	if (!saved) { return; }
+
+	// Collect all cardIds currently in the DOM
+	const domCardIds = new Set<string>();
+	document.querySelectorAll('[data-mmp-card-id]').forEach((el) => {
+		const id = (el as HTMLElement).dataset.mmpCardId;
+		if (id) { domCardIds.add(id); }
+	});
+	console.log('[MMP:RestoreState] DOM card IDs:', Array.from(domCardIds));
+
+	// Only restore keys whose cardId prefix matches a DOM container
+	let restoredMirror = 0, skippedMirror = 0;
 	if (saved.mmpMirrorDecisions && typeof saved.mmpMirrorDecisions === 'object') {
-		Object.assign(state.mmpMirrorDecisions, saved.mmpMirrorDecisions);
+		for (const [key, val] of Object.entries(saved.mmpMirrorDecisions)) {
+			const cardId = key.split(':')[0];
+			if (domCardIds.has(cardId)) {
+				state.mmpMirrorDecisions[key] = val;
+				restoredMirror++;
+			} else {
+				skippedMirror++;
+			}
+		}
 	}
+
+	let restoredMenu = 0, skippedMenu = 0;
 	if (saved.mmpMenuSelections && typeof saved.mmpMenuSelections === 'object') {
-		Object.assign(state.mmpMenuSelections, saved.mmpMenuSelections);
+		for (const [key, val] of Object.entries(saved.mmpMenuSelections)) {
+			const cardId = key.split(':')[0];
+			if (domCardIds.has(cardId)) {
+				state.mmpMenuSelections[key] = val;
+				restoredMenu++;
+			} else {
+				skippedMenu++;
+			}
+		}
 	}
+
+	let restoredPm = 0, skippedPm = 0;
 	if (saved.mmpPreMortemDecisions && typeof saved.mmpPreMortemDecisions === 'object') {
-		Object.assign(state.mmpPreMortemDecisions, saved.mmpPreMortemDecisions);
+		for (const [key, val] of Object.entries(saved.mmpPreMortemDecisions)) {
+			const cardId = key.split(':')[0];
+			if (domCardIds.has(cardId)) {
+				state.mmpPreMortemDecisions[key] = val;
+				restoredPm++;
+			} else {
+				skippedPm++;
+			}
+		}
+	}
+
+	console.log('[MMP:RestoreState] Restored — mirror:', restoredMirror, '(skipped', skippedMirror + ')',
+		'| menu:', restoredMenu, '(skipped', skippedMenu + ')',
+		'| pm:', restoredPm, '(skipped', skippedPm + ')');
+
+	// Persist the cleaned state back so stale keys don't return
+	if (skippedMirror > 0 || skippedMenu > 0 || skippedPm > 0) {
+		console.log('[MMP:RestoreState] Cleaning stale keys from webview state');
+		const existing = (vscode.getState() as Record<string, unknown>) || {};
+		vscode.setState({
+			...existing,
+			mmpMirrorDecisions: state.mmpMirrorDecisions,
+			mmpMenuSelections: state.mmpMenuSelections,
+			mmpPreMortemDecisions: state.mmpPreMortemDecisions,
+		});
 	}
 }
 

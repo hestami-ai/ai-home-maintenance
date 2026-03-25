@@ -1,0 +1,173 @@
+---
+// Three-layer hybrid model: Chat Layer → Web Command Center → Governed Stream
+---
+
+<div class="hmd">
+  <div class="hmd__layer hmd__layer--chat">
+    <div class="hmd__layer-bar"></div>
+    <div class="hmd__layer-content">
+      <span class="hmd__layer-label">CHAT LAYER</span>
+      <h4 class="hmd__layer-title">Slack · Discord · Telegram</h4>
+      <div class="hmd__layer-items">
+        <span class="hmd__chip">Commands</span>
+        <span class="hmd__chip">Alerts</span>
+        <span class="hmd__chip">Decisions</span>
+        <span class="hmd__chip">Summaries</span>
+      </div>
+      <p class="hmd__layer-role">Where humans <strong>govern and intervene</strong></p>
+    </div>
+  </div>
+
+  <div class="hmd__arrow">
+    <div class="hmd__arrow-line"></div>
+    <span class="hmd__arrow-text">commands · approvals · overrides</span>
+    <div class="hmd__arrow-line"></div>
+  </div>
+
+  <div class="hmd__layer hmd__layer--web">
+    <div class="hmd__layer-bar"></div>
+    <div class="hmd__layer-content">
+      <span class="hmd__layer-label hmd__layer-label--cyan">WEB COMMAND CENTER</span>
+      <h4 class="hmd__layer-title">Agent Command Center UI</h4>
+      <div class="hmd__layer-items">
+        <span class="hmd__chip hmd__chip--cyan">Mission Control</span>
+        <span class="hmd__chip hmd__chip--cyan">Agent Roster</span>
+        <span class="hmd__chip hmd__chip--cyan">Task Graph</span>
+        <span class="hmd__chip hmd__chip--cyan">Artifacts</span>
+        <span class="hmd__chip hmd__chip--cyan">Deep Traceability</span>
+      </div>
+      <p class="hmd__layer-role">Where humans <strong>inspect and navigate</strong></p>
+    </div>
+  </div>
+
+  <div class="hmd__arrow">
+    <div class="hmd__arrow-line"></div>
+    <span class="hmd__arrow-text">reads · projections · drill-downs</span>
+    <div class="hmd__arrow-line"></div>
+  </div>
+
+  <div class="hmd__layer hmd__layer--stream">
+    <div class="hmd__layer-bar"></div>
+    <div class="hmd__layer-content">
+      <span class="hmd__layer-label hmd__layer-label--green">GOVERNED STREAM</span>
+      <h4 class="hmd__layer-title">Canonical Source of Truth</h4>
+      <div class="hmd__layer-items">
+        <span class="hmd__chip hmd__chip--green">Append-only events</span>
+        <span class="hmd__chip hmd__chip--green">Decision traces</span>
+        <span class="hmd__chip hmd__chip--green">Claims + verdicts</span>
+        <span class="hmd__chip hmd__chip--green">Full audit trail</span>
+      </div>
+      <p class="hmd__layer-role">Where the system <strong>records everything</strong></p>
+    </div>
+  </div>
+</div>
+
+<style>
+  .hmd {
+    margin: var(--space-2xl) 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .hmd__layer {
+    width: 100%;
+    display: flex;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .hmd__layer-bar {
+    width: 4px;
+    flex-shrink: 0;
+    background: var(--color-text-muted);
+  }
+
+  .hmd__layer--chat .hmd__layer-bar { background: var(--color-text-muted); }
+  .hmd__layer--web .hmd__layer-bar { background: var(--color-primary); }
+  .hmd__layer--stream .hmd__layer-bar { background: var(--color-accent); }
+
+  .hmd__layer-content {
+    padding: var(--space-lg) var(--space-xl);
+    flex: 1;
+  }
+
+  .hmd__layer-label {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--color-text-muted);
+  }
+
+  .hmd__layer-label--cyan { color: var(--color-primary); }
+  .hmd__layer-label--green { color: var(--color-accent); }
+
+  .hmd__layer-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 4px 0 var(--space-sm);
+  }
+
+  .hmd__layer-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: var(--space-sm);
+  }
+
+  .hmd__chip {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 2px;
+    color: var(--color-text-muted);
+    background: rgba(74, 94, 120, 0.1);
+    border: 1px solid rgba(74, 94, 120, 0.2);
+  }
+
+  .hmd__chip--cyan {
+    color: var(--color-primary);
+    background: rgba(0, 212, 255, 0.06);
+    border-color: rgba(0, 212, 255, 0.2);
+  }
+
+  .hmd__chip--green {
+    color: var(--color-accent);
+    background: rgba(0, 255, 178, 0.06);
+    border-color: rgba(0, 255, 178, 0.2);
+  }
+
+  .hmd__layer-role {
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  .hmd__layer-role strong { color: var(--color-text-secondary); }
+
+  /* Arrows */
+  .hmd__arrow {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) 0;
+  }
+
+  .hmd__arrow-line {
+    flex: 1;
+    height: 1px;
+    background: var(--color-border);
+  }
+
+  .hmd__arrow-text {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+</style>

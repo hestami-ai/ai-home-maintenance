@@ -1,0 +1,211 @@
+---
+// Complementary strengths: Humans excel at judgment, LLMs excel at generation
+---
+
+<div class="hls">
+  <div class="hls__side hls__side--human">
+    <div class="hls__side-header">
+      <span class="hls__icon">👤</span>
+      <span class="hls__side-title">HUMANS</span>
+    </div>
+    <div class="hls__section">
+      <span class="hls__section-label hls__section-label--strong">EXTRAORDINARY AT</span>
+      <ul class="hls__list hls__list--strong">
+        <li>Judgment — choosing between options</li>
+        <li>Saying yes or no</li>
+        <li>Recognizing what's wrong</li>
+        <li>Prioritizing trade-offs</li>
+        <li>Spotting what's missing</li>
+      </ul>
+    </div>
+    <div class="hls__section">
+      <span class="hls__section-label hls__section-label--weak">POOR AT</span>
+      <ul class="hls__list hls__list--weak">
+        <li>Articulating full context</li>
+        <li>Writing precise instructions</li>
+        <li>Transferring tacit knowledge</li>
+        <li>Exhaustive enumeration</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="hls__divider">
+    <div class="hls__divider-line"></div>
+    <span class="hls__divider-label">COMPLEMENTARY</span>
+    <div class="hls__divider-line"></div>
+  </div>
+
+  <div class="hls__side hls__side--llm">
+    <div class="hls__side-header">
+      <span class="hls__icon">🤖</span>
+      <span class="hls__side-title">LLMs</span>
+    </div>
+    <div class="hls__section">
+      <span class="hls__section-label hls__section-label--strong">EXCEPTIONAL AT</span>
+      <ul class="hls__list hls__list--strong">
+        <li>Generating expansive proposals</li>
+        <li>Documenting and structuring</li>
+        <li>Transferring context</li>
+        <li>Exhaustive domain enumeration</li>
+        <li>Following structured instructions</li>
+      </ul>
+    </div>
+    <div class="hls__section">
+      <span class="hls__section-label hls__section-label--weak">POOR AT</span>
+      <ul class="hls__list hls__list--weak">
+        <li>Judgment under ambiguity</li>
+        <li>Knowing what matters most</li>
+        <li>Detecting their own errors</li>
+        <li>Respecting unstated constraints</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<style>
+  .hls {
+    margin: var(--space-2xl) 0;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .hls__side {
+    padding: var(--space-xl);
+  }
+
+  .hls__side-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .hls__icon { font-size: 1rem; }
+
+  .hls__side-title {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--color-text);
+  }
+
+  .hls__section { margin-bottom: var(--space-md); }
+
+  .hls__section-label {
+    display: block;
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    margin-bottom: var(--space-xs);
+  }
+
+  .hls__section-label--strong { color: var(--color-accent); }
+  .hls__section-label--weak { color: var(--color-error); opacity: 0.7; }
+
+  .hls__list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .hls__list li {
+    font-size: 0.75rem;
+    padding: 3px 0 3px var(--space-md);
+    position: relative;
+  }
+
+  .hls__list--strong li {
+    color: var(--color-text-secondary);
+  }
+
+  .hls__list--strong li::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    transform: rotate(45deg) translateY(-50%);
+    border: 1px solid var(--color-accent);
+    border-radius: 1px;
+  }
+
+  .hls__list--weak li {
+    color: var(--color-text-muted);
+    font-style: italic;
+    opacity: 0.7;
+  }
+
+  .hls__list--weak li::before {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    transform: rotate(45deg) translateY(-50%);
+    border: 1px solid var(--color-text-muted);
+    border-radius: 1px;
+    opacity: 0.5;
+  }
+
+  .hls__divider {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md) var(--space-sm);
+    background: var(--color-bg);
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+  }
+
+  .hls__divider-line {
+    width: 1px;
+    flex: 1;
+    background: var(--color-primary);
+    opacity: 0.3;
+  }
+
+  .hls__divider-label {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--color-primary);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    padding: var(--space-sm) 0;
+  }
+
+  @media (max-width: 768px) {
+    .hls {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto;
+    }
+    .hls__divider {
+      flex-direction: row;
+      border-left: none;
+      border-right: none;
+      border-top: 1px solid var(--color-border);
+      border-bottom: 1px solid var(--color-border);
+      writing-mode: horizontal-tb;
+      padding: var(--space-sm) var(--space-md);
+    }
+    .hls__divider-label {
+      writing-mode: horizontal-tb;
+    }
+    .hls__divider-line {
+      width: auto;
+      height: 1px;
+    }
+  }
+</style>

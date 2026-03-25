@@ -253,7 +253,8 @@ export interface AssembleContextOptions {
 	phase: Phase;
 	subPhase?: string;
 	intent?: string;
-	tokenBudget: number;
+	/** Token budget for context assembly. Optional — when omitted, no truncation is applied. */
+	tokenBudget?: number;
 	/**
 	 * Role-specific extras passed through to the Context Engineer agent.
 	 * Examples: claimToVerify, humanFeedback, architectureDoc, approvedPlan, currentPlan, humanMessage.

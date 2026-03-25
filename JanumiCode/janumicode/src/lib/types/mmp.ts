@@ -40,6 +40,8 @@ export interface MirrorItem {
 	status: MirrorStatus;
 	/** If human edited the assumption, their corrected text */
 	editedText?: string;
+	/** Provenance: where this item originated (document-specified, ai-proposed, etc.) */
+	source?: string;
 }
 
 /**

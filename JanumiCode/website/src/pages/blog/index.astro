@@ -25,7 +25,7 @@ function postUrl(post: { id: string; data: { pubDate: Date } }) {
 
       <div class="blog-grid">
         {posts.map(post => (
-          <a href={postUrl(post)} class="blog-card card">
+          <a href={postUrl(post)} class="blog-card card" data-pubdate={post.data.pubDate.toISOString()}>
             <div class="blog-card__meta">
               <time datetime={post.data.pubDate.toISOString()}>
                 {post.data.pubDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
@@ -90,4 +90,21 @@ function postUrl(post: { id: string; data: { pubDate: Date } }) {
   .blog-card:hover .blog-card__title {
     color: var(--color-primary);
   }
+
+  /* Anti-flicker: hide cards until JS determines visibility */
+  .blog-card[data-pubdate] {
+    visibility: hidden;
+  }
 </style>
+
+<script>
+  const now = Date.now();
+  document.querySelectorAll('.blog-card[data-pubdate]').forEach(card => {
+    const pubDate = new Date((card as HTMLElement).dataset.pubdate!).valueOf();
+    if (pubDate <= now) {
+      (card as HTMLElement).style.visibility = 'visible';
+    } else {
+      (card as HTMLElement).style.display = 'none';
+    }
+  });
+</script>

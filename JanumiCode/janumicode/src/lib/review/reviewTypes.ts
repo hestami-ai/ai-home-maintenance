@@ -34,6 +34,8 @@ export interface ReasoningReview {
 	reviewDurationMs: number;
 	/** Which model performed the review. */
 	reviewerModel: string;
+	/** The full prompt sent to the reviewer LLM (system + user message). */
+	reviewPrompt?: string;
 }
 
 /** Options for the reasoning review invocation. */

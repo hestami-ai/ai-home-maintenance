@@ -1823,20 +1823,6 @@ function formatApprovedPlanForExecutor(
 		sections.push(`## Proposed Approach\n\n${plan.proposedApproach}`);
 	}
 
-	// Domain coverage gap enrichment (Adaptive Deep INTAKE)
-	const domainCoverage = plan.domainCoverage as DomainCoverageMap | undefined;
-	if (domainCoverage) {
-		const gaps = getCoverageGaps(domainCoverage);
-		if (gaps.length > 0) {
-			sections.push(
-				'## Domain Coverage Gaps (from INTAKE)\n\n' +
-				'The following engineering domains had limited coverage during INTAKE. ' +
-				'Generate explicit assumptions for these areas:\n\n' +
-				gaps.map(d => `- **${DOMAIN_INFO[d].label}**: ${DOMAIN_INFO[d].description}`).join('\n')
-			);
-		}
-	}
-
 	sections.push(
 		'\n---\n\nImplement this plan. Generate a concrete proposal with assumptions.'
 	);
@@ -1860,16 +1846,16 @@ export async function initializeAdaptiveIntake(
 	try {
 		const recommendation = await classifyIntakeInput(humanInput, attachments, dialogueId);
 
-		// Initialize coverage map and set mode
-		const coverageMap = initializeCoverageMap();
-
-		// STATE_DRIVEN and DOMAIN_GUIDED use inverted flow (ANALYZING → PROPOSING → CLARIFYING)
+		// STATE_DRIVEN and DOMAIN_GUIDED use inverted flow (INTENT_DISCOVERY → PROPOSING → CLARIFYING)
 		// HYBRID_CHECKPOINTS uses the original flow (DISCUSSING)
 		const needsAnalysis = recommendation.recommended === IntakeMode.STATE_DRIVEN
 			|| recommendation.recommended === IntakeMode.DOMAIN_GUIDED;
-		const currentDomain = null; // No sequential domain walk in inverted flow
+
+		// Domain coverage only used in legacy GATHERING/DISCUSSING flows, not proposer flow
+		const coverageMap = needsAnalysis ? null : initializeCoverageMap();
+		const currentDomain = null;
 		const initialSubState = needsAnalysis
-			? IntakeSubState.ANALYZING
+			? IntakeSubState.INTENT_DISCOVERY
 			: IntakeSubState.DISCUSSING;
 
 		// Persist to DB
@@ -1894,10 +1880,12 @@ export async function initializeAdaptiveIntake(
 			mode: recommendation.recommended,
 			source: 'classifier',
 		});
-		getEventBus().emit('intake:domain_coverage_updated', {
-			dialogueId,
-			coverage: coverageMap,
-		});
+		if (coverageMap) {
+			getEventBus().emit('intake:domain_coverage_updated', {
+				dialogueId,
+				coverage: coverageMap,
+			});
+		}
 
 		if (isLoggerInitialized()) {
 			getLogger().child({ component: 'orchestrator:intake' }).info(

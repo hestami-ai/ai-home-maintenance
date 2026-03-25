@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "deep-memory": {
+      "command": "node",
+      "args": [
+        "dist/memory/mcpServer.js"
+      ],
+      "env": {
+        "JANUMICODE_DB_PATH": ".janumicode/janumicode.db"
+      },
+      "trust": true
+    }
+  }
+}

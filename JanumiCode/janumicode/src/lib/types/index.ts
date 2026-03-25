@@ -199,6 +199,7 @@ export interface Verdict {
  * Represents a blocking point requiring human decision
  */
 export interface Gate {
+	gate_seq: number; // Autoincrement stable ID for MMP cardId consistency
 	gate_id: string; // UUID
 	dialogue_id: string;
 	reason: string; // Why the gate was triggered

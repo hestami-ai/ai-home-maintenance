@@ -1139,26 +1139,37 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 		try {
 			const config = await getConfig();
-			const result = await executeWorkflowCycle(
-				this._activeDialogueId,
-				config.llmConfig,
-				config.tokenBudget,
-				20
-			);
+			let iterationLimitHit = true;
 
-			if (this._disposed) {return;}
+			// Auto-continue when iteration limit is hit (architecture sub-state loops can
+			// exhaust a single cycle). Cap at 5 continuation rounds as a safety net.
+			for (let round = 0; round < 5 && iterationLimitHit; round++) {
+				const result = await executeWorkflowCycle(
+					this._activeDialogueId!,
+					config.llmConfig,
+					config.tokenBudget,
+				);
 
-			if (!result.success) {
-				// Suppress abort errors during disposal
-				if (result.error.message === 'Aborted') {return;}
-				vscode.window.showErrorMessage(`Workflow error: ${result.error.message}`);
-				this._update();
-				return;
-			}
+				if (this._disposed) { return; }
 
-			if (result.value.completed) {
-				this._activeDialogueId = null;
-				vscode.window.showInformationMessage('Workflow completed successfully.');
+				if (!result.success) {
+					if (result.error.message === 'Aborted') { return; }
+					vscode.window.showErrorMessage(`Workflow error: ${result.error.message}`);
+					this._update();
+					return;
+				}
+
+				iterationLimitHit = result.value.iterationLimitHit === true;
+
+				if (result.value.completed) {
+					this._activeDialogueId = null;
+					vscode.window.showInformationMessage('Workflow completed successfully.');
+					break;
+				}
+
+				if (result.value.gateTriggered || result.value.awaitingInput) {
+					break;
+				}
 			}
 
 			// Always refresh the view after a workflow cycle completes
@@ -2236,12 +2247,25 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			const { getPendingMmpDecisions } = require('../../database/pendingMmpStore');
 			const result = getPendingMmpDecisions(this._activeDialogueId);
 			if (result.success && Object.keys(result.value).length > 0) {
+				const cardIds = Object.keys(result.value);
+				console.log('[MMP:Host:PostPending] Sending pending decisions for', cardIds.length, 'cards:', cardIds);
+				for (const [cid, decisions] of Object.entries(result.value)) {
+					const d = decisions as { mirrorDecisions?: Record<string, unknown>; menuSelections?: Record<string, unknown>; preMortemDecisions?: Record<string, unknown> };
+					console.log('[MMP:Host:PostPending] Card:', cid,
+						'| mirror:', Object.keys(d.mirrorDecisions ?? {}),
+						'| menu:', Object.keys(d.menuSelections ?? {}),
+						'| pm:', Object.keys(d.preMortemDecisions ?? {}));
+				}
 				this._view.webview.postMessage({
 					type: 'pendingMmpDecisionsLoaded',
 					decisions: result.value,
 				});
+			} else {
+				console.log('[MMP:Host:PostPending] No pending decisions found for dialogue:', this._activeDialogueId);
 			}
-		} catch { /* table may not exist yet */ }
+		} catch (err) {
+			console.error('[MMP:Host:PostPending] Error:', err);
+		}
 	}
 
 	/**

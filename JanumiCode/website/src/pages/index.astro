@@ -4,12 +4,12 @@ import Base from "../layouts/Base.astro";
 const marketplaceUrl = "https://marketplace.visualstudio.com/items?itemName=hestami.janumicode";
 
 const roles = [
-  { name: "Technical Expert", desc: "High-fidelity reasoning engine specialized in structural integrity and algorithmic consistency.", tags: ["FULL STACK AGENT", "MULTI-PHASE"] },
-  { name: "Executor", desc: "Isolated sandbox agent with write-authority for bounded codebase mutations and test execution.", tags: ["APPROVAL CONTROLLED", "SANDBOXED"] },
-  { name: "Verifier", desc: "Continuous audit loop that validates claims. Expert output against engine policy constraints.", tags: ["APPROVAL FREE", "READ-ONLY"] },
-  { name: "Historian", desc: "Manages narrative curation of dialogue events into persistent technical documentation.", tags: ["DECISION TRACKER", "READ-ONLY"] },
-  { name: "Context Engineer", desc: "Orchestrates context packets and briefing updates to keep agent latency sub-100ms.", tags: ["POLICY DRIVEN", "TOKEN BUDGETED"] },
-  { name: "Deep Research Memory", desc: "Semantic retrieval agent specialized in conflict-detecting massive repository histories.", tags: ["MULTI-STAGE", "GRAPH-AWARE"] },
+  { name: "Technical Expert", icon: "🔬", desc: "High-fidelity reasoning engine specialized in structural integrity and algorithmic consistency.", tags: ["FULL STACK AGENT", "MULTI-PHASE"] },
+  { name: "Executor", icon: "⚡", desc: "Isolated sandbox agent with write-authority for bounded codebase mutations and test execution.", tags: ["APPROVAL CONTROLLED", "SANDBOXED"] },
+  { name: "Verifier", icon: "🛡", desc: "Continuous audit loop that validates claims. Expert output against engine policy constraints.", tags: ["APPROVAL FREE", "READ-ONLY"] },
+  { name: "Historian", icon: "📜", desc: "Manages narrative curation of dialogue events into persistent technical documentation.", tags: ["DECISION TRACKER", "READ-ONLY"] },
+  { name: "Context Engineer", icon: "🧠", desc: "Orchestrates context packets and briefing updates to keep agent latency sub-100ms.", tags: ["POLICY DRIVEN", "TOKEN BUDGETED"] },
+  { name: "Deep Research Memory", icon: "🔍", desc: "Semantic retrieval agent specialized in conflict-detecting massive repository histories.", tags: ["MULTI-STAGE", "GRAPH-AWARE"] },
 ];
 
 const valueProps = [
@@ -29,10 +29,10 @@ const valueProps = [
           <span class="badge">MULTI-AGENT</span>
           <span class="badge">GOVERNED WORKFLOW</span>
         </div>
-        <h1 class="hero__title">Governed<br /><span class="hero__accent">Stream</span></h1>
+        <h1 class="hero__title">Human-Centered AI Agent-Driven Development.<br /><span class="hero__accent">Governed.</span></h1>
         <p class="hero__sub">
           A multi-agent architecture designed for deterministic code
-          synthesis. Governed by a triple-verification loop and a narrative-driven memory engine.
+          synthesis. Governed by a triple-verification loop and a narrative-driven memory engine for highly complex engineering.
         </p>
         <div class="hero__actions">
           <a href={marketplaceUrl} class="btn btn--primary" target="_blank" rel="noopener">
@@ -78,7 +78,7 @@ const valueProps = [
       <div class="grid grid--3">
         {roles.map(r => (
           <div class="card">
-            <div class="card__icon--diamond"><span></span></div>
+            <div class="card__icon"><span>{r.icon}</span></div>
             <h4 class="card__title">{r.name}</h4>
             <p class="card__text">{r.desc}</p>
             <div class="card__tags">

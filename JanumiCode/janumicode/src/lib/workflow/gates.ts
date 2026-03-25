@@ -69,7 +69,25 @@ export function createGate(options: CreateGateOptions): Result<Gate> {
 		const gateId = randomUUID();
 		const now = new Date().toISOString();
 
+		const result = db.prepare(
+			`
+			INSERT INTO gates (
+				gate_id, dialogue_id, reason, status,
+				blocking_claims, created_at, resolved_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
+		`
+		).run(
+			gateId,
+			options.dialogueId,
+			options.reason,
+			GateStatus.OPEN,
+			JSON.stringify(options.blockingClaims),
+			now,
+			null
+		);
+
 		const gate: Gate = {
+			gate_seq: Number(result.lastInsertRowid),
 			gate_id: gateId,
 			dialogue_id: options.dialogueId,
 			reason: options.reason,
@@ -78,23 +96,6 @@ export function createGate(options: CreateGateOptions): Result<Gate> {
 			created_at: now,
 			resolved_at: null,
 		};
-
-		db.prepare(
-			`
-			INSERT INTO gates (
-				gate_id, dialogue_id, reason, status,
-				blocking_claims, created_at, resolved_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
-		`
-		).run(
-			gate.gate_id,
-			gate.dialogue_id,
-			gate.reason,
-			gate.status,
-			JSON.stringify(gate.blocking_claims),
-			gate.created_at,
-			gate.resolved_at
-		);
 
 		// Create gate metadata table if needed
 		if (options.metadata) {
@@ -168,7 +169,7 @@ export function getGate(gateId: string): Result<Gate> {
 		const gate = db
 			.prepare(
 				`
-			SELECT gate_id, dialogue_id, reason, status,
+			SELECT gate_seq, gate_id, dialogue_id, reason, status,
 			       blocking_claims, created_at, resolved_at
 			FROM gates
 			WHERE gate_id = ?
@@ -223,7 +224,7 @@ export function getGatesForDialogue(
 		}
 
 		let query = `
-			SELECT gate_id, dialogue_id, reason, status,
+			SELECT gate_seq, gate_id, dialogue_id, reason, status,
 			       blocking_claims, created_at, resolved_at
 			FROM gates
 			WHERE dialogue_id = ?

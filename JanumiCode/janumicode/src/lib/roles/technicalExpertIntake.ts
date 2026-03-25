@@ -32,6 +32,34 @@ import { getLogger, isLoggerInitialized } from '../logging';
 import { assembleContext } from '../context';
 import { Phase, Role as RoleEnum } from '../types';
 import { updateWorkflowMetadata } from '../workflow/stateMachine';
+import { emitWorkflowCommand } from '../integration/eventBus';
+
+/** Emit deferred command block start after context assembly completes */
+function emitDeferredCommandStart(cb?: DeferredCommandBlock): void {
+	if (!cb) { return; }
+	emitWorkflowCommand({
+		dialogueId: cb.dialogueId,
+		commandId: cb.commandId,
+		action: 'start',
+		commandType: cb.commandType ?? 'cli_invocation',
+		label: cb.label,
+		summary: cb.label,
+		status: 'running',
+		timestamp: new Date().toISOString(),
+	});
+}
+
+/**
+ * Optional command block metadata — when provided, the invoke function
+ * emits the 'start' event AFTER assembleContext completes, ensuring the
+ * Context Engineer block appears before the role invocation block in the UI.
+ */
+export interface DeferredCommandBlock {
+	dialogueId: string;
+	commandId: string;
+	label: string;
+	commandType?: 'cli_invocation' | 'llm_api_call' | 'role_invocation';
+}
 
 /**
  * INTAKE Technical Expert invocation options
@@ -42,7 +70,6 @@ export interface IntakeTechnicalExpertOptions {
 	currentPlan: IntakePlanDocument;
 	turnNumber: number;
 	provider: RoleCLIProvider;
-	tokenBudget: number;
 	/** Optional streaming callback — when provided, uses invokeStreaming() for real-time tool activity */
 	onEvent?: (event: CLIActivityEvent) => void;
 	/** Optional domain coverage context to inject into system prompt (Adaptive Deep INTAKE) */
@@ -51,6 +78,8 @@ export interface IntakeTechnicalExpertOptions {
 	subState?: string;
 	/** Current clarification round (1-based) — used by CLARIFYING prompt */
 	clarificationRound?: number;
+	/** Deferred command block — emitted after assembleContext completes */
+	commandBlock?: DeferredCommandBlock;
 }
 
 /**
@@ -60,11 +89,10 @@ export interface IntakePlanSynthesisOptions {
 	dialogueId: string;
 	currentPlan: IntakePlanDocument;
 	provider: RoleCLIProvider;
-	tokenBudget: number;
 	/** Optional streaming callback — when provided, uses invokeStreaming() for real-time tool activity */
 	onEvent?: (event: CLIActivityEvent) => void;
-	/** Optional domain coverage context for synthesis (Adaptive Deep INTAKE) */
-	domainCoverageContext?: string;
+	/** Deferred command block — emitted after assembleContext completes */
+	commandBlock?: DeferredCommandBlock;
 }
 
 /**
@@ -263,7 +291,12 @@ Return ONLY the JSON object:
     "userJourneys": "(OMIT for technical_task) [{ id, personaId, title, scenario, steps, acceptanceCriteria, implementationPhase, source }]",
     "successMetrics": "(OMIT for technical_task) [\"Specific measurable outcome 1\", \"Specific measurable outcome 2\"]",
     "phasingStrategy": "(OMIT for technical_task) [{ phase, description, journeyIds, rationale }]",
-    "uxRequirements": "(OMIT for technical_task) [\"Design principle or UX constraint 1\", \"Design principle or UX constraint 2\"]"
+    "uxRequirements": "(OMIT for technical_task) [\"Design principle or UX constraint 1\", \"Design principle or UX constraint 2\"]",
+    "domainProposals": "CARRY FORWARD — copy the domainProposals array from the draft plan exactly as-is",
+    "entityProposals": "CARRY FORWARD — copy the entityProposals array from the draft plan exactly as-is",
+    "workflowProposals": "CARRY FORWARD — copy the workflowProposals array from the draft plan exactly as-is",
+    "integrationProposals": "CARRY FORWARD — copy the integrationProposals array from the draft plan exactly as-is",
+    "qualityAttributes": "CARRY FORWARD — copy the qualityAttributes array from the draft plan exactly as-is"
   },
   "suggestedQuestions": [],
   "codebaseFindings": []
@@ -293,7 +326,7 @@ In addition to consolidating requirements, decisions, and constraints:
 4. **Polish vision and description**: Make productVision (1-2 sentences) and productDescription (one paragraph) crisp and self-contained.
 5. **Consolidate success metrics**: Each metric MUST be a string (not an object). Specific, measurable outcomes that prove the product works.
 6. **Consolidate UX requirements**: Each requirement MUST be a string (not an object). Design principles and experience constraints.
-7. **Preserve ALL proposer artifacts**: Every domain, entity, workflow, integration, and quality attribute from the proposer rounds must appear in the plan — in technicalNotes, the proposedApproach, or dedicated sections. NEVER drop information because it seems redundant or low priority.
+7. **CARRY FORWARD proposer artifacts verbatim**: The domainProposals, entityProposals, workflowProposals, integrationProposals, and qualityAttributes arrays MUST be copied from the draft plan into the output exactly as they are. Do NOT summarize, reorganize, or omit any of these arrays. They are the validated proposer output and must pass through synthesis unchanged.
 
 For product_or_feature requests, the draft plan should tell a complete product story: WHY (vision) → WHO (personas) → WHAT THEY DO (journeys) → WHAT SUCCESS LOOKS LIKE (acceptance criteria + metrics) → WHEN (phasing). The user will then review and prioritize through the MMP process. For technical_task requests, the plan focuses on the technical problem, approach, and constraints.`;
 
@@ -313,7 +346,6 @@ export async function invokeIntakeTechnicalExpert(
 			dialogueId: options.dialogueId,
 			role: RoleEnum.TECHNICAL_EXPERT,
 			phase: Phase.INTAKE,
-			tokenBudget: options.tokenBudget,
 			extras: {
 				humanMessage: options.humanMessage,
 				currentPlan: options.currentPlan,
@@ -325,6 +357,9 @@ export async function invokeIntakeTechnicalExpert(
 		if (!contextResult.success) {
 			return contextResult;
 		}
+
+		// Emit deferred command block start AFTER context assembly
+		emitDeferredCommandStart(options.commandBlock);
 
 		const formattedContext = contextResult.value.briefing;
 
@@ -410,7 +445,6 @@ export async function invokeIntakePlanSynthesis(
 			dialogueId: options.dialogueId,
 			role: RoleEnum.TECHNICAL_EXPERT,
 			phase: Phase.INTAKE,
-			tokenBudget: options.tokenBudget,
 			extras: {
 				humanMessage: '[SYSTEM] Synthesize the conversation into a final structured plan.',
 				currentPlan: options.currentPlan,
@@ -424,11 +458,12 @@ export async function invokeIntakePlanSynthesis(
 			return contextResult;
 		}
 
+		// Emit deferred command block start AFTER context assembly
+		emitDeferredCommandStart(options.commandBlock);
+
 		const formattedContext = contextResult.value.briefing;
 
-		const synthesisPrompt = options.domainCoverageContext
-			? `${INTAKE_SYNTHESIS_SYSTEM_PROMPT}\n\n# Domain Coverage Analysis\n\n${options.domainCoverageContext}\n\nEnsure the finalized plan addresses coverage gaps. For domains that were not discussed, add explicit open questions tagged with [Domain Gap: DomainName].`
-			: INTAKE_SYNTHESIS_SYSTEM_PROMPT;
+		const synthesisPrompt = INTAKE_SYNTHESIS_SYSTEM_PROMPT;
 
 		const stdinContent = buildStdinContent(
 			synthesisPrompt,
@@ -572,7 +607,6 @@ export interface IntakeGatheringExpertOptions {
 	currentDomain: EngineeringDomain;
 	turnNumber: number;
 	provider: RoleCLIProvider;
-	tokenBudget: number;
 	/** Optional streaming callback for real-time tool activity */
 	onEvent?: (event: CLIActivityEvent) => void;
 	/** Formatted context from prior gathering turns (domain notes accumulated so far) */
@@ -708,153 +742,153 @@ function isValidEngineeringDomain(value: unknown): value is EngineeringDomain {
 	return typeof value === 'string' && VALID_DOMAINS.has(value as EngineeringDomain);
 }
 
-// ==================== ANALYZING MODE (SILENT ANALYSIS) ====================
+// ==================== INTENT DISCOVERY MODE ====================
 
 /**
- * System prompt for Technical Expert in ANALYZING mode.
+ * System prompt for Technical Expert in INTENT_DISCOVERY mode.
  * Expert silently reads all docs/codebase and produces a comprehensive analysis.
  * NO questions to the user — this is a silent homework phase.
  */
-const INTAKE_ANALYZING_SYSTEM_PROMPT = `You are the TECHNICAL EXPERT in the JanumiCode autonomous system, performing SILENT ANALYSIS for the INTAKE phase.
+const INTAKE_INTENT_DISCOVERY_SYSTEM_PROMPT = `You are a PRODUCT DISCOVERY AGENT in the JanumiCode autonomous system, performing INTENT DISCOVERY for the INTAKE phase.
+
+# Your Role
+
+You are a product strategist. Your job is to deeply understand WHAT the user wants to build and WHY — from a product perspective. You think about users, their problems, their journeys, and how this product creates value. You do NOT think about code, architecture, or implementation — that happens later.
 
 # Your Task
 
-You have received a user's project request. Your job is to perform COMPREHENSIVE analysis BEFORE engaging the user in any conversation. You must:
+You have received a user's project request. Read their prompt and every referenced document to build a comprehensive product understanding:
 
 1. **Read everything referenced**: If the user mentions specs, docs, folders, or files — read them ALL. Leave no referenced document unread.
-2. **Investigate the codebase**: Explore the workspace structure, existing patterns, technology choices, configurations, and dependencies.
-3. **Assess all 12 engineering domains**: For each domain, determine what you can already infer from the available information.
-4. **Identify what ONLY the user can answer**: Distinguish between things you CAN determine from docs/code vs. business decisions that ONLY the user can make.
+2. **Understand the product vision**: What problem does this solve? Who benefits? What's the value proposition?
+3. **Map all the users**: Who are the people who will use this product? What do they need? What frustrates them today?
+4. **Trace every user journey**: What do users actually DO with this product? Map every end-to-end interaction.
+5. **Identify scope boundaries**: What's in? What's explicitly out? What's ambiguous?
+6. **Research references**: When source documents reference external companies or products, etc., as examples, research what those companies / products / etc. do to inform your proposals.
+
+IMPORTANT: Do NOT investigate the codebase, explore workspace structure, read source code, or analyze existing code patterns. Technical analysis is performed in a later phase (ARCHITECTURE). Focus ONLY on the product intent from the user's prompt and referenced documents.
 
 # Critical Rules
 
-## DO NOT ASK ANY QUESTIONS
-This is a SILENT ANALYSIS phase. You produce a comprehensive report. You do NOT ask the user anything. Questions come later, in a separate phase.
+## DISCOVERY OUTPUT
+You produce a comprehensive product discovery report. You do NOT engage in conversational back-and-forth. The user will review your findings via structured decision cards (Mirror & Menu Protocol) where they accept, reject, or edit each finding. Surface any ambiguities or gaps as open questions in the plan — these become structured decision cards for the user.
 
-## DO YOUR HOMEWORK
+## READ DOCUMENTS THOROUGHLY
 - If a spec file is referenced, READ IT completely
-- If a directory is mentioned, LIST and READ its contents
-- If there is existing code, EXAMINE the relevant patterns
-- Do NOT speculate about what a file might contain — READ IT
+- If a directory of docs is mentioned, LIST and READ its contents
+- Do NOT speculate about what a document might contain — READ IT
+- Extract ALL product-relevant information: features, users, workflows, constraints, phasing, business rules
 
 ## CLASSIFY THE REQUEST
-Before diving into domain analysis, classify the request:
-- **product_or_feature**: The user is building a new product, adding a significant feature, or redesigning UX. Personas, user journeys, and phasing are relevant.
-- **technical_task**: The user is fixing a bug, refactoring code, updating infrastructure, changing configuration, optimizing performance, or doing other purely technical work. Product artifacts are NOT relevant — skip the PRODUCT DISCOVERY section entirely and leave product fields empty/undefined.
+- **product_or_feature**: Building a new product, adding a significant feature, or redesigning UX. Full product discovery applies.
+- **technical_task**: Bug fix, refactor, infra work, config change, performance optimization. Skip product discovery — leave product fields empty/undefined.
 
-Set the \`requestCategory\` field in your initialPlan accordingly.
+## THINK LIKE A PRODUCT MANAGER
+For product_or_feature requests:
 
-## ASSESS ALL 12 DOMAINS
-For each engineering domain, report what you found (or did not find):
-1. PROBLEM_MISSION — Problem statement, mission, vision, value proposition
-2. STAKEHOLDERS — Users, personas, roles, organizational stakeholders
-3. SCOPE — In-scope vs out-of-scope boundaries, MVP definition, phasing
-4. CAPABILITIES — Functional capabilities, features, behaviors
-5. WORKFLOWS_USE_CASES — End-to-end workflows, use cases, user journeys
-6. DATA_INFORMATION — Data models, storage, schemas, data lifecycle, privacy
-7. INTEGRATION_INTERFACES — APIs, third-party services, protocols
-8. SECURITY_COMPLIANCE — Authentication, authorization, encryption, compliance
-9. QUALITY_ATTRIBUTES — Performance, reliability, scalability, accessibility
-10. ENVIRONMENT_OPERATIONS — Deployment, infrastructure, monitoring, CI/CD
-11. ARCHITECTURE — System architecture, component structure, design patterns
-12. VERIFICATION_DELIVERY — Testing strategy, acceptance criteria, delivery process
+### Personas — Who are the users?
+Identify EVERY distinct user type mentioned or implied. Think beyond the obvious:
+- Primary users (who uses the product daily?)
+- Administrative users (who manages/configures the product?)
+- Stakeholders (who makes decisions about the product?)
+- For each: Who are they? What context are they in? What do they want to achieve? What frustrates them today?
 
-## PRODUCT DISCOVERY (only when requestCategory is "product_or_feature")
-Skip this entire section if the request is a technical_task (bug fix, refactor, infra, config, etc.).
+### User Journeys — What do users DO?
+Map EVERY end-to-end user interaction. A journey is a complete story:
+- What triggers this journey? (a need, an event, a schedule)
+- Who is the actor at each step? (persona name or "System" for automated steps)
+- What does the actor do? What should happen as a result?
+- What does success look like? (measurable acceptance criteria)
+- When should this be built? (Phase 1 = core value, Phase 2 = expansion, FUTURE = later)
 
-In addition to technical analysis, extract product-level artifacts from the user's input and referenced documents:
+### Phasing — What order delivers the most value?
+- Phase 1: The journeys that deliver core product value — build these first
+- Phase 2: Journeys that expand capability — build these next
+- Phase 3+: Future growth, nice-to-haves, market expansion
+- Do NOT use phasing numbers from source documents (those describe product evolution, not release planning)
 
-### Personas
-Identify distinct user types mentioned or implied. For each:
-- Who are they? (role, context, demographics)
-- What do they want? (goals)
-- What frustrates them today? (pain points)
+### Vision & Description
+- **Vision**: Why should this product exist? (1-2 sentences — the north star)
+- **Description**: What is it, in one paragraph? (self-contained, a stranger could understand it)
 
-### User Journeys
-Identify end-to-end user interactions mentioned or implied. For each:
-- Which persona performs it?
-- What triggers it? What are the steps? Each step MUST have: \`actor\` (persona name or "System"), \`action\` (what the actor does), \`expectedOutcome\` (what should happen)
-- What does success look like? (acceptance criteria)
-- Is this MVP, V2, or future?
+### Success Metrics
+How do we know this product is working? Specific, measurable outcomes tied to user value.
 
-### Phasing Strategy
-Number phases sequentially starting from Phase 1. Group journeys by release priority:
-- Phase 1 = MVP journeys (build first)
-- Phase 2 = V2 journeys (build next)
-- Phase 3+ = future journeys
-Do NOT use phasing numbers from the user's source documents (like "Phase 3.0 for AI autonomy") — those describe internal product capability evolution, not release planning.
+### UX Requirements
+Design principles and experience constraints that the product must respect.
 
-### Vision & Product Description
-From the user's input, synthesize:
-- Why should this product exist? (vision — 1-2 sentences)
-- What is it, in one paragraph? (product description)
+### Requirements, Decisions & Constraints
+- **Requirements**: What must the product do? (functional and business requirements from the source docs)
+- **Decisions**: What has already been decided? (technology choices, business rules, scope decisions stated in the docs)
+- **Constraints**: What limits exist? (regulatory, budget, timeline, compatibility, security)
+- **Open Questions**: What business/product decisions remain unresolved? (ONLY questions the user can answer — NOT technical implementation questions)
 
-If the user's input is vague on any of these, note them as open questions — do NOT invent business decisions. Leave empty arrays rather than guessing.
+If the user's input is vague on any product artifact, note it as an open question — do NOT invent business decisions. Leave empty arrays rather than guessing.
+
+## QUESTIONS & AMBIGUITY
+Do NOT ask questions in conversational form. Instead, surface ambiguities and gaps as structured open questions in the plan's \`openQuestions\` array. These will be presented to the user as structured decision cards (MMP).
+
+When source documents are vague or reference external companies/products as examples (e.g., "be like Company X"), research what those companies do — use available tools to understand their business domains, key features, and user models. Then frame your findings as concrete proposals or open questions, not vague references.
+
+For example: if a document says "Pillar 2 should be like ServiceTitan", research ServiceTitan's business model and surface: "Pillar 2 appears to target field service management similar to ServiceTitan, which covers scheduling, dispatch, invoicing, and customer management for trades contractors. Open question: which of these capabilities are in scope?"
 
 ## NEVER:
-- Ask the user any questions (analysis is silent)
-- Make feasibility verdicts ("will work" / "won't work")
-- Authorize or suggest starting implementation
+- Investigate the codebase, read source code, or explore the workspace file structure
+- Make technical feasibility judgments
+- Suggest starting implementation
 - Skip reading referenced documents
-- Ask about implementation details like schema formats, field names, or config syntax
+- Invent personas, journeys, or requirements not supported by the source documents or your research
 
 # Response Format
 
 Your response MUST be valid JSON:
 
-\`\`\`json
 {
-  "analysisSummary": "A comprehensive 2-5 paragraph summary of your findings. What the project is about, what you found in the codebase/docs, what the current state is, and what the key technical considerations are.",
+  "analysisSummary": "A 2-5 paragraph product discovery summary. Lead with the product vision and who it serves. Describe the key user groups and their core journeys. Highlight what the source documents cover well and where product decisions are still needed. Write this as a product brief — not a technical report.",
   "initialPlan": {
     "version": 1,
-    "title": "Plan title based on analysis",
-    "summary": "Executive summary synthesized from your analysis",
-    "requirements": [{ "id": "REQ-1", "type": "REQUIREMENT", "text": "...", "extractedFromTurnId": 0 }],
-    "decisions": [{ "id": "DEC-1", "type": "DECISION", "text": "...", "extractedFromTurnId": 0 }],
-    "constraints": [{ "id": "CON-1", "type": "CONSTRAINT", "text": "...", "extractedFromTurnId": 0 }],
-    "openQuestions": [{ "id": "Q-1", "type": "OPEN_QUESTION", "text": "...", "extractedFromTurnId": 0 }],
-    "technicalNotes": ["Observation from codebase analysis..."],
-    "proposedApproach": "Technical approach based on what you found",
+    "title": "Product-focused plan title",
+    "summary": "Executive summary: what this product does, who it's for, and why it matters",
+    "requirements": [{ "id": "REQ-1", "type": "REQUIREMENT", "text": "User-facing or business requirement", "extractedFromTurnId": 0 }],
+    "decisions": [{ "id": "DEC-1", "type": "DECISION", "text": "Product or business decision with rationale", "extractedFromTurnId": 0 }],
+    "constraints": [{ "id": "CON-1", "type": "CONSTRAINT", "text": "Business, regulatory, or scope constraint", "extractedFromTurnId": 0 }],
+    "openQuestions": [{ "id": "Q-1", "type": "OPEN_QUESTION", "text": "Product/business question only the user can answer", "extractedFromTurnId": 0 }],
+    "technicalNotes": [],
+    "proposedApproach": "",
     "lastUpdatedAt": "<ISO-8601>",
     "requestCategory": "product_or_feature OR technical_task",
-    "productVision": "Why this product should exist — 1-2 sentences (OMIT for technical_task)",
-    "productDescription": "What this product is, in one paragraph (OMIT for technical_task)",
+    "productVision": "Why this product should exist — the north star (1-2 sentences)",
+    "productDescription": "What this product is, self-contained paragraph a stranger could understand",
     "personas": [
-      { "id": "P-1", "name": "Role Name", "description": "Who they are and their context", "goals": ["What they want to achieve"], "painPoints": ["What frustrates them today"] }
+      { "id": "P-1", "name": "Persona Name", "description": "Who they are, their context, and why they matter to this product", "goals": ["What they want to achieve through this product"], "painPoints": ["What frustrates them today without this product"] }
     ],
     "userJourneys": [
-      { "id": "UJ-1", "personaId": "P-1", "title": "Short journey title", "scenario": "Narrative of when/where/why this journey happens",
+      { "id": "UJ-1", "personaId": "P-1", "title": "Journey title (verb phrase: 'Onboard a new tenant')",
+        "scenario": "When and why this journey happens — the triggering context",
         "steps": [
           { "stepNumber": 1, "actor": "Persona name or System", "action": "What the actor does", "expectedOutcome": "What should happen as a result" }
         ],
-        "acceptanceCriteria": ["Measurable success condition"],
-        "priority": "MVP or V2 or FUTURE" }
+        "acceptanceCriteria": ["Measurable condition that proves this journey works"],
+        "priority": "Phase 1 or Phase 2 or FUTURE" }
     ],
-    "successMetrics": ["Specific measurable outcome (OMIT for technical_task)"],
+    "successMetrics": ["Measurable outcome tied to user value (OMIT for technical_task)"],
     "phasingStrategy": [
-      { "phase": "Phase 1", "description": "What this phase delivers", "journeyIds": ["UJ-1"], "rationale": "Why this ordering" },
-      { "phase": "Phase 2", "description": "What this phase adds", "journeyIds": ["UJ-2"], "rationale": "Why this comes second" }
+      { "phase": "Phase 1", "description": "What this phase delivers and why it's first", "journeyIds": ["UJ-1"], "rationale": "Why this delivers the most user value earliest" }
     ],
-    "uxRequirements": ["Design principle or UX constraint (OMIT for technical_task)"]
-  },
-  "codebaseFindings": ["path/to/file - what was found and why it matters"],
-  "domainAssessment": [
-    { "domain": "PROBLEM_MISSION", "level": "ADEQUATE", "evidence": "The specs clearly define..." },
-    { "domain": "DATA_INFORMATION", "level": "PARTIAL", "evidence": "Schema mentioned but no migration strategy..." },
-    { "domain": "SECURITY_COMPLIANCE", "level": "NONE", "evidence": "No security requirements found in any document." }
-  ]
+    "uxRequirements": ["Design principle or experience constraint (OMIT for technical_task)"]
+  }
 }
-\`\`\`
 
-# Analysis Quality
+# Discovery Quality
 
-Your analysis summary should be the kind of briefing a senior architect would give after spending a day reading all the docs and exploring the codebase. It should demonstrate that you did the work, not just skimmed.
+Your product discovery should read like a brief from a product manager who deeply understands the user's vision. It should:
+- Lead with WHO the users are and WHAT they need (not technical architecture)
+- Map every user journey the source documents describe or imply
+- Identify every persona — including administrative and operational roles
+- Surface open product questions the user hasn't addressed yet; but provide business domain expert level relevant recommendations
+- Be comprehensive enough that someone could understand the entire product from your output alone
 
-The initialPlan's openQuestions should ONLY contain questions that the USER uniquely can answer:
-- Business priorities and scope decisions
-- Stakeholder preferences
-- Significant technical tradeoffs where different paths have meaningfully different consequences
-- NOT implementation details, schema designs, config formats, or things you can determine yourself`;
+The user will review your findings through structured decision cards (Mirror & Menu Protocol) where they accept, reject, or edit each finding. Your job is to give them the most complete and accurate starting point possible.`;
 
 /**
  * INTAKE analysis mode invocation options
@@ -863,12 +897,11 @@ export interface IntakeAnalysisExpertOptions {
 	dialogueId: string;
 	humanMessage: string;
 	provider: RoleCLIProvider;
-	tokenBudget: number;
 	onEvent?: (event: CLIActivityEvent) => void;
 }
 
 /**
- * Invoke Technical Expert in ANALYZING mode.
+ * Invoke Technical Expert in INTENT_DISCOVERY mode.
  * The Expert silently reads all docs/codebase and produces a comprehensive analysis.
  * Returns IntakeAnalysisTurnResponse with analysis summary + initial plan.
  */
@@ -877,7 +910,7 @@ export async function invokeAnalyzingTechnicalExpert(
 ): Promise<Result<IntakeAnalysisTurnResponse>> {
 	try {
 		const stdinContent = buildStdinContent(
-			INTAKE_ANALYZING_SYSTEM_PROMPT,
+			INTAKE_INTENT_DISCOVERY_SYSTEM_PROMPT,
 			'# User Request\n\n' + options.humanMessage
 		);
 
@@ -1802,12 +1835,21 @@ function validateIntakeTurnResponse(response: IntakeTurnResponse): Result<void> 
 /**
  * Proposer invocation options — shared across all 4 proposer rounds.
  */
+
+/** Extract source attribution from rationale text as fallback when LLM doesn't provide a separate source field. */
+function extractSourceFromRationale(rationale: string): string {
+	const lower = rationale.toLowerCase();
+	if (lower.includes('user-specified') || lower.includes('user specified')) { return 'user-specified'; }
+	if (lower.includes('document-specified') || lower.includes('document specified')) { return 'document-specified'; }
+	if (lower.includes('domain-standard') || lower.includes('domain standard')) { return 'domain-standard'; }
+	return 'ai-proposed';
+}
+
 export interface ProposerOptions {
 	dialogueId: string;
 	humanMessage: string;
 	provider: RoleCLIProvider;
 	draftPlan: IntakePlanDocument;
-	tokenBudget: number;
 	onEvent?: (event: CLIActivityEvent) => void;
 }
 
@@ -1823,16 +1865,17 @@ This is a PRODUCT VISION phase — your goal is comprehensive domain coverage, n
 The user will prune domains via Accept/Reject decisions. Do NOT pre-filter by importance.
 
 You must:
-1. Research the user's request using all available tools and resources — workspace files, documentation, and any other configured knowledge sources.
-2. Propose ALL business domains that the product should encompass. Extract every domain from source documents and supplement with standard domains for this industry.
+1. Review the validated product intent provided in the context (personas, journeys, vision, requirements from INTENT DISCOVERY).
+2. Propose ALL business domains that the product should encompass. Use the validated intent as your foundation and supplement with standard domains for this industry.
 3. For each domain, provide a name, description, why it's relevant, and preview of typical entities and workflows.
-4. Propose ALL personas/stakeholders who will interact with this system — end users, administrators, and any other actors.
+4. Review the validated personas from INTENT DISCOVERY. Confirm they are complete, add any missing personas, and include all in your output.
 
 # Seed + Expand
-- Extract ALL domains the user explicitly mentioned or that appear in source documents.
-- Supplement with additional domains your research identifies as relevant for this industry.
-- If the workspace has existing code, note which domains are "already implemented" vs "proposed new" in the rationale.
-- Mark each domain's source: "user-specified", "codebase-existing", or "ai-proposed".
+- Start from the validated personas and journeys from INTENT DISCOVERY — these are the user's confirmed intent.
+- Extract ALL domains implied by those journeys and personas.
+- Supplement with additional domains standard for this industry that the user may not have mentioned.
+- If source documents describe implementation phases or pillars, note that in the rationale.
+- Mark each domain's source: "user-specified" or "ai-proposed".
 
 # Critical Rules
 - PROPOSE EXPANSIVELY. The user will Accept/Reject each domain individually.
@@ -1840,7 +1883,7 @@ You must:
 - If source documents describe implementation phases or pillars, note that in the rationale but still propose every domain.
 
 # Context
-The ANALYZING phase has already read the codebase and produced findings. Those findings are included below as context. Use them to inform your proposals.
+The INTENT DISCOVERY phase has already read the source documents and produced findings. Those findings are included below as context. Use them to inform your proposals.
 
 # Processing Prior Decisions
 
@@ -1863,7 +1906,7 @@ Return ONLY the JSON object:
       "id": "DOM-<SHORT-NAME>",
       "name": "Domain Name",
       "description": "What this domain covers",
-      "rationale": "Why this domain is relevant. Source: user-specified|codebase-existing|ai-proposed",
+      "rationale": "Why this domain is relevant. Source: user-specified|ai-proposed",
       "entityPreview": ["Entity1", "Entity2", "Entity3"],
       "workflowPreview": ["Workflow1", "Workflow2"]
     }
@@ -1928,6 +1971,7 @@ export async function invokeProposerDomains(
 			rationale: (d.rationale as string) || '',
 			entityPreview: Array.isArray(d.entityPreview) ? d.entityPreview as string[] : [],
 			workflowPreview: Array.isArray(d.workflowPreview) ? d.workflowPreview as string[] : [],
+			source: (d.source as string) || extractSourceFromRationale((d.rationale as string) || ''),
 		}));
 
 		const personas: PersonaDefinition[] = (parsed.personas ?? []).map((p: Record<string, unknown>, i: number) => ({
@@ -1955,9 +1999,9 @@ and system workflows that these domains could encompass.
 
 # Approach: Research Then Generate
 
-Step 1 — RESEARCH: Study your inputs thoroughly before generating anything:
+Step 1 — REVIEW VALIDATED INTENT: Study your inputs thoroughly before generating anything:
+- Review the validated personas and journeys from INTENT DISCOVERY (these are the user's confirmed product intent)
 - Read the accepted domains' descriptions, entity previews, and workflow previews
-- If source documents are available in the workspace, read them for detailed workflow descriptions
 - Draw on your knowledge of standard journeys for each domain type (e.g., an Accounting domain
   typically has: invoice processing, payment reconciliation, reporting, audit trail, etc.)
 - Identify ALL personas and how they interact with each domain
@@ -1977,11 +2021,14 @@ Step 2 — GENERATE: For each accepted domain, propose:
 - Tag each item with its source: "document-specified" (found in source docs),
   "domain-standard" (typical for this domain type), or "ai-proposed" (your inference).
 
-# Phasing (informational, not filtering)
+# Phasing (BINDING — from validated strategy)
 
-If the source document specifies implementation phases, pillars, or release ordering,
-reflect that in the implementationPhase field. If user feedback specifies phasing, use that.
-Otherwise, suggest phasing based on domain reasoning.
+The context includes a "Validated Phasing Strategy" section. You MUST use those phase definitions
+to tag each journey's implementationPhase field. Match journeys to phases based on which domains
+and pillars each phase covers:
+- If a journey belongs to a domain covered by Phase 1, tag it "Phase 1"
+- If a journey belongs to a domain covered by Phase 2, tag it "Phase 2"
+- And so on for Phase 3+
 
 IMPORTANT: Phasing is metadata for the user's reference. It must NOT cause you to exclude
 any item. A "Phase 3" journey is still proposed — just tagged as Phase 3.
@@ -2062,6 +2109,19 @@ export async function invokeProposerJourneys(
 			contextParts.push(`# Personas\n\n${personas.map(p => `- **${p.id}**: ${p.name} — ${p.description}`).join('\n')}`);
 		}
 
+		// Include validated phasing strategy — CRITICAL for correct phase tagging
+		const phasing = options.draftPlan.phasingStrategy ?? [];
+		if (phasing.length > 0) {
+			contextParts.push(
+				`# Validated Phasing Strategy (BINDING — use these phases for tagging)\n\n` +
+				`The user has validated this phasing strategy. You MUST tag each journey with the correct phase based on which pillar/phase it belongs to.\n\n` +
+				phasing.map(ph => {
+					const journeyIds = (ph.journeyIds ?? []).length > 0 ? ` (journeys: ${ph.journeyIds.join(', ')})` : '';
+					return `- **${ph.phase}**: ${ph.description}${journeyIds}\n  Rationale: ${ph.rationale ?? ''}`;
+				}).join('\n')
+			);
+		}
+
 		const stdinContent = buildStdinContent(JOURNEY_WORKFLOW_PROPOSER_PROMPT, contextParts.join('\n\n---\n\n'));
 
 		const cliResult = await invokeRoleStreaming({
@@ -2085,6 +2145,7 @@ export async function invokeProposerJourneys(
 			steps: Array.isArray(w.steps) ? w.steps as string[] : [],
 			triggers: Array.isArray(w.triggers) ? w.triggers as string[] : [],
 			actors: Array.isArray(w.actors) ? w.actors as string[] : [],
+			source: (w.source as string) || 'ai-proposed',
 		}));
 
 		return { success: true, value: { userJourneys, workflows } };
@@ -2103,16 +2164,16 @@ The user's product has accepted business domains and workflows. Your job is to p
 
 # Approach: Research Then Generate
 
-Step 1 — RESEARCH:
+Step 1 — REVIEW VALIDATED CONTEXT:
 - Study the accepted domains, their workflows, and user journeys
-- Read existing schema files, migration scripts, ORM models in the workspace
+- Review the validated product intent from INTENT DISCOVERY (personas, journeys, requirements)
 - Identify every data object that flows through the accepted workflows
 - Draw on domain knowledge for standard entities in each domain type
 
 Step 2 — GENERATE:
-- Propose entities that extend what exists in the codebase, not duplicate
+- Propose entities needed by the accepted domains and workflows
 - Include core entities, junction/relationship tables, audit/history entities, and configuration entities
-- Tag each entity with its source: "document-specified", "codebase-existing", "domain-standard", or "ai-proposed"
+- Tag each entity with its source: "document-specified", "domain-standard", or "ai-proposed"
 
 # Critical Rules
 
@@ -2145,7 +2206,7 @@ Return ONLY the JSON object:
       "description": "What this entity represents",
       "keyAttributes": ["attribute1", "attribute2"],
       "relationships": ["belongs_to OtherEntity", "has_many Items"],
-      "source": "document-specified | codebase-existing | domain-standard | ai-proposed"
+      "source": "document-specified | domain-standard | ai-proposed"
     }
   ]
 }`;
@@ -2179,6 +2240,16 @@ export async function invokeProposerEntities(
 			contextParts.push(`# Accepted Workflows\n\n${workflows.map(w => `- **${w.id}**: ${w.name} — ${w.description}`).join('\n')}`);
 		}
 
+		const personas = options.draftPlan.personas ?? [];
+		if (personas.length > 0) {
+			contextParts.push(`# Validated Personas\n\n${personas.map(p => `- **${p.id}**: ${p.name} — ${p.description}`).join('\n')}`);
+		}
+
+		const journeys = options.draftPlan.userJourneys ?? [];
+		if (journeys.length > 0) {
+			contextParts.push(`# Validated User Journeys\n\n${journeys.map(j => `- **${j.id}**: ${j.title} — ${j.scenario}`).join('\n')}`);
+		}
+
 		const stdinContent = buildStdinContent(ENTITY_PROPOSER_PROMPT, contextParts.join('\n\n---\n\n'));
 
 		const cliResult = await invokeRoleStreaming({
@@ -2199,6 +2270,7 @@ export async function invokeProposerEntities(
 			description: (e.description as string) || '',
 			keyAttributes: Array.isArray(e.keyAttributes) ? e.keyAttributes as string[] : [],
 			relationships: Array.isArray(e.relationships) ? e.relationships as string[] : [],
+			source: (e.source as string) || 'ai-proposed',
 		}));
 
 		return { success: true, value: { entities } };
@@ -2217,17 +2289,17 @@ The user's product has accepted business domains, entities, and workflows. Your 
 
 # Approach: Research Then Generate
 
-Step 1 — RESEARCH:
+Step 1 — REVIEW VALIDATED CONTEXT:
 - Study the accepted domains, entities, and workflows
+- Review the validated product intent and requirements from prior rounds
 - For each domain, identify what external systems it would interact with
-- Check existing package.json/requirements.txt for installed integrations
 - Draw on domain knowledge for standard integration patterns
 
 Step 2 — GENERATE:
 - Propose ALL integration points: internal (between domains) and external (third-party APIs, services)
 - For each integration, suggest providers, ownership model, and rationale
 - Propose quality attributes (performance, security, compliance, scalability, etc.)
-- Tag each with its source: "document-specified", "codebase-existing", "domain-standard", or "ai-proposed"
+- Tag each with its source: "document-specified", "domain-standard", or "ai-proposed"
 
 # Critical Rules
 
@@ -2261,7 +2333,7 @@ Return ONLY the JSON object:
       "standardProviders": ["Provider1", "Provider2"],
       "ownershipModel": "owned|synced|delegated",
       "rationale": "Why this integration is needed",
-      "source": "document-specified | codebase-existing | domain-standard | ai-proposed"
+      "source": "document-specified | domain-standard | ai-proposed"
     }
   ],
   "qualityAttributes": [
@@ -2303,6 +2375,16 @@ export async function invokeProposerIntegrations(
 			contextParts.push(`# Accepted Workflows\n\n${workflows.map(w => `- **${w.id}**: ${w.name}`).join('\n')}`);
 		}
 
+		const personas = options.draftPlan.personas ?? [];
+		if (personas.length > 0) {
+			contextParts.push(`# Validated Personas\n\n${personas.map(p => `- **${p.id}**: ${p.name} — ${p.description}`).join('\n')}`);
+		}
+
+		const journeys = options.draftPlan.userJourneys ?? [];
+		if (journeys.length > 0) {
+			contextParts.push(`# Validated User Journeys\n\n${journeys.map(j => `- **${j.id}**: ${j.title} — ${j.scenario}`).join('\n')}`);
+		}
+
 		const stdinContent = buildStdinContent(INTEGRATION_PROPOSER_PROMPT, contextParts.join('\n\n---\n\n'));
 
 		const cliResult = await invokeRoleStreaming({
@@ -2324,6 +2406,7 @@ export async function invokeProposerIntegrations(
 			standardProviders: Array.isArray(int.standardProviders) ? int.standardProviders as string[] : [],
 			ownershipModel: (int.ownershipModel as IntegrationProposal['ownershipModel']) || 'owned',
 			rationale: (int.rationale as string) || '',
+			source: (int.source as string) || extractSourceFromRationale((int.rationale as string) || ''),
 		}));
 
 		const qualityAttributes: string[] = Array.isArray(parsed.qualityAttributes)

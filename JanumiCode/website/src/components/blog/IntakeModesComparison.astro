@@ -1,0 +1,167 @@
+---
+// Side-by-side: DOMAIN_GUIDED vs INFRASTRUCTURE_GUIDED intake modes
+---
+
+<div class="imc grid grid--2">
+  <div class="card imc__card imc__card--domain">
+    <span class="imc__label">DOMAIN_GUIDED</span>
+    <h4 class="imc__title">Product & Feature Intake</h4>
+    <div class="imc__rounds">
+      <div class="imc__round-chip">Domains</div>
+      <div class="imc__round-chip">Journeys</div>
+      <div class="imc__round-chip">Entities</div>
+      <div class="imc__round-chip">Integrations</div>
+    </div>
+    <div class="imc__focus-label">PRIMARY FOCUS</div>
+    <ul class="imc__list">
+      <li>Business domains &amp; personas</li>
+      <li>User journeys &amp; workflows</li>
+      <li>Data model &amp; entities</li>
+      <li>External integrations</li>
+      <li>UX requirements</li>
+    </ul>
+    <div class="imc__focus-label">DE-PRIORITIZED</div>
+    <ul class="imc__list imc__list--dim">
+      <li>Network topology</li>
+      <li>IAM &amp; security groups</li>
+      <li>Deployment pipelines</li>
+      <li>Observability SLIs/SLOs</li>
+    </ul>
+  </div>
+
+  <div class="card imc__card imc__card--infra">
+    <span class="imc__label imc__label--cyan">INFRASTRUCTURE_GUIDED</span>
+    <h4 class="imc__title">Platform Engineering Intake</h4>
+    <div class="imc__rounds">
+      <div class="imc__round-chip imc__round-chip--cyan">Topology</div>
+      <div class="imc__round-chip imc__round-chip--cyan">Compute/Storage</div>
+      <div class="imc__round-chip imc__round-chip--warn">Security/IAM</div>
+      <div class="imc__round-chip imc__round-chip--green">Ops/Delivery</div>
+    </div>
+    <div class="imc__focus-label imc__focus-label--cyan">PRIMARY FOCUS</div>
+    <ul class="imc__list imc__list--bright">
+      <li>Environment topology &amp; boundaries</li>
+      <li>Compute, storage &amp; state management</li>
+      <li>IAM, least privilege &amp; compliance</li>
+      <li>CI/CD, observability &amp; day-2 ops</li>
+      <li>Blast radius &amp; rollback safety</li>
+    </ul>
+    <div class="imc__focus-label">DE-PRIORITIZED</div>
+    <ul class="imc__list imc__list--dim">
+      <li>User personas &amp; journeys</li>
+      <li>Business domain models</li>
+      <li>Stakeholder analysis</li>
+      <li>UX/UI requirements</li>
+    </ul>
+  </div>
+</div>
+
+<style>
+  .imc { margin: var(--space-2xl) 0; }
+
+  .imc__card { padding: var(--space-xl); }
+
+  .imc__card--infra {
+    border-color: var(--color-border-active);
+    box-shadow: 0 0 20px var(--color-primary-glow);
+  }
+
+  .imc__label {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--color-text-muted);
+    display: block;
+    margin-bottom: var(--space-xs);
+  }
+
+  .imc__label--cyan { color: var(--color-primary); }
+
+  .imc__title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: var(--space-md);
+  }
+
+  .imc__rounds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: var(--space-lg);
+  }
+
+  .imc__round-chip {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 2px;
+    color: var(--color-text-muted);
+    background: rgba(74, 94, 120, 0.1);
+    border: 1px solid rgba(74, 94, 120, 0.2);
+  }
+
+  .imc__round-chip--cyan {
+    color: var(--color-primary);
+    background: rgba(0, 212, 255, 0.06);
+    border-color: rgba(0, 212, 255, 0.2);
+  }
+
+  .imc__round-chip--warn {
+    color: var(--color-warning);
+    background: rgba(255, 184, 0, 0.06);
+    border-color: rgba(255, 184, 0, 0.2);
+  }
+
+  .imc__round-chip--green {
+    color: var(--color-accent);
+    background: rgba(0, 255, 178, 0.06);
+    border-color: rgba(0, 255, 178, 0.2);
+  }
+
+  .imc__focus-label {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-xs);
+    margin-top: var(--space-sm);
+  }
+
+  .imc__focus-label--cyan { color: var(--color-primary); }
+
+  .imc__list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--space-sm);
+  }
+
+  .imc__list li {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    padding: 2px 0 2px var(--space-md);
+    position: relative;
+  }
+
+  .imc__list li::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    transform: rotate(45deg) translateY(-50%);
+    border: 1px solid var(--color-text-muted);
+    border-radius: 1px;
+  }
+
+  .imc__list--bright li::before { border-color: var(--color-primary); }
+  .imc__list--bright li { color: var(--color-text); }
+
+  .imc__list--dim li {
+    color: var(--color-text-muted);
+    opacity: 0.6;
+  }
+</style>

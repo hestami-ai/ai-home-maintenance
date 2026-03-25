@@ -85,17 +85,11 @@ import {
 
 // ==================== CONSTANTS ====================
 
-/** Number of recent turns to keep in full (raw) in the context window */
+/** Number of recent turns to keep in context for normal (non-synthesis) turns */
 const INTAKE_CONTEXT_WINDOW_SIZE = 6;
 
-/** When turns outside the sliding window exceed this count, trigger accumulation */
+/** When turns outside the sliding window exceed this count, trigger accumulation (legacy flows) */
 const INTAKE_ACCUMULATION_THRESHOLD = 4;
-
-/** Maximum token budget for INTAKE context (excluding system prompt) */
-const INTAKE_MAX_CONTEXT_TOKENS = 8000;
-
-/** Default token budget for INTAKE invocations */
-const INTAKE_DEFAULT_TOKEN_BUDGET = 10000;
 
 // ==================== CONVERSATION TURN ====================
 
@@ -136,24 +130,12 @@ export async function executeIntakeConversationTurn(
 
 		// 3. Invoke Technical Expert in INTAKE mode (with streaming for tool activity observability)
 		const intakeCommandId = randomUUID();
-		emitWorkflowCommand({
-			dialogueId,
-			commandId: intakeCommandId,
-			action: 'start',
-			commandType: 'cli_invocation',
-			label: `Technical Expert — INTAKE Turn ${turnNumber}`,
-			summary: `Processing: ${humanMessage.substring(0, 120)}`,
-			status: 'running',
-			timestamp: new Date().toISOString(),
-		});
-
 		const expertResult = await invokeIntakeTechnicalExpert({
 			dialogueId,
 			humanMessage,
 			currentPlan: conv.draftPlan,
 			turnNumber,
 			provider: providerResult.value,
-			tokenBudget: INTAKE_DEFAULT_TOKEN_BUDGET,
 			onEvent: (event) => {
 				emitCLIActivity(dialogueId, {
 					...event,
@@ -162,6 +144,11 @@ export async function executeIntakeConversationTurn(
 				});
 			},
 			domainCoverageContext: buildDomainCoverageContextForExpert(conv),
+			commandBlock: {
+				dialogueId,
+				commandId: intakeCommandId,
+				label: `Technical Expert — INTAKE Turn ${turnNumber}`,
+			},
 		});
 
 		emitWorkflowCommand({
@@ -314,22 +301,12 @@ export async function executeIntakePlanFinalization(
 		}
 
 		const synthesisCommandId = randomUUID();
-		emitWorkflowCommand({
-			dialogueId,
-			commandId: synthesisCommandId,
-			action: 'start',
-			commandType: 'cli_invocation',
-			label: 'Technical Expert — Plan Synthesis',
-			summary: 'Synthesizing conversation into final plan',
-			status: 'running',
-			timestamp: new Date().toISOString(),
-		});
-
+		// Synthesis needs a higher token budget — the plan now contains full proposer artifacts
+		// (domains, journeys with steps, entities with attributes, integrations) which can be 15K+ tokens
 		const synthesisResult = await invokeIntakePlanSynthesis({
 			dialogueId,
 			currentPlan: conv.draftPlan,
 			provider: providerResult.value,
-			tokenBudget: INTAKE_DEFAULT_TOKEN_BUDGET,
 			onEvent: (event) => {
 				emitCLIActivity(dialogueId, {
 					...event,
@@ -337,7 +314,11 @@ export async function executeIntakePlanFinalization(
 					phase: 'INTAKE' as Phase,
 				});
 			},
-			domainCoverageContext: buildDomainCoverageContextForExpert(conv),
+			commandBlock: {
+				dialogueId,
+				commandId: synthesisCommandId,
+				label: 'Technical Expert — Plan Synthesis',
+			},
 		});
 
 		emitWorkflowCommand({
@@ -358,26 +339,7 @@ export async function executeIntakePlanFinalization(
 
 		const finalizedPlan = synthesisResult.value.updatedPlan;
 
-		// 2b. Enrich finalized plan with domain coverage gaps as open questions
-		if (conv.domainCoverage) {
-			const gaps = getCoverageGaps(conv.domainCoverage);
-			for (const domain of gaps) {
-				const info = DOMAIN_INFO[domain];
-				const gapQuestion = {
-					id: `Q-DOMAIN-${domain}`,
-					type: 'OPEN_QUESTION' as const,
-					text: `[Domain Gap: ${info.label}] ${info.description} — this domain was not discussed during INTAKE.`,
-					extractedFromTurnId: conv.turnCount,
-					timestamp: new Date().toISOString(),
-				};
-				// Avoid duplicates
-				if (!finalizedPlan.openQuestions.some(q => q.id === gapQuestion.id)) {
-					finalizedPlan.openQuestions.push(gapQuestion);
-				}
-			}
-		}
-
-		// 2c. Carry forward proposer artifacts that synthesis may not have populated
+		// 2b. Carry forward proposer artifacts that synthesis may not have populated
 		const dp = conv.draftPlan;
 		if (dp.proposerPhase !== null && dp.proposerPhase !== undefined) {
 			// Map quality attributes → uxRequirements if synthesis didn't populate them
@@ -946,7 +908,6 @@ export async function executeIntakeGatheringTurn(
 			currentDomain: conv.currentDomain,
 			turnNumber,
 			provider: providerResult.value,
-			tokenBudget: INTAKE_DEFAULT_TOKEN_BUDGET,
 			onEvent: (event) => {
 				emitCLIActivity(dialogueId, {
 					...event,
@@ -1202,7 +1163,17 @@ function checkGatheringComplete(
  * Only generates MMP for product_or_feature requests with actual product artifacts.
  */
 export function extractProductDiscoveryMMP(plan: IntakePlanDocument): MMPPayload | undefined {
-	if (plan.requestCategory !== 'product_or_feature') { return undefined; }
+	if (plan.requestCategory !== 'product_or_feature') {
+		console.log('[INTAKE:ExtractMMP] Skipped — requestCategory:', plan.requestCategory);
+		return undefined;
+	}
+	console.log('[INTAKE:ExtractMMP] Extracting for product_or_feature. Plan fields:', {
+		personas: plan.personas?.length ?? 0,
+		userJourneys: plan.userJourneys?.length ?? 0,
+		uxRequirements: plan.uxRequirements?.length ?? 0,
+		phasingStrategy: plan.phasingStrategy?.length ?? 0,
+		productVision: !!plan.productVision,
+	});
 
 	const mirrorItems: MirrorItem[] = [];
 	const menuItems: MenuItem[] = [];
@@ -1332,13 +1303,21 @@ export function extractProductDiscoveryMMP(plan: IntakePlanDocument): MMPPayload
 		result.menu = { items: menuItems };
 	}
 
+	const hasMirror = !!result.mirror;
+	const hasMenu = !!result.menu;
+	console.log('[INTAKE:ExtractMMP] Result:', {
+		hasMirror,
+		mirrorCount: result.mirror?.items?.length ?? 0,
+		hasMenu,
+		menuCount: result.menu?.items?.length ?? 0,
+		returning: (hasMirror || hasMenu) ? 'MMPPayload' : 'empty object (truthy but no cards)',
+	});
+
 	return result;
 }
 
-// ==================== ANALYZING PHASE (INVERTED FLOW) ====================
+// ==================== INTENT DISCOVERY PHASE (INVERTED FLOW) ====================
 
-/** Higher token budget for comprehensive analysis */
-const INTAKE_ANALYSIS_TOKEN_BUDGET = 20000;
 
 /**
  * Execute the silent ANALYSIS phase for STATE_DRIVEN and DOMAIN_GUIDED modes.
@@ -1363,14 +1342,14 @@ export async function executeIntakeAnalysis(
 			return providerResult as Result<PhaseExecutionResult>;
 		}
 
-		// 3. Invoke Expert in ANALYZING mode
+		// 3. Invoke Expert in INTENT_DISCOVERY mode
 		const analysisCommandId = randomUUID();
 		emitWorkflowCommand({
 			dialogueId,
 			commandId: analysisCommandId,
 			action: 'start',
 			commandType: 'cli_invocation',
-			label: 'Technical Expert — INTAKE Analysis',
+			label: 'Product Discovery — Intent Discovery',
 			summary: 'Analyzing: ' + humanMessage.substring(0, 120),
 			status: 'running',
 			timestamp: new Date().toISOString(),
@@ -1380,7 +1359,6 @@ export async function executeIntakeAnalysis(
 			dialogueId,
 			humanMessage,
 			provider: providerResult.value,
-			tokenBudget: INTAKE_ANALYSIS_TOKEN_BUDGET,
 			onEvent: (event) => {
 				emitCLIActivity(dialogueId, {
 					...event,
@@ -1395,9 +1373,9 @@ export async function executeIntakeAnalysis(
 			commandId: analysisCommandId,
 			action: expertResult.success ? 'complete' : 'error',
 			commandType: 'cli_invocation',
-			label: 'Technical Expert — INTAKE Analysis',
+			label: 'Product Discovery — Intent Discovery',
 			summary: expertResult.success
-				? 'Analysis completed'
+				? 'Intent discovery completed'
 				: 'Error: ' + (expertResult.error?.message ?? 'Unknown'),
 			timestamp: new Date().toISOString(),
 		});
@@ -1408,12 +1386,31 @@ export async function executeIntakeAnalysis(
 
 		const analysis = expertResult.value;
 
-		// 4. Seed domain coverage from analysis domainAssessment
-		const coverageMap = conv.domainCoverage ?? initializeCoverageMap();
-		const seededCoverage = seedCoverageFromAnalysis(coverageMap, analysis.domainAssessment);
+		// Strip technical fields from Intent Discovery output — technical analysis belongs in ARCHITECTURE
+		analysis.codebaseFindings = [];
+		analysis.domainAssessment = [];
+		analysis.initialPlan.technicalNotes = [];
+		analysis.initialPlan.proposedApproach = '';
+
+		// Domain coverage removed from INTAKE — handled by ARCHITECTURE TECHNICAL_ANALYSIS
 
 		// 4b. Extract product discovery MMP for human review (if product/feature request)
 		const productMMP = extractProductDiscoveryMMP(analysis.initialPlan);
+
+		console.log('[INTAKE:Analysis] Product discovery MMP extraction:', {
+			requestCategory: analysis.initialPlan.requestCategory,
+			intakeMode: conv.intakeMode,
+			hasMMP: productMMP !== undefined,
+			mirrorCount: productMMP?.mirror?.items?.length ?? 0,
+			menuCount: productMMP?.menu?.items?.length ?? 0,
+			preMortemCount: productMMP?.preMortem?.items?.length ?? 0,
+			personasCount: analysis.initialPlan.personas?.length ?? 0,
+			journeysCount: analysis.initialPlan.userJourneys?.length ?? 0,
+			phasingCount: analysis.initialPlan.phasingStrategy?.length ?? 0,
+			uxReqCount: analysis.initialPlan.uxRequirements?.length ?? 0,
+			hasVision: !!analysis.initialPlan.productVision,
+			hasDescription: !!analysis.initialPlan.productDescription,
+		});
 
 		// 5. Store analysis event
 		const eventResult = writeDialogueEvent({
@@ -1422,7 +1419,7 @@ export async function executeIntakeAnalysis(
 			role: Role.TECHNICAL_EXPERT,
 			phase: 'INTAKE',
 			speech_act: SpeechAct.EVIDENCE,
-			summary: 'Analysis complete',
+			summary: 'Intent discovery complete',
 			content: analysis.analysisSummary,
 			detail: {
 				humanMessage,
@@ -1446,9 +1443,15 @@ export async function executeIntakeAnalysis(
 		let targetSubState: IntakeSubState;
 		if (analysis.initialPlan.requestCategory === 'product_or_feature'
 			&& (conv.intakeMode === IntakeMode.STATE_DRIVEN || conv.intakeMode === IntakeMode.DOMAIN_GUIDED)) {
-			// Enter Proposer-Validator loop — ANALYZING homework seeds the proposer rounds
-			targetSubState = IntakeSubState.PROPOSING_DOMAINS;
 			analysis.initialPlan.proposerPhase = ProposerPhase.DOMAIN_MAPPING;
+			if (productMMP !== undefined) {
+				// Gate on PRODUCT_REVIEW — user must review product artifacts before proposer rounds
+				targetSubState = IntakeSubState.PRODUCT_REVIEW;
+				analysis.initialPlan.preProposerReview = true;
+			} else {
+				// No product MMP — skip directly to proposer
+				targetSubState = IntakeSubState.PROPOSING_DOMAINS;
+			}
 		} else if (productMMP !== undefined) {
 			// Fallback: HYBRID_CHECKPOINTS with product artifacts → legacy PRODUCT_REVIEW
 			targetSubState = IntakeSubState.PRODUCT_REVIEW;
@@ -1456,11 +1459,17 @@ export async function executeIntakeAnalysis(
 			targetSubState = IntakeSubState.PROPOSING;
 		}
 
+		console.log('[INTAKE:Analysis] Transition decision:', {
+			targetSubState,
+			needsInput: targetSubState === IntakeSubState.PRODUCT_REVIEW || targetSubState === IntakeSubState.PROPOSING,
+			preProposerReview: analysis.initialPlan.preProposerReview ?? false,
+			productDiscoveryMMPStored: !!(productMMP ? JSON.stringify(productMMP) : undefined),
+		});
+
 		const updateResult = updateIntakeConversation(dialogueId, {
 			subState: targetSubState,
 			turnCount: 1,
 			draftPlan: analysis.initialPlan,
-			domainCoverage: seededCoverage,
 			currentDomain: null,
 		});
 
@@ -1469,10 +1478,6 @@ export async function executeIntakeAnalysis(
 		}
 
 		// 7. Emit events
-		getEventBus().emit('intake:domain_coverage_updated', {
-			dialogueId,
-			coverage: seededCoverage,
-		});
 		getEventBus().emit('intake:analysis_complete', {
 			dialogueId,
 			domainAssessment: analysis.domainAssessment,
@@ -1562,24 +1567,12 @@ export async function executeIntakeClarificationTurn(
 
 		// 3. Invoke Expert with CLARIFYING prompt
 		const clarifyCommandId = randomUUID();
-		emitWorkflowCommand({
-			dialogueId,
-			commandId: clarifyCommandId,
-			action: 'start',
-			commandType: 'cli_invocation',
-			label: 'Technical Expert — Clarification Round ' + currentRound,
-			summary: 'Clarifying: ' + humanMessage.substring(0, 120),
-			status: 'running',
-			timestamp: new Date().toISOString(),
-		});
-
 		const expertResult = await invokeIntakeTechnicalExpert({
 			dialogueId,
 			humanMessage,
 			currentPlan: conv.draftPlan,
 			turnNumber,
 			provider: providerResult.value,
-			tokenBudget: INTAKE_DEFAULT_TOKEN_BUDGET,
 			onEvent: (event) => {
 				emitCLIActivity(dialogueId, {
 					...event,
@@ -1590,6 +1583,11 @@ export async function executeIntakeClarificationTurn(
 			domainCoverageContext: buildDomainCoverageContextForExpert(conv),
 			subState: IntakeSubState.CLARIFYING,
 			clarificationRound: currentRound,
+			commandBlock: {
+				dialogueId,
+				commandId: clarifyCommandId,
+				label: 'Technical Expert — Clarification Round ' + currentRound,
+			},
 		});
 
 		emitWorkflowCommand({
@@ -1755,21 +1753,23 @@ export function extractDomainMMP(
 
 	for (const d of domains) {
 		mirrorItems.push({
-			id: d.id,  // Use domain's own ID for 1:1 linking
+			id: d.id,
 			text: `${d.name}: ${d.description}`,
 			category: 'domain',
 			rationale: d.rationale,
 			status: 'pending',
+			source: d.source,
 		});
 	}
 
 	for (const p of personas) {
 		mirrorItems.push({
-			id: p.id,  // Use persona's own ID for 1:1 linking
+			id: p.id,
 			text: `${p.name}: ${p.description}`,
 			category: 'persona',
 			rationale: 'Identified from domain analysis',
 			status: 'pending',
+			source: 'document-specified', // Personas come from Intent Discovery (user-validated)
 		});
 	}
 
@@ -1820,23 +1820,24 @@ export function extractJourneyWorkflowMMP(
 
 	for (const j of journeys) {
 		const phaseTag = j.implementationPhase ?? j.priority ?? '';
-		const sourceTag = j.source ? ` (${j.source})` : '';
 		mirrorItems.push({
 			id: j.id,
-			text: `${phaseTag ? '[' + phaseTag + '] ' : ''}${j.title}: ${j.scenario}${sourceTag}`,
+			text: `${phaseTag ? '[' + phaseTag + '] ' : ''}${j.title}: ${j.scenario}`,
 			category: 'journey',
 			rationale: 'Proposed for accepted domains',
 			status: 'pending',
+			source: j.source,
 		});
 	}
 
 	for (const w of workflows) {
 		mirrorItems.push({
-			id: w.id,  // Use workflow's own ID
+			id: w.id,
 			text: `${w.name}: ${w.description}`,
 			category: 'workflow',
 			rationale: `Domain: ${w.domainId}. Steps: ${w.steps.length}. Actors: ${w.actors.join(', ')}`,
 			status: 'pending',
+			source: w.source,
 		});
 	}
 
@@ -1860,11 +1861,12 @@ export function extractEntityMMP(
 
 	for (const e of entities) {
 		mirrorItems.push({
-			id: e.id,  // Use entity's own ID
+			id: e.id,
 			text: `${e.name}: ${e.description}`,
 			category: 'entity',
 			rationale: `Domain: ${e.domainId}. Attributes: ${e.keyAttributes.join(', ')}. Relationships: ${e.relationships.join(', ')}`,
 			status: 'pending',
+			source: e.source,
 		});
 	}
 
@@ -1889,21 +1891,23 @@ export function extractIntegrationMMP(
 
 	for (const int of integrations) {
 		mirrorItems.push({
-			id: int.id,  // Use integration's own ID
+			id: int.id,
 			text: `${int.name} (${int.category}): ${int.description}`,
 			category: 'integration',
 			rationale: `Providers: ${int.standardProviders.join(', ')}. Ownership: ${int.ownershipModel}. ${int.rationale}`,
 			status: 'pending',
+			source: int.source,
 		});
 	}
 
 	for (let i = 0; i < qualityAttributes.length; i++) {
 		mirrorItems.push({
-			id: `PV-QA-${i + 1}`,  // No source ID for QA strings — keep synthetic
+			id: `PV-QA-${i + 1}`,
 			text: qualityAttributes[i],
 			category: 'ux',
 			rationale: 'Quality attribute for the platform',
 			status: 'pending',
+			source: 'ai-proposed',
 		});
 	}
 
@@ -1938,7 +1942,7 @@ export function extractIntegrationMMP(
 
 /**
  * Proposer Round 1: Propose business domains + personas.
- * Uses ANALYZING findings as seed context.
+ * Uses INTENT_DISCOVERY findings as seed context.
  */
 export async function executeProposerDomains(
 	dialogueId: string,
@@ -1968,7 +1972,6 @@ export async function executeProposerDomains(
 			humanMessage,
 			provider: providerResult.value,
 			draftPlan: conv.draftPlan,
-			tokenBudget: INTAKE_ANALYSIS_TOKEN_BUDGET,
 			onEvent: (event: CLIActivityEvent) => {
 				emitCLIActivity(dialogueId, {
 					...event,
@@ -2069,7 +2072,6 @@ export async function executeProposerJourneys(
 			humanMessage,
 			provider: providerResult.value,
 			draftPlan: conv.draftPlan,
-			tokenBudget: INTAKE_ANALYSIS_TOKEN_BUDGET,
 			onEvent: (event: CLIActivityEvent) => {
 				emitCLIActivity(dialogueId, {
 					...event,
@@ -2169,7 +2171,6 @@ export async function executeProposerEntities(
 			humanMessage,
 			provider: providerResult.value,
 			draftPlan: conv.draftPlan,
-			tokenBudget: INTAKE_ANALYSIS_TOKEN_BUDGET,
 			onEvent: (event: CLIActivityEvent) => {
 				emitCLIActivity(dialogueId, {
 					...event,
@@ -2268,7 +2269,6 @@ export async function executeProposerIntegrations(
 			humanMessage,
 			provider: providerResult.value,
 			draftPlan: conv.draftPlan,
-			tokenBudget: INTAKE_ANALYSIS_TOKEN_BUDGET,
 			onEvent: (event: CLIActivityEvent) => {
 				emitCLIActivity(dialogueId, {
 					...event,

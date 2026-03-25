@@ -46,6 +46,9 @@ export interface RoleInvokeOptions {
 	/** MCP config file paths (Claude Code only). Cleaned up automatically after invocation. */
 	mcpConfigPaths?: string[];
 
+	/** Pre-registered MCP server names to allow (Gemini CLI --allowed-mcp-server-names). */
+	allowedMcpServerNames?: string[];
+
 	/** Restrict which tools the CLI can use without approval (Claude Code). */
 	allowedTools?: string[];
 
@@ -88,6 +91,7 @@ export async function invokeRoleStreaming(
 	if (options.workingDirectory) { invokeOptions.workingDirectory = options.workingDirectory; }
 	if (options.timeout !== undefined) { invokeOptions.timeout = options.timeout; }
 	if (options.mcpConfigPaths) { invokeOptions.mcpConfigPaths = options.mcpConfigPaths; }
+	if (options.allowedMcpServerNames) { invokeOptions.allowedMcpServerNames = options.allowedMcpServerNames; }
 	if (options.allowedTools) { invokeOptions.allowedTools = options.allowedTools; }
 	if (options.sandboxMode) { invokeOptions.sandboxMode = options.sandboxMode; }
 	if (options.permissionPromptTool) { invokeOptions.permissionPromptTool = options.permissionPromptTool; }
@@ -140,43 +144,85 @@ export async function invokeRoleStreaming(
 				role: options.provider?.id,
 				minSeverity: minSev,
 			});
-			if (review?.hasConcerns) {
-				result.value.reasoningReview = review;
 
-				// Persist as a command output on the most recent running/completed command.
-				// This ensures the review renders alongside the command block it reviewed,
-				// not as a standalone event at an unpredictable position.
-				try {
-					const dialogueId = options.dialogueId ?? getActiveDialogueId();
-					if (dialogueId) {
-						const db = (await import('../database/init.js')).getDatabase();
-						if (db) {
-							const cmd = db.prepare(`
-								SELECT command_id FROM workflow_commands
-								WHERE dialogue_id = ?
-								ORDER BY started_at DESC LIMIT 1
-							`).get(dialogueId) as { command_id: string } | undefined;
+			// Always persist the review result — even clean reviews and failures —
+			// so the user can see that a review was attempted and what happened.
+			try {
+				const dialogueId = options.dialogueId ?? getActiveDialogueId();
+				if (dialogueId) {
+					const db = (await import('../database/init.js')).getDatabase();
+					if (db) {
+						const cmd = db.prepare(`
+							SELECT command_id FROM workflow_commands
+							WHERE dialogue_id = ?
+							ORDER BY started_at DESC LIMIT 1
+						`).get(dialogueId) as { command_id: string } | undefined;
 
-							if (cmd) {
-								const { appendCommandOutput } = await import('../workflow/commandStore.js');
+						if (cmd) {
+							const { appendCommandOutput } = await import('../workflow/commandStore.js');
+							if (review) {
+								result.value.reasoningReview = review.hasConcerns ? review : undefined;
 								appendCommandOutput(
 									cmd.command_id,
 									'reasoning_review' as import('../workflow/commandStore.js').WorkflowCommandOutput['line_type'],
 									JSON.stringify({
 										concerns: review.concerns,
-										overallAssessment: review.overallAssessment,
+										overallAssessment: review.overallAssessment || (review.hasConcerns ? '' : 'No concerns found — reasoning appears sound.'),
 										reviewerModel: review.reviewerModel,
 										durationMs: review.reviewDurationMs,
+										reviewPrompt: review.reviewPrompt,
+									}),
+									new Date().toISOString(),
+								);
+							} else {
+								// Review returned null — provider unavailable or call failed
+								appendCommandOutput(
+									cmd.command_id,
+									'reasoning_review' as import('../workflow/commandStore.js').WorkflowCommandOutput['line_type'],
+									JSON.stringify({
+										concerns: [],
+										overallAssessment: 'Reasoning review could not be completed — reviewer unavailable or LLM call failed.',
+										reviewerModel: 'unknown',
+										durationMs: 0,
+										failed: true,
 									}),
 									new Date().toISOString(),
 								);
 							}
 						}
 					}
-				} catch { /* non-fatal */ }
-			}
-		} catch {
-			// Reviewer failure is non-fatal — don't block the workflow
+				}
+			} catch { /* non-fatal — don't block the workflow */ }
+		} catch (reviewError) {
+			// Reviewer failure is non-fatal — but log it so we know it's happening
+			try {
+				const dialogueId = options.dialogueId ?? getActiveDialogueId();
+				if (dialogueId) {
+					const db = (await import('../database/init.js')).getDatabase();
+					if (db) {
+						const cmd = db.prepare(`
+							SELECT command_id FROM workflow_commands
+							WHERE dialogue_id = ?
+							ORDER BY started_at DESC LIMIT 1
+						`).get(dialogueId) as { command_id: string } | undefined;
+						if (cmd) {
+							const { appendCommandOutput } = await import('../workflow/commandStore.js');
+							appendCommandOutput(
+								cmd.command_id,
+								'reasoning_review' as import('../workflow/commandStore.js').WorkflowCommandOutput['line_type'],
+								JSON.stringify({
+									concerns: [],
+									overallAssessment: `Reasoning review failed: ${reviewError instanceof Error ? reviewError.message : String(reviewError)}`,
+									reviewerModel: 'unknown',
+									durationMs: 0,
+									failed: true,
+								}),
+								new Date().toISOString(),
+							);
+						}
+					}
+				}
+			} catch { /* truly non-fatal fallback */ }
 		}
 	}
 

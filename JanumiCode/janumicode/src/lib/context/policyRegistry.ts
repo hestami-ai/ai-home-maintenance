@@ -90,7 +90,7 @@ const HISTORICAL_VERDICTS: ContextBlockSpec = {
 const WORKSPACE_SPECS: ContextBlockSpec = {
 	blockId: 'workspace_specs',
 	label: 'Workspace Specification Files',
-	source: 'agent_synthesized',
+	source: 'static',  // Pre-assembled by the caller via workspaceReader and passed as extras
 };
 
 const HUMAN_CORRECTIONS: ContextBlockSpec = {
@@ -107,11 +107,25 @@ const VALIDATION_FINDINGS: ContextBlockSpec = {
 	queryHint: 'architecture phase validation findings from gate metadata',
 };
 
+/** Validation findings passed via extras during fast-loop repair (not from DB). */
+const VALIDATION_FINDINGS_STATIC: ContextBlockSpec = {
+	blockId: 'validation_findings',
+	label: 'Architecture Validation Findings',
+	source: 'static',
+};
+
 const HUMAN_FEEDBACK: ContextBlockSpec = {
 	blockId: 'human_feedback',
 	label: 'Human Feedback on Architecture',
 	source: 'db_query',
 	queryHint: 'human_decisions WHERE phase = ARCHITECTURE — most recent feedback',
+};
+
+/** Human feedback passed via extras during fast-loop repair (not from DB). */
+const HUMAN_FEEDBACK_STATIC: ContextBlockSpec = {
+	blockId: 'human_feedback',
+	label: 'Human Feedback on Architecture',
+	source: 'static',
 };
 
 // ==================== POLICY DEFINITIONS ====================
@@ -153,22 +167,31 @@ const policies: ContextPolicy[] = [
 		phase: Phase.ARCHITECTURE,
 		subPhase: 'MODELING',
 		intent: '*',
-		version: 1,
+		version: 3,
 		requiredBlocks: [
 			{
 				blockId: 'capabilities',
 				label: 'Capabilities & Workflows',
-				source: 'db_query',
-				queryHint: 'architecture_documents — capabilities and workflows from latest doc',
+				source: 'static',  // Pre-assembled from architecture_documents via extras
 			},
 		],
 		optionalBlocks: [
-			{ blockId: 'plan_requirements', label: 'Plan Requirements', source: 'handoff_doc', handoffDocType: HandoffDocType.INTAKE },
+			{
+				blockId: 'approved_plan',
+				label: 'Approved Plan (with entity/domain proposals)',
+				source: 'static',  // Pre-assembled via extras — includes entityProposals, domainProposals
+			},
+			WORKSPACE_SPECS,
+			VALIDATION_FINDINGS_STATIC,
+			HUMAN_FEEDBACK_STATIC,
 		],
-		sheddingPriority: ['plan_requirements'],
+		sheddingPriority: ['human_feedback', 'validation_findings', 'workspace_specs', 'approved_plan'],
 		sectionBudgets: {
-			capabilities: 0.7,
-			plan_requirements: 0.3,
+			capabilities: 0.35,
+			approved_plan: 0.25,
+			workspace_specs: 0.1,
+			validation_findings: 0.15,
+			human_feedback: 0.15,
 		},
 		omissionStrategy: 'degrade_with_warning',
 	},
@@ -179,28 +202,30 @@ const policies: ContextPolicy[] = [
 		phase: Phase.ARCHITECTURE,
 		subPhase: 'DESIGNING',
 		intent: '*',
-		version: 1,
+		version: 3,
 		requiredBlocks: [
 			{
 				blockId: 'capabilities',
 				label: 'Capabilities & Workflows',
-				source: 'db_query',
-				queryHint: 'architecture_documents — capabilities and workflows',
+				source: 'static',  // Pre-assembled from architecture_documents via extras
 			},
 			{
 				blockId: 'domain_model',
 				label: 'Domain Model',
-				source: 'db_query',
-				queryHint: 'architecture_documents — domain entities, relationships, invariants',
+				source: 'static',  // Pre-assembled from architecture_documents via extras
 			},
 			{
 				blockId: 'decomposition_config',
 				label: 'Decomposition Configuration',
-				source: 'db_query',
-				queryHint: 'architecture_documents — decomposition constraints and config',
+				source: 'static',  // Pre-assembled from architecture_documents via extras
 			},
 		],
 		optionalBlocks: [
+			{
+				blockId: 'constraints_and_decisions',
+				label: 'Constraints & Decisions (from Intake)',
+				source: 'static',  // Pre-assembled via extras — includes technical constraints and architectural decisions
+			},
 			VALIDATION_FINDINGS,
 			HUMAN_FEEDBACK,
 			WORKSPACE_SPECS,
@@ -223,36 +248,42 @@ const policies: ContextPolicy[] = [
 		phase: Phase.ARCHITECTURE,
 		subPhase: 'SEQUENCING',
 		intent: '*',
-		version: 1,
+		version: 3,
 		requiredBlocks: [
 			{
 				blockId: 'components',
 				label: 'Components & Dependencies',
-				source: 'db_query',
-				queryHint: 'architecture_documents — components with dependencies',
+				source: 'static',  // Pre-assembled from architecture_documents via extras
 			},
 			{
 				blockId: 'interfaces',
 				label: 'Interface Contracts',
-				source: 'db_query',
-				queryHint: 'architecture_documents — interfaces with providers/consumers',
+				source: 'static',  // Pre-assembled from architecture_documents via extras
 			},
 			{
 				blockId: 'domain_model',
 				label: 'Domain Model Summary',
-				source: 'db_query',
-				queryHint: 'architecture_documents — entities and relationships',
+				source: 'static',  // Pre-assembled from architecture_documents via extras
 			},
 		],
 		optionalBlocks: [
-			{ blockId: 'workspace_patterns', label: 'Workspace Build Patterns', source: 'agent_synthesized' },
+			{
+				blockId: 'phasing_strategy',
+				label: 'Product Phasing Strategy (from Intake)',
+				source: 'static',  // Pre-assembled via extras — user-defined implementation phases
+			},
+			{ blockId: 'workspace_patterns', label: 'Workspace Build Patterns', source: 'static' },
+			VALIDATION_FINDINGS_STATIC,
+			HUMAN_FEEDBACK_STATIC,
 		],
-		sheddingPriority: ['workspace_patterns'],
+		sheddingPriority: ['human_feedback', 'validation_findings', 'workspace_patterns'],
 		sectionBudgets: {
-			components: 0.35,
-			interfaces: 0.25,
-			domain_model: 0.2,
-			workspace_patterns: 0.2,
+			components: 0.25,
+			interfaces: 0.2,
+			domain_model: 0.15,
+			workspace_patterns: 0.15,
+			validation_findings: 0.15,
+			human_feedback: 0.1,
 		},
 		omissionStrategy: 'degrade_with_warning',
 	},
@@ -265,7 +296,7 @@ const policies: ContextPolicy[] = [
 		phase: Phase.EXECUTE,
 		subPhase: '*',
 		intent: '*',
-		version: 1,
+		version: 2,
 		requiredBlocks: [
 			GOAL,
 			CONSTRAINTS,
@@ -273,16 +304,18 @@ const policies: ContextPolicy[] = [
 			ACTIVE_CLAIMS,
 		],
 		optionalBlocks: [
+			HISTORICAL_VERDICTS,
 			HISTORICAL_FINDINGS,
 			NARRATIVE_MEMORY,
 			WORKSPACE_SPECS,
 		],
-		sheddingPriority: ['workspace_specs', 'narrative_memory', 'historical_findings'],
+		sheddingPriority: ['workspace_specs', 'narrative_memory', 'historical_findings', 'historical_verdicts'],
 		sectionBudgets: {
 			goal: 0.05,
 			constraints: 0.1,
-			architecture_doc: 0.35,
-			active_claims: 0.2,
+			architecture_doc: 0.3,
+			active_claims: 0.15,
+			historical_verdicts: 0.1,
 			historical_findings: 0.1,
 			narrative_memory: 0.1,
 			workspace_specs: 0.1,
@@ -380,7 +413,7 @@ const policies: ContextPolicy[] = [
 		phase: Phase.HISTORICAL_CHECK,
 		subPhase: '*',
 		intent: '*',
-		version: 1,
+		version: 2,
 		requiredBlocks: [
 			{
 				blockId: 'full_event_history',
@@ -395,6 +428,7 @@ const policies: ContextPolicy[] = [
 				queryHint: 'claims LEFT JOIN verdicts — all claims with their latest verdict',
 			},
 			HUMAN_DECISIONS,
+			CONSTRAINTS,
 		],
 		optionalBlocks: [
 			{
@@ -426,7 +460,7 @@ const policies: ContextPolicy[] = [
 		phase: Phase.HISTORICAL_CHECK,
 		subPhase: 'ADJUDICATION',
 		intent: '*',
-		version: 1,
+		version: 2,
 		requiredBlocks: [
 			{
 				blockId: 'conflicting_verdicts',
@@ -440,6 +474,7 @@ const policies: ContextPolicy[] = [
 				queryHint: 'claims + verdicts + evidence for the conflicting claims',
 			},
 			HUMAN_DECISIONS,
+			CONSTRAINTS,
 		],
 		optionalBlocks: [
 			{
@@ -467,7 +502,7 @@ const policies: ContextPolicy[] = [
 		phase: Phase.INTAKE,
 		subPhase: '*',
 		intent: '*',
-		version: 1,
+		version: 2,
 		requiredBlocks: [
 			{
 				blockId: 'conversation_history',
@@ -478,8 +513,7 @@ const policies: ContextPolicy[] = [
 			{
 				blockId: 'current_plan',
 				label: 'Current Plan Document',
-				source: 'db_query',
-				queryHint: 'intake_conversations — draft or finalized plan',
+				source: 'static',  // Live in-memory plan passed via extras — avoids stale DB reads
 			},
 			{
 				blockId: 'human_message',
@@ -513,9 +547,14 @@ const policies: ContextPolicy[] = [
 		phase: '*',
 		subPhase: '*',
 		intent: '*',
-		version: 1,
+		version: 2,
 		requiredBlocks: [
 			GOAL,
+			{
+				blockId: 'question',
+				label: 'Target Question',
+				source: 'static',  // Passed via extras — the specific question the agent must answer
+			},
 			{
 				blockId: 'related_claims',
 				label: 'Related Claims',
@@ -531,13 +570,18 @@ const policies: ContextPolicy[] = [
 				source: 'db_query',
 				queryHint: 'verdicts with evidence_ref — prioritized by relevance to question',
 			},
+			WORKSPACE_SPECS,
+			ARCHITECTURE_DOC,
 		],
-		sheddingPriority: ['historical_evidence'],
+		sheddingPriority: ['architecture_doc', 'workspace_specs', 'historical_evidence'],
 		sectionBudgets: {
-			goal: 0.1,
-			related_claims: 0.3,
-			constraints: 0.2,
-			historical_evidence: 0.4,
+			goal: 0.05,
+			question: 0.1,
+			related_claims: 0.2,
+			constraints: 0.15,
+			historical_evidence: 0.2,
+			workspace_specs: 0.15,
+			architecture_doc: 0.15,
 		},
 		omissionStrategy: 'degrade_with_warning',
 	},

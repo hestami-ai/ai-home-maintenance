@@ -15,19 +15,31 @@ export function handleMmpPartialSave(
 	message: { type: string; [key: string]: unknown }
 ): void {
 	if (!activeDialogueId) {return;}
+	const cardId = message.cardId as string;
+	const mirrorDecisions = message.mirrorDecisions as Record<string, { status: string; editedText?: string }> || {};
+	const menuSelections = message.menuSelections as Record<string, { selectedOptionId: string; customResponse?: string }> || {};
+	const preMortemDecisions = message.preMortemDecisions as Record<string, { status: string; rationale?: string }> || {};
+
+	console.log('[MMP:Host:PartialSave] dialogueId:', activeDialogueId, '| cardId:', cardId,
+		'| mirror keys:', Object.keys(mirrorDecisions),
+		'| menu keys:', Object.keys(menuSelections),
+		'| pm keys:', Object.keys(preMortemDecisions));
+
 	try {
 		const { savePendingMmpDecisions } = require('../../database/pendingMmpStore');
 		savePendingMmpDecisions(
 			activeDialogueId,
-			message.cardId as string,
+			cardId,
 			{
-				mirrorDecisions: message.mirrorDecisions as Record<string, { status: string; editedText?: string }> || {},
-				menuSelections: message.menuSelections as Record<string, { selectedOptionId: string; customResponse?: string }> || {},
-				preMortemDecisions: message.preMortemDecisions as Record<string, { status: string; rationale?: string }> || {},
+				mirrorDecisions,
+				menuSelections,
+				preMortemDecisions,
 				productEdits: message.productEdits as Record<string, string> || {},
 			}
 		);
-	} catch { /* non-critical */ }
+	} catch (err) {
+		console.error('[MMP:Host:PartialSave] Error:', err);
+	}
 }
 
 /**

@@ -260,10 +260,19 @@ export async function invokeVerifier(
 			});
 		}
 
+		// Pass MCP config for web research tools — the Verifier prompt instructs
+		// the agent to use WebSearch/WebFetch for unfamiliar technologies
+		const { join, dirname } = await import('node:path');
+		const verifierMcpConfig = join(dirname(dirname(__dirname)), '.mcp.json');
+		const verifierProviderId = options.provider.id;
+
 		const cliResult = await invokeRoleStreaming({
 			provider: options.provider,
 			stdinContent,
 			onEvent: options.onEvent,
+			mcpConfigPaths: verifierProviderId === 'claude-code' ? [verifierMcpConfig] : undefined,
+			allowedMcpServerNames: verifierProviderId === 'gemini-cli' ? ['deep-memory'] : undefined,
+			dialogueId: options.dialogueId,
 		});
 
 		if (!cliResult.success) {

@@ -1,0 +1,375 @@
+---
+// Slack-style mockup showing mission channel with agent messages and commands
+---
+
+<div class="slk">
+  <div class="slk__sidebar">
+    <div class="slk__workspace">JANUMICODE</div>
+    <div class="slk__channels">
+      <div class="slk__channel-label">Missions</div>
+      <div class="slk__channel"># mission-arc-workflow</div>
+      <div class="slk__channel slk__channel--active"># mission-billing-system</div>
+      <div class="slk__channel"># mission-mobile-app</div>
+      <div class="slk__channel-label">System</div>
+      <div class="slk__channel"># jnc-alerts</div>
+      <div class="slk__channel"># jnc-decisions</div>
+    </div>
+  </div>
+
+  <div class="slk__main">
+    <div class="slk__header">
+      <span class="slk__header-channel"># mission-billing-system</span>
+      <span class="slk__header-status">Phase: ARCHITECTURE · 63% complete</span>
+    </div>
+
+    <div class="slk__messages">
+      <div class="slk__msg slk__msg--system">
+        <div class="slk__msg-avatar slk__msg-avatar--system">📊</div>
+        <div class="slk__msg-content">
+          <div class="slk__msg-header">
+            <span class="slk__msg-name slk__msg-name--system">System Status</span>
+            <span class="slk__msg-time">10:42 AM</span>
+          </div>
+          <div class="slk__msg-card">
+            <div class="slk__status-phase">ARCHITECTURE → Component Design</div>
+            <div class="slk__status-row"><span>Agents:</span> <span class="slk__status-val">Executor <span class="slk__dot slk__dot--active"></span> · Verifier <span class="slk__dot slk__dot--blocked"></span> · Historian <span class="slk__dot slk__dot--idle"></span></span></div>
+            <div class="slk__status-row"><span>Tasks:</span> <span class="slk__status-val">5 ✓ · 3 ⚠ · 2 ⛔</span></div>
+            <div class="slk__status-row"><span>Next action:</span> <span class="slk__status-val slk__status-val--warn">Resolve MVP Scope Strategy</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="slk__msg">
+        <div class="slk__msg-avatar slk__msg-avatar--verifier">✓</div>
+        <div class="slk__msg-content">
+          <div class="slk__msg-header">
+            <span class="slk__msg-name slk__msg-name--verifier">Verifier</span>
+            <span class="slk__msg-time">10:44 AM</span>
+          </div>
+          <div class="slk__msg-text">⚠️ <strong>Claim FAILED</strong> — "Billing approval flow meets PRD-BIL-8 requirements"</div>
+          <div class="slk__msg-detail">Evidence: PRD-BIL-8 requires dual approval for amounts &gt; $10k. Current flow has single approver. Confidence: 0.93</div>
+        </div>
+      </div>
+
+      <div class="slk__msg">
+        <div class="slk__msg-avatar slk__msg-avatar--historian">📚</div>
+        <div class="slk__msg-content">
+          <div class="slk__msg-header">
+            <span class="slk__msg-name slk__msg-name--historian">Historian</span>
+            <span class="slk__msg-time">10:44 AM</span>
+          </div>
+          <div class="slk__msg-text">📚 <strong>Contradiction Detected</strong> — Previous decision in mission-arc-workflow required committee review for cross-domain approvals. Current design uses single-manager flow.</div>
+        </div>
+      </div>
+
+      <div class="slk__msg slk__msg--decision">
+        <div class="slk__msg-avatar slk__msg-avatar--decision">⚖️</div>
+        <div class="slk__msg-content">
+          <div class="slk__msg-header">
+            <span class="slk__msg-name slk__msg-name--decision">Decision Required</span>
+            <span class="slk__msg-time">10:45 AM</span>
+          </div>
+          <div class="slk__msg-text"><strong>Billing Approval Flow</strong></div>
+          <div class="slk__msg-detail">How should amounts &gt; $10k be handled?</div>
+          <div class="slk__buttons">
+            <button class="slk__btn slk__btn--primary">Dual Approval</button>
+            <button class="slk__btn">Committee Review</button>
+            <button class="slk__btn">Custom</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="slk__msg slk__msg--user">
+        <div class="slk__msg-avatar slk__msg-avatar--user">MC</div>
+        <div class="slk__msg-content">
+          <div class="slk__msg-header">
+            <span class="slk__msg-name">You</span>
+            <span class="slk__msg-time">10:46 AM</span>
+          </div>
+          <div class="slk__msg-cmd">/jnc approve billing-approval:dual-approval</div>
+        </div>
+      </div>
+
+      <div class="slk__msg">
+        <div class="slk__msg-avatar slk__msg-avatar--executor">🔧</div>
+        <div class="slk__msg-content">
+          <div class="slk__msg-header">
+            <span class="slk__msg-name slk__msg-name--executor">Executor</span>
+            <span class="slk__msg-time">10:46 AM</span>
+          </div>
+          <div class="slk__msg-text">🔧 <strong>Proposal Updated</strong> — Added dual-approval step for amounts &gt; $10k. Gate added before payment processing.</div>
+          <div class="slk__msg-link">View artifact → <a href="#">billing_approval_flow_v2.json</a></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="slk__input">
+      <span class="slk__input-placeholder">/jnc status · /jnc tasks · /jnc decisions</span>
+    </div>
+  </div>
+</div>
+
+<style>
+  .slk {
+    margin: var(--space-2xl) 0;
+    display: flex;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    min-height: 460px;
+  }
+
+  /* Sidebar */
+  .slk__sidebar {
+    width: 200px;
+    background: var(--color-bg);
+    border-right: 1px solid var(--color-border);
+    padding: var(--space-md);
+    flex-shrink: 0;
+  }
+
+  .slk__workspace {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--color-text);
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .slk__channel-label {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    margin-top: var(--space-md);
+    margin-bottom: var(--space-xs);
+  }
+
+  .slk__channel {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    padding: 3px var(--space-sm);
+    border-radius: var(--radius-sm);
+    cursor: default;
+  }
+
+  .slk__channel--active {
+    color: var(--color-text);
+    background: var(--color-bg-card);
+    font-weight: 500;
+  }
+
+  /* Main area */
+  .slk__main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .slk__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .slk__header-channel {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .slk__header-status {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+  }
+
+  /* Messages */
+  .slk__messages {
+    flex: 1;
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    overflow-y: auto;
+  }
+
+  .slk__msg {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .slk__msg-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+  }
+
+  .slk__msg-avatar--system { background: rgba(0, 212, 255, 0.1); }
+  .slk__msg-avatar--verifier { background: rgba(255, 68, 102, 0.1); color: var(--color-error); font-size: 0.7rem; font-weight: 700; }
+  .slk__msg-avatar--historian { background: rgba(167, 139, 250, 0.1); }
+  .slk__msg-avatar--decision { background: rgba(255, 184, 0, 0.1); }
+  .slk__msg-avatar--executor { background: rgba(0, 255, 178, 0.1); }
+  .slk__msg-avatar--user { background: var(--color-primary); color: var(--color-bg); font-size: 0.6rem; font-weight: 700; }
+
+  .slk__msg-content { flex: 1; min-width: 0; }
+
+  .slk__msg-header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    margin-bottom: 2px;
+  }
+
+  .slk__msg-name {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .slk__msg-name--system { color: var(--color-primary); }
+  .slk__msg-name--verifier { color: var(--color-error); }
+  .slk__msg-name--historian { color: #A78BFA; }
+  .slk__msg-name--decision { color: var(--color-warning); }
+  .slk__msg-name--executor { color: var(--color-accent); }
+
+  .slk__msg-time {
+    font-size: 0.6rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .slk__msg-text {
+    font-size: 0.78rem;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+
+  .slk__msg-text strong { color: var(--color-text); }
+
+  .slk__msg-detail {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+    line-height: 1.45;
+  }
+
+  .slk__msg-link {
+    font-size: 0.7rem;
+    margin-top: 4px;
+    color: var(--color-text-muted);
+  }
+
+  .slk__msg-link a { color: var(--color-primary); }
+
+  .slk__msg-cmd {
+    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    color: var(--color-primary);
+    background: rgba(0, 212, 255, 0.06);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(0, 212, 255, 0.15);
+    display: inline-block;
+  }
+
+  /* Status card */
+  .slk__msg-card {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm) var(--space-md);
+    margin-top: 4px;
+  }
+
+  .slk__status-phase {
+    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--color-primary);
+    margin-bottom: var(--space-xs);
+  }
+
+  .slk__status-row {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    display: flex;
+    gap: var(--space-sm);
+    padding: 1px 0;
+  }
+
+  .slk__status-val { color: var(--color-text-secondary); }
+  .slk__status-val--warn { color: var(--color-warning); font-weight: 500; }
+
+  .slk__dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-left: 1px;
+  }
+
+  .slk__dot--active { background: var(--color-accent); }
+  .slk__dot--blocked { background: var(--color-warning); }
+  .slk__dot--idle { background: var(--color-text-muted); opacity: 0.4; }
+
+  /* Decision buttons */
+  .slk__buttons {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+  }
+
+  .slk__btn {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
+    cursor: default;
+  }
+
+  .slk__btn--primary {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: rgba(0, 212, 255, 0.3);
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+
+  /* Input bar */
+  .slk__input {
+    padding: var(--space-sm) var(--space-md);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .slk__input-placeholder {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    opacity: 0.5;
+  }
+
+  @media (max-width: 768px) {
+    .slk__sidebar { display: none; }
+  }
+</style>

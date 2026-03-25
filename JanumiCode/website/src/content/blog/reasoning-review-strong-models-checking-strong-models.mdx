@@ -1,0 +1,163 @@
+---
+title: "Reasoning Review: Why We Use Strong Models to Check Strong Models"
+description: "JanumiCode's Reasoning Reviewer critiques the thinking of reasoning models after every invocation. Here's why we chose strong-on-strong review over weak-model cost optimization — and what the research says about the trade-offs."
+pubDate: 2026-04-09T12:00:00
+author: "JanumiCode Team"
+tags: ["reasoning-review", "verification", "llm-collaboration", "research"]
+heroLabel: "BLOG // VERIFICATION"
+readingTime: "12 min read"
+---
+
+import ReasoningReviewFlow from '../../components/blog/ReasoningReviewFlow.astro';
+import ReviewCardMockup from '../../components/blog/ReviewCardMockup.astro';
+
+Every agent invocation in JanumiCode — every time the Technical Expert proposes architecture, every time the Executor generates code, every time the Context Engineer assembles a briefing — produces a reasoning trace. A chain of thought that shows how the model arrived at its conclusion.
+
+Most AI tools throw that trace away. JanumiCode does something different: **a second strong model reads the entire reasoning trace and critiques it for substantive risks**.
+
+This is the Reasoning Reviewer. It runs after every invocation. It's non-blocking — it doesn't slow the workflow. But when it finds something serious, it pauses the pipeline and demands attention.
+
+The question we get most often: **why use a strong model as the reviewer? Wouldn't a cheaper model do the same job?**
+
+The answer is nuanced, and the research is illuminating.
+
+---
+
+## How the Reasoning Reviewer Works
+
+After every CLI agent invocation completes, the Reasoning Reviewer receives the full reasoning trace and final response. It runs at temperature 0.1 — maximum analytical consistency — and looks for a specific set of substantive risks:
+
+<ReasoningReviewFlow />
+
+The reviewer isn't looking for style issues or formatting preferences. It's looking for **reasoning failures that will cause downstream problems**:
+
+- **Assumptions stated as facts** — the model treats something as given that hasn't been validated
+- **Missing edge cases** — empty arrays, null values, concurrent access, race conditions
+- **Contradictions** — the reasoning says one thing, the conclusion does another
+- **Over-confident conclusions** — strong claims from insufficient evidence
+- **Happy-path-only solutions** — works for the normal case, fails on everything else
+- **Fragile coupling** — components depending on each other in ways not made explicit
+
+Each concern is classified by severity. HIGH means it's likely to cause failures. MEDIUM means it's fragile but may work. LOW means it's a preference issue. When a HIGH-severity concern is found, the workflow soft-pauses — a configurable countdown (default 15 seconds) that gives the engineer time to read the review before the pipeline continues.
+
+---
+
+## What It Looks Like
+
+In the Governed Stream, reasoning reviews appear directly below the command block they critique:
+
+<ReviewCardMockup />
+
+Each concern is expandable, showing the detail, the location in the reasoning where the problem was identified, and a recommendation. The engineer can acknowledge the review, re-run the invocation with corrections, or add guidance to prevent similar issues in future invocations.
+
+This is not a score or a thumbs-up. It's a **structured critique with actionable specifics** — the kind of feedback that actually changes outcomes.
+
+---
+
+## The Research: Weak Models as Reviewers
+
+There's a reasonable argument for using cheaper models as reviewers. If verification is simpler than generation — if it's easier to check an answer than to produce one — then a smaller, faster, cheaper model should be able to do the review job effectively.
+
+Recent work from CMU supports this intuition in specific contexts. Gandhi et al. (2025) studied strong-weak model collaboration on repository-level code generation and found that collaboration strategies can **match strong-model performance while reducing cost by 40%**. Their most surprising finding: weak models were actually *better* routers than strong models for deciding which tasks to escalate, because stronger models "overthink" the routing decision.
+
+This is compelling for pipeline optimization. If you're deciding which tasks need a strong model and which can be handled by a weak one, a small model can make that triage decision effectively. Cost savings are real.
+
+But routing is not the same as reviewing reasoning.
+
+---
+
+## The Research: When Strong-Weak Collaboration Fails
+
+Wang et al. (2025) studied what happens when strong and weak models collaborate directly — and found something that should give every multi-agent system designer pause.
+
+**Unguided strong-weak pairings performed worse than weak-weak pairings.**
+
+On GSM8K math reasoning, a strong model (GPT-4o) paired with a weak executor (Qwen-2.5-0.5B) achieved 45% accuracy — *below* the 46-58% achieved by two weak models working together. On MBPP code generation, the pattern repeated: strong-weak scored 36.5% versus weak-weak's 26-54%.
+
+The problem isn't that the strong model gives bad feedback. The problem is **cognitive mismatch**: the weak model can't effectively process or act on the strong model's sophisticated feedback. The review overwhelms the executor. Information is lost. Misinterpretation compounds.
+
+Their solution — an entropy-based adaptive guidance framework — improved strong-weak collaboration to 64-69% on GSM8K by calibrating feedback complexity to the recipient's comprehension capacity. But the raw finding stands: **simply pairing a powerful reviewer with a less capable executor, without explicit adaptation, can be actively counterproductive**.
+
+---
+
+## Why This Matters for JanumiCode
+
+JanumiCode's architecture avoids the cognitive mismatch problem entirely — but not by accident.
+
+**The Reasoning Reviewer is not giving feedback to another model.** It's giving feedback to a **human engineer**.
+
+This is the critical distinction. In the research, the failure mode is: strong model reviews → weak model misinterprets → worse outcome. In JanumiCode, the flow is: strong model reviews → human reads structured critique → human decides what to do.
+
+The human is not a weak model. The human can process sophisticated feedback, weigh it against their own knowledge, and make nuanced decisions. The Reasoning Reviewer's job is to surface risks that the engineer might miss when reading agent output directly. The engineer's job is to decide whether those risks are real, acceptable, or need correction.
+
+This means the reviewer should be **as strong as possible** — because the recipient (the human) can handle the full sophistication of its analysis.
+
+---
+
+## Why Not Weak Reviewers?
+
+Given the research, here's where weak-model review breaks down for our use case:
+
+### Reasoning traces are complex
+
+Agent reasoning traces aren't simple outputs. They're multi-step chains of thought that build on each other. A claim made in step 3 might contradict an assumption from step 1 that's only visible if you hold both in context. A weak model with a smaller context window or weaker reasoning capacity will miss these cross-step contradictions — which are exactly the most dangerous kind.
+
+### The review must match the reviewed
+
+The Reasoning Reviewer is critiquing the output of strong reasoning models — Claude, Gemini, GPT-4. The reasoning is sophisticated. The errors are subtle. An assumption stated as fact by a strong model is plausible by construction — it *sounds* right. A weak model is more likely to accept plausible-sounding reasoning at face value.
+
+This is the asymmetry: **generation errors from strong models require strong reviewers to detect**. The errors of a GPT-4 are not the errors of a GPT-4-mini. They're more subtle, better camouflaged by coherent reasoning, and harder to catch without equivalent analytical capability.
+
+### The cost trade-off is wrong for governance
+
+In a cost-optimization context, saving 40% on review by using a weaker model is a clear win. In a governance context, the question is different: **what is the cost of a missed HIGH-severity concern?**
+
+If a reasoning reviewer misses that the auth service assumes single-tenant token scope when the architecture requires multi-tenant isolation, the error propagates through Architecture, into Execution, and potentially into production. The cost of that miss dwarfs the cost difference between a strong and weak review model.
+
+For JanumiCode, the Reasoning Reviewer is a **governance mechanism**, not a cost center. We optimize for detection rate, not API spend.
+
+---
+
+## The Design Choices
+
+Several deliberate design choices follow from this analysis:
+
+**Temperature 0.1.** The reviewer operates at near-deterministic temperature. This isn't a creative task — it's analytical verification. We want consistency: the same reasoning trace should produce the same critique every time.
+
+**Non-blocking by default.** The review runs asynchronously after each invocation. The workflow doesn't wait for the review to complete before continuing. This keeps the pipeline fast while still capturing every concern. The exception is HIGH-severity findings, which trigger a soft pause.
+
+**Configurable severity filter.** Engineers can set `minSeverity` to control signal-to-noise. During early exploration, MEDIUM is appropriate. During critical production work, LOW catches everything. The default (MEDIUM) balances thoroughness with noise.
+
+**Structured JSON output.** No prose paragraphs. Each concern has a severity, summary, detail, location, and recommendation. This structure makes concerns actionable and parseable — both by humans reading the Governed Stream and by downstream automation.
+
+**Provider-agnostic.** The reviewer defaults to Gemini 2.5 Pro (currently the strongest analytical model available for this task), but supports Claude and OpenAI as alternatives. The engineer picks the model they trust most for analytical review.
+
+---
+
+## What the Reviewer Has Caught
+
+In practice, the Reasoning Reviewer has surfaced issues that would have been expensive to discover later:
+
+- **Proposer ignoring MMP decisions** — The Technical Expert processed domain proposals but didn't incorporate prior Mirror & Menu Protocol decisions. Approved domains were re-proposed. Rejected domains reappeared. The reviewer flagged it; we added explicit "Processing Prior Decisions" sections to all proposer prompts.
+
+- **Timestamp hallucination** — The Technical Expert assigned static future timestamps ("2026-03-19T00:00:00Z") to all plan items instead of using system-generated timestamps. Every item appeared to happen at the same moment. The reviewer caught the pattern; we removed timestamps from prompt schemas entirely.
+
+- **Cross-domain contradiction** — An architecture component assumed REST for internal communication while a prior approved decision specified gRPC for inter-service calls. The contradiction was buried in step 7 of a 12-step reasoning trace. The reviewer surfaced it with the specific location and the conflicting decision reference.
+
+These are not style issues. These are **reasoning failures that produce incorrect downstream artifacts**. Catching them at the reasoning stage — before they reach execution — is the entire point.
+
+---
+
+## The Broader Principle
+
+The Reasoning Reviewer embodies a principle that runs through all of JanumiCode:
+
+**Verification must be independent of generation, and at least as capable.**
+
+The Verifier doesn't trust the Executor. The Historian doesn't trust the Technical Expert. And the Reasoning Reviewer doesn't trust the reasoning trace of any agent — regardless of how strong that agent's model is.
+
+This isn't distrust. It's engineering discipline. The same discipline that puts code review before merge, QA before release, and audit before compliance certification.
+
+The research supports what our experience has shown: for high-stakes reasoning review, you want the strongest analytical capability available. The cost of a strong reviewer is a fraction of the cost of a missed defect. And unlike model-to-model collaboration, the human-in-the-loop architecture means the review's sophistication is an asset, not a mismatch.
+
+Strong models checking strong models, with humans making the final call. That's governed development.

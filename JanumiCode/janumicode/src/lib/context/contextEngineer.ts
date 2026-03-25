@@ -7,12 +7,13 @@
  * The Context Engineer:
  * - Consumes handoff documents produced at phase boundaries
  * - Applies declarative context policies (required/optional blocks, shedding priority)
- * - Can autonomously query the SQLite database via crafted SQL
+ * - Receives pre-assembled data (plan, conversation, handoff docs) as primary input
+ * - Has MCP tools available for autonomous gap-filling when pre-assembled data is insufficient
  * - Performs abstractive summarization, conflict resolution, and semantic relevance filtering
  * - Returns a HandoffPacket with audit manifest, token accounting, and sufficiency assessment
  */
 
-import type { Result, Role, Phase } from '../types';
+import type { Result } from '../types';
 import type {
 	AssembleContextOptions,
 	HandoffPacket,
@@ -28,43 +29,61 @@ import { ContextSufficiencyError } from './engineTypes';
 import { getPolicy } from './policyRegistry';
 import { getHandoffDocuments } from './handoffDocStore';
 import { computeFingerprint, getCachedPacket, cachePacket } from './contextCache';
-import { buildSchemaPrompt } from '../database/schemaPrompt';
 import { resolveProviderForRole } from '../cli/providerResolver';
 import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { buildStdinContent } from '../cli/types';
+import { ensureGeminiMcpServer } from '../cli/providers/geminiCli';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { Role as RoleEnum } from '../types';
 import { randomUUID } from 'node:crypto';
 import { emitWorkflowCommand } from '../integration/eventBus';
+import * as path from 'node:path';
 
 // ==================== SYSTEM PROMPT ====================
 
 const CONTEXT_ENGINEER_SYSTEM_PROMPT = `You are the CONTEXT ENGINEER in the JanumiCode governed workflow system.
 
-Your job is to assemble an optimally budgeted context briefing for a downstream LLM agent.
-You receive a POLICY that specifies required and optional context blocks, budget constraints,
-and shedding priorities. You also receive handoff documents (canonical phase-boundary artifacts)
-and database schema information.
+Your job is to assemble a comprehensive context briefing for a downstream LLM agent.
+You receive a POLICY that specifies required and optional context blocks, and you receive
+pre-assembled data including handoff documents, the current plan, and conversation history.
+
+## Source Types
+
+Each policy block specifies a \`source\` that tells you where to find its data:
+- **static**: Data is provided in the ROLE-SPECIFIC CONTEXT (extras) section below. Use it directly — do NOT attempt to retrieve it via tools or synthesize it.
+- **handoff_doc**: Data comes from the AVAILABLE HANDOFF DOCUMENTS section below.
+- **db_query**: Data should be retrieved via MCP tools if not already in the handoff docs or extras.
+- **agent_synthesized**: You synthesize this block from the other available data.
 
 ## Your Process
 
 1. Read the POLICY to understand what blocks are required vs optional
-2. Check available HANDOFF DOCUMENTS for pre-synthesized context
-3. For required blocks not covered by handoff docs, craft SQL queries against the database
-4. For optional blocks, include them in priority order until the token budget is exhausted
-5. Summarize verbose content to fit within section budget caps
-6. Detect conflicts between sources and resolve them:
+2. For source=static blocks, look in ROLE-SPECIFIC CONTEXT (extras). If the data is not there, report it as missing — do NOT fabricate it.
+3. For source=handoff_doc blocks, look in AVAILABLE HANDOFF DOCUMENTS.
+4. For source=db_query blocks, first check if the data is in handoff docs or extras. If not, use MCP tools to retrieve it.
+5. For optional blocks, include them in priority order based on relevance
+6. Summarize verbose content when sections are very large
+7. Detect conflicts between sources and resolve them:
    - Human decisions supersede automated verdicts
    - Later decisions supersede earlier ones
    - Explicit overrides supersede implicit assumptions
-7. For any data you must omit due to budget constraints, leave retrieval pointers
-   (e.g., "[Omitted: 15 historical verdicts, query: SELECT * FROM verdicts WHERE ...]")
 
-## Database Access
+## Data Retrieval Tools
 
-You have READ-ONLY access to the SQLite database. The schema is provided below.
-You can execute SELECT queries to retrieve data not covered by handoff documents.
-All queries MUST be scoped to the current dialogue_id.
+You have MCP tools available for data retrieval. **Prefer pre-assembled data** (handoff docs, extras, conversation history). Use tools only to fill gaps — not as a first resort.
+
+**Primary tools for gap-filling:**
+- \`search_memory_candidates\` — Full-text search across memory objects. Use when you need to find evidence related to a topic not covered by handoff docs.
+- \`load_evidence_span\` — Load specific records from allowlisted tables (dialogue_events, handoff_documents, memory_objects, etc.). Use when you need raw source data to verify or expand a summary.
+- \`temporal_query\` — Bi-temporal filtering by event_at and effective_at ranges. Use when the pre-assembled conversation window is too narrow.
+
+**Additional tools (typically used by the Deep Memory Researcher, but available):**
+- \`expand_memory_neighbors\` — Graph traversal on memory edges (BFS from a node)
+- \`get_supersession_chain\` — Follow superseded_by links to find the current governing version
+- \`get_conflict_set\` — Find contradictions between memory objects
+- \`check_health\` — Verify database connectivity
+
+Do NOT attempt to access the filesystem or run shell commands.
 
 ## Output Format
 
@@ -94,8 +113,9 @@ Respond with ONLY valid JSON (no markdown fences, no explanation outside the JSO
 
 ## Key Rules
 
-- NEVER fabricate data. Only include information from handoff docs or database queries.
-- If a required block has no data available, set sufficient=false and list it in missingRequired.
+- NEVER fabricate data. Only include information from pre-assembled data (handoff docs, extras, conversation history) or data retrieved via MCP tools.
+- If a required block has no data available from ANY source, set sufficient=false and list it in missingRequired. Do NOT synthesize a plausible substitute and present it as retrieved data.
+- When reporting sources in sectionManifest, accurately reflect where the data actually came from. Do NOT claim source=db_query if you did not execute a tool call.
 - Token counts should be approximate (estimate ~4 chars per token for English text).
 - The briefing MUST be formatted as clean markdown with clear section headers.
 - Prioritize clarity and completeness for the receiving agent over compression.
@@ -186,6 +206,25 @@ export async function assembleContext(
 		timestamp: new Date().toISOString(),
 	});
 
+	// MCP tool access — provider-specific configuration:
+	// - Claude Code: --mcp-config <path> (per-invocation JSON config file)
+	// - Gemini CLI: --allowed-mcp-server-names (pre-registered via `gemini mcp add`)
+	// At runtime __dirname = dist/, .mcp.json is at extension root (one level up)
+	const mcpConfigPath = path.join(__dirname, '..', '.mcp.json');
+	const providerId = providerResult.value.id;
+
+	// Auto-register deep-memory MCP server with Gemini CLI if not already present
+	if (providerId === 'gemini-cli') {
+		const extensionRoot = path.join(__dirname, '..');
+		await ensureGeminiMcpServer(
+			'deep-memory',
+			'node',
+			['dist/memory/mcpServer.js'],
+			{ JANUMICODE_DB_PATH: '.janumicode/janumicode.db' },
+			extensionRoot,
+		);
+	}
+
 	const cliResult = await invokeRoleStreaming({
 		provider: providerResult.value,
 		stdinContent,
@@ -194,6 +233,10 @@ export async function assembleContext(
 			options.onEvent?.(event);
 		},
 		sandboxMode: 'read-only',
+		// Claude Code: pass .mcp.json config file
+		mcpConfigPaths: providerId === 'claude-code' ? [mcpConfigPath] : undefined,
+		// Gemini CLI: whitelist pre-registered MCP server by name
+		allowedMcpServerNames: providerId === 'gemini-cli' ? ['deep-memory'] : undefined,
 		signal: options.signal,
 		timeout: 120_000, // 2 minute timeout for context assembly
 		dialogueId: options.dialogueId,
@@ -264,7 +307,7 @@ function buildAgentStdin(
 	policy: ContextPolicy,
 	handoffDocs: HandoffDocument[],
 	dialogueId: string,
-	tokenBudget: number,
+	tokenBudget: number | undefined,
 	extras?: Record<string, unknown>,
 ): string {
 	const sections: string[] = [];
@@ -298,19 +341,14 @@ function buildAgentStdin(
 
 	sections.push('## Section Budgets (fraction of total)');
 	for (const [blockId, fraction] of Object.entries(policy.sectionBudgets)) {
-		sections.push(`- ${blockId}: ${Math.round(fraction * tokenBudget)} tokens (${(fraction * 100).toFixed(0)}%)`);
+		sections.push(`- ${blockId}: ${tokenBudget ? Math.round(fraction * tokenBudget) + ' tokens' : 'unlimited'} (${(fraction * 100).toFixed(0)}%)`);
 	}
-	sections.push('');
-
-	// Database schema
-	sections.push('# DATABASE SCHEMA');
-	sections.push(buildSchemaPrompt('handoff context claims verdicts decisions events intake architecture', dialogueId));
 	sections.push('');
 
 	// Available handoff documents
 	sections.push('# AVAILABLE HANDOFF DOCUMENTS');
 	if (handoffDocs.length === 0) {
-		sections.push('No handoff documents available. Use database queries to retrieve data.');
+		sections.push('No handoff documents available. Use MCP tools (search_memory_candidates, load_evidence_span, temporal_query) to retrieve data.');
 	} else {
 		for (const doc of handoffDocs) {
 			sections.push(`## ${doc.doc_type} (${doc.doc_id})`);

@@ -1,0 +1,222 @@
+---
+title: "Governed Development Beyond the IDE: JanumiCode in Slack, Discord, and Telegram"
+description: "What happens when you bring governed multi-agent development to chat platforms? Not a chatbot — a coordination layer for humans supervising autonomous systems."
+pubDate: 2026-04-02T12:00:00
+author: "JanumiCode Team"
+tags: ["chat-platforms", "slack", "ux-architecture", "governance"]
+heroLabel: "BLOG // PLATFORM VISION"
+readingTime: "10 min read"
+---
+
+import ChatArchitectureLayers from '../../components/blog/ChatArchitectureLayers.astro';
+import SlackMockup from '../../components/blog/SlackMockup.astro';
+import HybridModelDiagram from '../../components/blog/HybridModelDiagram.astro';
+
+There's a recurring question we hear from enterprise teams evaluating JanumiCode:
+
+> "Can this run in Slack? Our teams already live there."
+
+The short answer is yes. But the real answer requires rethinking what "running in Slack" actually means.
+
+---
+
+## The Trap: AI Chatbot in a Channel
+
+Every platform — Slack, Discord, Telegram — shares a fundamental UX constraint: they are **chronological, message-based systems**. Linear history. Limited spatial layout. Weak support for multi-dimensional state.
+
+JanumiCode's system is the opposite: **graph-based, stateful, multi-agent, multi-view**.
+
+If you try to implement JanumiCode as "a smarter chatbot in Slack," you will build something that floods channels with agent noise, buries decisions in scroll, and loses state awareness entirely.
+
+The symptoms are predictable: too many messages, no structure, no prioritization, no indication of what actually needs human attention.
+
+---
+
+## The Correct Design Principle
+
+**Chat becomes the transport layer — not the system model.**
+
+The platform carries events, captures decisions, and surfaces notifications. But the real system state, the full graph of agents, tasks, and artifacts, lives elsewhere. Chat is the coordination surface, not the representation layer.
+
+<ChatArchitectureLayers />
+
+---
+
+## Mission-Centric Channels
+
+Instead of generic chat rooms, each major initiative gets its own channel:
+
+```
+# mission-arc-workflow
+# mission-billing-system
+# mission-mobile-app
+```
+
+Each channel is **one Mission**. The pinned message becomes Mission Control — a living summary of phase, progress, active agents, pending tasks, and required decisions. Updated automatically as the system evolves.
+
+The channel doesn't contain every agent thought. It contains what matters: **state changes, decisions needed, and outcomes.**
+
+---
+
+## Commands as the Primary Interaction
+
+Instead of freeform prompts, users issue structured commands that map directly to system objects:
+
+```
+/jnc start "Implement billing workflow"
+/jnc status
+/jnc agents
+/jnc tasks
+/jnc decisions
+/jnc approve domain:billing
+/jnc reject entity:legacy-invoice
+/jnc explain artifact:api_billing_v2
+```
+
+This matters because commands are **unambiguous**. They align with system state. They map to backend operations. There's no prompt engineering, no hoping the AI understood what you meant. You said `approve`, and the system recorded an approval with full provenance.
+
+---
+
+## Agents as Visible Actors
+
+Each agent posts as a **distinct identity** in the channel. The Verifier posts claim failures. The Historian surfaces contradictions. The Executor announces proposal updates. The Context Engineer reports briefing delivery.
+
+This transforms agents from invisible background processes into **visible actors in a system**. The team can see who did what, when, and why — directly in the conversation flow.
+
+<SlackMockup />
+
+---
+
+## Thread-Based Context Isolation
+
+Major artifacts and decisions get their own threads. A decision about MVP scope strategy doesn't flood the main channel — it opens a thread where options are presented, agent assessments are collected, and the human resolves it.
+
+This prevents stream overload, isolates reasoning, and keeps the main channel focused on **events and decisions** rather than lengthy analysis.
+
+---
+
+## The Adjudication Inbox
+
+This is the critical piece that must never be buried in scroll.
+
+Pending decisions surface through platform-native affordances:
+- **Slack**: App Home dashboard + modal dialogs
+- **Discord**: Interactive messages with buttons
+- **Telegram**: Inline keyboards for quick approvals
+
+The adjudication inbox presents decisions with clear options, agent assessments, and one-tap resolution:
+
+```
+⚖️ Pending Decisions (2)
+
+1. MVP Scope Strategy
+   [Approve Core] [Approve All] [Custom]
+
+2. Domain: Work Orders Ambiguity
+   [Clarify] [Defer] [Override]
+```
+
+No context switching. No opening another tool. Decisions are captured where the team already works.
+
+---
+
+## Status Snapshots, Not Logs
+
+Instead of flooding the channel with continuous output, the system posts **periodic status snapshots** — anchor messages that give the team a clear picture of where things stand:
+
+```
+📊 SYSTEM STATUS
+
+Phase: ARCHITECTURE
+Agents: 2 active · 1 blocked
+Tasks: 5 complete · 3 partial · 2 blocked
+Next Required Action: → Resolve MVP Scope Strategy
+```
+
+These snapshots become the team's primary awareness mechanism. They can glance at the channel and know exactly what phase the system is in, what's blocked, and what needs their attention.
+
+---
+
+## Deep Views via Links
+
+Chat cannot handle graphs, complex artifacts, or full traceability. It's not designed for it and it shouldn't try.
+
+Instead, chat links to a **web-based command center** for deep inspection:
+
+```
+View Full Graph:    janumicode.app/mission/billing/graph
+View Artifact:      janumicode.app/artifact/api_billing_v2
+View Decision Trail: janumicode.app/mission/billing/decisions
+```
+
+The chat layer handles coordination. The web layer handles inspection. Each does what it's best at.
+
+---
+
+## The Hybrid Model
+
+This is the architecture that actually works:
+
+<HybridModelDiagram />
+
+**Chat Layer** (Slack / Discord / Telegram) — commands, alerts, decisions, summaries. Where humans **govern and intervene**.
+
+**Web Command Center** (Agent Command Center UI) — mission control, agent roster, task graph, artifacts, deep traceability. Where humans **inspect and navigate**.
+
+**Governed Stream** (Canonical Source of Truth) — append-only events, decision traces, claims and verdicts, full audit trail. Where the system **records everything**.
+
+Each layer serves a distinct function. None tries to be the other.
+
+---
+
+## Platform-Specific Strengths
+
+**Slack** excels at enterprise workflows. App Home provides a dashboard surface. Slash commands provide structured control. Threads provide reasoning isolation. Modals handle complex decisions.
+
+**Discord** excels at real-time agent visibility. Bot identities per agent create the multi-persona feel naturally. Channels per mission organize work spatially. Ephemeral responses keep noise down.
+
+**Telegram** excels at lightweight, mobile-first control. Inline keyboards enable quick approvals from a phone. Status checks are instant. It's the "govern from anywhere" surface.
+
+---
+
+## What This Enables
+
+### Team-Based Agent Governance
+
+Different roles interact with the system through the same channel but with different authority:
+- **PM** approves scope decisions in Slack
+- **Engineer** reviews artifacts via linked command center
+- **Architect** resolves technical conflicts through threaded discussions
+
+The governance model is inherently collaborative, not single-user.
+
+### Asynchronous Control
+
+Workflows continue autonomously. Decisions can be made without opening the IDE. The system surfaces what needs attention, and humans intervene on their schedule. The Governed Stream ensures nothing is lost between interactions.
+
+### Ambient Awareness
+
+The system is always "alive" in the channel. Issues surface immediately. Progress is visible passively. The team doesn't need to poll — the system comes to them.
+
+---
+
+## The Biggest UX Risk
+
+If done incorrectly, you get a noisy AI chatbot spamming a channel. The symptoms: too many messages, no structure, no prioritization, no state awareness.
+
+The antidote is discipline: **chat is for events, decisions, and notifications. Not for full system representation.**
+
+Every message in the channel should answer one of three questions:
+1. What happened?
+2. What needs my attention?
+3. What did I decide?
+
+Everything else belongs in the web command center or the Governed Stream.
+
+---
+
+## The One-Line Takeaway
+
+Don't turn Slack into an IDE — turn it into the place where humans **govern and intervene in an ongoing autonomous system**.
+
+That's the difference between a chatbot and a coordination layer. And it's exactly where JanumiCode is headed.

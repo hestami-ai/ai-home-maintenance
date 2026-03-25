@@ -1,0 +1,260 @@
+---
+// Infrastructure Proposer-Validator 4-round flow
+const rounds = [
+  {
+    num: '01', label: 'ROUND 1', title: 'Topology & Environments',
+    phase: 'PROPOSING_TOPOLOGY_ENVIRONMENTS',
+    artifacts: ['EnvironmentProposal', 'NetworkBoundaryProposal'],
+    questions: ['How many environments? (dev, staging, prod, DR)', 'VPC isolation model?', 'Regions and availability zones?'],
+    validates: 'Isolation levels, deployment regions, blast-radius boundaries, compliance zones',
+    color: '--color-primary'
+  },
+  {
+    num: '02', label: 'ROUND 2', title: 'Compute & Storage',
+    phase: 'PROPOSING_COMPUTE_STORAGE',
+    artifacts: ['ComputeResourceProposal', 'StorageResourceProposal'],
+    questions: ['EKS, Fargate, or Lambda?', 'RDS vs DynamoDB vs S3?', 'Ephemeral or persistent state?'],
+    validates: 'Capacity planning, statefulness, technology choices, cost profile',
+    color: '--color-primary'
+  },
+  {
+    num: '03', label: 'ROUND 3', title: 'Security & IAM',
+    phase: 'PROPOSING_SECURITY_IAM',
+    artifacts: ['IAMRoleProposal', 'SecurityGroupProposal'],
+    questions: ['Cross-account trust policies?', 'Least-privilege execution roles?', 'PCI/SOC2 compliance scope?'],
+    validates: 'No overly permissive access, compliance standards met, encryption requirements',
+    color: '--color-warning'
+  },
+  {
+    num: '04', label: 'ROUND 4', title: 'Operations & Delivery',
+    phase: 'PROPOSING_OPERATIONS_DELIVERY',
+    artifacts: ['DeliveryPipelineProposal', 'ObservabilityProposal'],
+    questions: ['Terraform Cloud, GitHub Actions, or Atlantis?', 'Blue/Green or Canary?', 'SLIs/SLOs and alerting thresholds?'],
+    validates: 'Deployment safety mechanisms, rollback procedures, monitoring coverage',
+    color: '--color-accent'
+  },
+];
+---
+
+<div class="iir">
+  <div class="iir__header">
+    <span class="iir__header-label">INFRASTRUCTURE PROPOSER-VALIDATOR FLOW</span>
+    <span class="iir__header-note">4 rounds · MMP decisions at each gate</span>
+  </div>
+
+  {rounds.map((r, i) => (
+    <>
+      <div class="iir__round">
+        <div class="iir__round-side">
+          <div class="iir__num" style={`border-color: var(${r.color}); color: var(${r.color})`}>
+            <span>{r.num}</span>
+          </div>
+          {i < rounds.length - 1 && <div class="iir__wire"></div>}
+        </div>
+        <div class="iir__round-body">
+          <div class="iir__round-header">
+            <span class="iir__label" style={`color: var(${r.color})`}>{r.label}</span>
+            <code class="iir__phase">{r.phase}</code>
+          </div>
+          <h4 class="iir__title">{r.title}</h4>
+
+          <div class="iir__columns">
+            <div class="iir__col">
+              <span class="iir__col-label">PROPOSED ARTIFACTS</span>
+              {r.artifacts.map(a => (
+                <div class="iir__artifact">
+                  <span class="iir__artifact-icon">📄</span>
+                  <code class="iir__artifact-name">{a}</code>
+                </div>
+              ))}
+            </div>
+            <div class="iir__col">
+              <span class="iir__col-label">TECHNICAL EXPERT INVESTIGATES</span>
+              {r.questions.map(q => (
+                <div class="iir__question">{q}</div>
+              ))}
+            </div>
+          </div>
+
+          <div class="iir__validates">
+            <span class="iir__validates-label">ENGINEER VALIDATES:</span>
+            <span class="iir__validates-text">{r.validates}</span>
+          </div>
+        </div>
+      </div>
+    </>
+  ))}
+</div>
+
+<style>
+  .iir {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+  }
+
+  .iir__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xl);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .iir__header-label {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-primary);
+  }
+
+  .iir__header-note {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+  }
+
+  .iir__round {
+    display: flex;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-lg);
+  }
+
+  .iir__round:last-child { margin-bottom: 0; }
+
+  .iir__round-side {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .iir__num {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    border: 2px solid var(--color-primary);
+    border-radius: 4px;
+    transform: rotate(45deg);
+  }
+
+  .iir__num span { transform: rotate(-45deg); }
+
+  .iir__wire {
+    width: 1px;
+    flex: 1;
+    min-height: 20px;
+    background: var(--color-primary);
+    opacity: 0.2;
+    margin-top: var(--space-xs);
+  }
+
+  .iir__round-body {
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .iir__round-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: 4px;
+  }
+
+  .iir__label {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+
+  .iir__phase {
+    font-size: 0.55rem;
+    padding: 1px 5px;
+  }
+
+  .iir__title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: var(--space-md);
+  }
+
+  .iir__columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-md);
+    margin-bottom: var(--space-sm);
+  }
+
+  .iir__col-label {
+    display: block;
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-xs);
+  }
+
+  .iir__artifact {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: 2px 0;
+  }
+
+  .iir__artifact-icon { font-size: 0.7rem; }
+
+  .iir__artifact-name {
+    font-size: 0.65rem;
+    padding: 1px 5px;
+    color: var(--color-primary);
+  }
+
+  .iir__question {
+    font-size: 0.7rem;
+    color: var(--color-text-secondary);
+    padding: 2px 0;
+    padding-left: var(--space-sm);
+    border-left: 2px solid var(--color-border);
+    font-style: italic;
+  }
+
+  .iir__validates {
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .iir__validates-label {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--color-accent);
+    margin-right: var(--space-sm);
+  }
+
+  .iir__validates-text {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+  }
+
+  @media (max-width: 768px) {
+    .iir__columns { grid-template-columns: 1fr; }
+    .iir__round-side { display: none; }
+    .iir__header { flex-direction: column; gap: 4px; }
+  }
+</style>

@@ -1,0 +1,176 @@
+---
+title: "The Mirror & Menu Protocol: Why AI Should Propose and Humans Should Judge"
+description: "Most AI tools ask humans to articulate. JanumiCode flips it: the AI proposes expansively, and humans accept, reject, edit, or prioritize. Here's why that works — and how the Mirror & Menu Protocol makes it structured."
+pubDate: 2026-03-05T12:00:00
+author: "JanumiCode Team"
+tags: ["mmp", "human-ai-interaction", "governance", "ux-design"]
+heroLabel: "BLOG // CORE DESIGN"
+readingTime: "11 min read"
+---
+
+import HumanLLMStrengths from '../../components/blog/HumanLLMStrengths.astro';
+import MMPCardsMockup from '../../components/blog/MMPCardsMockup.astro';
+
+Most AI coding tools start with a blank text box and an implicit instruction: *tell us what you want*.
+
+This sounds reasonable. The human has the intent. The AI has the capability. The human describes, the AI executes. Simple.
+
+Except it doesn't work — and the failure mode is fundamental, not incidental.
+
+---
+
+## The Articulation Problem
+
+Ask a product manager to describe a multi-tenant SaaS billing system in a prompt. What you'll get is a paragraph — maybe two — that captures the high-level intent but omits dozens of critical details. Not because the PM doesn't know them, but because **humans are terrible at exhaustive articulation**.
+
+We know what we want when we see it. We know what's wrong when we encounter it. But transferring the full context from our heads into a text prompt? That's a lossy compression operation, and the losses are invisible until they cause problems downstream.
+
+The traditional approach — we call it "Open-Ended Discovery" — works like this:
+
+1. Ask the user to articulate their intent
+2. LLM analyzes what's provided
+3. Produces artifacts proportional to input quality
+
+The output quality is **bounded by the input quality**. A sparse prompt produces sparse artifacts. A detailed prompt produces detailed artifacts. The human bears the full burden of context transfer.
+
+This creates a paradox: the humans who most need AI assistance — those working on complex, ambiguous problems — are exactly the ones least able to articulate their intent precisely enough for the AI to help effectively.
+
+---
+
+## The Complementary Strengths Insight
+
+The solution becomes obvious when you map the actual strengths of each party:
+
+<HumanLLMStrengths />
+
+The mismatch in traditional AI tools is that they **ask humans to do what humans are bad at** (articulate exhaustively) and **ask LLMs to do what LLMs are bad at** (judge what matters).
+
+The correct design inverts this:
+
+- **LLM proposes** expansively from its domain knowledge — generating comprehensive options, surfacing assumptions, enumerating risks
+- **Human judges** — accepting, rejecting, editing, prioritizing, choosing between alternatives
+
+The output is rich regardless of input verbosity, because the LLM is doing the generation work. The output is correct because the human is doing the judgment work.
+
+We call this the **Proposer-Validator** pattern. And its concrete implementation in JanumiCode is the Mirror & Menu Protocol.
+
+---
+
+## Three Card Types, Three Judgment Patterns
+
+The Mirror & Menu Protocol (MMP) structures every human-AI decision point into one of three card types, each mapping to a distinct cognitive operation:
+
+<MMPCardsMockup />
+
+### Mirror Cards: Accept, Reject, or Edit Assumptions
+
+The LLM proposes a set of assumptions about the user's intent — things it believes to be true based on the prompt and domain knowledge. Each assumption is categorized (intent, scope, constraint, priority, persona, journey) and presented with a rationale.
+
+The human's job is straightforward judgment:
+- **Accept** — "Yes, that's correct."
+- **Reject** — "No, that's wrong." The assumption is excluded from all downstream work.
+- **Edit** — "Almost right, but..." The human provides a corrected version.
+- **Defer** — "I'll decide this later."
+
+This is the "mirror" metaphor: the AI holds up a mirror showing what it thinks you said, and you confirm or correct the reflection.
+
+The steel man summary at the top is the LLM's best effort at articulating the user's complete intent — a compressed version of everything it understood. The individual items below are the decomposed assumptions that can be individually validated.
+
+### Menu Cards: Choose Between Options
+
+When the problem space contains genuine decision points — places where multiple valid approaches exist — the LLM presents them as a menu with options, each with trade-offs described.
+
+The human selects an option, or provides a custom alternative. One option may be marked as recommended, but the human is never forced to accept the recommendation.
+
+This is where the LLM's generative strength shines: it can enumerate options that the human might not have considered, describe trade-offs that require cross-cutting domain knowledge, and frame the decision clearly enough that the human can make an informed choice without being an expert in every dimension.
+
+### Pre-Mortem Cards: Evaluate Risks
+
+Before the plan is finalized, the LLM surfaces risks — things that could go wrong if certain assumptions fail. Each risk has a severity level (low, medium, high, critical), a failure scenario, and a proposed mitigation.
+
+The human accepts each risk (acknowledging it and proceeding) or rejects it (indicating it needs resolution before the plan can advance). Rejection can include a rationale explaining why the risk is unacceptable.
+
+This is proactive risk management built into the decision protocol. Instead of discovering risks during execution — when the cost of correction is high — they're surfaced during planning, when the cost of changing direction is low.
+
+---
+
+## How Decisions Flow Through the System
+
+MMP decisions are not just captured — they **propagate**. This is where the protocol becomes an engineering mechanism, not just a UX pattern.
+
+When the user submits MMP decisions from a proposer round, they're formatted as a structured block and fed into the next round:
+
+```
+[MMP Decisions]
+ACCEPTED: "Property management is the core domain"
+REJECTED: "Tenant onboarding requires self-service portal"
+EDITED: "Inspections by internal staff only"
+  → "Inspections by both internal staff and third-party vendors"
+SELECTED: "Portfolio structure" → "Hierarchical portfolio model"
+RISK_ACCEPTED: "Compliance domain requires jurisdiction-specific engines"
+```
+
+The next proposer round receives this as context with explicit instructions: **build on accepted items, exclude rejected items, use edited versions, honor selected options**. The proposer doesn't start from scratch — it builds on the validated foundation.
+
+If you reject a domain in Round 1, it won't appear in the entity proposals of Round 3. If you edit an assumption about inspections, the edited version flows through to journey design, architecture, and execution. Decisions are **binding and traceable** across the entire workflow.
+
+---
+
+## MMP Across the Workflow
+
+The Mirror & Menu Protocol isn't limited to Intake. It surfaces at every point in the workflow where human judgment is needed:
+
+### Intake — Product Discovery
+
+The Technical Expert proposes domains, journeys, entities, and integrations across four proposer rounds. Each round generates MMP cards based on the LLM's analysis. The user validates incrementally, building a structured plan from accepted assumptions rather than trying to write one from scratch.
+
+### Architecture — Design Validation
+
+When the Architecture phase produces component designs, interface contracts, and dependency graphs, MMP cards are **extracted deterministically** from the architecture document — no LLM needed. Interface type assumptions become Mirror cards. Structural validation findings become Pre-Mortem cards. The engineer validates the architecture through the same judgment pattern.
+
+### Review — Verification Gates
+
+After the Verifier checks claims against evidence, the results are synthesized into MMP cards:
+- **All-clear verdicts** → Mirror cards (pre-accepted, read-only confirmation)
+- **Awareness items** → Menu cards (uncertainty handling: accept as-is, add safeguard, or block)
+- **Decision-required items** → Pre-Mortem cards (critical risks from failed claims)
+
+The engineer sees verification results not as a wall of text, but as structured decisions they can make one at a time.
+
+---
+
+## Persistence and Recovery
+
+MMP decisions survive VS Code restarts. Every partial decision is persisted to SQLite as the user makes it — not just on submission. If the editor crashes mid-review, the user returns to exactly the state they left. No lost work, no re-doing decisions.
+
+The decision history is also stored in the intake conversation record, creating a complete audit trail of what was proposed, what was accepted, what was rejected, and what was edited. Every downstream artifact traces back to a specific MMP decision.
+
+---
+
+## Why This Matters at Enterprise Scale
+
+Enterprise software development involves decisions that span teams, require compliance review, and affect production systems. The traditional approach — long documents, review meetings, comment threads — is slow and produces artifacts that are hard to trace.
+
+MMP compresses this process:
+
+**For the engineer**: Instead of writing a 20-page requirements document, describe the intent in a paragraph and spend 10 minutes judging well-structured proposals. The output is richer than what you could have written manually.
+
+**For the architect**: Instead of reviewing prose descriptions of component designs, validate structured assumptions about interfaces, dependencies, and constraints. Each decision is atomic and traceable.
+
+**For the CTO**: Instead of asking "did we consider X?", check the MMP history. If X was proposed and rejected, the rejection rationale is recorded. If X was never proposed, that's a gap in the proposer's domain knowledge — visible and addressable.
+
+**For compliance**: Every decision has provenance. Who proposed it (which agent, which model). Who validated it (which human, when). What alternatives were considered (the full menu of options). Why the risk was accepted (the engineer's rationale). This is audit-ready by construction.
+
+---
+
+## The Deeper Principle
+
+The Mirror & Menu Protocol embodies a principle that we believe is fundamental to effective human-AI collaboration:
+
+**Don't ask humans to generate. Ask them to judge.**
+
+The AI's job is to expand the possibility space — propose assumptions, enumerate options, surface risks, describe trade-offs. The human's job is to collapse it — accept what's right, reject what's wrong, edit what's close, choose between alternatives.
+
+This isn't a convenience optimization. It's an architectural recognition that **generation and judgment are fundamentally different cognitive operations**, and the best outcomes happen when each party does what it's best at.
+
+The prompt is not the product. The decisions are.

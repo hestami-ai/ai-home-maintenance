@@ -25,6 +25,23 @@ import type { CLIActivityEvent } from '../cli/types';
 import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { assembleContext } from '../context';
 import { updateWorkflowMetadata } from '../workflow/stateMachine';
+import type { DeferredCommandBlock } from './technicalExpertIntake';
+import { emitWorkflowCommand } from '../integration/eventBus';
+
+/** Emit deferred command block start after context assembly completes */
+function emitDeferredStart(cb?: DeferredCommandBlock): void {
+	if (!cb) { return; }
+	emitWorkflowCommand({
+		dialogueId: cb.dialogueId,
+		commandId: cb.commandId,
+		action: 'start',
+		commandType: cb.commandType ?? 'cli_invocation',
+		label: cb.label,
+		summary: cb.label,
+		status: 'running',
+		timestamp: new Date().toISOString(),
+	});
+}
 import type {
 	CapabilityNode,
 	WorkflowNode,
@@ -38,7 +55,6 @@ import type {
 } from '../types/architecture';
 import type { IntakePlanDocument, DomainCoverageMap } from '../types/intake';
 import { getLogger, isLoggerInitialized } from '../logging';
-import { emitWorkflowCommand } from '../integration/eventBus';
 import { randomUUID } from 'node:crypto';
 
 // ==================== SYSTEM PROMPTS ====================
@@ -47,8 +63,17 @@ const DECOMPOSING_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT in a governed
 
 # Your Role
 You perform CAPABILITY DETECTION and WORKFLOW GRAPH GENERATION — the "Global Planner" step.
-You receive an approved implementation plan (with requirements, decisions, constraints, and domain coverage)
-and produce a structured decomposition into CAPABILITIES and WORKFLOWS.
+You receive an approved implementation plan and produce a structured decomposition into CAPABILITIES and WORKFLOWS.
+
+The plan includes:
+- **Requirements, decisions, constraints** — the core specification
+- **domainProposals** — user-validated business domains (from INTAKE Proposer Round 1). Use these as the PRIMARY source for capability grouping. Do NOT ignore them.
+- **workflowProposals** — user-validated workflows (from INTAKE Proposer Round 2). Use these as the PRIMARY source for workflow definitions. Do NOT reinvent workflows from scratch when validated proposals exist.
+- **entityProposals** — user-validated data entities (from INTAKE Proposer Round 3). Reference these when defining workflow inputs/outputs.
+- **userJourneys** — user-validated journey scenarios. Use these to ensure workflow coverage.
+- **phasingStrategy** — user-defined implementation phasing. Respect this when organizing capabilities.
+
+If the plan contains these proposer artifacts, they represent user-validated design decisions and MUST be used as the foundation for your decomposition — not as suggestions to consider.
 
 # Definitions
 - **Capability**: A cohesive group of functionality that the system must provide. Each capability
@@ -63,18 +88,27 @@ and produce a structured decomposition into CAPABILITIES and WORKFLOWS.
   Each workflow belongs to exactly one capability (usually a leaf capability) and identifies
   actors, triggers, and outputs.
 
+# Repair Mode
+If the context includes a "Prior Architecture Document" section with validation findings, this is a REPAIR pass.
+You MUST:
+- Preserve capabilities and workflows that are NOT cited in the validation findings
+- Only modify, add, or remove items to address the specific findings
+- Ensure every workflow ID referenced in a capability's "workflows" array has a full definition in the workflows array
+- Do NOT regenerate from scratch — make targeted fixes
+
 # Critical Guardrails
 1. EVERY capability MUST trace to at least one requirement from the plan (no scope creep)
 2. EVERY requirement from the plan MUST be covered by at least one capability (no gaps)
 3. Capabilities should be cohesive — group related requirements, don't create one per requirement
 4. Workflows must be concrete enough to identify actors and trigger conditions
-5. Include domain_mappings for EVERY capability — map to the engineering domain(s) listed in
+5. EVERY workflow ID referenced in a capability's "workflows" array MUST have a full definition in the top-level "workflows" array (no dangling references)
+6. Include domain_mappings for EVERY capability — map to the engineering domain(s) listed in
    the Domain Coverage section using their exact names. If unsure, use coverage_contribution: "SECONDARY".
    Do NOT leave domain_mappings empty.
-6. Use parent_capability_id to create a hierarchy. Top-level capabilities should be broad functional
+7. Use parent_capability_id to create a hierarchy. Top-level capabilities should be broad functional
    areas. Sub-capabilities should be specific enough to map to concrete workflows.
-7. Do NOT write, create, or modify any files. Your output is JSON only.
-8. Do NOT execute shell commands or use tools to make changes to the codebase.
+8. Do NOT write, create, or modify any files. Your output is JSON only.
+9. Do NOT execute shell commands or use tools to make changes to the codebase.
 
 # Response Format
 Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
@@ -135,14 +169,17 @@ The Domain Model defines every data entity the system works with — their field
 relationships, constraints, and business invariants.
 
 # Approach
-1. Examine the capabilities and workflows provided to identify all data entities
-   that flow through the system as inputs, outputs, or intermediate state.
-2. Read the ground-truth spec files in the workspace if available (look for
+1. **Start from entityProposals** — if the context includes user-validated \`entityProposals\`
+   from the INTAKE phase, use them as the PRIMARY source for entities. They contain pre-validated
+   names, key attributes, relationships, and domain assignments. Do NOT ignore them.
+2. Use \`domainProposals\` (if present) to understand domain groupings and entity previews.
+3. Examine the capabilities and workflows to identify additional entities not covered by proposals.
+4. Read the ground-truth spec files in the workspace if available (look for
    specs/ or ground-truth-specs/ directories) to understand domain patterns.
-3. For each entity, define complete field-level detail including types, constraints,
+5. For each entity, define complete field-level detail including types, constraints,
    and validation rules.
-4. Map all relationships with cardinality and direction.
-5. Define business invariants — rules that must always hold across the data model.
+6. Map all relationships with cardinality and direction.
+7. Define business invariants — rules that must always hold across the data model.
 
 # Critical Guardrails
 1. EVERY entity MUST trace to at least one workflow (no invented entities).
@@ -186,6 +223,15 @@ const DESIGNING_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT performing COMP
 Design the component architecture and interface contracts for the system described below.
 You receive capabilities, workflows, AND the Domain Model as input. Your job is to determine
 what software modules (components) the system needs and how they communicate (interfaces).
+
+# Repair Mode
+If the context includes validation findings or human feedback about specific issues, this is a REPAIR pass.
+You MUST:
+- Preserve components and interfaces that are NOT cited in the validation findings
+- Only modify, add, or remove items to address the specific findings
+- Ensure every component serves at least one workflow (fix orphan components by connecting them)
+- Ensure interfaces exist between all dependent component pairs
+- Do NOT regenerate the entire architecture from scratch — make targeted fixes
 
 # Design Approach: Flow-First
 For each workflow, trace how data flows through the system:
@@ -288,11 +334,15 @@ You receive the complete architecture (capabilities, domain model, components, i
 and must determine the optimal order for implementation.
 
 # Approach
-1. Identify foundation components that have no dependencies or only external dependencies.
-   These form Phase 1.
-2. Group components that depend on Phase 1 into Phase 2, and so on.
-3. Within each phase, order by: data model first, then logic, then interfaces.
-4. Each step should identify:
+1. **Respect the product phasing strategy** — if the context includes a \`phasingStrategy\` from the
+   INTAKE phase (e.g., "Phase 1: Home Assistant, Phase 2: Service Provider FSM"), align the
+   implementation roadmap with these user-defined product phases. Technical dependency resolution
+   should operate WITHIN each product phase, not override the product phasing.
+2. Identify foundation components that have no dependencies or only external dependencies.
+   These form the first technical phase within each product phase.
+3. Group components that depend on earlier phases into subsequent technical phases.
+4. Within each phase, order by: data model first, then logic, then interfaces.
+5. Each step should identify:
    - Which components are built or modified
    - What must be built first (dependency edges)
    - How to verify the step works (concrete verification method)
@@ -353,7 +403,7 @@ export async function invokeArchitectureDecomposition(
 	approvedPlan: IntakePlanDocument,
 	domainCoverage: DomainCoverageMap | null,
 	tokenBudget: number,
-	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; humanFeedback?: string | null }
+	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; humanFeedback?: string | null; priorArchitectureDoc?: import('../types/architecture').ArchitectureDocument | null; commandBlock?: DeferredCommandBlock }
 ): Promise<Result<DecompositionResult>> {
 	const log = isLoggerInitialized()
 		? getLogger().child({ component: 'architectureExpert', phase: 'DECOMPOSING' })
@@ -367,19 +417,25 @@ export async function invokeArchitectureDecomposition(
 		}
 
 		// 2. Assemble context via Context Engineer
+		const extras: Record<string, unknown> = { approvedPlan, domainCoverage, humanFeedback: options?.humanFeedback };
+		if (options?.priorArchitectureDoc) {
+			extras.priorArchitectureDoc = options.priorArchitectureDoc;
+		}
+
 		const contextResult = await assembleContext({
 			dialogueId,
 			role: Role.TECHNICAL_EXPERT,
 			phase: Phase.ARCHITECTURE,
 			subPhase: 'DECOMPOSING',
 			tokenBudget,
-			extras: { approvedPlan, domainCoverage, humanFeedback: options?.humanFeedback },
+			extras,
 			onEvent: options?.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult as unknown as Result<DecompositionResult>;
 		}
+		emitDeferredStart(options?.commandBlock);
 
 		// 3. Build stdin and invoke
 		const stdinContent = buildStdinContent(DECOMPOSING_SYSTEM_PROMPT, contextResult.value.briefing);
@@ -468,7 +524,7 @@ export async function invokeArchitectureDesign(
 	decompositionConfig: DecompositionConfig,
 	humanFeedback: string | null,
 	tokenBudget: number,
-	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void }
+	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; constraintsAndDecisions?: Record<string, unknown> | null; workspaceSpecs?: string | null; commandBlock?: DeferredCommandBlock }
 ): Promise<Result<DesignResult>> {
 	const log = isLoggerInitialized()
 		? getLogger().child({ component: 'architectureExpert', phase: 'DESIGNING' })
@@ -482,19 +538,24 @@ export async function invokeArchitectureDesign(
 		}
 
 		// 2. Assemble context via Context Engineer
+		const designExtras: Record<string, unknown> = { architectureDoc, decompositionConfig, humanFeedback };
+		if (options?.constraintsAndDecisions) { designExtras.constraintsAndDecisions = options.constraintsAndDecisions; }
+		if (options?.workspaceSpecs) { designExtras.workspace_specs = options.workspaceSpecs; }
+
 		const contextResult = await assembleContext({
 			dialogueId,
 			role: Role.TECHNICAL_EXPERT,
 			phase: Phase.ARCHITECTURE,
 			subPhase: 'DESIGNING',
 			tokenBudget,
-			extras: { architectureDoc, decompositionConfig, humanFeedback },
+			extras: designExtras,
 			onEvent: options?.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult as unknown as Result<DesignResult>;
 		}
+		emitDeferredStart(options?.commandBlock);
 
 		// 3. Build stdin and invoke
 		const stdinContent = buildStdinContent(DESIGNING_SYSTEM_PROMPT, contextResult.value.briefing);
@@ -577,8 +638,8 @@ function extractJson(raw: string): string {
 	if (firstBrace >= 0) {
 		let depth = 0;
 		for (let i = firstBrace; i < trimmed.length; i++) {
-			if (trimmed[i] === '{') {depth++;}
-			else if (trimmed[i] === '}') {depth--;}
+			if (trimmed[i] === '{') { depth++; }
+			else if (trimmed[i] === '}') { depth--; }
 			if (depth === 0) {
 				return trimmed.substring(firstBrace, i + 1);
 			}
@@ -785,7 +846,7 @@ export async function invokeArchitectureModeling(
 	dialogueId: string,
 	architectureDoc: ArchitectureDocument,
 	tokenBudget: number,
-	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void }
+	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; humanFeedback?: string | null; approvedPlan?: Record<string, unknown> | null; workspaceSpecs?: string | null; commandBlock?: DeferredCommandBlock }
 ): Promise<Result<ModelingResult>> {
 	const log = isLoggerInitialized()
 		? getLogger().child({ component: 'architectureExpert', phase: 'MODELING' })
@@ -797,19 +858,24 @@ export async function invokeArchitectureModeling(
 			return providerResult as unknown as Result<ModelingResult>;
 		}
 
+		const modelingExtras: Record<string, unknown> = { architectureDoc, humanFeedback: options?.humanFeedback };
+		if (options?.approvedPlan) { modelingExtras.approvedPlan = options.approvedPlan; }
+		if (options?.workspaceSpecs) { modelingExtras.workspace_specs = options.workspaceSpecs; }
+
 		const contextResult = await assembleContext({
 			dialogueId,
 			role: Role.TECHNICAL_EXPERT,
 			phase: Phase.ARCHITECTURE,
 			subPhase: 'MODELING',
 			tokenBudget,
-			extras: { architectureDoc },
+			extras: modelingExtras,
 			onEvent: options?.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult as unknown as Result<ModelingResult>;
 		}
+		emitDeferredStart(options?.commandBlock);
 
 		const stdinContent = buildStdinContent(MODELING_SYSTEM_PROMPT, contextResult.value.briefing);
 
@@ -867,7 +933,7 @@ export async function invokeArchitectureSequencing(
 	dialogueId: string,
 	architectureDoc: ArchitectureDocument,
 	tokenBudget: number,
-	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void }
+	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; humanFeedback?: string | null; phasingStrategy?: unknown[] | null; workspaceSpecs?: string | null; commandBlock?: DeferredCommandBlock }
 ): Promise<Result<SequencingResult>> {
 	const log = isLoggerInitialized()
 		? getLogger().child({ component: 'architectureExpert', phase: 'SEQUENCING' })
@@ -879,19 +945,24 @@ export async function invokeArchitectureSequencing(
 			return providerResult as unknown as Result<SequencingResult>;
 		}
 
+		const seqExtras: Record<string, unknown> = { architectureDoc, humanFeedback: options?.humanFeedback };
+		if (options?.phasingStrategy) { seqExtras.phasingStrategy = options.phasingStrategy; }
+		if (options?.workspaceSpecs) { seqExtras.workspace_patterns = options.workspaceSpecs; }
+
 		const contextResult = await assembleContext({
 			dialogueId,
 			role: Role.TECHNICAL_EXPERT,
 			phase: Phase.ARCHITECTURE,
 			subPhase: 'SEQUENCING',
 			tokenBudget,
-			extras: { architectureDoc },
+			extras: seqExtras,
 			onEvent: options?.onEvent,
 		});
 
 		if (!contextResult.success) {
 			return contextResult as unknown as Result<SequencingResult>;
 		}
+		emitDeferredStart(options?.commandBlock);
 
 		const stdinContent = buildStdinContent(SEQUENCING_SYSTEM_PROMPT, contextResult.value.briefing);
 
@@ -999,7 +1070,7 @@ export async function invokeBatchDecomposition(
 	dialogueId: string,
 	violating: Array<{ component: ComponentSpec; violations: string[] }>,
 	architectureDoc: ArchitectureDocument,
-	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void }
+	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; constraintsAndDecisions?: Record<string, unknown> | null; humanFeedback?: string | null }
 ): Promise<Result<ComponentSpec[]>> {
 	const log = isLoggerInitialized()
 		? getLogger().child({ component: 'architectureExpert', phase: 'DECOMPOSITION' })
@@ -1048,6 +1119,28 @@ export async function invokeBatchDecomposition(
 			if (comp.workflows_served.length > 0) {
 				contextSections.push(`  Workflows: ${comp.workflows_served.join(', ')}`);
 			}
+		}
+
+		// Intake context: constraints, decisions, and human feedback
+		if (options?.constraintsAndDecisions) {
+			const cd = options.constraintsAndDecisions;
+			if (Array.isArray(cd.constraints) && cd.constraints.length > 0) {
+				contextSections.push('\n# Constraints (from Intake)');
+				for (const c of cd.constraints as Array<{ id?: string; text?: string }>) {
+					contextSections.push(`- [${c.id ?? '?'}] ${c.text ?? ''}`);
+				}
+			}
+			if (Array.isArray(cd.decisions) && cd.decisions.length > 0) {
+				contextSections.push('\n# Decisions (from Intake)');
+				for (const d of cd.decisions as Array<{ id?: string; text?: string }>) {
+					contextSections.push(`- [${d.id ?? '?'}] ${d.text ?? ''}`);
+				}
+			}
+		}
+
+		if (options?.humanFeedback) {
+			contextSections.push('\n# Human Feedback / Validation Findings');
+			contextSections.push(options.humanFeedback);
 		}
 
 		contextSections.push('\n# Components Requiring Analysis');

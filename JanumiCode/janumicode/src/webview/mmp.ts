@@ -39,12 +39,18 @@ export function handleMirrorDecision(
 	const key = cardId + ':' + mirrorId;
 	const current = state.mmpMirrorDecisions[key];
 
+	console.log('[MMP:Mirror] Decision:', { mirrorId, cardId, decision, key, wasPrevious: current?.status ?? 'none' });
+
 	// Toggle off if already in this state
 	if (current && current.status === decision) {
 		delete state.mmpMirrorDecisions[key];
+		console.log('[MMP:Mirror] Toggled OFF:', key);
 	} else {
 		state.mmpMirrorDecisions[key] = { status: decision };
+		console.log('[MMP:Mirror] Set:', key, '=', decision);
 	}
+
+	console.log('[MMP:Mirror] All mirror keys:', Object.keys(state.mmpMirrorDecisions));
 
 	// Update UI — scoped to the correct card container
 	const item = scopedQuery(cardId, '[data-mmp-mirror-id="' + mirrorId + '"]');
@@ -256,6 +262,46 @@ export function handlePreMortemRationale(riskId: string, cardId: string, text: s
 	}
 }
 
+// ===== Bulk Action Handlers =====
+
+/**
+ * Apply a bulk action to all Mirror items in a card.
+ */
+export function handleBulkMirrorAction(
+	cardId: string,
+	action: 'accept' | 'reject' | 'defer',
+): void {
+	const decision = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'deferred';
+	const items = scopedQueryAll(cardId, '.mmp-mirror-item');
+	console.log('[MMP:Bulk] Mirror', action, 'all for card:', cardId, '| items:', items.length);
+
+	items.forEach((el) => {
+		const item = el as HTMLElement;
+		const mirrorId = item.dataset.mmpMirrorId;
+		if (!mirrorId) { return; }
+		handleMirrorDecision(mirrorId, cardId, decision);
+	});
+}
+
+/**
+ * Apply a bulk action to all Pre-Mortem items in a card.
+ */
+export function handleBulkPreMortemAction(
+	cardId: string,
+	action: 'accept' | 'reject',
+): void {
+	const decision = action === 'accept' ? 'accepted' : 'rejected';
+	const items = scopedQueryAll(cardId, '.mmp-premortem-item');
+	console.log('[MMP:Bulk] PreMortem', action, 'all for card:', cardId, '| items:', items.length);
+
+	items.forEach((el) => {
+		const item = el as HTMLElement;
+		const riskId = item.dataset.mmpPremortemId;
+		if (!riskId) { return; }
+		handlePreMortemDecision(riskId, cardId, decision);
+	});
+}
+
 // ===== Submit Handler =====
 
 /**
@@ -399,6 +445,19 @@ export function handleMMPSubmit(cardId: string): void {
 			btn.disabled = true;
 		}
 	}
+
+	// Clean up submitted card's keys from state to prevent accumulation
+	for (const key of Object.keys(state.mmpMirrorDecisions)) {
+		if (key.startsWith(prefix)) { delete state.mmpMirrorDecisions[key]; }
+	}
+	for (const key of Object.keys(state.mmpMenuSelections)) {
+		if (key.startsWith(prefix)) { delete state.mmpMenuSelections[key]; }
+	}
+	for (const key of Object.keys(state.mmpPreMortemDecisions)) {
+		if (key.startsWith(prefix)) { delete state.mmpPreMortemDecisions[key]; }
+	}
+	console.log('[MMP:Submit] Cleaned state for card:', cardId, '| remaining mirror keys:', Object.keys(state.mmpMirrorDecisions).length);
+	persistMmpState();
 }
 
 // ===== Progress Tracking =====
@@ -408,7 +467,10 @@ export function handleMMPSubmit(cardId: string): void {
  */
 function updateMMPProgress(cardId: string): void {
 	const progressEl = document.querySelector('[data-mmp-progress="' + cardId + '"]') as HTMLElement | null;
-	if (!progressEl) { return; }
+	if (!progressEl) {
+		console.warn('[MMP:Progress] No progress element for cardId:', cardId);
+		return;
+	}
 
 	const prefix = cardId + ':';
 
@@ -416,10 +478,14 @@ function updateMMPProgress(cardId: string): void {
 	const mirrorItems = scopedQueryAll(cardId, '.mmp-mirror-item');
 	const mirrorTotal = mirrorItems.length;
 	let mirrorDone = 0;
+	const mirrorDebug: string[] = [];
 	mirrorItems.forEach((item) => {
 		const el = item as HTMLElement;
 		const id = el.dataset.mmpMirrorId;
-		if (id && state.mmpMirrorDecisions[prefix + id]) { mirrorDone++; }
+		const stateKey = prefix + id;
+		const hasDecision = !!(id && state.mmpMirrorDecisions[stateKey]);
+		mirrorDebug.push(id + '=' + (hasDecision ? state.mmpMirrorDecisions[stateKey]?.status : 'none'));
+		if (hasDecision) { mirrorDone++; }
 	});
 
 	// Count menu items and selections — scoped to card
@@ -444,6 +510,13 @@ function updateMMPProgress(cardId: string): void {
 		const id = el.dataset.mmpPremortemId;
 		if (id && state.mmpPreMortemDecisions[prefix + id]) { pmDone++; }
 	});
+
+	console.log('[MMP:Progress] cardId:', cardId, '| mirror:', mirrorDone + '/' + mirrorTotal,
+		'| menu:', menuDone + '/' + menuTotal, '| pm:', pmDone + '/' + pmTotal);
+	console.log('[MMP:Progress] Mirror details:', mirrorDebug);
+	console.log('[MMP:Progress] DOM container found:', !!document.querySelector('[data-mmp-card-id="' + cardId + '"]'));
+	console.log('[MMP:Progress] State keys (mirror):', Object.keys(state.mmpMirrorDecisions).filter(k => k.startsWith(prefix)));
+	console.log('[MMP:Progress] State keys (ALL mirror):', Object.keys(state.mmpMirrorDecisions));
 
 	const parts: string[] = [];
 	if (mirrorTotal > 0) {
@@ -478,8 +551,26 @@ interface PendingDecisionSet {
 export function applyPendingMmpDecisions(
 	decisions: Record<string, PendingDecisionSet>
 ): void {
-	// Merge into state
-	for (const [_cardId, pending] of Object.entries(decisions)) {
+	console.log('[MMP:Restore] applyPendingMmpDecisions called with cards:', Object.keys(decisions));
+
+	// Collect all cardIds currently in the DOM
+	const domCardIds = new Set<string>();
+	document.querySelectorAll('[data-mmp-card-id]').forEach((el) => {
+		const id = (el as HTMLElement).dataset.mmpCardId;
+		if (id) { domCardIds.add(id); }
+	});
+
+	// Only merge keys whose cardId matches a DOM container
+	let restored = 0, skipped = 0;
+	for (const [cardId, pending] of Object.entries(decisions)) {
+		if (!domCardIds.has(cardId)) {
+			console.log('[MMP:Restore] Skipping card (not in DOM):', cardId);
+			skipped++;
+			continue;
+		}
+		console.log('[MMP:Restore] Restoring card:', cardId, '| mirror:', Object.keys(pending.mirrorDecisions ?? {}).length,
+			'| menu:', Object.keys(pending.menuSelections ?? {}).length,
+			'| pm:', Object.keys(pending.preMortemDecisions ?? {}).length);
 		if (pending.mirrorDecisions) {
 			Object.assign(state.mmpMirrorDecisions, pending.mirrorDecisions);
 		}
@@ -489,7 +580,13 @@ export function applyPendingMmpDecisions(
 		if (pending.preMortemDecisions) {
 			Object.assign(state.mmpPreMortemDecisions, pending.preMortemDecisions);
 		}
+		restored++;
 	}
+
+	console.log('[MMP:Restore] Restored', restored, 'cards, skipped', skipped);
+	console.log('[MMP:Restore] After merge — mirror:', Object.keys(state.mmpMirrorDecisions).length,
+		'| menu:', Object.keys(state.mmpMenuSelections).length,
+		'| pm:', Object.keys(state.mmpPreMortemDecisions).length);
 
 	// Also save to webview state for in-session persistence
 	persistMmpState();
@@ -504,10 +601,15 @@ export function applyPendingMmpDecisions(
  * Uses scoped queries to find elements in the correct card container.
  */
 export function applyMmpStateToDom(): void {
+	console.log('[MMP:ApplyDOM] Starting. Mirror entries:', Object.keys(state.mmpMirrorDecisions).length,
+		'| Menu entries:', Object.keys(state.mmpMenuSelections).length,
+		'| PM entries:', Object.keys(state.mmpPreMortemDecisions).length);
+
 	for (const [key, val] of Object.entries(state.mmpMirrorDecisions)) {
 		const parts = key.split(':');
 		const cardId = parts[0];
 		const mirrorId = parts.slice(1).join(':');
+		console.log('[MMP:ApplyDOM] Mirror key:', key, '→ cardId:', cardId, ', mirrorId:', mirrorId, ', status:', val.status);
 		const item = scopedQuery(cardId, '[data-mmp-mirror-id="' + mirrorId + '"]');
 		if (item) {
 			item.classList.remove('accepted', 'rejected', 'deferred', 'edited');

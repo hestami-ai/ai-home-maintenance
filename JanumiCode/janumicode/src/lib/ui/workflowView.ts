@@ -98,7 +98,7 @@ export class WorkflowViewProvider implements vscode.WebviewViewProvider {
 		const gates = db
 			.prepare(
 				`
-			SELECT gate_id, dialogue_id, reason, status,
+			SELECT gate_seq, gate_id, dialogue_id, reason, status,
 			       blocking_claims, created_at, resolved_at
 			FROM gates
 			WHERE status = 'OPEN'

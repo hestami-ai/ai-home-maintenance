@@ -1,0 +1,426 @@
+---
+// Interactive mockup of the three MMP card types: Mirror, Menu, Pre-Mortem
+---
+
+<div class="mmp-mock">
+  <div class="mmp-mock__header">
+    <span class="mmp-mock__dot"></span>
+    <span class="mmp-mock__title">MIRROR & MENU PROTOCOL — INTAKE : PROPOSING DOMAINS</span>
+    <span class="mmp-mock__progress">4/7 decided</span>
+  </div>
+
+  <!-- Mirror Card -->
+  <div class="mmp-mock__card mmp-mock__card--mirror">
+    <div class="mmp-mock__card-header">
+      <span class="mmp-mock__card-type mmp-mock__card-type--mirror">MIRROR</span>
+      <span class="mmp-mock__card-title">Assumptions to validate</span>
+    </div>
+    <div class="mmp-mock__card-sub">Steel man: "The platform requires 8 business domains covering property management, tenant lifecycle, billing, maintenance, inspections, compliance, analytics, and integrations."</div>
+    <div class="mmp-mock__items">
+      <div class="mmp-mock__item">
+        <span class="mmp-mock__item-text">Property management is the core domain with the most complex data model</span>
+        <span class="mmp-mock__item-cat">scope</span>
+        <div class="mmp-mock__item-actions">
+          <button class="mmp-mock__btn mmp-mock__btn--accepted">✓ Accepted</button>
+          <button class="mmp-mock__btn">✗</button>
+          <button class="mmp-mock__btn">✎</button>
+        </div>
+      </div>
+      <div class="mmp-mock__item">
+        <span class="mmp-mock__item-text">Tenant onboarding requires a self-service portal with document verification</span>
+        <span class="mmp-mock__item-cat">intent</span>
+        <div class="mmp-mock__item-actions">
+          <button class="mmp-mock__btn">✓</button>
+          <button class="mmp-mock__btn mmp-mock__btn--rejected">✗ Rejected</button>
+          <button class="mmp-mock__btn">✎</button>
+        </div>
+      </div>
+      <div class="mmp-mock__item">
+        <span class="mmp-mock__item-text">Billing must support both recurring charges and one-time assessments</span>
+        <span class="mmp-mock__item-cat">constraint</span>
+        <div class="mmp-mock__item-actions">
+          <button class="mmp-mock__btn mmp-mock__btn--accepted">✓ Accepted</button>
+          <button class="mmp-mock__btn">✗</button>
+          <button class="mmp-mock__btn">✎</button>
+        </div>
+      </div>
+      <div class="mmp-mock__item mmp-mock__item--edited">
+        <span class="mmp-mock__item-text">Inspections are performed by internal staff only</span>
+        <span class="mmp-mock__item-cat">scope</span>
+        <div class="mmp-mock__item-actions">
+          <button class="mmp-mock__btn">✓</button>
+          <button class="mmp-mock__btn">✗</button>
+          <button class="mmp-mock__btn mmp-mock__btn--edited">✎ Edited</button>
+        </div>
+      </div>
+      <div class="mmp-mock__edit-box">→ "Inspections performed by both internal staff <strong>and third-party vendors</strong>"</div>
+    </div>
+  </div>
+
+  <!-- Menu Card -->
+  <div class="mmp-mock__card mmp-mock__card--menu">
+    <div class="mmp-mock__card-header">
+      <span class="mmp-mock__card-type mmp-mock__card-type--menu">MENU</span>
+      <span class="mmp-mock__card-title">Decisions with options</span>
+    </div>
+    <div class="mmp-mock__menu-q">
+      <span class="mmp-mock__menu-label">QUESTION</span>
+      <span class="mmp-mock__menu-text">How should multi-property portfolio management be structured?</span>
+    </div>
+    <div class="mmp-mock__options">
+      <div class="mmp-mock__option mmp-mock__option--selected">
+        <span class="mmp-mock__option-radio">●</span>
+        <div>
+          <span class="mmp-mock__option-label">Hierarchical portfolio model</span>
+          <span class="mmp-mock__option-desc">Properties grouped under portfolios, portfolios under organizations. Supports multi-level permissions.</span>
+          <span class="mmp-mock__option-rec">RECOMMENDED</span>
+        </div>
+      </div>
+      <div class="mmp-mock__option">
+        <span class="mmp-mock__option-radio">○</span>
+        <div>
+          <span class="mmp-mock__option-label">Flat property list with tagging</span>
+          <span class="mmp-mock__option-desc">All properties at one level, organized by tags and filters. Simpler but less structured.</span>
+        </div>
+      </div>
+      <div class="mmp-mock__option">
+        <span class="mmp-mock__option-radio">○</span>
+        <div>
+          <span class="mmp-mock__option-label">Custom response</span>
+          <span class="mmp-mock__option-desc">Provide your own approach.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pre-Mortem Card -->
+  <div class="mmp-mock__card mmp-mock__card--premortem">
+    <div class="mmp-mock__card-header">
+      <span class="mmp-mock__card-type mmp-mock__card-type--premortem">PRE-MORTEM</span>
+      <span class="mmp-mock__card-title">Risks to evaluate</span>
+    </div>
+    <div class="mmp-mock__risks">
+      <div class="mmp-mock__risk">
+        <div class="mmp-mock__risk-header">
+          <span class="mmp-mock__risk-sev mmp-mock__risk-sev--high">HIGH</span>
+          <span class="mmp-mock__risk-text">Compliance domain may require jurisdiction-specific rule engines that significantly increase architectural complexity</span>
+        </div>
+        <div class="mmp-mock__risk-detail">
+          <span class="mmp-mock__risk-label">If this assumption fails:</span> Compliance features ship late or with regulatory gaps. Potential legal exposure.
+        </div>
+        <div class="mmp-mock__risk-detail">
+          <span class="mmp-mock__risk-label">Mitigation:</span> Define compliance as a pluggable adapter layer with jurisdiction-specific modules.
+        </div>
+        <div class="mmp-mock__risk-actions">
+          <button class="mmp-mock__btn mmp-mock__btn--risk-accept">Accept Risk</button>
+          <button class="mmp-mock__btn mmp-mock__btn--risk-reject">Reject — Needs Resolution</button>
+        </div>
+      </div>
+      <div class="mmp-mock__risk">
+        <div class="mmp-mock__risk-header">
+          <span class="mmp-mock__risk-sev mmp-mock__risk-sev--medium">MEDIUM</span>
+          <span class="mmp-mock__risk-text">Analytics domain assumes near-real-time data availability from all other domains</span>
+        </div>
+        <div class="mmp-mock__risk-actions">
+          <button class="mmp-mock__btn mmp-mock__btn--risk-accept mmp-mock__btn--active">✓ Accepted</button>
+          <button class="mmp-mock__btn">Reject</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mmp-mock__footer">
+    <span class="mmp-mock__footer-status">4 accepted · 1 rejected · 1 edited · 1 selected · 1 risk accepted</span>
+    <button class="mmp-mock__submit">Submit Decisions</button>
+  </div>
+</div>
+
+<style>
+  .mmp-mock {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .mmp-mock__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .mmp-mock__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); }
+
+  .mmp-mock__title {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-text-muted);
+    flex: 1;
+  }
+
+  .mmp-mock__progress {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  /* Cards */
+  .mmp-mock__card {
+    margin: var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .mmp-mock__card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .mmp-mock__card-type {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 1px 6px;
+    border-radius: 2px;
+  }
+
+  .mmp-mock__card-type--mirror { color: var(--color-primary); background: rgba(0, 212, 255, 0.08); border: 1px solid rgba(0, 212, 255, 0.2); }
+  .mmp-mock__card-type--menu { color: #A78BFA; background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.2); }
+  .mmp-mock__card-type--premortem { color: var(--color-warning); background: rgba(255, 184, 0, 0.08); border: 1px solid rgba(255, 184, 0, 0.2); }
+
+  .mmp-mock__card-title {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  .mmp-mock__card-sub {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+    padding: var(--space-sm) var(--space-md);
+    font-style: italic;
+    border-bottom: 1px solid var(--color-border);
+    line-height: 1.45;
+  }
+
+  /* Mirror items */
+  .mmp-mock__items { padding: var(--space-sm); }
+
+  .mmp-mock__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .mmp-mock__item:last-of-type { border-bottom: none; }
+
+  .mmp-mock__item-text {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    flex: 1;
+  }
+
+  .mmp-mock__item--edited .mmp-mock__item-text {
+    text-decoration: line-through;
+    color: var(--color-text-muted);
+  }
+
+  .mmp-mock__item-cat {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    padding: 1px 4px;
+    background: var(--color-bg);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .mmp-mock__item-actions { display: flex; gap: 3px; flex-shrink: 0; }
+
+  .mmp-mock__btn {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+    cursor: default;
+  }
+
+  .mmp-mock__btn--accepted { color: var(--color-accent); background: rgba(0, 255, 178, 0.08); border-color: rgba(0, 255, 178, 0.3); font-weight: 600; }
+  .mmp-mock__btn--rejected { color: var(--color-error); background: rgba(255, 68, 102, 0.08); border-color: rgba(255, 68, 102, 0.3); font-weight: 600; }
+  .mmp-mock__btn--edited { color: var(--color-primary); background: rgba(0, 212, 255, 0.08); border-color: rgba(0, 212, 255, 0.3); font-weight: 600; }
+
+  .mmp-mock__edit-box {
+    font-size: 0.72rem;
+    color: var(--color-primary);
+    padding: var(--space-xs) var(--space-md) var(--space-xs) var(--space-xl);
+    background: rgba(0, 212, 255, 0.04);
+    border-left: 2px solid var(--color-primary);
+    margin: 0 var(--space-md) var(--space-sm);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+
+  /* Menu */
+  .mmp-mock__menu-q {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .mmp-mock__menu-label {
+    display: block;
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    margin-bottom: 2px;
+  }
+
+  .mmp-mock__menu-text { font-size: 0.78rem; color: var(--color-text); font-weight: 500; }
+
+  .mmp-mock__options { padding: var(--space-sm); }
+
+  .mmp-mock__option {
+    display: flex;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 4px;
+    cursor: default;
+  }
+
+  .mmp-mock__option--selected {
+    border-color: rgba(167, 139, 250, 0.4);
+    background: rgba(167, 139, 250, 0.04);
+  }
+
+  .mmp-mock__option-radio {
+    font-size: 0.7rem;
+    color: #A78BFA;
+    margin-top: 1px;
+    flex-shrink: 0;
+  }
+
+  .mmp-mock__option-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text);
+    display: block;
+  }
+
+  .mmp-mock__option-desc {
+    font-size: 0.68rem;
+    color: var(--color-text-muted);
+    display: block;
+    line-height: 1.4;
+  }
+
+  .mmp-mock__option-rec {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--color-accent);
+    display: inline-block;
+    margin-top: 2px;
+  }
+
+  /* Pre-Mortem */
+  .mmp-mock__risks { padding: var(--space-sm); }
+
+  .mmp-mock__risk {
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+  }
+
+  .mmp-mock__risk-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+  }
+
+  .mmp-mock__risk-sev {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .mmp-mock__risk-sev--high { color: var(--color-error); background: rgba(255, 68, 102, 0.1); border: 1px solid rgba(255, 68, 102, 0.25); }
+  .mmp-mock__risk-sev--medium { color: var(--color-warning); background: rgba(255, 184, 0, 0.1); border: 1px solid rgba(255, 184, 0, 0.25); }
+
+  .mmp-mock__risk-text { font-size: 0.75rem; color: var(--color-text-secondary); line-height: 1.45; }
+
+  .mmp-mock__risk-detail {
+    font-size: 0.68rem;
+    color: var(--color-text-muted);
+    padding-left: var(--space-xl);
+    margin-bottom: 2px;
+    line-height: 1.4;
+  }
+
+  .mmp-mock__risk-label { font-weight: 600; color: var(--color-text-muted); }
+
+  .mmp-mock__risk-actions {
+    display: flex;
+    gap: var(--space-sm);
+    padding-left: var(--space-xl);
+    margin-top: var(--space-sm);
+  }
+
+  .mmp-mock__btn--risk-accept { color: var(--color-warning); border-color: rgba(255, 184, 0, 0.3); }
+  .mmp-mock__btn--risk-reject { color: var(--color-error); border-color: rgba(255, 68, 102, 0.3); }
+  .mmp-mock__btn--active { background: rgba(255, 184, 0, 0.08); font-weight: 600; }
+
+  /* Footer */
+  .mmp-mock__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-sm) var(--space-md);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg);
+  }
+
+  .mmp-mock__footer-status {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+  }
+
+  .mmp-mock__submit {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--color-primary);
+    cursor: default;
+  }
+</style>

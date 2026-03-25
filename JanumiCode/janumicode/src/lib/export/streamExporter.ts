@@ -182,6 +182,10 @@ function exportStreamItem(item: StreamItem, options: ExportOptions): string[] {
 				'',
 			);
 			break;
+
+		case 'reasoning_review':
+			lines.push(...exportReasoningReview(item.concerns, item.overallAssessment, item.reviewerModel, item.timestamp));
+			break;
 	}
 
 	return lines;
@@ -403,6 +407,56 @@ function exportReviewItem(item: ReviewItem, verdictByClaim: Map<string, Verdict>
 		lines.push(`- **[FINDING]** ${escapeMd(item.findingText)}`);
 	}
 	lines.push('');
+
+	return lines;
+}
+
+/**
+ * Export a reasoning review block
+ */
+function exportReasoningReview(
+	concerns: Array<{ severity: string; summary: string; detail: string; location: string; recommendation: string }>,
+	overallAssessment: string,
+	reviewerModel: string,
+	timestamp: string
+): string[] {
+	const lines: string[] = [];
+
+	lines.push(`#### Reasoning Review`);
+	lines.push('');
+	lines.push(`**Reviewer Model:** ${reviewerModel}`);
+	lines.push(`**Timestamp:** ${timestamp}`);
+	lines.push(`**Concerns:** ${concerns.length}`);
+	lines.push('');
+
+	if (overallAssessment) {
+		lines.push(`**Overall Assessment:**`);
+		lines.push('');
+		lines.push(`> ${escapeMd(overallAssessment).split('\n').join('\n> ')}`);
+		lines.push('');
+	}
+
+	if (concerns.length > 0) {
+		lines.push('| Severity | Summary | Location |');
+		lines.push('|----------|---------|----------|');
+		for (const c of concerns) {
+			lines.push(`| ${c.severity} | ${escapeMd(c.summary)} | ${escapeMd(c.location)} |`);
+		}
+		lines.push('');
+
+		for (const c of concerns) {
+			lines.push(`**[${c.severity}] ${escapeMd(c.summary)}**`);
+			lines.push('');
+			if (c.detail) {
+				lines.push(`> ${escapeMd(c.detail).split('\n').join('\n> ')}`);
+				lines.push('');
+			}
+			if (c.recommendation) {
+				lines.push(`*Recommendation:* ${escapeMd(c.recommendation)}`);
+				lines.push('');
+			}
+		}
+	}
 
 	return lines;
 }

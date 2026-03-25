@@ -217,13 +217,17 @@ export async function invokeExecutor(
 			};
 		}
 
+		// Pre-read workspace structure for context
+		const { getWorkspaceStructureSummary } = await import('../context/workspaceReader.js');
+		const workspaceSpecs = await getWorkspaceStructureSummary();
+
 		// Assemble context via Context Engineer
 		const contextResult = await assembleContext({
 			dialogueId: options.dialogueId,
 			role: RoleEnum.EXECUTOR,
 			phase: Phase.EXECUTE,
 			tokenBudget: options.tokenBudget,
-			extras: { goal: options.goal },
+			extras: { goal: options.goal, workspace_specs: workspaceSpecs },
 			onEvent: options.onEvent,
 		});
 

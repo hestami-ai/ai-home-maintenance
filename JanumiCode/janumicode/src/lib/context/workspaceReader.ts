@@ -351,3 +351,64 @@ export function formatWorkspaceFilesForContext(
 
 	return parts.join('');
 }
+
+/**
+ * Get a compact workspace structure summary for context injection.
+ * Returns a directory listing of key folders + contents of config files (package.json, tsconfig, etc.).
+ * Lightweight enough to include as an extras field without dominating the context budget.
+ */
+export async function getWorkspaceStructureSummary(): Promise<string | null> {
+	const root = getWorkspaceRoot();
+	if (!root) { return null; }
+
+	const sections: string[] = ['# Workspace Structure Summary\n'];
+
+	// 1. List top-level directory entries
+	try {
+		const entries = await fs.readdir(root, { withFileTypes: true });
+		const relevant = entries.filter(e =>
+			!e.name.startsWith('.') && e.name !== 'node_modules' && e.name !== 'dist' && e.name !== 'out'
+		);
+		sections.push('## Top-Level Directories');
+		for (const entry of relevant) {
+			sections.push(`- ${entry.name}${entry.isDirectory() ? '/' : ''}`);
+		}
+		sections.push('');
+	} catch { /* skip */ }
+
+	// 2. List src/ subdirectories if present
+	try {
+		const srcPath = path.join(root, 'src');
+		const srcEntries = await fs.readdir(srcPath, { withFileTypes: true });
+		sections.push('## src/ Structure');
+		for (const entry of srcEntries.slice(0, 30)) {
+			sections.push(`- src/${entry.name}${entry.isDirectory() ? '/' : ''}`);
+		}
+		sections.push('');
+	} catch { /* no src/ */ }
+
+	// 3. Read key config files (compact)
+	const configFiles = ['package.json', 'tsconfig.json', 'docker-compose.yml', 'Dockerfile'];
+	for (const fname of configFiles) {
+		try {
+			const content = await fs.readFile(path.join(root, fname), 'utf-8');
+			const truncated = content.length > 3000 ? content.substring(0, 3000) + '\n... [truncated]' : content;
+			sections.push(`## ${fname}\n\`\`\`\n${truncated}\n\`\`\`\n`);
+		} catch { /* file doesn't exist */ }
+	}
+
+	// 4. List specs/ or ground-truth-specs/ if present
+	for (const specsDir of ['specs', 'ground-truth-specs']) {
+		try {
+			const specsPath = path.join(root, specsDir);
+			const specEntries = await fs.readdir(specsPath, { withFileTypes: true });
+			sections.push(`## ${specsDir}/`);
+			for (const entry of specEntries.slice(0, 20)) {
+				sections.push(`- ${specsDir}/${entry.name}${entry.isDirectory() ? '/' : ''}`);
+			}
+			sections.push('');
+		} catch { /* not present */ }
+	}
+
+	return sections.length > 1 ? sections.join('\n') : null;
+}

@@ -131,13 +131,17 @@ export async function invokeTechnicalExpert(
 	options: TechnicalExpertInvocationOptions
 ): Promise<Result<EvidencePacket>> {
 	try {
+		// Pre-read workspace structure for context
+		const { getWorkspaceStructureSummary } = await import('../context/workspaceReader.js');
+		const workspaceSpecs = await getWorkspaceStructureSummary();
+
 		// Assemble context via Context Engineer
 		const contextResult = await assembleContext({
 			dialogueId: options.dialogueId,
 			role: Role.TECHNICAL_EXPERT,
 			phase: Phase.PROPOSE,
 			tokenBudget: options.tokenBudget,
-			extras: { question: options.question, relatedClaimIds: options.relatedClaimIds },
+			extras: { question: options.question, relatedClaimIds: options.relatedClaimIds, workspace_specs: workspaceSpecs },
 			onEvent: options.onEvent,
 		});
 

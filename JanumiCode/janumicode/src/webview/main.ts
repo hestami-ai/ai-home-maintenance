@@ -64,6 +64,8 @@ import {
 	handlePreMortemDecision,
 	handlePreMortemRationale,
 	handleMMPSubmit,
+	handleBulkMirrorAction,
+	handleBulkPreMortemAction,
 	applyPendingMmpDecisions,
 } from './mmp';
 import {
@@ -461,6 +463,16 @@ document.addEventListener('click', function (event: MouseEvent) {
 		case 'premortem-reject':
 			if (target.dataset.mmpItem && target.dataset.mmpCard) {
 				handlePreMortemDecision(target.dataset.mmpItem, target.dataset.mmpCard, 'rejected');
+			}
+			break;
+		case 'mmp-bulk':
+			if (target.dataset.mmpCard && target.dataset.mmpBulkAction) {
+				handleBulkMirrorAction(target.dataset.mmpCard, target.dataset.mmpBulkAction as 'accept' | 'reject' | 'defer');
+			}
+			break;
+		case 'mmp-bulk-pm':
+			if (target.dataset.mmpCard && target.dataset.mmpBulkAction) {
+				handleBulkPreMortemAction(target.dataset.mmpCard, target.dataset.mmpBulkAction as 'accept' | 'reject');
 			}
 			break;
 		case 'mmp-submit':

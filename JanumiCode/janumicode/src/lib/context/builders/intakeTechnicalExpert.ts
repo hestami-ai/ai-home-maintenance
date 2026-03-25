@@ -31,10 +31,7 @@ import {
 /** Number of most recent turns to keep in full (raw) in the context window */
 export const INTAKE_CONTEXT_WINDOW_SIZE = 6;
 
-/** Maximum approximate token budget for the INTAKE context (excluding system prompt) */
-export const INTAKE_MAX_CONTEXT_TOKENS = 8000;
-
-/** Rough characters-per-token estimate for budget calculations */
+/** Rough characters-per-token estimate (kept for estimatedTokens reporting, not for truncation) */
 const CHARS_PER_TOKEN = 4;
 
 // ==================== TYPES ====================
@@ -47,7 +44,6 @@ export interface IntakeTechnicalExpertContextOptions {
 	humanMessage: string;
 	currentPlan: IntakePlanDocument;
 	turnNumber: number;
-	tokenBudget: number;
 	/** When true, include ALL turns (not just recent) for synthesis */
 	synthesisMode?: boolean;
 }
@@ -58,6 +54,8 @@ export interface IntakeTechnicalExpertContextOptions {
  * doesn't use claims/verdicts/evidence — it's focused on conversation.
  */
 export interface IntakeContextPack {
+	/** Dialogue ID (for file-based context writing) */
+	dialogueId?: string;
 	/** The Human's latest message */
 	humanMessage: string;
 	/** Current draft plan document */
@@ -97,7 +95,6 @@ export async function buildIntakeTechnicalExpertContext(
 			humanMessage,
 			currentPlan,
 			turnNumber,
-			tokenBudget,
 			synthesisMode = false,
 		} = options;
 
@@ -136,6 +133,7 @@ export async function buildIntakeTechnicalExpertContext(
 		);
 
 		const contextPack: IntakeContextPack = {
+			dialogueId,
 			humanMessage,
 			currentPlan,
 			accumulations,
@@ -145,14 +143,7 @@ export async function buildIntakeTechnicalExpertContext(
 			isSynthesis: synthesisMode,
 		};
 
-		// If over budget, truncate conversation history
-		if (estimatedTokens > tokenBudget) {
-			return {
-				success: true,
-				value: truncateIntakeContext(contextPack, tokenBudget),
-			};
-		}
-
+		// No truncation — pass full context. CLI providers manage their own context windows.
 		return { success: true, value: contextPack };
 	} catch (error) {
 		return {
@@ -209,7 +200,32 @@ export function formatIntakeTechnicalExpertContext(
 		`---\n\nEstimated context tokens: ~${context.estimatedTokens}`
 	);
 
-	return sections.join('\n\n---\n\n');
+	const inlineContent = sections.join('\n\n---\n\n');
+
+	// If context is very large, write to files for CLI agent to read piecemeal
+	const totalChars = inlineContent.length;
+	if (totalChars > 100_000 && context.dialogueId) {
+		try {
+			const { writeContextToFiles, buildFileBasedPrompt } = require('../contextFileWriter');
+			const contextSections = [
+				{ name: 'plan.md', content: formatPlanSection(context.currentPlan) },
+				...(context.accumulations.length > 0 || context.recentTurns.length > 0
+					? [{ name: 'conversation-history.md', content: formatConversationHistory(context.accumulations, context.recentTurns) }]
+					: []),
+				{ name: 'request.md', content: context.isSynthesis
+					? 'Please synthesize the entire conversation above into a final, comprehensive implementation plan.'
+					: `# Human's Message (Turn ${context.turnNumber})\n\n${context.humanMessage}` },
+			];
+			const filePaths = writeContextToFiles(context.dialogueId, contextSections);
+			if (filePaths) {
+				return buildFileBasedPrompt(filePaths);
+			}
+		} catch {
+			// File writing failed — fall back to inline
+		}
+	}
+
+	return inlineContent;
 }
 
 // ==================== INTERNAL HELPERS ====================
@@ -325,6 +341,45 @@ function formatPlanSection(plan: IntakePlanDocument): string {
 		}
 	}
 
+	// Proposer artifacts — these contain the detailed output from each proposer round
+	if (plan.domainProposals && plan.domainProposals.length > 0) {
+		parts.push('## Proposed Domains (from Proposer Round 1)');
+		for (const d of plan.domainProposals) {
+			parts.push(`- [${d.id}] **${d.name}**: ${d.description}`);
+			if (d.rationale) { parts.push(`  Rationale: ${d.rationale}`); }
+			if (d.entityPreview?.length) { parts.push(`  Entity preview: ${d.entityPreview.join(', ')}`); }
+			if (d.workflowPreview?.length) { parts.push(`  Workflow preview: ${d.workflowPreview.join(', ')}`); }
+		}
+	}
+	if (plan.workflowProposals && plan.workflowProposals.length > 0) {
+		parts.push('## Proposed Workflows (from Proposer Round 2)');
+		for (const w of plan.workflowProposals) {
+			parts.push(`- [${w.id}] **${w.name}** (domain: ${w.domainId}): ${w.description}`);
+		}
+	}
+	if (plan.entityProposals && plan.entityProposals.length > 0) {
+		parts.push('## Proposed Entities (from Proposer Round 3)');
+		for (const e of plan.entityProposals) {
+			parts.push(`- [${e.id}] **${e.name}** (domain: ${e.domainId}): ${e.description}`);
+			if (e.keyAttributes?.length) { parts.push(`  Key attributes: ${e.keyAttributes.join(', ')}`); }
+			if (e.relationships?.length) { parts.push(`  Relationships: ${e.relationships.join(', ')}`); }
+		}
+	}
+	if (plan.integrationProposals && plan.integrationProposals.length > 0) {
+		parts.push('## Proposed Integrations (from Proposer Round 4)');
+		for (const int of plan.integrationProposals) {
+			parts.push(`- [${int.id}] **${int.name}** (${int.category}): ${int.description}`);
+			if (int.standardProviders?.length) { parts.push(`  Standard providers: ${int.standardProviders.join(', ')}`); }
+			if (int.ownershipModel) { parts.push(`  Ownership: ${int.ownershipModel}`); }
+		}
+	}
+	if (plan.qualityAttributes && plan.qualityAttributes.length > 0) {
+		parts.push('## Quality Attributes (from Proposer Round 4)');
+		for (const qa of plan.qualityAttributes) {
+			parts.push(`- ${qa}`);
+		}
+	}
+
 	return parts.join('\n\n');
 }
 
@@ -405,80 +460,6 @@ function estimateContextTokens(
 	return Math.ceil(charCount / CHARS_PER_TOKEN);
 }
 
-/**
- * Truncate INTAKE context to fit within token budget.
- * Strategy: drop oldest recent turns first, then truncate accumulations.
- * The plan and human message are never truncated.
- */
-function truncateIntakeContext(
-	context: IntakeContextPack,
-	tokenBudget: number
-): IntakeContextPack {
-	// Reserve budget for plan + human message (never truncated)
-	const planTokens = Math.ceil(JSON.stringify(context.currentPlan).length / CHARS_PER_TOKEN);
-	const messageTokens = Math.ceil(context.humanMessage.length / CHARS_PER_TOKEN);
-	const reservedTokens = planTokens + messageTokens + 200; // 200 for formatting overhead
-
-	const availableForHistory = tokenBudget - reservedTokens;
-
-	if (availableForHistory <= 0) {
-		// No room for history — just plan + message
-		return {
-			...context,
-			accumulations: [],
-			recentTurns: [],
-			estimatedTokens: reservedTokens,
-		};
-	}
-
-	// Try progressively fewer recent turns
-	let truncatedTurns = [...context.recentTurns];
-	let truncatedAccumulations = [...context.accumulations];
-
-	while (truncatedTurns.length > 0) {
-		const turnTokens = estimateContextTokens(
-			'', // don't count message again
-			{ version: 0, title: '', summary: '', requirements: [], decisions: [], constraints: [], openQuestions: [], technicalNotes: [], proposedApproach: '', lastUpdatedAt: '' },
-			truncatedAccumulations,
-			truncatedTurns
-		);
-
-		if (turnTokens <= availableForHistory) {
-			break;
-		}
-
-		// Drop the oldest turn
-		truncatedTurns.shift();
-	}
-
-	// If still over budget, drop accumulations
-	while (truncatedAccumulations.length > 0) {
-		const accTokens = estimateContextTokens(
-			'',
-			{ version: 0, title: '', summary: '', requirements: [], decisions: [], constraints: [], openQuestions: [], technicalNotes: [], proposedApproach: '', lastUpdatedAt: '' },
-			truncatedAccumulations,
-			truncatedTurns
-		);
-
-		if (accTokens <= availableForHistory) {
-			break;
-		}
-
-		// Drop the oldest accumulation
-		truncatedAccumulations.shift();
-	}
-
-	const finalTokens = estimateContextTokens(
-		context.humanMessage,
-		context.currentPlan,
-		truncatedAccumulations,
-		truncatedTurns
-	);
-
-	return {
-		...context,
-		accumulations: truncatedAccumulations,
-		recentTurns: truncatedTurns,
-		estimatedTokens: finalTokens,
-	};
-}
+// Token budget truncation removed — CLI providers manage their own context windows.
+// Full context is always passed through. For very large contexts, the file-based
+// context system in contextFileWriter.ts handles overflow.

@@ -235,6 +235,57 @@ async function resolveGeminiPath(): Promise<string> {
 	return 'gemini';
 }
 
+// ==================== MCP Server Registration ====================
+
+/**
+ * Ensure a named MCP server is registered with Gemini CLI.
+ * Checks `gemini mcp list` output; if the server name is absent, runs `gemini mcp add`.
+ *
+ * @param name - Server name (e.g., 'deep-memory')
+ * @param command - Server command (e.g., 'node')
+ * @param args - Server command args (e.g., ['dist/memory/mcpServer.js'])
+ * @param env - Environment variables (e.g., { JANUMICODE_DB_PATH: '.janumicode/janumicode.db' })
+ * @param cwd - Working directory for the gemini mcp add command
+ */
+export async function ensureGeminiMcpServer(
+	name: string,
+	command: string,
+	args: string[],
+	env?: Record<string, string>,
+	cwd?: string,
+): Promise<void> {
+	const geminiPath = await resolveGeminiPath();
+
+	// Check if server is already registered
+	try {
+		const { stdout } = await execAsync(`${geminiPath} mcp list`, { cwd });
+		// Each server line starts with a status icon then the server name followed by ':'
+		if (stdout.includes(`${name}:`)) {
+			return; // Already registered
+		}
+	} catch {
+		// If list fails (e.g., no API key set), try to add anyway
+	}
+
+	// Register the server
+	const addArgs = [geminiPath, 'mcp', 'add', name, command, ...args, '--scope', 'project', '--trust'];
+	if (env) {
+		for (const [key, value] of Object.entries(env)) {
+			addArgs.push('-e', `${key}=${value}`);
+		}
+	}
+
+	try {
+		await execAsync(addArgs.map(a => a.includes(' ') ? `"${a}"` : a).join(' '), { cwd });
+	} catch (error) {
+		// Non-fatal — the server won't be available but invocation can still proceed
+		const msg = error instanceof Error ? error.message : String(error);
+		if (typeof console !== 'undefined') {
+			console.warn(`Failed to register Gemini MCP server '${name}': ${msg}`);
+		}
+	}
+}
+
 // ==================== Argument Building ====================
 
 function buildGeminiArgs(outputFormat: string, options: RoleCLIInvocationOptions): string[] {
@@ -252,6 +303,13 @@ function buildGeminiArgs(outputFormat: string, options: RoleCLIInvocationOptions
 		|| '';
 	if (model) {
 		args.push('--model', model);
+	}
+
+	// MCP server access — Gemini CLI uses pre-registered servers (via `gemini mcp add`),
+	// whitelisted per invocation with --allowed-mcp-server-names.
+	// Note: Gemini CLI does NOT support --mcp-config (that's Claude Code only).
+	if (options.allowedMcpServerNames && options.allowedMcpServerNames.length > 0) {
+		args.push('--allowed-mcp-server-names', ...options.allowedMcpServerNames);
 	}
 
 	// Gemini CLI requires --approval-mode and --yolo to be mutually exclusive.

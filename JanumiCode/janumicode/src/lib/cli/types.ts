@@ -58,6 +58,9 @@ export interface RoleCLIInvocationOptions {
 	/** Paths to MCP config JSON files to pass via --mcp-config (Claude Code only) */
 	mcpConfigPaths?: string[];
 
+	/** Pre-registered MCP server names to allow (Gemini CLI --allowed-mcp-server-names) */
+	allowedMcpServerNames?: string[];
+
 	/** Claude Code tool names to allow without interactive approval (--allowedTools) */
 	allowedTools?: string[];
 

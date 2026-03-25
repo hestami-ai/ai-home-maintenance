@@ -646,7 +646,7 @@ export function formatUncoveredDomainsForPrompt(map: DomainCoverageMap): string 
 // ==================== ANALYSIS SEEDING ====================
 
 /**
- * Seed coverage from an ANALYZING phase response.
+ * Seed coverage from an INTENT_DISCOVERY phase response.
  * Sets coverage levels in one shot from the Expert's domain assessment.
  * Returns a new map (immutable update).
  */

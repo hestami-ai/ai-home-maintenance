@@ -29,7 +29,6 @@ import { registerRoleCLIProvider } from './lib/cli/roleCLIProvider';
 import { ClaudeCodeRoleCLIProvider } from './lib/cli/providers/claudeCode';
 import { GeminiCLIProvider } from './lib/cli/providers/geminiCli';
 import { CodexCLIProvider } from './lib/cli/providers/codexCli';
-import { OpenCodeCLIProvider } from './lib/cli/providers/opencodeCli';
 import { initializeLogger, getLogger, parseLogLevel } from './lib/logging';
 import { killAllActiveProcesses, getActiveProcessCount } from './lib/cli/spawnUtils';
 import { resetEventBus } from './lib/integration/eventBus';
@@ -187,8 +186,7 @@ export async function activate(
 	registerRoleCLIProvider(new ClaudeCodeRoleCLIProvider());
 	registerRoleCLIProvider(new GeminiCLIProvider());
 	registerRoleCLIProvider(new CodexCLIProvider());
-	registerRoleCLIProvider(new OpenCodeCLIProvider());
-	logger.info('CLI providers registered', { providers: ['claude-code', 'gemini-cli', 'codex-cli', 'opencode-cli'] });
+	logger.info('CLI providers registered', { providers: ['claude-code', 'gemini-cli', 'codex-cli'] });
 
 	// Watch for configuration changes
 	const configWatcher = watchConfig((newConfig) => {
@@ -711,6 +709,12 @@ async function performGracefulShutdown(): Promise<void> {
 	}
 
 	// 7. Remove the shutdown rejection handler to prevent process leak
+	// Clean up context files written for CLI agents
+	try {
+		const { cleanupAllContextFiles } = require('./lib/context/contextFileWriter');
+		await cleanupAllContextFiles();
+	} catch { /* non-critical */ }
+
 	process.removeListener('unhandledRejection', shutdownRejectionHandler);
 
 	console.warn('[JanumiCode] Graceful shutdown complete');

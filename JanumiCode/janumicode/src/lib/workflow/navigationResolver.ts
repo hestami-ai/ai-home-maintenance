@@ -72,6 +72,7 @@ const TARGET_ALIASES: Record<string, NavigationTarget> = {
 	'replan': { majorPhase: Phase.REPLAN },
 
 	// ARCHITECTURE sub-phases
+	'technical analysis': { majorPhase: Phase.ARCHITECTURE, subPhase: ArchitectureSubState.TECHNICAL_ANALYSIS, subPhaseOwner: 'ARCHITECTURE' },
 	'decompose': { majorPhase: Phase.ARCHITECTURE, subPhase: ArchitectureSubState.DECOMPOSING, subPhaseOwner: 'ARCHITECTURE' },
 	'decomposing': { majorPhase: Phase.ARCHITECTURE, subPhase: ArchitectureSubState.DECOMPOSING, subPhaseOwner: 'ARCHITECTURE' },
 	'decomposition': { majorPhase: Phase.ARCHITECTURE, subPhase: ArchitectureSubState.DECOMPOSING, subPhaseOwner: 'ARCHITECTURE' },
@@ -87,9 +88,11 @@ const TARGET_ALIASES: Record<string, NavigationTarget> = {
 	'architecture review': { majorPhase: Phase.ARCHITECTURE, subPhase: ArchitectureSubState.PRESENTING, subPhaseOwner: 'ARCHITECTURE' },
 
 	// INTAKE sub-phases
-	'analyze': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.ANALYZING, subPhaseOwner: 'INTAKE' },
-	'analyzing': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.ANALYZING, subPhaseOwner: 'INTAKE' },
-	'analysis': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.ANALYZING, subPhaseOwner: 'INTAKE' },
+	'analyze': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.INTENT_DISCOVERY, subPhaseOwner: 'INTAKE' },
+	'analyzing': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.INTENT_DISCOVERY, subPhaseOwner: 'INTAKE' },
+	'analysis': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.INTENT_DISCOVERY, subPhaseOwner: 'INTAKE' },
+	'discovery': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.INTENT_DISCOVERY, subPhaseOwner: 'INTAKE' },
+	'intent discovery': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.INTENT_DISCOVERY, subPhaseOwner: 'INTAKE' },
 	'product review': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.PRODUCT_REVIEW, subPhaseOwner: 'INTAKE' },
 	'product discovery': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.PRODUCT_REVIEW, subPhaseOwner: 'INTAKE' },
 	'proposing domains': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.PROPOSING_DOMAINS, subPhaseOwner: 'INTAKE' },

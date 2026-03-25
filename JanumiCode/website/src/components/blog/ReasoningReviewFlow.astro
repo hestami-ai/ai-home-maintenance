@@ -1,0 +1,262 @@
+---
+// Reasoning Review data flow: Agent invocation → Review → Pause/Persist → UI
+---
+
+<div class="rrf">
+  <div class="rrf__header">
+    <span class="rrf__header-dot"></span>
+    <span class="rrf__header-text">REASONING REVIEW — POST-INVOCATION PIPELINE</span>
+  </div>
+
+  <div class="rrf__flow">
+    <div class="rrf__step rrf__step--agent">
+      <div class="rrf__step-num">1</div>
+      <div class="rrf__step-body">
+        <span class="rrf__step-label">AGENT INVOCATION</span>
+        <h4 class="rrf__step-title">Role CLI Completes</h4>
+        <p class="rrf__step-desc">Technical Expert, Executor, or any role finishes its work. Reasoning trace + final response extracted from JSONL stream.</p>
+      </div>
+    </div>
+
+    <div class="rrf__connector"><span>↓</span></div>
+
+    <div class="rrf__step rrf__step--review">
+      <div class="rrf__step-num rrf__step-num--cyan">2</div>
+      <div class="rrf__step-body">
+        <span class="rrf__step-label rrf__step-label--cyan">REASONING REVIEW</span>
+        <h4 class="rrf__step-title">Strong LLM Critiques Reasoning</h4>
+        <p class="rrf__step-desc">A strong analytical model (Gemini 2.5 Pro, temp=0.1) reviews the agent's full reasoning trace for substantive risks.</p>
+        <div class="rrf__review-targets">
+          <span class="rrf__target">Assumptions stated as facts</span>
+          <span class="rrf__target">Missing edge cases</span>
+          <span class="rrf__target">Contradictions in reasoning</span>
+          <span class="rrf__target">Over-confident conclusions</span>
+          <span class="rrf__target">Happy-path-only solutions</span>
+          <span class="rrf__target">Fragile coupling</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rrf__connector"><span>↓</span></div>
+
+    <div class="rrf__step rrf__step--classify">
+      <div class="rrf__step-num rrf__step-num--warn">3</div>
+      <div class="rrf__step-body">
+        <span class="rrf__step-label rrf__step-label--warn">SEVERITY CLASSIFICATION</span>
+        <h4 class="rrf__step-title">Filter & Triage Concerns</h4>
+        <div class="rrf__severities">
+          <div class="rrf__sev rrf__sev--high">
+            <span class="rrf__sev-badge">HIGH</span>
+            <span class="rrf__sev-text">Likely to cause failures → <strong>triggers soft pause</strong></span>
+          </div>
+          <div class="rrf__sev rrf__sev--med">
+            <span class="rrf__sev-badge">MEDIUM</span>
+            <span class="rrf__sev-text">Fragile but may work → recorded for review</span>
+          </div>
+          <div class="rrf__sev rrf__sev--low">
+            <span class="rrf__sev-badge">LOW</span>
+            <span class="rrf__sev-text">Style/preference → filtered by minSeverity setting</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rrf__connector"><span>↓</span></div>
+
+    <div class="rrf__fork">
+      <div class="rrf__step rrf__step--pause">
+        <div class="rrf__step-num rrf__step-num--red">4a</div>
+        <div class="rrf__step-body">
+          <span class="rrf__step-label rrf__step-label--red">HIGH SEVERITY</span>
+          <h4 class="rrf__step-title">Soft Pause</h4>
+          <p class="rrf__step-desc">Workflow pauses 15s (configurable). Countdown visible in UI. User can interrupt or let it expire.</p>
+        </div>
+      </div>
+
+      <div class="rrf__step rrf__step--persist">
+        <div class="rrf__step-num rrf__step-num--green">4b</div>
+        <div class="rrf__step-body">
+          <span class="rrf__step-label rrf__step-label--green">PERSIST & RENDER</span>
+          <h4 class="rrf__step-title">Governed Stream</h4>
+          <p class="rrf__step-desc">Concerns stored in SQLite. Rendered as review cards below the command block they critique. Expandable details with action buttons.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .rrf {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .rrf__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .rrf__header-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-primary);
+  }
+
+  .rrf__header-text {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-text-muted);
+  }
+
+  .rrf__flow {
+    padding: var(--space-xl);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .rrf__step {
+    display: flex;
+    gap: var(--space-md);
+    width: 100%;
+    max-width: 560px;
+    padding: var(--space-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+  }
+
+  .rrf__step--review { border-color: var(--color-border-active); box-shadow: 0 0 16px var(--color-primary-glow); }
+  .rrf__step--pause { border-color: rgba(255, 68, 102, 0.3); }
+  .rrf__step--persist { border-color: rgba(0, 255, 178, 0.3); }
+
+  .rrf__step-num {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--color-text-muted);
+    border: 2px solid var(--color-border);
+    border-radius: 4px;
+    transform: rotate(45deg);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .rrf__step-num > * { transform: rotate(-45deg); }
+  .rrf__step-num--cyan { border-color: var(--color-primary); color: var(--color-primary); }
+  .rrf__step-num--warn { border-color: var(--color-warning); color: var(--color-warning); }
+  .rrf__step-num--red { border-color: var(--color-error); color: var(--color-error); }
+  .rrf__step-num--green { border-color: var(--color-accent); color: var(--color-accent); }
+
+  .rrf__step-body { flex: 1; min-width: 0; }
+
+  .rrf__step-label {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--color-text-muted);
+  }
+
+  .rrf__step-label--cyan { color: var(--color-primary); }
+  .rrf__step-label--warn { color: var(--color-warning); }
+  .rrf__step-label--red { color: var(--color-error); }
+  .rrf__step-label--green { color: var(--color-accent); }
+
+  .rrf__step-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 2px 0 var(--space-xs);
+  }
+
+  .rrf__step-desc {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .rrf__connector {
+    padding: var(--space-xs) 0;
+    color: var(--color-primary);
+    opacity: 0.4;
+    font-size: 0.9rem;
+  }
+
+  /* Review targets */
+  .rrf__review-targets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: var(--space-sm);
+  }
+
+  .rrf__target {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    padding: 2px 6px;
+    border-radius: 2px;
+    color: var(--color-primary);
+    background: rgba(0, 212, 255, 0.06);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+  }
+
+  /* Severities */
+  .rrf__severities { display: flex; flex-direction: column; gap: var(--space-xs); }
+
+  .rrf__sev {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .rrf__sev-badge {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 1px 6px;
+    border-radius: 2px;
+    min-width: 50px;
+    text-align: center;
+  }
+
+  .rrf__sev--high .rrf__sev-badge { color: var(--color-error); background: rgba(255, 68, 102, 0.1); border: 1px solid rgba(255, 68, 102, 0.25); }
+  .rrf__sev--med .rrf__sev-badge { color: var(--color-warning); background: rgba(255, 184, 0, 0.1); border: 1px solid rgba(255, 184, 0, 0.25); }
+  .rrf__sev--low .rrf__sev-badge { color: var(--color-primary); background: rgba(0, 212, 255, 0.08); border: 1px solid rgba(0, 212, 255, 0.2); }
+
+  .rrf__sev-text {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+  }
+
+  .rrf__sev-text strong { color: var(--color-text-secondary); }
+
+  /* Fork */
+  .rrf__fork {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-md);
+    width: 100%;
+    max-width: 560px;
+  }
+
+  @media (max-width: 768px) {
+    .rrf__fork { grid-template-columns: 1fr; }
+  }
+</style>

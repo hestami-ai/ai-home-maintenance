@@ -584,8 +584,10 @@ function renderSubPhaseProgress(state: GovernedStreamState): string {
 	const { currentPhase } = state;
 
 	if (currentPhase === Phase.INTAKE && state.intakeState) {
-		const proposerPhase = (state.intakeState.currentPlan as Record<string, unknown> | null)?.proposerPhase as string | undefined;
-		return renderSubPhaseDiagram(buildIntakeSubPhases(state.intakeState.subState, state.intakeState.intakeMode, proposerPhase));
+		const plan = state.intakeState.currentPlan as Record<string, unknown> | null;
+		const proposerPhase = plan?.proposerPhase as string | undefined;
+		const preProposerReview = plan?.preProposerReview === true;
+		return renderSubPhaseDiagram(buildIntakeSubPhases(state.intakeState.subState, state.intakeState.intakeMode, proposerPhase, preProposerReview));
 	}
 	if (currentPhase === Phase.ARCHITECTURE && state.architectureState) {
 		return renderSubPhaseDiagram(buildArchitectureSubPhases(state.architectureState));
@@ -600,7 +602,7 @@ function renderSubPhaseProgress(state: GovernedStreamState): string {
 	return '';
 }
 
-function buildIntakeSubPhases(subState: string, intakeMode: string | null, proposerPhase?: string): SubPhaseStep[] {
+function buildIntakeSubPhases(subState: string, intakeMode: string | null, proposerPhase?: string, preProposerReview?: boolean): SubPhaseStep[] {
 	// Proposer-Validator flow — show the full proposer sequence when in ANY proposer
 	// or review sub-state, or when the intake mode is STATE_DRIVEN/DOMAIN_GUIDED.
 	const isProposerFlow = subState.startsWith('PROPOSING_')
@@ -609,53 +611,56 @@ function buildIntakeSubPhases(subState: string, intakeMode: string | null, propo
 		|| intakeMode === 'DOMAIN_GUIDED';
 	if (isProposerFlow) {
 		const steps = [
-			{ id: 'ANALYZING', label: 'Analyze' },
+			{ id: 'INTENT_DISCOVERY', label: 'Discovery' },
 			{ id: 'PROPOSING_DOMAINS', label: 'Domains' },
 			{ id: 'PROPOSING_JOURNEYS', label: 'Journeys' },
 			{ id: 'PROPOSING_ENTITIES', label: 'Entities' },
 			{ id: 'PROPOSING_INTEGRATIONS', label: 'Integrations' },
-			{ id: 'PROPOSING', label: 'Propose' },
-			{ id: 'CLARIFYING', label: 'Clarify' },
 			{ id: 'SYNTHESIZING', label: 'Synthesize' },
 			{ id: 'AWAITING_APPROVAL', label: 'Approve' },
 		];
-		// PRODUCT_REVIEW is an intermediary between proposer rounds — map it
-		// to the proposer step that just completed so the diagram stays stable.
+		// PRODUCT_REVIEW is a gate state — map it to the appropriate step:
+		// - preProposerReview (after Intent Discovery): map to INTENT_DISCOVERY
+		// - between proposer rounds: map to the proposer step that just completed
 		let effectiveSubState = subState;
-		if (subState === 'PRODUCT_REVIEW' && proposerPhase) {
-			// ProposerPhase is a numeric enum (1-4) but may also arrive as string name
-			const phaseToStep: Record<string | number, string> = {
-				'DOMAIN_MAPPING': 'PROPOSING_DOMAINS',
-				'JOURNEY_WORKFLOW': 'PROPOSING_JOURNEYS',
-				'ENTITY_DATA_MODEL': 'PROPOSING_ENTITIES',
-				'INTEGRATION_QUALITY': 'PROPOSING_INTEGRATIONS',
-				1: 'PROPOSING_DOMAINS',
-				2: 'PROPOSING_JOURNEYS',
-				3: 'PROPOSING_ENTITIES',
-				4: 'PROPOSING_INTEGRATIONS',
-			};
-			effectiveSubState = phaseToStep[proposerPhase] ?? 'PROPOSING_DOMAINS';
+		if (subState === 'PRODUCT_REVIEW') {
+			if (preProposerReview) {
+				effectiveSubState = 'INTENT_DISCOVERY';
+			} else if (proposerPhase) {
+				const phaseToStep: Record<string | number, string> = {
+					'DOMAIN_MAPPING': 'PROPOSING_DOMAINS',
+					'JOURNEY_WORKFLOW': 'PROPOSING_JOURNEYS',
+					'ENTITY_DATA_MODEL': 'PROPOSING_ENTITIES',
+					'INTEGRATION_QUALITY': 'PROPOSING_INTEGRATIONS',
+					1: 'PROPOSING_DOMAINS',
+					2: 'PROPOSING_JOURNEYS',
+					3: 'PROPOSING_ENTITIES',
+					4: 'PROPOSING_INTEGRATIONS',
+				};
+				effectiveSubState = phaseToStep[proposerPhase] ?? 'PROPOSING_DOMAINS';
+			}
 		}
 		return assignSubPhaseStates(steps, effectiveSubState);
 	}
 	// Standard inverted flow
 	const steps = [
-		{ id: 'ANALYZING', label: 'Analyze' },
-		{ id: 'PRODUCT_REVIEW', label: 'Product Review' },
+		{ id: 'INTENT_DISCOVERY', label: 'Discovery' },
 		{ id: 'PROPOSING', label: 'Propose' },
 		{ id: 'CLARIFYING', label: 'Clarify' },
 		{ id: 'SYNTHESIZING', label: 'Synthesize' },
 		{ id: 'AWAITING_APPROVAL', label: 'Approve' },
 	];
-	return assignSubPhaseStates(steps, subState);
+	// PRODUCT_REVIEW maps to Discovery in standard flow too
+	const effective = subState === 'PRODUCT_REVIEW' ? 'INTENT_DISCOVERY' : subState;
+	return assignSubPhaseStates(steps, effective);
 }
 
 function buildArchitectureSubPhases(
 	archState: NonNullable<GovernedStreamState['architectureState']>
 ): SubPhaseStep[] {
-	const ordered = ['DECOMPOSING', 'MODELING', 'DESIGNING', 'SEQUENCING', 'VALIDATING', 'PRESENTING'];
+	const ordered = ['TECHNICAL_ANALYSIS', 'DECOMPOSING', 'MODELING', 'DESIGNING', 'SEQUENCING', 'VALIDATING', 'PRESENTING'];
 	const labels: Record<string, string> = {
-		DECOMPOSING: 'Decompose', MODELING: 'Model', DESIGNING: 'Design',
+		TECHNICAL_ANALYSIS: 'Analyze', DECOMPOSING: 'Decompose', MODELING: 'Model', DESIGNING: 'Design',
 		SEQUENCING: 'Sequence', VALIDATING: 'Validate', PRESENTING: 'Review',
 	};
 	const steps = assignSubPhaseStates(
@@ -1570,7 +1575,7 @@ export function renderReviewGateCard(
 
 	// Synthesize MMP from review findings (must be before hasMmpInteraction check)
 	const reviewMMP = synthesizeReviewMMP(reviewItems, summary, _historianFindings);
-	const mmpCardId = 'REV-' + gateId.substring(0, 8);
+	const mmpCardId = 'REV-' + gate.gate_seq;
 
 	// When MMP is active and interactive, it becomes the primary interaction —
 	// suppress duplicate review group rows and show a collapsed evidence detail section.
@@ -2707,6 +2712,18 @@ export interface PendingMmpSnapshot {
 	preMortemDecisions: Record<string, { status: string; rationale?: string }>;
 }
 
+/** Render a small source attribution badge for MMP items */
+function renderSourceBadge(source: string): string {
+	const sourceMap: Record<string, { label: string; cssClass: string }> = {
+		'document-specified': { label: 'DOC', cssClass: 'badge-source-doc' },
+		'user-specified': { label: 'USER', cssClass: 'badge-source-user' },
+		'domain-standard': { label: 'STANDARD', cssClass: 'badge-source-standard' },
+		'ai-proposed': { label: 'AI', cssClass: 'badge-source-ai' },
+	};
+	const info = sourceMap[source] ?? { label: source.toUpperCase(), cssClass: 'badge-source-ai' };
+	return '<span class="badge-source ' + info.cssClass + '" title="Source: ' + escapeHtml(source) + '">' + info.label + '</span>';
+}
+
 function renderMMPSection(
 	mmp: MMPPayload,
 	cardId: string,
@@ -2773,9 +2790,12 @@ function renderMirrorCard(
 				'Edited: ' + escapeHtml(item.editedText) + '</div>'
 			: '';
 
+		const sourceBadge = item.source ? renderSourceBadge(item.source) : '';
+
 		return '<div class="mmp-mirror-item' + statusClass + resolvedClass + '" data-mmp-mirror-id="' + escapeHtml(item.id) + '" data-mmp-card="' + cardId + '">' +
 			'<div class="mmp-mirror-item-header">' +
 				'<span class="mmp-category-badge ' + categoryClass + '">' + escapeHtml(item.category) + '</span>' +
+				sourceBadge +
 				'<span class="mmp-mirror-item-text">' + escapeHtml(item.text) + '</span>' +
 				resolvedBadge +
 			'</div>' +
@@ -2828,17 +2848,21 @@ function renderInlineMirrorButtons(
 	isLatest: boolean,
 	contentHtml: string,
 	pending?: PendingMmpSnapshot,
+	source?: string,
 ): string {
 	const itemKey = cardId + ':' + mirrorItemId;
 	const pendingDecision = pending?.mirrorDecisions[itemKey];
 	const effectiveStatus = pendingDecision?.status ?? null;
 	const statusClass = effectiveStatus ? ' ' + effectiveStatus : '';
 
+	const sourceBadge = source ? renderSourceBadge(source) : '';
+
 	let html = '<div class="mmp-mirror-item proposer-inline-mmp' + statusClass + '" data-mmp-mirror-id="' + escapeHtml(mirrorItemId) + '" data-mmp-card="' + cardId + '">';
 
+	// Source attribution badge (DOC, AI, STANDARD, USER)
+	if (sourceBadge) { html += sourceBadge; }
+
 	// The actual content (domain description, entity details, etc.)
-	// This IS the mirror — no separate mirror text needed. The card content replaces
-	// what used to be the mirror's re-listed description.
 	html += contentHtml;
 
 	// Hidden text for submit enrichment only (submit handler reads .mmp-mirror-item-text
@@ -3058,7 +3082,25 @@ function renderMMPSubmitBar(cardId: string, mmp?: MMPPayload, pending?: PendingM
 	if (pmTotal > 0) { progressParts.push('Risks: ' + pmDone + '/' + pmTotal); }
 	const progressHtml = progressParts.join(' &middot; ');
 
+	// Bulk action buttons for Mirror and Pre-Mortem items
+	const hasMirror = mirrorTotal > 0;
+	const hasPm = pmTotal > 0;
+	const bulkHtml = (hasMirror || hasPm)
+		? '<div class="mmp-bulk-actions">' +
+			(hasMirror
+				? '<button class="mmp-bulk-btn mmp-bulk-accept" data-action="mmp-bulk" data-mmp-card="' + cardId + '" data-mmp-bulk-action="accept" title="Accept all Mirror items">&#x2713; Accept All</button>' +
+				  '<button class="mmp-bulk-btn mmp-bulk-reject" data-action="mmp-bulk" data-mmp-card="' + cardId + '" data-mmp-bulk-action="reject" title="Reject all Mirror items">&#x2717; Reject All</button>' +
+				  '<button class="mmp-bulk-btn mmp-bulk-defer" data-action="mmp-bulk" data-mmp-card="' + cardId + '" data-mmp-bulk-action="defer" title="Defer all Mirror items">&#x23F3; Defer All</button>'
+				: '') +
+			(hasPm
+				? '<button class="mmp-bulk-btn mmp-bulk-accept-pm" data-action="mmp-bulk-pm" data-mmp-card="' + cardId + '" data-mmp-bulk-action="accept" title="Accept all risks">&#x2713; Accept All Risks</button>' +
+				  '<button class="mmp-bulk-btn mmp-bulk-reject-pm" data-action="mmp-bulk-pm" data-mmp-card="' + cardId + '" data-mmp-bulk-action="reject" title="Reject all risks">&#x2717; Reject All Risks</button>'
+				: '') +
+			'</div>'
+		: '';
+
 	return '<div class="mmp-submit-bar" data-mmp-submit-bar="' + cardId + '">' +
+		bulkHtml +
 		'<span class="mmp-submit-progress" data-mmp-progress="' + cardId + '">' + progressHtml + '</span>' +
 		'<button class="mmp-submit-btn" data-action="mmp-submit" data-mmp-card="' + cardId + '">Submit Decisions</button>' +
 	'</div>';
@@ -3078,6 +3120,7 @@ function renderGatheringTurnCard(
 	timestamp: string,
 	commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>,
 	isLatest?: boolean,
+	eventId?: number,
 ): string {
 	const domainInfo = DOMAIN_INFO[response.focusDomain];
 	const domainLabel = domainInfo ? domainInfo.label : response.focusDomain;
@@ -3097,7 +3140,7 @@ function renderGatheringTurnCard(
 
 	// Prefer MMP over legacy followUpQuestions
 	const hasMMP = response.mmp && (response.mmp.mirror || response.mmp.menu || response.mmp.preMortem);
-	const mmpCardId = 'GT' + turn.turnNumber;
+	const mmpCardId = 'GT-' + (eventId ?? turn.turnNumber);
 	const mmpHtml = hasMMP
 		? renderMMPSection(response.mmp!, mmpCardId, !!isLatest)
 		: '';
@@ -3164,11 +3207,12 @@ export function renderIntakeTurnCard(
 	timestamp: string,
 	commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>,
 	isLatest?: boolean,
+	eventId?: number,
 ): string {
 
 	// Delegate to gathering-specific renderer for interviewer turns
 	if (isGatheringResponse(turn.expertResponse)) {
-		return renderGatheringTurnCard(turn, turn.expertResponse, timestamp, commandBlocks, isLatest);
+		return renderGatheringTurnCard(turn, turn.expertResponse, timestamp, commandBlocks, isLatest, eventId);
 	}
 
 	// After filtering out gathering responses above, the remaining type is
@@ -3179,7 +3223,7 @@ export function renderIntakeTurnCard(
 	// Prefer MMP over legacy suggestedQuestions
 	const mmpSource = expertResponse.mmp;
 	const hasMMP = mmpSource && (mmpSource.mirror || mmpSource.menu || mmpSource.preMortem);
-	const mmpCardId = 'T' + turn.turnNumber;
+	const mmpCardId = 'T-' + (eventId ?? turn.turnNumber);
 
 	const mmpHtml = hasMMP
 		? renderMMPSection(mmpSource!, mmpCardId, !!isLatest)
@@ -3467,6 +3511,60 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 			</div>`
 		: '';
 
+	// Proposer artifacts — domains, entities, workflows, integrations, quality attributes
+	const domainsHtml = plan.domainProposals && plan.domainProposals.length > 0
+		? `<div class="intake-plan-section">
+				<h5>Business Domains (${plan.domainProposals.length})</h5>
+				<ul>${plan.domainProposals.map((d) =>
+					`<li><strong>[${escapeHtml(d.id)}] ${escapeHtml(d.name)}</strong>: ${escapeHtml(d.description)}`
+					+ (d.entityPreview?.length ? `<br/><em>Entities:</em> ${d.entityPreview.map(e => escapeHtml(e)).join(', ')}` : '')
+					+ (d.workflowPreview?.length ? `<br/><em>Workflows:</em> ${d.workflowPreview.map(w => escapeHtml(w)).join(', ')}` : '')
+					+ `</li>`
+				).join('')}</ul>
+			</div>`
+		: '';
+
+	const entitiesHtml = plan.entityProposals && plan.entityProposals.length > 0
+		? `<div class="intake-plan-section">
+				<h5>Data Entities (${plan.entityProposals.length})</h5>
+				<ul>${plan.entityProposals.map((e) =>
+					`<li><strong>[${escapeHtml(e.id)}] ${escapeHtml(e.name)}</strong> <span class="badge">${escapeHtml(e.domainId)}</span>: ${escapeHtml(e.description)}`
+					+ (e.keyAttributes?.length ? `<br/><em>Attributes:</em> ${e.keyAttributes.map(a => escapeHtml(a)).join(', ')}` : '')
+					+ (e.relationships?.length ? `<br/><em>Relationships:</em> ${e.relationships.map(r => escapeHtml(r)).join(', ')}` : '')
+					+ `</li>`
+				).join('')}</ul>
+			</div>`
+		: '';
+
+	const workflowsHtml = plan.workflowProposals && plan.workflowProposals.length > 0
+		? `<div class="intake-plan-section">
+				<h5>Workflows (${plan.workflowProposals.length})</h5>
+				<ul>${plan.workflowProposals.map((w) =>
+					`<li><strong>[${escapeHtml(w.id)}] ${escapeHtml(w.name)}</strong> <span class="badge">${escapeHtml(w.domainId)}</span>: ${escapeHtml(w.description)}</li>`
+				).join('')}</ul>
+			</div>`
+		: '';
+
+	const integrationsHtml = plan.integrationProposals && plan.integrationProposals.length > 0
+		? `<div class="intake-plan-section">
+				<h5>Integrations (${plan.integrationProposals.length})</h5>
+				<ul>${plan.integrationProposals.map((i) =>
+					`<li><strong>[${escapeHtml(i.id)}] ${escapeHtml(i.name)}</strong> <span class="badge">${escapeHtml(i.category)}</span>: ${escapeHtml(i.description)}`
+					+ (i.standardProviders?.length ? `<br/><em>Providers:</em> ${i.standardProviders.map(p => escapeHtml(p)).join(', ')}` : '')
+					+ `</li>`
+				).join('')}</ul>
+			</div>`
+		: '';
+
+	const qualityHtml = plan.qualityAttributes && plan.qualityAttributes.length > 0
+		? `<div class="intake-plan-section">
+				<h5>Quality Attributes (${plan.qualityAttributes.length})</h5>
+				<ul>${plan.qualityAttributes.map((q) => `<li>${escapeHtml(q)}</li>`).join('')}</ul>
+			</div>`
+		: '';
+
+	const hasProposerArtifacts = domainsHtml || entitiesHtml || workflowsHtml || integrationsHtml || qualityHtml;
+
 	// Combine product sections — show them before technical details when present
 	const hasProductArtifacts = visionHtml || descriptionHtml || personasHtml || journeysHtml;
 
@@ -3499,6 +3597,8 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 				${openQuestionsHtml}
 
 				${approachHtml}
+
+				${hasProposerArtifacts ? `${domainsHtml}${entitiesHtml}${workflowsHtml}${integrationsHtml}${qualityHtml}` : ''}
 
 			</div>
 
@@ -3963,7 +4063,7 @@ function renderIntakeAnalysisCard(
 	// Header
 	html += '<div class="intake-analysis-header">' +
 		'<span class="intake-analysis-icon">&#x1F50D;</span>' +
-		'<span class="intake-analysis-title">Technical Analysis</span>' +
+		'<span class="intake-analysis-title">Intent Discovery</span>' +
 		'</div>';
 
 	// Command blocks (CLI activity during analysis)
@@ -4011,6 +4111,7 @@ function renderIntakeProductDiscoveryCard(
 	},
 	mmpJson?: string,
 	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
+	eventId?: number,
 ): string {
 	let html = '<div class="intake-product-discovery-card">';
 
@@ -4034,7 +4135,7 @@ function renderIntakeProductDiscoveryCard(
 		try {
 			const mmp = JSON.parse(mmpJson) as MMPPayload;
 			if (mmp.mirror || mmp.menu || mmp.preMortem) {
-				const cardId = 'PD-REVIEW';
+				const cardId = 'PD-REVIEW-' + (eventId ?? '0');
 				html += renderMMPSection(mmp, cardId, true, { type: 'intake' }, allPendingDecisions?.[cardId]);
 			}
 		} catch { /* ignore parse errors */ }
@@ -4052,8 +4153,9 @@ function renderProposerDomainsCard(
 	mmpJson?: string,
 	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
 	isLatest: boolean = true,
+	eventId?: number,
 ): string {
-	const cardId = 'PV-DOMAINS';
+	const cardId = 'PV-DOMAINS-' + (eventId ?? '0');
 	const pending = allPendingDecisions?.[cardId];
 
 	// Parse MMP to get mirror items (keyed by source ID) + menu/preMortem
@@ -4092,7 +4194,7 @@ function renderProposerDomainsCard(
 
 			const mirrorItem = mirrorById.get(d.id);
 			if (mirrorItem) {
-				html += renderInlineMirrorButtons(d.id, mirrorItem.text, cardId, isLatest, contentHtml, pending);
+				html += renderInlineMirrorButtons(d.id, mirrorItem.text, cardId, isLatest, contentHtml, pending, mirrorItem.source);
 			} else {
 				// No mirror item for this domain — render content only
 				html += '<div class="proposer-domain-item">' + contentHtml + '</div>';
@@ -4108,7 +4210,7 @@ function renderProposerDomainsCard(
 			const contentHtml = '<strong>' + escapeHtml(p.name) + '</strong>: ' + escapeHtml(p.description);
 			const mirrorItem = mirrorById.get(p.id);
 			if (mirrorItem) {
-				html += renderInlineMirrorButtons(p.id, mirrorItem.text, cardId, isLatest, contentHtml, pending);
+				html += renderInlineMirrorButtons(p.id, mirrorItem.text, cardId, isLatest, contentHtml, pending, mirrorItem.source);
 			} else {
 				html += '<div class="proposer-persona-item">' + contentHtml + '</div>';
 			}
@@ -4141,8 +4243,9 @@ function renderProposerJourneysCard(
 	mmpJson?: string,
 	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
 	isLatest: boolean = true,
+	eventId?: number,
 ): string {
-	const cardId = 'PV-JOURNEYS';
+	const cardId = 'PV-JOURNEYS-' + (eventId ?? '0');
 	const pending = allPendingDecisions?.[cardId];
 
 	let mmp: import('../../../types/mmp').MMPPayload | null = null;
@@ -4175,7 +4278,7 @@ function renderProposerJourneysCard(
 				'<div>' + escapeHtml(j.scenario) + '</div>';
 			const mirrorItem = mirrorById.get(j.id);
 			if (mirrorItem) {
-				html += renderInlineMirrorButtons(j.id, mirrorItem.text, cardId, isLatest, contentHtml, pending);
+				html += renderInlineMirrorButtons(j.id, mirrorItem.text, cardId, isLatest, contentHtml, pending, mirrorItem.source);
 			} else {
 				html += '<div class="proposer-journey-item">' + contentHtml + '</div>';
 			}
@@ -4203,7 +4306,7 @@ function renderProposerJourneysCard(
 					'<div>' + escapeHtml(w.description) + '</div>';
 				const mirrorItem = mirrorById.get(w.id);
 				if (mirrorItem) {
-					html += renderInlineMirrorButtons(w.id, mirrorItem.text, cardId, isLatest, contentHtml, pending);
+					html += renderInlineMirrorButtons(w.id, mirrorItem.text, cardId, isLatest, contentHtml, pending, mirrorItem.source);
 				} else {
 					html += '<div class="proposer-workflow-item">' + contentHtml + '</div>';
 				}
@@ -4230,8 +4333,9 @@ function renderProposerEntitiesCard(
 	domainNames?: Record<string, string>,
 	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
 	isLatest: boolean = true,
+	eventId?: number,
 ): string {
-	const cardId = 'PV-ENTITIES';
+	const cardId = 'PV-ENTITIES-' + (eventId ?? '0');
 	const pending = allPendingDecisions?.[cardId];
 
 	let mmp: import('../../../types/mmp').MMPPayload | null = null;
@@ -4275,7 +4379,7 @@ function renderProposerEntitiesCard(
 				(e.relationships.length > 0 ? '<div class="proposer-entity-meta">Relationships: ' + e.relationships.map(r => escapeHtml(r)).join(', ') + '</div>' : '');
 			const mirrorItem = mirrorById.get(e.id);
 			if (mirrorItem) {
-				html += renderInlineMirrorButtons(e.id, mirrorItem.text, cardId, isLatest, contentHtml, pending);
+				html += renderInlineMirrorButtons(e.id, mirrorItem.text, cardId, isLatest, contentHtml, pending, mirrorItem.source);
 			} else {
 				html += '<div class="proposer-entity-item">' + contentHtml + '</div>';
 			}
@@ -4299,8 +4403,9 @@ function renderProposerIntegrationsCard(
 	mmpJson?: string,
 	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
 	isLatest: boolean = true,
+	eventId?: number,
 ): string {
-	const cardId = 'PV-INTEGRATIONS';
+	const cardId = 'PV-INTEGRATIONS-' + (eventId ?? '0');
 	const pending = allPendingDecisions?.[cardId];
 
 	let mmp: import('../../../types/mmp').MMPPayload | null = null;
@@ -4342,7 +4447,7 @@ function renderProposerIntegrationsCard(
 					' | Ownership: ' + escapeHtml(int.ownershipModel) + '</div>';
 				const mirrorItem = mirrorById.get(int.id);
 				if (mirrorItem) {
-					html += renderInlineMirrorButtons(int.id, mirrorItem.text, cardId, isLatest, contentHtml, pending);
+					html += renderInlineMirrorButtons(int.id, mirrorItem.text, cardId, isLatest, contentHtml, pending, mirrorItem.source);
 				} else {
 					html += '<div class="proposer-integration-item">' + contentHtml + '</div>';
 				}
@@ -4360,7 +4465,7 @@ function renderProposerIntegrationsCard(
 			const contentHtml = escapeHtml(qualityAttributes[i]);
 			const mirrorItem = mirrorById.get(qaId);
 			if (mirrorItem) {
-				html += renderInlineMirrorButtons(qaId, mirrorItem.text, cardId, isLatest, contentHtml, pending);
+				html += renderInlineMirrorButtons(qaId, mirrorItem.text, cardId, isLatest, contentHtml, pending, mirrorItem.source);
 			} else {
 				html += '<div class="proposer-qa-item">' + contentHtml + '</div>';
 			}
@@ -4611,13 +4716,13 @@ function renderReasoningReviewCard(
 	overallAssessment: string,
 	reviewerModel: string,
 	timestamp: string,
+	reviewPrompt?: string,
 ): string {
-	if (concerns.length === 0) {return '';}
-
-	const maxSeverity = concerns[0]?.severity ?? 'MEDIUM';
+	const maxSeverity = concerns.length > 0 ? (concerns[0]?.severity ?? 'MEDIUM') : 'CLEAN';
 	const severityClass = maxSeverity === 'HIGH' ? 'review-severity-high'
 		: maxSeverity === 'MEDIUM' ? 'review-severity-medium'
-		: 'review-severity-low';
+		: maxSeverity === 'LOW' ? 'review-severity-low'
+		: 'review-severity-clean';
 
 	const concernsHtml = concerns.map((c) => {
 		const sevBadge = c.severity === 'HIGH'
@@ -4640,16 +4745,27 @@ function renderReasoningReviewCard(
 		'</div>';
 	}).join('');
 
+	const promptHtml = reviewPrompt
+		? '<details class="review-prompt-details">' +
+			'<summary>&#x1F4DD; Review Prompt</summary>' +
+			'<pre class="review-prompt-content">' + escapeHtml(reviewPrompt) + '</pre>' +
+		  '</details>'
+		: '';
+
 	return '<div class="reasoning-review-card ' + severityClass + '">' +
 		'<div class="review-header">' +
 			'<span class="review-icon">&#x1F50D;</span>' +
 			'<span class="review-title">Reasoning Review</span>' +
-			'<span class="review-meta">' + concerns.length + ' concern' + (concerns.length !== 1 ? 's' : '') +
+			'<span class="review-meta">' +
+				(concerns.length > 0
+					? concerns.length + ' concern' + (concerns.length !== 1 ? 's' : '')
+					: 'Clean') +
 				' &middot; ' + escapeHtml(reviewerModel) +
 				' &middot; ' + formatTimestamp(timestamp) + '</span>' +
 		'</div>' +
 		'<div class="review-assessment">' + escapeHtml(overallAssessment) + '</div>' +
 		'<div class="review-concerns">' + concernsHtml + '</div>' +
+		promptHtml +
 		'<div class="review-actions">' +
 			'<button class="mmp-btn review-action-btn" data-action="review-acknowledge">Acknowledge</button>' +
 			'<button class="mmp-btn review-action-btn" data-action="review-rerun">Re-run with corrections</button>' +
@@ -4772,7 +4888,7 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 			case 'intake_turn':
 
-				return wrapResizable(renderIntakeTurnCard(item.turn, item.timestamp, item.commandBlocks, item.isLatest ?? false));
+				return wrapResizable(renderIntakeTurnCard(item.turn, item.timestamp, item.commandBlocks, item.isLatest ?? false, item.eventId));
 
 			case 'intake_plan_preview':
 
@@ -4788,7 +4904,7 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 			case 'reasoning_review':
 
-				return renderReasoningReviewCard(item.concerns, item.overallAssessment, item.reviewerModel, item.timestamp);
+				return renderReasoningReviewCard(item.concerns, item.overallAssessment, item.reviewerModel, item.timestamp, item.reviewPrompt);
 
 			case 'intake_mode_selector':
 
@@ -4821,23 +4937,23 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 						phasingStrategy: item.phasingStrategy,
 						successMetrics: item.successMetrics,
 						uxRequirements: item.uxRequirements,
-					}, item.mmpJson, allPendingDecisions);
+					}, item.mmpJson, allPendingDecisions, item.eventId);
 
 			case 'intake_proposal':
 
 				return renderIntakeProposalCard(item.title, item.summary, item.proposedApproach, item.domainCoverage);
 
 			case 'intake_proposer_domains':
-				return wrapResizable(renderProposerDomainsCard(item.domains, item.personas, item.mmpJson, allPendingDecisions, idx === lastProposerMmpIdx));
+				return wrapResizable(renderProposerDomainsCard(item.domains, item.personas, item.mmpJson, allPendingDecisions, idx === lastProposerMmpIdx, item.eventId));
 
 			case 'intake_proposer_journeys':
-				return wrapResizable(renderProposerJourneysCard(item.journeys, item.workflows, item.mmpJson, allPendingDecisions, idx === lastProposerMmpIdx));
+				return wrapResizable(renderProposerJourneysCard(item.journeys, item.workflows, item.mmpJson, allPendingDecisions, idx === lastProposerMmpIdx, item.eventId));
 
 			case 'intake_proposer_entities':
-				return wrapResizable(renderProposerEntitiesCard(item.entities, item.mmpJson, item.domainNames, allPendingDecisions, idx === lastProposerMmpIdx));
+				return wrapResizable(renderProposerEntitiesCard(item.entities, item.mmpJson, item.domainNames, allPendingDecisions, idx === lastProposerMmpIdx, item.eventId));
 
 			case 'intake_proposer_integrations':
-				return wrapResizable(renderProposerIntegrationsCard(item.integrations, item.qualityAttributes, item.mmpJson, allPendingDecisions, idx === lastProposerMmpIdx));
+				return wrapResizable(renderProposerIntegrationsCard(item.integrations, item.qualityAttributes, item.mmpJson, allPendingDecisions, idx === lastProposerMmpIdx, item.eventId));
 
 			case 'architecture_capabilities':
 
@@ -4853,7 +4969,7 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 			case 'architecture_gate':
 
-				return renderArchitectureGateCard(item.docId, item.version, item.capabilities, item.components, item.goalAlignmentScore, item.dialogueId, item.resolved, item.resolvedAction, item.mmpJson, item.decompositionDepth, allPendingDecisions);
+				return renderArchitectureGateCard(item.docId, item.version, item.capabilities, item.components, item.goalAlignmentScore, item.dialogueId, item.resolved, item.resolvedAction, item.mmpJson, item.decompositionDepth, allPendingDecisions, item.eventId);
 
 			default:
 
@@ -4867,8 +4983,10 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 
 
-	// Add domain coverage sidebar after first turn completes (avoid showing 0% prematurely)
-	if (intakeState && intakeState.domainCoverage && intakeState.turnCount > 0) {
+	// Add domain coverage sidebar only for legacy GATHERING/DISCUSSING flows
+	// (not for proposer flow where domain coverage is handled by ARCHITECTURE)
+	const isLegacyFlow = intakeState?.subState === 'GATHERING' || intakeState?.subState === 'DISCUSSING';
+	if (isLegacyFlow && intakeState && intakeState.domainCoverage && intakeState.turnCount > 0) {
 		html += renderDomainCoverageSidebar(intakeState.domainCoverage, intakeState.currentDomain);
 	}
 
@@ -4884,7 +5002,7 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Synthesizing final plan...</span></div>';
 		} else if (intakeState.subState === 'AWAITING_APPROVAL') {
 			html += renderIntakeFinalizeResolved();
-		} else if (intakeState.subState === 'ANALYZING') {
+		} else if (intakeState.subState === 'INTENT_DISCOVERY') {
 			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Analyzing documents and codebase...</span></div>';
 		} else if (intakeState.subState === 'PROPOSING_DOMAINS') {
 			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Proposing business domains...</span></div>';
@@ -5215,6 +5333,7 @@ function renderArchitectureGateCard(
 	mmpJson?: string,
 	decompositionDepth?: number,
 	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
+	eventId?: number,
 ): string {
 	const scoreDisplay = goalAlignmentScore !== null ? `${Math.round(goalAlignmentScore * 100)}%` : 'N/A';
 	const depth = decompositionDepth ?? 0;
@@ -5227,7 +5346,7 @@ function renderArchitectureGateCard(
 		try {
 			const mmp = JSON.parse(mmpJson) as MMPPayload;
 			if (mmp.mirror || mmp.menu || mmp.preMortem) {
-				const cardId = 'ARC-' + docId.substring(0, 8) + '-v' + version;
+				const cardId = 'ARC-' + (eventId ?? docId + '-v' + version);
 				mmpHtml = renderMMPSection(mmp, cardId, true, undefined, allPendingDecisions?.[cardId]);
 			}
 		} catch { /* ignore parse errors */ }

@@ -56,7 +56,7 @@ export async function executeIntakePhase(
 		const conv = convResult.value;
 
 		switch (conv.subState) {
-			case IntakeSubState.ANALYZING:
+			case IntakeSubState.INTENT_DISCOVERY:
 				return await executeIntakeAnalysis(dialogueId, humanInput);
 
 			case IntakeSubState.PRODUCT_REVIEW: {
@@ -108,16 +108,25 @@ export async function executeIntakePhase(
 							break;
 					}
 
-					// Only advance sub-state after successful execution
-					if (rerunResult.success) {
-						updateIntakeConversation(dialogueId, { subState: rerunSubState });
-					}
+					// NOTE: Do NOT overwrite subState — the proposer already set it to PRODUCT_REVIEW.
 					return rerunResult;
 				}
 
 				// MMP submission — advance to next proposer round
+				// Check if this is the pre-proposer product review (before any proposer round)
+				const isPreProposerReview = conv.draftPlan?.preProposerReview === true;
+				console.log('[INTAKE:Router] PRODUCT_REVIEW MMP submission:', {
+					proposerPhase,
+					isPreProposerReview,
+					isMmpSubmission,
+					humanInputLength: humanInput.length,
+				});
 				let nextSubState: IntakeSubState;
-				if (proposerPhase === ProposerPhase.DOMAIN_MAPPING) {
+				if (isPreProposerReview) {
+					// First PRODUCT_REVIEW from INTENT_DISCOVERY → apply decisions to plan, then start proposer rounds
+					nextSubState = IntakeSubState.PROPOSING_DOMAINS;
+					applyIntentDiscoveryDecisions(conv.draftPlan, humanInput);
+				} else if (proposerPhase === ProposerPhase.DOMAIN_MAPPING) {
 					nextSubState = IntakeSubState.PROPOSING_JOURNEYS;
 				} else if (proposerPhase === ProposerPhase.JOURNEY_WORKFLOW) {
 					nextSubState = IntakeSubState.PROPOSING_ENTITIES;
@@ -128,9 +137,16 @@ export async function executeIntakePhase(
 				} else {
 					nextSubState = IntakeSubState.PROPOSING;
 				}
+				console.log('[INTAKE:Router] Advancing to:', nextSubState);
 				// Execute FIRST, then advance sub-state on success (prevents corruption if execution throws)
 				let advanceResult;
-				if (nextSubState === IntakeSubState.PROPOSING_JOURNEYS) {
+				if (nextSubState === IntakeSubState.PROPOSING_DOMAINS) {
+					// Clear preProposerReview flag now that we're entering the proposer loop
+					updateIntakeConversation(dialogueId, {
+						draftPlan: { ...conv.draftPlan, preProposerReview: undefined } as IntakePlanDocument,
+					});
+					advanceResult = await executeProposerDomains(dialogueId, humanInput);
+				} else if (nextSubState === IntakeSubState.PROPOSING_JOURNEYS) {
 					advanceResult = await executeProposerJourneys(dialogueId, humanInput);
 				} else if (nextSubState === IntakeSubState.PROPOSING_ENTITIES) {
 					advanceResult = await executeProposerEntities(dialogueId, humanInput);
@@ -141,9 +157,9 @@ export async function executeIntakePhase(
 				}
 
 				if (advanceResult) {
-					if (advanceResult.success) {
-						updateIntakeConversation(dialogueId, { subState: nextSubState });
-					}
+					// NOTE: Do NOT overwrite subState here — the proposer functions
+					// already set subState to PRODUCT_REVIEW internally after execution.
+					// Overwriting would set it back to PROPOSING_X, causing a re-run.
 					return advanceResult;
 				}
 
@@ -198,7 +214,7 @@ export async function executeIntakePhase(
 					const freshResult = getOrCreateIntakeConversation(dialogueId);
 					if (freshResult.success) {
 						const fresh = freshResult.value;
-						// STATE_DRIVEN and DOMAIN_GUIDED now use inverted flow (ANALYZING)
+						// STATE_DRIVEN and DOMAIN_GUIDED now use inverted flow (INTENT_DISCOVERY)
 						if (fresh.intakeMode === IntakeMode.STATE_DRIVEN ||
 							fresh.intakeMode === IntakeMode.DOMAIN_GUIDED) {
 							return await executeIntakeAnalysis(dialogueId, humanInput);
@@ -263,4 +279,58 @@ export async function executeIntakePhase(
 					: new Error('Failed to execute INTAKE phase'),
 		};
 	}
+}
+
+/**
+ * Apply INTENT_DISCOVERY MMP decisions to the plan.
+ * Removes rejected personas/journeys, marks edited ones, preserves accepted ones.
+ * Mutates the plan in place (caller saves it to DB).
+ */
+function applyIntentDiscoveryDecisions(plan: IntakePlanDocument | undefined, mmpText: string): void {
+	if (!plan) { return; }
+
+	// Parse decision lines from the MMP text
+	const rejectedTexts = new Set<string>();
+	const editedMap = new Map<string, string>(); // original → edited
+
+	for (const line of mmpText.split('\n')) {
+		const rejectMatch = line.match(/^REJECTED:\s*"(.+)"$/);
+		if (rejectMatch) { rejectedTexts.add(rejectMatch[1]); }
+		const editMatch = line.match(/^EDITED:\s*"(.+)"\s*→\s*"(.+)"$/);
+		if (editMatch) { editedMap.set(editMatch[1], editMatch[2]); }
+	}
+
+	if (rejectedTexts.size === 0 && editedMap.size === 0) { return; }
+
+	// Filter personas — match by "Name: Description" format used in MMP text
+	if (plan.personas) {
+		plan.personas = plan.personas.filter(p => {
+			const text = `${p.name}: ${p.description}`;
+			return !rejectedTexts.has(text);
+		});
+	}
+
+	// Filter user journeys — match by "[priority] Title: steps" format
+	if (plan.userJourneys) {
+		plan.userJourneys = plan.userJourneys.filter(j => {
+			// The MMP text format varies; check if any rejection line contains the journey title
+			for (const rejected of rejectedTexts) {
+				if (rejected.includes(j.title)) { return false; }
+			}
+			return true;
+		});
+	}
+
+	// Filter UX requirements — direct text match
+	if (plan.uxRequirements) {
+		plan.uxRequirements = plan.uxRequirements.filter(ux => !rejectedTexts.has(ux));
+	}
+
+	console.log('[INTAKE:ApplyDecisions] Applied intent discovery decisions:', {
+		rejected: rejectedTexts.size,
+		edited: editedMap.size,
+		remainingPersonas: plan.personas?.length ?? 0,
+		remainingJourneys: plan.userJourneys?.length ?? 0,
+		remainingUxReqs: plan.uxRequirements?.length ?? 0,
+	});
 }

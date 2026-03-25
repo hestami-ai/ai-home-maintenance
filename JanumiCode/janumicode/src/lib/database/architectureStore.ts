@@ -462,25 +462,38 @@ export function getCapabilitiesForParent(
 function populateLookupTables(doc: ArchitectureDocument): void {
 	const d = db();
 
+	// Topologically sort capabilities: parents before children
+	const sortedCaps = topoSort(
+		doc.capabilities,
+		c => c.capability_id,
+		c => c.parent_capability_id ?? null
+	);
+
 	// Capabilities
 	const insertCap = d.prepare(`
-		INSERT INTO arch_capabilities (capability_id, doc_id, dialogue_id, label, description, source_requirements, parent_capability_id)
+		INSERT OR REPLACE INTO arch_capabilities (capability_id, doc_id, dialogue_id, label, description, source_requirements, parent_capability_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`);
-	for (const cap of doc.capabilities) {
+	const capIds = new Set(doc.capabilities.map(c => c.capability_id));
+	for (const cap of sortedCaps) {
+		// Null out orphan parent references to avoid FK violation
+		const safeParent = cap.parent_capability_id && capIds.has(cap.parent_capability_id)
+			? cap.parent_capability_id : null;
 		insertCap.run(
 			cap.capability_id, doc.doc_id, doc.dialogue_id,
 			cap.label, cap.description,
 			JSON.stringify(cap.source_requirements),
-			cap.parent_capability_id ?? null
+			safeParent
 		);
 
 		// Domain mappings for this capability
 		const insertMapping = d.prepare(`
-			INSERT INTO arch_domain_mappings (mapping_id, doc_id, domain, capability_id, requirement_ids, coverage_contribution)
+			INSERT OR REPLACE INTO arch_domain_mappings (mapping_id, doc_id, domain, capability_id, requirement_ids, coverage_contribution)
 			VALUES (?, ?, ?, ?, ?, ?)
 		`);
 		for (const mapping of cap.domain_mappings) {
+			// Skip mappings referencing non-existent capabilities
+			if (!capIds.has(mapping.capability_id)) { continue; }
 			insertMapping.run(
 				mapping.mapping_id, doc.doc_id, mapping.domain,
 				mapping.capability_id, JSON.stringify(mapping.requirement_ids),
@@ -489,12 +502,13 @@ function populateLookupTables(doc: ArchitectureDocument): void {
 		}
 	}
 
-	// Workflows
+	// Workflows — skip entries referencing non-existent capabilities
 	const insertWf = d.prepare(`
-		INSERT INTO arch_workflows (workflow_id, doc_id, capability_id, label, description, actors)
+		INSERT OR REPLACE INTO arch_workflows (workflow_id, doc_id, capability_id, label, description, actors)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`);
 	for (const wf of doc.workflow_graph) {
+		if (!capIds.has(wf.capability_id)) { continue; }
 		insertWf.run(
 			wf.workflow_id, doc.doc_id, wf.capability_id,
 			wf.label, wf.description,
@@ -502,24 +516,35 @@ function populateLookupTables(doc: ArchitectureDocument): void {
 		);
 	}
 
+	// Topologically sort components: parents before children
+	const sortedComps = topoSort(
+		doc.components,
+		c => c.component_id,
+		c => c.parent_component_id ?? null
+	);
+
 	// Components
 	const insertComp = d.prepare(`
-		INSERT INTO arch_components (component_id, doc_id, label, responsibility, rationale, workflows_served, dependencies, interaction_patterns, file_scope, parent_component_id)
+		INSERT OR REPLACE INTO arch_components (component_id, doc_id, label, responsibility, rationale, workflows_served, dependencies, interaction_patterns, file_scope, parent_component_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`);
-	for (const comp of doc.components) {
+	const compIds = new Set(doc.components.map(c => c.component_id));
+	for (const comp of sortedComps) {
+		// Null out orphan parent references to avoid FK violation
+		const safeParent = comp.parent_component_id && compIds.has(comp.parent_component_id)
+			? comp.parent_component_id : null;
 		insertComp.run(
 			comp.component_id, doc.doc_id, comp.label, comp.responsibility,
 			comp.rationale || '',
 			JSON.stringify(comp.workflows_served), JSON.stringify(comp.dependencies),
 			JSON.stringify(comp.interaction_patterns || []),
-			comp.file_scope, comp.parent_component_id
+			comp.file_scope, safeParent
 		);
 	}
 
 	// Implementation steps
 	const insertStep = d.prepare(`
-		INSERT INTO arch_implementation_steps (step_id, doc_id, label, description, components_involved, dependencies, estimated_complexity, verification_method, sort_order)
+		INSERT OR REPLACE INTO arch_implementation_steps (step_id, doc_id, label, description, components_involved, dependencies, estimated_complexity, verification_method, sort_order)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`);
 	for (const step of doc.implementation_sequence) {
@@ -529,6 +554,35 @@ function populateLookupTables(doc: ArchitectureDocument): void {
 			step.estimated_complexity, step.verification_method, step.sort_order
 		);
 	}
+}
+
+/**
+ * Topological sort for self-referencing FK tables (capabilities, components).
+ * Ensures parents are inserted before children. Handles orphan references
+ * gracefully by nulling out parent_id for items whose parent isn't in the set.
+ */
+function topoSort<T>(
+	items: T[],
+	getId: (item: T) => string,
+	getParentId: (item: T) => string | null
+): T[] {
+	const byId = new Map(items.map(item => [getId(item), item]));
+	const sorted: T[] = [];
+	const visited = new Set<string>();
+
+	function visit(item: T): void {
+		const id = getId(item);
+		if (visited.has(id)) { return; }
+		visited.add(id);
+		const parentId = getParentId(item);
+		if (parentId && byId.has(parentId)) {
+			visit(byId.get(parentId)!);
+		}
+		sorted.push(item);
+	}
+
+	for (const item of items) { visit(item); }
+	return sorted;
 }
 
 /**

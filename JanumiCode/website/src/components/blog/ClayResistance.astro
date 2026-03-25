@@ -1,0 +1,116 @@
+---
+// Material Resistance mapping: sculpture physics → software reality
+const resistances = [
+  { sculpture: 'Gravity collapse', software: 'Invalid architecture', icon: '🏗', severity: 'high' },
+  { sculpture: 'Structural weakness', software: 'Scalability failures', icon: '📉', severity: 'high' },
+  { sculpture: 'Cracking in kiln', software: 'Runtime failures', icon: '🔥', severity: 'high' },
+  { sculpture: 'Material limits', software: 'Infra constraints / latency / cost', icon: '⚙', severity: 'medium' },
+  { sculpture: 'Tool limitations', software: 'LLM context window / hallucination', icon: '🧠', severity: 'medium' },
+  { sculpture: 'Unsupported overhang', software: 'Missing dependency / circular reference', icon: '🔄', severity: 'medium' },
+];
+---
+
+<div class="cr">
+  <div class="cr__header">
+    <span class="cr__title">MATERIAL RESISTANCE</span>
+    <span class="cr__subtitle">Clay pushes back. So does software.</span>
+  </div>
+  <div class="cr__grid">
+    {resistances.map(r => (
+      <div class={`cr__item cr__item--${r.severity}`}>
+        <div class="cr__item-top">
+          <span class="cr__icon">{r.icon}</span>
+          <div>
+            <div class="cr__sculpture">{r.sculpture}</div>
+            <div class="cr__arrow-down">↓</div>
+            <div class="cr__software">{r.software}</div>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+  .cr {
+    margin: var(--space-2xl) 0;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+  }
+
+  .cr__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .cr__title {
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-warning);
+  }
+
+  .cr__subtitle {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .cr__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-sm);
+  }
+
+  .cr__item {
+    padding: var(--space-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--color-border);
+  }
+
+  .cr__item--high { border-left-color: var(--color-error); }
+  .cr__item--medium { border-left-color: var(--color-warning); }
+
+  .cr__item-top {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: flex-start;
+  }
+
+  .cr__icon { font-size: 0.85rem; margin-top: 2px; }
+
+  .cr__sculpture {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    font-style: italic;
+  }
+
+  .cr__arrow-down {
+    font-size: 0.65rem;
+    color: var(--color-primary);
+    opacity: 0.5;
+    padding: 1px 0;
+  }
+
+  .cr__software {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  @media (max-width: 768px) {
+    .cr__grid { grid-template-columns: repeat(2, 1fr); }
+    .cr__header { flex-direction: column; gap: 4px; }
+  }
+</style>
