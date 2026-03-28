@@ -9,7 +9,7 @@
 import { vscode } from './types';
 import type { IncomingMessage } from './types';
 import { state, restoreMmpState, restoreDrafts } from './state';
-import { scrollToBottom, scrollToClaimsByStatus, copySessionId } from './utils';
+import { initSmartScroll, scrollToBottom, forceScrollToBottom, scrollToClaimsByStatus, copySessionId } from './utils';
 import {
 	handleFullUpdate,
 	handleTurnAdded,
@@ -25,6 +25,7 @@ import {
 	handleKeyStatusUpdate,
 	handleSetInputEnabled,
 	handleSetProcessing,
+	handleProcessingElapsed,
 	handleSetInputThinking,
 	handleQaExchangeAdded,
 	handleQaThinkingStart,
@@ -35,6 +36,8 @@ import {
 	toggleSettingsPanel,
 	requestSetKey,
 	requestClearKey,
+	handleRecordingState,
+	handleClearStream,
 } from './messageHandlers';
 import { submitGateDecision, handleVerificationGateDecision, handleReviewGateDecision } from './gates';
 import { handleIntakeSubmitResponses, disableIntakeApprovalButtons, handleIntakeModeSelection, handleIntakeAskDomain } from './intake';
@@ -52,7 +55,8 @@ import {
 	mentionNavigate,
 	mentionConfirmSelection,
 } from './composer';
-import { handleCommandActivity, handleToolCallActivity, toggleCommandBlock, toggleStdinBlock, showMoreCommandOutput } from './commandBlocks';
+import { handleCommandActivity, handleToolCallActivity, toggleCommandBlock, toggleStdinBlock, showMoreCommandOutput, injectReasoningReviewCard } from './commandBlocks';
+import { initCopyCards } from './copyCards';
 import { handleRationaleInput, handleClaimRationaleInput, handleReviewItemRationaleInput, handleReviewOverallInput } from './gates';
 import { handleIntakeQuestionInput } from './intake';
 import {
@@ -84,12 +88,105 @@ import {
 	findNext,
 	findPrev,
 } from './findWidget';
+import { renderStreamItems, renderStreamItem } from './renderer/streamRenderer';
+import type { StreamItem, PendingMmpSnapshot } from './renderer/streamTypes';
+
+// ===== HYDRATION HANDLER =====
+
+function handleHydrate(msg: { items: unknown[]; headerHtml: string; inputHtml: string; pendingDecisions?: Record<string, unknown> }): void {
+	// Update header
+	const headerContainer = document.getElementById('header-container');
+	if (headerContainer) {
+		headerContainer.innerHTML = msg.headerHtml;
+	}
+
+	// Update input area
+	const inputContainer = document.getElementById('input-container');
+	if (inputContainer) {
+		inputContainer.innerHTML = msg.inputHtml;
+	}
+
+	// Render stream items client-side
+	const streamContent = document.getElementById('stream-content');
+	if (streamContent) {
+		const items = msg.items as StreamItem[];
+		if (items.length > 0) {
+			streamContent.innerHTML = renderStreamItems(items, undefined, msg.pendingDecisions as Record<string, import('./renderer/streamTypes').PendingMmpSnapshot> | undefined);
+		} else {
+			streamContent.innerHTML = '<div class="empty-state"><h2>Welcome to JanumiCode</h2><p>Start a new dialogue by typing a goal below.</p></div>';
+		}
+	}
+
+	// Restore composer draft and MMP state
+	restoreComposerDraft();
+	restoreMmpState();
+	if (msg.pendingDecisions) {
+		applyPendingMmpDecisions(msg.pendingDecisions as Record<string, { mirrorDecisions: Record<string, { status: string; editedText?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string }>; productEdits: Record<string, string> }>);
+	}
+	scrollToBottom();
+}
+
+// ===== COMPOSER DRAFT PERSISTENCE =====
+
+let _composerDraftTimer: ReturnType<typeof setTimeout> | null = null;
+
+function persistComposerDraft(composer: HTMLElement): void {
+	if (_composerDraftTimer) { clearTimeout(_composerDraftTimer); }
+	_composerDraftTimer = setTimeout(() => {
+		_composerDraftTimer = null;
+		const text = composer.textContent?.trim() ?? '';
+		const existing = (vscode.getState() as Record<string, unknown>) || {};
+		vscode.setState({ ...existing, composerDraft: text });
+	}, 500); // Debounce 500ms
+}
+
+function restoreComposerDraft(): void {
+	const saved = vscode.getState() as Record<string, unknown> | null;
+	const draft = saved?.composerDraft as string | undefined;
+	if (draft) {
+		const composer = document.getElementById('user-input');
+		if (composer && composer.textContent?.trim() === '') {
+			composer.textContent = draft;
+			updateComposerEmpty(composer);
+		}
+	}
+}
+
+function clearComposerDraft(): void {
+	const existing = (vscode.getState() as Record<string, unknown>) || {};
+	vscode.setState({ ...existing, composerDraft: '' });
+}
+
+function handleStreamItemAdded(msg: { item: unknown }): void {
+	const streamContent = document.getElementById('stream-content');
+	if (!streamContent) { return; }
+	const item = msg.item as StreamItem;
+	const idx = streamContent.children.length;
+	const html = renderStreamItem(item, idx, { lastIntakePlanIdx: -1, lastProposerMmpIdx: -1 });
+	if (html) {
+		streamContent.insertAdjacentHTML('beforeend', html);
+		scrollToBottom();
+	}
+}
 
 // ===== MESSAGE HANDLING =====
 
 window.addEventListener('message', function (event: MessageEvent) {
 	const msg = event.data as IncomingMessage;
 	switch (msg.type) {
+		case 'hydrate':
+			handleHydrate(msg);
+			break;
+		case 'headerUpdate': {
+			const headerContainer = document.getElementById('header-container');
+			if (headerContainer && (msg as { data?: { headerHtml?: string } }).data?.headerHtml) {
+				headerContainer.innerHTML = (msg as { data: { headerHtml: string } }).data.headerHtml;
+			}
+			break;
+		}
+		case 'streamItemAdded':
+			handleStreamItemAdded(msg);
+			break;
 		case 'fullUpdate':
 			handleFullUpdate(msg.data);
 			break;
@@ -119,6 +216,12 @@ window.addEventListener('message', function (event: MessageEvent) {
 			break;
 		case 'setProcessing':
 			handleSetProcessing(msg.data);
+			break;
+		case 'updateProcessingElapsed':
+			handleProcessingElapsed(msg.data);
+			break;
+		case 'reasoningReviewReady':
+			injectReasoningReviewCard(msg.data);
 			break;
 		case 'setInputThinking':
 			handleSetInputThinking(msg.data);
@@ -199,6 +302,12 @@ window.addEventListener('message', function (event: MessageEvent) {
 		case 'openFindWidget':
 			openFindWidget();
 			break;
+		case 'recordingState':
+			handleRecordingState(msg.active, msg.path);
+			break;
+		case 'clearStream':
+			handleClearStream();
+			break;
 	}
 });
 
@@ -250,6 +359,9 @@ document.addEventListener('click', function (event: MouseEvent) {
 		case 'toggle-find':
 			toggleFindWidget();
 			break;
+		case 'recording-toggle':
+			vscode.postMessage({ type: 'recordingToggle' });
+			break;
 		case 'close-find':
 			closeFindWidget();
 			break;
@@ -290,6 +402,22 @@ document.addEventListener('click', function (event: MouseEvent) {
 			toggleStdinBlock(stdinBlock);
 			break;
 		}
+		case 'toggle-cmd-output': {
+			const collapsed = target.closest('.cmd-output-collapsed') as HTMLElement | null;
+			if (collapsed) {
+				const hidden = collapsed.querySelector('.cmd-output-hidden') as HTMLElement | null;
+				const btn = collapsed.querySelector('.cmd-output-expand-btn') as HTMLElement | null;
+				if (hidden && btn) {
+					const isHidden = hidden.style.display === 'none';
+					hidden.style.display = isHidden ? '' : 'none';
+					btn.textContent = isHidden ? 'Collapse output' : btn.dataset.expandLabel || 'Show more';
+					if (!btn.dataset.expandLabel) {
+						btn.dataset.expandLabel = btn.textContent;
+					}
+				}
+			}
+			break;
+		}
 		case 'show-more-cmd':
 			if (target.dataset.blockId) {
 				showMoreCommandOutput(target.dataset.blockId);
@@ -316,7 +444,7 @@ document.addEventListener('click', function (event: MouseEvent) {
 			break;
 		case 'intake-switch-to-walkthrough':
 		case 'intake-switch-to-conversational':
-			// Switch mode from DOMAIN_GUIDED to fill coverage gaps
+			// Switch mode from DOCUMENT_BASED to fill coverage gaps
 			{
 				const mode = target.dataset.intakeMode;
 				if (mode) {
@@ -526,6 +654,12 @@ document.addEventListener('click', function (event: MouseEvent) {
 				handleSpeechToggle(target.dataset.speechTarget);
 			}
 			break;
+		case 'open-architecture-explorer':
+			vscode.postMessage({
+				type: 'openArchitectureExplorer',
+				dialogueId: target.dataset.dialogueId || '',
+			});
+			break;
 		// Architecture gate actions
 		case 'architecture-approve':
 			if (target.dataset.dialogueId && target.dataset.docId) {
@@ -615,6 +749,9 @@ document.addEventListener('click', function (event: MouseEvent) {
 				target.textContent = 'Decomposing...';
 			}
 			break;
+		case 'pause-workflow':
+			vscode.postMessage({ type: 'pauseWorkflow' });
+			break;
 		case 'cancel-workflow':
 			vscode.postMessage({ type: 'cancelWorkflow' });
 			break;
@@ -650,6 +787,22 @@ document.addEventListener('click', function (event: MouseEvent) {
 			}
 			break;
 		}
+		case 'validation-feedback': {
+			const findingId = target.dataset.findingId;
+			if (findingId) {
+				const useful = target.dataset.useful === 'true';
+				vscode.postMessage({ type: 'validationFeedback', findingId, useful });
+				// Update active state on both buttons in the row
+				const row = target.closest('.val-feedback-row');
+				if (row) {
+					row.querySelectorAll('.val-thumb-btn').forEach(function (btn) {
+						(btn as HTMLElement).classList.remove('val-thumb-active');
+					});
+					target.classList.add('val-thumb-active');
+				}
+			}
+			break;
+		}
 	}
 });
 
@@ -662,13 +815,14 @@ document.addEventListener('click', function (event: MouseEvent) {
 	}
 }, true);
 
-// Attach file button — asks extension host to show file picker
-const attachBtn = document.getElementById('attach-file-btn');
-if (attachBtn) {
-	attachBtn.addEventListener('click', function () {
+// Attach file button — delegated to survive hydration
+// (handled via the global click delegation: data-action="pick-file" or id match)
+document.addEventListener('click', function (event: MouseEvent) {
+	const target = event.target as HTMLElement;
+	if (target.closest('#attach-file-btn')) {
 		vscode.postMessage({ type: 'pickFile' });
-	});
-}
+	}
+});
 
 // Input delegation — handles gate rationale textareas and composer @-mention
 document.addEventListener('input', function (event: Event) {
@@ -697,6 +851,8 @@ document.addEventListener('input', function (event: Event) {
 	}
 	if (target.id === 'user-input') {
 		updateComposerEmpty(target);
+		// Persist composer draft to webview state (survives re-renders)
+		persistComposerDraft(target);
 		// Detect @ trigger for mentions
 		const query = getMentionQueryAtCursor();
 		const sel = window.getSelection();
@@ -731,114 +887,100 @@ document.addEventListener('keydown', function (event: KeyboardEvent) {
 	}
 });
 
-// Direct listeners for the composer contenteditable
-const userInput = document.getElementById('user-input');
-if (userInput) {
-	// Paste: strip HTML, insert plain text only via Selection API
-	userInput.addEventListener('paste', function (event: ClipboardEvent) {
+// Composer listeners use event delegation on document so they survive DOM replacement
+// (hydration replaces #input-container contents, destroying direct element listeners)
+document.addEventListener('paste', function (event: ClipboardEvent) {
+	const target = event.target as HTMLElement;
+	if (target.id !== 'user-input') { return; }
+	event.preventDefault();
+	const text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
+	if (!text) { return; }
+	const sel = window.getSelection();
+	if (!sel || sel.rangeCount === 0) { return; }
+	const range = sel.getRangeAt(0);
+	range.deleteContents();
+	const node = document.createTextNode(text);
+	range.insertNode(node);
+	range.setStartAfter(node);
+	range.collapse(true);
+	sel.removeAllRanges();
+	sel.addRange(range);
+	updateComposerEmpty(target);
+});
+
+// Composer keydown — delegated on document to survive hydration DOM replacement
+document.addEventListener('keydown', function (event: KeyboardEvent) {
+	const target = event.target as HTMLElement;
+	if (target.id !== 'user-input') { return; }
+
+	// Keyboard navigation when mention dropdown is active
+	if (state.mentionActive) {
+		if (event.key === 'ArrowDown') { event.preventDefault(); mentionNavigate(1); return; }
+		if (event.key === 'ArrowUp') { event.preventDefault(); mentionNavigate(-1); return; }
+		if (event.key === 'Enter') { event.preventDefault(); mentionConfirmSelection(); return; }
+		if (event.key === 'Escape') { event.preventDefault(); hideMentionDropdown(); return; }
+		if (event.key === 'Tab') { event.preventDefault(); mentionConfirmSelection(); return; }
+	}
+	// Escape during speech recording = cancel recording
+	if (event.key === 'Escape' && state.speechRecordingTarget) {
 		event.preventDefault();
-		const text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
-		if (!text) { return; }
-		const sel = window.getSelection();
-		if (!sel || sel.rangeCount === 0) { return; }
-		const range = sel.getRangeAt(0);
-		range.deleteContents();
-		const node = document.createTextNode(text);
-		range.insertNode(node);
-		range.setStartAfter(node);
-		range.collapse(true);
-		sel.removeAllRanges();
-		sel.addRange(range);
-		updateComposerEmpty(userInput);
-	});
-
-	userInput.addEventListener('keydown', function (event: KeyboardEvent) {
-		// Keyboard navigation when mention dropdown is active
-		if (state.mentionActive) {
-			if (event.key === 'ArrowDown') {
-				event.preventDefault();
-				mentionNavigate(1);
-				return;
-			}
-			if (event.key === 'ArrowUp') {
-				event.preventDefault();
-				mentionNavigate(-1);
-				return;
-			}
-			if (event.key === 'Enter') {
-				event.preventDefault();
-				mentionConfirmSelection();
-				return;
-			}
-			if (event.key === 'Escape') {
-				event.preventDefault();
-				hideMentionDropdown();
-				return;
-			}
-			if (event.key === 'Tab') {
-				event.preventDefault();
-				mentionConfirmSelection();
-				return;
-			}
-		}
-		// Escape during speech recording = cancel recording
-		if (event.key === 'Escape' && state.speechRecordingTarget) {
+		vscode.postMessage({ type: 'speechCancel' });
+		return;
+	}
+	// Escape during thinking = cancel
+	if (event.key === 'Escape') {
+		if (document.getElementById('submit-btn')?.classList.contains('thinking')) {
 			event.preventDefault();
-			vscode.postMessage({ type: 'speechCancel' });
-			return;
-		}
-		// Escape during thinking = cancel
-		if (event.key === 'Escape') {
-			if (document.getElementById('submit-btn')?.classList.contains('thinking')) {
-				event.preventDefault();
-				vscode.postMessage({ type: 'cancelThinking' });
-				return;
-			}
-		}
-		// Enter = submit, Shift+Enter = newline
-		if (event.key === 'Enter' && !event.shiftKey) {
-			event.preventDefault();
-			submitInput();
-			return;
-		}
-		if (event.key === 'Enter' && event.shiftKey) {
-			event.preventDefault();
-			const sel = window.getSelection();
-			if (sel && sel.rangeCount > 0) {
-				const range = sel.getRangeAt(0);
-				range.deleteContents();
-				const br = document.createElement('br');
-				range.insertNode(br);
-				range.setStartAfter(br);
-				range.collapse(true);
-				sel.removeAllRanges();
-				sel.addRange(range);
-				updateComposerEmpty(userInput);
-			}
-		}
-	});
-
-	// Dismiss mention dropdown on blur (with delay for click handling)
-	userInput.addEventListener('blur', function () {
-		setTimeout(function () {
-			const active = document.activeElement;
-			const dropdown = document.getElementById('mention-dropdown');
-			if (dropdown && dropdown.contains(active)) { return; }
-			hideMentionDropdown();
-		}, 200);
-	});
-}
-
-const submitBtn = document.getElementById('submit-btn');
-if (submitBtn) {
-	submitBtn.addEventListener('click', function () {
-		if (submitBtn.classList.contains('thinking')) {
 			vscode.postMessage({ type: 'cancelThinking' });
-		} else {
-			submitInput();
+			return;
 		}
-	});
-}
+	}
+	// Enter = submit, Shift+Enter = newline
+	if (event.key === 'Enter' && !event.shiftKey) {
+		event.preventDefault();
+		submitInput();
+		return;
+	}
+	if (event.key === 'Enter' && event.shiftKey) {
+		event.preventDefault();
+		const sel = window.getSelection();
+		if (sel && sel.rangeCount > 0) {
+			const range = sel.getRangeAt(0);
+			range.deleteContents();
+			const br = document.createElement('br');
+			range.insertNode(br);
+			range.setStartAfter(br);
+			range.collapse(true);
+			sel.removeAllRanges();
+			sel.addRange(range);
+			updateComposerEmpty(target);
+		}
+	}
+});
+
+// Composer blur — delegated via focusout to survive hydration
+document.addEventListener('focusout', function (event: FocusEvent) {
+	const target = event.target as HTMLElement;
+	if (target.id !== 'user-input') { return; }
+	setTimeout(function () {
+		const active = document.activeElement;
+		const dropdown = document.getElementById('mention-dropdown');
+		if (dropdown && dropdown.contains(active)) { return; }
+		hideMentionDropdown();
+	}, 200);
+});
+
+// Submit button — delegated click handler to survive hydration
+document.addEventListener('click', function (event: MouseEvent) {
+	const target = event.target as HTMLElement;
+	const btn = target.closest('#submit-btn') as HTMLElement | null;
+	if (!btn) { return; }
+	if (btn.classList.contains('thinking')) {
+		vscode.postMessage({ type: 'cancelThinking' });
+	} else {
+		submitInput();
+	}
+});
 
 // ===== FIND WIDGET WIRING =====
 
@@ -875,5 +1017,14 @@ if (findCloseBtn) { findCloseBtn.addEventListener('click', closeFindWidget); }
 // Visual state is handled by server-side rendering (classes baked into HTML).
 restoreMmpState();
 
+// ===== SMART SCROLL INIT =====
+initSmartScroll();
+
+// ===== CARD COPY BUTTONS =====
+initCopyCards();
+
 // ===== INITIAL SCROLL =====
-setTimeout(scrollToBottom, 100);
+setTimeout(forceScrollToBottom, 100);
+
+// Signal to extension host that the webview is ready for messages
+vscode.postMessage({ type: 'webviewReady' });

@@ -54,6 +54,8 @@ const COMMAND_ALIASES: Record<string, string> = {
 	'cancel': 'cancel',
 	'stop': 'cancel',
 	'abort': 'cancel',
+	'pause': 'pause',
+	'wait': 'pause',
 	'save': 'save-output',
 	'save-output': 'save-output',
 	'write-output': 'save-output',

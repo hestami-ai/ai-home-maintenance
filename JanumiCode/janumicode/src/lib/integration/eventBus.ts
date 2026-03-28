@@ -36,7 +36,7 @@ export type JanumiCodeEventType =
 	| 'permission:requested'
 	| 'permission:decided'
 	| 'intake:mode_selected'
-	| 'intake:domain_coverage_updated'
+	| 'intake:engineering_domain_coverage_updated'
 	| 'intake:checkpoint_triggered'
 	| 'intake:domain_transition'
 	| 'intake:classifier_result'
@@ -174,9 +174,9 @@ export interface EventPayloads {
 		mode: import('../types/intake').IntakeMode;
 		source: 'classifier' | 'user';
 	};
-	'intake:domain_coverage_updated': {
+	'intake:engineering_domain_coverage_updated': {
 		dialogueId: string;
-		coverage: import('../types/intake').DomainCoverageMap;
+		coverage: import('../types/intake').EngineeringDomainCoverageMap;
 	};
 	'intake:checkpoint_triggered': {
 		dialogueId: string;
@@ -199,7 +199,7 @@ export interface EventPayloads {
 	};
 	'intake:analysis_complete': {
 		dialogueId: string;
-		domainAssessment: Array<{ domain: string; level: string; evidence: string }>;
+		engineeringDomainAssessment: Array<{ domain: string; level: string; evidence: string }>;
 	};
 	'intake:clarification_round_complete': {
 		dialogueId: string;
@@ -618,7 +618,7 @@ export function subscribeToIntakeEvents(
 		'intake:plan_finalized',
 		'intake:plan_approved',
 		'intake:mode_selected',
-		'intake:domain_coverage_updated',
+		'intake:engineering_domain_coverage_updated',
 		'intake:checkpoint_triggered',
 		'intake:domain_transition',
 		'intake:classifier_result',

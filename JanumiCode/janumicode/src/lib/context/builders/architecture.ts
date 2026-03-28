@@ -9,7 +9,7 @@
  */
 
 import type { Result } from '../../types';
-import type { IntakePlanDocument, DomainCoverageMap } from '../../types/intake';
+import type { IntakePlanDocument, EngineeringDomainCoverageMap } from '../../types/intake';
 import type {
 	ArchitectureDocument,
 	DecompositionConfig,
@@ -22,7 +22,7 @@ import type { Role } from '../../types';
 export interface DecomposingContextOptions {
 	dialogueId: string;
 	approvedPlan: IntakePlanDocument;
-	domainCoverage: DomainCoverageMap | null;
+	engineeringDomainCoverage: EngineeringDomainCoverageMap | null;
 	tokenBudget: number;
 	/** Validation findings from a previous iteration (re-decomposition feedback). */
 	humanFeedback?: string | null;
@@ -70,9 +70,9 @@ export function buildDecomposingContext(
 		}
 
 		// 5. Domain coverage
-		if (options.domainCoverage) {
+		if (options.engineeringDomainCoverage) {
 			sections.push('## Domain Coverage from INTAKE');
-			for (const [domain, coverage] of Object.entries(options.domainCoverage)) {
+			for (const [domain, coverage] of Object.entries(options.engineeringDomainCoverage)) {
 				const entry = coverage as { level: string; notes?: string };
 				sections.push(`- **${domain}**: ${entry.level}${entry.notes ? ` — ${entry.notes}` : ''}`);
 			}

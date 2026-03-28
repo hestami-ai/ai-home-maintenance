@@ -43,6 +43,19 @@ interface OpenAIAPIRequest {
 	temperature?: number;
 	top_p?: number;
 	stop?: string[];
+	/**
+	 * Structured output enforcement. Both OpenAI and the Gemini OpenAI-compatible
+	 * endpoint support json_schema mode, which guarantees the response conforms to
+	 * the provided schema.
+	 */
+	response_format?: {
+		type: 'json_schema';
+		json_schema: {
+			name: string;
+			schema: object;
+			strict: boolean;
+		};
+	};
 }
 
 /**
@@ -145,6 +158,16 @@ export class OpenAIProvider implements LLMProvider {
 				}
 				if (request.stopSequences) {
 					apiRequest.stop = request.stopSequences;
+				}
+				if (request.responseSchema) {
+					apiRequest.response_format = {
+						type: 'json_schema',
+						json_schema: {
+							name: 'response',
+							schema: request.responseSchema,
+							strict: true,
+						},
+					};
 				}
 
 				// Make API request

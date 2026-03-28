@@ -11,7 +11,7 @@
  * Two separate taxonomies:
  *   - Engineering Domains (from INTAKE) = elicitation grammar (what to ask about)
  *   - Capabilities (from Architecture) = decomposition grammar (what to build)
- *   - DomainCapabilityMapping = explicit bridge between them
+ *   - EngineeringDomainCapabilityMapping = explicit bridge between them
  */
 
 import type { EngineeringDomain } from './intake';
@@ -52,7 +52,7 @@ export enum ArchitectureDocumentStatus {
  * capabilities are LLM-generated (not domain-constrained) but linked
  * back to domains via the requirements they implement.
  */
-export interface DomainCapabilityMapping {
+export interface EngineeringDomainCapabilityMapping {
 	mapping_id: string;
 	domain: EngineeringDomain;
 	capability_id: string;
@@ -82,7 +82,7 @@ export interface RequirementsTraceabilityResult {
 	/** Capabilities with no source requirements (potential scope creep) */
 	unbacked_capabilities: string[];
 	/** INTAKE domains with coverage but no capability mapping */
-	unmapped_domains: string[];
+	unmapped_engineering_domains: string[];
 	/** Per-capability coverage assessment */
 	coverage_map: CapabilityCoverageMap;
 }
@@ -97,7 +97,7 @@ export interface CapabilityNode {
 	label: string;
 	description: string;
 	source_requirements: string[];
-	domain_mappings: DomainCapabilityMapping[];
+	engineering_domain_mappings: EngineeringDomainCapabilityMapping[];
 	workflows: string[];
 }
 

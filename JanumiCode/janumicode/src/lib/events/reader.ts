@@ -26,7 +26,7 @@ import type {
 	IntakeConversationTurn,
 	IntakePlanDocument,
 	IntakeAccumulation,
-	DomainCoverageMap,
+	EngineeringDomainCoverageMap,
 	IntakeModeRecommendation,
 	IntakeCheckpoint,
 } from '../types';
@@ -759,10 +759,10 @@ function parseIntakeConversationRow(
 		updatedAt: row.updated_at,
 		// V15 Adaptive Deep INTAKE fields
 		intakeMode: row.intake_mode as IntakeMode | null,
-		domainCoverage: row.domain_coverage
-			? (JSON.parse(row.domain_coverage) as DomainCoverageMap)
+		engineeringDomainCoverage: row.domain_coverage
+			? (JSON.parse(row.domain_coverage) as EngineeringDomainCoverageMap)
 			: null,
-		currentDomain: row.current_domain as EngineeringDomain | null,
+		currentEngineeringDomain: row.current_domain as EngineeringDomain | null,
 		checkpoints: row.checkpoints
 			? (JSON.parse(row.checkpoints) as IntakeCheckpoint[])
 			: [],

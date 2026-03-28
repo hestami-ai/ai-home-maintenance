@@ -69,6 +69,14 @@ export interface RoleCLIInvocationOptions {
 
 	/** AbortSignal for cancelling the CLI process on extension disposal */
 	signal?: AbortSignal;
+
+	/**
+	 * JSON Schema string for structured output enforcement (Claude Code --json-schema).
+	 * When provided, Claude Code validates and coerces its final result to conform to
+	 * this schema before returning — eliminating parse failures at the source.
+	 * Print mode only; ignored by other CLI providers.
+	 */
+	jsonSchema?: string;
 }
 
 /**
@@ -196,6 +204,46 @@ export function buildStdinContent(systemPrompt: string, context: string): string
 	return `${systemPrompt}${STDIN_SEPARATOR}${context}`;
 }
 
+/** Try to extract a typed CLI result event from a single JSONL line. Returns the response string or null. */
+function extractResultEventResponse(line: string): string | null {
+	try {
+		const event = JSON.parse(line);
+		if (event.type === 'result' && typeof event.result === 'string') { return event.result; }
+		// --json-schema structured output: result is an object, not a string.
+		// Serialize it so callers receive a JSON string as normal.
+		if (event.type === 'result' && event.result !== null && typeof event.result === 'object') {
+			return JSON.stringify(event.result);
+		}
+		if (event.type === 'result' && typeof event.response === 'string') { return event.response; }
+		if (event.type === 'item.completed' && event.item?.type === 'agent_message' && event.item.text) {
+			return String(event.item.text);
+		}
+	} catch { /* not a parseable event */ }
+	return null;
+}
+
+/** Returns true if a line is a parseable JSONL event object (has a string `type` field). */
+function isJsonlEventLine(line: string): boolean {
+	try {
+		const event = JSON.parse(line);
+		return event.type != null && typeof event.type === 'string';
+	} catch { return false; }
+}
+
+/** Extract Gemini assistant message chunks from JSONL stream lines. */
+function extractGeminiMessageChunks(lines: string[]): string {
+	const chunks: string[] = [];
+	for (const line of lines) {
+		try {
+			const event = JSON.parse(line);
+			if (event.type === 'message' && event.role === 'assistant' && event.content) {
+				chunks.push(String(event.content));
+			}
+		} catch { /* skip non-JSON lines */ }
+	}
+	return chunks.join('');
+}
+
 /**
  * Extract the final model response from a streaming JSONL output.
  * Walks backward through lines to find the result event (emitted last by most CLIs).
@@ -204,40 +252,20 @@ export function buildStdinContent(systemPrompt: string, context: string): string
 export function extractFinalResponseFromStream(rawOutput: string): string {
 	const lines = rawOutput.split('\n').filter((l) => l.trim());
 
-	// Pass 1: Look for explicit result/completion events (backward scan)
+	// Pass 1: Explicit result/completion events (backward scan — Claude Code, Codex)
 	for (let i = lines.length - 1; i >= 0; i--) {
-		try {
-			const event = JSON.parse(lines[i]);
-			// Claude Code result event
-			if (event.type === 'result' && typeof event.result === 'string') {
-				return event.result;
-			}
-			// Codex result event
-			if (event.type === 'item.completed' && event.item?.type === 'agent_message' && event.item.text) {
-				return event.item.text;
-			}
-			// Generic response field
-			if (event.type === 'result' && typeof event.response === 'string') {
-				return event.response;
-			}
-		} catch { /* skip non-JSON lines */ }
+		const response = extractResultEventResponse(lines[i]);
+		if (response !== null) { return response; }
 	}
 
-	// Pass 2: Concatenate Gemini CLI assistant message events (forward scan)
-	// Gemini emits type:'message' with role:'assistant' for model output chunks
-	const messageChunks: string[] = [];
-	for (const line of lines) {
-		try {
-			const event = JSON.parse(line);
-			if (event.type === 'message' && event.role === 'assistant' && event.content) {
-				messageChunks.push(String(event.content));
-			}
-		} catch { /* skip non-JSON lines */ }
-	}
-	if (messageChunks.length > 0) {
-		return messageChunks.join('');
-	}
+	// Pass 2: Gemini message event chunks (forward scan)
+	const messageText = extractGeminiMessageChunks(lines);
+	if (messageText) { return messageText; }
 
-	// Fallback: return raw output
+	// Pass 3: Gemini 2.5 raw-text mode — output is plain text with only init/error events as JSONL.
+	// Strip all parseable event objects and return the remaining content lines.
+	const nonEventLines = lines.filter((l) => !isJsonlEventLine(l));
+	if (nonEventLines.length > 0) { return nonEventLines.join('\n'); }
+
 	return rawOutput;
 }

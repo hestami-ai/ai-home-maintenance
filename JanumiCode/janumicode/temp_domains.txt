@@ -1,0 +1,1324 @@
+src/lib/context/builders/architecture.ts:5: *   - DECOMPOSING: approved plan + domain coverage → capabilities + workflows
+src/lib/context/builders/architecture.ts:6: *   - MODELING: capabilities + workflows + plan requirements → domain model
+src/lib/context/builders/architecture.ts:7: *   - DESIGNING: capabilities + workflows + domain model → components + interfaces
+src/lib/context/builders/architecture.ts:8: *   - SEQUENCING: components + interfaces + domain model → implementation roadmap
+src/lib/context/builders/architecture.ts:12:import type { IntakePlanDocument, DomainCoverageMap } from '../../types/intake';
+src/lib/context/builders/architecture.ts:25:	domainCoverage: DomainCoverageMap | null;
+src/lib/context/builders/architecture.ts:33: * Provides the approved plan, domain coverage, and relevant history.
+src/lib/context/builders/architecture.ts:72:		// 5. Domain coverage
+src/lib/context/builders/architecture.ts:73:		if (options.domainCoverage) {
+src/lib/context/builders/architecture.ts:74:			sections.push('## Domain Coverage from INTAKE');
+src/lib/context/builders/architecture.ts:75:			for (const [domain, coverage] of Object.entries(options.domainCoverage)) {
+src/lib/context/builders/architecture.ts:77:				sections.push(`- **${domain}**: ${entry.level}${entry.notes ? ` — ${entry.notes}` : ''}`);
+src/lib/context/builders/architecture.ts:126: * Build context for the MODELING sub-state (Domain Model).
+src/lib/context/builders/architecture.ts:179:		sections.push('If ground-truth specification files exist in the workspace (look for specs/ or ground-truth-specs/ directories), examine them for domain entity patterns, field naming conventions, and relationship structures.');
+src/lib/context/builders/architecture.ts:199: * Provides capabilities, workflows, AND the Domain Model from MODELING.
+src/lib/context/builders/architecture.ts:239:		// 3. Domain Model from MODELING (key input for flow-first design)
+src/lib/context/builders/architecture.ts:241:			sections.push('# Domain Model (from MODELING stage)');
+src/lib/context/builders/architecture.ts:242:			sections.push('Use this domain model to inform component design. Components should align with these entities.');
+src/lib/context/builders/architecture.ts:309:			'Examine the workspace for implementation patterns. Look for existing module structures in src/, domain patterns in ground-truth-specs/, and project conventions in config files to inform component boundaries and file_scope.',
+src/lib/context/builders/architecture.ts:328: * Provides the complete architecture (capabilities, domain model, components, interfaces)
+src/lib/context/builders/architecture.ts:362:		// 3. Domain Model (for understanding data dependencies)
+src/lib/context/builders/architecture.ts:364:			sections.push('# Domain Model');
+src/lib/context/builders/executor.ts:443:	// Domain Model (enriched with full field detail, relationships, invariants)
+src/lib/context/builders/executor.ts:445:		sections.push('## Domain Model');
+src/lib/context/builders/intakeTechnicalExpert.ts:297:	const domainNameById = new Map((plan.domainProposals ?? []).map(d => [d.id, d.name]));
+src/lib/context/builders/intakeTechnicalExpert.ts:352:	if (plan.domainProposals && plan.domainProposals.length > 0) {
+src/lib/context/builders/intakeTechnicalExpert.ts:353:		parts.push('## Proposed Domains (from Proposer Round 1)');
+src/lib/context/builders/intakeTechnicalExpert.ts:354:		for (const d of plan.domainProposals) {
+src/lib/context/builders/intakeTechnicalExpert.ts:364:			parts.push(`- [${w.id}] **${w.name}** (domain: ${domainNameById.get(w.domainId) ?? w.domainId}): ${w.description}`);
+src/lib/context/builders/intakeTechnicalExpert.ts:370:			parts.push(`- [${e.id}] **${e.name}** (domain: ${domainNameById.get(e.domainId) ?? e.domainId}): ${e.description}`);
+src/lib/context/builders/technicalExpert.ts:37: * - Relevant domain context
+src/lib/context/builders/technicalExpert.ts:159: * Prioritizes evidence and domain knowledge over governance
+src/lib/context/policyRegistry.ts:76:const DOMAIN_COVERAGE: ContextBlockSpec = {
+src/lib/context/policyRegistry.ts:77:	blockId: 'domain_coverage',
+src/lib/context/policyRegistry.ts:78:	label: 'Domain Coverage Analysis',
+src/lib/context/policyRegistry.ts:80:	queryHint: 'intake_conversations — domain_coverage field from finalized plan',
+src/lib/context/policyRegistry.ts:154:			DOMAIN_COVERAGE,
+src/lib/context/policyRegistry.ts:164:			domain_coverage: 0.2,
+src/lib/context/policyRegistry.ts:189:				label: 'Approved Plan (with entity/domain proposals - CRITICAL: you MUST preserve the full entityProposals and domainProposals JSON arrays verbatim)',
+src/lib/context/policyRegistry.ts:190:				source: 'static',  // Pre-assembled via extras — includes entityProposals, domainProposals
+src/lib/context/policyRegistry.ts:221:				blockId: 'domain_model',
+src/lib/context/policyRegistry.ts:222:				label: 'Domain Model',
+src/lib/context/policyRegistry.ts:244:			domain_model: 0.2,
+src/lib/context/policyRegistry.ts:272:				blockId: 'domain_model',
+src/lib/context/policyRegistry.ts:273:				label: 'Domain Model Summary',
+src/lib/context/policyRegistry.ts:291:			domain_model: 0.15,
+src/lib/database/architectureStore.ts:7: *   - arch_domain_mappings (domain→capability traceability)
+src/lib/database/architectureStore.ts:24:	DomainCapabilityMapping,
+src/lib/database/architectureStore.ts:266:			domain_mappings: [], // Populated below
+src/lib/database/architectureStore.ts:270:		// Populate domain mappings
+src/lib/database/architectureStore.ts:273:				'SELECT * FROM arch_domain_mappings WHERE capability_id = ? AND doc_id = ?'
+src/lib/database/architectureStore.ts:275:			cap.domain_mappings = mappingRows.map(hydrateDomainMapping);
+src/lib/database/architectureStore.ts:340: * Get domain mappings for a specific domain across a document.
+src/lib/database/architectureStore.ts:343:export function getDomainMappingsForDomain(
+src/lib/database/architectureStore.ts:345:	domain: string
+src/lib/database/architectureStore.ts:346:): Result<DomainCapabilityMapping[]> {
+src/lib/database/architectureStore.ts:349:			'SELECT * FROM arch_domain_mappings WHERE doc_id = ? AND domain = ?'
+src/lib/database/architectureStore.ts:350:		).all(docId, domain) as Record<string, unknown>[];
+src/lib/database/architectureStore.ts:351:		return { success: true, value: rows.map(hydrateDomainMapping) };
+src/lib/database/architectureStore.ts:358: * Get all domain mappings for a document.
+src/lib/database/architectureStore.ts:361:export function getAllDomainMappings(docId: string): Result<DomainCapabilityMapping[]> {
+src/lib/database/architectureStore.ts:364:			'SELECT * FROM arch_domain_mappings WHERE doc_id = ?'
+src/lib/database/architectureStore.ts:366:		return { success: true, value: rows.map(hydrateDomainMapping) };
+src/lib/database/architectureStore.ts:403:				domain_mappings: [],
+src/lib/database/architectureStore.ts:433:			domain_mappings: [],
+src/lib/database/architectureStore.ts:437:		// Populate domain mappings and workflows
+src/lib/database/architectureStore.ts:440:				'SELECT * FROM arch_domain_mappings WHERE capability_id = ? AND doc_id = ?'
+src/lib/database/architectureStore.ts:442:			cap.domain_mappings = mappingRows.map(hydrateDomainMapping);
+src/lib/database/architectureStore.ts:489:		// Domain mappings for this capability
+src/lib/database/architectureStore.ts:491:			INSERT OR REPLACE INTO arch_domain_mappings (mapping_id, doc_id, domain, capability_id, requirement_ids, coverage_contribution)
+src/lib/database/architectureStore.ts:494:		for (const mapping of cap.domain_mappings) {
+src/lib/database/architectureStore.ts:498:				mapping.mapping_id, doc.doc_id, mapping.domain,
+src/lib/database/architectureStore.ts:593: * workflows/domain_mappings from OTHER documents can reference capabilities
+src/lib/database/architectureStore.ts:607:	d.prepare(`DELETE FROM arch_domain_mappings WHERE capability_id IN (
+src/lib/database/architectureStore.ts:631:function hydrateDomainMapping(row: Record<string, unknown>): DomainCapabilityMapping {
+src/lib/database/architectureStore.ts:634:		domain: row.domain as DomainCapabilityMapping['domain'],
+src/lib/database/init.ts:311:				'arch_domain_mappings',       // FK → architecture_documents, arch_capabilities
+src/lib/database/migrations.ts:225:			'arch_domain_mappings',
+src/lib/database/schema.ts:29: * 35. arch_domain_mappings — Domain→capability traceability
+src/lib/database/schema.ts:291:-- Tracks the evolving plan, sub-state, domain coverage, and accumulated context summaries.
+src/lib/database/schema.ts:295:    sub_state TEXT NOT NULL CHECK(sub_state IN ('GATHERING','DISCUSSING','SYNTHESIZING','AWAITING_APPROVAL','INTENT_DISCOVERY','PRODUCT_REVIEW','PROPOSING','CLARIFYING','PROPOSING_DOMAINS','PROPOSING_JOURNEYS','PROPOSING_ENTITIES','PROPOSING_INTEGRATIONS')) DEFAULT 'DISCUSSING',
+src/lib/database/schema.ts:303:    domain_coverage TEXT DEFAULT NULL,
+src/lib/database/schema.ts:304:    current_domain TEXT DEFAULT NULL,
+src/lib/database/schema.ts:631:-- Domain → capability mapping (traceability layer)
+src/lib/database/schema.ts:632:CREATE TABLE IF NOT EXISTS arch_domain_mappings (
+src/lib/database/schema.ts:635:    domain TEXT NOT NULL,
+src/lib/database/schema.ts:642:CREATE INDEX IF NOT EXISTS idx_arch_dm_doc ON arch_domain_mappings(doc_id);
+src/lib/database/schema.ts:643:CREATE INDEX IF NOT EXISTS idx_arch_dm_cap ON arch_domain_mappings(capability_id);
+src/lib/database/schema.ts:644:CREATE INDEX IF NOT EXISTS idx_arch_dm_domain ON arch_domain_mappings(domain);
+src/lib/database/schema.ts:807:CREATE TABLE IF NOT EXISTS arch_domain_mappings (
+src/lib/database/schema.ts:810:    domain TEXT NOT NULL,
+src/lib/database/schema.ts:817:CREATE INDEX IF NOT EXISTS idx_arch_dm_doc ON arch_domain_mappings(doc_id);
+src/lib/database/schema.ts:818:CREATE INDEX IF NOT EXISTS idx_arch_dm_cap ON arch_domain_mappings(capability_id);
+src/lib/database/schema.ts:819:CREATE INDEX IF NOT EXISTS idx_arch_dm_domain ON arch_domain_mappings(domain);
+src/lib/database/schema.ts:915:    domain_coverage TEXT DEFAULT NULL,
+src/lib/database/schema.ts:916:    current_domain TEXT DEFAULT NULL,
+src/lib/database/schema.ts:924:INSERT INTO intake_conversations_v6 (id, dialogue_id, sub_state, turn_count, draft_plan, accumulations, finalized_plan, created_at, updated_at, intake_mode, domain_coverage, current_domain, checkpoints, classifier_result, clarification_round, mmp_history)
+src/lib/database/schema.ts:925:    SELECT id, dialogue_id, sub_state, turn_count, draft_plan, accumulations, finalized_plan, created_at, updated_at, intake_mode, domain_coverage, current_domain, checkpoints, classifier_result, clarification_round, mmp_history
+src/lib/database/schema.ts:951:    sub_state TEXT NOT NULL CHECK(sub_state IN ('GATHERING','DISCUSSING','SYNTHESIZING','AWAITING_APPROVAL','INTENT_DISCOVERY','PRODUCT_REVIEW','PROPOSING','CLARIFYING','PROPOSING_DOMAINS','PROPOSING_JOURNEYS','PROPOSING_ENTITIES','PROPOSING_INTEGRATIONS')) DEFAULT 'DISCUSSING',
+src/lib/database/schema.ts:959:    domain_coverage TEXT DEFAULT NULL,
+src/lib/database/schema.ts:960:    current_domain TEXT DEFAULT NULL,
+src/lib/database/schema.ts:969:INSERT INTO intake_conversations_v8 (id, dialogue_id, sub_state, turn_count, draft_plan, accumulations, finalized_plan, created_at, updated_at, intake_mode, domain_coverage, current_domain, checkpoints, classifier_result, clarification_round, mmp_history)
+src/lib/database/schema.ts:970:    SELECT id, dialogue_id, sub_state, turn_count, draft_plan, accumulations, finalized_plan, created_at, updated_at, intake_mode, domain_coverage, current_domain, checkpoints, classifier_result, clarification_round, mmp_history
+src/lib/database/schema.ts:1081:    domain TEXT,
+src/lib/database/schema.ts:1116:CREATE INDEX IF NOT EXISTS idx_mo_domain ON memory_objects(domain);
+src/lib/documents/contextAssembler.ts:188:	// Domain proposals
+src/lib/documents/contextAssembler.ts:189:	if (plan.domainProposals?.length) {
+src/lib/documents/contextAssembler.ts:190:		lines.push('\n### Business Domains');
+src/lib/documents/contextAssembler.ts:191:		for (const d of plan.domainProposals) {
+src/lib/documents/contextAssembler.ts:204:			lines.push(`\n#### ${e.name} (${e.id}, domain: ${e.domainId})`);
+src/lib/documents/contextAssembler.ts:215:			lines.push(`\n#### ${w.name} (${w.id}, domain: ${w.domainId})`);
+src/lib/documents/registry.ts:39:IMPORTANT: Do NOT ask for more information. Instead, use your domain expertise
+src/lib/documents/registry.ts:56:IMPORTANT: Do NOT ask for more information. Instead, use your domain expertise
+src/lib/documents/registry.ts:73:IMPORTANT: Do NOT ask for more information. Instead, use your domain expertise
+src/lib/documents/registry.ts:88:const DOMAIN_MODEL_PROMPT = `You are a domain modeling expert generating a Domain Model document.
+src/lib/documents/registry.ts:89:You have access to domain proposals, entity proposals, and workflow proposals
+src/lib/documents/registry.ts:91:Your job is to synthesize this into a comprehensive Domain Model document.
+src/lib/documents/registry.ts:93:IMPORTANT: Do NOT ask for more information. Instead, use your domain expertise
+src/lib/documents/registry.ts:97:Generate a complete Domain Model document in markdown with these sections:
+src/lib/documents/registry.ts:99:2. Business Domains
+src/lib/documents/registry.ts:102:5. Domain Invariants & Business Rules
+src/lib/documents/registry.ts:110:IMPORTANT: Do NOT ask for more information. Instead, use your domain expertise
+src/lib/documents/registry.ts:130:IMPORTANT: Do NOT ask for more information. Instead, use your domain expertise
+src/lib/documents/registry.ts:147:IMPORTANT: Do NOT ask for more information. Instead, use your domain expertise
+src/lib/documents/registry.ts:165:IMPORTANT: Do NOT ask for more information. Instead, use your domain expertise
+src/lib/documents/registry.ts:182:IMPORTANT: Do NOT ask for more information. Instead, use your domain expertise
+src/lib/documents/registry.ts:219:	[DocumentType.DOMAIN_MODEL]: {
+src/lib/documents/registry.ts:220:		type: DocumentType.DOMAIN_MODEL,
+src/lib/documents/registry.ts:221:		label: 'Domain Model',
+src/lib/documents/registry.ts:224:		systemPrompt: DOMAIN_MODEL_PROMPT,
+src/lib/documents/registry.ts:296:	// Domain Model: needs domain proposals or entity proposals
+src/lib/documents/registry.ts:297:	[DocumentType.DOMAIN_MODEL]: (ctx) => {
+src/lib/documents/registry.ts:300:			(p.domainProposals?.length ?? 0) > 0 ||
+src/lib/documents/types.ts:16:	DOMAIN_MODEL = 'DOMAIN_MODEL',
+src/lib/events/reader.ts:29:	DomainCoverageMap,
+src/lib/events/reader.ts:33:import { IntakeSubState, IntakeMode, EngineeringDomain, createEmptyPlanDocument } from '../types';
+src/lib/events/reader.ts:712:	domain_coverage: string | null;
+src/lib/events/reader.ts:713:	current_domain: string | null;
+src/lib/events/reader.ts:762:		domainCoverage: row.domain_coverage
+src/lib/events/reader.ts:763:			? (JSON.parse(row.domain_coverage) as DomainCoverageMap)
+src/lib/events/reader.ts:765:		currentDomain: row.current_domain as EngineeringDomain | null,
+src/lib/events/writer.ts:23:	DomainCoverageMap,
+src/lib/events/writer.ts:35:	EngineeringDomain,
+src/lib/events/writer.ts:616:		domainCoverage?: DomainCoverageMap | null;
+src/lib/events/writer.ts:617:		currentDomain?: EngineeringDomain | null;
+src/lib/events/writer.ts:667:		if (updates.domainCoverage !== undefined) {
+src/lib/events/writer.ts:668:			setClauses.push('domain_coverage = ?');
+src/lib/events/writer.ts:670:				updates.domainCoverage === null
+src/lib/events/writer.ts:672:					: JSON.stringify(updates.domainCoverage)
+src/lib/events/writer.ts:675:		if (updates.currentDomain !== undefined) {
+src/lib/events/writer.ts:676:			setClauses.push('current_domain = ?');
+src/lib/events/writer.ts:677:			params.push(updates.currentDomain);
+src/lib/events/writer.ts:724:			domain_coverage: string | null;
+src/lib/events/writer.ts:725:			current_domain: string | null;
+src/lib/events/writer.ts:759:				domainCoverage: row.domain_coverage
+src/lib/events/writer.ts:760:					? (JSON.parse(row.domain_coverage) as DomainCoverageMap)
+src/lib/events/writer.ts:762:				currentDomain: row.current_domain as EngineeringDomain | null,
+src/lib/integration/eventBus.ts:39:	| 'intake:domain_coverage_updated'
+src/lib/integration/eventBus.ts:41:	| 'intake:domain_transition'
+src/lib/integration/eventBus.ts:177:	'intake:domain_coverage_updated': {
+src/lib/integration/eventBus.ts:179:		coverage: import('../types/intake').DomainCoverageMap;
+src/lib/integration/eventBus.ts:185:	'intake:domain_transition': {
+src/lib/integration/eventBus.ts:187:		fromDomain: import('../types/intake').EngineeringDomain | null;
+src/lib/integration/eventBus.ts:188:		toDomain: import('../types/intake').EngineeringDomain | null;
+src/lib/integration/eventBus.ts:202:		domainAssessment: Array<{ domain: string; level: string; evidence: string }>;
+src/lib/integration/eventBus.ts:621:		'intake:domain_coverage_updated',
+src/lib/integration/eventBus.ts:623:		'intake:domain_transition',
+src/lib/memory/ingestion.ts:36:	domain_assessment: { objectType: 'domain_assessment', authority: 'agent_proposed' },
+src/lib/memory/ingestion.ts:129:		'open_question', 'domain_assessment', 'persona', 'user_journey',
+src/lib/memory/ingestion.ts:146: * - Assumptions derive_from domain assessments
+src/lib/memory/ingestion.ts:205:	// Assumptions derived_from domain assessments
+src/lib/memory/ingestion.ts:207:	const assessments = byType.get('domain_assessment') || [];
+src/lib/memory/ingestion.ts:281:				domain_assessment: 'derived_conclusion',
+src/lib/memory/researchPrompt.ts:17:- **Key entities**: names, concepts, domains, components mentioned
+src/lib/memory/types.ts:28:	| 'domain_assessment'
+src/lib/roles/architectureExpert.ts:7: *   - invokeArchitectureModeling: MODELING → domain entities + relationships (Domain Model)
+src/lib/roles/architectureExpert.ts:54:	DomainCapabilityMapping,
+src/lib/roles/architectureExpert.ts:56:import type { IntakePlanDocument, DomainCoverageMap } from '../types/intake';
+src/lib/roles/architectureExpert.ts:70:- **domainProposals** — user-validated business domains (from INTAKE Proposer Round 1). Use these as the PRIMARY source for capability grouping. Do NOT ignore them.
+src/lib/roles/architectureExpert.ts:81:  to the 12 engineering domains — they are functional groupings that emerge from requirements.
+src/lib/roles/architectureExpert.ts:105:6. Include domain_mappings for EVERY capability — map to the engineering domain(s) listed in
+src/lib/roles/architectureExpert.ts:106:   the Domain Coverage section using their exact names. If unsure, use coverage_contribution: "SECONDARY".
+src/lib/roles/architectureExpert.ts:107:   Do NOT leave domain_mappings empty.
+src/lib/roles/architectureExpert.ts:116:    workflow inputs/outputs to ensure domain completeness.
+src/lib/roles/architectureExpert.ts:131:      "domain_mappings": [
+src/lib/roles/architectureExpert.ts:134:          "domain": "<EngineeringDomain enum value>",
+src/lib/roles/architectureExpert.ts:167:// ── MODELING prompt: Domain Model document ──
+src/lib/roles/architectureExpert.ts:169:const MODELING_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT performing DOMAIN MODELING.
+src/lib/roles/architectureExpert.ts:172:Produce a comprehensive Domain Model for the system described in the context below.
+src/lib/roles/architectureExpert.ts:173:The Domain Model defines every data entity the system works with — their fields,
+src/lib/roles/architectureExpert.ts:179:   names, key attributes, relationships, and domain assignments. Do NOT ignore them.
+src/lib/roles/architectureExpert.ts:180:2. Use \`domainProposals\` (if present) to understand domain groupings and entity previews.
+src/lib/roles/architectureExpert.ts:183:   specs/ or ground-truth-specs/ directories) to understand domain patterns.
+src/lib/roles/architectureExpert.ts:231:You receive capabilities, workflows, AND the Domain Model as input. Your job is to determine
+src/lib/roles/architectureExpert.ts:247:3. What domain entities does it read/write?
+src/lib/roles/architectureExpert.ts:287:2. Read ground-truth spec files (specs/ or ground-truth-specs/) for domain
+src/lib/roles/architectureExpert.ts:340:You receive the complete architecture (capabilities, domain model, components, interfaces)
+src/lib/roles/architectureExpert.ts:364:   domain priorities or phasing guidance.
+src/lib/roles/architectureExpert.ts:411:	domainCoverage: DomainCoverageMap | null,
+src/lib/roles/architectureExpert.ts:431:		const extras: Record<string, unknown> = { domainCoverage, humanFeedback: options?.humanFeedback };
+src/lib/roles/architectureExpert.ts:438:				domain: w.domainId,
+src/lib/roles/architectureExpert.ts:721:			domain_mappings: Array.isArray(c.domain_mappings)
+src/lib/roles/architectureExpert.ts:722:				? (c.domain_mappings as Record<string, unknown>[]).map(dm => ({
+src/lib/roles/architectureExpert.ts:724:					domain: dm.domain as DomainCapabilityMapping['domain'],
+src/lib/roles/architectureExpert.ts:888: * Invoke the Architecture Expert for MODELING (Domain Model).
+src/lib/roles/architectureExpert.ts:889: * Transforms capabilities and workflows into domain entities with full field detail.
+src/lib/roles/architectureExpert.ts:917:		// Pass a compact plan summary (entity/domain proposals only — not full 60KB plan)
+src/lib/roles/architectureExpert.ts:923:				domainProposals: plan.domainProposals,
+src/lib/roles/architectureExpert.ts:954:				label: 'Architect — Domain Modeling',
+src/lib/roles/architectureExpert.ts:1022:				domain_mappings: [], workflows: [],
+src/lib/roles/architectureExpert.ts:1113:- If distinct workflow groups touch different domain entities or data paths, DECOMPOSE.
+src/lib/roles/architectureExpert.ts:1214:			contextSections.push('\n# Domain Model (summary)');
+src/lib/roles/architectureValidator.ts:22:	getAllDomainMappings,
+src/lib/roles/architectureValidator.ts:90:		// Check domain mapping completeness
+src/lib/roles/architectureValidator.ts:91:		const mappingsResult = getAllDomainMappings(doc.doc_id);
+src/lib/roles/architectureValidator.ts:93:			// Get the approved plan's domain coverage from workflow metadata
+src/lib/roles/architectureValidator.ts:97:				const domainCoverage = meta.approvedIntakePlan?.domainCoverage;
+src/lib/roles/architectureValidator.ts:98:				if (domainCoverage) {
+src/lib/roles/architectureValidator.ts:99:					const mappedDomains = new Set(mappingsResult.value.map(m => m.domain));
+src/lib/roles/architectureValidator.ts:100:					for (const [domain, coverage] of Object.entries(domainCoverage)) {
+src/lib/roles/architectureValidator.ts:102:						if ((entry.level === 'ADEQUATE' || entry.level === 'PARTIAL') && !mappedDomains.has(domain as never)) {
+src/lib/roles/architectureValidator.ts:103:							findings.push(`Domain "${domain}" has ${entry.level} INTAKE coverage but no capability mapping in architecture`);
+src/lib/roles/architectureValidator.ts:180: * - unmapped_domains: INTAKE domains with coverage but no capability mapping
+src/lib/roles/architectureValidator.ts:188:	domainCoverage: Record<string, any> | null,
+src/lib/roles/architectureValidator.ts:200:	// 3. Unmapped domains: INTAKE domains with PARTIAL/ADEQUATE coverage but no capability mapping
+src/lib/roles/architectureValidator.ts:201:	const unmapped_domains: string[] = [];
+src/lib/roles/architectureValidator.ts:202:	if (domainCoverage) {
+src/lib/roles/architectureValidator.ts:203:		const mappedDomains = new Set<string>(
+src/lib/roles/architectureValidator.ts:204:			doc.capabilities.flatMap(c => c.domain_mappings.map(m => m.domain))
+src/lib/roles/architectureValidator.ts:206:		for (const [domain, entry] of Object.entries(domainCoverage)) {
+src/lib/roles/architectureValidator.ts:208:			if ((level === 'ADEQUATE' || level === 'PARTIAL') && !mappedDomains.has(domain)) {
+src/lib/roles/architectureValidator.ts:209:				unmapped_domains.push(domain);
+src/lib/roles/architectureValidator.ts:217:	return { uncovered_requirements, unbacked_capabilities, unmapped_domains, coverage_map };
+src/lib/roles/technicalExpertIntake.ts:20:	DomainProposal,
+src/lib/roles/technicalExpertIntake.ts:26:import { EngineeringDomain } from '../types/intake';
+src/lib/roles/technicalExpertIntake.ts:75:	/** Optional domain coverage context to inject into system prompt (Adaptive Deep INTAKE) */
+src/lib/roles/technicalExpertIntake.ts:76:	domainCoverageContext?: string;
+src/lib/roles/technicalExpertIntake.ts:253:IMPORTANT: Personas, user journeys, phasing strategy, success metrics, UX requirements, domain proposals, entity proposals, workflow proposals, integration proposals, and quality attributes are **assembled programmatically by the system** from the dedicated Proposer rounds. Do NOT include any of these fields in your response — the system will attach them after synthesis. Returning them wastes tokens and risks data corruption.
+src/lib/roles/technicalExpertIntake.ts:341:		// Build stdin: system prompt (with optional domain coverage context) + formatted context
+src/lib/roles/technicalExpertIntake.ts:343:			options.domainCoverageContext,
+src/lib/roles/technicalExpertIntake.ts:485: * System prompt for Technical Expert in GATHERING mode (domain interviewer).
+src/lib/roles/technicalExpertIntake.ts:486: * The Expert investigates ONE domain at a time, asks targeted questions,
+src/lib/roles/technicalExpertIntake.ts:493:You are conducting a structured requirements-gathering interview, focusing on ONE engineering domain at a time. You have full access to the codebase through CLI tools.
+src/lib/roles/technicalExpertIntake.ts:497:1. **ONE DOMAIN ONLY**: Your entire response must be scoped to the current domain specified below. Do NOT discuss other domains unless the Human explicitly asks.
+src/lib/roles/technicalExpertIntake.ts:501:3. **CODEBASE-GROUNDED**: Investigate the workspace to find patterns, files, configurations, and structures relevant to the current domain. Report what you find.
+src/lib/roles/technicalExpertIntake.ts:503:4. **ASK TARGETED QUESTIONS**: Ask 2-4 specific, concrete questions about the current domain. Base questions on what you find (or don't find) in the codebase.
+src/lib/roles/technicalExpertIntake.ts:507:6. **COVERAGE REPORTING**: End your response with a coverage tag: [DOMAIN_COVERAGE: DOMAIN_NAME=LEVEL] where LEVEL is NONE, PARTIAL, or ADEQUATE.
+src/lib/roles/technicalExpertIntake.ts:513:- Discuss domains other than the current focus domain
+src/lib/roles/technicalExpertIntake.ts:514:- Provide a broad overview of all domains
+src/lib/roles/technicalExpertIntake.ts:518:When gathering domain-specific information, prefer the Mirror & Menu approach over open-ended questions:
+src/lib/roles/technicalExpertIntake.ts:520:- **Mirror items**: State what you DISCOVERED or ASSUME about this domain based on the codebase and user's input. The user confirms/rejects. Categories: "intent", "scope", "constraint", "priority", "anti-goal", "persona", "journey", "ux".
+src/lib/roles/technicalExpertIntake.ts:521:- **Menu items**: When a domain-specific choice has meaningful consequences, present 2-3 concrete options with trade-offs.
+src/lib/roles/technicalExpertIntake.ts:522:- Only use \`followUpQuestions\` for domain-specific questions that cannot be framed as assumptions or options.
+src/lib/roles/technicalExpertIntake.ts:524:Maximum 5 Mirror items and 2 Menu items per domain turn.
+src/lib/roles/technicalExpertIntake.ts:526:# Domain-Specific Product Artifacts (only when requestCategory is "product_or_feature")
+src/lib/roles/technicalExpertIntake.ts:530:When gathering information for certain domains, also extract product artifacts in your domainNotes:
+src/lib/roles/technicalExpertIntake.ts:545:  "focusDomain": "DOMAIN_ENUM_VALUE",
+src/lib/roles/technicalExpertIntake.ts:546:  "domainNotes": ["Key fact 1...", "Key fact 2...", "Constraint discovered..."],
+src/lib/roles/technicalExpertIntake.ts:551:      "steelMan": "Based on my investigation of this domain, here is what I found...",
+src/lib/roles/technicalExpertIntake.ts:553:        { "id": "MIR-1", "text": "Domain assumption", "category": "scope", "rationale": "Found in codebase or inferred from specs", "status": "pending" }
+src/lib/roles/technicalExpertIntake.ts:558:        { "id": "MENU-1", "question": "Domain-specific decision", "context": "Why this matters", "options": [
+src/lib/roles/technicalExpertIntake.ts:568:The \`mmp\` field is optional. Include it when you have domain-specific assumptions to validate or decisions for the user. You may still use \`followUpQuestions\` as fallback for open-ended domain questions.
+src/lib/roles/technicalExpertIntake.ts:570:The "domainNotes" array should capture structured observations:
+src/lib/roles/technicalExpertIntake.ts:571:- Facts the Human stated about this domain
+src/lib/roles/technicalExpertIntake.ts:573:- Codebase patterns relevant to this domain
+src/lib/roles/technicalExpertIntake.ts:574:- Open questions specific to this domain`;
+src/lib/roles/technicalExpertIntake.ts:582:	currentDomain: EngineeringDomain;
+src/lib/roles/technicalExpertIntake.ts:587:	/** Formatted context from prior gathering turns (domain notes accumulated so far) */
+src/lib/roles/technicalExpertIntake.ts:589:	/** Domain-specific context (domain info, coverage status) */
+src/lib/roles/technicalExpertIntake.ts:590:	domainContext: string;
+src/lib/roles/technicalExpertIntake.ts:595: * The Expert investigates one domain, asks questions, and takes notes.
+src/lib/roles/technicalExpertIntake.ts:602:		// Build context: prior gathering notes + domain context + human message
+src/lib/roles/technicalExpertIntake.ts:606:				'# Current Domain Context\n\n' + options.domainContext,
+src/lib/roles/technicalExpertIntake.ts:610:				'# Current Domain Context\n\n' + options.domainContext,
+src/lib/roles/technicalExpertIntake.ts:634:			options.currentDomain
+src/lib/roles/technicalExpertIntake.ts:654:	expectedDomain: EngineeringDomain
+src/lib/roles/technicalExpertIntake.ts:665:					focusDomain: expectedDomain,
+src/lib/roles/technicalExpertIntake.ts:666:					domainNotes: [],
+src/lib/roles/technicalExpertIntake.ts:683:				focusDomain: isValidEngineeringDomain(parsed.focusDomain) ? parsed.focusDomain : expectedDomain,
+src/lib/roles/technicalExpertIntake.ts:684:				domainNotes: Array.isArray(parsed.domainNotes) ? parsed.domainNotes : [],
+src/lib/roles/technicalExpertIntake.ts:706:				focusDomain: expectedDomain,
+src/lib/roles/technicalExpertIntake.ts:707:				domainNotes: [],
+src/lib/roles/technicalExpertIntake.ts:715:const VALID_DOMAINS = new Set(Object.values(EngineeringDomain));
+src/lib/roles/technicalExpertIntake.ts:716:function isValidEngineeringDomain(value: unknown): value is EngineeringDomain {
+src/lib/roles/technicalExpertIntake.ts:717:	return typeof value === 'string' && VALID_DOMAINS.has(value as EngineeringDomain);
+src/lib/roles/technicalExpertIntake.ts:806:When source documents are vague or reference external companies/products as examples (e.g., "be like Company X"), research what those companies do — use available tools to understand their business domains, key features, and user models. Then frame your findings as concrete proposals or open questions, not vague references.
+src/lib/roles/technicalExpertIntake.ts:863:- Surface open product questions the user hasn't addressed yet; but provide business domain expert level relevant recommendations
+src/lib/roles/technicalExpertIntake.ts:1022:				domainAssessment: Array.isArray(parsed.domainAssessment) ? parsed.domainAssessment : [],
+src/lib/roles/technicalExpertIntake.ts:1065:function buildClarifyingSystemPrompt(round: number, maxRounds: number, domainCoverageContext?: string): string {
+src/lib/roles/technicalExpertIntake.ts:1071:	const coverageSection = domainCoverageContext
+src/lib/roles/technicalExpertIntake.ts:1072:		? `\n\n# Domain Coverage Context\n\n${domainCoverageContext}\n\nWhen you address a domain in your response, include a tag like [DOMAIN_COVERAGE: DOMAIN_NAME=LEVEL].`
+src/lib/roles/technicalExpertIntake.ts:1214: * For STATE_DRIVEN mode, the domain coverage context contains a strong
+src/lib/roles/technicalExpertIntake.ts:1215: * behavioral override that narrows the Expert's scope to the current domain.
+src/lib/roles/technicalExpertIntake.ts:1216: * For other modes (DOMAIN_GUIDED, HYBRID_CHECKPOINTS), it appends advisory
+src/lib/roles/technicalExpertIntake.ts:1219: * Returns the base prompt unmodified when no domain context is provided.
+src/lib/roles/technicalExpertIntake.ts:1222:	domainCoverageContext?: string,
+src/lib/roles/technicalExpertIntake.ts:1231:			domainCoverageContext,
+src/lib/roles/technicalExpertIntake.ts:1235:	if (!domainCoverageContext) {
+src/lib/roles/technicalExpertIntake.ts:1239:	// Check if gathered context is present (prepended by buildDomainCoverageContextForExpert)
+src/lib/roles/technicalExpertIntake.ts:1240:	const hasGatheredNotes = domainCoverageContext.includes('# Domain Gathering Notes');
+src/lib/roles/technicalExpertIntake.ts:1242:		? '\n\n# Using Gathered Domain Notes\n\n'
+src/lib/roles/technicalExpertIntake.ts:1243:			+ 'The domain notes below were gathered during a structured interview phase. '
+src/lib/roles/technicalExpertIntake.ts:1250:	if (domainCoverageContext.includes('INTAKE MODE: State-Driven')) {
+src/lib/roles/technicalExpertIntake.ts:1251:		return buildStateDrivenPrompt(domainCoverageContext) + gatheringInstruction;
+src/lib/roles/technicalExpertIntake.ts:1254:	// DOMAIN_GUIDED and HYBRID_CHECKPOINTS: append coverage context as advisory
+src/lib/roles/technicalExpertIntake.ts:1257:		+ '\n\n# Domain Coverage Context\n\n'
+src/lib/roles/technicalExpertIntake.ts:1258:		+ domainCoverageContext
+src/lib/roles/technicalExpertIntake.ts:1259:		+ '\n\nWhen you address a domain in your response, include a tag like [DOMAIN_COVERAGE: DOMAIN_NAME=LEVEL] (e.g., [DOMAIN_COVERAGE: SECURITY_COMPLIANCE=PARTIAL]) to help track coverage.';
+src/lib/roles/technicalExpertIntake.ts:1264: * "Conversation Style" section with explicit single-domain focus instructions.
+src/lib/roles/technicalExpertIntake.ts:1265: * This ensures the Expert narrows its scope to one engineering domain at a time
+src/lib/roles/technicalExpertIntake.ts:1268:function buildStateDrivenPrompt(domainContext: string): string {
+src/lib/roles/technicalExpertIntake.ts:1269:	// Replace the "Conversation Style" section with domain-focused instructions
+src/lib/roles/technicalExpertIntake.ts:1272:		`# Conversation Style — STATE-DRIVEN DOMAIN WALKTHROUGH
+src/lib/roles/technicalExpertIntake.ts:1274:**CRITICAL: You are in State-Driven Domain Walkthrough mode.**
+src/lib/roles/technicalExpertIntake.ts:1276:You are systematically walking the Human through engineering domains ONE AT A TIME to build comprehensive requirements. This is NOT a free-form conversation — you must stay focused on the current domain.
+src/lib/roles/technicalExpertIntake.ts:1278:## Current Domain Focus
+src/lib/roles/technicalExpertIntake.ts:1280:${domainContext}
+src/lib/roles/technicalExpertIntake.ts:1284:1. **SCOPE RESTRICTION**: Your conversational response MUST focus on the current domain listed above. Do NOT discuss other engineering domains unless the Human explicitly asks about them.
+src/lib/roles/technicalExpertIntake.ts:1286:2. **QUESTION-DRIVEN**: Ask 2-4 focused, specific questions about the current domain. Make them concrete, not abstract. Reference what you find in the codebase when possible.
+src/lib/roles/technicalExpertIntake.ts:1288:3. **EVIDENCE GATHERING**: If you can investigate the codebase to find information relevant to the current domain, do so. Report your findings within the scope of this domain.
+src/lib/roles/technicalExpertIntake.ts:1290:4. **PLAN UPDATES**: Only add plan items (requirements, decisions, constraints, questions) that relate to the current domain. Carry forward all existing items but do not add items for other domains.
+src/lib/roles/technicalExpertIntake.ts:1292:5. **COVERAGE REPORTING**: At the end of your response, include a coverage tag for the current domain: [DOMAIN_COVERAGE: DOMAIN_NAME=LEVEL] where LEVEL is NONE, PARTIAL, or ADEQUATE.
+src/lib/roles/technicalExpertIntake.ts:1294:6. **DOMAIN COMPLETION**: When you believe the current domain has been sufficiently explored (the Human has answered your key questions and you have enough information), state this clearly: "I believe we have adequate coverage of [domain]. Ready to move to the next domain."
+src/lib/roles/technicalExpertIntake.ts:1296:7. **DO NOT** attempt to cover all domains at once. DO NOT provide a broad overview. Stay narrow and deep on the current domain.`
+src/lib/roles/technicalExpertIntake.ts:1819:	if (lower.includes('domain-standard') || lower.includes('domain standard')) { return 'domain-standard'; }
+src/lib/roles/technicalExpertIntake.ts:1831:// ── DOMAIN PROPOSER ──
+src/lib/roles/technicalExpertIntake.ts:1833:const DOMAIN_PROPOSER_PROMPT = `You are a PRODUCT DOMAIN PROPOSER in an autonomous software engineering system.
+src/lib/roles/technicalExpertIntake.ts:1837:The user has described a product they want to build. Your job is to propose ALL business domains and personas that this product should encompass.
+src/lib/roles/technicalExpertIntake.ts:1839:This is a PRODUCT VISION phase — your goal is comprehensive domain coverage, not MVP scoping.
+src/lib/roles/technicalExpertIntake.ts:1840:The user will prune domains via Accept/Reject decisions. Do NOT pre-filter by importance.
+src/lib/roles/technicalExpertIntake.ts:1844:2. Propose ALL business domains that the product should encompass. Use the validated intent as your foundation and supplement with standard domains for this industry.
+src/lib/roles/technicalExpertIntake.ts:1845:3. For each domain, provide a name, description, why it's relevant, and preview of typical entities and workflows.
+src/lib/roles/technicalExpertIntake.ts:1850:- Extract ALL domains implied by those journeys and personas.
+src/lib/roles/technicalExpertIntake.ts:1851:- Supplement with additional domains standard for this industry that the user may not have mentioned.
+src/lib/roles/technicalExpertIntake.ts:1853:- Mark each domain's source: "user-specified" or "ai-proposed".
+src/lib/roles/technicalExpertIntake.ts:1856:- PROPOSE EXPANSIVELY. The user will Accept/Reject each domain individually.
+src/lib/roles/technicalExpertIntake.ts:1857:- Do NOT exclude domains because they seem low priority or future scope. Propose them ALL.
+src/lib/roles/technicalExpertIntake.ts:1858:- If source documents describe implementation phases or pillars, note that in the rationale but still propose every domain.
+src/lib/roles/technicalExpertIntake.ts:1879:  "domains": [
+src/lib/roles/technicalExpertIntake.ts:1882:      "name": "Domain Name",
+src/lib/roles/technicalExpertIntake.ts:1883:      "description": "What this domain covers",
+src/lib/roles/technicalExpertIntake.ts:1884:      "rationale": "Why this domain is relevant. Source: user-specified|ai-proposed",
+src/lib/roles/technicalExpertIntake.ts:1901: * Invoke the domain proposer — Round 1.
+src/lib/roles/technicalExpertIntake.ts:1903:export async function invokeProposerDomains(
+src/lib/roles/technicalExpertIntake.ts:1905:): Promise<Result<{ domains: DomainProposal[]; personas: PersonaDefinition[] }>> {
+src/lib/roles/technicalExpertIntake.ts:1929:		const stdinContent = buildStdinContent(DOMAIN_PROPOSER_PROMPT, contextParts.join('\n\n---\n\n'));
+src/lib/roles/technicalExpertIntake.ts:1942:		const domains: DomainProposal[] = (parsed.domains ?? []).map((d: Record<string, unknown>, i: number) => ({
+src/lib/roles/technicalExpertIntake.ts:1960:		return { success: true, value: { domains, personas } };
+src/lib/roles/technicalExpertIntake.ts:1972:You have accepted business domains and personas. Your job is to propose ALL user journeys
+src/lib/roles/technicalExpertIntake.ts:1973:and system workflows that these domains could encompass.
+src/lib/roles/technicalExpertIntake.ts:1979:- Read the accepted domains' descriptions, entity previews, and workflow previews
+src/lib/roles/technicalExpertIntake.ts:1980:- Draw on your knowledge of standard journeys for each domain type (e.g., an Accounting domain
+src/lib/roles/technicalExpertIntake.ts:1982:- Identify ALL personas and how they interact with each domain
+src/lib/roles/technicalExpertIntake.ts:1984:Step 2 — GENERATE: For each accepted domain, propose:
+src/lib/roles/technicalExpertIntake.ts:1994:- Cover EVERY accepted domain. If a domain has no journeys, explain why.
+src/lib/roles/technicalExpertIntake.ts:1997:  "domain-standard" (typical for this domain type), or "ai-proposed" (your inference).
+src/lib/roles/technicalExpertIntake.ts:2002:to tag each journey's implementationPhase field. Match journeys to phases based on which domains
+src/lib/roles/technicalExpertIntake.ts:2004:- If a journey belongs to a domain covered by Phase 1, tag it "Phase 1"
+src/lib/roles/technicalExpertIntake.ts:2005:- If a journey belongs to a domain covered by Phase 2, tag it "Phase 2"
+src/lib/roles/technicalExpertIntake.ts:2038:      "source": "document-specified | domain-standard | ai-proposed"
+src/lib/roles/technicalExpertIntake.ts:2044:      "domainId": "DOM-X",
+src/lib/roles/technicalExpertIntake.ts:2050:      "source": "document-specified | domain-standard | ai-proposed"
+src/lib/roles/technicalExpertIntake.ts:2075:		// Include accepted domains
+src/lib/roles/technicalExpertIntake.ts:2076:		const domains = options.draftPlan.domainProposals ?? [];
+src/lib/roles/technicalExpertIntake.ts:2077:		if (domains.length > 0) {
+src/lib/roles/technicalExpertIntake.ts:2078:			contextParts.push(`# Accepted Domains\n\n${domains.map(d => `- **${d.id}**: ${d.name} — ${d.description}`).join('\n')}`);
+src/lib/roles/technicalExpertIntake.ts:2117:			domainId: (w.domainId as string) || '',
+src/lib/roles/technicalExpertIntake.ts:2138:The user's product has accepted business domains and workflows. Your job is to propose ALL data entities needed by these domains.
+src/lib/roles/technicalExpertIntake.ts:2143:- Study the accepted domains, their workflows, and user journeys
+src/lib/roles/technicalExpertIntake.ts:2146:- Draw on domain knowledge for standard entities in each domain type
+src/lib/roles/technicalExpertIntake.ts:2149:- Propose entities needed by the accepted domains and workflows
+src/lib/roles/technicalExpertIntake.ts:2151:- Tag each entity with its source: "document-specified", "domain-standard", or "ai-proposed"
+src/lib/roles/technicalExpertIntake.ts:2155:- PROPOSE EXPANSIVELY. Include all entities the product would need across all accepted domains.
+src/lib/roles/technicalExpertIntake.ts:2157:- Cover EVERY accepted domain with its relevant entities.
+src/lib/roles/technicalExpertIntake.ts:2158:- If a workflow involves data flow between domains, propose the junction entities.
+src/lib/roles/technicalExpertIntake.ts:2179:      "domainId": "DOM-X",
+src/lib/roles/technicalExpertIntake.ts:2184:      "source": "document-specified | domain-standard | ai-proposed"
+src/lib/roles/technicalExpertIntake.ts:2208:		const domains = options.draftPlan.domainProposals ?? [];
+src/lib/roles/technicalExpertIntake.ts:2209:		if (domains.length > 0) {
+src/lib/roles/technicalExpertIntake.ts:2210:			contextParts.push(`# Accepted Domains\n\n${domains.map(d => `- **${d.id}**: ${d.name} — ${d.description}`).join('\n')}`);
+src/lib/roles/technicalExpertIntake.ts:2243:			domainId: (e.domainId as string) || '',
+src/lib/roles/technicalExpertIntake.ts:2263:The user's product has accepted business domains, entities, and workflows. Your job is to propose ALL integrations with external systems and quality attributes.
+src/lib/roles/technicalExpertIntake.ts:2268:- Study the accepted domains, entities, and workflows
+src/lib/roles/technicalExpertIntake.ts:2270:- For each domain, identify what external systems it would interact with
+src/lib/roles/technicalExpertIntake.ts:2271:- Draw on domain knowledge for standard integration patterns
+src/lib/roles/technicalExpertIntake.ts:2274:- Propose ALL integration points: internal (between domains) and external (third-party APIs, services)
+src/lib/roles/technicalExpertIntake.ts:2277:- Tag each with its source: "document-specified", "domain-standard", or "ai-proposed"
+src/lib/roles/technicalExpertIntake.ts:2283:- Cover EVERY accepted domain with its relevant integration points.
+src/lib/roles/technicalExpertIntake.ts:2284:- Include both obvious integrations (payment, auth) and domain-specific ones.
+src/lib/roles/technicalExpertIntake.ts:2311:      "source": "document-specified | domain-standard | ai-proposed"
+src/lib/roles/technicalExpertIntake.ts:2338:		const domains = options.draftPlan.domainProposals ?? [];
+src/lib/roles/technicalExpertIntake.ts:2339:		if (domains.length > 0) {
+src/lib/roles/technicalExpertIntake.ts:2340:			contextParts.push(`# Accepted Domains\n\n${domains.map(d => `- **${d.id}**: ${d.name}`).join('\n')}`);
+src/lib/roles/technicalExpertIntake.ts:2343:		const domainNameById = new Map(domains.map(d => [d.id, d.name]));
+src/lib/roles/technicalExpertIntake.ts:2346:			contextParts.push(`# Accepted Entities\n\n${entities.map(e => `- **${e.id}**: ${e.name} (domain: ${domainNameById.get(e.domainId) ?? e.domainId})`).join('\n')}`);
+src/lib/types/architecture.ts:12: *   - Engineering Domains (from INTAKE) = elicitation grammar (what to ask about)
+src/lib/types/architecture.ts:14: *   - DomainCapabilityMapping = explicit bridge between them
+src/lib/types/architecture.ts:17:import type { EngineeringDomain } from './intake';
+src/lib/types/architecture.ts:26:	/** Domain modeling: workflows → entities, fields, relationships, invariants */
+src/lib/types/architecture.ts:28:	/** Component design + interface contracts: domain model → components → interfaces */
+src/lib/types/architecture.ts:47:// ==================== DOMAIN-CAPABILITY MAPPING ====================
+src/lib/types/architecture.ts:50: * Explicit mapping between an INTAKE engineering domain and an
+src/lib/types/architecture.ts:51: * Architecture capability. Requirements carry domain tags from INTAKE;
+src/lib/types/architecture.ts:52: * capabilities are LLM-generated (not domain-constrained) but linked
+src/lib/types/architecture.ts:53: * back to domains via the requirements they implement.
+src/lib/types/architecture.ts:55:export interface DomainCapabilityMapping {
+src/lib/types/architecture.ts:57:	domain: EngineeringDomain;
+src/lib/types/architecture.ts:73:	has_domain_mapping: boolean;
+src/lib/types/architecture.ts:84:	/** INTAKE domains with coverage but no capability mapping */
+src/lib/types/architecture.ts:85:	unmapped_domains: string[];
+src/lib/types/architecture.ts:100:	domain_mappings: DomainCapabilityMapping[];
+src/lib/types/index.ts:391:	EngineeringDomain,
+src/lib/types/index.ts:392:	DomainCoverageLevel,
+src/lib/types/index.ts:401:	type DomainCoverageEntry,
+src/lib/types/index.ts:402:	type DomainCoverageMap,
+src/lib/types/index.ts:410:	type DomainProposal,
+src/lib/types/intake.ts:18:	/** Expert is gathering domain-by-domain info as interviewer (no plan output) */
+src/lib/types/intake.ts:27:	// === Inverted flow (STATE_DRIVEN + DOMAIN_GUIDED) ===
+src/lib/types/intake.ts:38:	/** Proposer Round 1: AI proposes business domains + personas. User validates via MMP. */
+src/lib/types/intake.ts:39:	PROPOSING_DOMAINS = 'PROPOSING_DOMAINS',
+src/lib/types/intake.ts:40:	/** Proposer Round 2: AI proposes user journeys + system workflows for accepted domains. */
+src/lib/types/intake.ts:42:	/** Proposer Round 3: AI proposes entities + data model for accepted domains/workflows. */
+src/lib/types/intake.ts:54:	/** Sequential walk through 12 engineering domains. Best for vague, high-level inputs. */
+src/lib/types/intake.ts:57:	DOMAIN_GUIDED = 'DOMAIN_GUIDED',
+src/lib/types/intake.ts:69:	DOMAIN_MAPPING = 1,
+src/lib/types/intake.ts:75:/** A proposed business domain, generated by the domain proposer. */
+src/lib/types/intake.ts:77:export type ProposalSource = 'document-specified' | 'user-specified' | 'domain-standard' | 'ai-proposed';
+src/lib/types/intake.ts:79:export interface DomainProposal {
+src/lib/types/intake.ts:84:	/** What this domain covers */
+src/lib/types/intake.ts:88:	/** Preview of typical entities in this domain (names only) */
+src/lib/types/intake.ts:90:	/** Preview of typical workflows in this domain (names only) */
+src/lib/types/intake.ts:96:/** A proposed data entity for an accepted domain. */
+src/lib/types/intake.ts:100:	/** References DomainProposal.id */
+src/lib/types/intake.ts:101:	domainId: string;
+src/lib/types/intake.ts:114:/** A proposed system workflow for an accepted domain. */
+src/lib/types/intake.ts:118:	/** References DomainProposal.id */
+src/lib/types/intake.ts:119:	domainId: string;
+src/lib/types/intake.ts:154:// ==================== ENGINEERING DOMAINS ====================
+src/lib/types/intake.ts:157: * The 12 engineering domains that systematic INTAKE coverage tracks.
+src/lib/types/intake.ts:159:export enum EngineeringDomain {
+src/lib/types/intake.ts:175: * Coverage level for each engineering domain.
+src/lib/types/intake.ts:177:export enum DomainCoverageLevel {
+src/lib/types/intake.ts:178:	/** Domain has not been discussed at all */
+src/lib/types/intake.ts:180:	/** Domain mentioned but not adequately explored */
+src/lib/types/intake.ts:182:	/** Domain sufficiently covered with evidence */
+src/lib/types/intake.ts:186:// ==================== DOMAIN COVERAGE ====================
+src/lib/types/intake.ts:189: * Coverage tracking entry for a single engineering domain.
+src/lib/types/intake.ts:191:export interface DomainCoverageEntry {
+src/lib/types/intake.ts:192:	domain: EngineeringDomain;
+src/lib/types/intake.ts:193:	level: DomainCoverageLevel;
+src/lib/types/intake.ts:196:	/** Turn numbers where this domain was discussed */
+src/lib/types/intake.ts:201: * Complete coverage map across all 12 engineering domains.
+src/lib/types/intake.ts:203:export type DomainCoverageMap = Record<EngineeringDomain, DomainCoverageEntry>;
+src/lib/types/intake.ts:218: * Used by HYBRID_CHECKPOINTS (periodic) and DOMAIN_GUIDED (post-analysis).
+src/lib/types/intake.ts:224:	coverageSnapshot: DomainCoverageMap;
+src/lib/types/intake.ts:225:	/** Domains the checkpoint suggests exploring next */
+src/lib/types/intake.ts:226:	suggestedDomains: EngineeringDomain[];
+src/lib/types/intake.ts:292:	source?: 'document-specified' | 'domain-standard' | 'ai-proposed';
+src/lib/types/intake.ts:389:	 *  Cleared after user submits MMP, causing transition to PROPOSING_DOMAINS. */
+src/lib/types/intake.ts:391:	/** Proposed business domains from Round 1 */
+src/lib/types/intake.ts:392:	domainProposals?: DomainProposal[];
+src/lib/types/intake.ts:424: * The Expert acts as a domain interviewer — no plan output, just focused Q&A.
+src/lib/types/intake.ts:427:	/** Interviewer-style conversational response scoped to one domain */
+src/lib/types/intake.ts:429:	/** The domain this turn focused on */
+src/lib/types/intake.ts:430:	focusDomain: EngineeringDomain;
+src/lib/types/intake.ts:431:	/** Structured notes extracted from this domain investigation */
+src/lib/types/intake.ts:432:	domainNotes: string[];
+src/lib/types/intake.ts:433:	/** Codebase findings specific to this domain */
+src/lib/types/intake.ts:435:	/** Follow-up questions for the user about this domain (legacy fallback) */
+src/lib/types/intake.ts:453:	/** Per-domain coverage assessment from analysis */
+src/lib/types/intake.ts:454:	domainAssessment: Array<{
+src/lib/types/intake.ts:455:		domain: string;
+src/lib/types/intake.ts:467:	return 'focusDomain' in response && !('updatedPlan' in response);
+src/lib/types/intake.ts:527:	/** Per-domain coverage tracking (null = not initialized) */
+src/lib/types/intake.ts:528:	domainCoverage: DomainCoverageMap | null;
+src/lib/types/intake.ts:529:	/** Current domain being explored in STATE_DRIVEN mode */
+src/lib/types/intake.ts:530:	currentDomain: EngineeringDomain | null;
+src/lib/types/mmp.ts:19:	| 'domain' | 'workflow' | 'entity' | 'integration';
+src/lib/ui/governedStream/GovernedStreamPanel.ts:646:			bus.on('intake:domain_coverage_updated', () => {
+src/lib/ui/governedStream/GovernedStreamPanel.ts:658:			bus.on('intake:domain_transition', () => {
+src/lib/ui/governedStream/dataAggregator.ts:22:import type { IntakePlanDocument, IntakeConversationTurn, DomainCoverageMap, IntakeModeRecommendation, IntakeCheckpoint, EngineeringDomain } from '../../types/intake';
+src/lib/ui/governedStream/dataAggregator.ts:23:import { IntakeSubState, DomainCoverageLevel, isGatheringResponse } from '../../types/intake';
+src/lib/ui/governedStream/dataAggregator.ts:24:import { DOMAIN_INFO, DOMAIN_SEQUENCE } from '../../workflow/domainCoverageTracker';
+src/lib/ui/governedStream/dataAggregator.ts:156:	| { type: 'intake_domain_transition'; dialogueId: string; fromDomain: string; fromLabel: string; toDomain: string | null; toLabel: string | null; toDescription: string | null; timestamp: string }
+src/lib/ui/governedStream/dataAggregator.ts:158:	| { type: 'intake_analysis'; dialogueId: string; humanMessage: string; analysisSummary: string; codebaseFindings: string[]; domainAssessment: Array<{ domain: string; level: string; evidence: string }>; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }> }
+src/lib/ui/governedStream/dataAggregator.ts:160:	| { type: 'intake_proposal'; dialogueId: string; title: string; summary: string; proposedApproach: string; domainCoverage: { adequate: number; partial: number; none: number; percentage: number }; timestamp: string }
+src/lib/ui/governedStream/dataAggregator.ts:162:	| { type: 'intake_proposer_domains'; dialogueId: string; domains: Array<{ id: string; name: string; description: string; rationale: string; entityPreview: string[]; workflowPreview: string[] }>; personas: Array<{ id: string; name: string; description: string }>; mmpJson?: string; eventId?: number; timestamp: string }
+src/lib/ui/governedStream/dataAggregator.ts:163:	| { type: 'intake_proposer_journeys'; dialogueId: string; journeys: Array<{ id: string; title: string; scenario: string; priority?: string }>; workflows: Array<{ id: string; name: string; description: string; domainId: string }>; mmpJson?: string; eventId?: number; timestamp: string }
+src/lib/ui/governedStream/dataAggregator.ts:164:	| { type: 'intake_proposer_entities'; dialogueId: string; entities: Array<{ id: string; name: string; description: string; domainId: string; keyAttributes: string[]; relationships: string[] }>; domainNames?: Record<string, string>; mmpJson?: string; eventId?: number; timestamp: string }
+src/lib/ui/governedStream/dataAggregator.ts:210:		domainCoverage: DomainCoverageMap | null;
+src/lib/ui/governedStream/dataAggregator.ts:211:		currentDomain: string | null;
+src/lib/ui/governedStream/dataAggregator.ts:443:				domainAssessment: expertResponse?.domainAssessment ?? [],
+src/lib/ui/governedStream/dataAggregator.ts:450:				// Compute domain coverage from the domain assessment if available
+src/lib/ui/governedStream/dataAggregator.ts:451:				const domainAssess: Array<{ domain: string; level: string }> = expertResponse?.domainAssessment ?? [];
+src/lib/ui/governedStream/dataAggregator.ts:453:				for (const d of domainAssess) {
+src/lib/ui/governedStream/dataAggregator.ts:494:					domainCoverage: { adequate, partial, none, percentage },
+src/lib/ui/governedStream/dataAggregator.ts:513:		} else if (eventType === 'intake_proposer_domains') {
+src/lib/ui/governedStream/dataAggregator.ts:517:				type: 'intake_proposer_domains',
+src/lib/ui/governedStream/dataAggregator.ts:519:				domains: content.domains ?? [],
+src/lib/ui/governedStream/dataAggregator.ts:539:					description: w.description as string ?? '', domainId: w.domainId as string ?? '',
+src/lib/ui/governedStream/dataAggregator.ts:548:			// Build domain name lookup from prior proposer_domains event
+src/lib/ui/governedStream/dataAggregator.ts:549:			const domainNames: Record<string, string> = {};
+src/lib/ui/governedStream/dataAggregator.ts:551:				if (prior.type === 'intake_proposer_domains') {
+src/lib/ui/governedStream/dataAggregator.ts:552:					for (const d of prior.domains) {
+src/lib/ui/governedStream/dataAggregator.ts:553:						domainNames[d.id] = d.name;
+src/lib/ui/governedStream/dataAggregator.ts:562:					description: e.description as string ?? '', domainId: e.domainId as string ?? '',
+src/lib/ui/governedStream/dataAggregator.ts:566:				domainNames: Object.keys(domainNames).length > 0 ? domainNames : undefined,
+src/lib/ui/governedStream/dataAggregator.ts:609:			//   1. After DESIGNING: components + interfaces + domain model
+src/lib/ui/governedStream/dataAggregator.ts:1116:	// Inject derived INTAKE cards (mode selector, checkpoints, domain transitions,
+src/lib/ui/governedStream/dataAggregator.ts:1203: * Resolve a possibly-malformed domain string to its canonical EngineeringDomain enum value.
+src/lib/ui/governedStream/dataAggregator.ts:1207:function resolveDomainEnum(raw: string): EngineeringDomain | null {
+src/lib/ui/governedStream/dataAggregator.ts:1209:	if (DOMAIN_INFO[raw as EngineeringDomain]) {
+src/lib/ui/governedStream/dataAggregator.ts:1210:		return raw as EngineeringDomain;
+src/lib/ui/governedStream/dataAggregator.ts:1214:	for (const domain of DOMAIN_SEQUENCE) {
+src/lib/ui/governedStream/dataAggregator.ts:1215:		if (domain === normalized) { return domain; }
+src/lib/ui/governedStream/dataAggregator.ts:1219:	for (const domain of DOMAIN_SEQUENCE) {
+src/lib/ui/governedStream/dataAggregator.ts:1220:		if (DOMAIN_INFO[domain].label.toLowerCase() === lowerRaw) { return domain; }
+src/lib/ui/governedStream/dataAggregator.ts:1264:		case 'intake_domain_transition': raw = item.timestamp; break;
+src/lib/ui/governedStream/dataAggregator.ts:1268:		case 'intake_proposer_domains': raw = item.timestamp; break;
+src/lib/ui/governedStream/dataAggregator.ts:1333:		case 'intake_proposer_domains': return 4.2;
+src/lib/ui/governedStream/dataAggregator.ts:1338:		case 'intake_domain_transition': return 5;
+src/lib/ui/governedStream/dataAggregator.ts:1607: * domain transitions, gathering-complete, approval gate).
+src/lib/ui/governedStream/dataAggregator.ts:1657:	// Inject domain transition cards from consecutive gathering turns in the stream
+src/lib/ui/governedStream/dataAggregator.ts:1666:			const prevResolved = resolveDomainEnum(prevResp.focusDomain);
+src/lib/ui/governedStream/dataAggregator.ts:1667:			const currResolved = resolveDomainEnum(currResp.focusDomain);
+src/lib/ui/governedStream/dataAggregator.ts:1669:				const fromInfo = prevResolved ? DOMAIN_INFO[prevResolved] : undefined;
+src/lib/ui/governedStream/dataAggregator.ts:1670:				const toInfo = currResolved ? DOMAIN_INFO[currResolved] : undefined;
+src/lib/ui/governedStream/dataAggregator.ts:1672:					type: 'intake_domain_transition',
+src/lib/ui/governedStream/dataAggregator.ts:1674:					fromDomain: prevResp.focusDomain,
+src/lib/ui/governedStream/dataAggregator.ts:1675:					fromLabel: fromInfo?.label ?? prevResp.focusDomain,
+src/lib/ui/governedStream/dataAggregator.ts:1676:					toDomain: currResp.focusDomain,
+src/lib/ui/governedStream/dataAggregator.ts:1677:					toLabel: toInfo?.label ?? currResp.focusDomain,
+src/lib/ui/governedStream/dataAggregator.ts:1687:		const coverage = conv.domainCoverage;
+src/lib/ui/governedStream/dataAggregator.ts:1692:			for (const domain of DOMAIN_SEQUENCE) {
+src/lib/ui/governedStream/dataAggregator.ts:1693:				switch (coverage[domain]?.level) {
+src/lib/ui/governedStream/dataAggregator.ts:1694:					case DomainCoverageLevel.ADEQUATE: adequate++; break;
+src/lib/ui/governedStream/dataAggregator.ts:1695:					case DomainCoverageLevel.PARTIAL: partial++; break;
+src/lib/ui/governedStream/dataAggregator.ts:1700:		const total = DOMAIN_SEQUENCE.length;
+src/lib/ui/governedStream/dataAggregator.ts:1772:		|| conv.subState === IntakeSubState.PROPOSING_DOMAINS
+src/lib/ui/governedStream/dataAggregator.ts:1822:		domainCoverage: conv.domainCoverage ?? null,
+src/lib/ui/governedStream/dataAggregator.ts:1823:		currentDomain: conv.currentDomain ?? null,
+src/lib/ui/governedStream/html/components.ts:11:import type { DialogueEvent, Claim, Verdict, Gate, IntakeModeRecommendation, DomainCoverageMap, IntakeCheckpoint } from '../../../types';
+src/lib/ui/governedStream/html/components.ts:12:import { Role, Phase, ClaimStatus, GateStatus, SpeechAct, IntakeMode, DomainCoverageLevel } from '../../../types';
+src/lib/ui/governedStream/html/components.ts:24:import { DOMAIN_INFO, DOMAIN_SEQUENCE } from '../../../workflow/domainCoverageTracker';
+src/lib/ui/governedStream/html/components.ts:607:	// or review sub-state, or when the intake mode is STATE_DRIVEN/DOMAIN_GUIDED.
+src/lib/ui/governedStream/html/components.ts:611:		|| intakeMode === 'DOMAIN_GUIDED';
+src/lib/ui/governedStream/html/components.ts:615:			{ id: 'PROPOSING_DOMAINS', label: 'Domains' },
+src/lib/ui/governedStream/html/components.ts:631:					'DOMAIN_MAPPING': 'PROPOSING_DOMAINS',
+src/lib/ui/governedStream/html/components.ts:635:					1: 'PROPOSING_DOMAINS',
+src/lib/ui/governedStream/html/components.ts:640:				effectiveSubState = phaseToStep[proposerPhase] ?? 'PROPOSING_DOMAINS';
+src/lib/ui/governedStream/html/components.ts:2766:		'domain-standard': { label: 'STANDARD', cssClass: 'badge-source-standard' },
+src/lib/ui/governedStream/html/components.ts:2887: * so the submit handler can find it. The `contentHtml` is the domain/journey/entity
+src/lib/ui/governedStream/html/components.ts:2911:	// The actual content (domain description, entity details, etc.)
+src/lib/ui/governedStream/html/components.ts:3161: * Shows domain badge, interviewer role, domain notes, and follow-up questions.
+src/lib/ui/governedStream/html/components.ts:3171:	const domainInfo = DOMAIN_INFO[response.focusDomain];
+src/lib/ui/governedStream/html/components.ts:3172:	const domainLabel = domainInfo ? domainInfo.label : response.focusDomain;
+src/lib/ui/governedStream/html/components.ts:3174:	const domainNotesHtml = response.domainNotes.length > 0
+src/lib/ui/governedStream/html/components.ts:3175:		? '<div class="intake-domain-notes"><ul>' +
+src/lib/ui/governedStream/html/components.ts:3176:			response.domainNotes.map((n) => '<li>' + escapeHtml(n) + '</li>').join('') +
+src/lib/ui/governedStream/html/components.ts:3222:		'<span class="intake-domain-badge">' + escapeHtml(domainLabel) + '</span>' +
+src/lib/ui/governedStream/html/components.ts:3241:		'<span class="intake-domain-badge">' + escapeHtml(domainLabel) + '</span>' +
+src/lib/ui/governedStream/html/components.ts:3244:		domainNotesHtml +
+src/lib/ui/governedStream/html/components.ts:3560:	// Proposer artifacts — domains, entities, workflows, integrations, quality attributes
+src/lib/ui/governedStream/html/components.ts:3561:	const domainsHtml = plan.domainProposals && plan.domainProposals.length > 0
+src/lib/ui/governedStream/html/components.ts:3563:				<h5>Business Domains (${plan.domainProposals.length})</h5>
+src/lib/ui/governedStream/html/components.ts:3564:				<ul>${plan.domainProposals.map((d) =>
+src/lib/ui/governedStream/html/components.ts:3577:					`<li><strong>[${escapeHtml(e.id)}] ${escapeHtml(e.name)}</strong> <span class="badge">${escapeHtml(e.domainId)}</span>: ${escapeHtml(e.description)}`
+src/lib/ui/governedStream/html/components.ts:3589:					`<li><strong>[${escapeHtml(w.id)}] ${escapeHtml(w.name)}</strong> <span class="badge">${escapeHtml(w.domainId)}</span>: ${escapeHtml(w.description)}</li>`
+src/lib/ui/governedStream/html/components.ts:3612:	const hasProposerArtifacts = domainsHtml || entitiesHtml || workflowsHtml || integrationsHtml || qualityHtml;
+src/lib/ui/governedStream/html/components.ts:3647:				${hasProposerArtifacts ? `${domainsHtml}${entitiesHtml}${workflowsHtml}${integrationsHtml}${qualityHtml}` : ''}
+src/lib/ui/governedStream/html/components.ts:3747:	const currentDomain = intakeState.currentDomain;
+src/lib/ui/governedStream/html/components.ts:3748:	const domainInfo = currentDomain ? DOMAIN_INFO[currentDomain as keyof typeof DOMAIN_INFO] : null;
+src/lib/ui/governedStream/html/components.ts:3749:	const currentIdx = currentDomain ? DOMAIN_SEQUENCE.indexOf(currentDomain as any) : -1;
+src/lib/ui/governedStream/html/components.ts:3751:	const coverage = intakeState.domainCoverage;
+src/lib/ui/governedStream/html/components.ts:3753:	// Coverage-based progress for DOMAIN_GUIDED, domain-sequential for STATE_DRIVEN
+src/lib/ui/governedStream/html/components.ts:3757:	if (mode === 'DOMAIN_GUIDED' && coverage) {
+src/lib/ui/governedStream/html/components.ts:3758:		// For document-based: show coverage percentage (domains may advance non-sequentially)
+src/lib/ui/governedStream/html/components.ts:3759:		const total = DOMAIN_SEQUENCE.length;
+src/lib/ui/governedStream/html/components.ts:3762:			if (coverage[key as keyof typeof coverage].level !== DomainCoverageLevel.NONE) {
+src/lib/ui/governedStream/html/components.ts:3767:		progressLabel = 'Analyzing documents \u2014 ' + covered + ' of ' + total + ' domains touched';
+src/lib/ui/governedStream/html/components.ts:3769:		// STATE_DRIVEN: sequential domain walkthrough
+src/lib/ui/governedStream/html/components.ts:3770:		progressPercent = Math.round(((currentIdx + 1) / DOMAIN_SEQUENCE.length) * 100);
+src/lib/ui/governedStream/html/components.ts:3771:		progressLabel = 'Domain ' + (currentIdx + 1) + ' of ' + DOMAIN_SEQUENCE.length + ': ' + (domainInfo ? domainInfo.label : currentDomain);
+src/lib/ui/governedStream/html/components.ts:3774:		progressLabel = 'Gathering domain information';
+src/lib/ui/governedStream/html/components.ts:3778:	const guidanceText = mode === 'DOMAIN_GUIDED'
+src/lib/ui/governedStream/html/components.ts:3802:			description: 'Sequential walk through 12 engineering domains with targeted questions',
+src/lib/ui/governedStream/html/components.ts:3804:		DOMAIN_GUIDED: {
+src/lib/ui/governedStream/html/components.ts:3807:			description: 'Analyze provided documents, then explore uncovered domains',
+src/lib/ui/governedStream/html/components.ts:3812:			description: 'Free-form discussion with periodic domain coverage checkpoints',
+src/lib/ui/governedStream/html/components.ts:3826:	const modes = [IntakeMode.STATE_DRIVEN, IntakeMode.DOMAIN_GUIDED, IntakeMode.HYBRID_CHECKPOINTS];
+src/lib/ui/governedStream/html/components.ts:3871:// ==================== DOMAIN COVERAGE SIDEBAR ====================
+src/lib/ui/governedStream/html/components.ts:3873:export function renderDomainCoverageSidebar(coverage: DomainCoverageMap, currentDomain?: string | null): string {
+src/lib/ui/governedStream/html/components.ts:3874:	let domainsHtml = '';
+src/lib/ui/governedStream/html/components.ts:3875:	for (const domain of DOMAIN_SEQUENCE) {
+src/lib/ui/governedStream/html/components.ts:3876:		const entry = coverage[domain];
+src/lib/ui/governedStream/html/components.ts:3877:		const info = DOMAIN_INFO[domain];
+src/lib/ui/governedStream/html/components.ts:3880:			case DomainCoverageLevel.ADEQUATE: dotClass = 'coverage-adequate'; break;
+src/lib/ui/governedStream/html/components.ts:3881:			case DomainCoverageLevel.PARTIAL: dotClass = 'coverage-partial'; break;
+src/lib/ui/governedStream/html/components.ts:3886:		const isCurrentDomain = currentDomain && domain === currentDomain;
+src/lib/ui/governedStream/html/components.ts:3891:		const pointer = isCurrentDomain ? '<span class="coverage-current-indicator">&#x25B6;</span>' : '';
+src/lib/ui/governedStream/html/components.ts:3893:		domainsHtml +=
+src/lib/ui/governedStream/html/components.ts:3894:			'<div class="coverage-domain-row' + (hasEvidence ? ' has-evidence' : '') + (isCurrentDomain ? ' current-domain' : '') + '" title="' + escapeHtml(info.description) + '" data-action="toggle-coverage-evidence">' +
+src/lib/ui/governedStream/html/components.ts:3898:				'<span class="coverage-domain-label">' + escapeHtml(info.label) + '</span>' +
+src/lib/ui/governedStream/html/components.ts:3908:	const total = DOMAIN_SEQUENCE.length;
+src/lib/ui/governedStream/html/components.ts:3909:	for (const domain of DOMAIN_SEQUENCE) {
+src/lib/ui/governedStream/html/components.ts:3910:		switch (coverage[domain].level) {
+src/lib/ui/governedStream/html/components.ts:3911:			case DomainCoverageLevel.ADEQUATE: adequate++; break;
+src/lib/ui/governedStream/html/components.ts:3912:			case DomainCoverageLevel.PARTIAL: partial++; break;
+src/lib/ui/governedStream/html/components.ts:3919:		<div class="domain-coverage-sidebar">
+src/lib/ui/governedStream/html/components.ts:3921:				<span class="coverage-sidebar-title">Domain Coverage</span>
+src/lib/ui/governedStream/html/components.ts:3932:			<div class="coverage-domain-list">
+src/lib/ui/governedStream/html/components.ts:3933:				${domainsHtml}
+src/lib/ui/governedStream/html/components.ts:3954:	const total = DOMAIN_SEQUENCE.length;
+src/lib/ui/governedStream/html/components.ts:3955:	for (const domain of DOMAIN_SEQUENCE) {
+src/lib/ui/governedStream/html/components.ts:3956:		const entry = checkpoint.coverageSnapshot[domain];
+src/lib/ui/governedStream/html/components.ts:3958:			case DomainCoverageLevel.ADEQUATE: adequate++; break;
+src/lib/ui/governedStream/html/components.ts:3959:			case DomainCoverageLevel.PARTIAL: partial++; break;
+src/lib/ui/governedStream/html/components.ts:3965:	// Suggested domain buttons
+src/lib/ui/governedStream/html/components.ts:3967:	if (checkpoint.suggestedDomains.length > 0 && !isResolved) {
+src/lib/ui/governedStream/html/components.ts:3968:		const domainBtns = checkpoint.suggestedDomains.map(d => {
+src/lib/ui/governedStream/html/components.ts:3969:			const info = DOMAIN_INFO[d];
+src/lib/ui/governedStream/html/components.ts:3970:			return `<button class="checkpoint-domain-btn"
+src/lib/ui/governedStream/html/components.ts:3971:				data-action="intake-ask-domain" data-domain-label="${escapeHtml(info.label)}">
+src/lib/ui/governedStream/html/components.ts:3978:				${domainBtns}
+src/lib/ui/governedStream/html/components.ts:3985:			// DOMAIN_GUIDED gap analysis: offer mode-switch to fill coverage gaps
+src/lib/ui/governedStream/html/components.ts:3987:				<div class="checkpoint-gap-prompt">How would you like to address uncovered domains?</div>
+src/lib/ui/governedStream/html/components.ts:4028:// ==================== INTAKE DOMAIN TRANSITION CARD ====================
+src/lib/ui/governedStream/html/components.ts:4030:function renderDomainTransitionCard(
+src/lib/ui/governedStream/html/components.ts:4032:	toDomain: string | null,
+src/lib/ui/governedStream/html/components.ts:4037:		'<div class="domain-transition-completed">' +
+src/lib/ui/governedStream/html/components.ts:4038:		'<span class="domain-transition-check">&#x2705;</span>' +
+src/lib/ui/governedStream/html/components.ts:4039:		'<span class="domain-transition-label">' + escapeHtml(fromLabel) + '</span>' +
+src/lib/ui/governedStream/html/components.ts:4040:		'<span class="domain-transition-status">Adequate</span>' +
+src/lib/ui/governedStream/html/components.ts:4044:	if (toDomain && toLabel) {
+src/lib/ui/governedStream/html/components.ts:4046:			'<div class="domain-transition-next">' +
+src/lib/ui/governedStream/html/components.ts:4047:			'<span class="domain-transition-next-label">Next: ' + escapeHtml(toLabel) + '</span>' +
+src/lib/ui/governedStream/html/components.ts:4049:				? '<span class="domain-transition-next-desc">' + escapeHtml(toDescription) + '</span>'
+src/lib/ui/governedStream/html/components.ts:4054:			'<div class="domain-transition-next">' +
+src/lib/ui/governedStream/html/components.ts:4055:			'<span class="domain-transition-next-label">All domains explored</span>' +
+src/lib/ui/governedStream/html/components.ts:4059:	return '<div class="intake-domain-transition">' +
+src/lib/ui/governedStream/html/components.ts:4061:		'<div class="domain-transition-arrow">&#x25BC;</div>' +
+src/lib/ui/governedStream/html/components.ts:4073:	const isDocBased = intakeMode === 'DOMAIN_GUIDED';
+src/lib/ui/governedStream/html/components.ts:4074:	const title = isDocBased ? 'Document Analysis Complete' : 'All Domains Gathered';
+src/lib/ui/governedStream/html/components.ts:4196:function renderProposerDomainsCard(
+src/lib/ui/governedStream/html/components.ts:4197:	domains: Array<{ id: string; name: string; description: string; rationale: string; entityPreview: string[]; workflowPreview: string[] }>,
+src/lib/ui/governedStream/html/components.ts:4204:	const cardId = 'PV-DOMAINS-' + (eventId ?? '0');
+src/lib/ui/governedStream/html/components.ts:4223:	html += '<div class="proposer-card proposer-domains-card">';
+src/lib/ui/governedStream/html/components.ts:4225:		'<span class="proposer-card-title">Proposed Business Domains</span></div>';
+src/lib/ui/governedStream/html/components.ts:4226:	html += '<div class="proposer-card-intro">Review the proposed business domains and personas. Accept, reject, or edit each one.</div>';
+src/lib/ui/governedStream/html/components.ts:4228:	// Domains with inline MMP buttons
+src/lib/ui/governedStream/html/components.ts:4229:	if (domains.length > 0) {
+src/lib/ui/governedStream/html/components.ts:4230:		html += '<div class="proposer-section"><div class="proposer-section-label">Domains (' + domains.length + ')</div>';
+src/lib/ui/governedStream/html/components.ts:4231:		for (const d of domains) {
+src/lib/ui/governedStream/html/components.ts:4233:				'<div class="proposer-domain-header">' +
+src/lib/ui/governedStream/html/components.ts:4236:				'<div class="proposer-domain-desc">' + escapeHtml(d.description) + '</div>' +
+src/lib/ui/governedStream/html/components.ts:4237:				'<div class="proposer-domain-meta">Entities: ' + d.entityPreview.map(e => escapeHtml(e)).join(', ') +
+src/lib/ui/governedStream/html/components.ts:4239:				'<div class="proposer-domain-rationale"><em>' + escapeHtml(d.rationale) + '</em></div>';
+src/lib/ui/governedStream/html/components.ts:4245:				// No mirror item for this domain — render content only
+src/lib/ui/governedStream/html/components.ts:4246:				html += '<div class="proposer-domain-item">' + contentHtml + '</div>';
+src/lib/ui/governedStream/html/components.ts:4267:	// Menu and Pre-Mortem cards (not 1:1 with domains — render separately)
+src/lib/ui/governedStream/html/components.ts:4288:	workflows: Array<{ id: string; name: string; description: string; domainId: string }>,
+src/lib/ui/governedStream/html/components.ts:4337:		const wfByDomain = new Map<string, typeof workflows>();
+src/lib/ui/governedStream/html/components.ts:4339:			const group = wfByDomain.get(w.domainId) ?? [];
+src/lib/ui/governedStream/html/components.ts:4341:			wfByDomain.set(w.domainId, group);
+src/lib/ui/governedStream/html/components.ts:4343:		html += '<div class="proposer-section"><div class="proposer-section-label">System Workflows (' + workflows.length + ' across ' + wfByDomain.size + ' domains)</div>';
+src/lib/ui/governedStream/html/components.ts:4344:		for (const [domainId, domainWorkflows] of wfByDomain) {
+src/lib/ui/governedStream/html/components.ts:4345:			html += '<details class="proposer-domain-group" open>' +
+src/lib/ui/governedStream/html/components.ts:4346:				'<summary class="proposer-domain-group-header">' + escapeHtml(domainId) +
+src/lib/ui/governedStream/html/components.ts:4347:				' <span class="proposer-domain-group-count">(' + domainWorkflows.length + ')</span></summary>' +
+src/lib/ui/governedStream/html/components.ts:4348:				'<div class="proposer-domain-group-body">';
+src/lib/ui/governedStream/html/components.ts:4349:			for (const w of domainWorkflows) {
+src/lib/ui/governedStream/html/components.ts:4377:	entities: Array<{ id: string; name: string; description: string; domainId: string; keyAttributes: string[]; relationships: string[] }>,
+src/lib/ui/governedStream/html/components.ts:4379:	domainNames?: Record<string, string>,
+src/lib/ui/governedStream/html/components.ts:4403:	const byDomain = new Map<string, typeof entities>();
+src/lib/ui/governedStream/html/components.ts:4405:		const group = byDomain.get(e.domainId) ?? [];
+src/lib/ui/governedStream/html/components.ts:4407:		byDomain.set(e.domainId, group);
+src/lib/ui/governedStream/html/components.ts:4411:		entities.length + ' entities across ' + byDomain.size + ' domains.</div>';
+src/lib/ui/governedStream/html/components.ts:4413:	for (const [domainId, domainEntities] of byDomain) {
+src/lib/ui/governedStream/html/components.ts:4414:		const domainName = domainNames?.[domainId] ?? domainId;
+src/lib/ui/governedStream/html/components.ts:4415:		html += '<details class="proposer-domain-group" open>' +
+src/lib/ui/governedStream/html/components.ts:4416:			'<summary class="proposer-domain-group-header">' +
+src/lib/ui/governedStream/html/components.ts:4417:			escapeHtml(domainName) + ' <span class="proposer-domain-group-count">(' +
+src/lib/ui/governedStream/html/components.ts:4418:			domainEntities.length + ' entit' + (domainEntities.length === 1 ? 'y' : 'ies') + ')</span></summary>' +
+src/lib/ui/governedStream/html/components.ts:4419:			'<div class="proposer-domain-group-body">';
+src/lib/ui/governedStream/html/components.ts:4420:		for (const e of domainEntities) {
+src/lib/ui/governedStream/html/components.ts:4484:			html += '<details class="proposer-domain-group" open>' +
+src/lib/ui/governedStream/html/components.ts:4485:				'<summary class="proposer-domain-group-header">' + escapeHtml(catLabel) +
+src/lib/ui/governedStream/html/components.ts:4486:				' <span class="proposer-domain-group-count">(' + catIntegrations.length + ')</span></summary>' +
+src/lib/ui/governedStream/html/components.ts:4487:				'<div class="proposer-domain-group-body">';
+src/lib/ui/governedStream/html/components.ts:4539:	domainCoverage: { adequate: number; partial: number; none: number; percentage: number },
+src/lib/ui/governedStream/html/components.ts:4570:	// Domain coverage summary
+src/lib/ui/governedStream/html/components.ts:4573:		'<span class="intake-proposal-coverage-label">Domain Coverage</span>' +
+src/lib/ui/governedStream/html/components.ts:4574:		'<span class="intake-proposal-coverage-pct">' + domainCoverage.percentage + '%</span>' +
+src/lib/ui/governedStream/html/components.ts:4577:		domainCoverage.adequate + ' adequate, ' +
+src/lib/ui/governedStream/html/components.ts:4578:		domainCoverage.partial + ' partial, ' +
+src/lib/ui/governedStream/html/components.ts:4579:		domainCoverage.none + ' uncovered' +
+src/lib/ui/governedStream/html/components.ts:4846:		if (item.type === 'intake_proposer_domains' || item.type === 'intake_proposer_journeys' ||
+src/lib/ui/governedStream/html/components.ts:4963:			case 'intake_domain_transition':
+src/lib/ui/governedStream/html/components.ts:4965:				return renderDomainTransitionCard(item.fromLabel, item.toDomain, item.toLabel, item.toDescription);
+src/lib/ui/governedStream/html/components.ts:4990:				return renderIntakeProposalCard(item.title, item.summary, item.proposedApproach, item.domainCoverage);
+src/lib/ui/governedStream/html/components.ts:4992:			case 'intake_proposer_domains':
+src/lib/ui/governedStream/html/components.ts:4993:				return wrapResizable(renderProposerDomainsCard(item.domains, item.personas, item.mmpJson, allPendingDecisions, idx === lastProposerMmpIdx, item.eventId));
+src/lib/ui/governedStream/html/components.ts:4999:				return wrapResizable(renderProposerEntitiesCard(item.entities, item.mmpJson, item.domainNames, allPendingDecisions, idx === lastProposerMmpIdx, item.eventId));
+src/lib/ui/governedStream/html/components.ts:5032:	// Add domain coverage sidebar only for legacy GATHERING/DISCUSSING flows
+src/lib/ui/governedStream/html/components.ts:5033:	// (not for proposer flow where domain coverage is handled by ARCHITECTURE)
+src/lib/ui/governedStream/html/components.ts:5035:	if (isLegacyFlow && intakeState && intakeState.domainCoverage && intakeState.turnCount > 0) {
+src/lib/ui/governedStream/html/components.ts:5036:		html += renderDomainCoverageSidebar(intakeState.domainCoverage, intakeState.currentDomain);
+src/lib/ui/governedStream/html/components.ts:5053:		} else if (intakeState.subState === 'PROPOSING_DOMAINS') {
+src/lib/ui/governedStream/html/components.ts:5054:			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Proposing business domains...</span></div>';
+src/lib/ui/governedStream/html/components.ts:5190:	// --- Section 2: Domain Model (entity cards with fields + relationships) ---
+src/lib/ui/governedStream/html/components.ts:5191:	const domainModelCards = dataModels.map(m => {
+src/lib/ui/governedStream/html/components.ts:5300:				<summary class="arch-section-summary">Domain Model (${dataModels.length} entities)</summary>
+src/lib/ui/governedStream/html/components.ts:5301:				<div class="arch-section-content">${domainModelCards}</div>
+src/lib/ui/governedStream/html/styles.ts:856:		/* --- Domain Model Cards --- */
+src/lib/ui/governedStream/html/styles.ts:4711:		/* ===== DOMAIN COVERAGE SIDEBAR ===== */
+src/lib/ui/governedStream/html/styles.ts:4712:		.domain-coverage-sidebar {
+src/lib/ui/governedStream/html/styles.ts:4781:		.coverage-domain-list {
+src/lib/ui/governedStream/html/styles.ts:4787:		.coverage-domain-row {
+src/lib/ui/governedStream/html/styles.ts:4797:		.coverage-domain-row:hover {
+src/lib/ui/governedStream/html/styles.ts:4821:		.coverage-domain-label {
+src/lib/ui/governedStream/html/styles.ts:4855:		.coverage-domain-row.has-evidence {
+src/lib/ui/governedStream/html/styles.ts:4868:		.coverage-domain-row.expanded .coverage-row-chevron {
+src/lib/ui/governedStream/html/styles.ts:4944:		.checkpoint-domain-btn {
+src/lib/ui/governedStream/html/styles.ts:4958:		.checkpoint-domain-btn:hover:not(:disabled) {
+src/lib/ui/governedStream/html/styles.ts:4963:		.checkpoint-domain-btn:disabled {
+src/lib/ui/governedStream/html/styles.ts:4968:		.checkpoint-domain-btn.was-selected {
+src/lib/ui/governedStream/html/styles.ts:4998:		.intake-domain-badge {
+src/lib/ui/governedStream/html/styles.ts:5009:		.intake-domain-notes {
+src/lib/ui/governedStream/html/styles.ts:5017:		.intake-domain-notes ul {
+src/lib/ui/governedStream/html/styles.ts:5022:		.intake-domain-notes li {
+src/lib/ui/governedStream/html/styles.ts:5097:		/* ===== INTAKE DOMAIN TRANSITION CARD ===== */
+src/lib/ui/governedStream/html/styles.ts:5099:		.intake-domain-transition {
+src/lib/ui/governedStream/html/styles.ts:5111:		.domain-transition-completed {
+src/lib/ui/governedStream/html/styles.ts:5118:		.domain-transition-check {
+src/lib/ui/governedStream/html/styles.ts:5122:		.domain-transition-label {
+src/lib/ui/governedStream/html/styles.ts:5127:		.domain-transition-status {
+src/lib/ui/governedStream/html/styles.ts:5135:		.domain-transition-arrow {
+src/lib/ui/governedStream/html/styles.ts:5140:		.domain-transition-next {
+src/lib/ui/governedStream/html/styles.ts:5147:		.domain-transition-next-label {
+src/lib/ui/governedStream/html/styles.ts:5153:		.domain-transition-next-desc {
+src/lib/ui/governedStream/html/styles.ts:5198:		/* ===== CURRENT DOMAIN HIGHLIGHT IN SIDEBAR ===== */
+src/lib/ui/governedStream/html/styles.ts:5200:		.coverage-domain-row.current-domain {
+src/lib/ui/governedStream/html/styles.ts:5338:		.proposer-domains-card {
+src/lib/ui/governedStream/html/styles.ts:5359:		.proposer-domain-item, .proposer-journey-item, .proposer-workflow-item,
+src/lib/ui/governedStream/html/styles.ts:5364:		.proposer-domain-desc, .proposer-entity-desc { font-size: 13px; margin-top: 4px; }
+src/lib/ui/governedStream/html/styles.ts:5365:		.proposer-domain-meta, .proposer-entity-meta { font-size: 12px; color: var(--vscode-descriptionForeground); margin-top: 2px; }
+src/lib/ui/governedStream/html/styles.ts:5366:		.proposer-domain-rationale { font-size: 12px; color: var(--vscode-descriptionForeground); font-style: italic; margin-top: 2px; }
+src/lib/ui/governedStream/html/styles.ts:5401:		/* Collapsible domain group sections */
+src/lib/ui/governedStream/html/styles.ts:5402:		.proposer-domain-group {
+src/lib/ui/governedStream/html/styles.ts:5408:		.proposer-domain-group-header {
+src/lib/ui/governedStream/html/styles.ts:5416:		.proposer-domain-group-header::-webkit-details-marker { display: none; }
+src/lib/ui/governedStream/html/styles.ts:5417:		.proposer-domain-group-header::before {
+src/lib/ui/governedStream/html/styles.ts:5423:		.proposer-domain-group[open] > .proposer-domain-group-header::before {
+src/lib/ui/governedStream/html/styles.ts:5426:		.proposer-domain-group-count {
+src/lib/ui/governedStream/html/styles.ts:5430:		.proposer-domain-group-body {
+src/lib/ui/governedStream/html/styles.ts:5436:		.mmp-category-badge.domain { background: var(--vscode-charts-blue, #3794ff); }
+src/lib/ui/governedStream/panelIntake.ts:11:import { getCoverageGaps, getPartialDomains, DOMAIN_SEQUENCE } from '../../workflow/domainCoverageTracker';
+src/lib/ui/governedStream/panelIntake.ts:71: * Handles user selection of an INTAKE mode (STATE_DRIVEN, DOMAIN_GUIDED, or HYBRID).
+src/lib/ui/governedStream/panelIntake.ts:72: * For STATE_DRIVEN mode, also determines the first domain to target based on
+src/lib/ui/governedStream/panelIntake.ts:82:		if (convResult.success && convResult.value.domainCoverage) {
+src/lib/ui/governedStream/panelIntake.ts:83:			const gaps = getCoverageGaps(convResult.value.domainCoverage);
+src/lib/ui/governedStream/panelIntake.ts:84:			const partials = getPartialDomains(convResult.value.domainCoverage);
+src/lib/ui/governedStream/panelIntake.ts:85:			const firstTarget = gaps.length > 0 ? gaps[0] : partials.length > 0 ? partials[0] : DOMAIN_SEQUENCE[0];
+src/lib/ui/governedStream/panelIntake.ts:86:			updates.currentDomain = firstTarget;
+src/lib/ui/governedStream/panelIntake.ts:88:			updates.currentDomain = DOMAIN_SEQUENCE[0];
+src/lib/workflow/architecturePhase.ts:9: *   MODELING     →  Domain modeling: workflows → entities, fields, relationships (Domain Model)
+src/lib/workflow/architecturePhase.ts:10: *   DESIGNING    →  Component design + interfaces: domain model → components → contracts (System Architecture + ICD)
+src/lib/workflow/architecturePhase.ts:22:import { initializeCoverageMap, seedCoverageFromAnalysis } from './domainCoverageTracker';
+src/lib/workflow/architecturePhase.ts:34:	DomainCapabilityMapping,
+src/lib/workflow/architecturePhase.ts:125: * Domain keyword patterns for fallback matching.
+src/lib/workflow/architecturePhase.ts:126: * Maps keywords found in capability labels/descriptions to engineering domains.
+src/lib/workflow/architecturePhase.ts:128:const DOMAIN_KEYWORDS: Record<string, string> = {
+src/lib/workflow/architecturePhase.ts:144: * Deterministic domain mapping backfill for capabilities missing domain_mappings.
+src/lib/workflow/architecturePhase.ts:146: * Strategy 1: Match capability's source_requirements to INTAKE domains via
+src/lib/workflow/architecturePhase.ts:147: *             requirement extractedFromTurnId ↔ DomainCoverageEntry.turnNumbers overlap.
+src/lib/workflow/architecturePhase.ts:148: * Strategy 2: Keyword-match capability label/description against domain names.
+src/lib/workflow/architecturePhase.ts:150: * Only modifies capabilities with empty domain_mappings — LLM-provided mappings are preserved.
+src/lib/workflow/architecturePhase.ts:152:export function backfillDomainMappings(
+src/lib/workflow/architecturePhase.ts:157:	domainCoverage: Record<string, any> | null,
+src/lib/workflow/architecturePhase.ts:159:	if (!domainCoverage) { return capabilities; }
+src/lib/workflow/architecturePhase.ts:161:	// Build requirement ID → domain set map from turn number overlap
+src/lib/workflow/architecturePhase.ts:162:	const reqToDomains = new Map<string, Set<string>>();
+src/lib/workflow/architecturePhase.ts:169:		const domains = new Set<string>();
+src/lib/workflow/architecturePhase.ts:170:		for (const [domain, entry] of Object.entries(domainCoverage)) {
+src/lib/workflow/architecturePhase.ts:174:				domains.add(domain);
+src/lib/workflow/architecturePhase.ts:177:		if (domains.size > 0) {
+src/lib/workflow/architecturePhase.ts:178:			reqToDomains.set(reqId, domains);
+src/lib/workflow/architecturePhase.ts:183:		if (cap.domain_mappings.length > 0) { return cap; } // LLM provided them
+src/lib/workflow/architecturePhase.ts:185:		// Strategy 1: Match via source_requirements → domain
+src/lib/workflow/architecturePhase.ts:186:		const inferredDomains = new Set<string>();
+src/lib/workflow/architecturePhase.ts:188:			const domains = reqToDomains.get(reqId);
+src/lib/workflow/architecturePhase.ts:189:			if (domains) {
+src/lib/workflow/architecturePhase.ts:190:				for (const d of domains) { inferredDomains.add(d); }
+src/lib/workflow/architecturePhase.ts:194:		// Strategy 2: Keyword match against domain names
+src/lib/workflow/architecturePhase.ts:195:		if (inferredDomains.size === 0) {
+src/lib/workflow/architecturePhase.ts:197:			for (const [keyword, domain] of Object.entries(DOMAIN_KEYWORDS)) {
+src/lib/workflow/architecturePhase.ts:199:					// Only map to domains with non-NONE coverage
+src/lib/workflow/architecturePhase.ts:200:					const entry = domainCoverage[domain] as { level?: string } | undefined;
+src/lib/workflow/architecturePhase.ts:202:						inferredDomains.add(domain);
+src/lib/workflow/architecturePhase.ts:209:		// Fallback: map to CAPABILITIES domain
+src/lib/workflow/architecturePhase.ts:210:		if (inferredDomains.size === 0) {
+src/lib/workflow/architecturePhase.ts:211:			inferredDomains.add('CAPABILITIES');
+src/lib/workflow/architecturePhase.ts:214:		const mappings: DomainCapabilityMapping[] = [...inferredDomains].map((domain, i) => ({
+src/lib/workflow/architecturePhase.ts:216:			domain: domain as DomainCapabilityMapping['domain'],
+src/lib/workflow/architecturePhase.ts:222:		return { ...cap, domain_mappings: mappings };
+src/lib/workflow/architecturePhase.ts:243:		const hasDomainMapping = cap.domain_mappings.length > 0;
+src/lib/workflow/architecturePhase.ts:249:		if (hasWorkflows && hasComponents && hasDomainMapping) {
+src/lib/workflow/architecturePhase.ts:263:			has_domain_mapping: hasDomainMapping,
+src/lib/workflow/architecturePhase.ts:438:  "domainAssessment": [
+src/lib/workflow/architecturePhase.ts:439:    { "domain": "PROBLEM_MISSION", "level": "ADEQUATE", "evidence": "Clearly defined in specs and approved plan" },
+src/lib/workflow/architecturePhase.ts:440:    { "domain": "DATA_INFORMATION", "level": "PARTIAL", "evidence": "Schema exists but migration strategy unclear" },
+src/lib/workflow/architecturePhase.ts:441:    { "domain": "SECURITY_COMPLIANCE", "level": "NONE", "evidence": "No auth implementation found in codebase" }
+src/lib/workflow/architecturePhase.ts:445:For domainAssessment, assess each of the 12 engineering domains based on what you find in the codebase AND the approved plan:
+src/lib/workflow/architecturePhase.ts:510:	// Seed domain coverage from the technical analysis domain assessment
+src/lib/workflow/architecturePhase.ts:511:	const domainAssessment = Array.isArray(technicalFindings.domainAssessment)
+src/lib/workflow/architecturePhase.ts:512:		? technicalFindings.domainAssessment as Array<{ domain: string; level: string; evidence: string }>
+src/lib/workflow/architecturePhase.ts:514:	if (domainAssessment.length > 0) {
+src/lib/workflow/architecturePhase.ts:516:		const seededCoverage = seedCoverageFromAnalysis(coverageMap, domainAssessment);
+src/lib/workflow/architecturePhase.ts:517:		updateIntakeConversation(dialogueId, { domainCoverage: seededCoverage });
+src/lib/workflow/architecturePhase.ts:518:		log?.info('Domain coverage seeded from technical analysis', {
+src/lib/workflow/architecturePhase.ts:519:			adequate: domainAssessment.filter(d => d.level === 'ADEQUATE').length,
+src/lib/workflow/architecturePhase.ts:520:			partial: domainAssessment.filter(d => d.level === 'PARTIAL').length,
+src/lib/workflow/architecturePhase.ts:521:			none: domainAssessment.filter(d => d.level === 'NONE').length,
+src/lib/workflow/architecturePhase.ts:632:		approvedPlan.domainCoverage ?? null,
+src/lib/workflow/architecturePhase.ts:659:	// Backfill domain mappings for capabilities where LLM omitted them
+src/lib/workflow/architecturePhase.ts:660:	const capabilities = backfillDomainMappings(
+src/lib/workflow/architecturePhase.ts:661:		rawCapabilities, approvedPlan, approvedPlan.domainCoverage ?? null
+src/lib/workflow/architecturePhase.ts:797:// ==================== MODELING (Domain Model Document) ====================
+src/lib/workflow/architecturePhase.ts:800: * MODELING sub-state: Produce the Domain Model document.
+src/lib/workflow/architecturePhase.ts:807: * produce the domain model. It can examine workspace files for existing patterns.
+src/lib/workflow/architecturePhase.ts:818:	log?.info('Starting domain modeling', { dialogueId, docId: meta.architectureDocId });
+src/lib/workflow/architecturePhase.ts:830:	// Invoke Architecture Expert for domain modeling
+src/lib/workflow/architecturePhase.ts:839:	// Get approved plan for entityProposals/domainProposals access
+src/lib/workflow/architecturePhase.ts:857:			commandBlock: { dialogueId, commandId: modelCmdId, label: `Architect — Domain Modeling [${providerName}]`, commandType: 'role_invocation' },
+src/lib/workflow/architecturePhase.ts:862:		log?.error('Domain modeling failed', { error: modelResult.error.message });
+src/lib/workflow/architecturePhase.ts:868:			label: `Architect — Domain Modeling [${providerName}]`,
+src/lib/workflow/architecturePhase.ts:885:		summary: '── Domain Model Output ──',
+src/lib/workflow/architecturePhase.ts:900:		label: `Architect — Domain Modeling [${providerName}]`,
+src/lib/workflow/architecturePhase.ts:901:		summary: `Modeled ${data_models.length} domain entities`,
+src/lib/workflow/architecturePhase.ts:906:	// Update document with domain model
+src/lib/workflow/architecturePhase.ts:909:		log?.error('Failed to persist domain model to architecture document', {
+src/lib/workflow/architecturePhase.ts:921:		summary: `Domain model: ${data_models.length} entities`,
+src/lib/workflow/architecturePhase.ts:931:	log?.info('Domain modeling complete, advancing to DESIGNING', {
+src/lib/workflow/architecturePhase.ts:954: * Input:  Capabilities + Workflows + Domain Model (from MODELING)
+src/lib/workflow/architecturePhase.ts:957: * The domain model is now available as structured input context, enabling
+src/lib/workflow/architecturePhase.ts:1015:			'  3. Domain model alignment — does the Domain Model suggest entity-oriented boundaries?',
+src/lib/workflow/architecturePhase.ts:1097:		//    Domain model is already available in doc.data_models (from MODELING sub-state)
+src/lib/workflow/architecturePhase.ts:1355: * Input:  Components + Interfaces + Domain Model + Capabilities
+src/lib/workflow/architecturePhase.ts:1580:			const domainCoverage = approvedPlan?.domainCoverage ?? null;
+src/lib/workflow/architecturePhase.ts:1582:			const traceResult = runRequirementsTraceabilityCheck(doc, approvedPlan, domainCoverage);
+src/lib/workflow/architecturePhase.ts:1584:			// Attempt deterministic repair for unmapped domains
+src/lib/workflow/architecturePhase.ts:1585:			if (traceResult.unmapped_domains.length > 0 && domainCoverage) {
+src/lib/workflow/architecturePhase.ts:1586:				const repairedCapabilities = backfillDomainMappings(
+src/lib/workflow/architecturePhase.ts:1587:					doc.capabilities, approvedPlan, domainCoverage
+src/lib/workflow/architecturePhase.ts:1589:				// Check how many domains are still unmapped after backfill
+src/lib/workflow/architecturePhase.ts:1590:				const repairedMappedDomains = new Set<string>(
+src/lib/workflow/architecturePhase.ts:1591:					repairedCapabilities.flatMap(c => c.domain_mappings.map(m => m.domain))
+src/lib/workflow/architecturePhase.ts:1593:				const stillUnmapped = traceResult.unmapped_domains.filter(d => !repairedMappedDomains.has(d));
+src/lib/workflow/architecturePhase.ts:1595:				if (stillUnmapped.length < traceResult.unmapped_domains.length) {
+src/lib/workflow/architecturePhase.ts:1605:						`[REPAIRED] Domain mapping backfill resolved ${traceResult.unmapped_domains.length - stillUnmapped.length} unmapped domain(s)`
+src/lib/workflow/architecturePhase.ts:1609:				for (const domain of stillUnmapped) {
+src/lib/workflow/architecturePhase.ts:1610:					structuralFindings.push(`Domain "${domain}" has INTAKE coverage but no capability mapping after backfill`);
+src/lib/workflow/architecturePhase.ts:1672:	const decomposingKeywords = /\bCapability\b.*\bno workflows\b|\bno capability mapping\b|\bno backing requirements\b|\bDomain\b.*\bno capability\b/;
+src/lib/workflow/architecturePhase.ts:1673:	const modelingKeywords = /\bData model\b|\breferences unknown target\b|\bentity\b.*\bnot found\b|\brelationship\b.*\bunknown\b|\bdomain model\b/i;
+src/lib/workflow/architecturePhase.ts:2128:	// 9. Domain model coverage: every data entity referenced by a component's
+src/lib/workflow/architecturePhase.ts:2129:	//    technology_notes or interaction_patterns should exist in the domain model
+src/lib/workflow/architecturePhase.ts:2135:				findings.push(`Component "${comp.label}" references data model "${dep}" not found in domain model`);
+src/lib/workflow/architecturePhase.ts:2142:	//     domains need formal contracts); intra-module gaps are WARN (internal wiring).
+src/lib/workflow/architectureTemplates.ts:118:	description: 'Standard create-read-update-delete operations for a domain entity with validation and authorization.',
+src/lib/workflow/architectureTemplates.ts:134:			rationale: 'Encapsulates domain rules independently of transport layer',
+src/lib/workflow/architectureTemplates.ts:155:			description: 'Domain entity with standard lifecycle fields',
+src/lib/workflow/architectureTemplates.ts:205:			responsibility: 'Emit domain events when state changes occur',
+src/lib/workflow/architectureTemplates.ts:236:			entity_name: 'DomainEvent',
+src/lib/workflow/architectureTemplates.ts:237:			description: 'Structured domain event with metadata',
+src/lib/workflow/architectureTemplates.ts:254:			label: 'Domain Event Channel',
+src/lib/workflow/architectureTemplates.ts:255:			description: 'Pub/sub channel for domain events',
+src/lib/workflow/architectureTemplates.ts:258:			contract: 'publish(event: DomainEvent) / subscribe(eventType, handler)',
+src/lib/workflow/architectureTemplates.ts:265:			description: 'Domain event is produced, routed, and consumed asynchronously',
+src/lib/workflow/architectureTemplates.ts:267:				{ step_id: 'S1', label: 'State change', actor: 'System', action: 'Domain operation triggers state change', inputs: ['operation result'], outputs: ['domain event'], next_steps: ['S2'] },
+src/lib/workflow/architectureTemplates.ts:268:				{ step_id: 'S2', label: 'Emit event', actor: 'System', action: 'Publish event to bus/broker', inputs: ['domain event'], outputs: [], next_steps: ['S3'] },
+src/lib/workflow/architectureTemplates.ts:269:				{ step_id: 'S3', label: 'Consume event', actor: 'System', action: 'Handler processes event and executes side effects', inputs: ['domain event'], outputs: ['side effect result'], next_steps: [] },
+src/lib/workflow/architectureTemplates.ts:272:			triggers: ['Domain state change'],
+src/lib/workflow/domainCoverageTracker.ts:2: * Domain Coverage Tracker
+src/lib/workflow/domainCoverageTracker.ts:4: * Pure-function module that tracks engineering domain coverage during INTAKE.
+src/lib/workflow/domainCoverageTracker.ts:5: * Maintains per-domain coverage level (NONE → PARTIAL → ADEQUATE) with evidence trails.
+src/lib/workflow/domainCoverageTracker.ts:10:	EngineeringDomain,
+src/lib/workflow/domainCoverageTracker.ts:11:	DomainCoverageLevel,
+src/lib/workflow/domainCoverageTracker.ts:15:	DomainCoverageEntry,
+src/lib/workflow/domainCoverageTracker.ts:16:	DomainCoverageMap,
+src/lib/workflow/domainCoverageTracker.ts:26:// ==================== DOMAIN METADATA ====================
+src/lib/workflow/domainCoverageTracker.ts:28:export interface DomainInfo {
+src/lib/workflow/domainCoverageTracker.ts:35: * Human-readable labels, descriptions, and keyword triggers for each domain.
+src/lib/workflow/domainCoverageTracker.ts:37:export const DOMAIN_INFO: Record<EngineeringDomain, DomainInfo> = {
+src/lib/workflow/domainCoverageTracker.ts:38:	[EngineeringDomain.PROBLEM_MISSION]: {
+src/lib/workflow/domainCoverageTracker.ts:46:	[EngineeringDomain.STAKEHOLDERS]: {
+src/lib/workflow/domainCoverageTracker.ts:54:	[EngineeringDomain.SCOPE]: {
+src/lib/workflow/domainCoverageTracker.ts:62:	[EngineeringDomain.CAPABILITIES]: {
+src/lib/workflow/domainCoverageTracker.ts:70:	[EngineeringDomain.WORKFLOWS_USE_CASES]: {
+src/lib/workflow/domainCoverageTracker.ts:78:	[EngineeringDomain.DATA_INFORMATION]: {
+src/lib/workflow/domainCoverageTracker.ts:87:	[EngineeringDomain.ENVIRONMENT_OPERATIONS]: {
+src/lib/workflow/domainCoverageTracker.ts:97:	[EngineeringDomain.QUALITY_ATTRIBUTES]: {
+src/lib/workflow/domainCoverageTracker.ts:106:	[EngineeringDomain.SECURITY_COMPLIANCE]: {
+src/lib/workflow/domainCoverageTracker.ts:116:	[EngineeringDomain.INTEGRATION_INTERFACES]: {
+src/lib/workflow/domainCoverageTracker.ts:126:	[EngineeringDomain.ARCHITECTURE]: {
+src/lib/workflow/domainCoverageTracker.ts:133:			'domain driven', 'hexagonal',
+src/lib/workflow/domainCoverageTracker.ts:136:	[EngineeringDomain.VERIFICATION_DELIVERY]: {
+src/lib/workflow/domainCoverageTracker.ts:148: * Ordered list of domains for STATE_DRIVEN sequential traversal.
+src/lib/workflow/domainCoverageTracker.ts:151:export const DOMAIN_SEQUENCE: EngineeringDomain[] = [
+src/lib/workflow/domainCoverageTracker.ts:152:	EngineeringDomain.PROBLEM_MISSION,
+src/lib/workflow/domainCoverageTracker.ts:153:	EngineeringDomain.STAKEHOLDERS,
+src/lib/workflow/domainCoverageTracker.ts:154:	EngineeringDomain.SCOPE,
+src/lib/workflow/domainCoverageTracker.ts:155:	EngineeringDomain.CAPABILITIES,
+src/lib/workflow/domainCoverageTracker.ts:156:	EngineeringDomain.WORKFLOWS_USE_CASES,
+src/lib/workflow/domainCoverageTracker.ts:157:	EngineeringDomain.DATA_INFORMATION,
+src/lib/workflow/domainCoverageTracker.ts:158:	EngineeringDomain.INTEGRATION_INTERFACES,
+src/lib/workflow/domainCoverageTracker.ts:159:	EngineeringDomain.SECURITY_COMPLIANCE,
+src/lib/workflow/domainCoverageTracker.ts:160:	EngineeringDomain.QUALITY_ATTRIBUTES,
+src/lib/workflow/domainCoverageTracker.ts:161:	EngineeringDomain.ENVIRONMENT_OPERATIONS,
+src/lib/workflow/domainCoverageTracker.ts:162:	EngineeringDomain.ARCHITECTURE,
+src/lib/workflow/domainCoverageTracker.ts:163:	EngineeringDomain.VERIFICATION_DELIVERY,
+src/lib/workflow/domainCoverageTracker.ts:169: * Create a fresh coverage map with all 12 domains at NONE.
+src/lib/workflow/domainCoverageTracker.ts:171:export function initializeCoverageMap(): DomainCoverageMap {
+src/lib/workflow/domainCoverageTracker.ts:172:	const map = {} as DomainCoverageMap;
+src/lib/workflow/domainCoverageTracker.ts:173:	for (const domain of Object.values(EngineeringDomain)) {
+src/lib/workflow/domainCoverageTracker.ts:174:		map[domain] = {
+src/lib/workflow/domainCoverageTracker.ts:175:			domain,
+src/lib/workflow/domainCoverageTracker.ts:176:			level: DomainCoverageLevel.NONE,
+src/lib/workflow/domainCoverageTracker.ts:186:/** Maximum evidence snippets stored per domain */
+src/lib/workflow/domainCoverageTracker.ts:187:const MAX_EVIDENCE_PER_DOMAIN = 10;
+src/lib/workflow/domainCoverageTracker.ts:194: * Update domain coverage based on text content from a conversation turn.
+src/lib/workflow/domainCoverageTracker.ts:195: * Scans for domain keywords and promotes coverage levels.
+src/lib/workflow/domainCoverageTracker.ts:199:	map: DomainCoverageMap,
+src/lib/workflow/domainCoverageTracker.ts:202:): DomainCoverageMap {
+src/lib/workflow/domainCoverageTracker.ts:206:	for (const domain of Object.values(EngineeringDomain)) {
+src/lib/workflow/domainCoverageTracker.ts:207:		const info = DOMAIN_INFO[domain];
+src/lib/workflow/domainCoverageTracker.ts:208:		const entry = updated[domain];
+src/lib/workflow/domainCoverageTracker.ts:215:		if (snippet && entry.evidence.length < MAX_EVIDENCE_PER_DOMAIN &&
+src/lib/workflow/domainCoverageTracker.ts:227:		if (entry.level === DomainCoverageLevel.NONE && cumulativeHits >= PARTIAL_THRESHOLD) {
+src/lib/workflow/domainCoverageTracker.ts:228:			entry.level = DomainCoverageLevel.PARTIAL;
+src/lib/workflow/domainCoverageTracker.ts:230:		if (entry.level === DomainCoverageLevel.PARTIAL && cumulativeHits >= ADEQUATE_THRESHOLD) {
+src/lib/workflow/domainCoverageTracker.ts:231:			entry.level = DomainCoverageLevel.ADEQUATE;
+src/lib/workflow/domainCoverageTracker.ts:240:const COVERAGE_EXTRACTION_PROMPT = `You are a domain coverage analyst for a software development intake process. Given conversation text from a planning session, extract evidence relevant to each engineering domain.
+src/lib/workflow/domainCoverageTracker.ts:242:The 12 engineering domains are:
+src/lib/workflow/domainCoverageTracker.ts:256:For each domain that has relevant content in the text, extract a concise but COMPLETE evidence summary (not a snippet — a coherent summary of what was said about that domain). Also assess the coverage level:
+src/lib/workflow/domainCoverageTracker.ts:257:- NONE: No meaningful information about this domain
+src/lib/workflow/domainCoverageTracker.ts:262:{"domains": [{"domain": "PROBLEM_MISSION", "level": "PARTIAL", "evidence": "The stated problem is..."}, ...]}
+src/lib/workflow/domainCoverageTracker.ts:264:Only include domains that have at least PARTIAL coverage. Omit NONE domains entirely.`;
+src/lib/workflow/domainCoverageTracker.ts:267: * LLM-backed domain coverage extraction.
+src/lib/workflow/domainCoverageTracker.ts:268: * Uses the evaluator's fast LLM to extract per-domain evidence and coverage levels.
+src/lib/workflow/domainCoverageTracker.ts:272:	map: DomainCoverageMap,
+src/lib/workflow/domainCoverageTracker.ts:276:): Promise<DomainCoverageMap> {
+src/lib/workflow/domainCoverageTracker.ts:278:		? getLogger().child({ component: 'domainCoverageExtractor' })
+src/lib/workflow/domainCoverageTracker.ts:317:			domainsUpdated: parsed.length,
+src/lib/workflow/domainCoverageTracker.ts:332:	map: DomainCoverageMap,
+src/lib/workflow/domainCoverageTracker.ts:333:	item: { domain: string; level: string; evidence: string },
+src/lib/workflow/domainCoverageTracker.ts:336:	const domain = resolveDomainFromString(item.domain);
+src/lib/workflow/domainCoverageTracker.ts:337:	if (!domain) { return; }
+src/lib/workflow/domainCoverageTracker.ts:339:	const entry = map[domain];
+src/lib/workflow/domainCoverageTracker.ts:340:	const level = isValidLevel(item.level) ? item.level as DomainCoverageLevel : null;
+src/lib/workflow/domainCoverageTracker.ts:342:	if (item.evidence && entry.evidence.length < MAX_EVIDENCE_PER_DOMAIN &&
+src/lib/workflow/domainCoverageTracker.ts:358:	map: DomainCoverageMap,
+src/lib/workflow/domainCoverageTracker.ts:362:): DomainCoverageMap {
+src/lib/workflow/domainCoverageTracker.ts:368:function parseCoverageExtractionResponse(content: string): Array<{ domain: string; level: string; evidence: string }> | null {
+src/lib/workflow/domainCoverageTracker.ts:375:		if (!parsed.domains || !Array.isArray(parsed.domains)) { return null; }
+src/lib/workflow/domainCoverageTracker.ts:376:		return parsed.domains.filter((d: { domain?: string; level?: string; evidence?: string }) =>
+src/lib/workflow/domainCoverageTracker.ts:377:			typeof d.domain === 'string' && typeof d.level === 'string' && typeof d.evidence === 'string'
+src/lib/workflow/domainCoverageTracker.ts:415: * Expert-reported domain coverage update.
+src/lib/workflow/domainCoverageTracker.ts:417: *   [DOMAIN_COVERAGE: SECURITY_COMPLIANCE=ADEQUATE]
+src/lib/workflow/domainCoverageTracker.ts:418: *   [DOMAIN_COVERAGE: Problem & Mission=ADEQUATE]
+src/lib/workflow/domainCoverageTracker.ts:422:	map: DomainCoverageMap,
+src/lib/workflow/domainCoverageTracker.ts:425:): DomainCoverageMap {
+src/lib/workflow/domainCoverageTracker.ts:427:	const pattern = /\[DOMAIN_COVERAGE:\s*([^=\]]+?)\s*=\s*(\w+)\s*\]/g;
+src/lib/workflow/domainCoverageTracker.ts:432:		const domainStr = match[1].trim();
+src/lib/workflow/domainCoverageTracker.ts:435:		// Resolve domain: try enum key first, then label lookup
+src/lib/workflow/domainCoverageTracker.ts:436:		const domain = resolveDomainFromString(domainStr);
+src/lib/workflow/domainCoverageTracker.ts:437:		if (!domain || !isValidLevel(levelStr)) { continue; }
+src/lib/workflow/domainCoverageTracker.ts:439:		const level = levelStr as DomainCoverageLevel;
+src/lib/workflow/domainCoverageTracker.ts:440:		const entry = updated[domain];
+src/lib/workflow/domainCoverageTracker.ts:454: * Resolve a domain string to an EngineeringDomain enum value.
+src/lib/workflow/domainCoverageTracker.ts:458:function resolveDomainFromString(str: string): EngineeringDomain | null {
+src/lib/workflow/domainCoverageTracker.ts:460:	if (isValidDomain(str)) {
+src/lib/workflow/domainCoverageTracker.ts:461:		return str as EngineeringDomain;
+src/lib/workflow/domainCoverageTracker.ts:466:	for (const domain of Object.values(EngineeringDomain)) {
+src/lib/workflow/domainCoverageTracker.ts:467:		if (DOMAIN_INFO[domain].label.toLowerCase() === lowerStr) {
+src/lib/workflow/domainCoverageTracker.ts:468:			return domain;
+src/lib/workflow/domainCoverageTracker.ts:478: * Get domains with NONE coverage — completely unaddressed.
+src/lib/workflow/domainCoverageTracker.ts:480:export function getCoverageGaps(map: DomainCoverageMap): EngineeringDomain[] {
+src/lib/workflow/domainCoverageTracker.ts:481:	return Object.values(EngineeringDomain).filter(
+src/lib/workflow/domainCoverageTracker.ts:482:		d => map[d].level === DomainCoverageLevel.NONE,
+src/lib/workflow/domainCoverageTracker.ts:487: * Get domains with PARTIAL coverage — mentioned but not adequately explored.
+src/lib/workflow/domainCoverageTracker.ts:489:export function getPartialDomains(map: DomainCoverageMap): EngineeringDomain[] {
+src/lib/workflow/domainCoverageTracker.ts:490:	return Object.values(EngineeringDomain).filter(
+src/lib/workflow/domainCoverageTracker.ts:491:		d => map[d].level === DomainCoverageLevel.PARTIAL,
+src/lib/workflow/domainCoverageTracker.ts:498:export function getCoverageSummary(map: DomainCoverageMap): {
+src/lib/workflow/domainCoverageTracker.ts:507:	const total = Object.values(EngineeringDomain).length;
+src/lib/workflow/domainCoverageTracker.ts:509:	for (const domain of Object.values(EngineeringDomain)) {
+src/lib/workflow/domainCoverageTracker.ts:510:		switch (map[domain].level) {
+src/lib/workflow/domainCoverageTracker.ts:511:			case DomainCoverageLevel.ADEQUATE: adequate++; break;
+src/lib/workflow/domainCoverageTracker.ts:512:			case DomainCoverageLevel.PARTIAL: partial++; break;
+src/lib/workflow/domainCoverageTracker.ts:513:			case DomainCoverageLevel.NONE: none++; break;
+src/lib/workflow/domainCoverageTracker.ts:533:	map: DomainCoverageMap,
+src/lib/workflow/domainCoverageTracker.ts:552:	map: DomainCoverageMap,
+src/lib/workflow/domainCoverageTracker.ts:556:	const partials = getPartialDomains(map);
+src/lib/workflow/domainCoverageTracker.ts:564:		suggestedDomains: suggested,
+src/lib/workflow/domainCoverageTracker.ts:571: * Get the next domain in the STATE_DRIVEN sequence.
+src/lib/workflow/domainCoverageTracker.ts:572: * Returns null if all domains have been visited.
+src/lib/workflow/domainCoverageTracker.ts:574:export function getNextDomain(
+src/lib/workflow/domainCoverageTracker.ts:575:	currentDomain: EngineeringDomain | null,
+src/lib/workflow/domainCoverageTracker.ts:576:): EngineeringDomain | null {
+src/lib/workflow/domainCoverageTracker.ts:577:	if (currentDomain === null) {
+src/lib/workflow/domainCoverageTracker.ts:578:		return DOMAIN_SEQUENCE[0];
+src/lib/workflow/domainCoverageTracker.ts:580:	const idx = DOMAIN_SEQUENCE.indexOf(currentDomain);
+src/lib/workflow/domainCoverageTracker.ts:581:	if (idx === -1 || idx >= DOMAIN_SEQUENCE.length - 1) {
+src/lib/workflow/domainCoverageTracker.ts:584:	return DOMAIN_SEQUENCE[idx + 1];
+src/lib/workflow/domainCoverageTracker.ts:588: * Check if the current domain has adequate coverage for STATE_DRIVEN exit criteria.
+src/lib/workflow/domainCoverageTracker.ts:590:export function isDomainAdequatelyCovered(
+src/lib/workflow/domainCoverageTracker.ts:591:	map: DomainCoverageMap,
+src/lib/workflow/domainCoverageTracker.ts:592:	domain: EngineeringDomain,
+src/lib/workflow/domainCoverageTracker.ts:594:	return map[domain].level === DomainCoverageLevel.ADEQUATE;
+src/lib/workflow/domainCoverageTracker.ts:602:export function formatCoverageSummaryForPrompt(map: DomainCoverageMap): string {
+src/lib/workflow/domainCoverageTracker.ts:603:	const lines: string[] = ['Domain Coverage Status:'];
+src/lib/workflow/domainCoverageTracker.ts:604:	for (const domain of DOMAIN_SEQUENCE) {
+src/lib/workflow/domainCoverageTracker.ts:605:		const entry = map[domain];
+src/lib/workflow/domainCoverageTracker.ts:606:		const info = DOMAIN_INFO[domain];
+src/lib/workflow/domainCoverageTracker.ts:607:		const icon = entry.level === DomainCoverageLevel.ADEQUATE ? '[OK]'
+src/lib/workflow/domainCoverageTracker.ts:608:			: entry.level === DomainCoverageLevel.PARTIAL ? '[PARTIAL]'
+src/lib/workflow/domainCoverageTracker.ts:618: * Format uncovered domains as a bulleted list for Expert prompt injection.
+src/lib/workflow/domainCoverageTracker.ts:620:export function formatUncoveredDomainsForPrompt(map: DomainCoverageMap): string {
+src/lib/workflow/domainCoverageTracker.ts:622:	const partials = getPartialDomains(map);
+src/lib/workflow/domainCoverageTracker.ts:625:		return 'All engineering domains have been adequately covered.';
+src/lib/workflow/domainCoverageTracker.ts:630:		lines.push('Domains NOT YET discussed:');
+src/lib/workflow/domainCoverageTracker.ts:632:			const info = DOMAIN_INFO[d];
+src/lib/workflow/domainCoverageTracker.ts:637:		lines.push('Domains only PARTIALLY covered:');
+src/lib/workflow/domainCoverageTracker.ts:639:			const info = DOMAIN_INFO[d];
+src/lib/workflow/domainCoverageTracker.ts:650: * Sets coverage levels in one shot from the Expert's domain assessment.
+src/lib/workflow/domainCoverageTracker.ts:654:	map: DomainCoverageMap,
+src/lib/workflow/domainCoverageTracker.ts:655:	domainAssessment: Array<{ domain: string; level: string; evidence: string }>,
+src/lib/workflow/domainCoverageTracker.ts:656:): DomainCoverageMap {
+src/lib/workflow/domainCoverageTracker.ts:659:	for (const item of domainAssessment) {
+src/lib/workflow/domainCoverageTracker.ts:660:		// Resolve domain string to enum (handles both enum keys and labels)
+src/lib/workflow/domainCoverageTracker.ts:661:		const domain = resolveDomainKey(item.domain);
+src/lib/workflow/domainCoverageTracker.ts:662:		if (!domain || !updated[domain]) { continue; }
+src/lib/workflow/domainCoverageTracker.ts:668:		updated[domain].level = level;
+src/lib/workflow/domainCoverageTracker.ts:670:			updated[domain].evidence.push(item.evidence);
+src/lib/workflow/domainCoverageTracker.ts:672:		if (!updated[domain].turnNumbers.includes(0)) {
+src/lib/workflow/domainCoverageTracker.ts:673:			updated[domain].turnNumbers.push(0); // Analysis is turn 0
+src/lib/workflow/domainCoverageTracker.ts:681: * Resolve a domain string (enum key or label) to EngineeringDomain.
+src/lib/workflow/domainCoverageTracker.ts:683:function resolveDomainKey(raw: string): EngineeringDomain | null {
+src/lib/workflow/domainCoverageTracker.ts:685:	if (DOMAIN_INFO[raw as EngineeringDomain]) {
+src/lib/workflow/domainCoverageTracker.ts:686:		return raw as EngineeringDomain;
+src/lib/workflow/domainCoverageTracker.ts:690:	for (const domain of DOMAIN_SEQUENCE) {
+src/lib/workflow/domainCoverageTracker.ts:691:		if (domain === normalized) { return domain; }
+src/lib/workflow/domainCoverageTracker.ts:695:	for (const domain of DOMAIN_SEQUENCE) {
+src/lib/workflow/domainCoverageTracker.ts:696:		if (DOMAIN_INFO[domain].label.toLowerCase() === lowerRaw) { return domain; }
+src/lib/workflow/domainCoverageTracker.ts:702: * Resolve a level string to DomainCoverageLevel.
+src/lib/workflow/domainCoverageTracker.ts:704:function resolveCoverageLevel(raw: string): DomainCoverageLevel | null {
+src/lib/workflow/domainCoverageTracker.ts:706:	if (upper === 'ADEQUATE') { return DomainCoverageLevel.ADEQUATE; }
+src/lib/workflow/domainCoverageTracker.ts:707:	if (upper === 'PARTIAL') { return DomainCoverageLevel.PARTIAL; }
+src/lib/workflow/domainCoverageTracker.ts:708:	if (upper === 'NONE') { return DomainCoverageLevel.NONE; }
+src/lib/workflow/domainCoverageTracker.ts:714:function deepCloneMap(map: DomainCoverageMap): DomainCoverageMap {
+src/lib/workflow/domainCoverageTracker.ts:715:	return JSON.parse(JSON.stringify(map)) as DomainCoverageMap;
+src/lib/workflow/domainCoverageTracker.ts:750:function isValidDomain(str: string): boolean {
+src/lib/workflow/domainCoverageTracker.ts:751:	return Object.values(EngineeringDomain).includes(str as EngineeringDomain);
+src/lib/workflow/domainCoverageTracker.ts:755:	return Object.values(DomainCoverageLevel).includes(str as DomainCoverageLevel);
+src/lib/workflow/domainCoverageTracker.ts:758:function levelRank(level: DomainCoverageLevel): number {
+src/lib/workflow/domainCoverageTracker.ts:760:		case DomainCoverageLevel.NONE: return 0;
+src/lib/workflow/domainCoverageTracker.ts:761:		case DomainCoverageLevel.PARTIAL: return 1;
+src/lib/workflow/domainCoverageTracker.ts:762:		case DomainCoverageLevel.ADEQUATE: return 2;
+src/lib/workflow/intakeClassifier.ts:13: *   - DOMAIN_GUIDED: Document-based analysis for spec-heavy inputs
+src/lib/workflow/intakeClassifier.ts:36:1. STATE_DRIVEN — Best for vague, high-level, or aspirational inputs. The user has a concept but hasn't worked out details. This mode walks them through 12 engineering domains one at a time (problem/mission, stakeholders, scope, capabilities, workflows, data, environment/operations, quality attributes, security/compliance, integrations, architecture, verification/delivery).
+src/lib/workflow/intakeClassifier.ts:39:2. DOMAIN_GUIDED — Best when the user references existing documents, specifications, or a codebase to review. The system pre-analyzes provided materials, maps which engineering domains are already covered, then focuses conversation on uncovered gaps.
+src/lib/workflow/intakeClassifier.ts:42:3. HYBRID_CHECKPOINTS — Best for moderately detailed requests or scoped tasks (bug fixes, feature additions, refactors). Free-form conversation with the Technical Expert, with periodic coverage checkpoint cards that highlight under-explored engineering domains.
+src/lib/workflow/intakeClassifier.ts:46:- Does the input reference existing files, paths, documents, or a codebase? → Lean toward DOMAIN_GUIDED
+src/lib/workflow/intakeClassifier.ts:49:- Does the input include or reference specification documents, design docs, or RFCs? → Lean toward DOMAIN_GUIDED
+src/lib/workflow/intakeClassifier.ts:50:- Is there an established codebase and the user wants review or audit? → Lean toward DOMAIN_GUIDED
+src/lib/workflow/intakeClassifier.ts:54:{"mode": "STATE_DRIVEN" | "DOMAIN_GUIDED" | "HYBRID_CHECKPOINTS", "confidence": 0.0-1.0, "rationale": "One sentence explaining why this mode fits the input"}`;
+src/lib/workflow/intakeClassifier.ts:351:		return buildHeuristicResult(IntakeMode.DOMAIN_GUIDED,
+src/lib/workflow/intakeClassifier.ts:360:			'Input describes a scoped task — free-form conversation with periodic domain checkpoints works best.',
+src/lib/workflow/intakeClassifier.ts:368:			'Input is a high-level concept — a guided domain walkthrough will systematically build out requirements.',
+src/lib/workflow/intakeClassifier.ts:373:		'Input has moderate detail — free-form conversation with periodic domain checkpoints works best.',
+src/lib/workflow/intakePhase.ts:24:	DomainCoverageMap,
+src/lib/workflow/intakePhase.ts:28:	IntakeSubState, IntakeMode, EngineeringDomain, isGatheringResponse,
+src/lib/workflow/intakePhase.ts:32:	DomainProposal, EntityProposal, WorkflowProposal, IntegrationProposal,
+src/lib/workflow/intakePhase.ts:75:	getNextDomain,
+src/lib/workflow/intakePhase.ts:76:	isDomainAdequatelyCovered,
+src/lib/workflow/intakePhase.ts:78:	getPartialDomains,
+src/lib/workflow/intakePhase.ts:80:	formatUncoveredDomainsForPrompt,
+src/lib/workflow/intakePhase.ts:82:	DOMAIN_INFO,
+src/lib/workflow/intakePhase.ts:83:	DOMAIN_SEQUENCE,
+src/lib/workflow/intakePhase.ts:84:} from './domainCoverageTracker';
+src/lib/workflow/intakePhase.ts:146:			domainCoverageContext: buildDomainCoverageContextForExpert(conv),
+src/lib/workflow/intakePhase.ts:194:		// 4b. Update domain coverage if mode is set
+src/lib/workflow/intakePhase.ts:195:		const coverageUpdates = await updateDomainCoverageAfterTurn(
+src/lib/workflow/intakePhase.ts:209:		// 4c. Emit domain coverage event if tracking is active
+src/lib/workflow/intakePhase.ts:210:		if (coverageUpdates.domainCoverage) {
+src/lib/workflow/intakePhase.ts:211:			getEventBus().emit('intake:domain_coverage_updated', {
+src/lib/workflow/intakePhase.ts:213:				coverage: coverageUpdates.domainCoverage,
+src/lib/workflow/intakePhase.ts:305:		// (domains, journeys with steps, entities with attributes, integrations) which can be 15K+ tokens
+src/lib/workflow/intakePhase.ts:356:		finalizedPlan.domainProposals      = dp.domainProposals      ?? [];
+src/lib/workflow/intakePhase.ts:452:		// 2. Store approved plan in workflow metadata (include domain coverage for downstream enrichment)
+src/lib/workflow/intakePhase.ts:454:		if (conv.domainCoverage) {
+src/lib/workflow/intakePhase.ts:455:			planForMetadata.domainCoverage = conv.domainCoverage;
+src/lib/workflow/intakePhase.ts:656:// ==================== DOMAIN COVERAGE HELPERS ====================
+src/lib/workflow/intakePhase.ts:659: * Build domain coverage context string for injection into the Expert's system prompt.
+src/lib/workflow/intakePhase.ts:662:function buildDomainCoverageContextForExpert(
+src/lib/workflow/intakePhase.ts:665:	if (!conv.intakeMode || !conv.domainCoverage) {
+src/lib/workflow/intakePhase.ts:669:	// Prepend gathered domain notes if any gathering turns exist
+src/lib/workflow/intakePhase.ts:678:			if (!conv.currentDomain) {
+src/lib/workflow/intakePhase.ts:679:				// All domains visited — in DISCUSSING mode after gathering
+src/lib/workflow/intakePhase.ts:681:					'INTAKE MODE: State-Driven (All Domains Gathered)',
+src/lib/workflow/intakePhase.ts:682:					'All 12 engineering domains have been explored during the gathering phase.',
+src/lib/workflow/intakePhase.ts:683:					'Use the gathered domain notes above to produce a comprehensive plan.',
+src/lib/workflow/intakePhase.ts:686:					formatCoverageSummaryForPrompt(conv.domainCoverage),
+src/lib/workflow/intakePhase.ts:689:			const info = DOMAIN_INFO[conv.currentDomain];
+src/lib/workflow/intakePhase.ts:690:			const domainIndex = DOMAIN_SEQUENCE.indexOf(conv.currentDomain);
+src/lib/workflow/intakePhase.ts:693:				'INTAKE MODE: State-Driven Domain Walkthrough',
+src/lib/workflow/intakePhase.ts:695:				'CURRENT DOMAIN (' + (domainIndex + 1) + ' of ' + DOMAIN_SEQUENCE.length + '): ' + info.label,
+src/lib/workflow/intakePhase.ts:699:				'Your ENTIRE conversational response must be scoped to this domain.',
+src/lib/workflow/intakePhase.ts:701:				'If you can find codebase evidence relevant to this domain, include it.',
+src/lib/workflow/intakePhase.ts:702:				'When this domain is sufficiently explored, say so explicitly.',
+src/lib/workflow/intakePhase.ts:704:				formatCoverageSummaryForPrompt(conv.domainCoverage),
+src/lib/workflow/intakePhase.ts:707:		case IntakeMode.DOMAIN_GUIDED: {
+src/lib/workflow/intakePhase.ts:709:				'INTAKE MODE: Domain-Guided Conversation',
+src/lib/workflow/intakePhase.ts:710:				'The user provided substantial input. Naturally steer the conversation toward uncovered domains.',
+src/lib/workflow/intakePhase.ts:711:				gatheringSummary ? 'Use the gathered domain notes above as the foundation for your plan.' : '',
+src/lib/workflow/intakePhase.ts:713:				formatUncoveredDomainsForPrompt(conv.domainCoverage),
+src/lib/workflow/intakePhase.ts:715:				formatCoverageSummaryForPrompt(conv.domainCoverage),
+src/lib/workflow/intakePhase.ts:721:				'Continue the natural conversation but be aware of uncovered engineering domains.',
+src/lib/workflow/intakePhase.ts:723:				formatCoverageSummaryForPrompt(conv.domainCoverage),
+src/lib/workflow/intakePhase.ts:730: * Update domain coverage after a conversation turn.
+src/lib/workflow/intakePhase.ts:734:async function updateDomainCoverageAfterTurn(
+src/lib/workflow/intakePhase.ts:740:	domainCoverage?: DomainCoverageMap;
+src/lib/workflow/intakePhase.ts:741:	currentDomain?: EngineeringDomain | null;
+src/lib/workflow/intakePhase.ts:743:	if (!conv.intakeMode || !conv.domainCoverage) {
+src/lib/workflow/intakePhase.ts:748:	let coverage = await updateCoverageFromLLM(conv.domainCoverage, humanMessage, expertResponse, turnNumber);
+src/lib/workflow/intakePhase.ts:754:		domainCoverage: DomainCoverageMap;
+src/lib/workflow/intakePhase.ts:755:		currentDomain?: EngineeringDomain | null;
+src/lib/workflow/intakePhase.ts:756:	} = { domainCoverage: coverage };
+src/lib/workflow/intakePhase.ts:758:	// STATE_DRIVEN: advance current domain if adequately covered
+src/lib/workflow/intakePhase.ts:759:	if (conv.intakeMode === IntakeMode.STATE_DRIVEN && conv.currentDomain) {
+src/lib/workflow/intakePhase.ts:760:		if (isDomainAdequatelyCovered(coverage, conv.currentDomain)) {
+src/lib/workflow/intakePhase.ts:761:			const nextDomain = getNextDomain(conv.currentDomain);
+src/lib/workflow/intakePhase.ts:762:			result.currentDomain = nextDomain;
+src/lib/workflow/intakePhase.ts:770: * Handle mode-specific post-turn logic (checkpoints, domain transitions).
+src/lib/workflow/intakePhase.ts:776:	coverageUpdates: { domainCoverage?: DomainCoverageMap; currentDomain?: EngineeringDomain | null },
+src/lib/workflow/intakePhase.ts:785:	// STATE_DRIVEN: emit domain transition if domain changed
+src/lib/workflow/intakePhase.ts:786:	if (conv.intakeMode === IntakeMode.STATE_DRIVEN && coverageUpdates.currentDomain !== undefined) {
+src/lib/workflow/intakePhase.ts:787:		if (coverageUpdates.currentDomain !== conv.currentDomain) {
+src/lib/workflow/intakePhase.ts:788:			getEventBus().emit('intake:domain_transition', {
+src/lib/workflow/intakePhase.ts:790:				fromDomain: conv.currentDomain,
+src/lib/workflow/intakePhase.ts:791:				toDomain: coverageUpdates.currentDomain,
+src/lib/workflow/intakePhase.ts:793:			metadata.domainTransition = {
+src/lib/workflow/intakePhase.ts:794:				from: conv.currentDomain,
+src/lib/workflow/intakePhase.ts:795:				to: coverageUpdates.currentDomain,
+src/lib/workflow/intakePhase.ts:798:			// Persist domain transition
+src/lib/workflow/intakePhase.ts:800:				currentDomain: coverageUpdates.currentDomain,
+src/lib/workflow/intakePhase.ts:805:	// DOMAIN_GUIDED: after the first analysis turn, offer mode-switch to fill gaps
+src/lib/workflow/intakePhase.ts:806:	if (conv.intakeMode === IntakeMode.DOMAIN_GUIDED && coverageUpdates.domainCoverage && conv.checkpoints.length === 0) {
+src/lib/workflow/intakePhase.ts:807:		const gaps = getCoverageGaps(coverageUpdates.domainCoverage);
+src/lib/workflow/intakePhase.ts:808:		const partials = getPartialDomains(coverageUpdates.domainCoverage);
+src/lib/workflow/intakePhase.ts:810:			const checkpoint = buildCheckpoint(coverageUpdates.domainCoverage, turnNumber);
+src/lib/workflow/intakePhase.ts:828:	if (conv.intakeMode === IntakeMode.HYBRID_CHECKPOINTS && coverageUpdates.domainCoverage) {
+src/lib/workflow/intakePhase.ts:833:		if (shouldTriggerCheckpoint(coverageUpdates.domainCoverage, turnNumber, lastCheckpointTurn)) {
+src/lib/workflow/intakePhase.ts:834:			const checkpoint = buildCheckpoint(coverageUpdates.domainCoverage, turnNumber);
+src/lib/workflow/intakePhase.ts:857: * Expert acts as interviewer: investigates one domain, asks questions, takes notes.
+src/lib/workflow/intakePhase.ts:865:		// 1. Get conversation state (mode + currentDomain already set)
+src/lib/workflow/intakePhase.ts:873:		if (!conv.currentDomain) {
+src/lib/workflow/intakePhase.ts:876:				error: new Error('GATHERING requires currentDomain to be set'),
+src/lib/workflow/intakePhase.ts:889:		// 4. Build domain-specific context for the interviewer
+src/lib/workflow/intakePhase.ts:890:		const domainContext = buildGatheringDomainContext(conv);
+src/lib/workflow/intakePhase.ts:899:			label: 'Interviewer — ' + DOMAIN_INFO[conv.currentDomain].label + ' (Turn ' + turnNumber + ')',
+src/lib/workflow/intakePhase.ts:908:			currentDomain: conv.currentDomain,
+src/lib/workflow/intakePhase.ts:919:			domainContext,
+src/lib/workflow/intakePhase.ts:927:			label: 'Interviewer — ' + DOMAIN_INFO[conv.currentDomain].label + ' (Turn ' + turnNumber + ')',
+src/lib/workflow/intakePhase.ts:947:			summary: `Gathering: ${DOMAIN_INFO[conv.currentDomain].label}`,
+src/lib/workflow/intakePhase.ts:953:				focusDomain: conv.currentDomain,
+src/lib/workflow/intakePhase.ts:954:				domainNotes: response.domainNotes,
+src/lib/workflow/intakePhase.ts:963:		// 7. Update domain coverage from human text + expert response + expert tags
+src/lib/workflow/intakePhase.ts:964:		const coverageUpdates = await updateDomainCoverageAfterTurn(
+src/lib/workflow/intakePhase.ts:978:		// 9. Emit domain coverage event
+src/lib/workflow/intakePhase.ts:979:		if (coverageUpdates.domainCoverage) {
+src/lib/workflow/intakePhase.ts:980:			getEventBus().emit('intake:domain_coverage_updated', {
+src/lib/workflow/intakePhase.ts:982:				coverage: coverageUpdates.domainCoverage,
+src/lib/workflow/intakePhase.ts:986:		// 10. Check domain advancement (STATE_DRIVEN: move to next domain if covered)
+src/lib/workflow/intakePhase.ts:987:		if (conv.intakeMode === IntakeMode.STATE_DRIVEN && coverageUpdates.currentDomain !== undefined) {
+src/lib/workflow/intakePhase.ts:988:			if (coverageUpdates.currentDomain !== conv.currentDomain) {
+src/lib/workflow/intakePhase.ts:989:				getEventBus().emit('intake:domain_transition', {
+src/lib/workflow/intakePhase.ts:991:					fromDomain: conv.currentDomain,
+src/lib/workflow/intakePhase.ts:992:					toDomain: coverageUpdates.currentDomain,
+src/lib/workflow/intakePhase.ts:995:					currentDomain: coverageUpdates.currentDomain,
+src/lib/workflow/intakePhase.ts:1037:					focusDomain: conv.currentDomain,
+src/lib/workflow/intakePhase.ts:1041:					domainNotes: response.domainNotes,
+src/lib/workflow/intakePhase.ts:1060: * Groups notes by domain for injection into the Expert's context.
+src/lib/workflow/intakePhase.ts:1069:	const sections: string[] = ['# Domain Gathering Notes (from Interviewer Phase)'];
+src/lib/workflow/intakePhase.ts:1071:	// Group by focusDomain
+src/lib/workflow/intakePhase.ts:1072:	const byDomain = new Map<string, Array<{
+src/lib/workflow/intakePhase.ts:1082:		const domain = resp.focusDomain;
+src/lib/workflow/intakePhase.ts:1083:		if (!byDomain.has(domain)) { byDomain.set(domain, []); }
+src/lib/workflow/intakePhase.ts:1084:		byDomain.get(domain)!.push({
+src/lib/workflow/intakePhase.ts:1085:			notes: resp.domainNotes,
+src/lib/workflow/intakePhase.ts:1092:	for (const [domain, entries] of byDomain) {
+src/lib/workflow/intakePhase.ts:1093:		const info = DOMAIN_INFO[domain as EngineeringDomain];
+src/lib/workflow/intakePhase.ts:1111: * Build domain context string for gathering mode interviewer prompt.
+src/lib/workflow/intakePhase.ts:1113:function buildGatheringDomainContext(conv: IntakeConversationState): string {
+src/lib/workflow/intakePhase.ts:1114:	if (!conv.currentDomain || !conv.domainCoverage) {
+src/lib/workflow/intakePhase.ts:1118:	const info = DOMAIN_INFO[conv.currentDomain];
+src/lib/workflow/intakePhase.ts:1119:	const domainIndex = DOMAIN_SEQUENCE.indexOf(conv.currentDomain);
+src/lib/workflow/intakePhase.ts:1123:		'CURRENT DOMAIN (' + (domainIndex + 1) + ' of ' + DOMAIN_SEQUENCE.length + '): ' + info.label,
+src/lib/workflow/intakePhase.ts:1127:		'Your ENTIRE response must be scoped to this domain.',
+src/lib/workflow/intakePhase.ts:1129:		'Report codebase findings relevant to this domain.',
+src/lib/workflow/intakePhase.ts:1131:		formatCoverageSummaryForPrompt(conv.domainCoverage),
+src/lib/workflow/intakePhase.ts:1140:	coverageUpdates: { domainCoverage?: DomainCoverageMap; currentDomain?: EngineeringDomain | null },
+src/lib/workflow/intakePhase.ts:1143:		// Complete when current domain advances to null (all domains visited)
+src/lib/workflow/intakePhase.ts:1144:		return coverageUpdates.currentDomain === null;
+src/lib/workflow/intakePhase.ts:1146:	if (conv.intakeMode === IntakeMode.DOMAIN_GUIDED) {
+src/lib/workflow/intakePhase.ts:1147:		// Complete after gathering turns when no NONE-coverage domains remain,
+src/lib/workflow/intakePhase.ts:1149:		if (!coverageUpdates.domainCoverage) { return false; }
+src/lib/workflow/intakePhase.ts:1150:		const gaps = getCoverageGaps(coverageUpdates.domainCoverage);
+src/lib/workflow/intakePhase.ts:1323: * Execute the silent ANALYSIS phase for STATE_DRIVEN and DOMAIN_GUIDED modes.
+src/lib/workflow/intakePhase.ts:1391:		analysis.domainAssessment = [];
+src/lib/workflow/intakePhase.ts:1395:		// Domain coverage removed from INTAKE — handled by ARCHITECTURE TECHNICAL_ANALYSIS
+src/lib/workflow/intakePhase.ts:1429:				domainAssessment: analysis.domainAssessment,
+src/lib/workflow/intakePhase.ts:1441:		// Proposer-Validator flow: product_or_feature (STATE_DRIVEN or DOMAIN_GUIDED) → PROPOSING_DOMAINS
+src/lib/workflow/intakePhase.ts:1445:			&& (conv.intakeMode === IntakeMode.STATE_DRIVEN || conv.intakeMode === IntakeMode.DOMAIN_GUIDED)) {
+src/lib/workflow/intakePhase.ts:1446:			analysis.initialPlan.proposerPhase = ProposerPhase.DOMAIN_MAPPING;
+src/lib/workflow/intakePhase.ts:1453:				targetSubState = IntakeSubState.PROPOSING_DOMAINS;
+src/lib/workflow/intakePhase.ts:1473:			currentDomain: null,
+src/lib/workflow/intakePhase.ts:1483:			domainAssessment: analysis.domainAssessment,
+src/lib/workflow/intakePhase.ts:1518:					domainAssessment: analysis.domainAssessment,
+src/lib/workflow/intakePhase.ts:1583:			domainCoverageContext: buildDomainCoverageContextForExpert(conv),
+src/lib/workflow/intakePhase.ts:1634:		// 5. Update domain coverage
+src/lib/workflow/intakePhase.ts:1635:		const coverageUpdates = await updateDomainCoverageAfterTurn(
+src/lib/workflow/intakePhase.ts:1665:		if (coverageUpdates.domainCoverage) {
+src/lib/workflow/intakePhase.ts:1666:			getEventBus().emit('intake:domain_coverage_updated', {
+src/lib/workflow/intakePhase.ts:1668:				coverage: coverageUpdates.domainCoverage,
+src/lib/workflow/intakePhase.ts:1745: * Extract MMP for domain proposals — each domain and persona becomes a Mirror item.
+src/lib/workflow/intakePhase.ts:1748:export function extractDomainMMP(
+src/lib/workflow/intakePhase.ts:1749:	domains: DomainProposal[],
+src/lib/workflow/intakePhase.ts:1754:	for (const d of domains) {
+src/lib/workflow/intakePhase.ts:1758:			category: 'domain',
+src/lib/workflow/intakePhase.ts:1770:			rationale: 'Identified from domain analysis',
+src/lib/workflow/intakePhase.ts:1779:	if (domains.length > 2) {
+src/lib/workflow/intakePhase.ts:1783:				label: `All domains (${domains.length})`,
+src/lib/workflow/intakePhase.ts:1784:				description: 'Include every proposed domain in MVP scope',
+src/lib/workflow/intakePhase.ts:1789:				label: 'Core domains only',
+src/lib/workflow/intakePhase.ts:1790:				description: 'Focus MVP on the most essential domains. Mark others as V2/Future during review.',
+src/lib/workflow/intakePhase.ts:1798:			context: 'Accept/reject individual domains above, then choose the overall scoping strategy',
+src/lib/workflow/intakePhase.ts:1805:			steelMan: 'Based on your request and available context, here are the proposed business domains and personas for this product.',
+src/lib/workflow/intakePhase.ts:1827:			rationale: 'Proposed for accepted domains',
+src/lib/workflow/intakePhase.ts:1838:			rationale: `Domain: ${w.domainId}. Steps: ${w.steps.length}. Actors: ${w.actors.join(', ')}`,
+src/lib/workflow/intakePhase.ts:1848:			steelMan: 'Here are the proposed user journeys and system workflows for the accepted domains.',
+src/lib/workflow/intakePhase.ts:1867:			rationale: `Domain: ${e.domainId}. Attributes: ${e.keyAttributes.join(', ')}. Relationships: ${e.relationships.join(', ')}`,
+src/lib/workflow/intakePhase.ts:1877:			steelMan: 'Here are the proposed data entities for the accepted domains and workflows.',
+src/lib/workflow/intakePhase.ts:1944: * Proposer Round 1: Propose business domains + personas.
+src/lib/workflow/intakePhase.ts:1947:export async function executeProposerDomains(
+src/lib/workflow/intakePhase.ts:1963:			label: 'Proposer — Domain Mapping',
+src/lib/workflow/intakePhase.ts:1964:			summary: 'Proposing business domains and personas',
+src/lib/workflow/intakePhase.ts:1969:		const { invokeProposerDomains } = await import('../roles/technicalExpertIntake.js');
+src/lib/workflow/intakePhase.ts:1970:		const result = await invokeProposerDomains({
+src/lib/workflow/intakePhase.ts:1988:			label: 'Proposer — Domain Mapping',
+src/lib/workflow/intakePhase.ts:1990:				? `Proposed ${result.value.domains.length} domains, ${result.value.personas.length} personas`
+src/lib/workflow/intakePhase.ts:1997:		const { domains, personas } = result.value;
+src/lib/workflow/intakePhase.ts:1998:		const mmp = extractDomainMMP(domains, personas);
+src/lib/workflow/intakePhase.ts:2003:			proposerPhase: ProposerPhase.DOMAIN_MAPPING,
+src/lib/workflow/intakePhase.ts:2004:			domainProposals: domains,
+src/lib/workflow/intakePhase.ts:2010:			event_type: 'intake_proposer_domains',
+src/lib/workflow/intakePhase.ts:2014:			summary: `Proposed ${domains.length} domains, ${personas.length} personas`,
+src/lib/workflow/intakePhase.ts:2015:			content: JSON.stringify({ domains, personas }),
+src/lib/workflow/intakePhase.ts:2017:				proposerPhase: ProposerPhase.DOMAIN_MAPPING,
+src/lib/workflow/intakePhase.ts:2045: * Proposer Round 2: Propose user journeys + system workflows for accepted domains.
+src/lib/workflow/intakePhase.ts:2144: * Proposer Round 3: Propose entities + data model for accepted domains/workflows.
+src/lib/workflow/intakeRouter.ts:20:	executeProposerDomains,
+src/lib/workflow/intakeRouter.ts:72:					if (proposerPhase === ProposerPhase.DOMAIN_MAPPING) {
+src/lib/workflow/intakeRouter.ts:73:						rerunSubState = IntakeSubState.PROPOSING_DOMAINS;
+src/lib/workflow/intakeRouter.ts:81:						rerunSubState = IntakeSubState.PROPOSING_DOMAINS;
+src/lib/workflow/intakeRouter.ts:94:						case IntakeSubState.PROPOSING_DOMAINS:
+src/lib/workflow/intakeRouter.ts:95:							rerunResult = await executeProposerDomains(dialogueId, humanInput);
+src/lib/workflow/intakeRouter.ts:107:							rerunResult = await executeProposerDomains(dialogueId, humanInput);
+src/lib/workflow/intakeRouter.ts:127:					nextSubState = IntakeSubState.PROPOSING_DOMAINS;
+src/lib/workflow/intakeRouter.ts:129:				} else if (proposerPhase === ProposerPhase.DOMAIN_MAPPING) {
+src/lib/workflow/intakeRouter.ts:143:				if (nextSubState === IntakeSubState.PROPOSING_DOMAINS) {
+src/lib/workflow/intakeRouter.ts:148:					advanceResult = await executeProposerDomains(dialogueId, humanInput);
+src/lib/workflow/intakeRouter.ts:179:			case IntakeSubState.PROPOSING_DOMAINS:
+src/lib/workflow/intakeRouter.ts:180:				return await executeProposerDomains(dialogueId, humanInput);
+src/lib/workflow/intakeRouter.ts:217:						// STATE_DRIVEN and DOMAIN_GUIDED now use inverted flow (INTENT_DISCOVERY)
+src/lib/workflow/intakeRouter.ts:219:							fresh.intakeMode === IntakeMode.DOMAIN_GUIDED) {
+src/lib/workflow/navigationResolver.ts:81:	'domain model': { majorPhase: Phase.ARCHITECTURE, subPhase: ArchitectureSubState.MODELING, subPhaseOwner: 'ARCHITECTURE' },
+src/lib/workflow/navigationResolver.ts:98:	'proposing domains': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.PROPOSING_DOMAINS, subPhaseOwner: 'INTAKE' },
+src/lib/workflow/navigationResolver.ts:99:	'domains': { majorPhase: Phase.INTAKE, subPhase: IntakeSubState.PROPOSING_DOMAINS, subPhaseOwner: 'INTAKE' },
+src/lib/workflow/navigationResolver.ts:250:		subPhases = '\nIntake sub-phases: analyze, product review, domains, journeys, entities, integrations, clarify, synthesize, approval';
+src/lib/workflow/orchestrator.ts:34:import type { DomainCoverageMap } from '../types';
+src/lib/workflow/orchestrator.ts:40:	DOMAIN_INFO,
+src/lib/workflow/orchestrator.ts:41:} from './domainCoverageTracker';
+src/lib/workflow/orchestrator.ts:1856:		// STATE_DRIVEN and DOMAIN_GUIDED use inverted flow (INTENT_DISCOVERY → PROPOSING → CLARIFYING)
+src/lib/workflow/orchestrator.ts:1859:			|| recommendation.recommended === IntakeMode.DOMAIN_GUIDED;
+src/lib/workflow/orchestrator.ts:1861:		// Domain coverage only used in legacy GATHERING/DISCUSSING flows, not proposer flow
+src/lib/workflow/orchestrator.ts:1863:		const currentDomain = null;
+src/lib/workflow/orchestrator.ts:1871:			domainCoverage: coverageMap,
+src/lib/workflow/orchestrator.ts:1872:			currentDomain,
+src/lib/workflow/orchestrator.ts:1891:			getEventBus().emit('intake:domain_coverage_updated', {
+src/lib/workflow/orchestrator.ts:1907:				'Failed to initialize adaptive INTAKE — proceeding without domain tracking',
+src/lib/workflow/outputAdopter.ts:254:		case 'PROPOSING_DOMAINS':
+src/lib/workflow/outputAdopter.ts:357:			const proposerFields = ['domainProposals', 'entityProposals', 'workflowProposals', 'integrationProposals', 'qualityAttributes'] as const;
+src/lib/workflow/outputAdopter.ts:407: * Expects: analysisSummary + initialPlan + codebaseFindings + domainAssessment.
+src/lib/workflow/outputAdopter.ts:419:	const domainAssessment = (parsed.domainAssessment as Array<Record<string, unknown>>) ?? [];
+src/lib/workflow/outputAdopter.ts:424:	if (domainAssessment.length > 0) { fieldsAdopted.push('domainAssessment'); }
+src/lib/workflow/outputAdopter.ts:439:			domainAssessment,
+src/lib/workflow/outputAdopter.ts:464: * Adopt output from proposer sub-phases (PROPOSING_DOMAINS, PROPOSING_JOURNEYS, etc.).
+src/lib/workflow/outputAdopter.ts:465: * These produce structured artifacts (domains, journeys, entities, integrations) with MMP.
+src/lib/workflow/outputAdopter.ts:478:		'PROPOSING_DOMAINS': ['domains', 'personas'],
+src/webview/intake.ts:116:export function handleIntakeAskDomain(target: HTMLElement): void {
+src/webview/intake.ts:117:	const domainLabel = target.dataset.domainLabel;
+src/webview/intake.ts:118:	if (!domainLabel) { return; }
+src/webview/intake.ts:126:		text: 'Tell me about ' + domainLabel + ' considerations for this project.',
+src/webview/main.ts:41:import { handleIntakeSubmitResponses, disableIntakeApprovalButtons, handleIntakeModeSelection, handleIntakeAskDomain } from './intake';
+src/webview/main.ts:373:			const row = target.closest('.coverage-domain-row') as HTMLElement | null;
+src/webview/main.ts:420:		case 'intake-ask-domain':
+src/webview/main.ts:421:			handleIntakeAskDomain(target);
+src/webview/main.ts:435:			// Switch mode from DOMAIN_GUIDED to fill coverage gaps
+src/webview/mmp.ts:15: * MMP cards exist in the DOM (e.g., Domains card + Journeys card).
+src/webview/types.ts:178:export interface DomainCoverageUpdateData {
+src/webview/types.ts:179:	coverage: Record<string, { domain: string; level: string; evidence: string[]; turnNumbers: number[] }>;
+src/webview/types.ts:186:	suggestedDomains: Array<{ domain: string; label: string }>;
+src/webview/types.ts:212:	| { type: 'domainCoverageUpdate'; data: DomainCoverageUpdateData }

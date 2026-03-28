@@ -47,6 +47,16 @@ interface ClaudeAPIRequest {
 	top_p?: number;
 	stop_sequences?: string[];
 	metadata?: Record<string, unknown>;
+	/**
+	 * Tool definitions for structured output enforcement.
+	 * Claude uses tool-use (forced via tool_choice) to guarantee schema-conformant output.
+	 */
+	tools?: Array<{
+		name: string;
+		description: string;
+		input_schema: object;
+	}>;
+	tool_choice?: { type: 'tool'; name: string };
 }
 
 /**
@@ -56,12 +66,12 @@ interface ClaudeAPIResponse {
 	id: string;
 	type: 'message';
 	role: 'assistant';
-	content: Array<{
-		type: 'text';
-		text: string;
-	}>;
+	content: Array<
+		| { type: 'text'; text: string }
+		| { type: 'tool_use'; name: string; input: Record<string, unknown> }
+	>;
 	model: string;
-	stop_reason: 'end_turn' | 'max_tokens' | 'stop_sequence' | null;
+	stop_reason: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use' | null;
 	usage: {
 		input_tokens: number;
 		output_tokens: number;
@@ -147,6 +157,14 @@ export class ClaudeProvider implements LLMProvider {
 				}
 				if (request.metadata) {
 					apiRequest.metadata = request.metadata;
+				}
+				if (request.responseSchema) {
+					apiRequest.tools = [{
+						name: 'structured_output',
+						description: 'Return the response conforming to the required schema.',
+						input_schema: request.responseSchema,
+					}];
+					apiRequest.tool_choice = { type: 'tool', name: 'structured_output' };
 				}
 
 				// Make API request
@@ -319,11 +337,18 @@ export class ClaudeProvider implements LLMProvider {
 		try {
 			const data = (await response.json()) as ClaudeAPIResponse;
 
-			// Extract text content
-			const content = data.content
-				.filter((c) => c.type === 'text')
-				.map((c) => c.text)
-				.join('');
+			// Structured output: tool_use block takes precedence — its input IS the response.
+			// Plain text: concatenate all text blocks as usual.
+			const toolUseBlock = data.content.find(
+				(c): c is Extract<typeof c, { type: 'tool_use' }> =>
+					c.type === 'tool_use' && c.name === 'structured_output'
+			);
+			const content = toolUseBlock
+				? JSON.stringify(toolUseBlock.input)
+				: data.content
+					.filter((c): c is Extract<typeof c, { type: 'text' }> => c.type === 'text')
+					.map((c) => c.text)
+					.join('');
 
 			return {
 				success: true,

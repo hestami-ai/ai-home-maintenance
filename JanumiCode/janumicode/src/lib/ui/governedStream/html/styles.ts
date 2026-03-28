@@ -2828,6 +2828,103 @@ export function getStyles(): string {
 			font-size: 14px;
 		}
 
+		/* ===== SCROLL-TO-BOTTOM BADGE ===== */
+		.scroll-to-bottom-badge {
+			position: fixed;
+			bottom: 80px;
+			right: 20px;
+			z-index: 200;
+			display: none;
+			align-items: center;
+			gap: 4px;
+			padding: 6px 12px;
+			border-radius: 12px;
+			border: 1px solid var(--vscode-widget-border);
+			background: var(--vscode-editorWidget-background);
+			color: var(--vscode-editorWidget-foreground);
+			font-size: 12px;
+			font-family: var(--vscode-font-family);
+			cursor: pointer;
+			box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+			opacity: 0;
+			transform: translateY(8px);
+			transition: opacity 0.15s ease, transform 0.15s ease;
+			pointer-events: none;
+		}
+		.scroll-to-bottom-badge.visible {
+			display: flex;
+			opacity: 1;
+			transform: translateY(0);
+			pointer-events: auto;
+		}
+		.scroll-to-bottom-badge:hover {
+			background: var(--vscode-list-hoverBackground);
+		}
+
+		/* ===== CARD COPY BUTTON ===== */
+		.card-copy-btn {
+			flex-shrink: 0;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			width: 22px;
+			height: 22px;
+			margin-left: 4px;
+			padding: 0;
+			border: none;
+			border-radius: 4px;
+			background: transparent;
+			color: var(--vscode-descriptionForeground);
+			font-size: 12px;
+			cursor: pointer;
+			opacity: 0;
+			transition: opacity 0.15s, background 0.1s, color 0.15s;
+		}
+		.command-block-header:hover .card-copy-btn,
+		.collapsible-card-header:hover .card-copy-btn,
+		.qa-exchange-question:hover .card-copy-btn {
+			opacity: 1;
+		}
+		.card-copy-btn:hover {
+			background: var(--vscode-list-hoverBackground);
+			color: var(--vscode-foreground);
+		}
+		.card-copy-btn.copied {
+			color: var(--vscode-charts-green, #73c991);
+			opacity: 1;
+		}
+
+		/* ===== SESSION RECORDER BUTTON ===== */
+		.record-btn {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			width: 24px;
+			height: 24px;
+			padding: 0;
+			border: none;
+			border-radius: 4px;
+			background: transparent;
+			color: var(--vscode-descriptionForeground);
+			font-size: 13px;
+			cursor: pointer;
+			opacity: 0.7;
+			transition: opacity 0.15s, color 0.15s;
+		}
+		.record-btn:hover {
+			opacity: 1;
+			background: var(--vscode-list-hoverBackground);
+		}
+		.record-btn.active {
+			color: var(--vscode-charts-red, #f48771);
+			opacity: 1;
+			animation: rec-pulse 1.4s ease-in-out infinite;
+		}
+		@keyframes rec-pulse {
+			0%, 100% { opacity: 1; }
+			50%       { opacity: 0.35; }
+		}
+
 		/* ===== SCROLLBAR STYLING ===== */
 		.stream-area::-webkit-scrollbar {
 			width: 8px;
@@ -3050,6 +3147,11 @@ export function getStyles(): string {
 
 		/* ===== PROCESSING INDICATOR ===== */
 
+		#processing-container {
+			/* Normal flow element — sits below stream-content in the scroll area.
+			   NOT sticky — sticky caused cards to scroll underneath it. */
+		}
+
 		.processing-indicator {
 			display: flex;
 			align-items: center;
@@ -3089,6 +3191,12 @@ export function getStyles(): string {
 			font-size: 13px;
 			opacity: 0.8;
 		}
+		.processing-elapsed {
+			margin-top: 2px;
+			font-size: 12px;
+			opacity: 0.6;
+			font-variant-numeric: tabular-nums;
+		}
 
 		.cancel-btn {
 			flex-shrink: 0;
@@ -3106,6 +3214,11 @@ export function getStyles(): string {
 			background: color-mix(in srgb, var(--vscode-errorForeground) 15%, transparent);
 			color: var(--vscode-errorForeground);
 			border-color: var(--vscode-errorForeground);
+		}
+		.cancel-btn.pause-btn:hover {
+			background: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 15%, transparent);
+			color: var(--vscode-charts-yellow, #cca700);
+			border-color: var(--vscode-charts-yellow, #cca700);
 		}
 
 		/* Processing cancel bar — embedded in input area above composer */
@@ -3322,6 +3435,29 @@ export function getStyles(): string {
 
 		.command-block-output .cmd-line.success {
 			color: var(--vscode-charts-green);
+		}
+
+		.cmd-output-collapsed {
+			position: relative;
+		}
+		.cmd-output-collapsed .cmd-output-visible {
+			/* First N lines always visible */
+		}
+		.cmd-output-expand-btn {
+			display: block;
+			width: 100%;
+			background: var(--vscode-editor-background);
+			border: 1px solid var(--vscode-widget-border);
+			color: var(--vscode-textLink-foreground);
+			padding: 4px 10px;
+			margin-top: 4px;
+			border-radius: 3px;
+			cursor: pointer;
+			font-size: 12px;
+			text-align: center;
+		}
+		.cmd-output-expand-btn:hover {
+			background: var(--vscode-list-hoverBackground);
 		}
 
 		.command-block-truncated {

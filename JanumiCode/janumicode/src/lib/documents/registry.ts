@@ -297,7 +297,7 @@ const DATA_CHECKS: Record<DocumentType, (ctx: DialogueContext) => boolean> = {
 	[DocumentType.DOMAIN_MODEL]: (ctx) => {
 		const p = ctx.plan;
 		return !!p && (
-			(p.domainProposals?.length ?? 0) > 0 ||
+			(p.businessDomainProposals?.length ?? 0) > 0 ||
 			(p.entityProposals?.length ?? 0) > 0
 		);
 	},

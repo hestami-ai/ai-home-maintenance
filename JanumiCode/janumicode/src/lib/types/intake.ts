@@ -24,7 +24,7 @@ export enum IntakeSubState {
 	/** Final plan produced, awaiting Human approval */
 	AWAITING_APPROVAL = 'AWAITING_APPROVAL',
 
-	// === Inverted flow (STATE_DRIVEN + DOMAIN_GUIDED) ===
+	// === Inverted flow (STATE_DRIVEN + DOCUMENT_BASED) ===
 	/** Expert reads prompt + source docs, extracts product intent (personas, journeys, vision). MMP gate. */
 	INTENT_DISCOVERY = 'INTENT_DISCOVERY',
 	/** User reviews product discovery artifacts (personas, journeys, phasing) via MMP. UI gate — no LLM call. */
@@ -36,7 +36,7 @@ export enum IntakeSubState {
 
 	// === Proposer-Validator flow (STATE_DRIVEN + product_or_feature) ===
 	/** Proposer Round 1: AI proposes business domains + personas. User validates via MMP. */
-	PROPOSING_DOMAINS = 'PROPOSING_DOMAINS',
+	PROPOSING_BUSINESS_DOMAINS = 'PROPOSING_BUSINESS_DOMAINS',
 	/** Proposer Round 2: AI proposes user journeys + system workflows for accepted domains. */
 	PROPOSING_JOURNEYS = 'PROPOSING_JOURNEYS',
 	/** Proposer Round 3: AI proposes entities + data model for accepted domains/workflows. */
@@ -54,7 +54,7 @@ export enum IntakeMode {
 	/** Sequential walk through 12 engineering domains. Best for vague, high-level inputs. */
 	STATE_DRIVEN = 'STATE_DRIVEN',
 	/** Pre-fill from documents, free-form with gap tracking. Best for rich inputs with docs. */
-	DOMAIN_GUIDED = 'DOMAIN_GUIDED',
+	DOCUMENT_BASED = 'DOCUMENT_BASED',
 	/** Free-form with periodic coverage checkpoint cards. Default mode. */
 	HYBRID_CHECKPOINTS = 'HYBRID_CHECKPOINTS',
 }
@@ -66,7 +66,7 @@ export enum IntakeMode {
  * Stored on IntakePlanDocument.proposerPhase to route PRODUCT_REVIEW transitions.
  */
 export enum ProposerPhase {
-	DOMAIN_MAPPING = 1,
+	BUSINESS_DOMAIN_MAPPING = 1,
 	JOURNEY_WORKFLOW = 2,
 	ENTITY_DATA_MODEL = 3,
 	INTEGRATION_QUALITY = 4,
@@ -76,7 +76,7 @@ export enum ProposerPhase {
 /** Source attribution for proposer artifacts — tracks whether an item came from the user's source documents or was AI-generated. */
 export type ProposalSource = 'document-specified' | 'user-specified' | 'domain-standard' | 'ai-proposed';
 
-export interface DomainProposal {
+export interface BusinessDomainProposal {
 	/** Unique identifier, e.g., "DOM-ACCOUNTING" */
 	id: string;
 	/** Human-readable name, e.g., "Accounting & Financial Management" */
@@ -97,8 +97,8 @@ export interface DomainProposal {
 export interface EntityProposal {
 	/** Unique identifier, e.g., "ENT-PROPERTY" */
 	id: string;
-	/** References DomainProposal.id */
-	domainId: string;
+	/** References BusinessDomainProposal.id */
+	businessDomainId: string;
 	/** Entity name, e.g., "Property" */
 	name: string;
 	/** What this entity represents */
@@ -115,8 +115,8 @@ export interface EntityProposal {
 export interface WorkflowProposal {
 	/** Unique identifier, e.g., "WF-VIOLATION-LIFECYCLE" */
 	id: string;
-	/** References DomainProposal.id */
-	domainId: string;
+	/** References BusinessDomainProposal.id */
+	businessDomainId: string;
 	/** Workflow name */
 	name: string;
 	/** What this workflow accomplishes */
@@ -174,7 +174,7 @@ export enum EngineeringDomain {
 /**
  * Coverage level for each engineering domain.
  */
-export enum DomainCoverageLevel {
+export enum EngineeringDomainCoverageLevel {
 	/** Domain has not been discussed at all */
 	NONE = 'NONE',
 	/** Domain mentioned but not adequately explored */
@@ -188,9 +188,9 @@ export enum DomainCoverageLevel {
 /**
  * Coverage tracking entry for a single engineering domain.
  */
-export interface DomainCoverageEntry {
+export interface EngineeringDomainCoverageEntry {
 	domain: EngineeringDomain;
-	level: DomainCoverageLevel;
+	level: EngineeringDomainCoverageLevel;
 	/** Text snippets that contributed to coverage */
 	evidence: string[];
 	/** Turn numbers where this domain was discussed */
@@ -200,7 +200,7 @@ export interface DomainCoverageEntry {
 /**
  * Complete coverage map across all 12 engineering domains.
  */
-export type DomainCoverageMap = Record<EngineeringDomain, DomainCoverageEntry>;
+export type EngineeringDomainCoverageMap = Record<EngineeringDomain, EngineeringDomainCoverageEntry>;
 
 /**
  * Input classifier's recommendation for which INTAKE mode to use.
@@ -215,13 +215,13 @@ export interface IntakeModeRecommendation {
 
 /**
  * A coverage checkpoint triggered during INTAKE conversation.
- * Used by HYBRID_CHECKPOINTS (periodic) and DOMAIN_GUIDED (post-analysis).
+ * Used by HYBRID_CHECKPOINTS (periodic) and DOCUMENT_BASED (post-analysis).
  */
 export interface IntakeCheckpoint {
 	/** The turn number when this checkpoint was triggered */
 	turnNumber: number;
 	/** Coverage snapshot at checkpoint time */
-	coverageSnapshot: DomainCoverageMap;
+	coverageSnapshot: EngineeringDomainCoverageMap;
 	/** Domains the checkpoint suggests exploring next */
 	suggestedDomains: EngineeringDomain[];
 	/** When true, the checkpoint offers mode-switching to fill coverage gaps */
@@ -386,10 +386,10 @@ export interface IntakePlanDocument {
 	/** Which proposer round is active (null = not in proposer flow) */
 	proposerPhase?: ProposerPhase | null;
 	/** True when PRODUCT_REVIEW is entered from INTENT_DISCOVERY (before any proposer round).
-	 *  Cleared after user submits MMP, causing transition to PROPOSING_DOMAINS. */
+	 *  Cleared after user submits MMP, causing transition to PROPOSING_BUSINESS_DOMAINS. */
 	preProposerReview?: boolean;
 	/** Proposed business domains from Round 1 */
-	domainProposals?: DomainProposal[];
+	businessDomainProposals?: BusinessDomainProposal[];
 	/** Proposed entities from Round 3 */
 	entityProposals?: EntityProposal[];
 	/** Proposed system workflows from Round 2 */
@@ -427,9 +427,9 @@ export interface IntakeGatheringTurnResponse {
 	/** Interviewer-style conversational response scoped to one domain */
 	conversationalResponse: string;
 	/** The domain this turn focused on */
-	focusDomain: EngineeringDomain;
+	focusEngineeringDomain: EngineeringDomain;
 	/** Structured notes extracted from this domain investigation */
-	domainNotes: string[];
+	engineeringDomainNotes: string[];
 	/** Codebase findings specific to this domain */
 	codebaseFindings?: string[];
 	/** Follow-up questions for the user about this domain (legacy fallback) */
@@ -451,7 +451,7 @@ export interface IntakeAnalysisTurnResponse {
 	/** Files and patterns discovered during analysis */
 	codebaseFindings: string[];
 	/** Per-domain coverage assessment from analysis */
-	domainAssessment: Array<{
+	engineeringDomainAssessment: Array<{
 		domain: string;
 		level: string;
 		evidence: string;
@@ -464,7 +464,7 @@ export interface IntakeAnalysisTurnResponse {
 export function isGatheringResponse(
 	response: IntakeTurnResponse | IntakeGatheringTurnResponse | IntakeAnalysisTurnResponse,
 ): response is IntakeGatheringTurnResponse {
-	return 'focusDomain' in response && !('updatedPlan' in response);
+	return 'focusEngineeringDomain' in response && !('updatedPlan' in response);
 }
 
 /**
@@ -525,9 +525,9 @@ export interface IntakeConversationState {
 	/** Selected INTAKE mode (null = legacy/pre-V15 conversation) */
 	intakeMode: IntakeMode | null;
 	/** Per-domain coverage tracking (null = not initialized) */
-	domainCoverage: DomainCoverageMap | null;
+	engineeringDomainCoverage: EngineeringDomainCoverageMap | null;
 	/** Current domain being explored in STATE_DRIVEN mode */
-	currentDomain: EngineeringDomain | null;
+	currentEngineeringDomain: EngineeringDomain | null;
 	/** Coverage checkpoints triggered during HYBRID_CHECKPOINTS mode */
 	checkpoints: IntakeCheckpoint[];
 	/** Input classifier's recommendation (stored for audit/display) */

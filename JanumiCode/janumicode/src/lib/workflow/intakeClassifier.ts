@@ -10,7 +10,7 @@
  *
  * Three INTAKE modes:
  *   - STATE_DRIVEN: Guided walkthrough for vague/high-concept inputs
- *   - DOMAIN_GUIDED: Document-based analysis for spec-heavy inputs
+ *   - DOCUMENT_BASED: Document-based analysis for spec-heavy inputs
  *   - HYBRID_CHECKPOINTS: Free-form conversation with periodic checkpoints (default)
  */
 
@@ -21,8 +21,7 @@ import { MessageRole } from '../llm/provider';
 import { createProvider } from '../llm/providerFactory';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { getSecretKeyManager } from '../config/secretKeyManager';
-import { emitWorkflowCommand } from '../integration/eventBus';
-import { randomUUID } from 'node:crypto';
+
 import * as vscode from 'vscode';
 
 // ==================== SYSTEM PROMPT ====================
@@ -36,22 +35,22 @@ Modes:
 1. STATE_DRIVEN — Best for vague, high-level, or aspirational inputs. The user has a concept but hasn't worked out details. This mode walks them through 12 engineering domains one at a time (problem/mission, stakeholders, scope, capabilities, workflows, data, environment/operations, quality attributes, security/compliance, integrations, architecture, verification/delivery).
    Examples: "Build a real estate management product", "I want an app that tracks fitness goals", "Create a marketplace for freelancers"
 
-2. DOMAIN_GUIDED — Best when the user references existing documents, specifications, or a codebase to review. The system pre-analyzes provided materials, maps which engineering domains are already covered, then focuses conversation on uncovered gaps.
+2. DOCUMENT_BASED — Best when the user references existing documents, specifications, or a codebase to review. The system pre-analyzes provided materials, maps which engineering domains are already covered, then focuses conversation on uncovered gaps.
    Examples: "Review the specifications in specs/ and prepare for implementation", "Analyze these PRD documents and identify what's missing", "Look at the existing codebase and propose improvements", "Here are our requirements docs — assess readiness for development"
 
 3. HYBRID_CHECKPOINTS — Best for moderately detailed requests or scoped tasks (bug fixes, feature additions, refactors). Free-form conversation with the Technical Expert, with periodic coverage checkpoint cards that highlight under-explored engineering domains.
    Examples: "Add dark mode support to the settings page", "Fix the authentication timeout issue", "Refactor the payment module to support Stripe", "We need to add multi-tenancy — here's what we've considered so far"
 
 Key decision factors:
-- Does the input reference existing files, paths, documents, or a codebase? → Lean toward DOMAIN_GUIDED
+- Does the input reference existing files, paths, documents, or a codebase? → Lean toward DOCUMENT_BASED
 - Is the input a short, high-concept idea with no concrete resources? → Lean toward STATE_DRIVEN
 - Is the input a specific task, bug fix, or feature request with moderate detail? → Lean toward HYBRID_CHECKPOINTS
-- Does the input include or reference specification documents, design docs, or RFCs? → Lean toward DOMAIN_GUIDED
-- Is there an established codebase and the user wants review or audit? → Lean toward DOMAIN_GUIDED
+- Does the input include or reference specification documents, design docs, or RFCs? → Lean toward DOCUMENT_BASED
+- Is there an established codebase and the user wants review or audit? → Lean toward DOCUMENT_BASED
 
 Respond with valid JSON only. No markdown, no code fences, no extra text.
 
-{"mode": "STATE_DRIVEN" | "DOMAIN_GUIDED" | "HYBRID_CHECKPOINTS", "confidence": 0.0-1.0, "rationale": "One sentence explaining why this mode fits the input"}`;
+{"mode": "STATE_DRIVEN" | "DOCUMENT_BASED" | "HYBRID_CHECKPOINTS", "confidence": 0.0-1.0, "rationale": "One sentence explaining why this mode fits the input"}`;
 
 // ==================== LLM-BACKED CLASSIFIER ====================
 
@@ -98,7 +97,6 @@ async function classifyWithLLM(
 	logger: ReturnType<ReturnType<typeof getLogger>['child']> | undefined,
 ): Promise<IntakeModeRecommendation | null> {
 	const model = getClassifierModel();
-	const commandId = randomUUID();
 	const startMs = Date.now();
 
 	// Build user message with context
@@ -107,18 +105,6 @@ async function classifyWithLLM(
 		? '\n\nAttached files (' + attachments.length + '):\n' + attachmentList
 		: '';
 	const userMessage = `User's initial request:\n${text}${attachmentInfo}`;
-
-	emitWorkflowCommand({
-		dialogueId: dialogueId ?? 'classifier',
-		commandId,
-		action: 'start',
-		commandType: 'llm_api_call',
-		label: `Intake Classifier (${model})`,
-		summary: 'Classifying intake mode…',
-		status: 'running',
-		timestamp: new Date().toISOString(),
-		collapsed: true,
-	});
 
 	const result = await provider.complete({
 		systemPrompt: CLASSIFIER_SYSTEM_PROMPT,
@@ -131,32 +117,12 @@ async function classifyWithLLM(
 
 	if (!result.success) {
 		logger?.warn('Classifier LLM call failed', { error: result.error.message, elapsedMs });
-		emitWorkflowCommand({
-			dialogueId: dialogueId ?? 'classifier',
-			commandId,
-			action: 'error',
-			commandType: 'llm_api_call',
-			label: 'Intake Classifier',
-			summary: `Failed: ${result.error.message}`,
-			status: 'error',
-			timestamp: new Date().toISOString(),
-		});
 		return null;
 	}
 
 	const parsed = parseClassifierResponse(result.value.content);
 	if (!parsed) {
 		logger?.warn('Could not parse classifier response', { content: result.value.content });
-		emitWorkflowCommand({
-			dialogueId: dialogueId ?? 'classifier',
-			commandId,
-			action: 'error',
-			commandType: 'llm_api_call',
-			label: 'Intake Classifier',
-			summary: 'Failed to parse response',
-			status: 'error',
-			timestamp: new Date().toISOString(),
-		});
 		return null;
 	}
 
@@ -166,18 +132,6 @@ async function classifyWithLLM(
 		inputTokens: result.value.usage.inputTokens,
 		outputTokens: result.value.usage.outputTokens,
 		elapsedMs,
-	});
-
-	emitWorkflowCommand({
-		dialogueId: dialogueId ?? 'classifier',
-		commandId,
-		action: 'complete',
-		commandType: 'llm_api_call',
-		label: 'Intake Classifier',
-		summary: `Mode: ${parsed.recommended} (${elapsedMs}ms, ${result.value.usage.inputTokens}+${result.value.usage.outputTokens} tokens)`,
-		detail: parsed.rationale,
-		status: 'success',
-		timestamp: new Date().toISOString(),
 	});
 
 	return parsed;
@@ -348,7 +302,7 @@ function classifyWithHeuristics(
 	const greenfieldScore = computeGreenfieldScore(signals, attachments.length);
 
 	if (documentScore >= 3) {
-		return buildHeuristicResult(IntakeMode.DOMAIN_GUIDED,
+		return buildHeuristicResult(IntakeMode.DOCUMENT_BASED,
 			Math.min(0.5 + documentScore * 0.08, 0.95),
 			'Input references documents, specifications, or existing resources — document-based analysis will map coverage gaps.',
 			signals);

@@ -251,7 +251,7 @@ function adoptIntakeOutput(
 		case 'SYNTHESIZING':
 			return adoptIntakeSynthesisOutput(dialogueId, parsed, metadata);
 
-		case 'PROPOSING_DOMAINS':
+		case 'PROPOSING_BUSINESS_DOMAINS':
 		case 'PROPOSING_JOURNEYS':
 		case 'PROPOSING_ENTITIES':
 		case 'PROPOSING_INTEGRATIONS':
@@ -354,7 +354,7 @@ function adoptIntakeSynthesisOutput(
 	if (convResult.success) {
 		const dp = convResult.value.draftPlan;
 		if (dp?.proposerPhase !== null && dp?.proposerPhase !== undefined) {
-			const proposerFields = ['domainProposals', 'entityProposals', 'workflowProposals', 'integrationProposals', 'qualityAttributes'] as const;
+			const proposerFields = ['businessDomainProposals', 'entityProposals', 'workflowProposals', 'integrationProposals', 'qualityAttributes'] as const;
 			for (const field of proposerFields) {
 				if (!updatedPlan[field] && dp[field]) {
 					updatedPlan[field] = dp[field] as unknown;
@@ -404,7 +404,7 @@ function adoptIntakeSynthesisOutput(
 
 /**
  * Adopt output from the INTENT_DISCOVERY sub-phase.
- * Expects: analysisSummary + initialPlan + codebaseFindings + domainAssessment.
+ * Expects: analysisSummary + initialPlan + codebaseFindings + engineeringDomainAssessment.
  */
 function adoptIntakeAnalysisOutput(
 	dialogueId: string,
@@ -416,12 +416,12 @@ function adoptIntakeAnalysisOutput(
 	const analysisSummary = (parsed.analysisSummary as string) ?? '';
 	const initialPlan = (parsed.initialPlan as Record<string, unknown>) ?? {};
 	const codebaseFindings = (parsed.codebaseFindings as string[]) ?? [];
-	const domainAssessment = (parsed.domainAssessment as Array<Record<string, unknown>>) ?? [];
+	const engineeringDomainAssessment = (parsed.engineeringDomainAssessment as Array<Record<string, unknown>>) ?? [];
 
 	if (analysisSummary) { fieldsAdopted.push('analysisSummary'); }
 	if (Object.keys(initialPlan).length > 0) { fieldsAdopted.push('initialPlan'); }
 	if (codebaseFindings.length > 0) { fieldsAdopted.push('codebaseFindings'); }
-	if (domainAssessment.length > 0) { fieldsAdopted.push('domainAssessment'); }
+	if (engineeringDomainAssessment.length > 0) { fieldsAdopted.push('engineeringDomainAssessment'); }
 
 	writeDialogueEvent({
 		dialogue_id: dialogueId,
@@ -436,7 +436,7 @@ function adoptIntakeAnalysisOutput(
 			expertResponse: parsed,
 			initialPlan,
 			codebaseFindings,
-			domainAssessment,
+			engineeringDomainAssessment,
 			turnNumber: 0,
 		},
 	});
@@ -461,7 +461,7 @@ function adoptIntakeAnalysisOutput(
 }
 
 /**
- * Adopt output from proposer sub-phases (PROPOSING_DOMAINS, PROPOSING_JOURNEYS, etc.).
+ * Adopt output from proposer sub-phases (PROPOSING_BUSINESS_DOMAINS, PROPOSING_JOURNEYS, etc.).
  * These produce structured artifacts (domains, journeys, entities, integrations) with MMP.
  */
 function adoptIntakeProposerOutput(
@@ -475,7 +475,7 @@ function adoptIntakeProposerOutput(
 
 	// Map sub-phase to expected output fields
 	const expectedFields: Record<string, string[]> = {
-		'PROPOSING_DOMAINS': ['domains', 'personas'],
+		'PROPOSING_BUSINESS_DOMAINS': ['domains', 'personas'],
 		'PROPOSING_JOURNEYS': ['userJourneys', 'workflows'],
 		'PROPOSING_ENTITIES': ['entities'],
 		'PROPOSING_INTEGRATIONS': ['integrations', 'qualityAttributes'],

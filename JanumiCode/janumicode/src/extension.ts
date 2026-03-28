@@ -427,6 +427,33 @@ function registerCommands(context: vscode.ExtensionContext, streamProvider: Gove
 	);
 	context.subscriptions.push(openGovernedStreamCmd);
 
+	// Open Architecture Explorer
+	const openArchExplorerCmd = vscode.commands.registerCommand(
+		'janumicode.openArchitectureExplorer',
+		async (dialogueId?: string) => {
+			const id = dialogueId || streamProvider.activeDialogueId;
+			if (!id) {
+				vscode.window.showWarningMessage('No active dialogue — start a session first.');
+				return;
+			}
+			const { openArchitectureExplorer } = await import('./lib/ui/architectureExplorer/ArchitectureExplorerPanel.js');
+			openArchitectureExplorer(id, context.extensionUri);
+		}
+	);
+	context.subscriptions.push(openArchExplorerCmd);
+
+	// Replay session recording
+	const replaySessionCmd = vscode.commands.registerCommand(
+		'janumicode.replaySession',
+		async (filePath?: string) => {
+			const { pickRecordingFile } = await import('./lib/ui/governedStream/sessionRecorder.js');
+			const target = filePath ?? await pickRecordingFile();
+			if (!target) { return; }
+			await streamProvider.replaySession(target);
+		}
+	);
+	context.subscriptions.push(replaySessionCmd);
+
 	// Show workflow status command (now points to governed stream)
 	const showWorkflowCmd = vscode.commands.registerCommand(
 		'janumicode.showWorkflowStatus',

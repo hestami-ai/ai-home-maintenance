@@ -1,0 +1,126 @@
+```json
+{
+  "implementation_sequence": [
+    {
+      "step_id": "STEP-1",
+      "label": "Phase 1.1: Foundational Data & Identity",
+      "description": "Establish the foundational data layer with core entities (Community, Property, Person, User) and the Identity service for user authentication. This is the bedrock for all other services.",
+      "components_involved": ["COMP-CORE-DATA", "COMP-IDENTITY"],
+      "dependencies": [],
+      "estimated_complexity": "MEDIUM",
+      "verification_method": "Run unit tests for COMP-CORE-DATA CRUD operations. Validate COMP-IDENTITY endpoints for user registration and login against the core data service.",
+      "sort_order": 1
+    },
+    {
+      "step_id": "STEP-2",
+      "label": "Phase 1.2: Core Service Management",
+      "description": "Implement the service for managing the lifecycle of WorkOrders, the primary function for the homeowner assistant. This includes state transitions and event publishing.",
+      "components_involved": ["COMP-SERVICE-MGMT"],
+      "dependencies": ["STEP-1"],
+      "estimated_complexity": "MEDIUM",
+      "verification_method": "Run unit tests for WorkOrder state transitions. Verify that creating a WorkOrder publishes a WORKORDER_CREATED event to a message broker.",
+      "sort_order": 2
+    },
+    {
+      "step_id": "STEP-3",
+      "label": "Phase 1.3: Homeowner API and Gateway",
+      "description": "Build the homeowner-facing API (BFF) to provide tailored data views and deploy the API Gateway as the secure, unified entry point for all clients.",
+      "components_involved": ["COMP-BFF-HOME", "COMP-API-GATEWAY"],
+      "dependencies": ["STEP-1", "STEP-2"],
+      "estimated_complexity": "MEDIUM",
+      "verification_method": "Validate API-PUBLIC-BFF schema for homeowner endpoints. Run end-to-end tests from the gateway, ensuring proper authentication via COMP-IDENTITY and routing to COMP-BFF-HOME.",
+      "sort_order": 3
+    },
+    {
+      "step_id": "STEP-4",
+      "label": "Phase 1.4: Homeowner Web Portal",
+      "description": "Develop the user-facing web application for homeowners to manage their property, submit service requests, and view their status, completing the core Pillar 1 functionality.",
+      "components_involved": ["COMP-WEB-PORTAL-HOME"],
+      "dependencies": ["STEP-3"],
+      "estimated_complexity": "HIGH",
+      "verification_method": "Perform end-to-end UI tests: user logs in, views property, submits a new service request, and sees the request status update.",
+      "sort_order": 4
+    },
+    {
+      "step_id": "STEP-5",
+      "label": "Phase 1.5: Notification Service",
+      "description": "Implement the centralized notification service to handle events and communicate with users. The initial implementation will focus on homeowner-related events.",
+      "components_involved": ["COMP-NOTIFICATIONS"],
+      "dependencies": ["STEP-2"],
+      "estimated_complexity": "LOW",
+      "verification_method": "Verify that a WORKORDER_CREATED event from COMP-SERVICE-MGMT triggers the Notification Service to dispatch a message.",
+      "sort_order": 5
+    },
+    {
+      "step_id": "STEP-6",
+      "label": "Phase 2.1: Vendor Management",
+      "description": "Establish the Vendor Management service and extend the core data model to include Service Providers and Technicians. This is the foundation for the FSM pillar.",
+      "components_involved": ["COMP-VENDOR-MGMT"],
+      "dependencies": ["STEP-1"],
+      "estimated_complexity": "MEDIUM",
+      "verification_method": "Run unit tests for CRUD operations on ServiceProvider and Technician entities. Validate API for managing vendor profiles and compliance documents.",
+      "sort_order": 6
+    },
+    {
+      "step_id": "STEP-7",
+      "label": "Phase 2.2: Service Provider API",
+      "description": "Build the Backend-for-Frontend API tailored to the needs of Service Providers, aggregating data on work orders, profiles, and compliance.",
+      "components_involved": ["COMP-BFF-SP"],
+      "dependencies": ["STEP-2", "STEP-6"],
+      "estimated_complexity": "LOW",
+      "verification_method": "Validate API schemas for endpoints serving work order lists and vendor profiles. Test aggregation from COMP-SERVICE-MGMT and COMP-VENDOR-MGMT.",
+      "sort_order": 7
+    },
+    {
+      "step_id": "STEP-8",
+      "label": "Phase 2.3: Service Provider Web Portal",
+      "description": "Develop the user-facing web portal for Service Providers to manage their assigned work, update job statuses, and handle their company profile.",
+      "components_involved": ["COMP-WEB-PORTAL-SP"],
+      "dependencies": ["STEP-7", "STEP-3"],
+      "estimated_complexity": "HIGH",
+      "verification_method": "Perform end-to-end UI tests: a vendor logs in, views their assigned work orders, updates the status of a work order, and manages compliance documents.",
+      "sort_order": 8
+    },
+    {
+      "step_id": "STEP-9",
+      "label": "Phase 3.1: Financial & Governance Services",
+      "description": "Implement the core back-office services for financial management (GL, Invoicing) and community governance (Violations, ARC). These are critical for CAM operations.",
+      "components_involved": ["COMP-FINANCIAL-MGMT", "COMP-GOVERNANCE-MGMT"],
+      "dependencies": ["STEP-1"],
+      "estimated_complexity": "HIGH",
+      "verification_method": "Unit test the double-entry accounting logic in COMP-FINANCIAL-MGMT. Validate state machine logic for Violation and ArchitecturalRequest lifecycles in COMP-GOVERNANCE-MGMT.",
+      "sort_order": 9
+    },
+    {
+      "step_id": "STEP-10",
+      "label": "Phase 3.2: AI Pipeline for Matching & Document Processing",
+      "description": "Implement the AI pipeline. Initially, it will handle vendor matching for work orders. It will later be extended for intelligent document processing.",
+      "components_involved": ["COMP-AI-PIPELINE"],
+      "dependencies": ["STEP-2", "STEP-6", "STEP-9"],
+      "estimated_complexity": "HIGH",
+      "verification_method": "Verify that a WORKORDER_CREATED event triggers the vendor matching workflow. Test the document intelligence pipeline by posting a document and checking for correctly extracted data.",
+      "sort_order": 10
+    },
+    {
+      "step_id": "STEP-11",
+      "label": "Phase 3.3: CAM API Layers",
+      "description": "Build the dedicated BFFs for the CAM portal, providing aggregated data for Operations, Governance, and Financials to support complex back-office workflows.",
+      "components_involved": ["COMP-BFF-CAM-OPS", "COMP-BFF-CAM-GOV", "COMP-BFF-CAM-FIN"],
+      "dependencies": ["STEP-9", "STEP-2", "STEP-6"],
+      "estimated_complexity": "MEDIUM",
+      "verification_method": "Validate API schemas for all CAM BFF endpoints. Run integration tests to ensure correct data aggregation from downstream services.",
+      "sort_order": 11
+    },
+    {
+      "step_id": "STEP-12",
+      "label": "Phase 3.4: CAM Web Portals",
+      "description": "Develop the comprehensive back-office web application for Community Association Managers, with distinct modules for managing operations, governance, and financials.",
+      "components_involved": ["COMP-WEB-PORTAL-CAM-OPS", "COMP-WEB-PORTAL-CAM-GOV", "COMP-WEB-PORTAL-CAM-FIN", "COMP-WEB-PORTAL-CAM"],
+      "dependencies": ["STEP-11", "STEP-3"],
+      "estimated_complexity": "HIGH",
+      "verification_method": "Perform end-to-end UI tests for key CAM workflows: creating a violation, processing an invoice against the GL, and assigning a vendor to a work order.",
+      "sort_order": 12
+    }
+  ]
+}
+```

@@ -21,7 +21,7 @@ import type {
 	ArchitectureDocument,
 	ArchitectureDocumentStatus,
 	CapabilityNode,
-	DomainCapabilityMapping,
+	EngineeringDomainCapabilityMapping,
 	WorkflowNode,
 	ComponentSpec,
 	ImplementationStep,
@@ -77,7 +77,13 @@ export function createArchitectureDocument(
 				full.created_at, full.updated_at
 			);
 
-			// 2. Populate normalized lookup tables
+			// 2. Clear ALL stale lookup entries for this dialogue before populating.
+			//    Lookup tables share globally-unique PKs across doc versions; leaving
+			//    old entries in place causes INSERT OR REPLACE to DELETE rows still
+			//    referenced by FK constraints from the old doc → FOREIGN KEY failure.
+			clearLookupTablesForDialogue(full.dialogue_id);
+
+			// 3. Populate normalized lookup tables
 			populateLookupTables(full);
 		});
 		txn();
@@ -182,8 +188,10 @@ export function updateArchitectureDocument(
 				merged.updated_at, docId
 			);
 
-			// 2. Clear and repopulate lookup tables
-			clearLookupTables(docId);
+			// 2. Clear ALL lookup entries for the dialogue, then repopulate from
+			//    the current doc. This prevents FK failures from stale entries left
+			//    by older doc versions that share the same globally-unique PKs.
+			clearLookupTablesForDialogue(merged.dialogue_id);
 			populateLookupTables(merged);
 		});
 		txn();
@@ -263,7 +271,7 @@ export function getCapabilitiesForDocument(docId: string): Result<CapabilityNode
 			label: row.label as string,
 			description: row.description as string,
 			source_requirements: parseJSON<string[]>(row.source_requirements as string, []),
-			domain_mappings: [], // Populated below
+			engineering_domain_mappings: [], // Populated below
 			workflows: [],      // Populated below
 		}));
 
@@ -272,7 +280,7 @@ export function getCapabilitiesForDocument(docId: string): Result<CapabilityNode
 			const mappingRows = db().prepare(
 				'SELECT * FROM arch_domain_mappings WHERE capability_id = ? AND doc_id = ?'
 			).all(cap.capability_id, docId) as Record<string, unknown>[];
-			cap.domain_mappings = mappingRows.map(hydrateDomainMapping);
+			cap.engineering_domain_mappings = mappingRows.map(hydrateDomainMapping);
 
 			const workflowRows = db().prepare(
 				'SELECT workflow_id FROM arch_workflows WHERE capability_id = ? AND doc_id = ?'
@@ -343,7 +351,7 @@ export function getImplementationStepsForDocument(docId: string): Result<Impleme
 export function getDomainMappingsForDomain(
 	docId: string,
 	domain: string
-): Result<DomainCapabilityMapping[]> {
+): Result<EngineeringDomainCapabilityMapping[]> {
 	try {
 		const rows = db().prepare(
 			'SELECT * FROM arch_domain_mappings WHERE doc_id = ? AND domain = ?'
@@ -358,7 +366,7 @@ export function getDomainMappingsForDomain(
  * Get all domain mappings for a document.
  * Used by Historian for completeness validation.
  */
-export function getAllDomainMappings(docId: string): Result<DomainCapabilityMapping[]> {
+export function getAllDomainMappings(docId: string): Result<EngineeringDomainCapabilityMapping[]> {
 	try {
 		const rows = db().prepare(
 			'SELECT * FROM arch_domain_mappings WHERE doc_id = ?'
@@ -400,7 +408,7 @@ export function findUnbackedCapabilities(docId: string): Result<CapabilityNode[]
 				label: row.label as string,
 				description: row.description as string,
 				source_requirements: [],
-				domain_mappings: [],
+				engineering_domain_mappings: [],
 				workflows: [],
 			})),
 		};
@@ -430,7 +438,7 @@ export function getCapabilitiesForParent(
 			label: row.label as string,
 			description: row.description as string,
 			source_requirements: parseJSON<string[]>(row.source_requirements as string, []),
-			domain_mappings: [],
+			engineering_domain_mappings: [],
 			workflows: [],
 		}));
 
@@ -439,7 +447,7 @@ export function getCapabilitiesForParent(
 			const mappingRows = db().prepare(
 				'SELECT * FROM arch_domain_mappings WHERE capability_id = ? AND doc_id = ?'
 			).all(cap.capability_id, docId) as Record<string, unknown>[];
-			cap.domain_mappings = mappingRows.map(hydrateDomainMapping);
+			cap.engineering_domain_mappings = mappingRows.map(hydrateDomainMapping);
 
 			const workflowRows = db().prepare(
 				'SELECT workflow_id FROM arch_workflows WHERE capability_id = ? AND doc_id = ?'
@@ -491,7 +499,7 @@ function populateLookupTables(doc: ArchitectureDocument): void {
 			INSERT OR REPLACE INTO arch_domain_mappings (mapping_id, doc_id, domain, capability_id, requirement_ids, coverage_contribution)
 			VALUES (?, ?, ?, ?, ?, ?)
 		`);
-		for (const mapping of cap.domain_mappings) {
+		for (const mapping of cap.engineering_domain_mappings) {
 			// Skip mappings referencing non-existent capabilities
 			if (!capIds.has(mapping.capability_id)) { continue; }
 			insertMapping.run(
@@ -600,6 +608,38 @@ function clearLookupTables(docId: string): void {
 }
 
 /**
+ * Clear ALL normalized lookup entries for every doc in a dialogue.
+ *
+ * The lookup tables use globally-unique PKs (capability_id, workflow_id,
+ * component_id) — NOT scoped per doc_id. When the architecture sub-state
+ * machine loops back and creates a new doc version, the new doc's LLM output
+ * often reuses the same semantic IDs (e.g. "CAP-DATA"). `INSERT OR REPLACE`
+ * on those IDs triggers DELETE + INSERT: the DELETE step fails with a
+ * FOREIGN KEY constraint because arch_workflows entries from the OLD doc still
+ * reference the capability being deleted.
+ *
+ * Clearing ALL lookup entries for the dialogue before repopulating ensures no
+ * stale conflicting PKs remain from prior doc versions.
+ *
+ * Safe to call from create or update paths — only ONE active set of lookup
+ * entries per dialogue is ever needed (the current live doc).
+ *
+ * Must be called within a transaction.
+ */
+function clearLookupTablesForDialogue(dialogueId: string): void {
+	const d = db();
+	// Subquery resolves all doc_ids for the dialogue — not all lookup tables
+	// carry a dialogue_id column directly, so we route through the parent table.
+	const sub = 'SELECT doc_id FROM architecture_documents WHERE dialogue_id = ?';
+	// Order: children before parents (FK constraints)
+	d.prepare(`DELETE FROM arch_implementation_steps WHERE doc_id IN (${sub})`).run(dialogueId);
+	d.prepare(`DELETE FROM arch_components WHERE doc_id IN (${sub})`).run(dialogueId);
+	d.prepare(`DELETE FROM arch_workflows WHERE doc_id IN (${sub})`).run(dialogueId);
+	d.prepare(`DELETE FROM arch_domain_mappings WHERE doc_id IN (${sub})`).run(dialogueId);
+	d.prepare(`DELETE FROM arch_capabilities WHERE doc_id IN (${sub})`).run(dialogueId);
+}
+
+/**
  * Hydrate an ArchitectureDocument from the JSON snapshot column.
  */
 function hydrateArchitectureDocument(row: Record<string, unknown>): ArchitectureDocument {
@@ -616,10 +656,10 @@ function hydrateArchitectureDocument(row: Record<string, unknown>): Architecture
 	return doc;
 }
 
-function hydrateDomainMapping(row: Record<string, unknown>): DomainCapabilityMapping {
+function hydrateDomainMapping(row: Record<string, unknown>): EngineeringDomainCapabilityMapping {
 	return {
 		mapping_id: row.mapping_id as string,
-		domain: row.domain as DomainCapabilityMapping['domain'],
+		domain: row.domain as EngineeringDomainCapabilityMapping['domain'],
 		capability_id: row.capability_id as string,
 		requirement_ids: parseJSON<string[]>(row.requirement_ids as string, []),
 		coverage_contribution: row.coverage_contribution as 'PRIMARY' | 'SECONDARY',

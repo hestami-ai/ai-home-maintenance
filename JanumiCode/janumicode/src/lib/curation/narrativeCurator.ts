@@ -938,9 +938,27 @@ function materializeIntakeHandoff(db: DB, dialogueId: string): IntakeHandoffCont
 		'SELECT finalized_plan, draft_plan FROM intake_conversations WHERE dialogue_id = ?'
 	).get(dialogueId) as { finalized_plan: string | null; draft_plan: string | null } | undefined;
 
-	const planStr = intake?.finalized_plan ?? intake?.draft_plan ?? '{}';
+	// Parse finalized_plan and draft_plan separately so we can do field-level fallback.
+	// The synthesis LLM may return empty arrays for product artifacts even when the draft had data.
 	let finalizedPlan: Record<string, unknown> = {};
-	try { finalizedPlan = JSON.parse(planStr); } catch { /* use empty */ }
+	let draftPlan: Record<string, unknown> = {};
+	try { if (intake?.finalized_plan) { finalizedPlan = JSON.parse(intake.finalized_plan); } } catch { /* use empty */ }
+	try { if (intake?.draft_plan) { draftPlan = JSON.parse(intake.draft_plan); } } catch { /* use empty */ }
+
+	// Field-level merge: for array fields that are empty in finalized_plan, fall back to draft_plan.
+	// This recovers product artifacts (personas, userJourneys, phasingStrategy, etc.) that the
+	// synthesis LLM silently dropped by returning an empty array.
+	const ARRAY_FIELDS = ['personas', 'userJourneys', 'successMetrics', 'phasingStrategy', 'uxRequirements'];
+	for (const field of ARRAY_FIELDS) {
+		if (Array.isArray(finalizedPlan[field]) && (finalizedPlan[field] as unknown[]).length === 0
+			&& Array.isArray(draftPlan[field]) && (draftPlan[field] as unknown[]).length > 0) {
+			finalizedPlan[field] = draftPlan[field];
+		}
+	}
+	// Use draft if finalized is completely absent
+	if (Object.keys(finalizedPlan).length === 0 && Object.keys(draftPlan).length > 0) {
+		finalizedPlan = draftPlan;
+	}
 
 	// Human decisions
 	const decisions = db.prepare(`

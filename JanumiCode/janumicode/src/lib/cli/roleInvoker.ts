@@ -66,6 +66,12 @@ export interface RoleInvokeOptions {
 
 	/** Dialogue ID — if provided, reasoning review concerns are stored as dialogue events. */
 	dialogueId?: string;
+
+	/**
+	 * JSON Schema string for structured output enforcement (Claude Code --json-schema).
+	 * Passed through to the provider unchanged; ignored by non-Claude-Code providers.
+	 */
+	jsonSchema?: string;
 }
 
 /**
@@ -97,6 +103,7 @@ export async function invokeRoleStreaming(
 	if (options.permissionPromptTool) { invokeOptions.permissionPromptTool = options.permissionPromptTool; }
 	if (options.model) { invokeOptions.model = options.model; }
 	if (options.signal) { invokeOptions.signal = options.signal; }
+	if (options.jsonSchema) { invokeOptions.jsonSchema = options.jsonSchema; }
 
 	const result = await options.provider.invokeStreaming(
 		invokeOptions,
@@ -108,10 +115,25 @@ export async function invokeRoleStreaming(
 		result.value.response = extractFinalResponseFromStream(result.value.rawOutput);
 
 		// Non-zero exit code handling:
-		// If the CLI exited with a non-zero code but produced a response that looks
-		// like actual model output (contains JSON), treat as soft failure.
-		// Hard-fail if the response is empty, too short, or looks like a CLI error message.
+		// Gemini CLI fatal exit codes (41–53) always indicate a hard failure —
+		// skip the heuristic and fail immediately. Other non-zero codes (e.g. 1)
+		// are ambiguous: Gemini emits exit code 1 even on successful completions,
+		// so we fall through to the model-output heuristic for those.
 		if (result.value.exitCode !== 0 && result.value.exitCode !== undefined) {
+			if (isGeminiFatalExitCode(result.value.exitCode)) {
+				const resp = (result.value.response ?? '').trim();
+				const diagnostic = resp || (result.value.rawOutput ?? '').trim();
+				return {
+					success: false,
+					error: new Error(
+						`CLI exited with fatal code ${result.value.exitCode}` +
+						(diagnostic ? `: ${diagnostic.substring(0, 500)}` : '')
+					),
+				};
+			}
+
+			// For other non-zero exit codes: check if the response looks like genuine
+			// model output or a CLI error message (auth failure, SSL, missing module, etc.)
 			const resp = (result.value.response ?? '').trim();
 			const looksLikeModelOutput = resp.length > 50 && resp.includes('{') && !isCliErrorMessage(resp);
 
@@ -162,18 +184,28 @@ export async function invokeRoleStreaming(
 							const { appendCommandOutput } = await import('../workflow/commandStore.js');
 							if (review) {
 								result.value.reasoningReview = review.hasConcerns ? review : undefined;
+								const reviewData = {
+									concerns: review.concerns,
+									overallAssessment: review.overallAssessment || (review.hasConcerns ? '' : 'No concerns found — reasoning appears sound.'),
+									reviewerModel: review.reviewerModel,
+									durationMs: review.reviewDurationMs,
+									reviewPrompt: review.reviewPrompt,
+								};
 								appendCommandOutput(
 									cmd.command_id,
 									'reasoning_review' as import('../workflow/commandStore.js').WorkflowCommandOutput['line_type'],
-									JSON.stringify({
-										concerns: review.concerns,
-										overallAssessment: review.overallAssessment || (review.hasConcerns ? '' : 'No concerns found — reasoning appears sound.'),
-										reviewerModel: review.reviewerModel,
-										durationMs: review.reviewDurationMs,
-										reviewPrompt: review.reviewPrompt,
-									}),
+									JSON.stringify(reviewData),
 									new Date().toISOString(),
 								);
+								// Emit event so the webview can render the review card immediately
+								try {
+									const { getEventBus } = await import('../integration/eventBus.js');
+									getEventBus().emit('reasoning:review_ready' as never, {
+										commandId: cmd.command_id,
+										dialogueId,
+										review: reviewData,
+									} as never);
+								} catch { /* non-fatal */ }
 							} else {
 								// Review returned null — provider unavailable or call failed
 								appendCommandOutput(
@@ -267,29 +299,55 @@ function getActiveDialogueId(): string | null {
 }
 
 /**
+ * Gemini CLI fatal exit codes — always a hard failure, no heuristic needed.
+ * https://google-gemini.github.io/gemini-cli/docs/troubleshooting.html
+ */
+function isGeminiFatalExitCode(code: number): boolean {
+	// 41=FatalAuthenticationError, 42=FatalInputError, 44=FatalSandboxError,
+	// 52=FatalConfigError, 53=FatalTurnLimitedError
+	return code === 41 || code === 42 || code === 44 || code === 52 || code === 53;
+}
+
+/**
  * Detect CLI error messages that should NOT be treated as model output.
  * These are infrastructure errors from the CLI tool itself, not LLM responses.
+ * Covers common patterns from Claude Code, Codex, and Gemini CLI error output.
  */
 function isCliErrorMessage(text: string): boolean {
-	const lower = text.toLowerCase();
+	// Only scan the first 500 chars — CLI error messages appear at the start of output,
+	// not buried in model-generated content that may contain any architectural terminology
+	// (e.g. "authentication", "not found", "ssl" appear legitimately in architecture docs).
+	const lower = text.substring(0, 500).toLowerCase();
 	const errorPatterns = [
+		// Quota / billing
 		'usage limit',
 		'rate limit',
 		'quota exceeded',
 		'upgrade to pro',
 		'api key',
-		'authentication',
+		// Auth (Gemini: "failed to login", "invalid argument"; generic)
+		'authentication failed',
+		'authentication error',
+		'failed to login',
+		'invalid argument',
 		'unauthorized',
 		'forbidden',
+		// Network / TLS (Gemini: "unable_to_get_issuer_cert_locally")
 		'connection refused',
 		'network error',
 		'timed out',
 		'econnrefused',
 		'enotfound',
-		'certificate',
-		'ssl',
+		'certificate error',
+		'ssl error',
+		'unable_to_get_issuer_cert_locally',
+		'unable to get local issuer certificate',
+		// Runtime / module errors (Gemini: "MODULE_NOT_FOUND", "command not found")
+		'module_not_found',
+		'command not found',
+		'operation not permitted',
 		'permission denied',
-		'not found',
+		// HTTP server errors
 		'internal server error',
 		'502 bad gateway',
 		'503 service unavailable',

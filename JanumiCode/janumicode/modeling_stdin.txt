@@ -1,0 +1,162 @@
+You are the ARCHITECTURE EXPERT performing DOMAIN MODELING.
+
+# Your Task
+Produce a comprehensive Domain Model for the system described in the context below.
+The Domain Model defines every data entity the system works with — their fields,
+relationships, constraints, and business invariants.
+
+# Approach
+1. **Start from entityProposals** — if the context includes user-validated `entityProposals`
+   from the INTAKE phase, use them as the PRIMARY source for entities. They contain pre-validated
+   names, key attributes, relationships, and domain assignments. Do NOT ignore them.
+2. Use `domainProposals` (if present) to understand domain groupings and entity previews.
+3. Examine the capabilities and workflows to identify additional entities not covered by proposals.
+4. Read the ground-truth spec files in the workspace if available (look for
+   specs/ or ground-truth-specs/ directories) to understand domain patterns.
+5. For each entity, define complete field-level detail including types, constraints,
+   and validation rules.
+6. Map all relationships with cardinality and direction.
+7. Define business invariants — rules that must always hold across the data model.
+
+# Critical Guardrails
+1. EVERY entity MUST trace to at least one workflow (no invented entities).
+   If an entity is needed, identify which workflow step produces or consumes it.
+2. Include field-level detail: name, type, required/optional, description, constraints.
+3. Relationships MUST reference other entities in this model (no dangling references).
+4. Do NOT invent infrastructure entities (caches, queues, registries) unless
+   requirements explicitly demand them.
+5. Do NOT write, create, or modify any files. Your output is JSON only.
+6. Do NOT execute shell commands or use tools to make changes to the codebase.
+
+# Response Format
+Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
+explanatory text before or after the JSON. Do NOT use markdown code fences.
+Return ONLY the JSON object:
+
+{
+  "data_models": [
+    {
+      "model_id": "DM-<SHORT-NAME>",
+      "entity_name": "EntityName",
+      "description": "What this entity represents and its role in the system",
+      "fields": [
+        { "name": "field_name", "type": "string|uuid|integer|timestamp|boolean|jsonb|enum(...)", "required": true, "description": "Purpose and validation rules" }
+      ],
+      "relationships": [
+        { "target_model": "DM-<ID>", "type": "one-to-one|one-to-many|many-to-many", "description": "What this relationship means" }
+      ],
+      "constraints": ["Unique on email", "Check: status IN ('active', 'archived')"],
+      "invariants": ["A tenant must have at least one admin user", "Property address cannot change after listing is published"],
+      "source_requirements": ["REQ-1", "REQ-2"]
+    }
+  ]
+}
+---
+# Context for TECHNICAL_EXPERT
+
+## Capabilities & Workflows
+This section outlines the system's capabilities and the detailed workflows that implement them, based on the draft architecture document.
+
+### System Capabilities
+
+*   **CAP-PLATFORM-CORE: Platform Core Services**
+    *   **Description**: Provides foundational, cross-cutting services required for all pillars of the Hestami AI Real Property OS, including the common data model, user management, and security.
+    *   **Source Requirements**: REQ-1, REQ-7
+    *   **Sub-capabilities**:
+        *   **CAP-COMMON-DATA-MODEL: Common Data Model Management**: Manages the central, unified data model.
+        *   **CAP-USER-ACCESS-MGMT: User and Access Management**: Manages user identities, authentication, and role-based access control (RBAC).
+
+*   **CAP-FINANCIAL-MGMT: Financial Management**
+    *   **Description**: Provides comprehensive financial services, including general ledger, accounts payable, accounts receivable, and payment processing.
+    *   **Source Requirements**: REQ-2, REQ-3, REQ-4, REQ-5
+    *   **Sub-capabilities**:
+        *   **CAP-GL-MGMT: General Ledger Management**: Manages the auditable General Ledger (GL).
+        *   **CAP-ASSESSMENTS-MGMT: Periodic Assessments Management**: Handles the automatic, periodic posting of assessments.
+        *   **CAP-AP-INTEGRATION: Work Order AP Integration**: Integrates work order management with Accounts Payable.
+
+*   **CAP-COMMUNITY-GOVERNANCE: Community Governance**
+    *   **Description**: Manages governance workflows for community associations, including violations and architectural requests (ARC).
+    *   **Source Requirements**: REQ-5, REQ-6
+    *   **Sub-capabilities**:
+        *   **CAP-VIOLATION-MGMT: Violation Management**: Handles the end-to-end workflow for community violations.
+        *   **CAP-ARC-MGMT: Architectural Request (ARC) Management**: Manages the workflow for architectural requests.
+
+*   **CAP-AI-SERVICES: AI Services**
+    *   **Description**: Provides AI-driven services for intelligent document processing, including extraction, classification, and summarization.
+    *   **Source Requirements**: REQ-8
+
+*   **CAP-MOBILE-CLIENTS: Native Mobile Clients**
+    *   **Description**: Provides dedicated native mobile applications for iOS and Android for homeowners and field technicians, with offline-first capabilities.
+    *   **Source Requirements**: REQ-9, REQ-10
+
+### Defined Workflows
+
+*   **WF-MANAGE-CORE-ENTITY**: Handles CRUD operations for core data model entities.
+*   **WF-USER-LOGIN**: Authenticates a user and establishes a session.
+*   **WF-MANAGE-USER-ROLE**: Allows an administrator to assign or revoke roles for a user.
+*   **WF-POST-TO-GL**: Posts a financial transaction to the General Ledger.
+*   **WF-POST-PERIODIC-ASSESSMENT**: Scheduled workflow to automatically post recurring assessments.
+*   **WF-PROCESS-WORK-ORDER-PAYMENT**: Manages payment for a completed work order.
+*   **WF-MANAGE-VIOLATION**: Handles the lifecycle for a community violation, including notices, hearings, and fines.
+*   **WF-PROCESS-ARC-REQUEST**: Manages the submission, review, and decision process for architectural requests.
+*   **WF-PROCESS-DOCUMENT-AI**: Analyzes an uploaded document using AI for extraction, classification, and summarization.
+*   **WF-MOBILE-OFFLINE-SYNC**: Synchronizes data between the native mobile client and the server for offline-first capabilities.
+
+## Approved Plan (with entity/domain proposals)
+This is a summary of the approved plan, which guides the architectural design.
+
+*   **Goal**: To build a three-pillar platform (Home Assistant, Service Provider FSM, Community Association Management) for property management, maintenance, and governance.
+*   **Core Requirements**:
+    *   **REQ-1**: Support a common data model (associations, properties, people, accounting, etc.).
+    *   **REQ-2**: Provide an auditable General Ledger (GL).
+    *   **REQ-4**: Integrate work orders with Accounts Payable.
+    *   **REQ-5 & REQ-6**: Implement workflows for violations and architectural requests (ARC).
+    *   **REQ-7**: Provide role-based portals for Owners, Tenants, Managers, and Vendors.
+    *   **REQ-8**: Feature AI-driven document analysis.
+    *   **REQ-9 & REQ-10**: Provide native, offline-first mobile clients.
+*   **Key Decisions**:
+    *   **DEC-1**: A three-phased development approach corresponding to the three pillars.
+    *   **DEC-4**: A pre-defined tech stack: SvelteKit (Frontend), Node.js/Bun (Backend), DBOS (Workflow), PostgreSQL (DB), and Cerbos (AuthZ).
+*   **Key Constraints**:
+    *   **CON-2**: Durable, multi-step processes must be implemented as DBOS versioned workflows.
+    *   **CON-3**: Strict multi-tenant data isolation must be enforced via PostgreSQL RLS.
+*   **Proposed Domains & Entities**: The plan includes extensive proposals for 15 domains (e.g., Property Management, Financial Management, AI & Automation) and 31 associated entities (e.g., Property, Service Request, Invoice, Violation). These form the basis of the common data model.
+
+## Workspace Specification Files
+```
+# Workspace Structure Summary
+
+## Top-Level Directories
+- docs/
+- specs/
+
+## specs/
+- specs/hestami-ai-real-property-os(2)/
+```
+
+## Architecture Validation Findings
+This is a list of automated findings from validating the draft architecture document. The model should address these issues.
+
+*   Orphan component "Web Frontend Application" (COMP-WEB-FRONTEND) serves no workflow
+*   Data model "Property" references unknown target: "DM-ASSESSMENT" (DM-ASSESSMENT)
+*   [WARN] Capability "Platform Core Services" has no workflows (infrastructure — non-blocking)
+*   Capability "Financial Management" has no workflows
+*   Capability "Community Governance" has no workflows
+*   Missing interface: "User and Access Management Service" depends on "COMP-CORE-DATA" but no interface connects them
+*   Missing interface: "Financial Ledger Service" depends on "COMP-CORE-DATA" but no interface connects them
+*   Missing interface: "Assessment Scheduler Workflow" depends on "COMP-CORE-DATA" but no interface connects them
+*   Missing interface: "Assessment Scheduler Workflow" depends on "COMP-FINANCE-LEDGER" but no interface connects them
+*   Missing interface: "Violation Management Workflow" depends on "COMP-CORE-DATA" but no interface connects them
+*   Missing interface: "Violation Management Workflow" depends on "COMP-FINANCE-LEDGER" but no interface connects them
+*   Missing interface: "Architectural Request (ARC) Workflow" depends on "COMP-CORE-DATA" but no interface connects them
+*   Missing interface: "Accounts Payable Payment Workflow" depends on "COMP-FINANCE-LEDGER" but no interface connects them
+*   Missing interface: "AI Document Processing Service" depends on "COMP-CORE-DATA" but no interface connects them
+*   Missing interface: "Mobile Sync Gateway" depends on "COMP-CORE-DATA" but no interface connects them
+*   Missing interface: "Mobile Sync Gateway" depends on "COMP-VIOLATION-WORKFLOW" but no interface connects them
+*   Capability "Platform Core Services" has NONE coverage — no workflows or components mapped
+*   Capability "Financial Management" has NONE coverage — no workflows or components mapped
+*   Capability "Community Governance" has NONE coverage — no workflows or components mapped
+*   Component "Web Frontend Application" (COMP-WEB-FRONTEND) serves no workflow — orphan component
+*   The data model is incomplete and missing definitions for 'work orders', 'communications', 'governance', 'reserve studies', and 'compliance', all of which are specified in REQ-1.
+*   The web frontend component (COMP-WEB-FRONTEND) is not associated with any workflows, failing to architecturally address the portal requirements (REQ-7).
+*   A workflow exists for processing work order payments (WF-PROCESS-WORK-ORDER-PAYMENT), but there is no corresponding 'Work Order' data model, creating a significant implementation gap for REQ-4.

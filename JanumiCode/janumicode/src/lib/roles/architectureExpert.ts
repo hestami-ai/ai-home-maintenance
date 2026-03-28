@@ -51,11 +51,17 @@ import type {
 	ImplementationStep,
 	ArchitectureDocument,
 	DecompositionConfig,
-	DomainCapabilityMapping,
+	EngineeringDomainCapabilityMapping,
 } from '../types/architecture';
-import type { IntakePlanDocument, DomainCoverageMap } from '../types/intake';
+import type { IntakePlanDocument, EngineeringDomainCoverageMap } from '../types/intake';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { randomUUID } from 'node:crypto';
+import { jsonrepair } from 'jsonrepair';
+import { LLMProvider as LLMProviderEnum } from '../types';
+import { createProvider } from '../llm/providerFactory';
+import { MessageRole } from '../llm/provider';
+import { getSecretKeyManager } from '../config/secretKeyManager';
+import * as vscode from 'vscode';
 
 // ==================== SYSTEM PROMPTS ====================
 
@@ -67,7 +73,7 @@ You receive an approved implementation plan and produce a structured decompositi
 
 The plan includes:
 - **Requirements, decisions, constraints** — the core specification
-- **domainProposals** — user-validated business domains (from INTAKE Proposer Round 1). Use these as the PRIMARY source for capability grouping. Do NOT ignore them.
+- **businessDomainProposals** — user-validated business domains (from INTAKE Proposer Round 1). Use these as the PRIMARY source for capability grouping. Do NOT ignore them.
 - **workflowProposals** — user-validated workflows (from INTAKE Proposer Round 2). Use these as the PRIMARY source for workflow definitions. Do NOT reinvent workflows from scratch when validated proposals exist.
 - **entityProposals** — user-validated data entities (from INTAKE Proposer Round 3). Reference these when defining workflow inputs/outputs.
 - **userJourneys** — user-validated journey scenarios. Use these to ensure workflow coverage.
@@ -102,13 +108,18 @@ You MUST:
 3. Capabilities should be cohesive — group related requirements, don't create one per requirement
 4. Workflows must be concrete enough to identify actors and trigger conditions
 5. EVERY workflow ID referenced in a capability's "workflows" array MUST have a full definition in the top-level "workflows" array (no dangling references)
-6. Include domain_mappings for EVERY capability — map to the engineering domain(s) listed in
+6. Include engineering_domain_mappings for EVERY capability — map to the engineering domain(s) listed in
    the Domain Coverage section using their exact names. If unsure, use coverage_contribution: "SECONDARY".
-   Do NOT leave domain_mappings empty.
+   Do NOT leave engineering_domain_mappings empty.
 7. Use parent_capability_id to create a hierarchy. Top-level capabilities should be broad functional
    areas. Sub-capabilities should be specific enough to map to concrete workflows.
 8. Do NOT write, create, or modify any files. Your output is JSON only.
 9. Do NOT execute shell commands or use tools to make changes to the codebase.
+10. If the context includes a "User-Validated Workflow Proposals" section, EVERY workflow listed
+    there MUST appear in your output (use the same ID or an improved one, but do not drop them).
+    Do not invent replacement workflows that contradict validated proposals.
+11. If the context includes "User-Validated Entity Proposals", reference them when defining
+    workflow inputs/outputs to ensure domain completeness.
 
 # Response Format
 Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
@@ -123,7 +134,7 @@ Return ONLY the JSON object:
       "label": "Top-level capability name",
       "description": "What this capability area provides",
       "source_requirements": ["REQ-1", "REQ-2"],
-      "domain_mappings": [
+      "engineering_domain_mappings": [
         {
           "mapping_id": "DM-<UUID>",
           "domain": "<EngineeringDomain enum value>",
@@ -172,7 +183,7 @@ relationships, constraints, and business invariants.
 1. **Start from entityProposals** — if the context includes user-validated \`entityProposals\`
    from the INTAKE phase, use them as the PRIMARY source for entities. They contain pre-validated
    names, key attributes, relationships, and domain assignments. Do NOT ignore them.
-2. Use \`domainProposals\` (if present) to understand domain groupings and entity previews.
+2. Use \`businessBusinessDomainProposals\` (if present) to understand domain groupings and entity previews.
 3. Examine the capabilities and workflows to identify additional entities not covered by proposals.
 4. Read the ground-truth spec files in the workspace if available (look for
    specs/ or ground-truth-specs/ directories) to understand domain patterns.
@@ -182,8 +193,10 @@ relationships, constraints, and business invariants.
 7. Define business invariants — rules that must always hold across the data model.
 
 # Critical Guardrails
-1. EVERY entity MUST trace to at least one workflow (no invented entities).
-   If an entity is needed, identify which workflow step produces or consumes it.
+1. Every entity SHOULD trace to at least one workflow. If an entity was user-validated during
+   INTAKE but its workflow is not yet defined in the architecture, include the entity anyway
+   and note in source_requirements which requirement motivates it. Do NOT drop user-validated
+   entities just because a corresponding workflow is missing.
 2. Include field-level detail: name, type, required/optional, description, constraints.
 3. Relationships MUST reference other entities in this model (no dangling references).
 4. Do NOT invent infrastructure entities (caches, queues, registries) unless
@@ -401,7 +414,7 @@ export interface DecompositionResult {
 export async function invokeArchitectureDecomposition(
 	dialogueId: string,
 	approvedPlan: IntakePlanDocument,
-	domainCoverage: DomainCoverageMap | null,
+	engineeringDomainCoverage: EngineeringDomainCoverageMap | null,
 	tokenBudget: number,
 	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; humanFeedback?: string | null; priorArchitectureDoc?: import('../types/architecture').ArchitectureDocument | null; commandBlock?: DeferredCommandBlock }
 ): Promise<Result<DecompositionResult>> {
@@ -417,9 +430,61 @@ export async function invokeArchitectureDecomposition(
 		}
 
 		// 2. Assemble context via Context Engineer
-		const extras: Record<string, unknown> = { approvedPlan, domainCoverage, humanFeedback: options?.humanFeedback };
+		// Note: the full approvedPlan is NOT in extras — the DECOMPOSING policy
+		// requests it via source: handoff_doc (summarized). To prevent workflow/entity
+		// data loss from over-aggressive summarization, pass compact proposal lists
+		// as separate extras that the CE will include verbatim.
+		const extras: Record<string, unknown> = { engineeringDomainCoverage, humanFeedback: options?.humanFeedback };
+		// Pass compact workflow/entity proposal lists so the CE includes them verbatim and the
+		// LLM preserves all user-validated items (prevents data loss from over-summarization)
+		if (approvedPlan.workflowProposals && approvedPlan.workflowProposals.length > 0) {
+			extras.workflowProposals = approvedPlan.workflowProposals.map(w => ({
+				id: w.id,
+				name: w.name,
+				domain: w.businessDomainId,
+			}));
+		}
+		if (approvedPlan.entityProposals && approvedPlan.entityProposals.length > 0) {
+			extras.entityProposalNames = approvedPlan.entityProposals.map(e => e.name);
+		}
+		// Pass business domain proposals (compact) — PRIMARY source for capability grouping.
+		// Include name + description + entityPreview so the LLM can group capabilities by domain.
+		if (approvedPlan.businessDomainProposals && approvedPlan.businessDomainProposals.length > 0) {
+			extras.businessDomainProposals = approvedPlan.businessDomainProposals.map(d => ({
+				id: d.id,
+				name: d.name,
+				description: d.description,
+				entityPreview: d.entityPreview,
+				workflowPreview: d.workflowPreview,
+			}));
+		}
+		// Pass user journeys (compact) — used to verify workflow coverage across all phases.
+		if (approvedPlan.userJourneys && approvedPlan.userJourneys.length > 0) {
+			extras.userJourneys = approvedPlan.userJourneys.map(uj => ({
+				id: uj.id,
+				title: uj.title,
+				personaId: uj.personaId,
+				implementationPhase: uj.implementationPhase,
+				scenario: uj.scenario,
+			}));
+		}
+		// Pass phasing strategy — must be respected when organizing capabilities by product phase.
+		if (approvedPlan.phasingStrategy && approvedPlan.phasingStrategy.length > 0) {
+			extras.phasingStrategy = approvedPlan.phasingStrategy;
+		}
 		if (options?.priorArchitectureDoc) {
-			extras.priorArchitectureDoc = options.priorArchitectureDoc;
+			// Pass only a compact summary of the prior doc — not the full 90KB document
+			const priorDoc = options.priorArchitectureDoc;
+			extras.priorArchitectureSummary = {
+				capabilities: priorDoc.capabilities.map(c => ({ id: c.capability_id, label: c.label, parentId: c.parent_capability_id })),
+				workflowCount: priorDoc.workflow_graph.length,
+				componentCount: priorDoc.components.length,
+				componentLabels: priorDoc.components.map(c => `${c.component_id}: ${c.label}`),
+				dataModelCount: priorDoc.data_models.length,
+				interfaceCount: priorDoc.interfaces.length,
+				validationFindings: priorDoc.validation_findings ?? [],
+				goalAlignmentScore: priorDoc.goal_alignment_score,
+			};
 		}
 
 		const contextResult = await assembleContext({
@@ -433,6 +498,7 @@ export async function invokeArchitectureDecomposition(
 		});
 
 		if (!contextResult.success) {
+			emitDeferredStart(options?.commandBlock);
 			return contextResult as unknown as Result<DecompositionResult>;
 		}
 		emitDeferredStart(options?.commandBlock);
@@ -500,6 +566,64 @@ export interface DesignResult {
 	raw_response: string;
 }
 
+/**
+ * JSON Schema for the design response, passed as --json-schema to Claude Code CLI.
+ * Claude Code validates and coerces its final output to this shape before returning,
+ * preventing the encoding/formatting failures that otherwise reach parseDesignResponse.
+ */
+const DESIGN_OUTPUT_SCHEMA = JSON.stringify({
+	type: 'object',
+	properties: {
+		components: {
+			type: 'array',
+			items: {
+				type: 'object',
+				properties: {
+					component_id:          { type: 'string' },
+					label:                 { type: 'string' },
+					responsibility:        { type: 'string' },
+					rationale:             { type: 'string' },
+					workflows_served:      { type: 'array', items: { type: 'string' } },
+					dependencies:          { type: 'array', items: { type: 'string' } },
+					interaction_patterns:  { type: 'array', items: { type: 'string' } },
+					technology_notes:      { type: 'string' },
+					file_scope:            { type: 'string' },
+					parent_component_id:   { type: ['string', 'null'] },
+				},
+				required: [
+					'component_id', 'label', 'responsibility', 'rationale',
+					'workflows_served', 'dependencies', 'interaction_patterns',
+					'technology_notes', 'file_scope', 'parent_component_id',
+				],
+				additionalProperties: false,
+			},
+		},
+		interfaces: {
+			type: 'array',
+			items: {
+				type: 'object',
+				properties: {
+					interface_id:        { type: 'string' },
+					type:                { type: 'string', enum: ['REST', 'EVENT', 'RPC', 'FILE', 'IPC'] },
+					label:               { type: 'string' },
+					description:         { type: 'string' },
+					provider_component:  { type: 'string' },
+					consumer_components: { type: 'array', items: { type: 'string' } },
+					contract:            { type: 'string' },
+					source_workflows:    { type: 'array', items: { type: 'string' } },
+				},
+				required: [
+					'interface_id', 'type', 'label', 'description',
+					'provider_component', 'consumer_components', 'contract', 'source_workflows',
+				],
+				additionalProperties: false,
+			},
+		},
+	},
+	required: ['components', 'interfaces'],
+	additionalProperties: false,
+});
+
 // ==================== MODELING INVOCATION ====================
 
 export interface ModelingResult {
@@ -538,8 +662,18 @@ export async function invokeArchitectureDesign(
 		}
 
 		// 2. Assemble context via Context Engineer
-		const designExtras: Record<string, unknown> = { architectureDoc, decompositionConfig, humanFeedback };
-		if (options?.constraintsAndDecisions) { designExtras.constraintsAndDecisions = options.constraintsAndDecisions; }
+		// Prune architectureDoc: DESIGNING needs capabilities + workflows + data_models
+		// but not prior implementation_sequence (it's generating components/interfaces)
+		const prunedDesignDoc = {
+			...architectureDoc,
+			implementation_sequence: [], // SEQUENCING generates this
+		};
+		const designExtras: Record<string, unknown> = { architectureDoc: prunedDesignDoc, decompositionConfig, humanFeedback };
+		// Note: constraintsAndDecisions duplicates data already in the handoff doc — only include if small
+		if (options?.constraintsAndDecisions) {
+			const cdSize = JSON.stringify(options.constraintsAndDecisions).length;
+			if (cdSize < 10_000) { designExtras.constraintsAndDecisions = options.constraintsAndDecisions; }
+		}
 		if (options?.workspaceSpecs) { designExtras.workspace_specs = options.workspaceSpecs; }
 
 		const contextResult = await assembleContext({
@@ -553,6 +687,7 @@ export async function invokeArchitectureDesign(
 		});
 
 		if (!contextResult.success) {
+			emitDeferredStart(options?.commandBlock);
 			return contextResult as unknown as Result<DesignResult>;
 		}
 		emitDeferredStart(options?.commandBlock);
@@ -584,6 +719,7 @@ export async function invokeArchitectureDesign(
 			provider: providerResult.value,
 			stdinContent,
 			onEvent: options?.onEvent,
+			jsonSchema: DESIGN_OUTPUT_SCHEMA,
 		});
 
 		if (!cliResult.success) {
@@ -595,11 +731,29 @@ export async function invokeArchitectureDesign(
 		// Cache raw output BEFORE parsing
 		updateWorkflowMetadata(dialogueId, { cachedRawCliOutput: rawResponse });
 
-		// 4. Parse response
-		const parsed = parseDesignResponse(rawResponse);
+		// 4. Parse response — with LLM repair fallback
+		let parsed = parseDesignResponse(rawResponse);
 		if (!parsed.success) {
-			log?.error('Failed to parse design response', { error: parsed.error.message });
-			return parsed;
+			log?.warn('Design response parse failed — attempting LLM repair', {
+				error: parsed.error.message,
+				rawPreview: rawResponse.substring(0, 300),
+			});
+			const repairedJson = await repairDesignJsonWithLlm(rawResponse);
+			if (repairedJson) {
+				const reparse = parseDesignResponse(repairedJson);
+				if (reparse.success) {
+					log?.info('LLM JSON repair succeeded');
+					parsed = reparse;
+				} else {
+					log?.warn('LLM repair produced still-unparseable JSON', {
+						repairPreview: repairedJson.substring(0, 300),
+					});
+				}
+			}
+			if (!parsed.success) {
+				log?.error('Failed to parse design response', { error: parsed.error.message });
+				return parsed;
+			}
 		}
 
 		log?.info('Design complete', {
@@ -616,37 +770,135 @@ export async function invokeArchitectureDesign(
 // ==================== RESPONSE PARSING ====================
 
 /**
- * Extract JSON from LLM response, handling markdown fences and preamble text.
+ * Extract and repair JSON from an LLM response.
+ * Handles markdown fences, preamble text, unescaped control characters,
+ * trailing commas, and other common LLM output issues via jsonrepair.
+ *
+ * Also handles double-escaped JSON — where the LLM outputs JSON with all
+ * quotes backslash-escaped (\"key\": \"value\") as if the content were the
+ * body of a JSON string literal. This is not a structural issue jsonrepair
+ * can fix; instead we use the JSON parser itself: wrapping the raw text in
+ * "..." and parsing strips exactly one layer of JSON string encoding, turning
+ * \"key\" → "key" reliably for any escape sequence the model may have used.
  */
 function extractJson(raw: string): string {
-	const trimmed = raw.trim();
-
-	// Try direct parse
+	// Attempt 1: standard repair. If the result is valid JSON, use it.
 	try {
-		JSON.parse(trimmed);
-		return trimmed;
-	} catch { /* continue */ }
+		const repaired = jsonrepair(raw);
+		JSON.parse(repaired);
+		return repaired;
+	} catch { /* fall through to double-escape recovery */ }
 
-	// Try extracting from markdown fence
-	const fenceMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-	if (fenceMatch) {
-		return fenceMatch[1].trim();
-	}
-
-	// Try finding balanced JSON object
-	const firstBrace = trimmed.indexOf('{');
-	if (firstBrace >= 0) {
-		let depth = 0;
-		for (let i = firstBrace; i < trimmed.length; i++) {
-			if (trimmed[i] === '{') { depth++; }
-			else if (trimmed[i] === '}') { depth--; }
-			if (depth === 0) {
-				return trimmed.substring(firstBrace, i + 1);
-			}
+	// Attempt 2: double-escaped JSON recovery.
+	// Wrapping raw in quotes makes the JSON parser treat the content as a string
+	// value and decode all \"-style escapes in one pass. This is the only
+	// reliable way to strip a JSON string-encoding layer without brittle regex.
+	try {
+		const unescaped = JSON.parse('"' + raw + '"');
+		if (typeof unescaped === 'string') {
+			const repaired = jsonrepair(unescaped);
+			JSON.parse(repaired); // validate before returning
+			return repaired;
 		}
-	}
+	} catch { /* fall through to best-effort fallback */ }
 
-	return trimmed;
+	// Fallback: return whatever jsonrepair produces without further validation.
+	return jsonrepair(raw);
+}
+
+/**
+ * System prompt for the LLM JSON repair call.
+ * Tight scope: fix encoding and syntax only — no content changes.
+ */
+const DESIGN_JSON_REPAIR_PROMPT =
+`You are a JSON syntax repair tool. You receive malformed or incorrectly encoded JSON.
+
+Return ONLY the corrected JSON. No explanation, no code fences, no prose.
+Fix ONLY encoding and syntax errors. Do not add, remove, rename, or paraphrase any fields or values.
+
+The JSON must conform to this structure:
+{
+  "components": [
+    {
+      "component_id": "string",
+      "label": "string",
+      "responsibility": "string",
+      "rationale": "string",
+      "workflows_served": ["string"],
+      "dependencies": ["string"],
+      "interaction_patterns": ["string"],
+      "technology_notes": "string",
+      "file_scope": "string",
+      "parent_component_id": "string or null"
+    }
+  ],
+  "interfaces": [
+    {
+      "interface_id": "string",
+      "type": "REST|EVENT|RPC|FILE|IPC",
+      "label": "string",
+      "description": "string",
+      "provider_component": "string",
+      "consumer_components": ["string"],
+      "contract": "string",
+      "source_workflows": ["string"]
+    }
+  ]
+}`;
+
+/**
+ * Last-resort JSON repair via LLM (claude-haiku-4-5-20251001, temperature 0).
+ *
+ * Called only when programmatic repair fails. Haiku is chosen over Sonnet/Opus
+ * because at temperature 0 it follows tight constraints literally — more capable
+ * models are more likely to silently rename or complete content while "fixing" it,
+ * which would corrupt the architecture document.
+ *
+ * Returns the repaired JSON string if the model produces valid output, or null
+ * if the call fails or the result is still unparseable.
+ */
+async function repairDesignJsonWithLlm(rawResponse: string): Promise<string | null> {
+	try {
+		// Resolve provider — defaults to Gemini, configurable via VS Code settings
+		const config = vscode.workspace.getConfiguration('janumicode');
+		const providerName = config.get<string>('jsonRepair.provider', 'GEMINI');
+		const model = config.get<string>('jsonRepair.model', 'gemini-2.5-pro');
+		const providerEnum =
+			LLMProviderEnum[providerName as keyof typeof LLMProviderEnum] ??
+			LLMProviderEnum.GEMINI;
+
+		const apiKey = await (async () => {
+			try {
+				const key = await getSecretKeyManager().getApiKey('jsonRepair', providerEnum);
+				if (key?.trim()) { return key.trim(); }
+				// Fall back to evaluator key (same lightweight utility pattern)
+				const evalKey = await getSecretKeyManager().getApiKey('evaluator', providerEnum);
+				if (evalKey?.trim()) { return evalKey.trim(); }
+			} catch { /* SecretStorage may not be initialized */ }
+			return null;
+		})();
+
+		if (!apiKey) { return null; }
+
+		const providerResult = createProvider(providerEnum, { apiKey, defaultModel: model });
+		if (!providerResult.success) { return null; }
+
+		const result = await providerResult.value.complete({
+			systemPrompt: DESIGN_JSON_REPAIR_PROMPT,
+			messages: [{ role: MessageRole.USER, content: rawResponse }],
+			model,
+			maxTokens: 8192,
+			temperature: 0,
+			responseSchema: JSON.parse(DESIGN_OUTPUT_SCHEMA),
+		});
+		if (!result.success || !result.value.content.trim()) { return null; }
+		// Run through jsonrepair + validate before trusting the output
+		const repaired = jsonrepair(result.value.content.trim());
+		JSON.parse(repaired);
+		return repaired;
+	} catch {
+		return null;
+	}
 }
 
 function parseDecompositionResponse(rawResponse: string): Result<DecompositionResult> {
@@ -672,10 +924,10 @@ function parseDecompositionResponse(rawResponse: string): Result<DecompositionRe
 			label: (c.label as string) || '',
 			description: (c.description as string) || '',
 			source_requirements: Array.isArray(c.source_requirements) ? c.source_requirements as string[] : [],
-			domain_mappings: Array.isArray(c.domain_mappings)
-				? (c.domain_mappings as Record<string, unknown>[]).map(dm => ({
+			engineering_domain_mappings: Array.isArray(c.engineering_domain_mappings)
+				? (c.engineering_domain_mappings as Record<string, unknown>[]).map(dm => ({
 					mapping_id: (dm.mapping_id as string) || `DM-${randomUUID().substring(0, 8)}`,
-					domain: dm.domain as DomainCapabilityMapping['domain'],
+					domain: dm.domain as EngineeringDomainCapabilityMapping['domain'],
 					capability_id: (dm.capability_id as string) || c.capability_id as string,
 					requirement_ids: Array.isArray(dm.requirement_ids) ? dm.requirement_ids as string[] : [],
 					coverage_contribution: (dm.coverage_contribution as 'PRIMARY' | 'SECONDARY') || 'PRIMARY',
@@ -858,8 +1110,27 @@ export async function invokeArchitectureModeling(
 			return providerResult as unknown as Result<ModelingResult>;
 		}
 
-		const modelingExtras: Record<string, unknown> = { architectureDoc, humanFeedback: options?.humanFeedback };
-		if (options?.approvedPlan) { modelingExtras.approvedPlan = options.approvedPlan; }
+		// Prune architectureDoc: MODELING needs capabilities + workflows + component labels
+		// but not data_models/interfaces/implementation_sequence (those are generated downstream)
+		const prunedDoc = {
+			...architectureDoc,
+			data_models: [],
+			interfaces: [],
+			implementation_sequence: [],
+			components: architectureDoc.components.map(c => ({ component_id: c.component_id, label: c.label, workflows_served: c.workflows_served })),
+		};
+		const modelingExtras: Record<string, unknown> = { architectureDoc: prunedDoc, humanFeedback: options?.humanFeedback };
+		// Pass a compact plan summary (entity/domain proposals only — not full 60KB plan)
+		if (options?.approvedPlan) {
+			const plan = options.approvedPlan as Record<string, unknown>;
+			modelingExtras.approved_plan = {
+				requirements: plan.requirements,
+				entityProposals: plan.entityProposals,
+				businessBusinessDomainProposals: plan.businessBusinessDomainProposals,
+				constraints: plan.constraints,
+				decisions: plan.decisions,
+			};
+		}
 		if (options?.workspaceSpecs) { modelingExtras.workspace_specs = options.workspaceSpecs; }
 
 		const contextResult = await assembleContext({
@@ -873,6 +1144,7 @@ export async function invokeArchitectureModeling(
 		});
 
 		if (!contextResult.success) {
+			emitDeferredStart(options?.commandBlock);
 			return contextResult as unknown as Result<ModelingResult>;
 		}
 		emitDeferredStart(options?.commandBlock);
@@ -945,7 +1217,22 @@ export async function invokeArchitectureSequencing(
 			return providerResult as unknown as Result<SequencingResult>;
 		}
 
-		const seqExtras: Record<string, unknown> = { architectureDoc, humanFeedback: options?.humanFeedback };
+		// Prune architectureDoc: SEQUENCING needs components + interfaces + data_models
+		// to plan implementation order, but capabilities/workflows are summary-level only
+		const prunedSeqDoc = {
+			...architectureDoc,
+			capabilities: architectureDoc.capabilities.map(c => ({
+				capability_id: c.capability_id, label: c.label,
+				parent_capability_id: c.parent_capability_id,
+				source_requirements: c.source_requirements,
+				engineering_domain_mappings: [], workflows: [],
+			})),
+			workflow_graph: architectureDoc.workflow_graph.map(w => ({
+				workflow_id: w.workflow_id, label: w.label,
+				capability_id: w.capability_id, steps: [], actors: [], triggers: [], outputs: [],
+			})),
+		};
+		const seqExtras: Record<string, unknown> = { architectureDoc: prunedSeqDoc, humanFeedback: options?.humanFeedback };
 		if (options?.phasingStrategy) { seqExtras.phasingStrategy = options.phasingStrategy; }
 		if (options?.workspaceSpecs) { seqExtras.workspace_patterns = options.workspaceSpecs; }
 
@@ -960,6 +1247,7 @@ export async function invokeArchitectureSequencing(
 		});
 
 		if (!contextResult.success) {
+			emitDeferredStart(options?.commandBlock);
 			return contextResult as unknown as Result<SequencingResult>;
 		}
 		emitDeferredStart(options?.commandBlock);
@@ -1083,41 +1371,81 @@ export async function invokeBatchDecomposition(
 			return providerResult as unknown as Result<ComponentSpec[]>;
 		}
 
-		// 2. Build focused context with full architecture + violating components
+		// 2. Build focused context — only include architecture elements relevant
+		//    to the violating components to avoid context blowout (was 90KB+)
 		const contextSections: string[] = [];
 
-		// Full architecture context for coherent reasoning
-		contextSections.push('# Capabilities');
-		for (const cap of architectureDoc.capabilities) {
-			contextSections.push(`- ${cap.capability_id}: ${cap.label} — ${cap.description}`);
+		// Collect IDs relevant to violating components
+		const violatingIds = new Set(violating.map(v => v.component.component_id));
+		const relevantWorkflowIds = new Set<string>();
+		const relevantCapabilityIds = new Set<string>();
+		const relevantComponentIds = new Set<string>();
+		for (const v of violating) {
+			for (const wfId of v.component.workflows_served) { relevantWorkflowIds.add(wfId); }
+			for (const dep of v.component.dependencies) { relevantComponentIds.add(dep); }
 		}
-
-		contextSections.push('\n# Workflows');
 		for (const wf of architectureDoc.workflow_graph) {
-			const stepSummary = wf.steps.map(s => `${s.label} (${s.actor})`).join(' → ');
-			contextSections.push(`- ${wf.workflow_id}: ${wf.label} — ${stepSummary}`);
+			if (relevantWorkflowIds.has(wf.workflow_id)) { relevantCapabilityIds.add(wf.capability_id); }
 		}
-
-		if (architectureDoc.data_models.length > 0) {
-			contextSections.push('\n# Domain Model');
-			for (const dm of architectureDoc.data_models) {
-				const rels = dm.relationships.map(r => `→ ${r.target_model} (${r.type})`).join(', ');
-				contextSections.push(`- ${dm.model_id}: ${dm.entity_name} — ${dm.description}${rels ? ` [${rels}]` : ''}`);
-			}
-		}
-
-		if (architectureDoc.interfaces.length > 0) {
-			contextSections.push('\n# Interfaces');
-			for (const iface of architectureDoc.interfaces) {
-				contextSections.push(`- ${iface.interface_id}: ${iface.label} (${iface.type}) — ${iface.provider_component} → ${iface.consumer_components.join(', ')}`);
-			}
-		}
-
-		contextSections.push('\n# All Current Components (for context)');
+		// Also include sibling components (share workflows with violating ones)
 		for (const comp of architectureDoc.components) {
-			contextSections.push(`- ${comp.component_id}: ${comp.label} — ${comp.responsibility.substring(0, 120)}${comp.responsibility.length > 120 ? '...' : ''}`);
-			if (comp.workflows_served.length > 0) {
-				contextSections.push(`  Workflows: ${comp.workflows_served.join(', ')}`);
+			if (comp.workflows_served.some(wf => relevantWorkflowIds.has(wf))) {
+				relevantComponentIds.add(comp.component_id);
+			}
+		}
+
+		// Capabilities: full detail for relevant ones, IDs only for others
+		contextSections.push('# Capabilities (relevant to components being analyzed)');
+		for (const cap of architectureDoc.capabilities) {
+			if (relevantCapabilityIds.has(cap.capability_id)) {
+				contextSections.push(`- ${cap.capability_id}: ${cap.label} — ${cap.description}`);
+			}
+		}
+		if (architectureDoc.capabilities.length > relevantCapabilityIds.size) {
+			const otherCaps = architectureDoc.capabilities.filter(c => !relevantCapabilityIds.has(c.capability_id));
+			contextSections.push(`\n(${otherCaps.length} other capabilities: ${otherCaps.map(c => c.label).join(', ')})`);
+		}
+
+		// Workflows: only those served by violating components
+		contextSections.push('\n# Relevant Workflows');
+		for (const wf of architectureDoc.workflow_graph) {
+			if (relevantWorkflowIds.has(wf.workflow_id)) {
+				const stepSummary = wf.steps.map(s => `${s.label} (${s.actor})`).join(' → ');
+				contextSections.push(`- ${wf.workflow_id}: ${wf.label} — ${stepSummary}`);
+			}
+		}
+
+		// Data models: only those referenced by relevant workflows (via model_id matching)
+		if (architectureDoc.data_models.length > 0) {
+			contextSections.push('\n# Domain Model (summary)');
+			for (const dm of architectureDoc.data_models) {
+				contextSections.push(`- ${dm.model_id}: ${dm.entity_name}`);
+			}
+		}
+
+		// Interfaces: only those involving violating or related components
+		if (architectureDoc.interfaces.length > 0) {
+			const relevantIfaces = architectureDoc.interfaces.filter(iface =>
+				relevantComponentIds.has(iface.provider_component) ||
+				violatingIds.has(iface.provider_component) ||
+				iface.consumer_components.some(c => relevantComponentIds.has(c) || violatingIds.has(c))
+			);
+			if (relevantIfaces.length > 0) {
+				contextSections.push('\n# Relevant Interfaces');
+				for (const iface of relevantIfaces) {
+					contextSections.push(`- ${iface.interface_id}: ${iface.label} (${iface.type}) — ${iface.provider_component} → ${iface.consumer_components.join(', ')}`);
+				}
+			}
+		}
+
+		// Related components (siblings/dependencies) — IDs and labels only
+		const relatedComps = architectureDoc.components.filter(c =>
+			relevantComponentIds.has(c.component_id) && !violatingIds.has(c.component_id)
+		);
+		if (relatedComps.length > 0) {
+			contextSections.push('\n# Related Components (siblings/dependencies)');
+			for (const comp of relatedComps) {
+				contextSections.push(`- ${comp.component_id}: ${comp.label} — serves: ${comp.workflows_served.join(', ')}`);
 			}
 		}
 

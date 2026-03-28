@@ -472,7 +472,9 @@ function normalizeGeminiStreamEvent(line: string): CLIActivityEvent | null {
 					eventType: 'error',
 					summary: event.message || 'Unknown error',
 					detail: JSON.stringify(event),
-					status: 'error',
+					// severity:'warning' events (e.g. "Loop detected") are non-fatal — omit status
+					// so they render as informational rather than red error items.
+					status: event.severity === 'warning' ? undefined : 'error' as const,
 				};
 
 			case 'result':

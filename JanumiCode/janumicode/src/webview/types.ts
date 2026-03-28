@@ -197,6 +197,8 @@ export type IncomingMessage =
 	| { type: 'keyStatusUpdate'; data: KeyStatusUpdateData }
 	| { type: 'setInputEnabled'; data: SetInputEnabledData }
 	| { type: 'setProcessing'; data: SetProcessingData }
+	| { type: 'updateProcessingElapsed'; data: { elapsed: number; processCount: number } }
+	| { type: 'reasoningReviewReady'; data: { commandId: string; dialogueId: string; review: { concerns: Array<{ severity: string; summary: string; detail: string; location?: string; recommendation?: string }>; overallAssessment: string; reviewerModel: string; durationMs?: number; reviewPrompt?: string; failed?: boolean } } }
 	| { type: 'setInputThinking'; data: SetInputThinkingData }
 	| { type: 'qaExchangeAdded'; data: QaExchangeAddedData }
 	| { type: 'qaThinkingStart'; data: QaThinkingStartData }
@@ -207,7 +209,7 @@ export type IncomingMessage =
 	| { type: 'toolCallActivity'; data: ToolCallActivityData }
 	| { type: 'intakePlanUpdated'; data: unknown }
 	| { type: 'intakeModeOptions'; data: IntakeModeOptionsData }
-	| { type: 'domainCoverageUpdate'; data: DomainCoverageUpdateData }
+	| { type: 'engineeringDomainCoverageUpdate'; data: DomainCoverageUpdateData }
 	| { type: 'intakeCheckpoint'; data: IntakeCheckpointData }
 	| { type: 'dialogueTitleUpdated'; data: DialogueTitleUpdatedData }
 	| { type: 'systemMessage'; data: SystemMessageData }
@@ -224,12 +226,18 @@ export type IncomingMessage =
 	| { type: 'speechCapability'; data: SpeechCapabilityData }
 	| { type: 'openFindWidget' }
 	| { type: 'pendingMmpDecisionsLoaded'; decisions: Record<string, { mirrorDecisions: Record<string, { status: string; editedText?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string }>; productEdits: Record<string, string> }> }
-	| { type: 'draftsLoaded'; drafts: Record<string, Record<string, string>> };
+	| { type: 'draftsLoaded'; drafts: Record<string, Record<string, string>> }
+	| { type: 'hydrate'; items: unknown[]; headerHtml: string; inputHtml: string; pendingDecisions?: Record<string, unknown> }
+	| { type: 'streamItemAdded'; item: unknown }
+	| { type: 'headerUpdate'; data: { headerHtml: string } }
+	| { type: 'recordingState'; active: boolean; path?: string }
+	| { type: 'clearStream' };
 
 // ===== Outgoing Messages (Webview → Extension Host) =====
 
 export type OutgoingMessage =
 	| { type: 'refresh' }
+	| { type: 'webviewReady' }
 	| { type: 'gateDecision'; gateId: string; action: string; rationale: string }
 	| { type: 'verificationGateDecision'; gateId: string; action: string; claimRationales?: Record<string, string> }
 	| { type: 'reviewGateDecision'; gateId: string; action: string; itemRationales?: Record<string, string>; overallFeedback?: string }
@@ -253,12 +261,14 @@ export type OutgoingMessage =
 	| { type: 'executeRetryAction'; kind: string; gateId: string | null }
 	| { type: 'permissionDecision'; permissionId: string; approved: boolean; approveAll?: boolean }
 	| { type: 'cancelWorkflow' }
+	| { type: 'pauseWorkflow' }
 	| { type: 'cancelThinking' }
 	| { type: 'intakeSkipGathering' }
 	| { type: 'reviewMmpDecision'; gateId: string; cardId: string; mirrorDecisions: Record<string, { status: string; editedText?: string; text?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string; question?: string; selectedLabel?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string; assumption?: string }> }
 	| { type: 'mmpSubmit'; cardId: string; mirrorDecisions: Record<string, { status: string; editedText?: string; text?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string; question?: string; selectedLabel?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string; assumption?: string }>; productEdits?: Record<string, string> }
 	| { type: 'architectureGateDecision'; action: string; dialogueId: string; docId: string; feedback?: string }
 	| { type: 'architectureDecomposeDeeper'; dialogueId: string; docId: string }
+	| { type: 'openArchitectureExplorer'; dialogueId: string }
 	| { type: 'mmpPartialSave'; cardId: string; mirrorDecisions: Record<string, { status: string; editedText?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string }> }
 	| { type: 'speechStart'; targetInputId: string }
 	| { type: 'speechStop' }
@@ -266,4 +276,6 @@ export type OutgoingMessage =
 	| { type: 'generateDocument' }
 	| { type: 'reviewRerun'; guidance?: string }
 	| { type: 'draftSave'; drafts: Array<{ category: string; itemKey: string; value: string }> }
-	| { type: 'draftClear'; category?: string };
+	| { type: 'draftClear'; category?: string }
+	| { type: 'validationFeedback'; findingId: string; useful: boolean }
+	| { type: 'recordingToggle' };

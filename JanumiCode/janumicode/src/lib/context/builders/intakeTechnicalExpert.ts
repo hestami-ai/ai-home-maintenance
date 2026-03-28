@@ -291,6 +291,11 @@ function formatPlanSection(plan: IntakePlanDocument): string {
 		parts.push(`## Proposed Approach\n\n${plan.proposedApproach}`);
 	}
 
+	// Build ID→name lookup maps for human-readable cross-references
+	const personaNameById = new Map((plan.personas ?? []).map(p => [p.id, p.name]));
+	const journeyTitleById = new Map((plan.userJourneys ?? []).map(j => [j.id, j.title]));
+	const domainNameById = new Map((plan.businessDomainProposals ?? []).map(d => [d.id, d.name]));
+
 	// Product artifacts
 	if (plan.productVision) {
 		parts.push(`## Product Vision\n\n${plan.productVision}`);
@@ -309,7 +314,7 @@ function formatPlanSection(plan: IntakePlanDocument): string {
 	if (plan.userJourneys && plan.userJourneys.length > 0) {
 		parts.push('## User Journeys');
 		for (const j of plan.userJourneys) {
-			parts.push(`- [${j.id}] **${j.title}** (${j.personaId}, ${j.priority}): ${j.scenario}`);
+			parts.push(`- [${j.id}] **${j.title}** (persona: ${personaNameById.get(j.personaId) ?? j.personaId}, ${j.priority}): ${j.scenario}`);
 			const steps = (j.steps ?? []).filter(s => s.actor || s.action);
 			if (steps.length > 0) {
 				for (const s of steps) {
@@ -324,7 +329,9 @@ function formatPlanSection(plan: IntakePlanDocument): string {
 	if (plan.phasingStrategy && plan.phasingStrategy.length > 0) {
 		parts.push('## Phasing Strategy');
 		for (const ph of plan.phasingStrategy) {
-			const journeyList = (ph.journeyIds ?? []).length > 0 ? ` (journeys: ${ph.journeyIds.join(', ')})` : '';
+			const journeyList = (ph.journeyIds ?? []).length > 0
+				? ` (journeys: ${ph.journeyIds.map(id => journeyTitleById.get(id) ?? id).join(', ')})`
+				: '';
 			parts.push(`- **${ph.phase ?? ''}**: ${ph.description ?? ''}${journeyList} — ${ph.rationale ?? ''}`);
 		}
 	}
@@ -342,9 +349,9 @@ function formatPlanSection(plan: IntakePlanDocument): string {
 	}
 
 	// Proposer artifacts — these contain the detailed output from each proposer round
-	if (plan.domainProposals && plan.domainProposals.length > 0) {
+	if (plan.businessDomainProposals && plan.businessDomainProposals.length > 0) {
 		parts.push('## Proposed Domains (from Proposer Round 1)');
-		for (const d of plan.domainProposals) {
+		for (const d of plan.businessDomainProposals) {
 			parts.push(`- [${d.id}] **${d.name}**: ${d.description}`);
 			if (d.rationale) { parts.push(`  Rationale: ${d.rationale}`); }
 			if (d.entityPreview?.length) { parts.push(`  Entity preview: ${d.entityPreview.join(', ')}`); }
@@ -354,13 +361,13 @@ function formatPlanSection(plan: IntakePlanDocument): string {
 	if (plan.workflowProposals && plan.workflowProposals.length > 0) {
 		parts.push('## Proposed Workflows (from Proposer Round 2)');
 		for (const w of plan.workflowProposals) {
-			parts.push(`- [${w.id}] **${w.name}** (domain: ${w.domainId}): ${w.description}`);
+			parts.push(`- [${w.id}] **${w.name}** (domain: ${domainNameById.get(w.businessDomainId) ?? w.businessDomainId}): ${w.description}`);
 		}
 	}
 	if (plan.entityProposals && plan.entityProposals.length > 0) {
 		parts.push('## Proposed Entities (from Proposer Round 3)');
 		for (const e of plan.entityProposals) {
-			parts.push(`- [${e.id}] **${e.name}** (domain: ${e.domainId}): ${e.description}`);
+			parts.push(`- [${e.id}] **${e.name}** (domain: ${domainNameById.get(e.businessDomainId) ?? e.businessDomainId}): ${e.description}`);
 			if (e.keyAttributes?.length) { parts.push(`  Key attributes: ${e.keyAttributes.join(', ')}`); }
 			if (e.relationships?.length) { parts.push(`  Relationships: ${e.relationships.join(', ')}`); }
 		}

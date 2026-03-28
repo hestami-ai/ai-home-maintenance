@@ -8,8 +8,8 @@
 
 
 
-import type { DialogueEvent, Claim, Verdict, Gate, IntakeModeRecommendation, DomainCoverageMap, IntakeCheckpoint } from '../../../types';
-import { Role, Phase, ClaimStatus, GateStatus, SpeechAct, IntakeMode, DomainCoverageLevel } from '../../../types';
+import type { DialogueEvent, Claim, Verdict, Gate, IntakeModeRecommendation, EngineeringDomainCoverageMap, IntakeCheckpoint } from '../../../types';
+import { Role, Phase, ClaimStatus, GateStatus, SpeechAct, IntakeMode, EngineeringDomainCoverageLevel } from '../../../types';
 
 import type { GovernedStreamState, ClaimHealthSummary, StreamItem, DialogueSummary, ReviewItem, ReviewSummary } from '../dataAggregator';
 
@@ -21,7 +21,7 @@ import type { WorkflowCommandRecord, WorkflowCommandOutput } from '../../../work
 
 import type { IntakePlanDocument, IntakeConversationTurn, IntakeGatheringTurnResponse, IntakeTurnResponse } from '../../../types/intake';
 import { isGatheringResponse } from '../../../types/intake';
-import { DOMAIN_INFO, DOMAIN_SEQUENCE } from '../../../workflow/domainCoverageTracker';
+import { DOMAIN_INFO, DOMAIN_SEQUENCE } from '../../../workflow/engineeringDomainCoverageTracker';
 import type { MMPPayload } from '../../../types/mmp';
 
 
@@ -395,6 +395,8 @@ export function renderStickyHeader(state: GovernedStreamState): string {
 
 				<span class="header-title">Governed Stream</span>
 
+				<button class="record-btn" data-action="recording-toggle" title="Record session">&#x23FA;</button>
+
 				<button class="header-find-btn" data-action="toggle-find" title="Find (Ctrl+F)"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg></button>
 
 				${humanStateHtml}
@@ -604,15 +606,15 @@ function renderSubPhaseProgress(state: GovernedStreamState): string {
 
 function buildIntakeSubPhases(subState: string, intakeMode: string | null, proposerPhase?: string, preProposerReview?: boolean): SubPhaseStep[] {
 	// Proposer-Validator flow — show the full proposer sequence when in ANY proposer
-	// or review sub-state, or when the intake mode is STATE_DRIVEN/DOMAIN_GUIDED.
+	// or review sub-state, or when the intake mode is STATE_DRIVEN/DOCUMENT_BASED.
 	const isProposerFlow = subState.startsWith('PROPOSING_')
 		|| subState === 'PRODUCT_REVIEW'
 		|| intakeMode === 'STATE_DRIVEN'
-		|| intakeMode === 'DOMAIN_GUIDED';
+		|| intakeMode === 'DOCUMENT_BASED';
 	if (isProposerFlow) {
 		const steps = [
 			{ id: 'INTENT_DISCOVERY', label: 'Discovery' },
-			{ id: 'PROPOSING_DOMAINS', label: 'Domains' },
+			{ id: 'PROPOSING_BUSINESS_DOMAINS', label: 'Domains' },
 			{ id: 'PROPOSING_JOURNEYS', label: 'Journeys' },
 			{ id: 'PROPOSING_ENTITIES', label: 'Entities' },
 			{ id: 'PROPOSING_INTEGRATIONS', label: 'Integrations' },
@@ -628,16 +630,16 @@ function buildIntakeSubPhases(subState: string, intakeMode: string | null, propo
 				effectiveSubState = 'INTENT_DISCOVERY';
 			} else if (proposerPhase) {
 				const phaseToStep: Record<string | number, string> = {
-					'DOMAIN_MAPPING': 'PROPOSING_DOMAINS',
+					'BUSINESS_DOMAIN_MAPPING': 'PROPOSING_BUSINESS_DOMAINS',
 					'JOURNEY_WORKFLOW': 'PROPOSING_JOURNEYS',
 					'ENTITY_DATA_MODEL': 'PROPOSING_ENTITIES',
 					'INTEGRATION_QUALITY': 'PROPOSING_INTEGRATIONS',
-					1: 'PROPOSING_DOMAINS',
+					1: 'PROPOSING_BUSINESS_DOMAINS',
 					2: 'PROPOSING_JOURNEYS',
 					3: 'PROPOSING_ENTITIES',
 					4: 'PROPOSING_INTEGRATIONS',
 				};
-				effectiveSubState = phaseToStep[proposerPhase] ?? 'PROPOSING_DOMAINS';
+				effectiveSubState = phaseToStep[proposerPhase] ?? 'PROPOSING_BUSINESS_DOMAINS';
 			}
 		}
 		return assignSubPhaseStates(steps, effectiveSubState);
@@ -2646,6 +2648,52 @@ export function renderCommandBlock(
 
 
 
+	// Split output into visible/hidden sections for large outputs
+	const OUTPUT_COLLAPSE_THRESHOLD = 20; // lines
+	const OUTPUT_VISIBLE_LINES = 10;
+
+	// Count rendered output lines (each <span class="cmd-line"> or <div class="cmd-*">)
+	const lineMatches = outputLines.match(/<span class="cmd-line|<div class="cmd-stdin-block|<div class="tool-call-card/g);
+	const outputLineCount = lineMatches ? lineMatches.length : 0;
+
+	let outputHtml: string;
+	if (outputLineCount > OUTPUT_COLLAPSE_THRESHOLD) {
+		// Split output at the Nth line boundary
+		const lineRegex = /(<span class="cmd-line[^>]*>.*?<\/span>|<div class="cmd-stdin-block[\s\S]*?<\/div>\s*<\/div>|<div class="tool-call-card[\s\S]*?<\/div>\s*<\/div>\s*<\/div>)/g;
+		const allLines: string[] = [];
+		let match: RegExpExecArray | null;
+		let lastIndex = 0;
+		while ((match = lineRegex.exec(outputLines)) !== null) {
+			// Include any text between matches (whitespace, etc.)
+			if (match.index > lastIndex) {
+				const between = outputLines.slice(lastIndex, match.index);
+				if (allLines.length > 0) { allLines[allLines.length - 1] += between; }
+			}
+			allLines.push(match[0]);
+			lastIndex = match.index + match[0].length;
+		}
+
+		const visibleLines = allLines.slice(0, OUTPUT_VISIBLE_LINES).join('');
+		const hiddenLines = allLines.slice(OUTPUT_VISIBLE_LINES).join('');
+		const hiddenCount = allLines.length - OUTPUT_VISIBLE_LINES;
+		const totalChars = outputLines.length;
+		const sizeLabel = totalChars < 1024
+			? `${totalChars} chars`
+			: totalChars < 1048576
+				? `${(totalChars / 1024).toFixed(1)} KB`
+				: `${(totalChars / 1048576).toFixed(1)} MB`;
+
+		outputHtml = `<div class="cmd-output-collapsed">`
+			+ `<div class="cmd-output-visible">${visibleLines}</div>`
+			+ `<div class="cmd-output-hidden" style="display:none;">${hiddenLines}</div>`
+			+ `<button class="cmd-output-expand-btn" data-action="toggle-cmd-output" data-expand-label="Show ${hiddenCount} more lines (${sizeLabel})">`
+			+ `Show ${hiddenCount} more lines (${sizeLabel})`
+			+ `</button>`
+			+ `</div>`;
+	} else {
+		outputHtml = outputLines;
+	}
+
 	const retryBar = command.status === 'error'
 
 		? `<div class="command-block-actions">
@@ -2682,7 +2730,7 @@ export function renderCommandBlock(
 
 			<div class="command-block-body">
 
-				<div class="command-block-output">${outputLines}</div>
+				<div class="command-block-output">${outputHtml}</div>
 
 				${retryBar}
 
@@ -3122,12 +3170,12 @@ function renderGatheringTurnCard(
 	isLatest?: boolean,
 	eventId?: number,
 ): string {
-	const domainInfo = DOMAIN_INFO[response.focusDomain];
-	const domainLabel = domainInfo ? domainInfo.label : response.focusDomain;
+	const domainInfo = DOMAIN_INFO[response.focusEngineeringDomain];
+	const domainLabel = domainInfo ? domainInfo.label : response.focusEngineeringDomain;
 
-	const domainNotesHtml = response.domainNotes.length > 0
+	const engineeringDomainNotesHtml = response.engineeringDomainNotes.length > 0
 		? '<div class="intake-domain-notes"><ul>' +
-			response.domainNotes.map((n) => '<li>' + escapeHtml(n) + '</li>').join('') +
+			response.engineeringDomainNotes.map((n) => '<li>' + escapeHtml(n) + '</li>').join('') +
 			'</ul></div>'
 		: '';
 
@@ -3195,7 +3243,7 @@ function renderGatheringTurnCard(
 		'<span class="intake-domain-badge">' + escapeHtml(domainLabel) + '</span>' +
 		'</div></div>' +
 		'<div class="card-content">' + simpleMarkdownToHtml(response.conversationalResponse) + '</div>' +
-		domainNotesHtml +
+		engineeringDomainNotesHtml +
 		mmpHtml +
 		followUpHtml +
 		findingsHtml +
@@ -3512,10 +3560,10 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 		: '';
 
 	// Proposer artifacts — domains, entities, workflows, integrations, quality attributes
-	const domainsHtml = plan.domainProposals && plan.domainProposals.length > 0
+	const domainsHtml = plan.businessDomainProposals && plan.businessDomainProposals.length > 0
 		? `<div class="intake-plan-section">
-				<h5>Business Domains (${plan.domainProposals.length})</h5>
-				<ul>${plan.domainProposals.map((d) =>
+				<h5>Business Domains (${plan.businessDomainProposals.length})</h5>
+				<ul>${plan.businessDomainProposals.map((d) =>
 					`<li><strong>[${escapeHtml(d.id)}] ${escapeHtml(d.name)}</strong>: ${escapeHtml(d.description)}`
 					+ (d.entityPreview?.length ? `<br/><em>Entities:</em> ${d.entityPreview.map(e => escapeHtml(e)).join(', ')}` : '')
 					+ (d.workflowPreview?.length ? `<br/><em>Workflows:</em> ${d.workflowPreview.map(w => escapeHtml(w)).join(', ')}` : '')
@@ -3528,7 +3576,7 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 		? `<div class="intake-plan-section">
 				<h5>Data Entities (${plan.entityProposals.length})</h5>
 				<ul>${plan.entityProposals.map((e) =>
-					`<li><strong>[${escapeHtml(e.id)}] ${escapeHtml(e.name)}</strong> <span class="badge">${escapeHtml(e.domainId)}</span>: ${escapeHtml(e.description)}`
+					`<li><strong>[${escapeHtml(e.id)}] ${escapeHtml(e.name)}</strong> <span class="badge">${escapeHtml(e.businessDomainId)}</span>: ${escapeHtml(e.description)}`
 					+ (e.keyAttributes?.length ? `<br/><em>Attributes:</em> ${e.keyAttributes.map(a => escapeHtml(a)).join(', ')}` : '')
 					+ (e.relationships?.length ? `<br/><em>Relationships:</em> ${e.relationships.map(r => escapeHtml(r)).join(', ')}` : '')
 					+ `</li>`
@@ -3540,7 +3588,7 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 		? `<div class="intake-plan-section">
 				<h5>Workflows (${plan.workflowProposals.length})</h5>
 				<ul>${plan.workflowProposals.map((w) =>
-					`<li><strong>[${escapeHtml(w.id)}] ${escapeHtml(w.name)}</strong> <span class="badge">${escapeHtml(w.domainId)}</span>: ${escapeHtml(w.description)}</li>`
+					`<li><strong>[${escapeHtml(w.id)}] ${escapeHtml(w.name)}</strong> <span class="badge">${escapeHtml(w.businessDomainId)}</span>: ${escapeHtml(w.description)}</li>`
 				).join('')}</ul>
 			</div>`
 		: '';
@@ -3698,22 +3746,22 @@ function renderIntakeFinalizeResolved(): string {
 }
 
 function renderIntakeGatheringFooter(intakeState: NonNullable<GovernedStreamState['intakeState']>): string {
-	const currentDomain = intakeState.currentDomain;
-	const domainInfo = currentDomain ? DOMAIN_INFO[currentDomain as keyof typeof DOMAIN_INFO] : null;
-	const currentIdx = currentDomain ? DOMAIN_SEQUENCE.indexOf(currentDomain as any) : -1;
+	const currentEngineeringDomain = intakeState.currentEngineeringDomain;
+	const domainInfo = currentEngineeringDomain ? DOMAIN_INFO[currentEngineeringDomain as keyof typeof DOMAIN_INFO] : null;
+	const currentIdx = currentEngineeringDomain ? DOMAIN_SEQUENCE.indexOf(currentEngineeringDomain as any) : -1;
 	const mode = intakeState.intakeMode;
-	const coverage = intakeState.domainCoverage;
+	const coverage = intakeState.engineeringDomainCoverage;
 
-	// Coverage-based progress for DOMAIN_GUIDED, domain-sequential for STATE_DRIVEN
+	// Coverage-based progress for DOCUMENT_BASED, domain-sequential for STATE_DRIVEN
 	let progressLabel: string;
 	let progressPercent: number;
 
-	if (mode === 'DOMAIN_GUIDED' && coverage) {
+	if (mode === 'DOCUMENT_BASED' && coverage) {
 		// For document-based: show coverage percentage (domains may advance non-sequentially)
 		const total = DOMAIN_SEQUENCE.length;
 		let covered = 0;
 		for (const key of Object.keys(coverage)) {
-			if (coverage[key as keyof typeof coverage].level !== DomainCoverageLevel.NONE) {
+			if (coverage[key as keyof typeof coverage].level !== EngineeringDomainCoverageLevel.NONE) {
 				covered++;
 			}
 		}
@@ -3722,14 +3770,14 @@ function renderIntakeGatheringFooter(intakeState: NonNullable<GovernedStreamStat
 	} else if (currentIdx >= 0) {
 		// STATE_DRIVEN: sequential domain walkthrough
 		progressPercent = Math.round(((currentIdx + 1) / DOMAIN_SEQUENCE.length) * 100);
-		progressLabel = 'Domain ' + (currentIdx + 1) + ' of ' + DOMAIN_SEQUENCE.length + ': ' + (domainInfo ? domainInfo.label : currentDomain);
+		progressLabel = 'Domain ' + (currentIdx + 1) + ' of ' + DOMAIN_SEQUENCE.length + ': ' + (domainInfo ? domainInfo.label : currentEngineeringDomain);
 	} else {
 		progressPercent = 0;
 		progressLabel = 'Gathering domain information';
 	}
 
 	// Guidance text: tell the user what to do next
-	const guidanceText = mode === 'DOMAIN_GUIDED'
+	const guidanceText = mode === 'DOCUMENT_BASED'
 		? 'Answer any questions above, then submit to continue document analysis. Or type freely in the composer.'
 		: 'Answer any questions above, then submit to continue the walkthrough. Or type freely in the composer.';
 
@@ -3755,7 +3803,7 @@ export function renderIntakeModeSelector(recommendation: IntakeModeRecommendatio
 			icon: '&#x1F4CB;',
 			description: 'Sequential walk through 12 engineering domains with targeted questions',
 		},
-		DOMAIN_GUIDED: {
+		DOCUMENT_BASED: {
 			label: 'Document-Based',
 			icon: '&#x1F4C4;',
 			description: 'Analyze provided documents, then explore uncovered domains',
@@ -3777,7 +3825,7 @@ export function renderIntakeModeSelector(recommendation: IntakeModeRecommendatio
 		: 'Select INTAKE Mode';
 
 	let buttonsHtml = '';
-	const modes = [IntakeMode.STATE_DRIVEN, IntakeMode.DOMAIN_GUIDED, IntakeMode.HYBRID_CHECKPOINTS];
+	const modes = [IntakeMode.STATE_DRIVEN, IntakeMode.DOCUMENT_BASED, IntakeMode.HYBRID_CHECKPOINTS];
 	for (const mode of modes) {
 		const info = modeLabels[mode];
 		const isRecommended = mode === recommendation.recommended;
@@ -3824,20 +3872,20 @@ export function renderIntakeModeSelector(recommendation: IntakeModeRecommendatio
 
 // ==================== DOMAIN COVERAGE SIDEBAR ====================
 
-export function renderDomainCoverageSidebar(coverage: DomainCoverageMap, currentDomain?: string | null): string {
+export function renderDomainCoverageSidebar(coverage: EngineeringDomainCoverageMap, currentEngineeringDomain?: string | null): string {
 	let domainsHtml = '';
 	for (const domain of DOMAIN_SEQUENCE) {
 		const entry = coverage[domain];
 		const info = DOMAIN_INFO[domain];
 		let dotClass: string;
 		switch (entry.level) {
-			case DomainCoverageLevel.ADEQUATE: dotClass = 'coverage-adequate'; break;
-			case DomainCoverageLevel.PARTIAL: dotClass = 'coverage-partial'; break;
+			case EngineeringDomainCoverageLevel.ADEQUATE: dotClass = 'coverage-adequate'; break;
+			case EngineeringDomainCoverageLevel.PARTIAL: dotClass = 'coverage-partial'; break;
 			default: dotClass = 'coverage-none'; break;
 		}
 
 		const hasEvidence = entry.evidence.length > 0;
-		const isCurrentDomain = currentDomain && domain === currentDomain;
+		const isCurrentDomain = currentEngineeringDomain && domain === currentEngineeringDomain;
 		const evidenceSnippets = hasEvidence
 			? entry.evidence.map(e => '<li>' + escapeHtml(e) + '</li>').join('')
 			: '<li class="no-evidence">No evidence yet</li>';
@@ -3862,8 +3910,8 @@ export function renderDomainCoverageSidebar(coverage: DomainCoverageMap, current
 	const total = DOMAIN_SEQUENCE.length;
 	for (const domain of DOMAIN_SEQUENCE) {
 		switch (coverage[domain].level) {
-			case DomainCoverageLevel.ADEQUATE: adequate++; break;
-			case DomainCoverageLevel.PARTIAL: partial++; break;
+			case EngineeringDomainCoverageLevel.ADEQUATE: adequate++; break;
+			case EngineeringDomainCoverageLevel.PARTIAL: partial++; break;
 			default: none++; break;
 		}
 	}
@@ -3909,8 +3957,8 @@ export function renderIntakeCheckpoint(checkpoint: IntakeCheckpoint, resolved?: 
 	for (const domain of DOMAIN_SEQUENCE) {
 		const entry = checkpoint.coverageSnapshot[domain];
 		switch (entry.level) {
-			case DomainCoverageLevel.ADEQUATE: adequate++; break;
-			case DomainCoverageLevel.PARTIAL: partial++; break;
+			case EngineeringDomainCoverageLevel.ADEQUATE: adequate++; break;
+			case EngineeringDomainCoverageLevel.PARTIAL: partial++; break;
 			default: none++; break;
 		}
 	}
@@ -3936,7 +3984,7 @@ export function renderIntakeCheckpoint(checkpoint: IntakeCheckpoint, resolved?: 
 	let actionsHtml = '';
 	if (!isResolved) {
 		if (checkpoint.offerModeSwitch) {
-			// DOMAIN_GUIDED gap analysis: offer mode-switch to fill coverage gaps
+			// DOCUMENT_BASED gap analysis: offer mode-switch to fill coverage gaps
 			actionsHtml = `
 				<div class="checkpoint-gap-prompt">How would you like to address uncovered domains?</div>
 				<div class="checkpoint-actions">
@@ -4024,7 +4072,7 @@ function renderGatheringCompleteBanner(
 	coverageSummary: { adequate: number; partial: number; none: number; percentage: number },
 	intakeMode?: string | null,
 ): string {
-	const isDocBased = intakeMode === 'DOMAIN_GUIDED';
+	const isDocBased = intakeMode === 'DOCUMENT_BASED';
 	const title = isDocBased ? 'Document Analysis Complete' : 'All Domains Gathered';
 	const hint = isDocBased
 		? 'Initial document analysis is complete. You can now discuss the plan, answer follow-up questions, or finalize.'
@@ -4239,7 +4287,7 @@ function renderProposerDomainsCard(
 
 function renderProposerJourneysCard(
 	journeys: Array<{ id: string; title: string; scenario: string; priority?: string }>,
-	workflows: Array<{ id: string; name: string; description: string; domainId: string }>,
+	workflows: Array<{ id: string; name: string; description: string; businessDomainId: string }>,
 	mmpJson?: string,
 	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
 	isLatest: boolean = true,
@@ -4290,14 +4338,14 @@ function renderProposerJourneysCard(
 	if (workflows.length > 0) {
 		const wfByDomain = new Map<string, typeof workflows>();
 		for (const w of workflows) {
-			const group = wfByDomain.get(w.domainId) ?? [];
+			const group = wfByDomain.get(w.businessDomainId) ?? [];
 			group.push(w);
-			wfByDomain.set(w.domainId, group);
+			wfByDomain.set(w.businessDomainId, group);
 		}
 		html += '<div class="proposer-section"><div class="proposer-section-label">System Workflows (' + workflows.length + ' across ' + wfByDomain.size + ' domains)</div>';
-		for (const [domainId, domainWorkflows] of wfByDomain) {
+		for (const [businessDomainId, domainWorkflows] of wfByDomain) {
 			html += '<details class="proposer-domain-group" open>' +
-				'<summary class="proposer-domain-group-header">' + escapeHtml(domainId) +
+				'<summary class="proposer-domain-group-header">' + escapeHtml(businessDomainId) +
 				' <span class="proposer-domain-group-count">(' + domainWorkflows.length + ')</span></summary>' +
 				'<div class="proposer-domain-group-body">';
 			for (const w of domainWorkflows) {
@@ -4328,7 +4376,7 @@ function renderProposerJourneysCard(
 }
 
 function renderProposerEntitiesCard(
-	entities: Array<{ id: string; name: string; description: string; domainId: string; keyAttributes: string[]; relationships: string[] }>,
+	entities: Array<{ id: string; name: string; description: string; businessDomainId: string; keyAttributes: string[]; relationships: string[] }>,
 	mmpJson?: string,
 	domainNames?: Record<string, string>,
 	allPendingDecisions?: Record<string, PendingMmpSnapshot>,
@@ -4356,16 +4404,16 @@ function renderProposerEntitiesCard(
 
 	const byDomain = new Map<string, typeof entities>();
 	for (const e of entities) {
-		const group = byDomain.get(e.domainId) ?? [];
+		const group = byDomain.get(e.businessDomainId) ?? [];
 		group.push(e);
-		byDomain.set(e.domainId, group);
+		byDomain.set(e.businessDomainId, group);
 	}
 
 	html += '<div class="proposer-card-intro">Review the proposed data entities — ' +
 		entities.length + ' entities across ' + byDomain.size + ' domains.</div>';
 
-	for (const [domainId, domainEntities] of byDomain) {
-		const domainName = domainNames?.[domainId] ?? domainId;
+	for (const [businessDomainId, domainEntities] of byDomain) {
+		const domainName = domainNames?.[businessDomainId] ?? businessDomainId;
 		html += '<details class="proposer-domain-group" open>' +
 			'<summary class="proposer-domain-group-header">' +
 			escapeHtml(domainName) + ' <span class="proposer-domain-group-count">(' +
@@ -4490,7 +4538,7 @@ function renderIntakeProposalCard(
 	title: string,
 	summary: string,
 	proposedApproach: string,
-	domainCoverage: { adequate: number; partial: number; none: number; percentage: number },
+	engineeringDomainCoverage: { adequate: number; partial: number; none: number; percentage: number },
 ): string {
 	let html = '<div class="intake-proposal-card">';
 
@@ -4525,12 +4573,12 @@ function renderIntakeProposalCard(
 	html += '<div class="intake-proposal-coverage">' +
 		'<div class="intake-proposal-coverage-bar">' +
 		'<span class="intake-proposal-coverage-label">Domain Coverage</span>' +
-		'<span class="intake-proposal-coverage-pct">' + domainCoverage.percentage + '%</span>' +
+		'<span class="intake-proposal-coverage-pct">' + engineeringDomainCoverage.percentage + '%</span>' +
 		'</div>' +
 		'<div class="intake-proposal-coverage-stats">' +
-		domainCoverage.adequate + ' adequate, ' +
-		domainCoverage.partial + ' partial, ' +
-		domainCoverage.none + ' uncovered' +
+		engineeringDomainCoverage.adequate + ' adequate, ' +
+		engineeringDomainCoverage.partial + ' partial, ' +
+		engineeringDomainCoverage.none + ' uncovered' +
 		'</div></div>';
 
 	// Footer prompt
@@ -4797,7 +4845,7 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 	// Pre-scan to find the last proposer MMP card index (only the latest should be interactive)
 	let lastProposerMmpIdx = -1;
 	items.forEach((item, idx) => {
-		if (item.type === 'intake_proposer_domains' || item.type === 'intake_proposer_journeys' ||
+		if (item.type === 'intake_proposer_business_domains' || item.type === 'intake_proposer_journeys' ||
 			item.type === 'intake_proposer_entities' || item.type === 'intake_proposer_integrations') {
 			lastProposerMmpIdx = idx;
 		}
@@ -4826,7 +4874,7 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 			if (!prevIsArch) {
 				prefix = '<div class="architecture-phase-group">' +
 					'<div class="architecture-phase-group-header">' +
-					'<span class="codicon codicon-layers"></span> Recursive Task Decomposition' +
+					'<span class="codicon codicon-layers"></span> Recursive Architecture Decomposition' +
 					'</div>';
 			}
 			if (!nextIsArch) {
@@ -4941,9 +4989,9 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 			case 'intake_proposal':
 
-				return renderIntakeProposalCard(item.title, item.summary, item.proposedApproach, item.domainCoverage);
+				return renderIntakeProposalCard(item.title, item.summary, item.proposedApproach, item.engineeringDomainCoverage);
 
-			case 'intake_proposer_domains':
+			case 'intake_proposer_business_domains':
 				return wrapResizable(renderProposerDomainsCard(item.domains, item.personas, item.mmpJson, allPendingDecisions, idx === lastProposerMmpIdx, item.eventId));
 
 			case 'intake_proposer_journeys':
@@ -4986,8 +5034,8 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 	// Add domain coverage sidebar only for legacy GATHERING/DISCUSSING flows
 	// (not for proposer flow where domain coverage is handled by ARCHITECTURE)
 	const isLegacyFlow = intakeState?.subState === 'GATHERING' || intakeState?.subState === 'DISCUSSING';
-	if (isLegacyFlow && intakeState && intakeState.domainCoverage && intakeState.turnCount > 0) {
-		html += renderDomainCoverageSidebar(intakeState.domainCoverage, intakeState.currentDomain);
+	if (isLegacyFlow && intakeState && intakeState.engineeringDomainCoverage && intakeState.turnCount > 0) {
+		html += renderDomainCoverageSidebar(intakeState.engineeringDomainCoverage, intakeState.currentEngineeringDomain);
 	}
 
 	// Add finalize button or resolved marker based on INTAKE sub-state
@@ -5004,7 +5052,7 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 			html += renderIntakeFinalizeResolved();
 		} else if (intakeState.subState === 'INTENT_DISCOVERY') {
 			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Analyzing documents and codebase...</span></div>';
-		} else if (intakeState.subState === 'PROPOSING_DOMAINS') {
+		} else if (intakeState.subState === 'PROPOSING_BUSINESS_DOMAINS') {
 			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Proposing business domains...</span></div>';
 		} else if (intakeState.subState === 'PROPOSING_JOURNEYS') {
 			html += '<div class="intake-finalize-bar"><span class="intake-finalize-hint">Proposing user journeys and workflows...</span></div>';
@@ -5078,6 +5126,7 @@ function renderArchitectureCapabilitiesCard(
 				<thead><tr><th>ID</th><th>Capability</th><th>Reqs</th><th>Workflows</th></tr></thead>
 				<tbody>${rows}</tbody>
 			</table>
+			<button class="gate-btn" data-action="open-architecture-explorer" style="margin-top:6px;">&#x1F50D; View Full Architecture</button>
 		</div>
 	</div>`;
 }
@@ -5261,6 +5310,7 @@ function renderArchitectureDesignCard(
 				<summary class="arch-section-summary">Implementation Roadmap (${sortedSteps.length} steps)</summary>
 				<div class="arch-section-content">${roadmapHtml}</div>
 			</details>` : ''}
+			<button class="gate-btn" data-action="open-architecture-explorer" style="margin-top:6px;">&#x1F50D; View Full Architecture</button>
 		</div>
 	</div>`;
 }
@@ -5305,7 +5355,7 @@ function renderDecompositionBreadcrumb(depth: number): string {
 		{ label: 'Workflows', level: -1 },
 		{ label: 'Components', level: 0 },
 		{ label: 'Sub-components', level: 1 },
-		{ label: 'Atomic Tasks', level: 2 },
+		{ label: 'Atomic Components', level: 2 },
 	];
 
 	const spans = levels.map(function (l) {
@@ -5374,6 +5424,7 @@ function renderArchitectureGateCard(
 			+ '<div class="card-body">'
 			+ breadcrumbHtml
 			+ '<p>Architecture v' + version + ': ' + capabilityCount + ' capabilities, ' + componentCount + ' components, goal alignment ' + scoreDisplay + '</p>'
+			+ '<button class="gate-btn" data-action="open-architecture-explorer" data-dialogue-id="' + escapeHtml(dialogueId) + '" style="margin-top:4px;">&#x1F50D; View Architecture</button>'
 			+ '</div>'
 			+ '</div>';
 	}
@@ -5407,6 +5458,7 @@ function renderArchitectureGateCard(
 		+ '<button class="gate-btn gate-btn-revise" data-action="architecture-revise" data-dialogue-id="' + escapeHtml(dialogueId) + '" data-doc-id="' + escapeHtml(docId) + '">Request Changes</button>'
 		+ '<button class="gate-btn gate-btn-skip" data-action="architecture-skip" data-dialogue-id="' + escapeHtml(dialogueId) + '" data-doc-id="' + escapeHtml(docId) + '">Skip</button>'
 		+ '<button class="gate-btn gate-btn-deeper" data-action="architecture-decompose-deeper" data-dialogue-id="' + escapeHtml(dialogueId) + '" data-doc-id="' + escapeHtml(docId) + '" title="' + deeperBtnTitle + '"' + deeperBtnDisabled + '>' + deeperBtnLabel + '</button>'
+		+ '<button class="gate-btn" data-action="open-architecture-explorer" data-dialogue-id="' + escapeHtml(dialogueId) + '" style="margin-left:auto;">&#x1F50D; View Architecture</button>'
 		+ '</div>'
 		+ '</div>'
 		+ '</div>';

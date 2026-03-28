@@ -20,7 +20,7 @@ import type {
 	IntakeConversationState,
 	IntakePlanDocument,
 	IntakeAccumulation,
-	DomainCoverageMap,
+	EngineeringDomainCoverageMap,
 	IntakeModeRecommendation,
 	IntakeCheckpoint,
 } from '../types';
@@ -613,8 +613,8 @@ export function updateIntakeConversation(
 		finalizedPlan?: IntakePlanDocument | null;
 		// V15 Adaptive Deep INTAKE fields
 		intakeMode?: IntakeMode;
-		domainCoverage?: DomainCoverageMap | null;
-		currentDomain?: EngineeringDomain | null;
+		engineeringDomainCoverage?: EngineeringDomainCoverageMap | null;
+		currentEngineeringDomain?: EngineeringDomain | null;
 		checkpoints?: IntakeCheckpoint[];
 		classifierResult?: IntakeModeRecommendation | null;
 		// V17 Inverted flow
@@ -664,17 +664,17 @@ export function updateIntakeConversation(
 			setClauses.push('intake_mode = ?');
 			params.push(updates.intakeMode);
 		}
-		if (updates.domainCoverage !== undefined) {
+		if (updates.engineeringDomainCoverage !== undefined) {
 			setClauses.push('domain_coverage = ?');
 			params.push(
-				updates.domainCoverage === null
+				updates.engineeringDomainCoverage === null
 					? null
-					: JSON.stringify(updates.domainCoverage)
+					: JSON.stringify(updates.engineeringDomainCoverage)
 			);
 		}
-		if (updates.currentDomain !== undefined) {
+		if (updates.currentEngineeringDomain !== undefined) {
 			setClauses.push('current_domain = ?');
-			params.push(updates.currentDomain);
+			params.push(updates.currentEngineeringDomain);
 		}
 		if (updates.checkpoints !== undefined) {
 			setClauses.push('checkpoints = ?');
@@ -756,10 +756,10 @@ export function updateIntakeConversation(
 				updatedAt: row.updated_at,
 				// V15 Adaptive Deep INTAKE fields
 				intakeMode: row.intake_mode as IntakeMode | null,
-				domainCoverage: row.domain_coverage
-					? (JSON.parse(row.domain_coverage) as DomainCoverageMap)
+				engineeringDomainCoverage: row.domain_coverage
+					? (JSON.parse(row.domain_coverage) as EngineeringDomainCoverageMap)
 					: null,
-				currentDomain: row.current_domain as EngineeringDomain | null,
+				currentEngineeringDomain: row.current_domain as EngineeringDomain | null,
 				checkpoints: row.checkpoints
 					? (JSON.parse(row.checkpoints) as IntakeCheckpoint[])
 					: [],

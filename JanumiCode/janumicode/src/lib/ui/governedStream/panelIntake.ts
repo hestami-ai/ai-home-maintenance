@@ -8,7 +8,7 @@ import { IntakeSubState, IntakeMode } from '../../types/intake';
 import { updateIntakeConversation, writeDialogueEvent } from '../../events/writer';
 import { getOrCreateIntakeConversation } from '../../events/reader';
 import { getEventBus } from '../../integration/eventBus';
-import { getCoverageGaps, getPartialDomains, DOMAIN_SEQUENCE } from '../../workflow/domainCoverageTracker';
+import { getCoverageGaps, getPartialDomains, DOMAIN_SEQUENCE } from '../../workflow/engineeringDomainCoverageTracker';
 
 /**
  * Sets subState to SYNTHESIZING and runs a workflow cycle to produce the final plan.
@@ -68,7 +68,7 @@ export function handleIntakeSkipGathering(ctx: PanelContext): void {
 }
 
 /**
- * Handles user selection of an INTAKE mode (STATE_DRIVEN, DOMAIN_GUIDED, or HYBRID).
+ * Handles user selection of an INTAKE mode (STATE_DRIVEN, DOCUMENT_BASED, or HYBRID).
  * For STATE_DRIVEN mode, also determines the first domain to target based on
  * coverage gaps.
  */
@@ -79,13 +79,13 @@ export function handleIntakeModeSelected(ctx: PanelContext, mode: string): void 
 	const updates: Record<string, unknown> = { intakeMode: mode as IntakeMode };
 	if (mode === IntakeMode.STATE_DRIVEN) {
 		const convResult = getOrCreateIntakeConversation(ctx.activeDialogueId);
-		if (convResult.success && convResult.value.domainCoverage) {
-			const gaps = getCoverageGaps(convResult.value.domainCoverage);
-			const partials = getPartialDomains(convResult.value.domainCoverage);
+		if (convResult.success && convResult.value.engineeringDomainCoverage) {
+			const gaps = getCoverageGaps(convResult.value.engineeringDomainCoverage);
+			const partials = getPartialDomains(convResult.value.engineeringDomainCoverage);
 			const firstTarget = gaps.length > 0 ? gaps[0] : partials.length > 0 ? partials[0] : DOMAIN_SEQUENCE[0];
-			updates.currentDomain = firstTarget;
+			updates.currentEngineeringDomain = firstTarget;
 		} else {
-			updates.currentDomain = DOMAIN_SEQUENCE[0];
+			updates.currentEngineeringDomain = DOMAIN_SEQUENCE[0];
 		}
 	}
 	updateIntakeConversation(ctx.activeDialogueId, updates);

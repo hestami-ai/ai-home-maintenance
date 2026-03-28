@@ -18,6 +18,19 @@ import {
 	emitError,
 } from './eventBus';
 
+// ── Pause support ──
+// Set by the UI panel when the user requests a pause. Checked between phases.
+let _pauseRequested = false;
+
+/** Request the workflow to pause after the current phase completes. */
+export function requestWorkflowPause(): void { _pauseRequested = true; }
+
+/** Clear the pause flag (called when resuming or starting a new cycle). */
+export function clearWorkflowPause(): void { _pauseRequested = false; }
+
+/** Check if a pause has been requested. */
+export function isWorkflowPauseRequested(): boolean { return _pauseRequested; }
+
 /**
  * Start dialogue with workflow options
  */
@@ -394,7 +407,19 @@ export async function executeWorkflowCycle(
 		let completed = false;
 		let finalPhase = '';
 
+		// Clear pause flag at start of cycle
+		_pauseRequested = false;
+
 		for (let i = 0; i < maxPhases; i++) {
+			// Check for pause request between phases
+			if (_pauseRequested) {
+				_pauseRequested = false;
+				const stateResult = getWorkflowState(dialogueId);
+				finalPhase = stateResult.success ? stateResult.value.current_phase : 'UNKNOWN';
+				awaitingInput = true; // Treat pause like awaiting input — stops the loop, enables input
+				break;
+			}
+
 			// Check for open gates before advancing
 			const gatesResult = hasOpenGates(dialogueId);
 			if (gatesResult.success && gatesResult.value) {

@@ -16,7 +16,7 @@
 export type MirrorCategory =
 	| 'intent' | 'scope' | 'constraint' | 'priority' | 'anti-goal'
 	| 'persona' | 'journey' | 'ux'
-	| 'domain' | 'workflow' | 'entity' | 'integration';
+	| 'business_domain' | 'workflow' | 'entity' | 'integration';
 
 /** Status of a mirror item after human judgment */
 export type MirrorStatus = 'pending' | 'accepted' | 'rejected' | 'edited' | 'deferred';

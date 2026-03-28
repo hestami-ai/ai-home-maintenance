@@ -145,6 +145,14 @@ export function getProviderCapabilityOverrides(providerId: string): {
 // ==================== MOBILE SPECIALIST MCP CONFIGURATION ====================
 
 /**
+ * Whether the Deep Validation Review hypothesizer agents run in parallel.
+ * Default is false (sequential) to avoid saturating the CLI provider with concurrent calls.
+ */
+export function isValidationParallelAgentsEnabled(): boolean {
+	return getWorkspaceConfig().get<boolean>('validation.parallelAgents', false);
+}
+
+/**
  * Whether the mobile-specialist MCP server is enabled for Executor invocations.
  */
 export function isMobileSpecialistEnabled(): boolean {

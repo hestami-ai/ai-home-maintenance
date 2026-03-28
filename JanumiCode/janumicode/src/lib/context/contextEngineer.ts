@@ -38,6 +38,7 @@ import { Role as RoleEnum } from '../types';
 import { randomUUID } from 'node:crypto';
 import { emitWorkflowCommand } from '../integration/eventBus';
 import * as path from 'node:path';
+import { jsonrepair } from 'jsonrepair';
 
 // ==================== SYSTEM PROMPT ====================
 
@@ -62,7 +63,7 @@ Each policy block specifies a \`source\` that tells you where to find its data:
 3. For source=handoff_doc blocks, look in AVAILABLE HANDOFF DOCUMENTS.
 4. For source=db_query blocks, first check if the data is in handoff docs or extras. If not, use MCP tools to retrieve it.
 5. For optional blocks, include them in priority order based on relevance
-6. Summarize verbose content when sections are very large
+6. Ensure complete data fidelity. Do not summarize, truncate or abbreviate large JSON structures, array elements, or detailed object definitions. You must pass them verbatim unless specifically directed otherwise by the policy block's queryHint.
 7. Detect conflicts between sources and resolve them:
    - Human decisions supersede automated verdicts
    - Later decisions supersede earlier ones
@@ -388,39 +389,12 @@ function parseAgentResponse(
 	let parsed: Record<string, unknown>;
 
 	try {
-		// Try direct parse first
-		parsed = JSON.parse(response);
+		parsed = JSON.parse(jsonrepair(response));
 	} catch {
-		// Strategy 1: Extract JSON from markdown code blocks (greedy — matches last closing fence)
-		const jsonMatch = response.match(/```(?:json)?\s*\n?([\s\S]*)\n?```\s*$/);
-		if (jsonMatch) {
-			try {
-				parsed = JSON.parse(jsonMatch[1]);
-			} catch {
-				// Code fence content wasn't valid JSON — fall through to brace extraction
-			}
-		}
-
-		// Strategy 2: Extract outermost { ... } from the response
-		if (!parsed!) {
-			const braceStart = response.indexOf('{');
-			const braceEnd = response.lastIndexOf('}');
-			if (braceStart !== -1 && braceEnd > braceStart) {
-				try {
-					parsed = JSON.parse(response.substring(braceStart, braceEnd + 1));
-				} catch {
-					return {
-						success: false,
-						error: new Error(`Context Engineer returned unparseable JSON: ${response.substring(0, 500)}`),
-					};
-				}
-			} else {
-				return {
-					success: false,
-					error: new Error(`Context Engineer returned no JSON: ${response.substring(0, 500)}`),
-				};
-			}
-		}
+		return {
+			success: false,
+			error: new Error(`Context Engineer returned unparseable JSON: ${response.substring(0, 500)}`),
+		};
 	}
 
 	// Extract fields with defaults

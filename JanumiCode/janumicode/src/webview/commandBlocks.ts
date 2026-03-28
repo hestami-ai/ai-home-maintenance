@@ -4,7 +4,7 @@
  * collapsible blocks in the stream.
  */
 
-import type { CommandActivityData, ToolCallActivityData } from './types';
+import type { CommandActivityData, ToolCallActivityData, IncomingMessage } from './types';
 import { state } from './state';
 import { escapeHtmlClient, formatTime, formatByteSize, scrollToBottom } from './utils';
 
@@ -395,4 +395,98 @@ export function buildToolCardBody(toolName: string, input: string, output: strin
 		'</div>';
 	}
 	return html;
+}
+
+// ===== Reasoning Review Card Injection =====
+
+/**
+ * Inject a reasoning review card into the stream immediately after its
+ * associated command block. Called when the host emits 'reasoningReviewReady'.
+ */
+export function injectReasoningReviewCard(data: {
+	commandId: string;
+	dialogueId: string;
+	review: {
+		concerns: Array<{ severity: string; summary: string; detail: string; location?: string; recommendation?: string }>;
+		overallAssessment: string;
+		reviewerModel: string;
+		durationMs?: number;
+		reviewPrompt?: string;
+		failed?: boolean;
+	};
+}): void {
+	const { commandId, review } = data;
+	const blockId = 'cmd-' + commandId;
+	const cmdBlock = document.getElementById(blockId);
+	const streamArea = document.getElementById('stream-content');
+	if (!streamArea) { return; }
+
+	// Don't duplicate if review card already exists
+	const reviewId = 'review-' + commandId;
+	if (document.getElementById(reviewId)) { return; }
+
+	const concerns = review.concerns ?? [];
+	const maxSeverity = concerns.length > 0 ? (concerns[0]?.severity ?? 'MEDIUM') : 'CLEAN';
+	const severityClass = maxSeverity === 'HIGH' ? 'review-severity-high'
+		: maxSeverity === 'MEDIUM' ? 'review-severity-medium'
+		: maxSeverity === 'LOW' ? 'review-severity-low'
+		: 'review-severity-clean';
+
+	const concernsHtml = concerns.map((c) => {
+		const sevBadge = c.severity === 'HIGH'
+			? '<span class="review-severity-badge review-sev-high">HIGH</span>'
+			: c.severity === 'MEDIUM'
+			? '<span class="review-severity-badge review-sev-medium">MEDIUM</span>'
+			: '<span class="review-severity-badge review-sev-low">LOW</span>';
+
+		return '<div class="review-concern">' +
+			'<div class="review-concern-header">' +
+				sevBadge +
+				'<span class="review-concern-summary">' + escapeHtmlClient(c.summary) + '</span>' +
+			'</div>' +
+			'<details class="review-concern-details">' +
+				'<summary>Details &amp; recommendation</summary>' +
+				'<div class="review-concern-detail">' + escapeHtmlClient(c.detail ?? '') + '</div>' +
+				(c.location ? '<div class="review-concern-location"><em>Location:</em> ' + escapeHtmlClient(c.location) + '</div>' : '') +
+				(c.recommendation ? '<div class="review-concern-recommendation"><strong>Recommendation:</strong> ' + escapeHtmlClient(c.recommendation) + '</div>' : '') +
+			'</details>' +
+		'</div>';
+	}).join('');
+
+	const promptHtml = review.reviewPrompt
+		? '<details class="review-prompt-details">' +
+			'<summary>&#x1F4DD; Review Prompt</summary>' +
+			'<pre class="review-prompt-content">' + escapeHtmlClient(review.reviewPrompt) + '</pre>' +
+		  '</details>'
+		: '';
+
+	const now = new Date().toLocaleTimeString();
+	const html = '<div id="' + reviewId + '" class="reasoning-review-card ' + severityClass + '">' +
+		'<div class="review-header">' +
+			'<span class="review-icon">&#x1F50D;</span>' +
+			'<span class="review-title">Reasoning Review</span>' +
+			'<span class="review-meta">' +
+				(concerns.length > 0
+					? concerns.length + ' concern' + (concerns.length !== 1 ? 's' : '')
+					: review.failed ? 'Failed' : 'Clean') +
+				' &middot; ' + escapeHtmlClient(review.reviewerModel) +
+				' &middot; ' + now + '</span>' +
+		'</div>' +
+		'<div class="review-assessment">' + escapeHtmlClient(review.overallAssessment) + '</div>' +
+		'<div class="review-concerns">' + concernsHtml + '</div>' +
+		promptHtml +
+		'<div class="review-actions">' +
+			'<button class="mmp-btn review-action-btn" data-action="review-acknowledge">Acknowledge</button>' +
+			'<button class="mmp-btn review-action-btn" data-action="review-rerun">Re-run with corrections</button>' +
+			'<button class="mmp-btn review-action-btn" data-action="review-guidance">Add guidance</button>' +
+		'</div>' +
+	'</div>';
+
+	// Insert after the associated command block, or at end of stream if not found
+	if (cmdBlock) {
+		cmdBlock.insertAdjacentHTML('afterend', html);
+	} else {
+		streamArea.insertAdjacentHTML('beforeend', html);
+	}
+	scrollToBottom();
 }

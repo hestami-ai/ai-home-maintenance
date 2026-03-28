@@ -37,6 +37,9 @@ export function clearComposer(): void {
 		composer.innerHTML = '';
 		updateComposerEmpty(composer);
 	}
+	// Clear persisted draft
+	const existing = (vscode.getState() as Record<string, unknown>) || {};
+	vscode.setState({ ...existing, composerDraft: '' });
 }
 
 export function composerIsEmpty(): boolean {

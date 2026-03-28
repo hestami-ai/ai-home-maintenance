@@ -258,6 +258,12 @@ function buildArgs(outputFormat: string, options: RoleCLIInvocationOptions): str
 		args.push('--permission-prompt-tool', options.permissionPromptTool);
 	}
 
+	// Structured output enforcement — validates final result against the provided JSON Schema.
+	// Claude Code coerces its output to conform before returning, eliminating parse failures.
+	if (options.jsonSchema) {
+		args.push('--json-schema', options.jsonSchema);
+	}
+
 	return args;
 }
 

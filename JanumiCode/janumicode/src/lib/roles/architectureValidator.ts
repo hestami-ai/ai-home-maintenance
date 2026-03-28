@@ -21,7 +21,6 @@ import { getLogger, isLoggerInitialized } from '../logging';
 import {
 	getAllDomainMappings,
 	findUnbackedCapabilities,
-	findOrphanComponents,
 } from '../database/architectureStore';
 
 // ==================== GOAL ALIGNMENT CHECK ====================
@@ -85,13 +84,8 @@ export async function runGoalAlignmentCheck(
 			}
 		}
 
-		// Check for orphan components
-		const orphanResult = findOrphanComponents(doc.doc_id);
-		if (orphanResult.success) {
-			for (const comp of orphanResult.value) {
-				findings.push(`Component "${comp.label}" (${comp.component_id}) serves no workflow — orphan component`);
-			}
-		}
+		// Note: orphan component detection is handled by the structural validator (runStructuralValidation)
+		// with context-aware WARN/BLOCKING logic. Skipped here to avoid double-reporting.
 
 		// Check domain mapping completeness
 		const mappingsResult = getAllDomainMappings(doc.doc_id);
@@ -100,10 +94,10 @@ export async function runGoalAlignmentCheck(
 			const stateResult = getWorkflowState(dialogueId);
 			if (stateResult.success) {
 				const meta = JSON.parse(stateResult.value.metadata);
-				const domainCoverage = meta.approvedIntakePlan?.domainCoverage;
-				if (domainCoverage) {
+				const engineeringDomainCoverage = meta.approvedIntakePlan?.engineeringDomainCoverage;
+				if (engineeringDomainCoverage) {
 					const mappedDomains = new Set(mappingsResult.value.map(m => m.domain));
-					for (const [domain, coverage] of Object.entries(domainCoverage)) {
+					for (const [domain, coverage] of Object.entries(engineeringDomainCoverage)) {
 						const entry = coverage as { level: string };
 						if ((entry.level === 'ADEQUATE' || entry.level === 'PARTIAL') && !mappedDomains.has(domain as never)) {
 							findings.push(`Domain "${domain}" has ${entry.level} INTAKE coverage but no capability mapping in architecture`);
@@ -183,7 +177,7 @@ import { computeCapabilityCoverage } from '../workflow/architecturePhase';
  * Returns:
  * - uncovered_requirements: plan requirements not mapped to any capability
  * - unbacked_capabilities: capabilities with no source requirements (scope creep)
- * - unmapped_domains: INTAKE domains with coverage but no capability mapping
+ * - unmapped_engineering_domains: INTAKE domains with coverage but no capability mapping
  * - coverage_map: per-capability coverage assessment
  */
 export function runRequirementsTraceabilityCheck(
@@ -191,7 +185,7 @@ export function runRequirementsTraceabilityCheck(
 	 
 	approvedPlan: any,
 	 
-	domainCoverage: Record<string, any> | null,
+	engineeringDomainCoverage: Record<string, any> | null,
 ): RequirementsTraceabilityResult {
 	// 1. Uncovered requirements: plan requirements not in any capability's source_requirements
 	const coveredReqs = new Set(doc.capabilities.flatMap(c => c.source_requirements));
@@ -204,15 +198,15 @@ export function runRequirementsTraceabilityCheck(
 		.map(c => c.capability_id);
 
 	// 3. Unmapped domains: INTAKE domains with PARTIAL/ADEQUATE coverage but no capability mapping
-	const unmapped_domains: string[] = [];
-	if (domainCoverage) {
+	const unmapped_engineering_domains: string[] = [];
+	if (engineeringDomainCoverage) {
 		const mappedDomains = new Set<string>(
-			doc.capabilities.flatMap(c => c.domain_mappings.map(m => m.domain))
+			doc.capabilities.flatMap(c => c.engineering_domain_mappings.map(m => m.domain))
 		);
-		for (const [domain, entry] of Object.entries(domainCoverage)) {
+		for (const [domain, entry] of Object.entries(engineeringDomainCoverage)) {
 			const level = (entry as { level?: string }).level;
 			if ((level === 'ADEQUATE' || level === 'PARTIAL') && !mappedDomains.has(domain)) {
-				unmapped_domains.push(domain);
+				unmapped_engineering_domains.push(domain);
 			}
 		}
 	}
@@ -220,7 +214,7 @@ export function runRequirementsTraceabilityCheck(
 	// 4. Compute capability coverage
 	const coverage_map = computeCapabilityCoverage(doc);
 
-	return { uncovered_requirements, unbacked_capabilities, unmapped_domains, coverage_map };
+	return { uncovered_requirements, unbacked_capabilities, unmapped_engineering_domains, coverage_map };
 }
 
 // ==================== ARCHITECTURE DRIFT CHECK ====================

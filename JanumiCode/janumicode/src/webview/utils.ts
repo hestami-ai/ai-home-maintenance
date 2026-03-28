@@ -111,11 +111,68 @@ export function inlineFmt(t: string): string {
 
 // ===== Scroll & Navigation =====
 
+const SCROLL_THRESHOLD = 80; // px from bottom before auto-scroll resumes
+let isNearBottom = true;
+let scrollBadgeEl: HTMLElement | null = null;
+
+/** Call once at startup to attach the scroll listener and create the badge. */
+export function initSmartScroll(): void {
+	const streamArea = document.querySelector<HTMLElement>('.stream-area');
+	if (!streamArea) { return; }
+
+	streamArea.addEventListener('scroll', function () {
+		const distanceFromBottom = streamArea.scrollHeight - streamArea.scrollTop - streamArea.clientHeight;
+		const wasNearBottom = isNearBottom;
+		isNearBottom = distanceFromBottom <= SCROLL_THRESHOLD;
+		if (isNearBottom && !wasNearBottom) {
+			hideScrollBadge();
+		}
+	});
+
+	const badge = document.createElement('button');
+	badge.id = 'scroll-to-bottom-badge';
+	badge.className = 'scroll-to-bottom-badge';
+	badge.setAttribute('aria-label', 'Scroll to latest content');
+	badge.innerHTML = '&#x2193; Latest';
+	badge.addEventListener('click', function () { forceScrollToBottom(); });
+	document.body.appendChild(badge);
+	scrollBadgeEl = badge;
+}
+
+function showScrollBadge(): void {
+	if (scrollBadgeEl) { scrollBadgeEl.classList.add('visible'); }
+}
+
+function hideScrollBadge(): void {
+	if (scrollBadgeEl) { scrollBadgeEl.classList.remove('visible'); }
+}
+
+/**
+ * Smart scroll — only scrolls to bottom if the user is already near the bottom.
+ * When suppressed, shows the "↓ Latest" badge instead.
+ * Use this for all automated updates (streaming, progress, phase changes).
+ */
 export function scrollToBottom(): void {
-	const streamArea = document.querySelector('.stream-area');
+	const streamArea = document.querySelector<HTMLElement>('.stream-area');
+	if (!streamArea) { return; }
+	if (isNearBottom) {
+		streamArea.scrollTop = streamArea.scrollHeight;
+	} else {
+		showScrollBadge();
+	}
+}
+
+/**
+ * Force scroll to bottom unconditionally — ignores user scroll position.
+ * Use this for deliberate navigation: initial page load, user message submit.
+ */
+export function forceScrollToBottom(): void {
+	const streamArea = document.querySelector<HTMLElement>('.stream-area');
 	if (streamArea) {
 		streamArea.scrollTop = streamArea.scrollHeight;
 	}
+	isNearBottom = true;
+	hideScrollBadge();
 }
 
 export function scrollToClaim(claimId: string): void {

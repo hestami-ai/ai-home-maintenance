@@ -100,7 +100,23 @@
       "Bash(GEMINI_API_KEY=dummy gemini mcp add deep-memory node -- dist/memory/mcpServer.js --scope project --trust -e \"JANUMICODE_DB_PATH=.janumicode/janumicode.db\")",
       "Bash(GEMINI_API_KEY=dummy gemini mcp remove deep-memory)",
       "Bash(GEMINI_API_KEY=dummy gemini mcp add deep-memory node dist/memory/mcpServer.js --scope project --trust -e \"JANUMICODE_DB_PATH=.janumicode/janumicode.db\")",
-      "Bash(2)"
+      "Bash(2)",
+      "Bash(where sqlite3:*)",
+      "Read(//c/Program Files/**)",
+      "Read(//c//**)",
+      "Bash(awk 'NR>=103 && NR<=1520' \"e:/Projects/hestami-ai/JanumiCode/janumicode/docs/debug/recursive task decomposition grows too large.txt\")",
+      "Bash(awk 'NR>=1521' \"e:/Projects/hestami-ai/JanumiCode/janumicode/docs/debug/recursive task decomposition grows too large.txt\")",
+      "Bash(awk 'NR>=1525 && NR<=2913' \"e:/Projects/hestami-ai/JanumiCode/janumicode/docs/debug/recursive task decomposition grows too large.txt\")",
+      "Bash(awk 'NR>=2914' \"e:/Projects/hestami-ai/JanumiCode/janumicode/docs/debug/recursive task decomposition grows too large.txt\")",
+      "Bash(awk 'NR>=1521 && NR<=1530' \"E:\\\\Projects\\\\hestami-ai\\\\JanumiCode\\\\janumicode\\\\docs\\\\debug\\\\recursive task decomposition grows too large.txt\")",
+      "Bash(awk 'NR>=1525 && NR<=3889' \"E:\\\\Projects\\\\hestami-ai\\\\JanumiCode\\\\janumicode\\\\docs\\\\debug\\\\recursive task decomposition grows too large.txt\")",
+      "Bash(awk 'NR>=3891 && NR<=5278' \"E:\\\\Projects\\\\hestami-ai\\\\JanumiCode\\\\janumicode\\\\docs\\\\debug\\\\recursive task decomposition grows too large.txt\")",
+      "Bash(awk 'NR>=103 && NR<=1520' \"E:\\\\Projects\\\\hestami-ai\\\\JanumiCode\\\\janumicode\\\\docs\\\\debug\\\\recursive task decomposition grows too large.txt\")",
+      "Bash(node -e \":*)",
+      "Bash(grep -n \"''domain''\" src/lib/types/mmp.ts)",
+      "Bash(1 echo:*)",
+      "Read(//e/Projects/hestami-ai/JanumiCode/janumicode/**)",
+      "WebFetch(domain:google-gemini.github.io)"
     ]
   }
 }

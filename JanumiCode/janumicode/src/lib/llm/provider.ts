@@ -57,6 +57,14 @@ export interface LLMRequest {
 	stopSequences?: string[];
 	/** Request metadata (for logging/tracking) */
 	metadata?: Record<string, unknown>;
+	/**
+	 * JSON Schema object for structured output enforcement.
+	 * When provided, the provider constrains the model's response to conform to
+	 * this schema. Mechanism varies by provider:
+	 *   - OpenAI / Gemini (OpenAI-compatible): response_format.json_schema
+	 *   - Claude: tool-use with forced tool_choice
+	 */
+	responseSchema?: object;
 }
 
 /**
@@ -82,7 +90,7 @@ export interface LLMResponse {
 	/** Token usage */
 	usage: TokenUsage;
 	/** Stop reason */
-	stopReason?: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'error';
+	stopReason?: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'error' | 'tool_use';
 	/** Provider-specific metadata */
 	metadata?: Record<string, unknown>;
 }

@@ -17,7 +17,7 @@ import {
 	executeIntakePlanApproval,
 	executeIntakeAnalysis,
 	executeIntakeClarificationTurn,
-	executeProposerDomains,
+	executeProposerBusinessDomains,
 	executeProposerJourneys,
 	executeProposerEntities,
 	executeProposerIntegrations,
@@ -69,8 +69,8 @@ export async function executeIntakePhase(
 				if (!isMmpSubmission && humanInput.trim().length > 0) {
 					// Determine which proposer to re-run based on current proposerPhase
 					let rerunSubState: IntakeSubState;
-					if (proposerPhase === ProposerPhase.DOMAIN_MAPPING) {
-						rerunSubState = IntakeSubState.PROPOSING_DOMAINS;
+					if (proposerPhase === ProposerPhase.BUSINESS_DOMAIN_MAPPING) {
+						rerunSubState = IntakeSubState.PROPOSING_BUSINESS_DOMAINS;
 					} else if (proposerPhase === ProposerPhase.JOURNEY_WORKFLOW) {
 						rerunSubState = IntakeSubState.PROPOSING_JOURNEYS;
 					} else if (proposerPhase === ProposerPhase.ENTITY_DATA_MODEL) {
@@ -78,7 +78,7 @@ export async function executeIntakePhase(
 					} else if (proposerPhase === ProposerPhase.INTEGRATION_QUALITY) {
 						rerunSubState = IntakeSubState.PROPOSING_INTEGRATIONS;
 					} else {
-						rerunSubState = IntakeSubState.PROPOSING_DOMAINS;
+						rerunSubState = IntakeSubState.PROPOSING_BUSINESS_DOMAINS;
 					}
 
 					// Store feedback in plan BEFORE execution (proposer needs it),
@@ -91,8 +91,8 @@ export async function executeIntakePhase(
 					// Re-run the proposer with feedback
 					let rerunResult;
 					switch (rerunSubState) {
-						case IntakeSubState.PROPOSING_DOMAINS:
-							rerunResult = await executeProposerDomains(dialogueId, humanInput);
+						case IntakeSubState.PROPOSING_BUSINESS_DOMAINS:
+							rerunResult = await executeProposerBusinessDomains(dialogueId, humanInput);
 							break;
 						case IntakeSubState.PROPOSING_JOURNEYS:
 							rerunResult = await executeProposerJourneys(dialogueId, humanInput);
@@ -104,7 +104,7 @@ export async function executeIntakePhase(
 							rerunResult = await executeProposerIntegrations(dialogueId, humanInput);
 							break;
 						default:
-							rerunResult = await executeProposerDomains(dialogueId, humanInput);
+							rerunResult = await executeProposerBusinessDomains(dialogueId, humanInput);
 							break;
 					}
 
@@ -124,9 +124,9 @@ export async function executeIntakePhase(
 				let nextSubState: IntakeSubState;
 				if (isPreProposerReview) {
 					// First PRODUCT_REVIEW from INTENT_DISCOVERY → apply decisions to plan, then start proposer rounds
-					nextSubState = IntakeSubState.PROPOSING_DOMAINS;
+					nextSubState = IntakeSubState.PROPOSING_BUSINESS_DOMAINS;
 					applyIntentDiscoveryDecisions(conv.draftPlan, humanInput);
-				} else if (proposerPhase === ProposerPhase.DOMAIN_MAPPING) {
+				} else if (proposerPhase === ProposerPhase.BUSINESS_DOMAIN_MAPPING) {
 					nextSubState = IntakeSubState.PROPOSING_JOURNEYS;
 				} else if (proposerPhase === ProposerPhase.JOURNEY_WORKFLOW) {
 					nextSubState = IntakeSubState.PROPOSING_ENTITIES;
@@ -140,12 +140,12 @@ export async function executeIntakePhase(
 				console.log('[INTAKE:Router] Advancing to:', nextSubState);
 				// Execute FIRST, then advance sub-state on success (prevents corruption if execution throws)
 				let advanceResult;
-				if (nextSubState === IntakeSubState.PROPOSING_DOMAINS) {
+				if (nextSubState === IntakeSubState.PROPOSING_BUSINESS_DOMAINS) {
 					// Clear preProposerReview flag now that we're entering the proposer loop
 					updateIntakeConversation(dialogueId, {
 						draftPlan: { ...conv.draftPlan, preProposerReview: undefined } as IntakePlanDocument,
 					});
-					advanceResult = await executeProposerDomains(dialogueId, humanInput);
+					advanceResult = await executeProposerBusinessDomains(dialogueId, humanInput);
 				} else if (nextSubState === IntakeSubState.PROPOSING_JOURNEYS) {
 					advanceResult = await executeProposerJourneys(dialogueId, humanInput);
 				} else if (nextSubState === IntakeSubState.PROPOSING_ENTITIES) {
@@ -176,8 +176,8 @@ export async function executeIntakePhase(
 			}
 
 			// === Proposer-Validator sub-states ===
-			case IntakeSubState.PROPOSING_DOMAINS:
-				return await executeProposerDomains(dialogueId, humanInput);
+			case IntakeSubState.PROPOSING_BUSINESS_DOMAINS:
+				return await executeProposerBusinessDomains(dialogueId, humanInput);
 
 			case IntakeSubState.PROPOSING_JOURNEYS:
 				return await executeProposerJourneys(dialogueId, humanInput);
@@ -214,9 +214,9 @@ export async function executeIntakePhase(
 					const freshResult = getOrCreateIntakeConversation(dialogueId);
 					if (freshResult.success) {
 						const fresh = freshResult.value;
-						// STATE_DRIVEN and DOMAIN_GUIDED now use inverted flow (INTENT_DISCOVERY)
+						// STATE_DRIVEN and DOCUMENT_BASED now use inverted flow (INTENT_DISCOVERY)
 						if (fresh.intakeMode === IntakeMode.STATE_DRIVEN ||
-							fresh.intakeMode === IntakeMode.DOMAIN_GUIDED) {
+							fresh.intakeMode === IntakeMode.DOCUMENT_BASED) {
 							return await executeIntakeAnalysis(dialogueId, humanInput);
 						}
 					}

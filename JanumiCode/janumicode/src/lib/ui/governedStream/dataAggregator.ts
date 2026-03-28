@@ -19,15 +19,16 @@ import {
 	type WorkflowCommandRecord,
 	type WorkflowCommandOutput,
 } from '../../workflow/commandStore';
-import type { IntakePlanDocument, IntakeConversationTurn, DomainCoverageMap, IntakeModeRecommendation, IntakeCheckpoint, EngineeringDomain } from '../../types/intake';
-import { IntakeSubState, DomainCoverageLevel, isGatheringResponse } from '../../types/intake';
-import { DOMAIN_INFO, DOMAIN_SEQUENCE } from '../../workflow/domainCoverageTracker';
+import type { IntakePlanDocument, IntakeConversationTurn, EngineeringDomainCoverageMap, IntakeModeRecommendation, IntakeCheckpoint, EngineeringDomain } from '../../types/intake';
+import { IntakeSubState, EngineeringDomainCoverageLevel, isGatheringResponse } from '../../types/intake';
+import { DOMAIN_INFO, DOMAIN_SEQUENCE } from '../../workflow/engineeringDomainCoverageTracker';
 import type { HumanFacingStatus } from '../../types/maker';
 import { getArchitectureDocumentForDialogue } from '../../database/architectureStore';
 import { resolveHumanFacingState } from '../../workflow/humanFacingState';
 import { getTaskGraphForDialogue, getTaskUnitsForGraph } from '../../database/makerStore';
 import { getGraphProgress } from '../../workflow/taskGraph';
 import { getDatabase } from '../../database';
+import { getFindingsForDialogue } from '../../database/validationStore';
 import type { MMPPayload, MirrorItem, MenuItem, MenuOption, PreMortemItem } from '../../types/mmp';
 
 // ==================== Parsed JSON Cache ====================
@@ -93,6 +94,7 @@ export interface ClaimHealthSummary {
  */
 export interface PhaseMilestone {
 	type: 'milestone';
+	dialogueId: string;
 	phase: Phase;
 	timestamp: string;
 }
@@ -140,34 +142,37 @@ export type StreamItem =
 	| { type: 'turn'; turn: DialogueEvent; claims: Claim[]; verdict?: Verdict }
 	| { type: 'gate'; gate: Gate; blockingClaims: Claim[]; resolvedAction?: string; metadata?: Record<string, unknown> }
 	| { type: 'verification_gate'; gate: Gate; allClaims: Claim[]; verdicts: Verdict[]; blockingClaims: Claim[]; resolvedAction?: string }
-	| { type: 'review_gate'; gate: Gate; allClaims: Claim[]; verdicts: Verdict[];
+	| { type: 'review_gate'; dialogueId: string; gate: Gate; allClaims: Claim[]; verdicts: Verdict[];
 		historianFindings: string[]; reviewItems: ReviewItem[]; summary: ReviewSummary; resolvedAction?: string; resolvedRationale?: string }
 	| PhaseMilestone
 	| { type: 'dialogue_start'; dialogueId: string; goal: string; title: string | null; timestamp: string }
 	| { type: 'dialogue_end'; dialogueId: string; status: string; timestamp: string }
-	| { type: 'command_block'; command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[]; hasReview?: boolean }
-	| { type: 'intake_turn'; turn: IntakeConversationTurn; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>; isLatest?: boolean; eventId?: number }
-	| { type: 'intake_plan_preview'; plan: IntakePlanDocument; isFinal: boolean; timestamp: string }
+	| { type: 'command_block'; dialogueId: string; command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[]; hasReview?: boolean }
+	| { type: 'intake_turn'; dialogueId: string; turn: IntakeConversationTurn; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>; isLatest?: boolean; eventId?: number }
+	| { type: 'intake_plan_preview'; dialogueId: string; plan: IntakePlanDocument; isFinal: boolean; timestamp: string }
 	| { type: 'intake_approval_gate'; plan: IntakePlanDocument; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string }
-	| { type: 'intake_mode_selector'; recommendation: IntakeModeRecommendation; timestamp: string; resolved?: boolean; selectedMode?: string }
-	| { type: 'intake_checkpoint'; checkpoint: IntakeCheckpoint; timestamp: string; resolved?: boolean }
-	| { type: 'intake_domain_transition'; fromDomain: string; fromLabel: string; toDomain: string | null; toLabel: string | null; toDescription: string | null; timestamp: string }
-	| { type: 'intake_gathering_complete'; coverageSummary: { adequate: number; partial: number; none: number; percentage: number }; intakeMode: string | null; timestamp: string }
-	| { type: 'intake_analysis'; humanMessage: string; analysisSummary: string; codebaseFindings: string[]; domainAssessment: Array<{ domain: string; level: string; evidence: string }>; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }> }
-	| { type: 'intake_product_discovery'; requestCategory: string; productVision?: string; productDescription?: string; personas?: Array<{ id: string; name: string; description: string; goals: string[]; painPoints: string[] }>; userJourneys?: Array<{ id: string; personaId: string; title: string; scenario: string; steps: Array<{ stepNumber: number; actor: string; action: string; expectedOutcome: string }>; acceptanceCriteria: string[]; priority: string }>; phasingStrategy?: Array<{ phase: string; description: string; journeyIds: string[]; rationale: string }>; successMetrics?: string[]; uxRequirements?: string[]; mmpJson?: string; eventId?: number; timestamp: string }
-	| { type: 'intake_proposal'; title: string; summary: string; proposedApproach: string; domainCoverage: { adequate: number; partial: number; none: number; percentage: number }; timestamp: string }
+	| { type: 'intake_mode_selector'; dialogueId: string; recommendation: IntakeModeRecommendation; timestamp: string; resolved?: boolean; selectedMode?: string }
+	| { type: 'intake_checkpoint'; dialogueId: string; checkpoint: IntakeCheckpoint; timestamp: string; resolved?: boolean }
+	| { type: 'intake_domain_transition'; dialogueId: string; fromDomain: string; fromLabel: string; toDomain: string | null; toLabel: string | null; toDescription: string | null; timestamp: string }
+	| { type: 'intake_gathering_complete'; dialogueId: string; coverageSummary: { adequate: number; partial: number; none: number; percentage: number }; intakeMode: string | null; timestamp: string }
+	| { type: 'intake_analysis'; dialogueId: string; humanMessage: string; analysisSummary: string; codebaseFindings: string[]; engineeringDomainAssessment: Array<{ domain: string; level: string; evidence: string }>; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }> }
+	| { type: 'intake_product_discovery'; dialogueId: string; requestCategory: string; productVision?: string; productDescription?: string; personas?: Array<{ id: string; name: string; description: string; goals: string[]; painPoints: string[] }>; userJourneys?: Array<{ id: string; personaId: string; title: string; scenario: string; steps: Array<{ stepNumber: number; actor: string; action: string; expectedOutcome: string }>; acceptanceCriteria: string[]; priority: string }>; phasingStrategy?: Array<{ phase: string; description: string; journeyIds: string[]; rationale: string }>; successMetrics?: string[]; uxRequirements?: string[]; mmpJson?: string; eventId?: number; timestamp: string }
+	| { type: 'intake_proposal'; dialogueId: string; title: string; summary: string; proposedApproach: string; engineeringDomainCoverage: { adequate: number; partial: number; none: number; percentage: number }; timestamp: string }
 	// Proposer-Validator items
-	| { type: 'intake_proposer_domains'; domains: Array<{ id: string; name: string; description: string; rationale: string; entityPreview: string[]; workflowPreview: string[] }>; personas: Array<{ id: string; name: string; description: string }>; mmpJson?: string; eventId?: number; timestamp: string }
-	| { type: 'intake_proposer_journeys'; journeys: Array<{ id: string; title: string; scenario: string; priority?: string }>; workflows: Array<{ id: string; name: string; description: string; domainId: string }>; mmpJson?: string; eventId?: number; timestamp: string }
-	| { type: 'intake_proposer_entities'; entities: Array<{ id: string; name: string; description: string; domainId: string; keyAttributes: string[]; relationships: string[] }>; domainNames?: Record<string, string>; mmpJson?: string; eventId?: number; timestamp: string }
-	| { type: 'intake_proposer_integrations'; integrations: Array<{ id: string; name: string; category: string; description: string; standardProviders: string[]; ownershipModel: string }>; qualityAttributes: string[]; mmpJson?: string; eventId?: number; timestamp: string }
-	| { type: 'qa_exchange'; question: string; answer: string; timestamp: string }
-	| { type: 'reasoning_review'; concerns: Array<{ severity: string; summary: string; detail: string; location: string; recommendation: string }>; overallAssessment: string; reviewerModel: string; reviewPrompt?: string; timestamp: string }
+	| { type: 'intake_proposer_business_domains'; dialogueId: string; domains: Array<{ id: string; name: string; description: string; rationale: string; entityPreview: string[]; workflowPreview: string[] }>; personas: Array<{ id: string; name: string; description: string }>; mmpJson?: string; eventId?: number; timestamp: string }
+	| { type: 'intake_proposer_journeys'; dialogueId: string; journeys: Array<{ id: string; title: string; scenario: string; priority?: string }>; workflows: Array<{ id: string; name: string; description: string; businessDomainId: string }>; mmpJson?: string; eventId?: number; timestamp: string }
+	| { type: 'intake_proposer_entities'; dialogueId: string; entities: Array<{ id: string; name: string; description: string; businessDomainId: string; keyAttributes: string[]; relationships: string[] }>; domainNames?: Record<string, string>; mmpJson?: string; eventId?: number; timestamp: string }
+	| { type: 'intake_proposer_integrations'; dialogueId: string; integrations: Array<{ id: string; name: string; category: string; description: string; standardProviders: string[]; ownershipModel: string }>; qualityAttributes: string[]; mmpJson?: string; eventId?: number; timestamp: string }
+	| { type: 'qa_exchange'; dialogueId: string; question: string; answer: string; timestamp: string }
+	| { type: 'reasoning_review'; dialogueId: string; concerns: Array<{ severity: string; summary: string; detail: string; location: string; recommendation: string }>; overallAssessment: string; reviewerModel: string; reviewPrompt?: string; timestamp: string }
 	// Architecture phase items
-	| { type: 'architecture_capabilities'; capabilities: Array<{ id: string; label: string; requirements: number; workflows: number; parentId: string | null }>; timestamp: string }
-	| { type: 'architecture_design'; components: Array<{ id: string; label: string; responsibility: string; rationale: string; parentId: string | null; workflowsServed: string[]; dependencies: string[]; interactionPatterns: string[]; technologyNotes: string; fileScope: string }>; dataModels: Array<{ id: string; entity: string; description: string; fields: Array<{ name: string; type: string; required: boolean }>; relationships: Array<{ targetModel: string; type: string; description: string }>; invariants: string[] }>; interfaces: Array<{ id: string; label: string; type: string; description: string; contract: string; providerComponent: string; consumerComponents: string[]; sourceWorkflows: string[] }>; implementationSequence: Array<{ id: string; label: string; description: string; componentsInvolved: string[]; dependencies: string[]; complexity: string; verificationMethod: string; sortOrder: number }>; timestamp: string }
-	| { type: 'architecture_validation'; score: number | null; findings: string[]; validated: boolean; timestamp: string }
-	| { type: 'architecture_gate'; docId: string; version: number; capabilities: number; components: number; goalAlignmentScore: number | null; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string; mmpJson?: string; decompositionDepth?: number; eventId?: number };
+	| { type: 'architecture_capabilities'; dialogueId: string; capabilities: Array<{ id: string; label: string; requirements: number; workflows: number; parentId: string | null }>; timestamp: string }
+	| { type: 'architecture_design'; dialogueId: string; components: Array<{ id: string; label: string; responsibility: string; rationale: string; parentId: string | null; workflowsServed: string[]; dependencies: string[]; interactionPatterns: string[]; technologyNotes: string; fileScope: string }>; dataModels: Array<{ id: string; entity: string; description: string; fields: Array<{ name: string; type: string; required: boolean }>; relationships: Array<{ targetModel: string; type: string; description: string }>; invariants: string[] }>; interfaces: Array<{ id: string; label: string; type: string; description: string; contract: string; providerComponent: string; consumerComponents: string[]; sourceWorkflows: string[] }>; implementationSequence: Array<{ id: string; label: string; description: string; componentsInvolved: string[]; dependencies: string[]; complexity: string; verificationMethod: string; sortOrder: number }>; timestamp: string }
+	| { type: 'architecture_validation'; dialogueId: string; score: number | null; findings: string[]; validated: boolean; timestamp: string }
+	| { type: 'architecture_gate'; docId: string; version: number; capabilities: number; components: number; goalAlignmentScore: number | null; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string; mmpJson?: string; decompositionDepth?: number; eventId?: number }
+	// Validation Review phase items
+	| { type: 'validation_finding'; dialogueId: string; findingId: string; hypothesis: string; category: string; severity: string; location: string; tool_used: string; proof_status: string; proof_artifact: string | null; confidence: number; useful_rating: number | null; timestamp: string }
+	| { type: 'validation_summary'; dialogueId: string; totalFindings: number; provenCount: number; probableCount: number; categories: Record<string, number>; timestamp: string };
 
 /**
  * Summary of a dialogue for the switcher dropdown
@@ -202,8 +207,8 @@ export interface GovernedStreamState {
 		turnCount: number;
 		currentPlan: IntakePlanDocument | null;
 		finalizedPlan: IntakePlanDocument | null;
-		domainCoverage: DomainCoverageMap | null;
-		currentDomain: string | null;
+		engineeringDomainCoverage: EngineeringDomainCoverageMap | null;
+		currentEngineeringDomain: string | null;
 		intakeMode: string | null;
 	} | null;
 	/** ARCHITECTURE phase sub-state for the active dialogue */
@@ -329,6 +334,18 @@ function buildStreamItems(
 		}
 	}
 
+	// Build a map of finding_id → useful_rating from the validation_findings table
+	// so rendered cards reflect any ratings applied after the event was written.
+	const findingRatings = new Map<string, number | null>();
+	if (dialogueId) {
+		const findingsResult = getFindingsForDialogue(dialogueId);
+		if (findingsResult.success) {
+			for (const f of findingsResult.value) {
+				findingRatings.set(f.finding_id, f.useful_rating ?? null);
+			}
+		}
+	}
+
 	let gateIdx = 0;
 
 	for (const event of events) {
@@ -336,6 +353,7 @@ function buildStreamItems(
 		if (event.phase !== lastPhase) {
 			items.push({
 				type: 'milestone',
+				dialogueId: dialogueId ?? '',
 				phase: event.phase,
 				timestamp: event.timestamp,
 			});
@@ -399,13 +417,14 @@ function buildStreamItems(
 				isGathering: eventType === 'intake_gathering',
 				createdAt: event.timestamp,
 			};
-			items.push({ type: 'intake_turn', turn: intakeTurn, timestamp: event.timestamp, eventId: event.event_id });
+			items.push({ type: 'intake_turn', dialogueId: dialogueId ?? '', turn: intakeTurn, timestamp: event.timestamp, eventId: event.event_id });
 
 			// Inject plan preview if plan version changed
 			const planVersion = intakeTurn.planSnapshot?.version ?? 0;
 			if (planVersion > 0 && planVersion !== lastPlanVersion) {
 				items.push({
 					type: 'intake_plan_preview',
+					dialogueId: dialogueId ?? '',
 					plan: intakeTurn.planSnapshot!,
 					isFinal: false,
 					timestamp: event.timestamp,
@@ -417,10 +436,11 @@ function buildStreamItems(
 			const expertResponse = detail.expertResponse;
 			items.push({
 				type: 'intake_analysis',
+				dialogueId: dialogueId ?? '',
 				humanMessage: detail.humanMessage ?? '',
 				analysisSummary: expertResponse?.analysisSummary ?? event.summary,
 				codebaseFindings: expertResponse?.codebaseFindings ?? [],
-				domainAssessment: expertResponse?.domainAssessment ?? [],
+				engineeringDomainAssessment: expertResponse?.engineeringDomainAssessment ?? [],
 				timestamp: event.timestamp,
 			});
 
@@ -428,7 +448,7 @@ function buildStreamItems(
 			const plan = expertResponse?.initialPlan ?? detail.initialPlan;
 			if (plan) {
 				// Compute domain coverage from the domain assessment if available
-				const domainAssess: Array<{ domain: string; level: string }> = expertResponse?.domainAssessment ?? [];
+				const domainAssess: Array<{ domain: string; level: string }> = expertResponse?.engineeringDomainAssessment ?? [];
 				let adequate = 0, partial = 0, none = 0;
 				for (const d of domainAssess) {
 					const lvl = (d.level ?? '').toUpperCase();
@@ -449,6 +469,7 @@ function buildStreamItems(
 				if (plan.requestCategory === 'product_or_feature' && detail.productDiscoveryMMP) {
 					items.push({
 						type: 'intake_product_discovery',
+						dialogueId: dialogueId ?? '',
 						requestCategory: plan.requestCategory,
 						productVision: plan.productVision,
 						productDescription: plan.productDescription,
@@ -466,10 +487,11 @@ function buildStreamItems(
 				// Technical proposal card (product fields removed — reviewed in PRODUCT_REVIEW)
 				items.push({
 					type: 'intake_proposal',
+					dialogueId: dialogueId ?? '',
 					title: plan.title ?? '',
 					summary: plan.summary ?? '',
 					proposedApproach: plan.proposedApproach ?? '',
-					domainCoverage: { adequate, partial, none, percentage },
+					engineeringDomainCoverage: { adequate, partial, none, percentage },
 					timestamp: event.timestamp,
 				});
 				lastPlanVersion = plan.version ?? 0;
@@ -479,6 +501,7 @@ function buildStreamItems(
 			if (detail.finalizedPlan) {
 				items.push({
 					type: 'intake_plan_preview',
+					dialogueId: dialogueId ?? '',
 					plan: detail.finalizedPlan,
 					isFinal: true,
 					timestamp: event.timestamp,
@@ -487,11 +510,12 @@ function buildStreamItems(
 			}
 		} else if (eventType === 'intake_approval') {
 			// Handled by injectIntakeDerivedCards (approval gate card)
-		} else if (eventType === 'intake_proposer_domains') {
+		} else if (eventType === 'intake_proposer_business_domains') {
 			const detail = cachedParseDetail(event);
 			const content = cachedParseContent(event);
 			items.push({
-				type: 'intake_proposer_domains',
+				type: 'intake_proposer_business_domains',
+				dialogueId: dialogueId ?? '',
 				domains: content.domains ?? [],
 				personas: (content.personas ?? []).map((p: Record<string, unknown>) => ({
 					id: p.id as string ?? '', name: p.name as string ?? '', description: p.description as string ?? '',
@@ -505,13 +529,14 @@ function buildStreamItems(
 			const content = cachedParseContent(event);
 			items.push({
 				type: 'intake_proposer_journeys',
+				dialogueId: dialogueId ?? '',
 				journeys: (content.userJourneys ?? []).map((j: Record<string, unknown>) => ({
 					id: j.id as string ?? '', title: j.title as string ?? '',
 					scenario: j.scenario as string ?? '', priority: j.priority as string ?? 'MVP',
 				})),
 				workflows: (content.workflows ?? []).map((w: Record<string, unknown>) => ({
 					id: w.id as string ?? '', name: w.name as string ?? '',
-					description: w.description as string ?? '', domainId: w.domainId as string ?? '',
+					description: w.description as string ?? '', businessDomainId: w.businessDomainId as string ?? '',
 				})),
 				mmpJson: detail.productDiscoveryMMP,
 				eventId: event.event_id,
@@ -523,7 +548,7 @@ function buildStreamItems(
 			// Build domain name lookup from prior proposer_domains event
 			const domainNames: Record<string, string> = {};
 			for (const prior of items) {
-				if (prior.type === 'intake_proposer_domains') {
+				if (prior.type === 'intake_proposer_business_domains') {
 					for (const d of prior.domains) {
 						domainNames[d.id] = d.name;
 					}
@@ -531,9 +556,10 @@ function buildStreamItems(
 			}
 			items.push({
 				type: 'intake_proposer_entities',
+				dialogueId: dialogueId ?? '',
 				entities: (content.entities ?? []).map((e: Record<string, unknown>) => ({
 					id: e.id as string ?? '', name: e.name as string ?? '',
-					description: e.description as string ?? '', domainId: e.domainId as string ?? '',
+					description: e.description as string ?? '', businessDomainId: e.businessDomainId as string ?? '',
 					keyAttributes: Array.isArray(e.keyAttributes) ? e.keyAttributes as string[] : [],
 					relationships: Array.isArray(e.relationships) ? e.relationships as string[] : [],
 				})),
@@ -547,6 +573,7 @@ function buildStreamItems(
 			const content = cachedParseContent(event);
 			items.push({
 				type: 'intake_proposer_integrations',
+				dialogueId: dialogueId ?? '',
 				integrations: (content.integrations ?? []).map((int: Record<string, unknown>) => ({
 					id: int.id as string ?? '', name: int.name as string ?? '',
 					category: int.category as string ?? 'other', description: int.description as string ?? '',
@@ -571,7 +598,7 @@ function buildStreamItems(
 				workflows: Array.isArray(c.workflows) ? (c.workflows as string[]).length : 0,
 				parentId: (c.parent_capability_id as string) || null,
 			}));
-			items.push({ type: 'architecture_capabilities', capabilities: caps, timestamp: event.timestamp });
+			items.push({ type: 'architecture_capabilities', dialogueId: dialogueId ?? '', capabilities: caps, timestamp: event.timestamp });
 		} else if (eventType === 'architecture_design' || eventType === 'architecture_modeling' || eventType === 'architecture_sequencing') {
 			// Three events contribute to architecture_design StreamItems:
 			//   - architecture_design carries components + interfaces + data_models (from doc)
@@ -586,6 +613,7 @@ function buildStreamItems(
 				const content = cachedParseContent(event);
 				items.push({
 					type: 'architecture_design',
+					dialogueId: dialogueId ?? '',
 					components: (content.components ?? []).map((c: Record<string, unknown>) => ({
 						id: (c.component_id as string) ?? '',
 						label: (c.label as string) ?? '',
@@ -635,6 +663,7 @@ function buildStreamItems(
 					const doc = archDocResult.value;
 					items.push({
 						type: 'architecture_design',
+						dialogueId: dialogueId ?? '',
 						components: doc.components.map(c => ({
 							id: c.component_id,
 							label: c.label,
@@ -692,6 +721,7 @@ function buildStreamItems(
 			const detail = cachedParseDetail(event);
 			items.push({
 				type: 'architecture_validation',
+				dialogueId: dialogueId ?? '',
 				score: detail.goalAlignmentScore ?? null,
 				findings: Array.isArray(detail.findings) ? detail.findings as string[] : [],
 				validated: !detail.findings?.length && (detail.goalAlignmentScore ?? 1) >= 0.6,
@@ -765,6 +795,37 @@ function buildStreamItems(
 				decompositionDepth: archDecompositionDepth,
 				eventId: event.event_id,
 			});
+		} else if (eventType === 'validation_finding') {
+			const detail = cachedParseDetail(event);
+			const usefulRating = detail.useful_rating !== undefined ? detail.useful_rating : null;
+			// Merge live rating from DB if available
+			const liveRating = findingRatings?.get(detail.finding_id ?? '');
+			items.push({
+				type: 'validation_finding',
+				dialogueId: event.dialogue_id,
+				findingId: detail.finding_id ?? '',
+				hypothesis: detail.text ?? event.content ?? '',
+				category: detail.category ?? 'best_practices',
+				severity: detail.severity ?? 'medium',
+				location: detail.location ?? '',
+				tool_used: detail.tool_used ?? 'llm_only',
+				proof_status: detail.proof_status ?? 'probable',
+				proof_artifact: detail.proof_artifact ?? null,
+				confidence: detail.confidence ?? 0.7,
+				useful_rating: liveRating !== undefined ? liveRating : (usefulRating as number | null),
+				timestamp: event.timestamp,
+			});
+		} else if (eventType === 'validation_summary') {
+			const detail = cachedParseDetail(event);
+			items.push({
+				type: 'validation_summary',
+				dialogueId: event.dialogue_id,
+				totalFindings: detail.totalFindings ?? 0,
+				provenCount: detail.provenCount ?? 0,
+				probableCount: detail.probableCount ?? 0,
+				categories: (detail.categories as Record<string, number>) ?? {},
+				timestamp: event.timestamp,
+			});
 		} else {
 			// Non-INTAKE events (proposal, assumption_surfacing, execution, commit, etc.)
 			const turnClaims = claimsByTurn.get(event.event_id) ?? [];
@@ -825,6 +886,7 @@ function pushGateOrReviewGate(
 			);
 			items.push({
 				type: 'review_gate',
+				dialogueId: dialogueId!,
 				gate,
 				allClaims,
 				verdicts,
@@ -1097,7 +1159,7 @@ function buildCommandBlockItems(dialogueId: string): StreamItem[] {
 
 		// Emit the command block (without reasoning reviews, but flagged if review exists)
 		const hasReview = reviewOutputs.length > 0;
-		items.push({ type: 'command_block' as const, command: cmd, outputs: regularOutputs, hasReview });
+		items.push({ type: 'command_block' as const, dialogueId, command: cmd, outputs: regularOutputs, hasReview });
 
 		// Emit each reasoning review as a standalone StreamItem.
 		// Use the command block's start timestamp so the review sorts alongside its command block,
@@ -1109,6 +1171,7 @@ function buildCommandBlockItems(dialogueId: string): StreamItem[] {
 				const concerns = reviewData.concerns ?? [];
 				items.push({
 					type: 'reasoning_review' as const,
+					dialogueId,
 					concerns,
 					overallAssessment: reviewData.overallAssessment ?? '',
 					reviewerModel: reviewData.reviewerModel ?? '',
@@ -1129,6 +1192,7 @@ function buildQaExchangeItems(dialogueId: string): StreamItem[] {
 	if (!result.success) { return []; }
 	return result.value.map((qa) => ({
 		type: 'qa_exchange' as const,
+		dialogueId,
 		question: qa.question,
 		answer: qa.answer,
 		timestamp: qa.timestamp,
@@ -1201,7 +1265,7 @@ function getStreamItemTimestamp(item: StreamItem): string {
 		case 'intake_gathering_complete': raw = item.timestamp; break;
 		case 'intake_analysis': raw = item.timestamp; break;
 		case 'intake_product_discovery': raw = item.timestamp; break;
-		case 'intake_proposer_domains': raw = item.timestamp; break;
+		case 'intake_proposer_business_domains': raw = item.timestamp; break;
 		case 'intake_proposer_journeys': raw = item.timestamp; break;
 		case 'intake_proposer_entities': raw = item.timestamp; break;
 		case 'intake_proposer_integrations': raw = item.timestamp; break;
@@ -1266,7 +1330,7 @@ function getStreamItemSortPriority(item: StreamItem): number {
 		case 'intake_mode_selector': return 3;
 		case 'intake_analysis': return 4;      // After command_block (3) + reasoning_review (3.5)
 		case 'intake_product_discovery': return 4.1;  // After analysis
-		case 'intake_proposer_domains': return 4.2;
+		case 'intake_proposer_business_domains': return 4.2;
 		case 'intake_proposer_journeys': return 4.3;
 		case 'intake_proposer_entities': return 4.4;
 		case 'intake_proposer_integrations': return 4.5;
@@ -1569,6 +1633,7 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 		const selectorTimestamp = firstIntakeTimestamp || conv.createdAt;
 		streamItems.push({
 			type: 'intake_mode_selector',
+			dialogueId,
 			recommendation: conv.classifierResult,
 			timestamp: selectorTimestamp,
 			resolved: isResolved,
@@ -1581,6 +1646,7 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 		for (const checkpoint of conv.checkpoints) {
 			streamItems.push({
 				type: 'intake_checkpoint',
+				dialogueId,
 				checkpoint,
 				timestamp: conv.updatedAt,
 				resolved: true,
@@ -1597,17 +1663,18 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 		const prevResp = gatheringItems[gi - 1].turn.expertResponse;
 		const currResp = gatheringItems[gi].turn.expertResponse;
 		if (prevResp && currResp && isGatheringResponse(prevResp) && isGatheringResponse(currResp)) {
-			const prevResolved = resolveDomainEnum(prevResp.focusDomain);
-			const currResolved = resolveDomainEnum(currResp.focusDomain);
+			const prevResolved = resolveDomainEnum(prevResp.focusEngineeringDomain);
+			const currResolved = resolveDomainEnum(currResp.focusEngineeringDomain);
 			if (prevResolved !== currResolved) {
 				const fromInfo = prevResolved ? DOMAIN_INFO[prevResolved] : undefined;
 				const toInfo = currResolved ? DOMAIN_INFO[currResolved] : undefined;
 				streamItems.push({
 					type: 'intake_domain_transition',
-					fromDomain: prevResp.focusDomain,
-					fromLabel: fromInfo?.label ?? prevResp.focusDomain,
-					toDomain: currResp.focusDomain,
-					toLabel: toInfo?.label ?? currResp.focusDomain,
+					dialogueId,
+					fromDomain: prevResp.focusEngineeringDomain,
+					fromLabel: fromInfo?.label ?? prevResp.focusEngineeringDomain,
+					toDomain: currResp.focusEngineeringDomain,
+					toLabel: toInfo?.label ?? currResp.focusEngineeringDomain,
 					toDescription: toInfo?.description ?? null,
 					timestamp: gatheringItems[gi].timestamp,
 				});
@@ -1617,15 +1684,15 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 
 	// Gathering complete: if there are gathering turns and subState advanced past GATHERING
 	if (gatheringItems.length > 0 && conv.subState !== IntakeSubState.GATHERING) {
-		const coverage = conv.domainCoverage;
+		const coverage = conv.engineeringDomainCoverage;
 		let adequate = 0;
 		let partial = 0;
 		let none = 0;
 		if (coverage) {
 			for (const domain of DOMAIN_SEQUENCE) {
 				switch (coverage[domain]?.level) {
-					case DomainCoverageLevel.ADEQUATE: adequate++; break;
-					case DomainCoverageLevel.PARTIAL: partial++; break;
+					case EngineeringDomainCoverageLevel.ADEQUATE: adequate++; break;
+					case EngineeringDomainCoverageLevel.PARTIAL: partial++; break;
 					default: none++; break;
 				}
 			}
@@ -1634,6 +1701,7 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 		const percentage = Math.round(((adequate * 100) + (partial * 50)) / total);
 		streamItems.push({
 			type: 'intake_gathering_complete',
+			dialogueId,
 			coverageSummary: { adequate, partial, none, percentage },
 			intakeMode: conv.intakeMode ?? null,
 			timestamp: gatheringItems.at(-1)!.timestamp,
@@ -1644,7 +1712,12 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 	// Use the intake_synthesis event timestamp as anchor — NOT conv.updatedAt which
 	// shifts as the conversation gets updated during downstream phases, causing
 	// the approval gate to sort after Architecture cards.
-	if (conv.finalizedPlan) {
+	// Fallback: if finalizedPlan is somehow null but subState is AWAITING_APPROVAL
+	// (e.g., partial DB write), use draftPlan so the gate still appears.
+	// Use finalizedPlan when available; fall back to draftPlan if subState is AWAITING_APPROVAL
+	// but finalizedPlan was not persisted (e.g. partial DB write) — ensures gate always appears.
+	const gatePlan = conv.finalizedPlan ?? (conv.subState === IntakeSubState.AWAITING_APPROVAL ? conv.draftPlan : null);
+	if (gatePlan) {
 		const wsResult = getWorkflowState(dialogueId);
 		const currentPhase = wsResult.success ? wsResult.value.current_phase : Phase.INTAKE;
 
@@ -1660,14 +1733,14 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 		if (conv.subState === IntakeSubState.AWAITING_APPROVAL) {
 			streamItems.push({
 				type: 'intake_approval_gate',
-				plan: conv.finalizedPlan,
+				plan: gatePlan,
 				dialogueId,
 				timestamp: gateTimestamp,
 			});
 		} else if (currentPhase !== Phase.INTAKE) {
 			streamItems.push({
 				type: 'intake_approval_gate',
-				plan: conv.finalizedPlan,
+				plan: gatePlan,
 				dialogueId,
 				timestamp: gateTimestamp,
 				resolved: true,
@@ -1676,7 +1749,7 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 		} else if (conv.subState === IntakeSubState.DISCUSSING) {
 			streamItems.push({
 				type: 'intake_approval_gate',
-				plan: conv.finalizedPlan,
+				plan: gatePlan,
 				dialogueId,
 				timestamp: gateTimestamp,
 				resolved: true,
@@ -1701,7 +1774,7 @@ function injectIntakeDerivedCards(dialogueId: string, streamItems: StreamItem[])
 	// and old product discovery card. The proposer cards replace them.
 	// The intake_analysis card (homework) stays visible.
 	const isProposerActive = conv.subState === IntakeSubState.PRODUCT_REVIEW
-		|| conv.subState === IntakeSubState.PROPOSING_DOMAINS
+		|| conv.subState === IntakeSubState.PROPOSING_BUSINESS_DOMAINS
 		|| conv.subState === IntakeSubState.PROPOSING_JOURNEYS
 		|| conv.subState === IntakeSubState.PROPOSING_ENTITIES
 		|| conv.subState === IntakeSubState.PROPOSING_INTEGRATIONS;
@@ -1751,8 +1824,8 @@ function buildIntakeState(
 		turnCount: conv.turnCount,
 		currentPlan: conv.draftPlan,
 		finalizedPlan: conv.finalizedPlan,
-		domainCoverage: conv.domainCoverage ?? null,
-		currentDomain: conv.currentDomain ?? null,
+		engineeringDomainCoverage: conv.engineeringDomainCoverage ?? null,
+		currentEngineeringDomain: conv.currentEngineeringDomain ?? null,
 		intakeMode: conv.intakeMode ?? null,
 	};
 }

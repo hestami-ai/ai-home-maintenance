@@ -215,6 +215,9 @@ export function handleSetProcessing(data: SetProcessingData): void {
 
 	if (!data.active) {
 		if (existing) { existing.remove(); }
+		// Clear processing container
+		const processingContainer = document.getElementById('processing-container');
+		if (processingContainer) { processingContainer.innerHTML = ''; }
 		// Also remove server-rendered processing cancel bar (baked into HTML by renderInputArea)
 		const cancelBar = document.querySelector('.processing-cancel-bar');
 		if (cancelBar) { cancelBar.remove(); }
@@ -228,17 +231,50 @@ export function handleSetProcessing(data: SetProcessingData): void {
 			'<div class="processing-phase">' + phase + '<span class="processing-dots"></span></div>' +
 			(detail ? '<div class="processing-detail">' + detail + '</div>' : '') +
 		'</div>' +
-		'<button class="cancel-btn" data-action="cancel-workflow" title="Cancel execution">Cancel</button>' +
+		'<button class="cancel-btn pause-btn" data-action="pause-workflow" title="Pause after current phase completes">Pause</button>' +
+	'<button class="cancel-btn" data-action="cancel-workflow" title="Cancel execution immediately">Cancel</button>' +
 	'</div>';
 	if (existing) {
 		existing.outerHTML = html;
 	} else {
-		const streamArea = document.getElementById('stream-content');
-		if (streamArea) {
-			streamArea.insertAdjacentHTML('beforeend', html);
-			scrollToBottom();
+		// Insert into the stable processing container (not stream-content, which gets replaced by hydration)
+		const processingContainer = document.getElementById('processing-container');
+		if (processingContainer) {
+			processingContainer.innerHTML = html;
+		} else {
+			// Fallback: append to stream-content if processing-container doesn't exist
+			const streamArea = document.getElementById('stream-content');
+			if (streamArea) {
+				streamArea.insertAdjacentHTML('beforeend', html);
+			}
 		}
+		scrollToBottom();
 	}
+}
+
+export interface ProcessingElapsedData {
+	elapsed: number;
+	processCount: number;
+}
+
+export function handleProcessingElapsed(data: ProcessingElapsedData): void {
+	const indicator = document.getElementById('processing-indicator');
+	if (!indicator) { return; }
+
+	const seconds = Math.floor(data.elapsed / 1000);
+	const minutes = Math.floor(seconds / 60);
+	const secs = seconds % 60;
+	const timeStr = minutes > 0 ? `${minutes}m ${secs}s` : `${secs}s`;
+	const processInfo = data.processCount > 0 ? ` (${data.processCount} process${data.processCount > 1 ? 'es' : ''})` : '';
+
+	let elapsedEl = indicator.querySelector('.processing-elapsed') as HTMLElement | null;
+	if (!elapsedEl) {
+		elapsedEl = document.createElement('div');
+		elapsedEl.className = 'processing-elapsed';
+		const label = indicator.querySelector('.processing-label');
+		if (label) { label.appendChild(elapsedEl); }
+	}
+	elapsedEl.textContent = `${timeStr}${processInfo}`;
 }
 
 export interface PermissionRequestedData {
@@ -474,4 +510,25 @@ export function handleQaThinkingComplete(data: QaThinkingCompleteData): void {
 	}
 
 	scrollToBottom();
+}
+
+// ===== Session Recorder =====
+
+export function handleRecordingState(active: boolean, path?: string): void {
+	const btn = document.querySelector<HTMLButtonElement>('.record-btn');
+	if (!btn) { return; }
+	if (active) {
+		btn.classList.add('active');
+		btn.title = 'Stop recording';
+		btn.innerHTML = '&#x23F9;'; // ⏹
+	} else {
+		btn.classList.remove('active');
+		btn.title = path ? `Recording saved: ${path}` : 'Record session';
+		btn.innerHTML = '&#x23FA;'; // ⏺
+	}
+}
+
+export function handleClearStream(): void {
+	const streamContent = document.getElementById('stream-content');
+	if (streamContent) { streamContent.innerHTML = ''; }
 }

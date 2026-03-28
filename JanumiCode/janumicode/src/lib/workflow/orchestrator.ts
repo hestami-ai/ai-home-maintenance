@@ -31,14 +31,14 @@ import {
 } from './stateMachine';
 import { hasOpenGates, createReviewGate, createGate, GateTriggerCondition } from './gates';
 import { IntakeSubState, IntakeMode, ProposerPhase } from '../types';
-import type { DomainCoverageMap } from '../types';
+import type { EngineeringDomainCoverageMap } from '../types';
 import { writeDialogueEvent, updateIntakeConversation } from '../events/writer';
 import { classifyIntakeInput } from './intakeClassifier';
 import {
 	initializeCoverageMap,
 	getCoverageGaps,
 	DOMAIN_INFO,
-} from './domainCoverageTracker';
+} from './engineeringDomainCoverageTracker';
 import { getEventBus } from '../integration/eventBus';
 import { executeVerification } from './verification';
 import {
@@ -1603,8 +1603,8 @@ export async function executeExecutePhase(
 
 /**
  * Execute VALIDATE phase
- * Validates execution results — checks whether execution succeeded.
- * MAKER path: runs acceptance contract validation (lint, type-check, test suite).
+ * Delegates to the deep validation review sub-state machine in validatePhase.ts.
+ * Pipeline: INGESTING → HYPOTHESIZING → VALIDATING → GRADING → PRESENTING → COMMIT
  *
  * @param dialogueId Dialogue ID
  * @returns Result containing phase execution result
@@ -1612,75 +1612,13 @@ export async function executeExecutePhase(
 export async function executeValidatePhase(
 	dialogueId: string
 ): Promise<Result<PhaseExecutionResult>> {
-	try {
-		const stateResult = getWorkflowState(dialogueId);
-		if (!stateResult.success) {
-			return stateResult as Result<PhaseExecutionResult>;
-		}
-
-		const metadata = JSON.parse(stateResult.value.metadata);
-		const execResult = metadata.executionResult;
-
-		const now = new Date().toISOString();
-
-		if (execResult && !execResult.success) {
-			// Execution failed — trigger a gate for human decision on how to proceed
-			const gateResult = createReviewGate(
-				dialogueId,
-				`Execution failed: ${execResult.error ?? 'unknown error'}. Human decision required.`
-			);
-
-			if (gateResult.success && gateResult.value) {
-				emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
-			}
-
-			return {
-				success: true,
-				value: {
-					phase: 'VALIDATE' as Phase,
-					success: true,
-					gateTriggered: true,
-					metadata: { validationPassed: false, reason: execResult.error },
-					timestamp: now,
-				},
-			};
-		}
-
-		// ── MAKER: Acceptance contract validation ──
-		const contractValidation = await runMakerContractValidation(dialogueId);
-		if (contractValidation.gateTriggered) {
-			return {
-				success: true,
-				value: {
-					phase: 'VALIDATE' as Phase,
-					success: true,
-					gateTriggered: true,
-					metadata: { validationPassed: false, reason: contractValidation.reason },
-					timestamp: now,
-				},
-			};
-		}
-
-		// Execution succeeded (or no result recorded) — proceed to COMMIT
-		return {
-			success: true,
-			value: {
-				phase: 'VALIDATE' as Phase,
-				success: true,
-				nextPhase: 'COMMIT' as Phase,
-				metadata: { validationPassed: true },
-				timestamp: now,
-			},
-		};
-	} catch (error) {
-		return {
-			success: false,
-			error:
-				error instanceof Error
-					? error
-					: new Error('Failed to execute VALIDATE phase'),
-		};
+	const stateResult = getWorkflowState(dialogueId);
+	if (!stateResult.success) {
+		return stateResult as Result<PhaseExecutionResult>;
 	}
+	const metadata = JSON.parse(stateResult.value.metadata) as Record<string, unknown>;
+	const { runValidatePhase } = await import('./validatePhase.js');
+	return runValidatePhase(dialogueId, metadata);
 }
 
 /**
@@ -1846,14 +1784,14 @@ export async function initializeAdaptiveIntake(
 	try {
 		const recommendation = await classifyIntakeInput(humanInput, attachments, dialogueId);
 
-		// STATE_DRIVEN and DOMAIN_GUIDED use inverted flow (INTENT_DISCOVERY → PROPOSING → CLARIFYING)
+		// STATE_DRIVEN and DOCUMENT_BASED use inverted flow (INTENT_DISCOVERY → PROPOSING → CLARIFYING)
 		// HYBRID_CHECKPOINTS uses the original flow (DISCUSSING)
 		const needsAnalysis = recommendation.recommended === IntakeMode.STATE_DRIVEN
-			|| recommendation.recommended === IntakeMode.DOMAIN_GUIDED;
+			|| recommendation.recommended === IntakeMode.DOCUMENT_BASED;
 
 		// Domain coverage only used in legacy GATHERING/DISCUSSING flows, not proposer flow
 		const coverageMap = needsAnalysis ? null : initializeCoverageMap();
-		const currentDomain = null;
+		const currentEngineeringDomain = null;
 		const initialSubState = needsAnalysis
 			? IntakeSubState.INTENT_DISCOVERY
 			: IntakeSubState.DISCUSSING;
@@ -1861,8 +1799,8 @@ export async function initializeAdaptiveIntake(
 		// Persist to DB
 		updateIntakeConversation(dialogueId, {
 			intakeMode: recommendation.recommended,
-			domainCoverage: coverageMap,
-			currentDomain,
+			engineeringDomainCoverage: coverageMap,
+			currentEngineeringDomain,
 			checkpoints: [],
 			classifierResult: recommendation,
 			subState: initialSubState,
@@ -1881,7 +1819,7 @@ export async function initializeAdaptiveIntake(
 			source: 'classifier',
 		});
 		if (coverageMap) {
-			getEventBus().emit('intake:domain_coverage_updated', {
+			getEventBus().emit('intake:engineering_domain_coverage_updated', {
 				dialogueId,
 				coverage: coverageMap,
 			});

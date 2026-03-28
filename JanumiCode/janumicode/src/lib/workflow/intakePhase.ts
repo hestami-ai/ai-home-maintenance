@@ -21,7 +21,7 @@ import type {
 	IntakeAccumulation,
 	IntakeConversationTurn,
 	IntakeConversationState,
-	DomainCoverageMap,
+	EngineeringDomainCoverageMap,
 	IntakeGatheringTurnResponse,
 } from '../types/intake';
 import {
@@ -29,7 +29,7 @@ import {
 	ProposerPhase,
 } from '../types/intake';
 import type {
-	DomainProposal, EntityProposal, WorkflowProposal, IntegrationProposal,
+	BusinessDomainProposal, EntityProposal, WorkflowProposal, IntegrationProposal,
 } from '../types/intake';
 import {
 	getOrCreateIntakeConversation,
@@ -81,7 +81,7 @@ import {
 	seedCoverageFromAnalysis,
 	DOMAIN_INFO,
 	DOMAIN_SEQUENCE,
-} from './domainCoverageTracker';
+} from './engineeringDomainCoverageTracker';
 
 // ==================== CONSTANTS ====================
 
@@ -207,10 +207,10 @@ export async function executeIntakeConversationTurn(
 		}
 
 		// 4c. Emit domain coverage event if tracking is active
-		if (coverageUpdates.domainCoverage) {
-			getEventBus().emit('intake:domain_coverage_updated', {
+		if (coverageUpdates.engineeringDomainCoverage) {
+			getEventBus().emit('intake:engineering_domain_coverage_updated', {
 				dialogueId,
-				coverage: coverageUpdates.domainCoverage,
+				coverage: coverageUpdates.engineeringDomainCoverage,
 			});
 		}
 
@@ -321,19 +321,16 @@ export async function executeIntakePlanFinalization(
 			},
 		});
 
-		emitWorkflowCommand({
-			dialogueId,
-			commandId: synthesisCommandId,
-			action: synthesisResult.success ? 'complete' : 'error',
-			commandType: 'cli_invocation',
-			label: 'Technical Expert — Plan Synthesis',
-			summary: synthesisResult.success
-				? 'Synthesis completed'
-				: `Error: ${synthesisResult.error?.message ?? 'Unknown'}`,
-			timestamp: new Date().toISOString(),
-		});
-
 		if (!synthesisResult.success) {
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: synthesisCommandId,
+				action: 'error',
+				commandType: 'cli_invocation',
+				label: 'Technical Expert — Plan Synthesis',
+				summary: `Error: ${synthesisResult.error?.message ?? 'Unknown'}`,
+				timestamp: new Date().toISOString(),
+			});
 			return synthesisResult as Result<PhaseExecutionResult>;
 		}
 
@@ -347,7 +344,7 @@ export async function executeIntakePlanFinalization(
 				finalizedPlan.uxRequirements = dp.qualityAttributes;
 			}
 			// Carry forward proposer-specific fields for downstream phases
-			if (!finalizedPlan.domainProposals && dp.domainProposals) { finalizedPlan.domainProposals = dp.domainProposals; }
+			if (!finalizedPlan.businessDomainProposals && dp.businessDomainProposals) { finalizedPlan.businessDomainProposals = dp.businessDomainProposals; }
 			if (!finalizedPlan.entityProposals && dp.entityProposals) { finalizedPlan.entityProposals = dp.entityProposals; }
 			if (!finalizedPlan.workflowProposals && dp.workflowProposals) { finalizedPlan.workflowProposals = dp.workflowProposals; }
 			if (!finalizedPlan.integrationProposals && dp.integrationProposals) { finalizedPlan.integrationProposals = dp.integrationProposals; }
@@ -359,15 +356,36 @@ export async function executeIntakePlanFinalization(
 			if ((!finalizedPlan.successMetrics || finalizedPlan.successMetrics.length === 0) && dp.successMetrics) { finalizedPlan.successMetrics = dp.successMetrics; }
 		}
 
-		// 3. Store finalized plan
+		// 3. Store finalized plan — emit command block status AFTER this succeeds
 		const updateResult = updateIntakeConversation(dialogueId, {
 			subState: IntakeSubState.AWAITING_APPROVAL,
 			finalizedPlan,
 		});
 
 		if (!updateResult.success) {
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: synthesisCommandId,
+				action: 'error',
+				commandType: 'cli_invocation',
+				label: 'Technical Expert — Plan Synthesis',
+				summary: `Failed to persist plan: ${updateResult.error?.message ?? 'Unknown'}`,
+				timestamp: new Date().toISOString(),
+			});
 			return updateResult as unknown as Result<PhaseExecutionResult>;
 		}
+
+		// Emit 'complete' only after the DB write succeeds — prevents UI showing success
+		// while the gate never appears due to a failed updateIntakeConversation.
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: synthesisCommandId,
+			action: 'complete',
+			commandType: 'cli_invocation',
+			label: 'Technical Expert — Plan Synthesis',
+			summary: 'Synthesis completed',
+			timestamp: new Date().toISOString(),
+		});
 
 		// 4. Record synthesis event
 		writeDialogueEvent({
@@ -451,8 +469,8 @@ export function executeIntakePlanApproval(
 
 		// 2. Store approved plan in workflow metadata (include domain coverage for downstream enrichment)
 		const planForMetadata: Record<string, unknown> = { ...conv.finalizedPlan };
-		if (conv.domainCoverage) {
-			planForMetadata.domainCoverage = conv.domainCoverage;
+		if (conv.engineeringDomainCoverage) {
+			planForMetadata.engineeringDomainCoverage = conv.engineeringDomainCoverage;
 		}
 		updateWorkflowMetadata(dialogueId, {
 			approvedIntakePlan: planForMetadata,
@@ -662,7 +680,7 @@ function createLocalAccumulation(
 function buildDomainCoverageContextForExpert(
 	conv: IntakeConversationState,
 ): string | undefined {
-	if (!conv.intakeMode || !conv.domainCoverage) {
+	if (!conv.intakeMode || !conv.engineeringDomainCoverage) {
 		return undefined;
 	}
 
@@ -675,7 +693,7 @@ function buildDomainCoverageContextForExpert(
 
 	switch (conv.intakeMode) {
 		case IntakeMode.STATE_DRIVEN: {
-			if (!conv.currentDomain) {
+			if (!conv.currentEngineeringDomain) {
 				// All domains visited — in DISCUSSING mode after gathering
 				return gatheringPrefix + [
 					'INTAKE MODE: State-Driven (All Domains Gathered)',
@@ -683,11 +701,11 @@ function buildDomainCoverageContextForExpert(
 					'Use the gathered domain notes above to produce a comprehensive plan.',
 					'Do NOT re-ask questions that were already answered during gathering.',
 					'',
-					formatCoverageSummaryForPrompt(conv.domainCoverage),
+					formatCoverageSummaryForPrompt(conv.engineeringDomainCoverage),
 				].join('\n');
 			}
-			const info = DOMAIN_INFO[conv.currentDomain];
-			const domainIndex = DOMAIN_SEQUENCE.indexOf(conv.currentDomain);
+			const info = DOMAIN_INFO[conv.currentEngineeringDomain];
+			const domainIndex = DOMAIN_SEQUENCE.indexOf(conv.currentEngineeringDomain);
 			const topicAreas = info.keywords.join(', ');
 			return gatheringPrefix + [
 				'INTAKE MODE: State-Driven Domain Walkthrough',
@@ -701,18 +719,18 @@ function buildDomainCoverageContextForExpert(
 				'If you can find codebase evidence relevant to this domain, include it.',
 				'When this domain is sufficiently explored, say so explicitly.',
 				'',
-				formatCoverageSummaryForPrompt(conv.domainCoverage),
+				formatCoverageSummaryForPrompt(conv.engineeringDomainCoverage),
 			].join('\n');
 		}
-		case IntakeMode.DOMAIN_GUIDED: {
+		case IntakeMode.DOCUMENT_BASED: {
 			return gatheringPrefix + [
 				'INTAKE MODE: Domain-Guided Conversation',
 				'The user provided substantial input. Naturally steer the conversation toward uncovered domains.',
 				gatheringSummary ? 'Use the gathered domain notes above as the foundation for your plan.' : '',
 				'',
-				formatUncoveredDomainsForPrompt(conv.domainCoverage),
+				formatUncoveredDomainsForPrompt(conv.engineeringDomainCoverage),
 				'',
-				formatCoverageSummaryForPrompt(conv.domainCoverage),
+				formatCoverageSummaryForPrompt(conv.engineeringDomainCoverage),
 			].filter(Boolean).join('\n');
 		}
 		case IntakeMode.HYBRID_CHECKPOINTS: {
@@ -720,7 +738,7 @@ function buildDomainCoverageContextForExpert(
 				'INTAKE MODE: Conversational with Periodic Checkpoints',
 				'Continue the natural conversation but be aware of uncovered engineering domains.',
 				'',
-				formatCoverageSummaryForPrompt(conv.domainCoverage),
+				formatCoverageSummaryForPrompt(conv.engineeringDomainCoverage),
 			].join('\n');
 		}
 	}
@@ -737,29 +755,29 @@ async function updateDomainCoverageAfterTurn(
 	expertResponse: string,
 	turnNumber: number,
 ): Promise<{
-	domainCoverage?: DomainCoverageMap;
-	currentDomain?: EngineeringDomain | null;
+	engineeringDomainCoverage?: EngineeringDomainCoverageMap;
+	currentEngineeringDomain?: EngineeringDomain | null;
 }> {
-	if (!conv.intakeMode || !conv.domainCoverage) {
+	if (!conv.intakeMode || !conv.engineeringDomainCoverage) {
 		return {};
 	}
 
 	// LLM-based extraction (falls back to keyword matching if unavailable)
-	let coverage = await updateCoverageFromLLM(conv.domainCoverage, humanMessage, expertResponse, turnNumber);
+	let coverage = await updateCoverageFromLLM(conv.engineeringDomainCoverage, humanMessage, expertResponse, turnNumber);
 
 	// Also apply expert-reported structured coverage tags (these are authoritative)
 	coverage = updateCoverageFromExpert(coverage, expertResponse, turnNumber);
 
 	const result: {
-		domainCoverage: DomainCoverageMap;
-		currentDomain?: EngineeringDomain | null;
-	} = { domainCoverage: coverage };
+		engineeringDomainCoverage: EngineeringDomainCoverageMap;
+		currentEngineeringDomain?: EngineeringDomain | null;
+	} = { engineeringDomainCoverage: coverage };
 
 	// STATE_DRIVEN: advance current domain if adequately covered
-	if (conv.intakeMode === IntakeMode.STATE_DRIVEN && conv.currentDomain) {
-		if (isDomainAdequatelyCovered(coverage, conv.currentDomain)) {
-			const nextDomain = getNextDomain(conv.currentDomain);
-			result.currentDomain = nextDomain;
+	if (conv.intakeMode === IntakeMode.STATE_DRIVEN && conv.currentEngineeringDomain) {
+		if (isDomainAdequatelyCovered(coverage, conv.currentEngineeringDomain)) {
+			const nextDomain = getNextDomain(conv.currentEngineeringDomain);
+			result.currentEngineeringDomain = nextDomain;
 		}
 	}
 
@@ -773,7 +791,7 @@ async function updateDomainCoverageAfterTurn(
 function handleModeSpecificPostTurn(
 	dialogueId: string,
 	conv: IntakeConversationState,
-	coverageUpdates: { domainCoverage?: DomainCoverageMap; currentDomain?: EngineeringDomain | null },
+	coverageUpdates: { engineeringDomainCoverage?: EngineeringDomainCoverageMap; currentEngineeringDomain?: EngineeringDomain | null },
 	turnNumber: number,
 ): Record<string, unknown> {
 	if (!conv.intakeMode) { return {}; }
@@ -783,31 +801,31 @@ function handleModeSpecificPostTurn(
 	};
 
 	// STATE_DRIVEN: emit domain transition if domain changed
-	if (conv.intakeMode === IntakeMode.STATE_DRIVEN && coverageUpdates.currentDomain !== undefined) {
-		if (coverageUpdates.currentDomain !== conv.currentDomain) {
+	if (conv.intakeMode === IntakeMode.STATE_DRIVEN && coverageUpdates.currentEngineeringDomain !== undefined) {
+		if (coverageUpdates.currentEngineeringDomain !== conv.currentEngineeringDomain) {
 			getEventBus().emit('intake:domain_transition', {
 				dialogueId,
-				fromDomain: conv.currentDomain,
-				toDomain: coverageUpdates.currentDomain,
+				fromDomain: conv.currentEngineeringDomain,
+				toDomain: coverageUpdates.currentEngineeringDomain,
 			});
 			metadata.domainTransition = {
-				from: conv.currentDomain,
-				to: coverageUpdates.currentDomain,
+				from: conv.currentEngineeringDomain,
+				to: coverageUpdates.currentEngineeringDomain,
 			};
 
 			// Persist domain transition
 			updateIntakeConversation(dialogueId, {
-				currentDomain: coverageUpdates.currentDomain,
+				currentEngineeringDomain: coverageUpdates.currentEngineeringDomain,
 			});
 		}
 	}
 
 	// DOMAIN_GUIDED: after the first analysis turn, offer mode-switch to fill gaps
-	if (conv.intakeMode === IntakeMode.DOMAIN_GUIDED && coverageUpdates.domainCoverage && conv.checkpoints.length === 0) {
-		const gaps = getCoverageGaps(coverageUpdates.domainCoverage);
-		const partials = getPartialDomains(coverageUpdates.domainCoverage);
+	if (conv.intakeMode === IntakeMode.DOCUMENT_BASED && coverageUpdates.engineeringDomainCoverage && conv.checkpoints.length === 0) {
+		const gaps = getCoverageGaps(coverageUpdates.engineeringDomainCoverage);
+		const partials = getPartialDomains(coverageUpdates.engineeringDomainCoverage);
 		if (gaps.length > 0 || partials.length > 0) {
-			const checkpoint = buildCheckpoint(coverageUpdates.domainCoverage, turnNumber);
+			const checkpoint = buildCheckpoint(coverageUpdates.engineeringDomainCoverage, turnNumber);
 			checkpoint.offerModeSwitch = true;
 			const updatedCheckpoints = [checkpoint];
 
@@ -825,13 +843,13 @@ function handleModeSpecificPostTurn(
 	}
 
 	// HYBRID_CHECKPOINTS: check if a checkpoint should be triggered
-	if (conv.intakeMode === IntakeMode.HYBRID_CHECKPOINTS && coverageUpdates.domainCoverage) {
+	if (conv.intakeMode === IntakeMode.HYBRID_CHECKPOINTS && coverageUpdates.engineeringDomainCoverage) {
 		const lastCheckpointTurn = conv.checkpoints.length > 0
 			? conv.checkpoints[conv.checkpoints.length - 1].turnNumber
 			: 0;
 
-		if (shouldTriggerCheckpoint(coverageUpdates.domainCoverage, turnNumber, lastCheckpointTurn)) {
-			const checkpoint = buildCheckpoint(coverageUpdates.domainCoverage, turnNumber);
+		if (shouldTriggerCheckpoint(coverageUpdates.engineeringDomainCoverage, turnNumber, lastCheckpointTurn)) {
+			const checkpoint = buildCheckpoint(coverageUpdates.engineeringDomainCoverage, turnNumber);
 			const updatedCheckpoints = [...conv.checkpoints, checkpoint];
 
 			updateIntakeConversation(dialogueId, {
@@ -870,7 +888,7 @@ export async function executeIntakeGatheringTurn(
 		const conv = convResult.value;
 		const turnNumber = conv.turnCount + 1;
 
-		if (!conv.currentDomain) {
+		if (!conv.currentEngineeringDomain) {
 			return {
 				success: false,
 				error: new Error('GATHERING requires currentDomain to be set'),
@@ -896,7 +914,7 @@ export async function executeIntakeGatheringTurn(
 			commandId: gatheringCommandId,
 			action: 'start',
 			commandType: 'cli_invocation',
-			label: 'Interviewer — ' + DOMAIN_INFO[conv.currentDomain].label + ' (Turn ' + turnNumber + ')',
+			label: 'Interviewer — ' + DOMAIN_INFO[conv.currentEngineeringDomain].label + ' (Turn ' + turnNumber + ')',
 			summary: 'Gathering: ' + humanMessage.substring(0, 120),
 			status: 'running',
 			timestamp: new Date().toISOString(),
@@ -905,7 +923,7 @@ export async function executeIntakeGatheringTurn(
 		const expertResult = await invokeGatheringTechnicalExpert({
 			dialogueId,
 			humanMessage,
-			currentDomain: conv.currentDomain,
+			currentEngineeringDomain: conv.currentEngineeringDomain,
 			turnNumber,
 			provider: providerResult.value,
 			onEvent: (event) => {
@@ -924,7 +942,7 @@ export async function executeIntakeGatheringTurn(
 			commandId: gatheringCommandId,
 			action: expertResult.success ? 'complete' : 'error',
 			commandType: 'cli_invocation',
-			label: 'Interviewer — ' + DOMAIN_INFO[conv.currentDomain].label + ' (Turn ' + turnNumber + ')',
+			label: 'Interviewer — ' + DOMAIN_INFO[conv.currentEngineeringDomain].label + ' (Turn ' + turnNumber + ')',
 			summary: expertResult.success
 				? 'Gathering turn completed'
 				: 'Error: ' + (expertResult.error?.message ?? 'Unknown'),
@@ -944,14 +962,14 @@ export async function executeIntakeGatheringTurn(
 			role: Role.TECHNICAL_EXPERT,
 			phase: 'INTAKE',
 			speech_act: SpeechAct.EVIDENCE,
-			summary: `Gathering: ${DOMAIN_INFO[conv.currentDomain].label}`,
+			summary: `Gathering: ${DOMAIN_INFO[conv.currentEngineeringDomain].label}`,
 			content: response.conversationalResponse,
 			detail: {
 				humanMessage,
 				expertResponse: response,
 				turnNumber,
-				focusDomain: conv.currentDomain,
-				domainNotes: response.domainNotes,
+				focusDomain: conv.currentEngineeringDomain,
+				domainNotes: response.engineeringDomainNotes,
 				tokenCount: estimateTokenCount(humanMessage, response.conversationalResponse),
 			},
 		});
@@ -976,23 +994,23 @@ export async function executeIntakeGatheringTurn(
 		}
 
 		// 9. Emit domain coverage event
-		if (coverageUpdates.domainCoverage) {
-			getEventBus().emit('intake:domain_coverage_updated', {
+		if (coverageUpdates.engineeringDomainCoverage) {
+			getEventBus().emit('intake:engineering_domain_coverage_updated', {
 				dialogueId,
-				coverage: coverageUpdates.domainCoverage,
+				coverage: coverageUpdates.engineeringDomainCoverage,
 			});
 		}
 
 		// 10. Check domain advancement (STATE_DRIVEN: move to next domain if covered)
-		if (conv.intakeMode === IntakeMode.STATE_DRIVEN && coverageUpdates.currentDomain !== undefined) {
-			if (coverageUpdates.currentDomain !== conv.currentDomain) {
+		if (conv.intakeMode === IntakeMode.STATE_DRIVEN && coverageUpdates.currentEngineeringDomain !== undefined) {
+			if (coverageUpdates.currentEngineeringDomain !== conv.currentEngineeringDomain) {
 				getEventBus().emit('intake:domain_transition', {
 					dialogueId,
-					fromDomain: conv.currentDomain,
-					toDomain: coverageUpdates.currentDomain,
+					fromDomain: conv.currentEngineeringDomain,
+					toDomain: coverageUpdates.currentEngineeringDomain,
 				});
 				updateIntakeConversation(dialogueId, {
-					currentDomain: coverageUpdates.currentDomain,
+					currentEngineeringDomain: coverageUpdates.currentEngineeringDomain,
 				});
 			}
 		}
@@ -1034,11 +1052,11 @@ export async function executeIntakeGatheringTurn(
 					turnNumber,
 					isGathering: true,
 					gatheringComplete,
-					focusDomain: conv.currentDomain,
+					focusDomain: conv.currentEngineeringDomain,
 					conversationalResponse: response.conversationalResponse,
 					followUpQuestions: response.followUpQuestions,
 					codebaseFindings: response.codebaseFindings,
-					domainNotes: response.domainNotes,
+					domainNotes: response.engineeringDomainNotes,
 					intakeMode: conv.intakeMode,
 				},
 				timestamp: new Date().toISOString(),
@@ -1079,10 +1097,10 @@ function buildGatheringContextSummary(dialogueId: string): string {
 	for (const turn of turnsResult.value) {
 		if (!isGatheringResponse(turn.expertResponse)) { continue; }
 		const resp = turn.expertResponse as IntakeGatheringTurnResponse;
-		const domain = resp.focusDomain;
+		const domain = resp.focusEngineeringDomain;
 		if (!byDomain.has(domain)) { byDomain.set(domain, []); }
 		byDomain.get(domain)!.push({
-			notes: resp.domainNotes,
+			notes: resp.engineeringDomainNotes,
 			findings: resp.codebaseFindings ?? [],
 			humanResponse: turn.humanMessage,
 			turnNumber: turn.turnNumber,
@@ -1111,12 +1129,12 @@ function buildGatheringContextSummary(dialogueId: string): string {
  * Build domain context string for gathering mode interviewer prompt.
  */
 function buildGatheringDomainContext(conv: IntakeConversationState): string {
-	if (!conv.currentDomain || !conv.domainCoverage) {
+	if (!conv.currentEngineeringDomain || !conv.engineeringDomainCoverage) {
 		return '';
 	}
 
-	const info = DOMAIN_INFO[conv.currentDomain];
-	const domainIndex = DOMAIN_SEQUENCE.indexOf(conv.currentDomain);
+	const info = DOMAIN_INFO[conv.currentEngineeringDomain];
+	const domainIndex = DOMAIN_SEQUENCE.indexOf(conv.currentEngineeringDomain);
 	const topicAreas = info.keywords.join(', ');
 
 	return [
@@ -1128,7 +1146,7 @@ function buildGatheringDomainContext(conv: IntakeConversationState): string {
 		'Ask 2-4 specific questions about the topics listed above.',
 		'Report codebase findings relevant to this domain.',
 		'',
-		formatCoverageSummaryForPrompt(conv.domainCoverage),
+		formatCoverageSummaryForPrompt(conv.engineeringDomainCoverage),
 	].join('\n');
 }
 
@@ -1137,17 +1155,17 @@ function buildGatheringDomainContext(conv: IntakeConversationState): string {
  */
 function checkGatheringComplete(
 	conv: IntakeConversationState,
-	coverageUpdates: { domainCoverage?: DomainCoverageMap; currentDomain?: EngineeringDomain | null },
+	coverageUpdates: { engineeringDomainCoverage?: EngineeringDomainCoverageMap; currentEngineeringDomain?: EngineeringDomain | null },
 ): boolean {
 	if (conv.intakeMode === IntakeMode.STATE_DRIVEN) {
 		// Complete when current domain advances to null (all domains visited)
-		return coverageUpdates.currentDomain === null;
+		return coverageUpdates.currentEngineeringDomain === null;
 	}
-	if (conv.intakeMode === IntakeMode.DOMAIN_GUIDED) {
+	if (conv.intakeMode === IntakeMode.DOCUMENT_BASED) {
 		// Complete after gathering turns when no NONE-coverage domains remain,
 		// or after 2 gathering turns
-		if (!coverageUpdates.domainCoverage) { return false; }
-		const gaps = getCoverageGaps(coverageUpdates.domainCoverage);
+		if (!coverageUpdates.engineeringDomainCoverage) { return false; }
+		const gaps = getCoverageGaps(coverageUpdates.engineeringDomainCoverage);
 		return gaps.length === 0 || conv.turnCount >= 2;
 	}
 	return false; // HYBRID_CHECKPOINTS never enters GATHERING
@@ -1388,7 +1406,7 @@ export async function executeIntakeAnalysis(
 
 		// Strip technical fields from Intent Discovery output — technical analysis belongs in ARCHITECTURE
 		analysis.codebaseFindings = [];
-		analysis.domainAssessment = [];
+		analysis.engineeringDomainAssessment = [];
 		analysis.initialPlan.technicalNotes = [];
 		analysis.initialPlan.proposedApproach = '';
 
@@ -1426,7 +1444,7 @@ export async function executeIntakeAnalysis(
 				expertResponse: analysis,
 				initialPlan: analysis.initialPlan,
 				codebaseFindings: analysis.codebaseFindings,
-				domainAssessment: analysis.domainAssessment,
+				engineeringDomainAssessment: analysis.engineeringDomainAssessment,
 				productDiscoveryMMP: productMMP ? JSON.stringify(productMMP) : undefined,
 				turnNumber: 0,
 				tokenCount: estimateTokenCount(humanMessage, analysis.analysisSummary),
@@ -1438,19 +1456,19 @@ export async function executeIntakeAnalysis(
 		}
 
 		// 6. Update conversation: seed plan, coverage, transition based on request type
-		// Proposer-Validator flow: product_or_feature (STATE_DRIVEN or DOMAIN_GUIDED) → PROPOSING_DOMAINS
+		// Proposer-Validator flow: product_or_feature (STATE_DRIVEN or DOMAIN_GUIDED) → PROPOSING_BUSINESS_DOMAINS
 		// Technical tasks: → PROPOSING (no product review)
 		let targetSubState: IntakeSubState;
 		if (analysis.initialPlan.requestCategory === 'product_or_feature'
-			&& (conv.intakeMode === IntakeMode.STATE_DRIVEN || conv.intakeMode === IntakeMode.DOMAIN_GUIDED)) {
-			analysis.initialPlan.proposerPhase = ProposerPhase.DOMAIN_MAPPING;
+			&& (conv.intakeMode === IntakeMode.STATE_DRIVEN || conv.intakeMode === IntakeMode.DOCUMENT_BASED)) {
+			analysis.initialPlan.proposerPhase = ProposerPhase.BUSINESS_DOMAIN_MAPPING;
 			if (productMMP !== undefined) {
 				// Gate on PRODUCT_REVIEW — user must review product artifacts before proposer rounds
 				targetSubState = IntakeSubState.PRODUCT_REVIEW;
 				analysis.initialPlan.preProposerReview = true;
 			} else {
 				// No product MMP — skip directly to proposer
-				targetSubState = IntakeSubState.PROPOSING_DOMAINS;
+				targetSubState = IntakeSubState.PROPOSING_BUSINESS_DOMAINS;
 			}
 		} else if (productMMP !== undefined) {
 			// Fallback: HYBRID_CHECKPOINTS with product artifacts → legacy PRODUCT_REVIEW
@@ -1470,7 +1488,7 @@ export async function executeIntakeAnalysis(
 			subState: targetSubState,
 			turnCount: 1,
 			draftPlan: analysis.initialPlan,
-			currentDomain: null,
+			currentEngineeringDomain: null,
 		});
 
 		if (!updateResult.success) {
@@ -1480,7 +1498,7 @@ export async function executeIntakeAnalysis(
 		// 7. Emit events
 		getEventBus().emit('intake:analysis_complete', {
 			dialogueId,
-			domainAssessment: analysis.domainAssessment,
+			engineeringDomainAssessment: analysis.engineeringDomainAssessment,
 		});
 		emitIntakeTurnCompleted(
 			dialogueId,
@@ -1515,7 +1533,7 @@ export async function executeIntakeAnalysis(
 					planVersion: analysis.initialPlan.version,
 					conversationalResponse: analysis.analysisSummary,
 					codebaseFindings: analysis.codebaseFindings,
-					domainAssessment: analysis.domainAssessment,
+					engineeringDomainAssessment: analysis.engineeringDomainAssessment,
 					intakeMode: conv.intakeMode,
 				},
 				timestamp: new Date().toISOString(),
@@ -1662,10 +1680,10 @@ export async function executeIntakeClarificationTurn(
 		}
 
 		// 8. Emit events
-		if (coverageUpdates.domainCoverage) {
-			getEventBus().emit('intake:domain_coverage_updated', {
+		if (coverageUpdates.engineeringDomainCoverage) {
+			getEventBus().emit('intake:engineering_domain_coverage_updated', {
 				dialogueId,
-				coverage: coverageUpdates.domainCoverage,
+				coverage: coverageUpdates.engineeringDomainCoverage,
 			});
 		}
 		getEventBus().emit('intake:clarification_round_complete', {
@@ -1746,7 +1764,7 @@ function estimateTokenCount(humanMessage: string, expertResponse: string): numbe
  * Menu item for MVP/V2/Future prioritization.
  */
 export function extractDomainMMP(
-	domains: DomainProposal[],
+	domains: BusinessDomainProposal[],
 	personas: Array<{ id: string; name: string; description: string }>,
 ): MMPPayload | undefined {
 	const mirrorItems: MirrorItem[] = [];
@@ -1755,7 +1773,7 @@ export function extractDomainMMP(
 		mirrorItems.push({
 			id: d.id,
 			text: `${d.name}: ${d.description}`,
-			category: 'domain',
+			category: 'business_domain',
 			rationale: d.rationale,
 			status: 'pending',
 			source: d.source,
@@ -1835,7 +1853,7 @@ export function extractJourneyWorkflowMMP(
 			id: w.id,
 			text: `${w.name}: ${w.description}`,
 			category: 'workflow',
-			rationale: `Domain: ${w.domainId}. Steps: ${w.steps.length}. Actors: ${w.actors.join(', ')}`,
+			rationale: `Domain: ${w.businessDomainId}. Steps: ${w.steps.length}. Actors: ${w.actors.join(', ')}`,
 			status: 'pending',
 			source: w.source,
 		});
@@ -1864,7 +1882,7 @@ export function extractEntityMMP(
 			id: e.id,
 			text: `${e.name}: ${e.description}`,
 			category: 'entity',
-			rationale: `Domain: ${e.domainId}. Attributes: ${e.keyAttributes.join(', ')}. Relationships: ${e.relationships.join(', ')}`,
+			rationale: `Domain: ${e.businessDomainId}. Attributes: ${e.keyAttributes.join(', ')}. Relationships: ${e.relationships.join(', ')}`,
 			status: 'pending',
 			source: e.source,
 		});
@@ -1944,7 +1962,7 @@ export function extractIntegrationMMP(
  * Proposer Round 1: Propose business domains + personas.
  * Uses INTENT_DISCOVERY findings as seed context.
  */
-export async function executeProposerDomains(
+export async function executeProposerBusinessDomains(
 	dialogueId: string,
 	humanMessage: string,
 ): Promise<Result<PhaseExecutionResult>> {
@@ -1966,8 +1984,8 @@ export async function executeProposerDomains(
 			timestamp: new Date().toISOString(),
 		});
 
-		const { invokeProposerDomains } = await import('../roles/technicalExpertIntake.js');
-		const result = await invokeProposerDomains({
+		const { invokeProposerBusinessDomains } = await import('../roles/technicalExpertIntake.js');
+		const result = await invokeProposerBusinessDomains({
 			dialogueId,
 			humanMessage,
 			provider: providerResult.value,
@@ -2000,21 +2018,21 @@ export async function executeProposerDomains(
 		// Store on draft plan
 		const updatedPlan = {
 			...conv.draftPlan,
-			proposerPhase: ProposerPhase.DOMAIN_MAPPING,
-			domainProposals: domains,
+			proposerPhase: ProposerPhase.BUSINESS_DOMAIN_MAPPING,
+			businessDomainProposals: domains,
 			personas,
 		};
 
 		writeDialogueEvent({
 			dialogue_id: dialogueId,
-			event_type: 'intake_proposer_domains',
+			event_type: 'intake_proposer_business_domains',
 			role: Role.TECHNICAL_EXPERT,
 			phase: 'INTAKE',
 			speech_act: SpeechAct.CLAIM,
 			summary: `Proposed ${domains.length} domains, ${personas.length} personas`,
 			content: JSON.stringify({ domains, personas }),
 			detail: {
-				proposerPhase: ProposerPhase.DOMAIN_MAPPING,
+				proposerPhase: ProposerPhase.BUSINESS_DOMAIN_MAPPING,
 				productDiscoveryMMP: mmp ? JSON.stringify(mmp) : undefined,
 			},
 		});

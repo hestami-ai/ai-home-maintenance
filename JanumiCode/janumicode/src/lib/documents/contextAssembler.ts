@@ -186,9 +186,9 @@ function assembleIntakePlan(dialogueId: string): string | null {
 	}
 
 	// Domain proposals
-	if (plan.domainProposals?.length) {
+	if (plan.businessDomainProposals?.length) {
 		lines.push('\n### Business Domains');
-		for (const d of plan.domainProposals) {
+		for (const d of plan.businessDomainProposals) {
 			lines.push(`\n#### ${d.name} (${d.id})`);
 			lines.push(d.description);
 			lines.push(`**Rationale:** ${d.rationale}`);
@@ -201,7 +201,7 @@ function assembleIntakePlan(dialogueId: string): string | null {
 	if (plan.entityProposals?.length) {
 		lines.push('\n### Data Entities');
 		for (const e of plan.entityProposals) {
-			lines.push(`\n#### ${e.name} (${e.id}, domain: ${e.domainId})`);
+			lines.push(`\n#### ${e.name} (${e.id}, domain: ${e.businessDomainId})`);
 			lines.push(e.description);
 			if (e.keyAttributes.length) { lines.push(`**Attributes:** ${e.keyAttributes.join(', ')}`); }
 			if (e.relationships.length) { lines.push(`**Relationships:** ${e.relationships.join('; ')}`); }
@@ -212,7 +212,7 @@ function assembleIntakePlan(dialogueId: string): string | null {
 	if (plan.workflowProposals?.length) {
 		lines.push('\n### System Workflows');
 		for (const w of plan.workflowProposals) {
-			lines.push(`\n#### ${w.name} (${w.id}, domain: ${w.domainId})`);
+			lines.push(`\n#### ${w.name} (${w.id}, domain: ${w.businessDomainId})`);
 			lines.push(w.description);
 			if (w.triggers.length) { lines.push(`**Triggers:** ${w.triggers.join(', ')}`); }
 			if (w.actors.length) { lines.push(`**Actors:** ${w.actors.join(', ')}`); }

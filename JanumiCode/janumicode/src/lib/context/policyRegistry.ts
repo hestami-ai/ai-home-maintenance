@@ -140,9 +140,20 @@ const policies: ContextPolicy[] = [
 		phase: Phase.ARCHITECTURE,
 		subPhase: 'DECOMPOSING',
 		intent: '*',
-		version: 1,
+		version: 3,
 		requiredBlocks: [
-			APPROVED_PLAN,
+			{
+				// Use the handoff doc but tell the CE to extract specific sections — the full plan
+				// (60KB with personas, journeys, entities, integrations) is too large for decomposition.
+				// Core spec (requirements/constraints/decisions) comes from handoff_doc.
+				// businessDomainProposals, userJourneys, phasingStrategy, workflowProposals, and
+				// entityProposalNames are pre-assembled in the ROLE-SPECIFIC CONTEXT (extras) below —
+				// include them verbatim from extras, do NOT re-extract them from the handoff doc.
+				blockId: 'approved_plan',
+				label: 'Approved Intake Plan (extract ONLY: requirements, constraints, decisions from handoff doc; all other proposer artifacts are in extras)',
+				source: 'handoff_doc',
+				handoffDocType: HandoffDocType.INTAKE,
+			},
 			DOMAIN_COVERAGE,
 			CONSTRAINTS,
 		],
@@ -152,10 +163,10 @@ const policies: ContextPolicy[] = [
 		],
 		sheddingPriority: ['human_corrections', 'historical_findings'],
 		sectionBudgets: {
-			approved_plan: 0.4,
-			domain_coverage: 0.2,
-			constraints: 0.15,
-			historical_findings: 0.15,
+			approved_plan: 0.25,
+			domain_coverage: 0.15,
+			constraints: 0.1,
+			historical_findings: 0.1,
 			human_corrections: 0.1,
 		},
 		omissionStrategy: 'degrade_with_warning',
@@ -178,8 +189,8 @@ const policies: ContextPolicy[] = [
 		optionalBlocks: [
 			{
 				blockId: 'approved_plan',
-				label: 'Approved Plan (with entity/domain proposals)',
-				source: 'static',  // Pre-assembled via extras — includes entityProposals, domainProposals
+				label: 'Approved Plan (with entity/domain proposals - CRITICAL: you MUST preserve the full entityProposals and businessBusinessDomainProposals JSON arrays verbatim)',
+				source: 'static',  // Pre-assembled via extras — includes entityProposals, businessBusinessDomainProposals
 			},
 			WORKSPACE_SPECS,
 			VALIDATION_FINDINGS_STATIC,
@@ -535,6 +546,114 @@ const policies: ContextPolicy[] = [
 			current_plan: 0.3,
 			human_message: 0.15,
 			accumulation_summaries: 0.15,
+		},
+		omissionStrategy: 'degrade_with_warning',
+	},
+
+	// ── TECHNICAL_EXPERT: VALIDATE phase (Deep Validation Review) ──
+
+	{
+		policyKey: 'TECHNICAL_EXPERT:VALIDATE:HYPOTHESIZING:security',
+		role: Role.TECHNICAL_EXPERT,
+		phase: Phase.VALIDATE,
+		subPhase: 'HYPOTHESIZING',
+		intent: 'security',
+		version: 1,
+		requiredBlocks: [
+			{
+				blockId: 'source_context',
+				label: 'Source Files & Workspace Structure',
+				source: 'static',  // Pre-assembled by validatePhase:INGESTING and passed via extras
+			},
+		],
+		optionalBlocks: [
+			ARCHITECTURE_DOC,
+			GOAL,
+		],
+		sheddingPriority: ['goal', 'architecture_doc'],
+		sectionBudgets: {
+			source_context: 0.75,
+			architecture_doc: 0.15,
+			goal: 0.1,
+		},
+		omissionStrategy: 'degrade_with_warning',
+	},
+
+	{
+		policyKey: 'TECHNICAL_EXPERT:VALIDATE:HYPOTHESIZING:logic',
+		role: Role.TECHNICAL_EXPERT,
+		phase: Phase.VALIDATE,
+		subPhase: 'HYPOTHESIZING',
+		intent: 'logic',
+		version: 1,
+		requiredBlocks: [
+			{
+				blockId: 'source_context',
+				label: 'Source Files & Workspace Structure',
+				source: 'static',
+			},
+		],
+		optionalBlocks: [
+			ARCHITECTURE_DOC,
+			GOAL,
+		],
+		sheddingPriority: ['goal', 'architecture_doc'],
+		sectionBudgets: {
+			source_context: 0.75,
+			architecture_doc: 0.15,
+			goal: 0.1,
+		},
+		omissionStrategy: 'degrade_with_warning',
+	},
+
+	{
+		policyKey: 'TECHNICAL_EXPERT:VALIDATE:HYPOTHESIZING:best_practices',
+		role: Role.TECHNICAL_EXPERT,
+		phase: Phase.VALIDATE,
+		subPhase: 'HYPOTHESIZING',
+		intent: 'best_practices',
+		version: 1,
+		requiredBlocks: [
+			{
+				blockId: 'source_context',
+				label: 'Source Files & Workspace Structure',
+				source: 'static',
+			},
+		],
+		optionalBlocks: [
+			ARCHITECTURE_DOC,
+			GOAL,
+		],
+		sheddingPriority: ['goal', 'architecture_doc'],
+		sectionBudgets: {
+			source_context: 0.75,
+			architecture_doc: 0.15,
+			goal: 0.1,
+		},
+		omissionStrategy: 'degrade_with_warning',
+	},
+
+	{
+		policyKey: 'TECHNICAL_EXPERT:VALIDATE:GRADING:*',
+		role: Role.TECHNICAL_EXPERT,
+		phase: Phase.VALIDATE,
+		subPhase: 'GRADING',
+		intent: '*',
+		version: 1,
+		requiredBlocks: [
+			{
+				blockId: 'validated_hypotheses',
+				label: 'Validated Hypotheses',
+				source: 'static',  // Pre-assembled from ValidatedHypothesis[] and passed via extras
+			},
+		],
+		optionalBlocks: [
+			GOAL,
+		],
+		sheddingPriority: ['goal'],
+		sectionBudgets: {
+			validated_hypotheses: 0.85,
+			goal: 0.15,
 		},
 		omissionStrategy: 'degrade_with_warning',
 	},

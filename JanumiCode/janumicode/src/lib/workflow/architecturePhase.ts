@@ -19,7 +19,7 @@
 import type { Result } from '../types';
 import { Phase, Role, SpeechAct } from '../types';
 import type { PhaseExecutionResult } from './orchestrator';
-import { initializeCoverageMap, seedCoverageFromAnalysis } from './domainCoverageTracker';
+import { initializeCoverageMap, seedCoverageFromAnalysis } from './engineeringDomainCoverageTracker';
 import { updateIntakeConversation } from '../events/writer';
 import type { MMPPayload, MirrorItem, PreMortemItem } from '../types/mmp';
 import { ArchitectureSubState, ArchitectureDocumentStatus } from '../types/architecture';
@@ -31,7 +31,7 @@ import type {
 	DataModelSpec,
 	InterfaceSpec,
 	ImplementationStep,
-	DomainCapabilityMapping,
+	EngineeringDomainCapabilityMapping,
 	StoppingCriteria,
 	DecompositionConfig,
 } from '../types/architecture';
@@ -88,7 +88,7 @@ const DEFAULT_METADATA: ArchitecturePhaseMetadata = {
 	architectureDocId: null,
 	designIterations: 0,
 	validationAttempts: 0,
-	maxValidationAttempts: 2,
+	maxValidationAttempts: 3,
 	decompositionConfig: DEFAULT_DECOMPOSITION_CONFIG,
 	humanFeedback: null,
 	decomposeDeeper: false,
@@ -141,22 +141,22 @@ const DOMAIN_KEYWORDS: Record<string, string> = {
 };
 
 /**
- * Deterministic domain mapping backfill for capabilities missing domain_mappings.
+ * Deterministic domain mapping backfill for capabilities missing engineering_domain_mappings.
  *
  * Strategy 1: Match capability's source_requirements to INTAKE domains via
- *             requirement extractedFromTurnId ↔ DomainCoverageEntry.turnNumbers overlap.
+ *             requirement extractedFromTurnId ↔ EngineeringDomainCoverageEntry.turnNumbers overlap.
  * Strategy 2: Keyword-match capability label/description against domain names.
  *
- * Only modifies capabilities with empty domain_mappings — LLM-provided mappings are preserved.
+ * Only modifies capabilities with empty engineering_domain_mappings — LLM-provided mappings are preserved.
  */
 export function backfillDomainMappings(
 	capabilities: CapabilityNode[],
 
 	approvedPlan: any,
 
-	domainCoverage: Record<string, any> | null,
+	engineeringDomainCoverage: Record<string, any> | null,
 ): CapabilityNode[] {
-	if (!domainCoverage) { return capabilities; }
+	if (!engineeringDomainCoverage) { return capabilities; }
 
 	// Build requirement ID → domain set map from turn number overlap
 	const reqToDomains = new Map<string, Set<string>>();
@@ -167,7 +167,7 @@ export function backfillDomainMappings(
 		if (!reqId) { continue; }
 
 		const domains = new Set<string>();
-		for (const [domain, entry] of Object.entries(domainCoverage)) {
+		for (const [domain, entry] of Object.entries(engineeringDomainCoverage)) {
 			const dEntry = entry as { level?: string; turnNumbers?: number[] };
 			if (dEntry.level === 'NONE') { continue; }
 			if (turnId !== undefined && dEntry.turnNumbers && dEntry.turnNumbers.includes(turnId)) {
@@ -180,7 +180,7 @@ export function backfillDomainMappings(
 	}
 
 	return capabilities.map(cap => {
-		if (cap.domain_mappings.length > 0) { return cap; } // LLM provided them
+		if (cap.engineering_domain_mappings.length > 0) { return cap; } // LLM provided them
 
 		// Strategy 1: Match via source_requirements → domain
 		const inferredDomains = new Set<string>();
@@ -197,7 +197,7 @@ export function backfillDomainMappings(
 			for (const [keyword, domain] of Object.entries(DOMAIN_KEYWORDS)) {
 				if (text.includes(keyword)) {
 					// Only map to domains with non-NONE coverage
-					const entry = domainCoverage[domain] as { level?: string } | undefined;
+					const entry = engineeringDomainCoverage[domain] as { level?: string } | undefined;
 					if (entry && entry.level !== 'NONE') {
 						inferredDomains.add(domain);
 						break; // Take first match
@@ -211,15 +211,15 @@ export function backfillDomainMappings(
 			inferredDomains.add('CAPABILITIES');
 		}
 
-		const mappings: DomainCapabilityMapping[] = [...inferredDomains].map((domain, i) => ({
+		const mappings: EngineeringDomainCapabilityMapping[] = [...inferredDomains].map((domain, i) => ({
 			mapping_id: `DM-BF-${cap.capability_id}-${i}`,
-			domain: domain as DomainCapabilityMapping['domain'],
+			domain: domain as EngineeringDomainCapabilityMapping['domain'],
 			capability_id: cap.capability_id,
 			requirement_ids: cap.source_requirements,
 			coverage_contribution: (i === 0 ? 'PRIMARY' : 'SECONDARY') as 'PRIMARY' | 'SECONDARY',
 		}));
 
-		return { ...cap, domain_mappings: mappings };
+		return { ...cap, engineering_domain_mappings: mappings };
 	});
 }
 
@@ -240,7 +240,7 @@ export function computeCapabilityCoverage(
 	for (const cap of doc.capabilities) {
 		const hasWorkflows = cap.workflows.some(wf => workflowIds.has(wf));
 		const hasComponents = cap.workflows.some(wf => componentWorkflows.has(wf));
-		const hasDomainMapping = cap.domain_mappings.length > 0;
+		const hasDomainMapping = cap.engineering_domain_mappings.length > 0;
 		const childrenCount = doc.capabilities.filter(
 			c => c.parent_capability_id === cap.capability_id
 		).length;
@@ -395,18 +395,40 @@ async function executeTechnicalAnalysis(
 			contextParts.push(`- [${d.id}] ${d.text}`);
 		}
 	}
+	// Include business domain proposals so domain assessment is grounded in product design,
+	// not just requirement text. Essential for greenfield projects with no target codebase.
+	if (approvedPlan.businessDomainProposals?.length) {
+		contextParts.push('## Validated Business Domains');
+		contextParts.push('User-validated business domains from INTAKE — use to inform engineering domain assessment:');
+		for (const d of approvedPlan.businessDomainProposals as Array<{ id: string; name: string; description: string }>) {
+			contextParts.push(`- **${d.name}** (${d.id}): ${d.description}`);
+		}
+	}
+	if (approvedPlan.phasingStrategy?.length) {
+		contextParts.push('## Phasing Strategy');
+		for (const p of approvedPlan.phasingStrategy as Array<{ phase: string; description: string }>) {
+			contextParts.push(`- **${p.phase}**: ${p.description}`);
+		}
+	}
 
 	const TECHNICAL_ANALYSIS_PROMPT = `You are the TECHNICAL EXPERT in the JanumiCode autonomous system, performing TECHNICAL ANALYSIS for the ARCHITECTURE phase.
 
 # Your Task
 
-An implementation plan has been approved. Before the system can decompose it into architecture, you must investigate the existing codebase and technical landscape. You must:
+An implementation plan has been approved. Investigate the technical landscape to inform architecture decomposition. You must:
 
 1. **Explore the workspace**: List directories, read key files (package.json, tsconfig, configs, docker files, etc.)
 2. **Identify existing patterns**: What frameworks, libraries, design patterns, and conventions are already in use?
 3. **Map existing code structure**: What modules/components already exist? What's the directory layout?
 4. **Identify technical constraints**: What does the existing codebase impose on the architecture? (e.g., existing database schema, API contracts, auth patterns)
 5. **Assess build/deploy infrastructure**: What CI/CD, containerization, hosting is in place?
+
+# Greenfield Projects
+
+**IMPORTANT**: If the workspace contains no codebase for the target product (greenfield build), you will find the JanumiCode tooling workspace instead. In that case:
+- Note that the target product has no existing codebase — set \`codebaseFindings\` to [] and note greenfield status in \`analysisSummary\`
+- Base \`technicalNotes\` on the stack decisions in the approved plan (requirements, constraints, decisions)
+- For \`domainAssessment\`, assess coverage of each engineering domain based on the plan content — requirements, decisions, constraints, the validated business domains, and phasing strategy provided below. A domain is ADEQUATE if the plan clearly addresses it; PARTIAL if partially covered; NONE if not addressed.
 
 # Critical Rules
 
@@ -435,14 +457,14 @@ Your response MUST be valid JSON:
     "other": ["any other significant tech"]
   },
   "proposedApproach": "High-level technical approach informed by what exists in the codebase",
-  "domainAssessment": [
+  "engineeringDomainAssessment": [
     { "domain": "PROBLEM_MISSION", "level": "ADEQUATE", "evidence": "Clearly defined in specs and approved plan" },
     { "domain": "DATA_INFORMATION", "level": "PARTIAL", "evidence": "Schema exists but migration strategy unclear" },
     { "domain": "SECURITY_COMPLIANCE", "level": "NONE", "evidence": "No auth implementation found in codebase" }
   ]
 }
 
-For domainAssessment, assess each of the 12 engineering domains based on what you find in the codebase AND the approved plan:
+For engineeringDomainAssessment, assess each of the 12 engineering domains based on what you find in the codebase AND the approved plan:
 1. PROBLEM_MISSION, 2. STAKEHOLDERS, 3. SCOPE, 4. CAPABILITIES, 5. WORKFLOWS_USE_CASES,
 6. DATA_INFORMATION, 7. INTEGRATION_INTERFACES, 8. SECURITY_COMPLIANCE, 9. QUALITY_ATTRIBUTES,
 10. ENVIRONMENT_OPERATIONS, 11. ARCHITECTURE, 12. VERIFICATION_DELIVERY
@@ -452,6 +474,13 @@ Levels: ADEQUATE (well covered), PARTIAL (some coverage), NONE (not addressed).`
 	const stdinContent = buildStdinContent(TECHNICAL_ANALYSIS_PROMPT, contextParts.join('\n\n'));
 
 	// 4. Emit command block and invoke
+	// Persist TECHNICAL_ANALYSIS substate to DB before emitting 'start' so the header
+	// breadcrumb renders immediately. All later substates are written by the previous
+	// substate on completion — only TECHNICAL_ANALYSIS has no prior substate to write it.
+	updateWorkflowMetadata(dialogueId, {
+		architectureSubState: ArchitectureSubState.TECHNICAL_ANALYSIS,
+	});
+
 	emitWorkflowCommand({
 		dialogueId,
 		commandId: analysisCmdId,
@@ -508,17 +537,17 @@ Levels: ADEQUATE (well covered), PARTIAL (some coverage), NONE (not addressed).`
 	});
 
 	// Seed domain coverage from the technical analysis domain assessment
-	const domainAssessment = Array.isArray(technicalFindings.domainAssessment)
-		? technicalFindings.domainAssessment as Array<{ domain: string; level: string; evidence: string }>
+	const engineeringDomainAssessment = Array.isArray(technicalFindings.engineeringDomainAssessment)
+		? technicalFindings.engineeringDomainAssessment as Array<{ domain: string; level: string; evidence: string }>
 		: [];
-	if (domainAssessment.length > 0) {
+	if (engineeringDomainAssessment.length > 0) {
 		const coverageMap = initializeCoverageMap();
-		const seededCoverage = seedCoverageFromAnalysis(coverageMap, domainAssessment);
-		updateIntakeConversation(dialogueId, { domainCoverage: seededCoverage });
+		const seededCoverage = seedCoverageFromAnalysis(coverageMap, engineeringDomainAssessment);
+		updateIntakeConversation(dialogueId, { engineeringDomainCoverage: seededCoverage });
 		log?.info('Domain coverage seeded from technical analysis', {
-			adequate: domainAssessment.filter(d => d.level === 'ADEQUATE').length,
-			partial: domainAssessment.filter(d => d.level === 'PARTIAL').length,
-			none: domainAssessment.filter(d => d.level === 'NONE').length,
+			adequate: engineeringDomainAssessment.filter(d => d.level === 'ADEQUATE').length,
+			partial: engineeringDomainAssessment.filter(d => d.level === 'PARTIAL').length,
+			none: engineeringDomainAssessment.filter(d => d.level === 'NONE').length,
 		});
 	}
 
@@ -629,7 +658,7 @@ async function executeDecomposing(
 	const decompositionResult = await invokeArchitectureDecomposition(
 		dialogueId,
 		approvedPlan,
-		approvedPlan.domainCoverage ?? null,
+		approvedPlan.engineeringDomainCoverage ?? null,
 		tokenBudget,
 		{
 			commandId: decomposeCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
@@ -658,7 +687,7 @@ async function executeDecomposing(
 
 	// Backfill domain mappings for capabilities where LLM omitted them
 	const capabilities = backfillDomainMappings(
-		rawCapabilities, approvedPlan, approvedPlan.domainCoverage ?? null
+		rawCapabilities, approvedPlan, approvedPlan.engineeringDomainCoverage ?? null
 	);
 
 	// RC2: Remove dangling workflow references — capabilities may reference workflow IDs
@@ -836,7 +865,7 @@ async function executeModeling(
 		if (pResult.success) { providerName = pResult.value.name; }
 	} catch { /* use fallback */ }
 
-	// Get approved plan for entityProposals/domainProposals access
+	// Get approved plan for entityProposals/businessBusinessDomainProposals access
 	const modelStateResult = getWorkflowState(dialogueId);
 	const modelApprovedPlan = modelStateResult.success
 		? JSON.parse(modelStateResult.value.metadata).approvedIntakePlan ?? null
@@ -904,7 +933,12 @@ async function executeModeling(
 	});
 
 	// Update document with domain model
-	updateArchitectureDocument(doc.doc_id, { data_models });
+	const modelUpdateResult = updateArchitectureDocument(doc.doc_id, { data_models });
+	if (!modelUpdateResult.success) {
+		log?.error('Failed to persist domain model to architecture document', {
+			error: modelUpdateResult.error.message, docId: doc.doc_id, dataModelCount: data_models.length,
+		});
+	}
 
 	// Record event
 	writeDialogueEvent({
@@ -1272,10 +1306,22 @@ async function executeDesigning(
 		}
 	}
 
+	// RC4: Deduplicate components by component_id (LLM sometimes emits the same ID twice,
+	// which causes inconsistency between the JSON blob and the DB lookup tables)
+	const seenCompIds = new Set<string>();
+	const dedupedFinals = finalComponents.filter(c => {
+		if (seenCompIds.has(c.component_id)) {
+			log?.warn('Duplicate component ID removed before persist', { component_id: c.component_id, label: c.label });
+			return false;
+		}
+		seenCompIds.add(c.component_id);
+		return true;
+	});
+
 	// 4. Update the document with design output (components + interfaces only;
 	//    data_models from MODELING, implementation_sequence from SEQUENCING)
 	const updateResult = updateArchitectureDocument(doc.doc_id, {
-		components: finalComponents,
+		components: dedupedFinals,
 		interfaces,
 	});
 
@@ -1290,8 +1336,8 @@ async function executeDesigning(
 		role: 'SYSTEM',
 		phase: 'ARCHITECTURE',
 		speech_act: SpeechAct.CLAIM,
-		summary: `Designed ${finalComponents.length} components, ${interfaces.length} interfaces`,
-		content: JSON.stringify({ components: finalComponents, interfaces, data_models: doc.data_models }),
+		summary: `Designed ${dedupedFinals.length} components, ${interfaces.length} interfaces`,
+		content: JSON.stringify({ components: dedupedFinals, interfaces, data_models: doc.data_models }),
 		detail: {
 			subState: 'DESIGNING',
 			iteration: meta.designIterations + 1,
@@ -1310,7 +1356,7 @@ async function executeDesigning(
 	});
 
 	log?.info('Design complete, advancing to SEQUENCING', {
-		components: finalComponents.length,
+		components: dedupedFinals.length,
 		interfaces: interfaces.length,
 	});
 
@@ -1321,7 +1367,7 @@ async function executeDesigning(
 			success: true,
 			metadata: {
 				subState: 'DESIGNING',
-				components: finalComponents.length,
+				components: dedupedFinals.length,
 				interfaces: interfaces.length,
 				iteration: meta.designIterations + 1,
 			},
@@ -1437,7 +1483,12 @@ async function executeSequencing(
 	});
 
 	// Update document with implementation sequence
-	updateArchitectureDocument(doc.doc_id, { implementation_sequence });
+	const seqUpdateResult = updateArchitectureDocument(doc.doc_id, { implementation_sequence });
+	if (!seqUpdateResult.success) {
+		log?.error('Failed to persist implementation sequence', {
+			error: seqUpdateResult.error.message, docId: doc.doc_id, stepCount: implementation_sequence.length,
+		});
+	}
 
 	// Record event
 	writeDialogueEvent({
@@ -1555,29 +1606,32 @@ async function executeValidating(
 		if (stateForTrace.success) {
 			const traceMeta = JSON.parse(stateForTrace.value.metadata);
 			const approvedPlan = traceMeta.approvedIntakePlan;
-			const domainCoverage = approvedPlan?.domainCoverage ?? null;
+			const engineeringDomainCoverage = approvedPlan?.engineeringDomainCoverage ?? null;
 
-			const traceResult = runRequirementsTraceabilityCheck(doc, approvedPlan, domainCoverage);
+			const traceResult = runRequirementsTraceabilityCheck(doc, approvedPlan, engineeringDomainCoverage);
 
 			// Attempt deterministic repair for unmapped domains
-			if (traceResult.unmapped_domains.length > 0 && domainCoverage) {
+			if (traceResult.unmapped_engineering_domains.length > 0 && engineeringDomainCoverage) {
 				const repairedCapabilities = backfillDomainMappings(
-					doc.capabilities, approvedPlan, domainCoverage
+					doc.capabilities, approvedPlan, engineeringDomainCoverage
 				);
 				// Check how many domains are still unmapped after backfill
 				const repairedMappedDomains = new Set<string>(
-					repairedCapabilities.flatMap(c => c.domain_mappings.map(m => m.domain))
+					repairedCapabilities.flatMap(c => c.engineering_domain_mappings.map(m => m.domain))
 				);
-				const stillUnmapped = traceResult.unmapped_domains.filter(d => !repairedMappedDomains.has(d));
+				const stillUnmapped = traceResult.unmapped_engineering_domains.filter(d => !repairedMappedDomains.has(d));
 
-				if (stillUnmapped.length < traceResult.unmapped_domains.length) {
+				if (stillUnmapped.length < traceResult.unmapped_engineering_domains.length) {
 					// Backfill resolved some gaps — persist repaired capabilities
-					updateArchitectureDocument(doc.doc_id, {
+					const backfillResult = updateArchitectureDocument(doc.doc_id, {
 						capabilities: repairedCapabilities,
 					});
+					if (!backfillResult.success) {
+						log?.error('Failed to persist backfilled capabilities', { error: backfillResult.error.message });
+					}
 					doc.capabilities = repairedCapabilities;
 					structuralFindings.push(
-						`[REPAIRED] Domain mapping backfill resolved ${traceResult.unmapped_domains.length - stillUnmapped.length} unmapped domain(s)`
+						`[REPAIRED] Domain mapping backfill resolved ${traceResult.unmapped_engineering_domains.length - stillUnmapped.length} unmapped domain(s)`
 					);
 				}
 
@@ -1672,13 +1726,18 @@ async function executeValidating(
 	});
 
 	// 5. Update document with validation results
-	updateArchitectureDocument(doc.doc_id, {
+	const valUpdateResult = updateArchitectureDocument(doc.doc_id, {
 		goal_alignment_score: goalAlignmentScore,
 		validation_findings: allFindings,
 		status: hasBlockingFindings
 			? ArchitectureDocumentStatus.DRAFT
 			: ArchitectureDocumentStatus.VALIDATED,
 	});
+	if (!valUpdateResult.success) {
+		log?.error('Failed to persist validation results', {
+			error: valUpdateResult.error.message, docId: doc.doc_id,
+		});
+	}
 
 	// 6. Record event
 	writeDialogueEvent({
@@ -1994,10 +2053,23 @@ function runStructuralValidation(doc: ArchitectureDocument): string[] {
 	const stepNameById = new Map(doc.implementation_sequence.map(s => [s.step_id, s.label]));
 	const resolveName = (id: string, lookup: Map<string, string>) => lookup.get(id) ?? id;
 
+	// Infrastructure keywords used for both capability and orphan component checks
+	const infraKeywords = /\b(shared|platform|foundation|infrastructure|cross.cutting|future|pillar|enablement|common|core.services|identity|auth|authorization|gateway|ledger|shell|registry|cache|queue|bus|broker)\b/i;
+
 	// 1. Orphan components: components that serve no workflow
+	// Only flag as BLOCKING if the component has NO workflows AND no other component depends on it.
+	// Shared/infrastructure services (e.g. identity, ledger, API gateway) legitimately have
+	// workflows_served:[] but are depended on by other components — those are WARN only.
+	const allDependencies = new Set(doc.components.flatMap(c => c.dependencies));
 	for (const comp of doc.components) {
 		if (comp.workflows_served.length === 0) {
-			findings.push(`Orphan component "${comp.label}" (${comp.component_id}) serves no workflow`);
+			const isSharedService = allDependencies.has(comp.component_id);
+			const isInfraByLabel = infraKeywords.test(comp.label);
+			if (isSharedService || isInfraByLabel) {
+				findings.push(`[WARN] Shared/infrastructure component "${comp.label}" (${comp.component_id}) serves no workflow directly — expected for shared services`);
+			} else {
+				findings.push(`Orphan component "${comp.label}" (${comp.component_id}) serves no workflow and has no dependents`);
+			}
 		}
 	}
 
@@ -2057,11 +2129,9 @@ function runStructuralValidation(doc: ArchitectureDocument): string[] {
 	}
 
 	// 7. Workflow completeness: every capability should have at least one workflow
-	//    Infrastructure / cross-cutting capabilities (e.g., "Shared Platform Foundation",
-	//    "Future Pillar Enablement") legitimately may have no user-facing workflows.
+	//    Infrastructure / cross-cutting capabilities legitimately may have no user-facing workflows.
 	//    Heuristic: capabilities whose label contains infrastructure keywords are
 	//    downgraded to warnings; others remain blocking.
-	const infraKeywords = /\b(shared|platform|foundation|infrastructure|cross.cutting|future|pillar|enablement|common|core.services)\b/i;
 	for (const cap of doc.capabilities) {
 		if (cap.workflows.length === 0) {
 			if (infraKeywords.test(cap.label)) {
@@ -2097,22 +2167,38 @@ function runStructuralValidation(doc: ArchitectureDocument): string[] {
 	}
 
 	// 10. Interface completeness: every component dependency should have a corresponding
-	//     interface (at least one interface where the dependency is the provider and the
-	//     component is the consumer, or vice versa)
+	//     interface. Cross-capability dependency gaps are BLOCKING (different capability
+	//     domains need formal contracts); intra-module gaps are WARN (internal wiring).
 	const interfaceEdges = new Set<string>();
 	for (const iface of doc.interfaces) {
 		for (const consumer of iface.consumer_components) {
 			interfaceEdges.add(`${iface.provider_component}->${consumer}`);
 		}
 	}
+	// Build component→capability set using workflows_served → workflow.capability_id
+	const compToCapabilities = new Map<string, Set<string>>();
+	for (const comp of doc.components) {
+		const caps = new Set(
+			comp.workflows_served
+				.map(wfId => doc.workflow_graph.find(w => w.workflow_id === wfId)?.capability_id)
+				.filter((c): c is string => !!c)
+		);
+		compToCapabilities.set(comp.component_id, caps);
+	}
 	for (const comp of doc.components) {
 		for (const dep of comp.dependencies) {
-			// Skip parent-child relationships and non-component references
+			// Skip non-component references (e.g. DM- model IDs)
 			if (!componentIds.has(dep)) { continue; }
 			const edge = `${dep}->${comp.component_id}`;
 			const reverseEdge = `${comp.component_id}->${dep}`;
 			if (!interfaceEdges.has(edge) && !interfaceEdges.has(reverseEdge)) {
-				findings.push(`Missing interface: "${comp.label}" depends on "${dep}" but no interface connects them`);
+				const depCaps = compToCapabilities.get(dep) ?? new Set<string>();
+				const compCaps = compToCapabilities.get(comp.component_id) ?? new Set<string>();
+				const sharedCaps = [...depCaps].filter(c => compCaps.has(c));
+				// Cross-capability (both sides have known, non-overlapping caps) → BLOCKING
+				const isCrossBoundary = depCaps.size > 0 && compCaps.size > 0 && sharedCaps.length === 0;
+				const prefix = isCrossBoundary ? '' : '[WARN] ';
+				findings.push(`${prefix}Missing interface: "${comp.label}" depends on "${resolveName(dep, compNameById)}" (${dep}) but no interface connects them`);
 			}
 		}
 	}

@@ -49,6 +49,11 @@
         "category": "JanumiCode"
       },
       {
+        "command": "janumicode.openArchitectureExplorer",
+        "title": "View Architecture Decomposition",
+        "category": "JanumiCode"
+      },
+      {
         "command": "janumicode.openSettings",
         "title": "Open Settings",
         "category": "JanumiCode",
@@ -67,6 +72,11 @@
       {
         "command": "janumicode.findInStream",
         "title": "Find in Stream",
+        "category": "JanumiCode"
+      },
+      {
+        "command": "janumicode.replaySession",
+        "title": "Replay Session Recording",
         "category": "JanumiCode"
       }
     ],
@@ -301,6 +311,11 @@
           ],
           "default": "info",
           "description": "Log level for the JanumiCode output channel"
+        },
+        "janumicode.validation.parallelAgents": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Run Deep Validation Review hypothesizer agents in parallel. When `false` (default), the three agents (security, logic, best_practices) run sequentially to avoid saturating the CLI provider with concurrent calls. Enable only if your CLI provider supports concurrent invocations without rate-limiting."
         },
         "janumicode.mcp.mobileSpecialist.enabled": {
           "type": "boolean",
@@ -582,6 +597,7 @@
     "@rollup/rollup-linux-x64-gnu": "^4.59.0",
     "@sqliteai/sqlite-vector": "^0.9.92",
     "better-sqlite3": "^12.6.2",
+    "jsonrepair": "^3.13.3",
     "nanoid": "^3.3.11",
     "openai": "^6.18.0",
     "rollup": "^4.59.0",

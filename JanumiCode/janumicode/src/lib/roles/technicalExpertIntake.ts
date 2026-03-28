@@ -17,7 +17,7 @@ import type {
 	UserJourney,
 	UserJourneyStep,
 	PhasingEntry,
-	DomainProposal,
+	BusinessDomainProposal,
 	EntityProposal,
 	WorkflowProposal,
 	IntegrationProposal,
@@ -292,7 +292,7 @@ Return ONLY the JSON object:
     "successMetrics": "(OMIT for technical_task) [\"Specific measurable outcome 1\", \"Specific measurable outcome 2\"]",
     "phasingStrategy": "(OMIT for technical_task) [{ phase, description, journeyIds, rationale }]",
     "uxRequirements": "(OMIT for technical_task) [\"Design principle or UX constraint 1\", \"Design principle or UX constraint 2\"]",
-    "domainProposals": "CARRY FORWARD — copy the domainProposals array from the draft plan exactly as-is",
+    "businessDomainProposals": "CARRY FORWARD — copy the businessDomainProposals array from the draft plan exactly as-is",
     "entityProposals": "CARRY FORWARD — copy the entityProposals array from the draft plan exactly as-is",
     "workflowProposals": "CARRY FORWARD — copy the workflowProposals array from the draft plan exactly as-is",
     "integrationProposals": "CARRY FORWARD — copy the integrationProposals array from the draft plan exactly as-is",
@@ -326,7 +326,7 @@ In addition to consolidating requirements, decisions, and constraints:
 4. **Polish vision and description**: Make productVision (1-2 sentences) and productDescription (one paragraph) crisp and self-contained.
 5. **Consolidate success metrics**: Each metric MUST be a string (not an object). Specific, measurable outcomes that prove the product works.
 6. **Consolidate UX requirements**: Each requirement MUST be a string (not an object). Design principles and experience constraints.
-7. **CARRY FORWARD proposer artifacts verbatim**: The domainProposals, entityProposals, workflowProposals, integrationProposals, and qualityAttributes arrays MUST be copied from the draft plan into the output exactly as they are. Do NOT summarize, reorganize, or omit any of these arrays. They are the validated proposer output and must pass through synthesis unchanged.
+7. **CARRY FORWARD proposer artifacts verbatim**: The businessDomainProposals, entityProposals, workflowProposals, integrationProposals, and qualityAttributes arrays MUST be copied from the draft plan into the output exactly as they are. Do NOT summarize, reorganize, or omit any of these arrays. They are the validated proposer output and must pass through synthesis unchanged.
 
 For product_or_feature requests, the draft plan should tell a complete product story: WHY (vision) → WHO (personas) → WHAT THEY DO (journeys) → WHAT SUCCESS LOOKS LIKE (acceptance criteria + metrics) → WHEN (phasing). The user will then review and prioritize through the MMP process. For technical_task requests, the plan focuses on the technical problem, approach, and constraints.`;
 
@@ -552,7 +552,7 @@ Maximum 5 Mirror items and 2 Menu items per domain turn.
 
 Skip this section entirely for technical_task requests (bug fix, refactor, infra, config, etc.).
 
-When gathering information for certain domains, also extract product artifacts in your domainNotes:
+When gathering information for certain domains, also extract product artifacts in your engineeringDomainNotes:
 
 - **PROBLEM_MISSION**: Identify productVision and productDescription. Mirror assumptions about why this product exists.
 - **STAKEHOLDERS**: Identify personas (who, goals, pain points). Use "persona" category Mirror items for each user type.
@@ -567,8 +567,8 @@ Your response MUST be valid JSON with this exact structure:
 \`\`\`json
 {
   "conversationalResponse": "Your interviewer-style response — findings from codebase + assumptions for validation...",
-  "focusDomain": "DOMAIN_ENUM_VALUE",
-  "domainNotes": ["Key fact 1...", "Key fact 2...", "Constraint discovered..."],
+  "focusEngineeringDomain": "DOMAIN_ENUM_VALUE",
+  "engineeringDomainNotes": ["Key fact 1...", "Key fact 2...", "Constraint discovered..."],
   "codebaseFindings": ["path/to/file - relevant finding"],
   "followUpQuestions": [],
   "mmp": {
@@ -592,7 +592,7 @@ Your response MUST be valid JSON with this exact structure:
 
 The \`mmp\` field is optional. Include it when you have domain-specific assumptions to validate or decisions for the user. You may still use \`followUpQuestions\` as fallback for open-ended domain questions.
 
-The "domainNotes" array should capture structured observations:
+The "engineeringDomainNotes" array should capture structured observations:
 - Facts the Human stated about this domain
 - Constraints or requirements you identified
 - Codebase patterns relevant to this domain
@@ -604,7 +604,7 @@ The "domainNotes" array should capture structured observations:
 export interface IntakeGatheringExpertOptions {
 	dialogueId: string;
 	humanMessage: string;
-	currentDomain: EngineeringDomain;
+	currentEngineeringDomain: EngineeringDomain;
 	turnNumber: number;
 	provider: RoleCLIProvider;
 	/** Optional streaming callback for real-time tool activity */
@@ -656,7 +656,7 @@ export async function invokeGatheringTechnicalExpert(
 
 		return parseGatheringTurnResponse(
 			cliResult.value.response,
-			options.currentDomain
+			options.currentEngineeringDomain
 		);
 	} catch (error) {
 		return {
@@ -687,8 +687,8 @@ function parseGatheringTurnResponse(
 				success: true,
 				value: {
 					conversationalResponse: rawResponse,
-					focusDomain: expectedDomain,
-					domainNotes: [],
+					focusEngineeringDomain: expectedDomain,
+					engineeringDomainNotes: [],
 					codebaseFindings: [],
 					followUpQuestions: [],
 				},
@@ -705,8 +705,8 @@ function parseGatheringTurnResponse(
 			success: true,
 			value: {
 				conversationalResponse: parsed.conversationalResponse,
-				focusDomain: isValidEngineeringDomain(parsed.focusDomain) ? parsed.focusDomain : expectedDomain,
-				domainNotes: Array.isArray(parsed.domainNotes) ? parsed.domainNotes : [],
+				focusEngineeringDomain: isValidEngineeringDomain(parsed.focusEngineeringDomain) ? parsed.focusEngineeringDomain : expectedDomain,
+				engineeringDomainNotes: Array.isArray(parsed.engineeringDomainNotes) ? parsed.engineeringDomainNotes : [],
 				codebaseFindings: Array.isArray(parsed.codebaseFindings) ? parsed.codebaseFindings : [],
 				followUpQuestions,
 				// Prefer LLM-generated MMP; fall back to converting followUpQuestions
@@ -728,8 +728,8 @@ function parseGatheringTurnResponse(
 			success: true,
 			value: {
 				conversationalResponse: cleanedResponse,
-				focusDomain: expectedDomain,
-				domainNotes: [],
+				focusEngineeringDomain: expectedDomain,
+				engineeringDomainNotes: [],
 				codebaseFindings: [],
 				followUpQuestions: [],
 			},
@@ -1044,7 +1044,7 @@ function parseAnalysisTurnResponse(
 				analysisSummary: parsed.analysisSummary ?? rawResponse,
 				initialPlan,
 				codebaseFindings: Array.isArray(parsed.codebaseFindings) ? parsed.codebaseFindings : [],
-				domainAssessment: Array.isArray(parsed.domainAssessment) ? parsed.domainAssessment : [],
+				engineeringDomainAssessment: Array.isArray(parsed.engineeringDomainAssessment) ? parsed.engineeringDomainAssessment : [],
 			},
 		};
 	} catch {
@@ -1238,7 +1238,7 @@ Your response MUST be valid JSON with this exact structure:
  * For CLARIFYING sub-state, uses the dedicated clarifying prompt.
  * For STATE_DRIVEN mode, the domain coverage context contains a strong
  * behavioral override that narrows the Expert's scope to the current domain.
- * For other modes (DOMAIN_GUIDED, HYBRID_CHECKPOINTS), it appends advisory
+ * For other modes (DOCUMENT_BASED, HYBRID_CHECKPOINTS), it appends advisory
  * coverage context without changing the Expert's fundamental behavior.
  *
  * Returns the base prompt unmodified when no domain context is provided.
@@ -1276,7 +1276,7 @@ function buildModeAwareSystemPrompt(
 		return buildStateDrivenPrompt(domainCoverageContext) + gatheringInstruction;
 	}
 
-	// DOMAIN_GUIDED and HYBRID_CHECKPOINTS: append coverage context as advisory
+	// DOCUMENT_BASED and HYBRID_CHECKPOINTS: append coverage context as advisory
 	return INTAKE_TECHNICAL_EXPERT_SYSTEM_PROMPT
 		+ gatheringInstruction
 		+ '\n\n# Domain Coverage Context\n\n'
@@ -1855,7 +1855,7 @@ export interface ProposerOptions {
 
 // ── DOMAIN PROPOSER ──
 
-const DOMAIN_PROPOSER_PROMPT = `You are a PRODUCT DOMAIN PROPOSER in an autonomous software engineering system.
+const BUSINESS_DOMAIN_PROPOSER_PROMPT = `You are a PRODUCT DOMAIN PROPOSER in an autonomous software engineering system.
 
 # Your Task
 
@@ -1925,9 +1925,9 @@ Return ONLY the JSON object:
 /**
  * Invoke the domain proposer — Round 1.
  */
-export async function invokeProposerDomains(
+export async function invokeProposerBusinessDomains(
 	options: ProposerOptions
-): Promise<Result<{ domains: DomainProposal[]; personas: PersonaDefinition[] }>> {
+): Promise<Result<{ domains: BusinessDomainProposal[]; personas: PersonaDefinition[] }>> {
 	try {
 		// Build context from draft plan findings
 		const contextParts: string[] = [];
@@ -1943,15 +1943,57 @@ export async function invokeProposerDomains(
 			contextParts.push(`# Human Feedback (MUST incorporate this guidance)\n\n${humanFeedback}`);
 		}
 
+		// Product vision & description from Intent Discovery
+		if (options.draftPlan.productVision) {
+			contextParts.push(`# Product Vision\n\n${options.draftPlan.productVision}`);
+		}
+		if (options.draftPlan.productDescription) {
+			contextParts.push(`# Product Description\n\n${options.draftPlan.productDescription}`);
+		}
+
+		// Personas from Intent Discovery
+		const discoveredPersonas = options.draftPlan.personas ?? [];
+		if (discoveredPersonas.length > 0) {
+			const personaLines = discoveredPersonas.map(p =>
+				`- **${p.id}**: ${p.name} — ${p.description}` +
+				(p.goals?.length ? `\n  Goals: ${p.goals.join('; ')}` : '') +
+				(p.painPoints?.length ? `\n  Pain points: ${p.painPoints.join('; ')}` : '')
+			);
+			contextParts.push(`# Validated Personas (from Intent Discovery)\n\n${personaLines.join('\n')}`);
+		}
+
+		// User journeys from Intent Discovery (compact — no step-by-step)
+		const journeys = options.draftPlan.userJourneys ?? [];
+		if (journeys.length > 0) {
+			const journeyLines = journeys.map(j =>
+				`- **${j.id}** [${j.implementationPhase ?? 'TBD'}] ${j.title} (${j.personaId}): ${j.scenario}`
+			);
+			contextParts.push(`# Validated User Journeys (from Intent Discovery)\n\n${journeyLines.join('\n')}`);
+		}
+
+		// Phasing strategy
+		const phasing = options.draftPlan.phasingStrategy ?? [];
+		if (phasing.length > 0) {
+			const phasingLines = phasing.map(ph => `- **${ph.phase}**: ${ph.description}`);
+			contextParts.push(`# Validated Phasing Strategy\n\n${phasingLines.join('\n')}`);
+		}
+
+		// Requirements
+		const requirements = options.draftPlan.requirements ?? [];
+		if (requirements.length > 0) {
+			const reqLines = requirements.slice(0, 15).map(r => `- ${r.text}`);
+			contextParts.push(`# Requirements\n\n${reqLines.join('\n')}`);
+		}
+
 		if (options.draftPlan.proposedApproach) {
-			contextParts.push(`# Analysis Findings\n\n${options.draftPlan.proposedApproach}`);
+			contextParts.push(`# Technical Approach Notes\n\n${options.draftPlan.proposedApproach}`);
 		}
 		const techNotes = options.draftPlan.technicalNotes ?? [];
 		if (techNotes.length > 0) {
 			contextParts.push(`# Codebase Observations\n\n${techNotes.join('\n')}`);
 		}
 
-		const stdinContent = buildStdinContent(DOMAIN_PROPOSER_PROMPT, contextParts.join('\n\n---\n\n'));
+		const stdinContent = buildStdinContent(BUSINESS_DOMAIN_PROPOSER_PROMPT, contextParts.join('\n\n---\n\n'));
 
 		const cliResult = await invokeRoleStreaming({
 			provider: options.provider,
@@ -1964,7 +2006,7 @@ export async function invokeProposerDomains(
 		const jsonStr = extractJsonFromIntakeResponse(cliResult.value.response);
 		const parsed = JSON.parse(jsonStr);
 
-		const domains: DomainProposal[] = (parsed.domains ?? []).map((d: Record<string, unknown>, i: number) => ({
+		const domains: BusinessDomainProposal[] = (parsed.domains ?? []).map((d: Record<string, unknown>, i: number) => ({
 			id: (d.id as string) || `DOM-${i + 1}`,
 			name: (d.name as string) || '',
 			description: (d.description as string) || '',
@@ -2066,7 +2108,7 @@ Return ONLY the JSON object:
   "workflows": [
     {
       "id": "WF-1",
-      "domainId": "DOM-X",
+      "businessDomainId": "DOM-X",
       "name": "Workflow name",
       "description": "What this workflow accomplishes",
       "steps": ["Step 1 description", "Step 2 description"],
@@ -2098,7 +2140,7 @@ export async function invokeProposerJourneys(
 		}
 
 		// Include accepted domains
-		const domains = options.draftPlan.domainProposals ?? [];
+		const domains = options.draftPlan.businessDomainProposals ?? [];
 		if (domains.length > 0) {
 			contextParts.push(`# Accepted Domains\n\n${domains.map(d => `- **${d.id}**: ${d.name} — ${d.description}`).join('\n')}`);
 		}
@@ -2139,7 +2181,7 @@ export async function invokeProposerJourneys(
 
 		const workflows: WorkflowProposal[] = (parsed.workflows ?? []).map((w: Record<string, unknown>, i: number) => ({
 			id: (w.id as string) || `WF-${i + 1}`,
-			domainId: (w.domainId as string) || '',
+			businessDomainId: (w.businessDomainId as string) || '',
 			name: (w.name as string) || '',
 			description: (w.description as string) || '',
 			steps: Array.isArray(w.steps) ? w.steps as string[] : [],
@@ -2201,7 +2243,7 @@ Return ONLY the JSON object:
   "entities": [
     {
       "id": "ENT-<NAME>",
-      "domainId": "DOM-X",
+      "businessDomainId": "DOM-X",
       "name": "Entity Name",
       "description": "What this entity represents",
       "keyAttributes": ["attribute1", "attribute2"],
@@ -2230,7 +2272,7 @@ export async function invokeProposerEntities(
 			contextParts.push(`# Human Feedback (MUST incorporate this guidance)\n\n${humanFeedback}`);
 		}
 
-		const domains = options.draftPlan.domainProposals ?? [];
+		const domains = options.draftPlan.businessDomainProposals ?? [];
 		if (domains.length > 0) {
 			contextParts.push(`# Accepted Domains\n\n${domains.map(d => `- **${d.id}**: ${d.name} — ${d.description}`).join('\n')}`);
 		}
@@ -2265,7 +2307,7 @@ export async function invokeProposerEntities(
 
 		const entities: EntityProposal[] = (parsed.entities ?? []).map((e: Record<string, unknown>, i: number) => ({
 			id: (e.id as string) || `ENT-${i + 1}`,
-			domainId: (e.domainId as string) || '',
+			businessDomainId: (e.businessDomainId as string) || '',
 			name: (e.name as string) || '',
 			description: (e.description as string) || '',
 			keyAttributes: Array.isArray(e.keyAttributes) ? e.keyAttributes as string[] : [],
@@ -2360,14 +2402,14 @@ export async function invokeProposerIntegrations(
 			contextParts.push(`# Human Feedback (MUST incorporate this guidance)\n\n${humanFeedback}`);
 		}
 
-		const domains = options.draftPlan.domainProposals ?? [];
+		const domains = options.draftPlan.businessDomainProposals ?? [];
 		if (domains.length > 0) {
 			contextParts.push(`# Accepted Domains\n\n${domains.map(d => `- **${d.id}**: ${d.name}`).join('\n')}`);
 		}
 
 		const entities = options.draftPlan.entityProposals ?? [];
 		if (entities.length > 0) {
-			contextParts.push(`# Accepted Entities\n\n${entities.map(e => `- **${e.id}**: ${e.name} (${e.domainId})`).join('\n')}`);
+			contextParts.push(`# Accepted Entities\n\n${entities.map(e => `- **${e.id}**: ${e.name} (${e.businessDomainId})`).join('\n')}`);
 		}
 
 		const workflows = options.draftPlan.workflowProposals ?? [];
