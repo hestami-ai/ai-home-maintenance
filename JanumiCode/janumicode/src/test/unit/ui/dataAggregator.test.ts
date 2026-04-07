@@ -176,10 +176,18 @@ describe('dataAggregator', () => {
 		it('computes claim health from active dialogue claims', () => {
 			initializeWorkflowState(DLG_ID);
 			const db = getDatabase()!;
+			// claims schema requires introduced_by NOT NULL, length-36 claim_id,
+			// and a composite FK (dialogue_id, turn_id) -> dialogue_events.
+			const turnInsert = db.prepare(`
+				INSERT INTO dialogue_events (dialogue_id, event_type, role, phase, speech_act, summary, content, timestamp)
+				VALUES (?, 'claim', 'EXECUTOR', 'PROPOSE', 'CLAIM', 'seed turn', 'seed', datetime('now'))
+			`).run(DLG_ID);
+			const turnId = Number(turnInsert.lastInsertRowid);
+			const claimId = 'claim001-0000-0000-0000-000000000001';
 			db.prepare(
-				`INSERT INTO claims (claim_id, dialogue_id, turn_id, statement, status, criticality, created_at)
-				VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
-			).run('claim1', DLG_ID, 1, 'Test claim', ClaimStatus.VERIFIED, 'CRITICAL');
+				`INSERT INTO claims (claim_id, dialogue_id, turn_id, statement, introduced_by, status, criticality, created_at)
+				VALUES (?, ?, ?, ?, 'EXECUTOR', ?, ?, datetime('now'))`
+			).run(claimId, DLG_ID, turnId, 'Test claim', ClaimStatus.VERIFIED, 'CRITICAL');
 
 			const result = aggregateStreamState(DLG_ID);
 			expect(result.claimHealth.verified).toBe(1);
@@ -469,9 +477,9 @@ describe('dataAggregator', () => {
 			initializeWorkflowState(DLG_ID);
 			const db = getDatabase()!;
 			db.prepare(
-				`INSERT INTO dialogue_events (dialogue_id, turn_id, event_type, phase, role, content, summary, timestamp)
+				`INSERT INTO dialogue_events (dialogue_id, event_type, phase, role, speech_act, content, summary, timestamp)
 				VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
-			).run(DLG_ID, 1, 'legacy', Phase.INTAKE, 'system', 'Legacy content', 'Legacy');
+			).run(DLG_ID, 'legacy', Phase.INTAKE, 'system', 'inform', 'Legacy content', 'Legacy');
 
 			const result = aggregateStreamState(DLG_ID);
 			const legacy = result.streamItems.find((i: any) => i.turn?.event_type === 'legacy');
@@ -516,9 +524,9 @@ describe('dataAggregator', () => {
 			initializeWorkflowState(DLG_ID);
 			const db = getDatabase()!;
 			db.prepare(
-				`INSERT INTO dialogue_events (dialogue_id, turn_id, event_type, phase, role, content, summary, timestamp)
+				`INSERT INTO dialogue_events (dialogue_id, event_type, phase, role, speech_act, content, summary, timestamp)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-			).run(DLG_ID, 1, 'human_message', Phase.INTAKE, 'user', 'Test', 'Test', '');
+			).run(DLG_ID, 'human_message', Phase.INTAKE, 'user', 'inform', 'Test', 'Test', '');
 
 			const result = aggregateStreamState(DLG_ID);
 			expect(result).toBeDefined();
