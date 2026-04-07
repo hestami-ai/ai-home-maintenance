@@ -639,14 +639,16 @@ describe('Event Reader', () => {
 	describe('getArtifactByHash', () => {
 		it('returns artifact by hash', () => {
 			const db = getDatabase()!;
+			// artifacts schema: (artifact_id UUID36 PK, content_hash UNIQUE, content BLOB, mime_type, size INTEGER, created_at)
 			db.prepare(
-				'INSERT INTO artifacts (content_hash, content, mime_type, size_bytes, created_at) VALUES (?, ?, ?, ?, datetime(\'now\'))'
-			).run('abc123', 'test content', 'text/plain', 12);
+				'INSERT INTO artifacts (artifact_id, content_hash, content, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\'))'
+			).run('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeee01', 'abc123', Buffer.from('test content'), 'text/plain', 12);
 
 			const result = getArtifactByHash('abc123');
 			expect(result.success).toBe(true);
 			if (result.success && result.value) {
-				expect(result.value.content).toBe('test content');
+				// content is BLOB; better-sqlite3 returns Buffer for BLOB columns.
+				expect(Buffer.from(result.value.content as unknown as Buffer).toString('utf8')).toBe('test content');
 			}
 		});
 

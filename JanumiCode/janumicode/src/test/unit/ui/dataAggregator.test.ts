@@ -189,14 +189,16 @@ describe('dataAggregator', () => {
 		it('identifies open gates for active dialogue', () => {
 			initializeWorkflowState(DLG_ID);
 			const db = getDatabase()!;
+			// gates schema: (gate_seq AUTOINCREMENT, gate_id UUID36, dialogue_id, reason, status, blocking_claims, created_at, resolved_at)
+			const gateId = 'gate0001-0000-0000-0000-000000000001';
 			db.prepare(
-				`INSERT INTO gates (gate_id, dialogue_id, gate_type, message, status, blocking_claims, created_at)
-				VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
-			).run('gate1', DLG_ID, 'HUMAN_DECISION', 'Test gate', GateStatus.OPEN, '[]');
+				`INSERT INTO gates (gate_id, dialogue_id, reason, status, blocking_claims, created_at)
+				VALUES (?, ?, ?, ?, ?, datetime('now'))`
+			).run(gateId, DLG_ID, 'Test gate', GateStatus.OPEN, '[]');
 
 			const result = aggregateStreamState(DLG_ID);
 			expect(result.openGates).toHaveLength(1);
-			expect(result.openGates[0].gate_id).toBe('gate1');
+			expect(result.openGates[0].gate_id).toBe(gateId);
 		});
 
 		it('builds intake state when in INTAKE phase', () => {
