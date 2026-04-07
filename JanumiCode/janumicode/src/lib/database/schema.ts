@@ -307,6 +307,7 @@ CREATE TABLE IF NOT EXISTS intake_conversations (
     classifier_result TEXT DEFAULT NULL,
     clarification_round INTEGER NOT NULL DEFAULT 0,
     mmp_history TEXT DEFAULT NULL,
+    proposer_phase INTEGER DEFAULT NULL,
     CONSTRAINT fk_dialogue_id CHECK(length(dialogue_id) = 36)
 );
 
@@ -750,9 +751,9 @@ CREATE TABLE IF NOT EXISTS pending_mmp_decisions (
     menu_selections TEXT NOT NULL DEFAULT '{}',
     premortem_decisions TEXT NOT NULL DEFAULT '{}',
     product_edits TEXT NOT NULL DEFAULT '{}',
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(dialogue_id, card_id)
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_mmp_dialogue_card ON pending_mmp_decisions(dialogue_id, card_id);
 CREATE INDEX IF NOT EXISTS idx_pending_mmp_dialogue ON pending_mmp_decisions(dialogue_id);
 
 -- ==================== VALIDATION FINDINGS ====================
@@ -1006,9 +1007,9 @@ CREATE TABLE IF NOT EXISTS pending_mmp_decisions (
     menu_selections TEXT NOT NULL DEFAULT '{}',
     premortem_decisions TEXT NOT NULL DEFAULT '{}',
     product_edits TEXT NOT NULL DEFAULT '{}',
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(dialogue_id, card_id)
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_mmp_dialogue_card ON pending_mmp_decisions(dialogue_id, card_id);
 CREATE INDEX IF NOT EXISTS idx_pending_mmp_dialogue ON pending_mmp_decisions(dialogue_id);
 `,
 	},

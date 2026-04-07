@@ -338,14 +338,18 @@ describe('Database Migrations', () => {
 			.all() as Array<{ name: string }>;
 		const tableNames = tables.map(t => t.name);
 
+		// MAKER tables (renamed since the test was first written; the schema
+		// uses unprefixed names with role-specific contracts).
 		const makerTables = [
-			'maker_intents',
-			'maker_task_units',
-			'maker_task_dependencies',
-			'maker_claims',
-			'maker_claim_validations',
-			'maker_validation_tests',
-			'maker_execution_traces',
+			'intent_records',
+			'acceptance_contracts',
+			'task_graphs',
+			'task_units',
+			'task_edges',
+			'claim_units',
+			'evidence_packets',
+			'validation_packets',
+			'repair_packets',
 		];
 
 		for (const table of makerTables) {
