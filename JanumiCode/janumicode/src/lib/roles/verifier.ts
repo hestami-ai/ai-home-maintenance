@@ -21,6 +21,7 @@ import { randomUUID } from 'node:crypto';
 import { nanoid } from 'nanoid';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { emitWorkflowCommand } from '../integration/eventBus';
+import { hasActiveWaiver, getActiveWaivers } from './human';
 
 /**
  * Verifier invocation options
@@ -213,7 +214,22 @@ Examples of novel dependencies:
 - Architecture recommends "Drizzle ORM" but the project uses Prisma
 - Architecture adds Redis to the stack when it's not currently used
 
-This flag does NOT affect the verdict — a novel dependency can still be VERIFIED. It signals that the human should approve adopting a new dependency.`;
+This flag does NOT affect the verdict — a novel dependency can still be VERIFIED. It signals that the human should approve adopting a new dependency.
+
+# Constraint Waivers
+
+You may receive an "ACTIVE CONSTRAINT WAIVERS" section listing constraints that have been explicitly waived by human authority with a time-bounded justification. When evaluating a claim:
+
+1. If the claim would normally be DISPROVED because it violates a constraint that has an active waiver:
+   - Return **CONDITIONAL** instead of DISPROVED
+   - Set "constraints_ref" to the waived constraint's reference
+   - In your rationale, explicitly acknowledge the waiver and the justification
+
+2. If no waiver applies, evaluate normally.
+
+3. Never treat a waiver as a VERIFIED signal — the underlying constraint concern is still real; the waiver is a time-bounded exception, not an endorsement.
+
+This policy preserves the audit trail: a CONDITIONAL verdict with a waiver annotation is materially different from a plain VERIFIED verdict, and downstream roles (Executor, Historian) will see that there's a live constraint exception in effect.`;
 
 /**
  * Invoke Verifier agent
@@ -240,7 +256,12 @@ export async function invokeVerifier(
 			return contextResult;
 		}
 
-		const formattedContext = contextResult.value.briefing;
+		// Prepend active waivers to the context so the LLM is aware of them.
+		// The post-processing `applyConstraintWaiverDowngrade` is the enforcement
+		// layer; this prompt injection is the hint layer that lets the LLM
+		// produce a more nuanced rationale when it recognizes a waived constraint.
+		const waiverSection = buildActiveWaiverSection();
+		const formattedContext = waiverSection + contextResult.value.briefing;
 
 		// Build stdin content: system prompt + formatted context
 		const stdinContent = buildStdinContent(VERIFIER_SYSTEM_PROMPT, formattedContext);
@@ -295,7 +316,11 @@ export async function invokeVerifier(
 			return validationResult;
 		}
 
-		return { success: true, value: parseResult.value };
+		// Apply constraint waivers: if the verdict is DISPROVED and the constraint
+		// has an active waiver, downgrade to CONDITIONAL with an audit-trail rationale.
+		const downgraded = applyConstraintWaiverDowngrade(parseResult.value);
+
+		return { success: true, value: downgraded };
 	} catch (error) {
 		return {
 			success: false,
@@ -422,6 +447,78 @@ function parseVerifierResponse(rawResponse: string): Result<VerifierResponse> {
 					: new Error('Failed to parse Verifier response'),
 		};
 	}
+}
+
+/**
+ * Build a context section listing all currently active constraint waivers.
+ * Prepended to the Verifier's context briefing so the LLM is aware of them
+ * when evaluating claims. Returns an empty string if no waivers are active.
+ */
+function buildActiveWaiverSection(): string {
+	const waiversResult = getActiveWaivers();
+	if (!waiversResult.success || waiversResult.value.length === 0) { return ''; }
+
+	const lines: string[] = [
+		'# ACTIVE CONSTRAINT WAIVERS',
+		'',
+		'The following constraints have active human-granted waivers. When evaluating',
+		'a claim that would otherwise be DISPROVED due to one of these constraints,',
+		'acknowledge the waiver in your rationale and return CONDITIONAL instead of',
+		'DISPROVED. The waiver is time-bounded and will expire automatically.',
+		'',
+	];
+	for (const waiver of waiversResult.value) {
+		const expiry = waiver.expiration
+			? `expires ${waiver.expiration}`
+			: 'no expiration (permanent)';
+		lines.push(
+			`- **${waiver.constraint_ref}** — granted by ${waiver.granted_by} (${expiry})`,
+			`  Justification: ${waiver.justification}`,
+		);
+	}
+	lines.push('', '---', '');
+	return lines.join('\n');
+}
+
+/**
+ * Apply constraint waiver downgrade to a Verifier response.
+ *
+ * When a claim is DISPROVED because it violates a project constraint, a human
+ * may have previously granted a time-bounded waiver for that constraint. In
+ * that case, the verdict should be downgraded from DISPROVED to CONDITIONAL,
+ * and the rationale annotated with the audit trail: who granted the waiver,
+ * which constraint, and when it expires.
+ *
+ * Semantic note: downgrading (rather than suppressing) preserves the Verifier's
+ * original finding for the audit trail. A CONDITIONAL verdict with a waiver
+ * annotation is materially different from a VERIFIED verdict — downstream
+ * roles can still see that there's a live constraint concern, just that it's
+ * been acknowledged and time-bounded by human authority.
+ *
+ * @param response Verifier's parsed response
+ * @returns Response with potentially downgraded verdict and annotated rationale
+ */
+function applyConstraintWaiverDowngrade(response: VerifierResponse): VerifierResponse {
+	// Only DISPROVED verdicts with a constraints_ref are candidates for waiving.
+	if (response.verdict !== VerdictType.DISPROVED) { return response; }
+	if (!response.constraints_ref) { return response; }
+
+	const waiverResult = hasActiveWaiver(response.constraints_ref);
+	if (!waiverResult.success || !waiverResult.value) { return response; }
+
+	// Active waiver exists — downgrade to CONDITIONAL with audit annotation.
+	const log = isLoggerInitialized()
+		? getLogger().child({ component: 'role:verifier', check: 'waiver_downgrade' })
+		: null;
+	log?.info('Downgrading DISPROVED verdict to CONDITIONAL due to active waiver', {
+		constraintRef: response.constraints_ref,
+	});
+
+	return {
+		...response,
+		verdict: VerdictType.CONDITIONAL,
+		rationale: `${response.rationale}\n\n[WAIVER APPLIED] This claim would have been DISPROVED due to constraint violation, but constraint "${response.constraints_ref}" has an active human-granted waiver. Verdict downgraded to CONDITIONAL. The constraint concern remains on record; the waiver is time-bounded and will automatically expire.`,
+	};
 }
 
 /**

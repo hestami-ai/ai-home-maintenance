@@ -30,11 +30,13 @@ import { ClaudeCodeRoleCLIProvider } from './lib/cli/providers/claudeCode';
 import { GeminiCLIProvider } from './lib/cli/providers/geminiCli';
 import { CodexCLIProvider } from './lib/cli/providers/codexCli';
 import { initializeLogger, getLogger, parseLogLevel } from './lib/logging';
+import { wireLoggingSubscriber } from './lib/logging/eventBusSubscriber';
 import { killAllActiveProcesses, getActiveProcessCount } from './lib/cli/spawnUtils';
 import { resetEventBus } from './lib/integration/eventBus';
 import { getActivePermissionBridge } from './lib/mcp/permissionBridge';
 import { shutdownEmbeddingProvider } from './lib/embedding/factory';
 import { unsubscribeCommandPersistence } from './lib/workflow/commandStore';
+import { buildDiagnosticSnapshot } from './lib/diagnostics/snapshot';
 
 /**
  * Module-level state for graceful shutdown
@@ -93,6 +95,10 @@ export async function activate(
 	context.subscriptions.push(outputChannel);
 	logger.info('Activating extension...');
 
+	// Wire event bus → structured logger subscriber (DEBUG level, invisible at default INFO)
+	const unsubEventBusLogging = wireLoggingSubscriber();
+	context.subscriptions.push({ dispose: unsubEventBusLogging });
+
 	// Load .env file from extension root (before any config reads)
 	loadDotenv(context.extensionPath);
 
@@ -135,10 +141,11 @@ export async function activate(
 	console.warn('[JanumiCode] DB init starting, path:', config.databasePath);
 	const dbInitResult = initializeDatabase({
 		path: config.databasePath,
+		extensionPath: context.extensionPath,
 	});
 
 	if (!dbInitResult.success) {
-		const msg = `Failed to initialize database: ${dbInitResult.error.message}`;
+		const msg = `Failed to initialize database: ${dbInitResult.error.message ?? ''}`;
 		dbLog.error(msg);
 		console.error('[JanumiCode]', msg);
 		vscode.window.showErrorMessage(`JanumiCode: ${msg}`);
@@ -589,6 +596,47 @@ function registerCommands(context: vscode.ExtensionContext, streamProvider: Gove
 		}
 	);
 	context.subscriptions.push(exportHistoryCmd);
+
+	// Export diagnostic snapshot command
+	const exportDiagnosticSnapshotCmd = vscode.commands.registerCommand(
+		'janumicode.exportDiagnosticSnapshot',
+		async (targetPath?: string, dialogueId?: string) => {
+			try {
+				let destinationPath = targetPath;
+				if (!destinationPath) {
+					const baseDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? context.globalStorageUri.fsPath;
+					const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+					const defaultFile = path.join(baseDir, `janumicode-diagnostic-snapshot-${timestamp}.json`);
+					const uri = await vscode.window.showSaveDialog({
+						defaultUri: vscode.Uri.file(defaultFile),
+						filters: {
+							'JSON files': ['json'],
+						},
+					});
+					if (!uri) {
+						return;
+					}
+					destinationPath = uri.fsPath;
+				}
+
+				const snapshot = buildDiagnosticSnapshot({
+					logLimit: 300,
+					eventLimit: 300,
+					stateLimit: 150,
+					transitionLimit: 300,
+					pendingLimit: 150,
+					dialogueId: dialogueId || undefined,
+				});
+				fs.writeFileSync(destinationPath, JSON.stringify(snapshot, null, 2), 'utf8');
+				vscode.window.showInformationMessage(`JanumiCode: Diagnostic snapshot exported to ${destinationPath}`);
+			} catch (error) {
+				const reason = error instanceof Error ? error.message : String(error);
+				getLogger().error('diagnosticSnapshotExportFailed', { error: reason });
+				vscode.window.showErrorMessage(`JanumiCode: Failed to export diagnostic snapshot: ${reason}`);
+			}
+		}
+	);
+	context.subscriptions.push(exportDiagnosticSnapshotCmd);
 
 	// Clear history command
 	const clearHistoryCmd = vscode.commands.registerCommand(

@@ -35,9 +35,18 @@ export function submitGateDecision(gateId: string, action: string): void {
 		action: action,
 		rationale: rationale,
 	});
-	// Clear consumed draft
+	// Don't clear draft yet — wait for host ack (handleGateDecisionAccepted)
+}
+
+/** Host accepted the gate decision — clear draft and freeze UI. */
+export function handleGateDecisionAccepted(gateId: string): void {
 	delete state.gateRationales[gateId];
 	vscode.postMessage({ type: 'draftClear', category: 'gate_rationale' });
+}
+
+/** Host rejected the gate decision — show error. */
+export function handleGateDecisionRejected(gateId: string, reason: string): void {
+	console.warn('[Gate:Rejected]', gateId, reason);
 }
 
 // ===== Verification Gate =====

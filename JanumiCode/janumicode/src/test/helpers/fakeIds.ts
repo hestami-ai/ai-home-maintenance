@@ -14,17 +14,17 @@ export interface DeterministicIds {
 	restore(): void;
 }
 
+function makeId(n: number): string {
+	const hex = n.toString(16).padStart(12, '0');
+	return `00000000-0000-0000-0000-${hex}`;
+}
+
 /**
  * Install a deterministic UUID generator.
  * Produces IDs like: 00000000-0000-0000-0000-000000000001, ...0002, etc.
  */
 export function useDeterministicIds(): DeterministicIds {
 	let counter = 0;
-
-	function makeId(n: number): string {
-		const hex = n.toString(16).padStart(12, '0');
-		return `00000000-0000-0000-0000-${hex}`;
-	}
 
 	const spy = vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
 		counter++;

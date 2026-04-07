@@ -100,6 +100,7 @@ export function captureHumanDecision(
 			action: input.action,
 			rationale: input.rationale,
 			attachments_ref: input.attachmentsRef?.join(',') ?? null,
+			decision_maker: input.decisionMaker,
 			timestamp,
 		};
 
@@ -107,8 +108,8 @@ export function captureHumanDecision(
 			`
 			INSERT INTO human_decisions (
 				decision_id, gate_id, action, rationale,
-				attachments_ref, timestamp
-			) VALUES (?, ?, ?, ?, ?, ?)
+				attachments_ref, decision_maker, timestamp
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
 		`
 		).run(
 			decision.decision_id,
@@ -116,6 +117,7 @@ export function captureHumanDecision(
 			decision.action,
 			decision.rationale,
 			decision.attachments_ref,
+			decision.decision_maker,
 			decision.timestamp
 		);
 
@@ -414,7 +416,7 @@ export function getDecisionHistory(
 			.prepare(
 				`
 			SELECT decision_id, gate_id, action, rationale,
-			       attachments_ref, timestamp
+			       attachments_ref, decision_maker, timestamp
 			FROM human_decisions
 			WHERE gate_id = ?
 			ORDER BY timestamp DESC

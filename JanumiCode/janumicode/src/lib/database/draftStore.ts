@@ -11,6 +11,9 @@
 
 import type { Result } from '../types';
 import { getDatabase } from './index';
+import { getLogger, isLoggerInitialized } from '../logging';
+
+const log = isLoggerInitialized() ? getLogger().child({ component: 'draftStore' }) : undefined;
 
 export interface DraftEntry {
 	category: string;
@@ -49,7 +52,7 @@ export function saveDraftsBatch(
 
 		return { success: true, value: undefined };
 	} catch (error) {
-		console.error('[DraftStore] saveDraftsBatch failed:', error);
+		log?.warn('saveDraftsBatch failed', { error: error instanceof Error ? error.message : String(error) });
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
 	}
 }
@@ -81,7 +84,7 @@ export function getDrafts(
 
 		return { success: true, value: grouped };
 	} catch (error) {
-		console.error('[DraftStore] getDrafts failed:', error);
+		log?.warn('getDrafts failed', { error: error instanceof Error ? error.message : String(error) });
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
 	}
 }
@@ -99,7 +102,7 @@ export function deleteAllDrafts(dialogueId: string): Result<void> {
 		db.prepare('DELETE FROM webview_drafts WHERE dialogue_id = ?').run(dialogueId);
 		return { success: true, value: undefined };
 	} catch (error) {
-		console.error('[DraftStore] deleteAllDrafts failed:', error);
+		log?.warn('deleteAllDrafts failed', { error: error instanceof Error ? error.message : String(error) });
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
 	}
 }
@@ -122,7 +125,7 @@ export function deleteDraftsByCategory(
 		).run(dialogueId, category);
 		return { success: true, value: undefined };
 	} catch (error) {
-		console.error('[DraftStore] deleteDraftsByCategory failed:', error);
+		log?.warn('deleteDraftsByCategory failed', { error: error instanceof Error ? error.message : String(error) });
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
 	}
 }

@@ -7,8 +7,7 @@
  * See: docs/Multi-CLI Integration Spec.md — Section 3
  */
 
-import type { Result, Role } from '../types';
-import { CodedError } from '../types';
+import type { Result } from '../types';
 import type {
 	CLIProviderInfo,
 	RoleCLIInvocationOptions,

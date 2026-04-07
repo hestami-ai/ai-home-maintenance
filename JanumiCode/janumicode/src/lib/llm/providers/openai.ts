@@ -97,7 +97,7 @@ interface OpenAIAPIError {
  */
 export class OpenAIProvider implements LLMProvider {
 	public readonly name = 'OpenAI';
-	private config: ProviderConfig;
+	private readonly config: ProviderConfig;
 	private rateLimitInfo: RateLimitInfo | null = null;
 
 	public readonly capabilities: ProviderCapabilities = {
@@ -257,8 +257,12 @@ export class OpenAIProvider implements LLMProvider {
 
 		// Convert messages
 		for (const msg of messages) {
+			let mappedRole: OpenAIMessage['role'];
+			if (msg.role === 'system') { mappedRole = 'system'; }
+			else if (msg.role === 'user') { mappedRole = 'user'; }
+			else { mappedRole = 'assistant'; }
 			const openaiMessage: OpenAIMessage = {
-				role: msg.role === 'system' ? 'system' : msg.role === 'user' ? 'user' : 'assistant',
+				role: mappedRole,
 				content:
 					typeof msg.content === 'string'
 						? msg.content
@@ -493,8 +497,8 @@ export class OpenAIProvider implements LLMProvider {
 
 		if (requestsRemaining && tokensRemaining && resetRequests) {
 			this.rateLimitInfo = {
-				requestsRemaining: parseInt(requestsRemaining, 10),
-				tokensRemaining: parseInt(tokensRemaining, 10),
+				requestsRemaining: Number.parseInt(requestsRemaining, 10),
+				tokensRemaining: Number.parseInt(tokensRemaining, 10),
 				resetAt: resetRequests,
 			};
 		}

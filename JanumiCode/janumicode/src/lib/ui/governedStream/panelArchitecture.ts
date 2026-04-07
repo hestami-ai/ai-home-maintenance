@@ -11,17 +11,34 @@ export async function handleArchitectureGateDecision(
     ctx: PanelContext,
     message: { type: string; [key: string]: unknown }
 ): Promise<void> {
-    if (!ctx.activeDialogueId || ctx.isProcessing) {return;}
     const action = message.action as string;
     const dialogueId = message.dialogueId as string;
-    const docId = message.docId as string;
+
+    if (!ctx.activeDialogueId || !dialogueId) {
+        ctx.postToWebview({ type: 'architectureGateRejected', reason: 'No active dialogue' });
+        return;
+    }
+    if (ctx.isProcessing) {
+        ctx.postToWebview({ type: 'architectureGateRejected', reason: 'Processing in progress — please wait' });
+        return;
+    }
+
     const feedback = message.feedback as string | undefined;
-    if (!action || !dialogueId) {return;}
+    if (!action) {
+        ctx.postToWebview({ type: 'architectureGateRejected', reason: 'No action specified' });
+        return;
+    }
 
     const gates = getGatesForDialogue(dialogueId);
-    if (!gates.success) { vscode.window.showErrorMessage('Failed to find architecture gate'); return; }
+    if (!gates.success) {
+        ctx.postToWebview({ type: 'architectureGateRejected', reason: 'Failed to find architecture gate' });
+        return;
+    }
     const pendingGate = gates.value.find(g => g.status === GateStatus.OPEN);
-    if (!pendingGate) { vscode.window.showErrorMessage('No pending architecture gate found'); return; }
+    if (!pendingGate) {
+        ctx.postToWebview({ type: 'architectureGateRejected', reason: 'No pending architecture gate found' });
+        return;
+    }
 
     const { captureHumanDecision } = await import('../../roles/human.js');
     const humanAction = action === 'APPROVE' ? HumanAction.APPROVE : action === 'SKIP' ? HumanAction.OVERRIDE : HumanAction.REFRAME;
@@ -33,17 +50,25 @@ export async function handleArchitectureGateDecision(
 
     const { handleArchitectureGateResolution } = await import('../../workflow/architecturePhase.js');
     const result = handleArchitectureGateResolution(dialogueId, action as 'APPROVE' | 'REVISE' | 'SKIP', feedback);
-    if (!result.success) { vscode.window.showErrorMessage(`Architecture gate decision failed: ${result.error.message}`); return; }
+    if (!result.success) {
+        ctx.postToWebview({ type: 'architectureGateRejected', reason: `Architecture gate decision failed: ${result.error.message}` });
+        return;
+    }
 
     const { nextPhase } = result.value;
     ctx.update();
 
     if (nextPhase) {
-        transitionWorkflow(dialogueId, nextPhase, TransitionTrigger.GATE_RESOLVED);
-        await ctx.resumeAfterGate();
-    } else {
-        await ctx.resumeAfterGate();
+        const transResult = transitionWorkflow(dialogueId, nextPhase, TransitionTrigger.GATE_RESOLVED);
+        if (!transResult.success) {
+            ctx.postToWebview({ type: 'architectureGateRejected', reason: `Failed to transition: ${transResult.error.message}` });
+            return;
+        }
     }
+
+    // Ack BEFORE resuming — webview can freeze the card
+    ctx.postToWebview({ type: 'architectureGateAccepted', action });
+    await ctx.resumeAfterGate();
 }
 
 /**
@@ -53,14 +78,27 @@ export async function handleArchitectureDecomposeDeeper(
     ctx: PanelContext,
     message: { type: string; [key: string]: unknown }
 ): Promise<void> {
-    if (!ctx.activeDialogueId || ctx.isProcessing) {return;}
     const dialogueId = message.dialogueId as string;
-    if (!dialogueId) {return;}
+
+    if (!ctx.activeDialogueId || !dialogueId) {
+        ctx.postToWebview({ type: 'architectureGateRejected', reason: 'No active dialogue' });
+        return;
+    }
+    if (ctx.isProcessing) {
+        ctx.postToWebview({ type: 'architectureGateRejected', reason: 'Processing in progress — please wait' });
+        return;
+    }
 
     const gates = getGatesForDialogue(dialogueId);
-    if (!gates.success) { vscode.window.showErrorMessage('Failed to find architecture gate'); return; }
+    if (!gates.success) {
+        ctx.postToWebview({ type: 'architectureGateRejected', reason: 'Failed to find architecture gate' });
+        return;
+    }
     const pendingGate = gates.value.find(g => g.status === GateStatus.OPEN);
-    if (!pendingGate) { vscode.window.showErrorMessage('No pending architecture gate found'); return; }
+    if (!pendingGate) {
+        ctx.postToWebview({ type: 'architectureGateRejected', reason: 'No pending architecture gate found' });
+        return;
+    }
 
     const { captureHumanDecision } = await import('../../roles/human.js');
     const decisionResult = captureHumanDecision({ gateId: pendingGate.gate_id, action: HumanAction.REFRAME, rationale: 'Requested deeper decomposition', decisionMaker: 'human-user' });
@@ -68,10 +106,14 @@ export async function handleArchitectureDecomposeDeeper(
     const decisionId = decisionResult.success ? decisionResult.value.decision_id : `arch-deepen-${Date.now()}`;
     resolveGate({ gateId: pendingGate.gate_id, decisionId, resolution: 'decompose deeper requested' });
 
-    const { handleArchitectureDecomposeDeeper } = await import('../../workflow/architecturePhase.js');
-    const result = handleArchitectureDecomposeDeeper(dialogueId);
-    if (!result.success) { vscode.window.showErrorMessage(`Decompose deeper failed: ${result.error.message}`); return; }
+    const { handleArchitectureDecomposeDeeper: handleDeeper } = await import('../../workflow/architecturePhase.js');
+    const result = handleDeeper(dialogueId);
+    if (!result.success) {
+        ctx.postToWebview({ type: 'architectureGateRejected', reason: `Decompose deeper failed: ${result.error.message}` });
+        return;
+    }
 
+    ctx.postToWebview({ type: 'architectureGateAccepted', action: 'DECOMPOSE_DEEPER' });
     ctx.update();
     await ctx.resumeAfterGate();
 }

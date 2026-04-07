@@ -104,7 +104,7 @@ export enum ConfigurationTarget {
 
 // ── Workspace Configuration ─────────────────────────────────────────
 
-const configStore: Record<string, unknown> = {
+const INITIAL_CONFIG_STORE: Readonly<Record<string, unknown>> = Object.freeze({
 	'janumicode.tokenBudget': 10000,
 	'janumicode.databasePath': '',
 	'janumicode.logLevel': 'info',
@@ -119,7 +119,33 @@ const configStore: Record<string, unknown> = {
 	'janumicode.evaluator.provider': 'GEMINI',
 	'janumicode.evaluator.model': 'gemini-3-flash-preview',
 	'janumicode.embedding.enabled': false,
-};
+});
+
+const configStore: Record<string, unknown> = { ...INITIAL_CONFIG_STORE };
+
+/**
+ * Test helpers — let scenarios mutate the mock workspace configuration
+ * before constructing components that read from it (e.g., redirecting
+ * `janumicode.cli.roles.technicalExpert` to `gemini-cli`).
+ */
+export function setMockConfig(key: string, value: unknown): void {
+	configStore[key] = value;
+}
+
+export function clearMockConfig(key: string): void {
+	delete configStore[key];
+}
+
+export function resetMockConfig(): void {
+	for (const k of Object.keys(configStore)) {
+		delete configStore[k];
+	}
+	Object.assign(configStore, INITIAL_CONFIG_STORE);
+}
+
+export function getMockConfig<T = unknown>(key: string): T | undefined {
+	return configStore[key] as T | undefined;
+}
 
 function createWorkspaceConfiguration(section?: string) {
 	return {

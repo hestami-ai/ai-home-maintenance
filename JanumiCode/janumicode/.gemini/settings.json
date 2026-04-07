@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "deep-memory": {
-      "command": "node",
+      "command": "node.exe",
       "args": [
         "dist/memory/mcpServer.js"
       ],

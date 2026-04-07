@@ -116,7 +116,13 @@
       "Bash(grep -n \"''domain''\" src/lib/types/mmp.ts)",
       "Bash(1 echo:*)",
       "Read(//e/Projects/hestami-ai/JanumiCode/janumicode/**)",
-      "WebFetch(domain:google-gemini.github.io)"
+      "WebFetch(domain:google-gemini.github.io)",
+      "Bash(pnpm test:unit)",
+      "Bash(npx vitest:*)",
+      "Bash(set -a)",
+      "Bash(source .env)",
+      "Bash(set +a)",
+      "Bash(wmic process:*)"
     ]
   }
 }

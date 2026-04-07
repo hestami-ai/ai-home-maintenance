@@ -24,13 +24,17 @@ export function handleGateDecision(
 	rationale: string
 ): void {
 	if (rationale.length < 10) {
-		vscode.window.showWarningMessage('Rationale must be at least 10 characters.');
+		ctx.postToWebview({ type: 'gateDecisionRejected', gateId, reason: 'Rationale must be at least 10 characters.' });
+		return;
+	}
+	if (ctx.isProcessing) {
+		ctx.postToWebview({ type: 'gateDecisionRejected', gateId, reason: 'Processing in progress — please wait' });
 		return;
 	}
 
 	const humanAction = action as HumanAction;
 	if (!Object.values(HumanAction).includes(humanAction)) {
-		vscode.window.showErrorMessage(`Invalid action: ${action}`);
+		ctx.postToWebview({ type: 'gateDecisionRejected', gateId, reason: `Invalid action: ${action}` });
 		return;
 	}
 
@@ -44,13 +48,14 @@ export function handleGateDecision(
 	const result = processHumanGateDecision(input);
 
 	if (result.success) {
+		ctx.postToWebview({ type: 'gateDecisionAccepted', gateId });
 		vscode.window.showInformationMessage(`Gate ${action.toLowerCase()}d successfully.`);
 		ctx.update();
 		if (ctx.activeDialogueId) {
 			runNarrativeCuration(ctx.activeDialogueId, CurationMode.FEEDBACK).catch(() => {});
 		}
 	} else {
-		vscode.window.showErrorMessage(`Gate decision failed: ${result.error.message}`);
+		ctx.postToWebview({ type: 'gateDecisionRejected', gateId, reason: result.error.message });
 	}
 }
 
@@ -105,6 +110,10 @@ export async function handleVerificationGateDecision(
 	claimRationales?: Record<string, string>
 ): Promise<void> {
 	if (!ctx.activeDialogueId) {return;}
+	if (ctx.isProcessing) {
+		ctx.postToWebview({ type: 'gateDecisionRejected', gateId, reason: 'Processing in progress — please wait' });
+		return;
+	}
 
 	switch (action) {
 		case 'OVERRIDE': {
@@ -233,6 +242,10 @@ export async function handleReviewGateDecision(
 	overallFeedback?: string
 ): Promise<void> {
 	if (!ctx.activeDialogueId) {return;}
+	if (ctx.isProcessing) {
+		ctx.postToWebview({ type: 'gateDecisionRejected', gateId, reason: 'Processing in progress — please wait' });
+		return;
+	}
 
 	switch (action) {
 		case 'APPROVE': {
@@ -337,16 +350,24 @@ export async function handleReviewGateDecision(
 				}
 			}
 
-			updateWorkflowMetadata(ctx.activeDialogueId, {
+			const metaResult = updateWorkflowMetadata(ctx.activeDialogueId, {
 				replanRationale: rationale,
 			});
+			if (!metaResult.success) {
+				vscode.window.showErrorMessage(`Failed to save replan rationale: ${metaResult.error.message}`);
+				return;
+			}
 
-			transitionWorkflow(
+			const transResult = transitionWorkflow(
 				ctx.activeDialogueId,
 				Phase.REPLAN,
 				TransitionTrigger.REPLAN_REQUIRED,
 				{ reason: 'Review gate: changes requested' }
 			);
+			if (!transResult.success) {
+				vscode.window.showErrorMessage(`Failed to transition to REPLAN: ${transResult.error.message}`);
+				return;
+			}
 
 			vscode.window.showInformationMessage('Changes requested — replanning proposal.');
 			await ctx.resumeAfterGate();

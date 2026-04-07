@@ -10,7 +10,9 @@
  */
 
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import * as vscode from 'vscode';
 import { getLogger, isLoggerInitialized } from '../logging';
+import { CodedError } from '../types';
 
 const IS_WINDOWS = process.platform === 'win32';
 
@@ -25,6 +27,23 @@ const activeProcesses = new Set<ChildProcess>();
  * Spawn functions read this automatically when no explicit signal is provided.
  */
 let _workflowSignal: AbortSignal | undefined;
+
+/**
+ * Resolve the working directory for a CLI spawn.
+ * Uses explicit option → VS Code workspace → REJECT (no process.cwd() fallback).
+ * Throws CodedError if no workspace is available — prevents CLI agents from
+ * running in the VS Code installation directory.
+ */
+export function resolveWorkingDirectory(explicit?: string): string {
+	if (explicit) { return explicit; }
+	const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+	if (wsFolder) { return wsFolder; }
+	throw new CodedError(
+		'NO_WORKSPACE',
+		'No workspace folder is open. JanumiCode requires an open workspace to run CLI agents. ' +
+		'Open a folder or workspace first (File → Open Folder).',
+	);
+}
 
 /** Set the module-level workflow abort signal. */
 export function setWorkflowAbortSignal(signal: AbortSignal | undefined): void {
@@ -210,6 +229,10 @@ export function spawnCLIWithStdin(
 			reject(enrichSpawnError(err, command, cwd));
 		});
 
+		// Swallow EPIPE errors on stdin — if the child exits before we finish
+		// writing, the EPIPE would otherwise crash the extension host as an
+		// unhandled error. The process exit/close handler will surface the failure.
+		proc.stdin!.on('error', () => {});
 		proc.stdin!.write(stdinContent);
 		proc.stdin!.end();
 	});
@@ -241,6 +264,16 @@ export function spawnCLIStreamingWithStdin(
 		const effectiveSignal = signal ?? _workflowSignal;
 		if (effectiveSignal?.aborted) {
 			return reject(new Error('Aborted'));
+		}
+
+		if (isLoggerInitialized()) {
+			getLogger().child({ component: 'cliSpawn' }).debug('Spawning streaming CLI process (pre-spawn)', {
+				command,
+				args: args.join(' '),
+				cwd,
+				timeout,
+				stdinLength: stdinContent.length,
+			});
 		}
 
 		const opts = buildSpawnOptions(cwd, timeout);
@@ -288,6 +321,8 @@ export function spawnCLIStreamingWithStdin(
 			reject(enrichSpawnError(err, command, cwd));
 		});
 
+		// Swallow EPIPE on stdin (child may exit before write completes)
+		proc.stdin!.on('error', () => {});
 		proc.stdin!.write(stdinContent);
 		proc.stdin!.end();
 	});

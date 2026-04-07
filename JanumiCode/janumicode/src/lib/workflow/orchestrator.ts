@@ -33,6 +33,7 @@ import { hasOpenGates, createReviewGate, createGate, GateTriggerCondition } from
 import { IntakeSubState, IntakeMode, ProposerPhase } from '../types';
 import type { EngineeringDomainCoverageMap } from '../types';
 import { writeDialogueEvent, updateIntakeConversation } from '../events/writer';
+import { getOrCreateIntakeConversation } from '../events/reader';
 import { classifyIntakeInput } from './intakeClassifier';
 import {
 	initializeCoverageMap,
@@ -416,7 +417,9 @@ export async function executeProposePhase(
 			emitDialogueTurnAdded(dialogueId, tid, Role.EXECUTOR);
 
 			if (isEmbeddingAvailable()) {
-				embedAndStore('dialogue_turn', String(tid), dialogueId, JSON.stringify(response.proposal)).catch(() => {});
+				embedAndStore('dialogue_turn', String(tid), dialogueId, JSON.stringify(response.proposal)).catch((err) => {
+					if (isLoggerInitialized()) { getLogger().child({ component: 'embedding' }).warn('Failed to embed dialogue turn', { error: err instanceof Error ? err.message : String(err), dialogueId }); }
+				});
 			}
 
 			// Cache executor response for ASSUMPTION_SURFACING (cross-phase)
@@ -462,7 +465,9 @@ export async function executeProposePhase(
 					emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
 				}
 				// Narrative Curator: lightweight failure trace
-				runNarrativeCuration(dialogueId, CurationMode.FAILURE).catch(() => {});
+				runNarrativeCuration(dialogueId, CurationMode.FAILURE).catch((err) => {
+					if (isLoggerInitialized()) { getLogger().child({ component: 'curator' }).warn('Curator FAILURE trace failed', { error: err instanceof Error ? err.message : String(err), dialogueId }); }
+				});
 				runner.clear();
 				return {
 					success: true,
@@ -493,7 +498,9 @@ export async function executeProposePhase(
 					emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
 				}
 				// Narrative Curator: lightweight failure trace
-				runNarrativeCuration(dialogueId, CurationMode.FAILURE).catch(() => {});
+				runNarrativeCuration(dialogueId, CurationMode.FAILURE).catch((err) => {
+					if (isLoggerInitialized()) { getLogger().child({ component: 'curator' }).warn('Curator FAILURE trace failed', { error: err instanceof Error ? err.message : String(err), dialogueId }); }
+				});
 				runner.clear();
 				return {
 					success: true,
@@ -699,7 +706,9 @@ export async function executeAssumptionSurfacingPhase(
 				emitClaimCreated(dialogueId, claim.claim_id, claim.statement);
 
 				if (isEmbeddingAvailable()) {
-					embedAndStore('claim', claim.claim_id, dialogueId, claim.statement).catch(() => {});
+					embedAndStore('claim', claim.claim_id, dialogueId, claim.statement).catch((err) => {
+						if (isLoggerInitialized()) { getLogger().child({ component: 'embedding' }).warn('Failed to embed claim', { error: err instanceof Error ? err.message : String(err), dialogueId, claimId: claim.claim_id }); }
+					});
 				}
 			}
 
@@ -1896,7 +1905,9 @@ export function createMakerIntentAndContract(dialogueId: string): void {
 				if (tcResult.success) {
 					logger?.info('Toolchains detected', { count: tcResult.value.length });
 				}
-			}).catch(() => {});
+			}).catch((err) => {
+				logger?.warn('Toolchain detection failed', { error: err instanceof Error ? err.message : String(err) });
+			});
 
 			// Build basic validation requirements from common commands
 			validationReqs = [
@@ -2548,9 +2559,15 @@ export async function advanceWorkflow(
 
 		const currentPhase = stateResult.value.current_phase as Phase;
 
+		// ── Diagnostic logging ──
+		const log = isLoggerInitialized() ? getLogger().child({ component: 'advanceWorkflow' }) : undefined;
+		log?.info('Advancing workflow', { phase: currentPhase, dialogueId: dialogueId.slice(0, 8) });
+		// ── End diagnostic logging ──
+
 		// Check for open gates
 		const gatesResult = hasOpenGates(dialogueId);
 		if (gatesResult.success && gatesResult.value) {
+			log?.warn('Blocked by open gates — not advancing');
 			return {
 				success: false,
 				error: new Error('Cannot advance: workflow has open gates'),
@@ -2565,6 +2582,37 @@ export async function advanceWorkflow(
 				const metadata = JSON.parse(stateResult.value.metadata);
 				const humanInput =
 					metadata.pendingIntakeInput ?? metadata.goal ?? '';
+
+				// Guard: if INTAKE is awaiting user input (PRODUCT_REVIEW, CLARIFYING, etc.)
+				// and there's no fresh pendingIntakeInput, do NOT replay the original goal.
+				// Return awaitingInput so the cycle stops and waits for the user.
+				log?.debug('INTAKE input state', { pendingIntakeInput: metadata.pendingIntakeInput ? 'SET(' + metadata.pendingIntakeInput.slice(0, 30) + '...)' : 'NONE', goal: metadata.goal?.slice(0, 30) ?? null });
+				if (!metadata.pendingIntakeInput) {
+					const convResult = getOrCreateIntakeConversation(dialogueId);
+					if (convResult.success) {
+						const subState = convResult.value.subState;
+						// States that require fresh user input (MMP decisions or text),
+						// NOT the original goal replayed from metadata.
+						const awaitingStates = [
+							'PRODUCT_REVIEW', 'CLARIFYING', 'AWAITING_APPROVAL',
+						];
+						if (awaitingStates.includes(subState)) {
+							log?.info('GUARD: awaiting user input — stopping cycle', { subState });
+							phaseResult = {
+								success: true,
+								value: {
+									phase: 'INTAKE' as Phase,
+									success: true,
+									awaitingInput: true,
+									timestamp: new Date().toISOString(),
+									metadata: {},
+								},
+							};
+							break;
+						}
+					}
+				}
+
 				phaseResult = await executeIntakePhase(
 					dialogueId,
 					humanInput

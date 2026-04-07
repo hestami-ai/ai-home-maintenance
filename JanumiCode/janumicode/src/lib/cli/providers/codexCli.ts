@@ -21,7 +21,7 @@ import type {
 	RoleCLIResult,
 	CLIActivityEvent,
 } from '../types';
-import { spawnCLIWithStdin, spawnCLIStreamingWithStdin } from '../spawnUtils';
+import { spawnCLIWithStdin, spawnCLIStreamingWithStdin, resolveWorkingDirectory } from '../spawnUtils';
 
 const execAsync = promisify(exec);
 
@@ -49,7 +49,8 @@ export class CodexCLIProvider implements RoleCLIProvider {
 					apiKeyConfigured,
 				},
 			};
-		} catch (_error) {
+		} catch (error) {
+			console.warn(`[CodexCLIProvider:${this.id}] detect() failed:`, error);
 			return {
 				success: true,
 				value: {
@@ -68,9 +69,7 @@ export class CodexCLIProvider implements RoleCLIProvider {
 
 		try {
 			const codexPath = await resolveCodexPath();
-			const cwd = options.workingDirectory
-				|| vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-				|| process.cwd();
+			const cwd = resolveWorkingDirectory(options.workingDirectory);
 			const timeout = options.timeout || 300000;
 
 			const args = buildCodexArgs(options);
@@ -109,9 +108,7 @@ export class CodexCLIProvider implements RoleCLIProvider {
 
 		try {
 			const codexPath = await resolveCodexPath();
-			const cwd = options.workingDirectory
-				|| vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-				|| process.cwd();
+			const cwd = resolveWorkingDirectory(options.workingDirectory);
 			const timeout = options.timeout || 300000;
 
 			// Codex exec always uses --json for JSONL streaming
@@ -239,12 +236,10 @@ async function resolveCodexPath(): Promise<string> {
 function buildCodexArgs(options: RoleCLIInvocationOptions): string[] {
 	const args = ['exec'];
 
-	// Sandbox mode — defaults to read-only for safety
+	// Sandbox mode — defaults to read-only for safety. JSON output enables
+	// structured/streaming events.
 	const sandbox = options.sandboxMode || 'read-only';
-	args.push('--sandbox', sandbox);
-
-	// JSON output for structured/streaming events
-	args.push('--json');
+	args.push('--sandbox', sandbox, '--json');
 
 	// Output schema for structured output validation (Codex-specific feature)
 	if (options.outputSchemaPath) {
@@ -624,7 +619,10 @@ function normalizeLegacyToolCall(event: Record<string, unknown>): CLIActivityEve
  */
 function normalizeLegacyToolResult(event: Record<string, unknown>): CLIActivityEvent {
 	const output = (event.output ?? event.result) as string | undefined;
-	const errorMsg = event.error ? String(event.error) : undefined;
+	let errorMsg: string | undefined;
+	if (event.error !== undefined && event.error !== null) {
+		errorMsg = typeof event.error === 'string' ? event.error : JSON.stringify(event.error);
+	}
 	return {
 		timestamp: new Date().toISOString(),
 		eventType: 'tool_result',

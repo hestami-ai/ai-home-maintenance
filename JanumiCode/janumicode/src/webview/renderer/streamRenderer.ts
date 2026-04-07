@@ -144,9 +144,107 @@ export function renderStreamItems(
 	return html;
 }
 
+// ==================== Item ID / Rev helpers ====================
+
+/**
+ * Returns true if the item belongs to the architecture phase group
+ * (rendered inside the .architecture-phase-group wrapper div).
+ */
+export function isArchitectureStreamItem(item: StreamItem): boolean {
+	if (item.type === 'architecture_capabilities' || item.type === 'architecture_design' ||
+		item.type === 'architecture_validation' || item.type === 'architecture_gate') {
+		return true;
+	}
+	if (item.type === 'command_block' && item.command.label.startsWith('Architect')) {
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Derive a stable, unique DOM ID for a stream item.
+ * Used for targeted DOM patching in future update protocols.
+ * Falls back to `{type}-{idx}` when no stable key is available.
+ */
+export function getStreamItemId(item: StreamItem, _idx: number): string {
+	switch (item.type) {
+		case 'turn':               return 'turn-' + item.turn.event_id;
+		case 'gate':               return 'gate-' + item.gate.gate_id;
+		case 'verification_gate':  return 'vgate-' + item.gate.gate_id;
+		case 'review_gate':        return 'rgate-' + item.gate.gate_id;
+		case 'command_block':      return 'cmd-' + item.command.command_id;
+		case 'intake_turn':        return item.eventId !== undefined ? 'iturn-' + item.eventId : 'iturn-' + item.dialogueId + '-' + item.timestamp;
+		case 'intake_approval_gate': return 'iapproval-' + item.dialogueId;
+		case 'intake_mode_selector': return 'imode-' + item.dialogueId;
+		case 'intake_product_discovery': return item.eventId !== undefined ? 'ipd-' + item.eventId : 'ipd-' + item.dialogueId + '-' + item.timestamp;
+		case 'intake_proposer_business_domains': return item.eventId !== undefined ? 'ibd-' + item.eventId : 'ibd-' + item.dialogueId + '-' + item.timestamp;
+		case 'intake_proposer_journeys':     return item.eventId !== undefined ? 'ijrn-' + item.eventId : 'ijrn-' + item.dialogueId + '-' + item.timestamp;
+		case 'intake_proposer_entities':     return item.eventId !== undefined ? 'ient-' + item.eventId : 'ient-' + item.dialogueId + '-' + item.timestamp;
+		case 'intake_proposer_integrations': return item.eventId !== undefined ? 'iint-' + item.eventId : 'iint-' + item.dialogueId + '-' + item.timestamp;
+		case 'architecture_capabilities': return item.eventId !== undefined ? 'arch-cap-' + item.eventId : 'arch-cap-' + item.dialogueId + '-' + item.timestamp;
+		case 'architecture_design':       return item.eventId !== undefined ? 'arch-design-' + item.eventId : 'arch-design-' + item.dialogueId + '-' + item.timestamp;
+		case 'architecture_validation':   return item.eventId !== undefined ? 'arch-val-' + item.eventId : 'arch-val-' + item.dialogueId + '-' + item.timestamp;
+		case 'architecture_gate':         return item.eventId !== undefined ? 'arch-gate-' + item.eventId : 'arch-gate-' + item.docId + '-v' + item.version;
+		case 'intake_analysis':    return item.eventId !== undefined ? 'ianalysis-' + item.eventId : 'ianalysis-' + item.dialogueId + '-' + item.timestamp;
+		case 'validation_finding': return 'vfind-' + item.findingId;
+		case 'validation_summary': return 'vsum-' + item.dialogueId;
+		case 'dialogue_start':  return 'dlg-start-' + item.dialogueId;
+		case 'dialogue_end':    return 'dlg-end-' + item.dialogueId;
+		case 'milestone':       return 'ms-' + item.dialogueId + '-' + item.phase;
+		// Stable IDs for remaining types — use dialogueId + timestamp (never array index)
+		case 'intake_plan_preview':      return 'iplan-' + item.dialogueId + '-' + item.timestamp;
+		case 'intake_checkpoint':        return 'ichk-' + item.dialogueId + '-t' + item.checkpoint.turnNumber;
+		case 'intake_domain_transition': return 'idom-' + item.dialogueId + '-' + (item.toDomain ?? 'end') + '-' + item.timestamp;
+		case 'intake_gathering_complete': return 'igather-' + item.dialogueId;
+		case 'intake_proposal':          return 'iprop-' + item.dialogueId + '-' + item.timestamp;
+		case 'qa_exchange':              return 'qa-' + item.dialogueId + '-' + item.timestamp;
+		case 'reasoning_review':         return 'rr-' + item.dialogueId + '-' + item.timestamp;
+		case 'human_message':            return 'hmsg-' + item.timestamp;
+		default:                         return (item as { type: string }).type + '-' + (item as { dialogueId?: string }).dialogueId + '-' + (item as { timestamp?: string }).timestamp;
+	}
+}
+
+/**
+ * Encode the mutable state of an item as a short revision string.
+ * The reconciler re-renders only when this changes between hydrates.
+ * Immutable items (turn, command_block, etc.) always return ''.
+ * Context-dependent items encode their position-sensitive property.
+ */
+export function getStreamItemRev(item: StreamItem, idx: number, context: RenderContext): string {
+	switch (item.type) {
+		case 'gate':                return item.resolvedAction ?? '';
+		case 'verification_gate':   return item.resolvedAction ?? '';
+		case 'review_gate':         return (item.resolvedAction ?? '') + '|' + (item.resolvedRationale ?? '');
+		case 'intake_approval_gate': return item.resolvedAction ?? '';
+		case 'intake_mode_selector': return item.selectedMode ?? '';
+		case 'intake_checkpoint':   return item.resolved ? '1' : '';
+		case 'architecture_gate':   return item.resolvedAction ?? '';
+		case 'validation_finding':  return String(item.useful_rating ?? '');
+		// Re-render when position changes so the "last" card shows/hides the MMP panel
+		case 'intake_plan_preview':
+			return idx === context.lastIntakePlanIdx ? 'last' : '';
+		case 'intake_proposer_business_domains':
+		case 'intake_proposer_journeys':
+		case 'intake_proposer_entities':
+		case 'intake_proposer_integrations':
+			return idx === context.lastProposerMmpIdx ? 'last' : '';
+		default: return '';
+	}
+}
+
+/**
+ * Inject data-item-id and data-item-rev onto the first element of an HTML string.
+ * Works the same way as wrapResizable — no extra wrapper div needed.
+ */
+function addItemMeta(html: string, id: string, rev: string): string {
+	// Trim leading whitespace from template literals before matching the opening tag
+	const trimmed = html.trimStart();
+	return trimmed.replace(/^(<\w+)/, '$1 data-item-id="' + id + '" data-item-rev="' + rev + '"');
+}
+
 // ==================== Item Content Dispatcher ====================
 
-function renderItemContent(item: StreamItem, idx: number, context: RenderContext): string {
+function renderItemContentInner(item: StreamItem, idx: number, context: RenderContext): string {
 	switch (item.type) {
 		case 'human_message':
 			return '<div class="intake-message intake-human">' +
@@ -260,6 +358,12 @@ function renderItemContent(item: StreamItem, idx: number, context: RenderContext
 		default:
 			return '';
 	}
+}
+
+export function renderItemContent(item: StreamItem, idx: number, context: RenderContext): string {
+	const html = renderItemContentInner(item, idx, context);
+	if (!html) { return ''; }
+	return addItemMeta(html, getStreamItemId(item, idx), getStreamItemRev(item, idx, context));
 }
 
 // ==================== Intake Footer Helpers ====================

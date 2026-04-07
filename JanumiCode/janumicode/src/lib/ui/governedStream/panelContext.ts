@@ -16,6 +16,7 @@ export interface PanelContext {
 	// Core methods
 	postProcessing(active: boolean, phase?: string, detail?: string): void;
 	postInputEnabled(enabled: boolean): void;
+	postToWebview(message: { type: string; [key: string]: unknown }): void;
 	update(): void;
 	runWorkflowCycle(): Promise<void>;
 	resumeAfterGate(): Promise<void>;

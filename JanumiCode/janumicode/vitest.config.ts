@@ -7,6 +7,7 @@ export default defineConfig({
 		include: [
 			'src/test/unit/**/*.test.ts',
 			'src/test/scenarios/**/*.test.ts',
+			'src/test/structural/**/*.test.ts',
 			'scripts/test/**/*.test.ts',
 		],
 		exclude: ['src/test/host/**'],

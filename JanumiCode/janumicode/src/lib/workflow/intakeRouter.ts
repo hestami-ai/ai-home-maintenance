@@ -55,6 +55,11 @@ export async function executeIntakePhase(
 
 		const conv = convResult.value;
 
+		// ── Diagnostic logging ──
+		const log = isLoggerInitialized() ? getLogger().child({ component: 'intakeRouter' }) : undefined;
+		log?.info('INTAKE router entry', { subState: conv.subState, proposerPhase: conv.draftPlan?.proposerPhase ?? null, preProposerReview: conv.draftPlan?.preProposerReview ?? undefined, inputPrefix: humanInput.slice(0, 40) });
+		// ── End diagnostic logging ──
+
 		switch (conv.subState) {
 			case IntakeSubState.INTENT_DISCOVERY:
 				return await executeIntakeAnalysis(dialogueId, humanInput);
@@ -115,7 +120,7 @@ export async function executeIntakePhase(
 				// MMP submission — advance to next proposer round
 				// Check if this is the pre-proposer product review (before any proposer round)
 				const isPreProposerReview = conv.draftPlan?.preProposerReview === true;
-				console.log('[INTAKE:Router] PRODUCT_REVIEW MMP submission:', {
+				log?.info('PRODUCT_REVIEW MMP submission', {
 					proposerPhase,
 					isPreProposerReview,
 					isMmpSubmission,
@@ -137,13 +142,13 @@ export async function executeIntakePhase(
 				} else {
 					nextSubState = IntakeSubState.PROPOSING;
 				}
-				console.log('[INTAKE:Router] Advancing to:', nextSubState);
+				log?.info('Advancing to next sub-state', { nextSubState });
 				// Execute FIRST, then advance sub-state on success (prevents corruption if execution throws)
 				let advanceResult;
 				if (nextSubState === IntakeSubState.PROPOSING_BUSINESS_DOMAINS) {
 					// Clear preProposerReview flag now that we're entering the proposer loop
 					updateIntakeConversation(dialogueId, {
-						draftPlan: { ...conv.draftPlan, preProposerReview: undefined } as IntakePlanDocument,
+						draftPlan: { ...conv.draftPlan, preProposerReview: false } as IntakePlanDocument,
 					});
 					advanceResult = await executeProposerBusinessDomains(dialogueId, humanInput);
 				} else if (nextSubState === IntakeSubState.PROPOSING_JOURNEYS) {
@@ -326,7 +331,8 @@ function applyIntentDiscoveryDecisions(plan: IntakePlanDocument | undefined, mmp
 		plan.uxRequirements = plan.uxRequirements.filter(ux => !rejectedTexts.has(ux));
 	}
 
-	console.log('[INTAKE:ApplyDecisions] Applied intent discovery decisions:', {
+	const applyLog = isLoggerInitialized() ? getLogger().child({ component: 'intakeRouter' }) : undefined;
+	applyLog?.info('Applied intent discovery decisions', {
 		rejected: rejectedTexts.size,
 		edited: editedMap.size,
 		remainingPersonas: plan.personas?.length ?? 0,

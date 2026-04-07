@@ -14,6 +14,13 @@ import * as readline from 'node:readline';
 import { getDatabase } from '../database/init';
 import type Database from 'better-sqlite3';
 
+/**
+ * Module-level database override. When the MCP server runs as a standalone
+ * process (via `node mcpServer.js`), it opens its own read-only connection
+ * instead of using the extension host's singleton from getDatabase().
+ */
+let standaloneDb: Database.Database | null = null;
+
 // ==================== JSON-RPC Types ====================
 
 interface JsonRpcRequest {
@@ -153,6 +160,9 @@ const EVIDENCE_TABLES: Record<string, string> = {
 // ==================== Tool Implementations ====================
 
 function requireDb(): Database.Database {
+	// Prefer standalone connection (when running as a separate process)
+	if (standaloneDb) { return standaloneDb; }
+	// Fall back to extension host singleton (when imported in-process)
 	const db = getDatabase();
 	if (!db) {
 		throw new Error('Database not initialized');
@@ -400,7 +410,7 @@ function getSupersessionChain(params: Record<string, unknown>): unknown {
 	let predId: string | null = startId;
 	const predSeen = new Set<string>([startId]);
 
-	// eslint-disable-next-line no-constant-condition
+	 
 	while (true) {
 		const pred = db.prepare('SELECT * FROM memory_objects WHERE superseded_by = ?').get(predId) as
 			| { object_id: string; superseded_by: string | null; [key: string]: unknown }
@@ -648,9 +658,27 @@ export function startMcpServer(): void {
 
 // ==================== Standalone Entry Point ====================
 
-// When run directly as `node mcpServer.js`, start the server immediately.
-// The `require.main === module` check works for CommonJS; for ESM, the caller
-// should invoke startMcpServer() explicitly.
+// When run directly as `node mcpServer.js`, open a direct read-only
+// better-sqlite3 connection (no sidecar dependency) and start the server.
+// The DB path comes from the JANUMICODE_DB_PATH env var.
 if (require.main === module) {
+	const dbPath = process.env.JANUMICODE_DB_PATH;
+	if (!dbPath) {
+		process.stderr.write('[mcp-memory] JANUMICODE_DB_PATH env var not set\n');
+		process.exit(1);
+	}
+
+	try {
+		 
+		const BetterSqlite3 = require('better-sqlite3');
+		standaloneDb = new BetterSqlite3(dbPath, { readonly: true }) as Database.Database;
+		standaloneDb.pragma('journal_mode = WAL');
+		standaloneDb.pragma('busy_timeout = 5000');
+		process.stderr.write(`[mcp-memory] Opened DB (read-only): ${dbPath}\n`);
+	} catch (err) {
+		process.stderr.write(`[mcp-memory] Failed to open DB: ${(err as Error).message}\n`);
+		process.exit(1);
+	}
+
 	startMcpServer();
 }

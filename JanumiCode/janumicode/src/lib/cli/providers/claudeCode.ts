@@ -6,7 +6,6 @@
  * See: docs/Multi-CLI Integration Spec.md — Section 4.1
  */
 
-import * as vscode from 'vscode';
 import type { Result } from '../../types';
 import { CodedError } from '../../types';
 import type { RoleCLIProvider } from '../roleCLIProvider';
@@ -17,7 +16,7 @@ import type {
 	CLIActivityEvent,
 } from '../types';
 import { detectClaudeCode } from '../../claudeCode/detector';
-import { spawnCLIWithStdin, spawnCLIStreamingWithStdin } from '../spawnUtils';
+import { spawnCLIWithStdin, spawnCLIStreamingWithStdin, resolveWorkingDirectory } from '../spawnUtils';
 
 /**
  * Claude Code CLI provider implementation of RoleCLIProvider.
@@ -82,9 +81,7 @@ export class ClaudeCodeRoleCLIProvider implements RoleCLIProvider {
 			}
 
 			const claudePath = detection.value.path || 'claude';
-			const cwd = options.workingDirectory
-				|| vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-				|| process.cwd();
+			const cwd = resolveWorkingDirectory(options.workingDirectory);
 			const timeout = options.timeout || 300000;
 			const outputFormat = options.outputFormat || 'json';
 
@@ -137,9 +134,7 @@ export class ClaudeCodeRoleCLIProvider implements RoleCLIProvider {
 			}
 
 			const claudePath = detection.value.path || 'claude';
-			const cwd = options.workingDirectory
-				|| vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-				|| process.cwd();
+			const cwd = resolveWorkingDirectory(options.workingDirectory);
 			const timeout = options.timeout || 300000;
 
 			const args = buildArgs('stream-json', options);
@@ -191,7 +186,7 @@ export class ClaudeCodeRoleCLIProvider implements RoleCLIProvider {
 			}
 
 			// Use stderr as the response text when stdout is empty and CLI failed
-			const responseText = raw.stdout || (raw.exitCode !== 0 ? raw.stderr : '');
+			const responseText = raw.stdout || (raw.exitCode === 0 ? '' : raw.stderr);
 
 			return {
 				success: true,

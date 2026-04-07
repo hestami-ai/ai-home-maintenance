@@ -3,12 +3,14 @@
  * Each function takes a PanelContext instead of using `this`.
  */
 
+import * as vscode from 'vscode';
 import type { PanelContext } from './panelContext';
 import { IntakeSubState, IntakeMode } from '../../types/intake';
 import { updateIntakeConversation, writeDialogueEvent } from '../../events/writer';
 import { getOrCreateIntakeConversation } from '../../events/reader';
 import { getEventBus } from '../../integration/eventBus';
 import { getCoverageGaps, getPartialDomains, DOMAIN_SEQUENCE } from '../../workflow/engineeringDomainCoverageTracker';
+import { updateWorkflowMetadata } from '../../workflow/stateMachine';
 
 /**
  * Sets subState to SYNTHESIZING and runs a workflow cycle to produce the final plan.
@@ -19,7 +21,11 @@ export async function handleIntakeFinalize(ctx: PanelContext): Promise<void> {
 	ctx.postInputEnabled(false);
 	ctx.postProcessing(true, 'Finalizing', 'Synthesizing plan from conversation');
 	try {
-		updateIntakeConversation(ctx.activeDialogueId, { subState: IntakeSubState.SYNTHESIZING });
+		const convResult = updateIntakeConversation(ctx.activeDialogueId, { subState: IntakeSubState.SYNTHESIZING });
+		if (!convResult.success) {
+			vscode.window.showErrorMessage(`Failed to transition to SYNTHESIZING: ${convResult.error.message}`);
+			return;
+		}
 		await ctx.runWorkflowCycle();
 	} finally {
 		ctx.isProcessing = false;
@@ -30,9 +36,28 @@ export async function handleIntakeFinalize(ctx: PanelContext): Promise<void> {
 
 /**
  * Approves the synthesized plan and advances the workflow to the Architecture phase.
+ *
+ * Sets `metadata.pendingIntakeInput` to a sentinel marker before invoking the
+ * workflow cycle. This bypasses the AWAITING_APPROVAL guard in
+ * `advanceWorkflow` (orchestrator.ts), which would otherwise treat the cycle
+ * as "waiting for fresh user input" and short-circuit before
+ * `executeIntakePlanApproval` can run. The sentinel is consumed and cleared
+ * by the orchestrator after the phase runs; `executeIntakePlanApproval`
+ * does not read its value — it only needs the guard to step aside.
  */
 export async function handleIntakeApprove(ctx: PanelContext): Promise<void> {
 	if (!ctx.activeDialogueId || ctx.isProcessing) {return;}
+
+	// Signal "user has supplied fresh input" (the approval click) so the
+	// orchestrator's AWAITING_APPROVAL guard lets the cycle proceed.
+	const metaResult = updateWorkflowMetadata(ctx.activeDialogueId, {
+		pendingIntakeInput: '[APPROVE_PLAN]',
+	});
+	if (!metaResult.success) {
+		vscode.window.showErrorMessage(`Failed to signal plan approval: ${metaResult.error.message}`);
+		return;
+	}
+
 	ctx.isProcessing = true;
 	ctx.postInputEnabled(false);
 	ctx.postProcessing(true, 'Approving', 'Advancing to Architecture phase');
@@ -52,7 +77,8 @@ export async function handleIntakeApprove(ctx: PanelContext): Promise<void> {
  */
 export function handleIntakeContinueDiscussing(ctx: PanelContext): void {
 	if (!ctx.activeDialogueId) {return;}
-	updateIntakeConversation(ctx.activeDialogueId, { subState: IntakeSubState.DISCUSSING });
+	const result = updateIntakeConversation(ctx.activeDialogueId, { subState: IntakeSubState.DISCUSSING });
+	if (!result.success) { vscode.window.showErrorMessage(`Failed to update intake state: ${result.error.message}`); return; }
 	ctx.update();
 }
 
@@ -62,7 +88,8 @@ export function handleIntakeContinueDiscussing(ctx: PanelContext): void {
  */
 export function handleIntakeSkipGathering(ctx: PanelContext): void {
 	if (!ctx.activeDialogueId) {return;}
-	updateIntakeConversation(ctx.activeDialogueId, { subState: IntakeSubState.DISCUSSING });
+	const result = updateIntakeConversation(ctx.activeDialogueId, { subState: IntakeSubState.DISCUSSING });
+	if (!result.success) { vscode.window.showErrorMessage(`Failed to update intake state: ${result.error.message}`); return; }
 	getEventBus().emit('intake:gathering_skipped', { dialogueId: ctx.activeDialogueId });
 	ctx.update();
 }
@@ -88,7 +115,8 @@ export function handleIntakeModeSelected(ctx: PanelContext, mode: string): void 
 			updates.currentEngineeringDomain = DOMAIN_SEQUENCE[0];
 		}
 	}
-	updateIntakeConversation(ctx.activeDialogueId, updates);
+	const modeResult = updateIntakeConversation(ctx.activeDialogueId, updates);
+	if (!modeResult.success) { vscode.window.showErrorMessage(`Failed to set intake mode: ${modeResult.error.message}`); return; }
 	const bus = getEventBus();
 	bus.emit('intake:mode_selected', { dialogueId: ctx.activeDialogueId, mode: mode as IntakeMode, source: 'user' as const });
 	ctx.update();

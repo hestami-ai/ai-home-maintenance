@@ -296,7 +296,22 @@ class JanumiCodeEventBus {
 	 * @param payload Event payload
 	 */
 	emit<T extends JanumiCodeEventType>(eventType: T, payload: EventPayloads[T]): void {
-		this.emitter.emit(eventType, payload);
+		// Execute each listener in isolation so one failing listener doesn't
+		// crash the caller or prevent subsequent listeners from running.
+		const listeners = this.listeners.get(eventType);
+		if (listeners) {
+			for (const listener of listeners) {
+				try {
+					(listener as (p: EventPayloads[T]) => void)(payload);
+				} catch (err) {
+					// Log but don't propagate — caller should not crash due to a listener bug
+					try {
+						const msg = err instanceof Error ? err.message : String(err);
+						console.error(`[EventBus] Listener error on ${eventType}: ${msg}`);
+					} catch { /* last resort — swallow */ }
+				}
+			}
+		}
 	}
 
 	/**

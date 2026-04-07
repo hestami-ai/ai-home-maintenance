@@ -1,0 +1,138 @@
+You are the ARCHITECTURE EXPERT performing TARGETED DECOMPOSITION.
+
+# Task
+You are given components that violated stopping criteria during recursive evaluation.
+For each one, analyze whether it should be decomposed into sub-components or kept intact.
+
+# Decision Framework
+For each violating component:
+1. **DECOMPOSE** into meaningful sub-components if genuine implementation boundaries exist.
+   Set parent_component_id on each sub-component to link to the parent.
+2. **KEEP INTACT** if the component is semantically cohesive despite the violations.
+   Return it unchanged with parent_component_id: null.
+
+# Analysis Guidelines
+- Consider each component in context of the FULL architecture (siblings, interfaces, data flows).
+- If workflows are cohesive (e.g., all CRUD on one entity), KEEP the component intact.
+- If distinct workflow groups touch different domain entities or data paths, DECOMPOSE.
+- Examine workspace (src/, ground-truth-specs/, project configs) for file structure that
+  confirms or denies proposed boundaries.
+- Do NOT redesign components that are not listed in the violating set.
+- Do NOT split into Data/Logic/API layers unless genuinely separable.
+- Each sub-component needs: component_id, label, responsibility, rationale, workflows_served,
+  dependencies, interaction_patterns, technology_notes, file_scope, parent_component_id.
+
+# Response Format
+Your response MUST be valid JSON:
+
+```json
+{
+  "components": [
+    {
+      "component_id": "COMP-<SHORT-NAME>",
+      "label": "Component name",
+      "responsibility": "Detailed: what it does, what behavior it enables, how it works",
+      "rationale": "Why this exists: which requirements and workflows necessitate it",
+      "workflows_served": ["WF-<ID>"],
+      "dependencies": ["COMP-<ID>"],
+      "interaction_patterns": ["Calls COMP-X via REST for Y"],
+      "technology_notes": "Stack/pattern decisions",
+      "file_scope": "src/modules/<name>/",
+      "parent_component_id": "COMP-<PARENT-ID> or null if kept intact"
+    }
+  ],
+  "interfaces": [
+    {
+      "interface_id": "API-<SHORT-NAME>",
+      "type": "REST | gRPC | EventBus | Function | Other",
+      "label": "Interface name",
+      "description": "What this contract enables",
+      "provider_component": "COMP-<CHILD-ID>",
+      "consumer_components": ["COMP-<CHILD-ID>"],
+      "contract": "Method signatures, payload shape, or event schema",
+      "source_workflows": ["WF-<ID>"]
+    }
+  ]
+}
+```
+
+If the new sub-components need to communicate with each other (e.g. one child calls another), declare those contracts in the "interfaces" array. Only declare interfaces between newly created sub-components — do NOT redeclare interfaces that involve unchanged components. Return an empty array if no new inter-child contracts are needed.
+
+# Interface Provider Remapping (CRITICAL)
+If you decompose a component that currently provides one or more interfaces (shown above in "Relevant Interfaces"), you MUST declare which child inherits each provider role. Add an "interface_provider_remap" array to your response:
+
+```json
+"interface_provider_remap": [
+  { "interface_id": "API-EXISTING-ID", "new_provider_component": "COMP-CHILD-ID" }
+]
+```
+
+Choose the child whose responsibility most directly owns the contract (e.g. for a REST API interface, the child that handles HTTP request/response cycles, not the child that handles database persistence). Omit entries for interfaces whose provider was not decomposed. Return an empty array if no provider remapping is needed.
+---
+# Capabilities (relevant to components being analyzed)
+- CAP-GL: General Ledger Management — Maintains an auditable and compliant General Ledger (GL) structure for all financial transactions within the platform.
+- CAP-ASSESS: Community Assessment Management — Automates the posting of periodic assessments for community associations to homeowner accounts.
+- CAP-WORK-ORDER: Work Order Management — Enables creation, assignment, tracking, and completion of work orders by service technicians using mobile devices.
+- CAP-HOMEOWNER-ACCESS: Homeowner Mobile Access — Allows homeowners to access their account information, view documents, and manage their property-related tasks via a native mobile client.
+
+(5 other capabilities: Document Intelligence, Financial Management, Field Services Management, Community Association Management, Platform Services)
+
+# Relevant Workflows
+- WF-RECORD-TRANSACTION: Record GL Transaction — Receive Transaction Event (System) → Create Ledger Entries (System) → Log Audit Trail (System)
+- WF-POST-ASSESSMENTS: Automatic Periodic Assessment Posting — Trigger Assessment Run (Worker) → Generate Invoices (Worker) → Post to Ledgers (System)
+- WF-TECHNICIAN-WO-LIFECYCLE: Technician Work Order Lifecycle (Mobile) — Sync and Receive Work Order (User) → Perform Work and Update Status (User) → Complete and Sync (System)
+- WF-HOMEOWNER-VIEW-ACCOUNT: Homeowner Views Account on Mobile — Authenticate (User) → Fetch and Sync Data (System) → Display Information (User)
+
+# Domain Model (summary)
+- DM-USER: User
+- DM-PROFILE: Profile
+- DM-ROLE: Role
+- DM-USER-ROLE: UserRole
+- DM-PROPERTY: Property
+- DM-WORK-ORDER: Work Order
+- DM-TECHNICIAN: Technician
+- DM-DOCUMENT: Document
+- DM-AI-ANALYSIS-RESULT: AIAnalysisResult
+- DM-TRANSACTION: Transaction
+- DM-TRANSACTION-LINE: TransactionLine
+- DM-ACCOUNT: Account
+- DM-ASSESSMENT: Assessment
+- DM-COMMUNITY: Community
+- DM-TENANT: Tenant
+- DM-AUDIT-LOG: AuditLog
+
+# Requirements & Product Context (digest)
+Requirements: [REQ-1] The platform must support AI-driven extraction, classification, and summarization of documents.; [REQ-2] The system must have an auditable, compliant GL structure for accounting.; [REQ-3] The platform must support automatic periodic assessment posting for community associations.; [REQ-4] The platform must provide native iOS and Android mobile clients for homeowners and technicians with offline-first capabilities.
+User Journeys: 
+Phasing: 
+
+# Constraints (from Intake)
+- [CON-1] Cloudflare CDN will be the only public entry point to the system.
+- [CON-2] External integrations with partners like Nextdoor are out-of-scope for the initial implementation.
+
+# Decisions (from Intake)
+- [DEC-1] The technology stack is pre-defined, including SvelteKit for the frontend, Node.js (Bun) for the backend, PostgreSQL for the database, and DBOS for the workflow engine.
+- [DEC-2] The product will be built in three phases, corresponding to the three pillars: 1. Home Assistant, 2. Field Services Management, 3. Community Association Management.
+- [DEC-3] Pillar 2 (Field Services Management) will be modeled after ServiceTitan.
+- [DEC-4] Pillar 3 (Community Association Management) will be modeled after Vantaca.
+
+# Components Requiring Analysis
+The following components violated stopping criteria and need decomposition analysis:
+
+## COMP-AUTH: Authentication Service
+Responsibility: Manages user identity, authentication, and authorization. It is the source of truth for all users (DM-USER), their profiles (DM-PROFILE), and assigned roles (DM-ROLE). It provides endpoints for user login and token generation, and an internal interface for other services to validate session tokens, ensuring that access to resources is securely controlled.
+Rationale: Centralizes all security-critical user management logic, a fundamental requirement for any authenticated workflow (WF-HOMEOWNER-VIEW-ACCOUNT, WF-TECHNICIAN-WO-LIFECYCLE). Separating this component improves security and simplifies the logic in other services, which can delegate authentication concerns.
+Workflows served: WF-HOMEOWNER-VIEW-ACCOUNT, WF-TECHNICIAN-WO-LIFECYCLE
+Dependencies: none
+Interaction patterns: Provides an RPC interface for other components to validate access tokens.
+File scope: src/components/auth/
+**Violations**: clear_inputs: dependencies may be implicit
+
+## COMP-FIN-CORE: Financial Core Service
+Responsibility: Manages the heart of the financial system, including the General Ledger (GL) and Chart of Accounts (DM-ACCOUNT). It subscribes to financial events from other components to record transactions (DM-TRANSACTION), ensuring every debit has a corresponding credit. It maintains a compliant audit log (DM-AUDIT-LOG) for all financial activities and provides an internal API for other components to query financial data.
+Rationale: Implements the core of CAP-FIN-MGMT and CAP-GL, and is the primary processor for WF-RECORD-TRANSACTION. Centralizing GL management ensures financial integrity, auditability, and consistency across the entire platform. It is a critical dependency for any feature involving money, such as assessments (WF-POST-ASSESSMENTS) or homeowner account views (WF-HOMEOWNER-VIEW-ACCOUNT).
+Workflows served: WF-RECORD-TRANSACTION, WF-POST-ASSESSMENTS, WF-HOMEOWNER-VIEW-ACCOUNT
+Dependencies: none
+Interaction patterns: Subscribes to the 'Transaction.Created' event on a message queue to record ledger entries.; Provides an RPC interface for querying homeowner account balances and history.
+File scope: src/components/finance-core/
+**Violations**: clear_inputs: dependencies may be implicit

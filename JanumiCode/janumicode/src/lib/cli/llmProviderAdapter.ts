@@ -50,7 +50,12 @@ export class LLMProviderAdapter implements RoleCLIProvider {
 					apiKeyConfigured: valid.success && valid.value,
 				},
 			};
-		} catch (_error) {
+		} catch (error) {
+			// Detection failure (e.g., API key validation threw): mark as
+			// unavailable rather than propagating — the resolver treats
+			// "available: false" as a clean unavailable signal. Surface the
+			// error message to console so debug runs can see why detection failed.
+			console.warn(`[LLMProviderAdapter:${this.id}] detect() failed:`, error);
 			return {
 				success: true,
 				value: {

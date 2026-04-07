@@ -219,6 +219,7 @@ export interface HumanDecision {
 	action: HumanAction;
 	rationale: string; // Required for all decisions
 	attachments_ref: string | null; // Reference to attached evidence
+	decision_maker?: string | null; // Who made the decision (audit trail, nullable for legacy rows)
 	timestamp: string; // ISO-8601
 }
 

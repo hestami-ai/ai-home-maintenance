@@ -8,6 +8,9 @@ import type { Result } from '../types';
 import { Phase } from '../types';
 import { getDatabase } from '../database';
 import { nanoid } from 'nanoid';
+import { getLogger, isLoggerInitialized } from '../logging';
+
+const log = isLoggerInitialized() ? getLogger().child({ component: 'stateMachine' }) : undefined;
 
 /**
  * Workflow state record
@@ -526,24 +529,35 @@ export function updateWorkflowMetadata(
 
 		const now = new Date().toISOString();
 
-		// Atomic read-modify-write in a single transaction to prevent concurrent overwrites
-		const txn = db.transaction(() => {
-			const row = db.prepare(
-				'SELECT metadata FROM workflow_states WHERE dialogue_id = ?'
-			).get(dialogueId) as { metadata: string } | undefined;
+		// Read-modify-write without db.transaction() wrapper.
+		// The extension host is single-threaded so concurrent writes aren't a concern,
+		// and the sidecar RPC's transaction recording pattern can't handle conditional
+		// logic (SELECT → check → UPDATE) because .get() returns a stub during recording.
+		const row = db.prepare(
+			'SELECT metadata FROM workflow_states WHERE dialogue_id = ?'
+		).get(dialogueId) as { metadata: string } | undefined;
 
-			if (!row) {
-				throw new Error(`No workflow state found for dialogue ${dialogueId}`);
+		if (!row) {
+			return {
+				success: false,
+				error: new Error(`No workflow state found for dialogue ${dialogueId}`),
+			};
+		}
+
+		const currentMetadata = JSON.parse(row.metadata) as StateMetadata;
+		const updatedMetadata = { ...currentMetadata, ...metadata };
+		// When a field is explicitly set to undefined, the spread above keeps
+		// the old value. Delete those keys so JSON.stringify omits them —
+		// this is how callers "clear" a metadata field.
+		for (const key of Object.keys(metadata)) {
+			if ((metadata as Record<string, unknown>)[key] === undefined) {
+				delete (updatedMetadata as Record<string, unknown>)[key];
 			}
+		}
 
-			const currentMetadata = JSON.parse(row.metadata) as StateMetadata;
-			const updatedMetadata = { ...currentMetadata, ...metadata };
-
-			db.prepare(
-				`UPDATE workflow_states SET metadata = ?, updated_at = ? WHERE dialogue_id = ?`
-			).run(JSON.stringify(updatedMetadata), now, dialogueId);
-		});
-		txn();
+		db.prepare(
+			`UPDATE workflow_states SET metadata = ?, updated_at = ? WHERE dialogue_id = ?`
+		).run(JSON.stringify(updatedMetadata), now, dialogueId);
 
 		return getWorkflowState(dialogueId);
 	} catch (error) {
@@ -637,13 +651,13 @@ export function reconcileStaleTransitionGraphs(): Result<number> {
 				const phaseIsValid = validPhases.has(row.current_phase as Phase);
 				if (!phaseIsValid) {
 					// Remap unknown phase to INTAKE
-					console.warn(`[StateMachine] Dialogue ${row.dialogue_id} has unknown phase "${row.current_phase}" (graph v${row.transition_graph_version}). Remapping to INTAKE.`);
+					log?.warn('Remapping unknown phase to INTAKE', { dialogueId: row.dialogue_id, unknownPhase: row.current_phase, graphVersion: row.transition_graph_version });
 					db.prepare(
 						`UPDATE workflow_states SET current_phase = ?, transition_graph_version = ?, updated_at = ? WHERE dialogue_id = ?`
 					).run(Phase.INTAKE, TRANSITION_GRAPH_VERSION, now, row.dialogue_id);
 				} else {
 					// Phase is valid in current graph, just stamp the version
-					console.log(`[StateMachine] Dialogue ${row.dialogue_id} upgraded from graph v${row.transition_graph_version} to v${TRANSITION_GRAPH_VERSION}`);
+					log?.info('Upgraded dialogue transition graph version', { dialogueId: row.dialogue_id, fromVersion: row.transition_graph_version, toVersion: TRANSITION_GRAPH_VERSION });
 					db.prepare(
 						`UPDATE workflow_states SET transition_graph_version = ?, updated_at = ? WHERE dialogue_id = ?`
 					).run(TRANSITION_GRAPH_VERSION, now, row.dialogue_id);

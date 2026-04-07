@@ -821,20 +821,25 @@ export async function invokeExecutorForUnit(
 			// Diagnostic: verify the MCP server script exists
 			const fs = await import('node:fs');
 			const serverExists = fs.existsSync(permissionServerPath);
-			console.log(`[PermissionBridge] __dirname = ${__dirname}`);
-			console.log(`[PermissionBridge] permissionServerPath = ${permissionServerPath}`);
-			console.log(`[PermissionBridge] server file exists = ${serverExists}`);
-			console.log(`[PermissionBridge] bridge port = ${permissionPort}`);
+			const pbLog = isLoggerInitialized() ? getLogger().child({ component: 'permissionBridge' }) : undefined;
+			pbLog?.debug('Permission bridge paths resolved', {
+				dirname: __dirname,
+				permissionServerPath,
+				serverFileExists: serverExists,
+				bridgePort: permissionPort,
+			});
 
 			const permissionMCPConfig = buildPermissionMCPConfig(permissionServerPath, permissionPort);
 			permissionConfigPath = createMCPConfigFile(permissionMCPConfig);
 			mcpConfigPaths.push(permissionConfigPath);
 
 			// Diagnostic: log the MCP config file contents
-			console.log(`[PermissionBridge] MCP config path = ${permissionConfigPath}`);
-			console.log(`[PermissionBridge] MCP config = ${JSON.stringify(permissionMCPConfig, null, 2)}`);
 			const mcpLogPath = path.join(require('node:os').tmpdir(), 'janumicode-mcp', 'permission-server.log');
-			console.log(`[PermissionBridge] MCP server log file = ${mcpLogPath}`);
+			pbLog?.debug('Permission bridge MCP config created', {
+				mcpConfigPath: permissionConfigPath,
+				mcpConfig: permissionMCPConfig,
+				mcpServerLogFile: mcpLogPath,
+			});
 
 			// Invoke with streaming for real-time progress
 			const executionResult = await invokeRoleStreaming({

@@ -28,7 +28,7 @@ export enum TokenCountMethod {
  */
 export function approximateTokensByChars(text: string): number {
 	// Remove extra whitespace
-	const normalized = text.trim().replace(/\s+/g, ' ');
+	const normalized = text.trim().replaceAll(/\s+/g, ' ');
 	// ~4 characters per token is a reasonable approximation
 	return Math.ceil(normalized.length / 4);
 }
@@ -141,25 +141,25 @@ export interface TokenPricing {
 export const MODEL_PRICING: Record<string, TokenPricing> = {
 	// Claude models
 	'claude-opus-4': {
-		inputPerMillion: 15.0,
-		outputPerMillion: 75.0,
+		inputPerMillion: 15,
+		outputPerMillion: 75,
 	},
 	'claude-sonnet-4': {
-		inputPerMillion: 3.0,
-		outputPerMillion: 15.0,
+		inputPerMillion: 3,
+		outputPerMillion: 15,
 	},
 	'claude-haiku-4': {
 		inputPerMillion: 0.8,
-		outputPerMillion: 4.0,
+		outputPerMillion: 4,
 	},
 	// OpenAI models
 	'gpt-4': {
-		inputPerMillion: 30.0,
-		outputPerMillion: 60.0,
+		inputPerMillion: 30,
+		outputPerMillion: 60,
 	},
 	'gpt-4-turbo': {
-		inputPerMillion: 10.0,
-		outputPerMillion: 30.0,
+		inputPerMillion: 10,
+		outputPerMillion: 30,
 	},
 	'gpt-3.5-turbo': {
 		inputPerMillion: 0.5,

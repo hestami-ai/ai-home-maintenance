@@ -66,28 +66,38 @@ export function handleIntakeSubmitResponses(): void {
 		attachments: [],
 	});
 
-	// Clear consumed drafts
+	// Show pending state — don't freeze or clear yet (wait for host ack)
+	const btn = document.getElementById('intake-submit-btn') as HTMLButtonElement | null;
+	if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+}
+
+/** Host accepted the intake submit — freeze UI and clear drafts. */
+export function handleIntakeSubmitAccepted(): void {
 	state.intakeQuestionResponses = {};
 	vscode.postMessage({ type: 'draftClear', category: 'intake_response' });
 
-	// Freeze inputs — keep text visible but disable editing
 	const textareas = document.querySelectorAll('.intake-question-textarea') as NodeListOf<HTMLTextAreaElement>;
 	textareas.forEach(function (ta) {
 		ta.readOnly = true;
 		ta.classList.add('submitted');
 	});
 
-	// Disable the submit button and show submitted state
 	const bar = document.getElementById('intake-questions-submit-bar');
-	const btn = document.getElementById('intake-submit-btn') as HTMLButtonElement | null;
+	const submitBtn = document.getElementById('intake-submit-btn') as HTMLButtonElement | null;
 	const countEl = document.getElementById('intake-submit-count');
-	if (btn) { btn.disabled = true; btn.textContent = 'Submitted'; }
+	if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitted'; }
 	if (countEl) { countEl.textContent = 'Responses submitted'; }
 	if (bar) { bar.classList.add('submitted'); }
 
-	// Disable Ask More buttons too
 	const askMoreBtns = document.querySelectorAll('.ask-more-toggle') as NodeListOf<HTMLButtonElement>;
 	askMoreBtns.forEach(function (b) { b.disabled = true; });
+}
+
+/** Host rejected the intake submit — restore button. */
+export function handleIntakeSubmitRejected(reason: string): void {
+	console.warn('[Intake:SubmitRejected]', reason);
+	const btn = document.getElementById('intake-submit-btn') as HTMLButtonElement | null;
+	if (btn) { btn.disabled = false; btn.textContent = 'Submit Responses'; }
 }
 
 export function disableIntakeApprovalButtons(clickedBtn: HTMLElement): void {

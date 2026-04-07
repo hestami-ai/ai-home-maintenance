@@ -66,10 +66,34 @@ export function submitInput(): void {
 		attachments: state.attachedFiles.slice(),
 	});
 
+	// Show pending state — don't clear yet (wait for host ack via composerSubmitAccepted)
+	const composer = document.getElementById('user-input');
+	if (composer) {
+		composer.setAttribute('contenteditable', 'false');
+		composer.style.opacity = '0.6';
+	}
+	hideMentionDropdown();
+}
+
+/** Host accepted the submit — clear composer and attachments. */
+export function handleComposerSubmitAccepted(): void {
 	clearComposer();
 	state.attachedFiles = [];
 	updateAttachmentsDisplay();
-	hideMentionDropdown();
+	const composer = document.getElementById('user-input');
+	if (composer) {
+		composer.setAttribute('contenteditable', 'true');
+		composer.style.opacity = '';
+	}
+}
+
+/** Host rejected the submit — restore composer editability. */
+export function handleComposerSubmitRejected(_reason: string): void {
+	const composer = document.getElementById('user-input');
+	if (composer) {
+		composer.setAttribute('contenteditable', 'true');
+		composer.style.opacity = '';
+	}
 }
 
 // ===== Attachment Model =====

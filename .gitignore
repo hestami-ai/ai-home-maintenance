@@ -294,3 +294,6 @@ hestami_deep_historian/docs/specs/hestami-ai-os-specs
 JanumiCode/janumicode/specs/hestami-ai-os-specs/
 JanumiCode/janumicode/docs/debug/
 JanumiCode/janumicode/ground-truth-specs/hestami-ai-os-specs
+JanumiCode/janumicode/.vscode-test
+JanumiCode/janumicode/coverage
+JanumiCode/janumicode/test-artifacts

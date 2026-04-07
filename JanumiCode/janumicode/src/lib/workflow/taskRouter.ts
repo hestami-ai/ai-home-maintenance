@@ -8,7 +8,6 @@
 import type { Result } from '../types';
 import { Role } from '../types';
 import type { TaskUnit, ProviderCapabilityProfile } from '../types/maker';
-import type { TaskCategory } from '../types/maker';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { getRoleCLIProvider } from '../cli/roleCLIProvider';
 import { rankProvidersForTask } from '../cli/providerCapabilities';
@@ -41,7 +40,7 @@ export async function routeTaskToProvider(
 
 	// 2. Rank by capability match
 	const ranked = rankProvidersForTask(
-		unit.category as TaskCategory,
+		unit.category,
 		profiles,
 		unit.preferred_provider
 	);

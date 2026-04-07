@@ -1861,7 +1861,7 @@ export function renderWarningCard(message: string): string {
 
 
 
-const PHASE_PLACEHOLDERS: Record<Phase, string> = {
+export const PHASE_PLACEHOLDERS: Record<Phase, string> = {
 	[Phase.INTAKE]: 'Discuss your requirements...',
 	[Phase.ARCHITECTURE]: 'Review architecture or wait for decomposition...',
 	[Phase.PROPOSE]: 'Ask a question or wait for the proposal...',
@@ -1888,7 +1888,7 @@ export function renderInputArea(currentPhase: Phase, hasOpenGates: boolean, gate
 		<div class="input-area">
 
 			${isProcessing ? '<div class="input-actions processing-cancel-bar"><span class="processing-cancel-label"><span class="processing-spinner-inline"></span> Processing&hellip;</span><button class="cancel-btn" data-action="cancel-workflow" title="Cancel current operation">Cancel</button></div>' : ''}
-			${hasOpenGates ? `<div class="input-actions"><span style="font-size: 11px; color: var(--vscode-charts-yellow);">&#x1F6A7; ${escapeHtml(gateContext || 'Gate is blocking \u2014 resolve above to continue')}</span></div>` : ''}
+			${hasOpenGates ? `<div class="input-actions gate-context-hint"><span style="font-size: 11px; color: var(--vscode-charts-yellow);">&#x1F6A7; ${escapeHtml(gateContext || 'Gate is blocking \u2014 resolve above to continue')}</span></div>` : ''}
 
 			<div class="input-attachments" id="input-attachments" style="display:none;"></div>
 

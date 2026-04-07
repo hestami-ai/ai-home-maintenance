@@ -6,12 +6,13 @@
 
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
+import { runWithTrace } from '../../logging/traceContext';
+import { getLogger, isLoggerInitialized } from '../../logging';
 import { getEventBus, emitDialogueResumed } from '../../integration/eventBus';
 import { aggregateStreamState, type GovernedStreamState } from './dataAggregator';
 import { Role, Phase, GateStatus } from '../../types';
 import { getStyles } from './html/styles';
-import { renderStickyHeader, renderStream, renderInputArea, renderEmptyState, renderRichCard, renderSettingsPanel, setSpeechEnabled, setSoxAvailable } from './html/components';
-import { getDialogueEventById, getClaims } from '../../events/reader';
+import { renderStickyHeader, renderStream, renderInputArea, renderEmptyState, renderSettingsPanel, setSpeechEnabled, setSoxAvailable, PHASE_PLACEHOLDERS } from './html/components';
 // getSecretKeyManager, getProviderForRole, clearRoleProviderCache moved to panelApiKeys.ts
 import {
 	startDialogueWithWorkflow,
@@ -83,6 +84,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			get view() { return self._view; },
 			postProcessing: (active, phase?, detail?) => this._postProcessing(active, phase, detail),
 			postInputEnabled: (enabled) => this._postInputEnabled(enabled),
+			postToWebview: (msg) => this._postToWebview(msg),
 			update: () => this._update(),
 			runWorkflowCycle: () => this._runWorkflowCycle(),
 			resumeAfterGate: () => this._resumeAfterGate(),
@@ -108,7 +110,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		_context: vscode.WebviewViewResolveContext,
 		_token: vscode.CancellationToken
 	): void {
-		console.log('[GovernedStream] resolveWebviewView called');
+		const log = isLoggerInitialized() ? getLogger().child({ component: 'governedStream' }) : undefined;
+		log?.info('resolveWebviewView');
 		this._view = webviewView;
 
 		webviewView.webview.options = {
@@ -121,10 +124,10 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			const activeResult = getActiveDialogue();
 			if (activeResult.success && activeResult.value) {
 				this._activeDialogueId = activeResult.value.dialogue_id;
-				console.log('[GovernedStream] Restored active dialogue:', this._activeDialogueId);
+				log?.info('restoredActiveDialogue', { dialogueId: this._activeDialogueId });
 			}
 		} catch (e) {
-			console.error('[GovernedStream] Error restoring active dialogue:', e);
+			log?.error('restoreActiveDialogueFailed', { error: e });
 		}
 
 		// Reconcile orphaned CLI commands from previous session crash/restart
@@ -132,10 +135,10 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			const { reconcileOrphanedCommands } = require('../../workflow/commandStore');
 			const result = reconcileOrphanedCommands();
 			if (result.success && result.value > 0) {
-				console.log(`[GovernedStream] Reconciled ${result.value} orphaned command(s) from previous session`);
+				log?.info('reconciledOrphanedCommands', { count: result.value });
 			}
 		} catch (e) {
-			console.error('[GovernedStream] Error reconciling orphaned commands:', e);
+			log?.error('reconcileOrphanedCommandsFailed', { error: e });
 		}
 
 		// Reconcile stale transition graph versions from previous extension versions
@@ -143,10 +146,10 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			const { reconcileStaleTransitionGraphs } = require('../../workflow/stateMachine');
 			const result = reconcileStaleTransitionGraphs();
 			if (result.success && result.value > 0) {
-				console.log(`[GovernedStream] Reconciled ${result.value} dialogue(s) with stale transition graph version`);
+				log?.info('reconciledStaleTransitionGraphs', { count: result.value });
 			}
 		} catch (e) {
-			console.error('[GovernedStream] Error reconciling transition graphs:', e);
+			log?.error('reconcileTransitionGraphsFailed', { error: e });
 		}
 
 		// Clear stale phase checkpoints from active dialogue (prevents orphaned step cache from causing stale resume)
@@ -161,9 +164,9 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		try {
 			const state = aggregateStreamState(this._activeDialogueId ?? undefined);
 			webviewView.webview.html = this._getHtmlForWebview(state, webviewView.webview);
-			console.log('[GovernedStream] Shell HTML set, waiting for webviewReady');
+			log?.info('shellHtmlSet', { status: 'waitingForWebviewReady' });
 		} catch (e) {
-			console.error('[GovernedStream] Error in initial render:', e);
+			log?.error('initialRenderFailed', { error: e });
 		}
 
 		// Handle visibility changes
@@ -312,7 +315,12 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 					type: 'phaseChanged',
 					data: payload,
 				});
-				// Full update to refresh header stepper and insert milestone
+				// Update header stepper immediately so sub-phase progress is visible.
+				// _scheduleUpdate is also queued but will skip the full stream hydrate
+				// while _isProcessing is true (see _scheduleUpdate guard).
+				if (this._isProcessing) {
+					this._postHeaderUpdate();
+				}
 				this._scheduleUpdate();
 			})
 		);
@@ -716,30 +724,25 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	/**
 	 * Handle a new turn being added — try incremental append first
 	 */
-	private _handleTurnAdded(turnId: number): void {
-		if (!this._view) {
-			return;
-		}
-
-		const eventResult = getDialogueEventById(turnId);
-		if (!eventResult.success || !eventResult.value) {
-			// Fallback to full update
+	private _handleTurnAdded(_turnId: number): void {
+		if (!this._view || !this._activeDialogueId) {
 			this._update();
 			return;
 		}
 
-		const event = eventResult.value;
-		const claimsResult = getClaims({ dialogue_id: event.dialogue_id });
-		const turnClaims = claimsResult.success
-			? claimsResult.value.filter((c) => c.turn_id === turnId)
-			: [];
+		// Build the stream state and send the most recently added item as a
+		// structured StreamItem. The webview renderer handles all card types
+		// (including architecture_capabilities, architecture_design, etc.)
+		// so we never need the legacy renderRichCard HTML-blob path here.
+		const streamState = aggregateStreamState(this._activeDialogueId);
+		const items = streamState.streamItems;
+		if (!items.length) {
+			this._update();
+			return;
+		}
 
-		const html = renderRichCard(event, turnClaims);
-
-		this._postToWebview({
-			type: 'turnAdded',
-			data: { html },
-		});
+		const newItem = items[items.length - 1];
+		this._postToWebview({ type: 'streamItemAdded', item: newItem });
 	}
 
 	/**
@@ -756,7 +759,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			if (this._disposed) {return;}
 			const msg = err instanceof Error ? err.message : String(err);
 			if (msg.includes('Canceled') || msg.includes('Channel has been closed')) {return;}
-			console.error('[GovernedStream] Unhandled async error:', msg);
+			const asyncLog = isLoggerInitialized() ? getLogger().child({ component: 'governedStream' }) : undefined;
+			asyncLog?.error('unhandledAsyncError', { error: msg });
 		});
 	}
 
@@ -766,15 +770,27 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		switch (message.type) {
 			case 'webviewReady':
 				// Webview script has loaded and is ready to receive messages
-				console.log('[GovernedStream] Webview ready — sending initial hydration');
+				{
+				const msgLog = isLoggerInitialized() ? getLogger().child({ component: 'governedStream' }) : undefined;
+				msgLog?.info('webviewReady', { action: 'sendingInitialHydration' });
+				}
 				this._update();
 				break;
 			case 'refresh':
-				this._update();
+				// Block full re-renders while the workflow is actively processing.
+				// The webview sends 'refresh' in response to 'phaseChanged' messages, but
+				// re-rendering mid-processing inserts architecture cards out of order.
+				if (this._isProcessing) {
+					this._postHeaderUpdate();
+				} else {
+					this._update();
+				}
 				break;
 
 			case 'submitInput':
-				this._safeAsync(() => this._handleSubmitInput(message.text as string));
+				this._safeAsync(() => runWithTrace(this._activeDialogueId ?? 'unknown', 'submitInput', () =>
+					this._handleSubmitInput(message.text as string)
+				));
 				break;
 
 			case 'gateDecision':
@@ -1037,8 +1053,14 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			this._postSystemMessage(
 				'A workflow is currently running. Use **pause** to stop after the current phase, **cancel** to stop immediately, or **navigate** / **retry** to redirect.'
 			);
+			this._postToWebview({ type: 'intakeSubmitRejected', reason: 'Processing in progress' });
+			this._postToWebview({ type: 'composerSubmitRejected', reason: 'Processing in progress' });
 			return;
 		}
+
+		// Ack the submit so the webview can freeze/clear UI
+		this._postToWebview({ type: 'intakeSubmitAccepted' });
+		this._postToWebview({ type: 'composerSubmitAccepted' });
 
 		// Smart text command parsing — two-tier intent detection
 		// Tier 1: instant alias map (retry, redo, approve, ok, etc.)
@@ -1266,7 +1288,10 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * Run the async workflow cycle
 	 */
 	private async _runWorkflowCycle(): Promise<void> {
+		const cycleLog = isLoggerInitialized() ? getLogger().child({ component: 'governedStream' }) : undefined;
+		cycleLog?.debug('runWorkflowCycleEntered', { dialogueId: this._activeDialogueId?.slice(0, 8) ?? null, disposed: this._disposed, isProcessing: this._isProcessing });
 		if (!this._activeDialogueId || this._disposed) {
+			cycleLog?.debug('runWorkflowCycleEarlyReturn', { reason: 'noDialogueIdOrDisposed' });
 			return;
 		}
 
@@ -1595,7 +1620,9 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	private async _handleMMPSubmit(message: { type: string; [key: string]: unknown }): Promise<void> {
-		await panelMmp.handleMMPSubmit(this._ctx(), message);
+		await runWithTrace(this._activeDialogueId ?? 'unknown', 'mmpSubmit', () =>
+			panelMmp.handleMMPSubmit(this._ctx(), message)
+		);
 	}
 
 	/**
@@ -1685,7 +1712,9 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * Handle a gate decision from the webview
 	 */
 	private _handleGateDecision(gateId: string, action: string, rationale: string): void {
-		panelGates.handleGateDecision(this._ctx(), gateId, action, rationale);
+		runWithTrace(this._activeDialogueId ?? 'unknown', 'gateDecision', () =>
+			panelGates.handleGateDecision(this._ctx(), gateId, action, rationale)
+		);
 	}
 
 	/**
@@ -1694,21 +1723,27 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * if the gate is a repair escalation, reset the failed unit to READY and resume.
 	 */
 	private async _handleGateDecisionAndResume(gateId: string, action: string, rationale: string): Promise<void> {
-		await panelGates.handleGateDecisionAndResume(this._ctx(), gateId, action, rationale);
+		await runWithTrace(this._activeDialogueId ?? 'unknown', 'gateDecision', () =>
+			panelGates.handleGateDecisionAndResume(this._ctx(), gateId, action, rationale)
+		);
 	}
 
 	/**
 	 * Handle a verification gate decision from the webview
 	 */
 	private async _handleVerificationGateDecision(gateId: string, action: string, claimRationales?: Record<string, string>): Promise<void> {
-		await panelGates.handleVerificationGateDecision(this._ctx(), gateId, action, claimRationales);
+		await runWithTrace(this._activeDialogueId ?? 'unknown', 'verificationGate', () =>
+			panelGates.handleVerificationGateDecision(this._ctx(), gateId, action, claimRationales)
+		);
 	}
 
 	/**
 	 * Handle review gate decisions: APPROVE or REFRAME (request changes)
 	 */
 	private async _handleReviewGateDecision(gateId: string, action: string, itemRationales?: Record<string, string>, overallFeedback?: string): Promise<void> {
-		await panelGates.handleReviewGateDecision(this._ctx(), gateId, action, itemRationales, overallFeedback);
+		await runWithTrace(this._activeDialogueId ?? 'unknown', 'reviewGate', () =>
+			panelGates.handleReviewGateDecision(this._ctx(), gateId, action, itemRationales, overallFeedback)
+		);
 	}
 
 	/**
@@ -1761,14 +1796,22 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		const approved = message.approved as boolean;
 		const approveAll = message.approveAll as boolean | undefined;
 
-		if (!permissionId) { return; }
+		if (!permissionId) {
+			this._postToWebview({ type: 'permissionDecisionRejected', permissionId: permissionId || '', reason: 'No permission ID' });
+			return;
+		}
 
-		getEventBus().emit('permission:decided', {
-			permissionId,
-			approved,
-			approveAll,
-			reason: approved ? 'Approved by human' : 'Denied by human',
-		});
+		try {
+			getEventBus().emit('permission:decided', {
+				permissionId,
+				approved,
+				approveAll,
+				reason: approved ? 'Approved by human' : 'Denied by human',
+			});
+			this._postToWebview({ type: 'permissionDecisionAccepted', permissionId, approved });
+		} catch (err) {
+			this._postToWebview({ type: 'permissionDecisionRejected', permissionId, reason: err instanceof Error ? err.message : 'Permission decision failed' });
+		}
 	}
 
 	/**
@@ -2380,11 +2423,23 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * Schedule a debounced _update(). Coalesces rapid events (e.g., phase change + gate trigger)
 	 * into a single re-render. Use this for event-driven updates; use _update() directly
 	 * for user-initiated actions that need immediate feedback.
+	 *
+	 * During active processing the full stream re-render is suppressed: only the header/stepper
+	 * is refreshed. Architecture sub-phase transitions write new cards (capabilities, design, etc.)
+	 * to the DB with timestamps that sort them BETWEEN existing CLI command cards, causing those
+	 * cards to appear mid-stream unexpectedly. Blocking the full hydrate during processing
+	 * prevents this; the complete stream is re-rendered once processing stops.
 	 */
 	private _scheduleUpdate(): void {
 		if (this._pendingUpdateTimer) {return;}
 		this._pendingUpdateTimer = setTimeout(() => {
 			this._pendingUpdateTimer = null;
+			if (this._isProcessing) {
+				// Processing is active — only refresh the header/stepper so sub-phase
+				// progress is visible without disrupting the stream card order.
+				this._postHeaderUpdate();
+				return;
+			}
 			this._incrementalOrFullUpdate();
 		}, 100);
 	}
@@ -2440,21 +2495,39 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			} catch { /* table may not exist yet */ }
 		}
 
-		// Build header and input area server-side (these have complex state deps)
+		// Build header server-side (complex state deps)
 		const headerHtml = renderStickyHeader(state);
 		const gateContext = state.currentPhase === 'VERIFY' && state.openGates.length > 0
 			? 'Review verification results above and choose an action'
 			: state.currentPhase === 'REVIEW' && state.openGates.length > 0
 			? 'Review the summary above and approve or request changes'
 			: undefined;
-		const inputHtml = renderInputArea(state.currentPhase, state.openGates.length > 0, gateContext, this._isProcessing);
 
-		// Send hydrate message — webview renders stream items client-side
+		// ── Diagnostic logging ──
+		{
+			const hydrateLog = isLoggerInitialized() ? getLogger().child({ component: 'governedStream' }) : undefined;
+			const items = state.streamItems as Array<{ type: string }>;
+			hydrateLog?.debug('hydrateSending', { itemCount: items.length, types: items.map((it, i) => `${i}:${it.type}`) });
+			const typeCounts: Record<string, number> = {};
+			for (const it of items) { typeCounts[it.type] = (typeCounts[it.type] || 0) + 1; }
+			for (const [t, c] of Object.entries(typeCounts)) {
+				if (c > 1) { hydrateLog?.warn('hydrateDuplicateType', { duplicateType: t, count: c }); }
+			}
+		}
+		// ── End diagnostic logging ──
+
+		// Send hydrate message — webview renders stream items client-side and updates input area surgically
 		this._postToWebview({
 			type: 'hydrate',
 			items: state.streamItems,
 			headerHtml,
-			inputHtml,
+			inputState: {
+				phase: state.currentPhase,
+				isProcessing: this._isProcessing,
+				hasOpenGates: state.openGates.length > 0,
+				gateContext,
+				placeholder: PHASE_PLACEHOLDERS[state.currentPhase] ?? 'Enter your message...',
+			},
 			pendingDecisions,
 		});
 
@@ -2510,24 +2583,24 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			const { getPendingMmpDecisions } = require('../../database/pendingMmpStore');
 			const result = getPendingMmpDecisions(this._activeDialogueId);
 			if (result.success && Object.keys(result.value).length > 0) {
+				const pendLog = isLoggerInitialized() ? getLogger().child({ component: 'governedStream' }) : undefined;
 				const cardIds = Object.keys(result.value);
-				console.log('[MMP:Host:PostPending] Sending pending decisions for', cardIds.length, 'cards:', cardIds);
+				pendLog?.debug('postPendingSending', { cardCount: cardIds.length, cardIds });
 				for (const [cid, decisions] of Object.entries(result.value)) {
 					const d = decisions as { mirrorDecisions?: Record<string, unknown>; menuSelections?: Record<string, unknown>; preMortemDecisions?: Record<string, unknown> };
-					console.log('[MMP:Host:PostPending] Card:', cid,
-						'| mirror:', Object.keys(d.mirrorDecisions ?? {}),
-						'| menu:', Object.keys(d.menuSelections ?? {}),
-						'| pm:', Object.keys(d.preMortemDecisions ?? {}));
+					pendLog?.debug('postPendingCard', { cardId: cid, mirrorKeys: Object.keys(d.mirrorDecisions ?? {}), menuKeys: Object.keys(d.menuSelections ?? {}), pmKeys: Object.keys(d.preMortemDecisions ?? {}) });
 				}
 				this._postToWebview({
 					type: 'pendingMmpDecisionsLoaded',
 					decisions: result.value,
 				});
 			} else {
-				console.log('[MMP:Host:PostPending] No pending decisions found for dialogue:', this._activeDialogueId);
+				const noPendLog = isLoggerInitialized() ? getLogger().child({ component: 'governedStream' }) : undefined;
+				noPendLog?.debug('postPendingNone', { dialogueId: this._activeDialogueId });
 			}
 		} catch (err) {
-			console.error('[MMP:Host:PostPending] Error:', err);
+			const errLog = isLoggerInitialized() ? getLogger().child({ component: 'governedStream' }) : undefined;
+			errLog?.error('postPendingError', { error: err });
 		}
 	}
 
@@ -2573,8 +2646,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview', 'governedStream.js')
 		);
 
-		// Shell HTML: header + empty stream + settings + input
-		// Stream content is rendered client-side via hydrate message
+		// Shell HTML: header + empty stream + settings + static input area
+		// Stream content rendered client-side via hydrate/reconcile; input area updated surgically via inputState
 		const headerHtml = renderStickyHeader(state);
 		const gateContext = state.currentPhase === 'VERIFY' && state.openGates.length > 0
 			? 'Review verification results above and choose an action'
@@ -2643,7 +2716,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	// ==================== CLEANUP ====================
 
 	private _cleanup(): void {
-		console.warn('[GovernedStream] Cleanup started');
+		const cleanupLog = isLoggerInitialized() ? getLogger().child({ component: 'governedStream' }) : undefined;
+		cleanupLog?.info('cleanupStarted');
 		this._disposed = true;
 		this._isProcessing = false;
 		this._stopActivityMonitor();
@@ -2664,7 +2738,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		}
 		this._eventUnsubscribers = [];
 		this._view = undefined;
-		console.warn('[GovernedStream] Cleanup complete');
+		cleanupLog?.info('cleanupComplete');
 	}
 }
 

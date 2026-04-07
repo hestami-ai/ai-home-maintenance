@@ -136,13 +136,19 @@ export function renderComponentTree(doc: ArchitectureDocument, concerns: Concern
 
 	const compLabelById = new Map(components.map(c => [c.component_id, c.label]));
 
-	// Compute decomposition depth per component
+	// Compute decomposition depth per component. Guards against cyclic
+	// parent_component_id chains (which would otherwise hang the UI) by
+	// tracking visited IDs and bailing on revisit.
+	const compById = new Map(components.map(c => [c.component_id, c]));
 	function getDepth(comp: ComponentSpec): number {
 		let d = 0;
+		const visited = new Set<string>();
 		let current: ComponentSpec | undefined = comp;
 		while (current?.parent_component_id) {
+			if (visited.has(current.component_id)) { break; }
+			visited.add(current.component_id);
 			d++;
-			current = components.find(c => c.component_id === current!.parent_component_id);
+			current = compById.get(current.parent_component_id);
 		}
 		return d;
 	}
@@ -418,7 +424,11 @@ export function buildConcernMap(reviewJsonStrings: string[], doc: ArchitectureDo
 				const text = `${c.summary} ${c.detail ?? ''}`;
 				let matched = false;
 				for (const id of allIds) {
-					if (text.includes(id)) {
+					// Word-boundary match so e.g. "C1" doesn't steal concerns
+					// targeted at "C10". Escapes regex metacharacters in IDs.
+					const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+					const re = new RegExp(`(?:^|[^\\w-])${escaped}(?:$|[^\\w-])`);
+					if (re.test(text)) {
 						const list = map.get(id) ?? [];
 						list.push({ severity: c.severity, summary: c.summary, detail: c.detail, nodeId: id });
 						map.set(id, list);

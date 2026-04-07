@@ -5,3 +5,19 @@ test-workspace/
 *.vsix
 .env
 .electron-native-cache/
+
+# Prevent compiled JS in source tree (TypeScript outputs should go to dist/)
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts
+
+# Test outputs — checkpoints (persistent SQLite DBs) are reproducible scratch
+# state and should not be committed. Captured artifacts ARE committed because
+# they serve as the deterministic-replay test corpus.
+test-output/checkpoints/
+test-output/architecture-flow.log
+test-output/temp-dbs.jsonl
+
+# Architecture metrics (keep baseline, ignore snapshots)
+.arch-metrics/*
+!.arch-metrics/baseline.json

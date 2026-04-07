@@ -172,9 +172,10 @@ CREATE INDEX IF NOT EXISTS idx_gates_created_at ON gates(created_at);
 CREATE TABLE IF NOT EXISTS human_decisions (
     decision_id TEXT PRIMARY KEY CHECK(length(decision_id) = 36),
     gate_id TEXT NOT NULL,
-    action TEXT NOT NULL CHECK(action IN ('APPROVE', 'REJECT', 'OVERRIDE', 'REFRAME')),
+    action TEXT NOT NULL CHECK(action IN ('APPROVE', 'REJECT', 'OVERRIDE', 'REFRAME', 'DELEGATE', 'ESCALATE')),
     rationale TEXT NOT NULL,
     attachments_ref TEXT,
+    decision_maker TEXT,
     timestamp TEXT NOT NULL DEFAULT (datetime('now')),
 
     FOREIGN KEY (gate_id) REFERENCES gates(gate_id)
@@ -1155,6 +1156,35 @@ ALTER TABLE embeddings_v13 RENAME TO embeddings;
 CREATE INDEX IF NOT EXISTS idx_embeddings_source ON embeddings(source_type, source_id);
 CREATE INDEX IF NOT EXISTS idx_embeddings_dialogue ON embeddings(dialogue_id);
 CREATE INDEX IF NOT EXISTS idx_embeddings_hash ON embeddings(content_hash);
+`,
+	},
+	{
+		version: 14,
+		description:
+			'human_decisions: add decision_maker column + widen action CHECK to include DELEGATE/ESCALATE',
+		sql: `
+-- SQLite cannot ALTER CHECK constraints; rebuild the table to widen the action CHECK.
+-- Also adds decision_maker column for audit trail (previously validated but not persisted).
+CREATE TABLE human_decisions_v14 (
+    decision_id TEXT PRIMARY KEY CHECK(length(decision_id) = 36),
+    gate_id TEXT NOT NULL,
+    action TEXT NOT NULL CHECK(action IN ('APPROVE', 'REJECT', 'OVERRIDE', 'REFRAME', 'DELEGATE', 'ESCALATE')),
+    rationale TEXT NOT NULL,
+    attachments_ref TEXT,
+    decision_maker TEXT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (gate_id) REFERENCES gates(gate_id)
+);
+
+INSERT INTO human_decisions_v14 (decision_id, gate_id, action, rationale, attachments_ref, decision_maker, timestamp)
+    SELECT decision_id, gate_id, action, rationale, attachments_ref, NULL, timestamp
+    FROM human_decisions;
+
+DROP TABLE human_decisions;
+ALTER TABLE human_decisions_v14 RENAME TO human_decisions;
+CREATE INDEX IF NOT EXISTS idx_human_decisions_gate_id ON human_decisions(gate_id);
+CREATE INDEX IF NOT EXISTS idx_human_decisions_action ON human_decisions(action);
+CREATE INDEX IF NOT EXISTS idx_human_decisions_timestamp ON human_decisions(timestamp);
 `,
 	},
 ];

@@ -123,12 +123,15 @@ export async function handleGenerateDocument(
 					const result = await generateDocument(dialogueId, item.definition);
 
 					// Store in SQLite (upsert)
-					upsertGeneratedDocument(
+					const storeResult = upsertGeneratedDocument(
 						dialogueId,
 						result.documentType,
 						result.title,
 						result.content,
 					);
+					if (storeResult && !storeResult.success) {
+						vscode.window.showWarningMessage(`Document generated but failed to persist: ${item.label}`);
+					}
 
 					generated.push({ title: result.title, content: result.content, label: item.label });
 				} catch (err) {
@@ -245,9 +248,13 @@ export async function handleReviewRerun(
 	].join('\n');
 
 	// Feed the corrections as input and re-run the workflow cycle
-	updateWorkflowMetadata(activeDialogueId, {
+	const metaResult = updateWorkflowMetadata(activeDialogueId, {
 		pendingIntakeInput: correctionText,
 	});
+	if (!metaResult.success) {
+		postMessage(view, 'systemMessage', { message: `Failed to save corrections: ${metaResult.error.message}` });
+		return;
+	}
 
 	postMessage(view, 'systemMessage', { message: 'Re-running with reasoning review corrections...' });
 	postMessage(view, 'setInputEnabled', { enabled: false });

@@ -22,7 +22,7 @@ import type {
 	RoleCLIResult,
 	CLIActivityEvent,
 } from '../types';
-import { spawnCLIWithStdin, spawnCLIStreamingWithStdin } from '../spawnUtils';
+import { spawnCLIWithStdin, spawnCLIStreamingWithStdin, resolveWorkingDirectory } from '../spawnUtils';
 
 const execAsync = promisify(exec);
 
@@ -50,7 +50,8 @@ export class GeminiCLIProvider implements RoleCLIProvider {
 					apiKeyConfigured,
 				},
 			};
-		} catch (_error) {
+		} catch (error) {
+			console.warn(`[GeminiCLIProvider:${this.id}] detect() failed:`, error);
 			return {
 				success: true,
 				value: {
@@ -69,9 +70,7 @@ export class GeminiCLIProvider implements RoleCLIProvider {
 
 		try {
 			const geminiPath = await resolveGeminiPath();
-			const cwd = options.workingDirectory
-				|| vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-				|| process.cwd();
+			const cwd = resolveWorkingDirectory(options.workingDirectory);
 			const timeout = options.timeout || 300000;
 			const outputFormat = options.outputFormat || 'json';
 
@@ -112,9 +111,7 @@ export class GeminiCLIProvider implements RoleCLIProvider {
 
 		try {
 			const geminiPath = await resolveGeminiPath();
-			const cwd = options.workingDirectory
-				|| vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-				|| process.cwd();
+			const cwd = resolveWorkingDirectory(options.workingDirectory);
 			const timeout = options.timeout || 300000;
 
 			const args = buildGeminiArgs('stream-json', options);
@@ -168,7 +165,7 @@ export class GeminiCLIProvider implements RoleCLIProvider {
 			});
 
 			// Use stderr as response text when stdout is empty and CLI failed
-			const responseText = raw.stdout || (raw.exitCode !== 0 ? stderrText : '');
+			const responseText = raw.stdout || (raw.exitCode === 0 ? '' : stderrText);
 
 			return {
 				success: true,
@@ -279,10 +276,9 @@ export async function ensureGeminiMcpServer(
 		await execAsync(addArgs.map(a => a.includes(' ') ? `"${a}"` : a).join(' '), { cwd });
 	} catch (error) {
 		// Non-fatal — the server won't be available but invocation can still proceed
-		const msg = error instanceof Error ? error.message : String(error);
-		if (typeof console !== 'undefined') {
-			console.warn(`Failed to register Gemini MCP server '${name}': ${msg}`);
-		}
+		const { getLogger: getLog, isLoggerInitialized: isLogInit } = require('../../logging') as typeof import('../../logging');
+		const gemLog = isLogInit() ? getLog().child({ component: 'geminiCli' }) : undefined;
+		gemLog?.warn('Failed to register Gemini MCP server', { serverName: name, error: error instanceof Error ? error.message : String(error) });
 	}
 }
 
@@ -356,7 +352,8 @@ function parseGeminiOutput(
 			let totalInput = 0;
 			let totalOutput = 0;
 			let totalTokens = 0;
-			for (const modelStats of Object.values(parsed.stats.models) as Record<string, any>[]) {
+			for (const m of Object.values(parsed.stats.models)) {
+				const modelStats = m as { tokens?: { prompt?: number; candidates?: number; total?: number } };
 				totalInput += modelStats.tokens?.prompt || 0;
 				totalOutput += modelStats.tokens?.candidates || 0;
 				totalTokens += modelStats.tokens?.total || 0;

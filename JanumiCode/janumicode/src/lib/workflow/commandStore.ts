@@ -8,6 +8,9 @@
 import { getDatabase } from '../database';
 import { getEventBus, type EventPayloads } from '../integration/eventBus';
 import type { Result } from '../types';
+import { getLogger, isLoggerInitialized } from '../logging';
+
+const log = isLoggerInitialized() ? getLogger().child({ component: 'commandStore' }) : undefined;
 
 // ==================== TYPES ====================
 
@@ -173,7 +176,7 @@ export function reconcileOrphanedCommands(): Result<number> {
 
 		const count = result.changes;
 		if (count > 0) {
-			console.log(`[CommandStore] Reconciled ${count} orphaned command(s)`);
+			log?.info('Reconciled orphaned commands', { count });
 		}
 		return { success: true, value: count };
 	} catch (error) {

@@ -148,7 +148,13 @@ async function handleStartDialogue(payload: {
 		vscode.window.showInformationMessage(`Dialogue started: ${dialogueId}`);
 
 		// Fire-and-forget auto-advance so command palette path also runs the workflow
-		executeWorkflowCycle(dialogueId, llmConfig, config.tokenBudget).catch(() => {});
+		executeWorkflowCycle(dialogueId, llmConfig, config.tokenBudget).catch((err) => {
+			const msg = err instanceof Error ? err.message : String(err);
+			if (isLoggerInitialized()) {
+				getLogger().child({ component: 'uiEventHandler', dialogueId }).error('Workflow cycle failed', { error: msg });
+			}
+			vscode.window.showErrorMessage(`JanumiCode: Workflow failed — ${msg}`);
+		});
 
 		return {
 			success: true,

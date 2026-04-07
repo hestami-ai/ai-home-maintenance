@@ -186,6 +186,14 @@ export interface IntakeCheckpointData {
 	suggestedDomains: Array<{ domain: string; label: string }>;
 }
 
+export interface InputState {
+	phase: string;
+	isProcessing: boolean;
+	hasOpenGates: boolean;
+	gateContext?: string;
+	placeholder: string;
+}
+
 export type IncomingMessage =
 	| { type: 'fullUpdate'; data: FullUpdateData }
 	| { type: 'turnAdded'; data: TurnAddedData }
@@ -227,11 +235,23 @@ export type IncomingMessage =
 	| { type: 'openFindWidget' }
 	| { type: 'pendingMmpDecisionsLoaded'; decisions: Record<string, { mirrorDecisions: Record<string, { status: string; editedText?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string }>; productEdits: Record<string, string> }> }
 	| { type: 'draftsLoaded'; drafts: Record<string, Record<string, string>> }
-	| { type: 'hydrate'; items: unknown[]; headerHtml: string; inputHtml: string; pendingDecisions?: Record<string, unknown> }
+	| { type: 'hydrate'; items: unknown[]; headerHtml: string; inputState: InputState; pendingDecisions?: Record<string, unknown> }
 	| { type: 'streamItemAdded'; item: unknown }
 	| { type: 'headerUpdate'; data: { headerHtml: string } }
 	| { type: 'recordingState'; active: boolean; path?: string }
-	| { type: 'clearStream' };
+	| { type: 'clearStream' }
+	| { type: 'mmpSubmitAccepted'; cardId: string }
+	| { type: 'mmpSubmitRejected'; cardId: string; reason: string }
+	| { type: 'gateDecisionAccepted'; gateId: string }
+	| { type: 'gateDecisionRejected'; gateId: string; reason: string }
+	| { type: 'intakeSubmitAccepted' }
+	| { type: 'intakeSubmitRejected'; reason: string }
+	| { type: 'architectureGateAccepted'; action: string }
+	| { type: 'architectureGateRejected'; reason: string }
+	| { type: 'composerSubmitAccepted' }
+	| { type: 'composerSubmitRejected'; reason: string }
+	| { type: 'permissionDecisionAccepted'; permissionId: string; approved: boolean }
+	| { type: 'permissionDecisionRejected'; permissionId: string; reason: string };
 
 // ===== Outgoing Messages (Webview → Extension Host) =====
 

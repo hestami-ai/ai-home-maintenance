@@ -36,6 +36,10 @@
         "title": "JanumiCode: Export History"
       },
       {
+        "command": "janumicode.exportDiagnosticSnapshot",
+        "title": "JanumiCode: Export Diagnostic Snapshot"
+      },
+      {
         "command": "janumicode.clearHistory",
         "title": "JanumiCode: Clear History"
       },
@@ -568,14 +572,36 @@
     "lint": "eslint src",
     "test": "vscode-test",
     "test:unit": "vitest run",
+    "test:unit:direct": "node scripts/test/run-vitest-db-mode.mjs direct",
+    "test:unit:sidecar": "node scripts/test/run-vitest-db-mode.mjs sidecar",
+    "test:unit:matrix": "node scripts/test/run-vitest-matrix.mjs",
+    "test:critical:direct": "node scripts/test/run-vitest-db-mode.mjs direct src/test/unit/workflow/workflowMetadata.test.ts src/test/unit/workflow/workflowInvariants.test.ts src/test/unit/workflow/intakeMmpFlowRegression.test.ts src/test/unit/ui/panelMmp.test.ts src/test/unit/ui/panelMmp.failureInjection.test.ts src/test/unit/contracts/mmpMessageContract.table.test.ts src/test/unit/webview/mmpSubmitContract.test.ts",
+    "test:critical:sidecar": "node scripts/test/run-vitest-db-mode.mjs sidecar src/test/unit/workflow/workflowMetadata.test.ts src/test/unit/workflow/workflowInvariants.test.ts src/test/unit/workflow/intakeMmpFlowRegression.test.ts src/test/unit/ui/panelMmp.test.ts src/test/unit/ui/panelMmp.failureInjection.test.ts src/test/unit/contracts/mmpMessageContract.table.test.ts src/test/unit/webview/mmpSubmitContract.test.ts",
+    "test:critical:matrix": "node scripts/test/run-vitest-matrix.mjs src/test/unit/workflow/workflowMetadata.test.ts src/test/unit/workflow/workflowInvariants.test.ts src/test/unit/workflow/intakeMmpFlowRegression.test.ts src/test/unit/ui/panelMmp.test.ts src/test/unit/ui/panelMmp.failureInjection.test.ts src/test/unit/contracts/mmpMessageContract.table.test.ts src/test/unit/webview/mmpSubmitContract.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:coverage:critical": "vitest run --config vitest.critical.config.ts --coverage",
     "test:host": "tsc -p tsconfig.test.json && node esbuild.js && vscode-test",
-    "test:ci": "vitest run",
-    "rebuild:native": "node scripts/ensure-native-modules.js --force"
+    "test:host:smoke": "pnpm run test:host",
+    "test:ci:required": "node scripts/test/run-required-gates.mjs",
+    "test:ci:full": "pnpm run test:ci:required && pnpm run test:host:smoke",
+    "test:ci": "pnpm run test:ci:required",
+    "arch:validate": "depcruise src",
+    "arch:graph": "depcruise --output-type dot src | dot -T svg > architecture.svg",
+    "arch:graph:text": "depcruise --output-type err-long src",
+    "arch:metrics": "tsx scripts/arch/collect-metrics.ts",
+    "arch:drift": "tsx scripts/arch/detect-drift.ts",
+    "arch:baseline": "pnpm run arch:metrics && cp .arch-metrics/latest.json .arch-metrics/baseline.json",
+    "arch:suggest": "tsx scripts/arch/suggest-fixes.ts",
+    "test:structure": "vitest run src/test/structural",
+    "test:structure:watch": "vitest src/test/structural",
+    "test:all": "pnpm run arch:validate && pnpm run test:structure && pnpm run test:unit",
+    "package:win32-x64": "vsce package --target win32-x64",
+    "package:linux-x64": "vsce package --target linux-x64",
+    "package:darwin-x64": "vsce package --target darwin-x64",
+    "package:darwin-arm64": "vsce package --target darwin-arm64"
   },
   "devDependencies": {
-    "@electron/rebuild": "^3.7.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
@@ -584,6 +610,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
+    "dependency-cruiser": "^17.3.10",
     "esbuild": "^0.27.2",
     "eslint": "^9.39.2",
     "npm-run-all": "^4.1.5",

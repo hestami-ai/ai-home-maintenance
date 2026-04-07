@@ -1181,11 +1181,12 @@ function checkGatheringComplete(
  * Only generates MMP for product_or_feature requests with actual product artifacts.
  */
 export function extractProductDiscoveryMMP(plan: IntakePlanDocument): MMPPayload | undefined {
+	const mmpLog = isLoggerInitialized() ? getLogger().child({ component: 'intakeExtractMMP' }) : undefined;
 	if (plan.requestCategory !== 'product_or_feature') {
-		console.log('[INTAKE:ExtractMMP] Skipped — requestCategory:', plan.requestCategory);
+		mmpLog?.debug('Skipped — not product_or_feature', { requestCategory: plan.requestCategory });
 		return undefined;
 	}
-	console.log('[INTAKE:ExtractMMP] Extracting for product_or_feature. Plan fields:', {
+	mmpLog?.debug('Extracting for product_or_feature', {
 		personas: plan.personas?.length ?? 0,
 		userJourneys: plan.userJourneys?.length ?? 0,
 		uxRequirements: plan.uxRequirements?.length ?? 0,
@@ -1323,7 +1324,7 @@ export function extractProductDiscoveryMMP(plan: IntakePlanDocument): MMPPayload
 
 	const hasMirror = !!result.mirror;
 	const hasMenu = !!result.menu;
-	console.log('[INTAKE:ExtractMMP] Result:', {
+	mmpLog?.debug('Extraction result', {
 		hasMirror,
 		mirrorCount: result.mirror?.items?.length ?? 0,
 		hasMenu,
@@ -1355,7 +1356,10 @@ export async function executeIntakeAnalysis(
 		const conv = convResult.value;
 
 		// 2. Resolve Technical Expert CLI provider
+		const log = isLoggerInitialized() ? getLogger().child({ component: 'intakeAnalysis' }) : undefined;
+		log?.debug('Resolving Technical Expert CLI provider');
 		const providerResult = await resolveProviderForRole(Role.TECHNICAL_EXPERT);
+		log?.debug('Provider resolved', { success: providerResult.success, id: providerResult.success ? providerResult.value.id : undefined, error: !providerResult.success ? (providerResult as { error: Error }).error.message : undefined });
 		if (!providerResult.success) {
 			return providerResult as Result<PhaseExecutionResult>;
 		}
@@ -1373,6 +1377,7 @@ export async function executeIntakeAnalysis(
 			timestamp: new Date().toISOString(),
 		});
 
+		log?.debug('Invoking Technical Expert');
 		const expertResult = await invokeAnalyzingTechnicalExpert({
 			dialogueId,
 			humanMessage,
@@ -1415,7 +1420,7 @@ export async function executeIntakeAnalysis(
 		// 4b. Extract product discovery MMP for human review (if product/feature request)
 		const productMMP = extractProductDiscoveryMMP(analysis.initialPlan);
 
-		console.log('[INTAKE:Analysis] Product discovery MMP extraction:', {
+		log?.debug('Product discovery MMP extraction', {
 			requestCategory: analysis.initialPlan.requestCategory,
 			intakeMode: conv.intakeMode,
 			hasMMP: productMMP !== undefined,
@@ -1477,7 +1482,7 @@ export async function executeIntakeAnalysis(
 			targetSubState = IntakeSubState.PROPOSING;
 		}
 
-		console.log('[INTAKE:Analysis] Transition decision:', {
+		log?.info('Transition decision', {
 			targetSubState,
 			needsInput: targetSubState === IntakeSubState.PRODUCT_REVIEW || targetSubState === IntakeSubState.PROPOSING,
 			preProposerReview: analysis.initialPlan.preProposerReview ?? false,

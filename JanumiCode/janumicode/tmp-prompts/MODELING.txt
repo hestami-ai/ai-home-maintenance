@@ -1,0 +1,1518 @@
+You are the ARCHITECTURE EXPERT performing DOMAIN MODELING.
+
+# Your Task
+Produce a comprehensive Domain Model for the system described in the context below.
+The Domain Model defines every data entity the system works with — their fields,
+relationships, constraints, and business invariants.
+
+# Approach
+1. **Start from entityProposals** — if the context includes user-validated `entityProposals`
+   from the INTAKE phase, use them as the PRIMARY source for entities. They contain pre-validated
+   names, key attributes, relationships, and domain assignments. Do NOT ignore them.
+2. Use `businessBusinessDomainProposals` (if present) to understand domain groupings and entity previews.
+3. Examine the capabilities and workflows to identify additional entities not covered by proposals.
+4. Read the ground-truth spec files in the workspace if available (look for
+   specs/ or ground-truth-specs/ directories) to understand domain patterns.
+5. For each entity, define complete field-level detail including types, constraints,
+   and validation rules.
+6. Map all relationships with cardinality and direction.
+7. Define business invariants — rules that must always hold across the data model.
+
+# Critical Guardrails
+1. Every entity SHOULD trace to at least one workflow. If an entity was user-validated during
+   INTAKE but its workflow is not yet defined in the architecture, include the entity anyway
+   and note in source_requirements which requirement motivates it. Do NOT drop user-validated
+   entities just because a corresponding workflow is missing.
+2. Include field-level detail: name, type, required/optional, description, constraints.
+3. Relationships MUST reference other entities in this model (no dangling references).
+4. Do NOT invent infrastructure entities (caches, queues, registries) unless
+   requirements explicitly demand them.
+5. Do NOT write, create, or modify any files. Your output is JSON only.
+6. Do NOT execute shell commands or use tools to make changes to the codebase.
+
+# Response Format
+Your ENTIRE response must be a single JSON object. Do NOT write files. Do NOT include
+explanatory text before or after the JSON. Do NOT use markdown code fences.
+Return ONLY the JSON object:
+
+{
+  "data_models": [
+    {
+      "model_id": "DM-<SHORT-NAME>",
+      "entity_name": "EntityName",
+      "description": "What this entity represents and its role in the system",
+      "fields": [
+        { "name": "field_name", "type": "string|uuid|integer|timestamp|boolean|jsonb|enum(...)", "required": true, "description": "Purpose and validation rules" }
+      ],
+      "relationships": [
+        { "target_model": "DM-<ID>", "type": "one-to-one|one-to-many|many-to-many", "description": "What this relationship means" }
+      ],
+      "constraints": ["Unique on email", "Check: status IN ('active', 'archived')"],
+      "invariants": ["A tenant must have at least one admin user", "Property address cannot change after listing is published"],
+      "source_requirements": ["REQ-1", "REQ-2"]
+    }
+  ]
+}
+---
+# Context for TECHNICAL_EXPERT
+
+## Capabilities & Workflows
+
+### Capabilities
+
+```json
+[
+  {
+    "capability_id": "CAP-DOC-INTEL",
+    "parent_capability_id": null,
+    "label": "Document Intelligence",
+    "description": "Provides core services for AI-driven extraction, classification, and summarization of uploaded documents, such as invoices, legal notices, or property records.",
+    "source_requirements": [
+      "REQ-1"
+    ],
+    "engineering_domain_mappings": [
+      {
+        "mapping_id": "DM-DI-1",
+        "domain": "DATA_INFORMATION",
+        "capability_id": "CAP-DOC-INTEL",
+        "requirement_ids": [
+          "REQ-1"
+        ],
+        "coverage_contribution": "PRIMARY"
+      },
+      {
+        "mapping_id": "DM-DI-2",
+        "domain": "ARCHITECTURE",
+        "capability_id": "CAP-DOC-INTEL",
+        "requirement_ids": [
+          "REQ-1"
+        ],
+        "coverage_contribution": "SECONDARY"
+      }
+    ],
+    "workflows": [
+      "WF-DOC-PROCESS"
+    ]
+  },
+  {
+    "capability_id": "CAP-FIN-MGMT",
+    "parent_capability_id": null,
+    "label": "Financial Management",
+    "description": "Manages all financial operations, including general ledger accounting and community association assessments.",
+    "source_requirements": [
+      "REQ-2",
+      "REQ-3"
+    ],
+    "engineering_domain_mappings": [
+      {
+        "mapping_id": "DM-FM-1",
+        "domain": "DATA_INFORMATION",
+        "capability_id": "CAP-FIN-MGMT",
+        "requirement_ids": [
+          "REQ-2"
+        ],
+        "coverage_contribution": "PRIMARY"
+      }
+    ],
+    "workflows": []
+  },
+  {
+    "capability_id": "CAP-GL",
+    "parent_capability_id": "CAP-FIN-MGMT",
+    "label": "General Ledger Management",
+    "description": "Maintains an auditable and compliant General Ledger (GL) structure for all financial transactions within the platform.",
+    "source_requirements": [
+      "REQ-2"
+    ],
+    "engineering_domain_mappings": [
+      {
+        "mapping_id": "DM-GL-1",
+        "domain": "SECURITY_COMPLIANCE",
+        "capability_id": "CAP-GL",
+        "requirement_ids": [
+          "REQ-2"
+        ],
+        "coverage_contribution": "PRIMARY"
+      },
+      {
+        "mapping_id": "DM-GL-2",
+        "domain": "DATA_INFORMATION",
+        "capability_id": "CAP-GL",
+        "requirement_ids": [
+          "REQ-2"
+        ],
+        "coverage_contribution": "SECONDARY"
+      }
+    ],
+    "workflows": [
+      "WF-RECORD-TRANSACTION"
+    ]
+  },
+  {
+    "capability_id": "CAP-ASSESS",
+    "parent_capability_id": "CAP-FIN-MGMT",
+    "label": "Community Assessment Management",
+    "description": "Automates the posting of periodic assessments for community associations to homeowner accounts.",
+    "source_requirements": [
+      "REQ-3"
+    ],
+    "engineering_domain_mappings": [
+      {
+        "mapping_id": "DM-AS-1",
+        "domain": "WORKFLOWS_USE_CASES",
+        "capability_id": "CAP-ASSESS",
+        "requirement_ids": [
+          "REQ-3"
+        ],
+        "coverage_contribution": "PRIMARY"
+      }
+    ],
+    "workflows": [
+      "WF-POST-ASSESSMENTS"
+    ]
+  },
+  {
+    "capability_id": "CAP-FSM",
+    "parent_capability_id": null,
+    "label": "Field Services Management",
+    "description": "Manages field service operations, including work order management, technician dispatch, and mobile field access. (Pillar 2)",
+    "source_requirements": [
+      "REQ-4"
+    ],
+    "engineering_domain_mappings": [
+      {
+        "mapping_id": "DM-FSM-1",
+        "domain": "WORKFLOWS_USE_CASES",
+        "capability_id": "CAP-FSM",
+        "requirement_ids": [],
+        "coverage_contribution": "PRIMARY"
+      }
+    ],
+    "workflows": []
+  },
+  {
+    "capability_id": "CAP-WORK-ORDER",
+    "parent_capability_id": "CAP-FSM",
+    "label": "Work Order Management",
+    "description": "Enables creation, assignment, tracking, and completion of work orders by service technicians using mobile devices.",
+    "source_requirements": [
+      "REQ-4"
+    ],
+    "engineering_domain_mappings": [
+      {
+        "mapping_id": "DM-WO-1",
+        "domain": "QUALITY_ATTRIBUTES",
+        "capability_id": "CAP-WORK-ORDER",
+        "requirement_ids": [
+          "REQ-4"
+        ],
+        "coverage_contribution": "PRIMARY"
+      },
+      {
+        "mapping_id": "DM-WO-2",
+        "domain": "WORKFLOWS_USE_CASES",
+        "capability_id": "CAP-WORK-ORDER",
+        "requirement_ids": [
+          "REQ-4"
+        ],
+        "coverage_contribution": "SECONDARY"
+      }
+    ],
+    "workflows": [
+      "WF-TECHNICIAN-WO-LIFECYCLE"
+    ]
+  },
+  {
+    "capability_id": "CAP-CAM",
+    "parent_capability_id": null,
+    "label": "Community Association Management",
+    "description": "Provides tools and services for managing community associations, including homeowner account access and communication. (Pillar 3)",
+    "source_requirements": [
+      "REQ-4"
+    ],
+    "engineering_domain_mappings": [
+      {
+        "mapping_id": "DM-CAM-1",
+        "domain": "STAKEHOLDERS",
+        "capability_id": "CAP-CAM",
+        "requirement_ids": [],
+        "coverage_contribution": "PRIMARY"
+      }
+    ],
+    "workflows": []
+  },
+  {
+    "capability_id": "CAP-HOMEOWNER-ACCESS",
+    "parent_capability_id": "CAP-CAM",
+    "label": "Homeowner Mobile Access",
+    "description": "Allows homeowners to access their account information, view documents, and manage their property-related tasks via a native mobile client.",
+    "source_requirements": [
+      "REQ-4"
+    ],
+    "engineering_domain_mappings": [
+      {
+        "mapping_id": "DM-HA-1",
+        "domain": "QUALITY_ATTRIBUTES",
+        "capability_id": "CAP-HOMEOWNER-ACCESS",
+        "requirement_ids": [
+          "REQ-4"
+        ],
+        "coverage_contribution": "PRIMARY"
+      },
+      {
+        "mapping_id": "DM-HA-2",
+        "domain": "STAKEHOLDERS",
+        "capability_id": "CAP-HOMEOWNER-ACCESS",
+        "requirement_ids": [
+          "REQ-4"
+        ],
+        "coverage_contribution": "SECONDARY"
+      }
+    ],
+    "workflows": [
+      "WF-HOMEOWNER-VIEW-ACCOUNT"
+    ]
+  },
+  {
+    "capability_id": "CAP-PLATFORM",
+    "parent_capability_id": null,
+    "label": "Platform Services",
+    "description": "Provides foundational technical capabilities and infrastructure for the entire system, including mobile client support and public access.",
+    "source_requirements": [
+      "REQ-4"
+    ],
+    "engineering_domain_mappings": [
+      {
+        "mapping_id": "DM-P-1",
+        "domain": "ARCHITECTURE",
+        "capability_id": "CAP-PLATFORM",
+        "requirement_ids": [],
+        "coverage_contribution": "PRIMARY"
+      },
+      {
+        "mapping_id": "DM-P-2",
+        "domain": "INTEGRATION_INTERFACES",
+        "capability_id": "CAP-PLATFORM",
+        "requirement_ids": [],
+        "coverage_contribution": "PRIMARY"
+      }
+    ],
+    "workflows": []
+  }
+]
+```
+
+### Workflows
+
+```json
+[
+  {
+    "workflow_id": "WF-DOC-PROCESS",
+    "capability_id": "CAP-DOC-INTEL",
+    "label": "AI Document Processing",
+    "description": "A system-driven workflow to process an uploaded document by extracting text, classifying its type, and generating a concise summary.",
+    "steps": [
+      {
+        "step_id": "STEP-1",
+        "label": "Ingest Document",
+        "actor": "System",
+        "action": "Receives a document from an API endpoint.",
+        "inputs": [
+          "Document file"
+        ],
+        "outputs": [
+          "Stored document"
+        ],
+        "next_steps": [
+          "STEP-2"
+        ]
+      },
+      {
+        "step_id": "STEP-2",
+        "label": "Extract & Classify",
+        "actor": "Worker",
+        "action": "Calls an AI model to perform OCR, text extraction, and classification.",
+        "inputs": [
+          "Stored document"
+        ],
+        "outputs": [
+          "Extracted text",
+          "Document type"
+        ],
+        "next_steps": [
+          "STEP-3"
+        ]
+      },
+      {
+        "step_id": "STEP-3",
+        "label": "Summarize",
+        "actor": "Worker",
+        "action": "Calls an AI model to summarize the extracted text.",
+        "inputs": [
+          "Extracted text"
+        ],
+        "outputs": [
+          "Summary"
+        ],
+        "next_steps": []
+      }
+    ],
+    "actors": [
+      "System",
+      "Worker",
+      "API"
+    ],
+    "triggers": [
+      "A document is uploaded via an internal API call."
+    ],
+    "outputs": [
+      "Structured data (type, summary, text) associated with the document."
+    ]
+  },
+  {
+    "workflow_id": "WF-RECORD-TRANSACTION",
+    "capability_id": "CAP-GL",
+    "label": "Record GL Transaction",
+    "description": "Records a financial event in the General Ledger, ensuring it is compliant and auditable.",
+    "steps": [
+      {
+        "step_id": "STEP-1",
+        "label": "Receive Transaction Event",
+        "actor": "System",
+        "action": "Receives a financial event (e.g., invoice paid, expense recorded).",
+        "inputs": [
+          "Transaction data"
+        ],
+        "outputs": [
+          "Validated transaction data"
+        ],
+        "next_steps": [
+          "STEP-2"
+        ]
+      },
+      {
+        "step_id": "STEP-2",
+        "label": "Create Ledger Entries",
+        "actor": "System",
+        "action": "Creates double-entry bookkeeping records in the GL database.",
+        "inputs": [
+          "Validated transaction data"
+        ],
+        "outputs": [
+          "GL journal entry"
+        ],
+        "next_steps": [
+          "STEP-3"
+        ]
+      },
+      {
+        "step_id": "STEP-3",
+        "label": "Log Audit Trail",
+        "actor": "System",
+        "action": "Logs the transaction details, user, and timestamp to a secure audit log.",
+        "inputs": [
+          "GL journal entry"
+        ],
+        "outputs": [
+          "Audit log record"
+        ],
+        "next_steps": []
+      }
+    ],
+    "actors": [
+      "System"
+    ],
+    "triggers": [
+      "A financial event occurs elsewhere in the system."
+    ],
+    "outputs": [
+      "Auditable GL record"
+    ]
+  },
+  {
+    "workflow_id": "WF-POST-ASSESSMENTS",
+    "capability_id": "CAP-ASSESS",
+    "label": "Automatic Periodic Assessment Posting",
+    "description": "A scheduled workflow that automatically generates and posts recurring assessment fees to all homeowner accounts in a community.",
+    "steps": [
+      {
+        "step_id": "STEP-1",
+        "label": "Trigger Assessment Run",
+        "actor": "Worker",
+        "action": "A scheduled job (e.g., monthly) initiates the assessment posting process for a community.",
+        "inputs": [
+          "Schedule trigger",
+          "Community ID"
+        ],
+        "outputs": [
+          "List of homeowner accounts"
+        ],
+        "next_steps": [
+          "STEP-2"
+        ]
+      },
+      {
+        "step_id": "STEP-2",
+        "label": "Generate Invoices",
+        "actor": "Worker",
+        "action": "For each homeowner account, generate an assessment invoice based on the community's rules.",
+        "inputs": [
+          "Homeowner account",
+          "Assessment rules"
+        ],
+        "outputs": [
+          "Invoice records"
+        ],
+        "next_steps": [
+          "STEP-3"
+        ]
+      },
+      {
+        "step_id": "STEP-3",
+        "label": "Post to Ledgers",
+        "actor": "System",
+        "action": "Posts each invoice as a transaction to the homeowner's sub-ledger and the main GL.",
+        "inputs": [
+          "Invoice records"
+        ],
+        "outputs": [
+          "GL transaction events"
+        ],
+        "next_steps": []
+      }
+    ],
+    "actors": [
+      "System",
+      "Worker"
+    ],
+    "triggers": [
+      "Scheduled job execution (e.g., first day of the month)."
+    ],
+    "outputs": [
+      "Posted assessment fees on homeowner accounts."
+    ]
+  },
+  {
+    "workflow_id": "WF-TECHNICIAN-WO-LIFECYCLE",
+    "capability_id": "CAP-WORK-ORDER",
+    "label": "Technician Work Order Lifecycle (Mobile)",
+    "description": "A service technician uses the offline-first mobile app to receive, execute, and complete an assigned work order.",
+    "steps": [
+      {
+        "step_id": "STEP-1",
+        "label": "Sync and Receive Work Order",
+        "actor": "User",
+        "action": "Technician opens the mobile app and syncs with the server to download new work orders. App stores data locally for offline use.",
+        "inputs": [
+          "Technician authentication"
+        ],
+        "outputs": [
+          "Locally-stored work order data"
+        ],
+        "next_steps": [
+          "STEP-2"
+        ]
+      },
+      {
+        "step_id": "STEP-2",
+        "label": "Perform Work and Update Status",
+        "actor": "User",
+        "action": "Technician travels to the site, performs the work, and updates the work order status, adds notes, and attaches photos within the app (can be done offline).",
+        "inputs": [
+          "Work order details"
+        ],
+        "outputs": [
+          "Updated local work order data"
+        ],
+        "next_steps": [
+          "STEP-3"
+        ]
+      },
+      {
+        "step_id": "STEP-3",
+        "label": "Complete and Sync",
+        "actor": "System",
+        "action": "Once work is complete and the technician has network connectivity, the mobile app syncs the updated work order data back to the server.",
+        "inputs": [
+          "Updated local work order data"
+        ],
+        "outputs": [
+          "Server-side work order record updated"
+        ],
+        "next_steps": []
+      }
+    ],
+    "actors": [
+      "User",
+      "System"
+    ],
+    "triggers": [
+      "A dispatcher assigns a new work order to the technician."
+    ],
+    "outputs": [
+      "A completed work order with notes and photos."
+    ]
+  },
+  {
+    "workflow_id": "WF-HOMEOWNER-VIEW-ACCOUNT",
+    "capability_id": "CAP-HOMEOWNER-ACCESS",
+    "label": "Homeowner Views Account on Mobile",
+    "description": "A homeowner logs into the mobile app to view their account balance and transaction history.",
+    "steps": [
+      {
+        "step_id": "STEP-1",
+        "label": "Authenticate",
+        "actor": "User",
+        "action": "Homeowner opens the app and logs in with their credentials.",
+        "inputs": [
+          "Credentials"
+        ],
+        "outputs": [
+          "Authentication token"
+        ],
+        "next_steps": [
+          "STEP-2"
+        ]
+      },
+      {
+        "step_id": "STEP-2",
+        "label": "Fetch and Sync Data",
+        "actor": "System",
+        "action": "App requests account data from the server and caches it locally for offline viewing.",
+        "inputs": [
+          "Authentication token"
+        ],
+        "outputs": [
+          "Local cache of account data"
+        ],
+        "next_steps": [
+          "STEP-3"
+        ]
+      },
+      {
+        "step_id": "STEP-3",
+        "label": "Display Information",
+        "actor": "User",
+        "action": "Homeowner navigates to the account screen to view their balance and list of past transactions.",
+        "inputs": [
+          "Local cache of account data"
+        ],
+        "outputs": [
+          "UI display of account history"
+        ],
+        "next_steps": []
+      }
+    ],
+    "actors": [
+      "User",
+      "System"
+    ],
+    "triggers": [
+      "Homeowner opens the mobile application."
+    ],
+    "outputs": [
+      "Display of the homeowner's account information."
+    ]
+  }
+]
+```
+
+## Approved Plan (with entity/domain proposals - CRITICAL: you MUST preserve the full entityProposals and businessBusinessDomainProposals JSON arrays verbatim)
+
+```json
+{
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "type": "REQUIREMENT",
+      "text": "The platform must support AI-driven extraction, classification, and summarization of documents.",
+      "extractedFromTurnId": 0,
+      "timestamp": "2026-04-06T19:00:11.731Z"
+    },
+    {
+      "id": "REQ-2",
+      "type": "REQUIREMENT",
+      "text": "The system must have an auditable, compliant GL structure for accounting.",
+      "extractedFromTurnId": 0,
+      "timestamp": "2026-04-06T19:00:11.731Z"
+    },
+    {
+      "id": "REQ-3",
+      "type": "REQUIREMENT",
+      "text": "The platform must support automatic periodic assessment posting for community associations.",
+      "extractedFromTurnId": 0,
+      "timestamp": "2026-04-06T19:00:11.731Z"
+    },
+    {
+      "id": "REQ-4",
+      "type": "REQUIREMENT",
+      "text": "The platform must provide native iOS and Android mobile clients for homeowners and technicians with offline-first capabilities.",
+      "extractedFromTurnId": 0,
+      "timestamp": "2026-04-06T19:00:11.731Z"
+    }
+  ],
+  "entityProposals": [
+    {
+      "id": "ENT-USER",
+      "businessDomainId": "DOM-IDENTITY",
+      "name": "User",
+      "description": "Represents an individual who can log in and interact with the system, such as a homeowner, technician, CAM, or board member.",
+      "keyAttributes": [
+        "userId",
+        "email",
+        "hashedPassword",
+        "userType"
+      ],
+      "relationships": [
+        "has_one Profile",
+        "has_many Roles through UserRole",
+        "has_many Properties through PropertyUser",
+        "has_many Notifications"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-PROFILE",
+      "businessDomainId": "DOM-IDENTITY",
+      "name": "Profile",
+      "description": "Stores personal and contact information for a user.",
+      "keyAttributes": [
+        "profileId",
+        "userId",
+        "firstName",
+        "lastName",
+        "phoneNumber",
+        "address"
+      ],
+      "relationships": [
+        "belongs_to User"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-ROLE",
+      "businessDomainId": "DOM-IDENTITY",
+      "name": "Role",
+      "description": "Defines a set of permissions for a user, such as 'Homeowner', 'Admin', 'Technician', 'CAM', 'Board Member'.",
+      "keyAttributes": [
+        "roleId",
+        "roleName"
+      ],
+      "relationships": [
+        "has_many Users through UserRole",
+        "has_many Permissions through RolePermission"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-PERMISSION",
+      "businessDomainId": "DOM-IDENTITY",
+      "name": "Permission",
+      "description": "Represents a specific action a user can perform in the system, e.g., 'create_work_order', 'view_financial_reports'.",
+      "keyAttributes": [
+        "permissionId",
+        "permissionName",
+        "description"
+      ],
+      "relationships": [
+        "has_many Roles through RolePermission"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-USER_ROLE",
+      "businessDomainId": "DOM-IDENTITY",
+      "name": "UserRole",
+      "description": "Junction table linking Users to their assigned Roles.",
+      "keyAttributes": [
+        "userId",
+        "roleId"
+      ],
+      "relationships": [
+        "belongs_to User",
+        "belongs_to Role"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-PROPERTY",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "Property",
+      "description": "Represents a physical property, such as a house or condominium unit, including its details and address.",
+      "keyAttributes": [
+        "propertyId",
+        "address",
+        "parcelNumber",
+        "propertyType"
+      ],
+      "relationships": [
+        "belongs_to Community",
+        "has_many Users through PropertyUser",
+        "has_many Assets",
+        "has_many Documents",
+        "has_many ServiceRequests",
+        "has_many Violations",
+        "has_many ArchitecturalRequests"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-PROPERTY_USER",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "PropertyUser",
+      "description": "Junction table linking Users (Homeowners/Residents) to the Properties they own or reside in.",
+      "keyAttributes": [
+        "propertyId",
+        "userId",
+        "relationshipType"
+      ],
+      "relationships": [
+        "belongs_to Property",
+        "belongs_to User"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-ASSET",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "Asset",
+      "description": "Represents a specific asset within a property, such as an HVAC unit, water heater, or appliance, including purchase date and warranty info.",
+      "keyAttributes": [
+        "assetId",
+        "propertyId",
+        "name",
+        "manufacturer",
+        "modelNumber",
+        "installDate"
+      ],
+      "relationships": [
+        "belongs_to Property",
+        "has_many MaintenanceRecords"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-SERVICE_REQUEST",
+      "businessDomainId": "DOM-WORK-ORDER",
+      "name": "Service Request",
+      "description": "The initial request for service or repair submitted by a homeowner.",
+      "keyAttributes": [
+        "serviceRequestId",
+        "propertyId",
+        "userId",
+        "description",
+        "status",
+        "category"
+      ],
+      "relationships": [
+        "belongs_to Property",
+        "belongs_to User",
+        "has_one WorkOrder",
+        "has_many Bids"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-WORK_ORDER",
+      "businessDomainId": "DOM-WORK-ORDER",
+      "name": "Work Order",
+      "description": "A formal order authorizing work to be done, generated from a service request and assigned to a service provider.",
+      "keyAttributes": [
+        "workOrderId",
+        "serviceRequestId",
+        "serviceProviderId",
+        "status",
+        "scheduledDate"
+      ],
+      "relationships": [
+        "belongs_to ServiceRequest",
+        "belongs_to ServiceProvider",
+        "has_many Jobs",
+        "has_one Invoice",
+        "has_many Documents",
+        "has_many Notifications"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-BID",
+      "businessDomainId": "DOM-WORK-ORDER",
+      "name": "Bid",
+      "description": "A bid or quote submitted by a service provider for a service request.",
+      "keyAttributes": [
+        "bidId",
+        "serviceRequestId",
+        "serviceProviderId",
+        "amount",
+        "description",
+        "status"
+      ],
+      "relationships": [
+        "belongs_to ServiceRequest",
+        "belongs_to ServiceProvider"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-INVOICE",
+      "businessDomainId": "DOM-ACCOUNTING",
+      "name": "Invoice",
+      "description": "A bill for services rendered, generated after a work order is completed.",
+      "keyAttributes": [
+        "invoiceId",
+        "workOrderId",
+        "amount",
+        "dueDate",
+        "status"
+      ],
+      "relationships": [
+        "belongs_to WorkOrder",
+        "has_many Payments",
+        "has_one Transaction"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-PAYMENT",
+      "businessDomainId": "DOM-ACCOUNTING",
+      "name": "Payment",
+      "description": "A record of a payment made by a homeowner for an invoice or an assessment.",
+      "keyAttributes": [
+        "paymentId",
+        "userId",
+        "amount",
+        "paymentDate",
+        "paymentMethod"
+      ],
+      "relationships": [
+        "belongs_to User",
+        "belongs_to Invoice",
+        "belongs_to Assessment",
+        "has_one Transaction"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-SERVICE_PROVIDER",
+      "businessDomainId": "DOM-VENDOR",
+      "name": "Service Provider",
+      "description": "A business or contractor that provides services to homeowners.",
+      "keyAttributes": [
+        "serviceProviderId",
+        "businessName",
+        "contactInfo",
+        "rating"
+      ],
+      "relationships": [
+        "has_many Users",
+        "has_many Technicians",
+        "has_many ServiceOfferings",
+        "has_many VendorCredentials",
+        "has_many WorkOrders",
+        "has_many Reviews"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-VENDOR_CREDENTIAL",
+      "businessDomainId": "DOM-VENDOR",
+      "name": "Vendor Credential",
+      "description": "Represents a license, insurance policy, or other credential for a service provider.",
+      "keyAttributes": [
+        "credentialId",
+        "serviceProviderId",
+        "credentialType",
+        "issuer",
+        "expirationDate"
+      ],
+      "relationships": [
+        "belongs_to ServiceProvider",
+        "has_one Document"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-SERVICE_OFFERING",
+      "businessDomainId": "DOM-VENDOR",
+      "name": "Service Offering",
+      "description": "Defines a specific service or trade that a service provider offers (e.g., Plumbing, HVAC Repair).",
+      "keyAttributes": [
+        "serviceOfferingId",
+        "serviceProviderId",
+        "serviceName",
+        "description"
+      ],
+      "relationships": [
+        "belongs_to ServiceProvider"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-TECHNICIAN",
+      "businessDomainId": "DOM-FIELD-OPS",
+      "name": "Technician",
+      "description": "A field service worker employed by a Service Provider.",
+      "keyAttributes": [
+        "technicianId",
+        "userId",
+        "serviceProviderId",
+        "specialization"
+      ],
+      "relationships": [
+        "belongs_to User",
+        "belongs_to ServiceProvider",
+        "has_many Jobs through JobAssignment"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-JOB",
+      "businessDomainId": "DOM-FIELD-OPS",
+      "name": "Job",
+      "description": "A specific task or appointment scheduled for a technician to complete as part of a work order.",
+      "keyAttributes": [
+        "jobId",
+        "workOrderId",
+        "scheduledStartTime",
+        "status",
+        "location"
+      ],
+      "relationships": [
+        "belongs_to WorkOrder",
+        "has_many Technicians through JobAssignment",
+        "has_many JobLogs"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-JOB_ASSIGNMENT",
+      "businessDomainId": "DOM-FIELD-OPS",
+      "name": "Job Assignment",
+      "description": "Junction table linking Technicians to the Jobs they are assigned to.",
+      "keyAttributes": [
+        "jobId",
+        "technicianId"
+      ],
+      "relationships": [
+        "belongs_to Job",
+        "belongs_to Technician"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-JOB_LOG",
+      "businessDomainId": "DOM-FIELD-OPS",
+      "name": "Job Log",
+      "description": "A log of actions, notes, and status updates for a specific job, entered by a technician.",
+      "keyAttributes": [
+        "logId",
+        "jobId",
+        "technicianId",
+        "timestamp",
+        "notes",
+        "statusChange"
+      ],
+      "relationships": [
+        "belongs_to Job",
+        "belongs_to Technician"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-COMMUNITY",
+      "businessDomainId": "DOM-COMPLIANCE",
+      "name": "Community",
+      "description": "Represents a homeowners association (HOA) or managed community.",
+      "keyAttributes": [
+        "communityId",
+        "name",
+        "address"
+      ],
+      "relationships": [
+        "belongs_to Tenant",
+        "has_many Properties",
+        "has_many BoardMembers",
+        "has_many CAMs",
+        "has_many CommunityRules",
+        "has_many EnforcementPolicies",
+        "has_many FinancialReports"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-INSPECTION",
+      "businessDomainId": "DOM-COMPLIANCE",
+      "name": "Inspection",
+      "description": "A record of a community inspection performed by a CAM.",
+      "keyAttributes": [
+        "inspectionId",
+        "communityId",
+        "camUserId",
+        "inspectionDate"
+      ],
+      "relationships": [
+        "belongs_to Community",
+        "belongs_to User",
+        "has_many Violations"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-VIOLATION",
+      "businessDomainId": "DOM-COMPLIANCE",
+      "name": "Violation",
+      "description": "A record of a violation of community rules found at a property.",
+      "keyAttributes": [
+        "violationId",
+        "propertyId",
+        "inspectionId",
+        "ruleId",
+        "status",
+        "dateIssued"
+      ],
+      "relationships": [
+        "belongs_to Property",
+        "belongs_to Inspection",
+        "belongs_to CommunityRule",
+        "has_many ViolationHistoryRecords",
+        "has_many Notifications"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-COMMUNITY_RULE",
+      "businessDomainId": "DOM-COMPLIANCE",
+      "name": "Community Rule",
+      "description": "A specific rule or covenant for a community.",
+      "keyAttributes": [
+        "ruleId",
+        "communityId",
+        "ruleCode",
+        "description"
+      ],
+      "relationships": [
+        "belongs_to Community",
+        "has_many Violations"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-ENFORCEMENT_POLICY",
+      "businessDomainId": "DOM-COMPLIANCE",
+      "name": "Enforcement Policy",
+      "description": "Defines the steps and timeline for escalating unresolved violations (e.g., warning, fine, hearing).",
+      "keyAttributes": [
+        "policyId",
+        "communityId",
+        "name"
+      ],
+      "relationships": [
+        "belongs_to Community",
+        "has_many PolicySteps"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-ARCHITECTURAL_REQUEST",
+      "businessDomainId": "DOM-ARCH-REVIEW",
+      "name": "Architectural Request",
+      "description": "A request submitted by a homeowner for an architectural or property modification.",
+      "keyAttributes": [
+        "requestId",
+        "propertyId",
+        "userId",
+        "description",
+        "status",
+        "submissionDate"
+      ],
+      "relationships": [
+        "belongs_to Property",
+        "belongs_to User",
+        "has_many Documents",
+        "has_many Reviews"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-REVIEW",
+      "businessDomainId": "DOM-ARCH-REVIEW",
+      "name": "Review",
+      "description": "A review or vote on an architectural request by a committee member.",
+      "keyAttributes": [
+        "reviewId",
+        "requestId",
+        "reviewerId",
+        "decision",
+        "comments",
+        "reviewDate"
+      ],
+      "relationships": [
+        "belongs_to ArchitecturalRequest",
+        "belongs_to User"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-COMMITTEE",
+      "businessDomainId": "DOM-ARCH-REVIEW",
+      "name": "Committee",
+      "description": "A committee within a community, such as the Architectural Review Committee (ARC).",
+      "keyAttributes": [
+        "committeeId",
+        "communityId",
+        "name"
+      ],
+      "relationships": [
+        "belongs_to Community",
+        "has_many CommitteeMembers"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-COMMITTEE_MEMBER",
+      "businessDomainId": "DOM-ARCH-REVIEW",
+      "name": "Committee Member",
+      "description": "Junction table linking Users (Board Members) to the Committees they serve on.",
+      "keyAttributes": [
+        "committeeId",
+        "userId"
+      ],
+      "relationships": [
+        "belongs_to Committee",
+        "belongs_to User"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-ASSESSMENT",
+      "businessDomainId": "DOM-ACCOUNTING",
+      "name": "Assessment",
+      "description": "A charge or due owed by a homeowner to the community association (e.g., annual dues).",
+      "keyAttributes": [
+        "assessmentId",
+        "propertyId",
+        "amount",
+        "dueDate",
+        "period"
+      ],
+      "relationships": [
+        "belongs_to Property",
+        "has_many Payments",
+        "has_one Transaction"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-FINANCIAL_REPORT",
+      "businessDomainId": "DOM-ACCOUNTING",
+      "name": "Financial Report",
+      "description": "A generated financial report for a community, such as a balance sheet or income statement.",
+      "keyAttributes": [
+        "reportId",
+        "communityId",
+        "reportType",
+        "periodStartDate",
+        "periodEndDate"
+      ],
+      "relationships": [
+        "belongs_to Community",
+        "has_one Document"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-GENERAL_LEDGER",
+      "businessDomainId": "DOM-ACCOUNTING",
+      "name": "General Ledger",
+      "description": "The central ledger for a community's accounting, containing all financial transactions.",
+      "keyAttributes": [
+        "ledgerId",
+        "communityId",
+        "name"
+      ],
+      "relationships": [
+        "belongs_to Community",
+        "has_many Accounts",
+        "has_many Transactions"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-ACCOUNT",
+      "businessDomainId": "DOM-ACCOUNTING",
+      "name": "Account",
+      "description": "A specific account in the general ledger (e.g., 'Operating Cash', 'Reserve Funds', 'Assessment Income').",
+      "keyAttributes": [
+        "accountId",
+        "ledgerId",
+        "accountNumber",
+        "name",
+        "type"
+      ],
+      "relationships": [
+        "belongs_to GeneralLedger",
+        "has_many Transactions"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-TRANSACTION",
+      "businessDomainId": "DOM-ACCOUNTING",
+      "name": "Transaction",
+      "description": "Represents a single financial transaction, composed of debits and credits to various accounts.",
+      "keyAttributes": [
+        "transactionId",
+        "ledgerId",
+        "date",
+        "description"
+      ],
+      "relationships": [
+        "belongs_to GeneralLedger",
+        "has_many TransactionLines"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-COLLECTION_POLICY",
+      "businessDomainId": "DOM-ACCOUNTING",
+      "name": "Collection Policy",
+      "description": "Defines the automated process for collecting delinquent assessments.",
+      "keyAttributes": [
+        "policyId",
+        "communityId",
+        "name"
+      ],
+      "relationships": [
+        "belongs_to Community"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-DOCUMENT",
+      "businessDomainId": "DOM-DOCS",
+      "name": "Document",
+      "description": "A file stored in the system, such as a photo, invoice, report, or legal document.",
+      "keyAttributes": [
+        "documentId",
+        "fileName",
+        "fileType",
+        "storagePath",
+        "uploadDate"
+      ],
+      "relationships": [
+        "belongs_to User (uploader)",
+        "has_many DocumentVersions",
+        "has_one AIAnalysisResult"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-DOCUMENT_VERSION",
+      "businessDomainId": "DOM-DOCS",
+      "name": "Document Version",
+      "description": "Represents a specific version of a document, tracking its history.",
+      "keyAttributes": [
+        "versionId",
+        "documentId",
+        "versionNumber",
+        "timestamp"
+      ],
+      "relationships": [
+        "belongs_to Document"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-AI_ANALYSIS_RESULT",
+      "businessDomainId": "DOM-AI",
+      "name": "AI Analysis Result",
+      "description": "Stores the output of AI processing on a document, including extracted text, keywords, and indexed data.",
+      "keyAttributes": [
+        "resultId",
+        "documentId",
+        "analysisType",
+        "extractedData"
+      ],
+      "relationships": [
+        "belongs_to Document"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-RECOMMENDATION_LOG",
+      "businessDomainId": "DOM-AI",
+      "name": "Recommendation Log",
+      "description": "Logs the AI-generated recommendations for service providers for a given service request.",
+      "keyAttributes": [
+        "logId",
+        "serviceRequestId",
+        "recommendedProviderIds",
+        "timestamp"
+      ],
+      "relationships": [
+        "belongs_to ServiceRequest"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-NOTIFICATION",
+      "businessDomainId": "DOM-COMMS",
+      "name": "Notification",
+      "description": "Represents a notification sent to a user (e.g., email, SMS, push notification).",
+      "keyAttributes": [
+        "notificationId",
+        "userId",
+        "channel",
+        "status",
+        "content"
+      ],
+      "relationships": [
+        "belongs_to User",
+        "belongs_to NotificationTemplate"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-NOTIFICATION_TEMPLATE",
+      "businessDomainId": "DOM-COMMS",
+      "name": "Notification Template",
+      "description": "A reusable template for creating notifications for specific events (e.g., 'Work Order Complete', 'Violation Issued').",
+      "keyAttributes": [
+        "templateId",
+        "templateName",
+        "subject",
+        "body"
+      ],
+      "relationships": [
+        "has_many Notifications"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-REPORT",
+      "businessDomainId": "DOM-REPORTING",
+      "name": "Report",
+      "description": "A definition for a configured report or dashboard that users can view.",
+      "keyAttributes": [
+        "reportId",
+        "name",
+        "description",
+        "targetAudience"
+      ],
+      "relationships": [
+        "has_many DashboardWidgets"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-TENANT",
+      "businessDomainId": "DOM-ADMIN",
+      "name": "Tenant",
+      "description": "Represents a top-level customer organization, such as a Community Management Company, that contains multiple communities or provider businesses.",
+      "keyAttributes": [
+        "tenantId",
+        "name",
+        "subscriptionPlan"
+      ],
+      "relationships": [
+        "has_many Communities",
+        "has_many ServiceProviders",
+        "has_many Users"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-SYSTEM_SETTING",
+      "businessDomainId": "DOM-ADMIN",
+      "name": "System Setting",
+      "description": "A system-wide or tenant-specific configuration setting or feature flag.",
+      "keyAttributes": [
+        "settingId",
+        "tenantId",
+        "key",
+        "value"
+      ],
+      "relationships": [
+        "belongs_to Tenant"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-AUDIT_LOG",
+      "businessDomainId": "DOM-ADMIN",
+      "name": "Audit Log",
+      "description": "Records significant events and changes made by users throughout the system for security and compliance.",
+      "keyAttributes": [
+        "logId",
+        "userId",
+        "action",
+        "targetEntity",
+        "targetId",
+        "timestamp"
+      ],
+      "relationships": [
+        "belongs_to User"
+      ],
+      "source": "domain-standard"
+      }
+  ],
+  "constraints": [
+    {
+      "id": "CON-1",
+      "type": "CONSTRAINT",
+      "text": "Cloudflare CDN will be the only public entry point to the system.",
+      "extractedFromTurnId": 0,
+      "timestamp": "2026-04-06T19:00:11.731Z"
+    },
+    {
+      "id": "CON-2",
+      "type": "CONSTRAINT",
+      "text": "External integrations with partners like Nextdoor are out-of-scope for the initial implementation.",
+      "extractedFromTurnId": 0,
+      "timestamp": "2026-04-06T19:00:11.731Z"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "DEC-1",
+      "type": "DECISION",
+      "text": "The technology stack is pre-defined, including SvelteKit for the frontend, Node.js (Bun) for the backend, PostgreSQL for the database, and DBOS for the workflow engine.",
+      "extractedFromTurnId": 0,
+      "timestamp": "2026-04-06T19:00:11.731Z"
+    },
+    {
+      "id": "DEC-2",
+      "type": "DECISION",
+      "text": "The product will be built in three phases, corresponding to the three pillars: 1. Home Assistant, 2. Field Services Management, 3. Community Association Management.",
+      "extractedFromTurnId": 0,
+      "timestamp": "2026-04-06T19:00:11.731Z"
+    },
+    {
+      "id": "DEC-3",
+      "type": "DECISION",
+      "text": "Pillar 2 (Field Services Management) will be modeled after ServiceTitan.",
+      "extractedFromTurnId": 0,
+      "timestamp": "2026-04-06T19:00:11.731Z"
+    },
+    {
+      "id": "DEC-4",
+      "type": "DECISION",
+      "text": "Pillar 3 (Community Association Management) will be modeled after Vantaca.",
+      "extractedFromTurnId": 0,
+      "timestamp": "2026-04-06T19:00:11.731Z"
+    }
+  ]
+}
+```
+
+## Workspace Specification Files
+
+```json
+"# Workspace Structure Summary\n\n## Top-Level Directories\n- docs/\n- specs/\n\n## specs/\n- specs/hestami-ai-real-property-os(2)/\n"
+```
+
+## Architecture Validation Findings
+
+```json
+[]
+```

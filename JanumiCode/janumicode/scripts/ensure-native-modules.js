@@ -113,11 +113,18 @@ function rebuild(electronVersion) {
 	}
 
 	try {
-		// 2. Rebuild in-place for Electron (this is what @electron/rebuild does)
+		// 2. Rebuild in-place for Electron using node-gyp directly.
+		//    We bypass @electron/rebuild because its internal `node-abi` mapping
+		//    can be stale — e.g. Electron 39.8.3 needs ABI 140 but node-abi may
+		//    map it to 137. Using --dist-url=electronjs.org/headers downloads the
+		//    correct headers (with the right ABI) straight from Electron's CDN.
+		const betterSqlite3Dir = path.join(PROJECT_ROOT, 'node_modules', '.pnpm',
+			'better-sqlite3@12.6.2', 'node_modules', 'better-sqlite3');
+		console.log(`[native] Using node-gyp rebuild targeting Electron ${electronVersion} headers...`);
 		execSync(
-			`npx @electron/rebuild -v ${electronVersion} -o better-sqlite3`,
+			`npx node-gyp rebuild --target=${electronVersion} --arch=${process.arch} --dist-url=https://electronjs.org/headers --runtime=electron`,
 			{
-				cwd: PROJECT_ROOT,
+				cwd: betterSqlite3Dir,
 				stdio: 'inherit',
 				timeout: 180_000,
 			}
@@ -161,12 +168,12 @@ function rebuild(electronVersion) {
 
 // ── Main ────────────────────────────────────────────────────────────
 
-function ensure(force = false) {
-	const electronVersion = detectVSCodeElectronVersion();
+function ensure(force = false, explicitElectronVersion = null) {
+	const electronVersion = explicitElectronVersion || detectVSCodeElectronVersion();
 
 	if (!electronVersion) {
 		console.warn('[native] Could not detect VS Code Electron version. Skipping ABI check.');
-		console.warn('[native] Run manually: node scripts/ensure-native-modules.js --force');
+		console.warn('[native] Run manually: node scripts/ensure-native-modules.js --force --electron-version=X.Y.Z');
 		return { skipped: true, reason: 'no-vscode-detected' };
 	}
 
@@ -199,7 +206,9 @@ function ensure(force = false) {
 // Allow both CLI and programmatic usage
 if (require.main === module) {
 	const force = process.argv.includes('--force');
-	const result = ensure(force);
+	const evArg = process.argv.find(a => a.startsWith('--electron-version='));
+	const explicitVersion = evArg ? evArg.split('=')[1] : null;
+	const result = ensure(force, explicitVersion);
 	if (!result.skipped && !result.rebuilt) {
 		process.exit(1);
 	}

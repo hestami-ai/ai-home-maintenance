@@ -9,3 +9,6 @@
 
 // No global setup needed — the vscode alias handles everything.
 // This file exists to satisfy the vitest setupFiles config entry.
+
+process.env.JANUMICODE_TEST_SEED = process.env.JANUMICODE_TEST_SEED ?? '1337';
+process.env.TZ = process.env.TZ ?? 'UTC';

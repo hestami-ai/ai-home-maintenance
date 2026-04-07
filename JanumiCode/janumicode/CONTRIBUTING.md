@@ -391,6 +391,15 @@ npm run test:coverage
 
 # Watch mode
 npm run test:watch
+
+# Critical regression matrix (direct + sidecar DB backends)
+pnpm run test:critical:matrix
+
+# Required CI gates (critical matrix + critical coverage thresholds)
+pnpm run test:ci:required
+
+# Extension host smoke tests
+pnpm run test:host:smoke
 ```
 
 ## Documentation

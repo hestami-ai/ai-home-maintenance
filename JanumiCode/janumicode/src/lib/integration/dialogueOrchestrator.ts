@@ -17,6 +17,8 @@ import {
 	emitDialogueTurnAdded,
 	emitError,
 } from './eventBus';
+import { getLogger, isLoggerInitialized } from '../logging';
+import { withArtifactContext, updatePhase as updateArtifactPhase } from '../diagnostics/artifactContext';
 
 // ── Pause support ──
 // Set by the UI panel when the user requests a pause. Checked between phases.
@@ -357,7 +359,16 @@ export async function executeWorkflowCycle(
 		iterationLimitHit?: boolean;
 	}>
 > {
-	try {
+	const runCycle = async (): Promise<
+		Result<{
+			phasesExecuted: number;
+			finalPhase: string;
+			gateTriggered: boolean;
+			awaitingInput: boolean;
+			completed: boolean;
+			iterationLimitHit?: boolean;
+		}>
+	> => {
 		// Clear cached providers so fresh API keys are resolved each cycle
 		clearRoleProviderCache();
 
@@ -409,8 +420,13 @@ export async function executeWorkflowCycle(
 
 		// Clear pause flag at start of cycle
 		_pauseRequested = false;
+		const cycleLog = isLoggerInitialized() ? getLogger().child({ component: 'workflowCycle' }) : undefined;
 
 		for (let i = 0; i < maxPhases; i++) {
+			cycleLog?.debug('Workflow cycle iteration', { iteration: i, phasesExecuted });
+			// Refresh artifact context phase/sub-phase from current workflow state.
+			// No-op when no test scenario is active (artifact context store is empty).
+			refreshArtifactPhaseFromState(dialogueId);
 			// Check for pause request between phases
 			if (_pauseRequested) {
 				_pauseRequested = false;
@@ -433,6 +449,7 @@ export async function executeWorkflowCycle(
 			const result = await advanceWorkflow(dialogueId, providers, tokenBudget);
 
 			if (!result.success) {
+				cycleLog?.error('advanceWorkflow failed', { error: result.error.message });
 				emitError('WORKFLOW_ADVANCE_FAILED', result.error.message, { dialogueId });
 				// Return what we have so far rather than failing entirely
 				const stateResult = getWorkflowState(dialogueId);
@@ -476,7 +493,7 @@ export async function executeWorkflowCycle(
 		}
 
 		return {
-			success: true,
+			success: true as const,
 			value: {
 				phasesExecuted,
 				finalPhase,
@@ -486,6 +503,27 @@ export async function executeWorkflowCycle(
 				iterationLimitHit,
 			},
 		};
+	};
+
+	try {
+		// When the JANUMICODE_TEST_SCENARIO env var is set, the test driver wants
+		// us to thread an artifact context through the cycle so the CLI capture
+		// wrapper / mock replay provider can locate per-call artifacts on disk.
+		// Production runs leave the env var unset and skip the wrap entirely.
+		const scenario = process.env.JANUMICODE_TEST_SCENARIO;
+		if (scenario) {
+			return await withArtifactContext(
+				{
+					scenario,
+					dialogueId,
+					phase: 'INIT',
+					subPhase: undefined,
+					callIndex: 0,
+				},
+				runCycle,
+			);
+		}
+		return await runCycle();
 	} catch (error) {
 		return {
 			success: false,
@@ -494,5 +532,34 @@ export async function executeWorkflowCycle(
 				error instanceof Error ? error.message : 'Unknown error'
 			),
 		};
+	}
+}
+
+/**
+ * Read the workflow state for `dialogueId` and update the active artifact
+ * context's phase/sub-phase to match. No-op when there is no active artifact
+ * context (production path) or when the state lookup fails.
+ */
+function refreshArtifactPhaseFromState(dialogueId: string): void {
+	try {
+		const stateResult = getWorkflowState(dialogueId);
+		if (!stateResult.success) { return; }
+		const phase = stateResult.value.current_phase;
+		let subPhase: string | undefined;
+		try {
+			const meta = JSON.parse(stateResult.value.metadata ?? '{}');
+			// Phase modules each store a sub-state under a phase-prefixed key.
+			// We probe the well-known keys without coupling to phase internals.
+			subPhase = meta.architectureSubState
+				?? meta.intakeSubState
+				?? meta.validateSubState
+				?? meta.executeSubState
+				?? undefined;
+		} catch {
+			// Malformed metadata — skip sub-phase, keep phase.
+		}
+		updateArtifactPhase(phase, subPhase);
+	} catch {
+		// Defensive: never let artifact bookkeeping break a real cycle.
 	}
 }

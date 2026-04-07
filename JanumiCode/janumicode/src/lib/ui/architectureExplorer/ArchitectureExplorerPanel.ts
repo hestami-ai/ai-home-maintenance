@@ -33,7 +33,7 @@ export function openArchitectureExplorer(
 }
 
 class ArchitectureExplorerPanel {
-	private _panel: vscode.WebviewPanel;
+	private readonly _panel: vscode.WebviewPanel;
 	private _dialogueId: string;
 	private _eventUnsubscribers: (() => void)[] = [];
 	private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -73,20 +73,17 @@ class ArchitectureExplorerPanel {
 	private _subscribeToEvents(): void {
 		const bus = getEventBus();
 
-		// Refresh when architecture-related commands complete
 		this._eventUnsubscribers.push(
+			// Refresh when architecture-related commands complete
 			bus.on('workflow:command', (payload) => {
 				if (this._disposed) { return; }
 				const label = (payload as { label?: string }).label ?? '';
 				const action = (payload as { action?: string }).action ?? '';
-				if ((label.includes('Architect') || label.includes('ARCHITECTURE')) && action === 'complete') {
+				if (shouldRefreshOnCommand(label, action)) {
 					this._scheduleRefresh();
 				}
-			})
-		);
-
-		// Track sub-phase progress
-		this._eventUnsubscribers.push(
+			}),
+			// Track sub-phase progress
 			bus.on('workflow:phase_changed', (payload) => {
 				if (this._disposed) { return; }
 				const p = payload as { currentPhase?: string; currentSubPhase?: string };
@@ -94,15 +91,12 @@ class ArchitectureExplorerPanel {
 					this._currentSubPhase = p.currentSubPhase;
 					this._postProgress(p.currentSubPhase);
 				}
-			})
-		);
-
-		// Refresh when a gate is triggered (validation complete, presenting)
-		this._eventUnsubscribers.push(
+			}),
+			// Refresh when a gate is triggered (validation complete, presenting)
 			bus.on('workflow:gate_triggered', () => {
 				if (this._disposed) { return; }
 				this._scheduleRefresh();
-			})
+			}),
 		);
 	}
 
@@ -173,7 +167,7 @@ class ArchitectureExplorerPanel {
 		<h1>Architecture Explorer</h1>
 		<span class="meta">v${doc.version} | ${doc.capabilities.length} capabilities | ${doc.components.length} components | ${doc.data_models.length} data models | ${doc.interfaces.length} interfaces</span>
 		${subPhaseLabel}
-		<span class="meta" style="margin-left:auto;">Goal alignment: ${doc.goal_alignment_score != null ? Math.round(doc.goal_alignment_score * 100) + '%' : 'N/A'}</span>
+		<span class="meta" style="margin-left:auto;">Goal alignment: ${doc.goal_alignment_score !== null && doc.goal_alignment_score !== undefined ? Math.round(doc.goal_alignment_score * 100) + '%' : 'N/A'}</span>
 	</div>
 
 	<div class="tab-bar">
@@ -226,24 +220,31 @@ class ArchitectureExplorerPanel {
 				}
 			});
 
-			// Handle live progress updates from extension host
+			// Handle live progress updates from extension host. We never use
+			// innerHTML with the message payload — sub-phase strings come from
+			// workflow state that may be influenced by user input/LLM output and
+			// must be treated as untrusted text. Build DOM nodes and assign via
+			// textContent to neutralize any HTML/script content.
+			function setIndicator(indicator, subPhase) {
+				indicator.textContent = '';
+				const spinner = document.createElement('span');
+				spinner.className = 'progress-spinner';
+				indicator.appendChild(spinner);
+				indicator.appendChild(document.createTextNode(' ' + String(subPhase)));
+			}
 			window.addEventListener('message', event => {
 				const msg = event.data;
 				if (msg.type === 'architectureProgress') {
-					const indicator = document.getElementById('progress-indicator');
-					if (indicator) {
-						indicator.innerHTML = '<span class="progress-spinner"></span> ' + msg.data.subPhase;
-					} else {
-						// Create indicator if it doesn't exist
+					let indicator = document.getElementById('progress-indicator');
+					if (!indicator) {
 						const header = document.querySelector('.explorer-header');
-						if (header) {
-							const span = document.createElement('span');
-							span.id = 'progress-indicator';
-							span.className = 'progress-indicator';
-							span.innerHTML = '<span class="progress-spinner"></span> ' + msg.data.subPhase;
-							header.appendChild(span);
-						}
+						if (!header) { return; }
+						indicator = document.createElement('span');
+						indicator.id = 'progress-indicator';
+						indicator.className = 'progress-indicator';
+						header.appendChild(indicator);
 					}
+					setIndicator(indicator, msg.data.subPhase);
 				}
 			});
 		})();
@@ -264,6 +265,21 @@ class ArchitectureExplorerPanel {
 		this._eventUnsubscribers = [];
 		instance = undefined;
 	}
+}
+
+/**
+ * Predicate: should the explorer refresh in response to a workflow:command event?
+ * Architecture-related commands include:
+ *   - completion of architecture phase commands ("Architect — ...", action 'complete')
+ *   - per-pass output of the Recursive Decomposition local planner (action 'output')
+ * Exported so the subscription filter can be tested without spinning up a webview.
+ */
+export function shouldRefreshOnCommand(label: string, action: string): boolean {
+	const isArchLabel = label.includes('Architect')
+		|| label.includes('ARCHITECTURE')
+		|| label.includes('Recursive Decomposition');
+	if (!isArchLabel) { return false; }
+	return action === 'complete' || action === 'output';
 }
 
 // ── HELPERS ──
@@ -288,7 +304,7 @@ function loadReviewConcerns(dialogueId: string): string[] {
 }
 
 function escapeHtml(s: string): string {
-	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+	return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
 
 function getErrorHtml(message: string): string {

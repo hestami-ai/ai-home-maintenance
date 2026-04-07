@@ -414,24 +414,44 @@ export function handleMMPSubmit(cardId: string): void {
 		});
 	}
 
+	// Show pending state while waiting for host ack (don't freeze yet)
+	const submitBar = document.querySelector('[data-mmp-submit-bar="' + cardId + '"]') as HTMLElement | null;
+	if (submitBar) {
+		const btn = submitBar.querySelector('.mmp-submit-btn') as HTMLButtonElement | null;
+		if (btn) {
+			btn.textContent = 'Submitting...';
+			btn.disabled = true;
+		}
+	}
+}
+
+// ===== Submit Ack/Reject Handlers =====
+
+/**
+ * Host accepted the MMP submit — freeze the card and clean up state.
+ */
+export function handleMmpSubmitAccepted(cardId: string): void {
+	console.log('[MMP:SubmitAck] Accepted for card:', cardId);
+	const prefix = cardId + ':';
+
 	// Freeze the UI — disable all buttons, show submitted state
-	const container = mmpContainer;
-	if (container) {
-		container.querySelectorAll('button').forEach((btn) => {
+	const mmpContainer = document.querySelector('[data-mmp-card-id="' + cardId + '"]') as HTMLElement | null;
+	if (mmpContainer) {
+		mmpContainer.querySelectorAll('button').forEach((btn) => {
 			btn.disabled = true;
 		});
-		container.querySelectorAll('textarea').forEach((ta) => {
+		mmpContainer.querySelectorAll('textarea').forEach((ta) => {
 			ta.readOnly = true;
 			ta.style.opacity = '0.7';
 		});
-		container.querySelectorAll('.mmp-option-card').forEach((card) => {
+		mmpContainer.querySelectorAll('.mmp-option-card').forEach((card) => {
 			(card as HTMLElement).style.pointerEvents = 'none';
 		});
 	}
 	// Also freeze product discovery inline edit textareas (outside MMP container)
-	const pdCardForFreeze = mmpContainer?.closest('.intake-product-discovery-card');
-	if (pdCardForFreeze) {
-		pdCardForFreeze.querySelectorAll<HTMLTextAreaElement>('.pd-inline-edit-area').forEach((ta) => {
+	const pdCard = mmpContainer?.closest('.intake-product-discovery-card');
+	if (pdCard) {
+		pdCard.querySelectorAll<HTMLTextAreaElement>('.pd-inline-edit-area').forEach((ta) => {
 			ta.readOnly = true;
 			ta.style.opacity = '0.7';
 		});
@@ -458,6 +478,32 @@ export function handleMMPSubmit(cardId: string): void {
 	}
 	console.log('[MMP:Submit] Cleaned state for card:', cardId, '| remaining mirror keys:', Object.keys(state.mmpMirrorDecisions).length);
 	persistMmpState();
+}
+
+/**
+ * Host rejected the MMP submit — restore the submit button so the user can retry.
+ */
+export function handleMmpSubmitRejected(cardId: string, reason: string): void {
+	console.warn('[MMP:SubmitRejected] Card:', cardId, '| Reason:', reason);
+
+	const submitBar = document.querySelector('[data-mmp-submit-bar="' + cardId + '"]') as HTMLElement | null;
+	if (submitBar) {
+		const btn = submitBar.querySelector('.mmp-submit-btn') as HTMLButtonElement | null;
+		if (btn) {
+			btn.textContent = 'Submit Decisions';
+			btn.disabled = false;
+		}
+		// Show error briefly
+		let errorEl = submitBar.querySelector('.mmp-submit-error') as HTMLElement | null;
+		if (!errorEl) {
+			errorEl = document.createElement('div');
+			errorEl.className = 'mmp-submit-error';
+			errorEl.style.cssText = 'color: var(--vscode-errorForeground); font-size: 12px; margin-top: 4px;';
+			submitBar.appendChild(errorEl);
+		}
+		errorEl.textContent = reason;
+		setTimeout(() => { if (errorEl) { errorEl.textContent = ''; } }, 8000);
+	}
 }
 
 // ===== Progress Tracking =====

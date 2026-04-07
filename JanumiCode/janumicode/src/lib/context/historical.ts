@@ -237,7 +237,7 @@ export function retrieveRelevantDecisions(
 			.prepare(
 				`
 				SELECT hd.decision_id, hd.gate_id, hd.action,
-				       hd.rationale, hd.attachments_ref, hd.timestamp,
+				       hd.rationale, hd.attachments_ref, hd.decision_maker, hd.timestamp,
 				       g.dialogue_id
 				FROM human_decisions hd
 				JOIN gates g ON hd.gate_id = g.gate_id

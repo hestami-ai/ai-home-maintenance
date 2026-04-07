@@ -12,6 +12,7 @@
 
 import * as vscode from 'vscode';
 import { LogLevel, logLevelLabel, parseLogLevel } from './levels';
+import { getTraceContext } from './traceContext';
 
 /**
  * Contextual metadata attached to every log entry produced by a logger or its children.
@@ -176,10 +177,19 @@ export class Logger {
 	 * Walk the parent chain and merge all context, child overriding parent.
 	 */
 	private resolvedContext(): LogContext {
-		if (!this._parent) {
-			return { ...this._context };
+		const base = this._parent
+			? { ...this._parent.resolvedContext(), ...this._context }
+			: { ...this._context };
+
+		// Auto-enrich with AsyncLocalStorage trace context (if active).
+		// Explicit context fields take precedence over trace context.
+		const trace = getTraceContext();
+		if (trace) {
+			if (!base.traceId) { base.traceId = trace.traceId; }
+			if (!base.dialogueId) { base.dialogueId = trace.dialogueId; }
+			if (!base.action) { base.action = trace.action; }
 		}
-		return { ...this._parent.resolvedContext(), ...this._context };
+		return base;
 	}
 }
 

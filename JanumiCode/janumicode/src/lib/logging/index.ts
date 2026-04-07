@@ -19,3 +19,8 @@ export {
 	CLIErrorCode,
 	type ClassifiedError,
 } from './errorClassifier';
+export {
+	runWithTrace,
+	getTraceContext,
+	type TraceContext,
+} from './traceContext';

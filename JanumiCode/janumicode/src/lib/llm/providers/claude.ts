@@ -94,7 +94,7 @@ interface ClaudeAPIError {
  */
 export class ClaudeProvider implements LLMProvider {
 	public readonly name = 'Claude';
-	private config: ProviderConfig;
+	private readonly config: ProviderConfig;
 	private rateLimitInfo: RateLimitInfo | null = null;
 
 	public readonly capabilities: ProviderCapabilities = {
@@ -429,8 +429,8 @@ export class ClaudeProvider implements LLMProvider {
 
 		if (requestsRemaining && tokensRemaining && resetTimestamp) {
 			this.rateLimitInfo = {
-				requestsRemaining: parseInt(requestsRemaining, 10),
-				tokensRemaining: parseInt(tokensRemaining, 10),
+				requestsRemaining: Number.parseInt(requestsRemaining, 10),
+				tokensRemaining: Number.parseInt(tokensRemaining, 10),
 				resetAt: resetTimestamp,
 			};
 		}

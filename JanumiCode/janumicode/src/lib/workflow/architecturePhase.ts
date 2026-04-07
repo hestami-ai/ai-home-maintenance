@@ -544,6 +544,18 @@ Levels: ADEQUATE (well covered), PARTIAL (some coverage), NONE (not addressed).`
 		const coverageMap = initializeCoverageMap();
 		const seededCoverage = seedCoverageFromAnalysis(coverageMap, engineeringDomainAssessment);
 		updateIntakeConversation(dialogueId, { engineeringDomainCoverage: seededCoverage });
+
+		// Also propagate enriched coverage into approvedIntakePlan in workflow metadata
+		// so DECOMPOSING and downstream sub-phases can access it (Finding 1 fix).
+		const freshState = getWorkflowState(dialogueId);
+		if (freshState.success) {
+			const freshMeta = JSON.parse(freshState.value.metadata);
+			if (freshMeta.approvedIntakePlan) {
+				freshMeta.approvedIntakePlan.engineeringDomainCoverage = seededCoverage;
+				updateWorkflowMetadata(dialogueId, { approvedIntakePlan: freshMeta.approvedIntakePlan });
+			}
+		}
+
 		log?.info('Domain coverage seeded from technical analysis', {
 			adequate: engineeringDomainAssessment.filter(d => d.level === 'ADEQUATE').length,
 			partial: engineeringDomainAssessment.filter(d => d.level === 'PARTIAL').length,
@@ -1133,7 +1145,11 @@ async function executeDesigning(
 			if (pResult.success) { designProviderName = pResult.value.name; }
 		} catch { /* use fallback */ }
 
-		// Get constraints/decisions from approved plan for the DESIGNING agent
+		// Get constraints/decisions from approved plan for the DESIGNING agent.
+		// Only constraints, decisions, and technicalNotes are passed as static extras —
+		// the full plan (requirements, userJourneys, phasingStrategy, businessDomainProposals)
+		// is available to the Context Engineer via the INTAKE handoff document, which is
+		// assembled based on the DESIGNING policy in policyRegistry.ts.
 		const designStateResult = getWorkflowState(dialogueId);
 		const designPlan = designStateResult.success
 			? JSON.parse(designStateResult.value.metadata).approvedIntakePlan ?? null
@@ -1230,11 +1246,11 @@ async function executeDesigning(
 		timestamp: new Date().toISOString(),
 	});
 
-	const { applyRecursiveDecomposition } = await import('./architectureRecursion.js');
+	const { applyRecursiveDecomposition, remapDependencyEdges } = await import('./architectureRecursion.js');
 	const { invokeBatchDecomposition } = await import('../roles/architectureExpert.js');
 	type DecomposeFnType = import('./architectureRecursion').DecomposeFn;
 
-	// Get constraints/decisions for the batch decomposition agent (Intake context)
+	// Get constraints/decisions + requirements digest for the batch decomposition agent
 	const rtdStateResult = getWorkflowState(dialogueId);
 	const rtdPlan = rtdStateResult.success
 		? JSON.parse(rtdStateResult.value.metadata).approvedIntakePlan ?? null
@@ -1242,31 +1258,68 @@ async function executeDesigning(
 	const rtdConstraints = rtdPlan
 		? { constraints: rtdPlan.constraints, decisions: rtdPlan.decisions, technicalNotes: rtdPlan.technicalNotes }
 		: null;
+	// Build a compact requirements digest so batch decomposition knows WHY components exist
+	let requirementsDigest: string | null = null;
+	if (rtdPlan) {
+		const parts: string[] = [];
+		if (Array.isArray(rtdPlan.requirements)) {
+			parts.push('Requirements: ' + (rtdPlan.requirements as Array<{ id?: string; text?: string }>).map((r: { id?: string; text?: string }) => `[${r.id ?? '?'}] ${r.text ?? ''}`).join('; '));
+		}
+		if (Array.isArray(rtdPlan.userJourneys)) {
+			parts.push('User Journeys: ' + (rtdPlan.userJourneys as Array<{ name?: string }>).map((j: { name?: string }) => j.name ?? '').filter(Boolean).join(', '));
+		}
+		if (rtdPlan.phasingStrategy) {
+			const phases = Array.isArray(rtdPlan.phasingStrategy)
+				? (rtdPlan.phasingStrategy as Array<{ name?: string }>).map((p: { name?: string }) => p.name ?? '').filter(Boolean).join(', ')
+				: String(rtdPlan.phasingStrategy).slice(0, 200);
+			parts.push('Phasing: ' + phases);
+		}
+		if (parts.length > 0) { requirementsDigest = parts.join('\n'); }
+	}
 
 	const decomposeFn: DecomposeFnType = async (violating) => {
 		const result = await invokeBatchDecomposition(
-			dialogueId, violating, doc,
+			violating, doc,
 			{
 				commandId: recursionCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
 				constraintsAndDecisions: rtdConstraints,
 				humanFeedback: meta.humanFeedback,
+				requirementsDigest,
 			}
 		);
-		return result.success ? result.value : [];
+		return result.success ? result.value : { components: [], interfaces: [], interfaceProviderRemap: [] };
 	};
 
 	const recursionResult = await applyRecursiveDecomposition(
-		dialogueId,
 		components,
 		doc.workflow_graph,
 		decompositionConfig,
-		tokenBudget,
 		{ commandId: recursionCmdId, dialogueId, forcedMinDepth, decomposeFn }
 	);
 
 	const finalComponents = recursionResult.success
-		? recursionResult.value
+		? recursionResult.value.components
 		: components; // Fallback to flat components if recursion fails
+	const newInterfaces = recursionResult.success
+		? recursionResult.value.interfaces
+		: [];
+	const llmProviderRemap = recursionResult.success
+		? recursionResult.value.interfaceProviderRemap
+		: [];
+
+	if (newInterfaces.length > 0) {
+		const existingIfaceIds = new Set(interfaces.map(i => i.interface_id));
+		for (const iface of newInterfaces) {
+			if (!existingIfaceIds.has(iface.interface_id)) {
+				interfaces.push(iface);
+				existingIfaceIds.add(iface.interface_id);
+			}
+		}
+		log?.info('Aggregated interfaces from recursive decomposition', {
+			added: newInterfaces.length,
+			totalNow: interfaces.length,
+		});
+	}
 
 	const decomposed = finalComponents.length - components.length;
 	const recursionNow = new Date().toISOString();
@@ -1306,6 +1359,28 @@ async function executeDesigning(
 		}
 	}
 
+	// M5: Strip workflow refs that don't resolve to a real workflow ID. The LLM
+	// occasionally invents workflow IDs that don't exist in doc.workflow_graph.
+	// RC3 above only fires on empty arrays, so non-empty-but-bad arrays slipped through.
+	for (const comp of finalComponents) {
+		if (comp.workflows_served.length === 0) { continue; }
+		const valid: string[] = [];
+		const invalid: string[] = [];
+		for (const wfId of comp.workflows_served) {
+			if (allWorkflowIds.has(wfId)) {
+				valid.push(wfId);
+			} else {
+				invalid.push(wfId);
+			}
+		}
+		if (invalid.length > 0) {
+			log?.warn('Stripped invalid workflow_id refs from component.workflows_served', {
+				componentId: comp.component_id, label: comp.label, invalid, kept: valid,
+			});
+			comp.workflows_served = valid;
+		}
+	}
+
 	// RC4: Deduplicate components by component_id (LLM sometimes emits the same ID twice,
 	// which causes inconsistency between the JSON blob and the DB lookup tables)
 	const seenCompIds = new Set<string>();
@@ -1317,6 +1392,98 @@ async function executeDesigning(
 		seenCompIds.add(c.component_id);
 		return true;
 	});
+
+	// Phase 3 / Fix H3: Remap dependency edges from decomposed parents to children.
+	// Runs AFTER RC4 dedupe so it operates on the same component set as RC5,
+	// preventing the recursion-time remap from routing deps to children that RC4 later drops.
+	remapDependencyEdges(dedupedFinals, log);
+
+	// RC5: Remap interfaces to reference child components after decomposition.
+	// When a parent component is decomposed into children, interfaces that reference
+	// the parent as provider/consumer become stale. Remap them to the children
+	// that inherit the parent's workflows_served.
+	const finalComponentIds = new Set(dedupedFinals.map(c => c.component_id));
+	const parentToChildren = new Map<string, string[]>();
+	for (const comp of dedupedFinals) {
+		if (comp.parent_component_id && finalComponentIds.has(comp.parent_component_id)) {
+			const siblings = parentToChildren.get(comp.parent_component_id) || [];
+			siblings.push(comp.component_id);
+			parentToChildren.set(comp.parent_component_id, siblings);
+		}
+	}
+
+	// Build LLM-declared provider remap lookup (Option 3)
+	const llmRemapByIfaceId = new Map<string, string>();
+	for (const r of llmProviderRemap) {
+		llmRemapByIfaceId.set(r.interface_id, r.new_provider_component);
+	}
+	const finalCompById = new Map(dedupedFinals.map(c => [c.component_id, c]));
+
+	if (parentToChildren.size > 0) {
+		for (const iface of interfaces) {
+			// Remap provider: if provider was decomposed, prefer LLM-declared mapping;
+			// fall back to workflow-overlap heuristic; last resort: index 0 with warning.
+			const providerChildIds = parentToChildren.get(iface.provider_component);
+			if (providerChildIds && providerChildIds.length > 0) {
+				const originalProvider = iface.provider_component;
+				let chosen: string | undefined;
+				let strategy: 'llm' | 'workflow_overlap' | 'fallback_first' = 'fallback_first';
+
+				const llmChoice = llmRemapByIfaceId.get(iface.interface_id);
+				if (llmChoice && providerChildIds.includes(llmChoice)) {
+					chosen = llmChoice;
+					strategy = 'llm';
+				} else {
+					if (llmChoice) {
+						log?.warn('LLM provider remap target is not a child of the decomposed parent — ignoring', {
+							interfaceId: iface.interface_id,
+							llmChoice, validChildren: providerChildIds,
+						});
+					}
+					const sourceWfSet = new Set(iface.source_workflows);
+					const matched = providerChildIds.find(cid => {
+						const child = finalCompById.get(cid);
+						return child?.workflows_served.some(wf => sourceWfSet.has(wf));
+					});
+					if (matched) {
+						chosen = matched;
+						strategy = 'workflow_overlap';
+					} else {
+						chosen = providerChildIds[0];
+						log?.warn('Interface provider remap fell back to first child (no LLM mapping, no workflow overlap)', {
+							interfaceId: iface.interface_id,
+							originalProvider, candidates: providerChildIds, chosen,
+						});
+					}
+				}
+
+				log?.info('Remapping interface provider after decomposition', {
+					interfaceId: iface.interface_id, from: originalProvider, to: chosen, strategy,
+				});
+				iface.provider_component = chosen;
+			}
+
+			// Remap consumers: expand decomposed parents into all their children
+			const expandedConsumers: string[] = [];
+			for (const consumer of iface.consumer_components) {
+				const consumerChildren = parentToChildren.get(consumer);
+				if (consumerChildren && consumerChildren.length > 0) {
+					expandedConsumers.push(...consumerChildren);
+				} else {
+					expandedConsumers.push(consumer);
+				}
+			}
+			if (expandedConsumers.length !== iface.consumer_components.length ||
+				expandedConsumers.some((c, i) => c !== iface.consumer_components[i])) {
+				log?.info('Remapping interface consumers after decomposition', {
+					interfaceId: iface.interface_id,
+					from: iface.consumer_components,
+					to: expandedConsumers,
+				});
+				iface.consumer_components = expandedConsumers;
+			}
+		}
+	}
 
 	// 4. Update the document with design output (components + interfaces only;
 	//    data_models from MODELING, implementation_sequence from SEQUENCING)

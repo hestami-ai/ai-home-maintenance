@@ -13,6 +13,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { getLogger, isLoggerInitialized } from '../../logging';
 
 // ==================== Types ====================
 
@@ -78,7 +79,8 @@ export class SessionRecorder {
 
 			return fileUri.fsPath;
 		} catch (err) {
-			console.error('[SessionRecorder] Failed to flush recording:', err);
+			const recLog = isLoggerInitialized() ? getLogger().child({ component: 'sessionRecorder' }) : undefined;
+			recLog?.error('Failed to flush recording', { error: err instanceof Error ? err.message : String(err) });
 			return null;
 		}
 	}

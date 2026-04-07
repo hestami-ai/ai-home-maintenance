@@ -1,7 +1,6 @@
 const esbuild = require("esbuild");
 const fs = require("fs");
 const path = require("path");
-const { ensure: ensureNativeModules } = require("./scripts/ensure-native-modules");
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
@@ -34,17 +33,12 @@ const copyNativeModulesPlugin = {
 	name: 'copy-native-modules',
 
 	setup(build) {
-		// Ensure Electron-compatible native binary exists in cache (first build only)
-		let ensureResult = null;
 		build.onEnd(() => {
-			if (!ensureResult) {
-				ensureResult = ensureNativeModules();
-			}
-
 			const pnpmBase = path.join(__dirname, 'node_modules', '.pnpm', 'better-sqlite3@12.6.2', 'node_modules');
 			const distModules = path.join(__dirname, 'dist', 'node_modules');
 
-			// Copy better-sqlite3 JS/package from node_modules to dist/
+			// Copy better-sqlite3 JS/package + native binary from node_modules to dist/
+			// The sidecar process (running system or bundled Node.js) loads these directly
 			const srcDir = path.join(pnpmBase, 'better-sqlite3');
 			const destDir = path.join(distModules, 'better-sqlite3');
 
@@ -52,14 +46,6 @@ const copyNativeModulesPlugin = {
 				fs.mkdirSync(distModules, { recursive: true });
 				copyRecursiveSync(srcDir, destDir);
 				console.log('[copy] Copied better-sqlite3 to dist/node_modules');
-			}
-
-			// Overlay the Electron-compiled .node binary from cache
-			if (ensureResult && ensureResult.cachedNodeFile && fs.existsSync(ensureResult.cachedNodeFile)) {
-				const destNodeFile = path.join(destDir, 'build', 'Release', 'better_sqlite3.node');
-				fs.mkdirSync(path.dirname(destNodeFile), { recursive: true });
-				copyFileWithRetry(ensureResult.cachedNodeFile, destNodeFile);
-				console.log('[copy] Overlaid Electron-compiled .node from cache');
 			}
 
 			// Copy bindings (required by better-sqlite3 to locate native .node file)
@@ -196,13 +182,52 @@ async function main() {
 		],
 	});
 
+	// Database Sidecar build (Node.js / CommonJS — standalone child process)
+	const sidecarCtx = await esbuild.context({
+		entryPoints: [
+			'src/sidecar/dbServer.ts'
+		],
+		bundle: true,
+		format: 'cjs',
+		minify: production,
+		sourcemap: !production,
+		sourcesContent: false,
+		platform: 'node',
+		outfile: 'dist/sidecar/dbServer.js',
+		external: ['better-sqlite3', '@sqliteai/sqlite-vector'],
+		logLevel: 'silent',
+		plugins: [
+			esbuildProblemMatcherPlugin,
+		],
+	});
+
+	// Database RPC Worker build (Node.js / CommonJS — worker_threads)
+	const rpcWorkerCtx = await esbuild.context({
+		entryPoints: [
+			'src/lib/database/rpcWorker.ts'
+		],
+		bundle: true,
+		format: 'cjs',
+		minify: production,
+		sourcemap: !production,
+		sourcesContent: false,
+		platform: 'node',
+		outfile: 'dist/rpcWorker.js',
+		logLevel: 'silent',
+		plugins: [
+			esbuildProblemMatcherPlugin,
+		],
+	});
+
 	if (watch) {
-		await Promise.all([extensionCtx.watch(), webviewCtx.watch(), mcpServerCtx.watch()]);
+		await Promise.all([extensionCtx.watch(), webviewCtx.watch(), mcpServerCtx.watch(), sidecarCtx.watch(), rpcWorkerCtx.watch()]);
 	} else {
-		await Promise.all([extensionCtx.rebuild(), webviewCtx.rebuild(), mcpServerCtx.rebuild()]);
+		await Promise.all([extensionCtx.rebuild(), webviewCtx.rebuild(), mcpServerCtx.rebuild(), sidecarCtx.rebuild(), rpcWorkerCtx.rebuild()]);
 		await extensionCtx.dispose();
 		await webviewCtx.dispose();
 		await mcpServerCtx.dispose();
+		await sidecarCtx.dispose();
+		await rpcWorkerCtx.dispose();
 	}
 }
 

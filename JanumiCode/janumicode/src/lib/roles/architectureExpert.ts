@@ -672,7 +672,14 @@ export async function invokeArchitectureDesign(
 		// Note: constraintsAndDecisions duplicates data already in the handoff doc — only include if small
 		if (options?.constraintsAndDecisions) {
 			const cdSize = JSON.stringify(options.constraintsAndDecisions).length;
-			if (cdSize < 10_000) { designExtras.constraintsAndDecisions = options.constraintsAndDecisions; }
+			if (cdSize < 10_000) {
+				designExtras.constraintsAndDecisions = options.constraintsAndDecisions;
+			} else if (isLoggerInitialized()) {
+				getLogger().child({ component: 'architectureDesign' }).warn(
+					'constraintsAndDecisions exceeds 10KB — omitted from extras (available via handoff doc)',
+					{ cdSize, dialogueId: options?.dialogueId },
+				);
+			}
 		}
 		if (options?.workspaceSpecs) { designExtras.workspace_specs = options.workspaceSpecs; }
 
@@ -1342,9 +1349,34 @@ Your response MUST be valid JSON:
       "file_scope": "src/modules/<name>/",
       "parent_component_id": "COMP-<PARENT-ID> or null if kept intact"
     }
+  ],
+  "interfaces": [
+    {
+      "interface_id": "API-<SHORT-NAME>",
+      "type": "REST | gRPC | EventBus | Function | Other",
+      "label": "Interface name",
+      "description": "What this contract enables",
+      "provider_component": "COMP-<CHILD-ID>",
+      "consumer_components": ["COMP-<CHILD-ID>"],
+      "contract": "Method signatures, payload shape, or event schema",
+      "source_workflows": ["WF-<ID>"]
+    }
   ]
 }
-\`\`\``;
+\`\`\`
+
+If the new sub-components need to communicate with each other (e.g. one child calls another), declare those contracts in the "interfaces" array. Only declare interfaces between newly created sub-components — do NOT redeclare interfaces that involve unchanged components. Return an empty array if no new inter-child contracts are needed.
+
+# Interface Provider Remapping (CRITICAL)
+If you decompose a component that currently provides one or more interfaces (shown above in "Relevant Interfaces"), you MUST declare which child inherits each provider role. Add an "interface_provider_remap" array to your response:
+
+\`\`\`json
+"interface_provider_remap": [
+  { "interface_id": "API-EXISTING-ID", "new_provider_component": "COMP-CHILD-ID" }
+]
+\`\`\`
+
+Choose the child whose responsibility most directly owns the contract (e.g. for a REST API interface, the child that handles HTTP request/response cycles, not the child that handles database persistence). Omit entries for interfaces whose provider was not decomposed. Return an empty array if no provider remapping is needed.`;
 
 /**
  * Invoke the Architecture Expert for batched component decomposition.
@@ -1355,11 +1387,10 @@ Your response MUST be valid JSON:
  * Returns sub-components (with parent_component_id set) and intact components.
  */
 export async function invokeBatchDecomposition(
-	dialogueId: string,
 	violating: Array<{ component: ComponentSpec; violations: string[] }>,
 	architectureDoc: ArchitectureDocument,
-	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; constraintsAndDecisions?: Record<string, unknown> | null; humanFeedback?: string | null }
-): Promise<Result<ComponentSpec[]>> {
+	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; constraintsAndDecisions?: Record<string, unknown> | null; humanFeedback?: string | null; requirementsDigest?: string | null }
+): Promise<Result<{ components: ComponentSpec[]; interfaces: InterfaceSpec[]; interfaceProviderRemap: Array<{ interface_id: string; new_provider_component: string }> }>> {
 	const log = isLoggerInitialized()
 		? getLogger().child({ component: 'architectureExpert', phase: 'DECOMPOSITION' })
 		: null;
@@ -1368,7 +1399,7 @@ export async function invokeBatchDecomposition(
 		// 1. Resolve provider
 		const providerResult = await resolveProviderForRole(Role.TECHNICAL_EXPERT);
 		if (!providerResult.success) {
-			return providerResult as unknown as Result<ComponentSpec[]>;
+			return providerResult as unknown as Result<{ components: ComponentSpec[]; interfaces: InterfaceSpec[]; interfaceProviderRemap: Array<{ interface_id: string; new_provider_component: string }> }>;
 		}
 
 		// 2. Build focused context — only include architecture elements relevant
@@ -1449,6 +1480,12 @@ export async function invokeBatchDecomposition(
 			}
 		}
 
+		// Requirements digest — compact summary of WHY components exist
+		if (options?.requirementsDigest) {
+			contextSections.push('\n# Requirements & Product Context (digest)');
+			contextSections.push(options.requirementsDigest);
+		}
+
 		// Intake context: constraints, decisions, and human feedback
 		if (options?.constraintsAndDecisions) {
 			const cd = options.constraintsAndDecisions;
@@ -1517,7 +1554,7 @@ export async function invokeBatchDecomposition(
 		});
 
 		if (!cliResult.success) {
-			return cliResult as unknown as Result<ComponentSpec[]>;
+			return cliResult as unknown as Result<{ components: ComponentSpec[]; interfaces: InterfaceSpec[]; interfaceProviderRemap: Array<{ interface_id: string; new_provider_component: string }> }>;
 		}
 
 		// 4. Parse response — reuse the component normalization from parseDesignResponse
@@ -1542,12 +1579,37 @@ export async function invokeBatchDecomposition(
 			parent_component_id: (c.parent_component_id as string) || null,
 		}));
 
+		const interfaces: InterfaceSpec[] = Array.isArray(parsed.interfaces)
+			? parsed.interfaces.map((i: Record<string, unknown>) => ({
+				interface_id: (i.interface_id as string) || `API-${randomUUID().substring(0, 8)}`,
+				type: (i.type as InterfaceSpec['type']) || 'REST',
+				label: (i.label as string) || '',
+				description: (i.description as string) || '',
+				provider_component: (i.provider_component as string) || '',
+				consumer_components: Array.isArray(i.consumer_components) ? i.consumer_components as string[] : [],
+				contract: (i.contract as string) || '',
+				source_workflows: Array.isArray(i.source_workflows) ? i.source_workflows as string[] : [],
+			}))
+			: [];
+
+		const interfaceProviderRemap: Array<{ interface_id: string; new_provider_component: string }> =
+			Array.isArray(parsed.interface_provider_remap)
+				? parsed.interface_provider_remap
+					.map((r: Record<string, unknown>) => ({
+						interface_id: (r.interface_id as string) || '',
+						new_provider_component: (r.new_provider_component as string) || '',
+					}))
+					.filter((r: { interface_id: string; new_provider_component: string }) => r.interface_id && r.new_provider_component)
+				: [];
+
 		log?.info('Batch decomposition complete', {
 			inputComponents: violating.length,
 			outputComponents: components.length,
+			outputInterfaces: interfaces.length,
+			providerRemaps: interfaceProviderRemap.length,
 		});
 
-		return { success: true, value: components };
+		return { success: true, value: { components, interfaces, interfaceProviderRemap } };
 	} catch (error) {
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
 	}

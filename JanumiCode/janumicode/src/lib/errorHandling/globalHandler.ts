@@ -5,7 +5,6 @@
  */
 
 import * as vscode from 'vscode';
-import type { Result } from '../types';
 import { emitError } from '../integration/eventBus';
 
 /**
@@ -82,7 +81,7 @@ export interface StructuredError {
 class GlobalErrorHandler {
 	private outputChannel: vscode.OutputChannel | null = null;
 	private errorLog: StructuredError[] = [];
-	private maxLogSize = 1000;
+	private readonly maxLogSize = 1000;
 
 	/**
 	 * Initialize error handler
@@ -125,7 +124,7 @@ class GlobalErrorHandler {
 	 * @returns Structured error
 	 */
 	handleError(
-		error: Error | unknown,
+		error: unknown,
 		options?: {
 			severity?: ErrorSeverity;
 			category?: ErrorCategory;
@@ -159,7 +158,7 @@ class GlobalErrorHandler {
 	 * Create structured error
 	 */
 	private createStructuredError(
-		error: Error | unknown,
+		error: unknown,
 		options?: {
 			severity?: ErrorSeverity;
 			category?: ErrorCategory;
@@ -315,40 +314,52 @@ class GlobalErrorHandler {
 
 		switch (category) {
 			case ErrorCategory.DATABASE:
-				suggestions.push('Check database file permissions');
-				suggestions.push('Verify database is not corrupted');
-				suggestions.push('Try restarting VS Code');
+				suggestions.push(
+					'Check database file permissions',
+					'Verify database is not corrupted',
+					'Try restarting VS Code',
+				);
 				break;
 
 			case ErrorCategory.LLM_API:
-				suggestions.push('Check API key configuration');
-				suggestions.push('Verify internet connection');
-				suggestions.push('Check API rate limits');
-				suggestions.push('Retry after a short delay');
+				suggestions.push(
+					'Check API key configuration',
+					'Verify internet connection',
+					'Check API rate limits',
+					'Retry after a short delay',
+				);
 				break;
 
 			case ErrorCategory.NETWORK:
-				suggestions.push('Check internet connection');
-				suggestions.push('Verify proxy settings');
-				suggestions.push('Retry operation');
+				suggestions.push(
+					'Check internet connection',
+					'Verify proxy settings',
+					'Retry operation',
+				);
 				break;
 
 			case ErrorCategory.CONFIGURATION:
-				suggestions.push('Review extension settings');
-				suggestions.push('Verify configuration values');
-				suggestions.push('Reset to default settings');
+				suggestions.push(
+					'Review extension settings',
+					'Verify configuration values',
+					'Reset to default settings',
+				);
 				break;
 
 			case ErrorCategory.FILESYSTEM:
-				suggestions.push('Check file permissions');
-				suggestions.push('Verify file paths');
-				suggestions.push('Ensure sufficient disk space');
+				suggestions.push(
+					'Check file permissions',
+					'Verify file paths',
+					'Ensure sufficient disk space',
+				);
 				break;
 
 			default:
-				suggestions.push('Check error logs');
-				suggestions.push('Try restarting VS Code');
-				suggestions.push('Report issue if problem persists');
+				suggestions.push(
+					'Check error logs',
+					'Try restarting VS Code',
+					'Report issue if problem persists',
+				);
 		}
 
 		return suggestions;
@@ -595,9 +606,7 @@ let handlerInstance: GlobalErrorHandler | null = null;
  * Get global error handler instance
  */
 export function getGlobalErrorHandler(): GlobalErrorHandler {
-	if (!handlerInstance) {
-		handlerInstance = new GlobalErrorHandler();
-	}
+	handlerInstance ??= new GlobalErrorHandler();
 	return handlerInstance;
 }
 
@@ -612,7 +621,7 @@ export function initializeErrorHandler(outputChannel: vscode.OutputChannel): voi
  * Handle error (convenience function)
  */
 export function handleError(
-	error: Error | unknown,
+	error: unknown,
 	options?: {
 		severity?: ErrorSeverity;
 		category?: ErrorCategory;

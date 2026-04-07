@@ -226,7 +226,7 @@ function extractResultEventResponse(line: string): string | null {
 function isJsonlEventLine(line: string): boolean {
 	try {
 		const event = JSON.parse(line);
-		return event.type != null && typeof event.type === 'string';
+		return event.type !== null && event.type !== undefined && typeof event.type === 'string';
 	} catch { return false; }
 }
 

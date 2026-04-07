@@ -10,6 +10,7 @@
 
 import type { DialogueEvent, Claim, Verdict, Gate } from '../../types';
 import { ClaimStatus, GateStatus, Phase } from '../../types';
+import { getLogger, isLoggerInitialized } from '../../logging';
 import { getDialogueEvents, getClaims, getVerdicts, getGates, getHumanDecisions, getIntakeConversation, getQaExchanges } from '../../events/reader';
 import { getWorkflowState, type WorkflowState } from '../../workflow/stateMachine';
 import { getAllDialogues, type DialogueRecord } from '../../dialogue/lifecycle';
@@ -155,7 +156,7 @@ export type StreamItem =
 	| { type: 'intake_checkpoint'; dialogueId: string; checkpoint: IntakeCheckpoint; timestamp: string; resolved?: boolean }
 	| { type: 'intake_domain_transition'; dialogueId: string; fromDomain: string; fromLabel: string; toDomain: string | null; toLabel: string | null; toDescription: string | null; timestamp: string }
 	| { type: 'intake_gathering_complete'; dialogueId: string; coverageSummary: { adequate: number; partial: number; none: number; percentage: number }; intakeMode: string | null; timestamp: string }
-	| { type: 'intake_analysis'; dialogueId: string; humanMessage: string; analysisSummary: string; codebaseFindings: string[]; engineeringDomainAssessment: Array<{ domain: string; level: string; evidence: string }>; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }> }
+	| { type: 'intake_analysis'; dialogueId: string; humanMessage: string; analysisSummary: string; codebaseFindings: string[]; engineeringDomainAssessment: Array<{ domain: string; level: string; evidence: string }>; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>; eventId?: number }
 	| { type: 'intake_product_discovery'; dialogueId: string; requestCategory: string; productVision?: string; productDescription?: string; personas?: Array<{ id: string; name: string; description: string; goals: string[]; painPoints: string[] }>; userJourneys?: Array<{ id: string; personaId: string; title: string; scenario: string; steps: Array<{ stepNumber: number; actor: string; action: string; expectedOutcome: string }>; acceptanceCriteria: string[]; priority: string }>; phasingStrategy?: Array<{ phase: string; description: string; journeyIds: string[]; rationale: string }>; successMetrics?: string[]; uxRequirements?: string[]; mmpJson?: string; eventId?: number; timestamp: string }
 	| { type: 'intake_proposal'; dialogueId: string; title: string; summary: string; proposedApproach: string; engineeringDomainCoverage: { adequate: number; partial: number; none: number; percentage: number }; timestamp: string }
 	// Proposer-Validator items
@@ -166,13 +167,13 @@ export type StreamItem =
 	| { type: 'qa_exchange'; dialogueId: string; question: string; answer: string; timestamp: string }
 	| { type: 'reasoning_review'; dialogueId: string; concerns: Array<{ severity: string; summary: string; detail: string; location: string; recommendation: string }>; overallAssessment: string; reviewerModel: string; reviewPrompt?: string; timestamp: string }
 	// Architecture phase items
-	| { type: 'architecture_capabilities'; dialogueId: string; capabilities: Array<{ id: string; label: string; requirements: number; workflows: number; parentId: string | null }>; timestamp: string }
-	| { type: 'architecture_design'; dialogueId: string; components: Array<{ id: string; label: string; responsibility: string; rationale: string; parentId: string | null; workflowsServed: string[]; dependencies: string[]; interactionPatterns: string[]; technologyNotes: string; fileScope: string }>; dataModels: Array<{ id: string; entity: string; description: string; fields: Array<{ name: string; type: string; required: boolean }>; relationships: Array<{ targetModel: string; type: string; description: string }>; invariants: string[] }>; interfaces: Array<{ id: string; label: string; type: string; description: string; contract: string; providerComponent: string; consumerComponents: string[]; sourceWorkflows: string[] }>; implementationSequence: Array<{ id: string; label: string; description: string; componentsInvolved: string[]; dependencies: string[]; complexity: string; verificationMethod: string; sortOrder: number }>; timestamp: string }
-	| { type: 'architecture_validation'; dialogueId: string; score: number | null; findings: string[]; validated: boolean; timestamp: string }
+	| { type: 'architecture_capabilities'; dialogueId: string; capabilities: Array<{ id: string; label: string; requirements: number; workflows: number; parentId: string | null }>; timestamp: string; eventId?: number }
+	| { type: 'architecture_design'; dialogueId: string; components: Array<{ id: string; label: string; responsibility: string; rationale: string; parentId: string | null; workflowsServed: string[]; dependencies: string[]; interactionPatterns: string[]; technologyNotes: string; fileScope: string }>; dataModels: Array<{ id: string; entity: string; description: string; fields: Array<{ name: string; type: string; required: boolean }>; relationships: Array<{ targetModel: string; type: string; description: string }>; invariants: string[] }>; interfaces: Array<{ id: string; label: string; type: string; description: string; contract: string; providerComponent: string; consumerComponents: string[]; sourceWorkflows: string[] }>; implementationSequence: Array<{ id: string; label: string; description: string; componentsInvolved: string[]; dependencies: string[]; complexity: string; verificationMethod: string; sortOrder: number }>; timestamp: string; eventId?: number }
+	| { type: 'architecture_validation'; dialogueId: string; score: number | null; findings: string[]; validated: boolean; timestamp: string; eventId?: number }
 	| { type: 'architecture_gate'; docId: string; version: number; capabilities: number; components: number; goalAlignmentScore: number | null; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string; mmpJson?: string; decompositionDepth?: number; eventId?: number }
 	// Validation Review phase items
-	| { type: 'validation_finding'; dialogueId: string; findingId: string; hypothesis: string; category: string; severity: string; location: string; tool_used: string; proof_status: string; proof_artifact: string | null; confidence: number; useful_rating: number | null; timestamp: string }
-	| { type: 'validation_summary'; dialogueId: string; totalFindings: number; provenCount: number; probableCount: number; categories: Record<string, number>; timestamp: string };
+	| { type: 'validation_finding'; dialogueId: string; findingId: string; hypothesis: string; category: string; severity: string; location: string; tool_used: string; proof_status: string; proof_artifact: string | null; confidence: number; useful_rating: number | null; timestamp: string; eventId?: number }
+	| { type: 'validation_summary'; dialogueId: string; totalFindings: number; provenCount: number; probableCount: number; categories: Record<string, number>; timestamp: string; eventId?: number };
 
 /**
  * Summary of a dialogue for the switcher dropdown
@@ -442,6 +443,7 @@ function buildStreamItems(
 				codebaseFindings: expertResponse?.codebaseFindings ?? [],
 				engineeringDomainAssessment: expertResponse?.engineeringDomainAssessment ?? [],
 				timestamp: event.timestamp,
+				eventId: event.event_id,
 			});
 
 			// Inject proposal card if analysis includes an initial plan
@@ -460,12 +462,10 @@ function buildStreamItems(
 				const percentage = total > 0 ? Math.round(((adequate + partial * 0.5) / total) * 100) : 0;
 
 				// Emit product discovery card separately (only for product_or_feature with MMP)
-				console.log('[DataAgg] Product discovery check:', {
-					requestCategory: plan.requestCategory,
-					hasProductDiscoveryMMP: !!detail.productDiscoveryMMP,
-					mmpLength: detail.productDiscoveryMMP ? String(detail.productDiscoveryMMP).length : 0,
-					personasCount: plan.personas?.length ?? 0,
-				});
+				{
+					const aggLog = isLoggerInitialized() ? getLogger().child({ component: 'dataAggregator' }) : undefined;
+					aggLog?.debug('productDiscoveryCheck', { requestCategory: plan.requestCategory, hasProductDiscoveryMMP: !!detail.productDiscoveryMMP, mmpLength: detail.productDiscoveryMMP ? String(detail.productDiscoveryMMP).length : 0, personasCount: plan.personas?.length ?? 0 });
+				}
 				if (plan.requestCategory === 'product_or_feature' && detail.productDiscoveryMMP) {
 					items.push({
 						type: 'intake_product_discovery',
@@ -598,7 +598,7 @@ function buildStreamItems(
 				workflows: Array.isArray(c.workflows) ? (c.workflows as string[]).length : 0,
 				parentId: (c.parent_capability_id as string) || null,
 			}));
-			items.push({ type: 'architecture_capabilities', dialogueId: dialogueId ?? '', capabilities: caps, timestamp: event.timestamp });
+			items.push({ type: 'architecture_capabilities', dialogueId: dialogueId ?? '', capabilities: caps, timestamp: event.timestamp, eventId: event.event_id });
 		} else if (eventType === 'architecture_design' || eventType === 'architecture_modeling' || eventType === 'architecture_sequencing') {
 			// Three events contribute to architecture_design StreamItems:
 			//   - architecture_design carries components + interfaces + data_models (from doc)
@@ -654,6 +654,7 @@ function buildStreamItems(
 					})),
 					implementationSequence: [],
 					timestamp: event.timestamp,
+					eventId: event.event_id,
 				});
 			} else if (eventType === 'architecture_sequencing' && dialogueId) {
 				// After SEQUENCING, the document has all 4 artifact types.
@@ -713,6 +714,7 @@ function buildStreamItems(
 							sortOrder: typeof s.sort_order === 'number' ? s.sort_order : 0,
 						})),
 						timestamp: event.timestamp,
+						eventId: event.event_id,
 					});
 				}
 			}
@@ -726,6 +728,7 @@ function buildStreamItems(
 				findings: Array.isArray(detail.findings) ? detail.findings as string[] : [],
 				validated: !detail.findings?.length && (detail.goalAlignmentScore ?? 1) >= 0.6,
 				timestamp: event.timestamp,
+				eventId: event.event_id,
 			});
 		} else if (eventType === 'architecture_presentation') {
 			const detail = cachedParseDetail(event);
@@ -814,6 +817,7 @@ function buildStreamItems(
 				confidence: detail.confidence ?? 0.7,
 				useful_rating: liveRating !== undefined ? liveRating : (usefulRating as number | null),
 				timestamp: event.timestamp,
+				eventId: event.event_id,
 			});
 		} else if (eventType === 'validation_summary') {
 			const detail = cachedParseDetail(event);
@@ -825,6 +829,7 @@ function buildStreamItems(
 				probableCount: detail.probableCount ?? 0,
 				categories: (detail.categories as Record<string, number>) ?? {},
 				timestamp: event.timestamp,
+				eventId: event.event_id,
 			});
 		} else {
 			// Non-INTAKE events (proposal, assumption_surfacing, execution, commit, etc.)
@@ -1339,9 +1344,13 @@ function getStreamItemSortPriority(item: StreamItem): number {
 		case 'intake_gathering_complete': return 6;
 		case 'intake_checkpoint': return 7;
 		case 'qa_exchange': return 4;
-		case 'architecture_capabilities': return 2;
-		case 'architecture_design': return 3;
-		case 'architecture_validation': return 4;
+		// Architecture synthesis events are always written AFTER the CLI commands
+		// that informed them. They carry eventId so the eventId tiebreaker handles
+		// ordering when both items have it; these priorities cover the mixed case
+		// (synthesis vs a non-eventId item at the same second).
+		case 'architecture_capabilities': return 3.6;
+		case 'architecture_design': return 3.7;
+		case 'architecture_validation': return 3.8;
 		case 'architecture_gate': return 8;
 		case 'reasoning_review': return 3.5; // Right after command_block (3) at the same timestamp
 		case 'dialogue_end': return 9;
@@ -1350,8 +1359,34 @@ function getStreamItemSortPriority(item: StreamItem): number {
 }
 
 /**
- * Sort a StreamItem array in-place by normalized timestamp,
- * with type-based tiebreaking for items at the same time.
+ * Return the event_id for items that originate from dialogue_events.
+ * Used as a monotonic tiebreaker within the same timestamp second.
+ */
+function getStreamItemEventId(item: StreamItem): number | undefined {
+	switch (item.type) {
+		case 'turn': return item.turn.event_id;   // DialogueEvent already carries event_id
+		case 'intake_turn': return item.eventId;
+		case 'intake_analysis': return item.eventId;
+		case 'intake_product_discovery': return item.eventId;
+		case 'intake_proposer_business_domains': return item.eventId;
+		case 'intake_proposer_journeys': return item.eventId;
+		case 'intake_proposer_entities': return item.eventId;
+		case 'intake_proposer_integrations': return item.eventId;
+		case 'architecture_capabilities': return item.eventId;
+		case 'architecture_design': return item.eventId;
+		case 'architecture_validation': return item.eventId;
+		case 'architecture_gate': return item.eventId;
+		case 'validation_finding': return item.eventId;
+		case 'validation_summary': return item.eventId;
+		default: return undefined;
+	}
+}
+
+/**
+ * Sort a StreamItem array in-place by normalized timestamp.
+ * Tiebreaker when timestamps are equal (second granularity):
+ *   1. Both items have event_id → use monotonic DB insertion order.
+ *   2. Otherwise → fall back to type-based sort priority.
  */
 function sortStreamItemsByTimestamp(items: StreamItem[]): void {
 	items.sort((a, b) => {
@@ -1359,7 +1394,11 @@ function sortStreamItemsByTimestamp(items: StreamItem[]): void {
 		const tb = getStreamItemTimestamp(b);
 		if (ta < tb) { return -1; }
 		if (ta > tb) { return 1; }
-		// Tiebreaker: milestones/turns before command blocks at same timestamp
+		// Same timestamp second: prefer monotonic event_id when both items have it
+		const ea = getStreamItemEventId(a);
+		const eb = getStreamItemEventId(b);
+		if (ea !== undefined && eb !== undefined) { return ea - eb; }
+		// Mixed or no event_id: fall back to type-based priority
 		return getStreamItemSortPriority(a) - getStreamItemSortPriority(b);
 	});
 }

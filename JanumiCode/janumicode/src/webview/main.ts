@@ -39,8 +39,8 @@ import {
 	handleRecordingState,
 	handleClearStream,
 } from './messageHandlers';
-import { submitGateDecision, handleVerificationGateDecision, handleReviewGateDecision } from './gates';
-import { handleIntakeSubmitResponses, disableIntakeApprovalButtons, handleIntakeModeSelection, handleIntakeAskDomain } from './intake';
+import { submitGateDecision, handleVerificationGateDecision, handleReviewGateDecision, handleGateDecisionAccepted, handleGateDecisionRejected } from './gates';
+import { handleIntakeSubmitResponses, disableIntakeApprovalButtons, handleIntakeModeSelection, handleIntakeAskDomain, handleIntakeSubmitAccepted, handleIntakeSubmitRejected } from './intake';
 import { handleToggleAskMore, handleClarificationSend, handleClarificationResponse, restoreClarificationThreads } from './clarification';
 import {
 	submitInput,
@@ -54,6 +54,8 @@ import {
 	debouncedMentionQuery,
 	mentionNavigate,
 	mentionConfirmSelection,
+	handleComposerSubmitAccepted,
+	handleComposerSubmitRejected,
 } from './composer';
 import { handleCommandActivity, handleToolCallActivity, toggleCommandBlock, toggleStdinBlock, showMoreCommandOutput, injectReasoningReviewCard } from './commandBlocks';
 import { initCopyCards } from './copyCards';
@@ -71,6 +73,8 @@ import {
 	handleBulkMirrorAction,
 	handleBulkPreMortemAction,
 	applyPendingMmpDecisions,
+	handleMmpSubmitAccepted,
+	handleMmpSubmitRejected,
 } from './mmp';
 import {
 	handleSpeechToggle,
@@ -88,42 +92,262 @@ import {
 	findNext,
 	findPrev,
 } from './findWidget';
-import { renderStreamItems, renderStreamItem } from './renderer/streamRenderer';
+import { renderStreamItems, renderStreamItem, renderItemContent, getStreamItemId, getStreamItemRev, isArchitectureStreamItem } from './renderer/streamRenderer';
+import type { RenderContext } from './renderer/streamRenderer';
 import type { StreamItem, PendingMmpSnapshot } from './renderer/streamTypes';
+import type { InputState } from './types';
+
+// ===== INPUT AREA SURGICAL UPDATE =====
+
+function _escHtml(s: string): string {
+	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Surgically update the input area state without replacing #user-input.
+ * Preserves any text the user has typed in the composer.
+ */
+function updateInputArea(inputState: InputState): void {
+	const inputArea = document.querySelector<HTMLElement>('.input-area');
+	if (!inputArea) { return; }
+
+	// Processing cancel bar
+	const processingBar = inputArea.querySelector('.processing-cancel-bar');
+	if (inputState.isProcessing) {
+		if (!processingBar) {
+			const div = document.createElement('div');
+			div.className = 'input-actions processing-cancel-bar';
+			div.innerHTML = '<span class="processing-cancel-label"><span class="processing-spinner-inline"></span> Processing&hellip;</span>' +
+				'<button class="cancel-btn" data-action="cancel-workflow" title="Cancel current operation">Cancel</button>';
+			inputArea.prepend(div);
+		}
+	} else {
+		processingBar?.remove();
+	}
+
+	// Gate context hint
+	const gateHint = inputArea.querySelector<HTMLElement>('.gate-context-hint');
+	if (inputState.hasOpenGates && inputState.gateContext) {
+		if (!gateHint) {
+			const div = document.createElement('div');
+			div.className = 'input-actions gate-context-hint';
+			const attachments = inputArea.querySelector('.input-attachments');
+			if (attachments) { inputArea.insertBefore(div, attachments); } else { inputArea.appendChild(div); }
+		}
+		const hint = inputArea.querySelector<HTMLElement>('.gate-context-hint')!;
+		hint.innerHTML = '<span style="font-size: 11px; color: var(--vscode-charts-yellow);">&#x1F6A7; ' + _escHtml(inputState.gateContext) + '</span>';
+	} else {
+		gateHint?.remove();
+	}
+
+	// Phase placeholder
+	const userInput = document.getElementById('user-input');
+	if (userInput) {
+		userInput.setAttribute('data-placeholder', inputState.placeholder);
+	}
+}
+
+// ===== STREAM RECONCILIATION =====
+
+/**
+ * Update #stream-content to match `items` without destroying existing DOM nodes.
+ * - Existing items with unchanged data-item-rev are left untouched.
+ * - Existing items whose rev changed are replaced in-place.
+ * - New items are appended (inside the arch group wrapper for architecture items).
+ * - Items absent from the new array are removed.
+ */
+/**
+ * Reconcile #stream-content to match `items` without destroying unchanged DOM nodes.
+ *
+ * Algorithm (keyed reconciliation with order enforcement):
+ * 1. Build a map of existing DOM elements by data-item-id
+ * 2. Walk the data array in order:
+ *    - If element exists and is unchanged (same rev): move it to correct position
+ *    - If element exists but rev changed: re-render in place at correct position
+ *    - If element is new: create and insert at correct position
+ * 3. Remove any remaining unmatched DOM elements
+ *
+ * This preserves interactive state (expanded cards, rationale inputs, MMP decisions)
+ * while ensuring correct ordering and no duplicates.
+ */
+function reconcileStreamContent(
+	streamContent: HTMLElement,
+	items: StreamItem[],
+	pendingDecisions?: Record<string, PendingMmpSnapshot>,
+): void {
+	if (items.length === 0) {
+		streamContent.innerHTML = '<div class="empty-state"><h2>Welcome to JanumiCode</h2><p>Start a new dialogue by typing a goal below.</p></div>';
+		return;
+	}
+
+	// Remove the empty-state placeholder when real items arrive
+	const emptyEl = streamContent.querySelector('.empty-state');
+	if (emptyEl) { emptyEl.remove(); }
+
+	// Pre-scan for context indices (mirrors renderStreamItems logic)
+	let lastIntakePlanIdx = -1;
+	let lastProposerMmpIdx = -1;
+	items.forEach((item, idx) => {
+		if (item.type === 'intake_plan_preview') { lastIntakePlanIdx = idx; }
+		if (item.type === 'intake_proposer_business_domains' || item.type === 'intake_proposer_journeys' ||
+			item.type === 'intake_proposer_entities' || item.type === 'intake_proposer_integrations') {
+			lastProposerMmpIdx = idx;
+		}
+	});
+	const context: RenderContext = { lastIntakePlanIdx, lastProposerMmpIdx, pendingDecisions };
+
+	// Build id → element map (scan ALL descendants including inside arch group wrapper)
+	const existing = new Map<string, Element>();
+	streamContent.querySelectorAll('[data-item-id]').forEach(el => {
+		const id = el.getAttribute('data-item-id');
+		if (id) { existing.set(id, el); }
+	});
+
+	// Remove the architecture group wrapper temporarily — we'll rebuild it.
+	// This simplifies ordering since arch items need to be inside the wrapper.
+	const oldArchGroup = streamContent.querySelector('.architecture-phase-group');
+	if (oldArchGroup) {
+		// Move arch items out to streamContent before removing wrapper
+		const archItems = oldArchGroup.querySelectorAll('[data-item-id]');
+		archItems.forEach(el => streamContent.appendChild(el));
+		oldArchGroup.remove();
+	}
+
+	const seen = new Set<string>();
+	let newItemsAdded = false;
+
+	// ── Diagnostic logging ──
+	console.log(`[reconciler] hydrate: ${items.length} items, ${existing.size} existing DOM nodes`);
+	const idCounts = new Map<string, number>();
+	for (let i = 0; i < items.length; i++) {
+		const id = getStreamItemId(items[i], i);
+		idCounts.set(id, (idCounts.get(id) ?? 0) + 1);
+	}
+	for (const [id, count] of idCounts) {
+		if (count > 1) { console.warn(`[reconciler] DUPLICATE ID in data: "${id}" appears ${count} times`); }
+	}
+	// Log item types and IDs
+	console.log('[reconciler] items:', items.map((item, i) => `${i}:${item.type}→${getStreamItemId(item, i)}`).join(', '));
+	// ── End diagnostic logging ──
+
+	// Track the last DOM node we positioned, so we can insert after it
+	let lastPositionedNode: Element | null = null;
+
+	// Architecture items that need to be grouped
+	const archElements: Element[] = [];
+
+	for (let i = 0; i < items.length; i++) {
+		const item = items[i];
+		const id = getStreamItemId(item, i);
+		const rev = getStreamItemRev(item, i, context);
+		seen.add(id);
+
+		let el = existing.get(id);
+
+		if (el) {
+			// Existing element — re-render if rev changed
+			if ((el.getAttribute('data-item-rev') ?? '') !== rev) {
+				const html = renderItemContent(item, i, context);
+				if (html) {
+					const temp = document.createElement('div');
+					temp.innerHTML = html;
+					const newEl = temp.firstElementChild;
+					if (newEl) {
+						el.parentNode?.replaceChild(newEl, el);
+						el = newEl;
+						existing.set(id, el); // update map reference
+					}
+				}
+			}
+		} else {
+			// New element — create it
+			const html = renderItemContent(item, i, context);
+			if (!html) { continue; }
+			const temp = document.createElement('div');
+			temp.innerHTML = html;
+			el = temp.firstElementChild!;
+			if (!el) { continue; }
+			// Insert into the DOM at the right position (after lastPositionedNode)
+			if (lastPositionedNode && lastPositionedNode.nextSibling) {
+				streamContent.insertBefore(el, lastPositionedNode.nextSibling);
+			} else {
+				streamContent.appendChild(el);
+			}
+			newItemsAdded = true;
+		}
+
+		// Enforce order: move element to correct position if needed
+		if (isArchitectureStreamItem(item)) {
+			archElements.push(el);
+		} else {
+			const expectedNext: ChildNode | null = lastPositionedNode ? lastPositionedNode.nextSibling : streamContent.firstChild;
+			if (el !== expectedNext) {
+				if (lastPositionedNode && lastPositionedNode.nextSibling) {
+					streamContent.insertBefore(el, lastPositionedNode.nextSibling);
+				} else if (!lastPositionedNode) {
+					streamContent.insertBefore(el, streamContent.firstChild);
+				} else {
+					streamContent.appendChild(el);
+				}
+			}
+			lastPositionedNode = el;
+		}
+	}
+
+	// Rebuild the architecture group wrapper with items in correct order
+	if (archElements.length > 0) {
+		const archGroup = document.createElement('div');
+		archGroup.className = 'architecture-phase-group';
+		archGroup.innerHTML =
+			'<div class="architecture-phase-group-header">' +
+			'<span class="codicon codicon-layers"></span> Recursive Architecture Decomposition' +
+			'</div>';
+		for (const el of archElements) {
+			archGroup.appendChild(el);
+		}
+		// Insert arch group after the last non-arch positioned node
+		if (lastPositionedNode && lastPositionedNode.nextSibling) {
+			streamContent.insertBefore(archGroup, lastPositionedNode.nextSibling);
+		} else {
+			streamContent.appendChild(archGroup);
+		}
+	}
+
+	// Remove items no longer in the data array
+	for (const [id, el] of existing) {
+		if (!seen.has(id) && el.parentNode) { el.parentNode.removeChild(el); }
+	}
+
+	if (newItemsAdded) { scrollToBottom(); }
+}
 
 // ===== HYDRATION HANDLER =====
 
-function handleHydrate(msg: { items: unknown[]; headerHtml: string; inputHtml: string; pendingDecisions?: Record<string, unknown> }): void {
+function handleHydrate(msg: { items: unknown[]; headerHtml: string; inputState: InputState; pendingDecisions?: Record<string, unknown> }): void {
 	// Update header
 	const headerContainer = document.getElementById('header-container');
 	if (headerContainer) {
 		headerContainer.innerHTML = msg.headerHtml;
 	}
 
-	// Update input area
-	const inputContainer = document.getElementById('input-container');
-	if (inputContainer) {
-		inputContainer.innerHTML = msg.inputHtml;
-	}
+	// Surgically update input area — #user-input is never replaced
+	updateInputArea(msg.inputState);
 
-	// Render stream items client-side
+	// Reconcile stream items — preserves interactive state while enforcing correct order
 	const streamContent = document.getElementById('stream-content');
 	if (streamContent) {
-		const items = msg.items as StreamItem[];
-		if (items.length > 0) {
-			streamContent.innerHTML = renderStreamItems(items, undefined, msg.pendingDecisions as Record<string, import('./renderer/streamTypes').PendingMmpSnapshot> | undefined);
-		} else {
-			streamContent.innerHTML = '<div class="empty-state"><h2>Welcome to JanumiCode</h2><p>Start a new dialogue by typing a goal below.</p></div>';
-		}
+		reconcileStreamContent(
+			streamContent,
+			msg.items as StreamItem[],
+			msg.pendingDecisions as Record<string, PendingMmpSnapshot> | undefined,
+		);
 	}
 
-	// Restore composer draft and MMP state
-	restoreComposerDraft();
+	// Restore MMP state (JS-side state, not DOM)
 	restoreMmpState();
 	if (msg.pendingDecisions) {
 		applyPendingMmpDecisions(msg.pendingDecisions as Record<string, { mirrorDecisions: Record<string, { status: string; editedText?: string }>; menuSelections: Record<string, { selectedOptionId: string; customResponse?: string }>; preMortemDecisions: Record<string, { status: string; rationale?: string }>; productEdits: Record<string, string> }>);
 	}
-	scrollToBottom();
 }
 
 // ===== COMPOSER DRAFT PERSISTENCE =====
@@ -268,6 +492,42 @@ window.addEventListener('message', function (event: MessageEvent) {
 		case 'pendingMmpDecisionsLoaded':
 			// Merge pending decisions into JS state (visual state handled by server-side rendering)
 			applyPendingMmpDecisions(msg.decisions);
+			break;
+		case 'mmpSubmitAccepted':
+			handleMmpSubmitAccepted(msg.cardId);
+			break;
+		case 'mmpSubmitRejected':
+			handleMmpSubmitRejected(msg.cardId, msg.reason);
+			break;
+		case 'gateDecisionAccepted':
+			handleGateDecisionAccepted(msg.gateId);
+			break;
+		case 'gateDecisionRejected':
+			handleGateDecisionRejected(msg.gateId, msg.reason);
+			break;
+		case 'intakeSubmitAccepted':
+			handleIntakeSubmitAccepted();
+			break;
+		case 'intakeSubmitRejected':
+			handleIntakeSubmitRejected(msg.reason);
+			break;
+		case 'architectureGateAccepted':
+			handleArchitectureGateAccepted(msg.action as string);
+			break;
+		case 'architectureGateRejected':
+			handleArchitectureGateRejected(msg.reason as string);
+			break;
+		case 'composerSubmitAccepted':
+			handleComposerSubmitAccepted();
+			break;
+		case 'composerSubmitRejected':
+			handleComposerSubmitRejected(msg.reason as string);
+			break;
+		case 'permissionDecisionAccepted':
+			handlePermissionDecisionAccepted(msg.permissionId as string, msg.approved as boolean);
+			break;
+		case 'permissionDecisionRejected':
+			handlePermissionDecisionRejected(msg.permissionId as string, msg.reason as string);
 			break;
 		case 'draftsLoaded':
 			restoreDrafts(msg.drafts);
@@ -660,57 +920,35 @@ document.addEventListener('click', function (event: MouseEvent) {
 				dialogueId: target.dataset.dialogueId || '',
 			});
 			break;
-		// Architecture gate actions
+		// Architecture gate actions — show pending state, wait for host ack to freeze
 		case 'architecture-approve':
 			if (target.dataset.dialogueId && target.dataset.docId) {
-				vscode.postMessage({
-					type: 'architectureGateDecision',
-					action: 'APPROVE',
-					dialogueId: target.dataset.dialogueId,
-					docId: target.dataset.docId,
-				});
-				// Disable all gate buttons
-				const approveCard = target.closest('.architecture-gate');
-				if (approveCard) {
-					approveCard.querySelectorAll('.gate-btn').forEach(function (btn) {
-						(btn as HTMLButtonElement).disabled = true;
-					});
-				}
+				vscode.postMessage({ type: 'architectureGateDecision', action: 'APPROVE', dialogueId: target.dataset.dialogueId, docId: target.dataset.docId });
+				target.textContent = 'Approving...';
+				(target as HTMLButtonElement).disabled = true;
 			}
 			break;
 		case 'architecture-revise': {
 			if (target.dataset.dialogueId && target.dataset.docId) {
-				// Toggle feedback textarea visibility
 				const reviseCard = target.closest('.architecture-gate');
 				const feedbackArea = reviseCard?.querySelector('.architecture-feedback-area') as HTMLElement | null;
 				if (feedbackArea) {
 					const isVisible = feedbackArea.classList.contains('visible');
 					if (isVisible) {
-						// Submit the feedback
 						const textarea = feedbackArea.querySelector('textarea') as HTMLTextAreaElement | null;
 						const feedback = textarea?.value.trim() || '';
 						if (feedback.length < 10) {
-							// Flash the textarea to indicate more input needed
 							feedbackArea.classList.add('shake');
 							setTimeout(function () { feedbackArea.classList.remove('shake'); }, 500);
 							break;
 						}
-						vscode.postMessage({
-							type: 'architectureGateDecision',
-							action: 'REVISE',
-							dialogueId: target.dataset.dialogueId,
-							docId: target.dataset.docId,
-							feedback: feedback,
-						});
-						// Disable all gate buttons
-						reviseCard?.querySelectorAll('.gate-btn').forEach(function (btn) {
-							(btn as HTMLButtonElement).disabled = true;
-						});
+						vscode.postMessage({ type: 'architectureGateDecision', action: 'REVISE', dialogueId: target.dataset.dialogueId, docId: target.dataset.docId, feedback });
+						target.textContent = 'Submitting...';
+						(target as HTMLButtonElement).disabled = true;
 					} else {
 						feedbackArea.classList.add('visible');
 						const textarea = feedbackArea.querySelector('textarea') as HTMLTextAreaElement | null;
 						if (textarea) { textarea.focus(); }
-						// Change button text to indicate submit
 						target.textContent = 'Submit Feedback';
 					}
 				}
@@ -719,34 +957,16 @@ document.addEventListener('click', function (event: MouseEvent) {
 		}
 		case 'architecture-skip':
 			if (target.dataset.dialogueId && target.dataset.docId) {
-				vscode.postMessage({
-					type: 'architectureGateDecision',
-					action: 'SKIP',
-					dialogueId: target.dataset.dialogueId,
-					docId: target.dataset.docId,
-				});
-				const skipCard = target.closest('.architecture-gate');
-				if (skipCard) {
-					skipCard.querySelectorAll('.gate-btn').forEach(function (btn) {
-						(btn as HTMLButtonElement).disabled = true;
-					});
-				}
+				vscode.postMessage({ type: 'architectureGateDecision', action: 'SKIP', dialogueId: target.dataset.dialogueId, docId: target.dataset.docId });
+				target.textContent = 'Skipping...';
+				(target as HTMLButtonElement).disabled = true;
 			}
 			break;
 		case 'architecture-decompose-deeper':
 			if (target.dataset.dialogueId && target.dataset.docId) {
-				vscode.postMessage({
-					type: 'architectureDecomposeDeeper',
-					dialogueId: target.dataset.dialogueId,
-					docId: target.dataset.docId,
-				});
-				const deeperCard = target.closest('.architecture-gate');
-				if (deeperCard) {
-					deeperCard.querySelectorAll('.gate-btn').forEach(function (btn) {
-						(btn as HTMLButtonElement).disabled = true;
-					});
-				}
+				vscode.postMessage({ type: 'architectureDecomposeDeeper', dialogueId: target.dataset.dialogueId, docId: target.dataset.docId });
 				target.textContent = 'Decomposing...';
+				(target as HTMLButtonElement).disabled = true;
 			}
 			break;
 		case 'pause-workflow':
@@ -768,22 +988,9 @@ document.addEventListener('click', function (event: MouseEvent) {
 					approved: approved,
 					approveAll: approveAll,
 				});
-				// Disable all buttons in this card and show result
-				const card = target.closest('.permission-card');
-				if (card) {
-					card.querySelectorAll('.permission-btn').forEach(function (btn) {
-						(btn as HTMLButtonElement).disabled = true;
-					});
-					card.classList.add(approved ? 'permission-approved' : 'permission-denied');
-					const header = card.querySelector('.permission-header');
-					if (header) {
-						let label = '&#x274C; Permission Denied';
-						if (approved) {
-							label = approveAll ? '&#x2705; Permission Granted (All)' : '&#x2705; Permission Granted';
-						}
-						header.innerHTML = label;
-					}
-				}
+				// Show pending state — wait for host ack to apply final visual
+				target.textContent = approved ? 'Granting...' : 'Denying...';
+				(target as HTMLButtonElement).disabled = true;
 			}
 			break;
 		}
@@ -1016,6 +1223,74 @@ if (findCloseBtn) { findCloseBtn.addEventListener('click', closeFindWidget); }
 // Restore decision state from webview state API so click handlers can toggle correctly.
 // Visual state is handled by server-side rendering (classes baked into HTML).
 restoreMmpState();
+
+// ===== RESTORE COMPOSER DRAFT =====
+// #user-input is now static (never replaced by hydrate), so restore once at init.
+restoreComposerDraft();
+
+// ===== Ack/Reject Handlers for Architecture Gates & Permissions =====
+
+function handleArchitectureGateAccepted(_action: string): void {
+	// Freeze all gate buttons in every open architecture gate card
+	document.querySelectorAll('.architecture-gate').forEach(card => {
+		card.querySelectorAll('.gate-btn').forEach(btn => {
+			(btn as HTMLButtonElement).disabled = true;
+		});
+	});
+}
+
+function handleArchitectureGateRejected(reason: string): void {
+	console.warn('[ArchitectureGate:Rejected]', reason);
+	// Restore buttons in architecture gate cards
+	document.querySelectorAll('.architecture-gate').forEach(card => {
+		card.querySelectorAll('.gate-btn').forEach(btn => {
+			const b = btn as HTMLButtonElement;
+			b.disabled = false;
+			// Restore original text if it was changed to pending state
+			if (b.textContent === 'Approving...' || b.textContent === 'Submitting...' || b.textContent === 'Skipping...' || b.textContent === 'Decomposing...') {
+				const action = b.dataset.action || '';
+				if (action === 'architecture-approve') { b.textContent = 'Approve'; }
+				else if (action === 'architecture-revise') { b.textContent = 'Request Changes'; }
+				else if (action === 'architecture-skip') { b.textContent = 'Skip'; }
+				else if (action === 'architecture-decompose-deeper') { b.textContent = 'Decompose Deeper'; }
+			}
+		});
+	});
+}
+
+function handlePermissionDecisionAccepted(permissionId: string, approved: boolean): void {
+	const card = document.querySelector('.permission-card[data-permission-id="' + permissionId + '"]')
+		|| document.querySelector('.permission-card');
+	if (card) {
+		card.querySelectorAll('.permission-btn').forEach(btn => {
+			(btn as HTMLButtonElement).disabled = true;
+		});
+		card.classList.add(approved ? 'permission-approved' : 'permission-denied');
+		const header = card.querySelector('.permission-header');
+		if (header) {
+			header.innerHTML = approved ? '&#x2705; Permission Granted' : '&#x274C; Permission Denied';
+		}
+	}
+}
+
+function handlePermissionDecisionRejected(permissionId: string, reason: string): void {
+	console.warn('[Permission:Rejected]', permissionId, reason);
+	// Restore buttons
+	const card = document.querySelector('.permission-card[data-permission-id="' + permissionId + '"]')
+		|| document.querySelector('.permission-card');
+	if (card) {
+		card.querySelectorAll('.permission-btn').forEach(btn => {
+			const b = btn as HTMLButtonElement;
+			b.disabled = false;
+			if (b.textContent === 'Granting...' || b.textContent === 'Denying...') {
+				const act = b.dataset.action || '';
+				if (act === 'permission-approve') { b.textContent = 'Approve'; }
+				else if (act === 'permission-approve-all') { b.textContent = 'Approve All'; }
+				else if (act === 'permission-deny') { b.textContent = 'Deny'; }
+			}
+		});
+	}
+}
 
 // ===== SMART SCROLL INIT =====
 initSmartScroll();

@@ -38,6 +38,7 @@ import { Role as RoleEnum } from '../types';
 import { randomUUID } from 'node:crypto';
 import { emitWorkflowCommand } from '../integration/eventBus';
 import * as path from 'node:path';
+import { resolveNodeBinary } from '../runtime';
 import { jsonrepair } from 'jsonrepair';
 
 // ==================== SYSTEM PROMPT ====================
@@ -217,9 +218,10 @@ export async function assembleContext(
 	// Auto-register deep-memory MCP server with Gemini CLI if not already present
 	if (providerId === 'gemini-cli') {
 		const extensionRoot = path.join(__dirname, '..');
+		const nodeCmd = resolveNodeBinary(extensionRoot);
 		await ensureGeminiMcpServer(
 			'deep-memory',
-			'node',
+			nodeCmd,
 			['dist/memory/mcpServer.js'],
 			{ JANUMICODE_DB_PATH: '.janumicode/janumicode.db' },
 			extensionRoot,

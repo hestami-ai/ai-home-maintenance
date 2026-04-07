@@ -57,20 +57,27 @@ function applyMigration(
 	migration: Migration
 ): Result<void> {
 	try {
-		// Execute migration SQL in a transaction
-		const txn = db.transaction(() => {
-			// Execute the migration SQL
+		// Execute migration SQL — not wrapped in db.transaction() because
+		// the RPC client's transaction recording pattern cannot preserve
+		// try/catch semantics inside the function body.
+		try {
 			db.exec(migration.sql);
+		} catch (execErr) {
+			const msg = (execErr as Error).message ?? '';
+			// On a fresh DB, SCHEMA_V1 creates tables with all columns.
+			// Later ALTER TABLE ADD COLUMN migrations may fail with
+			// "duplicate column name" — this is safe to skip.
+			if (!msg.includes('duplicate column name')) {
+				throw execErr;
+			}
+		}
 
-			// Update schema version — never downgrade (consolidated schemas may set it higher)
-			const currentInDb = getCurrentSchemaVersion(db);
-			const targetVersion = Math.max(currentInDb, migration.version);
-			db.prepare(
-				"UPDATE schema_metadata SET value = ?, updated_at = datetime('now') WHERE key = 'schema_version'"
-			).run(targetVersion.toString());
-		});
-
-		txn();
+		// Update schema version — never downgrade (consolidated schemas may set it higher)
+		const currentInDb = getCurrentSchemaVersion(db);
+		const targetVersion = Math.max(currentInDb, migration.version);
+		db.prepare(
+			"UPDATE schema_metadata SET value = ?, updated_at = datetime('now') WHERE key = 'schema_version'"
+		).run(targetVersion.toString());
 
 		return { success: true, value: undefined };
 	} catch (error) {
