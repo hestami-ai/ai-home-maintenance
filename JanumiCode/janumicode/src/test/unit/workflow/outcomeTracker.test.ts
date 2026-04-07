@@ -25,10 +25,17 @@ describe('OutcomeTracker', () => {
 			"INSERT INTO dialogues (dialogue_id, goal, status, created_at) VALUES (?, 'test goal', 'ACTIVE', datetime('now'))"
 		).run(dialogueId);
 
+		// task_graphs.intent_id is NOT NULL with FK -> intent_records(intent_id)
+		const intentId = randomUUID();
 		db.prepare(
-			`INSERT INTO task_graphs (graph_id, dialogue_id, graph_status, created_at, updated_at)
-			 VALUES (?, ?, 'IN_PROGRESS', datetime('now'), datetime('now'))`
-		).run(graphId, dialogueId);
+			`INSERT INTO intent_records (intent_id, dialogue_id, human_goal, created_at, updated_at)
+			 VALUES (?, ?, 'test goal', datetime('now'), datetime('now'))`
+		).run(intentId, dialogueId);
+
+		db.prepare(
+			`INSERT INTO task_graphs (graph_id, dialogue_id, intent_id, root_goal, graph_status, created_at, updated_at)
+			 VALUES (?, ?, ?, 'test root goal', 'IN_PROGRESS', datetime('now'), datetime('now'))`
+		).run(graphId, dialogueId, intentId);
 	});
 
 	afterEach(() => {
@@ -121,8 +128,8 @@ describe('OutcomeTracker', () => {
 			).run(unitId, graphId, TaskCategory.IMPLEMENTATION);
 
 			db.prepare(
-				`INSERT INTO repair_packets (repair_id, unit_id, suspected_cause, repair_strategy, result, created_at)
-				 VALUES (?, ?, 'Type error', 'Add type annotation', 'FIXED', datetime('now'))`
+				`INSERT INTO repair_packets (repair_id, unit_id, suspected_cause, repair_strategy, escalation_threshold, result, created_at)
+				 VALUES (?, ?, 'Type error', 'Add type annotation', 'AUTO_REPAIR_SAFE', 'FIXED', datetime('now'))`
 			).run(randomUUID(), unitId);
 
 			const result = recordOutcomeSnapshot(dialogueId);
@@ -401,8 +408,8 @@ describe('OutcomeTracker', () => {
 			).run(unit2Id, graphId, TaskCategory.IMPLEMENTATION);
 
 			db.prepare(
-				`INSERT INTO repair_packets (repair_id, unit_id, suspected_cause, repair_strategy, result, created_at)
-				 VALUES (?, ?, 'Syntax error', 'Fix syntax', 'FIXED', datetime('now'))`
+				`INSERT INTO repair_packets (repair_id, unit_id, suspected_cause, repair_strategy, escalation_threshold, result, created_at)
+				 VALUES (?, ?, 'Syntax error', 'Fix syntax', 'AUTO_REPAIR_SAFE', 'FIXED', datetime('now'))`
 			).run(randomUUID(), unit2Id);
 
 			db.prepare(
@@ -477,13 +484,13 @@ describe('OutcomeTracker', () => {
 			).run(unit3Id, graphId, TaskCategory.IMPLEMENTATION);
 
 			db.prepare(
-				`INSERT INTO repair_packets (repair_id, unit_id, suspected_cause, repair_strategy, result, created_at)
-				 VALUES (?, ?, 'Import error', 'Add import', 'FIXED', datetime('now'))`
+				`INSERT INTO repair_packets (repair_id, unit_id, suspected_cause, repair_strategy, escalation_threshold, result, created_at)
+				 VALUES (?, ?, 'Import error', 'Add import', 'AUTO_REPAIR_SAFE', 'FIXED', datetime('now'))`
 			).run(randomUUID(), unit2Id);
 
 			db.prepare(
-				`INSERT INTO repair_packets (repair_id, unit_id, suspected_cause, repair_strategy, result, created_at)
-				 VALUES (?, ?, 'Complex refactor', 'Escalate to human', 'ESCALATED', datetime('now'))`
+				`INSERT INTO repair_packets (repair_id, unit_id, suspected_cause, repair_strategy, escalation_threshold, result, created_at)
+				 VALUES (?, ?, 'Complex refactor', 'Escalate to human', 'ESCALATE_REQUIRED', 'ESCALATED', datetime('now'))`
 			).run(randomUUID(), unit3Id);
 
 			const result = recordOutcomeSnapshot(dialogueId);

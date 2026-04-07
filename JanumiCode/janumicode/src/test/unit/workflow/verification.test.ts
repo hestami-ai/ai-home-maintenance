@@ -41,21 +41,20 @@ describe('Verification', () => {
 			],
 		});
 
-		// Create test claim
+		// Create test claim. The production claims table has a composite FK
+		// (dialogue_id, turn_id) -> dialogue_events(dialogue_id, event_id), so
+		// we must seed a dialogue + dialogue_event before inserting the claim.
 		const db = getDatabase();
 		if (db) {
-			db.exec(`
-				CREATE TABLE IF NOT EXISTS claims (
-					claim_id TEXT PRIMARY KEY,
-					statement TEXT NOT NULL,
-					introduced_by TEXT NOT NULL,
-					criticality TEXT NOT NULL,
-					status TEXT NOT NULL,
-					dialogue_id TEXT NOT NULL,
-					turn_id INTEGER,
-					created_at TEXT NOT NULL
-				)
-			`);
+			db.prepare(
+				"INSERT INTO dialogues (dialogue_id, goal, status, created_at) VALUES (?, 'test goal', 'ACTIVE', datetime('now'))"
+			).run(dialogueId);
+
+			const turnInsert = db.prepare(`
+				INSERT INTO dialogue_events (dialogue_id, event_type, role, phase, speech_act, summary, content, timestamp)
+				VALUES (?, 'claim', 'EXECUTOR', 'PROPOSE', 'CLAIM', 'seed turn', 'seed', datetime('now'))
+			`).run(dialogueId);
+			const turnId = Number(turnInsert.lastInsertRowid);
 
 			const claimId = randomUUID();
 			db.prepare(`
@@ -68,7 +67,7 @@ describe('Verification', () => {
 				ClaimCriticality.CRITICAL,
 				ClaimStatus.OPEN,
 				dialogueId,
-				1,
+				turnId,
 				new Date().toISOString()
 			);
 
@@ -79,7 +78,7 @@ describe('Verification', () => {
 				criticality: ClaimCriticality.CRITICAL,
 				status: ClaimStatus.OPEN,
 				dialogue_id: dialogueId,
-				turn_id: 1,
+				turn_id: turnId,
 				created_at: new Date().toISOString(),
 			};
 		}

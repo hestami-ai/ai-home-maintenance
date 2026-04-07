@@ -20,7 +20,7 @@ describe('PhaseRunner', () => {
 		).run(dialogueId);
 
 		db.prepare(
-			`INSERT INTO workflow_state (dialogue_id, current_phase, metadata, created_at, updated_at)
+			`INSERT INTO workflow_states (dialogue_id, current_phase, metadata, created_at, updated_at)
 			 VALUES (?, 'PROPOSE', '{}', datetime('now'), datetime('now'))`
 		).run(dialogueId);
 	});
@@ -154,7 +154,7 @@ describe('PhaseRunner', () => {
 
 			const db = getDatabase()!;
 			const state = db.prepare(
-				'SELECT metadata FROM workflow_state WHERE dialogue_id = ?'
+				'SELECT metadata FROM workflow_states WHERE dialogue_id = ?'
 			).get(dialogueId) as { metadata: string };
 			const metadata = JSON.parse(state.metadata);
 
@@ -200,7 +200,7 @@ describe('PhaseRunner', () => {
 
 			const db = getDatabase()!;
 			const state = db.prepare(
-				'SELECT metadata FROM workflow_state WHERE dialogue_id = ?'
+				'SELECT metadata FROM workflow_states WHERE dialogue_id = ?'
 			).get(dialogueId) as { metadata: string };
 			const metadata = JSON.parse(state.metadata);
 
@@ -232,7 +232,7 @@ describe('PhaseRunner', () => {
 			await runner.step('step1', () => 'result');
 			const db = getDatabase()!;
 			const state1 = db.prepare(
-				'SELECT metadata FROM workflow_state WHERE dialogue_id = ?'
+				'SELECT metadata FROM workflow_states WHERE dialogue_id = ?'
 			).get(dialogueId) as { metadata: string };
 			const time1 = JSON.parse(state1.metadata).phaseCheckpoint.lastUpdatedAt;
 
@@ -240,7 +240,7 @@ describe('PhaseRunner', () => {
 
 			await runner.step('step2', () => 'result');
 			const state2 = db.prepare(
-				'SELECT metadata FROM workflow_state WHERE dialogue_id = ?'
+				'SELECT metadata FROM workflow_states WHERE dialogue_id = ?'
 			).get(dialogueId) as { metadata: string };
 			const time2 = JSON.parse(state2.metadata).phaseCheckpoint.lastUpdatedAt;
 
@@ -254,7 +254,7 @@ describe('PhaseRunner', () => {
 
 			const db = getDatabase()!;
 			const state = db.prepare(
-				'SELECT metadata FROM workflow_state WHERE dialogue_id = ?'
+				'SELECT metadata FROM workflow_states WHERE dialogue_id = ?'
 			).get(dialogueId) as { metadata: string };
 			const metadata = JSON.parse(state.metadata);
 
@@ -374,7 +374,7 @@ describe('PhaseRunner', () => {
 
 			const db = getDatabase()!;
 			const state = db.prepare(
-				'SELECT metadata FROM workflow_state WHERE dialogue_id = ?'
+				'SELECT metadata FROM workflow_states WHERE dialogue_id = ?'
 			).get(dialogueId) as { metadata: string };
 			const metadata = JSON.parse(state.metadata);
 
@@ -559,7 +559,7 @@ describe('PhaseRunner', () => {
 
 			const db = getDatabase()!;
 			const state = db.prepare(
-				'SELECT metadata FROM workflow_state WHERE dialogue_id = ?'
+				'SELECT metadata FROM workflow_states WHERE dialogue_id = ?'
 			).get(dialogueId) as { metadata: string };
 			const metadata = JSON.parse(state.metadata);
 

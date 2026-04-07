@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { assembleDocumentContext } from '../../../lib/documents/contextAssembler';
 
-vi.mock('../../../lib/events/reader.js');
-vi.mock('../../../lib/workflow/stateMachine.js');
-vi.mock('../../../lib/database/architectureStore.js');
-vi.mock('../../../lib/database/makerStore.js');
-vi.mock('../../../lib/dialogue/lifecycle.js');
+import { getAllDialogues } from '../../../lib/dialogue/lifecycle';
+import { getWorkflowState } from '../../../lib/workflow/stateMachine';
+import { getIntakeConversation, getClaims, getVerdicts } from '../../../lib/events/reader';
+import { getArchitectureDocumentForDialogue } from '../../../lib/database/architectureStore';
+import { getTaskGraphForDialogue, getTaskUnitsForGraph } from '../../../lib/database/makerStore';
+
+vi.mock('../../../lib/events/reader');
+vi.mock('../../../lib/workflow/stateMachine');
+vi.mock('../../../lib/database/architectureStore');
+vi.mock('../../../lib/database/makerStore');
+vi.mock('../../../lib/dialogue/lifecycle');
 
 describe('Document Context Assembler', () => {
 	beforeEach(() => {
@@ -14,9 +20,6 @@ describe('Document Context Assembler', () => {
 
 	describe('assembleDocumentContext', () => {
 		it('assembles all available context sections', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
@@ -29,7 +32,7 @@ describe('Document Context Assembler', () => {
 						created_at: '2024-01-01T00:00:00Z',
 					},
 				],
-			});
+			} as any);
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -58,12 +61,11 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('handles missing dialogue metadata', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			const context = assembleDocumentContext('dialogue-999');
 
@@ -71,9 +73,6 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('includes intake plan when available', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
@@ -86,7 +85,7 @@ describe('Document Context Assembler', () => {
 						created_at: '2024-01-01T00:00:00Z',
 					},
 				],
-			});
+			} as any);
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -117,13 +116,11 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('includes architecture document when available', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getArchitectureDocumentForDialogue } = require('../../../lib/database/architectureStore.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			vi.mocked(getArchitectureDocumentForDialogue).mockReturnValue({
 				success: true,
@@ -147,7 +144,7 @@ describe('Document Context Assembler', () => {
 					workflow_graph: [],
 					implementation_sequence: [],
 				},
-			});
+			} as any);
 
 			const context = assembleDocumentContext('dialogue-123');
 
@@ -156,13 +153,11 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('includes claims and verdicts when available', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getClaims, getVerdicts } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
@@ -175,7 +170,7 @@ describe('Document Context Assembler', () => {
 						dialogue_id: 'dialogue-123',
 					},
 				],
-			});
+			} as any);
 
 			vi.mocked(getVerdicts).mockReturnValue({
 				success: true,
@@ -186,7 +181,7 @@ describe('Document Context Assembler', () => {
 						verdict: 'VERIFIED',
 					},
 				],
-			});
+			} as any);
 
 			const context = assembleDocumentContext('dialogue-123');
 
@@ -194,13 +189,11 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('includes task graph when available', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getTaskGraphForDialogue, getTaskUnitsForGraph } = require('../../../lib/database/makerStore.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			vi.mocked(getTaskGraphForDialogue).mockReturnValue({
 				success: true,
@@ -208,7 +201,7 @@ describe('Document Context Assembler', () => {
 					graph_id: 'graph-123',
 					graph_status: 'ACTIVE',
 				},
-			});
+			} as any);
 
 			vi.mocked(getTaskUnitsForGraph).mockReturnValue({
 				success: true,
@@ -219,7 +212,7 @@ describe('Document Context Assembler', () => {
 						status: 'PENDING',
 					},
 				],
-			});
+			} as any);
 
 			const context = assembleDocumentContext('dialogue-123');
 
@@ -227,13 +220,11 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('formats plan with all optional fields', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getIntakeConversation } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			vi.mocked(getIntakeConversation).mockReturnValue({
 				success: true,
@@ -299,13 +290,11 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('formats architecture with all sections', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getArchitectureDocumentForDialogue } = require('../../../lib/database/architectureStore.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			vi.mocked(getArchitectureDocumentForDialogue).mockReturnValue({
 				success: true,
@@ -354,7 +343,7 @@ describe('Document Context Assembler', () => {
 					],
 					validation_findings: ['Finding 1'],
 				},
-			});
+			} as any);
 
 			const context = assembleDocumentContext('dialogue-123');
 
@@ -367,8 +356,6 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('separates sections with delimiters', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getIntakeConversation } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
@@ -379,7 +366,7 @@ describe('Document Context Assembler', () => {
 						created_at: '2024-01-01T00:00:00Z',
 					},
 				],
-			});
+			} as any);
 
 			vi.mocked(getIntakeConversation).mockReturnValue({
 				success: true,
@@ -402,13 +389,11 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('handles plan with business domain proposals', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getIntakeConversation } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			vi.mocked(getIntakeConversation).mockReturnValue({
 				success: true,
@@ -464,36 +449,31 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('handles empty context gracefully', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getIntakeConversation } = require('../../../lib/events/reader.js');
-			const { getArchitectureDocumentForDialogue } = require('../../../lib/database/architectureStore.js');
-			const { getClaims } = require('../../../lib/events/reader.js');
-			const { getTaskGraphForDialogue } = require('../../../lib/database/makerStore.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			vi.mocked(getIntakeConversation).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			vi.mocked(getArchitectureDocumentForDialogue).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			vi.mocked(getClaims).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			vi.mocked(getTaskGraphForDialogue).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			const context = assembleDocumentContext('dialogue-999');
 
@@ -504,13 +484,11 @@ describe('Document Context Assembler', () => {
 
 	describe('edge cases', () => {
 		it('handles plan with integration proposals', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getIntakeConversation } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			vi.mocked(getIntakeConversation).mockReturnValue({
 				success: true,
@@ -543,13 +521,11 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('handles claims with verdicts map', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getClaims, getVerdicts } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
@@ -561,7 +537,7 @@ describe('Document Context Assembler', () => {
 						criticality: 'HIGH',
 					},
 				],
-			});
+			} as any);
 
 			vi.mocked(getVerdicts).mockReturnValue({
 				success: true,
@@ -577,7 +553,7 @@ describe('Document Context Assembler', () => {
 						verdict: 'CONDITIONAL',
 					},
 				],
-			});
+			} as any);
 
 			const context = assembleDocumentContext('dialogue-123');
 
@@ -586,8 +562,6 @@ describe('Document Context Assembler', () => {
 		});
 
 		it('handles untitled dialogue', () => {
-			const { getAllDialogues } = require('../../../lib/dialogue/lifecycle.js');
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
 
 			vi.mocked(getAllDialogues).mockReturnValue({
 				success: true,
@@ -600,12 +574,12 @@ describe('Document Context Assembler', () => {
 						created_at: '2024-01-01T00:00:00Z',
 					},
 				],
-			});
+			} as any);
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			const context = assembleDocumentContext('dialogue-123');
 

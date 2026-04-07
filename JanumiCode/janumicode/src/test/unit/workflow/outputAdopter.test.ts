@@ -23,14 +23,14 @@ describe('OutputAdopter', () => {
 		).run(dialogueId);
 
 		db.prepare(
-			`INSERT INTO workflow_state (dialogue_id, current_phase, metadata, created_at, updated_at)
+			`INSERT INTO workflow_states (dialogue_id, current_phase, metadata, created_at, updated_at)
 			 VALUES (?, 'INTAKE', '{}', datetime('now'), datetime('now'))`
 		).run(dialogueId);
 
 		db.prepare(
-			`INSERT INTO intake_conversations (conv_id, dialogue_id, turn_count, created_at)
-			 VALUES (?, ?, 0, datetime('now'))`
-		).run(randomUUID(), dialogueId);
+			`INSERT INTO intake_conversations (dialogue_id, turn_count, created_at)
+			 VALUES (?, 0, datetime('now'))`
+		).run(dialogueId);
 	});
 
 	afterEach(() => {
@@ -173,7 +173,7 @@ describe('OutputAdopter', () => {
 			it('returns error when cached output is too short', async () => {
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: 'short' }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -184,7 +184,7 @@ describe('OutputAdopter', () => {
 			it('returns error when JSON extraction fails', async () => {
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: 'This is not JSON at all and quite long' }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -198,7 +198,7 @@ describe('OutputAdopter', () => {
 			it('returns error for unsupported phase', async () => {
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET current_phase = 'EXECUTE', metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET current_phase = 'EXECUTE', metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: '{"data": "value"}' }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -226,7 +226,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: JSON.stringify(output) }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -251,7 +251,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(
 					JSON.stringify({
 						cachedRawCliOutput: JSON.stringify(output),
@@ -276,7 +276,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(
 					JSON.stringify({
 						cachedRawCliOutput: JSON.stringify(output),
@@ -303,7 +303,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(
 					JSON.stringify({
 						cachedRawCliOutput: JSON.stringify(output),
@@ -330,7 +330,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(
 					JSON.stringify({
 						cachedRawCliOutput: JSON.stringify(output),
@@ -355,7 +355,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(
 					JSON.stringify({
 						cachedRawCliOutput: JSON.stringify(output),
@@ -377,7 +377,7 @@ describe('OutputAdopter', () => {
 			beforeEach(() => {
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET current_phase = 'ARCHITECTURE' WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET current_phase = 'ARCHITECTURE' WHERE dialogue_id = ?`
 				).run(dialogueId);
 			});
 
@@ -389,7 +389,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: JSON.stringify(output) }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -409,7 +409,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: JSON.stringify(output) }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -429,7 +429,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: JSON.stringify(output) }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -449,7 +449,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: JSON.stringify(output) }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -468,7 +468,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: JSON.stringify(output) }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -484,7 +484,7 @@ describe('OutputAdopter', () => {
 			beforeEach(() => {
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET current_phase = 'PROPOSE' WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET current_phase = 'PROPOSE' WHERE dialogue_id = ?`
 				).run(dialogueId);
 			});
 
@@ -497,7 +497,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: JSON.stringify(output) }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -517,7 +517,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: JSON.stringify(output) }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -533,7 +533,7 @@ describe('OutputAdopter', () => {
 			beforeEach(() => {
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET current_phase = 'VERIFY' WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET current_phase = 'VERIFY' WHERE dialogue_id = ?`
 				).run(dialogueId);
 			});
 
@@ -545,7 +545,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: JSON.stringify(output) }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -566,7 +566,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: JSON.stringify(output) }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -607,7 +607,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(
 					JSON.stringify({
 						cachedRawCliOutput: JSON.stringify({ conversationalResponse: 'From metadata' }),
@@ -637,7 +637,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(
 					JSON.stringify({
 						cachedRawCliOutput: JSON.stringify(output),
@@ -652,7 +652,7 @@ describe('OutputAdopter', () => {
 				expect(result.success).toBe(true);
 
 				const state = db.prepare(
-					'SELECT metadata FROM workflow_state WHERE dialogue_id = ?'
+					'SELECT metadata FROM workflow_states WHERE dialogue_id = ?'
 				).get(dialogueId) as { metadata: string };
 				const metadata = JSON.parse(state.metadata);
 
@@ -672,7 +672,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: JSON.stringify(output) }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -698,7 +698,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET current_phase = 'PROPOSE', metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET current_phase = 'PROPOSE', metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: wrappedOutput }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);
@@ -717,7 +717,7 @@ describe('OutputAdopter', () => {
 
 				const db = getDatabase()!;
 				db.prepare(
-					`UPDATE workflow_state SET current_phase = 'VERIFY', metadata = ? WHERE dialogue_id = ?`
+					`UPDATE workflow_states SET current_phase = 'VERIFY', metadata = ? WHERE dialogue_id = ?`
 				).run(JSON.stringify({ cachedRawCliOutput: jsonlOutput }), dialogueId);
 
 				const result = await adoptCachedOutput(dialogueId);

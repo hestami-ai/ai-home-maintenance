@@ -41,11 +41,18 @@ describe('Workflow State Machine', () => {
 
 	function createClaim(dialogueId: string, criticality: string, status: string): string {
 		const db = getDatabase()!;
+		// claims.turn_id is NOT NULL with composite FK to dialogue_events(dialogue_id, event_id).
+		const turnInsert = db.prepare(`
+			INSERT INTO dialogue_events (dialogue_id, event_type, role, phase, speech_act, summary, content, timestamp)
+			VALUES (?, 'claim', 'EXECUTOR', 'PROPOSE', 'CLAIM', 'seed turn', 'seed', datetime('now'))
+		`).run(dialogueId);
+		const turnId = Number(turnInsert.lastInsertRowid);
+
 		const claimId = randomUUID();
 		db.prepare(
 			`INSERT INTO claims (claim_id, statement, introduced_by, criticality, status, dialogue_id, turn_id, created_at)
-			 VALUES (?, 'Test claim', 'executor', ?, ?, ?, NULL, datetime('now'))`
-		).run(claimId, criticality, status, dialogueId);
+			 VALUES (?, 'Test claim', 'EXECUTOR', ?, ?, ?, ?, datetime('now'))`
+		).run(claimId, criticality, status, dialogueId, turnId);
 		return claimId;
 	}
 

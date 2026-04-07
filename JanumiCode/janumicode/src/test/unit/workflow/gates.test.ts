@@ -50,11 +50,19 @@ describe('Gate Management', () => {
 
 	function createClaim(dialogueId: string, statement: string, criticality: string, status: string): string {
 		const db = getDatabase()!;
+		// claims.turn_id is NOT NULL with composite FK to dialogue_events(dialogue_id, event_id).
+		// Seed a dialogue_event and use its event_id.
+		const turnInsert = db.prepare(`
+			INSERT INTO dialogue_events (dialogue_id, event_type, role, phase, speech_act, summary, content, timestamp)
+			VALUES (?, 'claim', 'EXECUTOR', 'PROPOSE', 'CLAIM', 'seed turn', 'seed', datetime('now'))
+		`).run(dialogueId);
+		const turnId = Number(turnInsert.lastInsertRowid);
+
 		const claimId = randomUUID();
 		db.prepare(
 			`INSERT INTO claims (claim_id, statement, introduced_by, criticality, status, dialogue_id, turn_id, created_at)
-			 VALUES (?, ?, 'executor', ?, ?, ?, NULL, datetime('now'))`
-		).run(claimId, statement, criticality, status, dialogueId);
+			 VALUES (?, ?, 'EXECUTOR', ?, ?, ?, ?, datetime('now'))`
+		).run(claimId, statement, criticality, status, dialogueId, turnId);
 		return claimId;
 	}
 

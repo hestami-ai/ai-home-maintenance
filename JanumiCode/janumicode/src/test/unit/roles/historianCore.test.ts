@@ -6,6 +6,7 @@ import {
 	type HistoryQueryOptions,
 } from '../../../lib/roles/historianCore';
 
+import { getDatabase } from '../../../lib/database';
 vi.mock('../../../lib/database');
 
 describe('Historian-Core (Non-Agent)', () => {
@@ -15,7 +16,6 @@ describe('Historian-Core (Non-Agent)', () => {
 
 	describe('queryHistory', () => {
 		it('queries all event types by default', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),
@@ -31,7 +31,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('filters by dialogue ID', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockTurns = [
 				{
@@ -59,7 +58,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('filters by event types', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockClaims = [
 				{
@@ -88,7 +86,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('applies pagination with limit and offset', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockEvents = Array(50).fill(null).map((_, i) => ({
 				turn_id: `turn-${i}`,
@@ -118,7 +115,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('sorts events by timestamp', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockEvents = [
 				{
@@ -159,7 +155,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('filters by time range', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),
@@ -180,7 +175,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('handles database not initialized', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			vi.mocked(getDatabase).mockReturnValue(null);
 
@@ -190,7 +184,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('handles query errors', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			vi.mocked(getDatabase).mockImplementation(() => {
 				throw new Error('Database error');
@@ -204,7 +197,6 @@ describe('Historian-Core (Non-Agent)', () => {
 
 	describe('exportHistory', () => {
 		it('exports history for dialogue', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockEvents = [
 				{
@@ -233,7 +225,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('includes metadata in export', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockEvents = Array(25).fill(null).map((_, i) => ({
 				turn_id: `turn-${i}`,
@@ -259,7 +250,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('handles empty history', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),
@@ -278,7 +268,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('handles database not initialized', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			vi.mocked(getDatabase).mockReturnValue(null);
 
@@ -290,7 +279,6 @@ describe('Historian-Core (Non-Agent)', () => {
 
 	describe('event type filtering', () => {
 		it('queries only dialogue turns', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),
@@ -308,7 +296,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('queries only claims', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),
@@ -326,7 +313,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('queries only verdicts', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),
@@ -344,7 +330,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('queries only human decisions', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),
@@ -362,7 +347,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('queries multiple event types', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),
@@ -385,7 +369,6 @@ describe('Historian-Core (Non-Agent)', () => {
 
 	describe('edge cases', () => {
 		it('handles zero limit', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([
@@ -407,7 +390,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('handles large offset', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([
@@ -432,7 +414,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('handles filter by turn ID', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),
@@ -448,7 +429,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('handles filter by claim ID', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),
@@ -464,7 +444,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('handles empty options', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),
@@ -480,7 +459,6 @@ describe('Historian-Core (Non-Agent)', () => {
 		});
 
 		it('handles concurrent queries', () => {
-			const { getDatabase } = require('../../../lib/database');
 
 			const mockPrepare = vi.fn().mockReturnValue({
 				all: vi.fn().mockReturnValue([]),

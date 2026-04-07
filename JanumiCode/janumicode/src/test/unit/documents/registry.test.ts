@@ -2,9 +2,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getAvailableDocuments, DOCUMENT_DEFINITIONS } from '../../../lib/documents/registry';
 import { DocumentType } from '../../../lib/documents/types';
 
-vi.mock('../../../lib/workflow/stateMachine.js');
-vi.mock('../../../lib/events/reader.js');
-vi.mock('../../../lib/database/architectureStore.js');
+import { getWorkflowState } from '../../../lib/workflow/stateMachine';
+import { getIntakeConversation, getClaims } from '../../../lib/events/reader';
+import { getArchitectureDocumentForDialogue } from '../../../lib/database/architectureStore';
+
+vi.mock('../../../lib/workflow/stateMachine');
+vi.mock('../../../lib/events/reader');
+vi.mock('../../../lib/database/architectureStore');
 
 describe('Document Registry', () => {
 	beforeEach(() => {
@@ -47,12 +51,11 @@ describe('Document Registry', () => {
 
 	describe('getAvailableDocuments', () => {
 		it('returns empty array if workflow state not found', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-999');
 
@@ -60,8 +63,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns vision when plan has summary', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -81,7 +82,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -89,8 +90,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns vision when plan has product vision', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -110,7 +109,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -118,8 +117,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns ConOps when plan has personas', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -139,7 +136,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -147,8 +144,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns ConOps when plan has user journeys', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -168,7 +163,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -176,8 +171,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns PRD when plan has requirements and summary', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -198,7 +191,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -206,8 +199,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns Domain Model when plan has domain proposals', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -226,7 +217,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -234,9 +225,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns Architecture when architecture doc exists', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
-			const { getArchitectureDocumentForDialogue } = require('../../../lib/database/architectureStore.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -246,7 +234,7 @@ describe('Document Registry', () => {
 			vi.mocked(getIntakeConversation).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			vi.mocked(getArchitectureDocumentForDialogue).mockReturnValue({
 				success: true,
@@ -254,12 +242,12 @@ describe('Document Registry', () => {
 					doc_id: 'doc-123',
 					capabilities: [],
 				},
-			});
+			} as any);
 
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -267,9 +255,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns Implementation Roadmap when architecture has sequence', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
-			const { getArchitectureDocumentForDialogue } = require('../../../lib/database/architectureStore.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -279,7 +264,7 @@ describe('Document Registry', () => {
 			vi.mocked(getIntakeConversation).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			vi.mocked(getArchitectureDocumentForDialogue).mockReturnValue({
 				success: true,
@@ -289,12 +274,12 @@ describe('Document Registry', () => {
 						{ sort_order: 1, label: 'Step 1' },
 					],
 				},
-			});
+			} as any);
 
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -302,8 +287,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns Technical Brief when task has requirements', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -324,7 +307,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -332,8 +315,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns Change Impact when claims exist', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -343,14 +324,14 @@ describe('Document Registry', () => {
 			vi.mocked(getIntakeConversation).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [
 					{ claim_id: 'claim-1', statement: 'Claim' },
 				],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -358,8 +339,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns Verification Summary when claims exist', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -369,14 +348,14 @@ describe('Document Registry', () => {
 			vi.mocked(getIntakeConversation).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [
 					{ claim_id: 'claim-1', statement: 'Claim' },
 				],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -384,8 +363,6 @@ describe('Document Registry', () => {
 		});
 
 		it('filters by request category', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -406,7 +383,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -415,8 +392,6 @@ describe('Document Registry', () => {
 		});
 
 		it('allows "any" category documents for all request types', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -436,7 +411,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -444,8 +419,6 @@ describe('Document Registry', () => {
 		});
 
 		it('allows product docs when category is unknown', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -464,7 +437,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -472,8 +445,6 @@ describe('Document Registry', () => {
 		});
 
 		it('blocks technical docs when category is unknown', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -493,7 +464,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -501,8 +472,6 @@ describe('Document Registry', () => {
 		});
 
 		it('handles missing intake conversation', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -512,12 +481,12 @@ describe('Document Registry', () => {
 			vi.mocked(getIntakeConversation).mockReturnValue({
 				success: false,
 				error: new Error('Not found'),
-			});
+			} as any);
 
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -525,8 +494,6 @@ describe('Document Registry', () => {
 		});
 
 		it('prefers finalized plan over draft plan', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -550,7 +517,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -560,8 +527,6 @@ describe('Document Registry', () => {
 
 	describe('edge cases', () => {
 		it('handles plan with entity proposals only', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -580,7 +545,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -588,8 +553,6 @@ describe('Document Registry', () => {
 		});
 
 		it('handles plan with phasing strategy for roadmap', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -608,7 +571,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -616,8 +579,6 @@ describe('Document Registry', () => {
 		});
 
 		it('handles change impact with constraints but no claims', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -637,7 +598,7 @@ describe('Document Registry', () => {
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 
@@ -645,9 +606,6 @@ describe('Document Registry', () => {
 		});
 
 		it('returns multiple available documents', () => {
-			const { getWorkflowState } = require('../../../lib/workflow/stateMachine.js');
-			const { getIntakeConversation, getClaims } = require('../../../lib/events/reader.js');
-			const { getArchitectureDocumentForDialogue } = require('../../../lib/database/architectureStore.js');
 
 			vi.mocked(getWorkflowState).mockReturnValue({
 				success: true,
@@ -675,12 +633,12 @@ describe('Document Registry', () => {
 					doc_id: 'doc-123',
 					implementation_sequence: [{ sort_order: 1 }],
 				},
-			});
+			} as any);
 
 			vi.mocked(getClaims).mockReturnValue({
 				success: true,
 				value: [{ claim_id: 'claim-1' }],
-			});
+			} as any);
 
 			const result = getAvailableDocuments('dialogue-123');
 

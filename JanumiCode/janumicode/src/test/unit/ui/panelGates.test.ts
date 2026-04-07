@@ -1,4 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { getDatabase } from '../../../lib/database';
+import { getGate } from '../../../lib/workflow/gates';
+import { processHumanGateDecision } from '../../../lib/workflow/humanGateHandling';
+import { runNarrativeCuration } from '../../../lib/curation/narrativeCurator';
+import { updateWorkflowMetadata, transitionWorkflow } from '../../../lib/workflow/stateMachine';
+import { writeClaimEvent } from '../../../lib/events/writer';
 import {
 	handleGateDecision,
 	handleGateDecisionAndResume,
@@ -72,8 +78,6 @@ describe('ui/panelGates', () => {
 				all: vi.fn().mockReturnValue([]),
 			}),
 		};
-
-		const { getDatabase } = require('../../../lib/database');
 		vi.mocked(getDatabase).mockReturnValue(mockDb);
 
 		vi.clearAllMocks();
@@ -113,11 +117,10 @@ describe('ui/panelGates', () => {
 		});
 
 		it('processes valid gate decision', () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			handleGateDecision(mockContext, 'gate-1', 'APPROVE', 'This is a valid rationale');
 
@@ -141,11 +144,10 @@ describe('ui/panelGates', () => {
 		});
 
 		it('handles processing failure', () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: false,
 				error: new Error('Processing failed'),
-			});
+			} as any);
 
 			handleGateDecision(mockContext, 'gate-1', 'APPROVE', 'Valid rationale here');
 
@@ -157,13 +159,11 @@ describe('ui/panelGates', () => {
 		});
 
 		it('runs narrative curation after success', () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
-			const { runNarrativeCuration } = require('../../../lib/curation/narrativeCurator');
 
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			handleGateDecision(mockContext, 'gate-1', 'APPROVE', 'Valid rationale here');
 
@@ -173,11 +173,10 @@ describe('ui/panelGates', () => {
 
 	describe('handleGateDecisionAndResume', () => {
 		it('handles regular gate without repair escalation', async () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			mockDb.prepare().get.mockReturnValue(undefined);
 
@@ -187,11 +186,10 @@ describe('ui/panelGates', () => {
 		});
 
 		it('handles repair escalation gate', async () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			mockDb.prepare().get.mockReturnValue({
 				metadata: JSON.stringify({
@@ -228,13 +226,11 @@ describe('ui/panelGates', () => {
 		});
 
 		it('handles OVERRIDE action with claim rationales', async () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
-			const { writeClaimEvent } = require('../../../lib/events/writer');
 
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			const claimRationales = {
 				'claim-1': 'Risk accepted for claim 1',
@@ -256,8 +252,6 @@ describe('ui/panelGates', () => {
 		});
 
 		it('handles RETRY_VERIFY action', async () => {
-			const { getGate } = require('../../../lib/workflow/gates');
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
 
 			vi.mocked(getGate).mockReturnValue({
 				success: true,
@@ -265,12 +259,12 @@ describe('ui/panelGates', () => {
 					gate_id: 'gate-1',
 					blocking_claims: ['claim-1', 'claim-2'],
 				},
-			});
+			} as any);
 
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			await handleVerificationGateDecision(mockContext, 'gate-1', 'RETRY_VERIFY');
 
@@ -279,13 +273,11 @@ describe('ui/panelGates', () => {
 		});
 
 		it('handles REFRAME action', async () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
-			const { transitionWorkflow } = require('../../../lib/workflow/stateMachine');
 
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			await handleVerificationGateDecision(mockContext, 'gate-1', 'REFRAME');
 
@@ -325,13 +317,11 @@ describe('ui/panelGates', () => {
 		});
 
 		it('handles APPROVE action with item rationales', async () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
-			const { transitionWorkflow } = require('../../../lib/workflow/stateMachine');
 
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			const itemRationales = {
 				'claim-1': 'Looks good',
@@ -359,13 +349,11 @@ describe('ui/panelGates', () => {
 		});
 
 		it('skips claim events for findings', async () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
-			const { writeClaimEvent } = require('../../../lib/events/writer');
 
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			const itemRationales = {
 				'claim-1': 'Regular claim',
@@ -378,23 +366,21 @@ describe('ui/panelGates', () => {
 		});
 
 		it('handles REFRAME action', async () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
-			const { updateWorkflowMetadata, transitionWorkflow } = require('../../../lib/workflow/stateMachine');
 
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			vi.mocked(updateWorkflowMetadata).mockReturnValue({
 				success: true,
 				value: undefined,
-			});
+			} as any);
 
 			vi.mocked(transitionWorkflow).mockReturnValue({
 				success: true,
 				value: undefined,
-			});
+			} as any);
 
 			const itemRationales = {
 				'claim-1': 'Needs changes',
@@ -426,18 +412,16 @@ describe('ui/panelGates', () => {
 		});
 
 		it('handles metadata update failure in REFRAME', async () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
-			const { updateWorkflowMetadata } = require('../../../lib/workflow/stateMachine');
 
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			vi.mocked(updateWorkflowMetadata).mockReturnValue({
 				success: false,
 				error: new Error('Metadata update failed'),
-			});
+			} as any);
 
 			await handleReviewGateDecision(mockContext, 'gate-1', 'REFRAME');
 
@@ -447,23 +431,21 @@ describe('ui/panelGates', () => {
 		});
 
 		it('handles transition failure in REFRAME', async () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
-			const { updateWorkflowMetadata, transitionWorkflow } = require('../../../lib/workflow/stateMachine');
 
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			vi.mocked(updateWorkflowMetadata).mockReturnValue({
 				success: true,
 				value: undefined,
-			});
+			} as any);
 
 			vi.mocked(transitionWorkflow).mockReturnValue({
 				success: false,
 				error: new Error('Transition failed'),
-			});
+			} as any);
 
 			await handleReviewGateDecision(mockContext, 'gate-1', 'REFRAME');
 
@@ -473,23 +455,21 @@ describe('ui/panelGates', () => {
 		});
 
 		it('resets blocking claims in REFRAME', async () => {
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
-			const { updateWorkflowMetadata, transitionWorkflow } = require('../../../lib/workflow/stateMachine');
 
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			vi.mocked(updateWorkflowMetadata).mockReturnValue({
 				success: true,
 				value: undefined,
-			});
+			} as any);
 
 			vi.mocked(transitionWorkflow).mockReturnValue({
 				success: true,
 				value: undefined,
-			});
+			} as any);
 
 			mockDb.prepare().all.mockReturnValue([
 				{ claim_id: 'claim-1' },
@@ -504,14 +484,11 @@ describe('ui/panelGates', () => {
 
 	describe('error handling', () => {
 		it('handles database errors gracefully', async () => {
-			const { getDatabase } = require('../../../lib/database');
 			vi.mocked(getDatabase).mockReturnValue(null);
-
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			await handleGateDecisionAndResume(mockContext, 'gate-1', 'APPROVE', 'Valid rationale');
 
@@ -522,12 +499,10 @@ describe('ui/panelGates', () => {
 			mockDb.prepare.mockImplementation(() => {
 				throw new Error('Database error');
 			});
-
-			const { processHumanGateDecision } = require('../../../lib/workflow/humanGateHandling');
 			vi.mocked(processHumanGateDecision).mockReturnValue({
 				success: true,
 				value: { decision_id: 'dec-1' },
-			});
+			} as any);
 
 			await handleGateDecisionAndResume(mockContext, 'gate-1', 'APPROVE', 'Valid rationale');
 

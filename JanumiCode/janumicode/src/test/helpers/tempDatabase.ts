@@ -110,6 +110,33 @@ export function createTempDatabase(options?: TempDbOptions): TempDbContext {
 	if (!schemaResult.success) {
 		throw new Error(`Failed to initialize schema: ${schemaResult.error.message}`);
 	}
+	// Production code in src/lib/workflow/stateMachine.ts lazily creates the
+	// workflow_states and state_transitions tables on first call to
+	// initializeWorkflowState/transitionWorkflow. Tests that exercise other
+	// modules but read/write workflow state directly need the tables to exist
+	// up front, so mirror the lazy CREATEs here.
+	db.exec(`
+		CREATE TABLE IF NOT EXISTS workflow_states (
+			state_id TEXT PRIMARY KEY,
+			dialogue_id TEXT NOT NULL UNIQUE,
+			current_phase TEXT NOT NULL,
+			previous_phase TEXT,
+			metadata TEXT NOT NULL,
+			transition_graph_version INTEGER NOT NULL DEFAULT 1,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS state_transitions (
+			transition_id TEXT PRIMARY KEY,
+			workflow_state_id TEXT NOT NULL,
+			from_phase TEXT NOT NULL,
+			to_phase TEXT NOT NULL,
+			trigger TEXT NOT NULL,
+			metadata TEXT NOT NULL,
+			timestamp TEXT NOT NULL,
+			FOREIGN KEY (workflow_state_id) REFERENCES workflow_states(state_id)
+		);
+	`);
 	appendTempDbArtifact({
 		event: 'created',
 		dbPath,
