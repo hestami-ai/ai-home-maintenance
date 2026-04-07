@@ -43,7 +43,6 @@ import * as path from 'node:path';
 export interface ExecutorInvocationOptions {
 	dialogueId: string;
 	goal: string;
-	tokenBudget: number;
 	provider: RoleCLIProvider;
 	temperature?: number;
 	includeHistoricalFindings?: boolean;
@@ -226,7 +225,6 @@ export async function invokeExecutor(
 			dialogueId: options.dialogueId,
 			role: RoleEnum.EXECUTOR,
 			phase: Phase.EXECUTE,
-			tokenBudget: options.tokenBudget,
 			extras: { goal: options.goal, workspace_specs: workspaceSpecs },
 			onEvent: options.onEvent,
 		});

@@ -288,26 +288,25 @@ function buildArchitectureOnEvent(dialogueId: string) {
  */
 export async function executeArchitecturePhase(
 	dialogueId: string,
-	tokenBudget: number = 10000
 ): Promise<Result<PhaseExecutionResult>> {
 	try {
 		const meta = getArchitectureMetadata(dialogueId);
 
 		switch (meta.architectureSubState) {
 			case ArchitectureSubState.TECHNICAL_ANALYSIS:
-				return await executeTechnicalAnalysis(dialogueId, tokenBudget, meta);
+				return await executeTechnicalAnalysis(dialogueId, meta);
 
 			case ArchitectureSubState.DECOMPOSING:
-				return await executeDecomposing(dialogueId, tokenBudget, meta);
+				return await executeDecomposing(dialogueId, meta);
 
 			case ArchitectureSubState.MODELING:
-				return await executeModeling(dialogueId, tokenBudget, meta);
+				return await executeModeling(dialogueId, meta);
 
 			case ArchitectureSubState.DESIGNING:
-				return await executeDesigning(dialogueId, tokenBudget, meta);
+				return await executeDesigning(dialogueId, meta);
 
 			case ArchitectureSubState.SEQUENCING:
-				return await executeSequencing(dialogueId, tokenBudget, meta);
+				return await executeSequencing(dialogueId, meta);
 
 			case ArchitectureSubState.VALIDATING:
 				return await executeValidating(dialogueId, meta);
@@ -340,7 +339,6 @@ export async function executeArchitecturePhase(
  */
 async function executeTechnicalAnalysis(
 	dialogueId: string,
-	tokenBudget: number,
 	meta: ArchitecturePhaseMetadata
 ): Promise<Result<PhaseExecutionResult>> {
 	const log = isLoggerInitialized()
@@ -370,46 +368,19 @@ async function executeTechnicalAnalysis(
 	const analysisCmdId = randomUUID();
 	const providerName = providerResult.value.name || 'LLM';
 
-	// 3. Build context: approved plan summary + workspace access instructions
+	// 3. Build context: full approved plan, verbatim. Every field of the
+	// finalizedPlan is forwarded so the technical analysis grounds its
+	// assessment in the complete user-validated INTAKE output. No truncation.
 	const contextParts: string[] = [
 		'# Approved Implementation Plan',
-		`**Title:** ${approvedPlan.title || 'Untitled'}`,
-		`**Summary:** ${approvedPlan.summary || ''}`,
+		'',
+		'The following is the COMPLETE finalized intake plan. Every field is provided',
+		'verbatim. Use it as the authoritative source for the technical analysis.',
+		'',
+		'```json',
+		JSON.stringify(approvedPlan, null, 2),
+		'```',
 	];
-
-	if (approvedPlan.requirements?.length) {
-		contextParts.push('## Requirements');
-		for (const r of approvedPlan.requirements) {
-			contextParts.push(`- [${r.id}] ${r.text}`);
-		}
-	}
-	if (approvedPlan.constraints?.length) {
-		contextParts.push('## Constraints');
-		for (const c of approvedPlan.constraints) {
-			contextParts.push(`- [${c.id}] ${c.text}`);
-		}
-	}
-	if (approvedPlan.decisions?.length) {
-		contextParts.push('## Decisions');
-		for (const d of approvedPlan.decisions) {
-			contextParts.push(`- [${d.id}] ${d.text}`);
-		}
-	}
-	// Include business domain proposals so domain assessment is grounded in product design,
-	// not just requirement text. Essential for greenfield projects with no target codebase.
-	if (approvedPlan.businessDomainProposals?.length) {
-		contextParts.push('## Validated Business Domains');
-		contextParts.push('User-validated business domains from INTAKE — use to inform engineering domain assessment:');
-		for (const d of approvedPlan.businessDomainProposals as Array<{ id: string; name: string; description: string }>) {
-			contextParts.push(`- **${d.name}** (${d.id}): ${d.description}`);
-		}
-	}
-	if (approvedPlan.phasingStrategy?.length) {
-		contextParts.push('## Phasing Strategy');
-		for (const p of approvedPlan.phasingStrategy as Array<{ phase: string; description: string }>) {
-			contextParts.push(`- **${p.phase}**: ${p.description}`);
-		}
-	}
 
 	const TECHNICAL_ANALYSIS_PROMPT = `You are the TECHNICAL EXPERT in the JanumiCode autonomous system, performing TECHNICAL ANALYSIS for the ARCHITECTURE phase.
 
@@ -620,7 +591,6 @@ Levels: ADEQUATE (well covered), PARTIAL (some coverage), NONE (not addressed).`
  */
 async function executeDecomposing(
 	dialogueId: string,
-	tokenBudget: number,
 	meta: ArchitecturePhaseMetadata
 ): Promise<Result<PhaseExecutionResult>> {
 	const log = isLoggerInitialized()
@@ -671,7 +641,6 @@ async function executeDecomposing(
 		dialogueId,
 		approvedPlan,
 		approvedPlan.engineeringDomainCoverage ?? null,
-		tokenBudget,
 		{
 			commandId: decomposeCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
 			humanFeedback: meta.humanFeedback,
@@ -849,7 +818,6 @@ async function executeDecomposing(
  */
 async function executeModeling(
 	dialogueId: string,
-	tokenBudget: number,
 	meta: ArchitecturePhaseMetadata
 ): Promise<Result<PhaseExecutionResult>> {
 	const log = isLoggerInitialized()
@@ -889,7 +857,6 @@ async function executeModeling(
 	const modelResult = await invokeArchitectureModeling(
 		dialogueId,
 		doc,
-		tokenBudget,
 		{
 			commandId: modelCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
 			humanFeedback: meta.humanFeedback,
@@ -1001,7 +968,6 @@ async function executeModeling(
  */
 async function executeDesigning(
 	dialogueId: string,
-	tokenBudget: number,
 	meta: ArchitecturePhaseMetadata
 ): Promise<Result<PhaseExecutionResult>> {
 	const log = isLoggerInitialized()
@@ -1067,15 +1033,22 @@ async function executeDesigning(
 
 		const deeperWorkspaceSummary = await getWorkspaceSummaryForArchitecture();
 
+		// Approved plan for the deeper decomposition pass too — every architecture
+		// invocation receives the full proposer artifacts.
+		const deeperStateResult = getWorkflowState(dialogueId);
+		const deeperApprovedPlan = deeperStateResult.success
+			? JSON.parse(deeperStateResult.value.metadata).approvedIntakePlan ?? null
+			: null;
+
 		const { invokeArchitectureDesign } = await import('../roles/architectureExpert.js');
 		const deeperResult = await invokeArchitectureDesign(
 			dialogueId,
 			doc,
 			meta.decompositionConfig,
 			deeperFeedback,
-			tokenBudget,
 			{
 				commandId: deeperCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
+				approvedPlan: deeperApprovedPlan,
 				workspaceSpecs: deeperWorkspaceSummary,
 				commandBlock: { dialogueId, commandId: deeperCmdId, label: `Architect — Deeper Decomposition [Depth ${meta.decompositionDepth}] [${deeperProviderName}]`, commandType: 'role_invocation' as const },
 			}
@@ -1145,11 +1118,11 @@ async function executeDesigning(
 			if (pResult.success) { designProviderName = pResult.value.name; }
 		} catch { /* use fallback */ }
 
-		// Get constraints/decisions from approved plan for the DESIGNING agent.
-		// Only constraints, decisions, and technicalNotes are passed as static extras —
-		// the full plan (requirements, userJourneys, phasingStrategy, businessDomainProposals)
-		// is available to the Context Engineer via the INTAKE handoff document, which is
-		// assembled based on the DESIGNING policy in policyRegistry.ts.
+		// The full approved plan (requirements, decisions, constraints, personas,
+		// userJourneys, phasingStrategy, businessDomainProposals, workflowProposals,
+		// entityProposals, integrationProposals, ...) is forwarded verbatim to the
+		// DESIGNING agent via the architectureExpert call. The Context Engineer
+		// includes every entry — there is no truncation or shedding.
 		const designStateResult = getWorkflowState(dialogueId);
 		const designPlan = designStateResult.success
 			? JSON.parse(designStateResult.value.metadata).approvedIntakePlan ?? null
@@ -1166,10 +1139,10 @@ async function executeDesigning(
 			doc,
 			meta.decompositionConfig,
 			meta.humanFeedback,
-			tokenBudget,
 			{
 				commandId: designCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
 				constraintsAndDecisions,
+				approvedPlan: designPlan,
 				workspaceSpecs: designWorkspaceSummary,
 				commandBlock: { dialogueId, commandId: designCmdId, label: `Architect — Architecture Design${passLabel} [${designProviderName}]`, commandType: 'role_invocation' as const },
 			}
@@ -1557,7 +1530,6 @@ async function executeDesigning(
  */
 async function executeSequencing(
 	dialogueId: string,
-	tokenBudget: number,
 	meta: ArchitecturePhaseMetadata
 ): Promise<Result<PhaseExecutionResult>> {
 	const log = isLoggerInitialized()
@@ -1597,7 +1569,6 @@ async function executeSequencing(
 	const seqResult = await invokeArchitectureSequencing(
 		dialogueId,
 		doc,
-		tokenBudget,
 		{
 			commandId: seqCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
 			humanFeedback: meta.humanFeedback,

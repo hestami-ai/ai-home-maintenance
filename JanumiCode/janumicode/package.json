@@ -122,13 +122,6 @@
     "configuration": {
       "title": "JanumiCode",
       "properties": {
-        "janumicode.tokenBudget": {
-          "type": "number",
-          "default": 10000,
-          "description": "Token budget for context packs (per role invocation)",
-          "minimum": 1000,
-          "maximum": 100000
-        },
         "janumicode.databasePath": {
           "type": "string",
           "default": "",

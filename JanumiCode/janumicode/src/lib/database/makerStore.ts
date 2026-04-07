@@ -107,7 +107,9 @@ export function getIntentRecord(intentId: string): Result<IntentRecord> {
 
 export function getIntentRecordForDialogue(dialogueId: string): Result<IntentRecord | null> {
 	try {
-		const row = db().prepare('SELECT * FROM intent_records WHERE dialogue_id = ? ORDER BY created_at DESC LIMIT 1').get(dialogueId) as Record<string, unknown> | undefined;
+		// Tiebreak by rowid (monotonic per insert) so "latest" is deterministic when
+		// multiple records share a created_at timestamp.
+		const row = db().prepare('SELECT * FROM intent_records WHERE dialogue_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1').get(dialogueId) as Record<string, unknown> | undefined;
 		return { success: true, value: row ? hydrateIntentRecord(row) : null };
 	} catch (error) {
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
@@ -198,7 +200,10 @@ export function getAcceptanceContract(contractId: string): Result<AcceptanceCont
 
 export function getAcceptanceContractForDialogue(dialogueId: string): Result<AcceptanceContract | null> {
 	try {
-		const row = db().prepare('SELECT * FROM acceptance_contracts WHERE dialogue_id = ? ORDER BY created_at DESC LIMIT 1').get(dialogueId) as Record<string, unknown> | undefined;
+		// Tiebreak by rowid (monotonic per insert) so "latest" is deterministic when
+		// multiple contracts share a created_at timestamp (created_at is ms-resolution
+		// from new Date().toISOString(), so collisions in the same millisecond are real).
+		const row = db().prepare('SELECT * FROM acceptance_contracts WHERE dialogue_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1').get(dialogueId) as Record<string, unknown> | undefined;
 		return { success: true, value: row ? hydrateAcceptanceContract(row) : null };
 	} catch (error) {
 		return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
@@ -613,7 +618,9 @@ export function getValidationPacketsForUnit(unitId: string): Result<ValidationPa
 
 export function getLatestValidationForUnit(unitId: string): Result<ValidationPacket | null> {
 	try {
-		const row = db().prepare('SELECT * FROM validation_packets WHERE unit_id = ? ORDER BY created_at DESC LIMIT 1').get(unitId) as Record<string, unknown> | undefined;
+		// Tiebreak by rowid (monotonic per insert) so "latest" is deterministic when
+		// multiple packets share a created_at timestamp.
+		const row = db().prepare('SELECT * FROM validation_packets WHERE unit_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1').get(unitId) as Record<string, unknown> | undefined;
 		if (!row) {return { success: true, value: null };}
 		return {
 			success: true,

@@ -23,7 +23,6 @@ export interface HistorianInterpreterInvocationOptions {
 	query: string;
 	queryType: HistorianQueryType;
 	relatedClaimIds?: string[];
-	tokenBudget: number;
 	provider: RoleCLIProvider;
 	temperature?: number;
 	timeWindowDays?: number;
@@ -351,7 +350,6 @@ export async function invokeHistorianInterpreter(
 			role: Role.HISTORIAN,
 			phase: Phase.HISTORICAL_CHECK,
 			intent: options.queryType,
-			tokenBudget: options.tokenBudget,
 			extras: { query: options.query, queryType: options.queryType, relatedClaimIds: options.relatedClaimIds, timeWindowDays: options.timeWindowDays },
 			onEvent: options.onEvent,
 		});
@@ -645,27 +643,19 @@ function validateHistorianInterpreterResponse(
 }
 
 /**
- * Check for contradictions between a claim and historical claims
- * Convenience wrapper for CONTRADICTION_CHECK query type
- *
- * @param dialogueId Dialogue ID
- * @param claim Claim to check
- * @param provider LLM provider
- * @param tokenBudget Token budget
- * @returns Result containing contradiction findings
+ * Check for contradictions between a claim and historical claims.
+ * Convenience wrapper for CONTRADICTION_CHECK query type.
  */
 export async function checkForContradictions(
 	dialogueId: string,
 	claim: Claim,
 	provider: RoleCLIProvider,
-	tokenBudget: number
 ): Promise<Result<ContradictionFinding[]>> {
 	const result = await invokeHistorianInterpreter({
 		dialogueId,
 		query: `Check for contradictions with: ${claim.statement}`,
 		queryType: HistorianQueryType.CONTRADICTION_CHECK,
 		relatedClaimIds: [claim.claim_id],
-		tokenBudget,
 		provider,
 	});
 
@@ -677,26 +667,18 @@ export async function checkForContradictions(
 }
 
 /**
- * Search for precedents related to a query
- * Convenience wrapper for PRECEDENT_SEARCH query type
- *
- * @param dialogueId Dialogue ID
- * @param query Query describing the decision context
- * @param provider LLM provider
- * @param tokenBudget Token budget
- * @returns Result containing precedent findings
+ * Search for precedents related to a query.
+ * Convenience wrapper for PRECEDENT_SEARCH query type.
  */
 export async function searchPrecedents(
 	dialogueId: string,
 	query: string,
 	provider: RoleCLIProvider,
-	tokenBudget: number
 ): Promise<Result<PrecedentFinding[]>> {
 	const result = await invokeHistorianInterpreter({
 		dialogueId,
 		query,
 		queryType: HistorianQueryType.PRECEDENT_SEARCH,
-		tokenBudget,
 		provider,
 	});
 
@@ -716,7 +698,6 @@ export interface HistorianAdjudicationOptions {
 	dialogueId: string;
 	claims: Claim[];
 	verdicts: Verdict[];
-	tokenBudget: number;
 	provider: RoleCLIProvider;
 	commandId?: string;
 	onEvent?: (event: CLIActivityEvent) => void;
@@ -737,7 +718,6 @@ export async function invokeHistorianAdjudication(
 			role: Role.HISTORIAN,
 			phase: Phase.HISTORICAL_CHECK,
 			subPhase: 'ADJUDICATION',
-			tokenBudget: options.tokenBudget,
 			extras: { conflictingVerdicts: options.verdicts, claims: options.claims },
 			onEvent: options.onEvent,
 		});

@@ -67,18 +67,21 @@ describe('Workspace Reader', () => {
 			expect(formatted).toContain('```\nCode content\n```');
 		});
 
-		it('respects token budget', () => {
+		it('emits multiple large files in full (no truncation)', () => {
 			const largeContent = 'A'.repeat(10000);
 			const files = [
 				createMockWorkspaceFile({ relativePath: 'file1.md', content: largeContent }),
 				createMockWorkspaceFile({ relativePath: 'file2.md', content: largeContent }),
 				createMockWorkspaceFile({ relativePath: 'file3.md', content: largeContent }),
 			];
-			
-			const formatted = formatWorkspaceFilesForContext(files, 100);
 
-			expect(formatted.length).toBeLessThan(1000);
-			expect(formatted).toContain('more files omitted');
+			const formatted = formatWorkspaceFilesForContext(files);
+
+			// No truncation: every file is emitted in full.
+			expect(formatted).toContain('file1.md');
+			expect(formatted).toContain('file2.md');
+			expect(formatted).toContain('file3.md');
+			expect(formatted).not.toContain('omitted');
 		});
 
 		it('handles empty files array', () => {
@@ -97,31 +100,19 @@ describe('Workspace Reader', () => {
 			expect(formatted).toContain('# Workspace Files (5 files)');
 		});
 
-		it('truncates when approaching budget limit', () => {
+		it('emits every file regardless of total size (no truncation)', () => {
 			const files = Array.from({ length: 10 }, (_, i) =>
 				createMockWorkspaceFile({
 					relativePath: `file${i}.md`,
 					content: 'Content for file ' + i,
 				})
 			);
-			
-			const formatted = formatWorkspaceFilesForContext(files, 200);
 
-			const fileCount = (formatted.match(/##/g) || []).length;
-			expect(fileCount).toBeLessThan(10);
-		});
+			const formatted = formatWorkspaceFilesForContext(files);
 
-		it('shows remaining file count when truncated', () => {
-			const files = Array.from({ length: 10 }, (_, i) =>
-				createMockWorkspaceFile({
-					relativePath: `file${i}.md`,
-					content: 'A'.repeat(500),
-				})
-			);
-			
-			const formatted = formatWorkspaceFilesForContext(files, 100);
-
-			expect(formatted).toMatch(/\d+ more files omitted/);
+			const fileCount = (formatted.match(/^## /gm) || []).length;
+			expect(fileCount).toBe(10);
+			expect(formatted).not.toContain('omitted');
 		});
 
 		it('handles files with different extensions', () => {
@@ -138,23 +129,23 @@ describe('Workspace Reader', () => {
 			expect(formatted).toContain('script.ts');
 		});
 
-		it('handles very large token budget', () => {
+		it('emits a single small file in full', () => {
 			const files = [
 				createMockWorkspaceFile({ content: 'Test content' }),
 			];
-			
-			const formatted = formatWorkspaceFilesForContext(files, 1000000);
+
+			const formatted = formatWorkspaceFilesForContext(files);
 
 			expect(formatted).toContain('Test content');
 			expect(formatted).not.toContain('omitted');
 		});
 
-		it('handles zero token budget', () => {
+		it('emits a single file regardless of size', () => {
 			const files = [
 				createMockWorkspaceFile(),
 			];
 			
-			const formatted = formatWorkspaceFilesForContext(files, 0);
+			const formatted = formatWorkspaceFilesForContext(files);
 
 			expect(formatted).toContain('# Workspace Files');
 		});
@@ -313,7 +304,7 @@ describe('Workspace Reader', () => {
 				}),
 			];
 
-			const formatted = formatWorkspaceFilesForContext(files, 5000);
+			const formatted = formatWorkspaceFilesForContext(files);
 
 			expect(formatted).toContain('# Workspace Files (2 files)');
 			expect(formatted).toContain('## README.md');
@@ -348,7 +339,7 @@ describe('Workspace Reader', () => {
 			expect(formatted).toContain('config.yaml');
 		});
 
-		it('prioritizes files within budget', () => {
+		it('emits all 20 files (no truncation)', () => {
 			const files = Array.from({ length: 20 }, (_, i) =>
 				createMockWorkspaceFile({
 					relativePath: `file${i}.md`,
@@ -356,12 +347,12 @@ describe('Workspace Reader', () => {
 				})
 			);
 
-			const formatted = formatWorkspaceFilesForContext(files, 500);
+			const formatted = formatWorkspaceFilesForContext(files);
 
 			expect(formatted).toContain('# Workspace Files (20 files)');
 			const includedCount = (formatted.match(/## file/g) || []).length;
-			expect(includedCount).toBeLessThan(20);
-			expect(formatted).toContain('more files omitted');
+			expect(includedCount).toBe(20);
+			expect(formatted).not.toContain('omitted');
 		});
 	});
 
@@ -437,37 +428,18 @@ describe('Workspace Reader', () => {
 			expect(formatted).toContain('Кириллица');
 		});
 
-		it('handles very small token budget gracefully', () => {
-			const files = [createMockWorkspaceFile()];
-			
-			const formatted = formatWorkspaceFilesForContext(files, 1);
-
-			expect(formatted).toBeDefined();
-			expect(formatted.length).toBeGreaterThan(0);
-		});
-
-		it('calculates character budget from token budget', () => {
-			const files = [
-				createMockWorkspaceFile({ content: 'A'.repeat(100) }),
-			];
-
-			const formatted100 = formatWorkspaceFilesForContext(files, 100);
-			const formatted10 = formatWorkspaceFilesForContext(files, 10);
-
-			expect(formatted100.length).toBeGreaterThan(formatted10.length);
-		});
-
-		it('handles single file that exceeds budget', () => {
+		it('emits a large single file in full (no truncation)', () => {
 			const files = [
 				createMockWorkspaceFile({
 					content: 'X'.repeat(10000),
 				}),
 			];
 
-			const formatted = formatWorkspaceFilesForContext(files, 50);
+			const formatted = formatWorkspaceFilesForContext(files);
 
 			expect(formatted).toContain('# Workspace Files');
-			expect(formatted).toContain('more files omitted');
+			expect(formatted).not.toContain('omitted');
+			expect(formatted).toContain('X'.repeat(10000));
 		});
 
 		it('handles files with identical content', () => {

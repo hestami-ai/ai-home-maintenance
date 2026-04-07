@@ -1229,7 +1229,6 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 						role: Role.HUMAN,
 						content: text,
 						llmConfig: config.llmConfig,
-						tokenBudget: config.tokenBudget,
 						advanceWorkflow: false,
 					});
 
@@ -1247,7 +1246,6 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				const result = startDialogueWithWorkflow({
 					goal: text,
 					llmConfig: config.llmConfig,
-					tokenBudget: config.tokenBudget,
 				});
 
 				if (!result.success) {
@@ -1316,7 +1314,6 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				const result = await executeWorkflowCycle(
 					this._activeDialogueId!,
 					config.llmConfig,
-					config.tokenBudget,
 				);
 
 				if (this._disposed) { return; }

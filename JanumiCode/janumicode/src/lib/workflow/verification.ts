@@ -34,7 +34,6 @@ export interface VerificationExecutionOptions {
 	dialogueId: string;
 	claim: Claim;
 	provider: RoleCLIProvider;
-	tokenBudget: number;
 	temperature?: number;
 	includeHistoricalVerdicts?: boolean;
 	checkForContradictions?: boolean;
@@ -91,7 +90,6 @@ export async function executeVerification(
 		const verifierResult = await invokeVerifier({
 			dialogueId: options.dialogueId,
 			claimToVerify: options.claim,
-			tokenBudget: options.tokenBudget,
 			provider: options.provider,
 			temperature: options.temperature,
 			includeHistoricalVerdicts: options.includeHistoricalVerdicts,

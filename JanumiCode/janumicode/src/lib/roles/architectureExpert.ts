@@ -415,7 +415,6 @@ export async function invokeArchitectureDecomposition(
 	dialogueId: string,
 	approvedPlan: IntakePlanDocument,
 	engineeringDomainCoverage: EngineeringDomainCoverageMap | null,
-	tokenBudget: number,
 	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; humanFeedback?: string | null; priorArchitectureDoc?: import('../types/architecture').ArchitectureDocument | null; commandBlock?: DeferredCommandBlock }
 ): Promise<Result<DecompositionResult>> {
 	const log = isLoggerInitialized()
@@ -429,51 +428,21 @@ export async function invokeArchitectureDecomposition(
 			return providerResult as unknown as Result<DecompositionResult>;
 		}
 
-		// 2. Assemble context via Context Engineer
-		// Note: the full approvedPlan is NOT in extras — the DECOMPOSING policy
-		// requests it via source: handoff_doc (summarized). To prevent workflow/entity
-		// data loss from over-aggressive summarization, pass compact proposal lists
-		// as separate extras that the CE will include verbatim.
-		const extras: Record<string, unknown> = { engineeringDomainCoverage, humanFeedback: options?.humanFeedback };
-		// Pass compact workflow/entity proposal lists so the CE includes them verbatim and the
-		// LLM preserves all user-validated items (prevents data loss from over-summarization)
-		if (approvedPlan.workflowProposals && approvedPlan.workflowProposals.length > 0) {
-			extras.workflowProposals = approvedPlan.workflowProposals.map(w => ({
-				id: w.id,
-				name: w.name,
-				domain: w.businessDomainId,
-			}));
-		}
-		if (approvedPlan.entityProposals && approvedPlan.entityProposals.length > 0) {
-			extras.entityProposalNames = approvedPlan.entityProposals.map(e => e.name);
-		}
-		// Pass business domain proposals (compact) — PRIMARY source for capability grouping.
-		// Include name + description + entityPreview so the LLM can group capabilities by domain.
-		if (approvedPlan.businessDomainProposals && approvedPlan.businessDomainProposals.length > 0) {
-			extras.businessDomainProposals = approvedPlan.businessDomainProposals.map(d => ({
-				id: d.id,
-				name: d.name,
-				description: d.description,
-				entityPreview: d.entityPreview,
-				workflowPreview: d.workflowPreview,
-			}));
-		}
-		// Pass user journeys (compact) — used to verify workflow coverage across all phases.
-		if (approvedPlan.userJourneys && approvedPlan.userJourneys.length > 0) {
-			extras.userJourneys = approvedPlan.userJourneys.map(uj => ({
-				id: uj.id,
-				title: uj.title,
-				personaId: uj.personaId,
-				implementationPhase: uj.implementationPhase,
-				scenario: uj.scenario,
-			}));
-		}
-		// Pass phasing strategy — must be respected when organizing capabilities by product phase.
-		if (approvedPlan.phasingStrategy && approvedPlan.phasingStrategy.length > 0) {
-			extras.phasingStrategy = approvedPlan.phasingStrategy;
-		}
+		// 2. Assemble context via Context Engineer.
+		// All proposer artifacts are passed verbatim under block IDs that the
+		// DECOMPOSING policy declares as required, so the CE cannot drop them.
+		const extras: Record<string, unknown> = {
+			engineeringDomainCoverage,
+			humanFeedback: options?.humanFeedback,
+			business_domain_proposals: approvedPlan.businessDomainProposals ?? [],
+			workflow_proposals: approvedPlan.workflowProposals ?? [],
+			entity_proposals: approvedPlan.entityProposals ?? [],
+			user_journeys: approvedPlan.userJourneys ?? [],
+			phasing_strategy: approvedPlan.phasingStrategy ?? [],
+			integration_proposals: approvedPlan.integrationProposals ?? [],
+			personas: approvedPlan.personas ?? [],
+		};
 		if (options?.priorArchitectureDoc) {
-			// Pass only a compact summary of the prior doc — not the full 90KB document
 			const priorDoc = options.priorArchitectureDoc;
 			extras.priorArchitectureSummary = {
 				capabilities: priorDoc.capabilities.map(c => ({ id: c.capability_id, label: c.label, parentId: c.parent_capability_id })),
@@ -492,7 +461,6 @@ export async function invokeArchitectureDecomposition(
 			role: Role.TECHNICAL_EXPERT,
 			phase: Phase.ARCHITECTURE,
 			subPhase: 'DECOMPOSING',
-			tokenBudget,
 			extras,
 			onEvent: options?.onEvent,
 		});
@@ -647,8 +615,7 @@ export async function invokeArchitectureDesign(
 	architectureDoc: ArchitectureDocument,
 	decompositionConfig: DecompositionConfig,
 	humanFeedback: string | null,
-	tokenBudget: number,
-	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; constraintsAndDecisions?: Record<string, unknown> | null; workspaceSpecs?: string | null; commandBlock?: DeferredCommandBlock }
+	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; constraintsAndDecisions?: Record<string, unknown> | null; approvedPlan?: IntakePlanDocument | null; workspaceSpecs?: string | null; commandBlock?: DeferredCommandBlock }
 ): Promise<Result<DesignResult>> {
 	const log = isLoggerInitialized()
 		? getLogger().child({ component: 'architectureExpert', phase: 'DESIGNING' })
@@ -668,18 +635,26 @@ export async function invokeArchitectureDesign(
 			...architectureDoc,
 			implementation_sequence: [], // SEQUENCING generates this
 		};
-		const designExtras: Record<string, unknown> = { architectureDoc: prunedDesignDoc, decompositionConfig, humanFeedback };
-		// Note: constraintsAndDecisions duplicates data already in the handoff doc — only include if small
+		const designExtras: Record<string, unknown> = {
+			capabilities: { capabilities: architectureDoc.capabilities, workflow_graph: architectureDoc.workflow_graph },
+			domain_model: architectureDoc.data_models,
+			decomposition_config: decompositionConfig,
+			architectureDoc: prunedDesignDoc,
+			humanFeedback,
+		};
 		if (options?.constraintsAndDecisions) {
-			const cdSize = JSON.stringify(options.constraintsAndDecisions).length;
-			if (cdSize < 10_000) {
-				designExtras.constraintsAndDecisions = options.constraintsAndDecisions;
-			} else if (isLoggerInitialized()) {
-				getLogger().child({ component: 'architectureDesign' }).warn(
-					'constraintsAndDecisions exceeds 10KB — omitted from extras (available via handoff doc)',
-					{ cdSize, dialogueId: options?.dialogueId },
-				);
-			}
+			designExtras.constraints_and_decisions = options.constraintsAndDecisions;
+		}
+		if (options?.approvedPlan) {
+			const plan = options.approvedPlan;
+			designExtras.approved_plan = plan;
+			designExtras.business_domain_proposals = plan.businessDomainProposals ?? [];
+			designExtras.workflow_proposals = plan.workflowProposals ?? [];
+			designExtras.entity_proposals = plan.entityProposals ?? [];
+			designExtras.user_journeys = plan.userJourneys ?? [];
+			designExtras.integration_proposals = plan.integrationProposals ?? [];
+			designExtras.phasing_strategy = plan.phasingStrategy ?? [];
+			designExtras.personas = plan.personas ?? [];
 		}
 		if (options?.workspaceSpecs) { designExtras.workspace_specs = options.workspaceSpecs; }
 
@@ -688,7 +663,6 @@ export async function invokeArchitectureDesign(
 			role: Role.TECHNICAL_EXPERT,
 			phase: Phase.ARCHITECTURE,
 			subPhase: 'DESIGNING',
-			tokenBudget,
 			extras: designExtras,
 			onEvent: options?.onEvent,
 		});
@@ -1104,8 +1078,7 @@ function parseSequencingResponse(rawResponse: string): Result<SequencingResult> 
 export async function invokeArchitectureModeling(
 	dialogueId: string,
 	architectureDoc: ArchitectureDocument,
-	tokenBudget: number,
-	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; humanFeedback?: string | null; approvedPlan?: Record<string, unknown> | null; workspaceSpecs?: string | null; commandBlock?: DeferredCommandBlock }
+	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; humanFeedback?: string | null; approvedPlan?: IntakePlanDocument | null; workspaceSpecs?: string | null; commandBlock?: DeferredCommandBlock }
 ): Promise<Result<ModelingResult>> {
 	const log = isLoggerInitialized()
 		? getLogger().child({ component: 'architectureExpert', phase: 'MODELING' })
@@ -1126,17 +1099,19 @@ export async function invokeArchitectureModeling(
 			implementation_sequence: [],
 			components: architectureDoc.components.map(c => ({ component_id: c.component_id, label: c.label, workflows_served: c.workflows_served })),
 		};
-		const modelingExtras: Record<string, unknown> = { architectureDoc: prunedDoc, humanFeedback: options?.humanFeedback };
-		// Pass a compact plan summary (entity/domain proposals only — not full 60KB plan)
+		const modelingExtras: Record<string, unknown> = {
+			capabilities: { capabilities: architectureDoc.capabilities, workflow_graph: architectureDoc.workflow_graph },
+			architectureDoc: prunedDoc,
+			humanFeedback: options?.humanFeedback,
+		};
 		if (options?.approvedPlan) {
-			const plan = options.approvedPlan as Record<string, unknown>;
-			modelingExtras.approved_plan = {
-				requirements: plan.requirements,
-				entityProposals: plan.entityProposals,
-				businessBusinessDomainProposals: plan.businessBusinessDomainProposals,
-				constraints: plan.constraints,
-				decisions: plan.decisions,
-			};
+			const plan = options.approvedPlan;
+			modelingExtras.approved_plan = plan;
+			modelingExtras.business_domain_proposals = plan.businessDomainProposals ?? [];
+			modelingExtras.workflow_proposals = plan.workflowProposals ?? [];
+			modelingExtras.entity_proposals = plan.entityProposals ?? [];
+			modelingExtras.user_journeys = plan.userJourneys ?? [];
+			modelingExtras.integration_proposals = plan.integrationProposals ?? [];
 		}
 		if (options?.workspaceSpecs) { modelingExtras.workspace_specs = options.workspaceSpecs; }
 
@@ -1145,7 +1120,6 @@ export async function invokeArchitectureModeling(
 			role: Role.TECHNICAL_EXPERT,
 			phase: Phase.ARCHITECTURE,
 			subPhase: 'MODELING',
-			tokenBudget,
 			extras: modelingExtras,
 			onEvent: options?.onEvent,
 		});
@@ -1211,7 +1185,6 @@ export async function invokeArchitectureModeling(
 export async function invokeArchitectureSequencing(
 	dialogueId: string,
 	architectureDoc: ArchitectureDocument,
-	tokenBudget: number,
 	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; humanFeedback?: string | null; phasingStrategy?: unknown[] | null; workspaceSpecs?: string | null; commandBlock?: DeferredCommandBlock }
 ): Promise<Result<SequencingResult>> {
 	const log = isLoggerInitialized()
@@ -1239,8 +1212,14 @@ export async function invokeArchitectureSequencing(
 				capability_id: w.capability_id, steps: [], actors: [], triggers: [], outputs: [],
 			})),
 		};
-		const seqExtras: Record<string, unknown> = { architectureDoc: prunedSeqDoc, humanFeedback: options?.humanFeedback };
-		if (options?.phasingStrategy) { seqExtras.phasingStrategy = options.phasingStrategy; }
+		const seqExtras: Record<string, unknown> = {
+			components: architectureDoc.components,
+			interfaces: architectureDoc.interfaces,
+			domain_model: architectureDoc.data_models,
+			architectureDoc: prunedSeqDoc,
+			humanFeedback: options?.humanFeedback,
+		};
+		if (options?.phasingStrategy) { seqExtras.phasing_strategy = options.phasingStrategy; }
 		if (options?.workspaceSpecs) { seqExtras.workspace_patterns = options.workspaceSpecs; }
 
 		const contextResult = await assembleContext({
@@ -1248,7 +1227,6 @@ export async function invokeArchitectureSequencing(
 			role: Role.TECHNICAL_EXPERT,
 			phase: Phase.ARCHITECTURE,
 			subPhase: 'SEQUENCING',
-			tokenBudget,
 			extras: seqExtras,
 			onEvent: options?.onEvent,
 		});

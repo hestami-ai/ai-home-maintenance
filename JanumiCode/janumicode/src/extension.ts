@@ -16,7 +16,6 @@ import {
 } from './lib/database';
 import {
 	getConfig,
-	getTokenBudget,
 	validateConfig,
 	areAPIKeysConfigured,
 	getMissingAPIKeyRoles,
@@ -108,7 +107,6 @@ export async function activate(
 	// Get configuration (async — resolves API keys from SecretStorage/env)
 	const config = await getConfig();
 	logger.info('Configuration loaded', {
-		tokenBudget: config.tokenBudget,
 		databasePath: config.databasePath,
 	});
 
@@ -198,7 +196,6 @@ export async function activate(
 	// Watch for configuration changes
 	const configWatcher = watchConfig((newConfig) => {
 		logger.info('Configuration changed', {
-			tokenBudget: newConfig.tokenBudget,
 			databasePath: newConfig.databasePath,
 		});
 		// Update log level on config change
@@ -358,7 +355,7 @@ function registerCommands(context: vscode.ExtensionContext, streamProvider: Gove
 		() => {
 			const stats = getDatabaseStats();
 			vscode.window.showInformationMessage(
-				`JanumiCode is active! Database: ${stats?.sizeBytes || 0} bytes, Token Budget: ${getTokenBudget()}`
+				`JanumiCode is active! Database: ${stats?.sizeBytes || 0} bytes`
 			);
 		}
 	);

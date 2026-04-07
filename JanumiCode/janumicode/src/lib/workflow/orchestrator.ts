@@ -140,7 +140,6 @@ export interface WorkflowExecutionOptions {
 	dialogueId: string;
 	goal: string; // User's goal/request
 	llmConfig: RoleLLMConfig;
-	tokenBudget?: number;
 	autoAdvance?: boolean; // Auto-advance through phases
 }
 
@@ -236,16 +235,10 @@ export { executeIntakePhase };
 
 /**
  * Execute PROPOSE phase
- * Executor generates proposal and surfaces assumptions
- *
- * @param dialogueId Dialogue ID
- * @param provider LLM provider for Executor
- * @param tokenBudget Token budget
- * @returns Result containing phase execution result
+ * Executor generates proposal and surfaces assumptions.
  */
 export async function executeProposePhase(
 	dialogueId: string,
-	tokenBudget: number
 ): Promise<Result<PhaseExecutionResult>> {
 	try {
 		const db = getDatabase();
@@ -333,7 +326,6 @@ export async function executeProposePhase(
 			const executorResult = await invokeExecutor({
 				dialogueId,
 				goal,
-				tokenBudget,
 				provider: providerResult.value,
 				includeHistoricalFindings: true,
 				commandId: proposeCommandId,
@@ -620,17 +612,11 @@ export async function executeProposePhase(
 }
 
 /**
- * Execute ASSUMPTION_SURFACING phase
- * Converts executor assumptions (cached from PROPOSE) to claims
- *
- * @param dialogueId Dialogue ID
- * @param provider LLM provider (fallback if no cached response)
- * @param tokenBudget Token budget
- * @returns Result containing phase execution result
+ * Execute ASSUMPTION_SURFACING phase.
+ * Converts executor assumptions (cached from PROPOSE) to claims.
  */
 export async function executeAssumptionSurfacingPhase(
 	dialogueId: string,
-	tokenBudget: number
 ): Promise<Result<PhaseExecutionResult>> {
 	try {
 		const db = getDatabase();
@@ -663,7 +649,6 @@ export async function executeAssumptionSurfacingPhase(
 			const executorResult = await invokeExecutor({
 				dialogueId,
 				goal,
-				tokenBudget,
 				provider: executorProviderResult.value,
 			});
 			if (!executorResult.success) { throw executorResult.error; }
@@ -762,17 +747,10 @@ export async function executeAssumptionSurfacingPhase(
 }
 
 /**
- * Execute VERIFY phase
- * Verifies all open claims
- *
- * @param dialogueId Dialogue ID
- * @param provider LLM provider for Verifier
- * @param tokenBudget Token budget
- * @returns Result containing phase execution result
+ * Execute VERIFY phase. Verifies all open claims.
  */
 export async function executeVerifyPhase(
 	dialogueId: string,
-	tokenBudget: number
 ): Promise<Result<PhaseExecutionResult>> {
 	try {
 		const db = getDatabase();
@@ -866,7 +844,6 @@ export async function executeVerifyPhase(
 					dialogueId,
 					claim,
 					provider: verifierProviderResult.value,
-					tokenBudget: Math.max(2000, Math.floor(tokenBudget / openClaims.length)),
 					includeHistoricalVerdicts: true,
 					checkForContradictions: true,
 					commandId: verifyCommandId,
@@ -1008,17 +985,10 @@ export async function executeVerifyPhase(
 }
 
 /**
- * Execute HISTORICAL_CHECK phase
- * Checks for contradictions and precedents
- *
- * @param dialogueId Dialogue ID
- * @param provider LLM provider for Historian-Interpreter
- * @param tokenBudget Token budget
- * @returns Result containing phase execution result
+ * Execute HISTORICAL_CHECK phase. Checks for contradictions and precedents.
  */
 export async function executeHistoricalCheckPhase(
 	dialogueId: string,
-	tokenBudget: number
 ): Promise<Result<PhaseExecutionResult>> {
 	try {
 		// Resolve CLI provider for Historian-Interpreter role
@@ -1080,7 +1050,6 @@ export async function executeHistoricalCheckPhase(
 					dialogueId,
 					claims,
 					verdicts,
-					tokenBudget,
 					provider: historianProviderResult.value,
 					commandId: histCheckCommandId,
 				});
@@ -1126,7 +1095,6 @@ export async function executeHistoricalCheckPhase(
 					dialogueId,
 					query: 'Check for contradictions and relevant precedents',
 					queryType: HistorianQueryType.GENERAL_HISTORY,
-					tokenBudget,
 					provider: historianProviderResult.value,
 					commandId: histCheckCommandId,
 				});
@@ -1987,7 +1955,6 @@ async function attemptMakerDecomposition(
 			role: Role.EXECUTOR,
 			phase: Phase.EXECUTE,
 			intent: 'MAKER_PLANNER',
-			tokenBudget: 4000,
 			extras: { intentRecord: intent, acceptanceContract: contract },
 		});
 		const historicalContext = historicalCtx.success ? historicalCtx.value.briefing : '';
@@ -2241,7 +2208,6 @@ async function executeMakerExecutePhase(
 				role: Role.EXECUTOR,
 				phase: Phase.EXECUTE,
 				intent: 'MAKER_PLANNER',
-				tokenBudget: 3000,
 				extras: { intentRecord: intentResult.value, acceptanceContract: contract },
 			});
 			unitContext = ctxResult.success ? ctxResult.value.briefing : '';
@@ -2534,18 +2500,12 @@ function recordMakerOutcomeSnapshot(dialogueId: string): void {
 }
 
 /**
- * Advance workflow to next phase
- * Orchestrates automatic phase advancement
- *
- * @param dialogueId Dialogue ID
- * @param llmConfig LLM configuration
- * @param tokenBudget Token budget
- * @returns Result containing phase execution result
+ * Advance workflow to next phase.
+ * Orchestrates automatic phase advancement.
  */
 export async function advanceWorkflow(
 	dialogueId: string,
 	providers?: WorkflowProviders,
-	tokenBudget: number = 10000
 ): Promise<Result<PhaseExecutionResult>> {
 	try {
 		// Invalidate state cache at cycle start
@@ -2626,34 +2586,19 @@ export async function advanceWorkflow(
 				break;
 			}
 			case 'ARCHITECTURE':
-				phaseResult = await executeArchitecturePhase(
-					dialogueId,
-					tokenBudget
-				);
+				phaseResult = await executeArchitecturePhase(dialogueId);
 				break;
 			case 'PROPOSE':
-				phaseResult = await executeProposePhase(
-					dialogueId,
-					tokenBudget
-				);
+				phaseResult = await executeProposePhase(dialogueId);
 				break;
 			case 'ASSUMPTION_SURFACING':
-				phaseResult = await executeAssumptionSurfacingPhase(
-					dialogueId,
-					tokenBudget
-				);
+				phaseResult = await executeAssumptionSurfacingPhase(dialogueId);
 				break;
 			case 'VERIFY':
-				phaseResult = await executeVerifyPhase(
-					dialogueId,
-					tokenBudget
-				);
+				phaseResult = await executeVerifyPhase(dialogueId);
 				break;
 			case 'HISTORICAL_CHECK':
-				phaseResult = await executeHistoricalCheckPhase(
-					dialogueId,
-					tokenBudget
-				);
+				phaseResult = await executeHistoricalCheckPhase(dialogueId);
 				break;
 			case 'REVIEW':
 				phaseResult = await executeReviewPhase(dialogueId);

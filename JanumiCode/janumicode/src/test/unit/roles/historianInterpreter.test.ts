@@ -46,7 +46,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Check for contradictions',
 				queryType: HistorianQueryType.CONTRADICTION_CHECK,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -57,7 +56,6 @@ describe('Historian-Interpreter Role', () => {
 					dialogueId: 'test-dialogue-123',
 					role: Role.HISTORIAN,
 					phase: Phase.HISTORICAL_CHECK,
-					tokenBudget: 4000,
 				})
 			);
 		});
@@ -89,7 +87,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Find precedents',
 				queryType: HistorianQueryType.PRECEDENT_SEARCH,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -139,7 +136,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Check contradictions',
 				queryType: HistorianQueryType.CONTRADICTION_CHECK,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -186,7 +182,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Find similar decisions',
 				queryType: HistorianQueryType.PRECEDENT_SEARCH,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -233,7 +228,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Check invariants',
 				queryType: HistorianQueryType.INVARIANT_VIOLATION,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -273,7 +267,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Provide historical context',
 				queryType: HistorianQueryType.GENERAL_HISTORY,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -319,7 +312,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.CONTRADICTION_CHECK,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -364,7 +356,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.INVARIANT_VIOLATION,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -410,7 +401,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.PRECEDENT_SEARCH,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -450,7 +440,6 @@ describe('Historian-Interpreter Role', () => {
 				query: 'Test',
 				queryType: HistorianQueryType.GENERAL_HISTORY,
 				relatedClaimIds: ['claim-1', 'claim-2'],
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -493,7 +482,6 @@ describe('Historian-Interpreter Role', () => {
 				query: 'Recent history',
 				queryType: HistorianQueryType.GENERAL_HISTORY,
 				timeWindowDays: 30,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -520,7 +508,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.GENERAL_HISTORY,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -547,7 +534,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.GENERAL_HISTORY,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -577,7 +563,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.GENERAL_HISTORY,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -615,7 +600,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.GENERAL_HISTORY,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -650,7 +634,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.GENERAL_HISTORY,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -687,7 +670,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.GENERAL_HISTORY,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 				commandId: 'cmd-123',
 			};
@@ -730,7 +712,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.GENERAL_HISTORY,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -788,7 +769,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.CONTRADICTION_CHECK,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -809,7 +789,6 @@ describe('Historian-Interpreter Role', () => {
 				dialogueId: 'test-dialogue-123',
 				query: 'Test',
 				queryType: HistorianQueryType.GENERAL_HISTORY,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 

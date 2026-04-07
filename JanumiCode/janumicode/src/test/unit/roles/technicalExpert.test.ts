@@ -47,7 +47,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'How does X work?',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -58,7 +57,6 @@ describe('Technical Expert Role', () => {
 					dialogueId: 'test-dialogue-123',
 					role: Role.TECHNICAL_EXPERT,
 					phase: Phase.PROPOSE,
-					tokenBudget: 4000,
 				})
 			);
 		});
@@ -90,7 +88,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Explain API behavior',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -139,7 +136,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test question',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -185,7 +181,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -224,7 +219,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -266,7 +260,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -307,7 +300,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test question',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -354,7 +346,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -394,7 +385,6 @@ describe('Technical Expert Role', () => {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
 				relatedClaimIds: ['claim-1', 'claim-2'],
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -436,7 +426,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -464,7 +453,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -492,7 +480,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -523,7 +510,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -561,7 +547,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -596,7 +581,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -632,7 +616,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -649,7 +632,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -734,7 +716,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -775,7 +756,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -815,7 +795,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -859,7 +838,6 @@ describe('Technical Expert Role', () => {
 			const options: TechnicalExpertInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				question: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 

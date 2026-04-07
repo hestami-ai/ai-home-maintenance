@@ -41,8 +41,6 @@ export interface StartDialogueWithWorkflowOptions {
 	goal: string;
 	/** LLM configuration for all roles */
 	llmConfig: RoleLLMConfig;
-	/** Token budget for workflow execution */
-	tokenBudget?: number;
 	/** Additional metadata */
 	metadata?: Record<string, unknown>;
 }
@@ -69,8 +67,6 @@ export interface AdvanceDialogueWithWorkflowOptions {
 	content: string;
 	/** LLM configuration */
 	llmConfig: RoleLLMConfig;
-	/** Token budget */
-	tokenBudget?: number;
 	/** Whether to advance workflow after turn */
 	advanceWorkflow?: boolean;
 }
@@ -212,7 +208,6 @@ export async function advanceDialogueWithWorkflow(
 			const workflowResult = await advanceWorkflow(
 				options.dialogueId,
 				providers,
-				options.tokenBudget ?? 10000
 			);
 
 			return {
@@ -339,14 +334,12 @@ export function getDialogueWithWorkflow(dialogueId: string): Result<{
  *
  * @param dialogueId Dialogue ID
  * @param llmConfig LLM configuration
- * @param tokenBudget Token budget
  * @param maxPhases Maximum phases to execute (safety limit)
  * @returns Result with execution summary
  */
 export async function executeWorkflowCycle(
 	dialogueId: string,
 	llmConfig: RoleLLMConfig,
-	tokenBudget: number = 10000,
 	maxPhases: number = 50
 ): Promise<
 	Result<{
@@ -446,7 +439,7 @@ export async function executeWorkflowCycle(
 			}
 
 			// Advance one phase
-			const result = await advanceWorkflow(dialogueId, providers, tokenBudget);
+			const result = await advanceWorkflow(dialogueId, providers);
 
 			if (!result.success) {
 				cycleLog?.error('advanceWorkflow failed', { error: result.error.message });

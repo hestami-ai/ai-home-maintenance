@@ -137,7 +137,7 @@ async function executeIngesting(
 
 		const fileCount = scanResult.success ? scanResult.value.files.length : 0;
 		if (scanResult.success && fileCount > 0) {
-			const filesContext = formatWorkspaceFilesForContext(scanResult.value.files, 40_000);
+			const filesContext = formatWorkspaceFilesForContext(scanResult.value.files);
 			contextParts.push('\n# Source Files\n' + filesContext);
 		}
 

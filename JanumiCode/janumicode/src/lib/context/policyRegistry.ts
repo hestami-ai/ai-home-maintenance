@@ -1,10 +1,12 @@
 /**
  * Context Policy Registry
  *
- * Declarative policies defining the bounded situational awareness required
- * for each Role/Phase/SubPhase/Intent combination. The Context Engineer
- * consults these policies to decide what data to include, what to shed,
- * and what constitutes a sufficiency failure.
+ * Declarative policies defining the situational awareness required for each
+ * Role/Phase/SubPhase/Intent combination. The Context Engineer consults these
+ * policies to decide what data to include in each agent invocation.
+ *
+ * No token budgets, no shedding, no truncation: every block whose data is
+ * available MUST appear in the briefing. Completeness is the goal.
  *
  * Lookup: exact match → role:phase:* → role:*:*:* fallback chain.
  */
@@ -15,11 +17,9 @@ import type { ContextPolicy, ContextBlockSpec } from './engineTypes';
 
 // ==================== REUSABLE BLOCK SPECS ====================
 
-/** Common block specs reused across multiple policies. */
-
-const APPROVED_PLAN: ContextBlockSpec = {
+const APPROVED_PLAN_FULL: ContextBlockSpec = {
 	blockId: 'approved_plan',
-	label: 'Approved Intake Plan',
+	label: 'Approved Intake Plan (include the entire finalizedPlan content verbatim — every field, every array element)',
 	source: 'handoff_doc',
 	handoffDocType: HandoffDocType.INTAKE,
 };
@@ -90,7 +90,7 @@ const HISTORICAL_VERDICTS: ContextBlockSpec = {
 const WORKSPACE_SPECS: ContextBlockSpec = {
 	blockId: 'workspace_specs',
 	label: 'Workspace Specification Files',
-	source: 'static',  // Pre-assembled by the caller via workspaceReader and passed as extras
+	source: 'static',
 };
 
 const HUMAN_CORRECTIONS: ContextBlockSpec = {
@@ -128,6 +128,55 @@ const HUMAN_FEEDBACK_STATIC: ContextBlockSpec = {
 	source: 'static',
 };
 
+// ── Proposer-artifact blocks (user-validated INTAKE outputs, passed via extras) ──
+//
+// These five blocks are the user-validated foundation that downstream architecture
+// sub-phases MUST honor. They are passed as extras by the architecture phase code
+// (see roles/architectureExpert.ts) and the Context Engineer is required to include
+// every entry of every list verbatim.
+
+const BUSINESS_DOMAIN_PROPOSALS: ContextBlockSpec = {
+	blockId: 'business_domain_proposals',
+	label: 'User-Validated Business Domains (PRIMARY source for capability grouping — every entry MUST appear in your briefing)',
+	source: 'static',
+};
+
+const WORKFLOW_PROPOSALS: ContextBlockSpec = {
+	blockId: 'workflow_proposals',
+	label: 'User-Validated Workflow Proposals (PRIMARY source for workflows — every entry MUST appear in your briefing)',
+	source: 'static',
+};
+
+const ENTITY_PROPOSALS: ContextBlockSpec = {
+	blockId: 'entity_proposals',
+	label: 'User-Validated Entity Proposals (every entry MUST appear in your briefing)',
+	source: 'static',
+};
+
+const USER_JOURNEYS: ContextBlockSpec = {
+	blockId: 'user_journeys',
+	label: 'User-Validated User Journeys (every entry MUST appear in your briefing)',
+	source: 'static',
+};
+
+const PHASING_STRATEGY: ContextBlockSpec = {
+	blockId: 'phasing_strategy',
+	label: 'User-Defined Implementation Phasing Strategy (include verbatim)',
+	source: 'static',
+};
+
+const INTEGRATION_PROPOSALS: ContextBlockSpec = {
+	blockId: 'integration_proposals',
+	label: 'User-Validated Integration Proposals (every entry MUST appear in your briefing)',
+	source: 'static',
+};
+
+const PERSONAS: ContextBlockSpec = {
+	blockId: 'personas',
+	label: 'User-Validated Personas (include verbatim)',
+	source: 'static',
+};
+
 // ==================== POLICY DEFINITIONS ====================
 
 const policies: ContextPolicy[] = [
@@ -140,36 +189,23 @@ const policies: ContextPolicy[] = [
 		phase: Phase.ARCHITECTURE,
 		subPhase: 'DECOMPOSING',
 		intent: '*',
-		version: 3,
+		version: 4,
 		requiredBlocks: [
-			{
-				// Use the handoff doc but tell the CE to extract specific sections — the full plan
-				// (60KB with personas, journeys, entities, integrations) is too large for decomposition.
-				// Core spec (requirements/constraints/decisions) comes from handoff_doc.
-				// businessDomainProposals, userJourneys, phasingStrategy, workflowProposals, and
-				// entityProposalNames are pre-assembled in the ROLE-SPECIFIC CONTEXT (extras) below —
-				// include them verbatim from extras, do NOT re-extract them from the handoff doc.
-				blockId: 'approved_plan',
-				label: 'Approved Intake Plan (extract ONLY: requirements, constraints, decisions from handoff doc; all other proposer artifacts are in extras)',
-				source: 'handoff_doc',
-				handoffDocType: HandoffDocType.INTAKE,
-			},
+			APPROVED_PLAN_FULL,
+			BUSINESS_DOMAIN_PROPOSALS,
+			WORKFLOW_PROPOSALS,
+			ENTITY_PROPOSALS,
+			USER_JOURNEYS,
+			PHASING_STRATEGY,
 			DOMAIN_COVERAGE,
 			CONSTRAINTS,
 		],
 		optionalBlocks: [
+			INTEGRATION_PROPOSALS,
+			PERSONAS,
 			HISTORICAL_FINDINGS,
 			HUMAN_CORRECTIONS,
 		],
-		sheddingPriority: ['human_corrections', 'historical_findings'],
-		sectionBudgets: {
-			approved_plan: 0.25,
-			domain_coverage: 0.15,
-			constraints: 0.1,
-			historical_findings: 0.1,
-			human_corrections: 0.1,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	{
@@ -178,33 +214,25 @@ const policies: ContextPolicy[] = [
 		phase: Phase.ARCHITECTURE,
 		subPhase: 'MODELING',
 		intent: '*',
-		version: 3,
+		version: 4,
 		requiredBlocks: [
 			{
 				blockId: 'capabilities',
-				label: 'Capabilities & Workflows',
-				source: 'static',  // Pre-assembled from architecture_documents via extras
+				label: 'Capabilities & Workflows (from prior DECOMPOSING pass)',
+				source: 'static',
 			},
+			APPROVED_PLAN_FULL,
+			BUSINESS_DOMAIN_PROPOSALS,
+			ENTITY_PROPOSALS,
+			WORKFLOW_PROPOSALS,
 		],
 		optionalBlocks: [
-			{
-				blockId: 'approved_plan',
-				label: 'Approved Plan (with entity/domain proposals - CRITICAL: you MUST preserve the full entityProposals and businessBusinessDomainProposals JSON arrays verbatim)',
-				source: 'static',  // Pre-assembled via extras — includes entityProposals, businessBusinessDomainProposals
-			},
+			USER_JOURNEYS,
+			INTEGRATION_PROPOSALS,
 			WORKSPACE_SPECS,
 			VALIDATION_FINDINGS_STATIC,
 			HUMAN_FEEDBACK_STATIC,
 		],
-		sheddingPriority: ['human_feedback', 'validation_findings', 'workspace_specs', 'approved_plan'],
-		sectionBudgets: {
-			capabilities: 0.35,
-			approved_plan: 0.25,
-			workspace_specs: 0.1,
-			validation_findings: 0.15,
-			human_feedback: 0.15,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	{
@@ -213,44 +241,42 @@ const policies: ContextPolicy[] = [
 		phase: Phase.ARCHITECTURE,
 		subPhase: 'DESIGNING',
 		intent: '*',
-		version: 3,
+		version: 4,
 		requiredBlocks: [
 			{
 				blockId: 'capabilities',
-				label: 'Capabilities & Workflows',
-				source: 'static',  // Pre-assembled from architecture_documents via extras
+				label: 'Capabilities & Workflows (from prior DECOMPOSING pass)',
+				source: 'static',
 			},
 			{
 				blockId: 'domain_model',
-				label: 'Domain Model',
-				source: 'static',  // Pre-assembled from architecture_documents via extras
+				label: 'Domain Model (from prior MODELING pass)',
+				source: 'static',
 			},
 			{
 				blockId: 'decomposition_config',
 				label: 'Decomposition Configuration',
-				source: 'static',  // Pre-assembled from architecture_documents via extras
+				source: 'static',
 			},
+			APPROVED_PLAN_FULL,
+			BUSINESS_DOMAIN_PROPOSALS,
+			WORKFLOW_PROPOSALS,
+			ENTITY_PROPOSALS,
+			USER_JOURNEYS,
+			INTEGRATION_PROPOSALS,
 		],
 		optionalBlocks: [
+			PHASING_STRATEGY,
+			PERSONAS,
 			{
 				blockId: 'constraints_and_decisions',
 				label: 'Constraints & Decisions (from Intake)',
-				source: 'static',  // Pre-assembled via extras — includes technical constraints and architectural decisions
+				source: 'static',
 			},
 			VALIDATION_FINDINGS,
 			HUMAN_FEEDBACK,
 			WORKSPACE_SPECS,
 		],
-		sheddingPriority: ['workspace_specs', 'human_feedback', 'validation_findings'],
-		sectionBudgets: {
-			capabilities: 0.3,
-			domain_model: 0.2,
-			decomposition_config: 0.1,
-			validation_findings: 0.15,
-			human_feedback: 0.1,
-			workspace_specs: 0.15,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	{
@@ -259,44 +285,30 @@ const policies: ContextPolicy[] = [
 		phase: Phase.ARCHITECTURE,
 		subPhase: 'SEQUENCING',
 		intent: '*',
-		version: 3,
+		version: 4,
 		requiredBlocks: [
 			{
 				blockId: 'components',
-				label: 'Components & Dependencies',
-				source: 'static',  // Pre-assembled from architecture_documents via extras
+				label: 'Components & Dependencies (from prior DESIGNING pass)',
+				source: 'static',
 			},
 			{
 				blockId: 'interfaces',
-				label: 'Interface Contracts',
-				source: 'static',  // Pre-assembled from architecture_documents via extras
+				label: 'Interface Contracts (from prior DESIGNING pass)',
+				source: 'static',
 			},
 			{
 				blockId: 'domain_model',
 				label: 'Domain Model Summary',
-				source: 'static',  // Pre-assembled from architecture_documents via extras
+				source: 'static',
 			},
+			PHASING_STRATEGY,
 		],
 		optionalBlocks: [
-			{
-				blockId: 'phasing_strategy',
-				label: 'Product Phasing Strategy (from Intake)',
-				source: 'static',  // Pre-assembled via extras — user-defined implementation phases
-			},
 			{ blockId: 'workspace_patterns', label: 'Workspace Build Patterns', source: 'static' },
 			VALIDATION_FINDINGS_STATIC,
 			HUMAN_FEEDBACK_STATIC,
 		],
-		sheddingPriority: ['human_feedback', 'validation_findings', 'workspace_patterns'],
-		sectionBudgets: {
-			components: 0.25,
-			interfaces: 0.2,
-			domain_model: 0.15,
-			workspace_patterns: 0.15,
-			validation_findings: 0.15,
-			human_feedback: 0.1,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	// ── EXECUTOR ──
@@ -307,7 +319,7 @@ const policies: ContextPolicy[] = [
 		phase: Phase.EXECUTE,
 		subPhase: '*',
 		intent: '*',
-		version: 2,
+		version: 3,
 		requiredBlocks: [
 			GOAL,
 			CONSTRAINTS,
@@ -320,18 +332,6 @@ const policies: ContextPolicy[] = [
 			NARRATIVE_MEMORY,
 			WORKSPACE_SPECS,
 		],
-		sheddingPriority: ['workspace_specs', 'narrative_memory', 'historical_findings', 'historical_verdicts'],
-		sectionBudgets: {
-			goal: 0.05,
-			constraints: 0.1,
-			architecture_doc: 0.3,
-			active_claims: 0.15,
-			historical_verdicts: 0.1,
-			historical_findings: 0.1,
-			narrative_memory: 0.1,
-			workspace_specs: 0.1,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	{
@@ -340,7 +340,7 @@ const policies: ContextPolicy[] = [
 		phase: Phase.EXECUTE,
 		subPhase: '*',
 		intent: 'MAKER_PLANNER',
-		version: 1,
+		version: 2,
 		requiredBlocks: [
 			{
 				blockId: 'intent_record',
@@ -363,15 +363,6 @@ const policies: ContextPolicy[] = [
 				queryHint: 'historical_invariant_packets — failure motifs, precedent patterns, reusable subplans',
 			},
 		],
-		sheddingPriority: ['failure_motifs', 'historical_findings'],
-		sectionBudgets: {
-			intent_record: 0.25,
-			acceptance_contract: 0.2,
-			constraints: 0.15,
-			historical_findings: 0.2,
-			failure_motifs: 0.2,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	// ── VERIFIER ──
@@ -382,7 +373,7 @@ const policies: ContextPolicy[] = [
 		phase: Phase.VERIFY,
 		subPhase: '*',
 		intent: '*',
-		version: 1,
+		version: 2,
 		requiredBlocks: [
 			{
 				blockId: 'claim_to_verify',
@@ -405,15 +396,6 @@ const policies: ContextPolicy[] = [
 				source: 'agent_synthesized',
 			},
 		],
-		sheddingPriority: ['contradictions', 'historical_verdicts'],
-		sectionBudgets: {
-			claim_to_verify: 0.15,
-			constraints: 0.15,
-			related_evidence: 0.3,
-			historical_verdicts: 0.25,
-			contradictions: 0.15,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	// ── HISTORIAN ──
@@ -424,7 +406,7 @@ const policies: ContextPolicy[] = [
 		phase: Phase.HISTORICAL_CHECK,
 		subPhase: '*',
 		intent: '*',
-		version: 2,
+		version: 3,
 		requiredBlocks: [
 			{
 				blockId: 'full_event_history',
@@ -454,15 +436,6 @@ const policies: ContextPolicy[] = [
 				source: 'agent_synthesized',
 			},
 		],
-		sheddingPriority: ['precedents', 'cross_dialogue_lessons'],
-		sectionBudgets: {
-			full_event_history: 0.35,
-			claims_with_verdicts: 0.25,
-			human_decisions: 0.15,
-			cross_dialogue_lessons: 0.15,
-			precedents: 0.1,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	{
@@ -471,7 +444,7 @@ const policies: ContextPolicy[] = [
 		phase: Phase.HISTORICAL_CHECK,
 		subPhase: 'ADJUDICATION',
 		intent: '*',
-		version: 2,
+		version: 3,
 		requiredBlocks: [
 			{
 				blockId: 'conflicting_verdicts',
@@ -495,14 +468,6 @@ const policies: ContextPolicy[] = [
 				queryHint: 'prior adjudication decisions from narrative_memories',
 			},
 		],
-		sheddingPriority: ['historical_precedents'],
-		sectionBudgets: {
-			conflicting_verdicts: 0.3,
-			claim_context: 0.3,
-			human_decisions: 0.2,
-			historical_precedents: 0.2,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	// ── INTAKE (Technical Expert in INTAKE phase) ──
@@ -513,18 +478,18 @@ const policies: ContextPolicy[] = [
 		phase: Phase.INTAKE,
 		subPhase: '*',
 		intent: '*',
-		version: 2,
+		version: 3,
 		requiredBlocks: [
 			{
 				blockId: 'conversation_history',
 				label: 'Intake Conversation History',
 				source: 'db_query',
-				queryHint: 'intake_conversations + dialogue_events — recent turns with full content, older turns summarized',
+				queryHint: 'intake_conversations + dialogue_events — all turns with full content',
 			},
 			{
 				blockId: 'current_plan',
 				label: 'Current Plan Document',
-				source: 'static',  // Live in-memory plan passed via extras — avoids stale DB reads
+				source: 'static',
 			},
 			{
 				blockId: 'human_message',
@@ -540,14 +505,6 @@ const policies: ContextPolicy[] = [
 				queryHint: 'intake_conversations — prior accumulation summaries for context continuity',
 			},
 		],
-		sheddingPriority: ['accumulation_summaries'],
-		sectionBudgets: {
-			conversation_history: 0.4,
-			current_plan: 0.3,
-			human_message: 0.15,
-			accumulation_summaries: 0.15,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	// ── TECHNICAL_EXPERT: VALIDATE phase (Deep Validation Review) ──
@@ -558,25 +515,18 @@ const policies: ContextPolicy[] = [
 		phase: Phase.VALIDATE,
 		subPhase: 'HYPOTHESIZING',
 		intent: 'security',
-		version: 1,
+		version: 2,
 		requiredBlocks: [
 			{
 				blockId: 'source_context',
 				label: 'Source Files & Workspace Structure',
-				source: 'static',  // Pre-assembled by validatePhase:INGESTING and passed via extras
+				source: 'static',
 			},
 		],
 		optionalBlocks: [
 			ARCHITECTURE_DOC,
 			GOAL,
 		],
-		sheddingPriority: ['goal', 'architecture_doc'],
-		sectionBudgets: {
-			source_context: 0.75,
-			architecture_doc: 0.15,
-			goal: 0.1,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	{
@@ -585,7 +535,7 @@ const policies: ContextPolicy[] = [
 		phase: Phase.VALIDATE,
 		subPhase: 'HYPOTHESIZING',
 		intent: 'logic',
-		version: 1,
+		version: 2,
 		requiredBlocks: [
 			{
 				blockId: 'source_context',
@@ -597,13 +547,6 @@ const policies: ContextPolicy[] = [
 			ARCHITECTURE_DOC,
 			GOAL,
 		],
-		sheddingPriority: ['goal', 'architecture_doc'],
-		sectionBudgets: {
-			source_context: 0.75,
-			architecture_doc: 0.15,
-			goal: 0.1,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	{
@@ -612,7 +555,7 @@ const policies: ContextPolicy[] = [
 		phase: Phase.VALIDATE,
 		subPhase: 'HYPOTHESIZING',
 		intent: 'best_practices',
-		version: 1,
+		version: 2,
 		requiredBlocks: [
 			{
 				blockId: 'source_context',
@@ -624,13 +567,6 @@ const policies: ContextPolicy[] = [
 			ARCHITECTURE_DOC,
 			GOAL,
 		],
-		sheddingPriority: ['goal', 'architecture_doc'],
-		sectionBudgets: {
-			source_context: 0.75,
-			architecture_doc: 0.15,
-			goal: 0.1,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	{
@@ -639,23 +575,17 @@ const policies: ContextPolicy[] = [
 		phase: Phase.VALIDATE,
 		subPhase: 'GRADING',
 		intent: '*',
-		version: 1,
+		version: 2,
 		requiredBlocks: [
 			{
 				blockId: 'validated_hypotheses',
 				label: 'Validated Hypotheses',
-				source: 'static',  // Pre-assembled from ValidatedHypothesis[] and passed via extras
+				source: 'static',
 			},
 		],
 		optionalBlocks: [
 			GOAL,
 		],
-		sheddingPriority: ['goal'],
-		sectionBudgets: {
-			validated_hypotheses: 0.85,
-			goal: 0.15,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 
 	// ── TECHNICAL_EXPERT fallback (general questions) ──
@@ -666,13 +596,13 @@ const policies: ContextPolicy[] = [
 		phase: '*',
 		subPhase: '*',
 		intent: '*',
-		version: 2,
+		version: 3,
 		requiredBlocks: [
 			GOAL,
 			{
 				blockId: 'question',
 				label: 'Target Question',
-				source: 'static',  // Passed via extras — the specific question the agent must answer
+				source: 'static',
 			},
 			{
 				blockId: 'related_claims',
@@ -692,17 +622,6 @@ const policies: ContextPolicy[] = [
 			WORKSPACE_SPECS,
 			ARCHITECTURE_DOC,
 		],
-		sheddingPriority: ['architecture_doc', 'workspace_specs', 'historical_evidence'],
-		sectionBudgets: {
-			goal: 0.05,
-			question: 0.1,
-			related_claims: 0.2,
-			constraints: 0.15,
-			historical_evidence: 0.2,
-			workspace_specs: 0.15,
-			architecture_doc: 0.15,
-		},
-		omissionStrategy: 'degrade_with_warning',
 	},
 ];
 
@@ -735,7 +654,6 @@ export function getPolicy(
 	const sp = subPhase ?? '*';
 	const it = intent ?? '*';
 
-	// Try exact match first, then progressively widen
 	const candidates = [
 		`${role}:${phase}:${sp}:${it}`,
 		`${role}:${phase}:${sp}:*`,

@@ -26,25 +26,16 @@ import { HistorianQueryType, assembleContext } from '../context';
 
 /**
  * Invoke executor with context compilation
- * Compiles context for executor role and invokes
- *
- * @param dialogueId Dialogue ID
- * @param proposal Execution proposal
- * @param config LLM configuration
- * @param tokenBudget Token budget
- * @returns Result with executor response
  */
 export async function invokeExecutorWithContext(
 	dialogueId: string,
 	proposal: string,
 	provider: RoleCLIProvider,
-	tokenBudget: number = 10000
 ): Promise<Result<ExecutorResponse>> {
 	try {
 		return await invokeExecutor({
 			dialogueId,
 			goal: proposal,
-			tokenBudget,
 			provider,
 			includeHistoricalFindings: true,
 		});
@@ -61,25 +52,16 @@ export async function invokeExecutorWithContext(
 
 /**
  * Invoke technical expert with context compilation
- * Compiles context for technical expert role and invokes
- *
- * @param dialogueId Dialogue ID
- * @param query Technical query
- * @param config LLM configuration
- * @param tokenBudget Token budget
- * @returns Result with technical expert response
  */
 export async function invokeTechnicalExpertWithContext(
 	dialogueId: string,
 	query: string,
 	provider: RoleCLIProvider,
-	tokenBudget: number = 10000
 ): Promise<Result<EvidencePacket>> {
 	try {
 		return await invokeTechnicalExpert({
 			dialogueId,
 			question: query,
-			tokenBudget,
 			provider,
 			includeHistoricalEvidence: true,
 		});
@@ -96,25 +78,16 @@ export async function invokeTechnicalExpertWithContext(
 
 /**
  * Invoke verifier with context compilation
- * Compiles context for verifier role and invokes
- *
- * @param dialogueId Dialogue ID
- * @param claimId Claim ID to verify
- * @param config LLM configuration
- * @param tokenBudget Token budget
- * @returns Result with verifier response
  */
 export async function invokeVerifierWithContext(
 	dialogueId: string,
 	claim: Claim,
 	provider: RoleCLIProvider,
-	tokenBudget: number = 10000
 ): Promise<Result<VerifierResponse>> {
 	try {
 		return await invokeVerifier({
 			dialogueId,
 			claimToVerify: claim,
-			tokenBudget,
 			provider,
 			includeHistoricalVerdicts: true,
 			checkForContradictions: true,
@@ -132,26 +105,17 @@ export async function invokeVerifierWithContext(
 
 /**
  * Invoke historian interpreter with context compilation
- * Compiles context for historian interpreter role and invokes
- *
- * @param dialogueId Dialogue ID
- * @param claimId Claim ID to check
- * @param config LLM configuration
- * @param tokenBudget Token budget
- * @returns Result with historian interpreter response
  */
 export async function invokeHistorianInterpreterWithContext(
 	dialogueId: string,
 	query: string,
 	provider: RoleCLIProvider,
-	tokenBudget: number = 10000
 ): Promise<Result<HistorianInterpreterResponse>> {
 	try {
 		return await invokeHistorianInterpreter({
 			dialogueId,
 			query,
 			queryType: HistorianQueryType.GENERAL_HISTORY,
-			tokenBudget,
 			provider,
 		});
 	} catch (error) {
@@ -166,18 +130,12 @@ export async function invokeHistorianInterpreterWithContext(
 }
 
 /**
- * Compile role-specific context
- * Creates optimized context for a specific role
- *
- * @param roleType Role enum value
- * @param dialogueId Dialogue ID
- * @param tokenBudget Token budget
- * @returns Result with compiled context pack
+ * Compile role-specific context.
+ * Creates context for a specific role using the policy registry.
  */
 export async function compileRoleContext(
 	roleType: Role,
 	dialogueId: string,
-	tokenBudget: number = 10000
 ): Promise<Result<string>> {
 	try {
 		// Determine phase based on role (best-effort mapping for generic connector)
@@ -193,7 +151,6 @@ export async function compileRoleContext(
 			dialogueId,
 			role: roleType,
 			phase,
-			tokenBudget,
 		});
 
 		if (!contextResult.success) {

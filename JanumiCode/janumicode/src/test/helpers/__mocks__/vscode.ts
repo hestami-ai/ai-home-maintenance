@@ -105,7 +105,6 @@ export enum ConfigurationTarget {
 // ── Workspace Configuration ─────────────────────────────────────────
 
 const INITIAL_CONFIG_STORE: Readonly<Record<string, unknown>> = Object.freeze({
-	'janumicode.tokenBudget': 10000,
 	'janumicode.databasePath': '',
 	'janumicode.logLevel': 'info',
 	'janumicode.llm.executor.provider': 'CLAUDE',

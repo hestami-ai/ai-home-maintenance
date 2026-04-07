@@ -49,8 +49,6 @@ export interface ContextBlockSpec {
 	handoffDocType?: HandoffDocType;
 	/** For 'db_query' source: table name or SQL hint for the agent. */
 	queryHint?: string;
-	/** Maximum tokens for this block. When omitted, governed by policy's sectionBudgets. */
-	maxTokens?: number;
 }
 
 // ==================== CONTEXT POLICY ====================
@@ -73,20 +71,10 @@ export interface ContextPolicy {
 	/** Policy version — incremented on changes; used in cache fingerprinting. */
 	version: number;
 
-	/** Blocks that MUST be present. Absence triggers ContextSufficiencyError or degraded result. */
+	/** Blocks that MUST be present. Absence triggers ContextSufficiencyError. */
 	requiredBlocks: ContextBlockSpec[];
-	/** Blocks included if token budget permits, in priority order (highest first). */
+	/** Blocks included when their data is available. Order indicates suggested priority for the agent. */
 	optionalBlocks: ContextBlockSpec[];
-	/**
-	 * Block IDs in shedding order: first entry is dropped first when over budget.
-	 * Must cover all optional block IDs.
-	 */
-	sheddingPriority: string[];
-	/** Per-section token budget as fraction of total budget (0.0 – 1.0). */
-	sectionBudgets: Record<string, number>;
-
-	/** Strategy when a required block cannot be materialized. */
-	omissionStrategy: 'fail' | 'degrade_with_warning';
 }
 
 // ==================== HANDOFF DOCUMENTS ====================
@@ -166,18 +154,14 @@ export interface HistoricalHandoffContent {
 // ==================== HANDOFF PACKET (Return Type) ====================
 
 /**
- * The output of the Context Engineer — replaces CompiledContextPack.
- * Contains the rendered context briefing plus full audit metadata.
+ * The output of the Context Engineer.
+ * Contains the rendered context briefing plus audit metadata.
  */
 export interface HandoffPacket {
 	/** Rendered context string ready for LLM consumption (markdown). */
 	briefing: string;
 	/** Structured manifest of what's included. */
 	sectionManifest: SectionManifestEntry[];
-	/** What was omitted and why. */
-	omissions: OmissionEntry[];
-	/** Token accounting. */
-	tokenAccounting: TokenAccounting;
 	/** Sufficiency assessment. */
 	sufficiency: SufficiencyAssessment;
 	/** Cache fingerprint that produced this packet. */
@@ -190,33 +174,14 @@ export interface SectionManifestEntry {
 	blockId: string;
 	label: string;
 	source: ContextBlockSource;
-	tokenCount: number;
 	/** Pointer to source data for audit (e.g., "db:claims:dialogue-123", "handoff:INTAKE:doc-456"). */
 	retrievalPointer: string;
-}
-
-export interface OmissionEntry {
-	blockId: string;
-	reason: 'budget_exceeded' | 'not_available' | 'policy_excluded';
-	/** Estimated impact of this omission. */
-	impact: 'low' | 'medium' | 'high';
-	/** Optional retrieval pointer if the agent can fetch this data later. */
-	retrievalHint?: string;
-}
-
-export interface TokenAccounting {
-	budget: number;
-	used: number;
-	remaining: number;
-	/** Per-section token usage keyed by blockId. */
-	perSection: Record<string, number>;
 }
 
 export interface SufficiencyAssessment {
 	sufficient: boolean;
 	missingRequired: string[];
 	warnings: string[];
-	confidenceLevel: 'high' | 'medium' | 'low';
 }
 
 export interface ContextDiagnostics {
@@ -224,7 +189,6 @@ export interface ContextDiagnostics {
 	policyVersion: number;
 	handoffDocsConsumed: string[];
 	sqlQueriesExecuted: number;
-	agentReasoningTokens: number;
 	wallClockMs: number;
 }
 
@@ -236,8 +200,8 @@ export interface CacheFingerprint {
 	phase: Phase | '*';
 	subPhase: string;
 	intent: string;
-	tokenBudget: number;
 	policyVersion: number;
+	dialogueId: string;
 	latestEventId: number;
 	latestHandoffDocId: string | null;
 	/** Hash of extras keys+values to differentiate same-policy calls with different inputs. */
@@ -253,8 +217,6 @@ export interface AssembleContextOptions {
 	phase: Phase;
 	subPhase?: string;
 	intent?: string;
-	/** Token budget for context assembly. Optional — when omitted, no truncation is applied. */
-	tokenBudget?: number;
 	/**
 	 * Role-specific extras passed through to the Context Engineer agent.
 	 * Examples: claimToVerify, humanFeedback, architectureDoc, approvedPlan, currentPlan, humanMessage.
@@ -269,8 +231,7 @@ export interface AssembleContextOptions {
 // ==================== ERROR TYPES ====================
 
 /**
- * Thrown when the Context Engineer cannot satisfy a policy's required blocks
- * and the policy's omissionStrategy is 'fail'.
+ * Thrown when the Context Engineer cannot satisfy a policy's required blocks.
  */
 export class ContextSufficiencyError extends Error {
 	public readonly missingBlocks: string[];

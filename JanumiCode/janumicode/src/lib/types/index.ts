@@ -316,7 +316,6 @@ export interface RoleLLMConfig {
  * Extension configuration
  */
 export interface JanumiCodeConfig {
-	tokenBudget: number; // Default: 10,000
 	databasePath: string; // Path to SQLite database
 	llmConfig: RoleLLMConfig;
 }

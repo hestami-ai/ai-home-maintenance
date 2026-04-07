@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-	getTokenBudget,
 	getDatabasePath,
 	getProviderForRole,
 	getCLIProviderIdForRole,
@@ -11,7 +10,6 @@ import {
 	getMobileSpecialistConfig,
 	getCLIRoleAssignments,
 	validateConfig,
-	setTokenBudget,
 	setDatabasePath,
 	setLLMConfigForRole,
 	areAPIKeysConfigured,
@@ -25,37 +23,6 @@ vi.mock('../../../lib/config/secretKeyManager');
 describe('Configuration Manager', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-	});
-
-	describe('getTokenBudget', () => {
-		it('returns configured token budget', async () => {
-			const vscode = await import('vscode');
-			const mockConfig = {
-				get: vi.fn((key: string, defaultValue?: number) => {
-					if (key === 'tokenBudget') {return 15000;}
-					return defaultValue;
-				}),
-			};
-
-			vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(mockConfig as any);
-
-			const budget = getTokenBudget();
-
-			expect(budget).toBe(15000);
-		});
-
-		it('returns default when not configured', async () => {
-			const vscode = await import('vscode');
-			const mockConfig = {
-				get: vi.fn((key: string, defaultValue?: number) => defaultValue),
-			};
-
-			vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(mockConfig as any);
-
-			const budget = getTokenBudget();
-
-			expect(budget).toBe(10000);
-		});
 	});
 
 	describe('getDatabasePath', () => {
@@ -377,32 +344,6 @@ describe('Configuration Manager', () => {
 			expect(result.success).toBe(true);
 		});
 
-		it('fails validation for invalid token budget', async () => {
-			const vscode = await import('vscode');
-			const { getSecretKeyManager } = await import('../../../lib/config/secretKeyManager');
-
-			const mockConfig = {
-				get: vi.fn((key: string, defaultValue?: any) => {
-					if (key === 'tokenBudget') {return 500;}
-					if (key === 'databasePath') {return '/path/to/db';}
-					if (key.includes('.provider')) {return LLMProvider.CLAUDE;}
-					if (key.includes('.model')) {return 'model';}
-					return defaultValue;
-				}),
-			};
-
-			vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(mockConfig as any);
-
-			const mockSecretManager = {
-				getApiKey: vi.fn().mockResolvedValue('key'),
-			};
-			vi.mocked(getSecretKeyManager).mockReturnValue(mockSecretManager as any);
-
-			const result = await validateConfig();
-
-			expect(result.success).toBe(false);
-		});
-
 		it('fails validation for missing API keys', async () => {
 			const vscode = await import('vscode');
 			const { getSecretKeyManager } = await import('../../../lib/config/secretKeyManager');
@@ -425,38 +366,6 @@ describe('Configuration Manager', () => {
 			vi.mocked(getSecretKeyManager).mockReturnValue(mockSecretManager as any);
 
 			const result = await validateConfig();
-
-			expect(result.success).toBe(false);
-		});
-	});
-
-	describe('setTokenBudget', () => {
-		it('updates token budget successfully', async () => {
-			const vscode = await import('vscode');
-			const updateSpy = vi.fn().mockResolvedValue(undefined);
-			const mockConfig = {
-				get: vi.fn(),
-				update: updateSpy,
-			};
-
-			vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(mockConfig as any);
-
-			const result = await setTokenBudget(15000);
-
-			expect(result.success).toBe(true);
-			expect(updateSpy).toHaveBeenCalledWith('tokenBudget', 15000, false);
-		});
-
-		it('handles update errors', async () => {
-			const vscode = await import('vscode');
-			const mockConfig = {
-				get: vi.fn(),
-				update: vi.fn().mockRejectedValue(new Error('Update failed')),
-			};
-
-			vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(mockConfig as any);
-
-			const result = await setTokenBudget(15000);
 
 			expect(result.success).toBe(false);
 		});

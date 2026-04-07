@@ -121,7 +121,7 @@ describe('Orchestrator Phase Functions', () => {
 		});
 
 		it('invokes executor and caches response', async () => {
-			const result = await executeProposePhase(dialogueId, 4000);
+			const result = await executeProposePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 			if (result.success) {
@@ -148,7 +148,7 @@ describe('Orchestrator Phase Functions', () => {
 				lastFailedPhase: 'PROPOSE',
 			});
 
-			const result = await executeProposePhase(dialogueId, 4000);
+			const result = await executeProposePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 			
@@ -169,7 +169,7 @@ describe('Orchestrator Phase Functions', () => {
 				},
 			});
 
-			const result = await executeProposePhase(dialogueId, 4000);
+			const result = await executeProposePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -182,7 +182,7 @@ describe('Orchestrator Phase Functions', () => {
 				],
 			});
 
-			const result = await executeProposePhase(dialogueId, 4000);
+			const result = await executeProposePhase(dialogueId);
 
 			// Should handle gracefully
 			expect(result.success).toBeDefined();
@@ -205,7 +205,7 @@ describe('Orchestrator Phase Functions', () => {
 				},
 			});
 
-			const result = await executeAssumptionSurfacingPhase(dialogueId, 4000);
+			const result = await executeAssumptionSurfacingPhase(dialogueId);
 
 			expect(result.success).toBe(true);
 			if (result.success) {
@@ -214,7 +214,7 @@ describe('Orchestrator Phase Functions', () => {
 		});
 
 		it('invokes executor if no cached response', async () => {
-			const result = await executeAssumptionSurfacingPhase(dialogueId, 4000);
+			const result = await executeAssumptionSurfacingPhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -228,7 +228,7 @@ describe('Orchestrator Phase Functions', () => {
 				},
 			});
 
-			const result = await executeAssumptionSurfacingPhase(dialogueId, 4000);
+			const result = await executeAssumptionSurfacingPhase(dialogueId);
 
 			expect(result.success).toBe(true);
 			// Assumptions should be converted to CRITICAL claims
@@ -242,7 +242,7 @@ describe('Orchestrator Phase Functions', () => {
 		});
 
 		it('invokes verifier for open claims', async () => {
-			const result = await executeVerifyPhase(dialogueId, 4000);
+			const result = await executeVerifyPhase(dialogueId);
 
 			expect(result.success).toBe(true);
 			if (result.success) {
@@ -252,7 +252,7 @@ describe('Orchestrator Phase Functions', () => {
 
 		it('creates verdicts for claims', async () => {
 			// Would need to create claims first in a real scenario
-			const result = await executeVerifyPhase(dialogueId, 4000);
+			const result = await executeVerifyPhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -272,14 +272,14 @@ describe('Orchestrator Phase Functions', () => {
 				],
 			});
 
-			const result = await executeVerifyPhase(dialogueId, 4000);
+			const result = await executeVerifyPhase(dialogueId);
 
 			expect(result.success).toBe(true);
 			// Gate should be triggered
 		});
 
 		it('handles no open claims gracefully', async () => {
-			const result = await executeVerifyPhase(dialogueId, 4000);
+			const result = await executeVerifyPhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -292,7 +292,7 @@ describe('Orchestrator Phase Functions', () => {
 		});
 
 		it('queries historian for relevant history', async () => {
-			const result = await executeHistoricalCheckPhase(dialogueId, 4000);
+			const result = await executeHistoricalCheckPhase(dialogueId);
 
 			expect(result.success).toBe(true);
 			if (result.success) {
@@ -301,14 +301,14 @@ describe('Orchestrator Phase Functions', () => {
 		});
 
 		it('uses GENERAL_HISTORY query type', async () => {
-			const result = await executeHistoricalCheckPhase(dialogueId, 4000);
+			const result = await executeHistoricalCheckPhase(dialogueId);
 
 			expect(result.success).toBe(true);
 			// Should invoke historian with correct query type
 		});
 
 		it('stores historical findings', async () => {
-			const result = await executeHistoricalCheckPhase(dialogueId, 4000);
+			const result = await executeHistoricalCheckPhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -458,10 +458,10 @@ describe('Orchestrator Phase Functions', () => {
 			startWorkflow({ dialogueId, goal: 'Build app', llmConfig: mockLlmConfig });
 			initializeWorkflowState(dialogueId, { goal: 'Build app' });
 
-			const proposeResult = await executeProposePhase(dialogueId, 4000);
+			const proposeResult = await executeProposePhase(dialogueId);
 			expect(proposeResult.success).toBe(true);
 
-			const assumptionResult = await executeAssumptionSurfacingPhase(dialogueId, 4000);
+			const assumptionResult = await executeAssumptionSurfacingPhase(dialogueId);
 			expect(assumptionResult.success).toBe(true);
 
 			// Verify cached response was reused
@@ -476,10 +476,10 @@ describe('Orchestrator Phase Functions', () => {
 			startWorkflow({ dialogueId, goal: 'Test flow', llmConfig: mockLlmConfig });
 			initializeWorkflowState(dialogueId, { goal: 'Test flow' });
 
-			const verifyResult = await executeVerifyPhase(dialogueId, 4000);
+			const verifyResult = await executeVerifyPhase(dialogueId);
 			expect(verifyResult.success).toBe(true);
 
-			const historicalResult = await executeHistoricalCheckPhase(dialogueId, 4000);
+			const historicalResult = await executeHistoricalCheckPhase(dialogueId);
 			expect(historicalResult.success).toBe(true);
 
 			const reviewResult = await executeReviewPhase(dialogueId);
@@ -493,10 +493,10 @@ describe('Orchestrator Phase Functions', () => {
 			startWorkflow({ dialogueId, goal: 'Complete workflow', llmConfig: mockLlmConfig });
 			initializeWorkflowState(dialogueId, { goal: 'Complete workflow' });
 
-			await executeProposePhase(dialogueId, 4000);
-			await executeAssumptionSurfacingPhase(dialogueId, 4000);
-			await executeVerifyPhase(dialogueId, 4000);
-			await executeHistoricalCheckPhase(dialogueId, 4000);
+			await executeProposePhase(dialogueId);
+			await executeAssumptionSurfacingPhase(dialogueId);
+			await executeVerifyPhase(dialogueId);
+			await executeHistoricalCheckPhase(dialogueId);
 			await executeReviewPhase(dialogueId);
 			await executeExecutePhase(dialogueId);
 			await executeValidatePhase(dialogueId);
@@ -510,13 +510,13 @@ describe('Orchestrator Phase Functions', () => {
 		it('handles database errors gracefully', async () => {
 			tempDb.cleanup();
 
-			const result = await executeProposePhase('non-existent', 4000);
+			const result = await executeProposePhase('non-existent');
 
 			expect(result.success).toBe(false);
 		});
 
 		it('handles missing workflow state', async () => {
-			const result = await executeProposePhase(randomUUID(), 4000);
+			const result = await executeProposePhase(randomUUID());
 
 			expect(result.success).toBe(false);
 		});
@@ -524,7 +524,7 @@ describe('Orchestrator Phase Functions', () => {
 		it('handles provider resolution failure', async () => {
 			teardownFakeProviders();
 
-			const result = await executeProposePhase(dialogueId, 4000);
+			const result = await executeProposePhase(dialogueId);
 
 			expect(result.success).toBe(false);
 		});

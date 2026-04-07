@@ -29,7 +29,6 @@ import { hasActiveWaiver, getActiveWaivers } from './human';
 export interface VerifierInvocationOptions {
 	dialogueId: string;
 	claimToVerify: Claim;
-	tokenBudget: number;
 	provider: RoleCLIProvider;
 	temperature?: number;
 	includeHistoricalVerdicts?: boolean;
@@ -247,7 +246,6 @@ export async function invokeVerifier(
 			dialogueId: options.dialogueId,
 			role: RoleEnum.VERIFIER,
 			phase: Phase.VERIFY,
-			tokenBudget: options.tokenBudget,
 			extras: { claimToVerify: options.claimToVerify, checkForContradictions: options.checkForContradictions },
 			onEvent: options.onEvent,
 		});

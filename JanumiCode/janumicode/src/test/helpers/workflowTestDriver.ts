@@ -56,8 +56,6 @@ export interface DriverOptions {
 	goal: string;
 	/** LLM config — if omitted, reads from process.env */
 	llmConfig?: RoleLLMConfig;
-	/** Token budget (default 10000) */
-	tokenBudget?: number;
 	/** Max phases per cycle (default 50) */
 	maxPhases?: number;
 	/**
@@ -147,7 +145,6 @@ export class WorkflowTestDriver {
 	readonly dialogueId: string;
 	private readonly _tempDb: TempDbContext;
 	private readonly _llmConfig: RoleLLMConfig;
-	private readonly _tokenBudget: number;
 	private readonly _maxPhases: number;
 	private _cleaned = false;
 
@@ -155,13 +152,11 @@ export class WorkflowTestDriver {
 		dialogueId: string,
 		tempDb: TempDbContext,
 		llmConfig: RoleLLMConfig,
-		tokenBudget: number,
 		maxPhases: number,
 	) {
 		this.dialogueId = dialogueId;
 		this._tempDb = tempDb;
 		this._llmConfig = llmConfig;
-		this._tokenBudget = tokenBudget;
 		this._maxPhases = maxPhases;
 	}
 
@@ -204,7 +199,6 @@ export class WorkflowTestDriver {
 			: createTempDatabase();
 
 		const llmConfig = options.llmConfig ?? buildLlmConfigFromEnv();
-		const tokenBudget = options.tokenBudget ?? 10000;
 		const maxPhases = options.maxPhases ?? 50;
 
 		// Point the mock workspace to a real directory so CLI spawns have a valid cwd.
@@ -275,7 +269,7 @@ export class WorkflowTestDriver {
 			});
 		}
 
-		return new WorkflowTestDriver(dialogueId, tempDb, llmConfig, tokenBudget, maxPhases);
+		return new WorkflowTestDriver(dialogueId, tempDb, llmConfig, maxPhases);
 	}
 
 	/**
@@ -372,7 +366,6 @@ export class WorkflowTestDriver {
 		const result = await executeWorkflowCycle(
 			this.dialogueId,
 			this._llmConfig,
-			this._tokenBudget,
 			this._maxPhases,
 		);
 

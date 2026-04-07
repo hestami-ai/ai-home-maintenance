@@ -26,15 +26,6 @@ function getWorkspaceConfig(): vscode.WorkspaceConfiguration {
 }
 
 /**
- * Get token budget configuration
- * @returns Token budget (default: 10,000)
- */
-export function getTokenBudget(): number {
-	const config = getWorkspaceConfig();
-	return config.get<number>('tokenBudget', 10000);
-}
-
-/**
  * Get database path configuration
  * @returns Database path (defaults to workspace-specific location)
  */
@@ -228,7 +219,6 @@ export async function getLLMConfig(): Promise<RoleLLMConfig> {
  */
 export async function getConfig(): Promise<JanumiCodeConfig> {
 	return {
-		tokenBudget: getTokenBudget(),
 		databasePath: getDatabasePath(),
 		llmConfig: await getLLMConfig(),
 	};
@@ -241,11 +231,6 @@ export async function getConfig(): Promise<JanumiCodeConfig> {
 export async function validateConfig(): Promise<Result<boolean>> {
 	const config = await getConfig();
 	const errors: string[] = [];
-
-	// Check token budget
-	if (config.tokenBudget < 1000 || config.tokenBudget > 100000) {
-		errors.push('Token budget must be between 1,000 and 100,000');
-	}
 
 	// Check database path
 	if (!config.databasePath) {
@@ -286,29 +271,6 @@ export async function validateConfig(): Promise<Result<boolean>> {
 	return { success: true, value: true };
 }
 
-/**
- * Update token budget
- * @param tokenBudget New token budget
- * @param global Whether to update global or workspace setting
- */
-export async function setTokenBudget(
-	tokenBudget: number,
-	global = false
-): Promise<Result<void>> {
-	try {
-		const config = getWorkspaceConfig();
-		await config.update('tokenBudget', tokenBudget, global);
-		return { success: true, value: undefined };
-	} catch (error) {
-		return {
-			success: false,
-			error:
-				error instanceof Error
-					? error
-					: new Error('Failed to update token budget'),
-		};
-	}
-}
 
 /**
  * Update database path

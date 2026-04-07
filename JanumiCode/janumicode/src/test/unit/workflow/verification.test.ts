@@ -97,7 +97,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			expect(result.success).toBe(true);
@@ -113,7 +112,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			if (result.success) {
@@ -127,7 +125,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			if (result.success) {
@@ -146,7 +143,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			if (result.success) {
@@ -174,7 +170,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			if (result.success) {
@@ -187,7 +182,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			if (result.success) {
@@ -200,7 +194,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 				temperature: 0.2,
 			});
 
@@ -212,7 +205,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 				includeHistoricalVerdicts: true,
 			});
 
@@ -224,7 +216,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 				checkForContradictions: true,
 			});
 
@@ -236,7 +227,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 				commandId: randomUUID(),
 			});
 
@@ -265,7 +255,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			if (result.success) {
@@ -293,7 +282,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			if (result.success) {
@@ -321,7 +309,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			if (result.success) {
@@ -349,7 +336,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			if (result.success) {
@@ -396,7 +382,6 @@ describe('Verification', () => {
 				{
 					dialogueId,
 					provider: {} as any,
-					tokenBudget: 4000,
 				},
 				claims
 			);
@@ -414,7 +399,6 @@ describe('Verification', () => {
 				{
 					dialogueId,
 					provider: {} as any,
-					tokenBudget: 4000,
 				},
 				claims
 			);
@@ -427,7 +411,6 @@ describe('Verification', () => {
 				{
 					dialogueId,
 					provider: {} as any,
-					tokenBudget: 4000,
 				},
 				[]
 			);
@@ -447,7 +430,6 @@ describe('Verification', () => {
 				{
 					dialogueId,
 					provider: {} as any,
-					tokenBudget: 4000,
 				},
 				claims
 			);
@@ -486,7 +468,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			const result = getVerificationStatus(dialogueId);
@@ -516,7 +497,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			const result = getVerificationStatus(dialogueId);
@@ -551,7 +531,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			const result = isVerificationComplete(dialogueId);
@@ -592,7 +571,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			const result = getBlockingVerificationClaims(dialogueId);
@@ -629,7 +607,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			const result = getBlockingVerificationClaims(dialogueId);
@@ -644,7 +621,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			const result = getBlockingVerificationClaims(dialogueId);
@@ -696,7 +672,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			expect(result.success).toBe(false);
@@ -709,7 +684,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			expect(verifyResult.success).toBe(true);
@@ -741,7 +715,6 @@ describe('Verification', () => {
 				dialogueId,
 				claim: testClaim,
 				provider: {} as any,
-				tokenBudget: 4000,
 			});
 
 			if (verifyResult.success) {
@@ -795,7 +768,6 @@ describe('Verification', () => {
 				{
 					dialogueId,
 					provider: {} as any,
-					tokenBudget: 4000,
 				},
 				claims
 			);

@@ -20,8 +20,6 @@ import type {
 	HandoffDocument,
 	ContextPolicy,
 	SectionManifestEntry,
-	OmissionEntry,
-	TokenAccounting,
 	SufficiencyAssessment,
 	ContextDiagnostics,
 } from './engineTypes';
@@ -45,9 +43,18 @@ import { jsonrepair } from 'jsonrepair';
 
 const CONTEXT_ENGINEER_SYSTEM_PROMPT = `You are the CONTEXT ENGINEER in the JanumiCode governed workflow system.
 
-Your job is to assemble a comprehensive context briefing for a downstream LLM agent.
+Your job is to assemble a complete, faithful context briefing for a downstream LLM agent.
 You receive a POLICY that specifies required and optional context blocks, and you receive
 pre-assembled data including handoff documents, the current plan, and conversation history.
+
+## Completeness Mandate
+
+**There is no token budget. Completeness is the goal.** Include ALL data from the
+ROLE-SPECIFIC CONTEXT (extras) and ALL data referenced by policy blocks from the
+AVAILABLE HANDOFF DOCUMENTS, verbatim. Do NOT summarize, truncate, abbreviate,
+elide, or "compress" large JSON structures, array elements, or detailed object
+definitions. The downstream agent depends on receiving the user-validated INTAKE
+data in full — dropping fields silently breaks downstream phases.
 
 ## Source Types
 
@@ -59,13 +66,12 @@ Each policy block specifies a \`source\` that tells you where to find its data:
 
 ## Your Process
 
-1. Read the POLICY to understand what blocks are required vs optional
-2. For source=static blocks, look in ROLE-SPECIFIC CONTEXT (extras). If the data is not there, report it as missing — do NOT fabricate it.
-3. For source=handoff_doc blocks, look in AVAILABLE HANDOFF DOCUMENTS.
+1. Read the POLICY to understand what blocks are required vs optional.
+2. For source=static blocks, look in ROLE-SPECIFIC CONTEXT (extras). If the data is not there, report it as missing in \`sufficiency.missingRequired\` — do NOT fabricate it.
+3. For source=handoff_doc blocks, look in AVAILABLE HANDOFF DOCUMENTS. If the policy block names a specific subset of fields, include exactly those. If it does not, include the entire matching handoff doc content.
 4. For source=db_query blocks, first check if the data is in handoff docs or extras. If not, use MCP tools to retrieve it.
-5. For optional blocks, include them in priority order based on relevance
-6. Ensure complete data fidelity. Do not summarize, truncate or abbreviate large JSON structures, array elements, or detailed object definitions. You must pass them verbatim unless specifically directed otherwise by the policy block's queryHint.
-7. Detect conflicts between sources and resolve them:
+5. For optional blocks, include every one whose data is available — order is suggested priority for the reader, not a permission to drop.
+6. Detect conflicts between sources and resolve them:
    - Human decisions supersede automated verdicts
    - Later decisions supersede earlier ones
    - Explicit overrides supersede implicit assumptions
@@ -75,9 +81,9 @@ Each policy block specifies a \`source\` that tells you where to find its data:
 You have MCP tools available for data retrieval. **Prefer pre-assembled data** (handoff docs, extras, conversation history). Use tools only to fill gaps — not as a first resort.
 
 **Primary tools for gap-filling:**
-- \`search_memory_candidates\` — Full-text search across memory objects. Use when you need to find evidence related to a topic not covered by handoff docs.
-- \`load_evidence_span\` — Load specific records from allowlisted tables (dialogue_events, handoff_documents, memory_objects, etc.). Use when you need raw source data to verify or expand a summary.
-- \`temporal_query\` — Bi-temporal filtering by event_at and effective_at ranges. Use when the pre-assembled conversation window is too narrow.
+- \`search_memory_candidates\` — Full-text search across memory objects.
+- \`load_evidence_span\` — Load specific records from allowlisted tables.
+- \`temporal_query\` — Bi-temporal filtering by event_at and effective_at ranges.
 
 **Additional tools (typically used by the Deep Memory Researcher, but available):**
 - \`expand_memory_neighbors\` — Graph traversal on memory edges (BFS from a node)
@@ -94,22 +100,12 @@ Respond with ONLY valid JSON (no markdown fences, no explanation outside the JSO
 {
   "briefing": "# Context for [role]\\n\\n## [Section 1]\\n...\\n## [Section 2]\\n...",
   "sectionManifest": [
-    { "blockId": "...", "label": "...", "source": "handoff_doc|db_query|static|agent_synthesized", "tokenCount": 0, "retrievalPointer": "..." }
+    { "blockId": "...", "label": "...", "source": "handoff_doc|db_query|static|agent_synthesized", "retrievalPointer": "..." }
   ],
-  "omissions": [
-    { "blockId": "...", "reason": "budget_exceeded|not_available|policy_excluded", "impact": "low|medium|high", "retrievalHint": "..." }
-  ],
-  "tokenAccounting": {
-    "budget": 0,
-    "used": 0,
-    "remaining": 0,
-    "perSection": { "blockId": 0 }
-  },
   "sufficiency": {
     "sufficient": true,
     "missingRequired": [],
-    "warnings": [],
-    "confidenceLevel": "high|medium|low"
+    "warnings": []
   }
 }
 
@@ -118,9 +114,8 @@ Respond with ONLY valid JSON (no markdown fences, no explanation outside the JSO
 - NEVER fabricate data. Only include information from pre-assembled data (handoff docs, extras, conversation history) or data retrieved via MCP tools.
 - If a required block has no data available from ANY source, set sufficient=false and list it in missingRequired. Do NOT synthesize a plausible substitute and present it as retrieved data.
 - When reporting sources in sectionManifest, accurately reflect where the data actually came from. Do NOT claim source=db_query if you did not execute a tool call.
-- Token counts should be approximate (estimate ~4 chars per token for English text).
 - The briefing MUST be formatted as clean markdown with clear section headers.
-- Prioritize clarity and completeness for the receiving agent over compression.
+- Prioritize completeness over compactness. The downstream agent will fail if you drop user-validated artifacts.
 `;
 
 // ==================== MAIN ENTRY POINT ====================
@@ -154,7 +149,6 @@ export async function assembleContext(
 		options.phase,
 		options.subPhase,
 		options.intent,
-		options.tokenBudget,
 		policy.version,
 		options.dialogueId,
 		options.extras,
@@ -180,7 +174,6 @@ export async function assembleContext(
 		policy,
 		handoffDocs,
 		options.dialogueId,
-		options.tokenBudget,
 		options.extras,
 	);
 
@@ -292,10 +285,7 @@ export async function assembleContext(
 	if (isLoggerInitialized()) {
 		getLogger().child({ component: 'context-engineer' }).info('Context assembled', {
 			policyKey: policy.policyKey,
-			tokensUsed: packet.tokenAccounting.used,
-			tokenBudget: packet.tokenAccounting.budget,
 			sections: packet.sectionManifest.length,
-			omissions: packet.omissions.length,
 			sufficient: packet.sufficiency.sufficient,
 			wallClockMs: Date.now() - startTime,
 		});
@@ -310,7 +300,6 @@ function buildAgentStdin(
 	policy: ContextPolicy,
 	handoffDocs: HandoffDocument[],
 	dialogueId: string,
-	tokenBudget: number | undefined,
 	extras?: Record<string, unknown>,
 ): string {
 	const sections: string[] = [];
@@ -320,31 +309,17 @@ function buildAgentStdin(
 	sections.push(`Policy Key: ${policy.policyKey}`);
 	sections.push(`Target Role: ${policy.role}`);
 	sections.push(`Phase: ${policy.phase}, SubPhase: ${policy.subPhase}, Intent: ${policy.intent}`);
-	sections.push(`Token Budget: ${tokenBudget}`);
 	sections.push('');
 
-	sections.push('## Required Blocks');
+	sections.push('## Required Blocks (must all appear in the briefing)');
 	for (const block of policy.requiredBlocks) {
-		sections.push(`- **${block.blockId}** (${block.label}): source=${block.source}${block.queryHint ? `, hint: ${block.queryHint}` : ''}${block.maxTokens ? `, maxTokens: ${block.maxTokens}` : ''}`);
-	}
-	sections.push('');
-
-	sections.push('## Optional Blocks (in priority order, highest first)');
-	// Reverse shedding priority = highest priority first
-	const optionalByPriority = [...policy.optionalBlocks].sort((a, b) => {
-		const aPrio = policy.sheddingPriority.indexOf(a.blockId);
-		const bPrio = policy.sheddingPriority.indexOf(b.blockId);
-		// Higher index in shedding = shed later = higher priority to keep
-		return bPrio - aPrio;
-	});
-	for (const block of optionalByPriority) {
 		sections.push(`- **${block.blockId}** (${block.label}): source=${block.source}${block.queryHint ? `, hint: ${block.queryHint}` : ''}`);
 	}
 	sections.push('');
 
-	sections.push('## Section Budgets (fraction of total)');
-	for (const [blockId, fraction] of Object.entries(policy.sectionBudgets)) {
-		sections.push(`- ${blockId}: ${tokenBudget ? Math.round(fraction * tokenBudget) + ' tokens' : 'unlimited'} (${(fraction * 100).toFixed(0)}%)`);
+	sections.push('## Optional Blocks (include every one whose data is available; order is suggested priority for the reader)');
+	for (const block of policy.optionalBlocks) {
+		sections.push(`- **${block.blockId}** (${block.label}): source=${block.source}${block.queryHint ? `, hint: ${block.queryHint}` : ''}`);
 	}
 	sections.push('');
 
@@ -406,26 +381,11 @@ function parseAgentResponse(
 		? (parsed.sectionManifest as SectionManifestEntry[])
 		: [];
 
-	const omissions: OmissionEntry[] = Array.isArray(parsed.omissions)
-		? (parsed.omissions as OmissionEntry[])
-		: [];
-
-	const rawAccounting = parsed.tokenAccounting as Record<string, unknown> | undefined;
-	const tokenAccounting: TokenAccounting = {
-		budget: typeof rawAccounting?.budget === 'number' ? rawAccounting.budget : 0,
-		used: typeof rawAccounting?.used === 'number' ? rawAccounting.used : Math.round(briefing.length / 4),
-		remaining: typeof rawAccounting?.remaining === 'number' ? rawAccounting.remaining : 0,
-		perSection: (rawAccounting?.perSection as Record<string, number>) ?? {},
-	};
-
 	const rawSufficiency = parsed.sufficiency as Record<string, unknown> | undefined;
 	const sufficiency: SufficiencyAssessment = {
 		sufficient: rawSufficiency?.sufficient !== false,
 		missingRequired: Array.isArray(rawSufficiency?.missingRequired) ? rawSufficiency.missingRequired as string[] : [],
 		warnings: Array.isArray(rawSufficiency?.warnings) ? rawSufficiency.warnings as string[] : [],
-		confidenceLevel: ['high', 'medium', 'low'].includes(rawSufficiency?.confidenceLevel as string)
-			? (rawSufficiency!.confidenceLevel as 'high' | 'medium' | 'low')
-			: 'medium',
 	};
 
 	const diagnostics: ContextDiagnostics = {
@@ -435,15 +395,12 @@ function parseAgentResponse(
 			.filter(s => s.source === 'handoff_doc')
 			.map(s => s.retrievalPointer),
 		sqlQueriesExecuted: sectionManifest.filter(s => s.source === 'db_query').length,
-		agentReasoningTokens: 0, // Not tracked at this level
 		wallClockMs: Date.now() - startTime,
 	};
 
 	const packet: HandoffPacket = {
 		briefing,
 		sectionManifest,
-		omissions,
-		tokenAccounting,
 		sufficiency,
 		fingerprint,
 		diagnostics,
@@ -464,7 +421,6 @@ function validateSufficiency(
 
 	for (const block of policy.requiredBlocks) {
 		if (!includedBlockIds.has(block.blockId)) {
-			// Check if it's in the sufficiency.missingRequired already
 			if (!packet.sufficiency.missingRequired.includes(block.blockId)) {
 				missingRequired.push(block.blockId);
 			}
@@ -472,29 +428,18 @@ function validateSufficiency(
 	}
 
 	if (missingRequired.length > 0) {
-		// Update the packet's sufficiency assessment
 		packet.sufficiency.missingRequired = [
 			...packet.sufficiency.missingRequired,
 			...missingRequired,
 		];
 		packet.sufficiency.sufficient = false;
-
-		if (policy.omissionStrategy === 'fail') {
-			return {
-				success: false,
-				error: new ContextSufficiencyError(
-					packet.sufficiency.missingRequired,
-					policy.policyKey,
-				),
-			};
-		}
-
-		// degrade_with_warning — add warnings and continue
-		for (const blockId of missingRequired) {
-			packet.sufficiency.warnings.push(
-				`Required block '${blockId}' is missing from the assembled context`
-			);
-		}
+		return {
+			success: false,
+			error: new ContextSufficiencyError(
+				packet.sufficiency.missingRequired,
+				policy.policyKey,
+			),
+		};
 	}
 
 	return { success: true, value: packet };

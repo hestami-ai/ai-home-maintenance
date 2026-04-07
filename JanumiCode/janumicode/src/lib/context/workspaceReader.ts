@@ -312,43 +312,14 @@ export async function scanSpecFiles(
 }
 
 /**
- * Format workspace files into a string suitable for LLM context injection
- *
- * @param files Array of workspace files
- * @param tokenBudget Approximate token budget (1 token ≈ 4 chars)
- * @returns Formatted string with file contents
+ * Format workspace files into a string suitable for LLM context injection.
+ * Emits all files verbatim — no truncation.
  */
-export function formatWorkspaceFilesForContext(
-	files: WorkspaceFile[],
-	tokenBudget: number = 5000
-): string {
-	const charBudget = tokenBudget * 4; // rough approximation
-	const parts: string[] = [];
-	let totalChars = 0;
-
-	// Header
-	const header = `# Workspace Files (${files.length} files)\n\n`;
-	parts.push(header);
-	totalChars += header.length;
-
+export function formatWorkspaceFilesForContext(files: WorkspaceFile[]): string {
+	const parts: string[] = [`# Workspace Files (${files.length} files)\n\n`];
 	for (const file of files) {
-		const fileHeader = `## ${file.relativePath}\n`;
-		const fileContent = `\`\`\`\n${file.content}\n\`\`\`\n\n`;
-		const entryLength = fileHeader.length + fileContent.length;
-
-		if (totalChars + entryLength > charBudget) {
-			// Add a note about remaining files
-			const remaining = files.length - parts.length + 1;
-			if (remaining > 0) {
-				parts.push(`\n... (${remaining} more files omitted due to token budget)\n`);
-			}
-			break;
-		}
-
-		parts.push(fileHeader, fileContent);
-		totalChars += entryLength;
+		parts.push(`## ${file.relativePath}\n`, `\`\`\`\n${file.content}\n\`\`\`\n\n`);
 	}
-
 	return parts.join('');
 }
 

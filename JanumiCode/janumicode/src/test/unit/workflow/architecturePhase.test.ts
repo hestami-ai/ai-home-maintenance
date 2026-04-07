@@ -61,7 +61,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.TECHNICAL_ANALYSIS,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 			if (result.success) {
@@ -74,7 +74,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.TECHNICAL_ANALYSIS,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -84,7 +84,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.DECOMPOSING,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -94,7 +94,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.MODELING,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -104,7 +104,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.DESIGNING,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -114,7 +114,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.SEQUENCING,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -124,7 +124,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.VALIDATING,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -134,7 +134,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.PRESENTING,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -144,7 +144,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: 'INVALID' as any,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(false);
 			if (!result.success) {
@@ -168,7 +168,7 @@ describe('ArchitecturePhase', () => {
 				approvedIntakePlan: undefined,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(false);
 		});
@@ -448,7 +448,7 @@ describe('ArchitecturePhase', () => {
 
 			for (const subState of subStates) {
 				updateWorkflowMetadata(dialogueId, { architectureSubState: subState });
-				const result = await executeArchitecturePhase(dialogueId, 10000);
+				const result = await executeArchitecturePhase(dialogueId);
 				expect(result.success).toBe(true);
 			}
 		});
@@ -460,7 +460,7 @@ describe('ArchitecturePhase', () => {
 				maxValidationAttempts: 3,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(true);
 		});
@@ -470,19 +470,19 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.PRESENTING,
 			});
 
-			const presentResult = await executeArchitecturePhase(dialogueId, 10000);
+			const presentResult = await executeArchitecturePhase(dialogueId);
 			expect(presentResult.success).toBe(true);
 
 			handleArchitectureGateResolution(dialogueId, 'REVISE', 'Need changes');
 
-			const reviseResult = await executeArchitecturePhase(dialogueId, 10000);
+			const reviseResult = await executeArchitecturePhase(dialogueId);
 			expect(reviseResult.success).toBe(true);
 		});
 	});
 
 	describe('error handling', () => {
 		it('handles missing workflow state', async () => {
-			const result = await executeArchitecturePhase('nonexistent-dialogue', 10000);
+			const result = await executeArchitecturePhase('nonexistent-dialogue');
 
 			expect(result.success).toBe(false);
 		});
@@ -494,7 +494,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.TECHNICAL_ANALYSIS,
 			});
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(false);
 		});
@@ -502,7 +502,7 @@ describe('ArchitecturePhase', () => {
 		it('handles database errors gracefully', async () => {
 			tempDb.cleanup();
 
-			const result = await executeArchitecturePhase(dialogueId, 10000);
+			const result = await executeArchitecturePhase(dialogueId);
 
 			expect(result.success).toBe(false);
 		});
@@ -514,7 +514,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.TECHNICAL_ANALYSIS,
 			});
 
-			const analysisResult = await executeArchitecturePhase(dialogueId, 10000);
+			const analysisResult = await executeArchitecturePhase(dialogueId);
 			expect(analysisResult.success).toBe(true);
 		});
 
@@ -523,7 +523,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.PRESENTING,
 			});
 
-			const presentResult = await executeArchitecturePhase(dialogueId, 10000);
+			const presentResult = await executeArchitecturePhase(dialogueId);
 			expect(presentResult.success).toBe(true);
 
 			const approveResult = handleArchitectureGateResolution(dialogueId, 'APPROVE');
@@ -538,7 +538,7 @@ describe('ArchitecturePhase', () => {
 				architectureSubState: ArchitectureSubState.DESIGNING,
 			});
 
-			const designResult = await executeArchitecturePhase(dialogueId, 10000);
+			const designResult = await executeArchitecturePhase(dialogueId);
 			expect(designResult.success).toBe(true);
 		});
 	});

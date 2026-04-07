@@ -84,16 +84,13 @@ function makeHandoffPacket(briefing: string, overrides: Partial<HandoffPacket> =
 	return {
 		briefing,
 		sectionManifest: [],
-		omissions: [],
-		tokenAccounting: { budget: 10000, used: 1000, remaining: 9000, perSection: {} },
-		sufficiency: { sufficient: true, missingRequired: [], warnings: [], confidenceLevel: 'high' },
+		sufficiency: { sufficient: true, missingRequired: [], warnings: [] },
 		fingerprint: 'test-fp',
 		diagnostics: {
 			policyKey: 'test-policy',
 			policyVersion: 1,
 			handoffDocsConsumed: [],
 			sqlQueriesExecuted: 0,
-			agentReasoningTokens: 0,
 			wallClockMs: 0,
 		},
 		...overrides,
@@ -144,49 +141,6 @@ describe('Role Connector Integration', () => {
 					goal: 'Test proposal',
 					provider: mockProvider,
 					includeHistoricalFindings: true,
-				})
-			);
-		});
-
-		it('applies custom token budget', async () => {
-			const { invokeExecutor } = await import('../../../lib/roles/executor');
-
-			vi.mocked(invokeExecutor).mockResolvedValue({
-				success: true,
-				value: makeExecutorResponse({ proposal: '' }),
-			});
-
-			await invokeExecutorWithContext(
-				'test-dialogue-123',
-				'Test proposal',
-				mockProvider,
-				15000
-			);
-
-			expect(invokeExecutor).toHaveBeenCalledWith(
-				expect.objectContaining({
-					tokenBudget: 15000,
-				})
-			);
-		});
-
-		it('uses default token budget when not specified', async () => {
-			const { invokeExecutor } = await import('../../../lib/roles/executor');
-
-			vi.mocked(invokeExecutor).mockResolvedValue({
-				success: true,
-				value: makeExecutorResponse({ proposal: '' }),
-			});
-
-			await invokeExecutorWithContext(
-				'test-dialogue-123',
-				'Test proposal',
-				mockProvider
-			);
-
-			expect(invokeExecutor).toHaveBeenCalledWith(
-				expect.objectContaining({
-					tokenBudget: 10000,
 				})
 			);
 		});
@@ -269,28 +223,6 @@ describe('Role Connector Integration', () => {
 					question: 'Technical query',
 					provider: mockProvider,
 					includeHistoricalEvidence: true,
-				})
-			);
-		});
-
-		it('applies custom token budget', async () => {
-			const { invokeTechnicalExpert } = await import('../../../lib/roles/technicalExpert');
-
-			vi.mocked(invokeTechnicalExpert).mockResolvedValue({
-				success: true,
-				value: makeEvidencePacket({ answer: '' }),
-			});
-
-			await invokeTechnicalExpertWithContext(
-				'test-dialogue-123',
-				'Query',
-				mockProvider,
-				20000
-			);
-
-			expect(invokeTechnicalExpert).toHaveBeenCalledWith(
-				expect.objectContaining({
-					tokenBudget: 20000,
 				})
 			);
 		});
@@ -484,28 +416,6 @@ describe('Role Connector Integration', () => {
 			);
 		});
 
-		it('applies custom token budget', async () => {
-			const { invokeHistorianInterpreter } = await import('../../../lib/roles/historianInterpreter');
-
-			vi.mocked(invokeHistorianInterpreter).mockResolvedValue({
-				success: true,
-				value: makeHistorianResponse({ summary: '' }),
-			});
-
-			await invokeHistorianInterpreterWithContext(
-				'test-dialogue-123',
-				'Query',
-				mockProvider,
-				8000
-			);
-
-			expect(invokeHistorianInterpreter).toHaveBeenCalledWith(
-				expect.objectContaining({
-					tokenBudget: 8000,
-				})
-			);
-		});
-
 		it('handles historian interpreter failure', async () => {
 			const { invokeHistorianInterpreter } = await import('../../../lib/roles/historianInterpreter');
 
@@ -627,29 +537,6 @@ describe('Role Connector Integration', () => {
 				expect.objectContaining({
 					role: Role.TECHNICAL_EXPERT,
 					phase: Phase.PROPOSE,
-				})
-			);
-		});
-
-		it('applies custom token budget', async () => {
-			const { assembleContext } = await import('../../../lib/context');
-
-			vi.mocked(assembleContext).mockResolvedValue({
-				success: true,
-				value: makeHandoffPacket('Context', {
-					tokenAccounting: { budget: 5000, used: 5000, remaining: 0, perSection: {} },
-				}),
-			});
-
-			await compileRoleContext(
-				Role.EXECUTOR,
-				'test-dialogue-123',
-				5000
-			);
-
-			expect(assembleContext).toHaveBeenCalledWith(
-				expect.objectContaining({
-					tokenBudget: 5000,
 				})
 			);
 		});
@@ -835,7 +722,6 @@ describe('Role Connector Integration', () => {
 				'test-dialogue-123',
 				'Build feature X',
 				mockProvider,
-				12000
 			);
 
 			expect(result.success).toBe(true);

@@ -135,7 +135,6 @@ async function handleStartDialogue(payload: {
 		const result = startDialogueWithWorkflow({
 			goal: payload.goal,
 			llmConfig,
-			tokenBudget: config.tokenBudget,
 		});
 
 		if (!result.success) {
@@ -148,7 +147,7 @@ async function handleStartDialogue(payload: {
 		vscode.window.showInformationMessage(`Dialogue started: ${dialogueId}`);
 
 		// Fire-and-forget auto-advance so command palette path also runs the workflow
-		executeWorkflowCycle(dialogueId, llmConfig, config.tokenBudget).catch((err) => {
+		executeWorkflowCycle(dialogueId, llmConfig).catch((err) => {
 			const msg = err instanceof Error ? err.message : String(err);
 			if (isLoggerInitialized()) {
 				getLogger().child({ component: 'uiEventHandler', dialogueId }).error('Workflow cycle failed', { error: msg });
@@ -221,7 +220,6 @@ async function handleAdvanceWorkflow(payload: {
 			role: 'system',
 			content: 'Workflow advance requested by user',
 			llmConfig,
-			tokenBudget: config.tokenBudget,
 			advanceWorkflow: true,
 		});
 

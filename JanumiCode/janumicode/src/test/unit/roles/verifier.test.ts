@@ -58,7 +58,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -69,7 +68,6 @@ describe('Verifier Role', () => {
 					dialogueId: 'test-dialogue-123',
 					role: Role.VERIFIER,
 					phase: Phase.VERIFY,
-					tokenBudget: 4000,
 				})
 			);
 		});
@@ -100,7 +98,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -150,7 +147,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -188,7 +184,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -226,7 +221,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -264,7 +258,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -305,7 +298,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -348,7 +340,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -390,7 +381,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -430,7 +420,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -453,7 +442,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -479,7 +467,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -508,7 +495,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -545,7 +531,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -579,7 +564,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -614,7 +598,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -650,7 +633,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 				commandId: 'cmd-123',
 			};
@@ -690,7 +672,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 				checkForContradictions: true,
 			};
@@ -734,7 +715,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -777,7 +757,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -817,7 +796,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -838,7 +816,6 @@ describe('Verifier Role', () => {
 			const options: VerifierInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				claimToVerify: mockClaim,
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -905,7 +882,6 @@ describe('Verifier Role', () => {
 		const testOptions: VerifierInvocationOptions = {
 			dialogueId: 'test-dialogue-123',
 			claimToVerify: mockClaim,
-			tokenBudget: 4000,
 			provider: { id: 'test-provider', name: 'Test' } as any,
 		};
 

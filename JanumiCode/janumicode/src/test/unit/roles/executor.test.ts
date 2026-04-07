@@ -59,7 +59,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test goal',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -70,7 +69,6 @@ describe('Executor Role', () => {
 					dialogueId: 'test-dialogue-123',
 					role: Role.EXECUTOR,
 					phase: Phase.EXECUTE,
-					tokenBudget: 4000,
 				})
 			);
 		});
@@ -104,7 +102,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Build feature',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -139,7 +136,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test goal',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -188,7 +184,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test goal',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -241,7 +236,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test goal',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -284,7 +278,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test goal',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -312,7 +305,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test goal',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -342,7 +334,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test goal',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -375,7 +366,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test goal',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -413,7 +403,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test goal',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -457,7 +446,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test goal',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 				commandId: 'cmd-123',
 			};
@@ -497,7 +485,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test goal',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -544,7 +531,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Build iOS app',
-				tokenBudget: 4000,
 				provider: { id: 'test-provider', name: 'Test' } as any,
 			};
 
@@ -659,7 +645,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test', name: 'Test' } as any,
 			};
 
@@ -701,7 +686,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test', name: 'Test' } as any,
 			};
 
@@ -742,7 +726,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test', name: 'Test' } as any,
 				temperature: 0.3,
 			};
@@ -767,7 +750,6 @@ describe('Executor Role', () => {
 			const options: ExecutorInvocationOptions = {
 				dialogueId: 'test-dialogue-123',
 				goal: 'Test',
-				tokenBudget: 4000,
 				provider: { id: 'test', name: 'Test' } as any,
 			};
 

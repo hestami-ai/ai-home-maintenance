@@ -20,7 +20,6 @@ export interface TechnicalExpertInvocationOptions {
 	dialogueId: string;
 	question: string;
 	relatedClaimIds?: string[];
-	tokenBudget: number;
 	provider: RoleCLIProvider;
 	temperature?: number;
 	includeHistoricalEvidence?: boolean;
@@ -140,7 +139,6 @@ export async function invokeTechnicalExpert(
 			dialogueId: options.dialogueId,
 			role: Role.TECHNICAL_EXPERT,
 			phase: Phase.PROPOSE,
-			tokenBudget: options.tokenBudget,
 			extras: { question: options.question, relatedClaimIds: options.relatedClaimIds, workspace_specs: workspaceSpecs },
 			onEvent: options.onEvent,
 		});
