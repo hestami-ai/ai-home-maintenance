@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Logger, initializeLogger, getLogger, isLoggerInitialized, resetLogger } from '../../../lib/logging/logger';
 import { LogLevel } from '../../../lib/logging/levels';
-
-vi.mock('vscode');
+// vscode is aliased to a manual mock in vitest.config.ts. Use its exported
+// helpers to drive workspace configuration instead of vi.mock('vscode'),
+// which would replace the manual mock's working getConfiguration with empty
+// vi.fn() stubs.
+import { setMockConfig, resetMockConfig } from '../../helpers/__mocks__/vscode';
 
 describe('Logger', () => {
 	let mockOutputChannel: any;
@@ -14,10 +17,12 @@ describe('Logger', () => {
 			dispose: vi.fn(),
 		};
 		resetLogger();
+		resetMockConfig();
 	});
 
 	afterEach(() => {
 		resetLogger();
+		resetMockConfig();
 	});
 
 	describe('createRoot', () => {
@@ -27,16 +32,8 @@ describe('Logger', () => {
 			expect(logger).toBeInstanceOf(Logger);
 		});
 
-		it('uses configured log level from settings', async () => {
-			const vscode = await import('vscode');
-			const mockConfig = {
-				get: vi.fn((key: string) => {
-					if (key === 'logLevel') {return 'warn';}
-					return undefined;
-				}),
-			};
-
-			vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(mockConfig as any);
+		it('uses configured log level from settings', () => {
+			setMockConfig('janumicode.logLevel', 'warn');
 
 			const logger = Logger.createRoot(mockOutputChannel);
 
@@ -200,8 +197,9 @@ describe('Logger', () => {
 
 			root.info('Info message');
 
+			// Level labels are padded to 5 chars in formatLogEntry for column alignment.
 			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
-				expect.stringContaining('[INFO]')
+				expect.stringContaining('[INFO ]')
 			);
 		});
 
@@ -212,7 +210,7 @@ describe('Logger', () => {
 			root.warn('Warn message');
 
 			expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
-				expect.stringContaining('[WARN]')
+				expect.stringContaining('[WARN ]')
 			);
 		});
 

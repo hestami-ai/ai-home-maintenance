@@ -738,6 +738,44 @@ CREATE TABLE IF NOT EXISTS webview_drafts (
 );
 CREATE INDEX IF NOT EXISTS idx_webview_drafts_dialogue ON webview_drafts(dialogue_id);
 
+-- ==================== PENDING MMP DECISIONS ====================
+-- Persists partial MMP user decisions across restarts (matches v9 migration).
+-- Was missing from the consolidated SCHEMA_V1 baseline; see migrations.ts which
+-- skips v9 once SCHEMA_V1 sets schema_version >= 9.
+CREATE TABLE IF NOT EXISTS pending_mmp_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id TEXT NOT NULL,
+    card_id TEXT NOT NULL,
+    mirror_decisions TEXT NOT NULL DEFAULT '{}',
+    menu_selections TEXT NOT NULL DEFAULT '{}',
+    premortem_decisions TEXT NOT NULL DEFAULT '{}',
+    product_edits TEXT NOT NULL DEFAULT '{}',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(dialogue_id, card_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pending_mmp_dialogue ON pending_mmp_decisions(dialogue_id);
+
+-- ==================== VALIDATION FINDINGS ====================
+-- Stores graded findings from the VALIDATE phase. Was never present in any
+-- migration — added here so production and test databases get the table that
+-- src/lib/database/validationStore.ts assumes exists.
+CREATE TABLE IF NOT EXISTS validation_findings (
+    finding_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    hypothesis TEXT NOT NULL,
+    category TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    location TEXT NOT NULL,
+    tool_used TEXT NOT NULL,
+    proof_status TEXT NOT NULL,
+    proof_artifact TEXT,
+    confidence REAL NOT NULL,
+    useful_rating INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_validation_findings_dialogue ON validation_findings(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_validation_findings_proof ON validation_findings(dialogue_id, proof_status);
+
 -- ==================== METADATA ====================
 
 -- Schema metadata table — tracks schema version and migration history

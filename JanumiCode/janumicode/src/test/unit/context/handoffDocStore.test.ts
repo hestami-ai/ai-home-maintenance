@@ -11,6 +11,7 @@ import {
 import { HandoffDocType } from '../../../lib/context/engineTypes';
 import type { IntakeHandoffContent, ArchitectureHandoffContent } from '../../../lib/context/engineTypes';
 import { randomUUID } from 'node:crypto';
+import { getDatabase } from '../../../lib/database/init';
 
 describe('Handoff Document Store', () => {
 	let tempDb: TempDbContext;
@@ -24,6 +25,16 @@ describe('Handoff Document Store', () => {
 		tempDb.cleanup();
 		teardownTestLogger();
 	});
+
+	function mintDialogue(): string {
+		const id = randomUUID();
+		const db = getDatabase()!;
+		db.prepare(
+			"INSERT INTO dialogues (dialogue_id, goal, status, created_at) VALUES (?, 'test goal', 'ACTIVE', datetime('now'))"
+		).run(id);
+		return id;
+	}
+
 
 	const createMockIntakeContent = (): IntakeHandoffContent => ({
 		type: 'INTAKE',
@@ -46,7 +57,7 @@ describe('Handoff Document Store', () => {
 
 	describe('storeHandoffDocument', () => {
 		it('stores handoff document successfully', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			const result = storeHandoffDocument(
@@ -71,7 +82,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('stores architecture handoff document', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockArchitectureContent();
 
 			const result = storeHandoffDocument(
@@ -91,7 +102,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('generates unique document IDs', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			const result1 = storeHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -104,7 +115,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('sets created_at timestamp', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			const result = storeHandoffDocument(
@@ -124,7 +135,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('stores multiple documents for same dialogue', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const intakeContent = createMockIntakeContent();
 			const archContent = createMockArchitectureContent();
 
@@ -135,7 +146,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('preserves content structure through JSON serialization', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 			content.finalizedPlan = { complex: { nested: { structure: 'value' } } };
 
@@ -158,7 +169,7 @@ describe('Handoff Document Store', () => {
 
 	describe('getLatestHandoffDocument', () => {
 		it('retrieves latest document of given type', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			storeHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -174,7 +185,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('returns null when no documents exist', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 
 			const result = getLatestHandoffDocument(dialogueId, HandoffDocType.INTAKE);
 
@@ -185,7 +196,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('filters by document type', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const intakeContent = createMockIntakeContent();
 			const archContent = createMockArchitectureContent();
 
@@ -202,8 +213,8 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('returns null for wrong dialogue ID', () => {
-			const dialogueId1 = randomUUID();
-			const dialogueId2 = randomUUID();
+			const dialogueId1 = mintDialogue();
+			const dialogueId2 = mintDialogue();
 			const content = createMockIntakeContent();
 
 			storeHandoffDocument(dialogueId1, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -217,7 +228,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('deserializes content correctly', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 			content.openLoops = [
 				{ category: 'technical', description: 'Decide on DB', priority: 'HIGH' },
@@ -237,7 +248,7 @@ describe('Handoff Document Store', () => {
 
 	describe('getHandoffDocuments', () => {
 		it('retrieves all documents for dialogue', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const intakeContent = createMockIntakeContent();
 			const archContent = createMockArchitectureContent();
 
@@ -254,7 +265,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('filters by document type when specified', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const intakeContent = createMockIntakeContent();
 			const archContent = createMockArchitectureContent();
 
@@ -272,7 +283,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('returns empty array when no documents exist', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 
 			const result = getHandoffDocuments(dialogueId);
 
@@ -283,7 +294,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('orders documents by created_at descending', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			const doc1 = storeHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -301,8 +312,8 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('isolates documents by dialogue', () => {
-			const dialogueId1 = randomUUID();
-			const dialogueId2 = randomUUID();
+			const dialogueId1 = mintDialogue();
+			const dialogueId2 = mintDialogue();
 			const content = createMockIntakeContent();
 
 			storeHandoffDocument(dialogueId1, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -321,7 +332,7 @@ describe('Handoff Document Store', () => {
 
 	describe('getHandoffDocumentsSince', () => {
 		it('retrieves documents after watermark', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			storeHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -338,7 +349,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('returns empty array when no documents after watermark', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			storeHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -352,7 +363,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('excludes documents at exact watermark', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			storeHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -367,7 +378,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('returns all documents when watermark is 0', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			storeHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -382,7 +393,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('includes all document types in results', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const intakeContent = createMockIntakeContent();
 			const archContent = createMockArchitectureContent();
 
@@ -403,7 +414,7 @@ describe('Handoff Document Store', () => {
 
 	describe('deleteHandoffDocuments', () => {
 		it('deletes all documents for dialogue', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			storeHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -424,7 +435,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('returns 0 when no documents to delete', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 
 			const result = deleteHandoffDocuments(dialogueId);
 
@@ -435,8 +446,8 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('does not affect other dialogues', () => {
-			const dialogueId1 = randomUUID();
-			const dialogueId2 = randomUUID();
+			const dialogueId1 = mintDialogue();
+			const dialogueId2 = mintDialogue();
 			const content = createMockIntakeContent();
 
 			storeHandoffDocument(dialogueId1, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -452,7 +463,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('deletes documents of all types', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const intakeContent = createMockIntakeContent();
 			const archContent = createMockArchitectureContent();
 
@@ -470,7 +481,7 @@ describe('Handoff Document Store', () => {
 
 	describe('integration scenarios', () => {
 		it('handles complete document lifecycle', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			const storeResult = storeHandoffDocument(
@@ -500,7 +511,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('handles phase progression with multiple handoffs', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const intakeContent = createMockIntakeContent();
 			const archContent = createMockArchitectureContent();
 
@@ -521,7 +532,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('supports incremental document creation', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			storeHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -538,7 +549,7 @@ describe('Handoff Document Store', () => {
 
 	describe('edge cases', () => {
 		it('handles empty content arrays', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 			content.openLoops = [];
 			content.humanDecisions = [];
@@ -560,7 +571,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('handles zero token count', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			const result = storeHandoffDocument(
@@ -579,7 +590,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('handles very large token counts', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			const result = storeHandoffDocument(
@@ -598,7 +609,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('handles null mmpDecisions field', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 			content.mmpDecisions = null;
 
@@ -618,7 +629,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('handles complex nested structures in content', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockArchitectureContent();
 			content.capabilities = [
 				{
@@ -645,7 +656,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('handles negative watermark query', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			storeHandoffDocument(dialogueId, HandoffDocType.INTAKE, 'INTAKE', content, 500, 10);
@@ -659,7 +670,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('handles very long source phase names', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 			const longPhaseName = 'VERY_LONG_PHASE_NAME_'.repeat(10);
 
@@ -681,7 +692,7 @@ describe('Handoff Document Store', () => {
 
 	describe('data integrity', () => {
 		it('preserves all document fields through storage and retrieval', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 			content.goal = 'Complex goal with special chars: 日本語 & symbols!@#$%';
 
@@ -713,7 +724,7 @@ describe('Handoff Document Store', () => {
 		});
 
 		it('maintains document ordering consistency', () => {
-			const dialogueId = randomUUID();
+			const dialogueId = mintDialogue();
 			const content = createMockIntakeContent();
 
 			for (let i = 0; i < 5; i++) {

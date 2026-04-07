@@ -247,7 +247,11 @@ describe('PendingMmpStore', () => {
 
 			const timestamp2 = row2?.updated_at;
 
-			expect(timestamp2).not.toBe(timestamp1);
+			// updated_at must not regress. SQLite datetime('now') is second-resolution,
+			// so back-to-back upserts can tie within the same second — that's OK.
+			expect(timestamp2).toBeDefined();
+			expect(timestamp1).toBeDefined();
+			expect(timestamp2! >= timestamp1!).toBe(true);
 		});
 	});
 

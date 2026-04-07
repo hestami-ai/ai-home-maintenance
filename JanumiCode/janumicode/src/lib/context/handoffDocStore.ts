@@ -90,7 +90,7 @@ export function getLatestHandoffDocument(
 			SELECT doc_id, dialogue_id, doc_type, source_phase, content, token_count, event_watermark, created_at
 			FROM handoff_documents
 			WHERE dialogue_id = ? AND doc_type = ?
-			ORDER BY created_at DESC
+			ORDER BY created_at DESC, rowid DESC
 			LIMIT 1
 		`).get(dialogueId, docType) as HandoffDocRow | undefined;
 
@@ -124,14 +124,14 @@ export function getHandoffDocuments(
 				SELECT doc_id, dialogue_id, doc_type, source_phase, content, token_count, event_watermark, created_at
 				FROM handoff_documents
 				WHERE dialogue_id = ? AND doc_type = ?
-				ORDER BY created_at DESC
+				ORDER BY created_at DESC, rowid DESC
 			`).all(dialogueId, docType) as HandoffDocRow[];
 		} else {
 			rows = db.prepare(`
 				SELECT doc_id, dialogue_id, doc_type, source_phase, content, token_count, event_watermark, created_at
 				FROM handoff_documents
 				WHERE dialogue_id = ?
-				ORDER BY created_at DESC
+				ORDER BY created_at DESC, rowid DESC
 			`).all(dialogueId) as HandoffDocRow[];
 		}
 
@@ -159,7 +159,7 @@ export function getHandoffDocumentsSince(
 			SELECT doc_id, dialogue_id, doc_type, source_phase, content, token_count, event_watermark, created_at
 			FROM handoff_documents
 			WHERE dialogue_id = ? AND event_watermark > ?
-			ORDER BY created_at DESC
+			ORDER BY created_at DESC, rowid DESC
 		`).all(dialogueId, eventWatermark) as HandoffDocRow[];
 
 		return { success: true, value: rows.map(rowToDocument) };
