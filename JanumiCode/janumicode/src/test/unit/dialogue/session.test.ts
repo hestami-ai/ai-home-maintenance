@@ -121,7 +121,7 @@ describe('Session', () => {
 				const envelope = createEnvelope({
 					dialogue_id: dialogueId,
 					turn_id: 1,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test',
@@ -154,7 +154,7 @@ describe('Session', () => {
 				const envelope = createEnvelope({
 					dialogue_id: dialogueId,
 					turn_id: 1,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test',
@@ -184,7 +184,7 @@ describe('Session', () => {
 				const envelope = createEnvelope({
 					dialogue_id: createResult.value.dialogue_id,
 					turn_id: 1,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test-content',
@@ -196,7 +196,7 @@ describe('Session', () => {
 
 				if (result.success) {
 					expect(result.value.event_id).toBe(1);
-					expect(result.value.role).toBe(Role.HUMAN);
+					expect(result.value.role).toBe(Role.EXECUTOR);
 					expect(result.value.phase).toBe(Phase.INTAKE);
 				}
 			}
@@ -212,7 +212,7 @@ describe('Session', () => {
 				const envelope = createEnvelope({
 					dialogue_id: dialogueId,
 					turn_id: 1,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test',
@@ -241,7 +241,7 @@ describe('Session', () => {
 				const envelope = createEnvelope({
 					dialogue_id: dialogueId,
 					turn_id: 5,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test',
@@ -288,7 +288,7 @@ describe('Session', () => {
 					const envelope = createEnvelope({
 						dialogue_id: dialogueId,
 						turn_id: i,
-						role: Role.HUMAN,
+						role: Role.EXECUTOR,
 						phase: Phase.INTAKE,
 						speech_act: SpeechAct.CLAIM,
 						content_ref: `blob://test-${i}`,
@@ -341,7 +341,7 @@ describe('Session', () => {
 			if (createResult.success) {
 				const result = createAndAddTurn({
 					dialogue_id: createResult.value.dialogue_id,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test',
@@ -364,7 +364,7 @@ describe('Session', () => {
 
 				createAndAddTurn({
 					dialogue_id: dialogueId,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test1',
@@ -372,7 +372,7 @@ describe('Session', () => {
 
 				const result = createAndAddTurn({
 					dialogue_id: dialogueId,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test2',
@@ -388,7 +388,7 @@ describe('Session', () => {
 		it('fails if dialogue does not exist', () => {
 			const result = createAndAddTurn({
 				dialogue_id: 'non-existent-id',
-				role: Role.HUMAN,
+				role: Role.EXECUTOR,
 				phase: Phase.INTAKE,
 				speech_act: SpeechAct.CLAIM,
 				content_ref: 'blob://test',
@@ -443,7 +443,7 @@ describe('Session', () => {
 
 				createAndAddTurn({
 					dialogue_id: dialogueId,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test',
@@ -494,7 +494,9 @@ describe('Session', () => {
 
 				const session = getDialogueSession(dialogueId);
 				if (session.success && session.value) {
-					expect(session.value.last_updated).not.toBe(originalTimestamp);
+					// last_updated must not regress; SQLite datetime('now') is second-resolution
+					// so back-to-back updates can tie within the same second.
+					expect(session.value.last_updated >= originalTimestamp).toBe(true);
 				}
 			}
 		});
@@ -559,7 +561,7 @@ describe('Session', () => {
 
 				createAndAddTurn({
 					dialogue_id: dialogueId,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test',
@@ -598,7 +600,7 @@ describe('Session', () => {
 
 				createAndAddTurn({
 					dialogue_id: dialogueId,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test',
@@ -626,7 +628,7 @@ describe('Session', () => {
 				for (let i = 0; i < 3; i++) {
 					createAndAddTurn({
 						dialogue_id: dialogueId,
-						role: Role.HUMAN,
+						role: Role.EXECUTOR,
 						phase: Phase.INTAKE,
 						speech_act: SpeechAct.CLAIM,
 						content_ref: `blob://test-${i}`,
@@ -652,7 +654,7 @@ describe('Session', () => {
 				for (let i = 0; i < 5; i++) {
 					createAndAddTurn({
 						dialogue_id: dialogueId,
-						role: Role.HUMAN,
+						role: Role.EXECUTOR,
 						phase: Phase.INTAKE,
 						speech_act: SpeechAct.CLAIM,
 						content_ref: `blob://test-${i}`,
@@ -679,7 +681,7 @@ describe('Session', () => {
 
 				createAndAddTurn({
 					dialogue_id: dialogueId,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test1',
@@ -698,7 +700,7 @@ describe('Session', () => {
 
 				if (result.success) {
 					expect(result.value.turn_count).toBe(2);
-					expect(result.value.role_distribution[Role.HUMAN]).toBe(1);
+					expect(result.value.role_distribution[Role.EXECUTOR]).toBe(1);
 					expect(result.value.role_distribution[Role.EXECUTOR]).toBe(1);
 					expect(result.value.phase_distribution[Phase.INTAKE]).toBe(1);
 					expect(result.value.phase_distribution[Phase.PROPOSE]).toBe(1);
@@ -717,7 +719,7 @@ describe('Session', () => {
 				for (let i = 0; i < 3; i++) {
 					createAndAddTurn({
 						dialogue_id: dialogueId,
-						role: Role.HUMAN,
+						role: Role.EXECUTOR,
 						phase: Phase.INTAKE,
 						speech_act: SpeechAct.CLAIM,
 						content_ref: `blob://test-${i}`,
@@ -727,7 +729,7 @@ describe('Session', () => {
 				const result = getDialogueStats(dialogueId);
 				if (result.success) {
 					expect(result.value.turn_count).toBe(3);
-					expect(result.value.role_distribution[Role.HUMAN]).toBe(3);
+					expect(result.value.role_distribution[Role.EXECUTOR]).toBe(3);
 				}
 			}
 		});
@@ -760,7 +762,7 @@ describe('Session', () => {
 
 				createAndAddTurn({
 					dialogue_id: dialogueId,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://intake-goal',
@@ -803,7 +805,7 @@ describe('Session', () => {
 
 				createAndAddTurn({
 					dialogue_id: dialogueId,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test',
@@ -819,7 +821,7 @@ describe('Session', () => {
 
 				createAndAddTurn({
 					dialogue_id: dialogueId,
-					role: Role.HUMAN,
+					role: Role.EXECUTOR,
 					phase: Phase.INTAKE,
 					speech_act: SpeechAct.CLAIM,
 					content_ref: 'blob://test2',

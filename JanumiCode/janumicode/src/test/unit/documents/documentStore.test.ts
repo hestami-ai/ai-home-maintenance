@@ -156,7 +156,7 @@ describe('DocumentStore', () => {
 
 			expect(first.success && second.success).toBe(true);
 			if (first.success && second.success) {
-				expect(second.value.created_at).not.toBe(first.value.created_at);
+				expect(second.value.created_at >= first.value.created_at).toBe(true);
 			}
 		});
 

@@ -150,7 +150,9 @@ describe('DraftStore', () => {
 
 			const timestamp2 = row2?.updated_at;
 
-			expect(timestamp2).not.toBe(timestamp1);
+			expect(timestamp1).toBeDefined();
+			expect(timestamp2).toBeDefined();
+			expect(timestamp2! >= timestamp1!).toBe(true);
 		});
 	});
 

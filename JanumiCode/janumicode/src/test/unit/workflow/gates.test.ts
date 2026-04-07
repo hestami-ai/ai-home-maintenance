@@ -322,7 +322,7 @@ describe('Gate Management', () => {
 
 		it('returns no trigger when no critical issues', () => {
 			setupDialogue(ID1);
-			createClaim(ID1, 'Normal claim', 'NORMAL', ClaimStatus.VERIFIED);
+			createClaim(ID1, 'Normal claim', 'NON_CRITICAL', ClaimStatus.VERIFIED);
 
 			const result = checkGateTriggers(ID1);
 			expect(result.success).toBe(true);

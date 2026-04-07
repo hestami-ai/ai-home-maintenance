@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createTempDatabase, type TempDbContext } from '../../helpers/tempDatabase';
 import { initTestLogger, teardownTestLogger } from '../../helpers/fakeLogger';
 import { registerFakeProviders, teardownFakeProviders } from '../../helpers/fakeProviders';
@@ -16,6 +16,28 @@ import {
 import { initializeWorkflowState, getWorkflowState, updateWorkflowMetadata } from '../../../lib/workflow/stateMachine';
 import { Phase, LLMProvider, type RoleLLMConfig } from '../../../lib/types';
 import { randomUUID } from 'node:crypto';
+
+// Stub the Context Engineer so unit tests don't trigger real LLM calls
+// (the CE is itself an LLM-invoking agent that runs as a pre-step before
+// role invocations). We're testing the workflow logic, not context assembly.
+vi.mock('../../../lib/context', async () => {
+	const actual = await vi.importActual<typeof import('../../../lib/context')>('../../../lib/context');
+	return {
+		...actual,
+		assembleContext: vi.fn(async () => ({
+			success: true as const,
+			value: {
+				briefing: '# Stub briefing for unit test',
+				sectionManifest: [],
+				sufficiency: { sufficient: true, missingRequired: [], warnings: [] },
+				fingerprint: 'test-fp',
+				diagnostics: { policyKey: 'test', policyVersion: 1, handoffDocsConsumed: [], sqlQueriesExecuted: 0, wallClockMs: 0 },
+			},
+		})),
+	};
+});
+
+
 
 const mockLlmConfig: RoleLLMConfig = {
 	executor: { provider: LLMProvider.GEMINI, model: 'gemini-2.0-flash-exp', apiKey: 'test-key' },

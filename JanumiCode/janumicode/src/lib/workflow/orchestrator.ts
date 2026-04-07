@@ -189,24 +189,13 @@ export function startWorkflow(
 			};
 		}
 
-		// Create dialogue record
-		db.exec(`
-			CREATE TABLE IF NOT EXISTS dialogues (
-				dialogue_id TEXT PRIMARY KEY,
-				goal TEXT NOT NULL,
-				created_at TEXT NOT NULL,
-				updated_at TEXT NOT NULL
-			)
-		`);
-
-		const now = new Date().toISOString();
-
+		// Create dialogue record. The dialogues table is created by the migration
+		// system (see schema.ts) with NOT NULL `goal`, `status` (default 'ACTIVE'),
+		// and a CHECK constraint that dialogue_id is a 36-char UUID.
 		db.prepare(
-			`
-			INSERT INTO dialogues (dialogue_id, goal, created_at, updated_at)
-			VALUES (?, ?, ?, ?)
-		`
-		).run(options.dialogueId, options.goal, now, now);
+			`INSERT INTO dialogues (dialogue_id, goal, status, created_at)
+			 VALUES (?, ?, 'ACTIVE', datetime('now'))`
+		).run(options.dialogueId, options.goal);
 
 		// Initialize workflow state
 		const stateResult = initializeWorkflowState(options.dialogueId, {
