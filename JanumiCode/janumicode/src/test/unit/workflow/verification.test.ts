@@ -370,9 +370,15 @@ describe('Verification', () => {
 			const db = getDatabase();
 			const claims: Claim[] = [];
 
-			// Create multiple claims
+			// Create multiple claims. Each needs a corresponding dialogue_event for
+			// the composite FK (dialogue_id, turn_id) -> dialogue_events.
 			for (let i = 0; i < 3; i++) {
 				const claimId = randomUUID();
+				const turnInsert = db!.prepare(`
+					INSERT INTO dialogue_events (dialogue_id, event_type, role, phase, speech_act, summary, content, timestamp)
+					VALUES (?, 'claim', 'EXECUTOR', 'PROPOSE', 'CLAIM', 'seed turn', 'seed', datetime('now'))
+				`).run(dialogueId);
+				const turnId = Number(turnInsert.lastInsertRowid);
 				db?.prepare(`
 					INSERT INTO claims (claim_id, statement, introduced_by, criticality, status, dialogue_id, turn_id, created_at)
 					VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -383,7 +389,7 @@ describe('Verification', () => {
 					ClaimCriticality.CRITICAL,
 					ClaimStatus.OPEN,
 					dialogueId,
-					i + 1,
+					turnId,
 					new Date().toISOString()
 				);
 
@@ -394,7 +400,7 @@ describe('Verification', () => {
 					criticality: ClaimCriticality.CRITICAL,
 					status: ClaimStatus.OPEN,
 					dialogue_id: dialogueId,
-					turn_id: i + 1,
+					turn_id: turnId,
 					created_at: new Date().toISOString(),
 				});
 			}
@@ -654,7 +660,11 @@ describe('Verification', () => {
 		it('does not include non-CRITICAL claims', async () => {
 			const db = getDatabase();
 			const nonCriticalId = randomUUID();
-			
+			const turnInsert = db!.prepare(`
+				INSERT INTO dialogue_events (dialogue_id, event_type, role, phase, speech_act, summary, content, timestamp)
+				VALUES (?, 'claim', 'EXECUTOR', 'PROPOSE', 'CLAIM', 'seed turn', 'seed', datetime('now'))
+			`).run(dialogueId);
+			const turnId = Number(turnInsert.lastInsertRowid);
 			db?.prepare(`
 				INSERT INTO claims (claim_id, statement, introduced_by, criticality, status, dialogue_id, turn_id, created_at)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -665,7 +675,7 @@ describe('Verification', () => {
 				ClaimCriticality.NON_CRITICAL,
 				ClaimStatus.UNKNOWN,
 				dialogueId,
-				2,
+				turnId,
 				new Date().toISOString()
 			);
 
@@ -759,6 +769,11 @@ describe('Verification', () => {
 
 			for (let i = 0; i < 2; i++) {
 				const claimId = randomUUID();
+				const turnInsert = db!.prepare(`
+					INSERT INTO dialogue_events (dialogue_id, event_type, role, phase, speech_act, summary, content, timestamp)
+					VALUES (?, 'claim', 'EXECUTOR', 'PROPOSE', 'CLAIM', 'seed turn', 'seed', datetime('now'))
+				`).run(dialogueId);
+				const turnId = Number(turnInsert.lastInsertRowid);
 				db?.prepare(`
 					INSERT INTO claims (claim_id, statement, introduced_by, criticality, status, dialogue_id, turn_id, created_at)
 					VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -769,7 +784,7 @@ describe('Verification', () => {
 					ClaimCriticality.CRITICAL,
 					ClaimStatus.OPEN,
 					dialogueId,
-					i + 2,
+					turnId,
 					new Date().toISOString()
 				);
 
@@ -780,7 +795,7 @@ describe('Verification', () => {
 					criticality: ClaimCriticality.CRITICAL,
 					status: ClaimStatus.OPEN,
 					dialogue_id: dialogueId,
-					turn_id: i + 2,
+					turn_id: turnId,
 					created_at: new Date().toISOString(),
 				});
 			}

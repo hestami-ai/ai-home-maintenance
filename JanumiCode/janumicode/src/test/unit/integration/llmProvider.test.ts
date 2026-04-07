@@ -53,9 +53,9 @@ describe('LLM Provider Integration', () => {
 				stop_reason: 'end_turn',
 			});
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: { create: mockCreate },
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -90,9 +90,9 @@ describe('LLM Provider Integration', () => {
 				},
 			});
 
-			vi.mocked(OpenAI).mockImplementation(() => ({
+			vi.mocked(OpenAI).mockImplementation(function () { return ({
 				chat: { completions: { create: mockCreate } },
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.OPENAI,
@@ -137,9 +137,9 @@ describe('LLM Provider Integration', () => {
 				stop_reason: 'end_turn',
 			});
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: { create: mockCreate },
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -168,9 +168,9 @@ describe('LLM Provider Integration', () => {
 				usage: { prompt_tokens: 80, completion_tokens: 40, total_tokens: 120 },
 			});
 
-			vi.mocked(OpenAI).mockImplementation(() => ({
+			vi.mocked(OpenAI).mockImplementation(function () { return ({
 				chat: { completions: { create: mockCreate } },
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.OPENAI,
@@ -202,9 +202,9 @@ describe('LLM Provider Integration', () => {
 				stop_reason: 'end_turn',
 			});
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: { create: mockCreate },
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -234,9 +234,9 @@ describe('LLM Provider Integration', () => {
 				stop_reason: 'end_turn',
 			});
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: { create: mockCreate },
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -258,11 +258,11 @@ describe('LLM Provider Integration', () => {
 		it('handles Anthropic API errors', async () => {
 			const Anthropic = (await import('@anthropic-ai/sdk')).default;
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: {
 					create: vi.fn().mockRejectedValue(new Error('API rate limit exceeded')),
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -282,13 +282,13 @@ describe('LLM Provider Integration', () => {
 		it('handles OpenAI API errors', async () => {
 			const OpenAI = (await import('openai')).default;
 
-			vi.mocked(OpenAI).mockImplementation(() => ({
+			vi.mocked(OpenAI).mockImplementation(function () { return ({
 				chat: {
 					completions: {
 						create: vi.fn().mockRejectedValue(new Error('Invalid API key')),
 					},
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.OPENAI,
@@ -308,7 +308,7 @@ describe('LLM Provider Integration', () => {
 		it('includes token usage in response', async () => {
 			const Anthropic = (await import('@anthropic-ai/sdk')).default;
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: {
 					create: vi.fn().mockResolvedValue({
 						id: 'msg-123',
@@ -321,7 +321,7 @@ describe('LLM Provider Integration', () => {
 						stop_reason: 'end_turn',
 					}),
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -343,7 +343,7 @@ describe('LLM Provider Integration', () => {
 		it('handles multiple text blocks from Claude', async () => {
 			const Anthropic = (await import('@anthropic-ai/sdk')).default;
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: {
 					create: vi.fn().mockResolvedValue({
 						id: 'msg-123',
@@ -356,7 +356,7 @@ describe('LLM Provider Integration', () => {
 						stop_reason: 'end_turn',
 					}),
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -376,7 +376,7 @@ describe('LLM Provider Integration', () => {
 		it('handles empty OpenAI response', async () => {
 			const OpenAI = (await import('openai')).default;
 
-			vi.mocked(OpenAI).mockImplementation(() => ({
+			vi.mocked(OpenAI).mockImplementation(function () { return ({
 				chat: {
 					completions: {
 						create: vi.fn().mockResolvedValue({
@@ -387,7 +387,7 @@ describe('LLM Provider Integration', () => {
 						}),
 					},
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.OPENAI,
@@ -409,7 +409,7 @@ describe('LLM Provider Integration', () => {
 		it('succeeds on first attempt', async () => {
 			const Anthropic = (await import('@anthropic-ai/sdk')).default;
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: {
 					create: vi.fn().mockResolvedValue({
 						id: 'msg-123',
@@ -419,7 +419,7 @@ describe('LLM Provider Integration', () => {
 						stop_reason: 'end_turn',
 					}),
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -437,7 +437,7 @@ describe('LLM Provider Integration', () => {
 			const Anthropic = (await import('@anthropic-ai/sdk')).default;
 
 			let callCount = 0;
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: {
 					create: vi.fn().mockImplementation(() => {
 						callCount++;
@@ -453,7 +453,7 @@ describe('LLM Provider Integration', () => {
 						};
 					}),
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -471,11 +471,11 @@ describe('LLM Provider Integration', () => {
 		it('fails after max retries', async () => {
 			const Anthropic = (await import('@anthropic-ai/sdk')).default;
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: {
 					create: vi.fn().mockRejectedValue(new Error('Persistent error')),
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -495,7 +495,7 @@ describe('LLM Provider Integration', () => {
 			const delays: number[] = [];
 			let lastCall = Date.now();
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: {
 					create: vi.fn().mockImplementation(() => {
 						const now = Date.now();
@@ -506,7 +506,7 @@ describe('LLM Provider Integration', () => {
 						throw new Error('Retry test');
 					}),
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -525,7 +525,7 @@ describe('LLM Provider Integration', () => {
 		it('invokes LLM with role configuration', async () => {
 			const Anthropic = (await import('@anthropic-ai/sdk')).default;
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: {
 					create: vi.fn().mockResolvedValue({
 						id: 'msg-123',
@@ -535,7 +535,7 @@ describe('LLM Provider Integration', () => {
 						stop_reason: 'end_turn',
 					}),
 				},
-			} as any));
+			}); } as any);
 
 			const config = {
 				executor: {
@@ -584,9 +584,9 @@ describe('LLM Provider Integration', () => {
 				stop_reason: 'end_turn',
 			});
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: { create: mockCreate },
-			} as any));
+			}); } as any);
 
 			const config = {
 				executor: {
@@ -624,9 +624,9 @@ describe('LLM Provider Integration', () => {
 				stop_reason: 'end_turn',
 			});
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: { create: mockCreate },
-			} as any));
+			}); } as any);
 
 			const config = {
 				executor: {
@@ -835,7 +835,7 @@ describe('LLM Provider Integration', () => {
 		it('handles Claude response with no content blocks', async () => {
 			const Anthropic = (await import('@anthropic-ai/sdk')).default;
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: {
 					create: vi.fn().mockResolvedValue({
 						id: 'msg-123',
@@ -845,7 +845,7 @@ describe('LLM Provider Integration', () => {
 						stop_reason: 'end_turn',
 					}),
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -865,7 +865,7 @@ describe('LLM Provider Integration', () => {
 		it('handles OpenAI response with missing usage', async () => {
 			const OpenAI = (await import('openai')).default;
 
-			vi.mocked(OpenAI).mockImplementation(() => ({
+			vi.mocked(OpenAI).mockImplementation(function () { return ({
 				chat: {
 					completions: {
 						create: vi.fn().mockResolvedValue({
@@ -876,7 +876,7 @@ describe('LLM Provider Integration', () => {
 						}),
 					},
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.OPENAI,
@@ -896,7 +896,7 @@ describe('LLM Provider Integration', () => {
 		it('handles very long prompts', async () => {
 			const Anthropic = (await import('@anthropic-ai/sdk')).default;
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: {
 					create: vi.fn().mockResolvedValue({
 						id: 'msg-123',
@@ -906,7 +906,7 @@ describe('LLM Provider Integration', () => {
 						stop_reason: 'end_turn',
 					}),
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -931,9 +931,9 @@ describe('LLM Provider Integration', () => {
 				stop_reason: 'end_turn',
 			});
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: { create: mockCreate },
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
@@ -955,7 +955,7 @@ describe('LLM Provider Integration', () => {
 		it('handles concurrent invocations', async () => {
 			const Anthropic = (await import('@anthropic-ai/sdk')).default;
 
-			vi.mocked(Anthropic).mockImplementation(() => ({
+			vi.mocked(Anthropic).mockImplementation(function () { return ({
 				messages: {
 					create: vi.fn().mockResolvedValue({
 						id: 'msg-123',
@@ -965,7 +965,7 @@ describe('LLM Provider Integration', () => {
 						stop_reason: 'end_turn',
 					}),
 				},
-			} as any));
+			}); } as any);
 
 			const options: LLMRequestOptions = {
 				provider: LLMProvider.CLAUDE,
