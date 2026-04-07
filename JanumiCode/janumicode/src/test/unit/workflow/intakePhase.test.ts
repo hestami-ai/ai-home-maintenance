@@ -40,9 +40,53 @@ import {
 	extractIntegrationMMP,
 } from '../../../lib/workflow/intakePhase';
 import { initializeWorkflowState, updateWorkflowMetadata } from '../../../lib/workflow/stateMachine';
-import { Phase } from '../../../lib/types';
+import { Phase, IntakeSubState } from '../../../lib/types';
+import type { IntakePlanDocument } from '../../../lib/types/intake';
 import { randomUUID } from 'node:crypto';
 import { getOrCreateIntakeConversation } from '../../../lib/events';
+import { updateIntakeConversation } from '../../../lib/events/writer';
+import { getDatabase } from '../../../lib/database/init';
+
+function makeMinimalFinalizedPlan(): IntakePlanDocument {
+	return {
+		version: 1,
+		title: 'Test plan',
+		summary: 'Minimal finalized plan for unit tests.',
+		requirements: [],
+		decisions: [],
+		constraints: [],
+		openQuestions: [],
+		technicalNotes: [],
+		proposedApproach: 'Implement.',
+		lastUpdatedAt: new Date().toISOString(),
+	};
+}
+
+function seedAwaitingApproval(dialogueId: string): void {
+	const db = getDatabase()!;
+	db.prepare(
+		"INSERT INTO dialogues (dialogue_id, goal, status, created_at) VALUES (?, 'test', 'ACTIVE', datetime('now'))"
+	).run(dialogueId);
+	getOrCreateIntakeConversation(dialogueId);
+	updateIntakeConversation(dialogueId, {
+		subState: IntakeSubState.AWAITING_APPROVAL,
+		turnCount: 3,
+		finalizedPlan: makeMinimalFinalizedPlan(),
+	});
+}
+
+function seedGatheringMode(dialogueId: string): void {
+	const db = getDatabase()!;
+	db.prepare(
+		"INSERT INTO dialogues (dialogue_id, goal, status, created_at) VALUES (?, 'test', 'ACTIVE', datetime('now'))"
+	).run(dialogueId);
+	getOrCreateIntakeConversation(dialogueId);
+	updateIntakeConversation(dialogueId, {
+		subState: IntakeSubState.GATHERING,
+		intakeMode: 'GATHERING' as any,
+		currentEngineeringDomain: 'PROBLEM_MISSION' as any,
+	});
+}
 
 describe('IntakePhase', () => {
 	let tempDb: TempDbContext;
@@ -147,6 +191,7 @@ describe('IntakePhase', () => {
 
 	describe('executeIntakePlanApproval', () => {
 		it('stores approved plan', () => {
+			seedAwaitingApproval(dialogueId);
 			const result = executeIntakePlanApproval(dialogueId);
 
 			expect(result.success).toBe(true);
@@ -156,6 +201,7 @@ describe('IntakePhase', () => {
 		});
 
 		it('transitions to next phase', () => {
+			seedAwaitingApproval(dialogueId);
 			const result = executeIntakePlanApproval(dialogueId);
 
 			expect(result.success).toBe(true);
@@ -172,6 +218,8 @@ describe('IntakePhase', () => {
 	});
 
 	describe('executeIntakeGatheringTurn', () => {
+		beforeEach(() => seedGatheringMode(dialogueId));
+
 		it('executes gathering turn', async () => {
 			const result = await executeIntakeGatheringTurn(
 				dialogueId,
@@ -406,6 +454,9 @@ describe('IntakePhase', () => {
 	describe('MMP extraction', () => {
 		describe('extractProductDiscoveryMMP', () => {
 			it('extracts MMP for product features', () => {
+				// Production semantics: menu is generated only when > 2 journeys exist
+				// AND priority categorization is present. With one journey we get a
+				// mirror (persona + journey) and no menu — assert that shape.
 				const plan = {
 					requestCategory: 'product_or_feature' as const,
 					summary: 'E-commerce platform',
@@ -419,7 +470,7 @@ describe('IntakePhase', () => {
 				expect(mmp).toBeDefined();
 				if (mmp) {
 					expect(mmp.mirror).toBeDefined();
-					expect(mmp.menu).toBeDefined();
+					expect(mmp.mirror?.items.length).toBeGreaterThan(0);
 				}
 			});
 
@@ -486,7 +537,7 @@ describe('IntakePhase', () => {
 					{ id: 'j1', title: 'Login', scenario: 'User logs in' }
 				];
 				const workflows = [
-					{ id: 'w1', name: 'Auth', description: 'Authentication', triggers: [] }
+					{ id: 'w1', name: 'Auth', description: 'Authentication', businessDomainId: 'd1', steps: [], actors: [], triggers: [], source: 'user' as const }
 				];
 
 				const mmp = extractJourneyWorkflowMMP(journeys, workflows as any);
@@ -496,7 +547,7 @@ describe('IntakePhase', () => {
 
 			it('includes both journeys and workflows', () => {
 				const journeys = [{ id: 'j1', title: 'Journey 1', scenario: 'Scenario' }];
-				const workflows = [{ id: 'w1', name: 'Workflow 1', description: 'Desc', triggers: [] }];
+				const workflows = [{ id: 'w1', name: 'Workflow 1', description: 'Desc', businessDomainId: 'd1', steps: [], actors: [], triggers: [], source: 'user' as const }];
 
 				const mmp = extractJourneyWorkflowMMP(journeys, workflows as any);
 
@@ -510,8 +561,8 @@ describe('IntakePhase', () => {
 		describe('extractEntityMMP', () => {
 			it('extracts MMP for entities', () => {
 				const entities = [
-					{ id: 'e1', name: 'User', description: 'User entity', attributes: [] },
-					{ id: 'e2', name: 'Product', description: 'Product entity', attributes: [] }
+					{ id: 'e1', name: 'User', description: 'User entity', businessDomainId: 'd1', keyAttributes: [], relationships: [], source: 'user' as const },
+					{ id: 'e2', name: 'Product', description: 'Product entity', businessDomainId: 'd1', keyAttributes: [], relationships: [], source: 'user' as const }
 				];
 
 				const mmp = extractEntityMMP(entities as any);
@@ -524,7 +575,7 @@ describe('IntakePhase', () => {
 
 			it('creates mirror items for each entity', () => {
 				const entities = [
-					{ id: 'e1', name: 'Order', description: 'Order entity', attributes: [] }
+					{ id: 'e1', name: 'Order', description: 'Order entity', businessDomainId: 'd1', keyAttributes: [], relationships: [], source: 'user' as const }
 				];
 
 				const mmp = extractEntityMMP(entities as any);
@@ -535,8 +586,8 @@ describe('IntakePhase', () => {
 
 		describe('extractIntegrationMMP', () => {
 			it('extracts MMP for integrations', () => {
-				const integrations: Array<{ id: string; name: string; description: string; purpose: string }> = [
-					{ id: 'i1', name: 'Stripe', description: 'Payment processing', purpose: 'Payments' }
+				const integrations = [
+					{ id: 'i1', name: 'Stripe', category: 'payment', description: 'Payment processing', standardProviders: ['Stripe'], ownershipModel: 'managed', rationale: 'Payments', source: 'user' as const }
 				];
 				const qualityAttributes = ['Security', 'Performance'];
 

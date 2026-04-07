@@ -218,14 +218,15 @@ describe('Primitive Catalog', () => {
 			expect(primitive).toBeDefined();
 		});
 
-		it('registers mutation.recordHumanDecision', async () => {
+		it('registers mutation.processGateDecision', async () => {
+			// Renamed from mutation.recordHumanDecision in catalog refactor.
 			const { PrimitiveRegistry } = await import('../../../lib/primitives/registry');
 			const { registerAllPrimitives } = await import('../../../lib/primitives/catalog');
 
 			const registry = new PrimitiveRegistry();
 			registerAllPrimitives(registry);
 
-			const primitive = registry.get('mutation.recordHumanDecision');
+			const primitive = registry.get('mutation.processGateDecision');
 
 			expect(primitive).toBeDefined();
 		});
@@ -244,108 +245,41 @@ describe('Primitive Catalog', () => {
 	});
 
 	describe('UI communication primitives', () => {
-		it('registers ui.showMessage', async () => {
+		// Production catalog has only ui.systemMessage; the older
+		// ui.showMessage / ui.setProcessing / ui.setInputEnabled / ui.refreshView
+		// primitives were collapsed into ui.systemMessage and direct
+		// uiChannel methods that aren't surfaced as separate primitives.
+		it('registers ui.systemMessage', async () => {
 			const { PrimitiveRegistry } = await import('../../../lib/primitives/registry');
 			const { registerAllPrimitives } = await import('../../../lib/primitives/catalog');
 
 			const registry = new PrimitiveRegistry();
 			registerAllPrimitives(registry);
 
-			const primitive = registry.get('ui.showMessage');
-
-			expect(primitive).toBeDefined();
-		});
-
-		it('ui.showMessage executes', async () => {
-			const { PrimitiveRegistry } = await import('../../../lib/primitives/registry');
-			const { registerAllPrimitives } = await import('../../../lib/primitives/catalog');
-
-			const registry = new PrimitiveRegistry();
-			registerAllPrimitives(registry);
-
-			const mockUIChannel = {
-				postSystemMessage: vi.fn(),
-			};
-
-			const primitive = registry.get('ui.showMessage');
-			const result = await primitive!.execute(
-				{ message: 'Test message' },
-				{ uiChannel: mockUIChannel } as any
-			);
-
-			expect(result.success).toBe(true);
-			expect(mockUIChannel.postSystemMessage).toHaveBeenCalledWith('Test message');
-		});
-
-		it('registers ui.setProcessing', async () => {
-			const { PrimitiveRegistry } = await import('../../../lib/primitives/registry');
-			const { registerAllPrimitives } = await import('../../../lib/primitives/catalog');
-
-			const registry = new PrimitiveRegistry();
-			registerAllPrimitives(registry);
-
-			const primitive = registry.get('ui.setProcessing');
-
-			expect(primitive).toBeDefined();
-		});
-
-		it('registers ui.setInputEnabled', async () => {
-			const { PrimitiveRegistry } = await import('../../../lib/primitives/registry');
-			const { registerAllPrimitives } = await import('../../../lib/primitives/catalog');
-
-			const registry = new PrimitiveRegistry();
-			registerAllPrimitives(registry);
-
-			const primitive = registry.get('ui.setInputEnabled');
-
-			expect(primitive).toBeDefined();
-		});
-
-		it('registers ui.refreshView', async () => {
-			const { PrimitiveRegistry } = await import('../../../lib/primitives/registry');
-			const { registerAllPrimitives } = await import('../../../lib/primitives/catalog');
-
-			const registry = new PrimitiveRegistry();
-			registerAllPrimitives(registry);
-
-			const primitive = registry.get('ui.refreshView');
-
-			expect(primitive).toBeDefined();
+			expect(registry.get('ui.systemMessage')).toBeDefined();
 		});
 	});
 
 	describe('workflow control primitives', () => {
-		it('registers workflow.triggerCycle', async () => {
+		// Renamed from workflow.triggerCycle to control.runWorkflowCycle.
+		it('registers control.runWorkflowCycle', async () => {
 			const { PrimitiveRegistry } = await import('../../../lib/primitives/registry');
 			const { registerAllPrimitives } = await import('../../../lib/primitives/catalog');
 
 			const registry = new PrimitiveRegistry();
 			registerAllPrimitives(registry);
 
-			const primitive = registry.get('workflow.triggerCycle');
-
-			expect(primitive).toBeDefined();
+			expect(registry.get('control.runWorkflowCycle')).toBeDefined();
 		});
 
-		it('workflow.triggerCycle executes', async () => {
+		it('registers control.transitionToPhase', async () => {
 			const { PrimitiveRegistry } = await import('../../../lib/primitives/registry');
 			const { registerAllPrimitives } = await import('../../../lib/primitives/catalog');
 
 			const registry = new PrimitiveRegistry();
 			registerAllPrimitives(registry);
 
-			const mockUIChannel = {
-				runWorkflowCycle: vi.fn().mockResolvedValue(undefined),
-			};
-
-			const primitive = registry.get('workflow.triggerCycle');
-			const result = await primitive!.execute(
-				{},
-				{ uiChannel: mockUIChannel } as any
-			);
-
-			expect(result.success).toBe(true);
-			expect(mockUIChannel.runWorkflowCycle).toHaveBeenCalled();
+			expect(registry.get('control.transitionToPhase')).toBeDefined();
 		});
 	});
 
