@@ -65,6 +65,7 @@ import {
 } from '../integration/eventBus';
 import type { CLIActivityEvent } from '../cli/types';
 import { getLogger, isLoggerInitialized } from '../logging';
+import { getDatabase } from '../database';
 import { randomUUID } from 'node:crypto';
 import {
 	initializeCoverageMap,
@@ -472,6 +473,40 @@ export function executeIntakePlanApproval(
 		if (conv.engineeringDomainCoverage) {
 			planForMetadata.engineeringDomainCoverage = conv.engineeringDomainCoverage;
 		}
+
+		// 2b. Enrich with handoff wrapper fields that the finalizedPlan alone does not carry.
+		// These are the same fields that materializeIntakeHandoff produces for the
+		// handoff_documents table, ensuring downstream phases (ARCHITECTURE, etc.)
+		// that read approvedIntakePlan from workflow metadata get the complete picture.
+		const db = getDatabase();
+		if (db) {
+			const dialogue = db.prepare(
+				'SELECT goal FROM dialogues WHERE dialogue_id = ?'
+			).get(dialogueId) as { goal: string } | undefined;
+			if (dialogue?.goal) {
+				planForMetadata.goal = dialogue.goal;
+			}
+
+			const humanDecisions = db.prepare(`
+				SELECT hd.action, hd.rationale
+				FROM human_decisions hd
+				JOIN gates g ON hd.gate_id = g.gate_id
+				WHERE g.dialogue_id = ?
+				ORDER BY hd.timestamp ASC
+			`).all(dialogueId) as Array<{ action: string; rationale: string }>;
+			planForMetadata.humanDecisions = humanDecisions;
+
+			const openLoops = db.prepare(`
+				SELECT category, description, priority
+				FROM open_loops
+				WHERE dialogue_id = ?
+				ORDER BY priority ASC
+			`).all(dialogueId) as Array<{ category: string; description: string; priority: string }>;
+			planForMetadata.openLoops = openLoops;
+
+			planForMetadata.mmpDecisions = null;
+		}
+
 		updateWorkflowMetadata(dialogueId, {
 			approvedIntakePlan: planForMetadata,
 		});

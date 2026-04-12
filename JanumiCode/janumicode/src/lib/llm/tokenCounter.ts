@@ -39,8 +39,11 @@ export function approximateTokensByChars(text: string): number {
  * @returns Approximate token count
  */
 export function approximateTokensByWords(text: string): number {
-	// Remove extra whitespace and split by words
-	const words = text.trim().split(/\s+/);
+	// Empty/whitespace input has zero tokens. (`split(/\s+/)` returns ['']
+	// for an empty string, so we have to special-case.)
+	const trimmed = text.trim();
+	if (trimmed.length === 0) { return 0; }
+	const words = trimmed.split(/\s+/);
 	// Most words are 1-2 tokens, average ~1.3 tokens per word
 	return Math.ceil(words.length * 1.3);
 }

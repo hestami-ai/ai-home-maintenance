@@ -1,0 +1,23 @@
+{
+  "$id": "janumicode:quality_evaluation_plan:1.0",
+  "title": "Quality Evaluation Plan",
+  "type": "object",
+  "required": ["criteria"],
+  "properties": {
+    "criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["nfr_id", "category", "evaluation_tool", "threshold", "measurement_method"],
+        "properties": {
+          "nfr_id": { "type": "string" },
+          "category": { "type": "string" },
+          "evaluation_tool": { "type": "string" },
+          "threshold": { "type": "string" },
+          "measurement_method": { "type": "string" },
+          "fallback_if_tool_unavailable": { "type": "string" }
+        }
+      }
+    }
+  }
+}

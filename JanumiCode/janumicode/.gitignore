@@ -18,6 +18,10 @@ test-output/checkpoints/
 test-output/architecture-flow.log
 test-output/temp-dbs.jsonl
 
+# Ollama probe outputs — rolling per-run artifacts (the fixture under
+# src/test/fixtures/ollama/ IS committed; these rolling outputs are not).
+test-output/ollama-probes/
+
 # Architecture metrics (keep baseline, ignore snapshots)
 .arch-metrics/*
 !.arch-metrics/baseline.json

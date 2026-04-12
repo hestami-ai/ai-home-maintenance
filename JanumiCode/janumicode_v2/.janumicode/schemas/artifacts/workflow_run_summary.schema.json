@@ -1,0 +1,14 @@
+{
+  "$id": "janumicode:workflow_run_summary:1.0",
+  "title": "Workflow Run Summary",
+  "type": "object",
+  "required": ["run_id", "completion_timestamp"],
+  "properties": {
+    "run_id": { "type": "string" },
+    "intent_statement_summary": { "type": "string" },
+    "key_decisions": { "type": "integer" },
+    "artifacts_produced": { "type": "integer" },
+    "janumicode_version_sha": { "type": "string" },
+    "completion_timestamp": { "type": "string" }
+  }
+}

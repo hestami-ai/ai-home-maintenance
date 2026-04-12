@@ -119,7 +119,7 @@ export function getArchitectureDocumentForDialogue(
 ): Result<ArchitectureDocument | null> {
 	try {
 		const row = db().prepare(
-			'SELECT * FROM architecture_documents WHERE dialogue_id = ? ORDER BY version DESC LIMIT 1'
+			'SELECT * FROM architecture_documents WHERE dialogue_id = ? ORDER BY version DESC, created_at DESC LIMIT 1'
 		).get(dialogueId) as Record<string, unknown> | undefined;
 		return { success: true, value: row ? hydrateArchitectureDocument(row) : null };
 	} catch (error) {

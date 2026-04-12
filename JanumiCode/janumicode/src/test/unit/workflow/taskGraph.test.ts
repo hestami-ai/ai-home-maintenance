@@ -42,11 +42,22 @@ vi.mock('../../../lib/context', async () => {
 describe('TaskGraph', () => {
 	let tempDb: TempDbContext;
 	let graphId: string;
+	let dialogueId: string;
+	let intentId: string;
 
-	beforeEach(() => {
+	beforeEach(async () => {
 		initTestLogger();
 		tempDb = createTempDatabase();
 		graphId = randomUUID();
+		dialogueId = randomUUID();
+		intentId = randomUUID();
+		// task_units FK to task_graphs which FK to intent_records which FK to
+		// dialogues. Seed the chain so buildTaskGraphFromResponse can persist.
+		const { getDatabase } = await import('../../../lib/database/init');
+		const db = getDatabase()!;
+		db.prepare("INSERT INTO dialogues (dialogue_id, goal, status, created_at) VALUES (?, 'test', 'ACTIVE', datetime('now'))").run(dialogueId);
+		db.prepare("INSERT INTO intent_records (intent_id, dialogue_id, human_goal, created_at, updated_at) VALUES (?, ?, 'g', datetime('now'), datetime('now'))").run(intentId, dialogueId);
+		db.prepare("INSERT INTO task_graphs (graph_id, dialogue_id, intent_id, root_goal, graph_status, created_at, updated_at) VALUES (?, ?, ?, 'g', 'DRAFT', datetime('now'), datetime('now'))").run(graphId, dialogueId, intentId);
 	});
 
 	afterEach(() => {

@@ -65,7 +65,7 @@ import * as vscode from 'vscode';
 
 // ==================== SYSTEM PROMPTS ====================
 
-const DECOMPOSING_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT in a governed multi-role dialogue system.
+export const DECOMPOSING_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT in a governed multi-role dialogue system.
 
 # Your Role
 You perform CAPABILITY DETECTION and WORKFLOW GRAPH GENERATION — the "Global Planner" step.
@@ -108,9 +108,26 @@ You MUST:
 3. Capabilities should be cohesive — group related requirements, don't create one per requirement
 4. Workflows must be concrete enough to identify actors and trigger conditions
 5. EVERY workflow ID referenced in a capability's "workflows" array MUST have a full definition in the top-level "workflows" array (no dangling references)
-6. Include engineering_domain_mappings for EVERY capability — map to the engineering domain(s) listed in
-   the Domain Coverage section using their exact names. If unsure, use coverage_contribution: "SECONDARY".
-   Do NOT leave engineering_domain_mappings empty.
+6. Include engineering_domain_mappings for EVERY capability.
+   - "mapping_id" MUST use the prefix "ENG-DM-" (engineering domain mapping). Example: "ENG-DM-001".
+   - "domain" MUST be one of the following 12 canonical engineering domain enum values, and ONLY
+     these. Do NOT invent your own taxonomy (e.g. "WEB_APP", "MOBILE_CLIENT", "API_GATEWAY",
+     "AUTHENTICATION" are NOT valid here):
+     - PROBLEM_MISSION
+     - STAKEHOLDERS
+     - SCOPE
+     - CAPABILITIES
+     - WORKFLOWS_USE_CASES
+     - DATA_INFORMATION
+     - INTEGRATION_INTERFACES
+     - SECURITY_COMPLIANCE
+     - QUALITY_ATTRIBUTES
+     - ENVIRONMENT_OPERATIONS
+     - ARCHITECTURE
+     - VERIFICATION_DELIVERY
+   If a Domain Coverage section is included in the context, prefer mappings whose domains appear
+   there. If unsure of contribution level, use coverage_contribution: "SECONDARY". Do NOT leave
+   engineering_domain_mappings empty.
 7. Use parent_capability_id to create a hierarchy. Top-level capabilities should be broad functional
    areas. Sub-capabilities should be specific enough to map to concrete workflows.
 8. Do NOT write, create, or modify any files. Your output is JSON only.
@@ -136,8 +153,8 @@ Return ONLY the JSON object:
       "source_requirements": ["REQ-1", "REQ-2"],
       "engineering_domain_mappings": [
         {
-          "mapping_id": "DM-<UUID>",
-          "domain": "<EngineeringDomain enum value>",
+          "mapping_id": "ENG-DM-<UUID>",
+          "domain": "DATA_INFORMATION",
           "capability_id": "CAP-<SHORT-NAME>",
           "requirement_ids": ["REQ-1"],
           "coverage_contribution": "PRIMARY"
@@ -172,25 +189,28 @@ Return ONLY the JSON object:
 
 // ── MODELING prompt: Domain Model document ──
 
-const MODELING_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT performing DOMAIN MODELING.
+export const MODELING_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT performing ENTITY / DATA MODELING.
 
 # Your Task
-Produce a comprehensive Domain Model for the system described in the context below.
-The Domain Model defines every data entity the system works with — their fields,
-relationships, constraints, and business invariants.
+Produce a comprehensive set of data models (entities) for the system described in the
+context below. Each data model defines a single entity the system works with — its
+fields, relationships, constraints, and business invariants. This sub-phase produces
+ENTITIES (DAT-MD-*), not business domains (BUS-DM-*). Business domains were validated
+in the INTAKE phase and are inputs here, not outputs.
 
 # Approach
 1. **Start from entityProposals** — if the context includes user-validated \`entityProposals\`
    from the INTAKE phase, use them as the PRIMARY source for entities. They contain pre-validated
-   names, key attributes, relationships, and domain assignments. Do NOT ignore them.
-2. Use \`businessBusinessDomainProposals\` (if present) to understand domain groupings and entity previews.
-3. Examine the capabilities and workflows to identify additional entities not covered by proposals.
-4. Read the ground-truth spec files in the workspace if available (look for
-   specs/ or ground-truth-specs/ directories) to understand domain patterns.
-5. For each entity, define complete field-level detail including types, constraints,
+   names, key attributes, relationships, and business domain assignments. Do NOT ignore them.
+2. Use \`businessDomainProposals\` (if present) ONLY for grouping context — to understand which
+   business domain each entity belongs to. Business domains are NOT entities themselves; do not
+   emit them as data_models.
+3. Examine the capabilities and workflows in the brief to identify additional entities not
+   already covered by entityProposals.
+4. For each entity, define complete field-level detail including types, constraints,
    and validation rules.
-6. Map all relationships with cardinality and direction.
-7. Define business invariants — rules that must always hold across the data model.
+5. Map all relationships with cardinality and direction.
+6. Define business invariants — rules that must always hold across the data model.
 
 # Critical Guardrails
 1. Every entity SHOULD trace to at least one workflow. If an entity was user-validated during
@@ -212,14 +232,14 @@ Return ONLY the JSON object:
 {
   "data_models": [
     {
-      "model_id": "DM-<SHORT-NAME>",
+      "model_id": "DAT-MD-<SHORT-NAME>",
       "entity_name": "EntityName",
       "description": "What this entity represents and its role in the system",
       "fields": [
         { "name": "field_name", "type": "string|uuid|integer|timestamp|boolean|jsonb|enum(...)", "required": true, "description": "Purpose and validation rules" }
       ],
       "relationships": [
-        { "target_model": "DM-<ID>", "type": "one-to-one|one-to-many|many-to-many", "description": "What this relationship means" }
+        { "target_model": "DAT-MD-<ID>", "type": "one-to-one|one-to-many|many-to-many", "description": "What this relationship means" }
       ],
       "constraints": ["Unique on email", "Check: status IN ('active', 'archived')"],
       "invariants": ["A tenant must have at least one admin user", "Property address cannot change after listing is published"],
@@ -230,7 +250,7 @@ Return ONLY the JSON object:
 
 // ── DESIGNING prompt: System Architecture + Interface Contract documents ──
 
-const DESIGNING_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT performing COMPONENT DESIGN and INTERFACE SPECIFICATION.
+export const DESIGNING_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT performing COMPONENT DESIGN and INTERFACE SPECIFICATION.
 
 # Your Task
 Design the component architecture and interface contracts for the system described below.
@@ -317,7 +337,7 @@ Return ONLY the JSON object:
       "rationale": "Why this exists: which requirements and workflows necessitate it",
       "workflows_served": ["WF-<ID>"],
       "dependencies": ["COMP-<ID>"],
-      "interaction_patterns": ["Calls COMP-X via REST for Y", "Reads from DM-Z via database query"],
+      "interaction_patterns": ["Calls COMP-X via REST for Y", "Reads from DAT-MD-Z via database query"],
       "technology_notes": "Stack/pattern decisions with justification",
       "file_scope": "src/modules/<name>/",
       "parent_component_id": null
@@ -339,7 +359,7 @@ Return ONLY the JSON object:
 
 // ── SEQUENCING prompt: Implementation Roadmap document ──
 
-const SEQUENCING_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT performing IMPLEMENTATION SEQUENCING.
+export const SEQUENCING_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT performing IMPLEMENTATION SEQUENCING.
 
 # Your Task
 Produce an Implementation Roadmap — a phased plan for building the system described below.
@@ -415,7 +435,7 @@ export async function invokeArchitectureDecomposition(
 	dialogueId: string,
 	approvedPlan: IntakePlanDocument,
 	engineeringDomainCoverage: EngineeringDomainCoverageMap | null,
-	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; humanFeedback?: string | null; priorArchitectureDoc?: import('../types/architecture').ArchitectureDocument | null; commandBlock?: DeferredCommandBlock }
+	options?: { commandId?: string; dialogueId?: string; onEvent?: (event: CLIActivityEvent) => void; humanFeedback?: string | null; priorArchitectureDoc?: import('../types/architecture').ArchitectureDocument | null; technicalAnalysis?: Record<string, unknown> | null; commandBlock?: DeferredCommandBlock }
 ): Promise<Result<DecompositionResult>> {
 	const log = isLoggerInitialized()
 		? getLogger().child({ component: 'architectureExpert', phase: 'DECOMPOSING' })
@@ -441,6 +461,7 @@ export async function invokeArchitectureDecomposition(
 			phasing_strategy: approvedPlan.phasingStrategy ?? [],
 			integration_proposals: approvedPlan.integrationProposals ?? [],
 			personas: approvedPlan.personas ?? [],
+			technical_analysis: options?.technicalAnalysis ?? null,
 		};
 		if (options?.priorArchitectureDoc) {
 			const priorDoc = options.priorArchitectureDoc;
@@ -791,41 +812,21 @@ function extractJson(raw: string): string {
  * System prompt for the LLM JSON repair call.
  * Tight scope: fix encoding and syntax only — no content changes.
  */
-const DESIGN_JSON_REPAIR_PROMPT =
-`You are a JSON syntax repair tool. You receive malformed or incorrectly encoded JSON.
+export const DESIGN_JSON_REPAIR_PROMPT =
+`You are a JSON syntax repair tool. The input is JSON that fails to parse due to encoding errors, missing or extra commas, smart quotes, unquoted keys, escaping issues, or similar punctuation/encoding problems.
 
-Return ONLY the corrected JSON. No explanation, no code fences, no prose.
-Fix ONLY encoding and syntax errors. Do not add, remove, rename, or paraphrase any fields or values.
+Your job is to return the SAME data with the SAME fields and the SAME values, with ONLY the syntax fixed so it parses as valid JSON.
 
-The JSON must conform to this structure:
-{
-  "components": [
-    {
-      "component_id": "string",
-      "label": "string",
-      "responsibility": "string",
-      "rationale": "string",
-      "workflows_served": ["string"],
-      "dependencies": ["string"],
-      "interaction_patterns": ["string"],
-      "technology_notes": "string",
-      "file_scope": "string",
-      "parent_component_id": "string or null"
-    }
-  ],
-  "interfaces": [
-    {
-      "interface_id": "string",
-      "type": "REST|EVENT|RPC|FILE|IPC",
-      "label": "string",
-      "description": "string",
-      "provider_component": "string",
-      "consumer_components": ["string"],
-      "contract": "string",
-      "source_workflows": ["string"]
-    }
-  ]
-}`;
+ABSOLUTE RULES:
+- Do NOT add fields that were not in the input.
+- Do NOT remove fields that were in the input.
+- Do NOT rename fields.
+- Do NOT change, paraphrase, or "improve" any field values.
+- Do NOT interpret the meaning of any field — you have no schema and you do not need one.
+- Do NOT wrap the output in code fences, markdown, or prose.
+- Return ONLY the corrected JSON object, nothing else.
+
+If the input cannot be repaired by punctuation/encoding fixes alone (for example, if structure is fundamentally broken), return the original input unchanged.`;
 
 /**
  * Last-resort JSON repair via LLM (claude-haiku-4-5-20251001, temperature 0).
@@ -907,7 +908,7 @@ function parseDecompositionResponse(rawResponse: string): Result<DecompositionRe
 			source_requirements: Array.isArray(c.source_requirements) ? c.source_requirements as string[] : [],
 			engineering_domain_mappings: Array.isArray(c.engineering_domain_mappings)
 				? (c.engineering_domain_mappings as Record<string, unknown>[]).map(dm => ({
-					mapping_id: (dm.mapping_id as string) || `DM-${randomUUID().substring(0, 8)}`,
+					mapping_id: (dm.mapping_id as string) || `ENG-DM-${randomUUID().substring(0, 8)}`,
 					domain: dm.domain as EngineeringDomainCapabilityMapping['domain'],
 					capability_id: (dm.capability_id as string) || c.capability_id as string,
 					requirement_ids: Array.isArray(dm.requirement_ids) ? dm.requirement_ids as string[] : [],
@@ -1004,7 +1005,7 @@ function parseModelingResponse(rawResponse: string): Result<ModelingResult> {
 		}
 
 		const data_models: DataModelSpec[] = parsed.data_models.map((m: Record<string, unknown>) => ({
-			model_id: (m.model_id as string) || `DM-${randomUUID().substring(0, 8)}`,
+			model_id: (m.model_id as string) || `DAT-MD-${randomUUID().substring(0, 8)}`,
 			entity_name: (m.entity_name as string) || '',
 			description: (m.description as string) || '',
 			fields: Array.isArray(m.fields)
@@ -1285,7 +1286,7 @@ export async function invokeArchitectureSequencing(
 
 // ==================== BATCH DECOMPOSITION INVOCATION ====================
 
-const DECOMPOSITION_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT performing TARGETED DECOMPOSITION.
+export const DECOMPOSITION_SYSTEM_PROMPT = `You are the ARCHITECTURE EXPERT performing TARGETED DECOMPOSITION.
 
 # Task
 You are given components that violated stopping criteria during recursive evaluation.

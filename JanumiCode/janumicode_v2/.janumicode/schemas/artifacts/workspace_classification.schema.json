@@ -1,0 +1,27 @@
+{
+  
+  "$id": "janumicode:workspace_classification:1.0",
+  "title": "Workspace Classification",
+  "description": "Phase 0.1 output — classifies workspace as greenfield or brownfield",
+  "type": "object",
+  "required": ["workspace_type", "janumicode_version_sha"],
+  "properties": {
+    "workspace_type": {
+      "type": "string",
+      "enum": ["greenfield", "brownfield"]
+    },
+    "janumicode_version_sha": {
+      "type": "string",
+      "minLength": 1
+    },
+    "existing_artifact_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "prior_workflow_run_count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}

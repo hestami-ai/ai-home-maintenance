@@ -1,0 +1,15 @@
+{
+  "$id": "janumicode:consistency_report:1.0",
+  "title": "Consistency Report",
+  "type": "object",
+  "required": ["overall_pass"],
+  "properties": {
+    "overall_pass": { "type": "boolean" },
+    "traceability_results": { "type": "array" },
+    "semantic_findings": { "type": "array" },
+    "internal_findings": { "type": "array" },
+    "compliance_findings": { "type": "array" },
+    "blocking_failures": { "type": "array", "items": { "type": "string" } },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  }
+}

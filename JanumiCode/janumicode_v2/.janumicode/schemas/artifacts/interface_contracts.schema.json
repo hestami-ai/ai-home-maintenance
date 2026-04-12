@@ -1,0 +1,24 @@
+{
+  "$id": "janumicode:interface_contracts:1.0",
+  "title": "Interface Contracts",
+  "type": "object",
+  "required": ["contracts"],
+  "properties": {
+    "contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "systems_involved", "protocol", "data_format"],
+        "properties": {
+          "id": { "type": "string" },
+          "systems_involved": { "type": "array", "items": { "type": "string" }, "minItems": 2 },
+          "protocol": { "type": "string" },
+          "data_format": { "type": "string" },
+          "auth_mechanism": { "type": "string" },
+          "error_handling_strategy": { "type": "string" },
+          "error_responses": { "type": "array", "minItems": 1, "items": { "type": "object" } }
+        }
+      }
+    }
+  }
+}

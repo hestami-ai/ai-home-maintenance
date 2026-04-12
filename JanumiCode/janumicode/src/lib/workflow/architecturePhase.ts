@@ -38,6 +38,7 @@ import type {
 import { DEFAULT_DECOMPOSITION_CONFIG } from '../types/architecture';
 import {
 	createArchitectureDocument,
+	getArchitectureDocument,
 	getArchitectureDocumentForDialogue,
 	updateArchitectureDocument,
 	updateArchitectureDocumentStatus,
@@ -53,6 +54,71 @@ import { buildStdinContent } from '../cli/types';
 import { invokeRoleStreaming } from '../cli/roleInvoker';
 import { randomUUID } from 'node:crypto';
 import { getWorkspaceStructureSummary } from '../context/workspaceReader';
+
+/**
+ * System prompt for the TECHNICAL_ANALYSIS sub-state of the ARCHITECTURE phase.
+ * Exported so the prompt-regression test harness can import it without
+ * duplicating the text.
+ */
+export const TECHNICAL_ANALYSIS_PROMPT = `You are the TECHNICAL EXPERT in the JanumiCode autonomous system, performing TECHNICAL ANALYSIS for the ARCHITECTURE phase.
+
+# Your Task
+
+An implementation plan has been approved. Investigate the technical landscape to inform architecture decomposition. You must:
+
+1. **Explore the workspace**: List directories, read key files (package.json, tsconfig, configs, docker files, etc.)
+2. **Identify existing patterns**: What frameworks, libraries, design patterns, and conventions are already in use?
+3. **Map existing code structure**: What modules/components already exist? What's the directory layout?
+4. **Identify technical constraints**: What does the existing codebase impose on the architecture? (e.g., existing database schema, API contracts, auth patterns)
+5. **Assess build/deploy infrastructure**: What CI/CD, containerization, hosting is in place?
+
+# Greenfield Projects
+
+**IMPORTANT**: If the workspace contains no codebase for the target product (greenfield build), you will find the JanumiCode tooling workspace instead. In that case:
+- Note that the target product has no existing codebase — set \`codebaseFindings\` to [] and note greenfield status in \`analysisSummary\`
+- Base \`technicalNotes\` on the stack decisions in the approved plan (requirements, constraints, decisions)
+- For \`domainAssessment\`, assess coverage of each engineering domain based on the plan content — requirements, decisions, constraints, the validated business domains, and phasing strategy provided below. A domain is ADEQUATE if the plan clearly addresses it; PARTIAL if partially covered; NONE if not addressed.
+
+# Critical Rules
+
+- DO NOT modify any files. This is read-only investigation.
+- DO NOT propose architecture decisions. That's the next phase's job.
+- DO NOT ask questions. Produce findings only.
+- Be thorough — read actual files, don't guess from names.
+
+# Response Format
+
+Your response MUST be valid JSON:
+
+{
+  "analysisSummary": "A comprehensive 2-4 paragraph summary of the technical landscape: what exists, what patterns are established, what the codebase state is.",
+  "codebaseFindings": [
+    "path/to/file - what was found and why it matters for architecture"
+  ],
+  "technicalNotes": [
+    "Observation about existing patterns, conventions, or constraints that architecture must respect"
+  ],
+  "existingStack": {
+    "languages": ["TypeScript", "Python"],
+    "frameworks": ["SvelteKit", "Express"],
+    "databases": ["PostgreSQL"],
+    "infrastructure": ["Docker Compose", "Cloudflare"],
+    "other": ["any other significant tech"]
+  },
+  "proposedApproach": "High-level technical approach informed by what exists in the codebase",
+  "engineeringDomainAssessment": [
+    { "domain": "PROBLEM_MISSION", "level": "ADEQUATE", "evidence": "Clearly defined in specs and approved plan" },
+    { "domain": "DATA_INFORMATION", "level": "PARTIAL", "evidence": "Schema exists but migration strategy unclear" },
+    { "domain": "SECURITY_COMPLIANCE", "level": "NONE", "evidence": "No auth implementation found in codebase" }
+  ]
+}
+
+For engineeringDomainAssessment, assess each of the 12 engineering domains based on what you find in the codebase AND the approved plan:
+1. PROBLEM_MISSION, 2. STAKEHOLDERS, 3. SCOPE, 4. CAPABILITIES, 5. WORKFLOWS_USE_CASES,
+6. DATA_INFORMATION, 7. INTEGRATION_INTERFACES, 8. SECURITY_COMPLIANCE, 9. QUALITY_ATTRIBUTES,
+10. ENVIRONMENT_OPERATIONS, 11. ARCHITECTURE, 12. VERIFICATION_DELIVERY
+
+Levels: ADEQUATE (well covered), PARTIAL (some coverage), NONE (not addressed).`;
 
 /** Cached workspace summary — read once per architecture phase execution, reused across sub-states. */
 let _cachedWorkspaceSummary: string | null | undefined;
@@ -212,7 +278,7 @@ export function backfillDomainMappings(
 		}
 
 		const mappings: EngineeringDomainCapabilityMapping[] = [...inferredDomains].map((domain, i) => ({
-			mapping_id: `DM-BF-${cap.capability_id}-${i}`,
+			mapping_id: `ENG-DM-BF-${cap.capability_id}-${i}`,
 			domain: domain as EngineeringDomainCapabilityMapping['domain'],
 			capability_id: cap.capability_id,
 			requirement_ids: cap.source_requirements,
@@ -381,66 +447,6 @@ async function executeTechnicalAnalysis(
 		JSON.stringify(approvedPlan, null, 2),
 		'```',
 	];
-
-	const TECHNICAL_ANALYSIS_PROMPT = `You are the TECHNICAL EXPERT in the JanumiCode autonomous system, performing TECHNICAL ANALYSIS for the ARCHITECTURE phase.
-
-# Your Task
-
-An implementation plan has been approved. Investigate the technical landscape to inform architecture decomposition. You must:
-
-1. **Explore the workspace**: List directories, read key files (package.json, tsconfig, configs, docker files, etc.)
-2. **Identify existing patterns**: What frameworks, libraries, design patterns, and conventions are already in use?
-3. **Map existing code structure**: What modules/components already exist? What's the directory layout?
-4. **Identify technical constraints**: What does the existing codebase impose on the architecture? (e.g., existing database schema, API contracts, auth patterns)
-5. **Assess build/deploy infrastructure**: What CI/CD, containerization, hosting is in place?
-
-# Greenfield Projects
-
-**IMPORTANT**: If the workspace contains no codebase for the target product (greenfield build), you will find the JanumiCode tooling workspace instead. In that case:
-- Note that the target product has no existing codebase — set \`codebaseFindings\` to [] and note greenfield status in \`analysisSummary\`
-- Base \`technicalNotes\` on the stack decisions in the approved plan (requirements, constraints, decisions)
-- For \`domainAssessment\`, assess coverage of each engineering domain based on the plan content — requirements, decisions, constraints, the validated business domains, and phasing strategy provided below. A domain is ADEQUATE if the plan clearly addresses it; PARTIAL if partially covered; NONE if not addressed.
-
-# Critical Rules
-
-- DO NOT modify any files. This is read-only investigation.
-- DO NOT propose architecture decisions. That's the next phase's job.
-- DO NOT ask questions. Produce findings only.
-- Be thorough — read actual files, don't guess from names.
-
-# Response Format
-
-Your response MUST be valid JSON:
-
-{
-  "analysisSummary": "A comprehensive 2-4 paragraph summary of the technical landscape: what exists, what patterns are established, what the codebase state is.",
-  "codebaseFindings": [
-    "path/to/file - what was found and why it matters for architecture"
-  ],
-  "technicalNotes": [
-    "Observation about existing patterns, conventions, or constraints that architecture must respect"
-  ],
-  "existingStack": {
-    "languages": ["TypeScript", "Python"],
-    "frameworks": ["SvelteKit", "Express"],
-    "databases": ["PostgreSQL"],
-    "infrastructure": ["Docker Compose", "Cloudflare"],
-    "other": ["any other significant tech"]
-  },
-  "proposedApproach": "High-level technical approach informed by what exists in the codebase",
-  "engineeringDomainAssessment": [
-    { "domain": "PROBLEM_MISSION", "level": "ADEQUATE", "evidence": "Clearly defined in specs and approved plan" },
-    { "domain": "DATA_INFORMATION", "level": "PARTIAL", "evidence": "Schema exists but migration strategy unclear" },
-    { "domain": "SECURITY_COMPLIANCE", "level": "NONE", "evidence": "No auth implementation found in codebase" }
-  ]
-}
-
-For engineeringDomainAssessment, assess each of the 12 engineering domains based on what you find in the codebase AND the approved plan:
-1. PROBLEM_MISSION, 2. STAKEHOLDERS, 3. SCOPE, 4. CAPABILITIES, 5. WORKFLOWS_USE_CASES,
-6. DATA_INFORMATION, 7. INTEGRATION_INTERFACES, 8. SECURITY_COMPLIANCE, 9. QUALITY_ATTRIBUTES,
-10. ENVIRONMENT_OPERATIONS, 11. ARCHITECTURE, 12. VERIFICATION_DELIVERY
-
-Levels: ADEQUATE (well covered), PARTIAL (some coverage), NONE (not addressed).`;
 
 	const stdinContent = buildStdinContent(TECHNICAL_ANALYSIS_PROMPT, contextParts.join('\n\n'));
 
@@ -617,10 +623,13 @@ async function executeDecomposing(
 		};
 	}
 
-	// 1b. On repair passes, load the prior architecture doc so the agent can fix specific issues
+	// 1b. Read technical analysis findings from prior sub-state for downstream context
+	const technicalAnalysis = workflowMeta.technicalAnalysis ?? null;
+
+	// 1c. On repair passes, load the prior architecture doc so the agent can fix specific issues
 	let priorArchDoc: import('../types/architecture').ArchitectureDocument | null = null;
 	if (isRepairPass && meta.architectureDocId) {
-		const priorResult = getArchitectureDocumentForDialogue(dialogueId);
+		const priorResult = getArchitectureDocument(meta.architectureDocId);
 		if (priorResult.success) {
 			priorArchDoc = priorResult.value;
 		}
@@ -645,6 +654,7 @@ async function executeDecomposing(
 			commandId: decomposeCmdId, dialogueId, onEvent: buildArchitectureOnEvent(dialogueId),
 			humanFeedback: meta.humanFeedback,
 			priorArchitectureDoc: priorArchDoc,
+			technicalAnalysis,
 			commandBlock: { dialogueId, commandId: decomposeCmdId, label: `Architect — Capability Decomposition [${providerName}]${isRepairPass ? ' (Repair)' : ''}`, commandType: 'role_invocation' },
 		}
 	);
@@ -830,9 +840,9 @@ async function executeModeling(
 		return { success: false, error: new Error('No architecture document ID — DECOMPOSING must run first') };
 	}
 
-	const docResult = getArchitectureDocumentForDialogue(dialogueId);
-	if (!docResult.success || !docResult.value) {
-		return { success: false, error: new Error('Architecture document not found') };
+	const docResult = getArchitectureDocument(meta.architectureDocId);
+	if (!docResult.success) {
+		return { success: false, error: new Error(`Architecture document not found: ${meta.architectureDocId}`) };
 	}
 	const doc = docResult.value;
 
@@ -987,10 +997,10 @@ async function executeDesigning(
 		};
 	}
 
-	// 1. Get current document
-	const docResult = getArchitectureDocumentForDialogue(dialogueId);
-	if (!docResult.success || !docResult.value) {
-		return { success: false, error: new Error('Architecture document not found') };
+	// 1. Get current document (use authoritative ID from metadata, not latest-version query)
+	const docResult = getArchitectureDocument(meta.architectureDocId);
+	if (!docResult.success) {
+		return { success: false, error: new Error(`Architecture document not found: ${meta.architectureDocId}`) };
 	}
 	const doc = docResult.value;
 
@@ -1542,9 +1552,9 @@ async function executeSequencing(
 		return { success: false, error: new Error('No architecture document ID — DESIGNING must run first') };
 	}
 
-	const docResult = getArchitectureDocumentForDialogue(dialogueId);
-	if (!docResult.success || !docResult.value) {
-		return { success: false, error: new Error('Architecture document not found') };
+	const docResult = getArchitectureDocument(meta.architectureDocId);
+	if (!docResult.success) {
+		return { success: false, error: new Error(`Architecture document not found: ${meta.architectureDocId}`) };
 	}
 	const doc = docResult.value;
 
@@ -1702,9 +1712,17 @@ async function executeValidating(
 		timestamp: new Date().toISOString(),
 	});
 
-	// 1. Get current document
-	const docResult = getArchitectureDocumentForDialogue(dialogueId);
-	if (!docResult.success || !docResult.value) {
+	// 1. Get current document (use authoritative ID from metadata)
+	let doc: import('../types/architecture').ArchitectureDocument | null = null;
+	if (meta.architectureDocId) {
+		const byIdResult = getArchitectureDocument(meta.architectureDocId);
+		if (byIdResult.success) { doc = byIdResult.value; }
+	}
+	if (!doc) {
+		const fallbackResult = getArchitectureDocumentForDialogue(dialogueId);
+		if (fallbackResult.success) { doc = fallbackResult.value; }
+	}
+	if (!doc) {
 		emitWorkflowCommand({
 			dialogueId,
 			commandId: validateCmdId,
@@ -1717,7 +1735,6 @@ async function executeValidating(
 		});
 		return { success: false, error: new Error('Architecture document not found') };
 	}
-	const doc = docResult.value;
 
 	// 2. Run structural consistency checks (deterministic, no LLM)
 	const structuralFindings = runStructuralValidation(doc);
@@ -1963,10 +1980,10 @@ async function executePresenting(
 		return { success: false, error: new Error('No architecture document ID in metadata') };
 	}
 
-	// 1. Get the document
-	const docResult = getArchitectureDocumentForDialogue(dialogueId);
-	if (!docResult.success || !docResult.value) {
-		return { success: false, error: new Error('Architecture document not found') };
+	// 1. Get the document (use authoritative ID from metadata)
+	const docResult = getArchitectureDocument(meta.architectureDocId);
+	if (!docResult.success) {
+		return { success: false, error: new Error(`Architecture document not found: ${meta.architectureDocId}`) };
 	}
 	const doc = docResult.value;
 

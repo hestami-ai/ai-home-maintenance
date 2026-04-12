@@ -1,0 +1,160 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createTestDatabase, type Database } from '../../../lib/database/init';
+import { GovernedStreamWriter } from '../../../lib/orchestrator/governedStreamWriter';
+import { DependencyClosureResolver } from '../../../lib/orchestrator/dependencyClosureResolver';
+
+let idCounter = 0;
+function testId(): string { return `dcr-${++idCounter}`; }
+
+describe('DependencyClosureResolver', () => {
+  let db: Database;
+  let writer: GovernedStreamWriter;
+  let resolver: DependencyClosureResolver;
+
+  beforeEach(() => {
+    idCounter = 0;
+    db = createTestDatabase();
+    writer = new GovernedStreamWriter(db, testId);
+    resolver = new DependencyClosureResolver(db, 50);
+
+    db.prepare(`
+      INSERT INTO workflow_runs (id, workspace_id, janumicode_version_sha, initiated_at, status)
+      VALUES ('run-1', 'ws-1', 'abc', '2026-01-01T00:00:00Z', 'initiated')
+    `).run();
+  });
+
+  afterEach(() => { db.close(); });
+
+  function writeArtifact(id?: string): string {
+    const record = writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: 'run-1',
+      janumicode_version_sha: 'abc',
+      content: {},
+    });
+    return record.id;
+  }
+
+  function addEdge(sourceId: string, targetId: string, edgeType: string = 'derives_from'): void {
+    db.prepare(`
+      INSERT INTO memory_edge (id, source_record_id, target_record_id, edge_type, asserted_by, asserted_at, authority_level, status)
+      VALUES (?, ?, ?, ?, 'test', '2026-01-01T00:00:00Z', 5, 'system_asserted')
+    `).run(testId(), sourceId, targetId, edgeType);
+  }
+
+  it('computes simple linear closure', () => {
+    // A → B → C (C derives from B, B derives from A)
+    const a = writeArtifact();
+    const b = writeArtifact();
+    const c = writeArtifact();
+    addEdge(b, a); // B derives from A
+    addEdge(c, b); // C derives from B
+
+    const closure = resolver.computeClosure(a, 'run-1');
+
+    // Rollback A should include B and C (everything that derives from A)
+    expect(closure.closureIds).toContain(a);
+    expect(closure.closureIds).toContain(b);
+    expect(closure.closureIds).toContain(c);
+    expect(closure.closureSize).toBe(3);
+  });
+
+  it('computes branching closure', () => {
+    // A → B, A → C (both B and C derive from A)
+    const a = writeArtifact();
+    const b = writeArtifact();
+    const c = writeArtifact();
+    addEdge(b, a);
+    addEdge(c, a);
+
+    const closure = resolver.computeClosure(a, 'run-1');
+
+    expect(closure.closureIds).toContain(a);
+    expect(closure.closureIds).toContain(b);
+    expect(closure.closureIds).toContain(c);
+    expect(closure.closureSize).toBe(3);
+  });
+
+  it('detects cycles', () => {
+    const a = writeArtifact();
+    const b = writeArtifact();
+    addEdge(b, a); // B derives from A
+    addEdge(a, b); // A derives from B (cycle!)
+
+    const closure = resolver.computeClosure(a, 'run-1');
+
+    expect(closure.cycleDetected).toBe(true);
+  });
+
+  it('stops at cross-run boundaries', () => {
+    // Create artifact in a different run
+    db.prepare(`
+      INSERT INTO workflow_runs (id, workspace_id, janumicode_version_sha, initiated_at, status)
+      VALUES ('run-2', 'ws-1', 'abc', '2026-01-02T00:00:00Z', 'initiated')
+    `).run();
+
+    const a = writeArtifact(); // run-1
+
+    // Create artifact in run-2
+    const priorRecord = writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: 'run-2',
+      source_workflow_run_id: 'run-2',
+      janumicode_version_sha: 'abc',
+      content: {},
+    });
+
+    addEdge(priorRecord.id, a); // prior-run artifact derives from A
+
+    const closure = resolver.computeClosure(a, 'run-1');
+
+    // Prior-run artifact should be referenced but NOT in the closure
+    expect(closure.closureIds).toContain(a);
+    expect(closure.closureIds).not.toContain(priorRecord.id);
+    expect(closure.crossRunReferences).toContain(priorRecord.id);
+  });
+
+  it('detects closure size limit exceedance', () => {
+    const smallResolver = new DependencyClosureResolver(db, 2);
+    const a = writeArtifact();
+    const b = writeArtifact();
+    const c = writeArtifact();
+    addEdge(b, a);
+    addEdge(c, a);
+
+    const closure = smallResolver.computeClosure(a, 'run-1');
+
+    expect(closure.exceedsLimit).toBe(true);
+    expect(closure.closureSize).toBe(3);
+  });
+
+  it('returns single-element closure when no dependencies', () => {
+    const a = writeArtifact();
+
+    const closure = resolver.computeClosure(a, 'run-1');
+
+    expect(closure.closureIds).toEqual([a]);
+    expect(closure.closureSize).toBe(1);
+    expect(closure.cycleDetected).toBe(false);
+    expect(closure.exceedsLimit).toBe(false);
+  });
+
+  it('executeRollback marks artifacts as non-current', () => {
+    const a = writeArtifact();
+    const b = writeArtifact();
+    addEdge(b, a);
+
+    const closure = resolver.computeClosure(a, 'run-1');
+    resolver.executeRollback(closure, 'rollback-1', 'run-1');
+
+    // Check artifacts are marked non-current
+    const aRecord = writer.getRecord(a);
+    expect(aRecord!.is_current_version).toBe(false);
+    expect(aRecord!.superseded_by_id).toBe('rollback-1');
+
+    const bRecord = writer.getRecord(b);
+    expect(bRecord!.is_current_version).toBe(false);
+  });
+});

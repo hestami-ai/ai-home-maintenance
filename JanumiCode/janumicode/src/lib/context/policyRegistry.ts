@@ -205,6 +205,11 @@ const policies: ContextPolicy[] = [
 			PERSONAS,
 			HISTORICAL_FINDINGS,
 			HUMAN_CORRECTIONS,
+			{
+				blockId: 'technical_analysis',
+				label: 'Technical Analysis Findings (codebase investigation results from prior sub-phase)',
+				source: 'static' as const,
+			},
 		],
 	},
 

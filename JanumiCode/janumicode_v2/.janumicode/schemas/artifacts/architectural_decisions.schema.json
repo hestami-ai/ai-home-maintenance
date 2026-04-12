@@ -1,0 +1,25 @@
+{
+  "$id": "janumicode:architectural_decisions:1.0",
+  "title": "Architectural Decisions",
+  "type": "object",
+  "required": ["adrs"],
+  "properties": {
+    "adrs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "status", "decision", "rationale"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "string", "enum": ["proposed", "accepted", "deprecated", "superseded"] },
+          "context": { "type": "string" },
+          "decision": { "type": "string" },
+          "alternatives": { "type": "array", "items": { "type": "string" } },
+          "rationale": { "type": "string" },
+          "consequences": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

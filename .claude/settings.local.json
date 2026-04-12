@@ -122,7 +122,19 @@
       "Bash(set -a)",
       "Bash(source .env)",
       "Bash(set +a)",
-      "Bash(wmic process:*)"
+      "Bash(wmic process:*)",
+      "Bash(OLLAMA_PROBE=1 npx vitest run src/test/scenarios/ollama/contextEngineer.ollama.test.ts)",
+      "Bash(pnpm --version)",
+      "Bash(npm --version)",
+      "Bash(echo '{\"onlyBuiltDependencies\":[\"better-sqlite3\",\"esbuild\"]}')",
+      "Bash(pnpm config:*)",
+      "Bash(pnpm test:*)",
+      "Bash(curl -s http://127.0.0.1:11434/api/tags)",
+      "Bash(pnpm test:probes -- --reporter verbose src/test/prompt-probes/intentQualityCheck.probe.ts)",
+      "Bash(pnpm test:probes -- src/test/prompt-probes/reasoningReview.probe.ts)",
+      "Bash(pnpm test:probes -- src/test/prompt-probes/reasoningReview.probe.ts -t \"clean\")",
+      "Bash(npx tsx:*)",
+      "Bash(pnpm exec:*)"
     ]
   }
 }

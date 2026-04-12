@@ -1,0 +1,22 @@
+{
+  "$id": "janumicode:non_functional_requirements:1.0",
+  "title": "Non-Functional Requirements",
+  "type": "object",
+  "required": ["requirements"],
+  "properties": {
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "category", "description", "threshold"],
+        "properties": {
+          "id": { "type": "string" },
+          "category": { "type": "string", "enum": ["performance", "security", "reliability", "scalability", "accessibility", "maintainability"] },
+          "description": { "type": "string" },
+          "threshold": { "type": "string" },
+          "measurement_method": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -41,7 +41,7 @@ import { jsonrepair } from 'jsonrepair';
 
 // ==================== SYSTEM PROMPT ====================
 
-const CONTEXT_ENGINEER_SYSTEM_PROMPT = `You are the CONTEXT ENGINEER in the JanumiCode governed workflow system.
+export const CONTEXT_ENGINEER_SYSTEM_PROMPT = `You are the CONTEXT ENGINEER in the JanumiCode governed workflow system.
 
 Your job is to assemble a complete, faithful context briefing for a downstream LLM agent.
 You receive a POLICY that specifies required and optional context blocks, and you receive
@@ -114,7 +114,6 @@ Respond with ONLY valid JSON (no markdown fences, no explanation outside the JSO
 - NEVER fabricate data. Only include information from pre-assembled data (handoff docs, extras, conversation history) or data retrieved via MCP tools.
 - If a required block has no data available from ANY source, set sufficient=false and list it in missingRequired. Do NOT synthesize a plausible substitute and present it as retrieved data.
 - When reporting sources in sectionManifest, accurately reflect where the data actually came from. Do NOT claim source=db_query if you did not execute a tool call.
-- The briefing MUST be formatted as clean markdown with clear section headers.
 - Prioritize completeness over compactness. The downstream agent will fail if you drop user-validated artifacts.
 `;
 
@@ -273,6 +272,37 @@ export async function assembleContext(
 
 	const packet = parseResult.value;
 
+	// 7b. Programmatic handoff doc injection — bypass LLM verbatim-copy failure.
+	// The Context Engineer LLM is prone to silently truncating large JSON payloads
+	// from handoff documents (e.g., dropping humanDecisions, openLoops, mmpDecisions
+	// from a ~17k-token INTAKE document). Instead of relying on the LLM to reproduce
+	// the handoff doc content faithfully, we mechanically append the authoritative
+	// JSON for every handoff_doc-sourced policy block after the LLM's briefing.
+	// This preserves the CE's dynamic synthesis while guaranteeing data completeness.
+	const handoffDocBlocks = [...policy.requiredBlocks, ...policy.optionalBlocks]
+		.filter(b => b.source === 'handoff_doc' && b.handoffDocType);
+	if (handoffDocBlocks.length > 0 && handoffDocs.length > 0) {
+		const injectedSections: string[] = [];
+		for (const block of handoffDocBlocks) {
+			const matchingDoc = handoffDocs.find(d => d.doc_type === block.handoffDocType);
+			if (matchingDoc) {
+				injectedSections.push(
+					`\n## Authoritative ${block.handoffDocType} Handoff Data (${block.blockId})\n` +
+					`> Programmatically injected — not subject to LLM summarization or truncation.\n\n` +
+					'```json\n' +
+					JSON.stringify(matchingDoc.content, null, 2) +
+					'\n```'
+				);
+			}
+		}
+		if (injectedSections.length > 0) {
+			packet.briefing += '\n\n# Authoritative Handoff Document Data\n' +
+				'The following sections contain the COMPLETE, unmodified handoff document content.\n' +
+				'If any field appears truncated or missing in the briefing above, the data below is authoritative.\n' +
+				injectedSections.join('\n');
+		}
+	}
+
 	// 8. Validate sufficiency
 	const sufficiencyResult = validateSufficiency(packet, policy);
 	if (!sufficiencyResult.success) {
@@ -296,7 +326,7 @@ export async function assembleContext(
 
 // ==================== AGENT STDIN BUILDER ====================
 
-function buildAgentStdin(
+export function buildAgentStdin(
 	policy: ContextPolicy,
 	handoffDocs: HandoffDocument[],
 	dialogueId: string,

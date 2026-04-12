@@ -1,0 +1,59 @@
+{
+  
+  "$id": "janumicode:intent_quality_report:1.0",
+  "title": "Intent Quality Report",
+  "description": "Sub-Phase 1.0 output — assesses Raw Intent completeness, consistency, coherence",
+  "type": "object",
+  "required": ["completeness_findings", "consistency_findings", "coherence_findings", "overall_status"],
+  "properties": {
+    "completeness_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["field", "status", "severity"],
+        "properties": {
+          "field": { "type": "string" },
+          "status": { "type": "string", "enum": ["present", "absent"] },
+          "severity": { "type": "string", "enum": ["high", "medium", "low"] },
+          "explanation": { "type": "string" }
+        }
+      }
+    },
+    "consistency_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["elements_in_conflict", "explanation"],
+        "properties": {
+          "elements_in_conflict": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 2
+          },
+          "explanation": { "type": "string" },
+          "severity": { "type": "string", "enum": ["blocking", "warning"] }
+        }
+      }
+    },
+    "coherence_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["concern", "explanation"],
+        "properties": {
+          "concern": { "type": "string" },
+          "explanation": { "type": "string" },
+          "severity": { "type": "string", "enum": ["blocking", "warning"] }
+        }
+      }
+    },
+    "overall_status": {
+      "type": "string",
+      "enum": ["pass", "requires_input", "blocking"]
+    },
+    "system_proposal_offered_for": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

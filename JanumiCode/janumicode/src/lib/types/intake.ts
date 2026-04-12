@@ -77,7 +77,7 @@ export enum ProposerPhase {
 export type ProposalSource = 'document-specified' | 'user-specified' | 'domain-standard' | 'ai-proposed';
 
 export interface BusinessDomainProposal {
-	/** Unique identifier, e.g., "DOM-ACCOUNTING" */
+	/** Unique identifier, e.g., "BUS-DM-ACCOUNTING" */
 	id: string;
 	/** Human-readable name, e.g., "Accounting & Financial Management" */
 	name: string;

@@ -1,0 +1,12 @@
+{
+  "$id": "janumicode:evaluation_results:1.0",
+  "title": "Evaluation Results",
+  "type": "object",
+  "required": ["functional", "quality", "reasoning", "overall_pass"],
+  "properties": {
+    "functional": { "type": "array" },
+    "quality": { "type": "array" },
+    "reasoning": { "type": "array" },
+    "overall_pass": { "type": "boolean" }
+  }
+}

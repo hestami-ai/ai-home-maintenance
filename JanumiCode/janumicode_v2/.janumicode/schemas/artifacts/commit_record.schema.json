@@ -1,0 +1,13 @@
+{
+  "$id": "janumicode:commit_record:1.0",
+  "title": "Commit Record",
+  "type": "object",
+  "required": ["branch", "commit_message"],
+  "properties": {
+    "commit_sha": { "type": "string" },
+    "branch": { "type": "string" },
+    "commit_message": { "type": "string" },
+    "artifact_ids_committed": { "type": "array", "items": { "type": "string" } },
+    "status": { "type": "string", "enum": ["prepared", "committed", "failed"] }
+  }
+}

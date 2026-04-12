@@ -1903,7 +1903,7 @@ Return ONLY the JSON object:
 {
   "domains": [
     {
-      "id": "DOM-<SHORT-NAME>",
+      "id": "BUS-DM-<SHORT-NAME>",
       "name": "Domain Name",
       "description": "What this domain covers",
       "rationale": "Why this domain is relevant. Source: user-specified|ai-proposed",
@@ -2007,7 +2007,7 @@ export async function invokeProposerBusinessDomains(
 		const parsed = JSON.parse(jsonStr);
 
 		const domains: BusinessDomainProposal[] = (parsed.domains ?? []).map((d: Record<string, unknown>, i: number) => ({
-			id: (d.id as string) || `DOM-${i + 1}`,
+			id: (d.id as string) || `BUS-DM-${i + 1}`,
 			name: (d.name as string) || '',
 			description: (d.description as string) || '',
 			rationale: (d.rationale as string) || '',
@@ -2108,7 +2108,7 @@ Return ONLY the JSON object:
   "workflows": [
     {
       "id": "WF-1",
-      "businessDomainId": "DOM-X",
+      "businessDomainId": "BUS-DM-X",
       "name": "Workflow name",
       "description": "What this workflow accomplishes",
       "steps": ["Step 1 description", "Step 2 description"],
@@ -2243,7 +2243,7 @@ Return ONLY the JSON object:
   "entities": [
     {
       "id": "ENT-<NAME>",
-      "businessDomainId": "DOM-X",
+      "businessDomainId": "BUS-DM-X",
       "name": "Entity Name",
       "description": "What this entity represents",
       "keyAttributes": ["attribute1", "attribute2"],

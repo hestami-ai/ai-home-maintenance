@@ -1,0 +1,14 @@
+[
+  {
+    "invariant_id": "DM-001",
+    "artifact_type": "data_models",
+    "description": "No entity has a field without a specified type",
+    "check_type": "field_presence",
+    "specification": {
+      "field_path": "models[*].entities[*].fields[*].type",
+      "message": "Entity field must have a specified type"
+    },
+    "severity": "blocking",
+    "phase_applies_to": ["5"]
+  }
+]

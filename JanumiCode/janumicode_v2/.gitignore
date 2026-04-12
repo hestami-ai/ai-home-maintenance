@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.vsix
+.janumicode/governed_stream.db
+.janumicode/governed_stream.db-wal
+.janumicode/governed_stream.db-shm
+.janumicode/context/
+.env
+coverage/
+test-output/

@@ -1,0 +1,736 @@
+{"type":"init","timestamp":"2026-04-07T14:16:27.753Z","session_id":"7f380532-6dd0-412e-951a-a88e162f6cf5","model":"auto-gemini-2.5"}```json
+{
+  "capabilities": [
+    {
+      "capability_id": "CAP-AI",
+      "parent_capability_id": null,
+      "label": "AI & Data Intelligence",
+      "description": "Provides AI-powered services like document analysis, service provider recommendations, and predictive maintenance insights to other domains.",
+      "source_requirements": [
+        "REQ-1"
+      ],
+      "engineering_domain_mappings": [
+        {
+          "mapping_id": "DM-AI-1",
+          "domain": "ARCHITECTURE",
+          "capability_id": "CAP-AI",
+          "requirement_ids": [
+            "REQ-1"
+          ],
+          "coverage_contribution": "PRIMARY"
+        }
+      ],
+      "workflows": [
+        "WF-AI-ANALYZE-DOC",
+        "WF-PROVIDER-RECOMMEND"
+      ]
+    },
+    {
+      "capability_id": "CAP-ACCOUNTING",
+      "parent_capability_id": null,
+      "label": "Financials & Accounting",
+      "description": "Manages all financial aspects for community associations, including accounts receivable (assessments), accounts payable, general ledger, and financial reporting.",
+      "source_requirements": [
+        "REQ-2",
+        "REQ-3"
+      ],
+      "engineering_domain_mappings": [
+        {
+          "mapping_id": "DM-ACC-1",
+          "domain": "DATA_INFORMATION",
+          "capability_id": "CAP-ACCOUNTING",
+          "requirement_ids": [
+            "REQ-2"
+          ],
+          "coverage_contribution": "PRIMARY"
+        },
+        {
+          "mapping_id": "DM-ACC-2",
+          "domain": "SECURITY_COMPLIANCE",
+          "capability_id": "CAP-ACCOUNTING",
+          "requirement_ids": [
+            "REQ-2"
+          ],
+          "coverage_contribution": "SECONDARY"
+        },
+        {
+          "mapping_id": "DM-ACC-3",
+          "domain": "WORKFLOWS_USE_CASES",
+          "capability_id": "CAP-ACCOUNTING",
+          "requirement_ids": [
+            "REQ-3"
+          ],
+          "coverage_contribution": "PRIMARY"
+        }
+      ],
+      "workflows": [
+        "WF-AR-COLLECTIONS",
+        "WF-POST-ASSESSMENTS"
+      ]
+    },
+    {
+      "capability_id": "CAP-COMPLIANCE",
+      "parent_capability_id": null,
+      "label": "Community & Compliance Management",
+      "description": "Governs the rules and regulations of a community association, including inspections, violation tracking, and enforcement workflows.",
+      "source_requirements": [],
+      "engineering_domain_mappings": [
+        {
+          "mapping_id": "DM-COMP-1",
+          "domain": "WORKFLOWS_USE_CASES",
+          "capability_id": "CAP-COMPLIANCE",
+          "requirement_ids": [],
+          "coverage_contribution": "PRIMARY"
+        }
+      ],
+      "workflows": [
+        "WF-VIOLATION-ESCALATE"
+      ]
+    },
+    {
+      "capability_id": "CAP-VENDOR",
+      "parent_capability_id": null,
+      "label": "Vendor & Provider Management",
+      "description": "Manages the network of service providers, including their onboarding, credentialing, service offerings, ratings, and performance.",
+      "source_requirements": [],
+      "engineering_domain_mappings": [
+        {
+          "mapping_id": "DM-VEND-1",
+          "domain": "WORKFLOWS_USE_CASES",
+          "capability_id": "CAP-VENDOR",
+          "requirement_ids": [],
+          "coverage_contribution": "PRIMARY"
+        }
+      ],
+      "workflows": [
+        "WF-MONITOR-CREDENTIALS"
+      ]
+    },
+    {
+      "capability_id": "CAP-WORK-ORDER",
+      "parent_capability_id": null,
+      "label": "Service & Work Order Management",
+      "description": "Manages the full lifecycle of a service request, from initial creation by a homeowner to bidding, work order generation, completion, and invoicing.",
+      "source_requirements": [],
+      "engineering_domain_mappings": [
+        {
+          "mapping_id": "DM-WO-1",
+          "domain": "WORKFLOWS_USE_CASES",
+          "capability_id": "CAP-WORK-ORDER",
+          "requirement_ids": [],
+          "coverage_contribution": "PRIMARY"
+        }
+      ],
+      "workflows": [
+        "WF-LIFECYCLE-NOTIFY"
+      ]
+    },
+    {
+      "capability_id": "CAP-DOCS",
+      "parent_capability_id": null,
+      "label": "Document Management",
+      "description": "Provides a centralized and secure repository for storing, organizing, versioning, and sharing all documents across the platform.",
+      "source_requirements": [
+        "REQ-1"
+      ],
+      "engineering_domain_mappings": [
+        {
+          "mapping_id": "DM-DOCS-1",
+          "domain": "DATA_INFORMATION",
+          "capability_id": "CAP-DOCS",
+          "requirement_ids": [
+            "REQ-1"
+          ],
+          "coverage_contribution": "PRIMARY"
+        }
+      ],
+      "workflows": [
+        "WF-AI-ANALYZE-DOC"
+      ]
+    },
+    {
+      "capability_id": "CAP-PLATFORM",
+      "parent_capability_id": null,
+      "label": "Platform Capabilities",
+      "description": "Cross-cutting capabilities that support the entire platform.",
+      "source_requirements": [
+        "REQ-4"
+      ],
+      "engineering_domain_mappings": [
+        {
+          "mapping_id": "DM-PLAT-1",
+          "domain": "ARCHITECTURE",
+          "capability_id": "CAP-PLATFORM",
+          "requirement_ids": [
+            "REQ-4"
+          ],
+          "coverage_contribution": "PRIMARY"
+        }
+      ],
+      "workflows": []
+    }
+  ],
+  "workflows": [
+    {
+      "workflow_id": "WF-PROVIDER-RECOMMEND",
+      "capability_id": "CAP-AI",
+      "label": "Service Provider Recommendation",
+      "description": "When a homeowner submits a service request, this workflow uses AI to analyze the request and recommend the best-fit service providers from the network.",
+      "steps": [
+        {
+          "step_id": "STEP-1",
+          "label": "Service Request Created",
+          "actor": "Homeowner",
+          "action": "Creates a new service request with description and media.",
+          "inputs": [
+            "Service Request Data"
+          ],
+          "outputs": [
+            "Created Service Request"
+          ],
+          "next_steps": [
+            "STEP-2"
+          ]
+        },
+        {
+          "step_id": "STEP-2",
+          "label": "Parse Request",
+          "actor": "System",
+          "action": "Parses the request description, category, and attached media using natural language processing.",
+          "inputs": [
+            "Created Service Request"
+          ],
+          "outputs": [
+            "Parsed Request Features"
+          ],
+          "next_steps": [
+            "STEP-3"
+          ]
+        },
+        {
+          "step_id": "STEP-3",
+          "label": "Match Providers",
+          "actor": "API",
+          "action": "AI model matches the request's needs against provider profiles, considering skills, service area, ratings, and availability.",
+          "inputs": [
+            "Parsed Request Features",
+            "Provider Profiles"
+          ],
+          "outputs": [
+            "Ranked List of Providers"
+          ],
+          "next_steps": [
+            "STEP-4"
+          ]
+        },
+        {
+          "step_id": "STEP-4",
+          "label": "Present Recommendations",
+          "actor": "System",
+          "action": "Presents the recommended providers to the homeowner.",
+          "inputs": [
+            "Ranked List of Providers"
+          ],
+          "outputs": [
+            "UI with Provider Recommendations"
+          ],
+          "next_steps": []
+        }
+      ],
+      "actors": [
+        "Homeowner",
+        "System",
+        "API"
+      ],
+      "triggers": [
+        "Creation of a new service request."
+      ],
+      "outputs": [
+        "List of recommended service providers."
+      ]
+    },
+    {
+      "workflow_id": "WF-MONITOR-CREDENTIALS",
+      "capability_id": "CAP-VENDOR",
+      "label": "Vendor Credential Expiration Monitoring",
+      "description": "This workflow automatically monitors the expiration dates of vendor credentials (like insurance or licenses) and triggers alerts to ensure compliance.",
+      "steps": [
+        {
+          "step_id": "STEP-1",
+          "label": "Scan Credentials",
+          "actor": "Worker",
+          "action": "A nightly system job scans all vendor profiles for credentials expiring within the next 60 days.",
+          "inputs": [
+            "Vendor Credentials"
+          ],
+          "outputs": [
+            "List of Expiring Credentials"
+          ],
+          "next_steps": [
+            "STEP-2"
+          ]
+        },
+        {
+          "step_id": "STEP-2",
+          "label": "Send Notifications",
+          "actor": "System",
+          "action": "Sends notifications at 60, 30, and 7 days to the Service Provider for each expiring credential.",
+          "inputs": [
+            "List of Expiring Credentials"
+          ],
+          "outputs": [
+            "Sent Notifications"
+          ],
+          "next_steps": [
+            "STEP-3"
+          ]
+        },
+        {
+          "step_id": "STEP-3",
+          "label": "Handle Expiration",
+          "actor": "System",
+          "action": "If a credential expires, automatically flags the provider's profile as 'Non-Compliant', suspends them from receiving new jobs, and notifies Hestami Admin.",
+          "inputs": [
+            "Expired Credential"
+          ],
+          "outputs": [
+            "Suspended Provider Profile",
+            "Admin Notification"
+          ],
+          "next_steps": [
+            "STEP-4"
+          ]
+        },
+        {
+          "step_id": "STEP-4",
+          "label": "Lift Suspension",
+          "actor": "System",
+          "action": "Lifts the suspension once the provider uploads a new, valid credential.",
+          "inputs": [
+            "New Valid Credential"
+          ],
+          "outputs": [
+            "Active Provider Profile"
+          ],
+          "next_steps": []
+        }
+      ],
+      "actors": [
+        "Worker",
+        "System",
+        "User"
+      ],
+      "triggers": [
+        "Scheduled nightly job."
+      ],
+      "outputs": [
+        "Compliant vendor network."
+      ]
+    },
+    {
+      "workflow_id": "WF-VIOLATION-ESCALATE",
+      "capability_id": "CAP-COMPLIANCE",
+      "label": "Violation Escalation Process",
+      "description": "Automates the escalation of unresolved community violations according to the association's predefined enforcement policy.",
+      "steps": [
+        {
+          "step_id": "STEP-1",
+          "label": "Deadline Passes",
+          "actor": "System",
+          "action": "A violation's resolution deadline passes without being resolved.",
+          "inputs": [
+            "Unresolved Violation"
+          ],
+          "outputs": [
+            "Trigger for Escalation"
+          ],
+          "next_steps": [
+            "STEP-2"
+          ]
+        },
+        {
+          "step_id": "STEP-2",
+          "label": "Check Policy",
+          "actor": "System",
+          "action": "Checks the community's enforcement policy for the next step.",
+          "inputs": [
+            "Trigger for Escalation",
+            "Enforcement Policy"
+          ],
+          "outputs": [
+            "Next Escalation Stage"
+          ],
+          "next_steps": [
+            "STEP-3"
+          ]
+        },
+        {
+          "step_id": "STEP-3",
+          "label": "Escalate Violation",
+          "actor": "System",
+          "action": "Automatically escalates the violation to the next stage (e.g., 'Second Notice').",
+          "inputs": [
+            "Next Escalation Stage"
+          ],
+          "outputs": [
+            "Updated Violation Status"
+          ],
+          "next_steps": [
+            "STEP-4"
+          ]
+        },
+        {
+          "step_id": "STEP-4",
+          "label": "Generate and Send Notice",
+          "actor": "System",
+          "action": "Generates a new notice and sends it to the homeowner. Applies a fine if defined in the policy.",
+          "inputs": [
+            "Updated Violation Status",
+            "Notice Template"
+          ],
+          "outputs": [
+            "Sent Notice",
+            "Ledger Entry for Fine"
+          ],
+          "next_steps": [
+            "STEP-1"
+          ]
+        }
+      ],
+      "actors": [
+        "System",
+        "User"
+      ],
+      "triggers": [
+        "Violation resolution deadline passing."
+      ],
+      "outputs": [
+        "Enforced community compliance."
+      ]
+    },
+    {
+      "workflow_id": "WF-AR-COLLECTIONS",
+      "capability_id": "CAP-ACCOUNTING",
+      "label": "Automated Accounts Receivable (AR) Collections",
+      "description": "Manages the process of collecting delinquent homeowner assessments based on the community's collections policy.",
+      "steps": [
+        {
+          "step_id": "STEP-1",
+          "label": "Assessment Overdue",
+          "actor": "System",
+          "action": "An assessment payment becomes overdue after its due date.",
+          "inputs": [
+            "Overdue Assessment"
+          ],
+          "outputs": [
+            "Trigger for Collections"
+          ],
+          "next_steps": [
+            "STEP-2"
+          ]
+        },
+        {
+          "step_id": "STEP-2",
+          "label": "Apply Late Fee",
+          "actor": "System",
+          "action": "Automatically applies a late fee to the homeowner's account after the grace period.",
+          "inputs": [
+            "Trigger for Collections",
+            "Collection Policy"
+          ],
+          "outputs": [
+            "Ledger Entry for Late Fee"
+          ],
+          "next_steps": [
+            "STEP-3"
+          ]
+        },
+        {
+          "step_id": "STEP-3",
+          "label": "Send Notices",
+          "actor": "System",
+          "action": "Sends a series of notices ('Friendly Reminder', 'Formal Demand') based on the policy timeline.",
+          "inputs": [
+            "Delinquent Account",
+            "Collection Policy"
+          ],
+          "outputs": [
+            "Sent Notices"
+          ],
+          "next_steps": [
+            "STEP-4"
+          ]
+        },
+        {
+          "step_id": "STEP-4",
+          "label": "Final Escalation",
+          "actor": "System",
+          "action": "Flags the account for final action (e.g., legal action) if it remains unpaid after all notices.",
+          "inputs": [
+            "Severely Delinquent Account"
+          ],
+          "outputs": [
+            "Flagged Account for CAM/Board review"
+          ],
+          "next_steps": []
+        }
+      ],
+      "actors": [
+        "System",
+        "User"
+      ],
+      "triggers": [
+        "An assessment due date passing without payment."
+      ],
+      "outputs": [
+        "Managed and collected assessments."
+      ]
+    },
+    {
+      "workflow_id": "WF-AI-ANALYZE-DOC",
+      "capability_id": "CAP-DOCS",
+      "label": "AI Document Analysis and Indexing",
+      "description": "When a document is uploaded, this workflow uses AI to process its content, extract key information, and make it searchable.",
+      "steps": [
+        {
+          "step_id": "STEP-1",
+          "label": "Upload Document",
+          "actor": "User",
+          "action": "Uploads a document (e.g., PDF, JPG) to the system.",
+          "inputs": [
+            "File"
+          ],
+          "outputs": [
+            "Stored Document"
+          ],
+          "next_steps": [
+            "STEP-2"
+          ]
+        },
+        {
+          "step_id": "STEP-2",
+          "label": "Perform OCR",
+          "actor": "API",
+          "action": "An Optical Character Recognition (OCR) service converts images of text into machine-readable text.",
+          "inputs": [
+            "Stored Document"
+          ],
+          "outputs": [
+            "Raw Text"
+          ],
+          "next_steps": [
+            "STEP-3"
+          ]
+        },
+        {
+          "step_id": "STEP-3",
+          "label": "Extract Entities",
+          "actor": "API",
+          "action": "A Natural Language Processing (NLP) model analyzes the text to identify key entities.",
+          "inputs": [
+            "Raw Text"
+          ],
+          "outputs": [
+            "Extracted Entities"
+          ],
+          "next_steps": [
+            "STEP-4"
+          ]
+        },
+        {
+          "step_id": "STEP-4",
+          "label": "Index and Tag",
+          "actor": "System",
+          "action": "The extracted text and entities are added to a search index and the document is auto-tagged with keywords.",
+          "inputs": [
+            "Extracted Entities",
+            "Raw Text"
+          ],
+          "outputs": [
+            "Searchable Document Index",
+            "Document Tags"
+          ],
+          "next_steps": []
+        }
+      ],
+      "actors": [
+        "User",
+        "System",
+        "API"
+      ],
+      "triggers": [
+        "File upload to the document management system."
+      ],
+      "outputs": [
+        "A searchable, indexed, and tagged document."
+      ]
+    },
+    {
+      "workflow_id": "WF-LIFECYCLE-NOTIFY",
+      "capability_id": "CAP-WORK-ORDER",
+      "label": "Work Order Lifecycle Notifications",
+      "description": "Keeps all stakeholders informed about the status of a work order as it progresses from creation to completion.",
+      "steps": [
+        {
+          "step_id": "STEP-1",
+          "label": "Work Order Created",
+          "actor": "System",
+          "action": "Notifies the awarded Service Provider of the new job.",
+          "inputs": [
+            "New Work Order"
+          ],
+          "outputs": [
+            "Provider Notification"
+          ],
+          "next_steps": [
+            "STEP-2"
+          ]
+        },
+        {
+          "step_id": "STEP-2",
+          "label": "Job Scheduled",
+          "actor": "System",
+          "action": "Notifies the Homeowner of the scheduled service date.",
+          "inputs": [
+            "Scheduled Job"
+          ],
+          "outputs": [
+            "Homeowner Notification"
+          ],
+          "next_steps": [
+            "STEP-3"
+          ]
+        },
+        {
+          "step_id": "STEP-3",
+          "label": "Technician En Route",
+          "actor": "System",
+          "action": "Sends an 'On the way' notification to the Homeowner with an ETA.",
+          "inputs": [
+            "Technician Status Update"
+          ],
+          "outputs": [
+            "Homeowner ETA Notification"
+          ],
+          "next_steps": [
+            "STEP-4"
+          ]
+        },
+        {
+          "step_id": "STEP-4",
+          "label": "Job Complete",
+          "actor": "System",
+          "action": "Notifies the Homeowner and Service Provider's office that the job is complete.",
+          "inputs": [
+            "Completed Job Status"
+          ],
+          "outputs": [
+            "Homeowner Completion Notification",
+            "Provider Office Notification"
+          ],
+          "next_steps": []
+        }
+      ],
+      "actors": [
+        "System",
+        "User"
+      ],
+      "triggers": [
+        "Change in work order status."
+      ],
+      "outputs": [
+        "Informed stakeholders throughout the work order lifecycle."
+      ]
+    },
+    {
+      "workflow_id": "WF-POST-ASSESSMENTS",
+      "capability_id": "CAP-ACCOUNTING",
+      "label": "Post Periodic Assessments",
+      "description": "Automatically generates and posts periodic assessment charges to all homeowner accounts in a community.",
+      "steps": [
+        {
+          "step_id": "STEP-1",
+          "label": "Trigger Posting",
+          "actor": "Worker",
+          "action": "A scheduled job initiates the assessment posting process for a community based on its billing cycle.",
+          "inputs": [
+            "Community Billing Cycle"
+          ],
+          "outputs": [
+            "Posting Process Trigger"
+          ],
+          "next_steps": [
+            "STEP-2"
+          ]
+        },
+        {
+          "step_id": "STEP-2",
+          "label": "Generate Charges",
+          "actor": "System",
+          "action": "For each property, the system generates an assessment charge based on the community's approved budget.",
+          "inputs": [
+            "Posting Process Trigger",
+            "Community Budget"
+          ],
+          "outputs": [
+            "List of Assessment Charges"
+          ],
+          "next_steps": [
+            "STEP-3"
+          ]
+        },
+        {
+          "step_id": "STEP-3",
+          "label": "Post to Ledgers",
+          "actor": "System",
+          "action": "Posts each charge as a transaction to the respective homeowner's account ledger.",
+          "inputs": [
+            "List of Assessment Charges"
+          ],
+          "outputs": [
+            "Updated Homeowner Ledgers"
+          ],
+          "next_steps": [
+            "STEP-4"
+          ]
+        },
+        {
+          "step_id": "STEP-4",
+          "label": "Deliver Invoices",
+          "actor": "System",
+          "action": "Generates and delivers invoices to homeowners via their preferred communication method.",
+          "inputs": [
+            "Updated Homeowner Ledgers"
+          ],
+          "outputs": [
+            "Delivered Invoices"
+          ],
+          "next_steps": []
+        }
+      ],
+      "actors": [
+        "Worker",
+        "System"
+      ],
+      "triggers": [
+        "Scheduled date based on community billing cycle."
+      ],
+      "outputs": [
+        "Posted assessments for all homeowners."
+      ]
+    }
+  ]
+}
+```CAP-AI: AI & Data Intelligence (1 reqs, 2 workflows)
+CAP-ACCOUNTING: Financials & Accounting (2 reqs, 2 workflows)
+CAP-COMPLIANCE: Community & Compliance Management (0 reqs, 1 workflows)
+CAP-VENDOR: Vendor & Provider Management (0 reqs, 1 workflows)
+CAP-WORK-ORDER: Service & Work Order Management (0 reqs, 1 workflows)
+CAP-DOCS: Document Management (1 reqs, 1 workflows)
+CAP-PLATFORM: Platform Capabilities (1 reqs, 0 workflows)WF-PROVIDER-RECOMMEND: Service Provider Recommendation (4 steps, actors: Homeowner, System, API)
+WF-MONITOR-CREDENTIALS: Vendor Credential Expiration Monitoring (4 steps, actors: Worker, System, User)
+WF-VIOLATION-ESCALATE: Violation Escalation Process (4 steps, actors: System, User)
+WF-AR-COLLECTIONS: Automated Accounts Receivable (AR) Collections (4 steps, actors: System, User)
+WF-AI-ANALYZE-DOC: AI Document Analysis and Indexing (4 steps, actors: User, System, API)
+WF-LIFECYCLE-NOTIFY: Work Order Lifecycle Notifications (4 steps, actors: System, User)
+WF-POST-ASSESSMENTS: Post Periodic Assessments (4 steps, actors: Worker, System)

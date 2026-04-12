@@ -1,0 +1,22 @@
+{
+  "$id": "janumicode:system_requirements:1.0",
+  "title": "System Requirements",
+  "type": "object",
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "source_requirement_ids", "priority"],
+        "properties": {
+          "id": { "type": "string" },
+          "statement": { "type": "string" },
+          "source_requirement_ids": { "type": "array", "items": { "type": "string" } },
+          "allocation": { "type": "string" },
+          "priority": { "type": "string", "enum": ["critical", "high", "medium", "low"] }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$id": "janumicode:cross_run_impact_report:1.0",
+  "title": "Cross-Run Impact Report",
+  "type": "object",
+  "required": ["changed_interface_id", "affected_artifact_ids", "modification_type"],
+  "properties": {
+    "changed_interface_id": { "type": "string" },
+    "affected_artifact_ids": { "type": "array", "items": { "type": "string" } },
+    "affected_file_paths": { "type": "array", "items": { "type": "string" } },
+    "estimated_refactoring_task_count": { "type": "integer", "minimum": 0 },
+    "estimated_file_count": { "type": "integer", "minimum": 0 },
+    "dependency_chain": { "type": "array", "items": { "type": "string" } },
+    "modification_type": { "type": "string", "enum": ["additive", "breaking", "non_breaking"] }
+  }
+}

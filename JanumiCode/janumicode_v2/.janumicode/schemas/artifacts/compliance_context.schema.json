@@ -1,0 +1,29 @@
+{
+  
+  "$id": "janumicode:compliance_context:1.0",
+  "title": "Compliance Context",
+  "description": "Sub-Phase 1.1b output — domain-specific compliance regimes",
+  "type": "object",
+  "required": ["regimes"],
+  "properties": {
+    "regimes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "description"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "applicable_phases": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "relevant_artifacts": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

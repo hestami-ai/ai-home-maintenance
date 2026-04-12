@@ -30,7 +30,7 @@ export interface GoalAlignmentResult {
 	findings: string[]; // Specific findings/issues
 }
 
-const GOAL_ALIGNMENT_SYSTEM_PROMPT = `You are the HISTORIAN role in a governed multi-role dialogue system.
+export const GOAL_ALIGNMENT_SYSTEM_PROMPT = `You are the HISTORIAN role in a governed multi-role dialogue system.
 
 # Your Task
 You are performing a GOAL ALIGNMENT CHECK on an architecture document.

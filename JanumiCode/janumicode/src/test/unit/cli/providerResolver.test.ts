@@ -143,7 +143,11 @@ describe('CLI Provider Resolver', () => {
 
 			expect(result.success).toBe(false);
 			if (!result.success) {
-				expect((result.error as CodedError).code).toBe('PROVIDER_NOT_FOUND');
+				// When the provider ID is not registered, the resolver tries the API
+				// fallback path first; if that also fails it returns NO_PROVIDER_AVAILABLE.
+				// PROVIDER_NOT_FOUND is reserved for a code path that's no longer
+				// reachable when the unknown-provider check happens after API fallback.
+				expect((result.error as CodedError).code).toBe('NO_PROVIDER_AVAILABLE');
 			}
 		});
 

@@ -1,0 +1,20 @@
+{
+  "$id": "janumicode:functional_evaluation_plan:1.0",
+  "title": "Functional Evaluation Plan",
+  "type": "object",
+  "required": ["criteria"],
+  "properties": {
+    "criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["functional_requirement_id", "evaluation_method", "success_condition"],
+        "properties": {
+          "functional_requirement_id": { "type": "string" },
+          "evaluation_method": { "type": "string" },
+          "success_condition": { "type": "string" }
+        }
+      }
+    }
+  }
+}

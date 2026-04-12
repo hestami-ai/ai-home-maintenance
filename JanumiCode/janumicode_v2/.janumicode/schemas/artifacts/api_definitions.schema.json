@@ -1,0 +1,33 @@
+{
+  "$id": "janumicode:api_definitions:1.0",
+  "title": "API Definitions",
+  "type": "object",
+  "required": ["definitions"],
+  "properties": {
+    "definitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["component_id", "endpoints"],
+        "properties": {
+          "component_id": { "type": "string" },
+          "endpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["path", "method", "auth_requirement"],
+              "properties": {
+                "path": { "type": "string" },
+                "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+                "inputs": { "type": "object" },
+                "outputs": { "type": "object" },
+                "error_codes": { "type": "array", "items": { "type": "object" } },
+                "auth_requirement": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

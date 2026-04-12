@@ -565,6 +565,8 @@
     "lint": "eslint src",
     "test": "vscode-test",
     "test:unit": "vitest run",
+    "fixture:extract-intake": "node scripts/extractIntakeFixture.js",
+    "test:ollama": "node scripts/runOllamaProbes.js",
     "test:unit:direct": "node scripts/test/run-vitest-db-mode.mjs direct",
     "test:unit:sidecar": "node scripts/test/run-vitest-db-mode.mjs sidecar",
     "test:unit:matrix": "node scripts/test/run-vitest-matrix.mjs",

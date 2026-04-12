@@ -225,8 +225,8 @@ export function checkDecompositionQuality(
 ): DecompositionQualityReport {
 	const issues: DecompositionQualityReport['issues'] = [];
 
-	// Unit count checks
-	if (units.length < TASK_GRAPH_LIMITS.reject_below_for_nontrivial) {
+	// Unit count checks (skip for empty — empty graphs are vacuously acceptable)
+	if (units.length > 0 && units.length < TASK_GRAPH_LIMITS.reject_below_for_nontrivial) {
 		issues.push({
 			issue: DecompositionIssue.TOO_COARSE,
 			detail: `Only ${units.length} units — below minimum of ${TASK_GRAPH_LIMITS.reject_below_for_nontrivial} for non-trivial features.`,

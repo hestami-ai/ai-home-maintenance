@@ -1,0 +1,29 @@
+{
+  
+  "$id": "janumicode:scope_classification:1.0",
+  "title": "Scope Classification",
+  "description": "Sub-Phase 1.1b output — breadth and depth classification of Raw Intent",
+  "type": "object",
+  "required": ["breadth", "depth"],
+  "properties": {
+    "breadth": {
+      "type": "string",
+      "enum": ["single_feature", "single_product", "multi_product_ecosystem"]
+    },
+    "depth": {
+      "type": "string",
+      "enum": ["proof_of_concept", "mvp", "production_grade"]
+    },
+    "cross_scope_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pillar", "dependency_description"],
+        "properties": {
+          "pillar": { "type": "string" },
+          "dependency_description": { "type": "string" }
+        }
+      }
+    }
+  }
+}

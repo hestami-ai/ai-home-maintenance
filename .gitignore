@@ -297,3 +297,10 @@ JanumiCode/janumicode/ground-truth-specs/hestami-ai-os-specs
 JanumiCode/janumicode/.vscode-test
 JanumiCode/janumicode/coverage
 JanumiCode/janumicode/test-artifacts
+
+JanumiCode/janumicode_v2/specs/hestami-ai-os-specs/
+JanumiCode/janumicode_v2/docs/debug/
+JanumiCode/janumicode_v2/ground-truth-specs/hestami-ai-os-specs
+JanumiCode/janumicode_v2/.vscode-test
+JanumiCode/janumicode_v2/coverage
+JanumiCode/janumicode_v2/test-artifacts

@@ -1,0 +1,119 @@
+{
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  },
+  "name": "janumicode",
+  "displayName": "JanumiCode",
+  "description": "AI agent-led software development with governed multi-phase pipeline, lossless interaction history, and human approval gates.",
+  "version": "2.0.0",
+  "publisher": "hestami-ai",
+  "icon": "resources/JanumiCodeIconFull.png",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "janumicode.startWorkflowRun",
+        "title": "JanumiCode: Start New Workflow Run"
+      },
+      {
+        "command": "janumicode.showWorkflowStatus",
+        "title": "JanumiCode: Show Workflow Status"
+      },
+      {
+        "command": "janumicode.openSettings",
+        "title": "Open Settings",
+        "category": "JanumiCode",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "janumicode.findInStream",
+        "title": "Find in Stream",
+        "category": "JanumiCode"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "janumicode.findInStream",
+        "key": "ctrl+f",
+        "mac": "cmd+f",
+        "when": "focusedView == 'janumicode.governedStream'"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "janumicode.openSettings",
+          "when": "view == janumicode.governedStream",
+          "group": "navigation"
+        }
+      ]
+    },
+    "views": {
+      "janumicode-sidebar": [
+        {
+          "id": "janumicode.governedStream",
+          "name": "Governed Stream",
+          "type": "webview"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "janumicode-sidebar",
+          "title": "JanumiCode",
+          "icon": "./resources/JanumiCodeActivityBarIcon.svg"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc --noEmit && node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "build": "node esbuild.js",
+    "build:prod": "node esbuild.js --production",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run src/test/unit/",
+    "test:coverage": "vitest run --coverage",
+    "test:probes": "tsx scripts/verifyProbeVariables.ts && vitest run --config vitest.probes.config.ts",
+    "test:probes:watch": "vitest --config vitest.probes.config.ts",
+    "verify:probes": "tsx scripts/verifyProbeVariables.ts",
+    "lint": "eslint src/",
+    "package": "pnpm build:prod && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.88.0",
+    "@eslint/js": "^10.0.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.6.0",
+    "@types/vscode": "^1.109.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.1",
+    "@typescript-eslint/parser": "^8.58.1",
+    "esbuild": "^0.28.0",
+    "esbuild-svelte": "^0.9.4",
+    "eslint": "^10.2.0",
+    "svelte": "^5.55.3",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.8",
+    "vitest": "^4.1.4"
+  },
+  "dependencies": {
+    "ajv": "^8.17.0",
+    "ajv-formats": "^3.0.0",
+    "better-sqlite3": "^12.8.0"
+  }
+}

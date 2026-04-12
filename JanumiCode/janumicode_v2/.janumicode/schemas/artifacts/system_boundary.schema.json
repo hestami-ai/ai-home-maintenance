@@ -1,0 +1,23 @@
+{
+  "$id": "janumicode:system_boundary:1.0",
+  "title": "System Boundary",
+  "type": "object",
+  "required": ["in_scope", "out_of_scope", "external_systems"],
+  "properties": {
+    "in_scope": { "type": "array", "items": { "type": "string" } },
+    "out_of_scope": { "type": "array", "items": { "type": "string" } },
+    "external_systems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "purpose", "interface_type"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "purpose": { "type": "string" },
+          "interface_type": { "type": "string" }
+        }
+      }
+    }
+  }
+}

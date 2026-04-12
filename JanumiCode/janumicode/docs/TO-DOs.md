@@ -294,3 +294,6 @@ The full review should produce a **review log** appended to `docs/reviews/rad-YY
 - New code review tooling (SonarLint already in place)
 - Automated review agents (could be future work)
 - Reviews of phases other than RAD (this plan is RAD-specific; the methodology generalizes but the smell catalog and pathological inputs do not)
+
+
+======

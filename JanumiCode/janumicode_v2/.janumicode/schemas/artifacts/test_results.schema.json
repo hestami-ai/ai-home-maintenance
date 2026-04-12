@@ -1,0 +1,22 @@
+{
+  "$id": "janumicode:test_results:1.0",
+  "title": "Test Results",
+  "type": "object",
+  "required": ["suite_results"],
+  "properties": {
+    "suite_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["suite_id"],
+        "properties": {
+          "suite_id": { "type": "string" },
+          "test_results": { "type": "array" }
+        }
+      }
+    },
+    "total_passed": { "type": "integer" },
+    "total_failed": { "type": "integer" },
+    "total_skipped": { "type": "integer" }
+  }
+}

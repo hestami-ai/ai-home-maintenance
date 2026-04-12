@@ -1,0 +1,31 @@
+{
+  "$id": "janumicode:software_domains:1.0",
+  "title": "Software Domains",
+  "type": "object",
+  "required": ["domains"],
+  "properties": {
+    "domains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "ubiquitous_language"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "ubiquitous_language": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["term", "definition"],
+              "properties": {
+                "term": { "type": "string" },
+                "definition": { "type": "string" }
+              }
+            }
+          },
+          "system_requirement_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

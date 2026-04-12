@@ -8,7 +8,8 @@ import {
 	onComplete,
 	onSpawnError,
 } from '../../../lib/logging/cliObserver';
-import { initializeLogger, resetLogger } from '../../../lib/logging/logger';
+import { initializeLogger, resetLogger, getLogger } from '../../../lib/logging/logger';
+import { LogLevel } from '../../../lib/logging/levels';
 
 describe('CLI Observer', () => {
 	let mockOutputChannel: any;
@@ -20,6 +21,10 @@ describe('CLI Observer', () => {
 			dispose: vi.fn(),
 		};
 		initializeLogger(mockOutputChannel);
+		// onInvokeStart and onSpawn log at DEBUG level. The default logger
+		// level is INFO so DEBUG messages get dropped silently. Bump the
+		// level so the observer's debug events reach the output channel.
+		getLogger().setLevel(LogLevel.DEBUG);
 	});
 
 	afterEach(() => {

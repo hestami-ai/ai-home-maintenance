@@ -1,0 +1,20 @@
+{
+  "$id": "janumicode:test_coverage_report:1.0",
+  "title": "Test Coverage Report",
+  "type": "object",
+  "required": ["gaps", "coverage_percentage"],
+  "properties": {
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["acceptance_criterion_id", "reason"],
+        "properties": {
+          "acceptance_criterion_id": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "coverage_percentage": { "type": "number", "minimum": 0, "maximum": 100 }
+  }
+}

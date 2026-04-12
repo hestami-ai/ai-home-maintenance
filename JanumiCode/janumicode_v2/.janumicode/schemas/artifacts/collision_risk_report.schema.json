@@ -1,0 +1,38 @@
+{
+  
+  "$id": "janumicode:collision_risk_report:1.0",
+  "title": "Collision Risk Report",
+  "description": "Phase 0.4 output — vocabulary collision check results",
+  "type": "object",
+  "required": ["aliases", "collision_risks", "overall_status"],
+  "properties": {
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["canonical_term", "detected_alias", "context"],
+        "properties": {
+          "canonical_term": { "type": "string" },
+          "detected_alias": { "type": "string" },
+          "context": { "type": "string" }
+        }
+      }
+    },
+    "collision_risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["term", "risk_description", "severity"],
+        "properties": {
+          "term": { "type": "string" },
+          "risk_description": { "type": "string" },
+          "severity": { "type": "string", "enum": ["high", "medium", "low"] }
+        }
+      }
+    },
+    "overall_status": {
+      "type": "string",
+      "enum": ["clean", "aliases_found", "collisions_found"]
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  
+  "$id": "janumicode:intent_bloom:1.0",
+  "title": "Intent Bloom",
+  "description": "Sub-Phase 1.2 output — expanded candidate space from Raw Intent",
+  "type": "object",
+  "required": ["candidate_product_concepts"],
+  "properties": {
+    "candidate_product_concepts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "description", "who_it_serves", "problem_it_solves"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "who_it_serves": { "type": "string" },
+          "problem_it_solves": { "type": "string" },
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["assumption", "basis"],
+              "properties": {
+                "assumption": { "type": "string" },
+                "basis": { "type": "string" }
+              }
+            }
+          },
+          "constraints": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "open_questions": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "system_proposed_content": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["field", "content", "approval_status"],
+        "properties": {
+          "field": { "type": "string" },
+          "content": { "type": "string" },
+          "approval_status": {
+            "type": "string",
+            "enum": ["pending", "approved", "rejected"]
+          }
+        }
+      }
+    },
+    "prior_decision_conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["candidate_id", "prior_decision_record_id", "conflict_description"],
+        "properties": {
+          "candidate_id": { "type": "string" },
+          "prior_decision_record_id": { "type": "string" },
+          "conflict_description": { "type": "string" }
+        }
+      }
+    }
+  }
+}

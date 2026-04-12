@@ -1,0 +1,27 @@
+[
+  {
+    "invariant_id": "FR-001",
+    "artifact_type": "functional_requirements",
+    "description": "Every User Story has at least one Acceptance Criterion with a measurable condition",
+    "check_type": "field_presence",
+    "specification": {
+      "field_path": "user_stories[*].acceptance_criteria[*].measurable_condition",
+      "message": "User Story is missing a measurable Acceptance Criterion"
+    },
+    "severity": "blocking",
+    "phase_applies_to": ["2"]
+  },
+  {
+    "invariant_id": "FR-002",
+    "artifact_type": "functional_requirements",
+    "description": "Every User Story has at least one Acceptance Criterion",
+    "check_type": "count_minimum",
+    "specification": {
+      "field_path": "user_stories[*].acceptance_criteria[*]",
+      "minimum": 1,
+      "message": "User Story must have at least one Acceptance Criterion"
+    },
+    "severity": "blocking",
+    "phase_applies_to": ["2"]
+  }
+]

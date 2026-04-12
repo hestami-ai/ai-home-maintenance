@@ -1,0 +1,39 @@
+{
+  "$id": "janumicode:reasoning_review_output:1.0",
+  "title": "Reasoning Review Output",
+  "description": "Output from the Reasoning Review LLM call — overall_pass + flaws array",
+  "type": "object",
+  "required": ["overall_pass", "flaws"],
+  "properties": {
+    "overall_pass": { "type": "boolean" },
+    "flaws": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["flaw_type", "severity", "description", "evidence", "recommended_action"],
+        "properties": {
+          "flaw_type": {
+            "type": "string",
+            "enum": [
+              "unsupported_assumption", "invalid_inference", "circular_logic",
+              "scope_violation", "premature_convergence", "false_equivalence",
+              "authority_confusion", "completeness_shortcut",
+              "contradiction_with_prior_approved", "unacknowledged_uncertainty",
+              "implementability_violation", "implementation_divergence",
+              "tool_result_misinterpretation_suspected"
+            ]
+          },
+          "severity": { "type": "string", "enum": ["high", "low"] },
+          "description": { "type": "string" },
+          "evidence": { "type": "string" },
+          "recommended_action": {
+            "type": "string",
+            "enum": ["retry", "escalate", "accept_with_caveat", "return_to_phase4", "escalate_to_unsticking"]
+          },
+          "governing_adr_id": { "type": "string" },
+          "completion_criteria_id": { "type": "string" }
+        }
+      }
+    }
+  }
+}

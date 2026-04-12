@@ -1,0 +1,21 @@
+{
+  "$id": "janumicode:reasoning_evaluation_plan:1.0",
+  "title": "Reasoning Evaluation Plan",
+  "type": "object",
+  "required": ["scenarios"],
+  "properties": {
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "pass_criteria"],
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" },
+          "pass_criteria": { "type": "string" }
+        }
+      }
+    },
+    "ai_subsystems_detected": { "type": "boolean" }
+  }
+}
