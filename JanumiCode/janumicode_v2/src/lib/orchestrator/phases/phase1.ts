@@ -151,10 +151,39 @@ export class Phase1Handler implements PhaseHandler {
     // ── Sub-Phase 1.3 — Intent Mirror & Menu (human prune) ────
     engine.stateMachine.setSubPhase(workflowRun.id, '1.3');
 
-    const mirror = engine.mirrorGenerator.generate({
+    // Extract assumption rows from each bloom candidate so the MirrorCard
+    // can render v1-style per-row Accept / Reject / Defer / Edit surfaces.
+    const assumptionItems: import('../../types/records').AssumptionItem[] = [];
+    for (const candidate of bloomContent.candidate_product_concepts) {
+      for (let i = 0; i < candidate.assumptions.length; i++) {
+        assumptionItems.push({
+          id: `${candidate.id}-assumption-${i}`,
+          text: candidate.assumptions[i],
+          category: candidate.name,
+          source: 'ai_proposed',
+          status: 'pending',
+        });
+      }
+      // Surface each candidate's open questions as assumptions too (they're
+      // ambiguities the user should consciously accept or reject).
+      for (let i = 0; i < candidate.open_questions.length; i++) {
+        assumptionItems.push({
+          id: `${candidate.id}-openq-${i}`,
+          text: `Open question: ${candidate.open_questions[i]}`,
+          category: candidate.name,
+          source: 'ai_proposed',
+          status: 'pending',
+        });
+      }
+    }
+
+    const assumptionMirror = engine.mirrorGenerator.generateAssumptionMirror({
       artifactId: bloomRecord.id,
       artifactType: 'intent_bloom',
-      content: bloomContent as unknown as Record<string, unknown>,
+      assumptions: assumptionItems,
+      steelMan: bloomContent.candidate_product_concepts.length > 0
+        ? `I identified ${bloomContent.candidate_product_concepts.length} candidate interpretation(s) of your intent. Review the assumptions and open questions below, then approve, reject, defer, or edit each one.`
+        : undefined,
     });
 
     const mirrorRecord = engine.writer.writeRecord({
@@ -167,17 +196,18 @@ export class Phase1Handler implements PhaseHandler {
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [bloomRecord.id],
       content: {
-        kind: 'intent_bloom_mirror',
-        mirror_id: mirror.mirrorId,
+        kind: 'assumption_mirror',
+        mirror_id: assumptionMirror.mirrorId,
         artifact_id: bloomRecord.id,
         artifact_type: 'intent_bloom',
-        fields: mirror.fields,
+        assumptions: assumptionMirror.assumptions,
+        steelMan: assumptionMirror.steelMan,
         candidates: bloomContent.candidate_product_concepts,
       },
     });
     artifactIds.push(mirrorRecord.id);
     engine.eventBus.emit('mirror:presented', {
-      mirrorId: mirror.mirrorId,
+      mirrorId: assumptionMirror.mirrorId,
       artifactType: 'intent_bloom',
     });
 
@@ -195,12 +225,18 @@ export class Phase1Handler implements PhaseHandler {
         derived_from_record_ids: [bloomRecord.id],
         content: {
           kind: 'intent_bloom_prune',
-          question: 'Select the candidate concepts to keep:',
+          question: 'Select the candidate interpretations to keep for synthesis:',
+          context: `${bloomContent.candidate_product_concepts.length} candidates were generated from your intent. Keep the ones that best match what you want to build.`,
           multi_select: true,
-          options: bloomContent.candidate_product_concepts.map(c => ({
+          allowCustom: false,
+          options: bloomContent.candidate_product_concepts.map((c, i) => ({
             id: c.id,
             label: c.name,
             description: c.description,
+            recommended: i === 0,
+            tradeoffs: c.open_questions.length > 0
+              ? `${c.open_questions.length} open question(s): ${c.open_questions[0]}`
+              : undefined,
           })),
         },
       });
@@ -379,6 +415,13 @@ export class Phase1Handler implements PhaseHandler {
         prompt: rendered.rendered,
         responseFormat: 'json',
         temperature: 0.3,
+        traceContext: {
+          workflowRunId: ctx.workflowRun.id,
+          phaseId: '1',
+          subPhaseId: '1.0',
+          agentRole: 'orchestrator',
+          label: 'Phase 1.0 — Intent Quality Check',
+        },
       });
       return result.parsed ?? defaultReport;
     } catch {
@@ -428,6 +471,13 @@ export class Phase1Handler implements PhaseHandler {
         prompt: rendered.rendered,
         responseFormat: 'json',
         temperature: 0.6,
+        traceContext: {
+          workflowRunId: ctx.workflowRun.id,
+          phaseId: '1',
+          subPhaseId: '1.2',
+          agentRole: 'domain_interpreter',
+          label: 'Phase 1.2 — Intent Domain Bloom',
+        },
       });
       const parsed = result.parsed as Partial<BloomContent> | null;
       if (parsed?.candidate_product_concepts && Array.isArray(parsed.candidate_product_concepts) && parsed.candidate_product_concepts.length > 0) {
@@ -483,6 +533,13 @@ export class Phase1Handler implements PhaseHandler {
         prompt: rendered.rendered,
         responseFormat: 'json',
         temperature: 0.4,
+        traceContext: {
+          workflowRunId: ctx.workflowRun.id,
+          phaseId: '1',
+          subPhaseId: '1.4',
+          agentRole: 'domain_interpreter',
+          label: 'Phase 1.4 — Intent Statement Synthesis',
+        },
       });
       const parsed = result.parsed as Partial<IntentStatementContent> | null;
       if (parsed?.product_concept) {

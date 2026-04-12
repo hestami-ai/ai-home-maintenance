@@ -181,6 +181,7 @@
           produced_at: new Date().toISOString(),
           authority_level: 1,
           quarantined: false,
+          derived_from_record_ids: [],
           content: { text: `Unknown slash command: /${cmd}` },
         });
         composerStore.setText('');

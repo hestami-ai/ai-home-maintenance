@@ -16,6 +16,12 @@ export interface SerializedRecord {
   produced_at: string;
   authority_level: number;
   quarantined: boolean;
+  /**
+   * Parent record ids — used by the AgentInvocationCard dispatcher to skip
+   * child records (agent_output, tool_call, etc.) at the top level and
+   * render them nested under their owning agent_invocation card.
+   */
+  derived_from_record_ids: string[];
   content: Record<string, unknown>;
 }
 
@@ -59,6 +65,30 @@ class RecordsStore {
   /** Look up a single record by id (used by provenance citation chips). */
   getById(id: string): SerializedRecord | undefined {
     return this.records.find(r => r.id === id);
+  }
+
+  /**
+   * Return all records whose `derived_from_record_ids` includes the given
+   * parent id. Used by AgentInvocationCard to gather its child records
+   * (agent_output, tool_call, agent_reasoning_step, etc.).
+   */
+  getChildren(parentId: string): SerializedRecord[] {
+    return this.records.filter(
+      r => r.derived_from_record_ids.includes(parentId),
+    );
+  }
+
+  /**
+   * Check if a record is a child of an agent_invocation. Used by the Card
+   * dispatcher to skip child records at the top level (they render nested
+   * inside AgentInvocationCard instead).
+   */
+  isChildOfInvocation(record: SerializedRecord): boolean {
+    if (record.derived_from_record_ids.length === 0) return false;
+    return this.records.some(
+      r => r.record_type === 'agent_invocation' &&
+           record.derived_from_record_ids.includes(r.id),
+    );
   }
 
   get count(): number {

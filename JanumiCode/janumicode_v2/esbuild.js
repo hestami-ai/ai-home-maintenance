@@ -160,32 +160,13 @@ const rpcWorkerBuild = {
 // runtime — the exact "Card is not defined" / "IntentComposer is not
 // defined" failure mode we hit.
 //
-// Instead, we plug in a tiny preprocessor that hands the script content to
-// esbuild's own TS transform with `verbatimModuleSyntax: true`, which
-// guarantees every import is preserved exactly as written.
+// The shared `tsScriptPreprocessor` in scripts/svelteTsPreprocessor.js
+// hands script blocks to esbuild's own TS transform with
+// `verbatimModuleSyntax: true`, guaranteeing every import survives. The
+// vitest config uses the same module so production and test compilation
+// agree on Svelte preprocessing.
 const sveltePlugin = require('esbuild-svelte');
-
-function tsScriptPreprocessor() {
-  return {
-    name: 'janumicode-ts-script',
-    async script({ attributes, content }) {
-      if (attributes.lang !== 'ts' && attributes.lang !== 'typescript') return;
-      const result = await esbuild.transform(content, {
-        loader: 'ts',
-        target: 'es2022',
-        tsconfigRaw: {
-          compilerOptions: {
-            // Preserve every import the user wrote, even if the script body
-            // doesn't reference the binding (Svelte template references are
-            // invisible to esbuild's TS transform).
-            verbatimModuleSyntax: true,
-          },
-        },
-      });
-      return { code: result.code, map: result.map };
-    },
-  };
-}
+const { tsScriptPreprocessor } = require('./scripts/svelteTsPreprocessor');
 
 const webviewBuild = {
   ...sharedOptions,

@@ -185,4 +185,36 @@ export class MirrorGenerator {
     if (typeof value === 'object') return value; // Let the webview render structured data
     return value;
   }
+
+  // ── Assumption-row mirror (Wave 5b) ────────────────────────────
+
+  /**
+   * Generate an assumption-row mirror from extracted assumption items.
+   * Used by Phase 1.3 for the bloom prune surface. The output shape gets
+   * written into the `mirror_presented` record with
+   * `content.kind === 'assumption_mirror'`.
+   *
+   * The MirrorCard detects this kind and renders the v1-style row layout
+   * with per-row Accept / Reject / Defer / Edit buttons.
+   */
+  generateAssumptionMirror(input: {
+    artifactId: string;
+    artifactType: string;
+    assumptions: import('../types/records').AssumptionItem[];
+    steelMan?: string;
+  }): {
+    mirrorId: string;
+    artifactId: string;
+    artifactType: string;
+    assumptions: import('../types/records').AssumptionItem[];
+    steelMan?: string;
+  } {
+    return {
+      mirrorId: `mirror-${++this.idCounter}`,
+      artifactId: input.artifactId,
+      artifactType: input.artifactType,
+      assumptions: input.assumptions,
+      steelMan: input.steelMan,
+    };
+  }
 }

@@ -119,13 +119,34 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
       this.post({ type: 'addRecord', record: p.record });
     });
     const off2 = this.engine.eventBus.on('phase:started', (p) => {
-      this.post({ type: 'phaseUpdate', event: 'phase:started', payload: p });
+      const completedPhases = this.session.currentRunId ? this.getCompletedPhases(this.session.currentRunId) : [];
+      const completedSubPhases = this.session.currentRunId ? this.getCompletedSubPhases(this.session.currentRunId) : [];
+      const skippedSubPhases = this.session.currentRunId ? this.getSkippedSubPhases(this.session.currentRunId) : [];
+      this.post({
+        type: 'phaseUpdate',
+        event: 'phase:started',
+        payload: { ...p, completedPhases, completedSubPhases, skippedSubPhases, workflowRunId: this.session.currentRunId },
+      });
     });
     const off3 = this.engine.eventBus.on('phase:completed', (p) => {
-      this.post({ type: 'phaseUpdate', event: 'phase:completed', payload: p });
+      const completedPhases = this.session.currentRunId ? this.getCompletedPhases(this.session.currentRunId) : [];
+      const completedSubPhases = this.session.currentRunId ? this.getCompletedSubPhases(this.session.currentRunId) : [];
+      const skippedSubPhases = this.session.currentRunId ? this.getSkippedSubPhases(this.session.currentRunId) : [];
+      this.post({
+        type: 'phaseUpdate',
+        event: 'phase:completed',
+        payload: { ...p, completedPhases, completedSubPhases, skippedSubPhases, workflowRunId: this.session.currentRunId },
+      });
     });
     const off4 = this.engine.eventBus.on('phase_gate:pending', (p) => {
-      this.post({ type: 'phaseUpdate', event: 'phase_gate:pending', payload: p });
+      const completedPhases = this.session.currentRunId ? this.getCompletedPhases(this.session.currentRunId) : [];
+      const completedSubPhases = this.session.currentRunId ? this.getCompletedSubPhases(this.session.currentRunId) : [];
+      const skippedSubPhases = this.session.currentRunId ? this.getSkippedSubPhases(this.session.currentRunId) : [];
+      this.post({
+        type: 'phaseUpdate',
+        event: 'phase_gate:pending',
+        payload: { ...p, completedPhases, completedSubPhases, skippedSubPhases, workflowRunId: this.session.currentRunId },
+      });
     });
     const off5 = this.engine.eventBus.on('error:occurred', (p) => {
       this.post({ type: 'error', message: p.message, context: p.context });
@@ -191,6 +212,12 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
       case 'decision':
         this.handleDecision(msg as unknown as { recordId: string; decision: InboundDecision });
         return;
+      case 'decisionBatch':
+        this.handleDecisionBatch(msg as unknown as {
+          recordId: string;
+          decisions: Array<{ itemId: string; action: string; payload?: Record<string, unknown> }>;
+        });
+        return;
       default:
         getLogger().debug('ui', 'Unhandled webview message', { type: msg.type });
     }
@@ -218,11 +245,22 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     // Send phase update so the composer mode flips to Open Query.
     if (this.session.currentRunId) {
       const run = this.engine.stateMachine.getWorkflowRun(this.session.currentRunId);
+      const completedPhases = this.getCompletedPhases(this.session.currentRunId);
+      const completedSubPhases = this.getCompletedSubPhases(this.session.currentRunId);
+      const skippedSubPhases = this.getSkippedSubPhases(this.session.currentRunId);
       if (run?.current_phase_id) {
         this.post({
           type: 'phaseUpdate',
           event: 'phase:started',
-          payload: { phaseId: run.current_phase_id },
+          payload: {
+            phaseId: run.current_phase_id,
+            subPhaseId: run.current_sub_phase_id,
+            completedPhases,
+            completedSubPhases,
+            skippedSubPhases,
+            status: run.status === 'in_progress' ? 'active' : run.status,
+            workflowRunId: this.session.currentRunId,
+          },
         });
       }
 
@@ -340,6 +378,28 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     this.decisionRouter.route(this.session.currentRunId, msg.decision);
   }
 
+  private handleDecisionBatch(msg: {
+    recordId: string;
+    decisions: Array<{
+      itemId: string;
+      action: string;
+      payload?: Record<string, unknown>;
+    }>;
+  }): void {
+    if (!this.session.currentRunId) {
+      this.post({ type: 'error', message: 'No active workflow run.' });
+      return;
+    }
+    this.decisionRouter.routeBatch(this.session.currentRunId, {
+      recordId: msg.recordId,
+      decisions: msg.decisions.map(d => ({
+        itemId: d.itemId,
+        action: d.action as 'accepted' | 'rejected' | 'deferred' | 'edited',
+        payload: d.payload,
+      })),
+    });
+  }
+
   // ── Helpers ───────────────────────────────────────────────────
 
   private buildCapabilityContext(activeRun: WorkflowRun | null): CapabilityContext {
@@ -378,6 +438,99 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     return rows.map((r) => this.rowToRecord(r));
   }
 
+  /**
+   * Get list of completed phase IDs for a workflow run.
+   * Completed phases are those with phase_gate_approved records.
+   */
+  private getCompletedPhases(runId: string): PhaseId[] {
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT phase_id FROM governed_stream
+         WHERE workflow_run_id = ?
+           AND record_type = 'phase_gate_approved'
+           AND is_current_version = 1
+         ORDER BY produced_at ASC`,
+      )
+      .all(runId) as { phase_id: string }[];
+    return rows.map((r) => r.phase_id as PhaseId);
+  }
+
+  /**
+   * Get list of completed sub-phase IDs for a workflow run.
+   * Completed sub-phases are those that have records produced after them
+   * (indicating the sub-phase finished). We track by looking at all sub_phase_id
+   * values that appear in records, excluding the current one.
+   */
+  private getCompletedSubPhases(runId: string): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT sub_phase_id FROM governed_stream
+         WHERE workflow_run_id = ?
+           AND sub_phase_id IS NOT NULL
+           AND sub_phase_id != ''
+           AND is_current_version = 1
+         ORDER BY produced_at ASC`,
+      )
+      .all(runId) as { sub_phase_id: string }[];
+    // Get current sub-phase to exclude it
+    const run = this.engine.stateMachine.getWorkflowRun(runId);
+    const currentSubPhase = run?.current_sub_phase_id;
+    return rows
+      .map((r) => r.sub_phase_id)
+      .filter((sp) => sp !== currentSubPhase);
+  }
+
+  /**
+   * Get list of skipped sub-phase IDs for a workflow run.
+   * Skipped sub-phases are conditional sub-phases that don't apply:
+   * - Brownfield-only sub-phases (0.2, 0.2b, 0.3) for greenfield projects
+   * - Phase 0.5 sub-phases when Phase 0.5 was not triggered
+   */
+  private getSkippedSubPhases(runId: string): string[] {
+    const skipped: string[] = [];
+
+    // Check if workspace is greenfield (skip brownfield-only sub-phases)
+    const classificationRow = this.db
+      .prepare(
+        `SELECT content FROM governed_stream
+         WHERE workflow_run_id = ?
+           AND record_type = 'workspace_classification'
+           AND is_current_version = 1
+         LIMIT 1`,
+      )
+      .get(runId) as { content: string } | undefined;
+
+    if (classificationRow) {
+      try {
+        const content = JSON.parse(classificationRow.content) as { workspace_type?: string };
+        if (content.workspace_type === 'greenfield') {
+          // Brownfield-only sub-phases to skip
+          skipped.push('0.2', '0.2b', '0.3');
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    // Check if Phase 0.5 was triggered (skip if not)
+    const phase05Triggered = this.db
+      .prepare(
+        `SELECT 1 FROM governed_stream
+         WHERE workflow_run_id = ?
+           AND phase_id = '0.5'
+           AND is_current_version = 1
+         LIMIT 1`,
+      )
+      .get(runId);
+
+    if (!phase05Triggered) {
+      // Phase 0.5 sub-phases to skip
+      skipped.push('0.5.1', '0.5.2');
+    }
+
+    return skipped;
+  }
+
   private serialize(record: GovernedStreamRecord): SerializedRecord {
     return {
       id: record.id,
@@ -388,6 +541,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
       produced_at: record.produced_at,
       authority_level: record.authority_level,
       quarantined: record.quarantined,
+      derived_from_record_ids: record.derived_from_record_ids ?? [],
       content: record.content,
     };
   }

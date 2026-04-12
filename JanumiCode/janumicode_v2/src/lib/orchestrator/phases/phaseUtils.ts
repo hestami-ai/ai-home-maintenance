@@ -85,6 +85,7 @@ export function serializeRecord(record: GovernedStreamRecord): SerializedRecord 
     produced_at: record.produced_at,
     authority_level: record.authority_level,
     quarantined: record.quarantined,
+    derived_from_record_ids: record.derived_from_record_ids ?? [],
     content: record.content,
   };
 }

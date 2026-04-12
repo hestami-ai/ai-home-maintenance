@@ -62,6 +62,15 @@ export class PriorityLLMCaller {
   }
 
   /**
+   * Forward governed-stream writer attachment to the inner LLMCaller so
+   * its agent_invocation / agent_output / tool_call instrumentation runs
+   * for every priority-queued call.
+   */
+  setWriter(writer: import('../orchestrator/governedStreamWriter').GovernedStreamWriter, versionSha: string): void {
+    this.inner.setWriter(writer, versionSha);
+  }
+
+  /**
    * Enqueue an LLM call. The returned promise resolves when the call has
    * actually run through the inner caller (after any preceding work in the
    * same provider's queue and any internal LLMCaller retry/backoff).

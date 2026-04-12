@@ -4,7 +4,23 @@
  *
  * Used by: Reasoning Review, Narrative Memory, Domain Compliance Review,
  * Orchestrator reasoning calls, Deep Memory Research, Ingestion Pipeline Stage III.
+ *
+ * Wave 5b instrumentation: when a `GovernedStreamWriter` is attached via
+ * `setWriter(...)`, every call() writes:
+ *   - one `agent_invocation` record BEFORE the call (status: 'running')
+ *   - one `agent_output` record AFTER the call (status: 'success' | 'error',
+ *     with token counts, duration, tool_calls if any), derived from the
+ *     invocation
+ *   - one `tool_call` record per native tool call returned, derived from the
+ *     invocation
+ *
+ * Phase handlers pass a `traceContext` (workflow_run_id, phase_id,
+ * sub_phase_id, agent_role) so the records get stamped correctly. Without
+ * a writer or trace context, instrumentation is a no-op.
  */
+
+import type { GovernedStreamWriter } from '../orchestrator/governedStreamWriter';
+import type { AgentRole } from '../types/records';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -28,6 +44,19 @@ export interface ToolCall {
   id?: string;
 }
 
+export interface LLMTraceContext {
+  workflowRunId: string;
+  phaseId?: string | null;
+  subPhaseId?: string | null;
+  agentRole?: AgentRole | null;
+  /**
+   * Human-readable label for the invocation. Shown in the AgentInvocationCard
+   * header (e.g. "Phase 1.0 — Intent Quality Check"). Falls back to
+   * "<provider> <model>" when omitted.
+   */
+  label?: string;
+}
+
 export interface LLMCallOptions {
   /** Provider name */
   provider: string;
@@ -47,6 +76,13 @@ export interface LLMCallOptions {
   tools?: ToolDefinition[];
   /** Tool selection strategy. Defaults to `auto` when tools are provided. */
   toolChoice?: 'auto' | 'none' | 'required' | { name: string };
+  /**
+   * Workflow context — used by the writer instrumentation to stamp
+   * agent_invocation/agent_output/tool_call records with the right
+   * workflow_run_id / phase_id / agent_role. Optional: when missing or
+   * when no writer is attached, instrumentation is skipped silently.
+   */
+  traceContext?: LLMTraceContext;
 }
 
 export interface LLMCallResult {
@@ -112,6 +148,8 @@ export class LLMError extends Error {
 
 export class LLMCaller {
   private providers = new Map<string, LLMProviderAdapter>();
+  private writer: GovernedStreamWriter | null = null;
+  private versionSha = 'dev';
 
   constructor(private readonly config: LLMCallerConfig) {}
 
@@ -123,7 +161,20 @@ export class LLMCaller {
   }
 
   /**
-   * Make an LLM API call with retry and fallback.
+   * Attach a GovernedStreamWriter so every call() writes
+   * agent_invocation / agent_output / tool_call records. The OrchestratorEngine
+   * wires this in its constructor (see engine.constructor → llmCaller.setWriter).
+   * Without a writer attached, instrumentation is silently skipped.
+   */
+  setWriter(writer: GovernedStreamWriter, versionSha: string): void {
+    this.writer = writer;
+    this.versionSha = versionSha;
+  }
+
+  /**
+   * Make an LLM API call with retry and fallback. When a writer is attached
+   * AND options.traceContext is set, also writes the agent_invocation /
+   * agent_output / tool_call records that the AgentInvocationCard renders.
    */
   async call(options: LLMCallOptions): Promise<LLMCallResult> {
     const adapter = this.providers.get(options.provider);
@@ -134,6 +185,12 @@ export class LLMCaller {
       );
     }
 
+    // Pre-call instrumentation: write agent_invocation BEFORE the call so the
+    // webview sees it as 'running' immediately. The card flips to ✅/❌ when
+    // the agent_output record arrives.
+    const invocationId = this.writeInvocationRecord(options);
+    const startedAt = Date.now();
+
     // Try primary provider with retries
     let lastError: LLMError | null = null;
     let retryAttempts = 0;
@@ -142,6 +199,7 @@ export class LLMCaller {
       try {
         const result = await adapter.call(options);
         result.retryAttempts = retryAttempts;
+        this.writeOutputRecords(invocationId, options, result, Date.now() - startedAt, null);
         return result;
       } catch (err) {
         retryAttempts++;
@@ -173,6 +231,7 @@ export class LLMCaller {
           const result = await fallbackAdapter.call(fallbackOptions);
           result.usedFallback = true;
           result.retryAttempts = retryAttempts;
+          this.writeOutputRecords(invocationId, fallbackOptions, result, Date.now() - startedAt, null);
           return result;
         } catch {
           // Fallback also failed — throw original error
@@ -180,7 +239,122 @@ export class LLMCaller {
       }
     }
 
+    // All retries + fallback exhausted: write a final error output record so
+    // the AgentInvocationCard's status flips from running → error.
+    this.writeOutputRecords(invocationId, options, null, Date.now() - startedAt, lastError);
     throw lastError ?? new LLMError('LLM call failed', 'unknown');
+  }
+
+  // ── Instrumentation helpers ─────────────────────────────────────
+
+  /**
+   * Write the agent_invocation record before the LLM call. Returns the
+   * invocation id (or null when instrumentation is disabled), which the
+   * agent_output and tool_call records use as their derived_from anchor.
+   */
+  private writeInvocationRecord(options: LLMCallOptions): string | null {
+    if (!this.writer || !options.traceContext) return null;
+    const ctx = options.traceContext;
+    try {
+      const record = this.writer.writeRecord({
+        record_type: 'agent_invocation',
+        schema_version: '1.0',
+        workflow_run_id: ctx.workflowRunId,
+        phase_id: ctx.phaseId ?? null,
+        sub_phase_id: ctx.subPhaseId ?? null,
+        produced_by_agent_role: ctx.agentRole ?? null,
+        janumicode_version_sha: this.versionSha,
+        content: {
+          provider: options.provider,
+          model: options.model,
+          label: ctx.label ?? `${options.provider} ${options.model}`,
+          response_format: options.responseFormat ?? 'text',
+          tool_count: options.tools?.length ?? 0,
+          status: 'running',
+          started_at: new Date().toISOString(),
+        },
+      });
+      return record.id;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Write the agent_output record after the LLM call returns (success or
+   * error). On success, also writes one tool_call record per native tool
+   * invocation in the result. All children point at the parent invocation
+   * via derived_from_record_ids so the AgentInvocationCard can group them.
+   */
+  private writeOutputRecords(
+    invocationId: string | null,
+    options: LLMCallOptions,
+    result: LLMCallResult | null,
+    durationMs: number,
+    error: LLMError | null,
+  ): void {
+    if (!this.writer || !invocationId || !options.traceContext) return;
+    const ctx = options.traceContext;
+
+    try {
+      this.writer.writeRecord({
+        record_type: 'agent_output',
+        schema_version: '1.0',
+        workflow_run_id: ctx.workflowRunId,
+        phase_id: ctx.phaseId ?? null,
+        sub_phase_id: ctx.subPhaseId ?? null,
+        produced_by_agent_role: ctx.agentRole ?? null,
+        janumicode_version_sha: this.versionSha,
+        derived_from_record_ids: [invocationId],
+        content: result ? {
+          status: 'success',
+          provider: result.provider,
+          model: result.model,
+          text: result.text,
+          input_tokens: result.inputTokens,
+          output_tokens: result.outputTokens,
+          duration_ms: durationMs,
+          tool_call_count: result.toolCalls?.length ?? 0,
+          retry_attempts: result.retryAttempts,
+          used_fallback: result.usedFallback,
+        } : {
+          status: 'error',
+          provider: options.provider,
+          model: options.model,
+          duration_ms: durationMs,
+          error_type: error?.errorType ?? 'unknown',
+          error_message: error?.message ?? 'Unknown error',
+          retry_attempts: error ? this.config.maxRetries : 0,
+        },
+      });
+    } catch {
+      /* instrumentation must never break the call path */
+    }
+
+    // One tool_call record per native tool call in the result.
+    if (result?.toolCalls?.length) {
+      for (const tc of result.toolCalls) {
+        try {
+          this.writer.writeRecord({
+            record_type: 'tool_call',
+            schema_version: '1.0',
+            workflow_run_id: ctx.workflowRunId,
+            phase_id: ctx.phaseId ?? null,
+            sub_phase_id: ctx.subPhaseId ?? null,
+            produced_by_agent_role: ctx.agentRole ?? null,
+            janumicode_version_sha: this.versionSha,
+            derived_from_record_ids: [invocationId],
+            content: {
+              tool_name: tc.name,
+              parameters: tc.params,
+              tool_use_id: tc.id ?? null,
+            },
+          });
+        } catch {
+          /* instrumentation must never break the call path */
+        }
+      }
+    }
   }
 
   /**

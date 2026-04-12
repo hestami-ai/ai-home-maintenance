@@ -12,8 +12,13 @@
   import { onMount } from 'svelte';
   import { recordsStore, type SerializedRecord } from './stores/records.svelte';
   import { composerStore } from './stores/composer.svelte';
+  import { phaseStore } from './stores/phase.svelte';
+  import type { PhaseId } from '../lib/types/records';
   import Card from './components/Card.svelte';
+  import VirtualScroll from './components/VirtualScroll.svelte';
   import IntentComposer from './components/IntentComposer.svelte';
+  import PhaseIndicator from './components/PhaseIndicator.svelte';
+  import { scrollToPhase } from './scroll';
 
   interface Props {
     vscode: {
@@ -50,10 +55,29 @@
       case 'snapshot':
         recordsStore.setSnapshot(message.records as SerializedRecord[]);
         composerStore.endSubmit();
+        phaseStore.reset();
         if (autoScroll) scrollToBottom();
         break;
       case 'phaseUpdate': {
-        const payload = message.payload as { phaseId?: string };
+        const payload = message.payload as {
+          phaseId?: string;
+          subPhaseId?: string;
+          completedPhases?: string[];
+          completedSubPhases?: string[];
+          skippedSubPhases?: string[];
+          status?: 'active' | 'paused' | 'completed' | 'failed';
+          workflowRunId?: string;
+        };
+        phaseStore.update({
+          currentPhaseId: (payload.phaseId as PhaseId) ?? null,
+          currentSubPhaseId: payload.subPhaseId ?? null,
+          completedPhases: (payload.completedPhases as PhaseId[]) ?? [],
+          completedSubPhases: payload.completedSubPhases ?? [],
+          skippedSubPhases: payload.skippedSubPhases ?? [],
+          status: payload.status ?? 'active',
+          workflowRunId: payload.workflowRunId ?? phaseStore.state.workflowRunId,
+        });
+        // Keep composerStore in sync for mode detection
         if (payload?.phaseId) composerStore.currentPhase = payload.phaseId;
         break;
       }
@@ -81,6 +105,7 @@
           produced_at: new Date().toISOString(),
           authority_level: 1,
           quarantined: false,
+          derived_from_record_ids: [],
           content: { text: String(message.message ?? 'Unknown error'), context: message.context },
         });
         composerStore.endSubmit();
@@ -130,6 +155,12 @@
     });
   }
 
+  function handleNavigateToPhase(phaseId: PhaseId) {
+    if (containerEl) {
+      scrollToPhase(containerEl, phaseId);
+    }
+  }
+
   onMount(() => {
     window.addEventListener('message', handleMessage);
     post({ type: 'webviewReady' });
@@ -138,6 +169,7 @@
 </script>
 
 <div class="root">
+  <PhaseIndicator onNavigateToPhase={handleNavigateToPhase} />
   <div class="stream" bind:this={containerEl} onscroll={handleScroll}>
     {#if recordsStore.records.length === 0}
       <div class="empty-state">
@@ -145,9 +177,15 @@
         <p>Governed Stream — Ready</p>
         <p class="hint">Type your intent below to start a new workflow.</p>
       </div>
+    {:else if recordsStore.records.length > 200}
+      <VirtualScroll items={recordsStore.records} estimatedItemHeight={120} bufferCount={10}>
+        {#snippet children({ item })}
+          <Card record={item} ondecision={handleDecision} {vscode} />
+        {/snippet}
+      </VirtualScroll>
     {:else}
       {#each recordsStore.records as record (record.id)}
-        <Card {record} ondecision={handleDecision} />
+        <Card {record} ondecision={handleDecision} {vscode} />
       {/each}
     {/if}
 

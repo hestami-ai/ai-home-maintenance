@@ -20,6 +20,7 @@ import type { LLMCaller } from '../llm/llmCaller';
 import type { TemplateLoader } from '../orchestrator/templateLoader';
 import type { OrchestratorEngine } from '../orchestrator/orchestratorEngine';
 import type { EmbeddingService } from '../embedding/embeddingService';
+import type { GovernedStreamRecord } from '../types/records';
 import { PriorityLLMCaller } from '../llm/priorityLLMCaller';
 import { randomUUID } from 'node:crypto';
 
@@ -134,24 +135,36 @@ export class ClientLiaisonAgent {
     const writer = this.engine.writer;
     const versionSha = this.engine.janumiCodeVersionSha;
 
-    // 1. Write the user input record (raw_intent_received or open_query_received).
-    const inputRecordType =
-      input.inputMode === 'raw_intent' ? 'raw_intent_received' : 'open_query_received';
-    const inputRecord = writer.writeRecord({
-      record_type: inputRecordType,
-      schema_version: '1.0',
-      workflow_run_id: ctx.activeRun?.id ?? input.id,
-      janumicode_version_sha: versionSha,
-      content: {
-        text: input.text,
-        attachments: input.attachments,
-        references: input.references,
-      },
-    });
+    // 1. Write the user input record up front when we already have an active
+    //    workflow run (open_query mode). For raw_intent mode the run doesn't
+    //    exist yet — writing a record now would violate the workflow_run_id
+    //    foreign key. The startWorkflow capability creates the run AND writes
+    //    its own raw_intent_received record via engine.startWorkflowRun(),
+    //    so we deliberately skip the pre-write and rely on that path.
+    let inputRecord: GovernedStreamRecord | null = null;
+    if (ctx.activeRun) {
+      const inputRecordType =
+        input.inputMode === 'raw_intent' ? 'raw_intent_received' : 'open_query_received';
+      inputRecord = writer.writeRecord({
+        record_type: inputRecordType,
+        schema_version: '1.0',
+        workflow_run_id: ctx.activeRun.id,
+        janumicode_version_sha: versionSha,
+        content: {
+          text: input.text,
+          attachments: input.attachments,
+          references: input.references,
+        },
+      });
+    }
+
+    // queryId stays stable across the function — it's the inputRecord id when
+    // we have one, otherwise the synthetic id the composer generated.
+    const queryId = inputRecord?.id ?? input.id;
 
     // 2. Build OpenQuery for classifier/retriever.
     const openQuery: OpenQuery = {
-      id: inputRecord.id,
+      id: queryId,
       text: input.text,
       workflowRunId: ctx.activeRun?.id ?? '',
       currentPhaseId: ctx.currentPhase ?? '0',
@@ -178,7 +191,7 @@ export class ClientLiaisonAgent {
       classification = await this.classifier.classify(openQuery);
     }
 
-    if (ctx.activeRun) {
+    if (ctx.activeRun && inputRecord) {
       writer.writeRecord({
         record_type: 'query_classification_record',
         schema_version: '1.0',
@@ -218,14 +231,21 @@ export class ClientLiaisonAgent {
       synthesis = await this.synthesizer.synthesize(openQuery, classification, retrieval, ctx);
     }
 
-    // 6. Write the response record.
-    if (ctx.activeRun || input.inputMode === 'raw_intent') {
+    // 6. Find the active run AFTER synthesis. The startWorkflow capability
+    //    creates a new workflow_run during step 5; for raw_intent mode the
+    //    response record below needs that new run id.
+    const activeRunAfter = ctx.activeRun ?? this.cdb.getCurrentWorkflowRun();
+
+    // 7. Write the response record. Only when there's a real workflow_run to
+    //    attach it to — otherwise we'd hit the same FK constraint we just
+    //    fixed at step 1.
+    if (activeRunAfter) {
       writer.writeRecord({
         record_type: 'client_liaison_response',
         schema_version: '1.0',
-        workflow_run_id: ctx.activeRun?.id ?? inputRecord.workflow_run_id,
+        workflow_run_id: activeRunAfter.id,
         janumicode_version_sha: versionSha,
-        derived_from_record_ids: [inputRecord.id],
+        derived_from_record_ids: inputRecord ? [inputRecord.id] : [],
         content: {
           query_type: classification.queryType,
           response_text: synthesis.responseText,
@@ -238,8 +258,8 @@ export class ClientLiaisonAgent {
       });
     }
 
-    // 7. Optional escalation.
-    if (synthesis.escalatedToOrchestrator && ctx.activeRun) {
+    // 8. Optional escalation.
+    if (synthesis.escalatedToOrchestrator && ctx.activeRun && inputRecord) {
       this.engine.escalateInconsistency({
         runId: ctx.activeRun.id,
         userQueryRecordId: inputRecord.id,
@@ -249,7 +269,7 @@ export class ClientLiaisonAgent {
     }
 
     return {
-      queryId: inputRecord.id,
+      queryId,
       queryType: classification.queryType,
       responseText: synthesis.responseText,
       provenanceRecordIds: synthesis.provenanceRecordIds,

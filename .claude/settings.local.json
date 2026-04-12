@@ -134,7 +134,8 @@
       "Bash(pnpm test:probes -- src/test/prompt-probes/reasoningReview.probe.ts)",
       "Bash(pnpm test:probes -- src/test/prompt-probes/reasoningReview.probe.ts -t \"clean\")",
       "Bash(npx tsx:*)",
-      "Bash(pnpm exec:*)"
+      "Bash(pnpm exec:*)",
+      "Bash(pnpm build:*)"
     ]
   }
 }

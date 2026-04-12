@@ -67,7 +67,7 @@ export class Phase0Handler implements PhaseHandler {
 
     artifactIds.push(classificationRecord.id);
     engine.ingestionPipeline.ingest(classificationRecord);
-    engine.eventBus.emit('record:added', { record: this.serializeRecord(classificationRecord) });
+    // Auto-emit happens inside writer.writeRecord() — no manual emit needed.
 
     // ── Sub-Phases 0.2, 0.2b, 0.3 — Brownfield (Wave 7) ─────
     // Skip for greenfield; brownfield handling added in Wave 7
@@ -108,22 +108,8 @@ export class Phase0Handler implements PhaseHandler {
 
     artifactIds.push(collisionRecord.id);
     engine.ingestionPipeline.ingest(collisionRecord);
-    engine.eventBus.emit('record:added', { record: this.serializeRecord(collisionRecord) });
+    // Auto-emit happens inside writer.writeRecord() — no manual emit needed.
 
     return { success: true, artifactIds };
-  }
-
-  private serializeRecord(record: { id: string; record_type: string; phase_id: string | null; sub_phase_id: string | null; produced_by_agent_role: string | null; produced_at: string; authority_level: number; quarantined: boolean; content: Record<string, unknown> }) {
-    return {
-      id: record.id,
-      record_type: record.record_type,
-      phase_id: record.phase_id,
-      sub_phase_id: record.sub_phase_id,
-      produced_by_agent_role: record.produced_by_agent_role,
-      produced_at: record.produced_at,
-      authority_level: record.authority_level,
-      quarantined: record.quarantined,
-      content: record.content,
-    };
   }
 }

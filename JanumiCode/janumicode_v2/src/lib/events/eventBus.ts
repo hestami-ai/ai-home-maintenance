@@ -93,6 +93,13 @@ export interface SerializedRecord {
   produced_at: string;
   authority_level: number;
   quarantined: boolean;
+  /**
+   * Parent record ids the agent_output / tool_call / agent_reasoning_step
+   * records use to anchor themselves to their owning agent_invocation. The
+   * AgentInvocationCard dispatcher reads this to skip child records at the
+   * top level and render them nested under their parent invocation card.
+   */
+  derived_from_record_ids: string[];
   content: Record<string, unknown>;
 }
 

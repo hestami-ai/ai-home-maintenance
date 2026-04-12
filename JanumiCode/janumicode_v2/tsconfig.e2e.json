@@ -1,0 +1,24 @@
+{
+  // Compiles the Layer C smoke suite (src/test/e2e/**) to out/test/e2e/**.js.
+  // The Extension Development Host loads .js files via Node's CommonJS
+  // require, so this config emits CJS regardless of the main tsconfig's
+  // module strategy. The runTests.ts entrypoint also lands in out/ so the
+  // `node out/test/e2e/runTests.js` invocation can find it.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "ignoreDeprecations": "6.0",
+    "lib": ["ES2022"],
+    "outDir": "out",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "types": ["node", "mocha"]
+  },
+  "include": ["src/test/e2e/**/*.ts"],
+  "exclude": ["node_modules", "dist", "out"]
+}

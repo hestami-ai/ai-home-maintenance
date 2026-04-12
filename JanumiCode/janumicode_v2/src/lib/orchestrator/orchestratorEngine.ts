@@ -140,6 +140,11 @@ export class OrchestratorEngine {
     this.llmCaller = new LLMCaller({
       maxRetries: config.workflow.max_retry_attempts_per_subphase,
     });
+    // Wave 5b: instrument every LLM call with agent_invocation /
+    // agent_output / tool_call records so the AgentInvocationCard has data
+    // to render. The writer's eventBus auto-emit forwards each record to
+    // the webview as it lands, so the user sees agent activity live.
+    this.llmCaller.setWriter(this.writer, this.versionSha);
 
     this.agentInvoker = new AgentInvoker(this.llmCaller, {
       timeoutSeconds: config.cli_invocation.timeout_seconds,

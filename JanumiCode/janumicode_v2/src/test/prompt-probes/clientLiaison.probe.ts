@@ -88,6 +88,197 @@ describe('Probe: Client Liaison Query Classification', () => {
     expect(result.structuralValid).toBe(true);
     expect(result.judgePassed).toBe(true);
   }, 600000);
+
+  it('classifies workflow initiation query', async () => {
+    const available = await checkOllama();
+    if (!available) return;
+
+    const result = await runProbe({
+      name: 'client_liaison_classify_workflow_initiation',
+      templateKey: 'cross_cutting/client_liaison_query_classification.system',
+      variables: {
+        query_text: 'Build me a REST API for user authentication with JWT tokens',
+        available_capabilities: '(no capabilities)',
+        janumicode_version_sha: 'test-probe',
+      },
+      expectedArtifactType: 'reasoning_review_output',
+      structuralAssertions: (parsed) => {
+        const errors: string[] = [];
+        if (parsed.query_type !== 'workflow_initiation') {
+          errors.push(`Expected workflow_initiation, got ${parsed.query_type}`);
+        }
+        return errors;
+      },
+      judgeRubric: {
+        name: 'Client Liaison classification of workflow initiation',
+        criteria: [
+          'query_type is "workflow_initiation"',
+          'confidence is >= 0.7 (the user is clearly asking to BUILD something new)',
+          'Did not classify as ambient_clarification or historical_lookup',
+        ],
+        reasoningCriteria: [
+          'The classifier recognized "Build me..." as an intent to create something new',
+        ],
+      },
+    });
+
+    logResult(result);
+    expect(result.parsed).not.toBeNull();
+    expect(result.structuralValid).toBe(true);
+    expect(result.judgePassed).toBe(true);
+  }, 600000);
+
+  it('classifies status check query', async () => {
+    const available = await checkOllama();
+    if (!available) return;
+
+    const result = await runProbe({
+      name: 'client_liaison_classify_status_check',
+      templateKey: 'cross_cutting/client_liaison_query_classification.system',
+      variables: {
+        query_text: 'Where are we? What phase is this?',
+        available_capabilities: '(no capabilities)',
+        janumicode_version_sha: 'test-probe',
+      },
+      expectedArtifactType: 'reasoning_review_output',
+      structuralAssertions: (parsed) => {
+        const errors: string[] = [];
+        if (parsed.query_type !== 'status_check') {
+          errors.push(`Expected status_check, got ${parsed.query_type}`);
+        }
+        return errors;
+      },
+      judgeRubric: {
+        name: 'Client Liaison classification of status check',
+        criteria: [
+          'query_type is "status_check"',
+          'confidence is >= 0.6',
+        ],
+        reasoningCriteria: [
+          'The classifier recognized "Where are we?" as a status/progress question',
+        ],
+      },
+    });
+
+    logResult(result);
+    expect(result.parsed).not.toBeNull();
+    expect(result.structuralValid).toBe(true);
+    expect(result.judgePassed).toBe(true);
+  }, 600000);
+
+  it('classifies artifact request query', async () => {
+    const available = await checkOllama();
+    if (!available) return;
+
+    const result = await runProbe({
+      name: 'client_liaison_classify_artifact_request',
+      templateKey: 'cross_cutting/client_liaison_query_classification.system',
+      variables: {
+        query_text: 'Show me the architecture diagram',
+        available_capabilities: '(no capabilities)',
+        janumicode_version_sha: 'test-probe',
+      },
+      expectedArtifactType: 'reasoning_review_output',
+      structuralAssertions: (parsed) => {
+        const errors: string[] = [];
+        if (parsed.query_type !== 'artifact_request') {
+          errors.push(`Expected artifact_request, got ${parsed.query_type}`);
+        }
+        return errors;
+      },
+      judgeRubric: {
+        name: 'Client Liaison classification of artifact request',
+        criteria: [
+          'query_type is "artifact_request"',
+          'confidence is >= 0.6',
+        ],
+        reasoningCriteria: [
+          'The classifier recognized "Show me..." as a request to view a specific artifact',
+        ],
+      },
+    });
+
+    logResult(result);
+    expect(result.parsed).not.toBeNull();
+    expect(result.structuralValid).toBe(true);
+    expect(result.judgePassed).toBe(true);
+  }, 600000);
+
+  it('classifies forward implication query', async () => {
+    const available = await checkOllama();
+    if (!available) return;
+
+    const result = await runProbe({
+      name: 'client_liaison_classify_forward_implication',
+      templateKey: 'cross_cutting/client_liaison_query_classification.system',
+      variables: {
+        query_text: 'If we change AuthService to use OAuth instead of JWT, what components would be affected?',
+        available_capabilities: '(no capabilities)',
+        janumicode_version_sha: 'test-probe',
+      },
+      expectedArtifactType: 'reasoning_review_output',
+      structuralAssertions: (parsed) => {
+        const errors: string[] = [];
+        if (parsed.query_type !== 'forward_implication') {
+          errors.push(`Expected forward_implication, got ${parsed.query_type}`);
+        }
+        return errors;
+      },
+      judgeRubric: {
+        name: 'Client Liaison classification of forward implication',
+        criteria: [
+          'query_type is "forward_implication"',
+          'confidence is >= 0.6',
+        ],
+        reasoningCriteria: [
+          'The classifier recognized "If we change... what would be affected?" as a downstream-impact question',
+        ],
+      },
+    });
+
+    logResult(result);
+    expect(result.parsed).not.toBeNull();
+    expect(result.structuralValid).toBe(true);
+    expect(result.judgePassed).toBe(true);
+  }, 600000);
+
+  it('classifies ambient clarification query', async () => {
+    const available = await checkOllama();
+    if (!available) return;
+
+    const result = await runProbe({
+      name: 'client_liaison_classify_ambient_clarification',
+      templateKey: 'cross_cutting/client_liaison_query_classification.system',
+      variables: {
+        query_text: 'What does the TaskService component do exactly?',
+        available_capabilities: '(no capabilities)',
+        janumicode_version_sha: 'test-probe',
+      },
+      expectedArtifactType: 'reasoning_review_output',
+      structuralAssertions: (parsed) => {
+        const errors: string[] = [];
+        if (parsed.query_type !== 'ambient_clarification') {
+          errors.push(`Expected ambient_clarification, got ${parsed.query_type}`);
+        }
+        return errors;
+      },
+      judgeRubric: {
+        name: 'Client Liaison classification of ambient clarification',
+        criteria: [
+          'query_type is "ambient_clarification"',
+          'confidence is >= 0.5',
+        ],
+        reasoningCriteria: [
+          'The classifier recognized "What does X do?" as a request for explanation, not history or action',
+        ],
+      },
+    });
+
+    logResult(result);
+    expect(result.parsed).not.toBeNull();
+    expect(result.structuralValid).toBe(true);
+    expect(result.judgePassed).toBe(true);
+  }, 600000);
 });
 
 describe('Probe: Client Liaison Response Synthesis', () => {

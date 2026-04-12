@@ -23,5 +23,12 @@
     }
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/webview/**/*.svelte"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "out",
+    "src/**/*.test.ts",
+    "src/webview/**/*.svelte",
+    "src/test/e2e/**"
+  ]
 }

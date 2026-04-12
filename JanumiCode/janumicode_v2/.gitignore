@@ -1,5 +1,8 @@
 node_modules/
 dist/
+out/
+.vscode-test/
+.vscode-test-user-data/
 *.vsix
 .janumicode/governed_stream.db
 .janumicode/governed_stream.db-wal

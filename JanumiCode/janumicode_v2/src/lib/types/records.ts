@@ -130,6 +130,94 @@ export const PHASE_NAMES: Record<PhaseId, string> = {
   '10': 'Commit and Deployment Initiation',
 };
 
+/**
+ * Sub-phase names per phase.
+ * Key: phaseId, Value: Record<subPhaseId, subPhaseName>
+ */
+export const SUB_PHASE_NAMES: Record<PhaseId, Record<string, string>> = {
+  '0': {
+    '0.1': 'Workspace Classification',
+    '0.2': 'Artifact Ingestion',
+    '0.2b': 'Brownfield Continuity Check',
+    '0.4': 'Vocabulary Collision Check',
+  },
+  '0.5': {
+    '0.5.1': 'Impact Enumeration',
+    '0.5.2': 'Refactoring Decision',
+  },
+  '1': {
+    '1.0': 'Intent Quality Check',
+    '1.1b': 'Scope Bounding',
+    '1.2': 'Intent Domain Bloom',
+    '1.3': 'Intent Mirror & Menu',
+    '1.4': 'Intent Statement Synthesis',
+    '1.5': 'Intent Statement Approval',
+  },
+  '2': {
+    '2.1': 'Functional Requirements Bloom',
+    '2.2': 'Non-Functional Requirements Bloom',
+    '2.3': 'Requirements Mirror and Menu',
+  },
+  '3': {
+    '3.1': 'System Boundary Definition',
+    '3.2': 'System Requirements Derivation',
+    '3.3': 'Interface Contract Specification',
+  },
+  '4': {
+    '4.1': 'Software Domain Identification',
+    '4.2': 'Component Decomposition',
+    '4.3': 'Architectural Decision Capture',
+  },
+  '5': {
+    '5.1': 'Data Model Specification',
+    '5.2': 'API Definition',
+    '5.3': 'Error Handling Strategy Specification',
+  },
+  '6': {
+    '6.1': 'Implementation Task Decomposition',
+    '6.2': 'Implementation Plan Mirror and Menu',
+    '6.3': 'Approval',
+  },
+  '7': {
+    '7.1': 'Test Case Generation',
+    '7.2': 'Test Coverage Analysis',
+    '7.3': 'Test Plan Mirror and Menu',
+  },
+  '8': {
+    '8.1': 'Functional Evaluation Design',
+    '8.2': 'Quality Evaluation Design',
+    '8.3': 'Reasoning Evaluation Design',
+  },
+  '9': {
+    '9.1': 'Implementation Task Execution',
+    '9.2': 'Test Execution',
+    '9.3': 'Evaluation Execution',
+  },
+  '10': {
+    '10.1': 'Pre-Commit Consistency Check',
+    '10.2': 'Commit Preparation',
+    '10.3': 'Workflow Run Closure',
+  },
+};
+
+/**
+ * Sub-phase order per phase for timeline rendering.
+ */
+export const SUB_PHASE_ORDER: Record<PhaseId, string[]> = {
+  '0': ['0.1', '0.2', '0.2b', '0.4'],
+  '0.5': ['0.5.1', '0.5.2'],
+  '1': ['1.0', '1.1b', '1.2', '1.3', '1.4', '1.5'],
+  '2': ['2.1', '2.2', '2.3'],
+  '3': ['3.1', '3.2', '3.3'],
+  '4': ['4.1', '4.2', '4.3'],
+  '5': ['5.1', '5.2', '5.3'],
+  '6': ['6.1', '6.2', '6.3'],
+  '7': ['7.1', '7.2', '7.3'],
+  '8': ['8.1', '8.2', '8.3'],
+  '9': ['9.1', '9.2', '9.3'],
+  '10': ['10.1', '10.2', '10.3'],
+};
+
 // ── Record Types (§6) ───────────────────────────────────────────────
 
 export type RecordType =
@@ -293,3 +381,42 @@ export type LoopStatus =
   | 'STALLED'
   | 'DIVERGING'
   | 'SCOPE_BLIND';
+
+// ── Assumption Items (Wave 5b — Mirror card row shape) ──────────────
+
+export type AssumptionSource =
+  | 'document_specified'
+  | 'user_specified'
+  | 'domain_standard'
+  | 'ai_proposed';
+
+export type AssumptionStatus =
+  | 'pending'
+  | 'accepted'
+  | 'rejected'
+  | 'deferred'
+  | 'edited';
+
+export interface AssumptionItem {
+  id: string;
+  text: string;
+  category: string;
+  source: AssumptionSource;
+  rationale?: string;
+  status: AssumptionStatus;
+  editedText?: string;
+}
+
+// ── Pre-Mortem Items (Wave 5b — risk card row shape) ────────────────
+
+export type PreMortemSeverity = 'critical' | 'medium' | 'low';
+
+export interface PreMortemItem {
+  id: string;
+  assumption: string;
+  severity: PreMortemSeverity;
+  failureScenario: string;
+  mitigation?: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  rationale?: string;
+}

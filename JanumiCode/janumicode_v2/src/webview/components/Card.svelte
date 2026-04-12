@@ -6,16 +6,22 @@
 -->
 <script lang="ts">
   import type { SerializedRecord } from '../stores/records.svelte';
+  import { recordsStore } from '../stores/records.svelte';
+  import { PHASE_NAMES, type PhaseId } from '../../lib/types/records';
+  import { formatTimestamp } from '../utils/timestamps';
   import MirrorCard from './MirrorCard.svelte';
   import MenuCard from './MenuCard.svelte';
   import PhaseGateCard from './PhaseGateCard.svelte';
+  import AgentInvocationCard from './AgentInvocationCard.svelte';
+  import PreMortemCard from './PreMortemCard.svelte';
 
   interface Props {
     record: SerializedRecord;
     ondecision?: (detail: { recordId: string; decision: { type: string; payload?: Record<string, unknown> } }) => void;
+    vscode?: { postMessage(message: unknown): void };
   }
 
-  const { record, ondecision }: Props = $props();
+  const { record, ondecision, vscode }: Props = $props();
 
   type CardCategory =
     | 'phase_milestone'
@@ -94,16 +100,33 @@
       : [],
   );
   let collapsed = $state(true);
+
+  // Agent child records (agent_output, tool_call, agent_reasoning_step, etc.)
+  // are rendered nested inside their parent AgentInvocationCard, NOT as
+  // top-level cards. If this record is a child of an invocation, skip it.
+  const isAgentChild = $derived(recordsStore.isChildOfInvocation(record));
 </script>
 
+<!-- Agent child records: skip at top level (rendered nested by AgentInvocationCard) -->
+{#if isAgentChild}
+  <!-- deliberately empty — rendered by parent AgentInvocationCard -->
+<!-- Agent invocation card (always expanded, owns its children) -->
+{:else if record.record_type === 'agent_invocation'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <AgentInvocationCard {record} {ondecision} />
+  </div>
 <!-- Specialized cards (always expanded) -->
-{#if record.record_type === 'mirror_presented'}
+{:else if record.record_type === 'mirror_presented' && record.content.kind === 'pre_mortem'}
   <div data-record-id={record.id}>
-    <MirrorCard {record} {ondecision} />
+    <PreMortemCard {record} {ondecision} {vscode} />
+  </div>
+{:else if record.record_type === 'mirror_presented'}
+  <div data-record-id={record.id}>
+    <MirrorCard {record} {ondecision} {vscode} />
   </div>
 {:else if record.record_type === 'menu_presented' || record.record_type === 'decision_bundle_presented'}
   <div data-record-id={record.id}>
-    <MenuCard {record} {ondecision} />
+    <MenuCard {record} {ondecision} {vscode} />
   </div>
 {:else if record.record_type === 'phase_gate_evaluation'}
   <div data-record-id={record.id}>
@@ -115,6 +138,8 @@
     class="card card-{category}"
     class:quarantined={record.quarantined}
     data-record-id={record.id}
+    data-phase-id={record.phase_id}
+    data-phase-label={record.phase_id ? PHASE_NAMES[record.phase_id as PhaseId] : undefined}
   >
     <button class="card-header" onclick={() => (collapsed = !collapsed)}>
       <span class="role-badge">{roleLabel}</span>
@@ -145,7 +170,7 @@
         </details>
 
         <div class="card-meta">
-          <span class="timestamp">{new Date(record.produced_at).toLocaleTimeString()}</span>
+          <span class="timestamp" title={record.produced_at}>{formatTimestamp(record.produced_at)}</span>
           <span class="authority">Authority: {record.authority_level}</span>
         </div>
       </div>
