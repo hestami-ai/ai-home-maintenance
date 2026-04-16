@@ -1,0 +1,29 @@
+{
+  "topic_entities": [
+    "Consumer Discovery MVP",
+    "Pillar 1",
+    "Home Real Property Assistant",
+    "US-001",
+    "Non-functional requirements",
+    "Property data ingestion",
+    "3D asset data",
+    "Splats",
+    "Individual Homeowner"
+  ],
+  "decision_types_sought": [
+    "phase_gate_approval",
+    "mirror_approval"
+  ],
+  "temporal_scope": {
+    "from": "2024-01-01",
+    "to": "2024-12-31"
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}

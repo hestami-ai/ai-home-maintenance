@@ -1,0 +1,897 @@
+{
+  "text": "{\n  \"models\": [\n    {\n      \"component_id\": \"cmp-prop-data\",\n      \"entities\": [\n        {\n          \"name\": \"PropertyAsset\",\n          \"fields\": [\n            {\n              \"name\": \"asset_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"property_identifier\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"asset_type\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"MAX_LENGTH(50)\"]\n            },\n            {\n              \"name\": \"ingested_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"status\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"foreign_key\",\n              \"target\": \"MediaManifest\",\n              \"field\": \"media_manifest_id\"\n            }\n          ]\n        },\n        {\n          \"name\": \"MediaManifest\",\n          \"fields\": [\n            {\n              \"name\": \"media_manifest_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"asset_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"FK\"]\n            },\n            {\n              \"name\": \"file_format\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"IN('PNG', 'JPG', 'GLTF')\"]\n            },\n            {\n              \"name\": \"storage_path\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"file_size_bytes\",\n              \"type\": \"integer\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"one-to-many\",\n              \"target\": \"PropertyAsset\",\n              \"field\": \"asset_id\"\n            }\n          ]\n        },\n        {\n          \"name\": \"OfflineBuffer\",\n          \"fields\": [\n            {\n              \"name\": \"buffer_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"asset_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"capture_timestamp\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"sync_status\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"retry_count\",\n              \"type\": \"integer\",\n              \"constraints\": [\"NOT NULL\", \"DEFAULT(0)\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"foreign_key\",\n              \"target\": \"PropertyAsset\",\n              \"field\": \"asset_id\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-provider-match\",\n      \"entities\": [\n        {\n          \"name\": \"ProviderProfile\",\n          \"fields\": [\n            {\n              \"name\": \"provider_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"business_name\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"location\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"match_score\",\n              \"type\": \"float\",\n              \"constraints\": [\"NOT NULL\", \"BETWEEN 0 AND 1\"]\n            },\n            {\n              \"name\": \"is_home_real_property\",\n              \"type\": \"boolean\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"accessed_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"many-to-one\",\n              \"target\": \"BidEstimate\",\n              \"field\": \"provider_id\"\n            }\n          ]\n        },\n        {\n          \"name\": \"BidEstimate\",\n          \"fields\": [\n            {\n              \"name\": \"estimate_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"provider_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"FK\"]\n            },\n            {\n              \"name\": \"property_identifier\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"bid_amount_cents\",\n              \"type\": \"integer\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"submission_timestamp\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"many-to-one\",\n              \"target\": \"ProviderProfile\",\n              \"field\": \"provider_id\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-compliance\",\n      \"entities\": [\n        {\n          \"name\": \"BylawsClause\",\n          \"fields\": [\n            {\n              \"name\": \"clause_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"source_doc_reference\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"extracted_text\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"MAX_LENGTH(10000)\"]\n            },\n            {\n              \"name\": \"extraction_confidence\",\n              \"type\": \"float\",\n              \"constraints\": [\"NOT NULL\", \"BETWEEN 0 AND 1\"]\n            },\n            {\n              \"name\": \"created_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"one-to-one\",\n              \"target\": \"NoticeRequirement\",\n              \"field\": \"notice_requirement_id\"\n            }\n          ]\n        },\n        {\n          \"name\": \"StatutoryDeadline\",\n          \"fields\": [\n            {\n              \"name\": \"deadline_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"jurisdiction\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"obligation_type\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"deadline_date\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": []\n        },\n        {\n          \"name\": \"NoticeRequirement\",\n          \"fields\": [\n            {\n              \"name\": \"notice_requirement_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"jurisdiction\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"content_template\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"is_active\",\n              \"type\": \"boolean\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"one-to-many\",\n              \"target\": \"BylawsClause\",\n              \"field\": \"clause_id\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-workflow\",\n      \"entities\": [\n        {\n          \"name\": \"ActionItem\",\n          \"fields\": [\n            {\n              \"name\": \"action_item_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"task_description\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"workflow_status\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"IN('Pending', 'In-Progress', 'Complete', 'Failed')\"]\n            },\n            {\n              \"name\": \"assigned_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"one-to-many\",\n              \"target\": \"TransitionLog\",\n              \"field\": \"action_item_id\"\n            }\n          ]\n        },\n        {\n          \"name\": \"TransitionLog\",\n          \"fields\": [\n            {\n              \"name\": \"log_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"action_item_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"FK\"]\n            },\n            {\n              \"name\": \"prev_status\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"new_status\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"transition_timestamp\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\", \"PRECISE(100ms)\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"many-to-one\",\n              \"target\": \"ActionItem\",\n              \"field\": \"action_item_id\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-notifications\",\n      \"entities\": [\n        {\n          \"name\": \"MessageBatch\",\n          \"fields\": [\n            {\n              \"name\": \"batch_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"channel_type\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"IN('Email', 'SMS')\"]\n            },\n            {\n              \"name\": \"payload_hash\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"status\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"created_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"one-to-many\",\n              \"target\": \"DeliveryAttempt\",\n              \"field\": \"batch_id\"\n            },\n            {\n              \"type\": \"one-to-many\",\n              \"target\": \"RecipientList\",\n              \"field\": \"batch_id\"\n            }\n          ]\n        },\n        {\n          \"name\": \"DeliveryAttempt\",\n          \"fields\": [\n            {\n              \"name\": \"attempt_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"batch_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"FK\"]\n            },\n            {\n              \"name\": \"recipient_identifier\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"delivery_status\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"bounce_status\",\n              \"type\": \"string\",\n              \"constraints\": [\"NULL\", \"NOT NULL\"]\n            },\n            {\n              \"name\": \"retry_count\",\n              \"type\": \"integer\",\n              \"constraints\": [\"NOT NULL\", \"DEFAULT(0)\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"many-to-one\",\n              \"target\": \"MessageBatch\",\n              \"field\": \"batch_id\"\n            }\n          ]\n        },\n        {\n          \"name\": \"RecipientList\",\n          \"fields\": [\n            {\n              \"name\": \"list_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"batch_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"FK\"]\n            },\n            {\n              \"name\": \"tenant_member_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"many-to-one\",\n              \"target\": \"MessageBatch\",\n              \"field\": \"batch_id\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-security\",\n      \"entities\": [\n        {\n          \"name\": \"RLSPolicy\",\n          \"fields\": [\n            {\n              \"name\": \"policy_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"tenant_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"scope\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"is_active\",\n              \"type\": \"boolean\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": []\n        },\n        {\n          \"name\": \"TenantBoundary\",\n          \"fields\": [\n            {\n              \"name\": \"boundary_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"tenant_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"accessible_scope\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"access_level\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"IN('Admin', 'Read', 'ViewOnly')\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"one-to-one\",\n              \"target\": \"RLSPolicy\",\n              \"field\": \"policy_id\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-payment\",\n      \"entities\": [\n        {\n          \"name\": \"PaymentIntent\",\n          \"fields\": [\n            {\n              \"name\": \"intent_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"amount_cents\",\n              \"type\": \"integer\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"currency\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"IN('USD')\"]\n            },\n            {\n              \"name\": \"gateway_reference\",\n              \"type\": \"string\",\n              \"constraints\": [\"NULL\", \"NOT NULL\"]\n            },\n            {\n              \"name\": \"status\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"created_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"one-to-many\",\n              \"target\": \"ReceiptDocument\",\n              \"field\": \"intent_id\"\n            },\n            {\n              \"type\": \"one-to-many\",\n              \"target\": \"DepositFee\",\n              \"field\": \"intent_id\"\n            }\n          ]\n        },\n        {\n          \"name\": \"ReceiptDocument\",\n          \"fields\": [\n            {\n              \"name\": \"receipt_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"intent_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"FK\"]\n            },\n            {\n              \"name\": \"document_url\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"generated_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"many-to-one\",\n              \"target\": \"PaymentIntent\",\n              \"field\": \"intent_id\"\n            }\n          ]\n        },\n        {\n          \"name\": \"DepositFee\",\n          \"fields\": [\n            {\n              \"name\": \"fee_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"PK\", \"UNIQUE\"]\n            },\n            {\n              \"name\": \"intent_id\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\", \"FK\"]\n            },\n            {\n              \"name\": \"fee_amount_cents\",\n              \"type\": \"integer\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"fee_type\",\n              \"type\": \"string\",\n              \"constraints\": [\"NOT NULL\"]\n            },\n            {\n              \"name\": \"processed_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": [\"NOT NULL\"]\n            }\n          ],\n          \"relationships\": [\n            {\n              \"type\": \"many-to-one\",\n              \"target\": \"PaymentIntent\",\n              \"field\": \"intent_id\"\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}",
+  "parsed": {
+    "models": [
+      {
+        "component_id": "cmp-prop-data",
+        "entities": [
+          {
+            "name": "PropertyAsset",
+            "fields": [
+              {
+                "name": "asset_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "property_identifier",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "asset_type",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "MAX_LENGTH(50)"
+                ]
+              },
+              {
+                "name": "ingested_at",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "status",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "foreign_key",
+                "target": "MediaManifest",
+                "field": "media_manifest_id"
+              }
+            ]
+          },
+          {
+            "name": "MediaManifest",
+            "fields": [
+              {
+                "name": "media_manifest_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "asset_id",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "FK"
+                ]
+              },
+              {
+                "name": "file_format",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "IN('PNG', 'JPG', 'GLTF')"
+                ]
+              },
+              {
+                "name": "storage_path",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "file_size_bytes",
+                "type": "integer",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "one-to-many",
+                "target": "PropertyAsset",
+                "field": "asset_id"
+              }
+            ]
+          },
+          {
+            "name": "OfflineBuffer",
+            "fields": [
+              {
+                "name": "buffer_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "asset_id",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "capture_timestamp",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "sync_status",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "retry_count",
+                "type": "integer",
+                "constraints": [
+                  "NOT NULL",
+                  "DEFAULT(0)"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "foreign_key",
+                "target": "PropertyAsset",
+                "field": "asset_id"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-provider-match",
+        "entities": [
+          {
+            "name": "ProviderProfile",
+            "fields": [
+              {
+                "name": "provider_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "business_name",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "location",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "match_score",
+                "type": "float",
+                "constraints": [
+                  "NOT NULL",
+                  "BETWEEN 0 AND 1"
+                ]
+              },
+              {
+                "name": "is_home_real_property",
+                "type": "boolean",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "accessed_at",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "many-to-one",
+                "target": "BidEstimate",
+                "field": "provider_id"
+              }
+            ]
+          },
+          {
+            "name": "BidEstimate",
+            "fields": [
+              {
+                "name": "estimate_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "provider_id",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "FK"
+                ]
+              },
+              {
+                "name": "property_identifier",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "bid_amount_cents",
+                "type": "integer",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "submission_timestamp",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "many-to-one",
+                "target": "ProviderProfile",
+                "field": "provider_id"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-compliance",
+        "entities": [
+          {
+            "name": "BylawsClause",
+            "fields": [
+              {
+                "name": "clause_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "source_doc_reference",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "extracted_text",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "MAX_LENGTH(10000)"
+                ]
+              },
+              {
+                "name": "extraction_confidence",
+                "type": "float",
+                "constraints": [
+                  "NOT NULL",
+                  "BETWEEN 0 AND 1"
+                ]
+              },
+              {
+                "name": "created_at",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "one-to-one",
+                "target": "NoticeRequirement",
+                "field": "notice_requirement_id"
+              }
+            ]
+          },
+          {
+            "name": "StatutoryDeadline",
+            "fields": [
+              {
+                "name": "deadline_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "jurisdiction",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "obligation_type",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "deadline_date",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": []
+          },
+          {
+            "name": "NoticeRequirement",
+            "fields": [
+              {
+                "name": "notice_requirement_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "jurisdiction",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "content_template",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "is_active",
+                "type": "boolean",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "one-to-many",
+                "target": "BylawsClause",
+                "field": "clause_id"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-workflow",
+        "entities": [
+          {
+            "name": "ActionItem",
+            "fields": [
+              {
+                "name": "action_item_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "task_description",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "workflow_status",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "IN('Pending', 'In-Progress', 'Complete', 'Failed')"
+                ]
+              },
+              {
+                "name": "assigned_at",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "one-to-many",
+                "target": "TransitionLog",
+                "field": "action_item_id"
+              }
+            ]
+          },
+          {
+            "name": "TransitionLog",
+            "fields": [
+              {
+                "name": "log_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "action_item_id",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "FK"
+                ]
+              },
+              {
+                "name": "prev_status",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "new_status",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "transition_timestamp",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL",
+                  "PRECISE(100ms)"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "many-to-one",
+                "target": "ActionItem",
+                "field": "action_item_id"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-notifications",
+        "entities": [
+          {
+            "name": "MessageBatch",
+            "fields": [
+              {
+                "name": "batch_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "channel_type",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "IN('Email', 'SMS')"
+                ]
+              },
+              {
+                "name": "payload_hash",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "status",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "created_at",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "one-to-many",
+                "target": "DeliveryAttempt",
+                "field": "batch_id"
+              },
+              {
+                "type": "one-to-many",
+                "target": "RecipientList",
+                "field": "batch_id"
+              }
+            ]
+          },
+          {
+            "name": "DeliveryAttempt",
+            "fields": [
+              {
+                "name": "attempt_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "batch_id",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "FK"
+                ]
+              },
+              {
+                "name": "recipient_identifier",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "delivery_status",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "bounce_status",
+                "type": "string",
+                "constraints": [
+                  "NULL",
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "retry_count",
+                "type": "integer",
+                "constraints": [
+                  "NOT NULL",
+                  "DEFAULT(0)"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "many-to-one",
+                "target": "MessageBatch",
+                "field": "batch_id"
+              }
+            ]
+          },
+          {
+            "name": "RecipientList",
+            "fields": [
+              {
+                "name": "list_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "batch_id",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "FK"
+                ]
+              },
+              {
+                "name": "tenant_member_id",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "many-to-one",
+                "target": "MessageBatch",
+                "field": "batch_id"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-security",
+        "entities": [
+          {
+            "name": "RLSPolicy",
+            "fields": [
+              {
+                "name": "policy_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "tenant_id",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "scope",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "is_active",
+                "type": "boolean",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": []
+          },
+          {
+            "name": "TenantBoundary",
+            "fields": [
+              {
+                "name": "boundary_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "tenant_id",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "accessible_scope",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "access_level",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "IN('Admin', 'Read', 'ViewOnly')"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "one-to-one",
+                "target": "RLSPolicy",
+                "field": "policy_id"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-payment",
+        "entities": [
+          {
+            "name": "PaymentIntent",
+            "fields": [
+              {
+                "name": "intent_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "amount_cents",
+                "type": "integer",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "currency",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "IN('USD')"
+                ]
+              },
+              {
+                "name": "gateway_reference",
+                "type": "string",
+                "constraints": [
+                  "NULL",
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "status",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "created_at",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "one-to-many",
+                "target": "ReceiptDocument",
+                "field": "intent_id"
+              },
+              {
+                "type": "one-to-many",
+                "target": "DepositFee",
+                "field": "intent_id"
+              }
+            ]
+          },
+          {
+            "name": "ReceiptDocument",
+            "fields": [
+              {
+                "name": "receipt_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "intent_id",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "FK"
+                ]
+              },
+              {
+                "name": "document_url",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "generated_at",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "many-to-one",
+                "target": "PaymentIntent",
+                "field": "intent_id"
+              }
+            ]
+          },
+          {
+            "name": "DepositFee",
+            "fields": [
+              {
+                "name": "fee_id",
+                "type": "string",
+                "constraints": [
+                  "PK",
+                  "UNIQUE"
+                ]
+              },
+              {
+                "name": "intent_id",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL",
+                  "FK"
+                ]
+              },
+              {
+                "name": "fee_amount_cents",
+                "type": "integer",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "fee_type",
+                "type": "string",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              },
+              {
+                "name": "processed_at",
+                "type": "timestamp",
+                "constraints": [
+                  "NOT NULL"
+                ]
+              }
+            ],
+            "relationships": [
+              {
+                "type": "many-to-one",
+                "target": "PaymentIntent",
+                "field": "intent_id"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "thinking": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Role:** [JC:Technical Spec Agent].\n    *   **Task:** Produce [JC:Data Models] for Sub-Phase 5.1.\n    *   **Input Context:** Component Model, Component Responsibilities, Software Domains, Terms, Constraints (JSON schema for output, specific data model rules).\n    *   **Constraints:**\n        *   No entity field may lack a specified type (Invariant: DM-001).\n        *   Data Models must be consistent with Component Responsibilities.\n        *   Use concrete types (string, integer, boolean, timestamp, uuid).\n        *   Output must be a JSON object matching the `data_models` schema (specifically: `models: array`, each with `component_id`, `entities: array` of `{name, fields: [{name, type, constraints}], relationships}`).\n    *   **Scope:** Consumer Discovery MVP (Phase 1 Focus).\n    *   **Components:** 7 Components (cmp-prop-data, cmp-provider-match, cmp-compliance, cmp-workflow, cmp-notifications, cmp-security, cmp-payment).\n    *   **Domains:** 7 Software Domains corresponding to the components.\n    *   **Terms:** Defined terms for each domain need to be reflected in entities/fields.\n\n2.  **Deconstruct the Components & Domains:**\n\n    *   **cmp-prop-data (Property Data Management):**\n        *   Terms: `PropertyAsset`, `MediaManifest`, `OfflineBuffer`.\n        *   Responsibilities: RSP-001 (Upload/Validate), RSP-002 (Index/Search), RSP-003 (Offline/Sync).\n        *   Entities needed: `PropertyAsset`, `MediaManifest`, `OfflineBuffer`.\n        *   Fields: Need concrete types. Constraints (format, storage location, etc.).\n\n    *   **cmp-provider-match (Service Provider Matching):**\n        *   Terms: `HomeRealProperty`, `ProviderProfile`, `BidEstimate`, `MatchScore`.\n        *   Responsibilities: RSP-004 (Search/Score), RSP-005 (Bid Comparison).\n        *   Entities needed: `ProviderProfile`, `BidEstimate`. (`HomeRealProperty` is a term/category, likely a field or tag, `MatchScore` is a metric/field).\n        *   Fields: `service_type`, `location`, `relevance_score`, `bid_amount`, `status`, etc.\n\n    *   **cmp-compliance (Compliance Rules Engine):**\n        *   Terms: `BylawsClause`, `StatutoryDeadline`, `NoticeRequirement`, `ExtractionConfidence`.\n        *   Responsibilities: RSP-006 (Extract/Validate), RSP-007 (Monitor Deadlines), RSP-008 (Generate Alerts).\n        *   Entities needed: `BylawsClause`, `StatutoryDeadline`, `NoticeRequirement`.\n        *   Fields: `text_content`, `confidence_score`, `jurisdiction`, `deadline_date`, `alert_status`.\n\n    *   **cmp-workflow (Action Workflow Orchestrator):**\n        *   Terms: `ActionItem`, `WorkflowState`, `TransitionLog`.\n        *   Responsibilities: RSP-009 (Manage States), RSP-010 (Status Updates).\n        *   Entities needed: `ActionItem`, `TransitionLog`. (`WorkflowState` is likely an enum/field value).\n        *   Fields: `item_id`, `status`, `created_at`, `updated_at`, `description`.\n        *   Relationships: `TransitionLog` references `ActionItem`.\n\n    *   **cmp-notifications (Notification Dispatcher):**\n        *   Terms: `MessageBatch`, `DeliveryAttempt`, `RecipientList`.\n        *   Responsibilities: RSP-011 (Process Batches), RSP-012 (Resume Delivery), RSP-013 (Confirm Receipt).\n        *   Entities needed: `MessageBatch`, `DeliveryAttempt`, `RecipientList`.\n        *   Fields: `channel_type`, `payload`, `status`, `retry_count`, `recipient_ids`.\n\n    *   **cmp-security (Tenant Security Gateway):**\n        *   Terms: `RLSPolicy`, `TenantBoundary`, `AccessLevel`.\n        *   Responsibilities: RSP-014 (Enforce RLS), RSP-015 (Unauthorized Access Response).\n        *   Entities needed: `RLSPolicy`, `TenantBoundary`. (`AccessLevel` is likely a field/enum).\n        *   Fields: `tenant_id`, `scope`, `permissions`.\n\n    *   **cmp-payment (Payment Transaction Processor):**\n        *   Terms: `PaymentIntent`, `ReceiptDocument`, `DepositFee`.\n        *   Responsibilities: RSP-016 (Process Payments), RSP-017 (Proof of Payment).\n        *   Entities needed: `PaymentIntent`, `ReceiptDocument`. (`DepositFee` is a line item, maybe part of Intent or separate entity; let's make it an entity or field within Transaction). Given \"Terms\", it suggests a specific entity. Let's create `DepositFee` entity or associate with `PaymentIntent`. Let's make it an entity for granularity).\n        *   Fields: `amount`, `gateway_id`, `authorization_code`, `document_url`.\n\n3.  **Drafting the Data Models (Adhering to Constraints):**\n    *   *Constraint Check:* No entity field may lack a specified type.\n    *   *Constraint Check:* Concrete types (string, integer, boolean, timestamp, uuid).\n    *   *Constraint Check:* Relationships (must be defined in the entities array).\n\n    *   *Schema Structure:*\n        ```json\n        {\n          \"models\": [\n            {\n              \"component_id\": \"...\",\n              \"entities\": [\n                {\n                  \"name\": \"...\",\n                  \"fields\": [ ... ],\n                  \"relationships\": [ ... ]\n                }\n              ]\n            }\n          ]\n        }\n        ```\n\n    *   *Refining Fields:* Ensure all types are explicit.\n    *   *Refining Relationships:* Use a standard format (e.g., `{\"from\": \"EntityA\", \"to\": \"EntityB\", \"type\": \"one-to-many\"}`). The prompt says `relationships` inside `entities`, implying self-referencing or cross-referencing. I will define relationships as arrays of objects describing foreign keys or links.\n\n4.  **Step-by-Step Construction:**\n\n    *   **1. cmp-prop-data:**\n        *   Entity: `PropertyAsset`. Fields: `asset_id` (uuid), `property_id` (uuid), `media_type` (string), `storage_path` (string), `status` (string).\n        *   Entity: `MediaManifest`. Fields: `manifest_id` (uuid), `property_asset_id` (uuid), `format` (string), `size_bytes` (integer).\n        *   Entity: `OfflineBuffer`. Fields: `buffer_id` (uuid), `payload_hash` (string), `sync_status` (string), `created_at` (timestamp).\n        *   Rel: `PropertyAsset` - `MediaManifest`.\n\n    *   **2. cmp-provider-match:**\n        *   Entity: `ProviderProfile`. Fields: `provider_id` (uuid), `name` (string), `license_id` (string), `location` (string), `match_score` (float/int? let's use float for score).\n        *   Entity: `BidEstimate`. Fields: `bid_id` (uuid), `provider_id` (uuid), `estimated_cost` (decimal/number? Constraint says integer/string. Let's use `number` or `string`. Better `number` for cost). `bid_amount` (string/decimal). Let's use `integer` cents or `string` for currency to be safe on precision? Constraint: \"Use concrete types\". Let's use `integer` for cents to avoid float issues, or `string` for currency. Let's use `string` for currency values to allow format. Actually `number` is concrete. Let's use `integer` for amounts to ensure constraint compliance on types. Wait, `decimal` isn't a standard JSON type usually, `number` is. Let's use `string` for currency to be precise on format or `integer` for cents. Let's stick to `integer` for amounts in cents.`\n        *   Entity: `MatchScore`. (This is a metric, probably a field in `BidEstimate` or `ProviderProfile`. The Term says \"MatchScore: A calculated relevance metric...\". Let's make it an entity `MatchScore` linked to `BidEstimate` to store historical rankings, or a field. Given \"Entities\" requirement, let's make it an entity if it represents a specific event, but the term definition suggests a property. I will create a `MatchScore` entity for historical tracking of matches, or include as field. To ensure rich modeling, I'll make it a field within `BidEstimate` if it's the result, but the term implies a recordable object. Let's make `MatchScore` a separate entity for detailed AI reasoning logs or just a field. Let's follow the \"Terms\" strictly. If \"MatchScore\" is a Term, I should probably have an entity or a field named `match_score`. The instruction says \"Use concrete types\". I will add `match_score` as a field in `ProviderProfile` or `BidEstimate`. However, to be safe on \"Entities\", I will create entities based on the Terms provided as nouns that sound like tables. `MatchScore` sounds like a record. `ExtractionConfidence` sounds like a field. I will make `MatchScore` a field in `BidEstimate` to save complexity, or an entity if it stores history. Let's make `ProviderProfile` have the score. Wait, Term: `BidEstimate`. Term: `MatchScore`. Let's make `BidEstimate` the main entity, and `MatchScore` a field. Or create `MatchResult` entity. Let's create `ProviderProfile` and `BidEstimate`. I will merge `MatchScore` concept into `BidEstimate` as a field `ai_match_score` to satisfy data model simplicity unless history is required. Actually, to be robust, I will treat `MatchScore` as a field within `BidEstimate` or `ProviderProfile`. Let's put it in `ProviderProfile`.\n        *   Wait, looking at `cmp-compliance`, `ExtractionConfidence` is a metric. I'll make that a field.\n        *   Re-evaluating: The prompt lists \"Terms\". I should map these to Entities/Fields.\n        *   `HomeRealProperty`: Category. Maybe a tag/enum field.\n        *   `ProviderProfile`: Entity.\n        *   `BidEstimate`: Entity.\n        *   `MatchScore`: I will define this as a field `match_score` on `ProviderProfile` to keep it normalized, or an association entity if multiple scores exist. Let's use `ProviderProfile` with `match_score`.\n\n    *   **3. cmp-compliance:**\n        *   Entity: `BylawsClause`. Fields: `clause_id` (uuid), `doc_reference` (string), `text` (string), `confidence` (float/int).\n        *   Entity: `StatutoryDeadline`. Fields: `deadline_id` (uuid), `obligation_type` (string), `due_date` (timestamp).\n        *   Entity: `NoticeRequirement`. Fields: `req_id` (uuid), `jurisdiction` (string), `content_template` (string).\n        *   Fields: `extraction_confidence` as a field or separate entity? Term says \"ExtractionConfidence\". I'll add `confidence_score` field to `BylawsClause`.\n        *   Rel: `BylawsClause` -> `NoticeRequirement` (maybe).\n\n    *   **4. cmp-workflow:**\n        *   Entity: `ActionItem`. Fields: `item_id` (uuid), `status` (enum/string), `description` (string).\n        *   Entity: `TransitionLog`. Fields: `log_id` (uuid), `item_id` (uuid), `prev_status` (string), `new_status` (string), `timestamp` (timestamp).\n        *   Rel: `TransitionLog` references `ActionItem`.\n\n    *   **5. cmp-notifications:**\n        *   Entity: `MessageBatch`. Fields: `batch_id` (uuid), `channel` (string), `status` (string), `created_at` (timestamp).\n        *   Entity: `DeliveryAttempt`. Fields: `attempt_id` (uuid), `batch_id` (uuid), `recipient` (string), `status` (string), `retry_count` (integer).\n        *   Entity: `RecipientList`. Fields: `list_id` (uuid), `batch_id` (uuid), `member_id` (string).\n        *   Rel: `MessageBatch` -> `DeliveryAttempt` (one-to-many).\n\n    *   **6. cmp-security:**\n        *   Entity: `RLSPolicy`. Fields: `policy_id` (uuid), `tenant_id` (uuid), `scope` (string).\n        *   Entity: `TenantBoundary`. Fields: `boundary_id` (uuid), `tenant_id` (uuid), `allowed_resources` (string).\n        *   Term `AccessLevel`: Field `access_level` in `TenantBoundary` or `RLSPolicy`.\n\n    *   **7. cmp-payment:**\n        *   Entity: `PaymentIntent`. Fields: `intent_id` (uuid), `amount` (integer - cents), `status` (string), `gateway_reference` (string).\n        *   Entity: `ReceiptDocument`. Fields: `doc_id` (uuid), `intent_id` (uuid), `document_url` (string), `generated_at` (timestamp).\n        *   Entity: `DepositFee`. (Maybe a line item in `PaymentIntent`? Term suggests entity). Let's make `DepositFee` a child entity of `PaymentIntent` or a separate transaction line. Let's make `DepositFee` an entity linked to `PaymentIntent`.\n\n    *   **Refining Types:**\n        *   UUID: `string`\n        *   Dates: `timestamp`\n        *   Booleans: `boolean`\n        *   Numbers: `integer` (cents), `float` (scores).\n        *   Foreign Keys: `uuid` (string).\n\n    *   **Relationships Format:**\n        *   Prompt example: `relationships`. I will assume an array of objects like `{ to: \"EntityName\", field: \"fk_name\", type: \"many\" }`. Or just text. Standardizing: `[{\"type\": \"foreign_key\", \"ref_entity\": \"OtherEntity\", \"ref_field\": \"id\"}]`.\n        *   Actually, looking at the schema requirement: `entities: array of {name, fields: [{name, type, constraints}], relationships}`. I will define relationships within the entity context.\n\n5.  **Final Review against Constraints:**\n    *   JSON object matching `data_models` schema.\n    *   No entity field may lack a specified type.\n    *   Concrete types.\n    *   Consistent with Component Responsibilities (MVP Phase 1).\n\n    *   *Self-Correction on `MatchScore` and `ExtractionConfidence`:* These are metrics. I will define them as fields within the primary entities (`BidEstimate` and `BylawsClause`) to avoid sparse tables unless they have specific lifecycle beyond the record. However, the Terms list them. I will add a field `match_score` to `ProviderProfile` and `ai_confidence` to `BylawsClause`.\n    *   *Self-Correction on `HomeRealProperty`:* This is a category. I will add a `category` field or `home_real_property` boolean field on `ProviderProfile`.\n    *   *Self-Correction on `DepositFee`:* Will create an entity `DepositFee` linked to `PaymentIntent` to track fees specifically as per Term.\n\n6.  **Constructing the JSON:**\n    *   Assemble the JSON structure.\n    *   Ensure all fields have types.\n    *   Ensure `component_id` is correct.\n\n    *   *Wait, one constraint check:* `data_models` schema in prompt description: `models: array, each with: component_id, entities: array of {name, fields: [{name, type, constraints}], relationships}`.\n    *   I need to make sure `constraints` is included in fields. e.g. `\"constraints\": [\"NOT NULL\", \"UNIQUE\"]`.\n    *   I need to make sure `relationships` is included. e.g. `[{\"type\": \"many-to-one\", \"target_entity\": \"Name\"}]`.\n\n    *   *Types:*\n        *   `uuid`: `string`\n        *   `timestamp`: `string` (ISO8601)\n        *   `text`: `string`\n        *   `amount`: `integer` (cents)\n        *   `score`: `float` (0.0 to 1.0)\n        *   `status`: `string`\n\n    *   *Constraints:*\n        *   `NOT NULL`, `UNIQUE`, `DEFAULT`, `MAX_LENGTH`.\n\n    *   *Let's write the content.*\n\n    *   **cmp-prop-data:**\n        *   `PropertyAsset`: `asset_id` (uuid, pk), `property_address` (string), `uploaded_at` (timestamp), `status` (string).\n        *   `MediaManifest`: `manifest_id` (uuid, pk), `asset_id` (uuid, fk), `file_format` (string), `storage_path` (string), `size_bytes` (integer).\n        *   `OfflineBuffer`: `buffer_id` (uuid, pk), `asset_id` (uuid, fk), `sync_status` (string), `retry_count` (integer).\n\n    *   **cmp-provider-match:**\n        *   `ProviderProfile`: `profile_id` (uuid, pk), `business_name` (string), `license_number` (string), `match_score` (float), `is_home_real_property` (boolean).\n        *   `BidEstimate`: `estimate_id` (uuid, pk), `provider_id` (uuid, fk), `property_address` (string), `bid_amount` (integer - cents), `timestamp` (timestamp), `ai_confidence` (float).\n\n    *   **cmp-compliance:**\n        *   `BylawsClause`: `clause_id` (uuid, pk), `source_doc_id` (uuid, fk), `extracted_text` (string), `extraction_confidence` (float).\n        *   `StatutoryDeadline`: `deadline_id` (uuid, pk), `jurisdiction` (string), `obligation_type` (string), `deadline_date` (timestamp).\n        *   `NoticeRequirement`: `requirement_id` (uuid, pk), `jurisdiction` (string), `content_template` (string), `is_active` (boolean).\n\n    *   **cmp-workflow:**\n        *   `ActionItem`: `action_item_id` (uuid, pk), `task_description` (string), `workflow_status` (string).\n        *   `TransitionLog`: `log_id` (uuid, pk), `action_item_id` (uuid, fk), `prev_status` (string), `new_status` (string), `occurred_at` (timestamp).\n\n    *   **cmp-notifications:**\n        *   `MessageBatch`: `batch_id` (uuid, pk), `channel` (string), `payload_hash` (string), `status` (string), `created_at` (timestamp).\n        *   `DeliveryAttempt`: `attempt_id` (uuid, pk), `batch_id` (uuid, fk), `recipient_id` (string), `delivery_status` (string), `bounce_status` (string), `retry_count` (integer).\n        *   `RecipientList`: `list_id` (uuid, pk), `batch_id` (uuid, fk), `tenant_member_id` (string).\n\n    *   **cmp-security:**\n        *   `RLSPolicy`: `policy_id` (uuid, pk), `tenant_id` (string), `scope` (string).\n        *   `TenantBoundary`: `boundary_id` (uuid, pk), `tenant_id` (string), `accessible_scope` (string), `access_level` (string).\n\n    *   **cmp-payment:**\n        *   `PaymentIntent`: `intent_id` (uuid, pk), `amount_cents` (integer), `currency` (string), `gateway_response` (string), `created_at` (timestamp), `status` (string).\n        *   `ReceiptDocument`: `receipt_id` (uuid, pk), `intent_id` (uuid, fk), `document_url` (string), `generated_at` (timestamp).\n        *   `DepositFee`: `fee_id` (uuid, pk), `intent_id` (uuid, fk), `fee_amount` (integer), `fee_type` (string).\n\n    *   *Note on `MatchScore` and `ExtractionConfidence`:* I have included them as fields in the main entities.\n    *   *Note on `HomeRealProperty`:* Included as a boolean/flag field `is_home_real_property`.\n    *   *Note on `DepositFee`:* Treated as separate entity linked to `PaymentIntent`.\n    *   *Note on `AccessLevel`:* Included as field `access_level` in `TenantBoundary`.\n\n    *   *Final Check:* Ensure JSON validity. Ensure `constraints` field exists for fields.\n\n    *   *JSON Structure:*\n        ```json\n        {\n          \"models\": [\n            {\n              \"component_id\": \"cmp-prop-data\",\n              \"entities\": [ ... ]\n            },\n            ...\n          ]\n        }\n        ```\n\n    *   *Constraint Check:* `relationships`. I will add a `relationships` array to each entity defining foreign keys.\n    *   Example: `relationships: [{ \"type\": \"FK\", \"ref_entity\": \"PropertyAsset\", \"field\": \"asset_id\" }]`.\n    *   Actually, for simplicity and standard schema compliance, I'll describe the relationships clearly within the array.\n\n    *   *Wait, one constraint:* \"Use concrete types\". `float` vs `double`? JSON doesn't have double, just number. I will use `number`. But for scores, `float` is clearer. I'll use `float`. For amounts, `integer`.\n\n    *   *Re-checking Terms:*\n        *   `PropertyAsset`, `MediaManifest`, `OfflineBuffer` -> Used.\n        *   `HomeRealProperty`, `ProviderProfile`, `BidEstimate`, `MatchScore` -> Used (MatchScore as field).\n        *   `BylawsClause`, `StatutoryDeadline`, `NoticeRequirement`, `ExtractionConfidence` -> Used (Confidence as field).\n        *   `ActionItem`, `WorkflowState`, `TransitionLog` -> Used (WorkflowState as field).\n        *   `MessageBatch`, `DeliveryAttempt`, `RecipientList` -> Used.\n        *   `RLSPolicy`, `TenantBoundary`, `AccessLevel` -> Used (AccessLevel as field).\n        *   `PaymentIntent`, `ReceiptDocument`, `DepositFee` -> Used.\n\n    *   *One small detail:* `WorkflowState` is a Term. I'll use it as a field value constraint in `ActionItem`.\n    *   `HomeRealProperty` is a Term. I'll use it as a field name or tag. `property_category` field set to `HomeRealProperty`.\n\n    *   *Formatting:* Ensure proper JSON escaping if needed (none expected).\n    *   *Final Output:* Just the JSON.\n\n    *   *Wait, `constraints` field:* \"No entity field may lack a specified type\". Does `constraints` need to be present for every field? The schema says `fields: [{name, type, constraints}]`. I will provide constraints for all fields where applicable (e.g. \"NOT NULL\", \"UNIQUE\").\n\n    *   *Refining Relationships:* The schema example isn't explicitly shown for relationships content, just `relationships`. I will use a descriptive format.\n    *   Example: `relationships: [{ \"relationship_type\": \"belongs_to\", \"target_entity\": \"PropertyAsset\" }]`.\n    *   Let's keep it simple: `[{\"type\": \"foreign_key\", \"target\": \"TargetEntityName\", \"field\": \"fk_field_name\"}]`.\n\n    *   *Wait, Schema Check:* `entities: array of {name, fields: [{name, type, constraints}], relationships}`.\n    *   I will populate `constraints` even if empty `[]` to ensure no missing type or constraint field.\n    *   Actually, if the schema allows `constraints` to be optional, I should ensure it matches. I'll fill it with common constraints.\n\n    *   *Wait, `MatchScore`:* If `MatchScore` is a term representing a metric, creating an entity `MatchScore` might be redundant if it's just a score. But if it's a calculated metric, it might be a field. Given \"MatchScore: A calculated relevance metric indicating provider quality\", it's likely a field. I will add it to `ProviderProfile` or `BidEstimate`. `BidEstimate` seems more relevant to the specific search result. I'll add `ai_match_score` to `BidEstimate`.\n    *   Actually, Term `MatchScore` implies it's a distinct concept. I'll add `match_score` field to `ProviderProfile`.\n\n    *   *Okay, ready to generate.*",
+  "provider": "ollama",
+  "model": "qwen3.5:9b",
+  "inputTokens": 1819,
+  "outputTokens": 9963,
+  "usedFallback": false,
+  "retryAttempts": 0
+}

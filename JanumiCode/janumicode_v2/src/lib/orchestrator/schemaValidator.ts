@@ -29,10 +29,15 @@ export interface SchemaValidationError {
 export class SchemaValidator {
   private ajv: Ajv;
   private validators = new Map<string, ValidateFunction>();
-  private schemasPath: string;
+  private readonly schemaDirs: string[];
 
   constructor(workspacePath: string) {
-    this.schemasPath = join(workspacePath, '.janumicode', 'schemas', 'artifacts');
+    const baseDir = join(workspacePath, '.janumicode', 'schemas');
+    // Load from both artifacts/ (phase outputs) and memory/ (DMR records)
+    this.schemaDirs = [
+      join(baseDir, 'artifacts'),
+      join(baseDir, 'memory'),
+    ];
 
     this.ajv = new Ajv({
       allErrors: true,
@@ -45,26 +50,29 @@ export class SchemaValidator {
   }
 
   /**
-   * Discover and compile all schema files at startup.
+   * Discover and compile all schema files at startup from every registered
+   * schema directory.
    */
   private loadSchemas(): void {
-    if (!existsSync(this.schemasPath)) return;
+    for (const dir of this.schemaDirs) {
+      if (!existsSync(dir)) continue;
 
-    const files = readdirSync(this.schemasPath)
-      .filter(f => f.endsWith('.schema.json'));
+      const files = readdirSync(dir)
+        .filter(f => f.endsWith('.schema.json'));
 
-    for (const file of files) {
-      const artifactType = basename(file, '.schema.json');
-      try {
-        const schemaJson = readFileSync(join(this.schemasPath, file), 'utf-8');
-        const schema = JSON.parse(schemaJson);
-        const validate = this.ajv.compile(schema);
-        this.validators.set(artifactType, validate);
-      } catch (err) {
-        getLogger().warn('validation', `Failed to load schema file`, {
-          file,
-          error: err instanceof Error ? err.message : String(err),
-        });
+      for (const file of files) {
+        const artifactType = basename(file, '.schema.json');
+        try {
+          const schemaJson = readFileSync(join(dir, file), 'utf-8');
+          const schema = JSON.parse(schemaJson);
+          const validate = this.ajv.compile(schema);
+          this.validators.set(artifactType, validate);
+        } catch (err) {
+          getLogger().warn('validation', `Failed to load schema file`, {
+            file,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     }
   }

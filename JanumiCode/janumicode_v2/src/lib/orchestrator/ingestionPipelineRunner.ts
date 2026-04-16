@@ -6,13 +6,13 @@
  *
  * Stage I  — Type Classification and Authority Assignment (deterministic)
  * Stage II — Deterministic Edge Assertion (deterministic)
- * Stage III — Relationship Extraction (LLM — Wave 4)
+ * Stage III — Sub-Artifact Registration + Edge Extraction (deterministic — Architecture Canvas)
  * Stage IV  — Supersession Detection (deterministic + LLM — Wave 4)
  * Stage V   — Open Question Resolution Check (deterministic — Wave 4)
  */
 
 import type { Database } from '../database/init';
-import type { GovernedStreamRecord, RecordType, MemoryEdgeType } from '../types/records';
+import type { GovernedStreamRecord, MemoryEdgeType, SubArtifactEdgeType } from '../types/records';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -62,12 +62,15 @@ export class IngestionPipelineRunner {
       result.errors.push(`Stage II error: ${err instanceof Error ? err.message : String(err)}`);
     }
 
-    // Stage III — Relationship Extraction (LLM API call)
-    // Uses template: cross_cutting/ingestion_pipeline_stage3.system.md
-    // In production, calls LLMCaller with the rendered template.
-    // For now: Stage III is a no-op when no LLMCaller is available.
-    // The template exists and can be tested via prompt probes.
-    result.stagesCompleted.push(3);
+    // Stage III — Sub-Artifact Registration + Edge Extraction (deterministic)
+    // Registers sub-artifacts (components, ADRs, test cases, etc.) and extracts
+    // edges between them for the Architecture Canvas.
+    try {
+      this.runStageIII(record);
+      result.stagesCompleted.push(3);
+    } catch (err) {
+      result.errors.push(`Stage III error: ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     // Stage IV — Supersession Detection (deterministic with LLM escalation)
     try {
@@ -144,6 +147,215 @@ export class IngestionPipelineRunner {
     }
 
     return edges;
+  }
+
+  /**
+   * Stage III -- Sub-Artifact Registration + Edge Extraction.
+   * Deterministic extraction of sub-artifacts and their edges for Architecture Canvas.
+   *
+   * For artifact_produced records, extracts:
+   * - Components from component_model artifacts
+   * - ADRs from architectural_decisions artifacts
+   * - Test cases from test_suite artifacts
+   * - etc.
+   *
+   * Registers sub-artifacts with semantic IDs and extracts edges between them.
+   */
+  private runStageIII(record: GovernedStreamRecord): void {
+    if (record.record_type !== 'artifact_produced') {
+      return;
+    }
+
+    const content = record.content as Record<string, unknown>;
+    const now = new Date().toISOString();
+
+    // Handle component_model artifacts
+    if (Array.isArray(content.components)) {
+      this.registerComponents(content.components, record, now);
+    }
+
+    // Handle architectural_decisions artifacts
+    if (Array.isArray(content.adrs)) {
+      this.registerADRs(content.adrs, record, now);
+    }
+
+    // Handle test_suite artifacts
+    if (Array.isArray(content.test_cases)) {
+      this.registerTestCases(content.test_cases, record, now);
+    }
+  }
+
+  /**
+   * Register components from a component_model artifact.
+   */
+  private registerComponents(
+    components: Array<Record<string, unknown>>,
+    record: GovernedStreamRecord,
+    now: string,
+  ): void {
+    for (const comp of components) {
+      const compId = comp.id as string;
+      if (!compId) continue;
+
+      // Register sub-artifact
+      this.registerSubArtifact({
+        id: compId,
+        parentRecordId: record.id,
+        jsonPath: `components[${compId}]`,
+        kind: 'component',
+        workflowRunId: record.workflow_run_id,
+        createdAt: now,
+      });
+
+      // Extract satisfies edges (component -> requirement)
+      const satisfiesIds = comp.satisfies_requirement_ids as string[] | undefined;
+      if (Array.isArray(satisfiesIds)) {
+        for (const reqId of satisfiesIds) {
+          this.registerSubArtifactEdge({
+            sourceId: compId,
+            targetId: reqId,
+            edgeType: 'satisfies',
+            workflowRunId: record.workflow_run_id,
+            assertedBy: 'ingestion_pipeline',
+            assertedAt: now,
+          });
+        }
+      }
+
+      // Extract depends_on edges (component -> component)
+      const deps = comp.dependencies as Array<Record<string, unknown>> | undefined;
+      if (Array.isArray(deps)) {
+        for (const dep of deps) {
+          const targetId = dep.target_component_id as string;
+          if (targetId) {
+            this.registerSubArtifactEdge({
+              sourceId: compId,
+              targetId,
+              edgeType: 'depends_on',
+              workflowRunId: record.workflow_run_id,
+              assertedBy: 'ingestion_pipeline',
+              assertedAt: now,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Register ADRs from an architectural_decisions artifact.
+   */
+  private registerADRs(
+    adrs: Array<Record<string, unknown>>,
+    record: GovernedStreamRecord,
+    now: string,
+  ): void {
+    for (const adr of adrs) {
+      const adrId = adr.id as string;
+      if (!adrId) continue;
+
+      // Register sub-artifact
+      this.registerSubArtifact({
+        id: adrId,
+        parentRecordId: record.id,
+        jsonPath: `adrs[${adrId}]`,
+        kind: 'adr',
+        workflowRunId: record.workflow_run_id,
+        createdAt: now,
+      });
+
+      // Extract governs edges (ADR -> component)
+      const governsIds = adr.governs_components as string[] | undefined;
+      if (Array.isArray(governsIds)) {
+        for (const compId of governsIds) {
+          this.registerSubArtifactEdge({
+            sourceId: adrId,
+            targetId: compId,
+            edgeType: 'governs',
+            workflowRunId: record.workflow_run_id,
+            assertedBy: 'ingestion_pipeline',
+            assertedAt: now,
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Register test cases from a test_suite artifact.
+   */
+  private registerTestCases(
+    testCases: Array<Record<string, unknown>>,
+    record: GovernedStreamRecord,
+    now: string,
+  ): void {
+    for (const tc of testCases) {
+      const tcId = tc.id as string;
+      if (!tcId) continue;
+
+      // Register sub-artifact
+      this.registerSubArtifact({
+        id: tcId,
+        parentRecordId: record.id,
+        jsonPath: `test_cases[${tcId}]`,
+        kind: 'test_case',
+        workflowRunId: record.workflow_run_id,
+        createdAt: now,
+      });
+    }
+  }
+
+  /**
+   * Register a sub-artifact in the database.
+   */
+  private registerSubArtifact(params: {
+    id: string;
+    parentRecordId: string;
+    jsonPath: string;
+    kind: string;
+    workflowRunId: string;
+    createdAt: string;
+  }): void {
+    // Use INSERT OR IGNORE to avoid duplicates on re-ingestion
+    this.db.prepare(`
+      INSERT OR IGNORE INTO sub_artifact (id, parent_record_id, json_path, kind, workflow_run_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      params.id,
+      params.parentRecordId,
+      params.jsonPath,
+      params.kind,
+      params.workflowRunId,
+      params.createdAt,
+    );
+  }
+
+  /**
+   * Register a sub-artifact edge in the database.
+   */
+  private registerSubArtifactEdge(params: {
+    sourceId: string;
+    targetId: string;
+    edgeType: SubArtifactEdgeType;
+    workflowRunId: string;
+    assertedBy: string;
+    assertedAt: string;
+  }): void {
+    const edgeId = this.generateId();
+
+    // Use INSERT OR IGNORE to avoid duplicates
+    this.db.prepare(`
+      INSERT OR IGNORE INTO sub_artifact_edge (id, source_id, target_id, edge_type, asserted_by, asserted_at, authority_level, status, workflow_run_id)
+      VALUES (?, ?, ?, ?, ?, ?, 5, 'system_asserted', ?)
+    `).run(
+      edgeId,
+      params.sourceId,
+      params.targetId,
+      params.edgeType,
+      params.assertedBy,
+      params.assertedAt,
+      params.workflowRunId,
+    );
   }
 
   /**

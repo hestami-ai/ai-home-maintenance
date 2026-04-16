@@ -117,140 +117,187 @@
 
 <style>
   .premortem-card {
-    border: 1px solid var(--vscode-panel-border, #333);
-    border-left: 3px solid var(--vscode-charts-orange, #d18616);
-    border-radius: 4px;
+    position: relative;
+    background: var(--jc-surface-container-low);
+    border: var(--jc-ghost-border);
+    border-radius: var(--jc-radius-md);
     overflow: hidden;
+  }
+  .premortem-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: var(--jc-status-bar-width);
+    background: var(--jc-error);
   }
 
   .pm-header {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    background: var(--vscode-editor-background);
-    font-weight: bold;
-    font-size: 0.9em;
+    gap: var(--jc-space-md);
+    padding: var(--jc-space-xl) var(--jc-space-xl) var(--jc-space-lg) var(--jc-space-2xl);
   }
-  .pm-title { flex: 1; }
+  .pm-icon { font-size: 1.1em; }
+  .pm-title {
+    flex: 1;
+    font-family: var(--jc-font-headline);
+    font-weight: 600;
+    font-size: 0.95em;
+    color: var(--jc-on-surface);
+  }
 
   .pm-summary {
-    padding: 6px 10px;
+    padding: var(--jc-space-md) var(--jc-space-2xl) var(--jc-space-lg);
     font-size: 0.85em;
-    opacity: 0.8;
-    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    color: var(--jc-on-surface-variant);
+    line-height: 1.5;
   }
 
-  .pm-risks { padding: 6px 10px; }
+  .pm-risks { padding: var(--jc-space-md) var(--jc-space-2xl) var(--jc-space-lg); }
 
   .pm-risk-row {
-    margin-bottom: 10px;
-    padding: 6px 8px;
-    border-radius: 3px;
-    border-left: 2px solid var(--vscode-descriptionForeground, #888);
-    background: rgba(100, 100, 100, 0.04);
+    margin-bottom: var(--jc-space-lg);
+    padding: var(--jc-space-lg) var(--jc-space-lg);
+    border-radius: var(--jc-radius-sm);
+    border-left: 2px solid var(--jc-outline);
+    background: var(--jc-surface-container);
   }
 
   .pm-risk-header {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
+    gap: var(--jc-space-md);
+    margin-bottom: var(--jc-space-md);
   }
 
   .severity-badge {
-    font-size: 0.65em;
-    font-weight: bold;
-    padding: 1px 6px;
-    border-radius: 6px;
+    font-size: 0.55em;
+    font-weight: 700;
+    padding: var(--jc-space-xs) var(--jc-space-md);
+    border-radius: var(--jc-radius-xs);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
   }
-  .severity-critical { background: #ef4444; color: #fff; }
-  .severity-medium { background: #f59e0b; color: #222; }
-  .severity-low { background: #22c55e; color: #fff; }
+  .severity-critical {
+    background: var(--jc-error-tint-strong);
+    color: var(--jc-error);
+    border: 1px solid var(--jc-error-tint-emphasis);
+  }
+  .severity-medium {
+    background: var(--jc-accent-amber-tint-strong);
+    color: var(--jc-warning);
+    border: 1px solid var(--jc-accent-amber-tint-strong);
+  }
+  .severity-low {
+    background: var(--jc-tertiary-tint-strong);
+    color: var(--jc-tertiary);
+    border: 1px solid var(--jc-tertiary-tint-emphasis);
+  }
 
-  .pm-assumption { font-size: 0.85em; flex: 1; }
+  .pm-assumption {
+    font-size: 0.85em;
+    flex: 1;
+    color: var(--jc-on-surface);
+  }
 
   .pm-failure, .pm-mitigation {
     font-size: 0.8em;
-    margin: 4px 0;
-    padding-left: 8px;
+    margin: var(--jc-space-sm) 0;
+    padding-left: var(--jc-space-lg);
+    line-height: 1.4;
   }
-  .pm-failure { color: var(--vscode-inputValidation-errorForeground, #f88); }
-  .pm-mitigation { opacity: 0.8; }
+  .pm-failure { color: var(--jc-error); }
+  .pm-mitigation { color: var(--jc-on-surface-variant); }
 
   .pm-actions {
     display: flex;
-    gap: 4px;
-    margin-top: 6px;
+    gap: var(--jc-space-md);
+    margin-top: var(--jc-space-md);
   }
 
   .mmp-btn {
-    padding: 2px 8px;
-    font-size: 0.75em;
-    border-radius: 3px;
+    padding: var(--jc-space-sm) var(--jc-space-lg);
+    font-size: 0.7em;
+    border-radius: var(--jc-radius-sm);
     cursor: pointer;
-    font-family: inherit;
-    border: 1px solid var(--vscode-panel-border, #555);
+    font-family: var(--jc-font-body);
+    font-weight: 600;
+    border: var(--jc-ghost-border);
     background: transparent;
-    color: var(--vscode-foreground);
+    color: var(--jc-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    transition: all var(--jc-transition-fast);
   }
-  .mmp-btn:hover { background: var(--vscode-list-hoverBackground); }
-  .mmp-accept:hover { background: rgba(34, 197, 94, 0.15); }
-  .mmp-reject:hover { background: rgba(244, 71, 71, 0.15); }
+  .mmp-btn:hover { background: var(--jc-surface-container-high); }
+  .mmp-accept:hover { background: var(--jc-tertiary-tint-soft); color: var(--jc-tertiary); }
+  .mmp-reject:hover { background: var(--jc-error-tint-soft); color: var(--jc-error); }
 
   .pm-footer {
     display: flex;
-    gap: 8px;
-    padding: 8px 10px;
-    border-top: 1px solid var(--vscode-panel-border, #333);
+    align-items: center;
+    gap: var(--jc-space-lg);
+    padding: var(--jc-space-lg) var(--jc-space-2xl);
+    background: var(--jc-surface-container);
   }
 
   .btn-approve {
-    padding: 4px 16px;
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    padding: var(--jc-space-md) var(--jc-space-2xl);
+    background: var(--jc-primary);
+    color: var(--jc-on-primary);
     border: none;
-    border-radius: 3px;
+    border-radius: var(--jc-radius-sm);
     cursor: pointer;
-    font-family: inherit;
+    font-family: var(--jc-font-body);
+    font-weight: 700;
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
-  .btn-approve:hover { background: var(--vscode-button-hoverBackground); }
+  .btn-approve:hover { filter: brightness(1.1); }
 
   .mmp-btn.selected {
-    border-color: var(--vscode-focusBorder);
-    background: var(--vscode-list-activeSelectionBackground);
-    font-weight: bold;
+    border-color: var(--jc-primary);
+    background: var(--jc-primary-tint-soft);
+    font-weight: 700;
+    color: var(--jc-primary);
   }
   .progress-counter {
-    font-size: 0.8em;
-    opacity: 0.7;
-    font-weight: bold;
+    font-family: var(--jc-font-mono);
+    font-size: 0.7em;
+    color: var(--jc-outline);
+    font-weight: 500;
   }
   .bulk-btn {
-    padding: 2px 8px;
-    font-size: 0.7em;
-    border-radius: 3px;
+    padding: var(--jc-space-sm) var(--jc-space-lg);
+    font-size: 0.65em;
+    border-radius: var(--jc-radius-sm);
     cursor: pointer;
-    font-family: inherit;
-    border: 1px solid var(--vscode-panel-border, #555);
+    font-family: var(--jc-font-body);
+    font-weight: 600;
+    border: var(--jc-ghost-border);
     background: transparent;
-    color: var(--vscode-foreground);
-    opacity: 0.7;
+    color: var(--jc-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all var(--jc-transition-fast);
   }
-  .bulk-btn:hover { opacity: 1; background: var(--vscode-list-hoverBackground); }
+  .bulk-btn:hover { background: var(--jc-surface-container-high); color: var(--jc-on-surface); }
   .btn-submit-decisions {
     margin-left: auto;
-    padding: 4px 16px;
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    padding: var(--jc-space-md) var(--jc-space-2xl);
+    background: var(--jc-primary);
+    color: var(--jc-on-primary);
     border: none;
-    border-radius: 3px;
+    border-radius: var(--jc-radius-sm);
     cursor: pointer;
-    font-family: inherit;
-    font-weight: bold;
+    font-family: var(--jc-font-body);
+    font-weight: 700;
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: filter var(--jc-transition-fast);
   }
-  .btn-submit-decisions:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-submit-decisions:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
+  .btn-submit-decisions:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-submit-decisions:hover:not(:disabled) { filter: brightness(1.1); }
 </style>

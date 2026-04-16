@@ -1,0 +1,30 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Deep Memory Research Agent] performing Stage 1 — Query Decomposition.
+
+Transform the retrieval query into structured retrieval targets for the Governed Stream search.
+
+RETRIEVAL BRIEF:
+Query: Interface contracts for external systems: EXT-001: Payment Gateway (Stripe/Square) (API/Webhook)
+EXT-002: Communication Provider (Email/SMS) (API/Webhook)
+EXT-003: Government Regulatory Services (API)
+EXT-004: AI/ML Service Provider (REST API)
+EXT-005: Mobile OS SDKs (SDK/Native)
+Scope: all_runs
+Requesting Agent: systems_agent
+
+YOUR REQUIRED OUTPUT (JSON):
+```json
+{
+  "topic_entities": ["entity1", "entity2"],
+  "decision_types_sought": ["menu_selection", "mirror_approval", "phase_gate_approval"],
+  "temporal_scope": {"from": "ISO-date", "to": "ISO-date"},
+  "authority_levels_included": [5, 6, 7],
+  "sources_in_scope": ["governed_stream_current_run"]
+}
+```
+
+Rules:
+- Extract concrete entities (names, IDs, concepts) from the query
+- decision_types_sought should match the type of historical context needed
+- authority_levels_included: always include 5+ (Human-Approved and above); include lower levels only if the query asks about exploratory or agent-generated content
+- sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs

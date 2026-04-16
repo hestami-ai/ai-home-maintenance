@@ -156,20 +156,30 @@ export const cancelWorkflow: Capability<CancelParams, { runId: string; status: s
   name: 'cancelWorkflow',
   category: 'workflow_control',
   description:
-    'Cancel the active workflow run. Destructive. Requires explicit user confirmation in the params.',
+    'Cancel the active workflow run. DESTRUCTIVE. The framework will ask the user to confirm before executing; re-invoke with `confirmed: true` once the user agrees.',
   parameters: {
     type: 'object',
     properties: {
       runId: { type: 'string', description: 'Optional explicit run id' },
-      confirmed: { type: 'boolean', description: 'Set to true after user confirmation' },
+      confirmed: {
+        type: 'boolean',
+        description: 'Must be true on the second invocation, after the user has agreed.',
+      },
     },
-    required: ['confirmed'],
   },
   preconditions: (ctx) => (ctx.activeRun ? true : 'No active workflow run to cancel.'),
+  // Declarative confirmation — synthesizer intercepts the first call and
+  // surfaces this prompt to the user. Replaces the old pattern where
+  // execute() threw if `confirmed` was missing, which was a poor UX
+  // because the LLM saw it as an error.
+  confirmation: {
+    prompt: (params, ctx) => {
+      const run = resolveRun(ctx, params.runId);
+      const id = run?.id ?? '(current run)';
+      return `This will cancel workflow ${id} and mark it as failed. Any work in progress will be lost. Confirm?`;
+    },
+  },
   execute: async (params, ctx) => {
-    if (!params.confirmed) {
-      throw new Error('Cancellation requires explicit user confirmation.');
-    }
     const run = resolveRun(ctx, params.runId);
     if (!run) throw new Error('Run not found');
     ctx.orchestrator.stateMachine.failWorkflowRun(run.id);

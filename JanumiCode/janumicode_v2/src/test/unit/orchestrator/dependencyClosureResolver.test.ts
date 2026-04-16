@@ -157,4 +157,88 @@ describe('DependencyClosureResolver', () => {
     const bRecord = writer.getRecord(b);
     expect(bRecord!.is_current_version).toBe(false);
   });
+
+  describe('phase-gate invalidation on rollback', () => {
+    // Regression: before the phase_gates producer fix, nothing ever
+    // INSERTed into phase_gates, so findAffectedPhaseGates always returned
+    // an empty set and executeRollback silently never marked any gate
+    // invalidated_by_rollback_at. The DecisionRouter now writes the row
+    // with phase_gates.id == the phase_gate_approved record id so the
+    // `validates` memory_edge (which ingestion keys off that same id)
+    // lines up.
+
+    // Mirror the DecisionRouter's producer invariant: phase_gates.id ==
+    // the phase_gate_approved governed_stream record's id. The validates
+    // memory_edge has an FK into governed_stream on source_record_id, so
+    // the test must write a real approved record, not a synthetic id.
+    function makeApprovedGate(phaseId: string = '1'): string {
+      const approved = writer.writeRecord({
+        record_type: 'phase_gate_approved',
+        schema_version: '1.0',
+        workflow_run_id: 'run-1',
+        phase_id: phaseId,
+        janumicode_version_sha: 'abc',
+        content: {},
+      });
+      db.prepare(`
+        INSERT INTO phase_gates
+          (id, workflow_run_id, phase_id, completed_at, human_approved, approval_record_id)
+        VALUES (?, 'run-1', ?, '2026-01-01T00:00:00Z', 1, ?)
+      `).run(approved.id, phaseId, approved.id);
+      return approved.id;
+    }
+
+    it('returns gates whose validates edge targets any closure artifact', () => {
+      // Phase-gate approval validates artifact A. Roll back A: the gate
+      // that certified A must surface as affected.
+      const a = writeArtifact();
+      const gateId = makeApprovedGate();
+      addEdge(gateId, a, 'validates');
+
+      const closure = resolver.computeClosure(a, 'run-1');
+      expect(closure.affectedPhaseGates).toContain(gateId);
+    });
+
+    it('does not return gates whose validates edge targets something outside the closure', () => {
+      // Gate certifies B, closure is rooted at A. Gate should be untouched.
+      const a = writeArtifact();
+      const b = writeArtifact();
+      const gateId = makeApprovedGate();
+      addEdge(gateId, b, 'validates');
+
+      const closure = resolver.computeClosure(a, 'run-1');
+      expect(closure.affectedPhaseGates).not.toContain(gateId);
+    });
+
+    it('executeRollback stamps invalidated_by_rollback_at on affected gates', () => {
+      const a = writeArtifact();
+      const gateId = makeApprovedGate();
+      addEdge(gateId, a, 'validates');
+
+      const closure = resolver.computeClosure(a, 'run-1');
+      resolver.executeRollback(closure, 'rollback-1', 'run-1');
+
+      const row = db
+        .prepare('SELECT invalidated_by_rollback_at FROM phase_gates WHERE id = ?')
+        .get(gateId) as { invalidated_by_rollback_at: string | null } | undefined;
+      expect(row?.invalidated_by_rollback_at).toBeTruthy();
+    });
+
+    it('leaves unaffected gates untouched after rollback', () => {
+      const a = writeArtifact();
+      const b = writeArtifact();
+      const gateA = makeApprovedGate('1');
+      const gateB = makeApprovedGate('2');
+      addEdge(gateA, a, 'validates');
+      addEdge(gateB, b, 'validates');
+
+      const closure = resolver.computeClosure(a, 'run-1');
+      resolver.executeRollback(closure, 'rollback-1', 'run-1');
+
+      const rowB = db
+        .prepare('SELECT invalidated_by_rollback_at FROM phase_gates WHERE id = ?')
+        .get(gateB) as { invalidated_by_rollback_at: string | null } | undefined;
+      expect(rowB?.invalidated_by_rollback_at).toBeNull();
+    });
+  });
 });

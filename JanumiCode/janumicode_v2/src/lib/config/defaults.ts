@@ -63,4 +63,12 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     idle_timeout_seconds: 120,
     buffer_max_events: 1000,
   },
+
+  llm_routing: {
+    reasoning_review: {
+      primary: { provider: 'google', model: 'gemini-2.0-flash-thinking' },
+      temperature: 0.2,
+      trace_max_tokens: 8000,
+    },
+  },
 };

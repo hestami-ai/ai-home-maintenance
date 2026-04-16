@@ -1,0 +1,170 @@
+{
+  "match": "[JC:SYSTEM SCOPE]\nYou are the [JC:Implementation Planner] decomposing Technical Specifications into ",
+  "key": "implementation_planner__6_1__07",
+  "agent_role": "implementation_planner",
+  "sub_phase_id": "6.1",
+  "call_sequence": 7,
+  "prompt_context_payload": {
+    "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Implementation Planner] decomposing Technical Specifications into Implementation Tasks for Sub-Phase 6.1.\n\nGOVERNING CONSTRAINTS (apply without exception):\n(none)\n\nDecomposition rule: One [JC:Implementation Task] = one Component + one Component Responsibility.\n\nREQUIRED OUTPUT: A JSON object matching the `implementation_plan` schema:\n- tasks: array, each with:\n  - id, task_type (standard|refactoring), component_id, component_responsibility (verbatim from compone"
+  },
+  "prompt_context_hash": "7e8a4086a15681ca",
+  "text": "{\n  \"implementation_plan\": {\n    \"tasks\": [\n      {\n        \"id\": \"TASK-001\",\n        \"task_type\": \"standard\",\n        \"component_id\": \"COMP-001\",\n        \"component_responsibility\": \"Create the storage file with a default structure upon first execution\",\n        \"description\": \"Initialize the storage file at the configured path with default permissions (0644) and JSONL structure containing id:uuid and created_at:timestamp fields. Handles configuration parameters (storage_file_path, storage_file_format, storage_permissions, backup_enabled, backup_path).\",\n        \"backing_tool\": \"Python\",\n        \"dependency_task_ids\": [],\n        \"estimated_complexity\": \"medium\",\n        \"completion_criteria\": [\n          \"Storage file exists at the specified path\",\n          \"Storage file permissions match the configured storage_permissions (0644)\",\n          \"Storage file contains the default structure with id and created_at fields\"\n        ],\n        \"write_directory_paths\": [\n          \"./tasks.json\",\n          \"./backups/\"\n        ],\n        \"read_directory_paths\": []\n      },\n      {\n        \"id\": \"TASK-002\",\n        \"task_type\": \"standard\",\n        \"component_id\": \"COMP-001\",\n        \"component_responsibility\": \"Append a new task record to the storage file\",\n        \"description\": \"Generate a new task record with a UUID and timestamp, validate input data against error handling strategies (validation_error), and append the record to the storage file. Implements backup logic if enabled.\",\n        \"backing_tool\": \"Python\",\n        \"dependency_task_ids\": [\n          \"TASK-001\"\n        ],\n        \"estimated_complexity\": \"medium\",\n        \"completion_criteria\": [\n          \"New task record is successfully appended to the storage file\",\n          \"Validation errors are caught and returned with appropriate status code\",\n          \"Backup copy is created if backup_enabled is true\"\n        ],\n        \"write_directory_paths\": [\n          \"./tasks.json\"\n        ],\n        \"read_directory_paths\": []\n      },\n      {\n        \"id\": \"TASK-003\",\n        \"task_type\": \"standard\",\n        \"component_id\": \"COMP-001\",\n        \"component_responsibility\": \"Read the storage file and retrieve all stored task records\",\n        \"description\": \"Read the storage file and parse JSONL records into a list of task objects. Handles file not found errors gracefully.\",\n        \"backing_tool\": \"Python\",\n        \"dependency_task_ids\": [\n          \"TASK-001\"\n        ],\n        \"estimated_complexity\": \"low\",\n        \"completion_criteria\": [\n          \"All stored task records are retrieved and returned\",\n          \"File read errors are handled with appropriate status code\"\n        ],\n        \"write_directory_paths\": [],\n        \"read_directory_paths\": [\n          \"./tasks.json\"\n        ]\n      },\n      {\n        \"id\": \"TASK-004\",\n        \"task_type\": \"standard\",\n        \"component_id\": \"COMP-001\",\n        \"component_responsibility\": \"Update the status attribute of a specific task record to 'completed'\",\n        \"description\": \"Read the storage file, locate the specific task record by ID, update the status attribute to 'completed', and write the changes back. Handles not_found errors for invalid task IDs.\",\n        \"backing_tool\": \"Python\",\n        \"dependency_task_ids\": [\n          \"TASK-001\",\n          \"TASK-003\"\n        ],\n        \"estimated_complexity\": \"medium\",\n        \"completion_criteria\": [\n          \"Task record status is updated to 'completed'\",\n          \"Changes are persisted to the storage file\",\n          \"Not found errors are returned for invalid task IDs\"\n        ],\n        \"write_directory_paths\": [\n          \"./tasks.json\"\n        ],\n        \"read_directory_paths\": [\n          \"./tasks.json\"\n        ]\n      },\n      {\n        \"id\": \"TASK-005\",\n        \"task_type\": \"standard\",\n        \"component_id\": \"COMP-001\",\n        \"component_responsibility\": \"Delete a specific task record from the storage file upon command\",\n        \"description\": \"Read the storage file, locate the specific task record by ID, remove the record, and write the updated file. Handles not_found errors for invalid task IDs.\",\n        \"backing_tool\": \"Python\",\n        \"dependency_task_ids\": [\n          \"TASK-001\",\n          \"TASK-003\"\n        ],\n        \"estimated_complexity\": \"medium\",\n        \"completion_criteria\": [\n          \"Task record is removed from the storage file\",\n          \"Changes are persisted to the storage file\",\n          \"Not found errors are returned for invalid task IDs\"\n        ],\n        \"write_directory_paths\": [\n          \"./tasks.json\"\n        ],\n        \"read_directory_paths\": [\n          \"./tasks.json\"\n        ]\n      },\n      {\n        \"id\": \"TASK-006\",\n        \"task_type\": \"standard\",\n        \"component_id\": \"COMP-002\",\n        \"component_responsibility\": \"Parse command line arguments to validate inputs\",\n        \"description\": \"Parse command line arguments using the configured argument_delimiter and strict_mode. Validates inputs against API definitions and returns validation errors if strict_mode is true.\",\n        \"backing_tool\": \"Python\",\n        \"dependency_task_ids\": [\n          \"TASK-001\"\n        ],\n        \"estimated_complexity\": \"low\",\n        \"completion_criteria\": [\n          \"Command line arguments are successfully parsed\",\n          \"Validation errors are returned for invalid inputs if strict_mode is true\"\n        ],\n        \"write_directory_paths\": [],\n        \"read_directory_paths\": []\n      },\n      {\n        \"id\": \"TASK-007\",\n        \"task_type\": \"standard\",\n        \"component_id\": \"COMP-003\",\n        \"component_responsibility\": \"Output all stored task records to standard output\",\n        \"description\": \"Retrieve task records from COMP-001 and format them for standard output. Handles rendering status queries.\",\n        \"backing_tool\": \"Python\",\n        \"dependency_task_ids\": [\n          \"TASK-003\"\n        ],\n        \"estimated_complexity\": \"low\",\n        \"completion_criteria\": [\n          \"Task records are formatted and written to standard output\",\n          \"Output matches standard I/O output formatting requirements\"\n        ],\n        \"write_directory_paths\": [],\n        \"read_directory_paths\": [\n          \"./tasks.json\"\n        ]\n      }\n    ]\n  }\n}",
+  "parsedJson": {
+    "implementation_plan": {
+      "tasks": [
+        {
+          "id": "TASK-001",
+          "task_type": "standard",
+          "component_id": "COMP-001",
+          "component_responsibility": "Create the storage file with a default structure upon first execution",
+          "description": "Initialize the storage file at the configured path with default permissions (0644) and JSONL structure containing id:uuid and created_at:timestamp fields. Handles configuration parameters (storage_file_path, storage_file_format, storage_permissions, backup_enabled, backup_path).",
+          "backing_tool": "Python",
+          "dependency_task_ids": [],
+          "estimated_complexity": "medium",
+          "completion_criteria": [
+            "Storage file exists at the specified path",
+            "Storage file permissions match the configured storage_permissions (0644)",
+            "Storage file contains the default structure with id and created_at fields"
+          ],
+          "write_directory_paths": [
+            "./tasks.json",
+            "./backups/"
+          ],
+          "read_directory_paths": []
+        },
+        {
+          "id": "TASK-002",
+          "task_type": "standard",
+          "component_id": "COMP-001",
+          "component_responsibility": "Append a new task record to the storage file",
+          "description": "Generate a new task record with a UUID and timestamp, validate input data against error handling strategies (validation_error), and append the record to the storage file. Implements backup logic if enabled.",
+          "backing_tool": "Python",
+          "dependency_task_ids": [
+            "TASK-001"
+          ],
+          "estimated_complexity": "medium",
+          "completion_criteria": [
+            "New task record is successfully appended to the storage file",
+            "Validation errors are caught and returned with appropriate status code",
+            "Backup copy is created if backup_enabled is true"
+          ],
+          "write_directory_paths": [
+            "./tasks.json"
+          ],
+          "read_directory_paths": []
+        },
+        {
+          "id": "TASK-003",
+          "task_type": "standard",
+          "component_id": "COMP-001",
+          "component_responsibility": "Read the storage file and retrieve all stored task records",
+          "description": "Read the storage file and parse JSONL records into a list of task objects. Handles file not found errors gracefully.",
+          "backing_tool": "Python",
+          "dependency_task_ids": [
+            "TASK-001"
+          ],
+          "estimated_complexity": "low",
+          "completion_criteria": [
+            "All stored task records are retrieved and returned",
+            "File read errors are handled with appropriate status code"
+          ],
+          "write_directory_paths": [],
+          "read_directory_paths": [
+            "./tasks.json"
+          ]
+        },
+        {
+          "id": "TASK-004",
+          "task_type": "standard",
+          "component_id": "COMP-001",
+          "component_responsibility": "Update the status attribute of a specific task record to 'completed'",
+          "description": "Read the storage file, locate the specific task record by ID, update the status attribute to 'completed', and write the changes back. Handles not_found errors for invalid task IDs.",
+          "backing_tool": "Python",
+          "dependency_task_ids": [
+            "TASK-001",
+            "TASK-003"
+          ],
+          "estimated_complexity": "medium",
+          "completion_criteria": [
+            "Task record status is updated to 'completed'",
+            "Changes are persisted to the storage file",
+            "Not found errors are returned for invalid task IDs"
+          ],
+          "write_directory_paths": [
+            "./tasks.json"
+          ],
+          "read_directory_paths": [
+            "./tasks.json"
+          ]
+        },
+        {
+          "id": "TASK-005",
+          "task_type": "standard",
+          "component_id": "COMP-001",
+          "component_responsibility": "Delete a specific task record from the storage file upon command",
+          "description": "Read the storage file, locate the specific task record by ID, remove the record, and write the updated file. Handles not_found errors for invalid task IDs.",
+          "backing_tool": "Python",
+          "dependency_task_ids": [
+            "TASK-001",
+            "TASK-003"
+          ],
+          "estimated_complexity": "medium",
+          "completion_criteria": [
+            "Task record is removed from the storage file",
+            "Changes are persisted to the storage file",
+            "Not found errors are returned for invalid task IDs"
+          ],
+          "write_directory_paths": [
+            "./tasks.json"
+          ],
+          "read_directory_paths": [
+            "./tasks.json"
+          ]
+        },
+        {
+          "id": "TASK-006",
+          "task_type": "standard",
+          "component_id": "COMP-002",
+          "component_responsibility": "Parse command line arguments to validate inputs",
+          "description": "Parse command line arguments using the configured argument_delimiter and strict_mode. Validates inputs against API definitions and returns validation errors if strict_mode is true.",
+          "backing_tool": "Python",
+          "dependency_task_ids": [
+            "TASK-001"
+          ],
+          "estimated_complexity": "low",
+          "completion_criteria": [
+            "Command line arguments are successfully parsed",
+            "Validation errors are returned for invalid inputs if strict_mode is true"
+          ],
+          "write_directory_paths": [],
+          "read_directory_paths": []
+        },
+        {
+          "id": "TASK-007",
+          "task_type": "standard",
+          "component_id": "COMP-003",
+          "component_responsibility": "Output all stored task records to standard output",
+          "description": "Retrieve task records from COMP-001 and format them for standard output. Handles rendering status queries.",
+          "backing_tool": "Python",
+          "dependency_task_ids": [
+            "TASK-003"
+          ],
+          "estimated_complexity": "low",
+          "completion_criteria": [
+            "Task records are formatted and written to standard output",
+            "Output matches standard I/O output formatting requirements"
+          ],
+          "write_directory_paths": [],
+          "read_directory_paths": [
+            "./tasks.json"
+          ]
+        }
+      ]
+    }
+  },
+  "thinking": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Role:** [JC:Implementation Planner].\n    *   **Task:** Decompose Technical Specifications into Implementation Tasks for Sub-Phase 6.1.\n    *   **Input:** Component Model (3 Components: COMP-001, COMP-002, COMP-003), Technical Specifications (Data Models, API Definitions, Error Handling, Config Params), Context (Single-file Shell/Python utility).\n    *   **Constraints:**\n        *   One Task = One Component + One Component Responsibility.\n        *   `component_responsibility` must be verbatim from the component_model.\n        *   Every Technical Specification must be covered.\n        *   No circular dependencies.\n        *   `estimated_complexity: high` tasks need `complexity_flag`.\n        *   Output must be a JSON object matching `implementation_plan` schema.\n        *   Invariant IP-001: `completion_criteria` must have at least one criterion per task.\n        *   Invariant IP-002: `component_responsibility` verbatim.\n    *   **Context:** Single-file script (Shell/Python), no external dependencies, text-based storage.\n\n2.  **Analyze the Components and Responsibilities:**\n    *   **COMP-001 (TaskStorageManager):**\n        *   RESP-001: Create the storage file with a default structure upon first execution.\n        *   RESP-002: Append a new task record to the storage file.\n        *   RESP-003: Read the storage file and retrieve all stored task records.\n        *   RESP-004: Update the status attribute of a specific task record to 'completed'.\n        *   RESP-005: Delete a specific task record from the storage file upon command.\n    *   **COMP-002 (TaskCommandParser):**\n        *   RESP-006: Parse command line arguments to validate inputs.\n    *   **COMP-003 (TaskOutputWriter):**\n        *   RESP-007: Output all stored task records to standard output.\n\n3.  **Analyze Technical Specifications to ensure coverage:**\n    *   **Data Models:** `id:uuid`, `created_at:timestamp`. (Covered by RESP-001, RESP-002).\n    *   **API Definitions:**\n        *   COMP-001: POST /storage/init, POST /tasks, GET /tasks, PATCH /tasks/{task_id}, DELETE /tasks/{task_id}. (Map to RESP-001, RESP-002, RESP-003, RESP-004, RESP-005).\n        *   COMP-002: POST /validate, POST /parse. (Map to RESP-006).\n        *   COMP-003: GET /render, GET /render/status. (Map to RESP-007).\n    *   **Error Handling:** Try/catch, HTTP status codes. (Should be integrated into tasks, likely RESP-002/003/004/005).\n    *   **Configuration Parameters:** storage_file_path, format, permissions, backup, etc. (Covered during RESP-001 initialization or general setup).\n    *   **Context:** Single-file, POSIX/Python, no GUI, no DB.\n\n4.  **Drafting Tasks (Adhering to Decomposition Rule):**\n    *   Rule: One Task = One Component + One Responsibility.\n    *   Total Responsibilities: 7 (RESP-001 to RESP-007).\n    *   Therefore, I need 7 tasks (or split if one responsibility covers multiple specs, but the rule says \"One Task = one Component + one Component Responsibility\"). I will map each RESP to a Task.\n\n    *   *Task 1 (RESP-001):* Create storage file.\n    *   *Task 2 (RESP-002):* Append task record.\n    *   *Task 3 (RESP-003):* Read task records.\n    *   *Task 4 (RESP-004):* Update status.\n    *   *Task 5 (RESP-005):* Delete task.\n    *   *Task 6 (RESP-006):* Parse arguments.\n    *   *Task 7 (RESP-007):* Output records.\n\n    *Wait, check constraints:* \"Every Technical Specification must be covered by at least one task\".\n    *   Error Handling is a spec. I should ensure tasks handle errors. Since the rule is strict on \"One Task = One Component + One Component Responsibility\", I cannot create a separate task just for error handling unless it maps to a responsibility. However, error handling is usually part of the implementation of the responsibility. I will ensure the `completion_criteria` or `description` reflects error handling requirements derived from the spec.\n    *   Configuration Parameters are specs. They need to be implemented. Usually, this happens during initialization (RESP-001). I will mention config loading in the description of Task 1.\n    *   Data Models (UUID, Timestamp) need to be implemented in RESP-001/002.\n\n    *   *Refinement on Dependencies:*\n        *   COMP-002 depends on COMP-001 (control). This implies parsing might happen before storage operations or in parallel. In a single script, usually, parsing happens first.\n        *   COMP-003 depends on COMP-001 (data). Reading happens before writing output.\n        *   Task Order: Parse (002) -> Init/Read (001) -> Write/Update/Delete (001) -> Output (003).\n        *   Actually, for a single script, the flow is: Parse -> Validate -> Execute Storage Op -> Output.\n        *   Dependencies in JSON: `dependency_task_ids`.\n        *   Task 6 (Parse) should probably come first or be independent. Let's make it independent or dependent on nothing, as it's the entry point logic.\n        *   Task 1 (Init) is independent (first run).\n        *   Task 2, 3, 4, 5 (Storage Ops) depend on Init (Task 1).\n        *   Task 7 (Output) depends on Read (Task 3).\n\n    *   *Complexity:*\n        *   RESP-001 (Init): Medium (File creation, permissions, structure).\n        *   RESP-002 (Append): Medium (File I/O, JSONL handling).\n        *   RESP-003 (Read): Low (File I/O).\n        *   RESP-004 (Update): Medium (Read-Modify-Write or JSONL append).\n        *   RESP-005 (Delete): Medium (File I/O).\n        *   RESP-006 (Parse): Low (String manipulation).\n        *   RESP-007 (Output): Low (Print/Write).\n        *   Error Handling is a spec. I will incorporate it into the tasks. If a task is \"high\" complexity, I need a flag. None seem \"high\" for a simple utility, but backup logic (CONFIG) might bump Init to Medium/High. Let's keep it Medium for safety on Init.\n\n    *   *Paths:*\n        *   Write: `./tasks.json` (default), `./backups/` (if backup enabled).\n        *   Read: `./tasks.json`.\n\n5.  **Constructing the JSON:**\n    *   Schema: `implementation_plan` -> `tasks` array.\n    *   Fields: `id`, `task_type`, `component_id`, `component_responsibility`, `description`, `backing_tool`, `dependency_task_ids`, `estimated_complexity`, `completion_criteria`, `write_directory_paths`, `read_directory_paths`.\n    *   `task_type`: `standard` (since these are implementation tasks, not refactoring).\n    *   `backing_tool`: `Python` or `Shell`. Context says \"Shell-Scripted Utility: A single-file shell or Python script\". I'll choose `Python` for robustness (UUID, Timestamp handling) or `Shell` for simplicity. Given \"Python\" allows better UUID/Timestamp handling without external libs (using `uuid`, `datetime`), I'll specify `Python` as the backing tool for logic, potentially wrapped in shell. Let's use `Python` for the implementation tasks to ensure UUID/Timestamp specs are met easily.\n    *   `completion_criteria`: Must be verbatim logic (e.g., \"File exists with correct permissions\").\n    *   `component_responsibility`: Must be verbatim from the Component Model provided in the prompt.\n\n    *   *Verbatim Responsibilities Check:*\n        *   RESP-001: \"Create the storage file with a default structure upon first execution\"\n        *   RESP-002: \"Append a new task record to the storage file\"\n        *   RESP-003: \"Read the storage file and retrieve all stored task records\"\n        *   RESP-004: \"Update the status attribute of a specific task record to 'completed'\"\n        *   RESP-005: \"Delete a specific task record from the storage file upon command\"\n        *   RESP-006: \"Parse command line arguments to validate inputs\"\n        *   RESP-007: \"Output all stored task records to standard output\"\n\n    *   *Dependencies:*\n        *   Task 1 (Init): None.\n        *   Task 2 (Append): Depends on Task 1 (File exists).\n        *   Task 3 (Read): Depends on Task 1 (File exists).\n        *   Task 4 (Update): Depends on Task 3 (Read data).\n        *   Task 5 (Delete): Depends on Task 3 (Read data).\n        *   Task 6 (Parse): None (Entry point).\n        *   Task 7 (Output): Depends on Task 3 (Data available).\n\n    *   *Paths:*\n        *   Write: `./tasks.json`, `./backups/` (conditional).\n        *   Read: `./tasks.json`.\n\n    *   *Complexity:*\n        *   Init: Medium (Config handling, permissions).\n        *   Append: Medium (Validation, Backup logic).\n        *   Read: Low.\n        *   Update: Medium.\n        *   Delete: Medium.\n        *   Parse: Low.\n        *   Output: Low.\n\n    *   *Error Handling:*\n        *   The spec mentions Error Handling Strategies. I need to ensure `completion_criteria` or `description` reflects handling validation errors or not found errors.\n        *   Task 2, 4, 5 involve errors (validation, not found).\n\n    *   *Config Params:*\n        *   Need to ensure `storage_file_path`, `format`, `permissions`, `backup_enabled` are addressed in Task 1 (Init).\n\n    *   *Data Models:*\n        *   `id:uuid`, `created_at:timestamp`. Addressed in Task 1 (Init) and Task 2 (Append).\n\n6.  **Final Review against Constraints:**\n    *   JSON object.\n    *   `tasks` array.\n    *   `component_responsibility` verbatim.\n    *   `completion_criteria` at least one per task.\n    *   No circular dependencies.\n    *   High complexity tasks have `complexity_flag`. (None are strictly high, but I'll mark Init as Medium due to config/permissions).\n    *   Cover all specs (Data, API, Error, Config).\n\n    *Self-Correction on Dependencies:*\n    The prompt says \"COMP-002 Dependencies: COMP-001 (control)\". This implies logical dependency. In a single script flow, parsing happens before execution.\n    Task 6 (Parse) should ideally be first.\n    Task 1 (Init) is setup.\n    Task 2, 4, 5 (Write/Update/Delete) depend on Init.\n    Task 3 (Read) depends on Init.\n    Task 7 (Output) depends on Read.\n\n    Let's refine the IDs.\n    T-001: RESP-001\n    T-002: RESP-002\n    T-003: RESP-003\n    T-004: RESP-004\n    T-005: RESP-005\n    T-006: RESP-006\n    T-007: RESP-007\n\n    Dependencies:\n    T-001: []\n    T-002: [T-001]\n    T-003: [T-001]\n    T-004: [T-001, T-003] (Need to read to update)\n    T-005: [T-001, T-003] (Need to read to delete)\n    T-006: []\n    T-007: [T-003]\n\n    Wait, COMP-002 depends on COMP-001 (control). This suggests parsing logic might rely on storage state or config loaded by COMP-001. But usually, parsing is independent. I will follow the Component Model's dependency note loosely for logical flow, but in a single script, parsing is often the very first step. However, to respect \"COMP-002 Dependencies: COMP-001 (control)\", I might link T-006 to T-001 if the config is loaded by COMP-001. But usually, config is global. I will keep T-006 independent or depend on T-001 for config loading. Let's make T-006 depend on T-001 to respect the \"control\" dependency note in the Component Model.\n\n    Actually, looking at the Component Model:\n    COMP-002 Dependencies: COMP-001 (control).\n    COMP-003 Dependencies: COMP-001 (data).\n    This implies T-006 depends on T-001, T-007 depends on T-003.\n\n    Let's finalize the JSON structure.\n\n    *One detail:* `estimated_complexity`. If I mark anything as `high`, I need `complexity_flag`. I'll stick to `medium` for Init/Write/Update/Delete due to file I/O and backup logic, `low` for Read/Parse/Output.\n\n    *One detail:* `backing_tool`. Context says \"Shell-Scripted Utility: A single-file shell or Python script\". I will use `Python` as the tool for implementation tasks to ensure robust UUID/Timestamp handling as per Data Models.\n\n    *One detail:* `write_directory_paths`. For Init, it writes to `./tasks.json` and potentially `./backups/`. For others, just `./tasks.json`.\n    *One detail:* `read_directory_paths`. `./tasks.json`.\n\n    *One detail:* `completion_criteria`. Must be specific.\n    Example: \"File exists at path with permissions 0644\".\n\n    *One detail:* `component_responsibility` verbatim. I must copy exactly from the prompt's Component Model section.\n\n    *Prompt Component Model Text:*\n    RESP-001: \"Create the storage file with a default structure upon first execution\"\n    RESP-002: \"Append a new task record to the storage file\"\n    RESP-003: \"Read the storage file and retrieve all stored task records\"\n    RESP-004: \"Update the status attribute of a specific task record to 'completed'\"\n    RESP-005: \"Delete a specific task record from the storage file upon command\"\n    RESP-006: \"Parse command line arguments to validate inputs\"\n    RESP-007: \"Output all stored task records to standard output\"\n\n    I will use these exact strings.\n\n    *Technical Specs Coverage:*\n    Data Models (UUID, Timestamp): Covered in T-001 (Init) and T-002 (Append).\n    API Definitions: Covered by the responsibilities mapping to the endpoints.\n    Error Handling: Covered in descriptions/criteria (e.g., \"Handle validation errors\").\n    Config Params: Covered in T-001 (Init) description/criteria.\n\n    Let's build the JSON.\n\n    *Wait, one constraint:* \"No circular task dependencies\".\n    My proposed graph:\n    T-001 (Init) -> T-002, T-003\n    T-001 -> T-006 (via COMP-001 control dep)\n    T-003 -> T-004, T-005, T-007\n    No cycles.\n\n    *Wait, one constraint:* \"Every Technical Specification must be covered by at least one task\".\n    Error Handling Strategy is a spec. I should mention it in the description or criteria of the tasks that perform actions (T-002, T-004, T-005).\n    Config Params are specs. Covered in T-001.\n    Data Models are specs. Covered in T-001, T-002.\n    API Definitions are specs. Covered by the existence of the tasks mapping to the logic.\n\n    Okay, ready to generate.\n\n    *Wait, check `estimated_complexity` rule:* \"Tasks rated estimated_complexity: high must include complexity_flag with explanation\".\n    I will rate Init as `medium` because of config handling. I will not rate any as `high` to avoid the extra flag requirement unless necessary. I'll stick to `low` and `medium`.\n\n    *Wait, check `completion_criteria` rule:* \"at least one criterion per task (Invariant: IP-001)\".\n    I will ensure each task has a list with at least one item.\n\n    *Wait, check `component_responsibility` rule:* \"must carry VERBATIM text from the component_model (Invariant: IP-002)\".\n    I will copy paste exactly.\n\n    *Wait, check `task_type`*: `standard` or `refactoring`. All are implementation, so `standard`.\n\n    *Wait, check `backing_tool`*: `Python` seems best for UUID/Timestamp.\n\n    *Wait, check `write_directory_paths`*:\n    T-001: `[\"./tasks.json\", \"./backups/\"]` (since backup_enabled is a param, even if default false, the path exists). Or just `[\"./tasks.json\"]`. I'll include the backup path as a potential write path.\n    T-002, T-004, T-005: `[\"./tasks.json\"]`.\n    T-003, T-007: `[]` (Read only).\n    T-006: `[]`.\n\n    *Wait, check `read_directory_paths`*:\n    T-001: `[]` (Write only).\n    T-002, T-004, T-005: `[]` (Write only, though read might happen for ID lookup, but spec says \"Append\", \"Update\", \"Delete\". Update/Read usually implies read-modify-write. I'll list the storage file as read path for T-003, T-004, T-005).\n    T-003: `[\"./tasks.json\"]`.\n    T-004, T-005: `[\"./tasks.json\"]`.\n    T-006: `[]`.\n    T-007: `[\"./tasks.json\"]`.\n    T-001: `[]`.\n\n    Actually, for T-001 (Init), it creates the file. So `read_directory_paths` is empty.\n    For T-002 (Append), it writes. `read` might be empty or include the file if it checks existence. I'll list `./tasks.json` as read for T-003, T-004, T-005, T-007.\n    For T-001, it creates. `read_directory_paths`: `[]`.\n\n    Let's refine T-001 paths. It creates the file. `write_directory_paths`: `[\"./tasks.json\"]`. `read_directory_paths`: `[]`.\n    T-002 (Append): `write_directory_paths`: `[\"./tasks.json\"]`. `read_directory_paths`: `[]`.\n    T-003 (Read): `write_directory_paths`: `[]`. `read_directory_paths`: `[\"./tasks.json\"]`.\n    T-004 (Update): `write_directory_paths`: `[\"./tasks.json\"]`. `read_directory_paths`: `[\"./tasks.json\"]`.\n    T-005 (Delete): `write_directory_paths`: `[\"./tasks.json\"]`. `read_directory_paths`: `[\"./tasks.json\"]`.\n    T-006 (Parse): `write_directory_paths`: `[]`. `read_directory_paths`: `[]`.\n    T-007 (Output): `write_directory_paths`: `[]`. `read_directory_paths`: `[\"./tasks.json\"]`.\n\n    Wait, T-001 also handles `backup_enabled`. If true, it writes to `./backups/`. I will list `./backups/` in write paths for T-001.\n\n    Let's finalize the JSON content.\n\n    One more check: \"No circular task dependencies\".\n    My plan:\n    T-001: []\n    T-002: [T-001]\n    T-003: [T-001]\n    T-004: [T-001, T-003]\n    T-005: [T-001, T-003]\n    T-006: [T-001] (Due to COMP-001 control dep)\n    T-007: [T-003]\n\n    This is safe.\n\n    One more check: \"component_responsibility must carry VERBATIM text\".\n    I will ensure exact matches.\n\n    One more check: \"completion_criteria: at least one criterion per task\".\n    I will write clear criteria.\n\n    One more check: \"estimated_complexity\".\n    I'll use `medium` for T-001, T-002, T-004, T-005. `low` for T-003, T-006, T-007.\n    None are `high`, so no `complexity_flag` needed.\n\n    One more check: \"write_directory_paths, read_directory_paths\".\n    These are arrays of strings.\n\n    One more check: \"backing_tool\".\n    I'll use `Python` for all to ensure consistency (single-file script).\n\n    One more check: \"task_type\".\n    `standard`.\n\n    One more check: \"id\".\n    I'll use `TASK-001` to `TASK-007`.\n\n    One more check: \"description\".\n    Must explain what the task does, referencing specs (Error handling, Config, Data Models).\n\n    Let's write it.",
+  "captured_at": "2026-04-13T16:48:35.871Z",
+  "janumicode_version_sha": "dev",
+  "llm_provider": "ollama",
+  "llm_model": "qwen3.5:9b"
+}

@@ -1,0 +1,12 @@
+{
+  "overall_pass": false,
+  "flaws": [
+    {
+      "flaw_type": "completeness_shortcut",
+      "severity": "high",
+      "description": "Agent's final output indicates a technical failure ('No output parser registered') instead of delivering the required integration artifacts (match scores, provider profiles). The agent treats an incomplete state as the conclusion of the task, violating the phase gate completion criteria.",
+      "evidence": "Final Output: No output parser registered for backing tool: AI Agent SDK / HTTP Client",
+      "recommended_action": "return_to_phase4"
+    }
+  ]
+}

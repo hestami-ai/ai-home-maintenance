@@ -257,11 +257,11 @@ export class GovernedStreamWriter {
     switch (recordType) {
       case 'mirror_approved':
       case 'phase_gate_approved':
+      case 'decision_bundle_resolved':
         return 5; // Human-Approved
       case 'mirror_edited':
         return 4; // Human-Edited
       case 'mirror_presented':
-      case 'menu_presented':
       case 'decision_bundle_presented':
         return 2; // Agent-Asserted (presented to human, not yet acted on)
       case 'decision_trace':

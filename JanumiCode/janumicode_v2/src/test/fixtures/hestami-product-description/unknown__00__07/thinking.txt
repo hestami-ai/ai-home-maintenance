@@ -1,0 +1,213 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Reasoning Review] agent.
+    *   **Task:** Inspect an agent's [JC:Execution Trace] for specific flaws based on a provided taxonomy.
+    *   **Input:** Context (Phase Gate Criteria, Completion Criteria) and a Trace Selection (Reasoning steps, Tool calls, Final Output).
+    *   **Output Format:** JSON.
+    *   **Constraints:**
+        *   Check against ALL flaw types in the taxonomy.
+        *   `overall_pass`: boolean.
+        *   `flaws`: list of flaw objects.
+        *   Each flaw needs: `flaw_type`, `severity`, `description`, `evidence`, `recommended_action`.
+        *   `severity`: `high` = blocks Phase Gate, `low` = warning.
+        *   `premature_convergence` is ALWAYS `high`.
+        *   Must cite specific evidence from the trace.
+        *   Tool results are excluded (I cannot see what tools returned).
+        *   Do NOT reproduce the agent's output schema.
+    *   **Specific Context:** The reviewed agent was required to produce: "Implement frontend and backend logic to display Good-Better-Best estimates and validate bid amounts." The Phase Gate will check these criteria (implied: completeness).
+    *   **Trace Selection:**
+        *   [REASONING] (seq 0): `{"invocation_id":"d25a5edd-aa3e-4ef8-8a46-66dd95e170e5","task_id":"TASK-PROV-002","backing_tool":"SvelteKit Frontend / Bun API","status":"started"}`
+        *   [AGENT'S FINAL OUTPUT]: "No output parser registered for backing tool: SvelteKit Frontend / Bun API"
+
+2.  **Evaluate the Trace:**
+    *   **Task:** Implement frontend and backend logic to display Good-Better-Best estimates and validate bid amounts.
+    *   **Agent Action:** The agent started a tool invocation (`SvelteKit Frontend / Bun API`), but the final output provided is an error message: "No output parser registered for backing tool: SvelteKit Frontend / Bun API".
+    *   **Completion Criteria:** The agent failed to produce the actual implementation (frontend/backend logic). It only returned an error regarding the tool registration.
+    *   **Phase Gate Criteria:** Requires implementation.
+    *   **Flaw Analysis:**
+        *   *completeness_shortcut*: The agent claims (implicitly or explicitly by returning an error) that the task is handled, or it failed to complete the task. Since the final output is just an error about tool registration, the actual deliverable (frontend/backend logic) is missing. This is effectively claiming the task is done (or attempting to move on) without the actual output. However, strictly speaking, this is more of a tool failure leading to non-completion. Let's look at the taxonomy.
+        *   `completeness_shortcut`: "Agent claims task complete when only part is done". Here, the agent produced *no* implementation, just an error message. It failed to complete the task. This fits `completeness_shortcut` if the agent implies the task is done (e.g., by closing the session) or if we consider the "No output parser..." message as the final output indicating a failure to generate the required artifact.
+        *   `implementability_violation`: "Component Responsibility too broad for single Executor Agent session". Not applicable here.
+        *   `contradiction_with_prior_approved`: The Phase Gate checks criteria. The agent didn't meet them.
+        *   `tool_result_misinterpretation_suspected`: The agent output says "No output parser registered...". This is a tool configuration error, not necessarily misinterpretation of a result, but it indicates the tool call failed to yield results the agent expected.
+        *   `unsupported_assumption`: Did the agent assume the tool was ready? Yes.
+        *   `premature_convergence`: No.
+        *   `unacknowledged_uncertainty`: Not really.
+        *   `completeness_shortcut`: The agent output is literally just an error message. It did not fulfill the task "Implement frontend and backend logic...". The trace shows the tool started but no result was returned (or the result was the parser error). The Phase Gate requires completion. The agent failed. Is this a `completeness_shortcut`? Usually, `completeness_shortcut` is used when the agent stops early thinking it's done. Here, the agent failed to execute the tool properly. However, the instruction says: "If the agent's output is missing required fields or contradicts the phase gate criteria, that is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw." Since the agent provided no implementation (just an error), it contradicts the Phase Gate criteria (which require the implementation). So `completeness_shortcut` is appropriate (or `contradiction_with_prior_approved` because it failed the criteria). Given the instruction "If the agent's output is missing required fields... that is a completeness_shortcut", this fits well. The "output" required was the implementation logic. The output provided was an error message. It is missing required fields/artifacts.
+        *   `unacknowledged_uncertainty`: The agent didn't acknowledge the tool failure.
+        *   Let's look for `implementability_violation`: Not relevant.
+        *   Let's look for `authority_confusion`: Not relevant.
+
+        *   Wait, is the output "No output parser registered..." considered a `completeness_shortcut`?
+        *   Actually, the most accurate flaw is `completeness_shortcut` (missing required implementation) OR potentially `unsupported_assumption` (assuming tool works). But `completeness_shortcut` is defined as "Agent claims task complete when only part is done". The agent stopped and returned an error. It didn't finish the job.
+        *   Also `contradiction_with_prior_approved`: The Phase Gate checks criteria. The criteria are implementation. The output is an error. This contradicts the requirement.
+        *   Between `completeness_shortcut` and `contradiction_with_prior_approved`: The instruction says: "If the agent's output is missing required fields or contradicts the phase gate criteria, that is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw."
+        *   Usually, if the task isn't done at all (because the tool failed), it's a `completeness_shortcut` (didn't finish) or a tool failure. In the context of this review system, if the agent says "Done" but failed to output the artifact, it's `completeness_shortcut`. Here the agent didn't say "Done", it returned an error. However, the instruction says "If the agent's output is missing required fields... that is a completeness_shortcut". The output is missing the frontend/backend logic.
+        *   Let's check `premature_convergence`: Not applicable.
+        *   Let's check `invalid_inference`: Not applicable.
+        *   Let's check `tool_result_misinterpretation_suspected`: The agent says "No output parser registered". This is a system error, not necessarily a misinterpretation of a tool result *provided*. But if the agent *thought* the tool call succeeded and moved on, that would be `tool_result_misinterpretation`. Here, the trace shows the final output is that error message. It seems the tool call is failing configuration-wise.
+        *   Most critical: The agent failed to deliver the requested code/logic.
+        *   Flaw: `completeness_shortcut`. Severity: `high` (blocks Phase Gate). Why? Because the Phase Gate cannot be passed without the implementation.
+        *   Flaw: `contradiction_with_prior_approved`. The Phase Gate criteria require implementation. The output is an error.
+
+        Let's pick the most specific one. `completeness_shortcut` is defined as "Agent claims task complete when only part is done". If the agent output is just an error, it implies the task is effectively stopped. Is it "claiming complete"? Or did it just fail? The instruction says: "If the agent's output is missing required fields... that is a completeness_shortcut". The output (the final message) is missing the implementation fields. So `completeness_shortcut`.
+
+        Wait, is there another flaw? `unsupported_assumption`. Did the agent assume the tool would work? The trace shows the tool status "started". The final output says "No output parser registered". This suggests a configuration issue.
+        The most significant issue is the lack of the actual artifact (frontend/backend logic).
+
+        Let's check `completeness_shortcut` definition again: "Agent claims task complete when only part is done".
+        If the agent simply crashed or returned an error without producing the code, is it `completeness_shortcut`?
+        Instruction: "If the agent's output is missing required fields or contradicts the phase gate criteria, that is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw."
+        Since the output is missing the implementation (required fields/artifact), `completeness_shortcut` is the correct classification per the specific rule in the prompt ("If the agent's output is missing required fields...").
+
+        Severity: `high`. Reason: Violates bloom-and-prune principle? No, but it's high because it blocks the Phase Gate.
+        Actually, looking at the severity rules: "severity: high = blocks Phase Gate, triggers quarantine and retry". Since the implementation is missing, the Phase Gate cannot be passed. So `high` is correct.
+
+        Is there `unacknowledged_uncertainty`? The agent didn't acknowledge the tool failure explicitly in a way that suggests uncertainty handling, but rather it just presented the error as the final output.
+        
+        Let's refine the flaw description.
+        Flaw Type: `completeness_shortcut`
+        Description: The agent failed to generate the required frontend and backend logic implementation, providing only an error message regarding the tool parser instead of the requested code.
+        Evidence: "AGENT'S FINAL OUTPUT — No output parser registered for backing tool: SvelteKit Frontend / Bun API"
+        Action: `escalate_to_unsticking` (since the tool itself is misconfigured) or `return_to_phase4` (since it didn't do the work). Usually, if a tool is broken, `return_to_phase4` (to fix setup) or `retry`. Let's use `return_to_phase4` or `escalate`. Given "trigger quarantine and retry", `retry` might be standard, but if the config is wrong, `return_to_phase4` (fixing the artifact/plan) is better. However, `escalate_to_unsticking` is for specific stuckness. Let's go with `return_to_phase4` (implies the task needs to be completed, likely fixing the tool setup or trying again). Or `retry`. Let's use `return_to_phase4` because it's a completeness failure.
+        Wait, `tool_result_misinterpretation_suspected`: "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The agent didn't make a conclusion based on the tool call other than the error itself. The error is the result.
+        
+        Let's stick to `completeness_shortcut`.
+        Wait, is there a `scope_violation`? The agent was asked to implement logic. It didn't.
+        
+        Is there `premature_convergence`? The instruction says "premature_convergence is ALWAYS severity: high". This doesn't apply here.
+        
+        So, main flaw: `completeness_shortcut`.
+        Evidence: The final output is an error message about the parser, not the requested code.
+        Severity: `high` (because the implementation is required to pass the Phase Gate).
+
+        Wait, is it `contradiction_with_prior_approved`?
+        The Phase Gate checks criteria (Completion Criteria). The agent didn't meet them.
+        The prompt says: "If the agent's output is missing required fields or contradicts the phase gate criteria, that is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw."
+        `completeness_shortcut` is usually "claiming done before done". Here, the output *is* an error. It's not claiming done. But the rule says "If the agent's output is missing required fields... that is a completeness_shortcut". So I will use `completeness_shortcut`.
+
+        Wait, looking closely at the "AGENT'S FINAL OUTPUT" section:
+        "No output parser registered for backing tool: SvelteKit Frontend / Bun API"
+        This implies the tool call failed to return data. The agent didn't write the code itself, it tried to use a tool, and the tool failed.
+        This is effectively a `completeness_shortcut` (didn't finish) or maybe `tool_result_misinterpretation_suspected` (if the agent thought the call succeeded). But here the output *is* the failure message.
+        So the agent is stuck. The task is incomplete.
+        Flaw: `completeness_shortcut`.
+        Evidence: Final Output text.
+        Severity: `high`.
+        Action: `return_to_phase4` (to address the implementation requirement) or `escalate`. Let's pick `return_to_phase4` as it implies reverting to fix the work.
+
+        Wait, there is also `unsupported_assumption`. The agent assumed the tool would work.
+        But `completeness_shortcut` is more direct regarding the missing artifact.
+
+        Let's check if there are other flaws.
+        `invalid_inference`? No.
+        `scope_violation`? No.
+        
+        Wait, I need to check if the output *is* the flaw or if the *lack* of output is the flaw.
+        The output is an error. The task was "Implement frontend and backend logic...".
+        The Phase Gate criteria (Completion Criteria) requires the implementation.
+        The agent failed.
+        
+        Okay, I will formulate the JSON.
+        `overall_pass`: false (since there are flaws).
+        `flaws`: Array with one or more items.
+        
+        Item 1: `completeness_shortcut`.
+        Evidence: "AGENT'S FINAL OUTPUT — No output parser registered for backing tool: SvelteKit Frontend / Bun API"
+        Description: The agent failed to produce the required frontend and backend logic implementation, outputting only a tool error message instead of the requested artifacts.
+        Severity: high.
+        Action: `return_to_phase4`.
+
+        Is there `unacknowledged_uncertainty`? The agent didn't state "I cannot do this". It just returned the error. So it's implicit. `completeness_shortcut` covers the missing output.
+
+        Is there `implementability_violation`? "Component Responsibility too broad". Not relevant.
+
+        Is there `tool_result_misinterpretation_suspected`? The agent didn't interpret a result incorrectly; the tool failed.
+        
+        Okay, sticking with `completeness_shortcut` as the primary flaw.
+        
+        Wait, one more check: `contradiction_with_prior_approved`.
+        The Phase Gate checks criteria. The agent output contradicts the criteria (which require implementation).
+        The prompt says: "If the agent's output is missing required fields or contradicts the phase gate criteria, that is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw."
+        Since it's missing the required implementation, `completeness_shortcut` is the specific label for "missing required fields".
+        
+        So, I will output `completeness_shortcut`.
+
+        Wait, does the trace show the agent *stopped* or *failed*?
+        Trace: [REASONING] ... status: "started".
+        Output: Error.
+        The agent did not complete the step.
+        This is `completeness_shortcut`.
+
+        Wait, is there a `false_equivalence`? No.
+        
+        Okay, ready to draft.
+
+        One nuance: The prompt says "If the agent's output is missing required fields... that is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw."
+        I'll use `completeness_shortcut` because it's missing the implementation (required fields/artifacts).
+        
+        Wait, I need to check the `recommended_action`.
+        `retry` vs `return_to_phase4`.
+        Since the agent failed to execute properly (parser not registered), simply retrying might fail again. `return_to_phase4` implies the work needs to be restarted/rewritten or the approach corrected.
+        `escalate_to_unsticking` is also an option for tool issues.
+        Let's check the list: `retry|escalate|accept_with_caveat|return_to_phase4|escalate_to_unsticking`.
+        If the tool config is wrong (`SvelteKit Frontend / Bun API` parser not registered), the agent cannot proceed on its own. It needs human intervention or configuration fix. `escalate_to_unsticking` is for when the agent is stuck. `return_to_phase4` is for when the task isn't done.
+        Since the task (implement logic) isn't done, `return_to_phase4` is logical.
+        
+        Wait, the instruction says "If no flaws found: overall_pass = true".
+        Here we definitely have a flaw.
+        
+        Final check on `completeness_shortcut` vs `contradiction_with_prior_approved`.
+        `completeness_shortcut`: Agent claims task complete when only part is done.
+        `contradiction_with_prior_approved`: Agent's output conflicts with a Phase-Gate-Certified artifact (criteria).
+        Since the criteria are "Completion Criteria (for completeness_shortcut checks)", and the agent didn't meet them, it is `completeness_shortcut`.
+        
+        Okay, drafting the JSON.
+        
+        Wait, one more thing. The prompt says "Do NOT output the reviewed agent's schema." I will not include any schema info.
+        
+        JSON Structure:
+        ```json
+        {
+          "overall_pass": false,
+          "flaws": [
+            {
+              "flaw_type": "completeness_shortcut",
+              "severity": "high",
+              "description": "The agent failed to implement the requested frontend and backend logic, outputting only a tool configuration error instead of the required artifacts.",
+              "evidence": "AGENT'S FINAL OUTPUT — No output parser registered for backing tool: SvelteKit Frontend / Bun API",
+              "recommended_action": "return_to_phase4"
+            }
+          ]
+        }
+        ```
+        
+        Wait, should I check for `unacknowledged_uncertainty`?
+        The agent didn't express uncertainty. It failed silently with an error. `completeness_shortcut` covers the incompleteness.
+        
+        Should I check `unsupported_assumption`?
+        The agent assumed the tool would work.
+        Evidence: Invocation started, but failed.
+        Is it a flaw? Yes. `unsupported_assumption`.
+        But `completeness_shortcut` is more relevant to the task output.
+        However, the taxonomy allows multiple flaws.
+        Is `unsupported_assumption` applicable? "Agent asserts something as true with no basis in Context Payload".
+        The agent assumed the tool `SvelteKit Frontend / Bun API` was ready/functional.
+        Severity: `low` (usually) or `high` if it blocks task?
+        The instruction says `completeness_shortcut` is `high`.
+        `unsupported_assumption` definition: "Agent asserts something as true with no basis in Context Payload".
+        Did the agent assert the tool works? It used it.
+        I think `completeness_shortcut` is the dominant flaw. Adding `unsupported_assumption` might be redundant or less precise given the error is technical, not logical.
+        I'll stick to `completeness_shortcut` as the primary reason for failure.
+        
+        Wait, I need to make sure I follow the "EVERY flaw must cite specific evidence from the trace".
+        Evidence: "AGENT'S FINAL OUTPUT — No output parser registered for backing tool: SvelteKit Frontend / Bun API"
+        
+        Okay, final decision: One flaw, `completeness_shortcut`, severity `high`.
+        
+        Wait, is `contradiction_with_prior_approved` better?
+        The prompt says: "The PHASE GATE will check these criteria: ... If the agent's output is missing required fields or contradicts the phase gate criteria, that is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw."
+        Since the criteria are completion-related, `completeness_shortcut` is the specific label for "missing required fields".
+        
+        Okay, writing the JSON.

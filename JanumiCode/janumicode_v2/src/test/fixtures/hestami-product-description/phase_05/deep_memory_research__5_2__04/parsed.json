@@ -1,0 +1,33 @@
+{
+  "topic_entities": [
+    "INT-EXT-001-PAYMENT",
+    "INT-EXT-002-COMMS",
+    "INT-EXT-003-REGULATORY",
+    "JC-Backend-Api",
+    "EXT-001: Payment Gateway",
+    "Stripe",
+    "Square",
+    "JC-Comms-Service",
+    "EXT-002: Communication Provider",
+    "JC-Compliance-Engine",
+    "EXT-003: Government Regulatory",
+    "API definitions",
+    "Interface Contracts"
+  ],
+  "decision_types_sought": [
+    "phase_gate_approval",
+    "mirror_approval"
+  ],
+  "temporal_scope": {
+    "from": "1970-01-01T00:00:00Z",
+    "to": "2024-06-01T00:00:00Z"
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}

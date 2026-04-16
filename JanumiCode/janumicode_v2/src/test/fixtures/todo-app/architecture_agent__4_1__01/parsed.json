@@ -1,0 +1,53 @@
+{
+  "software_domains": [
+    {
+      "id": "task_management",
+      "name": "Task Management",
+      "ubiquitous_language": [
+        {
+          "term": "Task Record",
+          "definition": "A single logical unit representing a task, containing its identifier, description, and status within the storage file."
+        },
+        {
+          "term": "Task Status",
+          "definition": "The current state of a Task Record, specifically 'pending' or 'completed', stored within the record."
+        },
+        {
+          "term": "Task Identifier",
+          "definition": "A unique string or index used to distinguish one Task Record from another within the storage file."
+        },
+        {
+          "term": "Task List",
+          "definition": "The collection of all Task Records currently stored within the Storage File, ready for output."
+        }
+      ],
+      "system_requirement_ids": [
+        "SR-002",
+        "SR-003",
+        "SR-004",
+        "SR-005"
+      ]
+    },
+    {
+      "id": "storage_management",
+      "name": "Storage Management",
+      "ubiquitous_language": [
+        {
+          "term": "Storage File",
+          "definition": "The single text file used for persistence, located in the system directory, containing all Task Records."
+        },
+        {
+          "term": "Default Structure",
+          "definition": "The initial format and schema of the Storage File created upon first execution, ensuring valid Task Record parsing."
+        },
+        {
+          "term": "File Entry",
+          "definition": "A raw text line or block within the Storage File representing a Task Record or metadata."
+        }
+      ],
+      "system_requirement_ids": [
+        "SR-001"
+      ]
+    }
+  ]
+}

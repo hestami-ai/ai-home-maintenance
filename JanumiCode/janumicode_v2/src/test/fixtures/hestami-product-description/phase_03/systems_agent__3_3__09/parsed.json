@@ -1,0 +1,156 @@
+{
+  "interface_contracts": {
+    "contracts": [
+      {
+        "id": "INT-EXT-001-PAYMENT",
+        "systems_involved": [
+          "JC-Backend-Api",
+          "EXT-001: Payment Gateway (Stripe/Square)"
+        ],
+        "protocol": "HTTPS/REST",
+        "data_format": "JSON (Payment Intent/Receipt Metadata)",
+        "auth_mechanism": "Shared Secret API Keys / OAuth2 (JWT)",
+        "error_handling_strategy": "Idempotency keys for retries, exponential backoff for rate limits, log transaction to dead-letter queue",
+        "error_responses": [
+          {
+            "code": "500.1",
+            "message": "TRANSACTION_FAILED",
+            "description": "Upstream payment gateway rejected the charge (e.g., declined card, insufficient funds).",
+            "action": "Notify user via UI/Email with retry option or cancel order."
+          },
+          {
+            "code": "429",
+            "message": "RATE_LIMIT_EXCEEDED",
+            "description": "Request rejected due to excessive frequency (Stripe API threshold).",
+            "action": "Wait before retrying (e.g., 60s) and increment client-side retry counter."
+          }
+        ]
+      },
+      {
+        "id": "INT-EXT-002-COMMS",
+        "systems_involved": [
+          "JC-Comms-Service",
+          "EXT-002: Communication Provider (Email/SMS)"
+        ],
+        "protocol": "HTTPS/SMTP-REST",
+        "data_format": "JSON (Recipient List, Content Body, Template ID)",
+        "auth_mechanism": "API Keys with IP Whitelisting",
+        "error_handling_strategy": "Queue failed messages, throttle burst traffic, validate email format pre-send",
+        "error_responses": [
+          {
+            "code": "502.1",
+            "message": "BOUNCE_FAILED",
+            "description": "External provider rejected the message (invalid address or inbox full).",
+            "action": "Update status table, flag for manual review, do not retry immediately."
+          },
+          {
+            "code": "404.2",
+            "message": "TEMPLATE_NOT_FOUND",
+            "description": "Referenced email/SMS template ID does not exist in provider.",
+            "action": "Fallback to default static template or alert admin."
+          }
+        ]
+      },
+      {
+        "id": "INT-EXT-003-REGULATORY",
+        "systems_involved": [
+          "JC-Compliance-Engine",
+          "EXT-003: Government Regulatory Services"
+        ],
+        "protocol": "HTTPS/REST",
+        "data_format": "JSON (Entity Data, Document IDs, Notice Dates)",
+        "auth_mechanism": "mTLS / OAuth2 Client Credentials",
+        "error_handling_strategy": "Circuit breaker pattern, alert compliance officer if external lookup fails repeatedly",
+        "error_responses": [
+          {
+            "code": "401.1",
+            "message": "AUTH_TOKEN_EXPIRED",
+            "description": "Government API session token has lapsed.",
+            "action": "Refresh token via admin service or fallback to static rule set."
+          },
+          {
+            "code": "500.3",
+            "message": "GOV_SERVICE_UNAVAILABLE",
+            "description": "External government endpoint timed out or returned 5xx.",
+            "action": "Retry with exponential backoff, log incident."
+          }
+        ]
+      },
+      {
+        "id": "INT-EXT-004-AI",
+        "systems_involved": [
+          "JC-Workflow-Engine",
+          "EXT-004: AI/ML Service Provider"
+        ],
+        "protocol": "HTTPS/REST",
+        "data_format": "JSON (Prompt Context, CC&R Text, Output Structure)",
+        "auth_mechanism": "Bearer Token (API Key)",
+        "error_handling_strategy": "Request timeout handling, cache last valid response for non-real-time tasks, fallback to static rules",
+        "error_responses": [
+          {
+            "code": "429.1",
+            "message": "MODEL_QUOTA_EXCEEDED",
+            "description": "AI provider rate limit reached.",
+            "action": "Queue job and retry later, notify tenant of service degradation if persistent."
+          },
+          {
+            "code": "400.1",
+            "message": "INVALID_INPUT_STRUCTURE",
+            "description": "Sent prompt JSON schema does not match AI provider requirements.",
+            "action": "Validate input schema before sending, sanitize text input."
+          }
+        ]
+      },
+      {
+        "id": "INT-EXT-005-MOBILE",
+        "systems_involved": [
+          "JC-Mobile-Client",
+          "EXT-005: Mobile OS SDKs"
+        ],
+        "protocol": "HTTPS / Native Inter-Process Communication",
+        "data_format": "JSON (Upload Queues, Offline Sync Tokens)",
+        "auth_mechanism": "App-Signed Certificate / Shared Secret",
+        "error_handling_strategy": "Local storage of failed uploads, background re-sync when connectivity restored",
+        "error_responses": [
+          {
+            "code": "1002",
+            "message": "OFFLINE_MODE_ACTIVE",
+            "description": "Device has no network; queue action locally.",
+            "action": "Store in local SQLite/Realm, do not block UI, alert user when connection restored."
+          },
+          {
+            "code": "1005",
+            "message": "OFFLINE_STORAGE_FULL",
+            "description": "Local queue for offline assets is at capacity.",
+            "action": "Delete oldest queued assets, notify user to free up space."
+          }
+        ]
+      },
+      {
+        "id": "INT-INT-001-STORAGE",
+        "systems_involved": [
+          "JC-Media-Ingestion-Service",
+          "JC-Storage-SeaweedFS"
+        ],
+        "protocol": "HTTPS/S3-Compatible",
+        "data_format": "Binary (Splats/Images) + JSON (Metadata)",
+        "auth_mechanism": "Pre-signed URLs / IAM Roles",
+        "error_handling_strategy": "Retry failed uploads with checksum verification, alert if storage quota hit",
+        "error_responses": [
+          {
+            "code": "400.0",
+            "message": "OBJECT_TOO_LARGE",
+            "description": "Splats/Image file exceeds storage object limit (e.g., 5GB).",
+            "action": "Compress file, split into chunks, or reject with guidance."
+          },
+          {
+            "code": "503.0",
+            "message": "STORAGE_CLUSTER_DOWN",
+            "description": "SeaweedFS cluster node failure or high load.",
+            "action": "Failover to secondary cluster if available, queue request for retry."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "error_handling_strategies": [
+    {
+      "component_id": "cmp-prop-data",
+      "error_types": [
+        "file_format_invalid",
+        "upload_size_exceeded",
+        "indexing_timeout",
+        "storage_quota_exceeded",
+        "sync_conflict"
+      ],
+      "detection": "HTTP middleware validation for MIME type; Async worker try/catch block with timeout; Storage driver check for disk availability",
+      "response": "Return 400 Bad Request with validation details; Reject with 403 Quota Exceeded; Failover to offline queue for sync; Return 504 Gateway Timeout for indexing failures",
+      "surfacing": "JSON error payload with field-specific validation messages; Admin dashboard metrics for storage usage; Logs flagged with severity ERROR; User receives 'Asset Failed Upload' toast notification"
+    },
+    {
+      "component_id": "cmp-provider-match",
+      "error_types": [
+        "ai_inference_timeout",
+        "bid_data_missing",
+        "provider_api_down",
+        "relevance_score_below_threshold"
+      ],
+      "detection": "Circuit breaker pattern on provider API calls; Timeout middleware on AI inference; Confidence score threshold check on results",
+      "response": "Failover to cached results; Retry with exponential backoff for provider API; Propagate empty results with fallback recommendation",
+      "surfacing": "502 Bad Gateway for external API failures; 'Low Confidence' warning badge on AI results; UI renders fallback list if primary provider unavailable"
+    },
+    {
+      "component_id": "cmp-compliance",
+      "error_types": [
+        "extraction_confidence_low",
+        "statutory_deadline_missed",
+        "notification_queue_full",
+        "rule_engine_mismatch"
+      ],
+      "detection": "AI confidence score validation below 0.7 threshold; Cron job polling for deadline state; Queue depth monitor; Schema validation on extracted text",
+      "response": "Flag document for manual review; Generate critical alert ticket; Retry notification payload with retry count limit",
+      "surfacing": "Critical severity logs; Admin alert for missed deadlines; User sees 'Compliance Action Required' banner; Webhook return 500 for critical rule mismatches"
+    },
+    {
+      "component_id": "cmp-workflow",
+      "error_types": [
+        "state_transition_invalid",
+        "audit_log_write_failed",
+        "workflow_timeout",
+        "transition_order_violated"
+      ],
+      "detection": "State machine validator before transition; Transaction rollback on constraint violation; Timeout on state update query",
+      "response": "Reject transition with 409 Conflict; Queue failed audit write; Compensating transaction to revert to previous state",
+      "surfacing": "409 Conflict with allowed transitions list; UI shows 'Action Processing Failed' status; Detailed stack trace logged for support ticketing"
+    },
+    {
+      "component_id": "cmp-notifications",
+      "error_types": [
+        "smtp_connection_timeout",
+        "sms_gateway_unavailable",
+        "email_bounce_detected",
+        "recipient_list_invalid"
+      ],
+      "detection": "Transport library timeout response; Batch job status check; Bounce report parsing from gateway; Email address format regex check",
+      "response": "Queue message with exponential backoff; Partial batch success reporting; Skip invalid recipients and continue batch",
+      "surfacing": "503 Service Unavailable during gateway outage; Bounce rate percentage in batch summary; Individual recipient delivery status in UI"
+    },
+    {
+      "component_id": "cmp-security",
+      "error_types": [
+        "token_expired",
+        "scope_insufficient",
+        "token_format_invalid",
+        "rbac_forbidden"
+      ],
+      "detection": "Token expiration check in header; Scope validation against RLS policy; Signature verification on request; 405 Method Not Allowed check",
+      "response": "Immediate 401 Unauthorized or 403 Forbidden; Block request without processing; Log suspicious IP address",
+      "surfacing": "HTTP 401/403 with security scope reason; No PII logged; Security alert sent to SOC team for repeated violations; WAF block rule trigger"
+    },
+    {
+      "component_id": "cmp-payment",
+      "error_types": [
+        "card_declined",
+        "idempotency_duplicate",
+        "gateway_connection_timeout",
+        "insufficient_funds_error"
+      ],
+      "detection": "Payment gateway error code parsing; Idempotency key check in request header; Timeout on webhook callback; Transaction status polling",
+      "response": "Return gateway decline reason code; Queue duplicate request for manual review; Retry transient failures with circuit breaker",
+      "surfacing": "402 Payment Required with specific decline reason; Receipt generation blocked; Admin portal flag for pending payments"
+    }
+  ]
+}

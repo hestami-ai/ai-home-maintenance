@@ -1,0 +1,344 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Eval Design Agent].
+    *   **Task:** Design evaluation criteria for Sub-Phase 8.1 (Evaluation Plan).
+    *   **Input:** Test Plan (read-only) containing 6 Test Suites (Functional/Integration Tests) and 12 Non-Functional Requirements (NFRs).
+    *   **Constraints:**
+        *   No duplication of Test Cases from Phase 7 (Functional Test Plan).
+        *   Every NFR must have at least one Quality Evaluation criterion with specified tooling (Invariant).
+        *   Compliance-related NFRs from compliance_context must have evaluation criteria (though the context says "No compliance regimes", I should still check if any NFRs relate to compliance/security obligations that require specific evaluation).
+        *   Output format: Three JSON objects (`functional_evaluation_plan`, `quality_evaluation_plan`, `reasoning_evaluation_plan`).
+        *   GOVERNING CONSTRAINTS: None specified beyond the main rules.
+    *   **Context:**
+        *   Functional Test Plan (Phase 7) is provided. I must *not* duplicate these test cases (TC-PROP-001, TC-PROV-001, etc.).
+        *   NFRs cover Performance, Reliability, Security, Scalability, Accessibility, Maintainability.
+        *   No Compliance Regimes are explicitly listed in the "Compliance" section of the context ("No compliance regimes"), but the NFRs themselves include security/compliance-like requirements (NFR-004, NFR-005, NFR-010). I need to ensure quality criteria cover these NFRs.
+        *   I need to design *Quality* and *Reasoning* evaluations, as *Functional* evaluation often overlaps with the Test Plan. However, the prompt asks for `functional_evaluation_plan` as well. I need to ensure this doesn't duplicate the Test Plan's functional tests (TC-...001, etc.). The prompt says "Receive the test_plan as read-only input to ensure no duplication." It implies I should design *additional* functional evaluations if necessary (e.g., edge cases not covered), or perhaps the `functional_evaluation_plan` here is meant to map NFRs to functional validation. Given the distinction in the prompt ("Design evaluation criteria for quality attributes NOT already covered by the Test Plan"), the `functional_evaluation_plan` should probably focus on NFR-driven functional validation or specific edge cases not in the Test Plan. However, looking at the structure required:
+            1. `functional_evaluation_plan`: {criteria: [{functional_requirement_id, evaluation_method, success_condition}]}
+            2. `quality_evaluation_plan`: {criteria: [{nfr_id, category, evaluation_tool, threshold, measurement_method, fallback_if_tool_unavailable}]}
+            3. `reasoning_evaluation_plan`: {scenarios: [{id, description, pass_criteria}], ai_subsystems_detected: boolean}
+
+    *   **Wait, re-reading the constraint:** "Design evaluation criteria for quality attributes NOT already covered by the Test Plan."
+    *   **Test Plan contains:** Functional tests (TC-PROP-001, TC-PROV-001, etc.).
+    *   **NFRs contain:** Performance, Reliability, Security, Scalability, etc.
+    *   **Task:**
+        *   `functional_evaluation_plan`: Should cover functional requirements *not* in the Test Plan, OR map NFRs to functional checks that haven't been functionally tested elsewhere. However, usually, if a Test Plan exists, functional tests are already done. The `functional_evaluation_plan` in this output might be for *acceptance* criteria mapping to the functional requirements (AC) that were listed in the Test Plan traces (e.g., AC-001-1). Wait, the prompt says "No evaluation criterion should duplicate a Test Case from Phase 7". So I need to find Functional Requirements (AC) that *haven't* been tested in the Phase 7 suite yet? Or is this about mapping NFRs to functional validation?
+        *   Let's look at the ACs listed in the Test Plan.
+            *   TC-PROP-001 -> AC-001-1
+            *   TC-PROP-002 -> AC-001-2
+            *   TC-PROP-003 -> AC-008-1
+            *   TC-PROV-001 -> AC-002-1
+            *   TC-PROV-002 -> AC-002-2
+            *   TC-PROV-003 -> AC-003-1
+            *   TC-COM-001 -> AC-004-1
+            *   TC-COM-002 -> AC-006-1
+            *   TC-COM-003 -> AC-006-2
+            *   TC-COM-004 -> AC-007-1
+            *   TC-WORK-001 -> AC-005-1
+            *   TC-SEC-001 -> AC-009-1
+            *   TC-PAY-001 -> AC-010-1
+        *   Missing ACs in the Test Plan list (based on NFRs/Context):
+            *   NFR-001 (Performance) -> AC-001-1 is in TC-PROP-001.
+            *   NFR-002 (Performance/Ingestion) -> No specific AC listed for ingestion throughput in the Test Plan list provided. I need to check if there are ACs associated with NFR-002. The prompt doesn't list specific ACs for NFR-002. I should probably create a functional evaluation criterion for the missing throughput requirement if it exists as an AC, or treat it as a functional boundary.
+            *   However, the constraint says "No evaluation criterion should duplicate a Test Case from Phase 7".
+            *   The `functional_evaluation_plan` usually maps Functional Requirements. The `quality_evaluation_plan` maps NFRs.
+            *   Since the prompt says "Design evaluation criteria for quality attributes NOT already covered by the Test Plan", the `functional_evaluation_plan` might be a bit tricky. Usually, functional tests are in the Test Plan. If I create a new functional evaluation plan, it risks duplication.
+            *   *Correction:* In many SDLC contexts, there are Unit Test Plan (Phase 7) and System/Integration Test Plan. This input looks like an Integration/Component Test Plan. I might need to ensure functional coverage for requirements *not* explicitly tested, or perhaps the `functional_evaluation_plan` is meant to be the "Acceptance Criteria Validation" list which complements the functional tests.
+            *   *Safest Interpretation:* The `functional_evaluation_plan` should cover Functional Requirements that *need* evaluation but aren't in the existing test cases (e.g., specific edge cases, or ACs implied by NFRs). However, to avoid duplication, I must ensure I don't reuse TC-PROP-001, etc.
+            *   Actually, looking at the input, the Test Plan covers AC-001 to AC-010 (roughly). There might be other ACs implied. But without a full list of ACs, I should focus on the `quality_evaluation_plan` and `reasoning_evaluation_plan` heavily.
+            *   Wait, the output *requires* a `functional_evaluation_plan`. I must provide criteria for functional requirements. I will focus on ACs that are *missing* from the explicit Test Case list provided in the read-only input.
+            *   Let's look for missing ACs.
+            *   Input ACs: AC-001-1, AC-001-2, AC-008-1, AC-002-1, AC-002-2, AC-003-1, AC-004-1, AC-006-1, AC-006-2, AC-007-1, AC-005-1, AC-009-1, AC-010-1.
+            *   NFRs don't explicitly map to ACs in the text provided (e.g., NFR-001 is performance, not an AC).
+            *   I will treat the `functional_evaluation_plan` as validation of functional requirements *derived* from NFRs where functional behavior is implied (e.g., NFR-012 maintainability implies a workflow upgrade feature). Or, I can map NFRs to functional checks that are distinct from the provided tests (e.g., Load testing is functional but often categorized differently, but the prompt asks for "functional_evaluation_plan").
+            *   *Better Approach:* The prompt says "Design evaluation criteria for quality attributes NOT already covered by the Test Plan."
+            *   The Test Plan covers Functional (TC-...).
+            *   The `functional_evaluation_plan` likely needs to capture functional requirements associated with NFRs that haven't been explicitly tested as functional tests yet (e.g., Scalability NFR -> Functional load test case).
+            *   However, to strictly avoid duplication of *Test Cases* (TC-...), I should define criteria based on the requirements (AC) without referencing the specific TC IDs directly as duplicates, but rather as new functional verifications.
+            *   Actually, a common pattern is that the `functional_evaluation_plan` validates the *Functional Requirements* (FRs) derived from the system, while the Test Plan validates specific *Test Cases*. If the Test Plan is the "Test Plan", then the `functional_evaluation_plan` output here is essentially asking for the "Functional Acceptance Criteria" list or "Functional Verification Criteria" that ensure the NFRs are met functionally.
+            *   Let's assume the `functional_evaluation_plan` maps to the Functional Requirements (ACs) that are *implied* or *derived* but need explicit criteria in this phase.
+            *   Wait, the NFRs list is separate. The Test Plan lists ACs.
+            *   Let's check if there are ACs associated with NFRs.
+            *   NFR-002 (Ingestion) -> AC-001-1 is about "Asset indexed in vector store". There might be an AC for Ingestion Throughput.
+            *   Since I don't have the full AC list for NFR-002, I will create a functional criterion for it (e.g., FR-002-1: System handles concurrent ingestion). I must ensure it doesn't duplicate TC-PROP-001 (which is about indexing time).
+            *   Wait, the `functional_evaluation_plan` requires `functional_requirement_id`. The input doesn't give explicit FR IDs, only NFR IDs and AC IDs. I should probably use AC IDs or derive FR IDs. I will assume the NFRs imply functional needs.
+            *   Actually, looking at the instruction: "Every NFR must have at least one Quality Evaluation criterion". This applies to `quality_evaluation_plan`.
+            *   For `functional_evaluation_plan`, I need to ensure no duplication. I will select ACs/Requirements that represent functional behavior not explicitly covered by the 6 Test Suites (e.g., specific edge cases in the workflow).
+            *   Let's look at the missing pieces.
+            *   Test Suites cover: Prop Data (Index, Reject, Offline), Provider Match (Response time, Filter, Table), Compliance (Extracted Clauses, Notifications, Offline Sync, Batch), Workflow (Audit), Security (Access), Payment (Auth, Receipt).
+            *   Missing Functional Areas (implied by NFRs but not tested):
+                *   NFR-006 (Scalability): Functional under high load? (Usually Performance).
+                *   NFR-012 (Maintainability): Functional behavior during upgrade?
+            *   I will focus `functional_evaluation_plan` on the ACs that map to the NFRs if they aren't tested, OR I can interpret this as "Functional Verification Criteria" which are distinct from "Test Cases".
+            *   Actually, the safest path to avoid duplication is to define criteria for requirements (ACs) that are *not* the ones in the TC list.
+            *   AC-001-1 is in TC-PROP-001.
+            *   AC-002-1 is in TC-PROV-001.
+            *   I need to find gaps.
+            *   Gap: NFR-001 (Performance). Usually Performance is Quality.
+            *   Gap: NFR-002 (Ingestion).
+            *   Gap: NFR-004 (RLS). Security is NFR/Quality.
+            *   I'll create functional criteria for *specific* scenarios related to NFRs that require functional validation (e.g., "System handles 5GB ingestion" -> Functional load test).
+            *   Wait, the prompt asks for "functional_evaluation_plan". It implies Functional Requirements.
+            *   I will use the NFR IDs or derived FR IDs. Let's use `AC-XXXX` IDs as they are the "functional requirements" in the context of the Test Plan input.
+            *   Constraint: "No evaluation criterion should duplicate a Test Case from Phase 7".
+            *   So if TC-PROP-001 covers AC-001-1, I cannot create a criterion for AC-001-1 in `functional_evaluation_plan`.
+            *   I need to find ACs that are *not* in the Test Plan.
+            *   Are there ACs implied by NFRs that aren't in the TC list?
+            *   NFR-002 (Ingestion) -> There is no explicit AC listed in the Test Plan for "Ingestion Throughput" other than AC-001-1 (Indexing). I can derive a new AC: AC-011-1 (Ingestion Load).
+            *   NFR-006 (Scalability) -> AC-012-1 (Concurrent Users).
+            *   NFR-012 (Maintainability) -> AC-013-1 (Workflow Migration).
+            *   Wait, "No compliance regimes" context, but NFR-005/010/004 are Security/Compliance-like.
+            *   I will construct the `functional_evaluation_plan` with functional requirements (ACs) that correspond to these gaps, ensuring I don't use AC-001 to AC-010 which are already in the Test Plan.
+            *   Actually, to be safe and strict: The Test Plan *is* the Functional Plan. Why do I need a `functional_evaluation_plan` here? The prompt asks for it. It likely means "Evaluation of Functional Quality" vs "Functional Requirements". Or it means "Functional Acceptance Criteria" that serve as the pass/fail for the overall system evaluation, distinct from the detailed Test Cases.
+            *   However, the instruction says "Design evaluation criteria for quality attributes NOT already covered by the Test Plan."
+            *   This implies the `functional_evaluation_plan` *is* the functional coverage check.
+            *   Okay, I will select criteria that target the NFRs where functional behavior is observable but not yet tested by the specific TCs listed (e.g., Load tests for Scalability).
+            *   I'll invent AC IDs for the missing functional requirements to ensure uniqueness (AC-011, AC-012, etc.) or stick to existing NFRs if they map to functionality.
+            *   Wait, looking at the output schema: `functional_requirement_id`. I should probably use the AC IDs or NFR IDs mapped to functional behavior. I'll use NFR IDs where applicable, or create new FR IDs if needed. Let's use NFR IDs for the Functional Evaluation of those NFRs that have a functional component (e.g., Scalability is functional under load).
+            *   Actually, I will create criteria for the *Functional Requirements* (FR) that correspond to the NFRs, but since NFR IDs are given, I will map NFRs to Functional Verification.
+            *   Wait, NFR-006 (Scalability) -> Functional Requirement: Support 1000 concurrent users.
+            *   NFR-002 (Performance) -> Functional: Handle 5GB/min.
+            *   I will use the NFR IDs as the `functional_requirement_id` for the functional evaluation plan if that's what's expected, or I should map to ACs. The input has NFR IDs. I will use `NFR-XXX` as IDs in the functional plan if they represent functional behavior, but usually Functional Requirements have FR IDs. I will use `NFR-001` etc as the ID since they define the requirement to evaluate.
+            *   Wait, strict reading: "No evaluation criterion should duplicate a Test Case from Phase 7".
+            *   Phase 7 (Test Plan) covers TC-PROP-001...
+            *   I need to evaluate NFRs.
+            *   NFR-001 (Performance) -> Quality Plan handles it. Functional Plan should not handle it if it's purely performance.
+            *   But `functional_evaluation_plan` exists. I must provide something.
+            *   I will focus on Functional Requirements that are distinct. E.g., "Workflow State Transition" is functional. AC-005-1 is tested.
+            *   Maybe I need to evaluate the *compliance* functional aspects that might be missing? "Compliance-related NFRs from compliance_context must have evaluation criteria". Context says "No compliance regimes".
+            *   Okay, I will create `functional_evaluation_plan` criteria for the *Functional Requirements* that support the NFRs where specific functional checks are needed (e.g. Security Access ACs).
+            *   I'll define `functional_requirement_id` as `NFR-XXX` where the requirement has a functional aspect to evaluate, or I'll define new FR IDs based on the gaps. Let's use `FR-{NFR-002-Load}` etc to be safe, or just use `NFR-001` but clarify.
+            *   Actually, standard practice: Use the AC IDs or NFR IDs. I will use NFR IDs for clarity, but I must ensure I don't duplicate the TCs. Since the TCs are specific to ACs (AC-001-1, etc.), and NFR-001 doesn't have an AC listed in the TC plan, I can evaluate NFR-001 functionally in the `functional_evaluation_plan`.
+            *   Wait, `quality_evaluation_plan` is for NFRs. `functional_evaluation_plan` is for Functional Requirements.
+            *   If NFR-001 is Performance, it belongs in `quality_evaluation_plan`.
+            *   So `functional_evaluation_plan` should cover the Functional Requirements (FR) that aren't covered by the Test Plan.
+            *   What Functional Requirements are missing?
+            *   Maybe "Payment Gateway Integration" (AC-010-1 is in Test Plan).
+            *   Maybe "Asset Indexing Logic" (AC-001-1 is in Test Plan).
+            *   Perhaps the Test Plan covers Integration, but I need Unit/Component functional?
+            *   Constraint: "Design evaluation criteria for quality attributes NOT already covered by the Test Plan."
+            *   This suggests the `functional_evaluation_plan` is for *Functional Attributes* that are Quality (like "Maintainability of Code" which is functional behavior during upgrade?).
+            *   Let's simplify: I will map NFRs to `functional_evaluation_plan` if they have a functional validation component not covered by TCs.
+            *   Actually, the best way to avoid duplication while satisfying the output requirement is to focus on the "Functional Requirements" implied by the system context (e.g. AC-011 for Scalability) which are not in the provided TC list.
+            *   I'll use `FR-011-1` (derived from NFR-006) etc. to denote new requirements.
+            *   Wait, the input says "Non-Functional Requirements". It doesn't list "Functional Requirements" explicitly as a separate list (other than ACs).
+            *   I will treat the ACs in the Test Plan as the "Covered Functional Requirements".
+            *   I need to find gaps.
+            *   Gap: NFR-007 (Offline Sync) -> NFR-007 is Reliability.
+            *   Gap: NFR-012 (Maintainability).
+            *   Gap: NFR-002 (Throughput).
+            *   Gap: NFR-001 (Latency) -> Performance.
+            *   I will create `functional_evaluation_plan` entries for the ACs associated with these NFRs that are *functional* checks (e.g., "System processes 1000 messages" is functional).
+            *   I will use `NFR-002` as the ID for the functional criterion of throughput (since NFRs are the requirements here).
+            *   Wait, strict rule: "No evaluation criterion should duplicate a Test Case from Phase 7".
+            *   TC-PROP-001 covers AC-001-1 (API returns 200 OK... asset indexed).
+            *   If I add `functional_requirement_id: AC-001-1`, is it duplication? Yes.
+            *   I must add *new* requirements.
+            *   I will derive new AC IDs for the missing NFRs.
+            *   Example: NFR-002 (Ingestion 5GB/min). New AC: AC-012-1. ID: AC-012-1.
+            *   Example: NFR-006 (1000 Concurrent Users). New AC: AC-013-1. ID: AC-013-1.
+            *   Example: NFR-012 (Versioned Updates). New AC: AC-014-1. ID: AC-014-1.
+            *   This satisfies "No duplication" and covers the missing NFRs functionally.
+            *   For `quality_evaluation_plan`, I must map *every* NFR (001-012).
+            *   For `reasoning_evaluation_plan`, I need to create scenarios for AI subsystems (if detected) or generic scenarios. The system has an 'AI Agent'. `ai_subsystems_detected: boolean`.
+            *   The Test Plan mentions "AI Agent discovery experience". So `ai_subsystems_detected` should be `true`.
+            *   Scenarios for reasoning: Check hallucination, safety, relevance.
+
+2.  **Drafting the JSON:**
+
+    *   **functional_evaluation_plan**:
+        *   Need to cover NFRs that have functional validation needs not in TCs.
+        *   NFR-002 (Ingestion): Need functional check for throughput. ID: `AC-012-1`.
+        *   NFR-006 (Scalability): Need functional check for concurrent users. ID: `AC-013-1`.
+        *   NFR-012 (Maintainability): Need functional check for versioned workflow. ID: `AC-014-1`.
+        *   (Self-Correction): The prompt says "quality attributes NOT already covered by the Test Plan". Functional evaluation usually checks functional requirements. I will ensure these IDs are distinct from AC-001 to AC-010.
+    *   **quality_evaluation_plan**:
+        *   Must cover NFR-001 to NFR-012.
+        *   Need `category`, `evaluation_tool`, `threshold`, `measurement_method`, `fallback_if_tool_unavailable`.
+        *   Tools: JMeter (Perf), Snyk/OWASP ZAP (Security), Lighthouse (A11y), Datadog (Reliability), Version Control (Maintainability).
+        *   Fallbacks: Manual inspection, synthetic monitoring.
+    *   **reasoning_evaluation_plan**:
+        *   `ai_subsystems_detected`: true (based on "AI Agent" in TC-PROV-001).
+        *   Scenarios: AI hallucination check, Bias check, Context retention.
+
+3.  **Refining Details:**
+
+    *   *Quality Evaluation:*
+        *   NFR-001 (Performance): Tool = JMeter/K6. Threshold = 200ms.
+        *   NFR-002 (Performance): Tool = JMeter. Threshold = 5GB/min.
+        *   NFR-003 (Reliability): Tool = Chaos Engineering (Litmus/Toxiproxy). Threshold = Checkpoint < 1s.
+        *   NFR-004 (Security): Tool = OWASP ZAP. Threshold = 403 return.
+        *   NFR-005 (Security): Tool = OpenSSL/TLS config check. Threshold = TLS 1.3/AES-256.
+        *   NFR-006 (Scalability): Tool = LoadRunner/Cloud Load. Threshold = 1000 users.
+        *   NFR-007 (Reliability): Tool = Custom Sync Monitor. Threshold = 100% integrity.
+        *   NFR-008 (Accessibility): Tool = Axe/Lighthouse. Threshold = WCAG AA.
+        *   NFR-009 (Maintainability): Tool = ELK/Logstash. Threshold = 90% event capture.
+        *   NFR-010 (Security): Tool = Vault/HashiCorp CLI. Threshold = 15 min expiry.
+        *   NFR-011 (Reliability): Tool = Message Queue Monitor (Kafka/Kinesis). Threshold = 99.5% within 5 mins.
+        *   NFR-012 (Maintainability): Tool = Migration Script Test. Threshold = Backward compatible.
+    *   *Reasoning:*
+        *   Scenario 1: AI generates incorrect legal clause. (Pass: Rejected).
+        *   Scenario 2: AI ignores tenant isolation. (Pass: Rejected).
+        *   Scenario 3: AI response irrelevant. (Pass: Relevance score > 80).
+        *   `ai_subsystems_detected`: true.
+
+4.  **Final Review against Constraints:**
+    *   No duplication of Test Plan TCs (TC-PROP-001, etc.). My FR IDs (AC-012-1 etc) are new.
+    *   Every NFR has at least one Quality Evaluation criterion. (Checked: 001-012 in quality plan).
+    *   Compliance-related NFRs have criteria (NFR-004, 005, 010 are security/compliance).
+    *   JSON structure correct.
+
+    *   *One check:* "Compliance-related NFRs from compliance_context must have evaluation criteria". Context says "No compliance regimes". But NFR-004/005/010 are security. I'll include them.
+    *   *Tooling:* Ensure specific tools are named (JMeter, OWASP ZAP, etc.).
+    *   *Thresholds:* Must match the NFR thresholds or be derived from them.
+    *   *Reasoning:* Needs to be logical.
+
+    *   *Wait, NFR-004 says "Unauth cross-tenant access must be logged and return 403".*
+    *   In Quality Plan, I'll put NFR-004.
+    *   In Functional Plan, I'll avoid duplicating TC-SEC-001 (which covers AC-009-1, Unauthorized access). I'll use new IDs for other security functional aspects if needed, or rely on Quality for Security NFRs. The `functional_evaluation_plan` should probably cover Functional Requirements, not Security NFRs. But the prompt asks for `functional_evaluation_plan`. I will put functional criteria for *System Behavior* not covered (e.g. AC-012-1 for scalability functional behavior).
+    *   Actually, to be safe, I will use the NFR IDs in `functional_requirement_id` for the functional aspects that need verification (like "System Scales" is a functional capability).
+    *   Let's align `functional_requirement_id` with the NFR ID for consistency if no separate FR ID exists.
+    *   Or better, I'll define new FR IDs (e.g., `FR-SCAL-001`) to avoid ambiguity with the Test Plan's ACs.
+    *   I'll use `NFR-006` as the functional requirement for Scalability in the functional plan, justifying it as "Functional Capacity".
+    *   Wait, if `quality_evaluation_plan` *must* have `nfr_id`, then `functional_evaluation_plan` might use `fr_id`.
+    *   Since I don't have a list of `fr_id`s, I'll derive them from the NFRs (e.g., `FR-{NFR-001}`). But to be distinct from Test Plan ACs, I'll add a suffix or use NFR ID.
+    *   Let's use `NFR-XXX` in the functional plan for requirements defined by NFRs, assuming functional verification is needed.
+    *   Actually, I will create `FR-001` to `FR-006` mapping to the system's core functions where NFRs dictate functional limits.
+    *   Better: I will simply use the NFR ID as the identifier for the requirement being evaluated functionally if no specific FR ID is given.
+    *   Wait, constraint: "No evaluation criterion should duplicate a Test Case from Phase 7".
+    *   Test Plan covers AC-001 to AC-010.
+    *   My Functional Plan must use IDs that are NOT in that list.
+    *   I'll use `FR-011` (for Ingestion), `FR-012` (Scalability), `FR-013` (Maintainability).
+    *   For the Quality Plan, I'll use `NFR-001` to `NFR-012`.
+
+    *   *Reasoning Plan:*
+        *   Check AI Subsystems. The prompt mentions "AI Agent". So `ai_subsystems_detected: true`.
+        *   Scenarios:
+            *   ID: AI-001. Description: Response generation latency > 200ms. Pass: < 200ms.
+            *   ID: AI-002. Description: Relevance score. Pass: > 0.8.
+            *   ID: AI-003. Description: Bias detection. Pass: Score > Threshold.
+        *   Wait, pass criteria needs to be specific.
+        *   I'll focus on Reasoning Evaluation for AI Safety and Accuracy.
+
+5.  **Final JSON Construction:**
+
+    *   **Functional Evaluation Plan:**
+        *   Criteria for Functional Requirements implied by NFRs not in Test Plan.
+        *   ID: `FR-011-1` (NFR-002 Ingestion). Method: Load Test. Condition: 5GB/min sustained.
+        *   ID: `FR-012-1` (NFR-006 Scalability). Method: Stress Test. Condition: 1000 users stable.
+        *   ID: `FR-013-1` (NFR-012 Maintainability). Method: Migration Test. Condition: 2 version releases compatible.
+        *   (Note: NFR-001, 004, 005, 007, 008, 009, 010, 011 are covered in Quality Plan or overlap functional/quality).
+        *   Wait, I need to cover "Functional Attributes NOT already covered".
+        *   I'll focus on the gaps in the Test Plan's Functional coverage.
+        *   Test Plan covers: Indexing (TC-PROP-001), Reject Files (TC-PROP-002), Offline Sync (TC-PROP-003), Response List (TC-PROV-001), Filter (TC-PROV-002), Table (TC-PROV-003), Clauses (TC-COM-001), Notifications (TC-COM-002), Offline Queue (TC-COM-003), Batch (TC-COM-004), Audit Log (TC-WORK-001), Access Control (TC-SEC-001), Payment (TC-PAY-001).
+        *   Missing Functional Behaviors:
+            *   Scalability (NFR-006) -> FR-006-Functional.
+            *   Maintainability (NFR-012) -> FR-012-Functional.
+            *   Ingestion Throughput (NFR-002) -> FR-002-Functional (since AC-001-1 is indexing time, not throughput).
+            *   I'll use NFR IDs for simplicity if I don't have explicit FR IDs, but I'll append a suffix to distinguish from Test Plan ACs. Actually, the prompt asks for `functional_requirement_id`. I'll use `FR-{NFR_ID-Func}`.
+            *   Actually, I will use the NFR ID directly because they *are* the requirements in this context (NFR = Functional/Non-Functional). Wait, the Test Plan uses AC IDs. I'll use `FR-001` for NFR-001 etc. No, that duplicates NFR ID usage in Quality Plan.
+            *   Let's use the NFR ID in the `functional_requirement_id` field, but ensure the `evaluation_method` distinguishes it as a functional test (e.g. "Functional Load Check" vs "Performance Load Check").
+            *   Actually, I'll use distinct IDs to be safe: `FR-SCL-001`, `FR-SCL-002`.
+            *   Okay, I will simply list the Functional Requirements that need evaluation.
+            *   I'll select `NFR-002`, `NFR-006`, `NFR-012` for Functional Evaluation (as they represent functional capacity) and `NFR-001` for Quality (Performance).
+            *   Wait, NFR-001 is Performance. I should put it in Quality Plan.
+            *   So Functional Plan gets: NFR-002 (Ingestion Functional), NFR-006 (Scalability Functional), NFR-012 (Maintainability Functional - Logic).
+            *   This avoids duplication with TC-PROP-001 (which is performance/time but NFR-002 is specific to throughput volume).
+            *   I'll construct the IDs as `FR-{NFR ID}-FUNC`.
+
+    *   **Quality Evaluation Plan:**
+        *   Must include all NFR-001 to NFR-012.
+        *   Category (Performance, Reliability, etc.).
+        *   Tool: JMeter, OWASP ZAP, Lighthouse, Datadog, etc.
+        *   Threshold: From NFR text.
+        *   Measurement Method: API Latency, Log Analysis, etc.
+        *   Fallback: Manual.
+
+    *   **Reasoning Evaluation Plan:**
+        *   Scenarios related to AI Agent.
+        *   `ai_subsystems_detected`: true.
+
+6.  **Formatting:** Ensure valid JSON. No markdown outside the JSON blocks? The prompt asks for "Three JSON objects". I will provide a single response containing these three objects in a structured text format or a code block. Usually, a single JSON object with nested keys is better if it was one object, but the prompt asks for "Three JSON objects". I will output them sequentially as distinct code blocks or one consolidated structure? "REQUIRED OUTPUT: Three JSON objects". I will provide three distinct JSON blocks for clarity, or one combined object if the schema implies one response. I will provide a single JSON block containing these three keys to ensure valid JSON parsing if the user expects one payload, or separate blocks. Given "Three JSON objects", I will output them as a list or a single object with these keys. I'll make a single response containing the three objects as distinct JSON blocks (separated by newlines) or one large JSON. I will use one large JSON object containing the three keys to be safe for parsing, or separate blocks. I'll use separate blocks for clarity as per "Three JSON objects". Wait, if I output 3 separate blocks, it might break parsers expecting 1. I will combine them into one JSON object structure `{ functional_evaluation_plan: ..., quality_evaluation_plan: ..., reasoning_evaluation_plan: ... }` as that is the most robust way to return "Three JSON objects" in a single response context. Wait, "REQUIRED OUTPUT: Three JSON objects". I will output them as three separate code blocks to strictly follow "Three JSON objects".
+
+    *   Wait, the prompt says "REQUIRED OUTPUT: Three JSON objects".
+    *   I will output:
+    *   ```json
+    *   { functional... }
+    *   ```
+    *   ```json
+    *   { quality... }
+    *   ```
+    *   ```json
+    *   { reasoning... }
+    *   ```
+    *   Or one object? I'll do one combined object to ensure it's a valid single response, but labeled clearly. No, I'll do three separate code blocks to be precise.
+    *   Wait, usually these tasks prefer a single response. I will combine them into one JSON object with the three keys as specified in the schema description. "Three JSON objects" might mean the structure should have these three parts. I will output a single JSON object with the three keys. That is safer.
+
+    *   Wait, looking at the schema: "1. functional_evaluation_plan: {...}", "2. quality...", "3. reasoning...".
+    *   I will construct one JSON object containing these three keys.
+
+    *   Wait, I need to check the constraint "No evaluation criterion should duplicate a Test Case from Phase 7".
+    *   Test Plan has: TC-PROP-001 (Indexing Time), TC-PROP-002 (File Reject), TC-PROP-003 (Offline).
+    *   My Functional Plan:
+        *   FR-002-INGEST (Ingestion Throughput). Different from TC-PROP-001 (Indexing Time).
+        *   FR-006-SCAL (Concurrent Users). Different from TC-PROV-001 (Response time).
+        *   FR-012-MAINT (Versioned Workflow). Different from TC-WORK-001 (Audit Log).
+    *   This is safe.
+
+    *   Check NFR-004 (Security). Test Plan has TC-SEC-001 (Unauthorized access). My Quality Plan has NFR-004. My Functional Plan? I won't duplicate TC-SEC-001.
+    *   Check NFR-001 (Performance). Quality Plan covers it. Functional Plan? I'll leave Performance out of Functional Plan to avoid duplication with NFR-driven Functional checks, focusing on Capacity.
+    *   Actually, I'll stick to Functional Requirements (FRs). Since NFRs are the list, I'll map the functional aspects of NFRs (like Scalability) to the Functional Plan.
+
+    *   Final check on JSON validity.
+
+    *   Wait, `functional_requirement_id` in the example schema. I'll use `FR-{code}` or `NFR-{id}`. I'll use `FR-{NFR_ID}` to denote the functional requirement derived from the NFR.
+    *   Wait, `quality_evaluation_plan` requires `nfr_id`.
+    *   Okay, I will use `NFR-001`... in Quality Plan.
+    *   In Functional Plan, I will use `FR-011`... to denote new requirements.
+
+    *   Okay, ready to write.
+
+    *   Wait, one more check: "Compliance-related NFRs from compliance_context must have evaluation criteria".
+    *   Context: "No compliance regimes".
+    *   So NFR-004, 005, 010 (Security) are the ones to check.
+    *   I will ensure they are in the Quality Plan (as required for every NFR).
+    *   I will ensure they are not duplicated in Functional Plan (as Functional Plan is for Functional Requirements).
+    *   Wait, if a Security NFR has a functional aspect (e.g. "System returns 403"), that is functional. But TC-SEC-001 covers it.
+    *   So I won't add a functional criterion for Security NFRs in the Functional Plan to avoid duplication.
+    *   I will add Functional criteria for NFRs that are *functionally* scalable/ingestion/upgrade.
+    *   Okay.
+
+    *   Wait, I need to check the "reasoning_evaluation_plan".
+    *   `ai_subsystems_detected`: boolean.
+    *   Scenarios: List.
+    *   This is for the AI Agent part.
+    *   Okay.
+
+    *   One detail: `measurement_method`. I need specific ways.
+    *   `fallback_if_tool_unavailable`. "Manual inspection", "Synthetic monitoring", "Static Analysis".
+
+    *   Okay, generating content.
+
+    *   JSON Structure:
+    *   `functional_evaluation_plan`: { criteria: [ ... ] }
+    *   `quality_evaluation_plan`: { criteria: [ ... ] }
+    *   `reasoning_evaluation_plan`: { scenarios: [ ... ], ai_subsystems_detected: boolean }
+
+    *   Wait, "Three JSON objects" -> I will output them as one combined JSON object as that is standard for API-like responses unless told "Three separate files". I will output a single JSON object containing the three keys.
+
+    *   Wait, "REQUIRED OUTPUT: Three JSON objects". This might mean I should output them separately. I will output them in separate markdown blocks to be safe and clear.
+
+    *   Wait, "Rules: ... No evaluation criterion should duplicate a Test Case from Phase 7".
+    *   I'll make sure IDs are unique.
+
+    *   Let's check the threshold for NFR-011 (Reliability). "99.5% of mass email... within 5 minutes".
+    *   Tool: Kafka Monitor.
+    *   Okay.
+
+    *   Final check on constraints: "Compliance-related NFRs... must have evaluation criteria".
+    *   Since there are no compliance regimes, the "Compliance-related NFRs" are likely the Security/Privacy ones (NFR-004, 005, 010). I will include them in Quality Plan.
+    *   I will ensure the `quality_evaluation_plan` includes ALL NFRs (001-012).
+    *   The `functional_evaluation_plan` will include only those where functional testing is distinct (Scalability, Maintainability, Ingestion).
+
+    *   Okay, writing the JSON.

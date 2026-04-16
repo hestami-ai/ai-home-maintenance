@@ -1,0 +1,223 @@
+The user wants me to act as the [JC:Deep Memory Research Agent] and produce a [JC:Context Packet] based on the provided query decomposition and material findings.
+I need to structure the output as a JSON object containing specific fields: `decision_context_summary`, `active_constraints`, `supersession_chains`, `contradictions`, `open_questions`, `completeness_status`, and `completeness_narrative`.
+
+**1. Analyze the Input:**
+*   **Topic Entities:** A list of system components, endpoints, strategies, and security tokens (`cmp-prop-data`, `/assets/upload`, `error handling strategy`, `Bearer Token`, etc.).
+*   **Decision Types Sought:** `phase_gate_approval`, `menu_selection`.
+*   **Material Findings:** A JSON array of records with IDs, record types, authority levels, governing status, summaries, and materiality scores.
+*   **Coverage Assessment:** Indicates `sourcesQueried` is `["governed_stream_all_runs"]`. `knownGaps` mention "Vector index coverage is 0%". `confidence` is 0.85.
+*   **Records:**
+    *   `83fd7cad-f74c-4657-a228-68ca3bc6eacc`: `raw_intent_received`, authority_level 5, summary: Review "specs/hestami-ai-real-property-os(2)/Hestami AI Real Property OS and Platform Product Description.md" and prepare for implementation.
+    *   Multiple `artifact_produced` records (authority_level 2) covering functional requirements, system boundaries, interface contracts, etc.
+    *   `agent_output` records containing snippets of the specifications (topics, definitions, models).
+    *   No records explicitly marked as `active_constraints` with `authority_level 6` in the provided findings (most are level 2 or 5).
+    *   No contradictions listed in the input.
+    *   Supersession chains are empty in input.
+
+**2. Synthesize the JSON Structure:**
+
+*   **`decision_context_summary`**: Needs to narrate the governing decisions.
+    *   Core directive: `83fd7cad-f74c-4657-a228-68ca3bc6eacc` mandates review of specs and implementation prep.
+    *   Artifacts produced (level 2) cover requirements, architecture, data models.
+    *   Entities defined (level 2) include payment, comms, regulatory components.
+    *   Must cite source IDs.
+*   **`active_constraints`**: Rules say "include ONLY Authority Level 6+ records that are NOT superseded".
+    *   Looking at the findings: Authority levels provided are 5 and 2. None are 6.
+    *   Therefore, this list might be empty or I need to check if `governing_status: "active"` implies a constraint. The rule is specific: `authority_level: 6+`. Since there are no Level 6 records in the provided findings, this list will likely be empty. However, I must check if the prompt implies there *should* be constraints found. The rule says "include ONLY Authority Level 6+ records". If none exist, return empty array.
+    *   *Self-Correction*: Wait, the prompt says "Every claim must cite source record IDs". If I state there are no constraints, I don't need to cite one for that statement, but the field expects a list. I will leave it empty or explain if applicable. The schema implies a list of objects. I will make it an empty list if no L6 records exist.
+    *   *Wait*, looking at `83fd7cad...`, it is Level 5. `995c1ae7...` is Level 2. None are Level 6. So `active_constraints` will be `[]`.
+*   **`supersession_chains`**: Input says `[]`. I should maintain this state unless synthesis finds something.
+*   **`contradictions`**: Input says `[]`. I will keep it `[]`.
+*   **`open_questions`**:
+    *   Coverage Assessment mentions `knownGaps`: "Vector index coverage is 0% (0/142) — semantic similarity results may be incomplete."
+    *   This suggests a significant gap in retrieval capability.
+    *   Also, `decisionTypesSought` includes `phase_gate_approval`, `menu_selection`. We haven't seen a result for a specific approval yet, just the intent to review.
+    *   I should capture the vector index gap.
+*   **`completeness_status`**: The `knownGaps` indicate 0% vector index coverage. This is a critical gap affecting retrieval quality. Confidence is 0.85 (fairly high, but index gap hurts).
+    *   "incomplete_high" seems appropriate because 0/142 vector index items is a significant structural gap.
+    *   Wait, let's look at `completeness` definition: "complete = all sources queried, no gaps". We queried `governed_stream_all_runs`. The vector index gap is about retrieval logic, not necessarily the source query itself, but it affects the findings.
+    *   `partial_medium` or `incomplete_high`? 0% coverage of a vector index used for semantic search is a functional gap. I'll go with `partial_medium` as the text generation parts (artifacts) are complete, but the retrieval vector index is empty. Or `incomplete_high` because the query specifically asks about `/assets/search` and `/providers/search` which rely on search capabilities.
+    *   Actually, the finding says "Vector index coverage is 0% (0/142)". This implies the semantic search system isn't indexed yet. This affects `error handling strategy` or `cmp-compliance` if those rely on search.
+    *   I will set `completeness_status` to `partial_medium` acknowledging the artifacts exist but the semantic search vector store is empty, which is a known gap. Or `incomplete_high` given the 0/142 metric is quite severe. Let's stick to `partial_medium` to allow for the artifacts to be synthesized, treating the vector index as an infrastructure gap rather than data content gap. Actually, reading the rules: "incomplete_high = critical gaps that may affect decision quality". Semantic search is critical for `cmp-provider-match`. So `incomplete_high` might be safer. Let's check confidence 0.85. That suggests the agent is sure.
+    *   Let's select `partial_medium`. The data artifacts are there, the search index isn't.
+    *   Actually, looking at the `knownGaps` array in the assessment, it explicitly lists "Vector index coverage is 0%". This is a gap.
+    *   Let's lean towards `partial_medium`.
+*   **`completeness_narrative`**: Summarize what was found (artifacts, requirements, models) and what is missing (vector index coverage for semantic search).
+
+**3. Drafting the Content:**
+
+*   **Summary**: Focus on `83fd7cad` (Intent/Spec review). Mention the Level 2 artifacts (functional, system, data models). Mention the entities found (Payment, Comms, Regulatory). Mention the specific endpoints (`/assets/upload`). Cite relevant IDs.
+*   **Constraints**: Empty (No Level 6 records).
+*   **Supersession**: Empty (No input chains).
+*   **Contradictions**: Empty.
+*   **Open Questions**:
+    *   Q: What is the status of the vector index build for `cmp-provider-match` and `cmp-prop-data` semantic lookups?
+    *   Q: Does the `error handling strategy` (found in topic entities) match the implemented artifacts in `995c1ae7...`?
+    *   Cite the assessment record or specific topic entities.
+    *   Wait, I need to check which record IDs are available in the *Material Findings*.
+    *   `83fd7cad`: Intent.
+    *   `995c1ae7`: Functional reqs.
+    *   `4e3d8629`: Topic entities (Payment/Comms/Reg).
+    *   `b4069ff4`: System boundary.
+    *   `56b84cd8`: Non-functional reqs.
+    *   `17bf4e80`: Intent statement.
+    *   `23f099aa`: Arch decisions.
+    *   `9b4e180c`: Agent output (Topic entities).
+    *   `dd574b87`: Agent output (API defs).
+    *   `d2c65340`: Agent output (Models).
+    *   `2b7f88e9`... `51d5bd16`... `8a92d7b6`... Context packets and invocations.
+    *   Coverage assessment record? No ID provided for coverage assessment in findings, but it's part of the prompt input. I should probably not cite the prompt input's coverage assessment unless I have a record ID for it. I don't see a record ID for the coverage assessment in the `MATERIAL FINDINGS` list. I have to cite IDs from `MATERIAL FINDINGS` only for claims *in the JSON output*.
+    *   For `completeness_narrative`, I can refer to the general state derived from findings.
+    *   For `open_questions`, I need to identify missing info. The vector index gap is a "known gap" from the prompt's coverage assessment section. I don't have a record ID for that specifically, but I can reference the fact that "0/142" items are missing. If I don't have a record ID for the coverage assessment, I cannot cite one.
+    *   Wait, I need to be careful. The instruction says "Every claim in decision_context_summary must cite a source_record_id". `completeness_narrative` is a string field, likely not strictly requiring citation per word, but good practice to cite where possible.
+    *   `active_constraints`: Must cite `source_record_ids`. Since none exist, array is `[]`.
+    *   `open_questions`: Need `source_record_id`. I can cite `83fd7cad` for the intent to prepare for implementation which might conflict with missing vector data? No, that's stretching.
+    *   Better to cite `83fd7cad` for the intent and mention the vector index gap as a general state derived from system state (which isn't a record ID).
+    *   Actually, looking at `knownGaps` in the input `COVERAGE ASSESSMENT`. Is that part of the "MATERIAL FINDINGS"? No, it's a separate section. The instructions say "Synthesize the research findings". The Coverage Assessment seems to be part of the findings provided in the context of the task (even if structurally separated).
+    *   However, strict instruction: "Every claim in decision_context_summary must cite source record IDs."
+    *   For `open_questions`, it asks for `source_record_id`. I will cite `83fd7cad` as the primary context driver, or `995c1ae7` for the functional requirements.
+    *   Wait, the "Known Gaps" are explicitly listed in the input `COVERAGE ASSESSMENT` object. Should I treat that as a record? It doesn't have an ID.
+    *   I will focus on `open_questions` regarding the intent implementation and the API definitions.
+    *   I will acknowledge the vector index gap in `completeness_narrative`.
+    *   Let's ensure I don't make claims without citations.
+    *   For `completeness_narrative`, if I say "Vector index coverage is 0%", I can't cite a record ID for that specific fact if it's not in the findings list. But the prompt says "Every claim in decision_context_summary must cite". Does `completeness_narrative` count as `decision_context_summary`? No, `completeness_narrative` is a separate field.
+    *   Okay, I will prioritize citation accuracy for `decision_context_summary`.
+    *   I will check if `995c1ae7` (functional requirements) or `91a1ffd8` (system requirements) can be cited for the status of the project.
+    *   I will check `4e3d8629` for the external entities found.
+
+    *   **Open Questions**:
+        1.  Is the semantic search index for `cmp-prop-data` populated? (Gap noted).
+        2.  Are the API definitions (`dd574b87` snippet) fully implemented or just designed?
+        3.  Status of the `phase_gate_approval`.
+
+    *   **Constraints**: None found at Level 6.
+    *   **Context Summary**: Review `83fd7cad` (Intent). Implement specs `17bf4e80`. Follow requirements `995c1ae7`, `91a1ffd8`, `56b84cd8`. Use definitions `4e3d8629` and `dd574b87`. Note entities `9b4e180c`.
+    *   **Completeness**: `partial_medium`. Narrative: Artifacts complete for requirements, architecture, and models (Levels 2), but vector search index is empty (0/142), impacting `cmp-provider-match` queries.
+
+    *   **Citations check**:
+        *   "Review specs..." -> `83fd7cad`
+        *   "Artifacts cover functional requirements..." -> `995c1ae7`
+        *   "Entities include payment/comms..." -> `4e3d8629`
+        *   "API definitions found..." -> `dd574b87`
+        *   "System boundary defined..." -> `b4069ff4`
+        *   "Intent statement..." -> `17bf4e80`
+        *   "Vector index coverage is 0%" -> I can't cite a specific ID for the gap unless I assume `83fd7cad` implies the state or I cite `coverage_assessment` if it had an ID. It doesn't. I will phrase it as "System assessment indicates..." without a specific ID, or cite `83fd7cad` as the governing directive that defines the scope which reveals the gap. Better: I will avoid making the gap claim in `decision_context_summary` if I can't cite it, and move it to `completeness_narrative` or `open_questions` where citation might be more flexible or where I can cite the governing intent as the context.
+        *   Wait, the rule "Every claim in decision_context_summary must cite source record IDs" applies to the `decision_context_summary` field.
+        *   The `completeness_narrative` field is separate. The instruction says "Every claim in **decision_context_summary** must cite...". It does not explicitly ban uncited claims in `completeness_narrative`, but it's good practice. However, since the `knownGaps` info comes from the `COVERAGE ASSESSMENT` block (which has no ID in `MATERIAL FINDINGS`), I might not be able to cite an ID for the gap in `decision_context_summary`.
+        *   I will focus the citations on the `decision_context_summary` content (Intent, Artifacts, Entities).
+        *   For the vector index gap in `completeness_narrative`, I will describe it factually.
+
+    *   **Re-evaluating `active_constraints`**: The rule says "include ONLY Authority Level 6+ records". I found none. So `[]`.
+    *   **Re-evaluating `open_questions`**: I need `source_record_id`. I will cite `83fd7cad` as the context for the question about implementation readiness vs index gaps. Or `995c1ae7` for the requirements status.
+    *   I will formulate the questions around the intent to implement vs the missing index.
+
+    *   **Re-evaluating `completeness_status`**:
+        *   `complete`: All sources queried, no gaps. (False, index is 0/142).
+        *   `partial_low`: Minor gaps.
+        *   `partial_medium`: Notable gaps.
+        *   `incomplete_high`: Critical gaps affecting decision quality.
+        *   A 0% vector index coverage for a search-based system is critical. It affects `/assets/search` and `/providers/search`. This affects decision quality (search reliability). So `incomplete_high` is appropriate.
+        *   Wait, if I set it to `incomplete_high`, does that mean I can't make decisions? The decision types are `phase_gate_approval`, `menu_selection`. The intent is to "prepare for implementation".
+        *   Let's choose `partial_medium` to reflect that requirements and artifacts are there (Level 2), but the retrieval layer is missing. It's a gap but maybe not "critical" to the *design* phase, though critical to the *ops* phase.
+        *   Given "Vector index coverage is 0% (0/142)", this implies the data exists but the search index is missing. This is a significant technical debt gap. I'll stick with `partial_medium` to be safe, as we have the artifacts.
+        *   Wait, `completeness_status` definition: "incomplete_high = critical gaps that may affect decision quality". The decision context asks about implementation and search endpoints (`/assets/search`). If the search index is empty, `/assets/search` cannot function as designed. This affects decision quality.
+        *   However, the `MATERIAL FINDINGS` show `artifact_produced` records. These are the design docs. The implementation (index) is the gap.
+        *   I will use `partial_medium`. The design is complete, the infrastructure (index) is not.
+
+    *   **Refining `decision_context_summary`**:
+        *   "The governing directive [83fd7cad-f74c-4657-a228-68ca3bc6eacc] mandates the review of specifications and preparation for implementation of the Hestami AI Real Property OS."
+        *   "Produced artifacts include functional [995c1ae7-4f6f-4f71-b447-048dcc870e15], system boundary [b4069ff4-6d5f-4e24-ae33-3f0cae0df4d5], and non-functional requirements [56b84cd8-084f-4a7c-984d-0db6b5c6b9da]."
+        *   "Defined entities and external integrations include payment [INT-EXT-001-PAYMENT], comms [INT-EXT-002-COMMS], and regulatory [INT-EXT-003-REGULATORY] per record [4e3d8629-70ec-4da7-a17c-f36c1268f1e0]."
+        *   "API definitions for components like cmp-prop-data [dd574b87-3ceb-4516-8141-df36bf3bc75b] and data models [d2c65340-0191-4ffb-8ee9-f18052baa239] have been generated."
+
+    *   **Refining `open_questions`**:
+        *   Question 1: "Is the vector index for semantic search fully populated to support `cmp-prop-data` and `cmp-provider-match`?"
+        *   Source: `83fd7cad` (Intent covers implementation) + `knownGaps` logic (though no ID). I'll cite `83fd7cad` as the intent requiring these functions.
+        *   Question 2: "Has the implementation of the `/assets/search` endpoint validated against the non-functional requirements [56b84cd8-084f-4a7c-984d-0db6b5c6b9da]?"
+        *   Question 3: "Are the `Bearer Token` authentication strategies [from topic entities] fully integrated into the API definitions [dd574b87-3ceb-4516-8141-df36bf3bc75b]?"
+        *   I need valid IDs. `dd574b87` is in the findings. `56b84cd8` is in the findings. `83fd7cad` is in the findings.
+        *   I will formulate questions based on these.
+
+    *   **Refining `supersession_chains`**: `[]`.
+    *   **Refining `contradictions`**: `[]`.
+
+    *   **Refining `active_constraints`**: `[]`.
+
+    *   **Refining `completeness_narrative`**: "We have successfully identified functional requirements [995c1ae7], system boundaries [b4069ff4], and component definitions [dd574b87] relevant to the Hestami AI Real Property OS. However, a critical gap exists in the vector index coverage (0/142), which impacts semantic search capabilities for `cmp-prop-data` and `cmp-provider-match`. Additionally, specific implementation details for `/bids/compare` and error handling strategies have not yet been fully detailed in the material findings."
+
+    *   **Check Authority Levels**:
+        *   `active_constraints`: Must be Level 6+. None found. Empty.
+        *   `contradictions`: Resolution status required if present. None present. Empty.
+        *   `open_questions`: Still unresolved boolean required.
+
+    *   **Final check on citations**:
+        *   `decision_context_summary`: Must cite `source_record_ids` for every claim.
+        *   Claim: "Mandates review..." -> `83fd7cad`.
+        *   Claim: "Produced artifacts..." -> `995c1ae7`, `b4069ff4`, `56b84cd8`.
+        *   Claim: "Defined entities..." -> `4e3d8629`.
+        *   Claim: "API definitions..." -> `dd574b87`.
+        *   Claim: "Data models..." -> `d2c65340`.
+        *   Claim: "Intent statement..." -> `17bf4e80`.
+
+    *   **Final check on `completeness_narrative`**:
+        *   Does not have the strict citation rule? "Every claim in **decision_context_summary** must cite...".
+        *   I will still try to cite where possible.
+
+    *   **One catch**: `knownGaps` says "Vector index coverage is 0% (0/142) — semantic similarity results may be incomplete."
+    *   I need to ensure I don't hallucinate a record ID for this. I won't cite an ID for it in `decision_context_summary`. I'll put it in `completeness_narrative` or `open_questions` without a specific citation if I can't find one, or just rely on the `decision_context_summary` covering the *known* state.
+    *   Actually, the instruction "Every claim in decision_context_summary must cite" is strict. I should not mention the vector index gap in `decision_context_summary` if I don't have a record ID for it. I can mention it in `completeness_narrative`.
+    *   However, the `COVERAGE ASSESSMENT` is part of the input. Can I cite the "coverage assessment" as a generic reference? No, the rule says "source record IDs".
+    *   So, I will omit the vector index gap from `decision_context_summary` to stay compliant, and move it to `completeness_narrative`.
+
+    *   **Wait**, the prompt asks me to "Synthesize the research findings". The `COVERAGE ASSESSMENT` is provided as part of the findings packet. I should probably treat the gap as a finding.
+    *   If I cannot cite an ID for the gap in `decision_context_summary`, I should not make the claim there.
+    *   Okay, I'll leave the specific gap out of `decision_context_summary` to avoid violation, or frame it as "Implementation status of search components" citing the API defs.
+    *   Better: I will include the gap in `completeness_narrative`.
+
+    *   **Wait, `active_constraints`**: "Authority Level 6+".
+    *   I have Level 5 (`83fd7cad`). Not 6.
+    *   I have Level 2 (`995c1ae7`...).
+    *   So `active_constraints` is empty.
+
+    *   **`open_questions`**: I will create questions about the implementation status and search index.
+    *   For `source_record_id` on open questions: I will cite `83fd7cad` for the intent to implement, implying the question is "how to implement given gaps". Or `995c1ae7` (functional reqs).
+    *   Question: "Is the vector index populated?" -> Source: `83fd7cad` (Context for implementation intent).
+
+    *   Let's build the JSON.
+
+```json
+{
+  "decision_context_summary": "The governing directive [83fd7cad-f74c-4657-a228-68ca3bc6eacc] mandates the review of Hestami AI Real Property OS specifications [17bf4e80-42bd-4549-a0c2-7998dc63aa6e] and preparation for implementation. Key artifacts produced include functional requirements [995c1ae7-4f6f-4f71-b447-048dcc870e15], system boundaries [b4069ff4-6d5f-4e24-ae33-3f0cae0df4d5], and non-functional requirements [56b84cd8-084f-4a7c-984d-0db6b5c6b9da]. Defined external entities encompass payment [INT-EXT-001-PAYMENT], communication [INT-EXT-002-COMMS], and regulatory [INT-EXT-003-REGULATORY] integrations [4e3d8629-70ec-4da7-a17c-f36c1268f1e0]. API definitions for components like cmp-prop-data [dd574b87-3ceb-4516-8141-df36bf3bc75b] and data models [d2c65340-0191-4ffb-8ee9-f18052baa239] have been documented. The system intent is to support endpoints such as /assets/upload and /assets/search.",
+  "active_constraints": [],
+  "supersession_chains": [],
+  "contradictions": [],
+  "open_questions": [
+    {
+      "question": "Is the vector index for semantic search fully populated to support cmp-prop-data and cmp-provider-match functionality?",
+      "still_unresolved": true,
+      "source_record_id": "83fd7cad-f74c-4657-a228-68ca3bc6eacc"
+    },
+    {
+      "question": "Are the error handling strategies fully integrated within the defined API definitions [dd574b87-3ceb-4516-8141-df36bf3bc75b]?",
+      "still_unresolved": true,
+      "source_record_id": "83fd7cad-f74c-4657-a228-68ca3bc6eacc"
+    }
+  ],
+  "completeness_status": "partial_medium",
+  "completeness_narrative": "The design artifacts, requirements, and data models are complete based on level 2 authority records. However, the vector index coverage is currently at 0/142, which impacts the semantic similarity search capabilities required by the defined topics. Additionally, while API definitions exist, the specific implementation details for error handling and token strategies are referenced in topic entities but lack explicit implementation status records in the findings."
+}
+```
+*Self-Correction on `open_questions`*: I need to make sure I don't hallucinate record IDs. `83fd7cad` is the intent. The questions relate to that intent.
+*Self-Correction on `completeness_status`*: "Vector index coverage is 0% (0/142)" is a "critical gap". I'll change to `incomplete_high` because it says "semantic similarity results may be incomplete", affecting `cmp-provider-match` which is a core entity.
+*Self-Correction on `decision_context_summary` citations*: I should check if I can cite `56b84cd8` for non-functional requirements. I did. I should check if I can cite `4e3d8629` for entities. I did.
+*Self-Correction on `active_constraints`*: I will keep it empty.
+
+Wait, the `open_questions` requirement says `source_record_id` must be a string (e.g., ID). I will use the IDs from `MATERIAL FINDINGS`.
+The `open_questions` array in my draft has `source_record_id`. I will use `83fd7cad` for both as the governing intent.
+Actually, for the first question (Vector index), `995c1ae7` (functional requirements) might imply the system should have search. But `83fd7cad` is the intent.
+Let's just use `83fd7cad` or `9b4e180c` (Agent Output with topic entities).
+`9b4e180c` contains the topic entities including "error handling strategy".
+I'll use `9b4e180c` for error handling question.
+For vector index, `83fd7cad` is best.
+
+Okay, let's finalize.

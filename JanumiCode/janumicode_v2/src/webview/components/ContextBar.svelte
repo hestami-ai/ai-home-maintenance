@@ -43,17 +43,17 @@
   .context-bar {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 4px 10px;
+    gap: var(--jc-space-md);
+    padding: var(--jc-space-sm) var(--jc-space-lg);
     font-size: 0.75em;
     opacity: 0.7;
-    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    border-bottom: 1px solid var(--vscode-panel-border, var(--jc-outline-variant));
   }
   .indicator {
-    background: var(--vscode-badge-background, #333);
-    color: var(--vscode-badge-foreground, #ddd);
-    padding: 1px 6px;
-    border-radius: 8px;
+    background: var(--vscode-badge-background, var(--jc-surface-container-highest));
+    color: var(--vscode-badge-foreground, var(--jc-on-surface));
+    padding: var(--jc-space-hairline) var(--jc-space-md);
+    border-radius: var(--jc-radius-lg);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

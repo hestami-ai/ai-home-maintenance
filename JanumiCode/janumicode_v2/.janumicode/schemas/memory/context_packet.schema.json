@@ -1,0 +1,177 @@
+{
+  "$id": "janumicode:context_packet:1.0",
+  "title": "Context Packet",
+  "description": "Output contract for the Deep Memory Research Agent (spec §8.4). Structured reconstruction of the governing state of all available and relevant sources.",
+  "type": "object",
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "query_decomposition",
+    "completeness_status",
+    "completeness_narrative",
+    "material_findings",
+    "active_constraints",
+    "supersession_chains",
+    "contradictions",
+    "open_questions",
+    "implicit_decisions",
+    "recommended_drilldowns",
+    "coverage_assessment",
+    "unavailable_sources"
+  ],
+  "properties": {
+    "artifact_type": { "type": "string", "const": "context_packet" },
+    "schema_version": { "type": "string", "const": "1.0" },
+    "query_decomposition": {
+      "type": "object",
+      "required": ["topic_entities", "decision_types_sought", "temporal_scope", "authority_levels_included", "sources_in_scope"],
+      "properties": {
+        "topic_entities": { "type": "array", "items": { "type": "string" } },
+        "decision_types_sought": { "type": "array", "items": { "type": "string" } },
+        "temporal_scope": {
+          "type": "object",
+          "required": ["from", "to"],
+          "properties": {
+            "from": { "type": "string" },
+            "to": { "type": "string" }
+          }
+        },
+        "authority_levels_included": { "type": "array", "items": { "type": "integer" } },
+        "sources_in_scope": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "completeness_status": {
+      "type": "string",
+      "enum": ["complete", "partial_low", "partial_medium", "incomplete_high"]
+    },
+    "completeness_narrative": { "type": "string" },
+    "unavailable_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source", "reason", "materiality", "materiality_explanation", "recommendation"],
+        "properties": {
+          "source": { "type": "string" },
+          "reason": { "type": "string" },
+          "materiality": { "type": "string", "enum": ["high", "medium", "low"] },
+          "materiality_explanation": { "type": "string" },
+          "recommendation": { "type": "string", "enum": ["delay", "proceed_with_caveat", "proceed"] }
+        }
+      }
+    },
+    "material_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "record_type", "authority_level", "governing_status", "summary", "source_record_ids"],
+        "properties": {
+          "id": { "type": "string" },
+          "record_type": { "type": "string" },
+          "authority_level": { "type": "integer", "minimum": 1, "maximum": 7 },
+          "governing_status": { "type": "string", "enum": ["active", "superseded", "contradicted", "unresolved"] },
+          "summary": { "type": "string" },
+          "source_record_ids": { "type": "array", "items": { "type": "string" } },
+          "materiality_score": { "type": "number" }
+        }
+      }
+    },
+    "active_constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "authority_level", "source_record_ids"],
+        "properties": {
+          "id": { "type": "string" },
+          "statement": { "type": "string" },
+          "authority_level": { "type": "integer", "minimum": 6, "maximum": 7 },
+          "source_record_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "supersession_chains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["subject", "chain"],
+        "properties": {
+          "subject": { "type": "string" },
+          "chain": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["record_id", "position"],
+              "properties": {
+                "record_id": { "type": "string" },
+                "position": { "type": "string", "enum": ["superseded", "current_governing"] },
+                "superseded_at": { "type": "string" },
+                "effective_from": { "type": "string" },
+                "timestamp": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "contradictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["record_ids", "explanation", "resolution_status"],
+        "properties": {
+          "record_ids": { "type": "array", "items": { "type": "string" }, "minItems": 2 },
+          "explanation": { "type": "string" },
+          "resolution_status": { "type": "string", "enum": ["unresolved", "resolved_by_recency", "resolved_by_authority"] },
+          "resolved_by_record_id": { "type": "string" }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["question", "still_unresolved", "source_record_id"],
+        "properties": {
+          "question": { "type": "string" },
+          "first_raised": { "type": "string" },
+          "still_unresolved": { "type": "boolean" },
+          "source_record_id": { "type": "string" }
+        }
+      }
+    },
+    "implicit_decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["inferred_decision", "basis", "confidence", "source_record_ids"],
+        "properties": {
+          "inferred_decision": { "type": "string" },
+          "basis": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "source_record_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "recommended_drilldowns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["target_record_id", "reason"],
+        "properties": {
+          "target_record_id": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "coverage_assessment": {
+      "type": "object",
+      "required": ["sources_queried", "sources_unavailable", "known_gaps", "confidence"],
+      "properties": {
+        "sources_queried": { "type": "array", "items": { "type": "string" } },
+        "sources_unavailable": { "type": "array", "items": { "type": "string" } },
+        "known_gaps": { "type": "array", "items": { "type": "string" } },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  },
+  "additionalProperties": false
+}

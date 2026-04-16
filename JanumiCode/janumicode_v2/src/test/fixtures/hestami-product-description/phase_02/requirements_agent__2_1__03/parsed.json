@@ -1,0 +1,159 @@
+{
+  "user_stories": [
+    {
+      "id": "US-001",
+      "role": "Individual Homeowner",
+      "action": "I want to upload property images and 3D asset data (Splats)",
+      "outcome": "so that the AI can analyze my property condition and identify needed services.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-001-1",
+          "description": "System accepts and stores image/splat uploads for a specific property record.",
+          "measurable_condition": "Upload endpoint returns '200 OK' for files under 10MB within 5 seconds; assets indexed in < 10 seconds post-upload."
+        },
+        {
+          "id": "AC-001-2",
+          "description": "System validates image format and storage location.",
+          "measurable_condition": "System rejects files not in .png/.jpg/.gltf formats with a specific error code and displays a user-friendly message."
+        }
+      ],
+      "priority": "critical"
+    },
+    {
+      "id": "US-002",
+      "role": "Individual Homeowner",
+      "action": "I want to use the AI Agent to search for service providers",
+      "outcome": "so that I receive relevant contractor matches based on my property data.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-002-1",
+          "description": "AI Agent returns a ranked list of providers matching uploaded property data.",
+          "measurable_condition": "AI response list displayed on screen within 300ms after query; top 5 providers listed with relevance scores."
+        },
+        {
+          "id": "AC-002-2",
+          "description": "Search filters apply only to Pillar 1 service types.",
+          "measurable_condition": "Filter dropdown limits options to 'Home Real Property' categories only; no options from Pillar 2 (Financials) appear."
+        }
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-003",
+      "role": "Individual Homeowner",
+      "action": "I want to view and compare bid estimates from multiple providers.",
+      "outcome": "so that I can select the best value quote for my property repairs.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-003-1",
+          "description": "Bid comparison table displays cost breakdown and scope.",
+          "measurable_condition": "Comparison table renders with 'Good-Better-Best' columns; minimum 3 bids must be displayed to render the comparison view."
+        }
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-004",
+      "role": "Individual Homeowner",
+      "action": "I want AI to extract and display CC&R and Bylaws information",
+      "outcome": "so that I am aware of property restrictions and compliance rules for my unit.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-004-1",
+          "description": "AI extraction tool parses uploaded documents for regulatory text.",
+          "measurable_condition": "System generates an 'Extracted Clauses' view containing text with >90% confidence score; highlights relevant sections."
+        }
+      ],
+      "priority": "medium"
+    },
+    {
+      "id": "US-005",
+      "role": "Hestami Staff",
+      "action": "I want to manage and track service action items across the platform",
+      "outcome": "so that I can replicate the 'System of Action' methodology for all property owners.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-005-1",
+          "description": "Action items are queued in the workflow engine with timestamps.",
+          "measurable_condition": "Workflow state transitions recorded in audit log every 100ms; status updates (Pending, In-Progress, Complete) reflect immediately in UI."
+        }
+      ],
+      "priority": "critical"
+    },
+    {
+      "id": "US-006",
+      "role": "Individual Homeowner",
+      "action": "I want to receive alerts about statutory deadlines for my property",
+      "outcome": "so that I can comply with legal notice requirements and avoid penalties.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-006-1",
+          "description": "System sends notifications before statutory deadlines expire.",
+          "measurable_condition": "Email/SMS notification triggered 30 days before deadline date; user receives confirmation receipt acknowledgment."
+        },
+        {
+          "id": "AC-006-2",
+          "description": "Notifications are queued for delivery during offline periods.",
+          "measurable_condition": "System saves notification payload to queue when offline; delivery attempts resume upon reconnection within 2 hours."
+        }
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-007",
+      "role": "Hestami Staff",
+      "action": "I want to send mass email/SMS for meeting notices and violation alerts",
+      "outcome": "so that I can efficiently communicate with owners regarding compliance issues.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-007-1",
+          "description": "Bulk messaging tool sends domain-authorized emails.",
+          "measurable_condition": "Batch message processing completes within 2 minutes for 1,000 recipients; bounce rates tracked in dashboard."
+        }
+      ],
+      "priority": "medium"
+    },
+    {
+      "id": "US-008",
+      "role": "Individual Homeowner",
+      "action": "I want to use the mobile app to verify data on-site",
+      "outcome": "so that I can upload evidence and manage tasks away from a desktop environment.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-008-1",
+          "description": "Mobile app supports offline capture of data and media.",
+          "measurable_condition": "App allows camera capture and text entry without network; data syncs successfully upon reconnection with no data loss."
+        }
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-009",
+      "role": "Hestami Staff",
+      "action": "I want to access system functions while restricted by policy",
+      "outcome": "so that sensitive property data remains isolated between tenants and roles.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-009-1",
+          "description": "System enforces Row-Level Security on database rows based on user role.",
+          "measurable_condition": "Unauthorized access attempts (e.g., viewing Tenant B data while logged in as Tenant A user) return '403 Forbidden' within 50ms."
+        }
+      ],
+      "priority": "critical"
+    },
+    {
+      "id": "US-010",
+      "role": "Individual Homeowner",
+      "action": "I want to process payments for my deposits or service fees",
+      "outcome": "so that I can secure a booking or pay for repairs securely.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-010-1",
+          "description": "Payment gateway integration captures funds securely.",
+          "measurable_condition": "Payment authorization response received within 5 seconds; receipt generated and emailed within 1 minute of confirmation."
+        }
+      ],
+      "priority": "medium"
+    }
+  ]
+}

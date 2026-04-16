@@ -1,0 +1,189 @@
+{
+  "test_suites": [
+    {
+      "suite_id": "PROP-DATA-SUITE",
+      "component_id": "cmp-prop-data",
+      "test_type": "integration",
+      "test_cases": [
+        {
+          "test_case_id": "TC-PROP-001",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-001-1"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "API returns 200 OK within 5 seconds; asset indexed in vector store within 10 seconds post-upload."
+        },
+        {
+          "test_case_id": "TC-PROP-002",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-001-2"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "System rejects non-.png/.jpg/.gltf files returning specific error code and displaying user-friendly rejection message."
+        },
+        {
+          "test_case_id": "TC-PROP-003",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-008-1"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "App allows camera capture/text entry without network; data syncs successfully upon reconnection with no data loss."
+        }
+      ]
+    },
+    {
+      "suite_id": "PROVIDER-MATCH-SUITE",
+      "component_id": "cmp-provider-match",
+      "test_type": "integration",
+      "test_cases": [
+        {
+          "test_case_id": "TC-PROV-001",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-002-1"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "AI response list displayed on screen within 300ms after query; top 5 providers listed with relevance scores."
+        },
+        {
+          "test_case_id": "TC-PROV-002",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-002-2"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "Filter dropdown limits options to 'Home Real Property' categories only; no Pillar 2 (Financials) options appear."
+        },
+        {
+          "test_case_id": "TC-PROV-003",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-003-1"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "Comparison table renders with 'Good-Better-Best' columns; minimum 3 bids displayed to render view."
+        }
+      ]
+    },
+    {
+      "suite_id": "COMPLIANCE-SUITE",
+      "component_id": "cmp-compliance",
+      "test_type": "integration",
+      "test_cases": [
+        {
+          "test_case_id": "TC-COM-001",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-004-1"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "System generates 'Extracted Clauses' view containing text with >90% confidence score; highlights relevant sections."
+        },
+        {
+          "test_case_id": "TC-COM-002",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-006-1"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "Email/SMS notification triggered 30 days before deadline date; user receives confirmation receipt acknowledgment."
+        },
+        {
+          "test_case_id": "TC-COM-003",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-006-2"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "System saves notification payload to queue when offline; delivery attempts resume upon reconnection within 2 hours."
+        },
+        {
+          "test_case_id": "TC-COM-004",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-007-1"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "Batch message processing completes within 2 minutes for 1,000 recipients; bounce rates tracked in dashboard."
+        }
+      ]
+    },
+    {
+      "suite_id": "WORKFLOW-SUITE",
+      "component_id": "cmp-workflow",
+      "test_type": "integration",
+      "test_cases": [
+        {
+          "test_case_id": "TC-WORK-001",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-005-1"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "Workflow state transitions recorded in audit log every 100ms; status updates (Pending, In-Progress, Complete) reflect immediately in UI."
+        }
+      ]
+    },
+    {
+      "suite_id": "SECURITY-SUITE",
+      "component_id": "cmp-security",
+      "test_type": "integration",
+      "test_cases": [
+        {
+          "test_case_id": "TC-SEC-001",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-009-1"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "Unauthorized access attempts (e.g., viewing Tenant B data while logged in as Tenant A user) return 403 Forbidden within 50ms."
+        }
+      ]
+    },
+    {
+      "suite_id": "PAYMENT-SUITE",
+      "component_id": "cmp-payment",
+      "test_type": "integration",
+      "test_cases": [
+        {
+          "test_case_id": "TC-PAY-001",
+          "type": "functional",
+          "acceptance_criterion_ids": [
+            "AC-010-1"
+          ],
+          "preconditions": [
+            "System is in a stable operational state with database connection active"
+          ],
+          "expected_outcome": "Payment authorization response received within 5 seconds; receipt generated and emailed within 1 minute of confirmation."
+        }
+      ]
+    }
+  ]
+}

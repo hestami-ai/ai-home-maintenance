@@ -1,0 +1,99 @@
+{
+  "system_requirements": {
+    "items": [
+      {
+        "id": "SR-001",
+        "statement": "The system shall accept property image and 3D asset data uploads under 10MB in formats .png, .jpg, and .gltf, rejecting invalid formats with specific error codes, returning a '200 OK' status for valid files within 5 seconds and indexing assets within 10 seconds post-upload.",
+        "source_requirement_ids": [
+          "US-001",
+          "AC-001-1",
+          "AC-001-2"
+        ],
+        "priority": "critical"
+      },
+      {
+        "id": "SR-002",
+        "statement": "The system shall utilize AI Agent processing to return service provider search results with relevance scores within 300ms after query, displaying the top 5 providers and restricting category filters to 'Home Real Property' only.",
+        "source_requirement_ids": [
+          "US-002",
+          "AC-002-1",
+          "AC-002-2"
+        ],
+        "priority": "high"
+      },
+      {
+        "id": "SR-003",
+        "statement": "The system shall render a bid estimate comparison table with 'Good-Better-Best' columns for service providers, requiring a minimum of 3 bid entries to render the view.",
+        "source_requirement_ids": [
+          "US-003",
+          "AC-003-1"
+        ],
+        "priority": "high"
+      },
+      {
+        "id": "SR-004",
+        "statement": "The system shall extract and display CC&R and Bylaws clauses using AI analysis, generating an 'Extracted Clauses' view with text having a confidence score greater than 90% and highlighting relevant sections.",
+        "source_requirement_ids": [
+          "US-004",
+          "AC-004-1"
+        ],
+        "priority": "medium"
+      },
+      {
+        "id": "SR-005",
+        "statement": "The system shall manage service action item workflows using a versioned engine, recording state transitions in an audit log with 100ms timestamp precision and reflecting status updates (Pending, In-Progress, Complete) immediately in the UI.",
+        "source_requirement_ids": [
+          "US-005",
+          "AC-005-1"
+        ],
+        "priority": "critical"
+      },
+      {
+        "id": "SR-006",
+        "statement": "The system shall monitor statutory deadlines and trigger email/SMS notifications 30 days before the deadline, saving notification payloads to an offline queue that resumes delivery attempts within 2 hours upon reconnection and confirms receipt.",
+        "source_requirement_ids": [
+          "US-006",
+          "AC-006-1",
+          "AC-006-2"
+        ],
+        "priority": "high"
+      },
+      {
+        "id": "SR-007",
+        "statement": "The system shall process mass email/SMS batches for meeting notices and violation alerts, completing message processing for 1,000 recipients within 2 minutes and tracking bounce rates in the dashboard.",
+        "source_requirement_ids": [
+          "US-007",
+          "AC-007-1"
+        ],
+        "priority": "medium"
+      },
+      {
+        "id": "SR-008",
+        "statement": "The mobile application client shall allow data capture via camera and text entry without a network connection, ensuring data integrity and successful synchronization upon reconnection with no data loss.",
+        "source_requirement_ids": [
+          "US-008",
+          "AC-008-1"
+        ],
+        "priority": "high"
+      },
+      {
+        "id": "SR-009",
+        "statement": "The system shall enforce multi-tenant security and Row-Level Security (RLS), returning a '403 Forbidden' response within 50ms for any unauthorized access attempts to restricted tenant data.",
+        "source_requirement_ids": [
+          "US-009",
+          "AC-009-1"
+        ],
+        "priority": "critical"
+      },
+      {
+        "id": "SR-010",
+        "statement": "The system shall process payments for deposits and service fees via integrated payment gateway, receiving authorization responses within 5 seconds and generating and emailing receipts within 1 minute of confirmation.",
+        "source_requirement_ids": [
+          "US-010",
+          "AC-010-1"
+        ],
+        "priority": "medium"
+      }
+    ]
+  }
+}

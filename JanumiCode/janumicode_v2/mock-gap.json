@@ -1,0 +1,124 @@
+{
+  "phase": "9",
+  "failed_at_phase": "9",
+  "missing_records": [],
+  "schema_violations": [],
+  "assertion_failures": [
+    {
+      "phase": "9",
+      "sub_phase": "unknown",
+      "assertion": "tests_have_results",
+      "expected": "true",
+      "actual": "false"
+    },
+    {
+      "phase": "9",
+      "sub_phase": "unknown",
+      "assertion": "eval_has_criteria_outcomes",
+      "expected": "true",
+      "actual": "false"
+    },
+    {
+      "phase": "10",
+      "sub_phase": "unknown",
+      "assertion": "commit_references_intent",
+      "expected": "true",
+      "actual": "false"
+    }
+  ],
+  "suggested_fix": "Invariant failures: tests_have_results, eval_has_criteria_outcomes, commit_references_intent. Review the invariant implementations in src/test/harness/lineageValidator.ts and the handler logic that produces the relevant artifacts.",
+  "spec_references": [
+    "invariant tests_have_results",
+    "invariant eval_has_criteria_outcomes",
+    "invariant commit_references_intent"
+  ],
+  "missing_record_analysis": [],
+  "violation_categories": {
+    "authority": [],
+    "schema": [],
+    "semantic": []
+  },
+  "assertion_context": [
+    {
+      "failure": {
+        "phase": "9",
+        "sub_phase": "unknown",
+        "assertion": "tests_have_results",
+        "expected": "true",
+        "actual": "false"
+      },
+      "expected_behavior": "Assertion should pass",
+      "actual_behavior": "Assertion failed",
+      "root_cause_hypothesis": "Unknown cause"
+    },
+    {
+      "failure": {
+        "phase": "9",
+        "sub_phase": "unknown",
+        "assertion": "eval_has_criteria_outcomes",
+        "expected": "true",
+        "actual": "false"
+      },
+      "expected_behavior": "Assertion should pass",
+      "actual_behavior": "Assertion failed",
+      "root_cause_hypothesis": "Unknown cause"
+    },
+    {
+      "failure": {
+        "phase": "10",
+        "sub_phase": "unknown",
+        "assertion": "commit_references_intent",
+        "expected": "true",
+        "actual": "false"
+      },
+      "expected_behavior": "Assertion should pass",
+      "actual_behavior": "Assertion failed",
+      "root_cause_hypothesis": "Unknown cause"
+    }
+  ],
+  "ai_spend_analysis": {
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "estimated_cost_usd": 0,
+    "by_phase": {
+      "1": {
+        "input": 0,
+        "output": 0
+      },
+      "2": {
+        "input": 0,
+        "output": 0
+      },
+      "3": {
+        "input": 0,
+        "output": 0
+      },
+      "4": {
+        "input": 0,
+        "output": 0
+      },
+      "5": {
+        "input": 0,
+        "output": 0
+      },
+      "6": {
+        "input": 0,
+        "output": 0
+      },
+      "7": {
+        "input": 0,
+        "output": 0
+      },
+      "8": {
+        "input": 0,
+        "output": 0
+      },
+      "9": {
+        "input": 0,
+        "output": 0
+      }
+    },
+    "cost_breakdown": []
+  },
+  "ci_failsafe_triggers": []
+}

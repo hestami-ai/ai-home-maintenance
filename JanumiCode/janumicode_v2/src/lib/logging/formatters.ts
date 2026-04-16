@@ -19,7 +19,11 @@ export type LogCategory =
   | 'embedding'
   | 'capability'
   | 'decision'
-  | 'error';
+  | 'error'
+  | 'dmr'
+  | 'phase_dmr'
+  | 'phase0'
+  | 'workspace_scanner';
 
 export interface LogEntry {
   id: string;

@@ -1,0 +1,193 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Requirements Agent] performing Non-Functional Requirements (NFR) Bloom for Sub-Phase 2.2.
+    *   **Task:** Derive NFRs that constrain HOW the system behaves.
+    *   **Input Context:**
+        *   Product: Consumer Discovery MVP (Phase 1 Focus).
+        *   Focus: Pillar 1 (Home Real Property Assistant).
+        *   Users: Individual Homeowners, Small Landlords, Investors, Hestami Staff.
+        *   Tech Stack: SvelteKit (Frontend), Bun (API), DBOS (Workflows), SeaweedFS (Media), Cerbos (Auth), Traefik (Ingress), FFmpeg (Video).
+        *   Constraints: Multi-tenant isolation (RLS), specific tech stacks, regulatory adherence (Statutory deadlines, etc.), offline capabilities (secondary for homeowners, primary for staff/mobile), payment integration (Stripe/Square).
+        *   Assumptions: MVP prioritizes AI Agent, offline capabilities secondary for homeowners (critical for staff), Financials/Accounting out of scope (Pillar 2/3).
+        *   Functional Requirements (US-001 to US-010) are provided. I must *not* duplicate these but complement them.
+        *   Compliance Context: "No compliance regimes" is listed in the prompt's "Compliance: No compliance regimes" section at the bottom, BUT the constraints section mentions "Must strictly follow the ServiceTitan business domains", "Must support Statutory deadlines", "Must support Reserve Studies". I need to reconcile the "No compliance regimes" line in the input summary with the constraints section. Usually, "No compliance regimes" in the input summary might mean no specific *external* compliance frameworks like HIPAA/GDPR listed as *primary* drivers, but regulatory obligations (like Statutory deadlines) are still constraints. However, looking closely at the input: `Compliance: No compliance regimes` appears at the very end of the CONTEXT SUMMARY. This is a strong instruction. I must respect this, even if constraints mention regulatory things (like statutory deadlines), those are functional/business logic constraints, not necessarily "compliance regimes" like GDPR/HIPAA. I will treat "Compliance: No compliance regimes" as a directive to focus on technical/business standards rather than specific legal frameworks (like SOC2, HIPAA, GDPR) unless implied by the "Statutory deadlines" constraint. Wait, looking at the Constraints list: "Must support Statutory deadlines (Notice requirements) via Rules Engine." This is a functional requirement driven by regulations. I should still derive NFRs related to security (RLS) and performance that support these without inventing a new compliance regime like HIPAA. I will stick to the "No compliance regimes" instruction but ensure security/reliability NFRs support the technical constraints (RLS, Auth).
+    *   **Output Schema:** JSON object matching `non_functional_requirements` schema.
+    *   **Rules:** Measurable thresholds for every NFR. Cover categories (performance, security, reliability, scalability, accessibility, maintainability). No duplication of Functional Requirements (US-xxx).
+
+2.  **Review Input Data & Identify NFR Gaps:**
+    *   **Performance:**
+        *   US-001 mentions upload latency (5s) and index time (10s). This is functional/performance boundary. NFR needs to cover backend throughput, latency under load, etc.
+        *   US-002 mentions AI response time (300ms). NFR can cover search engine indexing latency.
+        *   US-007 mentions batch processing (2 mins/1k). NFR can cover general API throughput.
+        *   Need NFRs for Bun API performance, SvelteKit hydration.
+    *   **Security:**
+        *   Constraint: Row-Level Security (RLS), Cerbos for policy.
+        *   NFR needs to address data encryption (at rest/transit), secure auth token handling, RLS verification time.
+    *   **Reliability:**
+        *   Constraint: DBOS versioned workflows.
+        *   NFR needs to address uptime, error handling, workflow durability (DBOS specific).
+        *   Constraint: Offline mode for mobile (US-008). NFR for data sync reliability (queue persistence).
+    *   **Scalability:**
+        *   Constraint: SeaweedFS for media. NFR for storage scaling.
+        *   Constraint: Multi-tenant (Pillar 1 vs others). NFR for tenant isolation performance.
+    *   **Accessibility:**
+        *   US-001 to US-010 don't explicitly cover WCAG.
+        *   Need NFR for screen reader support, keyboard navigation, color contrast (especially for SvelteKit).
+    *   **Maintainability:**
+        *   Constraint: SvelteKit, Bun, Traefik.
+        *   NFR for logging, observability (metrics), code modularity.
+        *   NFR for version control of workflows (DBOS).
+
+3.  **Drafting NFRs (Mental Check against Rules):**
+    *   *Rule:* Every NFR must have a measurable threshold.
+    *   *Rule:* No duplication of Functional Requirements. (e.g., Don't repeat "Upload returns 200 OK within 5s" if that's already US-001 AC-001-1, focus on aggregate throughput or error rates).
+    *   *Rule:* Cover categories.
+
+    *   *NFR-001 (Performance):* API Latency. Focus on Bun API throughput. Threshold: P99 latency < 200ms for search (complement US-002's 300ms AI response).
+    *   *NFR-002 (Security):* Data Encryption. TLS 1.3 required. Threshold: 99% of connections encrypted.
+    *   *NFR-003 (Security):* Authentication. JWT expiry, refresh token rotation. Threshold: Token expiry <= 15 mins.
+    *   *NFR-004 (Reliability):* DBOS Workflow Durability. Checkpointing interval. Threshold: Workflow state persisted every 1s (aligns with US-005 audit log 100ms but for storage). Let's align with DBOS durability.
+    *   *NFR-005 (Reliability):* Availability. Since financials are out of scope but MVP needs to be production grade. Threshold: 99.9% uptime (SLA).
+    *   *NFR-006 (Scalability):* Media Storage (SeaweedFS). Threshold: Support 100TB growth without manual intervention in Year 1.
+    *   *NFR-007 (Scalability):* Concurrent Users. Threshold: Support 100 concurrent users per tenant without degradation.
+    *   *NFR-008 (Accessibility):* WCAG Compliance. Threshold: AA level contrast, keyboard navigation tested.
+    *   *NFR-009 (Maintainability):* Observability. Threshold: 100% of critical errors logged with PII redaction.
+    *   *NFR-010 (Maintainability):* Code Health. Threshold: CI/CD pipeline runs in < 5 mins.
+    *   *NFR-011 (Performance):* Offline Sync Latency. Threshold: Sync queue processed within 2 minutes of connection (complement US-006/008).
+    *   *NFR-012 (Security):* Data Isolation. Threshold: RLS enforced at database layer, < 10ms overhead.
+
+    *Wait, check duplication:*
+    *   US-001 AC-001-1: Upload endpoint returns '200 OK' for files under 10MB within 5 seconds. -> NFR should not duplicate this specific endpoint timing, but perhaps broader ingestion throughput.
+    *   US-006 AC-006-2: Offline saves payload to queue, resume within 2 hours. -> NFR-011 should address queue processing reliability (e.g., max retry count).
+    *   US-009 AC-009-1: Unauthorized access return 403 within 50ms. -> NFR-012 covers RLS overhead.
+
+4.  **Refining Thresholds:**
+    *   Ensure all are measurable numbers.
+    *   Ensure they don't contradict Functional Requirements (which are mostly specific user stories). NFRs are about system properties.
+
+5.  **Finalizing JSON Structure:**
+    *   Root object with `non_functional_requirements` array.
+    *   Each item: `id`, `category`, `description`, `threshold`, `measurement_method`.
+
+6.  **Constructing the Output:**
+    *   *ID Format:* NFR-XXX.
+    *   *Categories:* performance, security, reliability, scalability, accessibility, maintainability.
+    *   *Descriptions:* Clear, linking to constraints (Bun, SeaweedFS, etc.).
+    *   *Thresholds:* Numbers (ms, %, % uptime, counts).
+    *   *Measurement:* Monitoring tools (APM, Logs, Tests).
+
+    *Self-Correction on "No Compliance Regimes":* The prompt explicitly says `Compliance: No compliance regimes` at the end of the context summary. This is a directive. I should not invent HIPAA/GDPR requirements. However, constraints mention "Statutory deadlines" and "RLS". These are functional/regulatory *logic*, but I won't add NFRs like "Must comply with GDPR". I will focus on technical security (encryption, auth) rather than regulatory compliance frameworks.
+
+    *Self-Correction on US-001 Duplication:* US-001 covers upload time. I will focus NFR on *concurrent* uploads or *storage* ingestion rate to avoid direct duplication.
+    *Self-Correction on US-009 Duplication:* US-009 covers auth timing. I will focus NFR on *storage* encryption or *network* security policies.
+
+    *Let's select the best 10-12 NFRs.*
+    1.  Performance: API Latency (Search/AI).
+    2.  Performance: Media Ingestion Throughput (SeaweedFS).
+    3.  Security: Data Encryption (At Rest).
+    4.  Security: Data Encryption (In Transit).
+    5.  Security: Auth Rate Limiting.
+    6.  Reliability: DBOS Workflow Durability (Checkpoints).
+    7.  Reliability: System Uptime (Availability).
+    8.  Scalability: Multi-tenant Isolation Overhead (RLS).
+    9.  Scalability: Concurrent User Support.
+    10. Accessibility: WCAG AA Compliance.
+    11. Maintainability: Log Aggregation & Retention.
+    12. Maintainability: Dependency Versioning (DBOS/SvelteKit).
+
+    *Reviewing Thresholds:*
+    1.  API P99 < 200ms (Search).
+    2.  Media Ingestion Throughput > 500MB/min (Aggregate).
+    3.  AES-256 Encryption standard.
+    4.  TLS 1.3 mandatory.
+    5.  429 after 100 reqs/min/IP.
+    6.  DBOS Workflow state persisted < 1s intervals.
+    7.  99.9% uptime.
+    8.  RLS Query Overhead < 15ms.
+    9.  Support 50 concurrent active sessions per tenant.
+    10. WCAG 2.1 AA standard.
+    11. Logs retained for 1 year.
+    12. Dependency vulnerabilities patched within 24hrs.
+
+    *Measurement Methods:*
+    - Synthetic tests, CloudWatch, APM, Penetration tests, Accessibility Audits, CI/CD pipelines.
+
+    *Checking Context Constraints:*
+    - Must use Bun -> High performance API.
+    - Must use SeaweedFS -> Distributed storage.
+    - Must use DBOS -> Durable workflows.
+    - Must use Cerbos -> Policy auth.
+    - Must use Traefik -> Ingress.
+    - Multi-tenant -> RLS.
+
+    *Refining NFRs to match context:*
+    - NFR-001: API Performance (Bun).
+    - NFR-002: Media Storage (SeaweedFS).
+    - NFR-003: Security (RLS/Cerbos).
+    - NFR-004: Reliability (DBOS).
+    - NFR-005: Accessibility (SvelteKit).
+    - NFR-006: Maintainability (Traefik/Logs).
+
+    *Wait, US-001 AC-001-1 says "Upload endpoint returns '200 OK' for files under 10MB within 5 seconds".*
+    *If I make an NFR for "Upload throughput", I need to ensure it doesn't contradict. I can focus on "Aggregate ingestion throughput" or "Queue resilience".*
+    *Let's ensure thresholds are distinct.*
+
+    *Final Plan:* Generate JSON. Ensure strict JSON validity. Ensure no markdown outside the JSON block (or follow instruction "REQUIRED OUTPUT: A JSON object"). The prompt says "REQUIRED OUTPUT: A JSON object matching the `non_functional_requirements` schema". I should output *only* the JSON or JSON within code blocks. Usually, for system instructions, I should output valid JSON. I will wrap it in a markdown code block for clarity but ensure the content is valid JSON. Actually, standard practice is to output the JSON directly. I will provide the JSON object.
+
+    *Wait, one more check on "Compliance: No compliance regimes".*
+    Does this mean I shouldn't list security based on "compliance"?
+    No, Security is a category. It just means don't say "Must comply with PCI-DSS". Instead say "Must use TLS 1.3".
+    Does "Statutory deadlines" count as compliance? It's a regulatory requirement. The NFR should support the system ability to enforce these (e.g., "System must generate alerts for deadlines"). But NFRs are Non-Functional. So NFRs like "Message Delivery Latency" for statutory notices.
+    I will stick to technical constraints for the NFRs, treating regulatory logic as functional (US-006) or supportable reliability (NFR-004).
+
+    *Let's finalize the list.*
+    1.  NFR-001 (Performance): Backend API Latency (Bun).
+    2.  NFR-002 (Performance): Search/Inference Latency (AI).
+    3.  NFR-003 (Reliability): Workflow Durability (DBOS).
+    4.  NFR-004 (Security): Tenant Isolation (RLS).
+    5.  NFR-005 (Security): Authentication/Authorization (Cerbos).
+    6.  NFR-006 (Scalability): Media Storage Capacity (SeaweedFS).
+    7.  NFR-007 (Accessibility): Frontend Accessibility (SvelteKit).
+    8.  NFR-008 (Maintainability): Observability/Logging.
+    9.  NFR-009 (Security): Encryption Standards.
+    10. NFR-010 (Reliability): Offline Sync Reliability.
+
+    *Thresholds check:*
+    - Latency: P95 < 200ms.
+    - Storage: Handle 1TB/year growth.
+    - Auth: < 50ms.
+    - Encryption: AES-256.
+    - WCAG: AA.
+    - Logs: 90% capture rate.
+    - Workflow Checkpoints: < 1s.
+    - Offline Sync: < 30 mins.
+
+    *Wait, US-001 already covers Upload endpoint time.* NFR-002 (Search/Inference) is different.
+    *Wait, US-009 covers Auth timing.* NFR-005 (Cerbos overhead) is specific.
+
+    *Okay, ready to write.*
+    *JSON Structure:*
+    ```json
+    {
+      "non_functional_requirements": [ ... ]
+    }
+    ```
+    *Ensure valid JSON.* No comments.
+    *Ensure IDs are unique.*
+    *Ensure categories are from the list.*
+
+    *One detail:* "Compliance: No compliance regimes" in the Context Summary.
+    *Another detail:* "Must strictly follow the ServiceTitan business domains".
+    *I will interpret "Compliance: No compliance regimes" as "Do not derive NFRs based on external frameworks like HIPAA/GDPR unless implied by the product nature (e.g. data privacy is inherent)."*
+    *I will include Data Privacy/Encryption as Security NFRs, not "Compliance with GDPR".*
+
+    *Final check on constraints:*
+    - Bun for high-performance API execution. -> NFR on API latency.
+    - DBOS versioned workflows. -> NFR on durability.
+    - SeaweedFS. -> NFR on storage scalability.
+    - Cerbos. -> NFR on auth timing/RLS.
+    - SvelteKit. -> NFR on accessibility/performance.
+    - Traefik. -> NFR on ingress security/latency.
+
+    *Let's assemble.*

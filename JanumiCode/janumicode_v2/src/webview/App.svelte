@@ -13,11 +13,14 @@
   import { recordsStore, type SerializedRecord } from './stores/records.svelte';
   import { composerStore } from './stores/composer.svelte';
   import { phaseStore } from './stores/phase.svelte';
+  import { activityStore } from './stores/activity.svelte';
+  import { streamingStore } from './stores/streaming.svelte';
   import type { PhaseId } from '../lib/types/records';
   import Card from './components/Card.svelte';
   import VirtualScroll from './components/VirtualScroll.svelte';
   import IntentComposer from './components/IntentComposer.svelte';
   import PhaseIndicator from './components/PhaseIndicator.svelte';
+  import ActivityStrip from './components/ActivityStrip.svelte';
   import { scrollToPhase } from './scroll';
 
   interface Props {
@@ -32,6 +35,11 @@
 
   let containerEl = $state<HTMLElement | null>(null);
   let autoScroll = $state(true);
+  // Buffer for paginated snapshot delivery — accumulates records across
+  // snapshotChunk messages until snapshotComplete commits them in one
+  // setSnapshot call (so conversationalSort runs once, not per page).
+  let snapshotBuffer: SerializedRecord[] = [];
+  let snapshotInProgress = false;
 
   // ── Message Handler ─────────────────────────────────────────
   function handleMessage(event: MessageEvent) {
@@ -56,8 +64,44 @@
         recordsStore.setSnapshot(message.records as SerializedRecord[]);
         composerStore.endSubmit();
         phaseStore.reset();
+        // A fresh snapshot supersedes any in-flight buffers from a prior
+        // session — buffers are transient and should not survive reload.
+        streamingStore.reset();
         if (autoScroll) scrollToBottom();
         break;
+      case 'snapshotStart':
+        // Begin a paginated snapshot. Reset stores and accumulate batches
+        // into a buffer; finalize on snapshotComplete to keep the in-store
+        // resort cost (conversationalSort) to a single pass.
+        recordsStore.clear();
+        streamingStore.reset();
+        snapshotBuffer = [];
+        snapshotInProgress = true;
+        break;
+      case 'snapshotChunk':
+        if (snapshotInProgress) {
+          snapshotBuffer.push(...(message.records as SerializedRecord[]));
+        }
+        break;
+      case 'snapshotComplete':
+        if (snapshotInProgress) {
+          recordsStore.setSnapshot(snapshotBuffer);
+          snapshotBuffer = [];
+          snapshotInProgress = false;
+          composerStore.endSubmit();
+          phaseStore.reset();
+          if (autoScroll) scrollToBottom();
+        }
+        break;
+      case 'streamChunk': {
+        const payload = message.payload as {
+          invocationId: string;
+          channel: 'response' | 'thinking' | 'stdout' | 'stderr';
+          text: string;
+        };
+        streamingStore.append(payload.invocationId, payload.channel, payload.text);
+        break;
+      }
       case 'phaseUpdate': {
         const payload = message.payload as {
           phaseId?: string;
@@ -86,11 +130,33 @@
         break;
       case 'llmStatus': {
         const event = message.event as 'queued' | 'started' | 'finished';
-        const payload = message.payload as { queueDepth?: number };
-        if (event === 'queued' && typeof payload.queueDepth === 'number') {
-          composerStore.llmQueueDepth = payload.queueDepth;
+        const payload = message.payload as {
+          provider?: string;
+          lane?: 'phase' | 'user_query';
+          queueDepth?: number;
+          label?: string | null;
+          agentRole?: string | null;
+          subPhaseId?: string | null;
+        };
+        if (event === 'queued') {
+          if (typeof payload.queueDepth === 'number') {
+            composerStore.llmQueueDepth = payload.queueDepth;
+            activityStore.handleQueued(payload.queueDepth);
+          }
+        } else if (event === 'started') {
+          activityStore.handleStarted({
+            provider: payload.provider ?? '?',
+            lane: payload.lane ?? 'phase',
+            label: payload.label ?? null,
+            agentRole: payload.agentRole ?? null,
+            subPhaseId: payload.subPhaseId ?? null,
+          });
         } else if (event === 'finished') {
           composerStore.llmQueueDepth = Math.max(0, composerStore.llmQueueDepth - 1);
+          activityStore.handleFinished({
+            label: payload.label ?? null,
+            agentRole: payload.agentRole ?? null,
+          });
         }
         break;
       }
@@ -170,6 +236,7 @@
 
 <div class="root">
   <PhaseIndicator onNavigateToPhase={handleNavigateToPhase} />
+  <ActivityStrip />
   <div class="stream" bind:this={containerEl} onscroll={handleScroll}>
     {#if recordsStore.records.length === 0}
       <div class="empty-state">
@@ -204,39 +271,63 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
+    background: var(--jc-surface);
   }
   .stream {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 8px;
+    padding: var(--jc-space-lg);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--jc-space-lg);
   }
   .empty-state {
-    text-align: center;
-    padding: 32px 16px;
-    opacity: 0.6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: calc(var(--jc-space-2xl) * 2) var(--jc-space-2xl);
+    min-height: 200px;
   }
-  .empty-state h2 { margin: 0 0 8px; font-size: 1.1em; }
-  .empty-state p { margin: 0; font-size: 0.9em; }
-  .empty-state .hint { margin-top: 16px; font-size: 0.8em; opacity: 0.7; }
+  .empty-state h2 {
+    margin: 0 0 var(--jc-space-md);
+    font-family: var(--jc-font-headline);
+    font-size: 1.4em;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--jc-on-surface);
+  }
+  .empty-state p {
+    margin: 0;
+    font-size: 0.85em;
+    color: var(--jc-on-surface-variant);
+  }
+  .empty-state .hint {
+    margin-top: var(--jc-space-xl);
+    font-size: 0.75em;
+    color: var(--jc-outline);
+  }
 
   .jump-to-latest {
     position: sticky;
-    bottom: 8px;
+    bottom: 12px;
     align-self: center;
-    padding: 6px 16px;
-    border-radius: 16px;
-    border: 1px solid var(--vscode-button-border, transparent);
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    padding: var(--jc-space-md) var(--jc-space-2xl);
+    border-radius: var(--jc-radius-sm);
+    border: var(--jc-ghost-border);
+    background: var(--jc-surface-container-highest);
+    color: var(--jc-primary);
     cursor: pointer;
-    font-size: 0.8em;
+    font-family: var(--jc-font-body);
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     z-index: 10;
+    transition: background var(--jc-transition-base);
   }
   .jump-to-latest:hover {
-    background: var(--vscode-button-hoverBackground);
+    background: var(--jc-surface-bright);
   }
 </style>

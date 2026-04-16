@@ -1,0 +1,33 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Architecture Agent] identifying Software Domains for Sub-Phase 4.1.
+
+GOVERNING CONSTRAINTS (apply without exception):
+(none)
+
+Identify [JC:Software Domains] — cohesive groupings of related business logic within the System Boundary, each with its own [JC:Ubiquitous Language].
+
+REQUIRED OUTPUT: A JSON object matching the `software_domains` schema:
+- domains: array, each with:
+  - id, name, ubiquitous_language (array of {term, definition}), system_requirement_ids
+
+Rules:
+- Each domain should have a clear bounded context
+- Ubiquitous language terms must be unambiguous within the domain
+- Do NOT use terms from the JanumiCode Canonical Vocabulary as domain terms
+
+CONTEXT:
+System Boundary: PROJECT TYPE: The Shell-Scripted Utility: A single-file shell or Python script that manages tasks using standard text files as storage, requiring no installation or external dependencies.
+Capabilities: Task Addition via Command Line Arguments; Task Listing via Command Line Arguments; Task Completion Status Toggle; Task Removal via Command Line Arguments; Storage File Initialization on First Run; Single-File Script Execution (Shell/Python); Text-Based File Storage Persistence; Cross-Platform Compatibility (POSIX/Python); Secure Input Validation; Standard I/O Output Formatting
+Excluded: Database Management Systems; Graphical User Interfaces (GUI); External Library Dependencies; Installation Packages (e.g., .deb, .rpm); Network Service Capabilities; Compiled Binary Distribution; User Authentication Services; Remote Storage Integration
+
+In scope: Task Addition via Command Line Arguments; Task Listing via Command Line Arguments; Task Completion Status Toggle; Task Removal via Command Line Arguments; Storage File Initialization on First Run; Single-File Script Execution (Shell/Python); Text-Based File Storage Persistence; Cross-Platform Compatibility (POSIX/Python); Secure Input Validation; Standard I/O Output Formatting
+Out of scope: Database Management Systems; Graphical User Interfaces (GUI); External Library Dependencies; Installation Packages (e.g., .deb, .rpm); Network Service Capabilities; Compiled Binary Distribution; User Authentication Services; Remote Storage Integration
+External systems: EXT-001: Operating System File System (File I/O (Read/Write)); EXT-002: Standard Input/Output Streams (Stream I/O (Stdin/Stdout/Stderr)); EXT-003: Terminal Emulator (Text Rendering)
+System Requirements: 5 System Requirements:
+  SR-001 [High]: The system shall create the storage file with a default structure upon first execution if the file does not exist. (traces to: ["FR-005"])
+  SR-002 [High]: The system shall parse command line arguments to validate and append a new task record to the storage file. (traces to: ["FR-001"])
+  SR-003 [High]: The system shall read the storage file and output all stored task records to standard output. (traces to: ["FR-002"])
+  SR-004 [High]: The system shall update the status attribute of a specific task record to 'completed' within the storage file. (traces to: ["FR-003"])
+  SR-005 [High]: The system shall delete a specific task record from the storage file upon command. (traces to: ["FR-004"])
+
+DETAIL FILE: (not available)

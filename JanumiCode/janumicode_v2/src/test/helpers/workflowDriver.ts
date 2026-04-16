@@ -18,19 +18,18 @@
  *   expect(stream.records.find(r => r.record_type === 'agent_invocation')).toBeDefined();
  */
 
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
-import { createTestDatabase, type Database } from '../../lib/database/init';
-import { ConfigManager } from '../../lib/config/configManager';
+import type { Database } from '../../lib/database/init';
 import { OrchestratorEngine } from '../../lib/orchestrator/orchestratorEngine';
-import { Phase0Handler } from '../../lib/orchestrator/phases/phase0';
-import { Phase1Handler } from '../../lib/orchestrator/phases/phase1';
-import { EmbeddingService } from '../../lib/embedding/embeddingService';
 import { ClientLiaisonAgent, makeUserInput } from '../../lib/agents/clientLiaisonAgent';
 import type { CapabilityContext } from '../../lib/agents/clientLiaison/capabilities/index';
 import type { LiaisonResponse, Reference } from '../../lib/agents/clientLiaison/types';
 import type { SerializedRecord, EventType, EventPayload } from '../../lib/events/eventBus';
-import type { LLMProviderAdapter } from '../../lib/llm/llmCaller';
+import type { PhaseId } from '../../lib/types/records';
 import { MockLLMProvider } from './mockLLMProvider';
+import { createTestEngine } from './createTestEngine';
 
 // ── Public types ────────────────────────────────────────────────────
 
@@ -102,6 +101,8 @@ export interface DriveOptions {
    * when testing workspace-specific behavior (e.g. detail-file paths).
    */
   workspacePath?: string;
+  /** Optional phase limit for test isolation. */
+  phaseLimit?: PhaseId | null;
 }
 
 export interface MockFixture {
@@ -119,77 +120,27 @@ export interface MockFixture {
 
 export async function driveWorkflow(opts: DriveOptions): Promise<CapturedStream> {
   const startedAt = Date.now();
-  const repoRoot = path.resolve(__dirname, '..', '..', '..');
-  const extensionPath = opts.extensionPath ?? repoRoot;
-  const workspacePath = opts.workspacePath ?? extensionPath;
+  // Default workspacePath to an empty temp dir. Using the repo root as the
+  // workspace means Phase 0 would treat the entire JanumiCode source tree
+  // as brownfield artifacts, flooding the governed stream with hundreds
+  // of unrelated source files and breaking Phase 1 test assertions.
+  // Tests that want real file content should pass workspacePath explicitly.
+  const workspacePath = opts.workspacePath
+    ?? fs.mkdtempSync(path.join(os.tmpdir(), 'jc-drive-ws-'));
 
-  // 1. In-memory database.
-  const db = createTestDatabase();
-
-  // 2. ConfigManager — defaults are fine for tests.
-  const configManager = new ConfigManager();
-
-  // 3. Engine. Auto-approve is default-on so tests don't deadlock on mirrors.
-  const engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
-  if (opts.autoApprove !== false) {
-    engine.setAutoApproveDecisions(true);
-  }
-  engine.registerPhase(new Phase0Handler());
-  engine.registerPhase(new Phase1Handler());
-
-  // 4. Embedding service — instantiated for completeness so the writer's
-  //    embedding hook doesn't error, but never started so it doesn't try to
-  //    talk to a real Ollama. Tests don't depend on vector search.
-  const embedding = new EmbeddingService(db, {
-    provider: 'ollama',
-    model: 'qwen3-embedding:8b',
-    maxParallel: 1,
+  // Shared engine bootstrap — same wiring as the CLI runner.
+  const te = await createTestEngine({
+    extensionPath: opts.extensionPath ?? path.resolve(__dirname, '..', '..', '..'),
+    workspacePath,
+    autoApprove: opts.autoApprove,
+    llmFixtures: opts.llmFixtures,
+    useRealProviders: opts.useLiveOllama,
+    phaseLimit: opts.phaseLimit,
   });
-  // NOTE: deliberately NOT calling embedding.start() — we don't want the
-  // worker queue running in test mode.
-
-  // 5. Mock LLM provider. Registered under every provider name the engine
-  //    and Liaison might use (ollama, anthropic, google, mock) so we don't
-  //    have to stub out the call sites' provider strings. All wrappers share
-  //    the same fixture store via mockLLM.bindAsProvider(name).
-  const mockLLM = new MockLLMProvider();
-  if (opts.llmFixtures) {
-    for (const [key, fixture] of Object.entries(opts.llmFixtures)) {
-      mockLLM.setFixture(key, fixture);
-    }
-  }
-
-  if (opts.useLiveOllama) {
-    // Lazy-import so tests that don't need it don't pay the cost.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { OllamaProvider } = require('../../lib/llm/providers/ollama');
-    engine.llmCaller.registerProvider(new OllamaProvider());
-  } else {
-    // Mock everything: every provider name routes to the same fixture store.
-    engine.llmCaller.registerProvider(mockLLM);
-    engine.llmCaller.registerProvider(mockLLM.bindAsProvider('ollama'));
-    engine.llmCaller.registerProvider(mockLLM.bindAsProvider('anthropic'));
-    engine.llmCaller.registerProvider(mockLLM.bindAsProvider('google'));
-  }
+  const { engine, liaison, db, mockLLM, embedding } = te;
 
   const previousProvider = process.env.JANUMICODE_LLM_PROVIDER;
   process.env.JANUMICODE_LLM_PROVIDER = opts.useLiveOllama ? 'ollama' : 'mock';
-
-  // 6. ClientLiaisonAgent (universal router).
-  const liaison = new ClientLiaisonAgent(
-    db,
-    engine,
-    {
-      provider: opts.useLiveOllama ? 'ollama' : 'mock',
-      model: opts.useLiveOllama ? 'qwen3.5:9b' : 'mock-model',
-      embeddingService: embedding,
-    },
-    null, // no extension host adapter in tests
-  );
-  // The Liaison's internal PriorityLLMCaller is a separate instance — register
-  // the same mock provider on it so its classifier/synthesizer route correctly.
-  liaison.registerProviders(mockLLM as unknown as LLMProviderAdapter);
-  liaison.setEventBus(engine.eventBus);
 
   // 7. Capture buffer — subscribe to every event we care about. Use string
   //    literals so we don't depend on private EventBus internals.
@@ -300,7 +251,7 @@ export async function driveWorkflow(opts: DriveOptions): Promise<CapturedStream>
       for (const off of disposers) off();
       if (previousProvider !== undefined) process.env.JANUMICODE_LLM_PROVIDER = previousProvider;
       else delete process.env.JANUMICODE_LLM_PROVIDER;
-      try { db.close(); } catch { /* ignore */ }
+      te.cleanup();
     },
   };
 }
@@ -321,21 +272,30 @@ async function waitForQuiescence(
   timeoutMs: number,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
+  let stableIdlePolls = 0;
   while (Date.now() < deadline) {
     const run = engine.stateMachine.getWorkflowRun(runId);
     if (!run) return;
     if (run.status === 'completed' || run.status === 'failed' || run.status === 'rolled_back') {
       return;
     }
-    // If the engine has no pending decisions and is sitting on a phase gate
-    // (the typical Phase 1 terminal state with auto-approve), we're done.
-    if (run.current_sub_phase_id && !engine['pendingDecisions'].size) {
-      // Give one more microtask tick for any in-flight then-callbacks.
-      await new Promise((r) => setTimeout(r, 5));
-      const after = engine.stateMachine.getWorkflowRun(runId);
-      if (after && after.current_sub_phase_id === run.current_sub_phase_id) return;
+
+    // Treat the run as quiescent only after several consecutive idle polls.
+    // A single matching sub-phase is too weak because auto-approved decisions
+    // can resume the workflow on the next microtask and race test cleanup.
+    const isIdle =
+      Boolean(run.current_sub_phase_id) &&
+      !engine['pendingDecisions'].size &&
+      engine.llmCaller.inFlightCount === 0;
+
+    if (isIdle) {
+      stableIdlePolls++;
+      if (stableIdlePolls >= 5) return;
+    } else {
+      stableIdlePolls = 0;
     }
-    await new Promise((r) => setTimeout(r, 10));
+
+    await new Promise((r) => setTimeout(r, 20));
   }
 }
 

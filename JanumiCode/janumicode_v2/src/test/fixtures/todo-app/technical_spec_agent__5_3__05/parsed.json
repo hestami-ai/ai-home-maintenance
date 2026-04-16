@@ -1,0 +1,38 @@
+{
+  "error_handling_strategies": [
+    {
+      "component_id": "COMP-001",
+      "error_types": [
+        "file_not_found",
+        "permission_denied",
+        "disk_full",
+        "corrupt_record"
+      ],
+      "detection": "exception_handling, file_exists_check",
+      "response": "propagate_fatal, fallback_corrupt",
+      "surfacing": "exit_code, stderr_message"
+    },
+    {
+      "component_id": "COMP-002",
+      "error_types": [
+        "invalid_argument",
+        "missing_required_arg",
+        "unknown_flag",
+        "malformed_task_id"
+      ],
+      "detection": "regex_validation, argument_count_check",
+      "response": "abort_operation",
+      "surfacing": "exit_code, stderr_message"
+    },
+    {
+      "component_id": "COMP-003",
+      "error_types": [
+        "broken_pipe",
+        "output_stream_error"
+      ],
+      "detection": "try_write_block",
+      "response": "fallback_stderr",
+      "surfacing": "stderr_message"
+    }
+  ]
+}

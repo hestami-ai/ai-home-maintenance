@@ -1,0 +1,350 @@
+The user wants me to act as a [JC:Domain Interpreter Agent] and perform Intent Domain Bloom (Sub-Phase 1.2).
+My goal is to expand the provided [Raw Intent] into a full candidate space of interpretations without narrowing, prioritizing, or converging.
+I need to output a JSON object matching the `intent_bloom` schema.
+
+**Constraints & Requirements:**
+1.  **Expand:** Maximize the range of plausible interpretations.
+2.  **No Convergence:** Do NOT narrow or prioritize. If two options are plausible, keep both.
+3.  **Surface Assumptions:** Surface EVERY assumption, even obvious ones, with a basis for each.
+4.  **Open Questions:** List genuine ambiguities.
+5.  **Minimum 3 Candidates:** Generate at least 3 distinct product concept candidates from different angles.
+6.  **JSON Output:** Strict JSON schema matching `intent_bloom`.
+7.  **Context:** I must reference the provided [Raw Intent] (Hestami AI Real Property OS) and the referenced files (Hestami AI Real Property OS Description, ServiceTitan, Vantaca).
+8.  **Brownfield:** Check for conflicts with prior decisions (though the context file path suggests checking `context/1.2_bloom-ef5a4e8d.md`, I don't have access to the actual file content, only the "Complete supporting context" note. Since I cannot read external files not provided in the prompt, I must rely on the "CONTEXT SUMMARY" and the detailed files provided in the prompt text. I will note if information is missing rather than hallucinating specific prior decisions.)
+9.  **Domain:** Real Property OS (Home services, CAM, FSM).
+10. **Technical Stack:** SvelteKit, Bun, PostgreSQL, DBOS, etc. (Must respect these constraints in the candidates).
+
+**Analysis of Raw Intent:**
+The Raw Intent is: "Review 'specs/hestami-ai-real-property-os(2)/Hestami AI Real Property OS and Platform Product Description.md' and prepare for implementation."
+This is a high-level directive to review the spec document (provided in the context) and prepare for implementation.
+"Prepare for implementation" is vague. It implies:
+- Designing the architecture further?
+- Identifying MVP features?
+- Defining the user journey?
+- Selecting the first phase scope?
+- Setting up the infrastructure?
+
+**Candidate Spaces to Explore:**
+Since I need to generate "product concept candidates" based on the Raw Intent of "prepare for implementation", I should interpret "candidates" as distinct strategic paths or architectural scopes for *how* to "prepare for implementation" given the vast scope described in the spec.
+
+*Candidate 1: The "Monolithic MVP" Approach*
+- Focus on Phase 1 (Home Assistant) as the immediate entry point.
+- Build the "Digital Twin" aspect (images, 3D splats) first.
+- Serve Individual Homeowners primarily.
+- Assumption: The complex accounting/ARC (Pillars 2 & 3) are too heavy for V1.
+
+*Candidate 2: The "Enterprise-First" Approach*
+- Focus on Phase 3 (CAM) and Phase 2 (FSM) for the initial deployment to secure B2B revenue.
+- Serve Community Associations and Management Companies primarily.
+- Assumption: Individual homeowners are too difficult to acquire/retain without B2B leverage.
+
+*Candidate 3: The "Modular/Platform" Approach*
+- Build the "Common Data Model" (Hestami CDM) and Workflow Engine (DBOS) first as a standalone platform.
+- Allow third parties to plug in Phase 1/2/3 logic later.
+- Serve the Platform itself and future integrations.
+- Assumption: The OS is a product itself, not just a suite of apps.
+
+*Candidate 4: The "Agent-First" Approach*
+- Prioritize the AI/Agentic capabilities (LLMs, Vision models) as the core product.
+- Focus on the "Decision, Rationale & Trust Ledger" domain.
+- Serve users who want automation over manual UI.
+- Assumption: AI is the differentiator, not just UI.
+
+*Candidate 5: The "Niche/Vertical" Approach*
+- Focus on specific trades (e.g., HVAC/Plumbing) for Phase 2.
+- Focus on specific property types (Condos vs. Single Family) for Phase 3.
+- Assumption: Generalization is not needed immediately.
+
+*Candidate 6: The "Legacy Integration" Approach*
+- Build specifically to integrate with existing HOA software (Vantaca competitors) and Property Management systems.
+- Assumption: Interoperability is the #1 barrier to entry.
+
+I need to select at least 3 distinct ones. I will choose:
+1.  **The "Homeowner-Centric MVP"**: Focuses on Phase 1 (Home Assistant) to get immediate user traction and data.
+2.  **The "B2B/Enterprise Foundation"**: Focuses on building the CDM and DBOS engine first to enable scalability for Phase 2 & 3.
+3.  **The "Trade-First Expansion"**: Focuses on Phase 2 (ServiceTitan model) as the revenue engine, assuming Phase 1 is a marketing funnel.
+
+Wait, the prompt asks to expand the *Raw Intent* ("prepare for implementation") into *candidate product concepts*.
+Usually, this means "What products are we actually building?"
+So the candidates should be specific *implementations* or *strategies* derived from the spec.
+Given the spec defines three pillars, the "candidates" might be different *scopes* of implementation.
+
+Let's refine the candidates to be about the *scope of the initial implementation*.
+
+*Candidate A: The "Single-Home MVP"*
+- Implement only the Hestami Home Real Property Assistant for a single user flow.
+- Ignore the CAM/FSM pillars entirely until V2.
+- Serves the Individual Homeowner.
+- Solves "Finding contractors".
+
+*Candidate B: The "HOA-Integrated Suite"*
+- Implement the Hestami CDM + CAM (Vantaca modeled) + FSM (ServiceTitan modeled) but locked to a single HOA vertical.
+- Serves HOAs and Associations.
+- Solves "Compliance & Governance".
+
+*Candidate C: The "Full OS Implementation"*
+- Implement all three pillars simultaneously as a single tenant SaaS.
+- Serves all personas (Owner, Vendor, Manager).
+- Solves "Holistic integration".
+
+Let's add more nuance to the "Candidates".
+Actually, the prompt says "Generate AT LEAST 3 distinct product concept candidates from different angles".
+The "Raw Intent" is "Review ... and prepare for implementation".
+So the "Product Concepts" could be:
+1.  **Concept 1: The "Trust & Verification" Product.** Focuses heavily on Domain 12 (Compliance), Domain 4 (Violations), and Domain 10 (Documents). Uses AI to verify licenses, insurance, and docs before allowing any service call.
+2.  **Concept 2: The "Workflow Automation" Product.** Focuses on Domain 3 (Workflow) and Domain 6 (Work Orders). Uses DBOS to orchestrate the complex state machine of a service call.
+3.  **Concept 3: The "Asset Digital Twin" Product.** Focuses on the AI Vision capabilities (Domain 1, 5, 10) - 3D Gaussian Splats, image analysis.
+
+These are distinct angles: Compliance/Trust, Operational Workflow, Visual/Data.
+
+Let's go with the "Scope/Strategy" candidates as they fit "Prepare for Implementation" better.
+1.  **Phase 1 Focused (Home Assistant)**: "The Consumer MVP". Focus on getting homeowners to upload data and get service.
+2.  **Phase 3 Focused (CAM)**: "The Enterprise MVP". Focus on selling to Management Companies.
+3.  **Platform Focused (CDM)**: "The Infrastructure MVP". Focus on the DBOS/Postgres engine first.
+
+Let's look at the constraints again. "Collisions Aliases", "System Proposed Content".
+I need to fill the JSON.
+I need to make sure I surface assumptions.
+
+*Assumption Example:* "We assume the DBOS engine is ready for production, not just a prototype."
+*Assumption Example:* "We assume homeowners will use the mobile app rather than a web portal."
+
+Let's draft the JSON.
+
+**Candidate 1: The "Homeowner First" MVP (Phase 1 Focus)**
+- *Concept:* Focus solely on Pillar 1 (Home Real Property Assistant).
+- *Goal:* Acquire data on property conditions and connect owners with vetted vendors.
+- *Why:* Lowers barrier to entry.
+- *Assumptions:* Owners are willing to use a new app; Vendor onboarding is external; Accounting (Domain 2) is handled later.
+- *Basis:* Raw Intent mentions Phase 1 is "Hestami Home Real Property Assistant".
+
+**Candidate 2: The "Association Enterprise" MVP (Phase 3 Focus)**
+- *Concept:* Focus solely on Pillar 3 (Community Association Management).
+- *Goal:* Replace Vantaca-style workflows for HOAs.
+- *Why:* Recurring revenue, less churn than single homeowners.
+- *Assumptions:* Complex accounting (Domain 2) is critical; Governance (Domain 8) must be robust.
+- *Basis:* Spec mentions Vantaca as the model for Phase 3.
+
+**Candidate 3: The "Trade OS" MVP (Phase 2 Focus)**
+- *Concept:* Focus solely on Pillar 2 (Service Provider Field Services Management).
+- *Goal:* Provide the FSM layer for contractors.
+- *Why:* High value for the trades; enables the platform to charge for dispatching.
+- *Assumptions:* Contractors will accept the platform; Offline capabilities (Domain 6) are critical.
+- *Basis:* Spec mentions ServiceTitan as the model for Phase 2.
+
+**Wait, are these distinct enough?**
+Maybe I should combine them or create more nuanced ones.
+Actually, the prompt asks to expand the *intent* "prepare for implementation".
+So the "Candidates" represent *strategies* of implementation.
+But the schema asks for `candidate_product_concepts`.
+So these must be "Product Concept Candidates".
+So "The Homeowner MVP" is a product concept. "The Enterprise MVP" is a product concept.
+These are distinct.
+
+Let's refine the descriptions to match the schema fields:
+- `id`: Unique string.
+- `name`: Short title.
+- `description`: What it is.
+- `who_it_serves`: User personas.
+- `problem_it_solves`: Specific pain point.
+- `assumptions`: List of inferred things.
+- `constraints`: Must satisfy DBOS, Postgres, SvelteKit.
+- `open_questions`: What we don't know.
+
+**Candidate 1: The "Owner-Centric Concierge" (Pillar 1 Focus)**
+- Focus on the "AI Home Assistant".
+- *Assumption:* The AI Agent will handle the discovery of service providers (Domain 8 - External Vendor Coordination) better than a manual directory.
+- *Assumption:* Offline capabilities are not required for the *Owner* (web app only), but required for the *Tech* (mobile app).
+
+**Candidate 2: The "Association Compliance Engine" (Pillar 3 Focus)**
+- Focus on Governance, Rules, Violations, Finance.
+- *Assumption:* Automated compliance tracking (Domain 12) is more valuable than generic work orders.
+
+**Candidate 3: The "Technician Dispatch Network" (Pillar 2 Focus)**
+- Focus on FSM, Routing, Inventory, Quoting.
+- *Assumption:* The platform must compete on dispatching intelligence.
+
+Wait, the prompt says "Generate AT LEAST 3 distinct product concept candidates from different angles".
+The angles are:
+1. User Base (Homeowner vs Owner vs Vendor)
+2. Value Prop (Trust/Discovery vs Compliance vs Operational Efficiency)
+3. Scope (Consumer App vs Enterprise SaaS vs Field Tool)
+
+I think these work.
+
+**System Proposed Content:**
+- Fields that are empty in the intent but needed.
+- "product_name" is implied "Hestami AI Real Property OS".
+- "version": "0.0.1".
+- "status": "planning".
+- These need approval_status: "pending".
+
+**Prior Decision Conflicts:**
+- The intent says "review ... and prepare".
+- No prior decisions provided in the prompt other than the file content.
+- I will note "No prior decisions found in provided context" or similar.
+
+**Open Questions:**
+- How to handle the "Nextdoor" integration (listed as To Be Determined).
+- Which "Digital Asset" storage (SeaweedFS vs S3) is final?
+- The specific "Eternal Perspective" data retention policies.
+
+Let's assemble the JSON.
+I need to make sure I don't hallucinate prior decisions I don't know.
+I will check the `context/1.2_bloom-ef5a4e8d.md` path mentioned in the prompt.
+Since I cannot access that file, I will treat the context as "provided in the prompt" which lists the Raw Intent and the referenced files.
+I will note that I am operating based on the text provided in the prompt for the `prior_decision_conflicts` (which will likely be empty or noting the lack of prior decisions).
+
+Wait, I should look closely at the `Collisions Aliases` section: "None".
+`system_proposed_content` fields: approval_status: "pending".
+`prior_decision_conflicts`: array.
+
+I will write the JSON carefully.
+
+One detail: "Surface EVERY assumption — even obvious ones".
+Obvious assumptions:
+- The system will run on the internet.
+- The system will need a server.
+- The system will store data.
+- Users have internet access (mostly).
+- The DBOS workflow engine requires idempotency.
+- The tech stack is fixed (Node/Bun, SvelteKit, Postgres).
+- "Single_product, production_grade" (from Context Summary) means we aren't building a POC, we are building for production.
+
+Let's draft the content.
+I need to make sure the JSON is valid.
+
+Structure:
+```json
+{
+  "candidate_product_concepts": [
+    {
+      "id": "cp-concierge-homeowner",
+      "name": "The Owner-Centric Concierge MVP",
+      "description": "A consumer-focused implementation focusing solely on Pillar 1 (Home Real Property Assistant) to acquire property data and facilitate vendor discovery for individual homeowners.",
+      "who_it_serves": ["Individual homeowners", "Small landlords", "Property investors"],
+      "problem_it_solves": "Wasting time finding reliable contractors, comparing inconsistent bids, and managing follow-up.",
+      "assumptions": [
+        "Homeowners will prioritize the 'AI Agent' discovery experience over a manual directory.",
+        "Vendor onboarding is external to the MVP; the MVP acts as the discovery layer.",
+        "Offline mobile access is a non-critical requirement for the Homeowner app at this phase.",
+        "Complex accounting (Pillar 2/3) can be deferred to Phase 2 without blocking user adoption."
+      ],
+      "constraints": [
+        "Must use DBOS for all workflows (even simple ones) per the 'Eternal Perspective'.",
+        "Must use SvelteKit for the Frontend.",
+        "Must support Row-Level Security (RLS) for multi-tenancy.",
+        "Must integrate with SeaweedFS for media assets."
+      ],
+      "open_questions": [
+        "How to monetize this consumer-facing MVP without selling user data?",
+        "What is the specific retention strategy for homeowners who only use the app once?"
+      ]
+    },
+    ...
+  ],
+  "system_proposed_content": [
+    {
+      "field_name": "product_version",
+      "proposed_value": "0.0.1-alpha",
+      "approval_status": "pending"
+    },
+    ...
+  ],
+  "prior_decision_conflicts": []
+}
+```
+
+I will expand the assumptions to be very granular as requested.
+I will add a candidate that focuses on the "Platform/Engine" first.
+I will add a candidate that focuses on "Compliance/Trust" first.
+
+Let's verify the `Raw Intent`: "Review ... and prepare for implementation."
+So the "Product Concept" is essentially "What is the product we build *first* or *next* based on this intent?".
+So the candidates are indeed different strategies for *implementation*.
+Strategy A: Build the Consumer App first.
+Strategy B: Build the Enterprise App first.
+Strategy C: Build the Engine/API first.
+
+I will formulate the JSON now.
+I need to make sure I don't miss the `prior_decision_conflicts`.
+Since I don't have the `1.2_bloom-ef5a4e8d.md` file, I can't check for conflicts there. I will assume empty or note the limitation. I will keep the array empty but add an entry explaining why if applicable? No, the schema says "array of conflicts". If none, empty array.
+Wait, "Consult for full prior decision history and compliance details."
+Since I don't have the file, I must assume no conflicts found in the available text, or I can't determine them. I'll leave it empty but perhaps add a note in the `open_questions` about this if relevant. No, better to keep it clean.
+
+Wait, looking at `COLLISION ALIASES`. It says `None`.
+`system_proposed_content`: "array of system-proposed field values (for absent fields)".
+I should propose fields that are missing from the "Raw Intent".
+Raw Intent: "Review ... and prepare".
+Missing fields: version, status, owner, etc.
+
+Let's finalize the candidates.
+
+**Candidate 1: The "Consumer Discovery" MVP (Phase 1)**
+Focus: Homeowners + Service Provider Matching.
+Angle: User Acquisition / Data Collection.
+
+**Candidate 2: The "Association Governance" MVP (Phase 3)**
+Focus: HOA Compliance, AR/AC, Financials.
+Angle: Enterprise / Recurring Revenue.
+
+**Candidate 3: The "Field Service Engine" MVP (Phase 2)**
+Focus: Technicians, Dispatching, Routing.
+Angle: Operational Efficiency / Trade Partner Enablement.
+
+These align with the 3 pillars. They are distinct.
+I will ensure `assumptions` are very detailed.
+I will ensure `constraints` reference the tech stack provided (SvelteKit, DBOS, etc.).
+
+One constraint from Context Summary: "Scope: single_product, production_grade".
+So I must assume we are building a "Single Product".
+If Candidate 1 builds only Phase 1, does that violate "Single Product"?
+No, "Single Product" usually means we don't sell three separate SKUs, but a platform that grows.
+So implementing Phase 1 features within the single product is valid.
+I will add a constraint "Product boundaries must align with the defined pillars" to the constraints.
+
+Let's construct the JSON.
+I need to make sure the output is valid JSON. No comments.
+
+```json
+{
+  "candidate_product_concepts": [ ... ],
+  "system_proposed_content": [ ... ],
+  "prior_decision_conflicts": [ ... ]
+}
+```
+
+I will write the assumptions in a way that explicitly states the basis.
+Example: "Assumption: Users will upload photos. Basis: Spec mentions 'digital assets exchange' and '3D Gaussian Splats'."
+Wait, the constraint says "Every assumption must have a basis (what in the Raw Intent led you to this inference)".
+I will be very specific about this in the `assumptions` array.
+The schema doesn't explicitly ask for a `basis` field inside the assumption object, but the instruction says "Every assumption must have a basis".
+This might mean I need to add a `basis` field to the assumption object, or I need to make the text of the assumption explain the basis.
+Looking at the schema definition:
+- `assumptions: inferences you made that were NOT stated — surface ALL of them`
+It does not define a nested schema for assumptions.
+I will interpret this as: The text of the assumption should state the basis, OR I can add a `basis` property if it fits the schema.
+Usually, if the schema is not strict, I can add fields. But "matching the `intent_bloom` schema" implies strictness.
+The provided schema description in the prompt is:
+- candidate_product_concepts: array of product concept candidates, each with:
+  - id, name, description, who_it_serves, problem_it_solves
+  - assumptions: inferences you made that were NOT stated — surface ALL of them
+  - constraints: conditions the solution must satisfy
+  - open_questions: ambiguities that cannot be resolved without human judgment
+It doesn't explicitly list a `basis` key.
+However, the instruction says "Every assumption must have a basis".
+I will structure the assumption strings to include the basis in parentheses or explicit phrasing like "Basis: [Source]."
+Actually, to be safe and clear, I will format the assumption values to explicitly mention the source from the Raw Intent.
+
+Wait, looking at `system_proposed_content`: "array of system-proposed field values (for absent fields), each with approval_status: 'pending'".
+I need to define what fields are "absent".
+The Raw Intent doesn't mention version. It mentions "Review ... and prepare".
+So I will propose `product_name`, `version`, `release_notes`.
+
+Let's finalize.
+
+One more check: `prior_decision_conflicts`.
+Since I don't have the file `context/1.2_bloom-ef5a4e8d.md`, I cannot confirm conflicts.
+I will leave it empty but ensure I don't hallucinate a conflict.
+
+Okay, ready to generate.

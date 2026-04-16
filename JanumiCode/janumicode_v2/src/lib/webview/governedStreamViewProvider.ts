@@ -17,6 +17,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { Database } from '../database/init';
 import type { OrchestratorEngine } from '../orchestrator/orchestratorEngine';
@@ -118,6 +119,26 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     const off1 = this.engine.eventBus.on('record:added', (p) => {
       this.post({ type: 'addRecord', record: p.record });
     });
+    // workflow:started fires BEFORE phase:started during intent submission.
+    // Sync the session run id here so the phaseUpdate payloads emitted by
+    // the subsequent phase:started handler carry a non-null workflowRunId —
+    // the webview's PhaseIndicator hides itself when workflowRunId is null.
+    const off0 = this.engine.eventBus.on('workflow:started', (p) => {
+      this.session.currentRunId = p.workflowRunId;
+      this.post({
+        type: 'phaseUpdate',
+        event: 'workflow:started',
+        payload: {
+          phaseId: '0',
+          subPhaseId: null,
+          completedPhases: [],
+          completedSubPhases: [],
+          skippedSubPhases: [],
+          status: 'active',
+          workflowRunId: p.workflowRunId,
+        },
+      });
+    });
     const off2 = this.engine.eventBus.on('phase:started', (p) => {
       const completedPhases = this.session.currentRunId ? this.getCompletedPhases(this.session.currentRunId) : [];
       const completedSubPhases = this.session.currentRunId ? this.getCompletedSubPhases(this.session.currentRunId) : [];
@@ -160,8 +181,16 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     const off8 = this.engine.eventBus.on('llm:finished', (p) => {
       this.post({ type: 'llmStatus', event: 'finished', payload: p });
     });
+    // Forward streaming chunks (LLM tokens + CLI stdout/stderr) directly to
+    // the webview without persisting them. The transient store keyed by
+    // invocationId in the webview reassembles them for live rendering;
+    // once `agent_output` lands, the card switches to its authoritative
+    // text and the transient buffer is dropped.
+    const off9 = this.engine.eventBus.on('llm:stream_chunk', (p) => {
+      this.post({ type: 'streamChunk', payload: p });
+    });
 
-    this.disposers.push(off1, off2, off3, off4, off5, off6, off7, off8);
+    this.disposers.push(off0, off1, off2, off3, off4, off5, off6, off7, off8, off9);
 
     view.onDidDispose(() => {
       for (const d of this.disposers) d();
@@ -218,6 +247,21 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
           decisions: Array<{ itemId: string; action: string; payload?: Record<string, unknown> }>;
         });
         return;
+      case 'decisionBundleSubmit':
+        this.handleDecisionBundleSubmit(msg as unknown as {
+          recordId: string;
+          surfaceId: string;
+          mirror_decisions: Array<{ item_id: string; action: string; edited_text?: string }>;
+          menu_selections: Array<{ option_id: string; free_text?: string }>;
+        });
+        return;
+      case 'focusComposer':
+        // Best-effort nudge emitted by DecisionBundleCard when the user
+        // hits "Ask more" — the webview focuses its own textarea, but
+        // this ensures the sidebar panel itself has focus so keyboard
+        // input lands in the composer without an extra click.
+        void this.focusComposer();
+        return;
       default:
         getLogger().debug('ui', 'Unhandled webview message', { type: msg.type });
     }
@@ -233,14 +277,16 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    // Build the snapshot from the database.
-    const records = this.session.currentRunId
-      ? this.loadAllRecordsForRun(this.session.currentRunId)
-      : [];
-    this.post({
-      type: 'snapshot',
-      records: records.map((r) => this.serialize(r)),
-    });
+    // Build and stream the snapshot from the database. Pagination keeps the
+    // RPC bridge bounded — without it, a workflow with thousands of records
+    // can produce a single response payload bigger than the SharedArrayBuffer
+    // can carry, which surfaces as the "RPC error: offset is out of bounds"
+    // the user reported on extension restart.
+    if (this.session.currentRunId) {
+      this.streamSnapshot(this.session.currentRunId);
+    } else {
+      this.post({ type: 'snapshot', records: [] });
+    }
 
     // Send phase update so the composer mode flips to Open Query.
     if (this.session.currentRunId) {
@@ -400,6 +446,28 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private handleDecisionBundleSubmit(msg: {
+    recordId: string;
+    surfaceId: string;
+    mirror_decisions: Array<{ item_id: string; action: string; edited_text?: string }>;
+    menu_selections: Array<{ option_id: string; free_text?: string }>;
+  }): void {
+    if (!this.session.currentRunId) {
+      this.post({ type: 'error', message: 'No active workflow run.' });
+      return;
+    }
+    this.decisionRouter.routeBundle(this.session.currentRunId, {
+      recordId: msg.recordId,
+      surfaceId: msg.surfaceId,
+      mirrorDecisions: msg.mirror_decisions.map(d => ({
+        item_id: d.item_id,
+        action: d.action as 'accepted' | 'rejected' | 'edited' | 'deferred',
+        edited_text: d.edited_text,
+      })),
+      menuSelections: msg.menu_selections,
+    });
+  }
+
   // ── Helpers ───────────────────────────────────────────────────
 
   private buildCapabilityContext(activeRun: WorkflowRun | null): CapabilityContext {
@@ -417,25 +485,46 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     };
   }
 
-  private surfaceTypeOf(recordType: string): 'mirror' | 'menu' | 'decision_bundle' | 'phase_gate' | null {
+  private surfaceTypeOf(recordType: string): 'mirror' | 'decision_bundle' | 'phase_gate' | null {
     switch (recordType) {
       case 'mirror_presented': return 'mirror';
-      case 'menu_presented': return 'menu';
       case 'decision_bundle_presented': return 'decision_bundle';
       case 'phase_gate_evaluation': return 'phase_gate';
       default: return null;
     }
   }
 
-  private loadAllRecordsForRun(runId: string): GovernedStreamRecord[] {
-    const rows = this.db
-      .prepare(
-        `SELECT * FROM governed_stream
-          WHERE workflow_run_id = ? AND is_current_version = 1
-          ORDER BY produced_at ASC`,
-      )
-      .all(runId) as Record<string, unknown>[];
-    return rows.map((r) => this.rowToRecord(r));
+  /**
+   * Stream a workflow's records to the webview in pages so neither the RPC
+   * bridge (capped by SharedArrayBuffer size) nor the postMessage channel
+   * has to carry the full snapshot in one shot. Sends:
+   *   - one `snapshotStart` so the webview can clear/reset stores
+   *   - N × `snapshotChunk` with batches of records
+   *   - one `snapshotComplete` so the webview can finalize (scroll, unlock
+   *     composer, etc.) once the last batch is in.
+   * Page size is generous (500 rows) but small enough that even rich
+   * agent_invocation rows with multi-KB prompts stay well under the 32MB
+   * RPC ceiling.
+   */
+  private streamSnapshot(runId: string): void {
+    const PAGE_SIZE = 500;
+    this.post({ type: 'snapshotStart' });
+    let offset = 0;
+    const stmt = this.db.prepare(
+      `SELECT * FROM governed_stream
+        WHERE workflow_run_id = ? AND is_current_version = 1
+        ORDER BY produced_at ASC
+        LIMIT ? OFFSET ?`,
+    );
+    while (true) {
+      const rows = stmt.all(runId, PAGE_SIZE, offset) as Record<string, unknown>[];
+      if (rows.length === 0) break;
+      const records = rows.map((r) => this.serialize(this.rowToRecord(r)));
+      this.post({ type: 'snapshotChunk', records });
+      if (rows.length < PAGE_SIZE) break;
+      offset += rows.length;
+    }
+    this.post({ type: 'snapshotComplete' });
   }
 
   /**
@@ -580,6 +669,15 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     );
     const nonce = this.generateNonce();
 
+    // Read the JanumiCode design system CSS from the built webview dir.
+    // This file is the single source of truth for design tokens (colors,
+    // spacing, radii, transitions, typography) — it's copied into dist/
+    // by esbuild's copy-design-system-css plugin. We inline its contents
+    // rather than linking so Svelte components can reference `var(--jc-*)`
+    // immediately without a second HTTP request (and without needing to
+    // loosen CSP for an extra stylesheet).
+    const designSystemCss = this.readDesignSystemCss();
+
     getLogger().info('ui', 'Building webview HTML', {
       scriptUri: scriptUri.toString(),
       cspSource: webview.cspSource,
@@ -601,12 +699,20 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
              script-src 'nonce-${nonce}' ${webview.cspSource};">
   <title>Governed Stream</title>
   <style>
+    /* ── JanumiCode Design System (inlined from design-system.css) ──── */
+    ${designSystemCss}
+
+    /* ── Webview-specific base rules (not design tokens) ──────────── */
     html, body { margin: 0; padding: 0; height: 100vh; }
     body {
-      font-family: var(--vscode-font-family);
-      font-size: var(--vscode-font-size);
-      color: var(--vscode-foreground);
-      background: var(--vscode-sideBar-background);
+      font-family: var(--jc-font-body);
+      /* Webview base font size. VS Code's default --vscode-font-size is
+         13px, which cascades through our em-based components down to
+         7–9px on badges and output blocks — unreadably small. Force a
+         16px floor; respects larger user settings via max(). */
+      font-size: max(16px, var(--vscode-font-size, 16px));
+      color: var(--jc-on-surface);
+      background: var(--jc-surface);
     }
     #app { height: 100vh; display: flex; flex-direction: column; }
     .boot-fallback {
@@ -614,7 +720,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
       text-align: center;
       opacity: 0.75;
     }
-    .boot-fallback h2 { margin: 0 0 8px; font-size: 1.05em; }
+    .boot-fallback h2 { margin: 0 0 8px; font-size: 1.05em; font-family: var(--jc-font-headline); }
     .boot-fallback p { margin: 4px 0; font-size: 0.85em; }
     .boot-fallback .hint { margin-top: 16px; opacity: 0.6; font-size: 0.8em; }
   </style>
@@ -660,6 +766,33 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
   private generateNonce(): string {
     return randomUUID().replace(/-/g, '');
+  }
+
+  /**
+   * Cached copy of the design system CSS — read once from disk on first
+   * call and reused for every subsequent buildHtml(). The file is copied
+   * into dist/webview/ by esbuild's copy-design-system-css plugin so it
+   * sits next to the bundled main.js at runtime. Falls back to an empty
+   * string if the file is missing — the inline body rules below keep the
+   * webview functional even when tokens are unavailable.
+   */
+  private cachedDesignSystemCss: string | null = null;
+  private readDesignSystemCss(): string {
+    if (this.cachedDesignSystemCss !== null) return this.cachedDesignSystemCss;
+    const cssPath = path.join(
+      this.extensionUri.fsPath,
+      'dist', 'webview', 'design-system.css',
+    );
+    try {
+      this.cachedDesignSystemCss = fs.readFileSync(cssPath, 'utf-8');
+    } catch (err) {
+      getLogger().warn('ui', 'Failed to read design-system.css — falling back to empty tokens', {
+        path: cssPath,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      this.cachedDesignSystemCss = '';
+    }
+    return this.cachedDesignSystemCss;
   }
 
   private post(message: Record<string, unknown>): void {

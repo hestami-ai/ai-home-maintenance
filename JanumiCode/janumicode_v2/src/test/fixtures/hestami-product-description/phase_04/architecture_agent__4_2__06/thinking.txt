@@ -1,0 +1,383 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** JC:Architecture Agent.
+    *   **Task:** Component Decomposition for Sub-Phase 4.2.
+    *   **Input:** System Requirements (SR-001 to SR-010) and Software Domains with specific terms (Property Data Management, Service Provider Matching, Compliance Rules Engine, Action Workflow Orchestrator, Notification Dispatcher, Tenant Security Gateway, Payment Transaction Processor).
+    *   **Output Format:** JSON object matching `component_model` schema.
+    *   **Schema Requirements:**
+        *   `components`: array.
+        *   Each component: `id`, `name`, `domain_id`, `responsibilities` (array of `{id, statement}`), `dependencies` (array of `{target_component_id, dependency_type}`).
+    *   **Constraints (Invariants):**
+        *   CM-001: Every Responsibility statement must be a SINGLE concern (no "and", "or").
+        *   CM-002: Every Component must have at least one Responsibility.
+        *   SR Allocation: Every System Requirement must be allocated to at least one Component.
+        *   Implementability: Responsibilities too broad for a single Executor Agent session are violations.
+    *   **Context:** 7 System Domains defined (property-data-management, service-provider-matching, compliance-rules-engine, action-workflow-orchestrator, notification-dispatcher, tenant-security-gateway, payment-transaction-processor).
+    *   **Goal:** Decompose the system into components based on the domains and requirements, ensuring each SR is covered, each component has responsibilities, and responsibilities are single concerns.
+
+2.  **Map System Requirements to Domains/Components:**
+    *   **SR-001 (Property Data):** Upload images/3D assets, format validation, indexing. -> *Property Data Management*.
+    *   **SR-002 (Provider Search):** AI Agent search, relevance scores, filters. -> *Service Provider Matching*.
+    *   **SR-003 (Bid Estimates):** Render comparison table, min 3 bids. -> *Service Provider Matching*.
+    *   **SR-004 (Compliance Extraction):** CC&R/Bylaws AI analysis, confidence scoring. -> *Compliance Rules Engine*.
+    *   **SR-005 (Workflow Management):** Action items, state transitions, audit log. -> *Action Workflow Orchestrator*.
+    *   **SR-006 (Deadlines & Notifications):** Monitor deadlines, trigger notifications, queue management. -> *Notification Dispatcher* (partially) or *Compliance* (monitoring). Looking at domain names, "Notification Dispatcher" fits SR-006 better for the dispatch part, but SR-006 involves monitoring deadlines. Let's look at the domains.
+        *   `notification-dispatcher`: reqs SR-007.
+        *   `compliance-rules-engine`: reqs SR-004, SR-006.
+        *   Wait, the prompt lists domains with specific requirements next to them in the Context section.
+        *   Context:
+            *   `property-data-management`: reqs: SR-001, SR-008
+            *   `service-provider-matching`: reqs: SR-002, SR-003
+            *   `compliance-rules-engine`: reqs: SR-004, SR-006
+            *   `action-workflow-orchestrator`: reqs: SR-005
+            *   `notification-dispatcher`: reqs: SR-007
+            *   `tenant-security-gateway`: reqs: SR-009
+            *   `payment-transaction-processor`: reqs: SR-010
+    *   *Correction*: The Context section explicitly links domains to specific SRs. I must respect this mapping.
+    *   *SR-008 (Mobile/Offline)* is linked to `property-data-management`. This implies the Property Data Management component handles the ingestion logic including the offline buffer.
+    *   *SR-006 (Deadlines)* is linked to `compliance-rules-engine`. This implies the Compliance engine handles the rule logic (StatutoryDeadline) and possibly triggers the notifications, though SR-007 (mass batch) is `notification-dispatcher`. I need to split responsibilities carefully to avoid CM-001 (Single Concern).
+
+3.  **Define Components:**
+    Based on the domains, I will create one primary component per domain, but potentially split if responsibilities get too broad. The prompt asks to "Decompose the system into [JC:Components]". I should create components that align with the domains provided.
+
+    *   `comp-001`: Property Data Manager (Domain: property-data-management)
+    *   `comp-002`: Provider Matcher (Domain: service-provider-matching)
+    *   `comp-003`: Compliance Analyzer (Domain: compliance-rules-engine)
+    *   `comp-004`: Workflow Manager (Domain: action-workflow-orchestrator)
+    *   `comp-005`: Notification Manager (Domain: notification-dispatcher)
+    *   `comp-006`: Security Enforcer (Domain: tenant-security-gateway)
+    *   `comp-007`: Payment Handler (Domain: payment-transaction-processor)
+
+    *Refinement on Responsibilities:*
+    *   *SR-001*: Asset Ingestion, Validation, Indexing.
+        *   Split? Upload validation (single concern) vs Indexing (single concern). However, SR-001 says "accept... rejecting... indexing...". This is a single process. Let's keep it within one component but ensure the *statement* doesn't mix concerns. "The system shall accept..." vs "The system shall index...". Actually, usually one component handles the end-to-end flow. Let's assign the responsibility statement to the component.
+        *   Statement: "Manage ingestion of property image and 3D asset data including format validation and indexing." -> This is one concern (Ingestion Pipeline).
+        *   Statement: "Ensure data integrity during offline capture and synchronization." -> SR-008 concern. This should also be in Property Data Manager.
+    *   *SR-002*: Search results, AI relevance.
+        *   Statement: "Calculate and return service provider relevance scores using AI within 300ms."
+    *   *SR-003*: Bid estimation rendering.
+        *   Statement: "Render bid estimate comparison table ensuring minimum bid entry threshold."
+    *   *SR-004*: Clause extraction.
+        *   Statement: "Extract and validate CC&R/Bylaws clauses using AI with confidence scoring."
+    *   *SR-006*: Deadline monitoring & Notification logic.
+        *   Wait, SR-006 involves monitoring deadlines. SR-007 is mass notification.
+        *   SR-006 says "save notification payloads to an offline queue".
+        *   If `compliance-rules-engine` owns SR-006 (per Context), it handles the rule logic. `notification-dispatcher` (SR-007) handles bulk.
+        *   However, SR-006 is about "trigger email/SMS". `notification-dispatcher` seems the right fit for the actual sending.
+        *   But the Context says `compliance-rules-engine: reqs: SR-004, SR-006`. I must follow the Context mapping.
+        *   This creates a potential conflict with `notification-dispatcher`.
+        *   Let's look at the domains again.
+        *   If I create a component "Compliance Rules Engine", it handles SR-004 and SR-006 logic.
+        *   If I create a component "Notification Dispatcher", it handles SR-007.
+        *   To avoid CM-001 (Single Concern), SR-006 (Monitoring + Triggering) might need to be split if "Monitoring" and "Dispatching" are distinct. But the domain mapping groups them.
+        *   Let's check SR-006 requirement text: "monitor statutory deadlines and trigger...".
+        *   Component `comp-003` (Compliance) will own the monitoring logic. Component `comp-005` (Notification) owns the dispatching.
+        *   Wait, the Context says `compliance-rules-engine` maps to `SR-004, SR-006`. This implies `comp-003` handles SR-006 logic (triggering). `comp-005` handles SR-007 logic.
+        *   To adhere to "Every Component must have at least one Responsibility" and "SR allocated to at least one Component", I will assign the responsibilities based on the Domain mapping provided in the Context section.
+        *   If SR-006 logic includes triggering, the `compliance-rules-engine` component might have a responsibility about triggering alerts. The `notification-dispatcher` handles the bulk (SR-007) and maybe the specific sending mechanism.
+        *   Better decomposition:
+            *   `Property Data Ingestion`: SR-001, SR-008 (Mobile part).
+            *   `Provider Search & Ranking`: SR-002.
+            *   `Bid Render`: SR-003.
+            *   `Compliance Extraction`: SR-004.
+            *   `Deadline Monitoring`: SR-006 (Monitoring part).
+            *   `Notification Dispatch`: SR-007 (Bulk part).
+            *   `Workflow State`: SR-005.
+            *   `Security Enforcement`: SR-009.
+            *   `Payment Processing`: SR-010.
+    *   *Constraint Check:* The Context defines the domains. I should use the domain names as the basis for Component IDs. However, decomposition often splits domains into components. The prompt says "Decompose the system into [JC:Components]". It lists "Software Domains" in Context. Usually, domains map to components or component groups. Given the strict JSON schema requirement and the need for single-concern responsibilities, I should define components that align with the responsibilities.
+    *   I will create components that match the domains but might need to be granular enough for single concerns.
+    *   Actually, looking at the domains provided in Context, they are high-level.
+    *   Let's try to map one component per domain provided, but ensure responsibilities are split.
+    *   Wait, the Context says: `property-data-management: ... reqs: SR-001, SR-008`.
+    *   `compliance-rules-engine: ... reqs: SR-004, SR-006`.
+    *   `notification-dispatcher: ... reqs: SR-007`.
+    *   If I define a component for "Compliance Rules Engine" and assign SR-006 to it, but SR-006 involves "trigger... notifications", does that violate single concern if it touches notification logic?
+    *   Let's look at SR-006: "monitor statutory deadlines and trigger...". This is a process.
+    *   Let's look at SR-007: "process mass email/SMS batches".
+    *   To strictly adhere to CM-001 (Single Concern), if a component handles "Monitoring" and "Triggering", is that one concern? Usually, Monitoring is logic, Triggering is action.
+    *   However, the Context explicitly links SR-006 to `compliance-rules-engine`. I should probably follow that domain mapping to avoid contradicting the provided Context, but split responsibilities internally if needed.
+    *   Actually, the prompt asks me to "Decompose the system into [JC:Components]". It does not explicitly say "Use the Domain names as Component IDs". But it says "Software Domains... Terms...".
+    *   I will create components that map to the responsibilities derived from the SRs and Domains. I will use the Domain names (pluralized or singularized as appropriate) or create specific component IDs.
+    *   Let's define Component IDs based on the domains provided to keep it clean.
+    *   Components:
+        1.  Property Data Manager (SR-001, SR-008)
+        2.  Provider Matching Service (SR-002, SR-003)
+        3.  Compliance Logic Engine (SR-004)
+        4.  Deadline Monitoring Service (SR-006 monitoring) -> *Wait, Context says Compliance handles SR-006.*
+        5.  Notification Dispatcher (SR-007)
+        6.  Workflow Orchestrator (SR-005)
+        7.  Security Gateway (SR-009)
+        8.  Payment Processor (SR-010)
+    *   *Issue:* SR-006 involves triggering notifications. If I put SR-006 in Compliance Engine, and SR-007 in Notification Dispatcher.
+    *   *Resolution:* I will create the components based on the domains listed in Context, but I might need to split responsibilities within SR-006 if the Context mapping is considered the *intended* allocation.
+    *   *Correction:* The Context says "Software Domains... reqs: SR-006". This is an instruction on *where* the requirements are allocated. I must respect that mapping.
+    *   So, Component: Compliance Rules Engine. Responsibility: SR-006.
+    *   Component: Notification Dispatcher. Responsibility: SR-007.
+    *   But SR-006 text says "trigger email/SMS notifications".
+    *   If I put "Trigger notifications" in Compliance Engine, and "Process mass batches" in Notification Dispatcher.
+    *   Is "Trigger" vs "Process Mass" a single concern? They are different types of communication.
+    *   I will split SR-006 responsibilities if possible, but the Domain mapping says `compliance-rules-engine` handles SR-006.
+    *   Okay, I will define the components based on the Domain names provided in the Context section, but ensure the *responsibility statements* are singular concerns.
+    *   SR-006 has two parts: 1. Monitor deadlines (Logic). 2. Trigger notifications (Action).
+    *   If I assign "Monitor and Trigger" to Compliance Engine, is that one concern? It's a lifecycle for a specific rule type.
+    *   Let's check `notification-dispatcher` requirements. `notification-dispatcher: reqs: SR-007`.
+    *   So `compliance-rules-engine` owns SR-006. `notification-dispatcher` owns SR-007.
+    *   I will assign SR-006 to the Compliance component, but refine the statement to focus on the *alert generation logic* rather than the actual SMTP sending (which is Dispatcher's job). But SR-006 explicitly says "trigger email/SMS... saving payloads...".
+    *   Okay, to avoid violation, I will split the responsibilities *if* the context allows, but the constraint says "Every System Requirement must be allocated to at least one Component". It doesn't forbid splitting an SR across components unless it violates "Single Concern".
+    *   SR-006: "monitor... and trigger... and saving... and confirms...". This is a workflow.
+    *   If I assign the whole SR-006 to Compliance Engine (as per Context), the responsibility statement might be broad. "Manage statutory deadlines and trigger alerts". This feels like a single workflow concern (Regulatory Alert Management).
+    *   Okay, I will stick to the Domain -> SR mapping for allocation.
+    *   I will define components using the Domain names (pluralized/adjusted) as IDs/names.
+    *   Wait, the Context lists "Software Domains". I will use these as the Component `name` and `domain_id`.
+    *   Actually, I should probably create components that map to these domains.
+    *   Let's finalize the Component list:
+        1.  `property-data-management` (SR-001, SR-008)
+        2.  `service-provider-matching` (SR-002, SR-003)
+        3.  `compliance-rules-engine` (SR-004, SR-006) -> *Wait, SR-006 involves notifications.* I might need to create a separate component for `deadline-monitoring` or rely on `notification-dispatcher` splitting the logic.
+        *   Given the instruction "Decompose the system into [JC:Components]... with defined responsibilities and dependencies", I have freedom to create components *within* the domains if necessary for single concern.
+        *   However, the Context section implies these are the primary buckets.
+        *   Let's check SR-006 again. "trigger email/SMS notifications... saving notification payloads to an offline queue".
+        *   SR-007: "process mass email/SMS batches".
+        *   Difference: SR-006 is event-driven/regulated. SR-007 is bulk/mass.
+        *   I will create `compliance-rules-engine` for SR-004 and SR-006 (Monitoring/Triggering logic).
+        *   I will create `notification-dispatcher` for SR-007.
+        *   Dependency: `compliance-rules-engine` calls `notification-dispatcher`? Or `compliance` saves payload to queue handled by dispatcher?
+        *   Dependency: `compliance-rules-engine` (SR-006 part) -> `notification-dispatcher` (SR-007 part)?
+        *   Actually, SR-006 says "saving notification payloads to an offline queue".
+        *   Let's create a component for `notification-dispatcher` that handles *all* sending, and `compliance-rules-engine` handles the *logic* of when to send (for SR-006) and *what* to send (content extraction).
+        *   To avoid SR-006 being too broad for one component:
+        *   Component A: `compliance-rules-engine` -> "Extract and display CC&R/Bylaws clauses". (SR-004)
+        *   Component B: `deadline-monitoring` -> "Monitor statutory deadlines and trigger alerts". (SR-006)
+        *   Component C: `notification-dispatcher` -> "Process mass email/SMS batches and track delivery". (SR-007)
+        *   Component D: `property-data-management` -> (SR-001, SR-008)
+        *   Component E: `service-provider-matching` -> (SR-002, SR-003)
+        *   Component F: `action-workflow-orchestrator` -> (SR-005)
+        *   Component G: `tenant-security-gateway` -> (SR-009)
+        *   Component H: `payment-transaction-processor` -> (SR-010)
+    *   *Refinement:* The Context explicitly maps SR-006 to `compliance-rules-engine`. Deviating might violate the "Context" implication, but CM-002 says "Every Component must have at least one Responsibility". If I create `deadline-monitoring` inside `compliance-rules-engine` domain, does that split the domain?
+    *   Better approach: Use the Domain names as Component Names, but split responsibilities within them if the SR contains multiple concerns.
+    *   SR-006: "monitor... and trigger... and save... and confirm". This is one functional concern (Regulatory Alert Lifecycle). It can be one component `compliance-rules-engine`.
+    *   SR-007: "process mass email...". Component `notification-dispatcher`.
+    *   SR-001/008: `property-data-management`.
+    *   SR-002/003: `service-provider-matching`.
+    *   SR-004: `compliance-rules-engine` (Wait, if I split SR-006 from SR-004 in Compliance, I create two components? No, one component, multiple responsibilities).
+    *   So `compliance-rules-engine` component has two responsibilities: SR-004 and SR-006.
+    *   Is SR-004 and SR-006 single concern? SR-004 is "Extraction/Display". SR-006 is "Deadline/Alert". These are distinct business capabilities.
+    *   However, if I make two components, I need to ensure SR allocation is covered.
+    *   If I create `compliance-rules-engine` for SR-004 and SR-006.
+    *   If I create `notification-dispatcher` for SR-007.
+    *   This looks clean.
+    *   Dependency: `compliance-rules-engine` might depend on `notification-dispatcher` to send the email. But SR-006 says "saving... to offline queue". This implies `compliance` prepares, `dispatcher` sends.
+    *   I will add dependencies where logical (e.g., Security depends on Gateway, Payment depends on Security).
+
+4.  **Drafting the Responsibilities (Single Concern Check):**
+    *   SR-001: "Accept property image and 3D asset data uploads under 10MB in formats .png, .jpg, and .gltf, rejecting invalid formats with specific error codes, returning a '200 OK' status for valid files within 5 seconds and indexing assets within 10 seconds post-upload." -> Too many clauses? "Accept", "Reject", "Return", "Indexing".
+        *   Concern: "Ingest property assets and validate format constraints." (Accept/Reject/Return).
+        *   Concern: "Index valid assets for search." (Indexing).
+        *   If I put both in one component (`property-data-management`), is it one responsibility? "Manage asset ingestion, validation, and indexing." This sounds like one pipeline.
+    *   SR-008: "Mobile app... offline capture... sync".
+        *   Concern: "Manage offline data capture and synchronization buffers."
+        *   I should split these? No, `property-data-management` handles SR-001 and SR-008.
+        *   Respons: "Manage ingestion of property assets including format validation and indexing."
+        *   Respons: "Manage offline data capture and synchronization buffers."
+        *   This splits SR-001/008 into two responsibilities, which is fine as long as they are separate concerns.
+    *   SR-002: "Return service provider search results...". -> "Calculate and rank service provider relevance scores using AI."
+    *   SR-003: "Render bid estimate comparison table...". -> "Render bid estimate comparison tables enforcing minimum bid entry thresholds."
+    *   SR-004: "Extract and display CC&R...". -> "Extract and validate CC&R and Bylaws clauses using AI confidence scoring."
+    *   SR-005: "Manage service action item workflows...". -> "Manage service action item workflow states and record audit log transitions."
+    *   SR-006: "Monitor statutory deadlines and trigger...". -> "Monitor statutory deadlines and generate notification payloads for regulatory compliance." (Splits sending logic).
+        *   Wait, SR-007 is "Process mass email/SMS...".
+        *   If `compliance-rules-engine` generates payload, and `notification-dispatcher` sends.
+        *   Then `compliance-rules-engine` responsibility: "Monitor statutory deadlines and generate compliance notification payloads."
+        *   `notification-dispatcher` responsibility: "Process bulk message batches and track delivery status."
+        *   This aligns well.
+    *   SR-009: "Enforce multi-tenant security...". -> "Enforce row-level security and access tiers for multi-tenant data isolation."
+    *   SR-010: "Process payments...". -> "Process payment intents and generate receipt documents."
+
+5.  **Drafting Dependencies:**
+    *   `compliance-rules-engine` -> `notification-dispatcher` (For SR-006 payload delivery).
+    *   `property-data-management` -> `tenant-security-gateway` (Ingestion needs auth?).
+    *   `service-provider-matching` -> `compliance-rules-engine`? No.
+    *   `tenant-security-gateway` -> Many components (All data access).
+    *   `payment-transaction-processor` -> `compliance-rules-engine`? (Maybe fees need compliance check?). Or independent.
+    *   `action-workflow-orchestrator` -> `notification-dispatcher` (Notify when workflow complete?).
+    *   `action-workflow-orchestrator` -> `payment-transaction-processor` (Payment on milestone?).
+    *   `property-data-management` -> `tenant-security-gateway` (Access control on upload).
+    *   `tenant-security-gateway` -> No dependencies (Base layer).
+    *   `payment-transaction-processor` -> `notification-dispatcher` (Send receipt).
+
+6.  **Constructing JSON:**
+    *   Structure: `components`: [ ... ]
+    *   Schema check: `id`, `name`, `domain_id`, `responsibilities`, `dependencies`.
+    *   Ensure Invariants:
+        *   CM-001: No "and" between distinct concerns in statement.
+        *   CM-002: At least one responsibility per component.
+        *   SR Allocation: All SRs covered.
+    *   SR IDs need to be referenced? No, the `responsibilities` array has `id` and `statement`. I should map the SR ID to the responsibility ID.
+    *   Let's map:
+        *   Comp: `property-data-management`. Resps: SR-001 Part A, SR-001 Part B, SR-008.
+        *   Better: Keep SR IDs in responsibility IDs.
+        *   Responsibility Statement: "Accept property image and 3D asset data uploads under 10MB in formats .png, .jpg, and .gltf." (Validation).
+        *   Responsibility Statement: "Index assets within 10 seconds post-upload." (Indexing).
+        *   Responsibility Statement: "Manage offline data capture and synchronization buffers." (SR-008).
+        *   Wait, SR-001 is one requirement. Splitting it into two responsibilities is allowed if they are single concerns. But SR-001 is one requirement.
+        *   Constraint: "Every System Requirement must be allocated to at least one Component". It doesn't say "A requirement cannot be split across responsibilities". But "Single Concern" means one statement per responsibility.
+        *   So, if I split SR-001 into "Validate/Reject" and "Index", they are single concerns.
+        *   Okay, I will split SR-001 to satisfy CM-001 if it contains multiple actions ("Accept" AND "Reject" AND "Index"). "Accept" and "Index" are distinct phases.
+        *   Responsibility 1: "Validate property image and 3D asset data uploads including format rejection logic." (SR-001 Input).
+        *   Responsibility 2: "Index valid assets within 10 seconds post-upload." (SR-001 Processing).
+        *   Responsibility 3: "Manage offline data capture and synchronization buffers." (SR-008).
+        *   Is splitting SR-001 okay? Yes, provided the component handles the whole.
+        *   Wait, "Accept... returning... status".
+        *   Statement: "Accept and validate property image and 3D asset data uploads, returning status codes."
+        *   Statement: "Index valid assets within 10 seconds post-upload."
+        *   Statement: "Manage offline data capture and synchronization buffers for mobile capture."
+        *   This covers SR-001 and SR-008.
+    *   SR-006:
+        *   Statement: "Monitor statutory deadlines for regulatory obligations."
+        *   Statement: "Generate compliance notification payloads for regulatory alerts."
+        *   Component: `compliance-rules-engine`.
+        *   Dependencies: `notification-dispatcher` (for sending the generated payload).
+    *   SR-007:
+        *   Statement: "Process mass email/SMS batches for recipient lists."
+    *   SR-010:
+        *   Statement: "Process payments for deposits and service fees via payment gateway."
+        *   Statement: "Generate receipt documents upon payment authorization."
+
+    *   Refining Component IDs:
+        *   `cmp-001`: property-data-management
+        *   `cmp-002`: service-provider-matching
+        *   `cmp-003`: compliance-rules-engine
+        *   `cmp-004`: action-workflow-orchestrator
+        *   `cmp-005`: notification-dispatcher
+        *   `cmp-006`: tenant-security-gateway
+        *   `cmp-007`: payment-transaction-processor
+
+    *   Dependencies Logic:
+        *   `action-workflow-orchestrator` needs `notification-dispatcher` (for alerts to users on completion).
+        *   `compliance-rules-engine` needs `notification-dispatcher` (for SR-006 alerts).
+        *   `tenant-security-gateway` is called by others.
+        *   `payment-transaction-processor` needs `notification-dispatcher` (for receipts).
+        *   `property-data-management` needs `tenant-security-gateway` (for upload auth).
+        *   `service-provider-matching` needs `compliance-rules-engine`? No.
+        *   `service-provider-matching` needs `tenant-security-gateway`? No, likely internal data.
+
+7.  **Final Review against Constraints:**
+    *   CM-001: No "and" connecting distinct concerns.
+        *   Example Bad: "Validate AND Index data."
+        *   Example Good: "Validate property image and 3D asset data uploads." (Validation is one concern).
+        *   Example Good: "Index valid assets within 10 seconds post-upload." (Indexing is one concern).
+    *   CM-002: At least one responsibility per component.
+    *   SR Allocation:
+        *   SR-001: Property Data Mgmt.
+        *   SR-002: Provider Matching.
+        *   SR-003: Provider Matching.
+        *   SR-004: Compliance Rules Engine.
+        *   SR-005: Action Workflow Orchestrator.
+        *   SR-006: Compliance Rules Engine.
+        *   SR-007: Notification Dispatcher.
+        *   SR-008: Property Data Mgmt.
+        *   SR-009: Tenant Security Gateway.
+        *   SR-010: Payment Transaction Processor.
+    *   Domain Mapping: Follow the Context mapping for component names and domains.
+    *   JSON Schema: `id`, `name`, `domain_id`, `responsibilities`, `dependencies`.
+    *   Responsibility objects: `{id, statement}`.
+    *   Dependency objects: `{target_component_id, dependency_type}`.
+    *   Dependency types: e.g., "calls", "reads", "writes". I'll use standard ones like "calls", "requires".
+
+    *   *Self-Correction on SR-006/SR-007*: SR-006 (Deadline Monitoring) is mapped to `compliance-rules-engine` in Context. SR-007 (Mass Batch) is mapped to `notification-dispatcher`.
+    *   I will assign SR-006 responsibilities to `compliance-rules-engine` (Monitoring + Payload Generation). I will assign SR-007 responsibilities to `notification-dispatcher`. I will add a dependency from `compliance-rules-engine` to `notification-dispatcher` for the actual transmission, as `notification-dispatcher` handles the sending (SR-007 covers "processing", SR-006 covers "saving to queue").
+    *   Actually, SR-006 says "saving notification payloads to an offline queue that resumes delivery attempts...". This implies the Dispatcher handles the sending. So `compliance-rules-engine` saves, `notification-dispatcher` sends.
+    *   Wait, if `compliance-rules-engine` saves to queue, does it call `notification-dispatcher`? Or is the queue a shared resource?
+    *   Dependency: `compliance-rules-engine` -> `notification-dispatcher` (Type: "submits_payload").
+    *   SR-010 (Payment) -> `notification-dispatcher` (Type: "triggers_receipt_send").
+    *   SR-005 (Workflow) -> `notification-dispatcher` (Type: "triggers_update").
+    *   SR-009 (Security) -> No dependencies (or maybe `action-workflow-orchestrator` depends on it). I'll put `action-workflow-orchestrator` -> `tenant-security-gateway` (for access checks).
+    *   `property-data-management` -> `tenant-security-gateway`.
+
+    *   *SR-001/008 Split*:
+        *   Responsibility A: "Accept property image and 3D asset data uploads including format validation and status response." (SR-001 Input).
+        *   Responsibility B: "Index assets within 10 seconds post-upload for search." (SR-001 Indexing).
+        *   Responsibility C: "Manage offline data capture and synchronization buffers." (SR-008).
+        *   Is this okay? Yes. They are single concerns.
+
+    *   *SR-006 Split*:
+        *   Responsibility A: "Monitor statutory deadlines for regulatory obligations." (Monitoring).
+        *   Responsibility B: "Generate compliance notification payloads for regulatory alerts." (Generation).
+        *   Are these one concern? Usually Monitoring is a scheduler, Generation is content. They are separate steps. I'll keep them separate to be safe on CM-001, or combine them if "Regulatory Alert Lifecycle" is the concern.
+        *   Let's check CM-001 again: "Every Component Responsibility statement must be a SINGLE concern".
+        *   If I combine them: "Monitor statutory deadlines and generate compliance notification payloads". This mixes "Monitoring" (Time) and "Generation" (Text). This might be considered two concerns.
+        *   I will split them to be strict.
+        *   Wait, if I split SR-006 into two responsibilities, does it still count as one SR allocated? Yes, as long as they map to the component.
+
+    *   *SR-010 Split*:
+        *   Responsibility A: "Process payment requests for deposits and service fees via payment gateway."
+        *   Responsibility B: "Generate electronic proof of payment and receipt documents."
+        *   These are distinct. I will split.
+
+    *   *Wait, one component per domain constraint?*
+    *   The prompt doesn't say "One component per domain". It says "Decompose the system".
+    *   However, the Context lists Domains.
+    *   I will create components named after the domains, but allow multiple responsibilities within them.
+    *   I'll stick to 7 components (one per domain) to align with Context, but split SR responsibilities within the domain components where necessary for single concern.
+
+    *   Wait, SR-006 (Compliance) and SR-007 (Notification).
+    *   If I create `compliance-rules-engine` and `notification-dispatcher`.
+    *   Dependencies:
+        *   `action-workflow-orchestrator` needs `tenant-security-gateway`.
+        *   `action-workflow-orchestrator` needs `notification-dispatcher`.
+        *   `payment-transaction-processor` needs `notification-dispatcher`.
+        *   `compliance-rules-engine` needs `notification-dispatcher`.
+        *   `property-data-management` needs `tenant-security-gateway`.
+    *   This looks consistent.
+
+    *   *Responsibility IDs:* I'll use `RSP-001` etc., linked to `SR-XXX`. Or use the SR ID as the Responsibility ID. The schema says `{id, statement}`. I'll use `SR-XXX` for ID or `RSP-XXX`. I'll use `RSP-001` etc., but the schema example in thought doesn't specify. I will use `SR-XXX` as the responsibility ID to trace back, or just `RSP-001`. I'll use `RSP-001` etc. and ensure mapping to SR is clear in the statement.
+    *   Actually, the schema says `id`. I'll use `RSP-001`.
+    *   Dependencies: `dependency_type`: "sync", "call", "read", "write".
+    *   I'll use `sync` for queue/processing, `call` for service.
+
+    *   *Final check on constraints:*
+    *   CM-001: Single concern.
+    *   CM-002: At least one resp.
+    *   SR Allocation: All SRs allocated.
+    *   Implementation: Ensure no conjunctions in statements.
+
+    *   Let's write the statements carefully.
+    *   SR-001: "Accept and reject property image and 3D asset data uploads." + "Index valid assets within 10 seconds post-upload." + "Manage offline data capture and synchronization buffers."
+    *   SR-002: "Return service provider search results with relevance scores using AI."
+    *   SR-003: "Render bid estimate comparison tables ensuring minimum bid entry thresholds."
+    *   SR-004: "Extract and validate CC&R and Bylaws clauses using AI confidence scoring."
+    *   SR-005: "Manage service action item workflow states and record audit log transitions."
+    *   SR-006: "Monitor statutory deadlines for regulatory obligations." + "Generate compliance notification payloads for regulatory alerts."
+    *   SR-007: "Process mass email/SMS batches and track delivery status for recipients."
+    *   SR-008: "Manage offline data capture and synchronization buffers." (Already in Property Data Mgmt).
+    *   SR-009: "Enforce multi-tenant security and Row-Level Security (RLS) for data access."
+    *   SR-010: "Process payment requests for deposits and service fees via payment gateway." + "Generate electronic proof of payment and receipt documents."
+
+    *   Wait, SR-008 is "Mobile application client...". This is handled by `property-data-management`.
+    *   I will merge SR-008 into `property-data-management`.
+    *   Split SR-001 into two responsibilities (Validation/Upload vs Indexing).
+    *   Split SR-006 into two responsibilities (Monitoring vs Payload).
+    *   Split SR-010 into two responsibilities (Payment vs Receipt).
+
+    *   Wait, `property-data-management` needs to handle SR-001 and SR-008.
+    *   I'll add dependencies: `property-data-management` depends on `tenant-security-gateway`.
+    *   `compliance-rules-engine` depends on `notification-dispatcher`.
+    *   `payment-transaction-processor` depends on `notification-dispatcher`.
+    *   `action-workflow-orchestrator` depends on `notification-dispatcher`.
+    *   `action-workflow-orchestrator` depends on `tenant-security-gateway`? (Auth checks).
+    *   I'll keep it simple.
+
+    *   *Component IDs*: `cmp-prop-data`, `cmp-provider-matching`, `cmp-compliance`, `cmp-workflow`, `cmp-notifications`, `cmp-security`, `cmp-payment`.
+    *   *Domain IDs*: `property-data-management`, `service-provider-matching`, etc.
+
+    *   *Refinement on SR-006 Splitting*:
+    *   If I put SR-006 in `compliance-rules-engine` component.
+    *   Resp: "Monitor statutory deadlines for regulatory obligations."
+    *   Resp: "Generate compliance notification payloads for regulatory alerts."
+    *   This splits the SR across responsibilities, which is fine.
+    *   Dependency to `notification-dispatcher` for the actual send.
+
+    *   Let's finalize the JSON structure.

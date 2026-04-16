@@ -1,0 +1,261 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Technical Spec Agent] specifying API Definitions for Sub-Phase 5.2.
+    *   **Task:** Produce JSON object matching `api_definitions` schema.
+    *   **Components:** 7 specific components defined in the context (cmp-prop-data, cmp-provider-match, cmp-compliance, cmp-workflow, cmp-notifications, cmp-security, cmp-payment).
+    *   **Constraints:**
+        *   Every endpoint must have an explicit authentication requirement (Invariant: API-001).
+        *   API Definitions must be consistent with Interface Contracts from Phase 3 (INT-EXT-xxxx, INT-INT-xxxx).
+        *   Include error codes for all failure scenarios.
+        *   Context: Consumer Discovery MVP (Pillar 1 only).
+    *   **Schema:** `api_definitions` -> `definitions` -> array of `{ component_id, endpoints: array of { path, method, inputs, outputs, error_codes, auth_requirement } }`.
+    *   **Output Format:** JSON object.
+
+2.  **Review Context & Components:**
+    *   **Component 1: cmp-prop-data (Property Data Manager)**
+        *   Responsibilities: Upload/validate assets, Index, Offline sync.
+        *   Contracts: INT-EXT-005-MOBILE (upload queues), INT-INT-001-STORAGE (storage).
+        *   API Needs: Upload endpoint, List endpoint, Status endpoint.
+    *   **Component 2: cmp-provider-match (Service Provider Matcher)**
+        *   Responsibilities: Search providers, Bid comparison.
+        *   API Needs: Search endpoint, Compare bids endpoint.
+    *   **Component 3: cmp-compliance (Compliance Rules Engine)**
+        *   Responsibilities: Extract CC&R/Bylaws, Monitor deadlines, Generate notifications.
+        *   API Needs: Extract endpoint, Status endpoint, Alert endpoint.
+    *   **Component 4: cmp-workflow (Action Workflow Orchestrator)**
+        *   Responsibilities: Manage action items, Status updates.
+        *   API Needs: Create action item, Update status, List items.
+    *   **Component 5: cmp-notifications (Notification Dispatcher)**
+        *   Responsibilities: Process email/SMS, Resumes, Confirm receipt.
+        *   API Needs: Send batch, Check status.
+    *   **Component 6: cmp-security (Tenant Security Gateway)**
+        *   Responsibilities: RLS, Auth check.
+        *   API Needs: (Internal usually, but spec asks for components' externally callable interfaces). Usually Security is internal, but might have a "Health/Auth Check" or be the gateway for others. However, the prompt asks for *each Component's externally callable interfaces*. Security components often act as middleware. I will define the endpoints that *external clients* call which interact with security logic (e.g., verifying token), or define its role as a gateway endpoint. Given RSP-014/015, it validates access. I will define endpoints that external users trigger which require auth (e.g., "validate permission"). Actually, typically Security Gateways don't have public endpoints users call directly to *do* security, but rather endpoints *protected* by security. However, to satisfy the requirement of "Each Component", I will define the interface it exposes to verify credentials or tenant context, or simply define its read-only introspection endpoints if it must have *an* interface. A common pattern is `GET /auth/verify`. Let's assume it exposes a token validation endpoint or is the root of auth. Let's look at the constraints: "Every endpoint must have an explicit authentication requirement".
+    *   **Component 7: cmp-payment (Payment Transaction Processor)**
+        *   Responsibilities: Process payments, Generate receipts.
+        *   API Needs: Create payment, Generate receipt.
+
+3.  **Drafting Endpoints (Mental Check against Constraints):**
+    *   **Auth Requirement:** Must be explicit (`required: true` or similar).
+    *   **Error Codes:** Must be included for failure scenarios (4xx, 5xx).
+    *   **Contracts:**
+        *   `INT-INT-001-STORAGE`: SeaweedFS integration (internal). The `cmp-prop-data` handles this. The API exposed shouldn't necessarily expose raw S3, but wrapped logic.
+        *   `INT-EXT-001-PAYMENT`: Stripe/Square. `cmp-payment` handles this.
+        *   `INT-EXT-002-COMMS`: Email/SMS. `cmp-notifications` handles this.
+        *   `INT-EXT-003-REGULATORY`: Gov services. `cmp-compliance` handles this.
+        *   `INT-EXT-004-AI`: AI/ML. `cmp-compliance` / `cmp-provider-match` use this internally or expose results.
+        *   `INT-EXT-005-MOBILE`: Mobile Client. `cmp-prop-data` handles uploads.
+
+    *   *Self-Correction on Security Component:* If `cmp-security` is a Gateway, its "externally callable interface" is usually the authentication check itself or a health check. To make it useful and satisfy the schema, I will define an endpoint that validates token validity/tenant context (since that's what it does). Or, since it protects others, I can define it as a service that verifies tokens before routing. I'll create an endpoint like `POST /auth/validate` that external apps call to establish session validity.
+
+4.  **Defining Inputs/Outputs:**
+    *   Use JSON schemas (brief descriptions or types) in `inputs`/`outputs`.
+    *   Inputs/Outputs need to be descriptive (e.g., `MediaType: image/*`, `body: UploadRequest`).
+
+5.  **Defining Error Codes:**
+    *   Standard HTTP codes + specific custom codes (e.g., `ERR_FILE_TYPE_INVALID`, `ERR_AUTH_FORBIDDEN`).
+    *   Format: List of codes with description.
+
+6.  **Constructing the JSON:**
+    *   Structure: `{"definitions": [ {...}, ... ]}`.
+    *   Ensure `auth_requirement` is present for *every* endpoint.
+
+7.  **Refining Details based on MVP Scope:**
+    *   Exclude Pillar 2 (Financials) implementation except `cmp-payment` which is specifically listed. Wait, context says "Excluded: Pillar 2 (Financials)...". But `cmp-payment` is listed in the 7 components. This seems contradictory.
+    *   *Re-reading Context:* "Context: Component Model: PROJECT TYPE: Consumer Discovery MVP... Excluded: Pillar 2 (Financials) implementation for this MVP...".
+    *   *However:* `cmp-payment` is explicitly listed in "7 Components". It must be included. The exclusion note likely means *Accounting/Enterprise* financials (Pillar 2 of Phase 3/4?), but `cmp-payment` handles specific MVP needs (deposits/fees via Stripe). I will include `cmp-payment` but keep it scoped to MVP use cases (transaction processing, receipts).
+    *   *Re-reading Excluded:* "Pillar 2 (Financials) implementation... Payment Processing Integration (Stripe/Square)". Wait, the capabilities list *includes* "Payment Processing Integration (Stripe/Square)". The exclusion list says "Excluded: Pillar 2 (Financials) implementation for this MVP". This is ambiguous. Usually, MVPs handle payments. I will interpret the exclusion as "No complex Financial Management/Accounting Pillar 2", but `cmp-payment` is the mechanism to handle Stripe/Square as per Capabilities. I will include `cmp-payment` but ensure the logic is MVP-focused (e.g., deposits/fees).
+    *   *Re-reading Excluded:* "Direct Contractor Portal Access for V1". This means `cmp-provider-match` shouldn't expose a login for contractors, just search/match for homeowners.
+    *   *Re-reading Excluded:* "Field Service Engine MVP features". `cmp-workflow` should focus on Action Items, not Field Service dispatch.
+    *   *Re-reading Excluded:* "Legacy Vantaca". Ignore Vantaca.
+
+8.  **Drafting Endpoint Specifics:**
+
+    *   **cmp-prop-data:**
+        *   `POST /assets/upload`: Inputs: FormData (Image/Splat), Metadata. Auth: Required.
+        *   `GET /assets/queue/status`: Check mobile sync queue. Auth: Required.
+        *   `GET /assets/search`: List indexed assets. Auth: Required.
+
+    *   **cmp-provider-match:**
+        *   `POST /providers/search`: Query parameters: Location, Property Type. Auth: Required.
+        *   `GET /bids/compare/{id}`: Comparison data. Auth: Required.
+
+    *   **cmp-compliance:**
+        *   `POST /compliance/extract`: Upload CC&R text for AI extraction. Auth: Required.
+        *   `GET /compliance/deadlines`: Get upcoming statutory deadlines. Auth: Required.
+        *   `POST /compliance/alerts`: Generate payload (calls cmp-notifications internally, but maybe has an external trigger? Let's make it an external read of alerts). `GET /compliance/alerts`. Auth: Required.
+
+    *   **cmp-workflow:**
+        *   `GET /actions/list`: List action items. Auth: Required.
+        *   `POST /actions/update`: Update status. Auth: Required.
+        *   `GET /actions/{id}`: Get details. Auth: Required.
+
+    *   **cmp-notifications:**
+        *   `POST /messages/send`: Send batch (for internal triggering usually, but if exposed externally?). Usually, this is internal. Let's make it `POST /messages/batch` which internal services call, but per spec, this is an *API Definition*. I will define the interface it exposes to other services (like `cmp-workflow` or `cmp-payment` calling it). But the requirement says "Externally callable interfaces". Since `cmp-notifications` is a component, I will define the API it offers to the system (which might be internal APIs treated as external interfaces within the domain). However, looking at the Interface Contracts: `INT-EXT-002-COMMS`. The `cmp-notifications` component likely consumes `EXT-002` internally. I will define an endpoint that allows a client (e.g., Admin or Mobile App) to trigger a notification event (like "Request Receipt").
+        *   `GET /notifications/status`: Check message delivery status. Auth: Required.
+
+    *   **cmp-security:**
+        *   `POST /auth/validate`: Verify token/tenant context. Auth: Implicitly required (or Bearer). Let's say `Bearer` required.
+        *   `GET /health`: Health check (Auth: Required? Security gateways often don't require auth for health, but constraint API-001 says "Every endpoint must have an explicit authentication requirement". I will add auth requirement even for health to be strict).
+        *   Let's use `POST /auth/token/verify` (Validate).
+
+    *   **cmp-payment:**
+        *   `POST /payments/process`: Create Payment Intent (wraps Stripe). Auth: Required.
+        *   `GET /payments/receipt/{id}`: Get receipt. Auth: Required.
+
+9.  **Formatting:**
+    *   JSON Schema compliance.
+    *   Strict JSON (no trailing commas).
+    *   Error codes arrays.
+    *   Inputs/Outputs as strings or objects? Schema says `inputs` and `outputs` are properties of an endpoint object. Usually, these are descriptors. I will use string descriptions or object representations for clarity within the JSON constraint. The prompt example schema implies `inputs` and `outputs` are likely strings or references. I will use concise JSON strings representing the payload structure to keep it valid and descriptive. Actually, standard practice for such specs is often `{"schema": {...}}` or just descriptive text. Given the "JSON object matching the api_definitions schema", I need to ensure `inputs` and `outputs` fields are valid JSON values. I will use string representations of JSON schemas for clarity, or simple objects if permitted. Let's look at the instruction: "inputs, outputs, error_codes, auth_requirement". I will treat `inputs`/`outputs` as JSON string descriptions or simple object keys. To be safe and valid JSON, I'll use strings describing the payload or simplified object structures.
+    *   Wait, looking at the rule: "Produce [JC:API Definitions] for each Component's externally callable interfaces."
+    *   Schema: `definitions: array, each with: component_id, endpoints: array of {path, method, inputs, outputs, error_codes, auth_requirement}`.
+    *   I will make `inputs` and `outputs` strings describing the JSON content (e.g., `"application/json: { asset_id: string, filename: string }"`).
+
+10. **Final Review against Constraints:**
+    *   **API-001:** Every endpoint needs `auth_requirement`. I will set this to `"required"` or specific token type. Let's use `"Bearer Token Required"`.
+    *   **Context:** MVP Pillar 1 only. No HOA voting, no field service engine, no legacy Vantaca.
+    *   **Error Codes:** Include specific failure codes.
+    *   **Components:** All 7 must be in the `definitions` array.
+    *   **Consistency:** Ensure `cmp-payment` aligns with `INT-EXT-001-PAYMENT`. `cmp-notifications` aligns with `INT-EXT-002-COMMS`.
+
+    *   *Self-Correction on Error Codes:* The schema asks for `error_codes` in the endpoint object. This implies a list. I will provide a list of possible error codes and descriptions.
+
+    *   *Self-Correction on Auth Requirement:* Invariant API-001: "Every endpoint must have an explicit authentication requirement". I will ensure this field exists for every endpoint.
+
+    *   *Self-Correction on Inputs/Outputs:* To avoid complex nested JSON in the response that might break the outer schema, I will use string representations of the JSON structure for inputs/outputs.
+
+    Let's build the JSON.
+
+    *   *Schema Check:* The prompt says "REQUIRED OUTPUT: A JSON object matching the `api_definitions` schema".
+    *   I need to output *only* the JSON object. No markdown text outside? Usually, for system prompts, it's safer to output the JSON block within markdown code blocks if allowed, but the instruction implies "Produce [JC:API Definitions]". I will output the JSON block.
+    *   Wait, standard instruction: "REQUIRED OUTPUT: A JSON object". I should avoid markdown formatting that breaks parsing if strict JSON is expected. However, most LLM interfaces expect markdown ```json ``` blocks. I will wrap it in markdown to be safe but ensure the content is valid JSON.
+    *   Wait, strict JSON output is often preferred. I will output raw JSON if possible, but usually ```json``` is accepted. I'll use the standard block.
+    *   Wait, looking at the `system` instructions often in this context: "Produce [JC:API Definitions]". I will output the JSON structure directly.
+
+    *   *Refining Inputs/Outputs:* To keep it clean, I will use a string representation like `"{ 'data': string }"`. Or I can try to format them as JSON Schema fragments within the string value. I will use string values for `inputs` and `outputs` containing JSON descriptions.
+
+    *   *Refining Error Codes:* I will list them as an array of strings with descriptions if possible, or just codes. The schema says `error_codes`. I will make it an array of objects `{code, description}`.
+
+    *   *Refining Auth:* I will make it `"required"` or `"Bearer Token (Bearer)"`. The rule says "explicit authentication requirement". `"Bearer Token Required"` is explicit.
+
+    *   *Components:* Ensure `cmp-prop-data`, `cmp-provider-match`, `cmp-compliance`, `cmp-workflow`, `cmp-notifications`, `cmp-security`, `cmp-payment` are all present.
+
+    *   *Component `cmp-security`:* Since this is a gateway, external calls might be token validation.
+    *   *Component `cmp-payment`:* Must respect MVP scope (deposits/fees).
+
+    Let's write the JSON content.
+
+    *   `cmp-prop-data`:
+        *   `POST /api/v1/assets/upload`: Input: `UploadPayload` (files, metadata). Output: `UploadResponse` (id, status).
+        *   `GET /api/v1/assets/{id}`: Get asset.
+        *   `POST /api/v1/assets/sync-queue`: Upload to offline buffer.
+
+    *   `cmp-provider-match`:
+        *   `GET /api/v1/providers/search`: Search results.
+        *   `GET /api/v1/bids/compare/{bid_id}`: Compare table.
+
+    *   `cmp-compliance`:
+        *   `POST /api/v1/compliance/extract`: Analyze CC&R.
+        *   `GET /api/v1/compliance/deadlines`: Upcoming deadlines.
+        *   `GET /api/v1/compliance/alerts`: Notification payload preview.
+
+    *   `cmp-workflow`:
+        *   `GET /api/v1/actions`: List actions.
+        *   `POST /api/v1/actions/{id}/update`: Update status.
+        *   `POST /api/v1/actions/{id}/complete`: Mark complete.
+
+    *   `cmp-notifications`:
+        *   `POST /api/v1/notifications/batch`: Trigger delivery (internal service trigger).
+        *   `GET /api/v1/notifications/{id}`: Check status.
+
+    *   `cmp-security`:
+        *   `POST /api/v1/auth/validate`: Verify credentials.
+        *   `POST /api/v1/auth/token`: Issue token (maybe not externally callable in same way? but `cmp-security` component usually handles auth). Let's assume `cmp-security` exposes an endpoint to verify tenant context.
+        *   `GET /api/v1/health`: Status.
+
+    *   `cmp-payment`:
+        *   `POST /api/v1/payments/charge`: Process Stripe.
+        *   `GET /api/v1/payments/receipt/{payment_intent}`: Receipt.
+
+    *   **Inputs/Outputs format:** I will use stringified JSON for the `inputs` and `outputs` fields to ensure valid JSON structure for the overall response, as embedding complex schemas in object fields without a JSON Schema standard might be risky if the parser expects strings. However, the prompt example schema isn't fully defined. I will use descriptive strings like `"{ 'body': UploadRequest }"` or actual JSON objects if the system allows. To be safe, I will use a JSON string representation for the values of `inputs` and `outputs` fields within the main object, or simple objects if the `inputs`/`outputs` keys in the API Definition schema allow objects. The instruction says `inputs`, `outputs` are properties of the endpoint object. I will use string descriptions to be safe.
+
+    *   **Error Codes:** Array of objects `{ code: string, description: string }`.
+    *   **Auth:** String e.g. "Bearer Token".
+
+    *   **Final check on Exclusions:**
+        *   No `field-service` endpoints.
+        *   No `hoA-voting` endpoints.
+        *   No `vanataca` endpoints.
+
+    *   **Component `cmp-security`:** Since it's a gateway, its endpoints are the entry points. I will define `POST /validate` and `GET /health`.
+
+    *   **Inputs/Outputs details:** I'll use string values for the JSON payloads to describe them.
+
+    Let's assemble.
+
+    Wait, one constraint: "Produce [JC:API Definitions] for each Component's externally callable interfaces."
+    Component `cmp-security` is likely internal middleware. However, to satisfy the schema, I will define it as the Auth service that external apps call to check permissions or status.
+    Actually, usually `cmp-security` *protects* the others. But if I must define it, I'll define the Auth endpoints.
+
+    Let's ensure the `api_definitions` schema is followed:
+    `definitions`: array.
+    `component_id`: string.
+    `endpoints`: array of objects.
+    `path`, `method`, `inputs`, `outputs`, `error_codes`, `auth_requirement`.
+
+    I will ensure every endpoint has `auth_requirement`.
+
+    Okay, ready to generate.
+
+    Wait, I need to make sure the `error_codes` field is valid JSON. I will put it as an array.
+    I will put `inputs` and `outputs` as strings representing the JSON structure to avoid nesting issues in the parent JSON if the parent schema expects strings, or objects if it allows. Given the instruction "matching the api_definitions schema", I will assume `inputs` and `outputs` can be objects. I will use objects for clarity, as that is standard for API definitions. If the schema strictly expects strings for those fields, I'll use strings. Usually, in these tasks, objects are fine. I'll use objects.
+
+    Wait, "REQUIRED OUTPUT: A JSON object matching the `api_definitions` schema".
+    The schema provided in the prompt is descriptive: `definitions: array, each with: component_id, endpoints: array of {path, method, inputs, outputs, error_codes, auth_requirement}`.
+    It doesn't specify the type of `inputs` or `outputs` fields specifically (e.g. string vs object). I will use objects for `inputs` and `outputs` to define the shape.
+
+    Wait, the prompt says "Include error codes for all failure scenarios".
+    I'll create a standard set (e.g., 400, 401, 403, 404, 500, and domain specific).
+
+    Let's finalize the content.
+
+    *   `cmp-prop-data`:
+        *   `POST /assets`: Upload. Input: `AssetUploadRequest`. Output: `AssetUploadResponse`.
+        *   `GET /assets/{id}`: Get Asset.
+        *   `POST /sync/queue`: Sync Queue.
+    *   `cmp-provider-match`:
+        *   `GET /providers/search`: Search.
+        *   `GET /bids/compare/{id}`: Compare.
+    *   `cmp-compliance`:
+        *   `POST /extract/ccr`: Extract CCR.
+        *   `GET /deadlines`: Get Deadlines.
+    *   `cmp-workflow`:
+        *   `GET /actions`: List Actions.
+        *   `POST /actions/{id}/update`: Update Action.
+    *   `cmp-notifications`:
+        *   `POST /dispatch/batch`: Send Batch.
+        *   `GET /status/{id}`: Check Status.
+    *   `cmp-security`:
+        *   `POST /auth/validate`: Validate Token.
+        *   `GET /tenant/context`: Get Tenant Context.
+    *   `cmp-payment`:
+        *   `POST /payments/process`: Process Charge.
+        *   `GET /receipts/{id}`: Get Receipt.
+
+    All have `auth_requirement: "Bearer Token Required"`.
+    `error_codes`: Array of `{ code: number, description: string }`.
+
+    Double Check MVP Scope:
+    *   `cmp-payment`: Process deposits/fees (Stripe). Not full accounting.
+    *   `cmp-workflow`: Action Items only. No Field Service dispatch.
+    *   `cmp-compliance`: CC&R extraction, Statutory deadlines.
+    *   `cmp-prop-data`: Images, 3D Splats, Mobile sync.
+
+    Looks good.
+
+    One final check on `auth_requirement`. The rule is "Every endpoint must have an explicit authentication requirement (Invariant: API-001)".
+    I will set `auth_requirement` to a string like `"Bearer Token (Required)"`.
+
+    Let's construct the JSON.

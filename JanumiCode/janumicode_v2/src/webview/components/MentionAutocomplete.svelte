@@ -44,21 +44,21 @@
     bottom: 100%;
     left: 8px;
     right: 8px;
-    margin-bottom: 4px;
+    margin-bottom: var(--jc-space-sm);
     max-height: 240px;
     overflow-y: auto;
-    background: var(--vscode-editorWidget-background, #252526);
-    border: 1px solid var(--vscode-panel-border, #444);
-    border-radius: 4px;
+    background: var(--vscode-editorWidget-background, var(--jc-surface-container-low));
+    border: 1px solid var(--vscode-panel-border, var(--jc-outline-variant));
+    border-radius: var(--jc-radius-sm);
     z-index: 100;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--jc-shadow-menu);
   }
   .item {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--jc-space-md);
     width: 100%;
-    padding: 6px 10px;
+    padding: var(--jc-space-md) var(--jc-space-lg);
     background: transparent;
     color: var(--vscode-foreground);
     border: none;
@@ -91,8 +91,8 @@
     background: transparent;
     color: var(--vscode-foreground);
     border: none;
-    border-top: 1px solid var(--vscode-panel-border, #444);
-    padding: 4px;
+    border-top: 1px solid var(--vscode-panel-border, var(--jc-outline-variant));
+    padding: var(--jc-space-sm);
     cursor: pointer;
     opacity: 0.5;
     font-size: 0.7em;

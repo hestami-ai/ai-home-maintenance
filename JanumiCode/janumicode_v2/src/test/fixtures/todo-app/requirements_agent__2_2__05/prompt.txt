@@ -1,0 +1,25 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Requirements Agent] performing Non-Functional Requirements Bloom for Sub-Phase 2.2.
+
+GOVERNING CONSTRAINTS (apply without exception):
+No constraints
+
+Derive [JC:Non-Functional Requirements] that constrain HOW the system behaves. Cover all applicable categories: performance, security, reliability, scalability, accessibility, maintainability.
+
+REQUIRED OUTPUT: A JSON object matching the `non_functional_requirements` schema:
+- requirements: array, each with:
+  - id: unique identifier (e.g., "NFR-001")
+  - category: performance | security | reliability | scalability | accessibility | maintainability
+  - description: what constraint applies
+  - threshold: specific measurable target
+  - measurement_method: how to verify
+
+Rules:
+- Every NFR must have a measurable threshold — not vague ("99.9% uptime", not "highly available")
+- Cover compliance regimes from compliance_context
+- Do NOT duplicate Functional Requirements from Sub-Phase 2.1
+
+CONTEXT SUMMARY:
+Intent: Local-First Binary: A self-contained CLI application that stores tasks locally on the user's machine using file-based storage, prioritizing speed and offline reliability without requiring network connectivity.
+Functional Requirements: 7 user stories covering: Execute the CLI binary without network connectivity; Create a new task via command line arguments; List all stored tasks from the local file; Update an existing task's status or description; Delete a specific task from the local storage
+Compliance: No compliance regimes

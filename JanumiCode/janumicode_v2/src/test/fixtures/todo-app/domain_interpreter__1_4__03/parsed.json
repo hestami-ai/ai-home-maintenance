@@ -1,0 +1,72 @@
+{
+  "product_concept": {
+    "name": "Local-First Binary",
+    "description": "A self-contained CLI application that stores tasks locally on the user's machine using file-based storage, prioritizing speed and offline reliability without requiring network connectivity.",
+    "who_it_serves": "Developers, system administrators, and power users who prefer offline workflows and want zero-latency task management.",
+    "problem_it_solves": "The need for a lightweight, dependency-free task manager that runs entirely offline and does not rely on external servers for basic CRUD operations."
+  },
+  "confirmed_assumptions": [
+    {
+      "assumption": "The application must run entirely on the local machine.",
+      "confirmed_by_record_id": "raw-intent-001"
+    },
+    {
+      "assumption": "'Simple' implies a focus on core CRUD operations without complex analytics or AI.",
+      "confirmed_by_record_id": "raw-intent-002"
+    },
+    {
+      "assumption": "Storage must be persistent but not database-driven to maintain 'simple' complexity.",
+      "confirmed_by_record_id": "raw-intent-003"
+    },
+    {
+      "assumption": "Security is assumed to be handled via OS permissions rather than application-level auth.",
+      "confirmed_by_record_id": "raw-intent-004"
+    }
+  ],
+  "confirmed_constraints": [
+    {
+      "constraint": "Must be installable via standard package managers (apt, brew, cargo, etc.).",
+      "type": "technical"
+    },
+    {
+      "constraint": "Must handle file I/O errors gracefully.",
+      "type": "technical"
+    },
+    {
+      "constraint": "Must support basic text input via stdin.",
+      "type": "technical"
+    }
+  ],
+  "out_of_scope": [
+    "Network connectivity and cloud synchronization features",
+    "Database-driven storage engines",
+    "Complex analytics, reporting, or AI-driven features",
+    "Application-level user authentication systems",
+    "Cross-device sync mechanisms"
+  ],
+  "scope_classification_ref": "scope-ref-001",
+  "compliance_context_ref": "compliance-ref-001",
+  "prior_decision_overrides": [],
+  "system_proposed_content_items": [
+    {
+      "field": "product_concept",
+      "content": "Local-First Binary",
+      "approved": true
+    },
+    {
+      "field": "confirmed_assumptions",
+      "content": "4 assumptions confirmed",
+      "approved": true
+    },
+    {
+      "field": "confirmed_constraints",
+      "content": "3 technical constraints confirmed",
+      "approved": true
+    },
+    {
+      "field": "out_of_scope",
+      "content": "5 items excluded",
+      "approved": true
+    }
+  ]
+}

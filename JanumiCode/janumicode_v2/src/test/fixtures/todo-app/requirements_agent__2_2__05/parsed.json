@@ -1,0 +1,46 @@
+{
+  "requirements": [
+    {
+      "id": "NFR-001",
+      "category": "performance",
+      "description": "The CLI binary must initialize and be ready to accept user input immediately after execution to ensure a responsive offline experience.",
+      "threshold": "≤ 100ms",
+      "measurement_method": "Measure elapsed time from process start to readiness for input using high-resolution system timers."
+    },
+    {
+      "id": "NFR-002",
+      "category": "security",
+      "description": "All data files created by the application must be restricted to the owning user to prevent unauthorized access or modification by other users.",
+      "threshold": "File permissions set to 0600",
+      "measurement_method": "Verify file permissions using 'ls -l' command on generated data files immediately after creation."
+    },
+    {
+      "id": "NFR-003",
+      "category": "reliability",
+      "description": "The application must ensure data integrity is maintained even if the process is terminated unexpectedly during a write operation.",
+      "threshold": "0% data loss on forced termination",
+      "measurement_method": "Simulate write operation followed by immediate process kill (SIGKILL) and verify file state on restart."
+    },
+    {
+      "id": "NFR-004",
+      "category": "scalability",
+      "description": "The file-based storage system must handle a growing number of tasks without significant performance degradation or file system fragmentation.",
+      "threshold": "Support up to 10,000 tasks with ≤ 50ms latency increase",
+      "measurement_method": "Load test by incrementing task count and measuring query latency using automated benchmarking scripts."
+    },
+    {
+      "id": "NFR-005",
+      "category": "maintainability",
+      "description": "The application must log all critical events to assist in debugging and monitoring system health.",
+      "threshold": "100% of error events logged with ISO 8601 timestamps",
+      "measurement_method": "Review log files during error scenarios to confirm timestamped entries exist and match error codes."
+    },
+    {
+      "id": "NFR-006",
+      "category": "accessibility",
+      "description": "All error messages and help text must be clear and actionable for users with varying technical proficiency.",
+      "threshold": "100% of error messages include a suggested resolution",
+      "measurement_method": "Inspect CLI output for all error codes to verify presence of resolution instructions via static analysis."
+    }
+  ]
+}

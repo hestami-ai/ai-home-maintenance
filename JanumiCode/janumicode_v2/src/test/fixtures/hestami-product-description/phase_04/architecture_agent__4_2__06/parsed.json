@@ -1,0 +1,162 @@
+{
+  "components": [
+    {
+      "id": "cmp-prop-data",
+      "name": "Property Data Manager",
+      "domain_id": "property-data-management",
+      "responsibilities": [
+        {
+          "id": "RSP-001",
+          "statement": "Accept and validate property image and 3D asset data uploads including format rejection logic."
+        },
+        {
+          "id": "RSP-002",
+          "statement": "Index valid assets within 10 seconds post-upload for search systems."
+        },
+        {
+          "id": "RSP-003",
+          "statement": "Manage offline data capture and synchronization buffers for mobile capture contexts."
+        }
+      ],
+      "dependencies": [
+        {
+          "target_component_id": "cmp-security",
+          "dependency_type": "reads"
+        }
+      ]
+    },
+    {
+      "id": "cmp-provider-match",
+      "name": "Service Provider Matcher",
+      "domain_id": "service-provider-matching",
+      "responsibilities": [
+        {
+          "id": "RSP-004",
+          "statement": "Return service provider search results with relevance scores using AI Agent processing."
+        },
+        {
+          "id": "RSP-005",
+          "statement": "Render bid estimate comparison tables ensuring minimum bid entry thresholds."
+        }
+      ],
+      "dependencies": [
+        {
+          "target_component_id": "cmp-security",
+          "dependency_type": "reads"
+        }
+      ]
+    },
+    {
+      "id": "cmp-compliance",
+      "name": "Compliance Rules Engine",
+      "domain_id": "compliance-rules-engine",
+      "responsibilities": [
+        {
+          "id": "RSP-006",
+          "statement": "Extract and validate CC&R and Bylaws clauses using AI confidence scoring."
+        },
+        {
+          "id": "RSP-007",
+          "statement": "Monitor statutory deadlines for regulatory obligations."
+        },
+        {
+          "id": "RSP-008",
+          "statement": "Generate compliance notification payloads for regulatory alerts."
+        }
+      ],
+      "dependencies": [
+        {
+          "target_component_id": "cmp-notifications",
+          "dependency_type": "calls"
+        }
+      ]
+    },
+    {
+      "id": "cmp-workflow",
+      "name": "Action Workflow Orchestrator",
+      "domain_id": "action-workflow-orchestrator",
+      "responsibilities": [
+        {
+          "id": "RSP-009",
+          "statement": "Manage service action item workflow states and record audit log transitions."
+        },
+        {
+          "id": "RSP-010",
+          "statement": "Reflect status updates immediately in the UI for workflow progress."
+        }
+      ],
+      "dependencies": [
+        {
+          "target_component_id": "cmp-security",
+          "dependency_type": "reads"
+        },
+        {
+          "target_component_id": "cmp-notifications",
+          "dependency_type": "calls"
+        }
+      ]
+    },
+    {
+      "id": "cmp-notifications",
+      "name": "Notification Dispatcher",
+      "domain_id": "notification-dispatcher",
+      "responsibilities": [
+        {
+          "id": "RSP-011",
+          "statement": "Process mass email/SMS batches for recipient lists and track delivery status."
+        },
+        {
+          "id": "RSP-012",
+          "statement": "Resume delivery attempts within 2 hours upon network reconnection."
+        },
+        {
+          "id": "RSP-013",
+          "statement": "Confirm receipt of messages for bounce rate tracking."
+        }
+      ],
+      "dependencies": [
+        {
+          "target_component_id": "cmp-security",
+          "dependency_type": "reads"
+        }
+      ]
+    },
+    {
+      "id": "cmp-security",
+      "name": "Tenant Security Gateway",
+      "domain_id": "tenant-security-gateway",
+      "responsibilities": [
+        {
+          "id": "RSP-014",
+          "statement": "Enforce multi-tenant security and Row-Level Security for data access."
+        },
+        {
+          "id": "RSP-015",
+          "statement": "Return unauthorized access responses within 50ms for restricted tenant data."
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "cmp-payment",
+      "name": "Payment Transaction Processor",
+      "domain_id": "payment-transaction-processor",
+      "responsibilities": [
+        {
+          "id": "RSP-016",
+          "statement": "Process payment requests for deposits and service fees via integrated payment gateway."
+        },
+        {
+          "id": "RSP-017",
+          "statement": "Generate electronic proof of payment and receipt documents."
+        }
+      ],
+      "dependencies": [
+        {
+          "target_component_id": "cmp-notifications",
+          "dependency_type": "calls"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,318 @@
+{
+  "definitions": [
+    {
+      "component_id": "COMP-001",
+      "endpoints": [
+        {
+          "path": "/storage/init",
+          "method": "POST",
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "storage_path": {
+                "type": "string",
+                "description": "Path to the storage file"
+              }
+            },
+            "required": [
+              "storage_path"
+            ]
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Initialization status"
+              },
+              "path": {
+                "type": "string",
+                "description": "Created file path"
+              }
+            }
+          },
+          "error_codes": [
+            "400",
+            "404",
+            "ERR_FILE_EXISTS",
+            "ERR_PERMISSION_DENIED"
+          ],
+          "auth_requirement": "None"
+        },
+        {
+          "path": "/tasks",
+          "method": "POST",
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "task_name": {
+                "type": "string",
+                "description": "Name of the task"
+              },
+              "description": {
+                "type": "string",
+                "description": "Task description"
+              },
+              "priority": {
+                "type": "integer",
+                "description": "Task priority"
+              }
+            },
+            "required": [
+              "task_name"
+            ]
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "description": "Unique task identifier"
+              },
+              "status": {
+                "type": "string",
+                "description": "Current task status"
+              }
+            }
+          },
+          "error_codes": [
+            "400",
+            "409",
+            "ERR_INVALID_NAME",
+            "ERR_STORAGE_FULL"
+          ],
+          "auth_requirement": "None"
+        },
+        {
+          "path": "/tasks",
+          "method": "GET",
+          "inputs": {
+            "type": "object",
+            "properties": {},
+            "required": []
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "error_codes": [
+            "400",
+            "404",
+            "ERR_STORAGE_NOT_FOUND"
+          ],
+          "auth_requirement": "None"
+        },
+        {
+          "path": "/tasks/{task_id}",
+          "method": "PATCH",
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "New status (e.g., 'completed')"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string"
+              },
+              "updated": {
+                "type": "boolean"
+              }
+            }
+          },
+          "error_codes": [
+            "400",
+            "404",
+            "ERR_INVALID_STATUS",
+            "ERR_TASK_NOT_FOUND"
+          ],
+          "auth_requirement": "None"
+        },
+        {
+          "path": "/tasks/{task_id}",
+          "method": "DELETE",
+          "inputs": {
+            "type": "object",
+            "properties": {},
+            "required": []
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "deleted": {
+                "type": "boolean"
+              }
+            }
+          },
+          "error_codes": [
+            "400",
+            "404",
+            "ERR_TASK_NOT_FOUND"
+          ],
+          "auth_requirement": "None"
+        }
+      ]
+    },
+    {
+      "component_id": "COMP-002",
+      "endpoints": [
+        {
+          "path": "/validate",
+          "method": "POST",
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string",
+                "description": "CLI command string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "command"
+            ]
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "valid": {
+                "type": "boolean"
+              },
+              "parsed_args": {
+                "type": "object"
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "error_codes": [
+            "400",
+            "ERR_INVALID_COMMAND",
+            "ERR_MISSING_ARGS",
+            "ERR_SYNTAX_ERROR"
+          ],
+          "auth_requirement": "None"
+        },
+        {
+          "path": "/parse",
+          "method": "POST",
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "input_stream": {
+                "type": "string",
+                "description": "UTF-8 text stream"
+              }
+            },
+            "required": [
+              "input_stream"
+            ]
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "data": {
+                "type": "object"
+              }
+            }
+          },
+          "error_codes": [
+            "400",
+            "ERR_ENCODING_ERROR",
+            "ERR_PARSE_FAILURE"
+          ],
+          "auth_requirement": "None"
+        }
+      ]
+    },
+    {
+      "component_id": "COMP-003",
+      "endpoints": [
+        {
+          "path": "/render",
+          "method": "GET",
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "task_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": []
+          },
+          "outputs": {
+            "type": "string",
+            "description": "ANSI Escape Code formatted text"
+          },
+          "error_codes": [
+            "400",
+            "ERR_RENDER_FAILED",
+            "ERR_TERMINAL_NOT_SUPPORTED"
+          ],
+          "auth_requirement": "None"
+        },
+        {
+          "path": "/render/status",
+          "method": "GET",
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "task_id"
+            ]
+          },
+          "outputs": {
+            "type": "string",
+            "description": "Formatted status message"
+          },
+          "error_codes": [
+            "400",
+            "404",
+            "ERR_TASK_NOT_FOUND"
+          ],
+          "auth_requirement": "None"
+        }
+      ]
+    }
+  ]
+}

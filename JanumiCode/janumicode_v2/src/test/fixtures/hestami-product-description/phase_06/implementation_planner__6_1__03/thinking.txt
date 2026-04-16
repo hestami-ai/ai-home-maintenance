@@ -1,0 +1,234 @@
+The user wants an `implementation_plan` JSON object generated based on the provided context.
+I need to decompose the Technical Specifications (which are implied by the Component Model, Technical Specifications, and API Definitions provided) into Implementation Tasks for Sub-Phase 6.1.
+
+**Context Analysis:**
+- **Project:** Consumer Discovery MVP (Phase 1 Focus).
+- **Pillar:** Home Real Property Assistant.
+- **Focus:** Property data ingestion (images, 3D splats), AI Agent Service Provider Search, Service Provider Matching, CC&R/Bylaws Extraction, Workflow Management, Notifications, Security, Payments.
+- **Components:** 7 components provided (`cmp-prop-data`, `cmp-provider-match`, `cmp-compliance`, `cmp-workflow`, `cmp-notifications`, `cmp-security`, `cmp-payment`).
+- **Data Models & APIs:** Provided for each component.
+- **Constraint:** `implementation_plan` schema is required.
+- **Rules:**
+    - One Task = One Component + One Responsibility.
+    - `component_responsibility` must be verbatim from the component model.
+    - Every Technical Specification must be covered (implies covering the main functional requirements described in the capabilities).
+    - No circular dependencies.
+    - Verbatim text for responsibilities.
+    - Complexity ratings.
+    - Completion criteria (Invariant: IP-001).
+    - Read/Write paths.
+    - Error handling context is provided but seems to be a general schema, specific error handling per task might be inferred or included in completion criteria if complex.
+    - The "DETAIL FILE" path suggests where this output will be saved or read from, but I am the generator.
+
+**Decomposition Strategy:**
+I need to iterate through each Responsibility (RSP-XXX) in the Component Model and create a Task for it.
+Then, I must ensure I don't leave out any major technical specifications (e.g., API endpoints, data models) unless they are covered by the task corresponding to the responsibility that implements them.
+
+Let's look at the responsibilities per component:
+1. `cmp-prop-data`:
+    - RSP-001: Accept and validate property image and 3D asset data uploads including format rejection logic.
+    - RSP-002: Index valid assets within 10 seconds post-upload for search systems.
+    - RSP-003: Manage offline data capture and synchronization buffers for mobile capture contexts.
+2. `cmp-provider-match`:
+    - RSP-004: Return service provider search results with relevance scores using AI Agent processing.
+    - RSP-005: Render bid estimate comparison tables ensuring minimum bid entry thresholds.
+3. `cmp-compliance`:
+    - RSP-006: Extract and validate CC&R and Bylaws clauses using AI confidence scoring.
+    - RSP-007: Monitor statutory deadlines for regulatory obligations.
+    - RSP-008: Generate compliance notification payloads for regulatory alerts.
+4. `cmp-workflow`:
+    - RSP-009: Manage service action item workflow states and record audit log transitions.
+    - RSP-010: Reflect status updates immediately in the UI for workflow progress.
+5. `cmp-notifications`:
+    - RSP-011: Process mass email/SMS batches for recipient lists and track delivery status.
+    - RSP-012: Resume delivery attempts within 2 hours upon network reconnection.
+    - RSP-013: Confirm receipt of messages for bounce rate tracking.
+6. `cmp-security`:
+    - RSP-014: Enforce multi-tenant security and Row-Level Security for data access.
+    - RSP-015: Return unauthorized access responses within 50ms for restricted tenant data.
+7. `cmp-payment`:
+    - RSP-016: Process payment requests for deposits and service fees via integrated payment gateway.
+    - RSP-017: Generate electronic proof of payment and receipt documents.
+
+There are 17 responsibilities. I will create 17 tasks.
+For each task, I need: `id`, `task_type`, `component_id`, `component_responsibility`, `description`, `backing_tool`, `dependency_task_ids`, `estimated_complexity`, `completion_criteria`, `write_directory_paths`, `read_directory_paths`.
+
+**Dependencies & Complexity:**
+- Security (cmp-security) is a dependency for most, but since Security usually happens *before* access, `cmp-security` tasks might be the first. However, in MVP context, RSP-014/015 might be handled in middleware or a shared auth layer. Given the Component Model says `Dependencies: none` for `cmp-security`, I will place it at the beginning or alongside infrastructure tasks.
+- `cmp-prop-data` depends on `cmp-security` (reads).
+- `cmp-compliance` calls `cmp-notifications`.
+- `cmp-notifications` calls `cmp-security` (reads).
+- `cmp-workflow` depends on `cmp-security`, `cmp-notifications`.
+- `cmp-payment` calls `cmp-notifications`.
+
+**Tooling:**
+- Backend: Bun API.
+- Frontend: SvelteKit.
+- DB: PostgreSQL/Vector Store.
+- Storage: SeaweedFS.
+- Workflow Engine: DBOS.
+- AI Agent: External service (implied).
+- Notification Channels: SMTP/Twilio/etc (implied).
+
+**Complexity Flag:**
+- High complexity: RSP-002 (Indexing within 10s is tight for large files, need async/background), RSP-006 (AI extraction confidence), RSP-008 (Regulatory payload generation).
+- Low/Medium: Standard CRUD, standard API integration.
+
+**Path Handling:**
+- Read paths: `storage_path` (SeaweedFS), DB connection strings.
+- Write paths: `storage_path` (SeaweedFS for uploads), `upload_queue` (internal).
+
+**Structure Plan:**
+I will construct the JSON array. I need to ensure `component_responsibility` is the EXACT string from the model.
+
+**Drafting Tasks:**
+
+1.  **RSP-001 (cmp-prop-data)**: Task ID `TASK-PROP-001`. Upload handler.
+2.  **RSP-002 (cmp-prop-data)**: Task ID `TASK-PROP-002`. Indexer service.
+3.  **RSP-003 (cmp-prop-data)**: Task ID `TASK-PROP-003`. Offline buffer sync.
+4.  **RSP-004 (cmp-provider-match)**: Task ID `TASK-PROV-001`. Search API & AI scoring.
+5.  **RSP-005 (cmp-provider-match)**: Task ID `TASK-PROV-002`. Bid comparison UI logic.
+6.  **RSP-006 (cmp-compliance)**: Task ID `TASK-COM-001`. Extraction logic.
+7.  **RSP-007 (cmp-compliance)**: Task ID `TASK-COM-002`. Deadline monitoring job.
+8.  **RSP-008 (cmp-compliance)**: Task ID `TASK-COM-003`. Alert payload gen.
+9.  **RSP-009 (cmp-workflow)**: Task ID `TASK-WORK-001`. State machine logic.
+10. **RSP-010 (cmp-workflow)**: Task ID `TASK-WORK-002`. UI status refresh hook.
+11. **RSP-011 (cmp-notifications)**: Task ID `TASK-NOTIF-001`. Batch processing.
+12. **RSP-012 (cmp-notifications)**: Task ID `TASK-NOTIF-002`. Retry job.
+13. **RSP-013 (cmp-notifications)**: Task ID `TASK-NOTIF-003`. Receipt confirm.
+14. **RSP-014 (cmp-security)**: Task ID `TASK-SEC-001`. RLS enforcement.
+15. **RSP-015 (cmp-security)**: Task ID `TASK-SEC-002`. Auth response latency check.
+16. **RSP-016 (cmp-payment)**: Task ID `TASK-PAY-001`. Payment processing.
+17. **RSP-017 (cmp-payment)**: Task ID `TASK-PAY-002`. Receipt generation.
+
+I need to map API endpoints to these tasks where relevant to ensure specs are covered.
+For example, `cmp-security` RSP-014 is critical. `cmp-payment` RSP-016 needs a completion criterion of payment success.
+
+I will write the JSON now. I must be careful to escape quotes properly and ensure valid JSON structure.
+The output must be *only* the JSON object.
+
+Wait, check constraint: "Every Technical Specification must be covered by at least one task". The specs are defined by the Data Models and APIs.
+- Data Models are implemented by the Logic in the tasks.
+- APIs are endpoints of the Logic in the tasks.
+- The Tasks correspond to the Responsibilities which define the logic.
+So covering Responsibilities covers the Specs.
+
+One detail: "No circular task dependencies". I will order them logically (Security first, then Prop Data, then Provider, Compliance, Workflow, Notifications, Payment).
+
+Let's refine complexity:
+- High: RSP-002 (Indexing constraint), RSP-006 (AI extraction), RSP-008 (Regulatory logic).
+- Medium: RSP-004 (AI processing), RSP-005 (UI logic), RSP-009 (Workflow state), RSP-011 (Batch processing).
+- Low: RSP-001 (Validation), RSP-003 (Sync), RSP-007 (Monitoring), RSP-010 (UI Update), RSP-012 (Resume), RSP-013 (Confirm), RSP-014 (Policy check), RSP-015 (Auth response), RSP-016 (Gateway call), RSP-017 (Doc gen).
+
+Actually, RSP-006 (AI) and RSP-011 (Mass SMS/Email) are Medium/High.
+Let's make RSP-002 High (10s constraint is strict).
+RSP-012 (Resume within 2 hours) is Medium (requires background worker logic).
+RSP-016 (Payment) is High (Financial logic, requires high reliability).
+
+Let's stick to the rules.
+`component_responsibility` must be verbatim.
+
+One more thing: The schema requires `implementation_plan`.
+The output should be a JSON object.
+
+Wait, I need to check if `implementation_plan` is the top level key or the array itself? The prompt says: "REQUIRED OUTPUT: A JSON object matching the `implementation_plan` schema". And "implementation_plan": "tasks: array...".
+Usually this means `{"implementation_plan": {"tasks": [...]}}`.
+Looking at the schema description: "tasks: array, each with...".
+I will output the JSON object containing the "implementation_plan" key with the "tasks" array.
+Actually, usually "JSON object matching the schema" means the root is that object.
+I will structure it as `{"implementation_plan": {"tasks": [...]}}`.
+
+Let's double check the "DETAIL FILE" context. It is just a path to where the file might be saved. I don't need to read it.
+
+Okay, I will generate the tasks.
+
+One check: "component_responsibility must carry VERBATIM text from the component_model".
+I will copy-paste the text from the prompt's component model exactly.
+
+Let's verify the text for RSP-001: `RSP-001: Accept and validate property image and 3D asset data uploads including format rejection logic.`
+RSP-002: `RSP-002: Index valid assets within 10 seconds post-upload for search systems.`
+... and so on.
+
+Dependencies:
+- `cmp-security` has no dependencies.
+- `cmp-prop-data` depends on `cmp-security`.
+- `cmp-provider-match` depends on `cmp-security`.
+- `cmp-compliance` depends on `cmp-notifications`.
+- `cmp-workflow` depends on `cmp-security`, `cmp-notifications`.
+- `cmp-notifications` depends on `cmp-security`.
+- `cmp-payment` depends on `cmp-notifications`.
+
+I will order tasks by these dependencies or assign IDs logically.
+Task IDs like `TASK-001` ... `TASK-017` or specific. I'll use descriptive IDs.
+
+Path logic:
+- Write: Upload to SeaweedFS (`storage_path`), DB writes (`db_url`).
+- Read: SeaweedFS (`storage_path`), DB (`db_url`).
+
+Let's construct the JSON.
+
+```json
+{
+  "implementation_plan": {
+    "tasks": [
+      {
+        "id": "TASK-SEC-01",
+        "task_type": "standard",
+        "component_id": "cmp-security",
+        "component_responsibility": "RSP-014: Enforce multi-tenant security and Row-Level Security for data access.",
+        "description": "Implement RLS policies and tenant boundary checks in the Tenant Security Gateway.",
+        "backing_tool": "DBOS Policy Engine / Bun Middleware",
+        "dependency_task_ids": [],
+        "estimated_complexity": "low",
+        "completion_criteria": [
+          "Security policy validation passes for all authorized requests.",
+          "Row-Level Security filters are active on database queries."
+        ],
+        "write_directory_paths": [],
+        "read_directory_paths": []
+      },
+      ...
+    ]
+  }
+}
+```
+I need to make sure I don't miss any. 17 responsibilities.
+I will ensure the JSON is valid.
+
+One detail on `component_responsibility`: It must include the prefix `RSP-XXX: `.
+The prompt lists them as:
+`RSP-001: Accept and validate...`
+I will include the `RSP-XXX: ` part.
+
+Let's finalize the list.
+
+1.  RSP-001 (Prop Data - Upload)
+2.  RSP-002 (Prop Data - Index)
+3.  RSP-003 (Prop Data - Offline)
+4.  RSP-004 (Provider - Search/AI)
+5.  RSP-005 (Provider - Bid Compare)
+6.  RSP-006 (Compliance - Extract)
+7.  RSP-007 (Compliance - Monitor)
+8.  RSP-008 (Compliance - Alert)
+9.  RSP-009 (Workflow - Manage State)
+10. RSP-010 (Workflow - UI Reflect)
+11. RSP-011 (Notif - Batch)
+12. RSP-012 (Notif - Resume)
+13. RSP-013 (Notif - Confirm)
+14. RSP-014 (Sec - RLS)
+15. RSP-015 (Sec - Latency)
+16. RSP-016 (Pay - Process)
+17. RSP-017 (Pay - Receipt)
+
+Wait, looking at RSP-015: `Return unauthorized access responses within 50ms for restricted tenant data.`
+This is likely handled by the same task as RSP-014 (Auth check) or as a specific high-perf task. Since `cmp-security` has two responsibilities, I will create two tasks for it, or combine if it makes sense, but the rule is "One Task = one Component + one Component Responsibility". So I must split them.
+RSP-014: Security Logic (RLS).
+RSP-015: Security Performance (Auth Response Latency).
+I will create separate tasks.
+
+Paths:
+For `cmp-prop-data`, write paths include `seaweedfs_root`. Read paths include `seaweedfs_root` for retrieval.
+For `cmp-compliance`, read paths include `db_url` (Bylaws stored in DB). Write paths include `db_url` (Extracted clauses).
+For `cmp-notifications`, read paths: `db_url` (lists). Write paths: `notification_queue` (internal logic, maybe no FS path, but I'll leave as empty or specific config). The spec says `write_directory_paths` and `read_directory_paths`. I will use empty arrays for network-based tasks (Payment, Notif) unless local config is touched, but usually these services interact with external providers. I'll put relevant DB paths or leave empty if appropriate. The prompt asks for `write_directory_paths`, `read_directory_paths`. I will include `db_url` paths if DB interaction happens, `storage_path` for files.
+
+Let's prepare the JSON content carefully.

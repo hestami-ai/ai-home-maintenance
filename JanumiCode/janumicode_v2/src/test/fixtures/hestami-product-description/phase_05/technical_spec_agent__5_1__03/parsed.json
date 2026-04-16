@@ -1,0 +1,887 @@
+{
+  "models": [
+    {
+      "component_id": "cmp-prop-data",
+      "entities": [
+        {
+          "name": "PropertyAsset",
+          "fields": [
+            {
+              "name": "asset_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "property_identifier",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "asset_type",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "MAX_LENGTH(50)"
+              ]
+            },
+            {
+              "name": "ingested_at",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "foreign_key",
+              "target": "MediaManifest",
+              "field": "media_manifest_id"
+            }
+          ]
+        },
+        {
+          "name": "MediaManifest",
+          "fields": [
+            {
+              "name": "media_manifest_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "asset_id",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "FK"
+              ]
+            },
+            {
+              "name": "file_format",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "IN('PNG', 'JPG', 'GLTF')"
+              ]
+            },
+            {
+              "name": "storage_path",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "file_size_bytes",
+              "type": "integer",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "one-to-many",
+              "target": "PropertyAsset",
+              "field": "asset_id"
+            }
+          ]
+        },
+        {
+          "name": "OfflineBuffer",
+          "fields": [
+            {
+              "name": "buffer_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "asset_id",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "capture_timestamp",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "sync_status",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "retry_count",
+              "type": "integer",
+              "constraints": [
+                "NOT NULL",
+                "DEFAULT(0)"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "foreign_key",
+              "target": "PropertyAsset",
+              "field": "asset_id"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-provider-match",
+      "entities": [
+        {
+          "name": "ProviderProfile",
+          "fields": [
+            {
+              "name": "provider_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "business_name",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "location",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "match_score",
+              "type": "float",
+              "constraints": [
+                "NOT NULL",
+                "BETWEEN 0 AND 1"
+              ]
+            },
+            {
+              "name": "is_home_real_property",
+              "type": "boolean",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "accessed_at",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "many-to-one",
+              "target": "BidEstimate",
+              "field": "provider_id"
+            }
+          ]
+        },
+        {
+          "name": "BidEstimate",
+          "fields": [
+            {
+              "name": "estimate_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "provider_id",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "FK"
+              ]
+            },
+            {
+              "name": "property_identifier",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "bid_amount_cents",
+              "type": "integer",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "submission_timestamp",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "many-to-one",
+              "target": "ProviderProfile",
+              "field": "provider_id"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-compliance",
+      "entities": [
+        {
+          "name": "BylawsClause",
+          "fields": [
+            {
+              "name": "clause_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "source_doc_reference",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "extracted_text",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "MAX_LENGTH(10000)"
+              ]
+            },
+            {
+              "name": "extraction_confidence",
+              "type": "float",
+              "constraints": [
+                "NOT NULL",
+                "BETWEEN 0 AND 1"
+              ]
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "one-to-one",
+              "target": "NoticeRequirement",
+              "field": "notice_requirement_id"
+            }
+          ]
+        },
+        {
+          "name": "StatutoryDeadline",
+          "fields": [
+            {
+              "name": "deadline_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "jurisdiction",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "obligation_type",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "deadline_date",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": []
+        },
+        {
+          "name": "NoticeRequirement",
+          "fields": [
+            {
+              "name": "notice_requirement_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "jurisdiction",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "content_template",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "is_active",
+              "type": "boolean",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "one-to-many",
+              "target": "BylawsClause",
+              "field": "clause_id"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-workflow",
+      "entities": [
+        {
+          "name": "ActionItem",
+          "fields": [
+            {
+              "name": "action_item_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "task_description",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "workflow_status",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "IN('Pending', 'In-Progress', 'Complete', 'Failed')"
+              ]
+            },
+            {
+              "name": "assigned_at",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "one-to-many",
+              "target": "TransitionLog",
+              "field": "action_item_id"
+            }
+          ]
+        },
+        {
+          "name": "TransitionLog",
+          "fields": [
+            {
+              "name": "log_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "action_item_id",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "FK"
+              ]
+            },
+            {
+              "name": "prev_status",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "new_status",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "transition_timestamp",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL",
+                "PRECISE(100ms)"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "many-to-one",
+              "target": "ActionItem",
+              "field": "action_item_id"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-notifications",
+      "entities": [
+        {
+          "name": "MessageBatch",
+          "fields": [
+            {
+              "name": "batch_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "channel_type",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "IN('Email', 'SMS')"
+              ]
+            },
+            {
+              "name": "payload_hash",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "one-to-many",
+              "target": "DeliveryAttempt",
+              "field": "batch_id"
+            },
+            {
+              "type": "one-to-many",
+              "target": "RecipientList",
+              "field": "batch_id"
+            }
+          ]
+        },
+        {
+          "name": "DeliveryAttempt",
+          "fields": [
+            {
+              "name": "attempt_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "batch_id",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "FK"
+              ]
+            },
+            {
+              "name": "recipient_identifier",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "delivery_status",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "bounce_status",
+              "type": "string",
+              "constraints": [
+                "NULL",
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "retry_count",
+              "type": "integer",
+              "constraints": [
+                "NOT NULL",
+                "DEFAULT(0)"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "many-to-one",
+              "target": "MessageBatch",
+              "field": "batch_id"
+            }
+          ]
+        },
+        {
+          "name": "RecipientList",
+          "fields": [
+            {
+              "name": "list_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "batch_id",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "FK"
+              ]
+            },
+            {
+              "name": "tenant_member_id",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "many-to-one",
+              "target": "MessageBatch",
+              "field": "batch_id"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-security",
+      "entities": [
+        {
+          "name": "RLSPolicy",
+          "fields": [
+            {
+              "name": "policy_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "tenant_id",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "scope",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "is_active",
+              "type": "boolean",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": []
+        },
+        {
+          "name": "TenantBoundary",
+          "fields": [
+            {
+              "name": "boundary_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "tenant_id",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "accessible_scope",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "access_level",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "IN('Admin', 'Read', 'ViewOnly')"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "one-to-one",
+              "target": "RLSPolicy",
+              "field": "policy_id"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-payment",
+      "entities": [
+        {
+          "name": "PaymentIntent",
+          "fields": [
+            {
+              "name": "intent_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "amount_cents",
+              "type": "integer",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "currency",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "IN('USD')"
+              ]
+            },
+            {
+              "name": "gateway_reference",
+              "type": "string",
+              "constraints": [
+                "NULL",
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "one-to-many",
+              "target": "ReceiptDocument",
+              "field": "intent_id"
+            },
+            {
+              "type": "one-to-many",
+              "target": "DepositFee",
+              "field": "intent_id"
+            }
+          ]
+        },
+        {
+          "name": "ReceiptDocument",
+          "fields": [
+            {
+              "name": "receipt_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "intent_id",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "FK"
+              ]
+            },
+            {
+              "name": "document_url",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "generated_at",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "many-to-one",
+              "target": "PaymentIntent",
+              "field": "intent_id"
+            }
+          ]
+        },
+        {
+          "name": "DepositFee",
+          "fields": [
+            {
+              "name": "fee_id",
+              "type": "string",
+              "constraints": [
+                "PK",
+                "UNIQUE"
+              ]
+            },
+            {
+              "name": "intent_id",
+              "type": "string",
+              "constraints": [
+                "NOT NULL",
+                "FK"
+              ]
+            },
+            {
+              "name": "fee_amount_cents",
+              "type": "integer",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "fee_type",
+              "type": "string",
+              "constraints": [
+                "NOT NULL"
+              ]
+            },
+            {
+              "name": "processed_at",
+              "type": "timestamp",
+              "constraints": [
+                "NOT NULL"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "type": "many-to-one",
+              "target": "PaymentIntent",
+              "field": "intent_id"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

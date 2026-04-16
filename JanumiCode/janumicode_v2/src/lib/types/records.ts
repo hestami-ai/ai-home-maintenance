@@ -225,6 +225,7 @@ export type RecordType =
   | 'raw_intent_received'
   | 'agent_invocation'
   | 'agent_output'
+  | 'agent_output_chunk'
   | 'agent_reasoning_step'
   | 'agent_self_correction'
   | 'tool_call'
@@ -238,8 +239,8 @@ export type RecordType =
   | 'detail_file_generated'
   // Human Interaction Records (§6.2)
   | 'mirror_presented'
-  | 'menu_presented'
   | 'decision_bundle_presented'
+  | 'decision_bundle_resolved'
   | 'decision_trace'
   | 'mirror_approved'
   | 'mirror_rejected'
@@ -258,6 +259,7 @@ export type RecordType =
   | 'decision_trace_summary'
   | 'retrieval_brief_record'
   | 'context_packet'
+  | 'query_decomposition_record'
   | 'memory_edge_proposed'
   | 'memory_edge_confirmed'
   | 'intent_quality_report'
@@ -300,6 +302,7 @@ export type DecisionType =
   | 'mirror_approval'
   | 'mirror_rejection'
   | 'mirror_edit'
+  | 'decision_bundle_resolution'
   | 'phase_gate_approval'
   | 'rollback_authorization'
   | 'unsticking_escalation_resolution'
@@ -332,6 +335,18 @@ export type MemoryEdgeStatus =
   | 'rejected'
   | 'superseded'
   | 'invalidated';
+
+// -- Sub-Artifact Edge Types (Architecture Canvas) --
+
+/**
+ * Edge types for relationships between sub-artifacts (components, ADRs, etc.).
+ * These edges are stored in sub_artifact_edge table, not memory_edge,
+ * because their endpoints are semantic IDs (e.g., "COMP-001") not governed_stream IDs.
+ */
+export type SubArtifactEdgeType =
+  | 'satisfies'    // Component -> Requirement
+  | 'depends_on'   // Component -> Component
+  | 'governs';     // ADR -> Component
 
 // ── Workflow Run (§5) ───────────────────────────────────────────────
 

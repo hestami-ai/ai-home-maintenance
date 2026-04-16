@@ -72,11 +72,16 @@ export function validateSchema(db: Database): { valid: boolean; issues: string[]
   const issues: string[] = [];
 
   // Check core tables exist
+  // detail_files, schema_versions, record_references, llm_api_calls were
+  // removed after the ghost-table audit: all four were redundant with
+  // governed_stream records / JSON columns and never populated by
+  // production code.
   const expectedTables = [
     'workflow_runs', 'governed_stream', 'phase_gates',
     'sub_phase_execution_log', 'agent_invocation_trace',
-    'memory_edge', 'detail_files', 'schema_versions',
-    'record_references', 'file_system_writes', 'llm_api_calls',
+    'memory_edge', 'file_system_writes',
+    // Architecture Canvas tables
+    'sub_artifact', 'sub_artifact_edge', 'canvas_layout_state',
   ];
 
   const tables = db.prepare(

@@ -1,0 +1,12 @@
+{
+  "overall_pass": false,
+  "flaws": [
+    {
+      "flaw_type": "completeness_shortcut",
+      "severity": "high",
+      "description": "The agent failed to deliver the requested 'batch processing queue' artifact, instead outputting only a tool configuration error message. The task requires developing the queue, but the output is missing the required implementation artifact entirely.",
+      "evidence": "Agent's Final Output: No output parser registered for backing tool: SMTP / Twilio SDK / Bun Queue",
+      "recommended_action": "retry"
+    }
+  ]
+}

@@ -1,0 +1,137 @@
+{
+  "candidate_product_concepts": [
+    {
+      "id": "cp-001-local-first",
+      "name": "Local-First Binary",
+      "description": "A self-contained CLI application that stores tasks locally on the user's machine using file-based storage, prioritizing speed and offline reliability without requiring network connectivity.",
+      "who_it_serves": "Developers, system administrators, and power users who prefer offline workflows and want zero-latency task management.",
+      "problem_it_solves": "The need for a lightweight, dependency-free task manager that runs entirely offline and does not rely on external servers for basic CRUD operations.",
+      "assumptions": [
+        {
+          "statement": "The application must run entirely on the local machine.",
+          "basis": "Raw Intent specifies 'CLI' and 'simple', implying local execution environment rather than a web-based service."
+        },
+        {
+          "statement": "'Simple' implies a focus on core CRUD operations without complex analytics or AI.",
+          "basis": "Raw Intent specifies 'simple', which typically excludes advanced features like machine learning or complex reporting in initial phases."
+        },
+        {
+          "statement": "Storage must be persistent but not database-driven to maintain 'simple' complexity.",
+          "basis": "Raw Intent specifies 'simple', suggesting file-based storage (JSON/YAML) is preferred over database engines for a minimal footprint."
+        },
+        {
+          "statement": "Security is assumed to be handled via OS permissions rather than application-level auth.",
+          "basis": "Raw Intent specifies 'simple', and Context Summary states 'No compliance regimes', implying basic security suffices."
+        }
+      ],
+      "constraints": [
+        "Must be installable via standard package managers (apt, brew, cargo, etc.).",
+        "Must handle file I/O errors gracefully.",
+        "Must support basic text input via stdin."
+      ],
+      "open_questions": [
+        "What specific file format is preferred for storage (JSON, YAML, TOML, SQLite)?",
+        "What is the definition of 'simple' in terms of feature count or lines of code?",
+        "Should the application support cross-device sync via a secondary mechanism?"
+      ]
+    },
+    {
+      "id": "cp-002-cloud-sync",
+      "name": "Cloud-Synced CLI",
+      "description": "A CLI application that wraps a REST API to sync tasks across multiple devices, requiring a backend service while maintaining a text-based user interface.",
+      "who_it_serves": "Remote workers and teams who need to access their task lists from multiple terminals without logging into a web browser.",
+      "problem_it_solves": "The need for task management that persists across different machines and sessions without the friction of a GUI or web login.",
+      "assumptions": [
+        {
+          "statement": "The application requires an internet connection for sync.",
+          "basis": "Raw Intent specifies 'app', and 'Cloud-Synced' implies data persistence beyond local storage, requiring a network layer."
+        },
+        {
+          "statement": "'Simple' refers to the user interface complexity, not the backend infrastructure.",
+          "basis": "Raw Intent specifies 'CLI', which simplifies the frontend, but 'app' implies a complete solution including backend infrastructure."
+        },
+        {
+          "statement": "Authentication is required for cloud sync.",
+          "basis": "Raw Intent implies an 'app' used by 'who_it_serves' (humans), implying identity management is needed for cloud services."
+        },
+        {
+          "statement": "The CLI must handle token refresh logic internally.",
+          "basis": "Raw Intent specifies 'CLI', which requires the tool to manage its own state (tokens) transparently to the user."
+        }
+      ],
+      "constraints": [
+        "Must support standard authentication protocols (OAuth2, API Keys).",
+        "Must handle network timeouts without crashing.",
+        "Must not store sensitive data in local logs."
+      ],
+      "open_questions": [
+        "What is the acceptable latency for sync operations?",
+        "Is the backend self-hosted or SaaS?",
+        "How should conflict resolution be handled for simultaneous edits?"
+      ]
+    },
+    {
+      "id": "cp-003-devops-pipeline",
+      "name": "DevOps Pipeline Task Manager",
+      "description": "A CLI tool designed to integrate directly into build pipelines and CI/CD workflows, treating tasks as artifacts or pipeline steps rather than personal to-dos.",
+      "who_it_serves": "DevOps engineers, CI/CD administrators, and automation scripts.",
+      "problem_it_solves": "The need to manage deployment tasks, pipeline steps, and environment configurations directly within the terminal without context switching to a GUI.",
+      "assumptions": [
+        {
+          "statement": "'Todo' implies 'tasks' in an automation context, not personal productivity.",
+          "basis": "Raw Intent specifies 'CLI', which is heavily associated with automation and scripting in a DevOps context."
+        },
+        {
+          "statement": "The application must be scriptable or hookable.",
+          "basis": "Raw Intent specifies 'CLI', and 'production-grade' implies integration into larger systems."
+        },
+        {
+          "statement": "State is managed via version control or artifact stores.",
+          "basis": "Raw Intent implies 'production-grade', which suggests version-controlled state rather than ephemeral state."
+        },
+        {
+          "statement": "'Simple' means low coupling to specific CI tools.",
+          "basis": "Raw Intent specifies 'simple', implying the tool should be agnostic to specific CI providers (GitHub Actions, GitLab, etc.)."
+        }
+      ],
+      "constraints": [
+        "Must be compatible with standard shell environments (bash, zsh, sh).",
+        "Must support piping input/output to other scripts.",
+        "Must exit with appropriate error codes for CI integration."
+      ],
+      "open_questions": [
+        "Should the tool support YAML-based configuration for pipelines?",
+        "Is the 'simple' aspect referring to syntax or underlying architecture?",
+        "Should the tool support human-readable logs or machine-readable output only?"
+      ]
+    }
+  ],
+  "system_proposed_content": [
+    {
+      "field_name": "target_language",
+      "proposed_value": "Rust or Go",
+      "approval_status": "pending"
+    },
+    {
+      "field_name": "storage_type",
+      "proposed_value": "File-based (JSON/SQLite)",
+      "approval_status": "pending"
+    },
+    {
+      "field_name": "license",
+      "proposed_value": "MIT or Apache-2.0",
+      "approval_status": "pending"
+    },
+    {
+      "field_name": "target_os",
+      "proposed_value": "Linux, macOS, Windows",
+      "approval_status": "pending"
+    },
+    {
+      "field_name": "authentication",
+      "proposed_value": "None (Local) or OAuth2 (Cloud)",
+      "approval_status": "pending"
+    }
+  ],
+  "prior_decision_conflicts": []
+}

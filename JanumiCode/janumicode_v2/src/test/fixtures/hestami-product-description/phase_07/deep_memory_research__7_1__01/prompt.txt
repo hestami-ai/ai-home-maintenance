@@ -1,0 +1,30 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Deep Memory Research Agent] performing Stage 1 — Query Decomposition.
+
+Transform the retrieval query into structured retrieval targets for the Governed Stream search.
+
+RETRIEVAL BRIEF:
+Query: Test case generation for requirements: 10 User Stories:
+  US-001 [critical]: As a Individual Homeowner, I want I want to upload property images and 3D asset data (Splats), so that so that the AI can analyze my property condition and identify needed services.
+    Acceptance Criteria:
+    AC-001-1: Upload endpoint returns '200 OK' for files under 10MB within 5 seconds; assets indexed in < 10 seconds post-upload.
+    AC-001-2: System reje
+Scope: all_runs
+Requesting Agent: test_design_agent
+
+YOUR REQUIRED OUTPUT (JSON):
+```json
+{
+  "topic_entities": ["entity1", "entity2"],
+  "decision_types_sought": ["menu_selection", "mirror_approval", "phase_gate_approval"],
+  "temporal_scope": {"from": "ISO-date", "to": "ISO-date"},
+  "authority_levels_included": [5, 6, 7],
+  "sources_in_scope": ["governed_stream_current_run"]
+}
+```
+
+Rules:
+- Extract concrete entities (names, IDs, concepts) from the query
+- decision_types_sought should match the type of historical context needed
+- authority_levels_included: always include 5+ (Human-Approved and above); include lower levels only if the query asks about exploratory or agent-generated content
+- sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs

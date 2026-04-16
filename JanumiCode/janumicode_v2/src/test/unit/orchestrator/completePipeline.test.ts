@@ -1,46 +1,37 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createTestDatabase, type Database } from '../../../lib/database/init';
-import { OrchestratorEngine } from '../../../lib/orchestrator/orchestratorEngine';
-import { Phase0Handler } from '../../../lib/orchestrator/phases/phase0';
-import { Phase1Handler } from '../../../lib/orchestrator/phases/phase1';
-import { Phase2Handler } from '../../../lib/orchestrator/phases/phase2';
-import { Phase3Handler } from '../../../lib/orchestrator/phases/phase3';
-import { Phase4Handler } from '../../../lib/orchestrator/phases/phase4';
-import { Phase5Handler } from '../../../lib/orchestrator/phases/phase5';
-import { Phase6Handler } from '../../../lib/orchestrator/phases/phase6';
-import { Phase7Handler } from '../../../lib/orchestrator/phases/phase7';
-import { Phase8Handler } from '../../../lib/orchestrator/phases/phase8';
-import { Phase9Handler } from '../../../lib/orchestrator/phases/phase9';
-import { Phase10Handler } from '../../../lib/orchestrator/phases/phase10';
-import { ConfigManager } from '../../../lib/config/configManager';
-import path from 'path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import type { Database } from '../../../lib/database/init';
+import type { OrchestratorEngine } from '../../../lib/orchestrator/orchestratorEngine';
+import { createTestEngine, type TestEngine } from '../../helpers/createTestEngine';
 
 describe('Complete Pipeline — Phase 0 through Phase 10', () => {
   let db: Database;
   let engine: OrchestratorEngine;
+  let te: TestEngine;
+  let tmpWorkspace: string;
 
-  beforeEach(() => {
-    db = createTestDatabase();
-    const configManager = new ConfigManager();
-    const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
-    engine.setAutoApproveDecisions(true);
-
-    // Register ALL phases
-    engine.registerPhase(new Phase0Handler());
-    engine.registerPhase(new Phase1Handler());
-    engine.registerPhase(new Phase2Handler());
-    engine.registerPhase(new Phase3Handler());
-    engine.registerPhase(new Phase4Handler());
-    engine.registerPhase(new Phase5Handler());
-    engine.registerPhase(new Phase6Handler());
-    engine.registerPhase(new Phase7Handler());
-    engine.registerPhase(new Phase8Handler());
-    engine.registerPhase(new Phase9Handler());
-    engine.registerPhase(new Phase10Handler());
+  beforeEach(async () => {
+    // Isolated workspace so Phase 0 doesn't try to scan the repo root.
+    tmpWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-complete-pipe-'));
+    // createTestEngine registers mock providers that route every
+    // configured llm_routing.* provider name (google, ollama, anthropic)
+    // to a MockLLMProvider, wires all 11 phase handlers, and calls
+    // engine.validateLLMRouting() — so a missing provider shows up here
+    // instead of silently swallowing a Reasoning Review.
+    te = await createTestEngine({
+      workspacePath: tmpWorkspace,
+      autoApprove: true,
+    });
+    engine = te.engine;
+    db = te.db;
   });
 
-  afterEach(() => { db.close(); });
+  afterEach(() => {
+    te.cleanup();
+    try { fs.rmSync(tmpWorkspace, { recursive: true, force: true }); } catch { /* ignore */ }
+  });
 
   it('executes the complete pipeline from intent to committed code', async () => {
     // Start workflow

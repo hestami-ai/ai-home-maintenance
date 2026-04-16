@@ -44,6 +44,22 @@ export interface ClientLiaisonDB {
   vectorSearch(query: string, opts?: { workflowRunId?: string; limit?: number }): Promise<GovernedStreamRecord[]>;
   hybridSearch(query: string, opts?: { workflowRunId?: string; limit?: number }): Promise<GovernedStreamRecord[]>;
   getRecentRecords(runId: string, limit?: number): GovernedStreamRecord[];
+  /**
+   * Retrieve the last N conversation turns for a run — pairs of
+   * open_query_received (or raw_intent_received) and the
+   * client_liaison_response that answered them. Used to give the
+   * synthesizer multi-turn context so follow-ups like "what about the
+   * previous one?" resolve correctly.
+   *
+   * Pairs are oldest-first in the returned array. Unpaired queries
+   * (still in flight) are omitted.
+   */
+  getRecentConversationTurns(runId: string, limit?: number): ConversationTurn[];
+}
+
+export interface ConversationTurn {
+  queryRecord: GovernedStreamRecord;
+  responseRecord: GovernedStreamRecord;
 }
 
 export class ClientLiaisonDBImpl implements ClientLiaisonDB {
@@ -166,6 +182,38 @@ export class ClientLiaisonDBImpl implements ClientLiaisonDB {
     return rows.map(r => this.rowToRecord(r));
   }
 
+  getRecentConversationTurns(runId: string, limit = 5): ConversationTurn[] {
+    // Pair each client_liaison_response with the raw_intent_received /
+    // open_query_received record it derived from. Ordered oldest-first so
+    // the prompt reads chronologically.
+    const responseRows = this.db
+      .prepare(
+        `SELECT * FROM governed_stream
+          WHERE workflow_run_id = ?
+            AND record_type = 'client_liaison_response'
+            AND is_current_version = 1
+          ORDER BY produced_at DESC
+          LIMIT ?`,
+      )
+      .all(runId, limit) as Record<string, unknown>[];
+
+    const turns: ConversationTurn[] = [];
+    for (const row of responseRows) {
+      const responseRecord = this.rowToRecord(row);
+      const derivedFrom = responseRecord.derived_from_record_ids ?? [];
+      if (derivedFrom.length === 0) continue;
+      const queryRecord = this.getRecordById(derivedFrom[0]);
+      if (!queryRecord) continue;
+      if (
+        queryRecord.record_type !== 'open_query_received' &&
+        queryRecord.record_type !== 'raw_intent_received'
+      ) continue;
+      turns.push({ queryRecord, responseRecord });
+    }
+    // Oldest-first for prompt readability.
+    return turns.reverse();
+  }
+
   // ── Memory edge graph traversal ───────────────────────────────
 
   traverseEdges(fromId: string, edgeType?: MemoryEdgeType, depth = 5): MemoryEdge[] {
@@ -280,11 +328,10 @@ export class ClientLiaisonDBImpl implements ClientLiaisonDB {
   }
 
   getPendingDecisions(runId: string): GovernedStreamRecord[] {
-    // Return mirror_presented / menu_presented / phase_gate_evaluation records
-    // that have no matching follow-up record.
+    // Return mirror_presented / decision_bundle_presented / phase_gate_evaluation
+    // records that have no matching follow-up record.
     const surfaces = [
       'mirror_presented',
-      'menu_presented',
       'decision_bundle_presented',
       'phase_gate_evaluation',
     ];
@@ -301,7 +348,8 @@ export class ClientLiaisonDBImpl implements ClientLiaisonDB {
               WHERE f.workflow_run_id = gs.workflow_run_id
                 AND f.record_type IN (
                   'mirror_approved', 'mirror_rejected', 'mirror_edited',
-                  'phase_gate_approved', 'phase_gate_rejected', 'decision_trace'
+                  'phase_gate_approved', 'phase_gate_rejected',
+                  'decision_bundle_resolved', 'decision_trace'
                 )
                 AND f.derived_from_record_ids LIKE '%' || gs.id || '%'
             )

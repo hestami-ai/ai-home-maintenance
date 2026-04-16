@@ -1,0 +1,12 @@
+{
+  "corpus": "CLI Todo App",
+  "intent": "Build a simple CLI todo app",
+  "phases_covered": ["1", "2", "3", "4", "5", "6", "7", "8"],
+  "fixture_count": 18,
+  "capture_notes": {
+    "phases_1_3": "Captured from initial full pipeline run with qwen3.5:9b",
+    "phases_4_8": "Re-captured after fixing context extraction (phaseContext.ts) to pass structured prior-phase data instead of [object Object]"
+  },
+  "created_at": "2026-04-13",
+  "janumicode_version_sha": "dev"
+}

@@ -30,7 +30,12 @@ import type { Database, Statement, RunResult } from './init';
 const CTRL_OFFSET = 0;
 const LEN_OFFSET = 1; // Int32 index (byte 4)
 const DATA_OFFSET = 8;
-const BUFFER_SIZE = 4 * 1024 * 1024; // 4MB max per message
+// Bumped from 4MB after a real workspace overflowed it on snapshot reload.
+// The bridge is per-RPC-call, so this caps the largest single SQL result
+// we can transport. Snapshots are now paginated in the view provider so
+// we never get close to this — but a single record may still carry a
+// large prompt/output, so the headroom stays useful.
+const BUFFER_SIZE = 32 * 1024 * 1024; // 32MB max per message
 
 const CTRL_IDLE = 0;
 const CTRL_REQUEST = 1;

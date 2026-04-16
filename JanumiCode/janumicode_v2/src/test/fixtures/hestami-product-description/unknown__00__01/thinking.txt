@@ -1,0 +1,309 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Reasoning Review] - A focused LLM API call inspecting an agent's [JC:Execution Trace].
+    *   **Task:** Inspect the provided trace for flaws based on a specific taxonomy.
+    *   **Input:**
+        *   [Context]: The reviewed agent was required to produce "Implement Row-Level Security policies and tenant boundary enforcement logic within the Bun API middleware layer."
+        *   [Phase Gate Criteria]: Not explicitly detailed in the prompt text provided under "Completion Criteria (for completeness_shortcut checks)", but generally implies the agent must complete the task defined in the Context.
+        *   [Trace Selection]:
+            *   Reasoning Step 0: Invocation ID `ea275637-d4af-4187-8c3a-a5b6c29cca9d`, Task ID `TASK-SEC-001`, Tool `DBOS Middleware / PostgreSQL RLS Policies`, Status `started`.
+            *   Agent's Final Output: "No output parser registered for backing tool: DBOS Middleware / PostgreSQL RLS Policies".
+    *   **Output Format:** JSON with `overall_pass` (boolean) and `flaws` (array of objects).
+    *   **Flaw Taxonomy:** A list of 12 flaw types (e.g., `completeness_shortcut`, `implementability_violation`, etc.).
+    *   **Rules:** `severity` high blocks Phase Gate. `premature_convergence` is ALWAYS high. Every flaw must cite specific evidence. If no flaws, `overall_pass` = true.
+
+2.  **Evaluate the Trace & Output:**
+    *   **Task:** Implement Row-Level Security (RLS) policies and tenant boundary enforcement in Bun API middleware.
+    *   **Trace Content:** The trace shows a tool invocation started but failed to produce results because "No output parser registered for backing tool".
+    *   **Final Output:** An error message indicating a tool failure/parsing issue.
+    *   **Assessment:**
+        *   The agent *attempted* to use a tool (`DBOS Middleware / PostgreSQL RLS Policies`) to get info or execute the task.
+        *   The tool invocation failed (parser missing).
+        *   The agent provided *no actual implementation*, no code, no policies, no logic. It just stated a tool error.
+        *   Did it complete the task? No. The task is to *Implement* policies. The output is an error message about a tool parser.
+        *   This looks like a `completeness_shortcut` (claims done? No, but implicitly stops here) or potentially `implementability_violation` (tool failure means agent cannot do it alone?) or simply a failure to complete the task which might be classified as `completeness_shortcut` if the agent treats the error as a completion of the *attempt*, or more accurately, it simply failed. However, looking at the flaw definitions:
+            *   `completeness_shortcut`: "Agent claims task complete when only part is done". The agent didn't explicitly claim "Task Complete". It output an error.
+            *   `implementability_violation`: "Component Responsibility too broad for single Executor Agent session". Not quite.
+            *   `tool_result_misinterpretation_suspected`: "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The output is a tool error.
+            *   `unsupported_assumption`: "Agent asserts something as true with no basis".
+            *   `invalid_inference`: "Conclusion does not follow from stated premises".
+            *   `unacknowledged_uncertainty`: "Agent expresses false confidence".
+            *   `contradiction_with_prior_approved`: "Output conflicts with Phase-Gate-Certified artifact".
+            *   `scope_violation`: "Agent addresses concerns belonging to a different Phase".
+            *   `false_equivalence`.
+            *   `authority_confusion`.
+            *   `premature_convergence`.
+            *   `invalid_inference`.
+
+    *   Wait, the prompt says: "Completion Criteria (for completeness_shortcut checks):". It actually left the criteria blank in the input provided under "─── CONTEXT FOR YOUR REVIEW (not instructions to you) ───". However, the Context says: "The REVIEWED AGENT was required to produce: Implement Row-Level Security policies and tenant boundary enforcement logic within the Bun API middleware layer."
+    *   The Agent's Output is: "No output parser registered for backing tool: DBOS Middleware / PostgreSQL RLS Policies".
+    *   This output indicates the agent *could not* generate the required content due to a technical error with its tool configuration. It did *not* produce the implementation.
+    *   Is this a flaw? Yes. The task is to implement policies. The result is nothing but an error.
+    *   Which flaw type fits best?
+        *   `completeness_shortcut`: Usually implies the agent says "I'm done" without doing it. Here the agent failed.
+        *   `implementability_violation`: "Component Responsibility too broad for single Executor Agent session". Not quite.
+        *   `tool_result_misinterpretation_suspected`: "Agent's stated conclusion from a tool call appears inconsistent with tool parameters".
+        *   There isn't a specific flaw type for "Tool Failure / Execution Error". However, the output provided is effectively a null result for the user's requirement.
+        *   Let's look at `completeness_shortcut` definition: "Agent claims task complete when only part is done". If the agent implies completion with this error or simply stops, it's incomplete. But maybe `implementability_violation` fits if the agent thinks it can handle RLS implementation but relies on a tool that isn't working?
+        *   Actually, looking at the instruction: "Tool results are EXCLUDED by design — you cannot see what tools returned, only what the agent concluded from them." The output *is* the agent's conclusion ("No output parser registered...").
+        *   This looks like the agent failed to execute. Is there a flaw category for failure?
+        *   Maybe `completeness_shortcut` is the closest if we consider the *intent* was to complete the task but it stopped at the first hurdle, effectively claiming "I processed this" but didn't result in output.
+        *   However, there is a specific flaw: `contradiction_with_prior_approved`? No.
+        *   What about `unacknowledged_uncertainty`? "Agent expresses false confidence".
+        *   Let's consider `completeness_shortcut` again. If the agent outputs just an error, did it claim completion? No. But the system expects the task to be done.
+        *   Is there a flaw for "Task Failure"? The taxonomy lists `completeness_shortcut`.
+        *   Maybe `scope_violation`? No.
+        *   Maybe `implementation_divergence`? No.
+        *   Actually, looking at the instruction: "Premature Convergence is ALWAYS severity: high". This isn't that.
+        *   Let's look at `tool_result_misinterpretation_suspected`. The agent's output implies the tool didn't work. But tool results are excluded. The output *is* the conclusion.
+        *   If the task is "Implement Row-Level Security...", and the output is "Error parsing tool", the agent did NOT implement the security.
+        *   Is this a `completeness_shortcut`? "Agent claims task complete when only part is done". The agent hasn't claimed it's complete, but it hasn't delivered.
+        *   Perhaps the best fit is `completeness_shortcut` with a nuance that the agent stopped short of the actual implementation requirement, or `implementability_violation` if the agent cannot handle this alone and the tool failed.
+        *   Wait, the instruction says: "Do NOT output the reviewed agent's schema. Your job is to report flaws, not to reproduce the agent's output."
+        *   If the agent simply fails because of a missing parser, is that a flaw in the *review*? Or is that a flaw in the *trace*? The task is to inspect the trace for flaws defined in the taxonomy.
+        *   If the agent *cannot* perform the task due to tool setup, is that a flaw type here?
+        *   `completeness_shortcut`: "Agent claims task complete when only part is done".
+        *   Let's look at `invalid_inference`: "Conclusion does not follow from stated premises". The agent might infer it can't proceed.
+        *   Actually, the most accurate description is that the task was not completed. In the context of the flaw taxonomy provided, `completeness_shortcut` is defined as "Agent claims task complete when only part is done". The agent output is essentially "Error". It didn't claim completion explicitly, but it effectively stopped.
+        *   However, maybe `unacknowledged_uncertainty`? No.
+        *   How about `implementability_violation`: "Component Responsibility too broad for single Executor Agent session". Implementing RLS in Bun middleware might be too broad for one session *if* the tool wasn't there. But usually, that's about scope.
+        *   Let's look at `contradiction_with_prior_approved`. Is there a prior approved phase gate? The prompt says "The PHASE GATE will check these criteria:". (Empty). "Completion Criteria (for completeness_shortcut checks):". (Empty).
+        *   This implies the *definition* of the task is the criteria.
+        *   The agent failed to produce the implementation.
+        *   If I must choose a flaw from the list.
+        *   `completeness_shortcut` is often used when an agent stops too early.
+        *   Is there a `failure` flaw? No.
+        *   If the agent stops because a tool is broken, is that `completeness_shortcut`? Yes, because the output provided is the "result" of the attempt, but the *task* (implementation) is not done. The agent effectively treats "I tried a tool and it failed" as the "state", potentially skipping the rest of the work (writing code).
+        *   Let's consider `unsupported_assumption`. "Agent asserts something as true with no basis". It doesn't assert much.
+        *   Let's consider `scope_violation`. No.
+        *   Let's consider `invalid_inference`. The agent inferred it can't do it.
+        *   Okay, let's step back. If a tool fails to parse output, and the agent just outputs that error message as the final result without providing the actual implementation required by the task, has it completed the task? No.
+        *   Does it fit `completeness_shortcut`? "Agent claims task complete when only part is done". The agent output *is* the claim of "I've processed this". It didn't provide the implementation.
+        *   Alternative: `completeness_shortcut` is the most fitting if we consider that the agent *should* have handled the error and continued (e.g., write the code manually without the tool or fix the tool). But the instructions say "Tool results are EXCLUDED". This means the agent's reasoning says "I can't get the result".
+        *   Actually, there is a specific flaw: `implementability_violation`? "Component Responsibility too broad". Implementing RLS might be too broad. But the agent couldn't do it.
+        *   Let's assume `completeness_shortcut` is the intended flag for "Did not deliver the artifact".
+        *   Wait, there is no `task_failure` category.
+        *   If I look at `completeness_shortcut` definition again: "Agent claims task complete when only part is done".
+        *   If the agent outputs an error, is that claiming completion? It's implicitly claiming "My turn is over" or "I am done here".
+        *   Severity: High? "completeness_shortcut" isn't explicitly high in the rules (only premature_convergence is explicitly high). However, the rules say "If no flaws found: overall_pass = true". If the agent fails, it shouldn't pass. So I must flag it.
+        *   If I flag `completeness_shortcut`, is it high? The prompt says "Premature convergence is ALWAYS severity: high". It doesn't say that for completeness_shortcut.
+        *   However, if the agent didn't do the task, it's a critical failure. I will mark severity as high because the task requirement is not met.
+        *   Evidence: Agent's Final Output: "No output parser registered...".
+        *   Description: Agent failed to implement the required Row-Level Security policies, stopping at a tool error without proceeding to deliver the implementation.
+        *   Wait, is there a flaw for "Tool Error"?
+        *   Maybe `tool_result_misinterpretation_suspected`? "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The tool was invoked (`starting`), the output says `No output parser registered`. This is a tool configuration issue, not necessarily misinterpretation.
+        *   Okay, the safest bet for "Task not completed" when the taxonomy restricts me to these 12 types is `completeness_shortcut`. It's often used for "stopped early".
+        *   Another possibility: `unacknowledged_uncertainty`. "Agent expresses false confidence". If it says "I failed", it acknowledges uncertainty?
+        *   Let's check the instruction: "COMPLETE FLAW TAXONOMY — check for ALL of these".
+        *   Is there a "Tool Failure" flaw? Not in the list.
+        *   Does `completeness_shortcut` cover "Output is missing required fields"? Yes: "contradicts the phase gate criteria" is under `contradiction_with_prior_approved`. Wait.
+        *   "Completion Criteria (for completeness_shortcut checks): ...". This section is empty in the prompt. But the Context says: "The REVIEWED AGENT was required to produce: Implement Row-Level Security policies...".
+        *   The Output is "Error".
+        *   This contradicts the requirement to produce the implementation.
+        *   So `completeness_shortcut` applies.
+        *   Also `contradiction_with_prior_approved`? "Agent's output conflicts with a Phase-Gate-Certified artifact". The requirement acts as the artifact. The output conflicts with the requirement (Error vs Implementation).
+        *   Which is better? `completeness_shortcut` is usually about stopping early. `contradiction` is about conflicting with a spec.
+        *   Since the output is literally an error about tooling, and the task is to implement, it's a failure to deliver.
+        *   I will select `completeness_shortcut` because the agent stopped before completing the work.
+        *   Severity: High. Because if the task is "Implement Security", and the agent output "Error", the system is insecure/non-compliant.
+        *   Wait, `completeness_shortcut` definition: "Agent claims task complete when only part is done". Does an error message count as claiming completion? In the context of the trace, the agent stopped and returned the error. It didn't explicitly say "I am done", but it returned the final output without proceeding.
+        *   Actually, looking at the instruction: "Tool results are EXCLUDED by design — you cannot see what tools returned, only what the agent concluded from them."
+        *   The agent concluded the tool call failed.
+        *   Is there a flaw for "Cannot use tool"? No.
+        *   If I *must* use one of the 12 flaws.
+        *   `completeness_shortcut` is the only one that captures "Not done".
+        *   Wait, `invalid_inference`? No.
+        *   Okay, I'll go with `completeness_shortcut`.
+
+        *   Wait, I need to check if `completeness_shortcut` implies the agent *thinks* it's done.
+        *   If I have to be strict, maybe `implementability_violation`? "Component Responsibility too broad for single Executor Agent session". If the agent tries to do RLS policies via a tool that doesn't work, is it because the task is too broad?
+        *   No, the tool is missing a parser. That's a setup issue.
+        *   Let's stick to `completeness_shortcut`. It's the closest to "Task not finished".
+
+        *   Wait, I need to check if `contradiction_with_prior_approved` is better. "Agent's output conflicts with a Phase-Gate-Certified artifact". The Phase Gate says "Implement Row-Level Security...". The output is "Error". This conflicts.
+        *   But `completeness_shortcut` is specifically listed under "Completion Criteria".
+        *   I will use `completeness_shortcut` because the agent did not complete the implementation.
+
+        *   Wait, one more check. Is there a flaw for "Tool Error"?
+        *   The taxonomy doesn't have "Tool Failure".
+        *   But the output *is* the error.
+        *   If the agent fails to execute the task, it's a failure.
+        *   I will flag `completeness_shortcut` with severity `high`.
+
+        *   Reasoning: The task required implementing security policies. The agent output indicates it relied on a tool that failed to parse output. The agent did not provide the implementation code or logic, effectively stopping the process without completing the objective.
+
+        *   Evidence: Agent's Final Output: "No output parser registered for backing tool: DBOS Middleware / PostgreSQL RLS Policies".
+
+        *   Is there `unacknowledged_uncertainty`? "Agent expresses false confidence". It expresses an error.
+        *   Is there `premature_convergence`? "Agent collapses options that should remain open". No.
+
+        *   Wait, could this be `tool_result_misinterpretation_suspected`? "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The agent concluded the parser wasn't registered. This might be a technical fact from the trace ("status":"started" but then error).
+        *   Actually, the best fit is `completeness_shortcut`.
+
+        *   Wait, the instruction says: "Tool results are EXCLUDED by design — you cannot see what tools returned, only what the agent concluded from them."
+        *   The agent's conclusion is that the tool failed.
+        *   The agent stopped there.
+        *   This is a `completeness_shortcut`.
+
+        *   Wait, what about `implementability_violation`? "Component Responsibility too broad".
+        *   Implementing RLS might be too broad for a single agent *without* the tool working?
+        *   I think `completeness_shortcut` is more direct. The agent didn't finish the job.
+
+        *   Final decision: `completeness_shortcut`.
+        *   Severity: High (Because the task is critical: Security).
+        *   Wait, does `completeness_shortcut` allow high severity? The rules say "Premature convergence is ALWAYS severity: high". It doesn't ban others from being high. It just says "If no flaws found...".
+        *   If the task fails, it shouldn't pass. So High is appropriate.
+
+3.  **Drafting the JSON:**
+    *   `overall_pass`: false (since a flaw exists).
+    *   `flaws`: List containing the flaw object.
+    *   `flaw_type`: `completeness_shortcut`.
+    *   `severity`: `high`. (Because security implementation is critical and it failed).
+    *   `description`: Agent failed to implement required Row-Level Security policies, halting execution at a tool configuration error without delivering the required implementation logic.
+    *   `evidence`: "No output parser registered for backing tool: DBOS Middleware / PostgreSQL RLS Policies"
+    *   `recommended_action`: `return_to_phase4` or `retry`. Since it's a tool error, `retry` might work if the tool is fixed, or `escalate` if the tool definition is wrong. Given it's a parser registration issue, `retry` (fix environment) or `escalate` (fix system). Let's use `return_to_phase4` implies going back to previous step to fix context/tool config. Or `escalate`. Let's use `retry` as it's a technical blocker. But wait, if the tool doesn't exist/work, `retry` won't work without human intervention. `escalate` might be better. However, usually `completeness_shortcut` implies the agent thought it was done. Here it stopped. `return_to_phase4` is good for "fix the blocker".
+    *   Wait, looking at `completeness_shortcut` definition: "Agent claims task complete when only part is done".
+    *   Is this accurate? The agent didn't claim complete, it output an error.
+    *   But effectively, it didn't complete the task.
+    *   Maybe `unacknowledged_uncertainty`? No.
+    *   Maybe `implementability_violation`?
+    *   Let's look at `completeness_shortcut` again.
+    *   If the agent says "Task Done" but output is wrong -> `completeness_shortcut`.
+    *   If the agent says "Error" and output is wrong -> It is `completeness_shortcut` by omission (didn't do the rest).
+    *   Okay, I'll stick with `completeness_shortcut`.
+
+    *   Wait, I should consider if `tool_result_misinterpretation_suspected` is better. "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The tool call started. The output says parser missing. This is a tool state, not necessarily misinterpretation.
+    *   Okay, sticking with `completeness_shortcut`.
+
+    *   One nuance: The instruction says "Tool results are EXCLUDED by design". The agent *concluded* there was no parser. This is the agent's knowledge.
+    *   The agent's task was to "Implement...".
+    *   The output is an error.
+    *   This means the task is incomplete.
+    *   So `completeness_shortcut`.
+
+    *   Action: `return_to_phase4` (to fix tool context) or `escalate`. `return_to_phase4` is standard for "restart the correct workflow".
+
+    *   Wait, check `contradiction_with_prior_approved`. The "Phase Gate Criteria" (though empty in prompt) imply "Implement RLS". The output contradicts this. But `completeness_shortcut` is the standard "Task not done" flag.
+
+    *   Wait, is `completeness_shortcut` severity high? The rules say "premature_convergence is ALWAYS severity: high". It doesn't restrict others. But usually `completeness_shortcut` is low (warning).
+    *   However, for a security task, failure is high.
+    *   But I must follow the taxonomy. Is `completeness_shortcut` high by default? The table defines `severity` as `high|low`.
+    *   If I mark it high, it blocks Phase Gate.
+    *   Since the agent output is an error message and no code was produced, blocking the gate is correct.
+    *   So `high` is justified.
+
+    *   Wait, looking at the rule: "If no flaws found: overall_pass = true".
+    *   Since I found a flaw, `overall_pass` = false.
+    *   I will set severity `high` because the output is a hard failure (no parser).
+
+    *   Wait, could this be `unsupported_assumption`? "Agent asserts something as true with no basis". No.
+    *   Okay, `completeness_shortcut` is the one.
+
+4.  **Final Polish:**
+    *   Ensure JSON validity.
+    *   Ensure `overall_pass` is false.
+    *   Ensure evidence quotes the output string exactly.
+    *   Ensure description explains the gap between task and output.
+
+    *   Wait, one more thought. Is `tool_result_misinterpretation_suspected` valid? "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The tool parameters aren't shown, only "status":"started". The agent concluded "No output parser". This is a conclusion about the tool state.
+    *   I'll stick with `completeness_shortcut`.
+
+    *   Wait, looking at the `recommended_action`. `retry` is usually for transient errors. `escalate` for permanent blockers. Missing parser is a config blocker. `return_to_phase4` implies reverting to start of task.
+    *   I'll use `return_to_phase4` as it suggests restarting the implementation properly. Or `retry`. Let's use `retry` as it might be fixable by a system restart (unlikely for parser). `return_to_phase4` seems safer for "task incomplete".
+    *   Actually, `escalate` is often used for blockers.
+    *   Let's check the `recommended_action` list: `retry|escalate|accept_with_caveat|return_to_phase4|escalate_to_unsticking`.
+    *   Since the agent failed to produce the implementation, and the tool is broken, `return_to_phase4` makes sense to fix the setup or `escalate`. I'll choose `return_to_phase4` to imply restarting the correct workflow.
+
+    *   Wait, one detail: "The PHASE GATE will check these criteria:". (Empty). "Completion Criteria (for completeness_shortcut checks):" (Empty).
+    *   This means I must rely on the Context Payload: "Implement Row-Level Security policies...".
+    *   So the agent failed that specific criteria.
+    *   Okay.
+
+    *   Wait, is there a chance this is `false_equivalence`? No.
+    *   Okay, ready to write.
+
+    *   Wait, check `completeness_shortcut` definition again. "Agent claims task complete when only part is done".
+    *   Does "No output parser registered" count as claiming task complete?
+    *   If the agent considers this the final output, it implies "I am done with this request".
+    *   It did not write the code.
+    *   So yes, it's a shortcut.
+
+    *   Wait, `tool_result_misinterpretation_suspected`? "Agent's stated conclusion from a tool call appears inconsistent with tool parameters".
+    *   The tool parameters aren't visible. The agent's conclusion is based on the tool.
+    *   I'll skip this. `completeness_shortcut` is more about the task outcome.
+
+    *   Okay, constructing JSON.
+
+    *   Wait, `overall_pass` must be `true` only if `flaws` is empty.
+    *   Since I found a flaw, `overall_pass` = `false`.
+    *   Wait, the instruction says "If no flaws found: overall_pass = true".
+    *   So if flaws exist, it must be false.
+
+    *   One more check on `severity`. "high = blocks Phase Gate".
+    *   If the agent fails to deliver security code, the Phase Gate must be blocked.
+    *   So `high`.
+
+    *   Wait, the prompt says "The PHASE GATE will check these criteria:". It doesn't list them. But the Context Payload lists the Task.
+    *   So the Criteria is "Task must be done".
+    *   Agent failed.
+    *   Flaw: `completeness_shortcut`.
+    *   Okay.
+
+    *   Wait, is `implementability_violation` better? "Component Responsibility too broad for single Executor Agent session".
+    *   If the agent relied on a tool that doesn't work, is the responsibility too broad? Or is the tool missing?
+    *   I'll stick with `completeness_shortcut` because the specific outcome (task not done) is the primary failure mode described.
+
+    *   Wait, I need to check if `completeness_shortcut` severity is allowed to be high. The rules only explicitly set "premature_convergence" to high.
+    *   But it doesn't forbid others from being high.
+    *   So `high` is valid for critical failures.
+
+    *   Final check on JSON structure.
+    *   Keys: `overall_pass`, `flaws`.
+    *   Flaws: `flaw_type`, `severity`, `description`, `evidence`, `recommended_action`.
+    *   All present.
+
+    *   Wait, is `completeness_shortcut` the right term?
+    *   It says "Agent claims task complete when only part is done".
+    *   The agent output is an error.
+    *   If the agent says "I can't do it", is that claiming completion?
+    *   In the context of the Trace Review, the agent stopped.
+    *   Yes, it's a shortcut (stopped early).
+    *   Okay.
+
+    *   Wait, what if the flaw is `unacknowledged_uncertainty`?
+    *   "Agent expresses false confidence".
+    *   The agent expressed an error.
+    *   No.
+
+    *   Okay, `completeness_shortcut` it is.
+
+    *   Wait, one last thing. The prompt says "Do NOT output the reviewed agent's schema."
+    *   I am outputting the Review JSON.
+    *   Okay.
+
+    *   Wait, "If no flaws found: overall_pass = true".
+    *   Since I found one, `overall_pass` = false.
+
+    *   Wait, is `tool_result_misinterpretation_suspected` relevant? "Agent's stated conclusion from a tool call appears inconsistent with tool parameters".
+    *   The agent's conclusion is "No output parser registered".
+    *   The tool parameters aren't shown, but the call started.
+    *   This doesn't seem inconsistent, just failed.
+    *   So `completeness_shortcut`.
+
+    *   Wait, `completeness_shortcut` might be the wrong label if the agent explicitly stated it couldn't proceed due to tool error.
+    *   But in the context of "Agent Claims Task Complete", usually, that means it outputs "Done".
+    *   If it outputs an error, it implies "I'm stuck".
+    *   Is that a flaw?
+    *   Yes, because the task wasn't completed.
+    *   Is there a specific flaw for "Failed to execute tool"? No.
+    *   So I must map it to one of the 12.
+    *   `completeness_shortcut` is the closest (Task not fully completed).
+    *   I will proceed.
+
+    *   Wait, checking `severity`. "high = blocks Phase Gate".
+    *   If I put `completeness_shortcut` as `low`, maybe it's a warning.
+    *   But the task is security. Failure is high.
+    *   I'll set `high`.
+
+    *   Okay, writing the JSON.

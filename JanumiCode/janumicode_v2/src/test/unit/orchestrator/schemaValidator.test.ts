@@ -27,6 +27,7 @@ describe('SchemaValidator', () => {
   describe('workspace_classification', () => {
     it('validates a correct greenfield classification', () => {
       const result = validator.validate('workspace_classification', {
+        kind: 'workspace_classification',
         workspace_type: 'greenfield',
         janumicode_version_sha: 'abc123',
       });

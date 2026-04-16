@@ -13,6 +13,7 @@
 
 import { createInterface } from 'readline';
 import { SCHEMA_DDL, VECTOR_SEARCH_DDL } from '../lib/database/schema';
+import { closeWithCheckpoint } from '../lib/database/init';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -113,7 +114,7 @@ function handleRequest(req: RpcRequest): RpcResponse {
       }
 
       case 'close':
-        db.close();
+        closeCleanly();
         return { id: req.id, result: 'closed' };
 
       default:
@@ -141,9 +142,13 @@ rl.on('line', (line) => {
 });
 
 rl.on('close', () => {
-  try { db.close(); } catch { /* ignore */ }
+  try { closeCleanly(); } catch { /* ignore */ }
   process.exit(0);
 });
+
+function closeCleanly(): void {
+  closeWithCheckpoint(db);
+}
 
 // Signal readiness
 process.stdout.write(JSON.stringify({ id: '__ready__', result: { pid: process.pid, dbPath } }) + '\n');

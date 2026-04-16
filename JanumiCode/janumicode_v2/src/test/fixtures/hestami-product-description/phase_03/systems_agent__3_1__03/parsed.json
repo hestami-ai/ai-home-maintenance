@@ -1,0 +1,65 @@
+{
+  "system_boundary": {
+    "in_scope": [
+      "Property Asset Ingestion (Images & 3D Splats)",
+      "AI Agent Service Provider Search & Matching",
+      "Bid Estimate Comparison UI (Good-Better-Best)",
+      "CC&R & Bylaws AI Extraction Module",
+      "Action Items Workflow Management (System of Action)",
+      "Statutory Deadline Tracking & Alert Engine",
+      "Mass Email/SMS Communication Channel",
+      "Mobile App Client (Offline Queueing)",
+      "Multi-tenant Security & Authorization (RLS)",
+      "Payment Processing Integration (Stripe/Square)",
+      "High-Performance Bun API Backend",
+      "SvelteKit Frontend Portal",
+      "DBOS Versioned Workflow Engine",
+      "Media Asset Storage (SeaweedFS)",
+      "Regulatory Rules Engine (Notice Requirements)"
+    ],
+    "out_of_scope": [
+      "Pillar 2 (Financials) implementation for this MVP",
+      "Pillar 3 (Accounting) implementation for this MVP",
+      "Enterprise Governance MVP features (Phase 3 Focus)",
+      "Field Service Engine MVP features (Phase 2 Focus)",
+      "Automated Homeowner Association (HOA) Voting modules (Phase 3)",
+      "Full offline-first capabilities for Homeowners (Secondary priority)",
+      "Legacy Vantaca integration for V1 (Replicate 'System of Action' only)",
+      "Advanced AI extraction beyond CC&Rs/Bylaws for V1",
+      "Direct Contractor Portal Access for V1",
+      "Real-time Bid Aggregation for non-homeowners"
+    ],
+    "external_systems": [
+      {
+        "id": "EXT-001",
+        "name": "Payment Gateway (Stripe/Square)",
+        "purpose": "Secure processing of deposits and service fees per US-010",
+        "interface_type": "API/Webhook"
+      },
+      {
+        "id": "EXT-002",
+        "name": "Communication Provider (Email/SMS)",
+        "purpose": "Delivery of statutory notices and mass alerts per US-006/007",
+        "interface_type": "API/Webhook"
+      },
+      {
+        "id": "EXT-003",
+        "name": "Government Regulatory Services",
+        "purpose": "Permit/BLDS lookup and integration for ARC domain per REC-ASS-008",
+        "interface_type": "API"
+      },
+      {
+        "id": "EXT-004",
+        "name": "AI/ML Service Provider",
+        "purpose": "LLM/OCR services for property analysis and document extraction per US-001/004",
+        "interface_type": "REST API"
+      },
+      {
+        "id": "EXT-005",
+        "name": "Mobile OS SDKs",
+        "purpose": "Native device camera and storage integration for Mobile App per US-008",
+        "interface_type": "SDK/Native"
+      }
+    ]
+  }
+}

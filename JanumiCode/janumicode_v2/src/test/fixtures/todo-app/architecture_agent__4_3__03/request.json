@@ -1,0 +1,15 @@
+{
+  "model": "qwen3.5:9b",
+  "provider": "ollama",
+  "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Architecture Agent] capturing Architectural Decisions for Sub-Phase 4.3.\n\nGOVERNING CONSTRAINTS (apply without exception):\n(none)\n\nProduce [JC:Architectural Decision Records] for every significant choice made during architecture definition.\n\nREQUIRED OUTPUT: A JSON object matching the `architectural_decisions` schema:\n- adrs: array, each with:\n  - id, title, status (proposed|accepted), context, decision, alternatives, rationale, consequences\n\nRules:\n- Every ADR must have status, decision, and rationale populated (Invariant: ADR-001, ADR-002)\n- Capture technology selections, pattern choices, and structural decisions\n- Every ADR must document at least one alternative that was considered\n\nCONTEXT:\nComponent Model: COMP-001: TaskStorageManager (domain: DOM-001)\n  Responsibilities:\n  RESP-001: Create the storage file with a default structure upon first execution\n  RESP-002: Append a new task record to the storage file\n  RESP-003: Read the storage file and retrieve all stored task records\n  RESP-004: Update the status attribute of a specific task record to 'completed'\n  RESP-005: Delete a specific task record from the storage file upon command\n  Dependencies: none\nCOMP-002: TaskCommandParser (domain: DOM-001)\n  Responsibilities:\n  RESP-006: Parse command line arguments to validate inputs\n  Dependencies: COMP-001 (control)\nCOMP-003: TaskOutputWriter (domain: DOM-001)\n  Responsibilities:\n  RESP-007: Output all stored task records to standard output\n  Dependencies: COMP-001 (data)\nSoftware Domains: DOM-001: Core Domain (reqs: SR-001)\n  Terms: application: The primary system being built",
+  "system": null,
+  "responseFormat": "json",
+  "temperature": 0.4,
+  "traceContext": {
+    "workflowRunId": "3d516646-d149-4a41-87bf-f9903a146fb3",
+    "phaseId": "4",
+    "subPhaseId": "4.3",
+    "agentRole": "architecture_agent",
+    "label": "Phase 4.3 — Architectural Decision Capture"
+  }
+}

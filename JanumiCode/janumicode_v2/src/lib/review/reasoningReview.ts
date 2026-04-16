@@ -34,6 +34,13 @@ export interface ReasoningReviewInput {
   completionCriteria?: string;
   /** Sub-phase ID */
   subPhaseId: string;
+  /**
+   * Workflow run ID — threaded into the LLM trace context so fixture
+   * capture and writer instrumentation can attribute the review call to
+   * the correct phase/sub-phase. Without this, captured fixtures land
+   * in an `unknown__00` bucket instead of `phase_NN/`.
+   */
+  workflowRunId?: string;
 }
 
 export interface ReasoningReviewResult {
@@ -107,6 +114,14 @@ export class ReasoningReview {
       prompt,
       responseFormat: 'json',
       temperature: this.config.temperature,
+      traceContext: input.workflowRunId
+        ? {
+            workflowRunId: input.workflowRunId,
+            phaseId: input.subPhaseId.split('.')[0],
+            subPhaseId: input.subPhaseId,
+            agentRole: 'reasoning_review',
+          }
+        : undefined,
     });
 
     // Parse result

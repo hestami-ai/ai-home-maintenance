@@ -16,7 +16,8 @@ describe('AgentInvocationCard', () => {
       expect($(container, '.inv-header')).toBeTruthy();
       expect($(container, '.inv-label')?.textContent).toContain('Quality Check');
       expect($(container, '.inv-type-badge')?.textContent).toBe('API');
-      expect($(container, '.inv-status')?.textContent).toContain('⏳');
+      // Running status uses the animated CSS spinner, not the old ⏳ emoji.
+      expect($(container, '.inv-status .inv-spinner')).toBeTruthy();
     } finally {
       cleanup();
     }

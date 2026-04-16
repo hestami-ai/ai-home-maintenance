@@ -1,0 +1,148 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Deep Memory Research Agent] performing Stage 1 — Query Decomposition.
+    *   **Task:** Transform the retrieval query into structured retrieval targets for the Governed Stream search.
+    *   **Input Query:** "Component decomposition for domains: property-data-management: Property Data Management (reqs: SR-001, SR-008)"
+    *   **Input Terms:** `PropertyAsset`, `MediaManifest`, `OfflineBuffer` (partial definition provided).
+    *   **Input Scope:** `all_runs`
+    *   **Input Authority:** `architecture_agent` requesting.
+    *   **Required Output Format:** JSON with specific keys (`topic_entities`, `decision_types_sought`, `temporal_scope`, `authority_levels_included`, `sources_in_scope`).
+    *   **Rules:**
+        *   Extract concrete entities from the query.
+        *   `decision_types_sought` should match the type of historical context needed (based on authority levels and query nature).
+        *   `authority_levels_included`: Always include 5+ (Human-Approved and above); include lower levels only if exploratory/agent-generated content is asked (query seems architectural/documentation, so likely 5+).
+        *   `sources_in_scope`: `all_runs` → `governed_stream_all_runs`.
+
+2.  **Deconstruct the Input Query:**
+    *   **Domain:** `property-data-management`
+    *   **Requirements:** `SR-001`, `SR-008` (System Requirements).
+    *   **Entities mentioned:** `PropertyAsset`, `MediaManifest`, `OfflineBuffer` (inferred from "Terms" section).
+    *   **Context:** Component decomposition (architectural analysis).
+    *   **Scope:** `all_runs` (implies historical search across all available memory streams).
+
+3.  **Determine JSON Fields:**
+
+    *   **`topic_entities`:** What are the core concepts/objects being queried?
+        *   `PropertyAsset`
+        *   `MediaManifest`
+        *   `OfflineBuffer`
+        *   `Property Data Management` (Domain)
+        *   `SR-001` (Requirement ID)
+        *   `SR-008` (Requirement ID)
+        *   *Refinement:* Keep it focused on the technical entities and domains.
+        *   Selection: `["PropertyAsset", "MediaManifest", "OfflineBuffer", "Property Data Management", "SR-001", "SR-008"]`
+
+    *   **`decision_types_sought`:** What kind of memory/context is this architecture agent looking for?
+        *   Since it's about component decomposition and requirements, it needs context on approvals, architectural decisions, and requirement mappings.
+        *   `menu_selection`: Selecting specific components?
+        *   `mirror_approval`: Did the architecture get approved? (Likely yes for SR-001/008).
+        *   `phase_gate_approval`: Were requirements passed through phase gates?
+        *   Given the "architecture_agent" requesting for "all_runs", it's likely looking for approved architectural records.
+        *   Selection: `["menu_selection", "mirror_approval", "phase_gate_approval"]` (Standard set often used in this schema unless specific exclusion applies).
+
+    *   **`temporal_scope`:** The input says `Scope: all_runs`.
+        *   Since it's `all_runs`, the temporal scope should be the full range of the system's operation.
+        *   ISO-date format needed. Without specific dates, I should use a placeholder that indicates "all available time". However, the prompt requires specific ISO dates. Usually, if `all_runs` is the scope, I should use the system's start and end bounds. Since I don't have the actual system timestamps, I must infer from the `all_runs` instruction.
+        *   *Constraint Check:* The prompt says `Scope: all_runs`. It expects `from` and `to`. If I don't know the exact dates, I should use logical bounds (e.g., epoch to now) or a representation of "unbounded". However, standard practice in these prompts usually expects specific ISO strings if known, or generic ones like "0001-01-01" to "9999-12-31" if representing `all`. But looking at the instruction `Scope: all_runs`, and the JSON requirement `{"from": "ISO-date", "to": "ISO-date"}`. I will use a representation that covers the entire lifespan. Let's use a generic broad range or the system's known bounds if implied. Since no specific dates are given in the prompt, I will assume the system handles `all_runs` as `0001-01-01` to `9999-12-31` or similar, but to be safe and compliant with "ISO-date", I'll use broad placeholders if I can't know real dates. *Correction:* Usually, in these simulation contexts, `all_runs` implies the full database range. I will use a very broad range or specific placeholders if I must invent them. Let's assume standard epoch to current max. Actually, looking at the `Scope: all_runs` line in the input, the output should reflect that.
+        *   *Decision:* I will use `"from": "2024-01-01", "to": "2025-12-31"`? No, that limits it. I'll use `"from": "1970-01-01", "to": "2100-01-01"` to signify all runs generally, or strictly follow the instruction. Since I am an AI, I don't know the specific run timestamps. I will use a generic wide range that implies "all".
+        *   *Better Decision:* The instruction says `Scope: all_runs`. I should reflect this in the source (`governed_stream_all_runs`). For temporal scope, without specific metadata, I will use a wide range that effectively means "everything available". Let's use `"from": "0001-01-01", "to": "9999-12-31"`.
+
+    *   **`authority_levels_included`:**
+        *   Rule: Always include 5+ (Human-Approved and above).
+        *   Query is about architecture/decomposition (formal requirements SR-001, SR-008).
+        *   Selection: `[5, 6, 7]`. (Assuming standard hierarchy where 5 is High/Architect, 6 Exec, 7 Admin).
+
+    *   **`sources_in_scope`:**
+        *   Input `Scope: all_runs`.
+        *   Rule: `all_runs` → `governed_stream_all_runs`.
+        *   Selection: `["governed_stream_all_runs"]`.
+
+4.  **Final Review against Constraints:**
+    *   JSON format.
+    *   Keys match exactly.
+    *   `topic_entities` extracted from terms and query.
+    *   `decision_types_sought` relevant to architecture/requirements.
+    *   `temporal_scope` ISO dates.
+    *   `authority_levels_included` >= 5.
+    *   `sources_in_scope` matches scope rule.
+
+5.  **Drafting the JSON:**
+    ```json
+    {
+      "topic_entities": ["PropertyAsset", "MediaManifest", "OfflineBuffer", "Property Data Management", "SR-001", "SR-008"],
+      "decision_types_sought": ["menu_selection", "mirror_approval", "phase_gate_approval"],
+      "temporal_scope": {"from": "0001-01-01", "to": "9999-12-31"},
+      "authority_levels_included": [5, 6, 7],
+      "sources_in_scope": ["governed_stream_all_runs"]
+    }
+    ```
+    *Self-Correction on Entities:* The prompt mentions "Terms: PropertyAsset...; MediaManifest...; OfflineBuffer...". I should include the domain "Property Data Management" as well.
+    *Self-Correction on Authority:* The rule says "include lower levels only if the query asks about exploratory or agent-generated content". This query is for "Component decomposition" for requirements SR-001/008, implying formal architecture. So 5+ is correct.
+    *Self-Correction on Dates:* "0001-01-01" might be too broad if the system expects actual dates. However, without context of the simulation's timeline, `all_runs` implies unbounded. I will stick with a wide range to ensure retrieval captures everything.
+    *Self-Correction on Sources:* `Scope: all_runs` explicitly maps to `governed_stream_all_runs`.
+
+6.  **Final Polish:** Ensure valid JSON.
+
+    *Wait, one check on `decision_types_sought`*: The rule says "should match the type of historical context needed".
+    Architecture decomposition usually needs to see the "approved" structure. So `mirror_approval` (approved design) and `phase_gate_approval` (requirements acceptance) are key. `menu_selection` might be relevant if we are selecting which components to view, but `mirror_approval` and `phase_gate_approval` are more critical for requirements. However, the rule often implies including the standard set if not specified otherwise, or picking the most relevant. I will include the standard set to ensure comprehensive retrieval unless explicitly told to limit.
+
+    *Wait, one check on Authority Levels*: Rule: "include 5+ (Human-Approved and above); include lower levels only if...". I will stick to `[5, 6, 7]`.
+
+    *Wait, one check on Temporal*: Since I don't know the actual start/end date of the `all_runs`, I should probably use a placeholder that signifies "all". Let's use `"from": "2023-01-01", "to": "2026-12-31"`? No, `all_runs` suggests the whole lifespan. I'll use `"0001-01-01"` to `"9999-12-31"` to represent the full range.
+
+    *Wait, one check on `topic_entities`*: Should I include the full text of the definition or just the names? Rule: "Extract concrete entities (names, IDs, concepts)". So names/IDs are better.
+
+    *Final JSON Construction.*
+
+    ```json
+    {
+      "topic_entities": ["PropertyAsset", "MediaManifest", "OfflineBuffer", "Property Data Management", "SR-001", "SR-008"],
+      "decision_types_sought": ["menu_selection", "mirror_approval", "phase_gate_approval"],
+      "temporal_scope": {"from": "0001-01-01", "to": "9999-12-31"},
+      "authority_levels_included": [5, 6, 7],
+      "sources_in_scope": ["governed_stream_all_runs"]
+    }
+    ```
+    Looks good. I will format it cleanly.
+
+    *Refining Temporal Scope*: Often in these prompts, if `Scope: all_runs`, the temporal scope should reflect the bounds of the stream. Since I am an agent simulating this, and I don't have the actual system start date, a wide range is the safest interpretation of `all_runs` for the *target* search parameters. I'll use a standard ISO date format.
+
+    *Refining Authority*: The prompt says `authority_levels_included`: always include 5+; include lower levels only if the query asks about exploratory or agent-generated content. This query asks for `Property Data Management` decomposition for `SR-001`, `SR-008`. This sounds like a formal requirement check. So 5, 6, 7 is correct.
+
+    *Refining Sources*: `Scope: all_runs` -> `governed_stream_all_runs`. Correct.
+
+    *Refining Decision Types*: Architecture agents usually look for `mirror_approval` (design validation) and `phase_gate_approval` (req acceptance). `menu_selection` might be less relevant but is often part of the standard schema for "retrieval targets". I will keep the standard list for robustness unless told to filter.
+
+    *Wait, looking at the provided `YOUR REQUIRED OUTPUT (JSON)` block*:
+    It expects:
+    ```json
+    {
+      "topic_entities": ["entity1", "entity2"],
+      "decision_types_sought": ["menu_selection", "mirror_approval", "phase_gate_approval"],
+      "temporal_scope": {"from": "ISO-date", "to": "ISO-date"},
+      "authority_levels_included": [5, 6, 7],
+      "sources_in_scope": ["governed_stream_current_run"]
+    }
+    ```
+    I need to adapt `sources_in_scope` to `governed_stream_all_runs` based on the input `Scope: all_runs`.
+    I need to adapt `topic_entities` to match the specific terms.
+    I need to adapt `authority_levels_included` to [5, 6, 7].
+
+    Okay, ready to generate.
+
+    One last check on the `temporal_scope`. The input `Scope: all_runs` suggests there might not be a specific date range. However, the output format requires ISO dates. I will use a placeholder that implies "all history". Let's use a generic wide range like `1970-01-01` to `2099-12-31` or similar to represent "all". I'll use `1900-01-01` and `2100-01-01` to be safe on ISO format compliance. Actually, `all_runs` usually means the lifetime of the system. I'll use `0001-01-01` and `9999-12-31`.
+
+    Wait, I see the example output in the prompt has `sources_in_scope`: `["governed_stream_current_run"]`. But my input says `Scope: all_runs`. So I must change it to `governed_stream_all_runs`.
+
+    Okay, proceeding.
+
+    Wait, checking `authority_levels_included`. The prompt example shows `[5, 6, 7]`. The rule says "always include 5+...". So `[5, 6, 7]` is correct.
+
+    Checking `topic_entities`. I will list the specific terms provided: `PropertyAsset`, `MediaManifest`, `OfflineBuffer`, `Property Data Management`, `SR-001`, `SR-008`.
+
+    Checking `decision_types_sought`. Since it is architecture, `mirror_approval` (design approval) and `phase_gate_approval` (req signoff) are key. `menu_selection` is also included in the example output schema, I will keep it for completeness as per standard schema unless I need to filter. I'll keep all three.
+
+    Final check on JSON syntax.
+
+    Let's write it.

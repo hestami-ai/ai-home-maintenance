@@ -1,0 +1,88 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Technical Spec Agent] specifying Error Handling Strategies for Sub-Phase 5.3.
+
+GOVERNING CONSTRAINTS (apply without exception):
+(none)
+
+Produce [JC:Error Handling Strategies] for each Component — how errors are detected, classified, responded to, and surfaced.
+
+REQUIRED OUTPUT: A JSON object matching the `error_handling_strategies` schema:
+- strategies: array, each with:
+  - component_id
+  - error_types: array of classified error categories (e.g., validation, authorization, timeout, internal)
+  - detection: how errors are detected (e.g., try/catch, middleware, health check)
+  - response: how the system responds (e.g., retry, fallback, circuit break, propagate)
+  - surfacing: how errors are communicated (e.g., HTTP status codes, error payloads, logs, alerts)
+
+Rules:
+- Every Component must have at least one error handling strategy
+- Error types must be specific, not generic ("validation_error", not "error")
+- Detection and response strategies must be concrete and implementable
+
+CONTEXT:
+Component Model: PROJECT TYPE: Consumer Discovery MVP (Phase 1 Focus): Implementation focused exclusively on Pillar 1 (Home Real Property Assistant) to prioritize user acquisition, property data ingestion (images, 3D splats), and service provider matching for individual homeowners.
+Capabilities: Property Asset Ingestion (Images & 3D Splats); AI Agent Service Provider Search & Matching; Bid Estimate Comparison UI (Good-Better-Best); CC&R & Bylaws AI Extraction Module; Action Items Workflow Management (System of Action); Statutory Deadline Tracking & Alert Engine; Mass Email/SMS Communication Channel; Mobile App Client (Offline Queueing); Multi-tenant Security & Authorization (RLS); Payment Processing Integration (Stripe/Square); High-Performance Bun API Backend; SvelteKit Frontend Portal; DBOS Versioned Workflow Engine; Media Asset Storage (SeaweedFS); Regulatory Rules Engine (Notice Requirements)
+Excluded: Pillar 2 (Financials) implementation for this MVP; Pillar 3 (Accounting) implementation for this MVP; Enterprise Governance MVP features (Phase 3 Focus); Field Service Engine MVP features (Phase 2 Focus); Automated Homeowner Association (HOA) Voting modules (Phase 3); Full offline-first capabilities for Homeowners (Secondary priority); Legacy Vantaca integration for V1 (Replicate 'System of Action' only); Advanced AI extraction beyond CC&Rs/Bylaws for V1; Direct Contractor Portal Access for V1; Real-time Bid Aggregation for non-homeowners
+
+7 Components:
+  cmp-prop-data: Property Data Manager (domain: property-data-management)
+    Responsibilities:
+    RSP-001: Accept and validate property image and 3D asset data uploads including format rejection logic.
+    RSP-002: Index valid assets within 10 seconds post-upload for search systems.
+    RSP-003: Manage offline data capture and synchronization buffers for mobile capture contexts.
+    Dependencies: cmp-security (reads)
+  cmp-provider-match: Service Provider Matcher (domain: service-provider-matching)
+    Responsibilities:
+    RSP-004: Return service provider search results with relevance scores using AI Agent processing.
+    RSP-005: Render bid estimate comparison tables ensuring minimum bid entry thresholds.
+    Dependencies: cmp-security (reads)
+  cmp-compliance: Compliance Rules Engine (domain: compliance-rules-engine)
+    Responsibilities:
+    RSP-006: Extract and validate CC&R and Bylaws clauses using AI confidence scoring.
+    RSP-007: Monitor statutory deadlines for regulatory obligations.
+    RSP-008: Generate compliance notification payloads for regulatory alerts.
+    Dependencies: cmp-notifications (calls)
+  cmp-workflow: Action Workflow Orchestrator (domain: action-workflow-orchestrator)
+    Responsibilities:
+    RSP-009: Manage service action item workflow states and record audit log transitions.
+    RSP-010: Reflect status updates immediately in the UI for workflow progress.
+    Dependencies: cmp-security (reads), cmp-notifications (calls)
+  cmp-notifications: Notification Dispatcher (domain: notification-dispatcher)
+    Responsibilities:
+    RSP-011: Process mass email/SMS batches for recipient lists and track delivery status.
+    RSP-012: Resume delivery attempts within 2 hours upon network reconnection.
+    RSP-013: Confirm receipt of messages for bounce rate tracking.
+    Dependencies: cmp-security (reads)
+  cmp-security: Tenant Security Gateway (domain: tenant-security-gateway)
+    Responsibilities:
+    RSP-014: Enforce multi-tenant security and Row-Level Security for data access.
+    RSP-015: Return unauthorized access responses within 50ms for restricted tenant data.
+    Dependencies: none
+  cmp-payment: Payment Transaction Processor (domain: payment-transaction-processor)
+    Responsibilities:
+    RSP-016: Process payment requests for deposits and service fees via integrated payment gateway.
+    RSP-017: Generate electronic proof of payment and receipt documents.
+    Dependencies: cmp-notifications (calls)
+API Definitions: Component cmp-prop-data:
+  POST /assets/upload (auth: Bearer Token Required)
+  GET /assets/search (auth: Bearer Token Required)
+  GET /sync/queue/status (auth: Bearer Token Required)
+Component cmp-provider-match:
+  GET /providers/search (auth: Bearer Token Required)
+  GET /bids/compare/{bid_id} (auth: Bearer Token Required)
+Component cmp-compliance:
+  POST /compliance/extract (auth: Bearer Token Required)
+  GET /compliance/deadlines (auth: Bearer Token Required)
+  POST /compliance/alerts (auth: Bearer Token Required)
+Component cmp-workflow:
+  GET /actions (auth: Bearer Token Required)
+  POST /actions/{action_id} (auth: Bearer Token Required)
+Component cmp-notifications:
+  POST /dispatch/batch (auth: Bearer Token Required)
+  GET /dispatch/status/{batch_id} (auth: Bearer Token Required)
+Component cmp-security:
+  POST /auth/validate (auth: Bearer Token Required)
+  GET /health (auth: Bearer Token Required)
+Component cmp-payment:
+  POST /payments/process (auth: Bearer Token Required)
+  GET /payments/receipt/{id} (auth: Bearer Token Required)

@@ -30,10 +30,14 @@ export class ConsoleHandler implements LogHandler {
     if (!this.shouldLog(entry.level)) return;
 
     const formatted = this.formatter.format(entry);
-    
-    // Use console.warn for WARN/ERROR to ensure visibility
+
+    // JANUMICODE_LOG_TO_STDERR=1 routes INFO/DEBUG to stderr so programmatic
+    // CLI consumers (--json mode) get a clean stdout containing only the
+    // HarnessResult. WARN/ERROR already go to stderr via console.warn.
     if (entry.level === 'ERROR' || entry.level === 'WARN') {
       console.warn(formatted);
+    } else if (process.env.JANUMICODE_LOG_TO_STDERR === '1') {
+      process.stderr.write(formatted + '\n');
     } else {
       console.log(formatted);
     }

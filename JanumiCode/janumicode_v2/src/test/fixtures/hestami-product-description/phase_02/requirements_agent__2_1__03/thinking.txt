@@ -1,0 +1,165 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Requirements Agent]
+    *   **Task:** Functional Requirements Bloom for Sub-Phase 2.1.
+    *   **Input:** [JC:Intent Statement], Governing Constraints, Context Summary (Intent, Assumptions, Constraints, Out of scope), and a reference to a detail file (which I cannot access directly, so I must rely on the provided text).
+    *   **Output Format:** JSON object matching a specific schema (`functional_requirements`).
+    *   **Schema Requirements:** `user_stories` array, each with `id`, `role`, `action`, `outcome`, `acceptance_criteria` (id, description, measurable_condition), `priority`.
+    *   **Constraints:**
+        *   Derive requirements *only* from the Intent Statement provided in the context summary.
+        *   Do NOT include Non-Functional Requirements (NFRs) like "Must use SvelteKit" -> these are implementation details/technical constraints, not functional user stories. However, the prompt says "Do NOT include Non-Functional Requirements (those are Sub-Phase 2.2)". I need to be careful here. The constraints list technical stack (SvelteKit, Bun, etc.). While the prompt says "Do NOT include NFR", often technical constraints manifest as functional capabilities (e.g., "Offline capabilities"). I should focus on *functional* behavior from a user perspective, derived from the intent. Technical constraints like "Must use SvelteKit" are implementation details, not functional requirements for the user story itself, but the *result* of those constraints (like "Responsive Web Interface") might be relevant if phrased correctly. However, strict interpretation says "Do NOT include Non-Functional Requirements". So, avoid "System must use SvelteKit". Focus on what the user sees/does.
+        *   Trace every User Story to a specific part of the Intent Statement.
+        *   Acceptance Criteria must be measurable.
+        *   Cover ALL functional aspects of the Intent Statement (Completeness shortcut).
+        *   MVP Focus: Consumer Discovery MVP (Phase 1 Focus) — Pillar 1 (Home Real Property Assistant).
+        *   Who it serves: Homeowners, Small landlords, Investors, Hestami Staff.
+        *   Problem: Finding contractors, comparing bids, managing follow-up/scheduling.
+        *   Key Functional Assumptions to cover: AI Agent discovery, Digital Asset ingestion (images/3D), Service provider matching, Action Items methodology, Statutory deadlines, Media storage, Payment capture (integration mentioned), CC&Rs extraction.
+        *   Out of Scope to avoid: Financials Pillar 2/3, Enterprise Governance, Field Service Engine, HOA Voting, Legacy Vantaca integration, Advanced AI beyond CC&Rs, Direct Contractor Portal (for V1), Real-time Bid Aggregation for non-homeowners.
+
+2.  **Deconstruct the Intent Statement:**
+    *   **Product:** Consumer Discovery MVP (Phase 1 Focus) — Implementation focused exclusively on Pillar 1 (Home Real Property Assistant).
+    *   **Users:** Individual homeowners, Small landlords, Property investors, Hestami Staff.
+    *   **Problem:** Wasting time finding contractors, comparing bids, managing follow-up.
+    *   **Core Functionality:**
+        *   AI Agent discovery experience (over manual directory).
+        *   Property data ingestion (images, 3D splats).
+        *   Service provider matching.
+        *   Action Items methodology (Replicate 'System of Action').
+        *   Statutory deadlines (Notice requirements).
+        *   Mass Email/SMS for notices.
+        *   Reserve Studies/Funding Plans (Domain 11) - *Wait, this is often associated with HOA/Financials (Pillar 3)*. The Intent says "Pillar 1 (Home Real Property Assistant)". Let's look at the assumptions.
+        *   Assumption 8: Integration with government services (Permits/BLDS) is critical for the ARC domain.
+        *   Assumption 10: AI extraction of documents (CC&Rs, Bylaws) is a core feature.
+        *   Assumption 13: Job Costing and Profitability are required immediately to attract contractors. *Wait, Out of Scope says "Pillar 2 (Financials)" implementation for this MVP*. However, Assumption 13 says "Job Costing... required immediately". This is conflicting. Let's look closer. Out of Scope: "Pillar 2 (Financials) implementation for this MVP", "Job Costing and Profitability are required immediately to attract contractors". Assumption 13 seems to imply a contractor-facing need, but Out of Scope says Financials are Pillar 2. If Job Costing is Vantaca model (Action Items), maybe that's Pillar 1 (Operations/Management). I will interpret Job Costing/Profitability as Contractor-facing data visibility which might be Pillar 1 (Home Real Property Assistant) functionality (managing property + jobs). But Out of Scope says "Pillar 2 (Financials) implementation for this MVP" is out. I need to respect Out of Scope. I will focus on Property Management/Matching, not accounting GLs. I will treat "Job Costing" carefully. Maybe just "Track Job Progress" functional, not GL posting.
+        *   Assumption 14: Offline mode with queueing.
+        *   Assumption 12: Mobile App is critical.
+    *   **Tech Constraints (to ignore as NFRs, but respect functional implications):** SvelteKit, Bun, DBOS, RLS, SeaweedFS, Cerbos, Traefik, FFmpeg, Stripe/Square.
+
+    *   **Refining the Scope:** The prompt specifically says "Product: Consumer Discovery MVP (Phase 1 Focus) — Implementation focused exclusively on Pillar 1 (Home Real Property Assistant)".
+    *   **Functional Areas:**
+        1.  User Registration/Onboarding (Homeowner/Staff).
+        2.  Property Discovery/Asset Upload (Images, 3D Splats).
+        3.  Service Provider Matching (AI Agent).
+        4.  Document Management (CC&Rs, Bylaws - AI Extraction).
+        5.  Task/Action Management (System of Action).
+        6.  Notification System (Email/SMS for notices).
+        7.  Staff Portal (Coordination).
+        8.  Compliance/Deadlines (Statutory deadlines).
+        9.  Media Processing (Video processing/Evidence).
+        10. Offline Capability (Queueing).
+
+    *   **Exclusions:** Pillar 2/3 Financials, HOA Voting, Field Service Engine, Legacy Vantaca integration (only replicate System of Action), Advanced AI, Contractor Portal, Non-homeowner Bid Aggregation.
+
+    *   **Reconciliation on "Job Costing":** Assumption 13 says "Job Costing and Profitability are required immediately to attract contractors." But Out of Scope says "Pillar 2 (Financials)...". Usually, Job Costing is Financials. However, if it's for the "Home Real Property Assistant" (Homeowner side), maybe it's about *estimating* costs for repairs (Bid comparison). I will frame this as "Estimate Comparison" rather than "General Ledger Accounting". I will treat "Job Costing" as "Cost Tracking per Job" for the user (Homeowner) to see if the bid fits their budget, without hitting the Pillar 2 Financial GL scope. Or, I can acknowledge the conflict but prioritize Out of Scope for "Financials". Let's stick to the "Property Discovery" and "Service Matching" core.
+
+    *   **Reconciliation on "Offsite/Offline":** Out of Scope says "Full offline-first capabilities for Homeowners (Secondary priority)" but Assumption 12/14 say Mobile App is critical and Offline mode is needed. I will include *partial* offline support (queueing) as functional, not "Full Offline".
+
+    *   **Reconciliation on "Financials":** I must exclude "Pillar 2 (Financials) implementation". So no invoices, no GL, no accounting reports. But "Payment capture (Stripe/Square)" is in constraints. How do we handle payments without Pillar 2? Maybe just "Store Payment Method" or "Capture Deposit". Or perhaps the MVP is discovery *before* payment. I will focus on the "Matching" and "Scheduling" aspects.
+
+3.  **Drafting User Stories:**
+
+    *   *US-001: Property Onboarding.* Homeowner wants to upload property data so AI can analyze it. (Assumption 4, Intent).
+    *   *US-002: AI Discovery.* Homeowner wants AI to find contractors based on uploaded assets. (Assumption 1).
+    *   *US-003: Bid Comparison.* Homeowner wants to compare bids from matched providers. (Problem Statement).
+    *   *US-004: Document Review.* Homeowner wants AI to extract CC&R info. (Assumption 10).
+    *   *US-005: Task Management.* Homeowner wants to manage follow-ups/tasks. (Assumption 6).
+    *   *US-006: Notifications.* Homeowner wants to receive notices (Statutory). (Constraint/Assumption 7).
+    *   *US-007: Staff Coordination.* Staff want to queue requests for review. (Assumption 14/Staff role).
+    *   *US-008: Media Upload.* Homeowner wants to upload images/3D splats. (Intent).
+    *   *US-009: Compliance Checks.* System wants to warn about Statutory deadlines. (Constraint).
+    *   *US-010: Mobile Access.* Homeowner wants to use the app for mobile verification. (Assumption 12).
+
+    *   *Refining Criteria:* Make them measurable.
+        *   "Upload Images" -> "System accepts jpg/png up to 10MB", "Thumbnail generation < 5s".
+        *   "AI Match" -> "Recommendation list displayed within 5s of query", "Top 5 providers listed".
+        *   "Offline Queue" -> "Changes saved locally", "Synced when connection restored".
+        *   "Deadlines" -> "Alert triggered 30 days before date".
+        *   "Extraction" -> "CC&R text extracted with >90% accuracy".
+
+4.  **Constructing the JSON:**
+    *   Validate against schema: `user_stories` array.
+    *   Ensure no NFRs like "Must use SvelteKit" appear as acceptance criteria. (e.g., "Responsive Design" is NFR-ish, but "View dashboard on mobile device" is functional).
+    *   Ensure traceability to Intent/Assumptions.
+
+5.  **Review against Constraints:**
+    *   Do NOT include NFR. (Technical stack constraints are implementation, not functional requirements). I will focus on the *behavior* enabled by these constraints (e.g., "Offline queueing" is a functional feature).
+    *   Complete functional coverage.
+    *   JSON format.
+
+    *   *Self-Correction on "Payment Capture":* Constraint says "Must integrate with Stripe/Square". If it's Pillar 1 (Home Real Property), does it involve payments? Probably deposits or fees. If Pillar 2 is out of scope (Financials), does this conflict? Maybe it's "Payment Link Generation" rather than "Accounting Ledger". I will include a story about "Secure Payment Processing for Deposits" but ensure the acceptance criteria focuses on the transaction flow, not accounting logic.
+    *   *Self-Correction on "Job Costing":* If Pillar 2 is Financials, Job Costing is likely Pillar 2. Assumption 13 says it's required to attract contractors. This is tricky. Since Out of Scope says "Pillar 2 (Financials) implementation for this MVP", I should likely exclude GL-based costing. However, "Estimates/Bids" are functional. I will focus on "Bid Comparison" rather than "Costing". I will interpret Assumption 13 as "Display Cost Estimates" (Pillar 1) rather than "Internal Costing" (Pillar 2).
+
+    *   *Prioritization:* Critical/High for core discovery and safety/compliance. Medium for secondary features.
+    *   *Traceability:* I need to explicitly mention the Intent/Assumption in the thought process (hidden), but in the JSON output, I just need to make sure they cover the requirements.
+    *   *Measurement:* "Response time < 200ms", "Upload < 5s", "Alert 30 days prior".
+
+6.  **Final Polish:** Check JSON validity. Ensure all keys match the schema.
+
+    *   *Story 1 (Upload/Asset Ingestion)*: Trace to Intent "property data ingestion (images, 3D splats)" + Assumption 4.
+    *   *Story 2 (AI Discovery)*: Trace to Assumption 1 ("AI Agent discovery").
+    *   *Story 3 (Matching)*: Trace to Intent "service provider matching".
+    *   *Story 4 (Action Items)*: Trace to Assumption 6 ("Replicate 'System of Action'").
+    *   *Story 5 (Compliance)*: Trace to Constraint "Statutory deadlines".
+    *   *Story 6 (Notifications)*: Trace to Constraint "Mass Email/SMS".
+    *   *Story 7 (Offline)*: Trace to Assumption 14 "Offline mode with queueing".
+    *   *Story 8 (Mobile)*: Trace to Assumption 12.
+    *   *Story 9 (Document AI)*: Trace to Assumption 10.
+    *   *Story 10 (Permissions)*: Trace to Constraint "Cerbos/RLS".
+
+    Let's build the JSON content.
+
+    *   **Schema Check:**
+        ```json
+        {
+          "user_stories": [
+            {
+              "id": "string",
+              "role": "string",
+              "action": "string",
+              "outcome": "string",
+              "acceptance_criteria": [
+                { "id": "string", "description": "string", "measurable_condition": "string" }
+              ],
+              "priority": "string"
+            }
+          ]
+        }
+        ```
+
+    *   **Wait, one constraint:** "Derive complete, traceable [JC:Functional Requirements] from the [JC:Intent Statement]."
+    *   **Constraint:** "Do NOT include Non-Functional Requirements (those are Sub-Phase 2.2)".
+    *   **Constraint:** "Cover ALL functional aspects of the Intent Statement — completeness_shortcut is a high-severity flaw".
+
+    *   **Conflict Resolution:** The technical constraints (SvelteKit, Bun, etc.) are NFRs/Architecture. I must not list them as User Stories or AC. However, the *result* of those constraints must be in the stories.
+    *   Example: Constraint "Must use DBOS for durable, versioned workflows". Functional equivalent: "Workflows persist and complete even if server restarts". This is a Functional Requirement for Data Integrity/Reliability. But usually, "Durable Workflows" is NFR. I will focus on "Track Status of Service Requests" as the functional story.
+    *   Example: "Offline mode with queueing". This is functional. "Save data locally" is the AC.
+    *   Example: "Statutory deadlines". Functional. "Show alert".
+
+    *   **Roles:** Homeowners, Small landlords, Investors, Hestami Staff.
+    *   **Intent:** "Consumer Discovery MVP".
+    *   **Pillar 1:** Home Real Property Assistant.
+
+    Let's finalize the list.
+    1.  US-001: Property Asset Ingestion (Images/3D).
+    2.  US-002: AI Contractor Discovery.
+    3.  US-003: Bid/Proposal Comparison.
+    4.  US-004: Document AI (CC&Rs/Bylaws).
+    5.  US-005: Action Item Management (System of Action).
+    6.  US-006: Compliance Deadline Alerts (Statutory).
+    7.  US-007: Notification Delivery (Mass Email/SMS).
+    8.  US-008: Offline Capability (Queueing).
+    9.  US-009: Multi-tenant Isolation (Security).
+    10. US-010: Mobile Access for Field Use.
+
+    I need to ensure the JSON is valid and follows the prompt's instructions strictly.
+
+    *One detail:* "Acceptance Criteria must be measurable".
+    *   "Uploads complete within 5 seconds for images under 10MB".
+    *   "AI matches returned within 3 seconds".
+    *   "Alerts sent at least 30 days before deadline".
+    *   "Offline edits synced upon reconnection within 2 hours".
+    *   "Access restricted based on Role (Staff vs Homeowner)".
+
+    Let's write the JSON.

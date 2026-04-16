@@ -1,0 +1,36 @@
+{
+  "topic_entities": [
+    "EXT-001",
+    "EXT-002",
+    "EXT-003",
+    "EXT-004",
+    "EXT-005",
+    "Payment Gateway",
+    "Communication Provider",
+    "Government Regulatory Services",
+    "AI/ML Service Provider",
+    "Mobile OS SDKs",
+    "Stripe",
+    "Square",
+    "Email",
+    "SMS",
+    "REST API",
+    "SDK"
+  ],
+  "decision_types_sought": [
+    "phase_gate_approval",
+    "mirror_approval"
+  ],
+  "temporal_scope": {
+    "from": "2020-01-01T00:00:00Z",
+    "to": "2099-12-31T23:59:59Z"
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}

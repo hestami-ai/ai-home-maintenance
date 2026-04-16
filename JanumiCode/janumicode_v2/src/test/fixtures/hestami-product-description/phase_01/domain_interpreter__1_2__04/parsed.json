@@ -1,0 +1,166 @@
+{
+  "candidate_product_concepts": [
+    {
+      "id": "CP-001-consumer-discovery-mvp",
+      "name": "Consumer Discovery MVP (Phase 1 Focus)",
+      "description": "Implementation focused exclusively on Pillar 1 (Home Real Property Assistant) to prioritize user acquisition, property data ingestion (images, 3D splats), and service provider matching for individual homeowners.",
+      "who_it_serves": [
+        "Individual homeowners",
+        "Small landlords",
+        "Property investors managing one or more residences",
+        "Hestami Staff (Coordinators)"
+      ],
+      "problem_it_solves": "Property owners wasting time finding reliable contractors, comparing inconsistent bids, and managing follow-up/scheduling.",
+      "assumptions": [
+        {
+          "inference": "The MVP should prioritize the 'AI Agent' discovery experience over a manual directory.",
+          "basis": "Raw Intent Vision Statement: 'minimize level of effort for both parties' via 'AI Agent or Hestami Staff facilitate service provider discovery'."
+        },
+        {
+          "inference": "Vendor onboarding is treated as an external process (non-internal platform requirement) for V1.",
+          "basis": "Raw Intent Pillar 1 Domain 9: 'External Vendor Coordination - Service provider tracking without onboarding requirements'."
+        },
+        {
+          "inference": "Offline capabilities for homeowners are secondary to the primary web-based experience.",
+          "basis": "Raw Intent Architecture: 'Mobile... Dedicated clients for homeowners and technicians, focusing on task-centric workflows and offline-first capabilities' (Implies offline is critical for Technicians, not necessarily Homeowners)."
+        },
+        {
+          "inference": "The 'Digital Asset' ingestion (3D Gaussian Splats, images) is a prerequisite for the service matching logic.",
+          "basis": "Raw Intent Mission Statement: 'leveraging modern techniques such 3D Gaussian Splats... to minimize friction'."
+        },
+        {
+          "inference": "Accounting/Financials (Pillar 2/3) are strictly out of scope for this MVP.",
+          "basis": "Raw Intent Phasing Strategy: Phase 1 is 'Hestami Home Real Property Assistant' distinct from Phase 2/3."
+        }
+      ],
+      "constraints": [
+        "Must use SvelteKit for the frontend portal.",
+        "Must use Bun for high-performance API execution.",
+        "Must use DBOS versioned workflows for the service call lifecycle.",
+        "Must enforce Row-Level Security (RLS) for multi-tenant isolation.",
+        "Must use SeaweedFS for media asset storage.",
+        "Must strictly follow the defined pillars (Phase 1 only) for feature gating."
+      ],
+      "open_questions": [
+        "How to monetize the consumer-facing MVP without violating privacy or trust models?",
+        "What is the specific retention strategy for homeowners who only use the app for a single service call?",
+        "Does the MVP include the Human Hestami Staff service call execution, or is it fully AI/Agent driven?"
+      ]
+    },
+    {
+      "id": "CP-002-enterprise-governance-mvp",
+      "name": "Enterprise Governance MVP (Phase 3 Focus)",
+      "description": "Implementation focused exclusively on Pillar 3 (Community Association Management) to prioritize compliance, financial governance, and vendor management for HOAs and management companies.",
+      "who_it_serves": [
+        "Community Association Managers",
+        "Board Members",
+        "HOA Stakeholders",
+        "Management Companies"
+      ],
+      "problem_it_solves": "Compliance violations, complex accounting (GL, AR/AP, assessments), and meeting governance workflows for HOAs.",
+      "assumptions": [
+        {
+          "inference": "The platform must replicate Vantaca's 'System of Action' (Action Items) methodology.",
+          "basis": "Referenced File: Vantaca Product Description - 'Vantaca HOAi... An AI-first automation engine... everything in Vantaca is an Action Item'."
+        },
+        {
+          "inference": "The MVP targets 'Production Grade' financial handling (Auditable, compliant GL structure).",
+          "basis": "Referenced File: Hestami CDM Domain 2 — Accounting — Requirements: 'Auditable, compliant GL structure'."
+        },
+        {
+          "inference": "Integration with government services (Permits/BLDS) is critical for the ARC domain.",
+          "basis": "Raw Intent Appendix: Pillar 1 Vision mentions 'integration with government services for actions such as permits review and applications'."
+        },
+        {
+          "inference": "The MVP assumes a 'Single Tenant' or 'Multi-Tenant' model where HOAs are distinct tenants.",
+          "basis": "Raw Intent Architecture: 'PostgreSQL ... Row-Level Security (RLS) to enforce strict multi-tenant isolation'."
+        },
+        {
+          "inference": "AI extraction of documents (CC&Rs, Bylaws) is a core feature, not an afterthought.",
+          "basis": "Referenced File: Hestami CDM Domain 10 — Documents & Records: 'AI-driven extraction, classification, and summarization are core enhancement features'."
+        }
+      ],
+      "constraints": [
+        "Must use Cerbos for policy-based authorization engine (Board vs. Staff access).",
+        "Must support Statutory deadlines (Notice requirements) via Rules Engine.",
+        "Must support Mass Email/SMS (Domain 7) for violation notices and meeting notices.",
+        "Must adhere to Vantaca model for CAM workflows.",
+        "Must support Reserve Studies and Funding Plans (Domain 11)."
+      ],
+      "open_questions": [
+        "How to handle the integration with legacy property management software?",
+        "What is the specific data retention policy for 'Eternal Perspective' historical data?",
+        "Which specific trade associations (PLUM, HVAC) are prioritized for compliance tracking?"
+      ]
+    },
+    {
+      "id": "CP-003-field-service-engine-mvp",
+      "name": "Field Service Engine MVP (Phase 2 Focus)",
+      "description": "Implementation focused exclusively on Pillar 2 (Service Provider Field Services Management) to prioritize dispatching, technician operations, and commercial terms for contractors.",
+      "who_it_serves": [
+        "Service Providers",
+        "Technicians",
+        "HOA Vendors",
+        "Property Owners (via Vendor interface)"
+      ],
+      "problem_it_solves": "Manual dispatching, lack of job costing, difficulty managing recurring services, and mobile access to work orders.",
+      "assumptions": [
+        {
+          "inference": "The MVP must function as an 'Operating System for the Trades' (ServiceTitan Model).",
+          "basis": "Referenced File: ServiceTitan Vision: 'Building the operating system for the trades'."
+        },
+        {
+          "inference": "Mobile App is a critical component for offline-first capabilities.",
+          "basis": "Raw Intent Architecture: 'Mobile... Dedicated clients for... technicians, focusing on task-centric workflows and offline-first capabilities'."
+        },
+        {
+          "inference": "Job Costing and Profitability are required immediately to attract contractors.",
+          "basis": "Referenced File: ServiceTitan Key Features: 'Project Management & Job Costing... breaking down costs across materials, equipment, commissions, and labor'."
+        },
+        {
+          "inference": "The platform must support 'Offline mode with queueing' for remote sites.",
+          "basis": "Referenced File: ServiceTitan Domain 6 — Field Technician Mobile Operations: 'Offline mode with queueing'."
+        },
+        {
+          "inference": "The MVP assumes a 'Good-Better-Best' quoting model is needed for estimates.",
+          "basis": "Referenced File: ServiceTitan Domain 7 — Estimates: 'Multi-tier proposal options'."
+        }
+      ],
+      "constraints": [
+        "Must use DBOS for durable, versioned workflows (Domain 3).",
+        "Must integrate with Stripe/Square for Payment capture (Domain 7).",
+        "Must use Traefik as the sole ingress proxy.",
+        "Must use FFmpeg for video processing (evidence capture).",
+        "Must strictly follow the ServiceTitan business domains (Identity, Workforce, Pricebook, etc.)."
+      ],
+      "open_questions": [
+        "Should the MVP support 'Freelance' technicians or only 'Agency' technicians?",
+        "How to handle the integration with accounting software (QuickBooks, Sage) for contractors?",
+        "What is the SLA timer logic for 'Emergency vs Routine' prioritization?"
+      ]
+    }
+  ],
+  "system_proposed_content": [
+    {
+      "field_name": "product_name",
+      "proposed_value": "Hestami AI Real Property OS",
+      "approval_status": "pending"
+    },
+    {
+      "field_name": "product_version",
+      "proposed_value": "0.0.1-alpha",
+      "approval_status": "pending"
+    },
+    {
+      "field_name": "release_strategy",
+      "proposed_value": "Phased rollout (Pillar 1 -> 2 -> 3)",
+      "approval_status": "pending"
+    },
+    {
+      "field_name": "primary_use_case",
+      "proposed_value": "Home Services & Community Management",
+      "approval_status": "pending"
+    }
+  ],
+  "prior_decision_conflicts": []
+}

@@ -145,30 +145,6 @@ CREATE INDEX IF NOT EXISTS me_type ON memory_edge(edge_type);
 CREATE INDEX IF NOT EXISTS me_asserted ON memory_edge(asserted_by, authority_level);
 CREATE INDEX IF NOT EXISTS me_status ON memory_edge(status);
 
--- ── Detail file registry ────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS detail_files (
-  id                            TEXT PRIMARY KEY,
-  invocation_id                 TEXT NOT NULL,
-  sub_phase_id                  TEXT NOT NULL,
-  file_path                     TEXT NOT NULL,
-  archived_path                 TEXT,
-  generated_at                  TEXT NOT NULL,
-  archived_at                   TEXT,
-  status                        TEXT NOT NULL
-);
-
--- ── Schema version registry ────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS schema_versions (
-  artifact_type                 TEXT NOT NULL,
-  schema_version                TEXT NOT NULL,
-  introduced_in_sha             TEXT NOT NULL,
-  is_current                    INTEGER DEFAULT 1,
-  breaking_change_from_version  TEXT,
-  PRIMARY KEY (artifact_type, schema_version)
-);
-
 -- ── FTS5 full-text search with BM25 ────────────────────────────────
 
 CREATE VIRTUAL TABLE IF NOT EXISTS governed_stream_fts USING fts5(
@@ -200,16 +176,6 @@ CREATE TRIGGER IF NOT EXISTS gs_fts_update_after AFTER UPDATE ON governed_stream
   VALUES (new.rowid, new.id, new.record_type, new.content);
 END;
 
--- ── Traceability reference index ────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS record_references (
-  source_record_id              TEXT NOT NULL,
-  target_record_id              TEXT NOT NULL,
-  reference_type                TEXT NOT NULL,
-  created_at                    TEXT NOT NULL,
-  PRIMARY KEY (source_record_id, target_record_id, reference_type)
-);
-
 -- ── File system write tracking ──────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS file_system_writes (
@@ -230,28 +196,73 @@ CREATE INDEX IF NOT EXISTS fsw_workflow ON file_system_writes(workflow_run_id);
 CREATE INDEX IF NOT EXISTS fsw_task ON file_system_writes(implementation_task_id);
 CREATE INDEX IF NOT EXISTS fsw_path ON file_system_writes(file_path);
 
--- ── LLM API call tracking ───────────────────────────────────────────
+-- -- Sub-Artifact Registry (Architecture Canvas) ------------------------
 
-CREATE TABLE IF NOT EXISTS llm_api_calls (
-  id                            TEXT PRIMARY KEY,
-  role                          TEXT NOT NULL,
-  provider                      TEXT NOT NULL,
-  model                         TEXT NOT NULL,
-  attempt_number                INTEGER NOT NULL DEFAULT 1,
-  status                        TEXT NOT NULL,
-  error_type                    TEXT,
-  error_message                 TEXT,
-  started_at                    TEXT NOT NULL,
-  completed_at                  TEXT,
-  input_tokens                  INTEGER,
-  output_tokens                 INTEGER,
-  workflow_run_id               TEXT,
-  sub_phase_id                  TEXT,
+/**
+ * Maps semantic IDs (e.g., "COMP-001") to parent governed_stream records.
+ * Enables canvas nodes to use stable semantic IDs for layout persistence.
+ */
+CREATE TABLE IF NOT EXISTS sub_artifact (
+  id                  TEXT PRIMARY KEY,     -- Semantic ID (e.g., "COMP-001")
+  parent_record_id    TEXT NOT NULL,       -- governed_stream.id
+  json_path           TEXT NOT NULL,       -- JSON path within parent content
+  kind                TEXT NOT NULL,       -- 'component', 'responsibility', 'adr', etc.
+  workflow_run_id     TEXT NOT NULL,
+  created_at          TEXT NOT NULL,
+  FOREIGN KEY (parent_record_id) REFERENCES governed_stream(id),
   FOREIGN KEY (workflow_run_id) REFERENCES workflow_runs(id)
 );
 
-CREATE INDEX IF NOT EXISTS lac_workflow ON llm_api_calls(workflow_run_id);
-CREATE INDEX IF NOT EXISTS lac_status ON llm_api_calls(status);
+CREATE INDEX IF NOT EXISTS sa_parent ON sub_artifact(parent_record_id);
+CREATE INDEX IF NOT EXISTS sa_kind ON sub_artifact(kind);
+CREATE INDEX IF NOT EXISTS sa_workflow ON sub_artifact(workflow_run_id);
+
+-- -- Sub-Artifact Edges (Architecture Canvas) ---------------------------
+
+/**
+ * Edges between sub-artifacts (satisfies, depends_on, governs).
+ * Stored separately from memory_edge because endpoints are semantic IDs,
+ * not governed_stream record IDs.
+ */
+CREATE TABLE IF NOT EXISTS sub_artifact_edge (
+  id                  TEXT PRIMARY KEY,
+  source_id           TEXT NOT NULL,       -- Semantic ID
+  target_id           TEXT NOT NULL,       -- Semantic ID
+  edge_type           TEXT NOT NULL,       -- 'satisfies', 'depends_on', 'governs'
+  asserted_by         TEXT NOT NULL,
+  asserted_at         TEXT NOT NULL,
+  authority_level     INTEGER NOT NULL DEFAULT 5,
+  status              TEXT NOT NULL DEFAULT 'system_asserted',
+  workflow_run_id     TEXT NOT NULL,
+  notes               TEXT,
+  FOREIGN KEY (source_id) REFERENCES sub_artifact(id),
+  FOREIGN KEY (target_id) REFERENCES sub_artifact(id),
+  FOREIGN KEY (workflow_run_id) REFERENCES workflow_runs(id)
+);
+
+CREATE INDEX IF NOT EXISTS sae_source ON sub_artifact_edge(source_id);
+CREATE INDEX IF NOT EXISTS sae_target ON sub_artifact_edge(target_id);
+CREATE INDEX IF NOT EXISTS sae_type ON sub_artifact_edge(edge_type);
+CREATE INDEX IF NOT EXISTS sae_workflow ON sub_artifact_edge(workflow_run_id);
+
+-- -- Canvas Layout State (Architecture Canvas) --------------------------
+
+/**
+ * Persists node positions for architecture canvas.
+ * Uses semantic IDs for node_id to ensure stability under reordering.
+ */
+CREATE TABLE IF NOT EXISTS canvas_layout_state (
+  workflow_run_id     TEXT NOT NULL,
+  node_id             TEXT NOT NULL,       -- Semantic ID
+  x                   REAL NOT NULL,
+  y                   REAL NOT NULL,
+  width               REAL,
+  height              REAL,
+  collapsed           INTEGER DEFAULT 0,
+  user_positioned     INTEGER DEFAULT 0,
+  last_modified_at    TEXT NOT NULL,
+  PRIMARY KEY (workflow_run_id, node_id)
+);
 `;
 
 /**

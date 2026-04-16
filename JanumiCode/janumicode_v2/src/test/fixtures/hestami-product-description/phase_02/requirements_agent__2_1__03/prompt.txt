@@ -1,0 +1,35 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Requirements Agent] performing Functional Requirements Bloom for Sub-Phase 2.1.
+
+GOVERNING CONSTRAINTS (apply without exception):
+(none)
+
+Derive complete, traceable [JC:Functional Requirements] from the [JC:Intent Statement]. Each requirement must be expressed as a [JC:User Story] with [JC:Acceptance Criteria].
+
+REQUIRED OUTPUT: A JSON object matching the `functional_requirements` schema:
+- user_stories: array of User Stories, each with:
+  - id: unique identifier (e.g., "US-001")
+  - role: who benefits ("As a [role]")
+  - action: what they want ("I want [action]")
+  - outcome: why ("so that [outcome]")
+  - acceptance_criteria: array with at least one criterion, each having:
+    - id, description, measurable_condition (specific, verifiable)
+  - priority: critical | high | medium | low
+
+Rules:
+- Every User Story must trace to a specific part of the Intent Statement
+- Acceptance Criteria must be measurable — not subjective ("response time < 200ms", not "fast")
+- Do NOT include Non-Functional Requirements (those are Sub-Phase 2.2)
+- Cover ALL functional aspects of the Intent Statement — completeness_shortcut is a high-severity flaw
+
+CONTEXT SUMMARY:
+Intent Statement: Product: Consumer Discovery MVP (Phase 1 Focus) — Implementation focused exclusively on Pillar 1 (Home Real Property Assistant) to prioritize user acquisition, property data ingestion (images, 3D splats), and service provider matching for individual homeowners.
+Who it serves: Individual homeowners,Small landlords,Property investors managing one or more residences,Hestami Staff (Coordinators)
+Problem: Property owners wasting time finding reliable contractors, comparing inconsistent bids, and managing follow-up/scheduling.
+Confirmed assumptions: [{"assumption":"The MVP should prioritize the 'AI Agent' discovery experience over a manual directory.","confirmed_by_record_id":"REC-ASS-001"},{"assumption":"Vendor onboarding is treated as an external process (non-internal platform requirement) for V1.","confirmed_by_record_id":"REC-ASS-002"},{"assumption":"Offline capabilities for homeowners are secondary to the primary web-based experience.","confirmed_by_record_id":"REC-ASS-003"},{"assumption":"The 'Digital Asset' ingestion (3D Gaussian Splats, images) is a prerequisite for the service matching logic.","confirmed_by_record_id":"REC-ASS-004"},{"assumption":"Accounting/Financials (Pillar 2/3) are strictly out of scope for this MVP.","confirmed_by_record_id":"REC-ASS-005"},{"assumption":"The platform must replicate Vantaca's 'System of Action' (Action Items) methodology.","confirmed_by_record_id":"REC-ASS-006"},{"assumption":"The MVP targets 'Production Grade' financial handling (Auditable, compliant GL structure).","confirmed_by_record_id":"REC-ASS-007"},{"assumption":"Integration with government services (Permits/BLDS) is critical for the ARC domain.","confirmed_by_record_id":"REC-ASS-008"},{"assumption":"The MVP assumes a 'Single Tenant' or 'Multi-Tenant' model where HOAs are distinct tenants.","confirmed_by_record_id":"REC-ASS-009"},{"assumption":"AI extraction of documents (CC&Rs, Bylaws) is a core feature, not an afterthought.","confirmed_by_record_id":"REC-ASS-010"},{"assumption":"The MVP must function as an 'Operating System for the Trades' (ServiceTitan Model).","confirmed_by_record_id":"REC-ASS-011"},{"assumption":"Mobile App is a critical component for offline-first capabilities.","confirmed_by_record_id":"REC-ASS-012"},{"assumption":"Job Costing and Profitability are required immediately to attract contractors.","confirmed_by_record_id":"REC-ASS-013"},{"assumption":"The platform must support 'Offline mode with queueing' for remote sites.","confirmed_by_record_id":"REC-ASS-014"},{"assumption":"The MVP assumes a 'Good-Better-Best' quoting model is needed for estimates.","confirmed_by_record_id":"REC-ASS-015"}]
+Confirmed constraints: [{"constraint":"Must use SvelteKit for the frontend portal.","type":"technical"},{"constraint":"Must use Bun for high-performance API execution.","type":"technical"},{"constraint":"Must use DBOS versioned workflows for the service call lifecycle.","type":"technical"},{"constraint":"Must enforce Row-Level Security (RLS) for multi-tenant isolation.","type":"technical"},{"constraint":"Must use SeaweedFS for media asset storage.","type":"technical"},{"constraint":"Must strictly follow the defined pillars (Phase 1 only) for feature gating.","type":"business"},{"constraint":"Must use Cerbos for policy-based authorization engine (Board vs. Staff access).","type":"technical"},{"constraint":"Must support Statutory deadlines (Notice requirements) via Rules Engine.","type":"regulatory"},{"constraint":"Must support Mass Email/SMS (Domain 7) for violation notices and meeting notices.","type":"technical"},{"constraint":"Must adhere to Vantaca model for CAM workflows.","type":"preferential"},{"constraint":"Must support Reserve Studies and Funding Plans (Domain 11).","type":"regulatory"},{"constraint":"Must use DBOS for durable, versioned workflows (Domain 3).","type":"technical"},{"constraint":"Must integrate with Stripe/Square for Payment capture (Domain 7).","type":"technical"},{"constraint":"Must use Traefik as the sole ingress proxy.","type":"technical"},{"constraint":"Must use FFmpeg for video processing (evidence capture).","type":"technical"},{"constraint":"Must strictly follow the ServiceTitan business domains (Identity, Workforce, Pricebook, etc.).","type":"business"}]
+Out of scope: ["Pillar 2 (Financials) implementation for this MVP","Pillar 3 (Accounting) implementation for this MVP","Enterprise Governance MVP features (Phase 3 Focus)","Field Service Engine MVP features (Phase 2 Focus)","Automated Homeowner Association (HOA) Voting modules (Phase 3)","Full offline-first capabilities for Homeowners (Secondary priority)","Legacy Vantaca integration for V1 (Replicate 'System of Action' only)","Advanced AI extraction beyond CC&Rs/Bylaws for V1","Direct Contractor Portal Access for V1","Real-time Bid Aggregation for non-homeowners"]
+Compliance: (none)
+
+DETAIL FILE:
+Complete supporting context at: E:\Projects\hestami-ai\JanumiCode\janumicode_v2\test-workspace/.janumicode/context/2.1_p2_1_func_req-ef5a4e8d.md

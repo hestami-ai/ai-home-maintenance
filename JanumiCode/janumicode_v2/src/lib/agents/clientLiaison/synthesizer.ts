@@ -23,6 +23,7 @@ import type {
   RetrievalResult,
   SynthesisResult,
 } from './types';
+import type { ConversationTurn } from './db';
 import type { CapabilityRegistry, CapabilityContext } from './capabilities/index';
 import { getLogger } from '../../logging';
 
@@ -30,7 +31,6 @@ const TEMPLATE_KEY = 'cross_cutting/client_liaison_synthesis.system';
 
 const PENDING_TYPES = new Set([
   'mirror_presented',
-  'menu_presented',
   'decision_bundle_presented',
   'phase_gate_evaluation',
 ]);
@@ -53,6 +53,7 @@ export class Synthesizer {
     classification: QueryClassification,
     retrieval: RetrievalResult,
     ctx: CapabilityContext,
+    conversationHistory: ConversationTurn[] = [],
   ): Promise<SynthesisResult> {
     const template = this.templates.getTemplate(TEMPLATE_KEY);
     if (!template) {
@@ -66,6 +67,19 @@ export class Synthesizer {
         query_type: classification.queryType,
         relevant_records: this.summarizeRecords(retrieval.records),
         pending_decisions: this.summarizePending(retrieval.records.filter(r => PENDING_TYPES.has(r.record_type))),
+        // Multi-turn conversation memory — gives the LLM the last few
+        // Q/A pairs so follow-ups like "what about the previous one?"
+        // resolve correctly.
+        conversation_history: this.summarizeConversation(conversationHistory),
+        // DMR quality signals — surfaced whenever the retrieval was
+        // delegated to DMR. When the packet is absent (workflow_initiation,
+        // status_check), these render as "(none available)" so the template
+        // doesn't have to special-case.
+        dmr_completeness: this.summarizeCompleteness(retrieval),
+        dmr_supersession_chains: this.summarizeSupersession(retrieval),
+        dmr_contradictions: this.summarizeContradictions(retrieval),
+        dmr_active_constraints: this.summarizeActiveConstraints(retrieval),
+        dmr_open_questions: this.summarizeOpenQuestions(retrieval),
         janumicode_version_sha: ctx.orchestrator.janumiCodeVersionSha,
       });
       if (rendered.missing_variables.length > 0) {
@@ -154,6 +168,25 @@ export class Synthesizer {
         continue;
       }
 
+      // Destructive-capability confirmation ritual. On the first
+      // invocation (confirmed absent or false), return the prompt to the
+      // user and do NOT execute. The LLM must re-invoke with
+      // `confirmed: true` after the user agrees.
+      if (cap.confirmation) {
+        const paramsRec = call.params;
+        const confirmed = paramsRec.confirmed === true;
+        if (!confirmed) {
+          const prompt = cap.confirmation.prompt(call.params, ctx);
+          results.push({
+            name: call.name,
+            formatted:
+              `**Confirmation required for \`${call.name}\`:** ${prompt}\n\n` +
+              `Re-invoke \`${call.name}\` with \`confirmed: true\` once the user agrees.`,
+          });
+          continue;
+        }
+      }
+
       try {
         const out = await cap.execute(call.params, ctx);
         results.push({
@@ -215,6 +248,96 @@ export class Synthesizer {
     return records
       .map(r => `- [${r.id}] ${r.record_type}: ${JSON.stringify(r.content).slice(0, 200)}`)
       .join('\n');
+  }
+
+  // ── DMR Context Packet surface helpers ──────────────────────────
+
+  private summarizeCompleteness(retrieval: RetrievalResult): string {
+    const p = retrieval.contextPacket;
+    if (!p) return '(not applicable — retrieval did not use DMR)';
+    const gaps = p.coverageAssessment.knownGaps;
+    const unavail = p.unavailableSources;
+    const parts: string[] = [
+      `Status: ${p.completenessStatus}`,
+      `Confidence: ${p.coverageAssessment.confidence.toFixed(2)}`,
+      `Narrative: ${p.completenessNarrative}`,
+    ];
+    if (unavail.length > 0) {
+      const unavailList = unavail.map(s => `${s.source} (${s.materiality})`).join(', ');
+      parts.push(`Unavailable sources: ${unavailList}`);
+    }
+    if (gaps.length > 0) {
+      parts.push(`Known gaps: ${gaps.join('; ')}`);
+    }
+    return parts.join('\n');
+  }
+
+  private summarizeSupersession(retrieval: RetrievalResult): string {
+    const p = retrieval.contextPacket;
+    if (!p || p.supersessionChains.length === 0) return '(none detected)';
+    return p.supersessionChains
+      .map(sc => {
+        const current = sc.chain.find(e => e.position === 'current_governing');
+        const superseded = sc.chain.filter(e => e.position === 'superseded');
+        const currentStr = current ? `current: [${current.recordId}]` : 'no current';
+        const supItems = superseded.map(e => `[${e.recordId}]`).join(', ');
+        const supStr = supItems.length > 0 ? `superseded: ${supItems}` : 'nothing superseded';
+        return `- Subject "${sc.subject}": ${currentStr}; ${supStr}`;
+      })
+      .join('\n');
+  }
+
+  private summarizeContradictions(retrieval: RetrievalResult): string {
+    const p = retrieval.contextPacket;
+    if (!p || p.contradictions.length === 0) return '(none detected)';
+    return p.contradictions
+      .map(c => {
+        const idList = c.recordIds.map(id => `[${id}]`);
+        const ids = idList.join(' vs ');
+        return `- ${ids} (${c.resolutionStatus}): ${c.explanation}`;
+      })
+      .join('\n');
+  }
+
+  private summarizeActiveConstraints(retrieval: RetrievalResult): string {
+    const p = retrieval.contextPacket;
+    if (!p || p.activeConstraints.length === 0) return '(none)';
+    return p.activeConstraints
+      .map(c => `- [${c.id}] (authority ${c.authorityLevel}): ${c.statement}`)
+      .join('\n');
+  }
+
+  private summarizeOpenQuestions(retrieval: RetrievalResult): string {
+    const p = retrieval.contextPacket;
+    if (!p || p.openQuestions.length === 0) return '(none unresolved)';
+    return p.openQuestions
+      .map(q => `- [${q.sourceRecordId}] ${q.question}${q.stillUnresolved ? ' (unresolved)' : ''}`)
+      .join('\n');
+  }
+
+  private summarizeConversation(history: ConversationTurn[]): string {
+    if (history.length === 0) return '(no prior turns in this session)';
+    return history
+      .map((t, i) => {
+        const qText = this.extractQueryText(t.queryRecord);
+        const rText = this.extractResponseText(t.responseRecord);
+        return `### Turn ${i + 1}\n**User:** ${qText}\n**You answered:** ${rText}`;
+      })
+      .join('\n\n');
+  }
+
+  private extractQueryText(record: GovernedStreamRecord): string {
+    const content = record.content;
+    const text = typeof content.text === 'string' ? content.text : JSON.stringify(content);
+    return text.slice(0, 300);
+  }
+
+  private extractResponseText(record: GovernedStreamRecord): string {
+    const content = record.content;
+    const text = typeof content.response_text === 'string'
+      ? content.response_text
+      : JSON.stringify(content);
+    return text.slice(0, 400);
   }
 
   private extractProvenanceFromText(text: string, records: GovernedStreamRecord[]): string[] {

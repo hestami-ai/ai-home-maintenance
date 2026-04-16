@@ -1,0 +1,146 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** JC:Deep Memory Research Agent (Stage 1 — Query Decomposition).
+    *   **Task:** Transform the retrieval query into structured retrieval targets for the Governed Stream search.
+    *   **Input Query:** "API definitions for components with contracts: 6 Interface Contracts: INT-EXT-001-PAYMENT: JC-Backend-Api <-> EXT-001: Payment Gateway (Stripe/Square) via HTTPS/REST (JSON (Payment Intent/Receipt Metadata)) INT-EXT-002-COMMS: JC-Comms-Service <-> EXT-002: Communication Provider (Email/SMS) via HTTPS/SMTP-REST (JSON (Recipient List, Content Body, Template ID)) INT-EXT-003-REGULATORY: JC-Compliance-Engine <-> EXT-003: Government Regulatory"
+    *   **Scope:** all_runs
+    *   **Requesting Agent:** technical_spec_agent
+    *   **Output Format:** JSON with specific fields (`topic_entities`, `decision_types_sought`, `temporal_scope`, `authority_levels_included`, `sources_in_scope`).
+    *   **Rules:**
+        *   Extract concrete entities (names, IDs, concepts).
+        *   `decision_types_sought` should match the type of historical context needed.
+        *   `authority_levels_included`: always include 5+ (Human-Approved and above); include lower levels only if the query asks about exploratory or agent-generated content. (Note: The query asks for "API definitions" and "contracts", which implies formal, approved technical specifications. Therefore, lower authority levels like draft/exploratory might not be appropriate unless specified. I will stick to 5, 6, 7 as per standard for technical specs unless evidence suggests otherwise, but the rule says "always include 5+... include lower levels only if...". Since this is a technical spec query, it likely relies on approved contracts. I will use 5, 6, 7 to be safe with the "always include 5+" rule).
+        *   `sources_in_scope`: depends on `scope_tier`. Input says `all_runs`. So `governed_stream_all_runs`. Wait, the prompt output example says `governed_stream_current_run`. I need to map the input `Scope: all_runs` to the correct source string. The rule says: `current_run → governed_stream_current_run; all_runs → governed_stream_all_runs`. So I will use `governed_stream_all_runs`.
+
+2.  **Extract `topic_entities`:**
+    *   From the query text:
+        *   `INT-EXT-001-PAYMENT`
+        *   `INT-EXT-002-COMMS`
+        *   `INT-EXT-003-REGULATORY`
+        *   `JC-Backend-Api`
+        *   `EXT-001: Payment Gateway`
+        *   `Stripe/Square`
+        *   `JC-Comms-Service`
+        *   `EXT-002: Communication Provider`
+        *   `JC-Compliance-Engine`
+        *   `EXT-003: Government Regulatory`
+        *   `API definitions`
+        *   `Interface Contracts`
+    *   Refining to concrete entities: Interface Contract IDs, Component Names, External Provider Names.
+    *   List: `["INT-EXT-001-PAYMENT", "INT-EXT-002-COMMS", "INT-EXT-003-REGULATORY", "JC-Backend-Api", "EXT-001: Payment Gateway", "Stripe", "Square", "JC-Comms-Service", "EXT-002: Communication Provider", "JC-Compliance-Engine", "EXT-003: Government Regulatory", "API definitions"]`
+
+3.  **Determine `decision_types_sought`:**
+    *   The query is asking for specific contract definitions and API specs. This isn't really a decision-making scenario like "approve/reject", but rather retrieval of formal specifications.
+    *   However, the schema requires specific values like `menu_selection`, `mirror_approval`, `phase_gate_approval`.
+    *   If the context is retrieving historical contracts for verification or integration, it aligns with verifying against approved states.
+    *   Looking at the schema examples: `decision_types_sought` implies what kind of historical decision record is needed to answer.
+    *   Since these are "contracts", they represent agreements or approvals.
+    *   `phase_gate_approval` fits best for technical contracts and interface definitions (design -> approval -> implementation).
+    *   `mirror_approval` might fit if checking against a live state.
+    *   `menu_selection` seems less relevant.
+    *   Given the strict rule "decision_types_sought should match the type of historical context needed": We need context on how these contracts were approved or defined.
+    *   Selection: `["phase_gate_approval", "mirror_approval"]`.
+
+4.  **Determine `temporal_scope`:**
+    *   The query says `Scope: all_runs`.
+    *   However, `temporal_scope` needs `from` and `to` ISO dates.
+    *   I don't have current time access, but I must provide ISO dates.
+    *   Standard practice for `all_runs` is typically `0001-01-01` to `current_date` or `latest_run_end`.
+    *   Since I am an AI, I should probably use a reasonable range covering the history.
+    *   `from`: "2020-01-01" (assuming system has history), `to`: "2024-06-01" (assuming today is around there). Or generic "0001-01-01" to "9999-12-31".
+    *   Actually, looking at the instruction: `temporal_scope` field in output JSON.
+    *   I will use a broad range suitable for `all_runs`. Let's assume the current date is roughly now (May 2024).
+    *   `from`: "1970-01-01T00:00:00Z", `to`: "2024-05-20T23:59:59Z". (Safe broad range).
+    *   Wait, the instruction doesn't give me the current date. I should probably use a generic placeholder or standard epoch/start/end if specific date isn't known. However, to be precise for a real system, I'll use a standard broad range like "1970-01-01" to "2024-06-01". Or just use the system's knowledge cutoff. Let's use "1970-01-01" to "2024-06-01".
+
+5.  **Determine `authority_levels_included`:**
+    *   Rule: "always include 5+ (Human-Approved and above); include lower levels only if the query asks about exploratory or agent-generated content".
+    *   This is about "API definitions for components with contracts". Contracts are formal agreements.
+    *   Therefore, no exploratory/agent-generated content implied.
+    *   Levels: 5, 6, 7.
+    *   Output: `[5, 6, 7]`.
+
+6.  **Determine `sources_in_scope`:**
+    *   Input `Scope: all_runs`.
+    *   Rule: `all_runs → governed_stream_all_runs`.
+    *   Output: `["governed_stream_all_runs"]`.
+
+7.  **Review and Format:**
+    *   Construct the JSON.
+    *   Ensure field names match exactly.
+    *   Ensure entities are accurate.
+
+    *   *Self-Correction on `temporal_scope`*: Since I don't have the actual system clock, using "all_runs" implies the entire historical scope of the database. I'll use a very wide range or the max range of the system context. Let's use ISO format dates. `from`: "1970-01-01", `to`: "2024-06-01".
+
+    *   *Self-Correction on `decision_types_sought`*: Does a contract search imply "approval"? Yes, contracts are approved artifacts. `phase_gate_approval` is the strongest fit. `mirror_approval` is secondary (current state check). I'll include both to be comprehensive.
+
+    *   *Self-Correction on `topic_entities`*: Keep it concise but accurate. Contract IDs are good. Component names are good.
+
+    *   *Final check on `authority_levels_included`*: The prompt says "always include 5+ ... include lower levels only if...". Since this is technical spec retrieval, it's formal. So 5, 6, 7.
+
+    *   *Final check on `sources_in_scope`*: `all_runs` maps to `governed_stream_all_runs`.
+
+8.  **Construct JSON:**
+    ```json
+    {
+      "topic_entities": [
+        "INT-EXT-001-PAYMENT",
+        "INT-EXT-002-COMMS",
+        "INT-EXT-003-REGULATORY",
+        "JC-Backend-Api",
+        "EXT-001: Payment Gateway",
+        "Stripe",
+        "Square",
+        "JC-Comms-Service",
+        "EXT-002: Communication Provider",
+        "JC-Compliance-Engine",
+        "EXT-003: Government Regulatory",
+        "API definitions"
+      ],
+      "decision_types_sought": [
+        "phase_gate_approval",
+        "mirror_approval"
+      ],
+      "temporal_scope": {
+        "from": "1970-01-01T00:00:00Z",
+        "to": "2024-06-01T00:00:00Z"
+      },
+      "authority_levels_included": [5, 6, 7],
+      "sources_in_scope": [
+        "governed_stream_all_runs"
+      ]
+    }
+    ```
+    *Wait, one detail:* The prompt says `Scope: all_runs` under `RETRIEVAL BRIEF`.
+    And the rule says: `sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs`.
+    So `sources_in_scope` should be `["governed_stream_all_runs"]`.
+    The `temporal_scope` needs to reflect `all_runs`. If I use a specific end date, does it imply current? Yes. I will use a placeholder end date that represents "now".
+    I'll refine the `temporal_scope` to be generic but valid ISO.
+    Actually, looking at previous similar tasks in this system persona, usually, if "all_runs" is requested, the temporal scope should ideally cover the entire lifespan.
+    I will use `1900-01-01` to `9999-12-31` or similar broad range if exact current date isn't known, but `2024-06-01` is a reasonable proxy for "current". Let's stick with a realistic recent end date.
+
+    Wait, re-reading the rule: `sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs`.
+    Okay.
+
+    Let's finalize the JSON.
+
+    One more check: `decision_types_sought`. If I'm just retrieving definitions, do I need "decision_types"? The schema requires this field. The context is retrieving historical documents (contracts). Contracts are typically results of approvals. So `phase_gate_approval` is accurate. `mirror_approval` (checking current state) is also accurate.
+
+    One more check: `topic_entities`. Should I include "HTTPS/REST", "JSON"? The rule says "Extract concrete entities (names, IDs, concepts)". Protocol names are concepts but maybe too generic. Contract IDs and Component Names are more critical. I will include the specific contract IDs and component names.
+
+    Okay, ready to generate.
+
+    Wait, I need to make sure I don't output markdown code blocks outside the JSON if the system expects raw JSON, but the prompt asks for `YOUR REQUIRED OUTPUT (JSON)`. Usually, this means a JSON block. I will wrap it in ```json``` for clarity unless strictly prohibited. The prompt example shows ```json ... ```. I will follow that.
+
+    Wait, looking closely at `authority_levels_included`. The rule says: "always include 5+ (Human-Approved and above); include lower levels only if the query asks about exploratory or agent-generated content".
+    This query is for "API definitions for components with contracts". This implies formal, stable definitions.
+    So `[5, 6, 7]` is correct.
+
+    Let's assemble.
+
+    Wait, `temporal_scope`: `from` and `to` should be `ISO-date`.
+    I will use "1970-01-01" and "2024-05-20" (assuming current).
+    Actually, to be safe on "all_runs", I might use a very wide range. But I don't know the system history. I will assume a standard operational range.
+
+    Okay, final JSON construction.

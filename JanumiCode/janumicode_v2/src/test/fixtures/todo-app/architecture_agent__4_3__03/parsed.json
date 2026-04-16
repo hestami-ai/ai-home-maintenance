@@ -1,0 +1,60 @@
+{
+  "architectural_decisions": [
+    {
+      "id": "ADR-001",
+      "title": "Storage Technology Selection",
+      "status": "accepted",
+      "context": "COMP-001 (TaskStorageManager) is responsible for creating, appending, reading, updating, and deleting task records (RESP-001 to RESP-005). The system requires persistent storage within the Core Domain (DOM-001).",
+      "decision": "Implement a file-based storage system using a single JSON file.",
+      "alternatives": [
+        "SQLite database for structured querying and concurrency.",
+        "CSV file for simple parsing and smaller footprint.",
+        "In-memory storage for stateless execution."
+      ],
+      "rationale": "A JSON file provides a balance between simplicity, human readability, and structured data capabilities without requiring external database dependencies. This aligns with the CLI nature of the application.",
+      "consequences": "Positive: Minimal setup, no external dependencies. Negative: Limited concurrency support, manual schema management required."
+    },
+    {
+      "id": "ADR-002",
+      "title": "Task Record Data Schema",
+      "status": "accepted",
+      "context": "COMP-001 must define the structure for task records upon creation (RESP-001) and when appending new records (RESP-002). The system must track status and task details.",
+      "decision": "Define a JSON object schema for each task record containing: id, command, status, timestamp, and metadata.",
+      "alternatives": [
+        "Flat text file with fixed-width columns.",
+        "Nested JSON structure with separate files per task.",
+        "Binary serialization for performance."
+      ],
+      "rationale": "A flat JSON array within a single file is optimal for the read-all (RESP-003) and delete (RESP-005) operations. It simplifies parsing logic for COMP-003.",
+      "consequences": "Positive: Easy to inspect and debug storage content. Negative: File size grows linearly with task count, potentially impacting read performance on large datasets."
+    },
+    {
+      "id": "ADR-003",
+      "title": "Concurrency and Execution Model",
+      "status": "accepted",
+      "context": "The application is a CLI tool (DOM-001) where COMP-002 (TaskCommandParser) controls flow and COMP-003 (TaskOutputWriter) writes data. Execution must be sequential to ensure data integrity in the single storage file.",
+      "decision": "Adopt a single-threaded execution model for the entire application lifecycle.",
+      "alternatives": [
+        "Multi-threaded execution for parallel task processing.",
+        "Async/Await based event loop.",
+        "Worker processes for isolation."
+      ],
+      "rationale": "Given the file-based storage (ADR-001) and CLI nature, single-threaded execution prevents race conditions during file writes/reads (RESP-002, RESP-004) and simplifies error handling.",
+      "consequences": "Positive: Simplified logic, no race conditions. Negative: No parallel processing capability, tasks must be processed sequentially."
+    },
+    {
+      "id": "ADR-004",
+      "title": "Output Formatting Strategy",
+      "status": "accepted",
+      "context": "COMP-003 (TaskOutputWriter) is responsible for outputting stored task records to standard output (RESP-007). The output must be readable by the user in a terminal environment.",
+      "decision": "Format output as a structured text representation (e.g., JSONL or formatted table) rather than raw binary or HTML.",
+      "alternatives": [
+        "Raw JSON array dump.",
+        "HTML formatted output.",
+        "Markdown formatted output."
+      ],
+      "rationale": "Structured text (JSONL) ensures machine parsability if needed, while formatted tables improve human readability in a terminal. This satisfies RESP-007 without requiring external rendering libraries.",
+      "consequences": "Positive: Compatible with standard CLI tools and log parsers. Negative: Less rich styling compared to HTML or Markdown."
+    }
+  ]
+}

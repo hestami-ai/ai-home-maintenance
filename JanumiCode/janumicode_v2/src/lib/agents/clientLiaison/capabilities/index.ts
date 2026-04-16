@@ -51,9 +51,43 @@ export interface Capability<P = any, R = any> {
   preconditions?: (ctx: CapabilityContext) => true | string;
   execute: (params: P, ctx: CapabilityContext) => Promise<R>;
   formatResponse: (result: R) => string;
+  /**
+   * Destructive capabilities (cancel, rollback, replace) must declare a
+   * confirmation prompt here. On first invocation with `confirmed` absent
+   * or false, the synthesizer returns the prompt as the response and the
+   * capability is NOT executed. On a second invocation with
+   * `confirmed: true`, it executes normally.
+   *
+   * This replaces the previous ad-hoc pattern where each destructive
+   * capability's execute() manually threw when `confirmed` was missing —
+   * which relied on the LLM remembering to include a `confirmed: true`
+   * param on its first try. Now the framework enforces the two-step
+   * dance and the LLM sees a clear "this needs user confirmation"
+   * response instead of an error.
+   */
+  confirmation?: {
+    /** Natural-language summary of what will happen, rendered to the user. */
+    prompt: (params: P, ctx: CapabilityContext) => string;
+  };
 }
 
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+/**
+ * Error thrown by the synthesizer-capability dispatch loop when a
+ * destructive capability is called without confirmation. The synthesizer
+ * catches it and surfaces the prompt to the user rather than treating
+ * it as an execution failure.
+ */
+export class CapabilityConfirmationRequired extends Error {
+  constructor(
+    public readonly capabilityName: string,
+    public readonly prompt: string,
+  ) {
+    super(`${capabilityName} requires user confirmation: ${prompt}`);
+    this.name = 'CapabilityConfirmationRequired';
+  }
+}
 
 export class CapabilityRegistry {
   private readonly map = new Map<string, Capability>();

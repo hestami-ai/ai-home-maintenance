@@ -157,26 +157,6 @@ export function makeMirrorPresented(opts: {
   });
 }
 
-export function makeMenuPresented(opts: {
-  question?: string;
-  options?: Array<{ id: string; label: string; description?: string; recommended?: boolean; tradeoffs?: string }>;
-  multiSelect?: boolean;
-  allowCustom?: boolean;
-} = {}): SerializedRecord {
-  return makeFakeRecord({
-    record_type: 'menu_presented',
-    content: {
-      question: opts.question ?? 'Pick an option',
-      options: opts.options ?? [
-        { id: 'a', label: 'Option A' },
-        { id: 'b', label: 'Option B' },
-      ],
-      multi_select: opts.multiSelect ?? false,
-      allow_free_text: opts.allowCustom ?? false,
-    },
-  });
-}
-
 export function makePhaseGateEvaluation(opts: {
   phaseId?: string;
   hasUnresolvedWarnings?: boolean;

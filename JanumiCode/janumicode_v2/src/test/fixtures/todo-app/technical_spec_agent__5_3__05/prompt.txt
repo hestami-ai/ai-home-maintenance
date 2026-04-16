@@ -1,0 +1,55 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Technical Spec Agent] specifying Error Handling Strategies for Sub-Phase 5.3.
+
+GOVERNING CONSTRAINTS (apply without exception):
+(none)
+
+Produce [JC:Error Handling Strategies] for each Component — how errors are detected, classified, responded to, and surfaced.
+
+REQUIRED OUTPUT: A JSON object matching the `error_handling_strategies` schema:
+- strategies: array, each with:
+  - component_id
+  - error_types: array of classified error categories (e.g., validation, authorization, timeout, internal)
+  - detection: how errors are detected (e.g., try/catch, middleware, health check)
+  - response: how the system responds (e.g., retry, fallback, circuit break, propagate)
+  - surfacing: how errors are communicated (e.g., HTTP status codes, error payloads, logs, alerts)
+
+Rules:
+- Every Component must have at least one error handling strategy
+- Error types must be specific, not generic ("validation_error", not "error")
+- Detection and response strategies must be concrete and implementable
+
+CONTEXT:
+Component Model: PROJECT TYPE: The Shell-Scripted Utility: A single-file shell or Python script that manages tasks using standard text files as storage, requiring no installation or external dependencies.
+Capabilities: Task Addition via Command Line Arguments; Task Listing via Command Line Arguments; Task Completion Status Toggle; Task Removal via Command Line Arguments; Storage File Initialization on First Run; Single-File Script Execution (Shell/Python); Text-Based File Storage Persistence; Cross-Platform Compatibility (POSIX/Python); Secure Input Validation; Standard I/O Output Formatting
+Excluded: Database Management Systems; Graphical User Interfaces (GUI); External Library Dependencies; Installation Packages (e.g., .deb, .rpm); Network Service Capabilities; Compiled Binary Distribution; User Authentication Services; Remote Storage Integration
+
+3 Components:
+  COMP-001: TaskStorageManager (domain: DOM-001)
+    Responsibilities:
+    RESP-001: Create the storage file with a default structure upon first execution
+    RESP-002: Append a new task record to the storage file
+    RESP-003: Read the storage file and retrieve all stored task records
+    RESP-004: Update the status attribute of a specific task record to 'completed'
+    RESP-005: Delete a specific task record from the storage file upon command
+    Dependencies: none
+  COMP-002: TaskCommandParser (domain: DOM-001)
+    Responsibilities:
+    RESP-006: Parse command line arguments to validate inputs
+    Dependencies: COMP-001 (control)
+  COMP-003: TaskOutputWriter (domain: DOM-001)
+    Responsibilities:
+    RESP-007: Output all stored task records to standard output
+    Dependencies: COMP-001 (data)
+API Definitions: Component COMP-001:
+  POST /storage/init (auth: None)
+  POST /tasks (auth: None)
+  GET /tasks (auth: None)
+  PATCH /tasks/{task_id} (auth: None)
+  DELETE /tasks/{task_id} (auth: None)
+Component COMP-002:
+  POST /validate (auth: None)
+  POST /parse (auth: None)
+Component COMP-003:
+  GET /render (auth: None)
+  GET /render/status (auth: None)

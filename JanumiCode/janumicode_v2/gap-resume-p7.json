@@ -1,0 +1,16 @@
+{
+  "phase": "8",
+  "missing_records": [
+    {
+      "record_type": "artifact_produced",
+      "phase": "8",
+      "reason": "Phase 8 (Evaluation Planning) produced no records — handler may be a stub or not registered"
+    }
+  ],
+  "schema_violations": [],
+  "assertion_failures": [],
+  "suggested_fix": "Implement Phase 8 (Evaluation Planning) handler. The previous phase (7) completed successfully with 74 total records. Register the handler via engine.registerPhase(new Phase8Handler()) and implement the sub-phase LLM calls.",
+  "spec_references": [
+    "§4 Phase 8: Evaluation Planning"
+  ]
+}

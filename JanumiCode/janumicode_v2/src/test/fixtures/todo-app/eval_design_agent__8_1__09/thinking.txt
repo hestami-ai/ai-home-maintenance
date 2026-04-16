@@ -1,0 +1,199 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Eval Design Agent]
+    *   **Task:** Design evaluation criteria for Sub-Phase 8.1.
+    *   **Input:** Test Plan (read-only), Non-Functional Requirements (NFRs), Compliance Context (None).
+    *   **Output:** Three JSON objects (`functional_evaluation_plan`, `quality_evaluation_plan`, `reasoning_evaluation_plan`).
+    *   **Constraints:**
+        *   Do not duplicate Test Cases from Phase 7 (Test Plan provided).
+        *   Every NFR must have at least one Quality Evaluation criterion (Invariant).
+        *   Compliance-related NFRs must have evaluation criteria (Compliance is "No compliance regimes" here, so this is less relevant but good to note).
+        *   Quality attributes NOT already covered by the Test Plan.
+        *   Specific JSON structure for each object.
+
+2.  **Analyze the Input Data:**
+    *   **Test Plan (Phase 7):**
+        *   TS-001 (COMP-001): TC-001-01 (Add task), TC-001-02 (Mark done), TC-001-03 (Delete), TC-001-04 (Init file), TC-001-05 (Static analysis/security imports).
+        *   TS-002 (COMP-002): TC-002-01 (Create task exit code), TC-002-02 (Error exit code), TC-002-03 (No modify exit code).
+        *   TS-003 (COMP-003): TC-003-01 (View list), TC-003-02 (Empty list), TC-003-03 (Error msg), TC-003-04 (Error msg).
+        *   *Observation:* The Test Plan covers functional CRUD operations (Add, View, Mark, Remove), basic error handling, file existence, and basic static security (imports/privileges).
+    *   **Non-Functional Requirements (NFRs):**
+        *   NFR-001 [performance]: Execution time <= 200ms.
+        *   NFR-002 [security]: Command injection prevention (sanitization).
+        *   NFR-003 [security]: File permissions (0600/0644).
+        *   NFR-004 [reliability]: Atomic writes (temp file + rename), 100% consistency across 1000 crashes.
+        *   NFR-005 [maintainability]: Self-documenting (header, docstrings).
+        *   NFR-006 [accessibility]: Help flag (`--help`).
+    *   **Compliance:** None.
+
+3.  **Drafting `functional_evaluation_plan`:**
+    *   *Goal:* Evaluate functional requirements not covered by the Test Plan.
+    *   *Gap Analysis:* The Test Plan covers basic CRUD (AC-001 to AC-006 based on trace references). It covers basic error handling.
+    *   *Potential Gaps:*
+        *   Edge cases not explicitly covered in the provided TC list (e.g., concurrent access, specific invalid input formats beyond basic errors).
+        *   However, the prompt asks for criteria for quality attributes *NOT already covered*. Usually, Functional Evaluation Plan covers functional requirements. If the Test Plan covers the functional requirements (AC-001 to AC-006), I need to check if there are functional requirements missing.
+        *   Looking at the Test Plan traces: AC-001-01, AC-003-01, AC-004-01, AC-005-01, AC-006-01/02, AC-001-02, AC-003-02, AC-004-02, AC-005-02, AC-002-01, AC-002-02.
+        *   It seems most functional ACs are covered.
+        *   *Strategy:* Since the instruction says "Design evaluation criteria for quality attributes NOT already covered by the Test Plan", but the output structure is `functional_evaluation_plan`, I need to ensure I don't duplicate TCs. If all functional ACs are covered by the Test Plan, this section might be minimal or focus on specific functional edge cases not in the TC list (e.g., specific validation logic not tested in TS-002-02).
+        *   *Wait, re-reading:* "Design evaluation criteria for quality attributes NOT already covered by the Test Plan." BUT the output requires `functional_evaluation_plan`. This implies there might be functional requirements that need evaluation but aren't in the TC list, OR I need to define functional criteria that complement the existing ones without duplicating.
+        *   *Safe Approach:* Focus on functional aspects that are quality-related (e.g., input validation completeness, specific error message content) that might not be fully covered by the simple "exit code 1" checks. Or, acknowledge that functional requirements are mostly covered, but add criteria for specific functional quality aspects (like input validation robustness).
+        *   *Actually:* The prompt says "Design evaluation criteria for quality attributes NOT already covered". But the output structure includes `functional_evaluation_plan`. This is slightly contradictory if the Test Plan covers all functional requirements.
+        *   *Interpretation:* I should look for functional requirements that are *quality* in nature (e.g., specific error messages, validation depth) or ensure the functional plan doesn't duplicate the specific TCs listed.
+        *   *Decision:* I will create functional criteria that focus on *validation* and *error handling specifics* that might be implied by NFRs but not explicitly tested as functional cases yet (e.g., specific input sanitization checks).
+        *   *Wait, looking at NFR-002:* It mentions command injection. The Test Plan has TC-002-02 (Error exit code). I need to ensure the functional evaluation doesn't just repeat "exit code 1".
+        *   *Better Interpretation:* The `functional_evaluation_plan` should cover functional requirements that are distinct from the specific Test Cases listed. If the Test Plan covers AC-001 through AC-006, I shouldn't duplicate those. However, I can add criteria for *specific* functional behaviors like "Help flag functionality" (NFR-006) or "File Permission checks" (NFR-003) which are functional behaviors.
+        *   *Refinement:* I will map NFRs to functional behaviors where applicable (e.g., `--help` command).
+        *   *Constraint Check:* "No evaluation criterion should duplicate a Test Case from Phase 7".
+        *   *Action:* I will define functional criteria for features like `--help` (NFR-006) or specific validation scenarios not explicitly detailed in the provided TC list (e.g., handling of special characters in task names beyond just error exit).
+
+4.  **Drafting `quality_evaluation_plan`:**
+    *   *Goal:* Evaluate NFRs using specific tools and thresholds.
+    *   *Constraint:* Every NFR must have at least one criterion.
+    *   *NFR-001 (Performance):* Tool: `time` or `perf`, Threshold: 200ms.
+    *   *NFR-002 (Security - Injection):* Tool: `fuzzing` or `static analysis` (e.g., `bandit`, `semgrep`), Threshold: 0 vulnerabilities.
+    *   *NFR-003 (Security - Permissions):* Tool: `stat`, `ls -l`, Threshold: Mode 0600/0644.
+    *   *NFR-004 (Reliability):* Tool: `stress-ng` or custom crash simulator, Threshold: 0 data loss.
+    *   *NFR-005 (Maintainability):* Tool: `pylint` or `flake8` (for docstrings), Threshold: 0 warnings on docstrings.
+    *   *NFR-006 (Accessibility):* Tool: `check-usage` (manual or script), Threshold: Help flag exists.
+    *   *Fallback:* If tools unavailable, manual inspection or alternative scripts.
+
+5.  **Drafting `reasoning_evaluation_plan`:**
+    *   *Goal:* Evaluate AI subsystems (if any) or reasoning capabilities.
+    *   *Context:* The system seems to be a shell script (Python/Bash implied by "script", "imports", "docstrings").
+    *   *AI Subsystems:* Likely `false` (it's a standard script task, not an AI model).
+    *   *Scenarios:* Edge cases, security reasoning, reliability reasoning.
+    *   *Constraint:* `ai_subsystems_detected: boolean`. Given the context (shell script, CRUD tasks), this is likely a standard software task, not an AI system. I will set it to `false` unless the prompt implies an AI component (it doesn't seem to).
+    *   *Scenarios:*
+        *   Scenario 1: Input sanitization reasoning (Security).
+        *   Scenario 2: Atomic write logic reasoning (Reliability).
+        *   Scenario 3: Help flag availability reasoning (Accessibility).
+
+6.  **Review and Refine:**
+    *   *Check JSON Structure:* Ensure keys match exactly (`criteria`, `scenarios`, etc.).
+    *   *Check Constraints:*
+        *   No duplication of TC-001-01 to TC-003-04.
+        *   Every NFR has a Quality criterion.
+        *   Compliance: None (so ignore compliance-specific criteria).
+    *   *Quality Attributes:* Ensure I'm not just repeating functional tests.
+        *   NFR-001 (Performance) -> Quality.
+        *   NFR-002 (Security) -> Quality.
+        *   NFR-003 (Security) -> Quality.
+        *   NFR-004 (Reliability) -> Quality.
+        *   NFR-005 (Maintainability) -> Quality.
+        *   NFR-006 (Accessibility) -> Quality.
+    *   *Functional Plan:* Since the Test Plan covers the core CRUD (AC-001 to AC-006), the Functional Evaluation Plan should focus on *additional* functional behaviors not explicitly tested as TCs, such as the `--help` flag (NFR-006) or specific validation logic (e.g., empty task name handling). I will create functional criteria for these specific behaviors to ensure coverage without duplicating the main CRUD TCs.
+    *   *Wait, one constraint:* "Design evaluation criteria for quality attributes NOT already covered by the Test Plan."
+    *   *Conflict:* The output requires `functional_evaluation_plan`. If I strictly follow "quality attributes NOT covered", the functional plan might be empty or minimal. However, usually, functional requirements *are* quality attributes in a broader sense. I will interpret this as: "Functional Evaluation Plan covers functional requirements that are distinct from the specific Test Cases listed (e.g., Help flag, specific validation)".
+    *   *Actually, looking at the instruction:* "Design evaluation criteria for quality attributes NOT already covered by the Test Plan." This implies the `functional_evaluation_plan` might be for functional requirements that are quality-related (e.g. input validation robustness).
+    *   *Correction:* I will populate the `functional_evaluation_plan` with criteria that verify functional behaviors that are *quality* focused (e.g., specific error message content, help flag output) which are distinct from the main CRUD TCs.
+    *   *Wait, looking at the provided Test Plan:* It covers AC-001 to AC-006.
+    *   *NFR-006 (Accessibility)*: `--help` flag. This is a functional requirement not explicitly in the TC list (TCs cover CRUD, errors, view). I will add this to Functional Evaluation Plan.
+    *   *NFR-005 (Maintainability)*: Docstrings. This is code quality, fits Quality Evaluation Plan better.
+    *   *NFR-001-004:* These fit Quality Evaluation Plan.
+    *   *So:* Functional Plan = `--help` and specific validation edge cases (e.g., special chars in task name). Quality Plan = NFRs 001-005.
+    *   *Wait, Constraint:* "Every NFR must have at least one Quality Evaluation criterion". So NFR-006 must be in Quality Plan too? Yes.
+    *   *So:* Functional Plan can focus on specific functional behaviors not covered by the main TCs (like `--help` output verification). Quality Plan covers all NFRs.
+
+    *   *Refining Functional Plan:*
+        *   FR-001 (Help Flag): Verify `--help` displays usage.
+        *   FR-002 (Input Validation): Verify specific invalid inputs trigger specific messages (beyond just exit code 1).
+        *   *Check:* Do these duplicate TCs? TC-002-02 covers "prints error message and exits code 1". I need to ensure I don't duplicate the *exact* check. I can focus on the *content* of the help flag or specific validation depth.
+        *   *Decision:* I will add functional criteria for `--help` and specific validation logic that complements the existing error handling TCs.
+
+    *   *Refining Quality Plan:*
+        *   Map each NFR to a tool/threshold.
+        *   Fallbacks needed.
+
+    *   *Refining Reasoning Plan:*
+        *   Scenarios for AI reasoning (if any). Since `ai_subsystems_detected` is likely false, I will focus on logical reasoning scenarios for the system's behavior (e.g., "If input contains ';', does it sanitize?").
+        *   Wait, `ai_subsystems_detected`: The system is a script. Usually, this field is for detecting if the system *uses* AI. Given the context (Shell script CRUD), it's likely `false`. I will set it to `false`.
+
+    *   *JSON Validation:* Ensure valid JSON. No trailing commas.
+
+7.  **Final Polish:**
+    *   Check keys: `functional_evaluation_plan`, `quality_evaluation_plan`, `reasoning_evaluation_plan`.
+    *   Check inner keys: `criteria`, `scenarios`.
+    *   Check `criteria` inner keys: `functional_requirement_id`, `evaluation_method`, `success_condition` (for functional).
+    *   Check `criteria` inner keys: `nfr_id`, `category`, `evaluation_tool`, `threshold`, `measurement_method`, `fallback_if_tool_unavailable` (for quality).
+    *   Check `scenarios` inner keys: `id`, `description`, `pass_criteria`.
+    *   Ensure no duplication of TCs (e.g., don't test "Add task" again if TC-001-01 exists). Focus on `--help` and specific validation details.
+
+    *   *Self-Correction on Functional Plan:* The prompt says "Design evaluation criteria for quality attributes NOT already covered by the Test Plan." The `functional_evaluation_plan` is one of the required outputs. This implies functional requirements *are* quality attributes in this context (or I need to define functional criteria that are quality-focused). I will treat the `functional_evaluation_plan` as covering functional aspects that are quality-critical (like Help Flag, specific validation) which might not be in the main TC list.
+    *   *Wait, one more check:* "No evaluation criterion should duplicate a Test Case from Phase 7".
+    *   TC-002-02 covers "prints an error message and exits with code 1".
+    *   I can add a functional criterion for "Help Flag" (NFR-006) which is not in the TC list.
+    *   I can add a functional criterion for "Atomic Write Verification" (NFR-004) - wait, that's reliability/quality.
+    *   Okay, Functional Plan: Focus on `--help` and specific validation edge cases (e.g., empty task name).
+    *   Quality Plan: Focus on NFRs (Performance, Security, Reliability, Maintainability, Accessibility).
+
+    *   *Wait, NFR-002 (Security - Injection)*: This is a Quality attribute.
+    *   *NFR-003 (Security - Permissions)*: Quality attribute.
+    *   *NFR-006 (Accessibility)*: Quality attribute.
+    *   *So:* Functional Plan should probably focus on functional requirements that are *not* NFRs but are quality-critical (e.g., specific error messages content).
+    *   *Actually:* The prompt asks for `functional_evaluation_plan`. I will include criteria for functional behaviors that ensure quality (e.g., Help Flag output).
+    *   *Wait, NFR-006 is Accessibility.* It says "A help flag... must be available". This is a functional requirement. I will put it in Functional Plan AND Quality Plan (as per NFR requirement).
+    *   *Constraint:* "Every NFR must have at least one Quality Evaluation criterion". So NFR-006 must be in Quality Plan.
+    *   *Constraint:* "No evaluation criterion should duplicate a Test Case".
+    *   *Okay:*
+        *   Functional Plan: `--help` verification (Functional behavior), Specific Input Validation (Functional behavior).
+        *   Quality Plan: NFR-001 to NFR-006 (Performance, Security, Reliability, Maintainability, Accessibility).
+        *   Reasoning Plan: Scenarios for logic verification.
+
+    *   *Wait, one detail:* "Compliance-related NFRs from compliance_context must have evaluation criteria". Compliance is "No compliance regimes". So ignore.
+
+    *   *Final check on JSON:* Ensure strings are escaped properly.
+
+    *   *Let's build the content:*
+        *   **Functional:**
+            *   FR-001 (Help Flag): Verify `--help` prints usage.
+            *   FR-002 (Input Validation): Verify specific invalid inputs (e.g., empty string) are rejected with specific message.
+        *   **Quality:**
+            *   NFR-001 (Performance): `time`, <200ms.
+            *   NFR-002 (Security): `bandit`/`semgrep`, 0 vulns.
+            *   NFR-003 (Security): `stat`, mode 0600.
+            *   NFR-004 (Reliability): `stress-ng`, 0 corruption.
+            *   NFR-005 (Maintainability): `pylint` (docstrings), 0 warnings.
+            *   NFR-006 (Accessibility): Manual check or `--help` check, text present.
+        *   **Reasoning:**
+            *   Scenario 1: Input sanitization logic.
+            *   Scenario 2: Atomic write logic.
+            *   Scenario 3: Error handling logic.
+            *   `ai_subsystems_detected`: false.
+
+    *   *Wait, one constraint:* "Design evaluation criteria for quality attributes NOT already covered by the Test Plan."
+    *   The Test Plan covers functional CRUD.
+    *   The Functional Evaluation Plan should ideally cover functional requirements that are *quality* attributes.
+    *   However, the output *requires* `functional_evaluation_plan`.
+    *   I will interpret this as: "Functional Evaluation Plan" covers functional behaviors that are critical for quality (like Help Flag) which are not in the main TC list.
+    *   Wait, if I put `--help` in Functional Plan, and also in Quality Plan (NFR-006), is that duplication?
+    *   The constraint says "No evaluation criterion should duplicate a Test Case from Phase 7". It doesn't say "Don't duplicate across JSON objects".
+    *   However, to be safe, I will ensure the Functional Plan focuses on *functional* verification (e.g., "Does the command exist?"), and Quality Plan focuses on *attributes* (e.g., "Is it accessible?").
+    *   Actually, `--help` is a functional feature.
+    *   Okay, I will proceed.
+
+    *   *Wait, one more thing:* "Receive the test_plan as read-only input to ensure no duplication."
+    *   I must ensure the `functional_evaluation_plan` criteria do not match TC-001-01 through TC-003-04.
+    *   TC-001-01: Add task (line count).
+    *   TC-001-02: Mark done.
+    *   TC-001-03: Delete.
+    *   TC-001-04: Init file.
+    *   TC-001-05: Static analysis (imports).
+    *   TC-002-01: Create exit code.
+    *   TC-002-02: Error exit code.
+    *   TC-002-03: No modify exit code.
+    *   TC-003-01: View list.
+    *   TC-003-02: Empty list.
+    *   TC-003-03: Error msg.
+    *   TC-003-04: Error msg.
+    *   *Functional Plan Idea:* Focus on `--help` (NFR-006) and specific validation (e.g., "Verify task name length limit").
+    *   *Quality Plan Idea:* Map all NFRs.
+
+    *   *Wait, NFR-002 (Security)*: "prevent command injection". This is a security attribute.
+    *   *NFR-003 (Security)*: "File permissions". This is a security attribute.
+    *   *NFR-001 (Performance)*: "Execution time".
+    *   *NFR-004 (Reliability)*: "Data integrity".
+    *   *NFR-005 (Maintainability)*: "Docstrings".
+    *   *NFR-006 (Accessibility)*: "Help flag".
+
+    *   *Okay, ready to write.*

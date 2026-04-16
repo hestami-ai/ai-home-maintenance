@@ -1,0 +1,57 @@
+{
+  "contracts": [
+    {
+      "id": "INT-CLI-LFSE-01",
+      "systems_involved": [
+        "CLI Command Line Interface",
+        "Local File Storage Engine"
+      ],
+      "protocol": "JSON over Stdio",
+      "data_format": "JSON",
+      "auth_mechanism": "Local User Context",
+      "error_handling_strategy": "Return HTTP-like status codes to CLI",
+      "error_responses": [
+        {
+          "code": 400,
+          "message": "Invalid Command Syntax"
+        }
+      ]
+    },
+    {
+      "id": "INT-LFSE-EXTFS-01",
+      "systems_involved": [
+        "Local File Storage Engine",
+        "EXT-FS-01: Local Operating System Filesystem"
+      ],
+      "protocol": "Native File I/O",
+      "data_format": "Binary/Text Files",
+      "auth_mechanism": "OS Permissions",
+      "error_handling_strategy": "Throw Exception on I/O Failure",
+      "error_responses": [
+        {
+          "code": "EIO",
+          "message": "Disk Full or Permission Denied"
+        }
+      ]
+    },
+    {
+      "id": "INT-TASK-LFSE-01",
+      "systems_involved": [
+        "Task Creation Logic",
+        "Task Listing Logic",
+        "Task Update Logic",
+        "Local File Storage Engine"
+      ],
+      "protocol": "Internal API",
+      "data_format": "JSON",
+      "auth_mechanism": "Internal Token",
+      "error_handling_strategy": "Retry with Backoff on Transient Errors",
+      "error_responses": [
+        {
+          "code": 500,
+          "message": "Task Data Validation Failed"
+        }
+      ]
+    }
+  ]
+}

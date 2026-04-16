@@ -1,0 +1,198 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Architecture Agent].
+    *   **Task:** Capture Architectural Decision Records (ADRs) for Sub-Phase 4.3.
+    *   **Output Format:** JSON object matching the `architectural_decisions` schema.
+    *   **Schema Fields:** `adrs` (array), each containing `id`, `title`, `status` (proposed|accepted), `context`, `decision`, `alternatives`, `rationale`, `consequences`.
+    *   **Constraints:**
+        *   Apply governing constraints (none specified, but follow general ADR best practices).
+        *   Every ADR must have `status`, `decision`, and `rationale` populated (Invariant: ADR-001, ADR-002).
+        *   Capture technology selections, pattern choices, and structural decisions.
+        *   Every ADR must document at least one alternative that was considered.
+    *   **Context:** Provided component models, responsibilities, domains, terms, and requirements.
+    *   **Goal:** Create meaningful ADRs based on the provided system context (Property Data Management, Service Provider Matching, Compliance, Workflows, Notifications, Security, Payment).
+
+2.  **Review the Context & Components:**
+    *   `cmp-prop-data`: Property Data Manager (uploads, indexing, offline sync).
+    *   `cmp-provider-match`: Service Provider Matcher (AI Agent, search, bid estimates).
+    *   `cmp-compliance`: Compliance Rules Engine (CC&R/Bylaws extraction, deadlines, notifications).
+    *   `cmp-workflow`: Action Workflow Orchestrator (state management, audit logs).
+    *   `cmp-notifications`: Notification Dispatcher (mass email/SMS, retry logic).
+    *   `cmp-security`: Tenant Security Gateway (RLS, access control).
+    *   `cmp-payment`: Payment Transaction Processor (Stripe/Square, receipts).
+    *   **Domains:** property-data-management, service-provider-matching, compliance-rules-engine, action-workflow-orchestrator, notification-dispatcher, tenant-security-gateway, payment-transaction-processor.
+    *   **Key Technical Decisions Needed:**
+        *   Data indexing strategy for uploads (RSP-002: 10s indexing).
+        *   AI Agent integration for matching/scoring (RSP-004, RSP-006).
+        *   Offline sync mechanism (RSP-003, RSP-012).
+        *   Security model for multi-tenancy (RSP-014).
+        *   Workflow state machine implementation (RSP-009).
+        *   Notification delivery strategy (RSP-011, RSP-012).
+        *   Payment gateway integration pattern (RSP-016).
+
+3.  **Drafting ADRs:**
+
+    *   *ADR 1: Indexing Strategy for Property Data.*
+        *   Context: RSP-001/002. Need to index valid assets within 10s.
+        *   Decision: Asynchronous queue (e.g., Kafka/RabbitMQ) + Background worker to process uploads and update search index concurrently.
+        *   Alternatives: Synchronous processing, Event-driven async, Batch processing.
+        *   Rationale: 10s constraint is tight for image/3D processing, async is safer.
+
+    *   *ADR 2: AI Agent Integration for Provider Matching & Compliance.*
+        *   Context: RSP-004, RSP-006. Using AI for relevance scores and clause extraction.
+        *   Decision: Integrate LLM-based AI Agent as a microservice with rate limiting and caching.
+        *   Alternatives: On-premise NLP, Rule-based regex extraction, External API-only.
+        *   Rationale: Need high confidence scores and complex semantic understanding.
+
+    *   *ADR 3: Multi-Tenant Security Model.*
+        *   Context: RSP-014, RSP-015. Row-Level Security (RLS) for multi-tenant data.
+        *   Decision: Database-level RLS policies enforced via connection string/tenant ID context at session start.
+        *   Alternatives: Application-level filtering, Hybrid approach, Separate databases per tenant.
+        *   Rationale: RLS is standard for shared DBs, ensures 50ms response.
+
+    *   *ADR 4: Offline Data Synchronization Strategy.*
+        *   Context: RSP-003, RSP-012. Mobile capture, 2-hour resume retry.
+        *   Decision: Optimistic locking with local conflict resolution strategy (Last-Write-Wins or Merge) + Cron-based sync service.
+        *   Alternatives: Polling only, Real-time push only, Client-side serverless sync.
+        *   Rationale: Network instability in mobile contexts requires robust local buffer and retry logic.
+
+    *   *ADR 5: Notification Delivery Architecture.*
+        *   Context: RSP-011, RSP-013. Mass emails, 2-hour resume.
+        *   Decision: Decoupled notification queue with dead-letter handling and exponential backoff for retries.
+        *   Alternatives: Direct HTTP calls, Synchronous template rendering, Third-party bulk service only.
+        *   Rationale: Bounce tracking and resilience required.
+
+    *   *ADR 6: Payment Processing Integration.*
+        *   Context: RSP-016, RSP-017. Stripe/Square, PoP generation.
+        *   Decision: Use Payment Gateway Webhooks for idempotency and async receipt generation.
+        *   Alternatives: Client-side SDK only, Sync API calls for every step.
+        *   Rationale: Need for idempotency and async generation of receipts.
+
+4.  **Refining ADR Content:**
+    *   Ensure all fields (`id`, `title`, `status`, `context`, `decision`, `alternatives`, `rationale`, `consequences`) are present.
+    *   Check `alternatives` has at least one item.
+    *   Check `status` is either `proposed` or `accepted`. Given this is Sub-Phase 4.3 (Architecture Definition), `accepted` is typical for finalized tech stack, but `proposed` might be safer for emerging tech (AI). Let's assume these are key architectural decisions being locked in, so `accepted` is appropriate for core infrastructure, maybe `proposed` for AI models. I will use `accepted` for most to show commitment, or mix if it fits the narrative. Let's stick to `accepted` for structural decisions as they define the architecture.
+    *   Ensure `id` is unique (e.g., ADR-001 to ADR-006).
+    *   Ensure `rationale` explains *why*.
+    *   Ensure `consequences` covers pros/cons/trade-offs.
+
+5.  **Constructing the JSON:**
+    *   Root object with `architectural_decisions`.
+    *   Array of objects.
+    *   Verify JSON validity.
+
+6.  **Self-Correction/Review:**
+    *   Did I capture "Technology selections"? Yes (e.g., Kafka, LLM, RLS).
+    *   Did I capture "Pattern choices"? Yes (Async, RLS, Queue).
+    *   Did I capture "Structural decisions"? Yes (Microservice boundaries, DB schema security).
+    *   Did every ADR have `status`, `decision`, `rationale`? Yes.
+    *   Did every ADR have `alternatives`? Yes.
+    *   Are the IDs consistent with the context (Sub-Phase 4.3)? I will number them sequentially starting from ADR-001 (as per Invariant hints) or generic `ad-001`. The prompt says "Invariant: ADR-001, ADR-002", implying specific IDs might be expected or just generic naming. I'll use `adr-001`, `adr-002`, etc., to be clear. Actually, the constraint says "Every ADR must have status, decision, and rationale populated (Invariant: ADR-001, ADR-002)". This likely means ensure these fields exist, not necessarily that the IDs *must* be 001 and 002 only. I will use sequential IDs like `adr-001`, `adr-002` etc.
+    *   Wait, the prompt says "Produce [JC:Architectural Decision Records]...". I need to make sure the JSON structure matches `architectural_decisions` schema. Usually, that means `{ "architectural_decisions": [ ... ] }`.
+    *   Check constraints again: "Every ADR must document at least one alternative".
+    *   Check context: The components have specific responsibilities (RSP-xxxx). My decisions should map to these.
+
+    *   *Refinement on ADR-1 (Indexing):* Maps to RSP-001/002.
+    *   *Refinement on ADR-2 (AI/Matching):* Maps to RSP-004/006.
+    *   *Refinement on ADR-3 (Offline/Sync):* Maps to RSP-003/012.
+    *   *Refinement on ADR-4 (Security):* Maps to RSP-014/015.
+    *   *Refinement on ADR-5 (Notifications):* Maps to RSP-011/012.
+    *   *Refinement on ADR-6 (Payments):* Maps to RSP-016/017.
+
+    Let's write the JSON.
+
+    *Note on JSON Structure:* The prompt says "REQUIRED OUTPUT: A JSON object matching the `architectural_decisions` schema". It defines the schema structure for `adrs` array. I will output the full object.
+
+    *Note on Status:* Since this is architecture definition (Sub-Phase), decisions are often `proposed` initially, but for the sake of a concrete record, `accepted` shows firm commitment. I'll use `accepted` to reflect the "Decision Records".
+
+    *Note on Alternatives:* Must be an array with at least one object/string.
+
+    *Let's finalize the content.*
+    ADR-001: Property Data Ingestion & Indexing.
+    ADR-002: AI Agent Implementation for Provider Matching.
+    ADR-003: Multi-Tenant Security Implementation.
+    ADR-004: Offline Data Synchronization Pattern.
+    ADR-005: Notification Delivery Strategy.
+    ADR-006: Payment Idempotency & Receipt Generation.
+
+    Looks good. I will ensure the JSON is valid.
+
+    *One more check:* "Governing Constraints (none)". Okay.
+    "Invariant: ADR-001, ADR-002". This is likely referring to the fields `status`, `decision`, `rationale` being present (as per the text "Every ADR must have status, decision, and rationale populated (Invariant: ADR-001, ADR-002)"). It might be an internal codename for that rule. I will treat it as a rule to ensure those fields exist.
+
+    Let's build the JSON.
+
+    *Wait, one detail:* "Sub-Phase 4.3". I should probably prefix IDs or just use the standard ADR ID format. I'll use `ADR-001` style to align with "Invariant: ADR-001".
+
+    *Wait, another detail:* "Context" field in ADR. I should reference the specific Responsibility or Component where relevant.
+    *Decision* field: Must be clear.
+    *Rationale* field: Explain why.
+    *Consequences* field: Tradeoffs.
+
+    Okay, ready to generate.
+
+    *Wait, checking the "alternatives" requirement again:* "Every ADR must document at least one alternative that was considered".
+    I will make sure `alternatives` is a list of strings or objects. Strings are usually easier for ADRs.
+    Example: `["Option A", "Option B"]`.
+    Or objects: `{"name": "Option A", "description": "..."}`.
+    Standard ADR practice usually allows strings or objects. I'll use strings for brevity unless complexity warrants objects. Let's use strings with descriptions for clarity.
+
+    Let's go.
+
+    *Wait, checking the output requirement:* "A JSON object matching the `architectural_decisions` schema".
+    The schema example in the prompt is:
+    `adrs: array, each with: id, title, status, context, decision, alternatives, rationale, consequences`
+    So the root key should likely be `architectural_decisions` (based on "matching the `architectural_decisions` schema" and "adrs: array"). Usually, the root key matches the variable name. I will use `architectural_decisions` as the root key containing the `adrs` array.
+
+    Wait, the prompt says: "REQUIRED OUTPUT: A JSON object matching the `architectural_decisions` schema: - adrs: array..."
+    This implies the root object has a key `adrs`.
+    However, standard schema definition often implies `{ "adrs": [ ... ] }`.
+    I will follow this structure.
+
+    Wait, looking at "Governing Constraints (none)".
+    Okay.
+
+    Let's draft the response.
+
+    *Self-Correction on "Alternatives":*
+    To be robust, I'll list the chosen path and the rejected paths.
+    Example: `["Option A", "Option B", "Option C"]`.
+
+    *Self-Correction on "Status":*
+    I'll use `accepted` as these are architectural decisions being locked.
+
+    *Final check on components:*
+    cmp-prop-data, cmp-provider-match, cmp-compliance, cmp-workflow, cmp-notifications, cmp-security, cmp-payment.
+    I should try to cover most of these if possible, or at least the most critical ones.
+    ADR-001: Property Data (cmp-prop-data).
+    ADR-002: Provider Match (cmp-provider-match).
+    ADR-003: Security (cmp-security).
+    ADR-004: Notifications (cmp-notifications).
+    ADR-005: Compliance (cmp-compliance) - Can combine or separate. Let's separate Compliance (Clause extraction) from Notifications (Delivery).
+    Actually, ADR-005 for Notifications.
+    ADR-006 for Compliance/Workflow integration? Or Payment.
+    Let's do Payment (cmp-payment) as well.
+    ADR-007 for Offline Sync (cmp-prop-data responsibility RSP-003).
+    Let's limit to 6 key decisions to keep it tight but comprehensive.
+    1. Indexing (Prop Data).
+    2. AI/Matching (Provider Match).
+    3. Security (Tenant Security).
+    4. Offline Sync (Prop Data/Notification retry).
+    5. Notification Queue (Notification Dispatcher).
+    6. Payment Processing (Payment Processor).
+    This covers the main domains.
+
+    Let's write it.
+
+    *Wait, check "Alternatives" constraint again:* "Every ADR must document at least one alternative that was considered".
+    So `alternatives` must have length >= 1.
+
+    Let's finalize the JSON content.
+    I will use specific IDs: `adr-001`, `adr-002`, etc.
+    Context should reference the components/responsibilities.
+    Decision should be concise.
+    Rationale should be the "Why".
+    Consequences should be "What happens next".
+
+    Okay, ready.

@@ -1,0 +1,66 @@
+{
+  "components": [
+    {
+      "id": "COMP-001",
+      "name": "TaskStorageManager",
+      "domain_id": "DOM-001",
+      "responsibilities": [
+        {
+          "id": "RESP-001",
+          "statement": "Create the storage file with a default structure upon first execution"
+        },
+        {
+          "id": "RESP-002",
+          "statement": "Append a new task record to the storage file"
+        },
+        {
+          "id": "RESP-003",
+          "statement": "Read the storage file and retrieve all stored task records"
+        },
+        {
+          "id": "RESP-004",
+          "statement": "Update the status attribute of a specific task record to 'completed'"
+        },
+        {
+          "id": "RESP-005",
+          "statement": "Delete a specific task record from the storage file upon command"
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "COMP-002",
+      "name": "TaskCommandParser",
+      "domain_id": "DOM-001",
+      "responsibilities": [
+        {
+          "id": "RESP-006",
+          "statement": "Parse command line arguments to validate inputs"
+        }
+      ],
+      "dependencies": [
+        {
+          "target_component_id": "COMP-001",
+          "dependency_type": "control"
+        }
+      ]
+    },
+    {
+      "id": "COMP-003",
+      "name": "TaskOutputWriter",
+      "domain_id": "DOM-001",
+      "responsibilities": [
+        {
+          "id": "RESP-007",
+          "statement": "Output all stored task records to standard output"
+        }
+      ],
+      "dependencies": [
+        {
+          "target_component_id": "COMP-001",
+          "dependency_type": "data"
+        }
+      ]
+    }
+  ]
+}

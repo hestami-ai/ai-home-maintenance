@@ -67,14 +67,23 @@ describe('Card.svelte dispatch', () => {
     }
   });
 
-  it('routes menu_presented to MenuCard', () => {
+  it('routes decision_bundle_presented to DecisionBundleCard', () => {
     const record = makeFakeRecord({
-      record_type: 'menu_presented',
-      content: { question: 'Pick one', options: [{ id: 'a', label: 'A' }] },
+      record_type: 'decision_bundle_presented',
+      content: {
+        surface_id: 'surface-1',
+        mirror: { kind: 'assumption_mirror', items: [{ id: 'a', text: 'A' }] },
+        menu: {
+          question: 'Pick one',
+          multi_select: false,
+          allow_free_text: false,
+          options: [{ id: 'a', label: 'A' }],
+        },
+      },
     });
     const { container, cleanup } = mountComponent(Card, { record });
     try {
-      expect($(container, '.menu-card')).toBeTruthy();
+      expect($(container, '.bundle-card')).toBeTruthy();
     } finally {
       cleanup();
     }

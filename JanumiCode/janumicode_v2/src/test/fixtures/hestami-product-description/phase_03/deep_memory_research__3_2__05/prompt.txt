@@ -1,0 +1,318 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Deep Memory Research Agent] performing Stage 7 — Context Packet Synthesis.
+
+Synthesize the research findings into a structured [JC:Context Packet]. Every claim must cite source record IDs. The packet must be as explicit about what it does NOT know as about what it does know.
+
+QUERY DECOMPOSITION:
+{
+  "topicEntities": [
+    "Consumer Discovery MVP",
+    "Phase 1",
+    "Pillar 1",
+    "Home Real Property Assistant",
+    "Property Asset Ingestion",
+    "Images",
+    "3D Splats",
+    "AI Agent Service Provider Search",
+    "Service Provider Matching",
+    "Bid Estimate C",
+    "User Acquisition"
+  ],
+  "decisionTypesSought": [
+    "phase_gate_approval",
+    "menu_selection"
+  ],
+  "temporalScope": {
+    "from": "2024-01-01",
+    "to": "2025-12-31"
+  },
+  "authorityLevelsIncluded": [
+    5,
+    6,
+    7
+  ],
+  "sourcesInScope": [
+    "governed_stream_all_runs"
+  ]
+}
+
+MATERIAL FINDINGS:
+[
+  {
+    "id": "83fd7cad-f74c-4657-a228-68ca3bc6eacc",
+    "record_type": "raw_intent_received",
+    "authority_level": 5,
+    "governing_status": "active",
+    "summary": "Review \"specs/hestami-ai-real-property-os(2)/Hestami AI Real Property OS and Platform Product Description.md\" and prepare for implementation.",
+    "materiality_score": 0.476
+  },
+  {
+    "id": "995c1ae7-4f6f-4f71-b447-048dcc870e15",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[functional_requirements]",
+    "materiality_score": 0.411
+  },
+  {
+    "id": "fb4ecd3a-4b12-476c-ad5a-0fa097959a84",
+    "record_type": "decision_bundle_presented",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "I identified 3 candidate interpretation(s) of your intent. Review the assumptions and open questions below, then approve, reject, defer, or edit each one.",
+    "materiality_score": 0.41
+  },
+  {
+    "id": "56b84cd8-084f-4a7c-984d-0db6b5c6b9da",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[non_functional_requirements]",
+    "materiality_score": 0.401
+  },
+  {
+    "id": "17bf4e80-42bd-4549-a0c2-7998dc63aa6e",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[intent_statement]",
+    "materiality_score": 0.4
+  },
+  {
+    "id": "227da453-847a-45d4-aa2e-f7f08c334025",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[intent_bloom]",
+    "materiality_score": 0.39
+  },
+  {
+    "id": "738b95ee-a08d-495b-80f0-6cb79f60a9a2",
+    "record_type": "query_decomposition_record",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[query_decomposition]",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "7588b3e7-4306-42af-9a09-a1e895c81efa",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "```json\n{\n  \"topic_entities\": [\n    \"Consumer Discovery MVP\",\n    \"Phase 1\",\n    \"Pillar 1\",\n    \"Home Real Property Assistant\",\n    \"Property Asset Ingestion\",\n    \"Images\",\n    \"3D Splats\",\n    \"AI Agent Service Provider Search\",\n    \"Service Provider Matching\",\n    \"Bid Estimate C\",\n    \"User Acq",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "575db478-cdf1-4e0b-83df-f19909715827",
+    "record_type": "agent_invocation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "b15466cb-5c6d-4d8a-b0e7-544571b4b251",
+    "record_type": "retrieval_brief_record",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "b4069ff4-6d5f-4e24-ae33-3f0cae0df4d5",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[system_boundary]",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "e5d3918b-7aec-4729-a658-17ed7895e178",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "{\n  \"system_boundary\": {\n    \"in_scope\": [\n      \"Property Asset Ingestion (Images & 3D Splats)\",\n      \"AI Agent Service Provider Search & Matching\",\n      \"Bid Estimate Comparison UI (Good-Better-Best)\",\n      \"CC&R & Bylaws AI Extraction Module\",\n      \"Action Items Workflow Management (System of",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "5b97e1cf-22a6-43ad-9c83-3fca339f2e62",
+    "record_type": "agent_invocation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "3cb39d4e-0e20-4931-86f2-6e390e52aec1",
+    "record_type": "context_packet",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "319b12e4-a18d-4e18-a885-7288b57e5aad",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "```json\n{\n  \"decision_context_summary\": \"The governing directive (Level 5, id: 83fd7cad-f74c-4657-a228-68ca3bc6eacc) mandates the review of Hestami AI Real Property OS specifications and preparation for the Implementation Phase. The MVP scope is defined as the Consumer Discovery MVP, focusing on Pil",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "7a5b1f84-8e48-4a69-b1c7-db62b5a96838",
+    "record_type": "agent_invocation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "21647d79-1a91-444b-adaf-3bc46fa8251a",
+    "record_type": "query_decomposition_record",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[query_decomposition]",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "7bada6d2-25f3-4b55-9b15-4d3520abbe18",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "{\n  \"topic_entities\": [\n    \"Consumer Discovery MVP\",\n    \"Phase 1 Focus\",\n    \"Pillar 1\",\n    \"Home Real Property Assistant\",\n    \"Property Data Ingestion\",\n    \"Service Provider Matching\",\n    \"Hestami Staff\",\n    \"Individual Homeowners\",\n    \"Small Landlords\",\n    \"Property Investors\",\n    \"User ",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "185578b9-7f07-4d12-af17-81d60e48e609",
+    "record_type": "agent_invocation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "6a0fe37d-cfaf-4ed7-b518-80d607c80926",
+    "record_type": "retrieval_brief_record",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "d778a8b2-8625-45a1-a1c2-3964f955903c",
+    "record_type": "phase_gate_evaluation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[phase_gate]",
+    "materiality_score": 0.381
+  },
+  {
+    "id": "21e69161-d6e4-4832-be5a-d318a1c92928",
+    "record_type": "mirror_presented",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[domain_attestation_mirror]",
+    "materiality_score": 0.381
+  },
+  {
+    "id": "65893404-0e60-4558-a192-22ac850d374f",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[consistency_report]",
+    "materiality_score": 0.381
+  },
+  {
+    "id": "4602db81-030f-4eee-a554-90faf0ebc62f",
+    "record_type": "mirror_presented",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[requirements_mirror]",
+    "materiality_score": 0.381
+  },
+  {
+    "id": "91d11032-040f-4ad5-a396-4cbf06692482",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "{\n  \"non_functional_requirements\": [\n    {\n      \"id\": \"NFR-001\",\n      \"category\": \"performance\",\n      \"description\": \"The Bun-based API backend must maintain low-latency responses for search and asset queries to ensure the 'AI Agent' discovery experience remains responsive.\",\n      \"threshold\": \"",
+    "materiality_score": 0.381
+  },
+  {
+    "id": "ba1b3854-396e-4ac9-8d57-7f3f25a3bad0",
+    "record_type": "agent_invocation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.381
+  },
+  {
+    "id": "8f939132-16bf-413f-b23f-e4954ce32211",
+    "record_type": "context_packet",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.381
+  },
+  {
+    "id": "3b08af8a-ab34-4464-9b81-fc68cc745cfe",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "{\n  \"decision_context_summary\": \"The governing directive (83fd7cad-f74c-4657-a228-68ca3bc6eacc) mandates the review of 'Hestami AI Real Property OS and Platform Product Description.md' and preparation for the Implementation Phase. The operational focus is currently on the Consumer Discovery MVP (14c",
+    "materiality_score": 0.381
+  },
+  {
+    "id": "0a30140e-4478-4e68-869c-3858c425d735",
+    "record_type": "agent_invocation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.381
+  },
+  {
+    "id": "c088e3be-3bf6-49f4-9f97-115f5acfae12",
+    "record_type": "query_decomposition_record",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[query_decomposition]",
+    "materiality_score": 0.381
+  }
+]
+
+SUPERSESSION CHAINS:
+[]
+
+CONTRADICTIONS:
+[]
+
+COVERAGE ASSESSMENT:
+{
+  "sourcesQueried": [
+    "governed_stream_all_runs"
+  ],
+  "sourcesUnavailable": [],
+  "knownGaps": [
+    "Vector index coverage is 0% (0/66) — semantic similarity results may be incomplete."
+  ],
+  "confidence": 0.85
+}
+
+YOUR REQUIRED OUTPUT (JSON):
+```json
+{
+  "decision_context_summary": "narrative summary of governing decisions",
+  "active_constraints": [{"statement": "...", "authority_level": 6, "source_record_ids": ["..."]}],
+  "supersession_chains": [{"subject": "...", "chain": [{"record_id": "...", "position": "current_governing"}]}],
+  "contradictions": [{"record_ids": ["..."], "explanation": "...", "resolution_status": "unresolved|resolved_by_recency|resolved_by_authority"}],
+  "open_questions": [{"question": "...", "still_unresolved": true, "source_record_id": "..."}],
+  "completeness_status": "complete|partial_low|partial_medium|incomplete_high",
+  "completeness_narrative": "what was found and what is missing"
+}
+```
+
+Rules:
+- Every claim in decision_context_summary must cite a source_record_id
+- active_constraints include ONLY Authority Level 6+ records that are NOT superseded
+- contradictions must have resolution_status — if unresolved, the hiring agent must be told
+- completeness_status: complete = all sources queried, no gaps; partial_low = minor gaps; partial_medium = notable gaps; incomplete_high = critical gaps that may affect decision quality

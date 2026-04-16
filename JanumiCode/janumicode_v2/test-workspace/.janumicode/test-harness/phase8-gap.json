@@ -1,0 +1,18 @@
+{
+  "phase": "0",
+  "missing_records": [],
+  "schema_violations": [],
+  "assertion_failures": [
+    {
+      "phase": "6",
+      "sub_phase": "unknown",
+      "assertion": "tasks_have_estimates",
+      "expected": "true",
+      "actual": "false"
+    }
+  ],
+  "suggested_fix": "Invariant failures: tasks_have_estimates. Review the invariant implementations in src/test/harness/lineageValidator.ts and the handler logic that produces the relevant artifacts.",
+  "spec_references": [
+    "invariant tasks_have_estimates"
+  ]
+}

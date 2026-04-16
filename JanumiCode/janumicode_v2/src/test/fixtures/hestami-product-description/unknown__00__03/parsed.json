@@ -1,0 +1,12 @@
+{
+  "overall_pass": false,
+  "flaws": [
+    {
+      "flaw_type": "completeness_shortcut",
+      "severity": "high",
+      "description": "The agent failed to produce the required implementation artifact (POST /assets/upload handler). Instead of delivering the code or continuing troubleshooting, the agent stopped and reported a tool configuration error, effectively treating the task as completed when the core deliverable is missing.",
+      "evidence": "Final Output: 'No output parser registered for backing tool: Bun File System / Bun Stream Validator'",
+      "recommended_action": "escalate"
+    }
+  ]
+}

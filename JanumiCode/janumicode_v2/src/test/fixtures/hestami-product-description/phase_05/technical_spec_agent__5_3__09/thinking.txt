@@ -1,0 +1,119 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Technical Spec Agent].
+    *   **Task:** Produce [JC:Error Handling Strategies] for Sub-Phase 5.3.
+    *   **Output Format:** A JSON object matching the `error_handling_strategies` schema.
+    *   **Schema Requirements:** `strategies` array, each with `component_id`, `error_types`, `detection`, `response`, `surfacing`.
+    *   **Constraints:**
+        *   Every Component must have at least one strategy.
+        *   Error types must be specific (not generic).
+        *   Detection and response strategies must be concrete/implementable.
+        *   Apply governing constraints (none listed, so focus on context).
+    *   **Context:** Consumer Discovery MVP (Phase 1 Focus).
+    *   **Components:** 7 specific components (`cmp-prop-data`, `cmp-provider-match`, `cmp-compliance`, `cmp-workflow`, `cmp-notifications`, `cmp-security`, `cmp-payment`).
+    *   **Capabilities/Exclusions:** Focus on Pillar 1 (Home Real Property Assistant), exclude Pillar 2/3/Field/Advanced features.
+
+2.  **Deconstruct Each Component & Define Errors:**
+
+    *   **cmp-prop-data (Property Data Manager):**
+        *   *Responsibilities:* Upload assets, index assets, offline sync.
+        *   *Potential Errors:* File format invalid, upload size exceeded, index timeout, sync queue full.
+        *   *Error Types:* `validation_error`, `storage_quota_error`, `indexing_timeout_error`, `sync_conflict_error`.
+        *   *Detection:* Try/Catch on upload stream, middleware validation, health check on queue.
+        *   *Response:* Reject with 400, fallback to offline buffer, retry with exponential backoff.
+        *   *Surfacing:* 400/413 status, error payload with field details, logs, admin alerts for sync failures.
+
+    *   **cmp-provider-match (Service Provider Matcher):**
+        *   *Responsibilities:* AI search, bid comparison.
+        *   *Potential Errors:* AI confidence low, bid data missing, provider unavailable, search timeout.
+        *   *Error Types:* `ai_confidence_error`, `bid_missing_error`, `search_timeout_error`, `rate_limit_error`.
+        *   *Detection:* Confidence score threshold check, API timeout catch, empty result validation.
+        *   *Response:* Return partial results, fallback to default providers, circuit breaker on external API, propagate with 5xx.
+        *   *Surfacing:* 502/504 status, "Low confidence" warning badge in UI, logs, fallback recommendation.
+
+    *   **cmp-compliance (Compliance Rules Engine):**
+        *   *Responsibilities:* CC&R extraction, deadline monitoring, alerts.
+        *   *Potential Errors:* Extraction failure, deadline missed, notification failure.
+        *   *Error Types:* `extraction_failure_error`, `statutory_deadline_exceeded_error`, `notification_delivery_failure_error`.
+        *   *Detection:* AI confidence score < threshold, cron job check, webhook callback failure.
+        *   *Response:* Escalate to admin, generate alert ticket, retry notification.
+        *   *Surfacing:* Critical severity logs, user-facing alerts (deadline missed), admin dashboard red flags.
+
+    *   **cmp-workflow (Action Workflow Orchestrator):**
+        *   *Responsibilities:* State management, UI status.
+        *   *Potential Errors:* State transition invalid, audit log write failure, DB timeout.
+        *   *Error Types:* `state_transition_error`, `audit_log_write_error`, `db_timeout_error`.
+        *   *Detection:* DB transaction rollback, DB unique constraint violation, timeout on state update.
+        *   *Response:* Compensating transaction, revert to previous state, queue for retry.
+        *   *Surfacing:* 400/409 status, UI shows "Processing/Failed", detailed error codes.
+
+    *   **cmp-notifications (Notification Dispatcher):**
+        *   *Responsibilities:* Batch email/SMS, delivery status.
+        *   *Potential Errors:* SMTP/SMS gateway down, batch processing error, bounce.
+        *   *Error Types:* `gateway_unreachable_error`, `batch_processing_error`, `message_bounce_error`.
+        *   *Detection:* Transport error response, status check after job completion.
+        *   *Response:* Queue retry (exponential backoff), partial batch success reporting.
+        *   *Surfacing:* 503 status during outage, bounce rate metrics, user sees specific delivery status.
+
+    *   **cmp-security (Tenant Security Gateway):**
+        *   *Responsibilities:* RLS, auth validation.
+        *   *Potential Errors:* Invalid token, expired token, unauthorized access.
+        *   *Error Types:* `authentication_token_invalid`, `authorization_forbidden`, `session_expired_error`.
+        *   *Detection:* Header validation, token verification logic.
+        *   *Response:* 401/403/400 HTTP response immediately.
+        *   *Surfacing:* HTTP 401/403, JSON error object with scope details, security logs (non-PII).
+
+    *   **cmp-payment (Payment Transaction Processor):**
+        *   *Responsibilities:* Process payments, receipts.
+        *   *Potential Errors:* Gateway decline, duplicate payment, insufficient funds, webhook failure.
+        *   *Error Types:* `payment_gateway_decline`, `duplicate_transaction_error`, `insufficient_funds_error`, `webhook_verification_error`.
+        *   *Detection:* API response code parsing, idempotency key check.
+        *   *Response:* Return decline reason, queue for manual review, generate error receipt.
+        *   *Surfacing:* 402/409 status, error payload with payment gateway code, receipt document marked invalid.
+
+3.  **Draft the JSON Structure:**
+    *   Ensure strict adherence to the schema: `strategies` (array), each item has `component_id`, `error_types`, `detection`, `response`, `surfacing`.
+    *   Ensure error types are specific strings.
+    *   Ensure detection/response are concrete (e.g., "middleware validation", "try/catch").
+
+4.  **Refine Content against Constraints:**
+    *   Check component IDs match the list.
+    *   Check context (MVP Pillar 1). Don't include Pillar 2/3 errors.
+    *   Keep it implementable (e.g., "try/catch block", "HTTP 4xx").
+
+5.  **Final Review:**
+    *   JSON validity.
+    *   All 7 components covered.
+    *   Specific error types used.
+    *   Concrete detection/response actions.
+
+6.  **Construct Output:** (Mental check of the JSON structure)
+    ```json
+    {
+      "error_handling_strategies": [
+        { "component_id": "cmp-prop-data", ... },
+        { "component_id": "cmp-provider-match", ... },
+        ...
+      ]
+    }
+    ```
+    *Wait, the prompt says "Produce [JC:Error Handling Strategies] for each Component". The schema says `strategies: array`. I will output the full JSON object.*
+
+    *Self-Correction on Schema:* The prompt says "REQUIRED OUTPUT: A JSON object matching the `error_handling_strategies` schema". The schema description implies the top-level key is `error_handling_strategies` containing a `strategies` array. I will follow this structure.
+
+    *Refining Error Types:*
+    *   cmp-prop-data: `file_format_invalid`, `upload_timeout`, `storage_quota_exceeded`.
+    *   cmp-provider-match: `ai_inference_timeout`, `bid_data_missing`, `provider_api_down`.
+    *   cmp-compliance: `extraction_confidence_low`, `statutory_deadline_missed`, `notification_queue_full`.
+    *   cmp-workflow: `state_transition_invalid`, `audit_log_write_failed`, `workflow_timeout`.
+    *   cmp-notifications: `smtp_connection_timeout`, `sms_gateway_unavailable`, `email_bounce_detected`.
+    *   cmp-security: `token_expired`, `scope_insufficient`, `token_format_invalid`.
+    *   cmp-payment: `card_declined`, `idempotency_duplicate`, `gateway_connection_timeout`.
+
+    *Refining Detection/Response/Surfacing:*
+    *   Make sure they align with the component responsibilities (e.g., cmp-security must be fast).
+
+    *Final Polish:* Ensure no generic "error" strings are used.
+
+    *Let's write the JSON.*

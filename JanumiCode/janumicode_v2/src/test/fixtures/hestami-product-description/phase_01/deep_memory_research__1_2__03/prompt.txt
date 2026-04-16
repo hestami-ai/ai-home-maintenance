@@ -1,0 +1,175 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Deep Memory Research Agent] performing Stage 7 — Context Packet Synthesis.
+
+Synthesize the research findings into a structured [JC:Context Packet]. Every claim must cite source record IDs. The packet must be as explicit about what it does NOT know as about what it does know.
+
+QUERY DECOMPOSITION:
+{
+  "topicEntities": [
+    "Hestami AI Real Property OS",
+    "Hestami AI Real Property OS and Platform Product Description.md",
+    "Real Property OS Platform",
+    "Implementation Phase"
+  ],
+  "decisionTypesSought": [
+    "phase_gate_approval",
+    "mirror_approval"
+  ],
+  "temporalScope": {
+    "from": "2024-01-01T00:00:00Z",
+    "to": "2024-12-31T23:59:59Z"
+  },
+  "authorityLevelsIncluded": [
+    5,
+    6,
+    7
+  ],
+  "sourcesInScope": [
+    "governed_stream_current_run"
+  ]
+}
+
+MATERIAL FINDINGS:
+[
+  {
+    "id": "83fd7cad-f74c-4657-a228-68ca3bc6eacc",
+    "record_type": "raw_intent_received",
+    "authority_level": 5,
+    "governing_status": "active",
+    "summary": "Review \"specs/hestami-ai-real-property-os(2)/Hestami AI Real Property OS and Platform Product Description.md\" and prepare for implementation.",
+    "materiality_score": 0.468
+  },
+  {
+    "id": "550f6b6e-4a1b-419e-9b44-210149920c7c",
+    "record_type": "query_decomposition_record",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[query_decomposition]",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "7f4891b6-195d-4e9b-b6d4-9fa3e64beb87",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "{\n  \"topic_entities\": [\n    \"Hestami AI Real Property OS\",\n    \"Hestami AI Real Property OS and Platform Product Description.md\",\n    \"Real Property OS Platform\",\n    \"Implementation Phase\"\n  ],\n  \"decision_types_sought\": [\n    \"phase_gate_approval\",\n    \"mirror_approval\"\n  ],\n  \"temporal_scope\": {\n",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "3e369c35-260a-4f7b-a5f7-46167f477832",
+    "record_type": "retrieval_brief_record",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "535d15ae-c158-451f-9d86-c5d1c54e9686",
+    "record_type": "agent_invocation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "78d7e1bf-3372-474d-9b15-e2d67489eb10",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[scope_classification]",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "1d1d9bd7-e69b-4cf8-aafa-5f95dc0f8913",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[compliance_context]",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "d6f8bee9-bdbb-43b0-b38d-bca05d056640",
+    "record_type": "intent_quality_report",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "5c6c5088-e8f2-4ddd-b4f2-e93f7b98a122",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "{\n  \"completeness_findings\": [\n    {\n      \"field\": \"what_is_being_built\",\n      \"status\": \"present\",\n      \"severity\": \"low\",\n      \"explanation\": \"Product name 'Hestami AI Real Property OS' is inferred from the referenced filename.\"\n    },\n    {\n      \"field\": \"who_it_serves\",\n      \"status\": \"abs",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "331200df-73a4-4375-8b78-210da7af3df9",
+    "record_type": "client_liaison_response",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "Started workflow run `ef5a4e8d-2bb6-403e-a7d5-fb7ca6a12d74`. Now in Phase 1.",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "f132fb4e-86d5-4e0f-ba67-6bb692f041e7",
+    "record_type": "agent_invocation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "1ca0b2dc-0473-44ad-a5d6-db5495c0eba3",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[ingested_artifact_index]",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "1b55b14f-2e03-42ce-9039-b8fb12021d1f",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[external_file_ingested]",
+    "materiality_score": 0.382
+  }
+]
+
+SUPERSESSION CHAINS:
+[]
+
+CONTRADICTIONS:
+[]
+
+COVERAGE ASSESSMENT:
+{
+  "sourcesQueried": [
+    "governed_stream_current_run"
+  ],
+  "sourcesUnavailable": [],
+  "knownGaps": [
+    "Vector index coverage is 0% (0/16) — semantic similarity results may be incomplete."
+  ],
+  "confidence": 0.85
+}
+
+YOUR REQUIRED OUTPUT (JSON):
+```json
+{
+  "decision_context_summary": "narrative summary of governing decisions",
+  "active_constraints": [{"statement": "...", "authority_level": 6, "source_record_ids": ["..."]}],
+  "supersession_chains": [{"subject": "...", "chain": [{"record_id": "...", "position": "current_governing"}]}],
+  "contradictions": [{"record_ids": ["..."], "explanation": "...", "resolution_status": "unresolved|resolved_by_recency|resolved_by_authority"}],
+  "open_questions": [{"question": "...", "still_unresolved": true, "source_record_id": "..."}],
+  "completeness_status": "complete|partial_low|partial_medium|incomplete_high",
+  "completeness_narrative": "what was found and what is missing"
+}
+```
+
+Rules:
+- Every claim in decision_context_summary must cite a source_record_id
+- active_constraints include ONLY Authority Level 6+ records that are NOT superseded
+- contradictions must have resolution_status — if unresolved, the hiring agent must be told
+- completeness_status: complete = all sources queried, no gaps; partial_low = minor gaps; partial_medium = notable gaps; incomplete_high = critical gaps that may affect decision quality

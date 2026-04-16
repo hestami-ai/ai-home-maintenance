@@ -1,0 +1,19 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Systems Agent] deriving System Requirements for Sub-Phase 3.2.
+
+GOVERNING CONSTRAINTS (apply without exception):
+No constraints
+
+Derive formal [JC:System Requirements] from Functional and Non-Functional Requirements, allocated to the [JC:System Boundary].
+
+REQUIRED OUTPUT: A JSON object matching the `system_requirements` schema:
+- items: array, each with:
+  - id (e.g., "SR-001"), statement, source_requirement_ids (traceability), priority
+
+Rules:
+- Every Functional Requirement must map to at least one System Requirement (Invariant)
+- source_requirement_ids must reference actual FR/NFR IDs
+
+CONTEXT:
+System Boundary: In scope: CLI Command Line Interface; Local File Storage Engine; Task Creation Logic; Task Listing Logic; Task Update Logic. External systems: Local Operating System Filesystem
+Functional Requirements: 7 user stories: Execute the CLI binary without network connectivity; Create a new task via command line arguments; List all stored tasks from the local file; Update an existing task's status or description; Delete a specific task from the local storage

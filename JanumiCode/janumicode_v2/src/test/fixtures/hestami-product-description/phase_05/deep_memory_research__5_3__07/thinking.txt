@@ -1,0 +1,151 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Deep Memory Research Agent] performing Stage 1 — Query Decomposition.
+    *   **Task:** Transform a retrieval query into structured retrieval targets for the Governed Stream search.
+    *   **Input Query:** Describes API endpoints and components (`cmp-prop-data`, `cmp-provider-match`, `cmp-compliance`) with authentication details.
+    *   **Scope:** `all_runs`.
+    *   **Requesting Agent:** `technical_spec_agent`.
+    *   **Output Format:** JSON.
+    *   **JSON Schema:** `topic_entities`, `decision_types_sought`, `temporal_scope`, `authority_levels_included`, `sources_in_scope`.
+    *   **Rules:**
+        *   Extract concrete entities (names, IDs, concepts).
+        *   `decision_types_sought` matches historical context needed (menu_selection, mirror_approval, phase_gate_approval).
+        *   `authority_levels_included`: Always include 5+ (Human-Approved). Include lower levels only if exploratory/agent-generated content is asked about.
+        *   `sources_in_scope`: `all_runs` → `governed_stream_all_runs`.
+
+2.  **Analyze the Input Query:**
+    *   **Content:** The query lists API endpoints (`POST /assets/upload`, `GET /assets/search`, `GET /sync/queue/status`, `GET /providers/search`, `GET /bids/compare/{bid_id}`, `POST /compliance/extract`). It lists component IDs (`cmp-prop-data`, `cmp-provider-match`, `cmp-compliance`). It mentions authentication (`Bearer Token Required`).
+    *   **Intent:** The query seems to be asking about the error handling strategy for these specific APIs/components. The user is likely asking for documentation, historical decisions, or specifications regarding error handling for these technical components.
+    *   **Context:** Technical specification agent requesting information.
+    *   **Scope:** `all_runs` (specified in the brief).
+
+3.  **Determine JSON Fields:**
+
+    *   **`topic_entities`:** What specific things are we looking for?
+        *   API Endpoints: `/assets/upload`, `/assets/search`, `/sync/queue/status`, `/providers/search`, `/bids/compare/{bid_id}`, `/compliance/extract`.
+        *   Components: `cmp-prop-data`, `cmp-provider-match`, `cmp-compliance`.
+        *   Concepts: `error handling strategy`, `Bearer Token`, `API authentication`.
+        *   *Selection:* Focus on the specific technical artifacts mentioned.
+        *   List: `["/assets/upload", "/assets/search", "/sync/queue/status", "/providers/search", "/bids/compare/{bid_id}", "/compliance/extract", "cmp-prop-data", "cmp-provider-match", "cmp-compliance", "error handling"]`
+
+    *   **`decision_types_sought`:** What kind of historical context does a technical spec agent need for error handling strategies?
+        *   Usually, error handling strategies are part of architectural decisions or phase gate approvals for API design.
+        *   They might need to see if there were specific approvals or selections made regarding how errors are handled.
+        *   Options: `menu_selection`, `mirror_approval`, `phase_gate_approval`.
+        *   Given the technical nature and the need for specs, `phase_gate_approval` (design phase decisions) and `menu_selection` (standard patterns selected) seem relevant. `mirror_approval` might be relevant if there's a governance review involved. However, usually, for technical specs, we look for `phase_gate_approval` (architectural decisions) or `menu_selection` (standard library selection). Let's pick the most relevant ones for API design specs. `phase_gate_approval` is strong for architectural standards. `menu_selection` is strong for picking specific error codes/handling patterns.
+        *   Decision: `["phase_gate_approval", "menu_selection"]` (These fit technical spec retrieval best).
+
+    *   **`temporal_scope`:** The brief says `Scope: all_runs`.
+        *   `from`: `"start_date_of_governed_stream"` or `"infinity"` or just `"0001-01-01"` (representing all history).
+        *   `to`: `"current_date"` or `"infinity"`.
+        *   However, the instruction says `all_runs`. I need to provide ISO dates. Since I don't have the actual system clock, I should use placeholders that signify "all time" or reasonable bounds. But often in these prompts, specific dates might be expected or generic placeholders like `"1970-01-01"` or `"now"`.
+        *   Looking at standard practices for this specific agent type: Usually, `all_runs` implies the full lifespan of the stream. I will use generic start/end that implies all history, or specific placeholder values if required. Given the lack of specific system date, I'll use `"1970-01-01"` and `"9999-12-31"` to denote full scope, or `"2024-01-01"` and `"2024-12-31"` if recent. Let's assume "all_runs" means full history of the system. I will use `"1970-01-01"` and `"2024-12-31"` (approximate current) or just `"unbounded"`. The prompt asks for ISO-date. I'll use `"1900-01-01"` and `"2100-01-01"` to be safe for "all runs".
+        *   *Correction:* Usually, specific dates aren't known by the model. I should probably indicate the scope is the whole system history. I will use `"1970-01-01"` and `"2025-01-01"` (current year) as a safe bet for "all". Or better, check the rule. The rule doesn't specify exact dates, just the format. I will use broad ranges.
+        *   Actually, looking at similar tasks, often `"from": "1970-01-01", "to": "2030-01-01"` is acceptable for "all runs".
+
+    *   **`authority_levels_included`:** Rule: Always include 5+ (Human-Approved).
+        *   Values: `[5, 6, 7]`.
+        *   Reasoning: The query is for error handling strategy in a technical spec context, which usually requires Human-Approved or above documentation. No request for exploratory/agent-generated content specifically, but since it's about strategies, higher authority levels ensure quality. The rule says "always include 5+".
+        *   List: `[5, 6, 7]`.
+
+    *   **`sources_in_scope`:** Depends on `scope_tier`. Brief says `Scope: all_runs`.
+        *   Rule: `all_runs` → `governed_stream_all_runs`.
+        *   List: `["governed_stream_all_runs"]`.
+
+4.  **Construct JSON:**
+
+    ```json
+    {
+      "topic_entities": [
+        "cmp-prop-data",
+        "cmp-provider-match",
+        "cmp-compliance",
+        "/assets/upload",
+        "/assets/search",
+        "/sync/queue/status",
+        "/providers/search",
+        "/bids/compare/{bid_id}",
+        "/compliance/extract",
+        "error handling strategy",
+        "Bearer Token",
+        "API authentication"
+      ],
+      "decision_types_sought": [
+        "phase_gate_approval",
+        "menu_selection"
+      ],
+      "temporal_scope": {
+        "from": "1970-01-01",
+        "to": "2025-01-01"
+      },
+      "authority_levels_included": [5, 6, 7],
+      "sources_in_scope": [
+        "governed_stream_all_runs"
+      ]
+    }
+    ```
+
+5.  **Review against Constraints:**
+    *   JSON format? Yes.
+    *   `topic_entities` extracted? Yes.
+    *   `decision_types_sought` match context? Yes (Technical specs need phase gate/menu).
+    *   `authority_levels_included`: 5+? Yes `[5, 6, 7]`.
+    *   `sources_in_scope`: `all_runs` -> `governed_stream_all_runs`. Yes.
+    *   ISO-date format? Yes.
+
+6.  **Final Polish:** Ensure strict JSON syntax.
+
+    *   Wait, checking `decision_types_sought`. The options provided in the prompt examples usually are specific. The prompt examples in the `YOUR REQUIRED OUTPUT` section show: `"decision_types_sought": ["menu_selection", "mirror_approval", "phase_gate_approval"]`. I should pick from these.
+    *   Checking `authority_levels_included`. The prompt says `authority_levels_included: always include 5+ (Human-Approved and above); include lower levels only if...`. So `[5, 6, 7]` is correct.
+    *   Checking `sources_in_scope`. `all_runs` -> `governed_stream_all_runs`. Correct.
+    *   Checking `temporal_scope`. Needs ISO-date. I'll use a wide range representing all runs.
+
+    *   Refined `topic_entities`: Make them concise but specific.
+    *   Refined `temporal_scope`: I'll use `"1900-01-01"` to `"9999-12-31"` to be safe for "all".
+
+    Let's assemble.
+
+    One detail: The prompt input says `Scope: all_runs`.
+    The rule says: `sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs`.
+    So `sources_in_scope` must be `["governed_stream_all_runs"]`.
+
+    One detail: `decision_types_sought`. For technical specs regarding error handling, `phase_gate_approval` (architectural decisions) is most critical. `menu_selection` (using standard patterns) is also relevant. `mirror_approval` is less common for raw API specs unless there's a mirror system. I'll include the top two most relevant.
+
+    Final check on Authority Levels. `[5, 6, 7]`.
+
+    Ready to generate.
+
+    Wait, one more check on `temporal_scope`. The system prompt doesn't give me the current date. I will use a reasonable ISO date range that implies "all time". "1970-01-01" to "2025-12-31" is common for this context if no specific current time is known. Or just "1900-01-01". I'll use "1970-01-01" to "2100-01-01".
+
+    Actually, looking at the instruction `temporal_scope`: `{"from": "ISO-date", "to": "ISO-date"}`. I will fill it with logical boundaries for "all runs".
+
+    Let's finalize the JSON content.
+
+    `topic_entities`:
+    - cmp-prop-data
+    - cmp-provider-match
+    - cmp-compliance
+    - /assets/upload
+    - /assets/search
+    - /sync/queue/status
+    - /providers/search
+    - /bids/compare/{bid_id}
+    - /compliance/extract
+    - error handling strategy
+
+    `decision_types_sought`:
+    - phase_gate_approval (for strategy decisions)
+    - menu_selection (for standard patterns)
+
+    `temporal_scope`:
+    - from: 1970-01-01
+    - to: 2100-01-01
+
+    `authority_levels_included`:
+    - [5, 6, 7]
+
+    `sources_in_scope`:
+    - ["governed_stream_all_runs"]
+
+    Looks good.

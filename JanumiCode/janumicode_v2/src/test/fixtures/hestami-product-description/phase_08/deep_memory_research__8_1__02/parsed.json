@@ -1,0 +1,20 @@
+{
+  "decision_context_summary": "The governing directive [83fd7cad-f74c-4657-a228-68ca3bc6eacc] mandates the review of specifications and preparation for the Hestami AI Real Property OS implementation. Produced artifacts include functional requirements [995c1ae7-4f6f-4f71-b447-048dcc870e15], system requirements [91a1ffd8-3df5-4a44-8625-b7c0738fe8c6], and non-functional requirements [56b84cd8-084f-4a7c-984d-0db6b5c6b9da] generated at Authority Level 2. A test plan [65be4310-2ef6-4e45-b852-5c1d535e0fa8] and API definitions [258617a8-cd2b-4374-b1a5-3ac9f88836dc] were also produced. However, specific NFR performance metrics such as P95 Latency and Throughput values are not explicitly detailed in the summaries, and vector index coverage remains at 0% according to the coverage assessment associated with the system context [964d1096-c2ba-47d8-a067-5e1ca80f6e6a].",
+  "active_constraints": [],
+  "supersession_chains": [],
+  "contradictions": [],
+  "open_questions": [
+    {
+      "question": "What are the specific P95 Latency and Throughput targets defined within the Non-Functional Requirements [56b84cd8-084f-4a7c-984d-0db6b5c6b9da]?",
+      "still_unresolved": true,
+      "source_record_id": "56b84cd8-084f-4a7c-984d-0db6b5c6b9da"
+    },
+    {
+      "question": "How does the current 0% Vector index coverage impact the semantic similarity results required for the Search Queries entity [964d1096-c2ba-47d8-a067-5e1ca80f6e6a]?",
+      "still_unresolved": true,
+      "source_record_id": "964d1096-c2ba-47d8-a067-5e1ca80f6e6a"
+    }
+  ],
+  "completeness_status": "partial_medium",
+  "completeness_narrative": "Research identified core intent, functional requirements, and test plans. Critical gaps exist regarding specific NFR performance values (Latency/Throughput) and the availability of vector index data, which may impact decision quality for Search Queries."
+}

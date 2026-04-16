@@ -1,0 +1,29 @@
+{
+  "completeness_findings": [
+    {
+      "field": "what is being built",
+      "status": "present",
+      "severity": "low",
+      "explanation": "Intent explicitly specifies 'CLI todo app'."
+    },
+    {
+      "field": "who it serves",
+      "status": "absent",
+      "severity": "medium",
+      "explanation": "No target audience or user persona is defined."
+    },
+    {
+      "field": "what problem it solves",
+      "status": "absent",
+      "severity": "medium",
+      "explanation": "No specific problem statement or use case is defined."
+    }
+  ],
+  "consistency_findings": [],
+  "coherence_findings": [],
+  "overall_status": "requires_input",
+  "system_proposal_offered_for": [
+    "who it serves",
+    "what problem it solves"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "$id": "janumicode:retrieval_brief:1.0",
+  "title": "Retrieval Brief",
+  "description": "Input contract for the Deep Memory Research Agent (spec §8.4)",
+  "type": "object",
+  "required": ["artifact_type", "requesting_agent_role", "scope_tier", "query", "workflow_run_id"],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "const": "retrieval_brief"
+    },
+    "requesting_agent_role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope_tier": {
+      "type": "string",
+      "enum": ["current_run", "all_runs", "all_runs_plus_external"]
+    },
+    "query": {
+      "type": "string",
+      "minLength": 1
+    },
+    "known_relevant_record_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "workflow_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase_id": {
+      "type": "string"
+    },
+    "sub_phase_id": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

@@ -21,12 +21,22 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { getLogger, OutputChannelHandler } from './lib/logging';
-import { initializeDatabase } from './lib/database/init';
+import { initializeDatabase, closeWithCheckpoint } from './lib/database/init';
 import { ConfigManager } from './lib/config/configManager';
 import { EmbeddingService } from './lib/embedding/embeddingService';
 import { OrchestratorEngine } from './lib/orchestrator/orchestratorEngine';
 import { Phase0Handler } from './lib/orchestrator/phases/phase0';
+import { Phase05Handler } from './lib/orchestrator/phases/phase05';
 import { Phase1Handler } from './lib/orchestrator/phases/phase1';
+import { Phase2Handler } from './lib/orchestrator/phases/phase2';
+import { Phase3Handler } from './lib/orchestrator/phases/phase3';
+import { Phase4Handler } from './lib/orchestrator/phases/phase4';
+import { Phase5Handler } from './lib/orchestrator/phases/phase5';
+import { Phase6Handler } from './lib/orchestrator/phases/phase6';
+import { Phase7Handler } from './lib/orchestrator/phases/phase7';
+import { Phase8Handler } from './lib/orchestrator/phases/phase8';
+import { Phase9Handler } from './lib/orchestrator/phases/phase9';
+import { Phase10Handler } from './lib/orchestrator/phases/phase10';
 import { OllamaProvider } from './lib/llm/providers/ollama';
 import { AnthropicProvider } from './lib/llm/providers/anthropic';
 import { GoogleProvider } from './lib/llm/providers/google';
@@ -37,6 +47,7 @@ import {
   buildExtensionHost,
   type WorkflowSession,
 } from './lib/webview/governedStreamViewProvider';
+import { CanvasEditorProvider } from './lib/canvas/canvasEditorProvider';
 
 let provider: GovernedStreamViewProvider | null = null;
 let liaison: ClientLiaisonAgent | null = null;
@@ -135,6 +146,7 @@ async function bootstrap(
   //    files, and config overrides.
   const extensionPath = context.extensionUri.fsPath;
   const engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
+  engine.setEmbeddingService(embedding);
   log.info('activation', 'Bootstrap step 7/14: OrchestratorEngine constructed', {
     workspacePath,
     extensionPath,
@@ -150,10 +162,26 @@ async function bootstrap(
   engine.llmCaller.registerProvider(new GoogleProvider());
   log.info('activation', 'Bootstrap step 8/14: LLM provider adapters registered');
 
-  // Register Phase 0 + Phase 1 handlers.
+  // Validate that every provider referenced by llm_routing config is
+  // registered. Correctness-validation roles (Reasoning Review, Domain
+  // Compliance) cannot fall back silently without undermining trust —
+  // this check surfaces misconfigurations at startup instead of mid-flow.
+  engine.validateLLMRouting();
+
+  // Register all phase handlers (0-10) for Architecture Canvas support.
   engine.registerPhase(new Phase0Handler());
+  engine.registerPhase(new Phase05Handler());
   engine.registerPhase(new Phase1Handler());
-  log.info('activation', 'Bootstrap step 9/14: Phase 0 + Phase 1 handlers registered');
+  engine.registerPhase(new Phase2Handler());
+  engine.registerPhase(new Phase3Handler());
+  engine.registerPhase(new Phase4Handler());
+  engine.registerPhase(new Phase5Handler());
+  engine.registerPhase(new Phase6Handler());
+  engine.registerPhase(new Phase7Handler());
+  engine.registerPhase(new Phase8Handler());
+  engine.registerPhase(new Phase9Handler());
+  engine.registerPhase(new Phase10Handler());
+  log.info('activation', 'Bootstrap step 9/14: All phase handlers (0-10) registered');
 
   // 10. ClientLiaisonAgent (universal router)
   const extHost = buildExtensionHost();
@@ -202,6 +230,10 @@ async function bootstrap(
   );
   log.info('activation', 'Bootstrap step 13/14: webview view provider registered');
 
+  // 13b. Architecture Canvas custom editor
+  context.subscriptions.push(CanvasEditorProvider.register(context, db));
+  log.info('activation', 'Architecture Canvas custom editor registered');
+
   // 13. Commands
   context.subscriptions.push(
     vscode.commands.registerCommand('janumicode.startWorkflowRun', async () => {
@@ -233,14 +265,36 @@ async function bootstrap(
     vscode.commands.registerCommand('janumicode.showLogs', () => {
       outputHandler.show();
     }),
+    vscode.commands.registerCommand('janumicode.openArchitectureCanvas', async () => {
+      // Open canvas for current workflow run or prompt for selection
+      if (session.currentRunId) {
+        const uri = vscode.Uri.parse(`janumicode-canvas:${session.currentRunId}?workflowRunId=${session.currentRunId}`);
+        await vscode.commands.executeCommand('vscode.openWith', uri, 'janumicode.canvas');
+      } else {
+        const runs = db.prepare('SELECT id, intent_summary FROM workflow_runs ORDER BY created_at DESC LIMIT 10').all() as Array<{ id: string; intent_summary: string }>;
+        if (runs.length === 0) {
+          void vscode.window.showInformationMessage('No workflow runs found. Start a workflow first.');
+          return;
+        }
+        const selected = await vscode.window.showQuickPick(
+          runs.map(r => ({ label: r.intent_summary ?? r.id, id: r.id })),
+          { placeHolder: 'Select a workflow run to visualize' },
+        );
+        if (selected) {
+          const uri = vscode.Uri.parse(`janumicode-canvas:${selected.id}?workflowRunId=${selected.id}`);
+          await vscode.commands.executeCommand('vscode.openWith', uri, 'janumicode.canvas');
+        }
+      }
+    }),
   );
 
-  // 14. Cleanup
+  // 14. Cleanup — checkpoint the WAL before closing so the .db file on
+  // disk is self-contained. See closeWithCheckpoint() for the rationale.
   context.subscriptions.push({
     dispose: () => {
       embedding.stop();
       try {
-        db.close();
+        closeWithCheckpoint(db);
       } catch { /* ignore */ }
     },
   });

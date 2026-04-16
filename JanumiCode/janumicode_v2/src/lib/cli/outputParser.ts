@@ -19,6 +19,7 @@ export interface ParsedEvent {
   sequencePosition: number;
 }
 
+
 export interface OutputParserConfig {
   /** Output format identifier */
   outputFormat: string;
@@ -38,48 +39,103 @@ export class OutputParser {
   }
 
   /**
-   * Parse a single line of stdout output into a ParsedEvent.
+   * Parse a single line of stdout output into zero or more ParsedEvents.
+   *
+   * Claude Code's real stream-json emits envelopes like
+   * `{"type":"assistant","message":{"content":[{"type":"text",…},
+   * {"type":"tool_use",…}]}}` — one envelope can carry several logical
+   * events (a text block plus N tool calls). Returning an array lets
+   * the invoker attribute them individually to the governed stream
+   * without losing order.
+   *
+   * For the legacy flat shape (`{type:'tool_use', …}`) the parser
+   * still emits one event — callers treat a length-1 array the same
+   * as the old scalar return.
    */
-  parseLine(line: string): ParsedEvent | null {
+  parseLine(line: string): ParsedEvent[] {
     const trimmed = line.trim();
-    if (!trimmed) return null;
+    if (!trimmed) return [];
 
-    // Try JSON parse for stream-json format
     if (this.config.outputFormat === 'stream-json') {
       return this.parseStreamJson(trimmed);
     }
 
-    // Fallback: treat as plain text reasoning step
-    return this.createEvent('agent_reasoning_step', { text: trimmed }, false);
+    // Non-stream-json parsers treat every non-empty line as reasoning.
+    const event = this.createEvent('agent_reasoning_step', { text: trimmed }, false);
+    return event ? [event] : [];
   }
 
   /**
-   * Parse Claude Code CLI stream-json format.
-   * Each line is a JSON object with a `type` field.
+   * Parse one line of Claude Code stream-json. Handles both shapes:
+   *
+   *   1. Nested envelope (real Claude Code CLI output):
+   *        { type: 'assistant' | 'user',
+   *          message: { content: [{ type: 'text'|'tool_use'|'tool_result', … }] } }
+   *        { type: 'result', result: '...', session_id: '...' }
+   *        { type: 'system', subtype: 'init', … }  (skipped)
+   *
+   *   2. Flat shape (stubs, test fixtures, pre-unwrapped streams):
+   *        { type: 'assistant'|'tool_use'|'tool_result'|'result'|'text', … }
+   *
+   * Unknown outer types silently yield [] so a newly added Claude Code
+   * envelope kind doesn't crash the pipeline; add it to recordMapping
+   * to surface it.
    */
-  private parseStreamJson(line: string): ParsedEvent | null {
+  private parseStreamJson(line: string): ParsedEvent[] {
     let json: Record<string, unknown>;
     try {
       json = JSON.parse(line);
     } catch {
-      // Not valid JSON — treat as raw text
-      return this.createEvent('agent_reasoning_step', { text: line }, false);
+      const event = this.createEvent('agent_reasoning_step', { text: line }, false);
+      return event ? [event] : [];
     }
 
-    const eventType = json.type as string;
-    if (!eventType) return null;
+    const eventType = json.type as string | undefined;
+    if (!eventType) return [];
 
-    // Map to Governed Stream record type
+    // Nested envelope: unwrap `message.content[]` into one event per item.
+    if ((eventType === 'assistant' || eventType === 'user') && isObject(json.message)) {
+      const content = (json.message as { content?: unknown[] }).content;
+      if (Array.isArray(content)) {
+        const events: ParsedEvent[] = [];
+        for (const item of content) {
+          if (!isObject(item)) continue;
+          const itemType = (item as { type?: string }).type;
+          if (!itemType) continue;
+          const recordType = this.config.recordMapping[itemType];
+          if (!recordType) continue;
+          // Flatten common Claude Code shapes so downstream consumers
+          // don't have to reach into `input` / `text` fields.
+          const data: Record<string, unknown> = { ...(item as Record<string, unknown>) };
+          if (itemType === 'text' && typeof data.text === 'string') {
+            data.content = data.text;
+          }
+          const isSelf = this.detectSelfCorrection(recordType, data);
+          const event = this.createEvent(recordType, data, isSelf);
+          if (event) events.push(event);
+        }
+        return events;
+      }
+    }
+
+    // `result` envelope at the end of a run — carries the final summary.
+    if (eventType === 'result') {
+      const recordType = this.config.recordMapping[eventType];
+      if (!recordType) return [];
+      const event = this.createEvent(recordType, json, false);
+      return event ? [event] : [];
+    }
+
+    // `system` / `init` envelopes are skipped — they carry no semantic
+    // content we want in the governed stream.
+    if (eventType === 'system') return [];
+
+    // Flat shape fallback: map the outer type directly.
     const recordType = this.config.recordMapping[eventType];
-    if (!recordType) {
-      // Unknown event type — skip
-      return null;
-    }
-
-    // Self-correction detection
-    const isSelfCorrection = this.detectSelfCorrection(recordType, json);
-
-    return this.createEvent(recordType, json, isSelfCorrection);
+    if (!recordType) return [];
+    const isSelf = this.detectSelfCorrection(recordType, json);
+    const event = this.createEvent(recordType, json, isSelf);
+    return event ? [event] : [];
   }
 
   /**
@@ -137,7 +193,7 @@ export class OutputParser {
     recordType: string,
     data: Record<string, unknown>,
     isSelfCorrection: boolean,
-  ): ParsedEvent {
+  ): ParsedEvent | null {
     return {
       recordType: isSelfCorrection ? 'agent_self_correction' : recordType,
       data,
@@ -153,6 +209,10 @@ export class OutputParser {
     this.sequenceCounter = 0;
     this.recentToolCalls = [];
   }
+}
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 // ── Pre-configured Parsers ──────────────────────────────────────────

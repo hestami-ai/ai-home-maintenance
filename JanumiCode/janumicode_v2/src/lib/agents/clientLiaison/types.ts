@@ -6,6 +6,7 @@
  */
 
 import type { GovernedStreamRecord, WorkflowRun, WorkflowRunStatus, PhaseId } from '../../types/records';
+import type { ContextPacket } from '../deepMemoryResearch';
 
 // ── Query Taxonomy (8 types) ────────────────────────────────────────
 
@@ -73,6 +74,15 @@ export interface QueryClassification {
 export interface RetrievalResult {
   records: GovernedStreamRecord[];
   strategy: string;
+  /**
+   * DMR Context Packet when the retrieval was delegated to the Deep Memory
+   * Research Agent (§8.4). Present for retrieval-type queries where
+   * completeness, supersession, and contradiction signals should be
+   * surfaced to the user; absent for workflow_initiation / status_check
+   * / workflow-mutating queries where full DMR research would be wasted
+   * or misleading.
+   */
+  contextPacket?: ContextPacket;
 }
 
 export interface RecordFilters {

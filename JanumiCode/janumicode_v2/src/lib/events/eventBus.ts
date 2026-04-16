@@ -36,8 +36,14 @@ export type EventType =
   | 'llm:queued'
   | 'llm:started'
   | 'llm:finished'
+  | 'llm:stream_chunk'
   | 'context:updated'
-  | 'error:occurred';
+  | 'error:occurred'
+  | 'test:run_started'
+  | 'test:suite_completed'
+  | 'test:run_completed'
+  | 'eval:started'
+  | 'eval:completed';
 
 export interface EventPayload {
   'record:added': { record: SerializedRecord };
@@ -61,7 +67,7 @@ export interface EventPayload {
   'decision:requested': {
     runId: string;
     decisionId: string;
-    surfaceType: 'mirror' | 'menu' | 'decision_bundle' | 'phase_gate';
+    surfaceType: 'mirror' | 'decision_bundle' | 'phase_gate';
   };
   'decision:resolved': {
     runId: string;
@@ -73,14 +79,66 @@ export interface EventPayload {
     escalationRecordId: string;
     description: string;
   };
-  'llm:queued': { provider: string; lane: 'phase' | 'user_query'; queueDepth: number };
-  'llm:started': { provider: string; lane: 'phase' | 'user_query' };
-  'llm:finished': { provider: string; lane: 'phase' | 'user_query'; durationMs: number };
+  'llm:queued': {
+    provider: string;
+    lane: 'phase' | 'user_query';
+    queueDepth: number;
+    /** Human-readable label from the call's traceContext, if any. */
+    label?: string | null;
+    agentRole?: string | null;
+    subPhaseId?: string | null;
+  };
+  'llm:started': {
+    provider: string;
+    lane: 'phase' | 'user_query';
+    label?: string | null;
+    agentRole?: string | null;
+    subPhaseId?: string | null;
+  };
+  'llm:finished': {
+    provider: string;
+    lane: 'phase' | 'user_query';
+    durationMs: number;
+    label?: string | null;
+    agentRole?: string | null;
+    subPhaseId?: string | null;
+  };
+  /**
+   * Streaming chunk from an in-flight LLM call. Emitted in lieu of writing
+   * an `agent_output_chunk` governed_stream record so we don't bloat the
+   * DB with one row per token. The view provider forwards these to the
+   * webview, which keeps a transient per-invocation buffer for live UI.
+   */
+  'llm:stream_chunk': {
+    invocationId: string;
+    sequence: number;
+    channel: 'response' | 'thinking' | 'stdout' | 'stderr';
+    text: string;
+  };
   'context:updated': {
     runId: string;
     summary: { activeFile: string | null; constraintCount: number; referenceCount: number };
   };
   'error:occurred': { message: string; context: string };
+  'test:run_started': { workflowRunId: string; suiteCount: number };
+  'test:suite_completed': {
+    workflowRunId: string;
+    suiteId: string;
+    suiteName: string;
+    passed: number;
+    failed: number;
+    skipped: number;
+  };
+  'test:run_completed': {
+    workflowRunId: string;
+    totalPassed: number;
+    totalFailed: number;
+    totalSkipped: number;
+    durationMs: number;
+    success: boolean;
+  };
+  'eval:started': { workflowRunId: string; evalType: string };
+  'eval:completed': { workflowRunId: string; evalType: string; passed: boolean };
 }
 
 /** Minimal record shape sent to the webview */

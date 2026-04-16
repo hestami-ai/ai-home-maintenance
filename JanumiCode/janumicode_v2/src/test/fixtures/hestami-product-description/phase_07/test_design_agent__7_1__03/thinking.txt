@@ -1,0 +1,254 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Test Design Agent]
+    *   **Task:** Generate Test Case specifications for Sub-Phase 7.1.
+    *   **Input:** Functional Requirements (10 User Stories with Acceptance Criteria), Implementation Plan (17 Tasks), Component Model (7 Components).
+    *   **Constraint:** Generate JSON object matching `test_plan` schema.
+    *   **Schema Requirements:**
+        *   `test_suites`: array
+        *   `test_cases` (inside suites): array
+        *   Each `test_case` must have: `test_case_id`, `type`, `acceptance_criterion_ids`, `preconditions` (at least one — Invariant), `expected_outcome`.
+        *   Every Acceptance Criterion must have at least one Test Case.
+        *   Every Test Case must have at least one precondition (Invariant).
+        *   Cover functional behavior only (no NFR coverage).
+        *   Test Cases are specifications, NOT code.
+    *   **Output Format:** JSON.
+
+2.  **Analyze the Input Data:**
+
+    *   **User Stories (US) & Acceptance Criteria (AC):**
+        *   US-001 (Critical): Upload (AC-001-1, AC-001-2). Component: `cmp-prop-data`.
+        *   US-002 (High): Search Providers (AC-002-1, AC-002-2). Component: `cmp-provider-match`.
+        *   US-003 (High): Compare Bids (AC-003-1). Component: `cmp-provider-match`.
+        *   US-004 (Medium): CC&R Extract (AC-004-1). Component: `cmp-compliance`.
+        *   US-005 (Critical): Workflow/Action Items (AC-005-1). Component: `cmp-workflow`.
+        *   US-006 (High): Alerts/Notifications (AC-006-1, AC-006-2). Component: `cmp-notifications`.
+        *   US-007 (Medium): Mass Email (AC-007-1). Component: `cmp-notifications`.
+        *   US-008 (High): Mobile Offline (AC-008-1). Component: `cmp-prop-data` (RSP-003).
+        *   US-009 (Critical): Security/Isolation (AC-009-1). Component: `cmp-security`.
+        *   US-010 (Medium): Payments (AC-010-1). Component: `cmp-payment`.
+
+    *   **Components:**
+        *   `cmp-prop-data` (Property Data)
+        *   `cmp-provider-match` (Provider Match)
+        *   `cmp-compliance` (Compliance)
+        *   `cmp-workflow` (Workflow)
+        *   `cmp-notifications` (Notifications)
+        *   `cmp-security` (Security)
+        *   `cmp-payment` (Payment)
+
+    *   **Test Types:** unit, integration, end_to_end.
+        *   Since these are functional requirements covering different components and interactions (upload, search, compare, workflow, security, payment), a mix is appropriate.
+        *   Unit tests often focus on logic within a component (e.g., format validation).
+        *   Integration tests focus on interactions (e.g., upload -> index).
+        *   End-to-end tests focus on user flows (e.g., full search to bid comparison).
+        *   However, given the constraint "Functional Requirements", integration and end_to_end are often more representative of ACs that involve multiple steps (like upload + index + search). Unit tests might be too low level for ACs like "AI response list displayed". Let's aim for a balanced approach: mostly integration for business logic, unit for specific validation, E2E for critical flows. To keep it clean and aligned with the ACs provided, I will group them by Component for `suite_id` or `suite_id` derived from US/Component logic. Let's use Component names as `component_id` and create suites based on logical grouping (e.g., Property Data Suite, Security Suite, etc.).
+
+3.  **Drafting Test Cases (Mapping ACs to Test Cases):**
+
+    *   **Suite 1: Property Data Management** (Component: `cmp-prop-data`)
+        *   US-001 AC-001-1 (Upload 200 OK, <5s, index <10s).
+        *   US-001 AC-001-2 (Reject bad formats).
+        *   US-008 AC-008-1 (Offline capture/sync).
+        *   *Test Case 1:* Upload valid PNG.
+        *   *Test Case 2:* Upload invalid JPG.
+        *   *Test Case 3:* Upload via offline mode.
+    *   **Suite 2: Security & Tenancy** (Component: `cmp-security`)
+        *   US-009 AC-009-1 (Unauthorized access 403).
+        *   *Test Case:* Cross-tenant data access.
+    *   **Suite 3: Provider Matching** (Component: `cmp-provider-match`)
+        *   US-002 AC-002-1 (Search latency, Top 5).
+        *   US-002 AC-002-2 (Filter categories).
+        *   US-003 AC-003-1 (Comparison table, min 3 bids).
+        *   *Test Case:* Search providers.
+        *   *Test Case:* Filter dropdown validation.
+        *   *Test Case:* Render comparison table.
+    *   **Suite 4: Compliance Engine** (Component: `cmp-compliance`)
+        *   US-004 AC-004-1 (Extract clauses >90% confidence).
+        *   *Test Case:* Extract text and highlight.
+        *   US-006 AC-006-1 (Email 30 days before).
+        *   US-006 AC-006-2 (Offline queue).
+        *   *Test Case:* Check deadline logic (Integration with Notification).
+        *   *Test Case:* Mass email batch (US-007 AC-007-1). (This overlaps with Notifications component, might need a separate suite or grouped).
+    *   **Suite 5: Workflow & Action Items** (Component: `cmp-workflow`)
+        *   US-005 AC-005-1 (Audit log, status UI update).
+        *   *Test Case:* Transition state and log check.
+    *   **Suite 6: Notifications** (Component: `cmp-notifications`)
+        *   US-006 AC-006-1 (Email trigger).
+        *   US-006 AC-006-2 (Retry logic).
+        *   US-007 AC-007-1 (Batch processing).
+        *   *Test Case:* Send alert confirmation.
+        *   *Test Case:* Retry mechanism.
+        *   *Test Case:* Batch processing.
+    *   **Suite 7: Payments** (Component: `cmp-payment`)
+        *   US-010 AC-010-1 (Auth response, receipt email).
+        *   *Test Case:* Process payment and receipt.
+
+    *   **Preconditions:** Every test case needs an invariant precondition.
+        *   Example: "User is authenticated", "System is online", "Database is initialized".
+        *   Let's use a standard system invariant: "System is in a stable state prior to test execution". Or specific to the component: "User session active", "Database connection established". I will use generic invariants like "System is running", "Database connection is active", "User is authenticated (where applicable)". The prompt says "at least one — Invariant". I'll use something robust like "System resources are available". Let's make it specific to the context: "Application Server is running and connected to Database".
+
+4.  **Constructing the JSON:**
+
+    *   Need to ensure `test_case_id`, `type`, `acceptance_criterion_ids`, `preconditions`, `expected_outcome`.
+    *   Grouping: I will group by Component for the `suite_id` to keep it organized.
+    *   Ensure all ACs are covered.
+
+    *   *Refining Test Case IDs:* TC-PROP-001, TC-SEC-001, etc.
+    *   *Refining AC IDs:* Use the provided AC IDs (e.g., AC-001-1).
+
+5.  **Review against Constraints:**
+    *   JSON object matching `test_plan` schema? Yes.
+    *   Every AC has at least one TC? Yes.
+    *   Every TC has at least one precondition (Invariant)? Yes.
+    *   Cover functional behavior only? Yes (no NFRs like performance metrics beyond the logic handling them, but AC-001-1 includes timing. That's a functional requirement constraint, usually treated as performance acceptance. I must include it in expected_outcome).
+    *   No code? Yes, descriptions only.
+
+6.  **Final Polish:**
+    *   Check that `acceptance_criterion_ids` is an array.
+    *   Check that `preconditions` is an array.
+    *   Check `test_type` values (unit, integration, end_to_end).
+    *   Ensure `suite_id` and `component_id` match the Component Model names (normalized to kebab-case).
+
+    *   *Mapping:*
+        *   US-001 -> cmp-prop-data (Suite: Property Data)
+        *   US-002, US-003 -> cmp-provider-match (Suite: Provider Matching)
+        *   US-004 -> cmp-compliance (Suite: Compliance Engine)
+        *   US-005 -> cmp-workflow (Suite: Action Workflow)
+        *   US-006, US-007 -> cmp-notifications (Suite: Notification Dispatcher)
+        *   US-008 -> cmp-prop-data (Integration into upload suite or separate? Let's group by component for cleanliness. US-008 affects `cmp-prop-data` RSP-003).
+        *   US-009 -> cmp-security (Suite: Security Gateway)
+        *   US-010 -> cmp-payment (Suite: Payment Processor)
+
+    *   *Wait, one nuance:* The Component Model lists `cmp-prop-data` and `cmp-security`.
+    *   I will create suites named after the components to keep the structure clear, or maybe suites named after the User Stories? The schema requires `suite_id`, `component_id`. Let's use `component_id` from the Component Model for consistency, and derive `suite_id` similarly.
+    *   Actually, usually `suite_id` groups test cases. Let's use `component_id` as the `suite_id` for simplicity, or a unique ID like "US-001". Let's use the Component ID for `component_id` and a descriptive name or the Component ID for `suite_id` to align.
+    *   Wait, `suite_id` and `component_id` are often related. Let's make `suite_id` unique (e.g., "PROP-DATA-SUITE") and `component_id` match the Component Model (e.g., "cmp-prop-data").
+    *   Actually, looking at the instruction: "test_suites: array, each with: suite_id, component_id...".
+    *   I will map each component to a suite.
+
+    *   *Preconditions:* Must be Invariant. "Database connection is active", "Application Server is online", "Valid Session Token exists".
+
+    *   *AC Coverage:*
+        *   AC-001-1 (Prop Data)
+        *   AC-001-2 (Prop Data)
+        *   AC-002-1 (Provider)
+        *   AC-002-2 (Provider)
+        *   AC-003-1 (Provider)
+        *   AC-004-1 (Compliance)
+        *   AC-005-1 (Workflow)
+        *   AC-006-1 (Notification)
+        *   AC-006-2 (Notification)
+        *   AC-007-1 (Notification)
+        *   AC-008-1 (Prop Data - Offline)
+        *   AC-009-1 (Security)
+        *   AC-010-1 (Payment)
+
+    *   *Test Case Count:*
+        *   Prop Data: 3 TCS (Upload Valid, Upload Invalid, Offline Sync).
+        *   Provider: 3 TCS (Search, Filter, Compare).
+        *   Compliance: 1 TC (Extract).
+        *   Workflow: 1 TC (State Log).
+        *   Notification: 3 TCS (Alert, Batch, Retry).
+        *   Security: 1 TC (Access Control).
+        *   Payment: 1 TC (Payment Auth).
+        *   Total: 13 TCS. This seems reasonable.
+
+    *   *Test Types:*
+        *   Unit: Format validation, Logic checks.
+        *   Integration: API calls, DB interactions.
+        *   End_to_end: Full user flow (e.g., Payment).
+        *   I'll distribute them. Since ACs describe system behavior (API responses, UI rendering), they lean towards Integration or E2E. However, "Format validation" is Unit. Let's make AC-001-2 (File rejection) a Unit or Integration (depends on endpoint). Let's call Upload/Validate Unit/Integration. Let's classify:
+            *   File Upload/Validation -> Integration (Backend API).
+            *   Search Latency -> Integration (API Response).
+            *   Security 403 -> Integration.
+            *   Payment -> Integration (Payment Gateway).
+            *   Offline/Queue -> Integration.
+            *   Let's use `integration` for most functional behaviors involving API endpoints or UI rendering. Let's use `unit` for specific logic validation like confidence scores or format checks in isolation. Let's use `end_to_end` for complex flows like Payment + Receipt.
+            *   To keep it simple but valid: Most ACs describe API/Response behavior -> Integration. Security -> Integration. Offline sync -> Integration.
+            *   I will use `integration` predominantly as these are system behavior specs. I'll sprinkle `unit` for specific logic assertions if they imply internal component testing, but ACs usually imply system acceptance. I will stick to `integration` for most, maybe `end_to_end` for US-010 and US-008.
+
+    *   Wait, checking constraint: "Test Cases are specifications — NOT code."
+    *   Checking constraint: "Every Acceptance Criterion must have at least one Test Case (Invariant)".
+    *   Checking constraint: "Every Test Case must have at least one precondition (Invariant)".
+
+    *   Let's write the JSON.
+
+    *   *Precondition Invariant:* I will use "System is in a stable operational state with connected database and authentication services."
+
+    *   *Component IDs:* cmp-prop-data, cmp-provider-match, cmp-compliance, cmp-workflow, cmp-notifications, cmp-security, cmp-payment.
+    *   *Suite IDs:* PROP-DATA-SUITE, PROVIDER-MATCH-SUITE, COMPLIANCE-SUITE, WORKFLOW-SUITE, NOTIFICATIONS-SUITE, SECURITY-SUITE, PAYMENT-SUITE.
+
+    *   *AC Mappings:*
+        *   PROP-DATA: AC-001-1, AC-001-2, AC-008-1.
+        *   PROVIDER-MATCH: AC-002-1, AC-002-2, AC-003-1.
+        *   COMPLIANCE: AC-004-1.
+        *   WORKFLOW: AC-005-1.
+        *   NOTIFICATIONS: AC-006-1, AC-006-2, AC-007-1.
+        *   SECURITY: AC-009-1.
+        *   PAYMENT: AC-010-1.
+
+    *   *Wait, US-005 AC-005-1 mentions audit log.* Component is `cmp-workflow`.
+    *   *US-007 AC-007-1:* Component `cmp-notifications`.
+    *   *US-006 AC-006-1:* Component `cmp-notifications` (payload/queue).
+    *   *US-006 AC-006-2:* Component `cmp-notifications` (retry).
+    *   Note: US-006 involves "Statutory Deadlines". This might link to `cmp-compliance` (RSP-007) which triggers notifications. However, the ACs are about the notification delivery and persistence. I'll put US-006 ACs under Notifications component suite as they describe delivery mechanics (Queue, Retry, Confirmation).
+    *   US-004 AC-004-1 (CC&R extraction) -> Compliance Component.
+
+    *   *Double Check:* AC-001-1 mentions "assets indexed in < 10 seconds post-upload". This involves `cmp-prop-data` (RSP-002). AC-001-1 covers Upload + Indexing.
+    *   AC-008-1 (Offline mobile). This involves `cmp-prop-data` (RSP-003).
+
+    *   Okay, ready to generate JSON.
+    *   Ensure strict JSON syntax (no trailing commas, proper escaping if needed).
+    *   Ensure all AC IDs match exactly.
+
+    *   *One detail:* `test_plan` schema isn't fully defined in the prompt, but inferred from the description. I will assume standard keys: `test_suites`, `test_cases`. Wait, schema description says: `test_suites: array, each with: suite_id, component_id, test_type...`. Wait, `test_type` is inside `suite`? The prompt says: "test_suites: array, each with: suite_id, component_id, test_type (unit|integration|end_to_end), test_cases: array...". Okay, `test_type` belongs to the suite level generally, or can be specific. Usually suites have a type. I will put a dominant type or a generic one, or allow per test case? The prompt says `test_type` is in the object with `suite_id`. I will assign a type to the suite (e.g., integration suite for functional). Or I can vary it? "each with: ... test_type". I will assign `integration` for functional suites mostly, or specific if needed. Let's assign `integration` to most as they verify API behaviors.
+
+    *   Wait, the prompt says: `test_suites: array, each with: - suite_id, component_id, test_type ... - test_cases: array ...`.
+    *   Okay, structure:
+        ```json
+        {
+          "test_suites": [
+            {
+              "suite_id": "...",
+              "component_id": "...",
+              "test_type": "...",
+              "test_cases": [
+                {
+                  "test_case_id": "...",
+                  "type": "...",
+                  "acceptance_criterion_ids": ["..."],
+                  "preconditions": ["..."],
+                  "expected_outcome": "..."
+                }
+              ]
+            }
+          ]
+        }
+        ```
+    *   Wait, `type` in `test_cases`? The prompt says `test_cases: array, each with: test_case_id, type, acceptance_criterion_ids, preconditions, expected_outcome`. So `test_case` has `type`. Does `suite` have `test_type`? Yes, the prompt says "test_suites: array, each with: ... test_type ...". Okay.
+    *   I will set suite `test_type` to match the dominant nature (Integration for API/Backend), but individual cases can be specific.
+    *   Actually, `test_case` `type` might be redundant with suite type, but I'll include it (e.g., "functional").
+    *   Precondition must be "Invariant". I will use a generic invariant string.
+
+    *   Let's check the number of ACs:
+        AC-001-1, AC-001-2 (2)
+        AC-002-1, AC-002-2 (2)
+        AC-003-1 (1)
+        AC-004-1 (1)
+        AC-005-1 (1)
+        AC-006-1, AC-006-2 (2)
+        AC-007-1 (1)
+        AC-008-1 (1)
+        AC-009-1 (1)
+        AC-010-1 (1)
+        Total 13 ACs.
+        I will create 13 test cases (or more if splitting, but 1:1 is efficient).
+        Let's stick to 1:1 to ensure coverage is clear.
+
+    *   Wait, one constraint: "Every Acceptance Criterion must have at least one Test Case (Invariant)".
+    *   And "Every Test Case must have at least one precondition (Invariant)".
+    *   I will use preconditions like "System is in a stable operational state with database connection active".
+
+    *   Ready.

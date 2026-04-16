@@ -147,6 +147,23 @@ const rpcWorkerBuild = {
   // The worker itself uses built-in worker_threads + child_process; no externals.
 };
 
+// 2c. CLI Entry Point — Headless workflow execution.
+//     Standalone Node.js CLI for test harness and automation.
+const cliBuild = {
+  ...sharedOptions,
+  entryPoints: ['src/cli/index.ts'],
+  outfile: 'dist/cli/janumicode.js',
+  platform: 'node',
+  format: 'cjs',
+  target: 'node22',
+  // Shebang comes from the source file (src/cli/index.ts line 1).
+  // Do NOT add a banner here — esbuild preserves the source shebang.
+  external: [
+    'better-sqlite3',
+    '@sqliteai/sqlite-vector',
+  ],
+};
+
 // 3. Webview Client — Browser IIFE with Svelte 5
 //
 // We do NOT use vitePreprocess({ script: true }) here. It uses Vite's Oxc
@@ -184,13 +201,63 @@ const webviewBuild = {
         css: 'injected',
       },
     }),
+    // Copy the design system's CSS to dist/webview/ so the extension host
+    // (governedStreamViewProvider.buildHtml) can read it and inline its
+    // custom properties into the webview HTML. Keeps design-system.css
+    // as the single source of truth for JanumiCode design tokens.
+    {
+      name: 'copy-design-system-css',
+      setup(build) {
+        build.onEnd(() => {
+          const src = path.join(__dirname, 'src', 'webview', 'design-system.css');
+          const dest = path.join(__dirname, 'dist', 'webview', 'design-system.css');
+          fs.mkdirSync(path.dirname(dest), { recursive: true });
+          fs.copyFileSync(src, dest);
+        });
+      },
+    },
+  ],
+};
+
+// 4. Canvas Webview Client -- Browser IIFE with Svelte 5
+//    Architecture Canvas visualization with Canvas 2D rendering.
+const canvasWebviewBuild = {
+  ...sharedOptions,
+  entryPoints: ['src/webview/canvas/main.ts'],
+  outfile: 'dist/webview/canvas.js',
+  platform: 'browser',
+  format: 'iife',
+  target: 'es2022',
+  mainFields: ['svelte', 'browser', 'module', 'main'],
+  conditions: ['svelte', 'browser'],
+  plugins: [
+    sveltePlugin({
+      preprocess: tsScriptPreprocessor(),
+      compilerOptions: {
+        css: 'injected',
+      },
+    }),
+    {
+      name: 'copy-design-system-css-for-canvas',
+      setup(build) {
+        build.onEnd(() => {
+          // Ensure design-system.css is copied (may already exist from webview build)
+          const src = path.join(__dirname, 'src', 'webview', 'design-system.css');
+          const dest = path.join(__dirname, 'dist', 'webview', 'design-system.css');
+          fs.mkdirSync(path.dirname(dest), { recursive: true });
+          if (!fs.existsSync(dest)) {
+            fs.copyFileSync(src, dest);
+          }
+        });
+      },
+    },
   ],
 };
 
 // ── Execute Builds ──────────────────────────────────────────────────
 
 async function build() {
-  const configs = [extensionBuild, sidecarBuild, rpcWorkerBuild, webviewBuild];
+  const configs = [extensionBuild, sidecarBuild, rpcWorkerBuild, cliBuild, webviewBuild, canvasWebviewBuild];
 
   if (isWatch) {
     const contexts = await Promise.all(

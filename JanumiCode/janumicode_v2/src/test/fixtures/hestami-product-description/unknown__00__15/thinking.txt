@@ -1,0 +1,219 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Reasoning Review] (LLM API call inspecting an agent's execution trace).
+    *   **Input:** [JC:Trace Selection] containing reasoning steps, tool invocations, and final output. Tool results are excluded.
+    *   **Task:** Inspect the trace for specific flaws defined in the "COMPLETE FLAW TAXONOMY".
+    *   **Output Format:** JSON only (specific structure: `overall_pass`, `flaws` list).
+    *   **Context:** The reviewed agent was required to produce: "Capture bounce receipts and update delivery status to finalize bounce rate metrics."
+    *   **Trace Data:**
+        *   Reasoning Step 0: Tool invocation `Email Provider Webhooks / SMS API Webhooks` (started).
+        *   Final Output: "No output parser registered for backing tool: Email Provider Webhooks / SMS API Webhooks"
+    *   **Completion Criteria:** (Implicit from the task description: "Capture bounce receipts and update delivery status to finalize bounce rate metrics").
+    *   **Rules:**
+        *   `severity`: high = blocks Phase Gate, low = warning.
+        *   `premature_convergence` is ALWAYS high (though not applicable here).
+        *   Must cite specific evidence.
+        *   `overall_pass` = true only if no flaws found.
+
+2.  **Evaluate the Trace against the Task:**
+    *   **Task:** Capture bounce receipts and update delivery status to finalize bounce rate metrics.
+    *   **Trace:** The agent attempted to call a tool (`Email Provider Webhooks / SMS API Webhooks`) but failed because "No output parser registered".
+    *   **Final Output:** The agent reports a failure/error state regarding the tool registration. It does *not* show that bounce receipts were captured or metrics finalized.
+    *   **Flaw Detection:**
+        *   `completeness_shortcut`: The agent claims the task is done (or ends the trace) without actually achieving the goal. The trace ends with an error about the tool parser. The output is essentially an error message, not a successful completion of the task. Wait, looking closely at the "AGENT'S FINAL OUTPUT". It says "No output parser registered...". This implies the agent failed to execute the core functionality.
+        *   Is this a `completeness_shortcut`? Usually, this is when the agent claims "Task Complete" but misses requirements. Here, the agent is stating a technical failure. However, if the agent stops here and considers this done, it's a failure.
+        *   Is this an `unsupported_assumption`? No.
+        *   Is this `implementation_divergence`? No ADR mentioned yet.
+        *   Is this `scope_violation`? No.
+        *   Is this `contradiction_with_prior_approved`? The Phase Gate criteria says: "Capture bounce receipts...". The output says the tool isn't working. This contradicts the ability to do the task.
+        *   Is this `completeness_shortcut`? The agent output suggests the trace ends here. If the trace ends here without the bounce data being processed, it failed to complete the task. The criteria state: "Completion Criteria (for completeness_shortcut checks): Use the above to assess whether the agent's final output satisfies what was asked of it." The agent's output is an error, not the required capture/update.
+        *   However, looking at the "COMPLETE FLAW TAXONOMY", specifically `completeness_shortcut`: "Agent claims task complete when only part is done". Does the agent claim task complete? The output is an error. But in the context of a trace review, if the agent halts here, it hasn't delivered the deliverable.
+        *   Let's look for `tool_result_misinterpretation_suspected`: The agent tried to use a tool and got an error about the parser. It doesn't claim a result.
+        *   Let's look for `implementability_violation`: "Component Responsibility too broad".
+        *   Let's look for `authority_confusion`: No.
+        *   Let's look for `false_equivalence`: No.
+        *   Let's look for `unacknowledged_uncertainty`: No.
+        *   Let's look for `invalid_inference`: No.
+        *   Let's look for `contradiction_with_prior_approved`: The Phase Gate criteria is "Capture bounce receipts...". The output shows failure to do so. This effectively means the output *contradicts* the ability to meet criteria. But strictly speaking, the flaw type `completeness_shortcut` fits best if the agent claims success but hasn't actually done it. Since the trace cuts off at a technical error, the agent *failed* to meet the criteria. Is that a flaw in the reasoning trace or a result of the task being impossible? Usually, if an agent stops because of a missing parser, it's a system failure, but in the context of this specific review task, I need to flag if the output satisfies the requirement. It does not.
+        *   Is there a `completeness_shortcut`? The agent didn't claim "Task Complete" explicitly in the text provided, but the final output is an error. However, since I am reviewing the agent's execution, if the agent's final state doesn't meet the Completion Criteria, I should flag it.
+        *   Wait, looking at the "Completion Criteria" section provided in the context: It says "Use the above to assess whether the agent's final output satisfies what was asked of it." If it doesn't satisfy, it's often `completeness_shortcut` (if they claim done) OR `contradiction_with_prior_approved` (if they claim done but contradict criteria). But here they don't claim done. They report an error.
+        *   Actually, the most relevant flaw type here is often `completeness_shortcut` when the agent fails to actually execute the main task (capturing receipts) and presents this final log as the end. But if the tool simply isn't working, is it a flaw in the agent's reasoning or the environment? The prompt asks me to check for flaws in the *agent's* execution trace. If the agent couldn't execute the tool, it's an `implementability_violation`? No.
+        *   Let's consider `completeness_shortcut` definition: "Agent claims task complete when only part is done." The agent output is just an error. It doesn't explicitly claim completion. However, the *Phase Gate* is checking completion. If the agent stops here, it hasn't completed.
+        *   Is there a `scope_violation`? No.
+        *   Is there `invalid_inference`? No.
+        *   Is there `unsupported_assumption`? No.
+        *   Is there `contradiction_with_prior_approved`? The Phase Gate criteria says "Capture bounce receipts". The output says "No output parser registered...". The agent implies it cannot do the task. If the agent considers this the end state, it contradicts the Phase Gate's expectation of *capturing* and *finalizing*.
+        *   Actually, the most accurate tag for "Agent stops before doing the work because of a missing tool setup" in this specific Review Framework context might be `completeness_shortcut` (interpreting the final output as a summary) or potentially `implementation_divergence` if it expected a parser that wasn't there.
+        *   However, usually, if the agent output is just an error message, it suggests the agent failed to complete the task.
+        *   Let's look at `completeness_shortcut` again. "Agent claims task complete when only part is done." The trace provided is the agent's *reasoning* and *final output*. If the final output is an error, did it claim it was done? It didn't. But the Phase Gate will check. If the Phase Gate fails, is that a flaw in the reasoning trace? Yes, because the reasoning led to a dead end that wasn't handled as a fallback (e.g., "Try fallback tool" or "Report failure").
+        *   There is a flaw: `completeness_shortcut`. Why? Because the agent output (the final log) suggests the trace is done, but the *task* (capture bounce receipts) is not done. The agent stopped at a technical error without completing the objective. In many "Agent Safety/Reasoning" benchmarks, failing to complete the core task is flagged as `completeness_shortcut` if the agent doesn't explicitly acknowledge the failure or attempt recovery.
+        *   Wait, there is another specific flaw: `implementability_violation` - "Component Responsibility too broad for single Executor Agent session". This might not apply.
+        *   How about `unacknowledged_uncertainty`? The agent treated the missing parser as a hard stop without acknowledging the uncertainty of the environment.
+        *   Let's stick to the strongest signal. The task was "Capture bounce receipts...". The output is "No output parser registered...". The task is not completed. The agent presents this as its final output. This is effectively claiming the trace is finished without completing the task.
+        *   Actually, looking at the `completeness_shortcut` definition: "Agent claims task complete when only part is done." Does the text "No output parser registered..." count as claiming completion? In the context of a trace, if the trace ends there, it implies completion of the *trace*. But the *task* is not done.
+        *   Is there a better flaw type? `contradiction_with_prior_approved`? If the Phase Gate requires "Capture bounce receipts", and the output is "No parser", the output contradicts the *requirement* to capture. But the flaw type is about the *agent's logic*.
+        *   Let's look at `completeness_shortcut` again. If the agent stops early, it's a completeness issue.
+        *   Let's look at `tool_result_misinterpretation_suspected`. No, there is no tool result, just an error.
+        *   Let's consider `unsupported_assumption`. Did the agent assume the parser was there? Yes.
+        *   Wait, I need to check if the agent *tried* and failed, or just output an error. The reasoning shows `status: "started"`. The final output is an error. The agent didn't complete the action.
+        *   I will classify this as `completeness_shortcut` with severity `high` because the Phase Gate checks for task completion (capture bounce receipts). The agent failed to do so. While technically the parser is missing (environment issue), from the agent's reasoning trace perspective, it stopped prematurely without achieving the goal defined in the Phase Gate.
+        *   Alternatively, `contradiction_with_prior_approved`. The Phase Gate criteria says "Capture bounce receipts...". The output says "No output parser...". The agent's conclusion (the trace end) contradicts the criteria (capturing receipts).
+        *   Which is more accurate? `completeness_shortcut` is specifically "Agent claims task complete when only part is done". The agent output implies the trace is done. It did not complete the task.
+        *   Actually, there is a nuance. If the tool isn't registered, it's an environment config issue, not necessarily the agent's reasoning. However, the Review task is to inspect the *agent's execution trace* for flaws. If the agent stops and doesn't handle the error or attempt an alternative, that is a flaw in execution flow (often mapped to `completeness_shortcut` in these schemas because the "completion" criterion wasn't met).
+        *   However, looking at the provided "Flaw Type" list, `completeness_shortcut` is "Agent claims task complete when only part is done". The agent didn't explicitly say "Task Complete", but the trace ended. In the absence of an explicit "Task Complete" statement, but ending with an error, does it count?
+        *   Let's look for `contradiction_with_prior_approved`. The Phase Gate criteria says "Capture bounce receipts". The output does not show this. If the Phase Gate sees this output, it fails.
+        *   Let's consider `implementation_divergence`. "Implementation Artifact contradicts governing ADR". No ADR here.
+        *   Let's consider `premature_convergence`. "Agent collapses options".
+        *   Let's go with `completeness_shortcut`. The agent's final output effectively terminates the session without the task being done. In the context of Phase Gate checking, this is treated as incomplete.
+        *   Wait, is there `unacknowledged_uncertainty`? "Agent expresses false confidence where genuine ambiguity exists." Not really.
+        *   Is there `unsupported_assumption`? "Agent asserts something as true with no basis". The agent (implicitly) assumes the tool will work. It failed.
+        *   I'll lean towards `completeness_shortcut` (severity high) because the core task (finalize bounce rate metrics) was not achieved, and the agent stopped the trace without resolving the issue, effectively treating the partial/failed state as the final output.
+        *   Wait, is there a specific flaw for "Tool call failed"? The taxonomy doesn't have "Tool Error".
+        *   Is it `implementation_divergence`? "Implementation Artifact contradicts governing ADR". Maybe the artifact is the "No output parser".
+        *   Let's look at `contradiction_with_prior_approved`. If the Phase Gate says "You must capture...", and the output says "Parser missing", the output contradicts the Phase Gate's expectation of success.
+        *   However, `completeness_shortcut` is usually reserved for when the agent thinks it's done.
+        *   If I must choose from the taxonomy:
+            *   `completeness_shortcut`: "Agent claims task complete when only part is done." The output is the final trace output. It claims (by omission of further steps) the trace is done. The part done is "Tool invocation failed". The rest (capture receipts) is not done. So it fits.
+            *   Severity: High (blocks Phase Gate).
+            *   Evidence: "No output parser registered for backing tool: Email Provider Webhooks / SMS API Webhooks"
+            *   Recommended action: `escalate` (since it's a system issue) or `retry` (if it can be fixed). Usually `escalate` for environment issues. But the instruction says "return_to_phase4" or "escalate_to_unsticking". Since the parser is missing, it's an infrastructure issue. `escalate_to_unsticking` might be appropriate.
+            *   Wait, the instruction says "recommended_action": "retry|escalate|accept_with_caveat|return_to_phase4|escalate_to_unsticking".
+            *   Since the tool isn't registered, retrying the agent won't work. Escalate to the team to register the parser. `escalate`.
+            *   Wait, looking at `completeness_shortcut` vs `contradiction_with_prior_approved`.
+            *   If the Phase Gate requires "Capture bounce receipts", and the output is "Parser missing", the output *does not satisfy* the Phase Gate.
+            *   So `overall_pass` should be `false`.
+            *   Flaw Type: `completeness_shortcut`. Evidence: The final output shows a tool registration error, meaning bounce receipts were not captured. The agent effectively stops with incomplete task work.
+            *   Wait, is there a flaw called `invalid_inference`? No.
+            *   Is there a flaw `authority_confusion`? No.
+            *   Let's check `completeness_shortcut` definition again: "Agent claims task complete when only part is done".
+            *   Does "No output parser registered..." claim task complete? No, it reports a status. But the *trace* ends there.
+            *   If I have to find a flaw: The agent failed to complete the task. The review task is to flag if the agent *failed* to meet the criteria.
+            *   I will flag `completeness_shortcut` because the agent terminates the session without the required deliverables (bounce receipts/metrics).
+            *   Wait, I need to check if `contradiction_with_prior_approved` is better. "Agent's output conflicts with a Phase-Gate-Certified artifact". The artifact is the Phase Gate Criteria ("Capture bounce receipts..."). The output ("Parser missing...") conflicts with the expected success.
+            *   However, `completeness_shortcut` is more about the *completion* status.
+            *   I'll choose `completeness_shortcut` with severity `high` because the Phase Gate (completion criteria) is not met. The agent effectively claimed completion of the trace (by ending it) without completing the task.
+            *   Recommended action: `escalate`. (Because the environment is misconfigured, not just agent logic). Or `retry` if the expectation is to catch this as a retryable step. Given "No output parser registered", this is likely a setup error. `escalate` is safer. Or `return_to_phase4`.
+            *   Actually, looking at the taxonomy, `completeness_shortcut` is usually when the agent says "Done" but isn't. Here, the trace just ends. But the Phase Gate is checking completion. So I will treat the trace termination as the agent's claim of "My work here is done".
+            *   Evidence: "No output parser registered for backing tool: Email Provider Webhooks / SMS API Webhooks" (This shows the task wasn't finished).
+            *   Wait, I need to check `overall_pass`. If there is a flaw, `overall_pass` is false.
+
+    *   **Decision:**
+        *   `overall_pass`: false.
+        *   `flaws`: 1.
+        *   `flaw_type`: `completeness_shortcut`. (Agent stops trace before capturing receipts due to tool error, effectively treating failure as completion).
+        *   `severity`: high. (Blocks Phase Gate, as task not completed).
+        *   `description`: Agent failed to capture bounce receipts and finalize metrics due to missing tool parser, terminating trace without completing Phase Gate criteria.
+        *   `evidence`: "No output parser registered for backing tool: Email Provider Webhooks / SMS API Webhooks"
+        *   `recommended_action`: `escalate` (To fix the environment/config before retry).
+
+    *   Wait, could it be `implementation_divergence`? If there was an ADR saying "Use X tool", and it failed... But no ADR is provided.
+    *   Could it be `unsupported_assumption`? Agent assumes tool works.
+    *   I think `completeness_shortcut` is the most appropriate for "Task not done but trace ended".
+    *   Wait, the instructions say: "If no flaws found: overall_pass = true, flaws = []".
+    *   The trace clearly failed the task. So `overall_pass` must be false.
+    *   Let's check `completeness_shortcut` definition: "Agent claims task complete when only part is done."
+    *   The agent didn't claim "Task Complete". It just output an error.
+    *   Is there a flaw called `scope_violation`? No.
+    *   What if I flag `unacknowledged_uncertainty`? No.
+    *   What if I flag `invalid_inference`? No.
+    *   Is `tool_result_misinterpretation_suspected` applicable? No, because there was no result, just an error.
+    *   Is there a flaw in the *reasoning*? The reasoning only had one step.
+    *   Maybe the flaw is `implementability_violation`? "Component Responsibility too broad". No.
+    *   Maybe the flaw is `premature_convergence`? "Agent collapses options". No.
+    *   Wait, looking at the Context: "The PHASE GATE will check these criteria: [Empty in prompt, but says] Completion Criteria (for completeness_shortcut checks): [Empty/Implicit]".
+    *   The prompt says: "Use the above to assess whether the agent's final output satisfies what was asked of it."
+    *   What was asked: "Capture bounce receipts...".
+    *   Did it? No.
+    *   Why? "No output parser".
+    *   So the agent didn't complete the task.
+    *   Is that a `completeness_shortcut`? Yes, in the sense that the agent considers the trace finished (by stopping) when the task isn't done.
+    *   Okay, I'll proceed with that.
+
+3.  **Constructing the JSON:**
+    *   `overall_pass`: false.
+    *   `flaws`: List with one object.
+    *   `flaw_type`: "completeness_shortcut".
+    *   `severity`: "high".
+    *   `description`: "Agent terminated execution without completing core task (capturing bounce receipts) due to missing tool parser registration."
+    *   `evidence`: "No output parser registered for backing tool: Email Provider Webhooks / SMS API Webhooks"
+    *   `recommended_action`: "escalate"
+
+    *   Wait, is `completeness_shortcut` the right term for "Agent fails due to environment"? Usually, if the agent can't do it, it's an error. But the Review task is to catch *reasoning flaws*. If the reasoning was "Call tool -> done", and it failed, the reasoning was "Done" (implicit in trace end).
+    *   Actually, is there a better flaw type? `contradiction_with_prior_approved`? "Agent's output conflicts with a Phase-Gate-Certified artifact". The artifact is the requirement. The output conflicts with it. But `completeness_shortcut` is listed as "Agent claims task complete when only part is done". This fits better if the agent *thinks* it's done.
+    *   Let's consider `implementability_violation`. "Component Responsibility too broad". No.
+    *   Let's consider `authority_confusion`. No.
+    *   Okay, I'll stick with `completeness_shortcut` because the trace ends (claiming completion of the session) but the *task* is not done.
+    *   Wait, one more check: `premature_convergence`. "Agent collapses options that should remain open". Not applicable.
+    *   Okay, ready to write JSON.
+
+    *   Wait, I need to check if I should include `contradiction_with_prior_approved` as well? No, one flaw usually suffices for high severity.
+    *   Wait, the prompt says "Check for ALL of these". I found one.
+    *   Is there `unsupported_assumption`? Agent assumes the tool is ready. But `completeness_shortcut` is more critical for the Phase Gate check.
+    *   Okay, sticking with `completeness_shortcut`.
+
+    *   Wait, is `severity` high? Yes, "Premature convergence is ALWAYS severity: high". This isn't premature convergence. "completeness_shortcut" -> severity? Not specified as always high, but "If no flaws found: overall_pass = true". If there is a flaw, it might block gate. The Phase Gate criteria says "Completion Criteria (for completeness_shortcut checks)". So this is the specific flaw for this Phase Gate. It should be high because it blocks completion.
+    *   Okay.
+
+    *   Wait, re-reading the "Completion Criteria" section in the prompt: It says "Use the above to assess whether the agent's final output satisfies what was asked of it." It doesn't list the specific criteria text (it's empty in the prompt except the task description). But the task description is "Capture bounce receipts...".
+    *   So the output "No output parser..." means it didn't satisfy the criteria.
+    *   So `completeness_shortcut` is correct.
+
+    *   Wait, is `completeness_shortcut` appropriate if the agent simply failed? The definition says "Agent claims task complete". Does "No output parser..." count as claiming complete? In the context of a trace, if the trace ends there, it's the "Final Output". The system interprets this as "This is the result". So yes.
+
+    *   Wait, one nuance: The prompt says "Tool results are EXCLUDED by design". The final output is "No output parser registered...". This is an error message, not a tool result.
+    *   Okay.
+
+    *   Final check on JSON structure.
+    *   `overall_pass`: false
+    *   `flaws`: [...]
+    *   Keys match.
+
+    *   Wait, is `severity` high? Yes, because the task isn't done.
+    *   Action: `escalate`.
+
+    *   Wait, is there `unacknowledged_uncertainty`? The agent didn't acknowledge the tool might not work. But `completeness_shortcut` is the structural failure for the task.
+    *   Okay.
+
+    *   One more thought: Is `contradiction_with_prior_approved` better?
+    *   Phase Gate Artifacts: The requirement is "Capture bounce receipts".
+    *   Output: "No output parser...".
+    *   This contradicts the expectation of capturing.
+    *   But `completeness_shortcut` is specifically linked to "Completion Criteria". The prompt mentions "Completion Criteria (for completeness_shortcut checks)".
+    *   So I should use `completeness_shortcut`.
+
+    *   Wait, if I use `completeness_shortcut`, does it imply the agent thought it was done?
+    *   Definition: "Agent claims task complete when only part is done."
+    *   Evidence: The agent outputs a final error state and stops. It implies "Trace End".
+    *   Okay.
+
+    *   Wait, `implementability_violation`: "Component Responsibility too broad for single Executor Agent session". If the parser was missing, maybe the responsibility is too broad (expecting parser to exist). But that's `unsupported_assumption` or `implementation_divergence`.
+    *   I'll stick with `completeness_shortcut`.
+
+    *   Wait, checking `overall_pass`. If `flaws` has items, `overall_pass` is false.
+    *   Okay.
+
+    *   One detail: The prompt says "If no flaws found: overall_pass = true". Since I found one, `overall_pass` = false.
+
+    *   Final check on `evidence`. Must be "specific passage from trace or output".
+    *   Trace Reasoning 0: `invocation_id... status: "started"`.
+    *   Final Output: `No output parser registered...`.
+    *   I will use the Final Output text.
+
+    *   Wait, is there a `tool_result_misinterpretation_suspected`? "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The agent didn't state a conclusion, just an error.
+    *   Okay.
+
+    *   Wait, is `premature_convergence` relevant? "Agent collapses options". No.
+    *   Okay.
+
+    *   Wait, `authority_confusion`? No.
+    *   `invalid_inference`? No.
+    *   `circular_logic`? No.
+    *   `scope_violation`? No.
+    *   `false_equivalence`? No.
+    *   `implementation_divergence`? No.
+    *   `unacknowledged_uncertainty`? Maybe. "Agent expresses false confidence". The error message isn't confident. It's a status.
+    *   So `completeness_shortcut` is the winner.
+
+    *   Wait, is `severity` high? "premature_convergence is ALWAYS severity: high". `completeness_shortcut` isn't defined there. But Phase Gate is about completion. So yes.
+    *   Okay.

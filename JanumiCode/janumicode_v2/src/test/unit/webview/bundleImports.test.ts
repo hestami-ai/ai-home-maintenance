@@ -30,13 +30,14 @@ const sveltePlugin = require('esbuild-svelte');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
 const ENTRY = path.join(REPO_ROOT, 'src', 'webview', 'main.ts');
+const CANVAS_ENTRY = path.join(REPO_ROOT, 'src', 'webview', 'canvas', 'main.ts');
 
 /** Expected Svelte components that should end up defined in the bundle. */
 const EXPECTED_COMPONENTS = [
   'App',
   'Card',
   'MirrorCard',
-  'MenuCard',
+  'DecisionBundleCard',
   'PhaseGateCard',
   'IntentComposer',
   'ContextBar',
@@ -72,9 +73,9 @@ function tsScriptPreprocessor(variant: 'fixed' | 'broken') {
   };
 }
 
-async function bundleWebview(variant: 'fixed' | 'broken'): Promise<string> {
+async function bundleEntry(entry: string, variant: 'fixed' | 'broken'): Promise<string> {
   const result = await esbuild.build({
-    entryPoints: [ENTRY],
+    entryPoints: [entry],
     absWorkingDir: REPO_ROOT,
     bundle: true,
     format: 'iife',
@@ -93,6 +94,10 @@ async function bundleWebview(variant: 'fixed' | 'broken'): Promise<string> {
     ],
   });
   return new TextDecoder().decode(result.outputFiles[0].contents);
+}
+
+async function bundleWebview(variant: 'fixed' | 'broken'): Promise<string> {
+  return bundleEntry(ENTRY, variant);
 }
 
 describe('Webview bundle — component import integrity', () => {
@@ -138,14 +143,23 @@ describe('Webview bundle — component import integrity', () => {
   );
 
   it(
-    'every .svelte import in a .svelte file resolves to a definition in the bundle (static check against the fixed bundle)',
+    'every .svelte import in a .svelte file resolves to a definition in the bundle that owns it',
     async () => {
-      const bundle = await bundleWebview('fixed');
+      // The webview ships as TWO bundles (main + canvas) — see esbuild.js.
+      // Canvas components (DetailPanel, Toolbar) live in the canvas bundle
+      // and must be validated against it; checking them against the main
+      // bundle produces false "missing" positives. Bundle both entries and
+      // route each .svelte file to the bundle that actually owns it.
+      const [mainBundle, canvasBundle] = await Promise.all([
+        bundleEntry(ENTRY, 'fixed'),
+        bundleEntry(CANVAS_ENTRY, 'fixed'),
+      ]);
 
-      // Walk src/webview recursively for .svelte files and collect imports.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = require('node:fs') as typeof import('node:fs');
       const webviewDir = path.join(REPO_ROOT, 'src', 'webview');
+      const canvasDir = path.join(REPO_ROOT, 'src', 'webview', 'canvas');
+
       const svelteFiles: string[] = [];
       const walk = (dir: string) => {
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -166,18 +180,25 @@ describe('Webview bundle — component import integrity', () => {
         if (!scriptMatch) continue;
         const script = scriptMatch[1];
 
+        // Pick the bundle that actually contains this file.
+        const inCanvas = file.startsWith(canvasDir + path.sep) || file === canvasDir;
+        const bundle = inCanvas ? canvasBundle : mainBundle;
+        const bundleName = inCanvas ? 'canvas' : 'main';
+
         let match: RegExpExecArray | null;
         while ((match = importRegex.exec(script)) !== null) {
           const componentName = match[1];
           if (!new RegExp(`function ${componentName}\\(`).test(bundle)) {
-            missing.push(`${componentName} (imported from ${path.relative(REPO_ROOT, file)})`);
+            missing.push(
+              `${componentName} (imported from ${path.relative(REPO_ROOT, file)}, expected in ${bundleName} bundle)`,
+            );
           }
         }
       }
 
       expect(
         missing,
-        'Every .svelte import should produce a function definition in the bundle',
+        'Every .svelte import should produce a function definition in the bundle that owns its file',
       ).toEqual([]);
     },
     30_000,

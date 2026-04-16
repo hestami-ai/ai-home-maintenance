@@ -26,23 +26,17 @@ Without a unified interface, users must navigate different commands and modes.
 | **G2** | Intelligent query classification and routing |
 | **G3** | Direct database access for information retrieval |
 | **G4** | Seamless workflow initiation when needed |
+| **G5** | Multi-turn conversations |
+| **G6** | Streaming responses |
+| **G7** | Custom capabilities |
+| **G8** | Capability discovery via LLM|
 
-### Non-Goals (MVP)
-
-| Non-Goal | Reason |
-|----------|--------|
-| Multi-turn conversations | Each query is independent |
-| Streaming responses | Complete responses sufficient |
-| Custom capabilities | Built-in capabilities only |
-| Capability discovery via LLM | Full list in system prompt |
 
 ### Success Metrics
 
 | Metric | Target |
 |--------|--------|
 | Query classification accuracy | > 95% |
-| Response time (information) | < 3 seconds |
-| Response time (action) | < 5 seconds |
 | User satisfaction | "I can ask anything" |
 
 ---
@@ -172,7 +166,7 @@ Without a unified interface, users must navigate different commands and modes.
 
 ## 4. Non-Functional Requirements
 
-### NFR-1: Performance
+### [DEFERRED] NFR-1: Performance
 
 | Requirement | Target |
 |-------------|--------|
@@ -199,7 +193,7 @@ Without a unified interface, users must navigate different commands and modes.
 
 ---
 
-## 5. Out of Scope (MVP)
+## 5. In Scope (MVP)
 
 | Feature | Reason | Future Consideration |
 |---------|--------|----------------------|

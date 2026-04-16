@@ -68,6 +68,32 @@ export interface JanumiCodeConfig {
     idle_timeout_seconds: number;
     buffer_max_events: number;
   };
+
+  /**
+   * LLM routing — per-role provider/model assignments.
+   * Based on spec §10 `llm_routing`. Providers referenced here MUST be
+   * registered with the OrchestratorEngine's LLMCaller at startup, or the
+   * Phase that uses them will fail loudly. This is by design: silent
+   * fallbacks in correctness-validation roles (e.g. Reasoning Review) would
+   * mask configuration errors that matter for trust in the system.
+   */
+  llm_routing: {
+    reasoning_review: {
+      /** Primary provider + model used for ReasoningReview LLM calls. */
+      primary: { provider: string; model: string };
+      /** Temperature for reasoning review; should be low for deterministic output. */
+      temperature: number;
+      /** Max tokens of trace to include in the review prompt. */
+      trace_max_tokens: number;
+      /** Optional fallback if primary fails. */
+      fallback?: { provider: string; model: string };
+      /** Ensemble config (future — not yet used). */
+      ensemble?: {
+        enabled: boolean;
+        secondary: { provider: string; model: string };
+      };
+    };
+  };
 }
 
 // ── Hardcoded Defaults ──────────────────────────────────────────────
@@ -127,6 +153,20 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     timeout_seconds: 600,
     idle_timeout_seconds: 120,
     buffer_max_events: 1000,
+  },
+
+  // Spec §10 canonical:
+  //   "primary": { "provider": "google", "model": "gemini-2.0-flash-thinking" }
+  // The provider name MUST match an LLMProviderAdapter.name (GoogleProvider
+  // registers as 'google'). If the named provider is not registered at
+  // engine startup, validateLLMRouting() logs a startup error and the
+  // phase will fail loudly at invocation time (not silently skip).
+  llm_routing: {
+    reasoning_review: {
+      primary: { provider: 'google', model: 'gemini-2.0-flash-thinking' },
+      temperature: 0.2,
+      trace_max_tokens: 8000,
+    },
   },
 };
 
@@ -199,4 +239,44 @@ export class ConfigManager {
   getContextAssembly() { return this.config.context_assembly; }
   getInvariantLibrary() { return this.config.invariant_library; }
   getCLIInvocation() { return this.config.cli_invocation; }
+  getLLMRouting() { return this.config.llm_routing; }
+
+  /**
+   * Validate that every provider referenced in `llm_routing` is actually
+   * registered with the LLMCaller. Called by OrchestratorEngine at startup
+   * once all providers have been registered.
+   *
+   * Returns an array of validation errors. Empty = OK. A non-empty result
+   * should be treated as a fatal misconfiguration: correctness-validation
+   * roles (Reasoning Review, Domain Compliance Review) cannot fall back
+   * silently without undermining the system's trust model.
+   */
+  validateLLMRouting(registeredProviders: ReadonlySet<string>): string[] {
+    const errors: string[] = [];
+    const routing = this.config.llm_routing;
+    if (!routing) return errors;
+
+    const rr = routing.reasoning_review;
+    if (rr?.primary && !registeredProviders.has(rr.primary.provider)) {
+      errors.push(
+        `llm_routing.reasoning_review.primary references provider '${rr.primary.provider}' ` +
+        `which is not registered. Registered providers: ${Array.from(registeredProviders).sort().join(', ')}. ` +
+        `Fix: either register the '${rr.primary.provider}' provider adapter at startup, ` +
+        `or override llm_routing.reasoning_review.primary.provider in .janumicode/config.json.`,
+      );
+    }
+    if (rr?.fallback && !registeredProviders.has(rr.fallback.provider)) {
+      errors.push(
+        `llm_routing.reasoning_review.fallback references provider '${rr.fallback.provider}' ` +
+        `which is not registered. Registered: ${Array.from(registeredProviders).sort().join(', ')}.`,
+      );
+    }
+    if (rr?.ensemble?.enabled && !registeredProviders.has(rr.ensemble.secondary.provider)) {
+      errors.push(
+        `llm_routing.reasoning_review.ensemble.secondary references provider ` +
+        `'${rr.ensemble.secondary.provider}' which is not registered.`,
+      );
+    }
+    return errors;
+  }
 }

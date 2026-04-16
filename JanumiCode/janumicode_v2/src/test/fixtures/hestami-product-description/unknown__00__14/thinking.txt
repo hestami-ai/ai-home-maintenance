@@ -1,0 +1,255 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Reasoning Review] - An LLM API call that inspects an agent's [JC:Execution Trace].
+    *   **Input:** [JC:Trace Selection] containing reasoning steps, self-corrections, tool call invocations, and final output. Tool results are excluded.
+    *   **Task:** Check the provided trace and output against a "COMPLETE FLAW TAXONOMY".
+    *   **Output Format:** JSON object with `overall_pass` (bool) and `flaws` (array).
+    *   **Specific Context:**
+        *   **Required Output by Reviewed Agent:** Implement retry logic for failed notifications to resume sending within the 2-hour window.
+        *   **Phase Gate Criteria:** (Implied: The agent must actually implement the retry logic and satisfy the completion criteria regarding that task).
+        *   **Trace Selection:** Shows one reasoning step (seq 0) indicating a tool invocation (`Bun Background Worker / Retry Logic`) started.
+        *   **Agent's Final Output:** "No output parser registered for backing tool: Bun Background Worker / Retry Logic".
+    *   **Constraint:** Do NOT output the reviewed agent's schema. Report flaws.
+
+2.  **Analyze the Trace & Output:**
+    *   **Reasoning Step 0:** Shows the agent tried to use a tool (`Bun Background Worker / Retry Logic`).
+    *   **Final Output:** The agent explicitly states "No output parser registered for backing tool: Bun Background Worker / Retry Logic".
+    *   **Task Requirement:** "Implement retry logic for failed notifications to resume sending within the 2-hour window."
+    *   **Phase Gate Check:** The agent claims it tried to do the task, but the tool failed or wasn't registered properly, and critically, it did not actually produce the implementation or confirm success.
+    *   **Completion Criteria:** The agent did not confirm the task is done. The output suggests failure to execute the tool properly.
+
+3.  **Evaluate against Flaw Taxonomy:**
+    *   **unsupported_assumption:** N/A.
+    *   **invalid_inference:** N/A.
+    *   **circular_logic:** N/A.
+    *   **scope_violation:** N/A.
+    *   **premature_convergence:** N/A.
+    *   **false_equivalence:** N/A.
+    *   **authority_confusion:** N/A.
+    *   **completeness_shortcut:** The agent claims to be engaging with the task (via tool call), but the final output indicates failure ("No output parser registered"). It effectively did not complete the task of implementing the retry logic because the tool execution failed without parsing the result. However, looking closely: The task is to "Implement retry logic". The agent called a tool that *should* do it. The output says "No output parser registered". This means the tool call didn't produce the expected result for the agent to proceed.
+    *   **contradiction_with_prior_approved:** The Phase Gate asks for implementation. The agent tried but failed to get results. This isn't necessarily a contradiction of an artifact, but a failure of execution.
+    *   **implementability_violation:** "Component Responsibility too broad". The tool is a background worker. The issue is technical setup (parser missing), not necessarily scope.
+    *   **implementation_divergence:** N/A.
+    *   **tool_result_misinterpretation_suspected:** The tool was called, but the agent got a message saying "No output parser registered". This is a technical error in the tool setup.
+    *   **completeness_shortcut (Re-evaluation):** Did the agent claim completion? No, it output an error message. However, the *system instruction* to *me* (the reviewer) says: "Use the above to assess whether the agent's final output satisfies what was asked of it."
+    *   The task is "Implement retry logic...". The agent's final output is an error about the tool. It did not actually implement the logic (at least not visibly confirmed as success).
+    *   Is there a flaw? Yes. The agent failed to complete the task because of a tool configuration error ("No output parser registered").
+    *   Which flaw type fits best?
+        *   **completeness_shortcut**: Usually implies claiming "done" when not done. Here, the agent didn't claim "done", it reported an error.
+        *   **tool_result_misinterpretation_suspected**: This fits the definition "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The tool call said "started", the output says "No output parser registered". This suggests the agent might think it's done, but actually it's blocked. Or, more accurately, the agent is unable to proceed.
+        *   **unacknowledged_uncertainty**: The agent didn't acknowledge the tool failure as a blocker?
+        *   **implementability_violation**: Not really.
+        *   **completeness_shortcut** (Strict interpretation): The Phase Gate checks "Completion Criteria (for completeness_shortcut checks)". If the agent output doesn't satisfy the criteria, it's a flaw. The criteria are "Implement retry logic...". The agent failed to do so because of the parser issue. However, "completeness_shortcut" is specifically "Agent claims task complete when only part is done". Here the agent didn't claim complete.
+        *   Let's look for a better fit. The instruction says: "If the agent's output is missing required fields or contradicts the phase gate criteria, that is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw."
+        *   Did the agent contradict the criteria? Yes, it failed to implement the logic.
+        *   Is it a `completeness_shortcut`? The definition is "Agent claims task complete when only part is done".
+        *   Is there a better flaw? Maybe **tool_result_misinterpretation_suspected**? The agent output says "No output parser registered". This means the agent's conclusion (that it tried the tool) is inconsistent with the result (tool unavailable/configured wrong).
+        *   Actually, looking at the "Phase Gate" instructions: "Use the above to assess whether the agent's final output satisfies what was asked of it." If it doesn't satisfy, it's a flaw.
+        *   Since the agent output is essentially an error message about the tool not working, it implies the task is NOT complete.
+        *   Does this fit `completeness_shortcut`? If I treat the error as the agent implying "I tried, so I'm doing it", but the tool didn't work.
+        *   Let's consider **implementability_violation**. "Component Responsibility too broad for single Executor Agent session". The tool `Bun Background Worker` is a backing tool.
+        *   Let's consider **completeness_shortcut** again. Often in these reviews, if the agent doesn't output the actual implementation or confirmation, but just a tool call, and the tool fails, it's a failure.
+        *   Wait, I need to check the flaw definitions again.
+        *   `completeness_shortcut`: Agent claims task complete when only part is done.
+        *   `contradiction_with_prior_approved`: Agent's output conflicts with a Phase-Gate-Certified artifact.
+        *   `tool_result_misinterpretation_suspected`: Agent's stated conclusion from a tool call appears inconsistent with tool parameters.
+        *   `unacknowledged_uncertainty`: Agent expresses false confidence where genuine ambiguity exists.
+        *   The agent output is: "No output parser registered...". This is a system message/error from the tool side. The agent didn't conclude anything positive.
+        *   However, the task is "Implement retry logic". The output indicates the tool is broken/missing parser. The agent hasn't implemented the logic.
+        *   If I must choose a flaw: The agent failed to meet the completion criteria. The criteria are satisfied if the retry logic is implemented. The output shows it wasn't.
+        *   Is there a specific flaw name for "Failed to use tool due to config"?
+        *   Maybe `unacknowledged_uncertainty`? No.
+        *   Maybe `completeness_shortcut` is the closest if we interpret the error message as the agent stopping and thinking it's done (or the system halting).
+        *   But strictly speaking, `completeness_shortcut` is about claiming completion.
+        *   Let's look at `implementation_divergence`. Implementation contradicts governing ADR. Not applicable.
+        *   Let's look at `premature_convergence`. Always high severity. N/A.
+        *   What about the fact that the agent did not actually *implement* the logic, just called a tool?
+        *   Maybe the flaw is **completeness_shortcut** because the agent effectively stops at the tool call error without attempting code implementation or handling the error to ensure the task is done (e.g., falling back to another method).
+        *   However, `completeness_shortcut` definition is specific: "Agent claims task complete when only part is done". The output doesn't claim "complete".
+        *   Is there a flaw called **implementability_violation**? "Component Responsibility too broad for single Executor Agent session".
+        *   Maybe **tool_result_misinterpretation_suspected**? "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The tool call parameters (to start retry logic) were invoked, but the result (parser missing) means the conclusion (logic implemented) is inconsistent.
+        *   Actually, the most appropriate flaw is likely **completeness_shortcut** (interpreted broadly as failing to complete the task properly before outputting) or simply that the task criteria are not met. But I need to map it to a taxonomy item.
+        *   Let's check `unsupported_assumption`. N/A.
+        *   Let's check `completeness_shortcut` again. The Phase Gate checks "Completion Criteria". The agent failed. Does that make it `completeness_shortcut`?
+        *   Actually, looking at the instruction: "If the agent's output is missing required fields or contradicts the phase gate criteria, that is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw."
+        *   So, since the output does not satisfy the Phase Gate criteria (Implement retry logic), and the agent didn't explicitly claim completion but just failed, does this count?
+        *   Usually, if the agent fails to deliver the result, it's a failure to complete.
+        *   Let's look for **unacknowledged_uncertainty**: "Agent expresses false confidence where genuine ambiguity exists". The agent says "No output parser registered". It acknowledges the error.
+        *   Let's consider the scenario: The agent tried to use a tool. The tool failed due to configuration ("No output parser registered"). The agent's "Final Output" is the error message.
+        *   Does this violate `completeness_shortcut`? The task asked to implement logic. The agent attempted but the tool failed. The task is not complete. If the agent outputs this as its *final* output, it implies the session ended.
+        *   If I have to find a flaw, the primary issue is that the task is not completed.
+        *   Is there a "tool failure" flaw? Not explicitly in the list.
+        *   Closest fit: **completeness_shortcut**. The agent implies "I have handled this" by ending the trace, but the criteria (Implement retry logic) are not met. The definition says "Agent claims task complete when only part is done". Calling a tool that fails is "part is done". Ending the trace is "claims task complete".
+        *   Severity: High (because the retry logic is critical functionality, missing implementation blocks Phase Gate).
+        *   Evidence: "No output parser registered for backing tool: Bun Background Worker / Retry Logic".
+        *   Recommended Action: `escalate` or `return_to_phase4`. Since I can't see the tool results (tool results excluded), I don't know if the background worker is fixed or not. But the agent failed to produce the output.
+        *   Wait, there is a specific rule: "premature_convergence is ALWAYS severity: high". This doesn't apply.
+        *   Let's check the Phase Gate criteria again: "Completion Criteria (for completeness_shortcut checks)".
+        *   If the agent fails to meet the criteria, it is a `completeness_shortcut` (in the sense of not being complete) OR `contradiction_with_prior_approved` (if it contradicts the requirement).
+        *   Given the output is an error, it's definitely not "compliant".
+        *   I will categorize this as **completeness_shortcut** because the agent effectively asserts "this is done" (by ending the turn) despite the tool error indicating the implementation wasn't successful/functional. Or better, use **tool_result_misinterpretation_suspected**? No, the output IS the error.
+        *   Actually, the most accurate flaw might be **completeness_shortcut**. The agent stopped at the error message, implying the session is done, but the task (Implement retry logic) was not actually achieved (since the tool didn't work).
+        *   Severity: High.
+        *   Evidence: "No output parser registered for backing tool: Bun Background Worker / Retry Logic"
+        *   Action: `escalate`.
+
+        Wait, let's look at the "Tool Results are EXCLUDED by design" rule. "you cannot see what tools returned, only what the agent concluded from them."
+        The agent concluded: "No output parser registered".
+        This means the agent concluded the tool failed.
+        Does this constitute a flaw?
+        If the agent tried the right tool and it failed, that's a technical limitation.
+        However, the instruction says: "Use the above to assess whether the agent's final output satisfies what was asked of it."
+        Task: "Implement retry logic".
+        Output: Error.
+        Result: Task not satisfied.
+        Therefore, `overall_pass` should be `false`.
+        Which flaw?
+        If I say `completeness_shortcut`, the description should be "Agent failed to demonstrate successful implementation of retry logic, terminating on tool configuration error without alternative resolution."
+        But is there a specific flaw for "Task not completed due to error"?
+        `completeness_shortcut` definition: "Agent claims task complete when only part is done".
+        By outputting an error message as the final output, the agent implies the trace is finished. This can be seen as claiming the *process* is complete (even if the logic isn't implemented).
+        I will use **completeness_shortcut** as the agent ends the session without confirming the retry logic is actually in place or handled.
+        Severity: **high** (Phase Gate blocks).
+        Action: `escalate`.
+
+        Alternative: **implementability_violation**? No.
+        Alternative: **contradiction_with_prior_approved**? Maybe, if the requirement was "Must work".
+        I'll stick with **completeness_shortcut**. The agent treats the error as a stopping point, effectively claiming "I can't do more/This is done" (completing the session), but the criteria (Implement retry logic) are not satisfied.
+
+        Wait, looking at the "Tool Results are EXCLUDED by design" instruction again. It means I shouldn't judge based on what the tool *actually* did (which I don't know), but based on the agent's *conclusion*.
+        The agent's conclusion is "No output parser registered".
+        So the agent concluded the tool failed.
+        Did the agent claim the task is complete? Implicitly, by providing a final output that isn't the solution but an error.
+        Flaw: `completeness_shortcut`.
+        Evidence: "No output parser registered for backing tool: Bun Background Worker / Retry Logic"
+        Description: The agent terminated the session with a tool error rather than implementing the logic or reporting a status that satisfies the completion criteria.
+        Severity: high.
+
+        Wait, is there a flaw for "Agent cannot use tool"?
+        Maybe `unacknowledged_uncertainty`? No.
+        Maybe `implementability_violation`? No.
+
+        Let's consider if this is **unsupported_assumption**. "Agent asserts something as true with no basis in Context Payload". No.
+        Let's consider **tool_result_misinterpretation_suspected**. "Agent's stated conclusion from a tool call appears inconsistent with tool parameters".
+        The tool call was "Bun Background Worker / Retry Logic". The output is "No output parser registered".
+        This suggests the tool call *parameters* (or setup) were valid, but the *result* (parser) was missing. The agent concluded this failure.
+        Is this a flaw in the *agent*? The agent followed the tool. The tool failed.
+        However, the *review instruction* says: "assess whether the agent's final output satisfies what was asked of it."
+        Since it doesn't satisfy the ask (Implement retry logic), there must be a flaw.
+        The most logical classification for "Did not finish the task because of output mismatch" is `completeness_shortcut` (didn't actually complete).
+        Or, since the tool call happened but no result was parsed, maybe **completeness_shortcut** is the best fit for "Task not done".
+        However, technically `completeness_shortcut` is "Claims complete when only part is done". The agent didn't explicitly say "Complete". But in trace reviews, ending the trace with an error often counts as "I'm done".
+        Actually, there is a flaw type: `implementation_divergence`. No.
+        What if I use **contradiction_with_prior_approved**? The Phase Gate criteria are the prior approval. The output contradicts (doesn't meet) the criteria.
+        But `completeness_shortcut` is specifically listed for Phase Gate checks.
+        I will use `completeness_shortcut`.
+
+        Wait, I need to check "Tool Results are EXCLUDED". The agent's output says "No output parser registered". This is part of the "Final Output".
+        This means the agent output an error message.
+        Does an error message satisfy the criteria? No.
+        So `overall_pass` = false.
+        Flaw = `completeness_shortcut`.
+        Severity = high.
+
+        Let's refine the description.
+        "The agent failed to provide the required implementation of retry logic, ending the trace with a tool configuration error ('No output parser registered') which does not satisfy the Completion Criteria."
+        Evidence: "No output parser registered for backing tool: Bun Background Worker / Retry Logic"
+        Action: `escalate` (since it's a technical block that might need infrastructure fix, not just logic retry).
+
+        Wait, one more check: `implementability_violation` definition: "Component Responsibility too broad for single Executor Agent session". The retry logic is likely a single component.
+        `tool_result_misinterpretation_suspected` definition: "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". Here the tool parameters were correct (it's a retry logic worker), but the output parser wasn't registered. This is a system state, not necessarily agent reasoning.
+        However, `completeness_shortcut` is the one linked to Phase Gate criteria.
+        I will proceed with `completeness_shortcut`.
+
+        Wait, re-reading the instructions: "If the agent's output is missing required fields or contradicts the phase gate criteria, that is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw."
+        The output contradicts the criteria (Criteria: Implement logic. Output: Error message).
+        So `completeness_shortcut` is valid.
+
+        Severity: High (blocks Phase Gate).
+
+4.  **Construct JSON:**
+    *   `overall_pass`: false
+    *   `flaws`: array with one object.
+    *   `flaw_type`: "completeness_shortcut"
+    *   `severity`: "high"
+    *   `description`: "Agent failed to demonstrate successful implementation of retry logic, terminating the session with a tool error that does not satisfy the Completion Criteria."
+    *   `evidence`: "No output parser registered for backing tool: Bun Background Worker / Retry Logic"
+    *   `recommended_action`: "escalate" (Technical blocker).
+
+        *Self-Correction on Severity:*
+        "severity: high = blocks Phase Gate, triggers quarantine and retry".
+        Since the task is critical (retry logic for notifications), and the tool is broken/missing parser, this blocks progress.
+        "recommended_action": "escalate_to_unsticking" or "escalate". Let's pick "escalate".
+        Actually, if the tool is missing a parser, that's an infrastructure issue. `escalate`.
+        Wait, "premature_convergence is ALWAYS severity: high".
+        My flaw is not that.
+        But it blocks the gate.
+        Action: `return_to_phase4` or `escalate`.
+        The instruction says: "recommended_action": "retry|escalate|accept_with_caveat|return_to_phase4|escalate_to_unsticking".
+        Since the agent couldn't produce the result due to tool parser issues, it's likely an infrastructure issue to fix. `escalate`.
+        Or `return_to_phase4` if we want them to try again with a fixed tool.
+        Given "escalate_to_unsticking" is an option for stuck situations.
+        I'll use `escalate`.
+
+        Wait, looking at the trace again.
+        [REASONING] (seq 0) -> Tool started.
+        [AGENT'S FINAL OUTPUT] -> "No output parser registered..."
+        This means the agent didn't get the result to process.
+        This is effectively a `completeness_shortcut` in that the session ended without the result required.
+        I will finalize the JSON.
+
+        One nuance: Is "No output parser registered" a `completeness_shortcut`?
+        The definition is "Agent claims task complete when only part is done".
+        By stopping at the error, does it claim complete? Yes, implicitly by ending the trace.
+        But also, the output explicitly states the tool failed.
+        So the task is not done.
+        So `completeness_shortcut` fits "Part is done (tool called) -> Task not done (logic not implemented) -> Agent thinks it's done/trace ends".
+        Okay, I'm confident.
+
+        Wait, one more check on `tool_result_misinterpretation_suspected`.
+        Definition: "Agent's stated conclusion from a tool call appears inconsistent with tool parameters".
+        Tool Parameters: Invoke retry logic.
+        Agent Stated Conclusion: Tool failed due to parser.
+        Is this inconsistent? No, it's consistent. The tool call was made, parser missing, tool failed.
+        So not `tool_result_misinterpretation`.
+        It is `completeness_shortcut`.
+
+        Final check on Severity: High.
+        Final check on Action: escalate.
+
+        Wait, the instruction says "If the agent's output is missing required fields or contradicts the phase gate criteria, that is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw."
+        So `completeness_shortcut` is the correct tag.
+        Severity High.
+        Action `escalate`.
+
+        Wait, is there an `overall_pass` field? Yes.
+        Since there is a flaw, `overall_pass` must be false.
+
+        One detail: The trace selection is minimal. Only one reasoning step.
+        The agent output is just the error.
+        Okay, ready to write.
+
+        Wait, I should ensure the JSON is valid.
+        Double check keys.
+        `overall_pass`, `flaws` (array of objects with `flaw_type`, `severity`, `description`, `evidence`, `recommended_action`).
+
+        One more thought: Is it `contradiction_with_prior_approved`?
+        "Agent's output conflicts with a Phase-Gate-Certified artifact".
+        The Phase Gate Criteria are "Implement retry logic...".
+        The agent output "No output parser...". This conflicts.
+        But the instruction groups these: "missing required fields or contradicts... is a `completeness_shortcut` or `contradiction_with_prior_approved` flaw".
+        Since the issue is about the *completeness* of the task (didn't implement), `completeness_shortcut` is more precise.
+
+        I will set `overall_pass` to `false`.
+        Flaw count: 1.
+        Evidence: "No output parser registered for backing tool: Bun Background Worker / Retry Logic"
+
+        Wait, `completeness_shortcut` is for "claims task complete when only part is done".
+        Is there a flaw for "Task failed entirely"?
+        The taxonomy doesn't have "tool_error".
+        It has `completeness_shortcut` (claims complete when part done).
+        By outputting an error message as the final output, the agent implies the trace is complete. But the task is not done.
+        So it fits `completeness_shortcut`.
+
+        Let's write the JSON.

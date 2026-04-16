@@ -30,6 +30,15 @@ export interface CLIInvocationOptions {
   bufferMaxEvents?: number;
   /** Output parser for this backing tool */
   outputParser: OutputParser;
+  /**
+   * Optional live-chunk callbacks. When provided, every stdout/stderr byte
+   * arriving on the pipe is reported before the process exits, so the
+   * webview card can render live output. The governed-stream write
+   * happens inside AgentInvoker, which adapts these chunks into
+   * `agent_output_chunk` records.
+   */
+  onStdoutChunk?: (text: string) => void;
+  onStderrChunk?: (text: string) => void;
 }
 
 export interface CLIInvocationResult {
@@ -85,7 +94,12 @@ export class CLIInvoker {
         // Reset idle timer on any output
         resetIdleTimer();
 
-        stdoutBuffer += chunk.toString('utf-8');
+        const chunkText = chunk.toString('utf-8');
+        stdoutBuffer += chunkText;
+
+        // Forward the raw chunk to the live callback so the webview card
+        // sees it immediately, before parsing / record-type classification.
+        options.onStdoutChunk?.(chunkText);
 
         // Process complete lines
         const lines = stdoutBuffer.split('\n');
@@ -94,16 +108,19 @@ export class CLIInvoker {
         for (const line of lines) {
           if (!line.trim()) continue;
           const parsed = options.outputParser.parseLine(line);
-          if (parsed) {
-            events.push(parsed);
-          }
+          // parseLine now returns an array — a single Claude Code
+          // envelope can carry multiple logical events (a text block
+          // plus N tool_use blocks). Treat each one independently.
+          for (const event of parsed) events.push(event);
         }
       });
 
       // ── Stderr handling ──────────────────────────────────────
 
       child.stderr?.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString('utf-8');
+        const chunkText = chunk.toString('utf-8');
+        stderr += chunkText;
+        options.onStderrChunk?.(chunkText);
       });
 
       // ── Process exit ─────────────────────────────────────────
@@ -114,7 +131,7 @@ export class CLIInvoker {
         // Process any remaining buffered stdout
         if (stdoutBuffer.trim()) {
           const parsed = options.outputParser.parseLine(stdoutBuffer);
-          if (parsed) events.push(parsed);
+          for (const event of parsed) events.push(event);
         }
 
         resolve({

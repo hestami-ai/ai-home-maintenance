@@ -66,22 +66,22 @@
   .attachment-bar {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
+    gap: var(--jc-space-md);
+    padding: var(--jc-space-sm) var(--jc-space-md);
     overflow-x: auto;
-    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    border-bottom: 1px solid var(--vscode-panel-border, var(--jc-outline-variant));
     scrollbar-width: thin;
   }
   .attachment-bar.drag-over {
-    background: var(--vscode-list-dropBackground, rgba(100, 150, 255, 0.15));
+    background: var(--vscode-list-dropBackground, var(--jc-primary-tint-medium));
   }
   .attach-btn {
     flex-shrink: 0;
     background: transparent;
     color: var(--vscode-foreground);
-    border: 1px dashed var(--vscode-panel-border, #555);
-    border-radius: 12px;
-    padding: 2px 10px;
+    border: 1px dashed var(--vscode-panel-border, var(--jc-outline));
+    border-radius: var(--jc-radius-pill);
+    padding: var(--jc-space-xs) var(--jc-space-lg);
     cursor: pointer;
     font-size: 0.75em;
     font-family: inherit;
@@ -92,11 +92,11 @@
   .chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    background: var(--vscode-badge-background, #333);
-    color: var(--vscode-badge-foreground, #ddd);
-    padding: 2px 6px 2px 8px;
-    border-radius: 12px;
+    gap: var(--jc-space-sm);
+    background: var(--vscode-badge-background, var(--jc-surface-container-highest));
+    color: var(--vscode-badge-foreground, var(--jc-on-surface));
+    padding: var(--jc-space-xs) var(--jc-space-md) var(--jc-space-xs) var(--jc-space-md);
+    border-radius: var(--jc-radius-pill);
     font-size: 0.75em;
     flex-shrink: 0;
     max-width: 200px;
@@ -111,7 +111,7 @@
     background: transparent;
     color: inherit;
     border: none;
-    padding: 0 2px;
+    padding: 0 var(--jc-space-xs);
     cursor: pointer;
     font-size: 1em;
     line-height: 1;

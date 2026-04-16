@@ -29,14 +29,13 @@ class RecordsStore {
   records = $state<SerializedRecord[]>([]);
 
   /**
-   * Add a single record. Inserts in chronological order by produced_at.
-   * No-op if a record with the same id already exists.
+   * Add a single record. Inserts in chronological order by produced_at,
+   * then pins conversational-thread records (client_liaison_response)
+   * adjacent to the record they derive from — see `conversationalSort`.
    */
   add(record: SerializedRecord): void {
     if (this.records.some(r => r.id === record.id)) return;
-    const next = [...this.records, record];
-    next.sort((a, b) => a.produced_at.localeCompare(b.produced_at));
-    this.records = next;
+    this.records = conversationalSort([...this.records, record]);
   }
 
   /**
@@ -52,10 +51,7 @@ class RecordsStore {
    * Replace the entire record set (e.g. on webview restore).
    */
   setSnapshot(snapshot: SerializedRecord[]): void {
-    const sorted = [...snapshot].sort(
-      (a, b) => a.produced_at.localeCompare(b.produced_at),
-    );
-    this.records = sorted;
+    this.records = conversationalSort([...snapshot]);
   }
 
   clear(): void {
@@ -97,3 +93,82 @@ class RecordsStore {
 }
 
 export const recordsStore = new RecordsStore();
+
+/**
+ * Sort records chronologically, then pin conversational-thread records
+ * adjacent to the record they reply to.
+ *
+ * Motivation: client_liaison_response records for workflow_initiation
+ * queries are written AFTER the forced `startWorkflow` capability
+ * returns, which is AFTER Phase 0 completes and often AFTER Phase 1's
+ * first few records land. A pure produced_at sort therefore shows the
+ * user their "Workflow started…" acknowledgement buried underneath
+ * Phase 1 content — confusing, because conversationally the response
+ * belongs immediately under the intent that triggered it.
+ *
+ * The fix: after chronological sort, lift every `client_liaison_response`
+ * up to sit right after the record it derives from (raw_intent_received
+ * or open_query_received). This matches chat-thread UX without mutating
+ * timestamps on the governed stream.
+ */
+function conversationalSort(records: SerializedRecord[]): SerializedRecord[] {
+  const chronological = records.slice().sort(
+    (a, b) => a.produced_at.localeCompare(b.produced_at),
+  );
+
+  const byId = new Map<string, SerializedRecord>();
+  for (const r of chronological) byId.set(r.id, r);
+
+  const result: SerializedRecord[] = [];
+  const placed = new Set<string>();
+  const respondingTypes = new Set(['raw_intent_received', 'open_query_received']);
+
+  // Group responses by their anchor record id so we can insert them right
+  // after the anchor during the pass below.
+  const responsesByAnchor = new Map<string, SerializedRecord[]>();
+  for (const r of chronological) {
+    if (r.record_type !== 'client_liaison_response') continue;
+    const anchorId = r.derived_from_record_ids.find(id => {
+      const anchor = byId.get(id);
+      return anchor && respondingTypes.has(anchor.record_type);
+    });
+    if (!anchorId) continue;
+    const list = responsesByAnchor.get(anchorId) ?? [];
+    list.push(r);
+    responsesByAnchor.set(anchorId, list);
+  }
+
+  for (const r of chronological) {
+    if (placed.has(r.id)) continue;
+    if (r.record_type === 'client_liaison_response' && responsesByAnchor.size > 0) {
+      // Responses are only emitted when traversed via their anchor below.
+      // Skipping here keeps the response from appearing out of thread.
+      const isAnchored = [...responsesByAnchor.values()].some(
+        list => list.some(resp => resp.id === r.id),
+      );
+      if (isAnchored) continue;
+    }
+    result.push(r);
+    placed.add(r.id);
+
+    const pinned = responsesByAnchor.get(r.id);
+    if (pinned) {
+      for (const resp of pinned) {
+        if (!placed.has(resp.id)) {
+          result.push(resp);
+          placed.add(resp.id);
+        }
+      }
+    }
+  }
+
+  // Safety: append anything that somehow got orphaned.
+  for (const r of chronological) {
+    if (!placed.has(r.id)) {
+      result.push(r);
+      placed.add(r.id);
+    }
+  }
+
+  return result;
+}

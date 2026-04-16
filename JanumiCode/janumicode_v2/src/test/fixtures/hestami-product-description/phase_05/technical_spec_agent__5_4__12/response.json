@@ -1,0 +1,312 @@
+{
+  "text": "{\n  \"configuration_parameters\": {\n    \"params\": [\n      {\n        \"component_id\": \"cmp-prop-data\",\n        \"name\": \"db_url\",\n        \"type\": \"url\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Connection string for the primary property asset database (PostgreSQL/Vector Store).\"\n      },\n      {\n        \"component_id\": \"cmp-prop-data\",\n        \"name\": \"seaweedfs_root\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Base storage path for SeaweedFS media asset ingestion (images and 3D splats).\"\n      },\n      {\n        \"component_id\": \"cmp-prop-data\",\n        \"name\": \"indexer_timeout_duration\",\n        \"type\": \"duration\",\n        \"default\": \"10s\",\n        \"required\": false,\n        \"description\": \"Maximum time allowed to index a valid asset after upload (RSP-002).\"\n      },\n      {\n        \"component_id\": \"cmp-prop-data\",\n        \"name\": \"db_password\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Database authentication password (security-sensitive).\"\n      },\n      {\n        \"component_id\": \"cmp-prop-data\",\n        \"name\": \"max_upload_size_mb\",\n        \"type\": \"integer\",\n        \"default\": 500,\n        \"required\": false,\n        \"description\": \"Maximum allowed file size in MB for property asset ingestion.\"\n      },\n      {\n        \"component_id\": \"cmp-prop-data\",\n        \"name\": \"offline_buffer_ttl_seconds\",\n        \"type\": \"integer\",\n        \"default\": 86400,\n        \"required\": false,\n        \"description\": \"Time-to-live for offline data capture buffers (RSP-003).\"\n      },\n      {\n        \"component_id\": \"cmp-provider-match\",\n        \"name\": \"search_db_url\",\n        \"type\": \"url\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Connection string for the provider search and bid estimation database.\"\n      },\n      {\n        \"component_id\": \"cmp-provider-match\",\n        \"name\": \"ai_agent_endpoint\",\n        \"type\": \"url\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"API endpoint for the AI Agent Service Provider Search & Matching processing.\"\n      },\n      {\n        \"component_id\": \"cmp-provider-match\",\n        \"name\": \"min_match_score\",\n        \"type\": \"float\",\n        \"default\": 0.75,\n        \"required\": false,\n        \"description\": \"Minimum relevance score for service provider results to be returned (RSP-004).\"\n      },\n      {\n        \"component_id\": \"cmp-provider-match\",\n        \"name\": \"api_secret_key\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"API secret key for the matching service (security-sensitive).\"\n      },\n      {\n        \"component_id\": \"cmp-provider-match\",\n        \"name\": \"bid_threshold_cents\",\n        \"type\": \"integer\",\n        \"default\": 0,\n        \"required\": false,\n        \"description\": \"Minimum bid amount in cents enforced in UI comparison tables (RSP-005).\"\n      },\n      {\n        \"component_id\": \"cmp-compliance\",\n        \"name\": \"regulatory_db_url\",\n        \"type\": \"url\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Connection string for the compliance rules and statutory deadline database.\"\n      },\n      {\n        \"component_id\": \"cmp-compliance\",\n        \"name\": \"deadline_check_interval_seconds\",\n        \"type\": \"integer\",\n        \"default\": 3600,\n        \"required\": false,\n        \"description\": \"Frequency (seconds) to monitor statutory deadlines for regulatory obligations (RSP-007).\"\n      },\n      {\n        \"component_id\": \"cmp-compliance\",\n        \"name\": \"ai_extraction_confidence_min\",\n        \"type\": \"float\",\n        \"default\": 0.85,\n        \"required\": false,\n        \"description\": \"Minimum confidence score for CC&R and Bylaws AI extraction to be trusted (RSP-006).\"\n      },\n      {\n        \"component_id\": \"cmp-compliance\",\n        \"name\": \"extractor_api_secret\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Secret key for the AI extraction module integration (security-sensitive).\"\n      },\n      {\n        \"component_id\": \"cmp-compliance\",\n        \"name\": \"alert_channel_id\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": false,\n        \"description\": \"ID of the default notification channel for compliance alerts.\"\n      },\n      {\n        \"component_id\": \"cmp-workflow\",\n        \"name\": \"workflow_db_url\",\n        \"type\": \"url\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Connection string for the Action Items and Workflow State database.\"\n      },\n      {\n        \"component_id\": \"cmp-workflow\",\n        \"name\": \"ui_sync_latency_target_ms\",\n        \"type\": \"integer\",\n        \"default\": 500,\n        \"required\": false,\n        \"description\": \"Target latency to reflect status updates immediately in the UI (RSP-010).\"\n      },\n      {\n        \"component_id\": \"cmp-workflow\",\n        \"name\": \"audit_retention_days\",\n        \"type\": \"integer\",\n        \"default\": 90,\n        \"required\": false,\n        \"description\": \"Retention period for workflow audit log transitions (RSP-009).\"\n      },\n      {\n        \"component_id\": \"cmp-workflow\",\n        \"name\": \"workflow_secret_key\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Secret key for workflow state verification and auth (security-sensitive).\"\n      },\n      {\n        \"component_id\": \"cmp-notifications\",\n        \"name\": \"smtp_host\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"SMTP server host for mass email processing (RSP-011).\"\n      },\n      {\n        \"component_id\": \"cmp-notifications\",\n        \"name\": \"smtp_port\",\n        \"type\": \"integer\",\n        \"default\": 587,\n        \"required\": false,\n        \"description\": \"SMTP server port for email delivery.\"\n      },\n      {\n        \"component_id\": \"cmp-notifications\",\n        \"name\": \"twilio_account_sid\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Twilio Account SID for SMS communication (RSP-011).\"\n      },\n      {\n        \"component_id\": \"cmp-notifications\",\n        \"name\": \"twilio_auth_token\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Twilio API authentication token for SMS (security-sensitive).\"\n      },\n      {\n        \"component_id\": \"cmp-notifications\",\n        \"name\": \"retry_max_attempts\",\n        \"type\": \"integer\",\n        \"default\": 3,\n        \"required\": false,\n        \"description\": \"Maximum number of delivery attempts for bounce tracking.\"\n      },\n      {\n        \"component_id\": \"cmp-notifications\",\n        \"name\": \"retry_window_hours\",\n        \"type\": \"integer\",\n        \"default\": 2,\n        \"required\": false,\n        \"description\": \"Total window in hours to resume delivery attempts upon reconnection (RSP-012).\"\n      },\n      {\n        \"component_id\": \"cmp-notifications\",\n        \"name\": \"notification_service_secret\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Secret key for the notification dispatcher service (security-sensitive).\"\n      },\n      {\n        \"component_id\": \"cmp-security\",\n        \"name\": \"auth_provider_endpoint\",\n        \"type\": \"url\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Endpoint for the multi-tenant security and authorization gateway.\"\n      },\n      {\n        \"component_id\": \"cmp-security\",\n        \"name\": \"jwt_signing_secret\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Secret key used to sign and validate JWT tokens (security-sensitive).\"\n      },\n      {\n        \"component_id\": \"cmp-security\",\n        \"name\": \"rls_policy_store_url\",\n        \"type\": \"url\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Connection for storing and querying Row-Level Security policies (RSP-014).\"\n      },\n      {\n        \"component_id\": \"cmp-security\",\n        \"name\": \"access_check_timeout_ms\",\n        \"type\": \"integer\",\n        \"default\": 50,\n        \"required\": false,\n        \"description\": \"Maximum time (ms) to enforce unauthorized access responses for restricted data (RSP-015).\"\n      },\n      {\n        \"component_id\": \"cmp-security\",\n        \"name\": \"session_timeout_seconds\",\n        \"type\": \"integer\",\n        \"default\": 1800,\n        \"required\": false,\n        \"description\": \"Default session timeout duration for authenticated users.\"\n      },\n      {\n        \"component_id\": \"cmp-payment\",\n        \"name\": \"currency_code\",\n        \"type\": \"string\",\n        \"default\": \"USD\",\n        \"required\": false,\n        \"description\": \"Default currency code for payment transactions (ISO 4217).\"\n      },\n      {\n        \"component_id\": \"cmp-payment\",\n        \"name\": \"stripe_api_secret_key\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Stripe API secret key for processing deposits and fees (RSP-016).\"\n      },\n      {\n        \"component_id\": \"cmp-payment\",\n        \"name\": \"stripe_webhook_secret\",\n        \"type\": \"string\",\n        \"default\": null,\n        \"required\": true,\n        \"description\": \"Secret for verifying Stripe payment event signatures (security-sensitive).\"\n      },\n      {\n        \"component_id\": \"cmp-payment\",\n        \"name\": \"receipt_template_url\",\n        \"type\": \"url\",\n        \"default\": null,\n        \"required\": false,\n        \"description\": \"Base URL for generating electronic proof of payment and receipts (RSP-017).\"\n      },\n      {\n        \"component_id\": \"cmp-payment\",\n        \"name\": \"payment_gateway_timeout_seconds\",\n        \"type\": \"integer\",\n        \"default\": 30,\n        \"required\": false,\n        \"description\": \"Timeout for payment gateway connections before failure.\"\n      }\n    ]\n  }\n}",
+  "parsed": {
+    "configuration_parameters": {
+      "params": [
+        {
+          "component_id": "cmp-prop-data",
+          "name": "db_url",
+          "type": "url",
+          "default": null,
+          "required": true,
+          "description": "Connection string for the primary property asset database (PostgreSQL/Vector Store)."
+        },
+        {
+          "component_id": "cmp-prop-data",
+          "name": "seaweedfs_root",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "Base storage path for SeaweedFS media asset ingestion (images and 3D splats)."
+        },
+        {
+          "component_id": "cmp-prop-data",
+          "name": "indexer_timeout_duration",
+          "type": "duration",
+          "default": "10s",
+          "required": false,
+          "description": "Maximum time allowed to index a valid asset after upload (RSP-002)."
+        },
+        {
+          "component_id": "cmp-prop-data",
+          "name": "db_password",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "Database authentication password (security-sensitive)."
+        },
+        {
+          "component_id": "cmp-prop-data",
+          "name": "max_upload_size_mb",
+          "type": "integer",
+          "default": 500,
+          "required": false,
+          "description": "Maximum allowed file size in MB for property asset ingestion."
+        },
+        {
+          "component_id": "cmp-prop-data",
+          "name": "offline_buffer_ttl_seconds",
+          "type": "integer",
+          "default": 86400,
+          "required": false,
+          "description": "Time-to-live for offline data capture buffers (RSP-003)."
+        },
+        {
+          "component_id": "cmp-provider-match",
+          "name": "search_db_url",
+          "type": "url",
+          "default": null,
+          "required": true,
+          "description": "Connection string for the provider search and bid estimation database."
+        },
+        {
+          "component_id": "cmp-provider-match",
+          "name": "ai_agent_endpoint",
+          "type": "url",
+          "default": null,
+          "required": true,
+          "description": "API endpoint for the AI Agent Service Provider Search & Matching processing."
+        },
+        {
+          "component_id": "cmp-provider-match",
+          "name": "min_match_score",
+          "type": "float",
+          "default": 0.75,
+          "required": false,
+          "description": "Minimum relevance score for service provider results to be returned (RSP-004)."
+        },
+        {
+          "component_id": "cmp-provider-match",
+          "name": "api_secret_key",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "API secret key for the matching service (security-sensitive)."
+        },
+        {
+          "component_id": "cmp-provider-match",
+          "name": "bid_threshold_cents",
+          "type": "integer",
+          "default": 0,
+          "required": false,
+          "description": "Minimum bid amount in cents enforced in UI comparison tables (RSP-005)."
+        },
+        {
+          "component_id": "cmp-compliance",
+          "name": "regulatory_db_url",
+          "type": "url",
+          "default": null,
+          "required": true,
+          "description": "Connection string for the compliance rules and statutory deadline database."
+        },
+        {
+          "component_id": "cmp-compliance",
+          "name": "deadline_check_interval_seconds",
+          "type": "integer",
+          "default": 3600,
+          "required": false,
+          "description": "Frequency (seconds) to monitor statutory deadlines for regulatory obligations (RSP-007)."
+        },
+        {
+          "component_id": "cmp-compliance",
+          "name": "ai_extraction_confidence_min",
+          "type": "float",
+          "default": 0.85,
+          "required": false,
+          "description": "Minimum confidence score for CC&R and Bylaws AI extraction to be trusted (RSP-006)."
+        },
+        {
+          "component_id": "cmp-compliance",
+          "name": "extractor_api_secret",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "Secret key for the AI extraction module integration (security-sensitive)."
+        },
+        {
+          "component_id": "cmp-compliance",
+          "name": "alert_channel_id",
+          "type": "string",
+          "default": null,
+          "required": false,
+          "description": "ID of the default notification channel for compliance alerts."
+        },
+        {
+          "component_id": "cmp-workflow",
+          "name": "workflow_db_url",
+          "type": "url",
+          "default": null,
+          "required": true,
+          "description": "Connection string for the Action Items and Workflow State database."
+        },
+        {
+          "component_id": "cmp-workflow",
+          "name": "ui_sync_latency_target_ms",
+          "type": "integer",
+          "default": 500,
+          "required": false,
+          "description": "Target latency to reflect status updates immediately in the UI (RSP-010)."
+        },
+        {
+          "component_id": "cmp-workflow",
+          "name": "audit_retention_days",
+          "type": "integer",
+          "default": 90,
+          "required": false,
+          "description": "Retention period for workflow audit log transitions (RSP-009)."
+        },
+        {
+          "component_id": "cmp-workflow",
+          "name": "workflow_secret_key",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "Secret key for workflow state verification and auth (security-sensitive)."
+        },
+        {
+          "component_id": "cmp-notifications",
+          "name": "smtp_host",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "SMTP server host for mass email processing (RSP-011)."
+        },
+        {
+          "component_id": "cmp-notifications",
+          "name": "smtp_port",
+          "type": "integer",
+          "default": 587,
+          "required": false,
+          "description": "SMTP server port for email delivery."
+        },
+        {
+          "component_id": "cmp-notifications",
+          "name": "twilio_account_sid",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "Twilio Account SID for SMS communication (RSP-011)."
+        },
+        {
+          "component_id": "cmp-notifications",
+          "name": "twilio_auth_token",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "Twilio API authentication token for SMS (security-sensitive)."
+        },
+        {
+          "component_id": "cmp-notifications",
+          "name": "retry_max_attempts",
+          "type": "integer",
+          "default": 3,
+          "required": false,
+          "description": "Maximum number of delivery attempts for bounce tracking."
+        },
+        {
+          "component_id": "cmp-notifications",
+          "name": "retry_window_hours",
+          "type": "integer",
+          "default": 2,
+          "required": false,
+          "description": "Total window in hours to resume delivery attempts upon reconnection (RSP-012)."
+        },
+        {
+          "component_id": "cmp-notifications",
+          "name": "notification_service_secret",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "Secret key for the notification dispatcher service (security-sensitive)."
+        },
+        {
+          "component_id": "cmp-security",
+          "name": "auth_provider_endpoint",
+          "type": "url",
+          "default": null,
+          "required": true,
+          "description": "Endpoint for the multi-tenant security and authorization gateway."
+        },
+        {
+          "component_id": "cmp-security",
+          "name": "jwt_signing_secret",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "Secret key used to sign and validate JWT tokens (security-sensitive)."
+        },
+        {
+          "component_id": "cmp-security",
+          "name": "rls_policy_store_url",
+          "type": "url",
+          "default": null,
+          "required": true,
+          "description": "Connection for storing and querying Row-Level Security policies (RSP-014)."
+        },
+        {
+          "component_id": "cmp-security",
+          "name": "access_check_timeout_ms",
+          "type": "integer",
+          "default": 50,
+          "required": false,
+          "description": "Maximum time (ms) to enforce unauthorized access responses for restricted data (RSP-015)."
+        },
+        {
+          "component_id": "cmp-security",
+          "name": "session_timeout_seconds",
+          "type": "integer",
+          "default": 1800,
+          "required": false,
+          "description": "Default session timeout duration for authenticated users."
+        },
+        {
+          "component_id": "cmp-payment",
+          "name": "currency_code",
+          "type": "string",
+          "default": "USD",
+          "required": false,
+          "description": "Default currency code for payment transactions (ISO 4217)."
+        },
+        {
+          "component_id": "cmp-payment",
+          "name": "stripe_api_secret_key",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "Stripe API secret key for processing deposits and fees (RSP-016)."
+        },
+        {
+          "component_id": "cmp-payment",
+          "name": "stripe_webhook_secret",
+          "type": "string",
+          "default": null,
+          "required": true,
+          "description": "Secret for verifying Stripe payment event signatures (security-sensitive)."
+        },
+        {
+          "component_id": "cmp-payment",
+          "name": "receipt_template_url",
+          "type": "url",
+          "default": null,
+          "required": false,
+          "description": "Base URL for generating electronic proof of payment and receipts (RSP-017)."
+        },
+        {
+          "component_id": "cmp-payment",
+          "name": "payment_gateway_timeout_seconds",
+          "type": "integer",
+          "default": 30,
+          "required": false,
+          "description": "Timeout for payment gateway connections before failure."
+        }
+      ]
+    }
+  },
+  "thinking": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Role:** [JC:Technical Spec Agent] specifying Configuration Parameters for Sub-Phase 5.4.\n    *   **Task:** Produce [JC:Configuration Parameters] for each Component (7 components defined).\n    *   **Output Format:** JSON object matching `configuration_parameters` schema.\n    *   **Schema:** `params`: array of objects with `component_id`, `name`, `type`, `default`, `required`, `description`.\n    *   **Constraints:**\n        *   Apply without exception (though none listed, this implies strict adherence to output format).\n        *   Every Component must have at least connection/initialization parameters.\n        *   Security-sensitive parameters (passwords, keys) must be `required: true`, `default: null`.\n        *   Use concrete types (string, integer, boolean, float, duration, url), not \"any\" or \"object\".\n        *   Context: Consumer Discovery MVP (Pillar 1 focus), specific components and data models provided.\n        *   Exclusions: Pillar 2, Pillar 3, Enterprise Governance, Field Service, Voting, Advanced AI, Direct Contractor Portal, Real-time Bid Aggregation (non-homeowners).\n\n2.  **Analyze the Components:**\n    *   `cmp-prop-data`: Property Data Manager (Images, 3D splats, offline sync).\n    *   `cmp-provider-match`: Service Provider Matcher (AI Agent search, bid comparison).\n    *   `cmp-compliance`: Compliance Rules Engine (CC&R/Bylaws extraction, statutory deadlines).\n    *   `cmp-workflow`: Action Workflow Orchestrator (Action items, audit logs).\n    *   `cmp-notifications`: Notification Dispatcher (Email/SMS, retries).\n    *   `cmp-security`: Tenant Security Gateway (RLS, Auth).\n    *   `cmp-payment`: Payment Transaction Processor (Stripe/Square integration).\n\n3.  **Determine Parameters for Each Component:**\n\n    *   **`cmp-prop-data`:**\n        *   DB Connection (Postgres/Vector store for images/3d data).\n        *   Storage Config (SeaweedFS connection).\n        *   Indexing settings (RSP-002: 10s target).\n        *   Upload validation config.\n        *   Offline buffer TTL.\n        *   Security: API Key/Secret.\n\n    *   **`cmp-provider-match`:**\n        *   AI Agent Endpoint URL/Config.\n        *   Search DB Connection.\n        *   Bid Comparison Thresholds.\n        *   Scoring weights.\n        *   Security: API Keys.\n\n    *   **`cmp-compliance`:**\n        *   Document Store DB Connection.\n        *   Statutory Database Connection.\n        *   Alert Thresholds.\n        *   Security: API Keys.\n\n    *   **`cmp-workflow`:**\n        *   DB Connection for Workflow State.\n        *   Audit Log Config.\n        *   UI Sync Latency settings.\n        *   Security: Auth Config.\n\n    *   **`cmp-notifications`:**\n        *   Email Provider (SMTP/SES).\n        *   SMS Provider (Twilio/etc.).\n        *   Retry Config (RSP-012: 2 hours).\n        *   Security: Auth Tokens.\n\n    *   **`cmp-security`:**\n        *   DB Connection.\n        *   RLS Configuration (Policy storage).\n        *   JWT/Token issuer settings.\n        *   Auth Provider (Auth0/Cognito).\n        *   Security: Secrets (API Keys).\n\n    *   **`cmp-payment`:**\n        *   Payment Gateway (Stripe/Square).\n        *   Webhook URL.\n        *   Webhook Secret.\n        *   Currency Config.\n        *   Security: API Keys/Secrets.\n\n4.  **Drafting the Parameters (adhering to constraints):**\n\n    *   *Constraint Check:* Every component needs connection/initialization params.\n    *   *Constraint Check:* Security params (passwords/keys) -> `required: true`, `default: null`.\n    *   *Constraint Check:* Concrete types (string, integer, boolean, float, duration, url).\n\n    *   *Specifics per component:*\n        *   `cmp-prop-data`: Needs SeaweedFS path, DB URL, Indexer TTL, Upload Validation Rules (JSON).\n        *   `cmp-provider-match`: Needs AI Search URL, Bid Min Threshold, Match Confidence Threshold.\n        *   `cmp-compliance`: Needs Rules DB URL, Deadline Check Interval, Alert Channel IDs.\n        *   `cmp-workflow`: Needs Workflow DB URL, Sync Latency Max (ms), Audit Retention Days.\n        *   `cmp-notifications`: Needs SMTP Host, SMTP Port, Twilio SID, Retry Max Count, Retry Window (duration).\n        *   `cmp-security`: Needs Auth Provider URL, RLS Policy Store URL, JWT Expiry, Session Timeout.\n        *   `cmp-payment`: Needs Stripe Publishable Key (Wait, public keys are not secret, but Stripe Secret Key is), Webhook Secret, Currency Code.\n\n5.  **Refining Types and Defaults:**\n    *   `database_url` -> string.\n    *   `storage_path` -> string/url.\n    *   `max_retries` -> integer.\n    *   `retry_window_minutes` -> integer or duration. Let's use integer for minutes.\n    *   `timeout_ms` -> integer.\n    *   `is_active` -> boolean.\n    *   `api_secret` -> string.\n\n    *   *Security Sensitivity:* Any parameter that stores a password, secret key, API token must be `required: true` and `default: null`. Do not provide dummy values for passwords.\n\n6.  **Constructing the JSON:**\n    *   Root structure: `{ \"configuration_parameters\": { \"params\": [...] } }`\n    *   Iterate through 7 components.\n    *   Ensure descriptions align with RSPs (Responsibility Statements).\n\n    *   *Self-Correction on `cmp-security`:* Since it's the gateway, it shouldn't store its own API keys necessarily, but might store Auth0 Client Secret. I will add auth provider secrets there as required.\n    *   *Self-Correction on `cmp-payment`:* Stripe requires Publishable Key (client side) and Secret Key (server side). Since this is server config, the Secret Key is the sensitive one. I'll include `stripe_api_secret_key` and `stripe_webhook_secret`.\n    *   *Self-Correction on `cmp-notifications`:* Retry logic needs specific duration types. I'll use `integer` (seconds or minutes). RSP-012 says \"within 2 hours\", so a duration field makes sense, but schema says concrete types. `integer` (minutes) is safer for config.\n\n7.  **Final Review against Rules:**\n    *   JSON object matching schema? Yes.\n    *   Every Component has at least connection/initialization? Yes (DB URLs, Hosts).\n    *   Security-sensitive required/null? Yes.\n    *   Concrete types? Yes.\n    *   Descriptions human-readable? Yes.\n    *   Context aligned (MVP Phase 1)? Yes (focus on ingestion, matching, basic compliance, workflow, notifications, security, payment).\n\n8.  **Output Generation** (Mental Draft to JSON):\n    *   `cmp-prop-data`: db_url, seaweedfs_root, indexer_ttl_seconds, upload_validation_rules_json (Wait, JSON might be complex. Let's keep it to specific types like string/url/integer). Let's use `upload_validation_config` as string (referring to a config file or JSON string). To be safe on types, `max_image_size_bytes` (integer), `allowed_formats` (string - comma separated).\n    *   `cmp-provider-match`: ai_agent_endpoint (url), min_bid_confidence (float), match_relevance_threshold (float).\n    *   `cmp-compliance`: deadline_check_interval_seconds (integer), alert_threshold_score (float).\n    *   `cmp-workflow`: sync_latency_ms (integer), audit_retention_days (integer).\n    *   `cmp-notifications`: smtp_host (string), smtp_port (integer), twilio_account_sid (string - wait, is this secret? Yes, API side). sms_twilio_api_key (string - secret), sms_twilio_api_secret (string - secret).\n    *   `cmp-security`: auth_provider_url (url), jwt_secret (string - secret), rls_engine_timeout_ms (integer).\n    *   `cmp-payment`: currency_code (string - ISO), stripe_secret_key (string - secret), webhook_secret (string - secret).\n\n    *Wait, one constraint:* \"Security-sensitive parameters (passwords, keys) must be marked as required with no default\".\n    *   So for `smtp_password`, `stripe_secret_key`, etc., I must set `required: true`, `default: null`.\n    *   For non-sensitive configs like `host`, `port`, I can set defaults or `null`.\n    *   For MVP, usually we want to define the keys exist.\n\n    *Refining types:* `duration` is allowed. I can use `duration` for timeouts.\n\n    *Refining Schema:* The prompt asks for a JSON object matching the `configuration_parameters` schema.\n    Root structure: `{ \"configuration_parameters\": { \"params\": [ ... ] } }`\n\n    *Let's build the array.*\n\n    (Self-Correction on `cmp-security`): It is the Tenant Security Gateway. It manages RLS. It connects to an Auth Provider. It needs DB connection.\n    (Self-Correction on `cmp-notifications`): Needs DB for message status (DeliveryAttempt model). Needs SMTP/SMS config.\n\n    *Let's finalize the parameter list for each.*\n\n    *cmp-prop-data:*\n    - `db_url` (string)\n    - `seaweedfs_root` (string/url)\n    - `indexer_timeout_duration` (duration)\n    - `max_upload_size_mb` (integer)\n    - `db_user` (string - required/secret? DB user is sensitive. Yes, usually.)\n    - `db_password` (string - required/secret)\n\n    *cmp-provider-match:*\n    - `search_db_url` (string)\n    - `ai_agent_endpoint` (string/url)\n    - `min_match_score` (float)\n    - `api_key` (string - required/secret)\n\n    *cmp-compliance:*\n    - `regulatory_db_url` (string)\n    - `rule_evaluation_timeout_duration` (duration)\n    - `alert_email_batch_size` (integer)\n    - `api_key` (string - required/secret)\n\n    *cmp-workflow:*\n    - `workflow_db_url` (string)\n    - `ui_sync_interval_seconds` (integer)\n    - `audit_log_retention_days` (integer)\n    - `audit_db_url` (string)\n\n    *cmp-notifications:*\n    - `smtp_host` (string)\n    - `smtp_port` (integer)\n    - `smtp_tls_enabled` (boolean)\n    - `twilio_sid` (string - required/secret)\n    - `twilio_auth_token` (string - required/secret)\n    - `retry_max_attempts` (integer)\n    - `retry_window_hours` (integer)\n\n    *cmp-security:*\n    - `auth_provider_endpoint` (string/url)\n    - `jwt_secret_key` (string - required/secret)\n    - `session_timeout_seconds` (integer)\n    - `rbac_policy_db_url` (string)\n\n    *cmp-payment:*\n    - `currency_default` (string)\n    - `stripe_publishable_key` (string - typically public, but for server side, we need Secret Key). Let's use `stripe_api_secret_key` (string - required/secret).\n    - `webhook_secret` (string - required/secret)\n    - `gateway_region` (string)\n\n    *Reviewing `required`:*\n    - If a parameter has a default, `required` is false.\n    - If it's sensitive (password, secret key), `required` is true, `default` is null.\n    - Connection params like `db_url` often have defaults in dev, but in prod they are config. I will set `required: true` for critical connection strings to ensure they are configured, but the prompt says \"Security-sensitive parameters... must be marked as required with no default\". It implies non-security params *can* have defaults. However, for a configuration schema, usually connection strings are required. I will mark `required: true` for DB URLs to be safe, or provide a default like `null` if optional. For an MVP spec, connection strings are usually required. I will set `required: true` for DBs and Keys.\n    - Actually, looking at the instruction: \"Security-sensitive parameters (passwords, keys) must be marked as required with no default\". It does not explicitly force *all* DB URLs to be required, but practically they are. I will mark sensitive ones as required + null default. Non-sensitive config defaults (like timeouts) can have defaults. Connection URLs I will treat as required because an app needs them to run.\n\n    *Wait, instruction:* \"Use concrete types, not 'any' or 'object'\".\n    *Instruction:* \"Every Component should have at least connection/initialization parameters\".\n    *Instruction:* \"Security-sensitive parameters (passwords, keys) must be marked as required with no default\".\n\n    Okay, ready to generate JSON.\n\n    *One detail:* `configuration_parameters` schema implies a root key. I will output the full JSON structure.\n    *Structure:*\n    ```json\n    {\n      \"configuration_parameters\": {\n        \"params\": [ ... ]\n      }\n    }\n    ```\n    Wait, the prompt says \"Produce [JC:Configuration Parameters] for each Component\". And \"REQUIRED OUTPUT: A JSON object matching the `configuration_parameters` schema: - params: array\".\n    Usually, this implies the root is the object containing `configuration_parameters` -> `params`. Or just the array?\n    \"REQUIRED OUTPUT: A JSON object matching the `configuration_parameters` schema: - params: array\".\n    I will wrap it in `configuration_parameters` as the root key based on standard config spec patterns, but the description says \"matching the `configuration_parameters` schema\".\n    Let's assume the schema defines the content of `params`.\n    However, to be safe and complete, I will output:\n    ```json\n    {\n      \"configuration_parameters\": {\n        \"params\": [...]\n      }\n    }\n    ```\n    Actually, looking at the schema description: \"matching the `configuration_parameters` schema: - params: array\". This suggests the root object has a key `params`.\n    I will structure it as `{ \"configuration_parameters\": { \"params\": [ ... ] } }`.\n\n    Let's double check parameter counts.\n    cmp-prop-data: db, storage, index, security.\n    cmp-provider-match: db, ai, bid, security.\n    cmp-compliance: db, alert, security.\n    cmp-workflow: db, ui sync, security.\n    cmp-notifications: smtp, sms, retry, security.\n    cmp-security: auth, jwt, policy, security (self ref).\n    cmp-payment: stripe, currency, webhooks.\n\n    Looks good. I will ensure all sensitive ones (secrets) are `required: true`, `default: null`.\n\n    *One more check:* \"Use concrete types\". `boolean`, `string`, `integer`, `float`, `duration`, `url`.\n    I will use `url` for URLs, `string` for text keys, `integer` for counts/timeouts, `boolean` for flags, `float` for scores, `duration` for timeouts (e.g., 10 seconds -> \"10s\"). Wait, if `duration` is a type, I should use `duration`. Or `string` with \"10s\" convention. I'll use `integer` for seconds/minutes unless the schema specifically implies a duration string type. The prompt lists `duration` as a valid type. I'll use `duration` for time-based configs to be explicit.\n\n    *Wait, `duration` type:* If I use `duration`, value might be \"10s\". If I use `integer`, value is 10 (seconds). I'll stick to `integer` for seconds/minutes to avoid ambiguity unless it's a specific timeout setting. Let's use `integer` for counts and `duration` for things like \"connection timeout\" if supported, but `integer` (seconds) is often safer for APIs. The prompt says `duration` is a valid type. I'll use `integer` for simple counts and `duration` for specific timeouts to show usage of the constraint.\n    Actually, to be most compatible, `integer` (seconds) is often treated as a duration. I'll use `integer` for seconds/counts to avoid string parsing issues unless strictly needed.\n    I'll use `duration` for things like `max_retry_duration`.\n    Okay, let's just use `integer` for seconds/minutes to keep it simple and concrete.\n\n    *Wait, one constraint:* \"Security-sensitive parameters (passwords, keys) must be marked as required with no default\".\n    I must ensure I don't put `default: \"password123\"`. It must be `null`.\n\n    Let's assemble.\n\n    Component IDs:\n    `cmp-prop-data`\n    `cmp-provider-match`\n    `cmp-compliance`\n    `cmp-workflow`\n    `cmp-notifications`\n    `cmp-security`\n    `cmp-payment`\n\n    Let's write the JSON.\n\n    *Note:* I need to make sure I don't accidentally mark non-sensitive params as required if they have defaults. E.g., `timeout` -> default 5000ms -> `required: false`.\n    But DB URLs are essential. I will set `required: true` for DB URLs.\n    Actually, if I set a default, `required` should be false. If I don't set a default, `required` can be true.\n    I will set `required: true` for critical infrastructure (DB, Storage) and `required: false` for optional tuning, with defaults where tuning exists.\n    For secrets, `required: true`, `default: null`.\n\n    Let's finalize the list.",
+  "provider": "ollama",
+  "model": "qwen3.5:9b",
+  "inputTokens": 1612,
+  "outputTokens": 6685,
+  "usedFallback": false,
+  "retryAttempts": 0
+}

@@ -1,0 +1,34 @@
+{
+  "topic_entities": [
+    "Consumer Discovery MVP",
+    "Pillar 1",
+    "Home Real Property Assistant",
+    "User Acquisition",
+    "Property Data Ingestion",
+    "Images",
+    "3D Splats",
+    "Service Provider Matching",
+    "Individual Homeowners",
+    "Property Asset Ingestion",
+    "AI Agent Service Provider Search",
+    "Bid Estimate Comparison UI",
+    "implementation_planner"
+  ],
+  "decision_types_sought": [
+    "menu_selection",
+    "mirror_approval",
+    "phase_gate_approval"
+  ],
+  "temporal_scope": {
+    "from": null,
+    "to": null
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}

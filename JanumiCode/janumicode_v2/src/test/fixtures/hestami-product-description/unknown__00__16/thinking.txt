@@ -1,0 +1,129 @@
+The user wants me to act as a [JC:Reasoning Review] system.
+I need to analyze the provided [JC:Execution Trace] (which includes reasoning steps, tool invocations, and final output) against a specific [JC:SYSTEM SCOPE] and [COMPLETE FLAW TAXONOMY].
+
+**Context:**
+- **Task:** Integrate Stripe/Square gateway to process deposit and service fee transactions securely.
+- **Phase Gate Criteria:** (Empty in the provided text, but implied by Completion Criteria).
+- **Completion Criteria:** Use the above to assess whether the agent's final output satisfies what was asked of it.
+
+**Trace Selection:**
+- **[REASONING] (seq 0):**
+  - Invocation ID: 9eb6d501-1fbb-47e8-98cd-84dc19371890
+  - Task ID: TASK-PAY-001
+  - Backing Tool: Stripe SDK / Square SDK / Bun Crypto
+  - Status: started
+- **AGENT'S FINAL OUTPUT:**
+  - "No output parser registered for backing tool: Stripe SDK / Square SDK / Bun Crypto"
+
+**Analysis:**
+1.  **Task Goal:** Integrate Stripe/Square gateway.
+2.  **Agent Output:** "No output parser registered for backing tool: Stripe SDK / Square SDK / Bun Crypto"
+3.  **Trace Info:** Shows the agent *started* trying to invoke tools (Stripe SDK / Square SDK / Bun Crypto).
+4.  **Conclusion:** The agent attempted to call a tool but failed because there was no registered output parser for it. Consequently, the agent provided an error message as its final output instead of the requested integration.
+5.  **Flaw Check:**
+    - `completeness_shortcut`: The agent claims the output (implicitly the error message) represents the task result, but the task (Integration) is clearly not done. The agent effectively stopped at an error but didn't report completion. However, is it a "shortcut"? It claims the output is the result. Actually, looking at `overall_pass`, if no flaws found -> `true`. If flaws found -> list them.
+    - `tool_result_misinterpretation_suspected`: The agent received a tool failure result ("No output parser registered") and presented it as the final output. This is technically how tools work, but does it count as a flaw? Usually, an agent failing a tool invocation and not retrying or escalating is a flow control issue.
+    - `completeness_shortcut`: The Phase Gate asks for "Integrate Stripe/Square gateway". The output provided is an error message regarding internal tool setup, not the integration itself. The task is *not* complete. The agent asserts the task is effectively "done" by outputting the trace/error (or rather, the trace ends here). This is a `completeness_shortcut` because the task requirements (Integration) are not met.
+    - `implementation_divergence`: The tool invocation parameters (Stripe SDK / Square SDK / Bun Crypto) were specified. The result says "No output parser registered". This suggests the environment wasn't ready.
+    - `scope_violation`: Not really.
+    - `unacknowledged_uncertainty`: The agent treated the error as the end state without uncertainty handling.
+    - `completeness_shortcut`: The agent did not complete the integration task. It output an error message instead of the code/config for the integration.
+    - `tool_result_misinterpretation_suspected`: The agent output the tool error directly. While sometimes agents do this, if it's the final output, it implies failure.
+    - Let's look for `completeness_shortcut`. The task is to integrate. The output says "No output parser...". This means the agent failed to produce the integration code/artifact. It essentially claimed completion (or stopped) without satisfying the "Integrate" requirement.
+    - Let's look for `tool_result_misinterpretation_suspected`. The agent didn't interpret the tool result as "I need to retry" or "I need to configure the tool". It just outputted the error.
+    - Let's look for `completeness_shortcut` specifically. Definition: "Agent claims task complete when only part is done". The agent output is an error message. It didn't explicitly say "Task Complete", but by stopping at the trace end, it implies termination. Is termination "completing" the task? No. But is it a "completeness_shortcut" flaw?
+    - Let's look for `implementation_divergence`: "Implementation Artifact contradicts governing ADR". There is no ADR provided here, but the task goal is "Integrate". The result is an error.
+    - Let's look for `unacknowledged_uncertainty`.
+    - Let's focus on `completeness_shortcut` because the Phase Gate says "Use the above to assess whether the agent's final output satisfies what was asked of it. If the agent's output is missing required fields or contradicts the phase gate criteria, that is a completeness_shortcut or contradiction_with_prior_approved flaw."
+    - The Phase Gate Criteria in the prompt text says: "Integrate Stripe/Square gateway to process deposit and service fee transactions securely."
+    - The Agent's Output is: "No output parser registered for backing tool: Stripe SDK / Square SDK / Bun Crypto".
+    - This output does NOT satisfy the requirement. It is missing the integration code, config, etc.
+    - Is this `completeness_shortcut`? The definition is "Agent claims task complete when only part is done". By outputting this error and ending, the agent implies the work is done (or stuck), but the requirement is not met. This is often categorized as `completeness_shortcut` in this specific framework if the output doesn't cover the requirements.
+    - However, usually `completeness_shortcut` implies the agent thinks it's done but isn't. Here, the agent failed. A failure often manifests as `tool_result_misinterpretation_suspected` (thinking the tool worked/failed gracefully) or simply not handling the failure.
+    - Let's check `tool_result_misinterpretation_suspected`. "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The tool parameters were "Stripe SDK / Square SDK / Bun Crypto". The result was "No output parser registered". This is a tool environment error, not necessarily a misinterpretation of the result, but the agent *acting* on the result by outputting it as final suggests it thought it resolved the issue or couldn't proceed.
+    - Actually, the most fitting flaw here is `completeness_shortcut`. The agent failed to perform the integration. The output provided does not satisfy the task. In many of these frameworks, if the task isn't done, it's either a `completeness_shortcut` (agent thinks it's done) or `contradiction_with_prior_approved`. But here, the trace is the final state. If the trace ends with an error, the task failed.
+    - Wait, there is a specific flaw type: `completeness_shortcut` (Agent claims task complete when only part is done). If the agent ends the trace with an error, it hasn't claimed completion. However, the system asks me to check if the output satisfies what was asked. If it doesn't, is it `completeness_shortcut`? Or is it `implementation_divergence`?
+    - Let's consider `unacknowledged_uncertainty`. The agent tried a tool that failed. It didn't acknowledge the need to set up the tool.
+    - Let's consider `unsupported_assumption`. Agent assumes tools are registered? No, it found they weren't.
+    - Let's consider `completeness_shortcut` again. "Agent claims task complete". The trace ends. The user might interpret the trace end as completion. The output text is an error.
+    - Let's consider `tool_result_misinterpretation_suspected`. "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The tool call was "started". The status was "started". The final output says "No output parser registered". This suggests the agent *invoked* a tool that returned this error. If the agent accepted this as the final output, it might be a failure to handle tool failure.
+    - But wait, look at `completeness_shortcut` again. "If the agent's output is missing required fields or contradicts the phase gate criteria". The Phase Gate Criteria is "Integrate Stripe/Square gateway". The output is "No output parser...". This contradicts the criteria (Integration required vs Error message). So `completeness_shortcut` is appropriate here (or `contradiction_with_prior_approved` if there was a prior artifact). Since there's no prior artifact, `completeness_shortcut` fits "only part is done" (0% done, but trace ended).
+    - Wait, is there a `contradiction_with_prior_approved`? No prior artifacts mentioned.
+    - What about `implementation_divergence`? "Implementation Artifact contradicts governing ADR". There is no ADR.
+    - Let's look at the definition of `completeness_shortcut`: "Agent claims task complete when only part is done". If the agent stops because of an error, is it "claiming complete"? In these frameworks, often ending the generation implies completion of the session. If the session ends before the task is done, it's a flaw.
+    - Severity: Since the task is critical (payment integration), failing to do it is high severity.
+    - Let's check `tool_result_misinterpretation_suspected`. "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The tool returned "No output parser". The agent concluded the trace with that text. It didn't retry or fix. This is a failure to handle the tool result. Is that `tool_result_misinterpretation_suspected`? Usually, that applies if the agent thinks "Success" when the tool returned "Failure". Here the agent just outputs the failure message. It doesn't claim success.
+    - However, the prompt says: "If the agent's output is missing required fields or contradicts the phase gate criteria, that is a completeness_shortcut". The output is missing the integration (required field of the task). It contradicts the criteria (Integration vs Error). So `completeness_shortcut` is the correct label.
+
+    - Severity: `high`. The task is payment integration. Not doing it is critical. `premature_convergence` is `high` by rule. Is `completeness_shortcut` high? Usually yes, if the task isn't done.
+    - Let's look at the rule: "premature_convergence is ALWAYS severity: high".
+    - Does `completeness_shortcut` have a default? Yes. Given the context (payment system), it's high.
+
+    - Evidence: "AGENT'S FINAL OUTPUT: No output parser registered for backing tool: Stripe SDK / Square SDK / Bun Crypto" vs Task "Integrate Stripe/Square gateway".
+    - Action: `escalate` or `return_to_phase4`? Since the agent is just an execution trace, and the output is an error, `return_to_phase4` implies going back to development/setup. The agent needs to acknowledge the error or retry. But `completeness_shortcut` implies the agent finished early. The action should likely be `return_to_phase4` or `escalate`. Given it's a tooling error (parser not registered), `escalate` to fix the infrastructure might be needed, or `return_to_phase4` if the agent should have handled the setup. Let's go with `return_to_phase4` (implying go back to building the artifact/config). Or `escalate`. Since I must pick one, `escalate` is safer for infrastructure issues. But `return_to_phase4` fits "completeness_shortcut" (didn't finish the phase properly). Wait, `completeness_shortcut` usually means "I said I'm done but I'm not". Here the agent just crashed. Is that `completeness_shortcut`? Maybe `implementation_divergence` is better? No, implementation_divergence is about contradicting an ADR.
+    - Let's reconsider `completeness_shortcut`. The task requires outputting the integration. The agent outputted an error. The agent *implied* completion by ending. So `completeness_shortcut` is valid.
+    - Severity: `high` because the payment integration is not functional.
+    - Action: `return_to_phase4` (since it's an internal agent task, going back to prepare is correct) or `escalate`. The prompt says "escalate_to_unsticking" exists. But `completeness_shortcut` usually triggers a return to work. Let's pick `return_to_phase4`.
+
+    - Wait, I missed one thing. The prompt asks me to "Use the above to assess whether the agent's final output satisfies what was asked of it."
+    - The output is *not* the integration. It is an error.
+    - So the task is not satisfied.
+    - Flaw: `completeness_shortcut`.
+    - Evidence: Final output is error message, not integration code.
+    - Severity: `high`.
+    - Action: `return_to_phase4` (go back to complete the task) or `escalate`. I will use `return_to_phase4`.
+
+    - Wait, is there a `tool_result_misinterpretation_suspected`? The agent called the tool (status started). The tool result (internal) wasn't visible to me (Tool results excluded). The final output is "No output parser registered...". This looks like the agent *read* the tool result and outputted it. Did it interpret it correctly? If it couldn't parse the tool result, that's a bug in the agent environment. `tool_result_misinterpretation_suspected` definition: "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The tool parameters were valid SDK names. The result was "No parser". This is an environment issue, not necessarily agent misinterpretation. The agent just printed the error.
+    - So `completeness_shortcut` is the main one. The agent failed to produce the artifact required.
+
+    - Wait, could it be `unsupported_assumption`? Agent assumed parsers existed? No, it checked and failed.
+    - Could it be `invalid_inference`? No.
+    - Could it be `scope_violation`? No.
+
+    - Let's double check `completeness_shortcut` definition: "Agent claims task complete when only part is done".
+    - By outputting "No output parser...", the agent stops. It effectively stops the trace. It stops *before* completing the integration.
+    - Is this `completeness_shortcut`? Yes, in the sense that it claims termination as completion.
+    - What about `implementation_divergence`? "Implementation Artifact contradicts governing ADR". No ADR.
+    - What about `premature_convergence`? No.
+    - What about `unacknowledged_uncertainty`? The agent didn't say "I can't do this, maybe retry".
+    - But `completeness_shortcut` is the specific one for "missing required fields or contradicts phase gate criteria".
+    - Phase Gate Criteria: "Integrate Stripe/Square gateway".
+    - Output: "No output parser...".
+    - This contradicts the criteria (Integration vs Error).
+    - So `completeness_shortcut` is the correct label.
+
+    - Action recommendation: Since it's a tool setup issue (parser not registered), the agent might be unable to proceed without environment setup. `escalate` to fix the infrastructure or `return_to_phase4` to fix the agent's capabilities. `return_to_phase4` is standard for "task incomplete".
+
+    - Wait, `completeness_shortcut` is defined as "Agent claims task complete when only part is done". The agent *stopped*. It didn't claim it was done verbally, but it outputted the final response. In these traces, the final response is the "output". If the output isn't the deliverable, it's incomplete.
+    - Severity: `high` because it's payment processing.
+
+    - Wait, one more check: `tool_result_misinterpretation_suspected`. "Agent's stated conclusion from a tool call appears inconsistent with tool parameters". The tool call was `Stripe SDK / Square SDK / Bun Crypto`. The result was `No output parser...`. The agent *concluded* with that text. It didn't try to resolve it. Is that misinterpretation? It's a failure to handle the error. Maybe `implementation_divergence` (if there was a config saying parsers should be there).
+    - Let's stick with `completeness_shortcut` as it directly addresses "satisfies what was asked".
+    - Action: `return_to_phase4` (implies go back and build the integration properly, fixing the parser issue if needed). Or `escalate` if infrastructure is the problem. Given the prompt context "Phase Gate", `return_to_phase4` implies sending it back to the agent for correction/continuation.
+
+    - Wait, looking at the provided JSON schema for flaws.
+    - I need to ensure I follow the schema strictly.
+    - `overall_pass`: `false` (because there are flaws).
+    - `flaws`: Array of objects.
+
+    - One more thing: The prompt says "Tool results are EXCLUDED by design — you cannot see what tools returned, only what the agent concluded from them."
+    - The trace shows `[REASONING] ... status: "started"`.
+    - The final output is "No output parser...".
+    - This implies the agent *knows* the tool failed or the parser is missing.
+    - The agent treated this failure state as the final output (concluding the session).
+    - This is `completeness_shortcut` (didn't finish the integration).
+
+    - Is there `unacknowledged_uncertainty`? The agent is certain it can't proceed (no parser). It states this. It doesn't hide ambiguity.
+    - Is there `contradiction_with_prior_approved`? No prior artifacts.
+    - Is there `implementation_divergence`? No ADR.
+    - Is there `completeness_shortcut`? Yes.
+
+    - What severity? `completeness_shortcut` usually high if critical path.
+    - Recommendation: `return_to_phase4` or `escalate`. Since the parser isn't registered, it might be an environment config issue, but `return_to_phase4` is safer for an agent flow. Or `escalate`. I'll pick `escalate` if it's an infrastructure blocker, but `return_to_phase4` if it's an agent capability issue. The error says "No output parser registered". This sounds like a missing dependency. `escalate` is appropriate for infrastructure blocks. However, standard procedure for incomplete task is `return_to_phase4`. I will use `return_to_phase4`. Wait, looking at the actions list: `retry`, `escalate`, `accept_with_caveat`, `return_to_phase4`, `escalate_to_unsticking`. `return_to_phase4` fits best for "fix the agent flow".
+
+    - Wait, is `completeness_shortcut` defined as "Agent claims task complete". The agent output is the *trace end*. The trace end implies completion. So yes.
+
+    - Wait, I should check if `tool_result_misinterpretation_suspected` applies. The agent invoked a tool. The output of the tool was "No parser". The agent displayed this as text. If the agent was supposed to handle this by retrying or fixing config, simply outputting it might be `tool_result_misinterpretation_suspected` (interpreting "Tool Failed" as "Task Done/Stopped" instead of "Error to Handle"). But the definition is "conclusion inconsistent with tool parameters". Parameters: Stripe SDK. Conclusion: No parser. This is an environmental fact, not necessarily a misinterpretation of the *tool's* meaning (e.g. interpreting success as failure). It's just a hard block. So `completeness_shortcut` is the most accurate description of the *outcome* relative to the task.
+
+    - Wait, `overall_pass`: If flaws exist, `overall_pass` is `false`.
+    - Okay, constructing the JSON.

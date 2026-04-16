@@ -1,0 +1,159 @@
+{
+  "test_suites": [
+    {
+      "suite_id": "TS-001",
+      "component_id": "COMP-001",
+      "test_type": "integration",
+      "test_cases": [
+        {
+          "test_case_id": "TC-001-01",
+          "type": "integration",
+          "acceptance_criterion_ids": [
+            "AC-001-01"
+          ],
+          "preconditions": [
+            "Storage file exists and is readable"
+          ],
+          "expected_outcome": "Storage file line count increases by exactly 1 after adding a task"
+        },
+        {
+          "test_case_id": "TC-001-02",
+          "type": "integration",
+          "acceptance_criterion_ids": [
+            "AC-003-01"
+          ],
+          "preconditions": [
+            "Storage file exists and contains task with valid ID"
+          ],
+          "expected_outcome": "Specific line in storage file contains 'status=done' after completing task"
+        },
+        {
+          "test_case_id": "TC-001-03",
+          "type": "integration",
+          "acceptance_criterion_ids": [
+            "AC-004-01"
+          ],
+          "preconditions": [
+            "Storage file exists and contains task with valid ID"
+          ],
+          "expected_outcome": "Line associated with task ID is no longer present in storage file after deletion"
+        },
+        {
+          "test_case_id": "TC-001-04",
+          "type": "integration",
+          "acceptance_criterion_ids": [
+            "AC-005-01"
+          ],
+          "preconditions": [
+            "Storage file does not exist"
+          ],
+          "expected_outcome": "File named 'tasks.txt' exists in current directory with size greater than 0 bytes after init"
+        },
+        {
+          "test_case_id": "TC-001-05",
+          "type": "unit",
+          "acceptance_criterion_ids": [
+            "AC-006-01",
+            "AC-006-02"
+          ],
+          "preconditions": [
+            "Source code is accessible for static analysis"
+          ],
+          "expected_outcome": "Static analysis reveals no external imports and no external commands requiring root privileges"
+        }
+      ]
+    },
+    {
+      "suite_id": "TS-002",
+      "component_id": "COMP-002",
+      "test_type": "integration",
+      "test_cases": [
+        {
+          "test_case_id": "TC-002-01",
+          "type": "integration",
+          "acceptance_criterion_ids": [
+            "AC-001-02"
+          ],
+          "preconditions": [
+            "Valid task name provided via command line arguments"
+          ],
+          "expected_outcome": "Script returns exit code 0 upon successful task creation"
+        },
+        {
+          "test_case_id": "TC-002-02",
+          "type": "integration",
+          "acceptance_criterion_ids": [
+            "AC-003-02",
+            "AC-004-02"
+          ],
+          "preconditions": [
+            "Invalid task ID provided via command line arguments"
+          ],
+          "expected_outcome": "Script prints an error message and exits with code 1"
+        },
+        {
+          "test_case_id": "TC-002-03",
+          "type": "integration",
+          "acceptance_criterion_ids": [
+            "AC-005-02"
+          ],
+          "preconditions": [
+            "Storage file already exists"
+          ],
+          "expected_outcome": "Script exits with code 0 without modifying file contents"
+        }
+      ]
+    },
+    {
+      "suite_id": "TS-003",
+      "component_id": "COMP-003",
+      "test_type": "integration",
+      "test_cases": [
+        {
+          "test_case_id": "TC-003-01",
+          "type": "integration",
+          "acceptance_criterion_ids": [
+            "AC-002-01"
+          ],
+          "preconditions": [
+            "Storage file exists and contains tasks"
+          ],
+          "expected_outcome": "Command prints every line from the storage file to stdout, excluding empty lines"
+        },
+        {
+          "test_case_id": "TC-003-02",
+          "type": "integration",
+          "acceptance_criterion_ids": [
+            "AC-002-02"
+          ],
+          "preconditions": [
+            "Storage file is empty or missing"
+          ],
+          "expected_outcome": "Command prints 'No tasks found' to stdout and exits with code 0"
+        },
+        {
+          "test_case_id": "TC-003-03",
+          "type": "integration",
+          "acceptance_criterion_ids": [
+            "AC-003-02"
+          ],
+          "preconditions": [
+            "Invalid task ID provided via command line arguments"
+          ],
+          "expected_outcome": "Script prints an error message to stdout"
+        },
+        {
+          "test_case_id": "TC-003-04",
+          "type": "integration",
+          "acceptance_criterion_ids": [
+            "AC-004-02"
+          ],
+          "preconditions": [
+            "Invalid task ID provided via command line arguments"
+          ],
+          "expected_outcome": "Script prints an error message to stdout"
+        }
+      ]
+    }
+  ]
+}

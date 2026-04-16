@@ -1,0 +1,367 @@
+{
+  "implementation_plan": {
+    "tasks": [
+      {
+        "id": "TASK-SEC-001",
+        "task_type": "standard",
+        "component_id": "cmp-security",
+        "component_responsibility": "RSP-014: Enforce multi-tenant security and Row-Level Security for data access.",
+        "description": "Implement Row-Level Security policies and tenant boundary enforcement logic within the Bun API middleware layer.",
+        "backing_tool": "DBOS Middleware / PostgreSQL RLS Policies",
+        "dependency_task_ids": [],
+        "estimated_complexity": "medium",
+        "completion_criteria": [
+          "Row-Level Security policies are successfully applied to all database access queries.",
+          "Unauthorized tenant access attempts return 403 Forbidden status."
+        ],
+        "write_directory_paths": [],
+        "read_directory_paths": []
+      },
+      {
+        "id": "TASK-SEC-002",
+        "task_type": "standard",
+        "component_id": "cmp-security",
+        "component_responsibility": "RSP-015: Return unauthorized access responses within 50ms for restricted tenant data.",
+        "description": "Optimize authentication response pathways to ensure sub-50ms latency for rejection payloads.",
+        "backing_tool": "Bun HTTP Server / Async Auth Layer",
+        "dependency_task_ids": [
+          "TASK-SEC-001"
+        ],
+        "estimated_complexity": "low",
+        "completion_criteria": [
+          "Latency metrics confirm unauthorized access responses are delivered under 50ms.",
+          "Auth service health checks validate low-latency constraints."
+        ],
+        "write_directory_paths": [],
+        "read_directory_paths": []
+      },
+      {
+        "id": "TASK-PROP-001",
+        "task_type": "standard",
+        "component_id": "cmp-prop-data",
+        "component_responsibility": "RSP-001: Accept and validate property image and 3D asset data uploads including format rejection logic.",
+        "description": "Implement the POST /assets/upload endpoint handler with MIME type validation and file integrity checks.",
+        "backing_tool": "Bun File System / Bun Stream Validator",
+        "dependency_task_ids": [
+          "TASK-SEC-001"
+        ],
+        "estimated_complexity": "medium",
+        "completion_criteria": [
+          "Invalid file formats are rejected with appropriate HTTP error codes.",
+          "Valid assets are acknowledged upon receipt before processing begins."
+        ],
+        "write_directory_paths": [
+          "${seaweedfs_root}/ingest_queue"
+        ],
+        "read_directory_paths": []
+      },
+      {
+        "id": "TASK-PROP-002",
+        "task_type": "standard",
+        "component_id": "cmp-prop-data",
+        "component_responsibility": "RSP-002: Index valid assets within 10 seconds post-upload for search systems.",
+        "description": "Configure background indexing job to ingest and vectorize assets against the 10-second SLA.",
+        "backing_tool": "DBOS Worker / Vector Store Client",
+        "dependency_task_ids": [
+          "TASK-PROP-001",
+          "TASK-SEC-001"
+        ],
+        "estimated_complexity": "high",
+        "completion_criteria": [
+          "Indexer job logs confirm all assets are indexed within 10 seconds of upload completion.",
+          "Search queries return results for newly uploaded assets."
+        ],
+        "write_directory_paths": [
+          "${seaweedfs_root}/index_cache"
+        ],
+        "read_directory_paths": [
+          "${seaweedfs_root}/ingest_queue"
+        ]
+      },
+      {
+        "id": "TASK-PROP-003",
+        "task_type": "standard",
+        "component_id": "cmp-prop-data",
+        "component_responsibility": "RSP-003: Manage offline data capture and synchronization buffers for mobile capture contexts.",
+        "description": "Develop offline queue persistence logic and retry mechanism for disconnected mobile clients.",
+        "backing_tool": "SQLite (Mobile) / PostgreSQL (Sync)",
+        "dependency_task_ids": [
+          "TASK-PROP-001"
+        ],
+        "estimated_complexity": "medium",
+        "completion_criteria": [
+          "Offline buffer entries are successfully synced upon network restoration.",
+          "Sync queue status reflects accurate retry counts and TTL status."
+        ],
+        "write_directory_paths": [
+          "${seaweedfs_root}/offline_buffer"
+        ],
+        "read_directory_paths": [
+          "${seaweedfs_root}/offline_buffer"
+        ]
+      },
+      {
+        "id": "TASK-PROV-001",
+        "task_type": "standard",
+        "component_id": "cmp-provider-match",
+        "component_responsibility": "RSP-004: Return service provider search results with relevance scores using AI Agent processing.",
+        "description": "Integrate AI Agent API to compute match scores and retrieve provider profiles for search endpoints.",
+        "backing_tool": "AI Agent SDK / HTTP Client",
+        "dependency_task_ids": [
+          "TASK-SEC-001",
+          "TASK-PROP-001"
+        ],
+        "estimated_complexity": "high",
+        "completion_criteria": [
+          "Search results include valid relevance scores from the AI Agent.",
+          "API response adheres to the specified schema for ProviderProfile data model."
+        ],
+        "write_directory_paths": [],
+        "read_directory_paths": [
+          "${db_url}/providers"
+        ]
+      },
+      {
+        "id": "TASK-PROV-002",
+        "task_type": "standard",
+        "component_id": "cmp-provider-match",
+        "component_responsibility": "RSP-005: Render bid estimate comparison tables ensuring minimum bid entry thresholds.",
+        "description": "Implement frontend and backend logic to display Good-Better-Best estimates and validate bid amounts.",
+        "backing_tool": "SvelteKit Frontend / Bun API",
+        "dependency_task_ids": [
+          "TASK-SEC-001",
+          "TASK-PROV-001"
+        ],
+        "estimated_complexity": "low",
+        "completion_criteria": [
+          "UI renders bid estimates with correct 'Good', 'Better', 'Best' classifications.",
+          "Bids below minimum threshold are filtered or flagged correctly."
+        ],
+        "write_directory_paths": [],
+        "read_directory_paths": [
+          "${db_url}/bids"
+        ]
+      },
+      {
+        "id": "TASK-COM-001",
+        "task_type": "standard",
+        "component_id": "cmp-compliance",
+        "component_responsibility": "RSP-006: Extract and validate CC&R and Bylaws clauses using AI confidence scoring.",
+        "description": "Build NLP pipeline to extract clauses from uploaded documents and assign confidence scores.",
+        "backing_tool": "LLM Extraction Module / Vector Database",
+        "dependency_task_ids": [
+          "TASK-SEC-001",
+          "TASK-PROP-001"
+        ],
+        "estimated_complexity": "high",
+        "completion_criteria": [
+          "Extraction endpoint returns BylawsClause entities with confidence scores.",
+          "Low confidence extractions are flagged for manual review."
+        ],
+        "write_directory_paths": [
+          "${seaweedfs_root}/compliance_extracts"
+        ],
+        "read_directory_paths": [
+          "${seaweedfs_root}/ingest_queue"
+        ]
+      },
+      {
+        "id": "TASK-COM-002",
+        "task_type": "standard",
+        "component_id": "cmp-compliance",
+        "component_responsibility": "RSP-007: Monitor statutory deadlines for regulatory obligations.",
+        "description": "Implement background scheduler to check and persist StatutoryDeadline events based on jurisdiction.",
+        "backing_tool": "DBOS Cron / PostgreSQL",
+        "dependency_task_ids": [
+          "TASK-COM-001",
+          "TASK-SEC-001"
+        ],
+        "estimated_complexity": "low",
+        "completion_criteria": [
+          "StatutoryDeadline records are accurately maintained and flagged for approach.",
+          "Alerts are triggered appropriately for upcoming obligations."
+        ],
+        "write_directory_paths": [
+          "${seaweedfs_root}/compliance_logs"
+        ],
+        "read_directory_paths": [
+          "${db_url}/statutory_deadlines"
+        ]
+      },
+      {
+        "id": "TASK-COM-003",
+        "task_type": "standard",
+        "component_id": "cmp-compliance",
+        "component_responsibility": "RSP-008: Generate compliance notification payloads for regulatory alerts.",
+        "description": "Construct standardized payload objects for regulatory alerts to be dispatched via Notification Dispatcher.",
+        "backing_tool": "Bun Template Engine",
+        "dependency_task_ids": [
+          "TASK-COM-002",
+          "TASK-COM-001"
+        ],
+        "estimated_complexity": "low",
+        "completion_criteria": [
+          "Notification payloads are generated successfully for all triggered deadlines.",
+          "Alert payloads conform to the required schema and jurisdiction templates."
+        ],
+        "write_directory_paths": [],
+        "read_directory_paths": [
+          "${db_url}/notice_requirements"
+        ]
+      },
+      {
+        "id": "TASK-WORK-001",
+        "task_type": "standard",
+        "component_id": "cmp-workflow",
+        "component_responsibility": "RSP-009: Manage service action item workflow states and record audit log transitions.",
+        "description": "Implement state machine logic to transition ActionItem statuses and write TransitionLog entries.",
+        "backing_tool": "DBOS Versioned Workflow Engine",
+        "dependency_task_ids": [
+          "TASK-SEC-001",
+          "TASK-COM-002"
+        ],
+        "estimated_complexity": "medium",
+        "completion_criteria": [
+          "Workflow state transitions are logged accurately in TransitionLog.",
+          "Audit logs are immutable and retrievable for all state changes."
+        ],
+        "write_directory_paths": [
+          "${seaweedfs_root}/workflow_logs"
+        ],
+        "read_directory_paths": [
+          "${db_url}/action_items",
+          "${db_url}/transition_logs"
+        ]
+      },
+      {
+        "id": "TASK-WORK-002",
+        "task_type": "standard",
+        "component_id": "cmp-workflow",
+        "component_responsibility": "RSP-010: Reflect status updates immediately in the UI for workflow progress.",
+        "description": "Implement optimistic UI updates and WebSocket/REST polling hooks to show real-time workflow states.",
+        "backing_tool": "SvelteKit Store / Bun API",
+        "dependency_task_ids": [
+          "TASK-WORK-001",
+          "TASK-SEC-001"
+        ],
+        "estimated_complexity": "medium",
+        "completion_criteria": [
+          "UI reflects workflow status updates immediately after backend events.",
+          "Data consistency is maintained between client and server state."
+        ],
+        "write_directory_paths": [],
+        "read_directory_paths": [
+          "${db_url}/action_items"
+        ]
+      },
+      {
+        "id": "TASK-NOTIF-001",
+        "task_type": "standard",
+        "component_id": "cmp-notifications",
+        "component_responsibility": "RSP-011: Process mass email/SMS batches for recipient lists and track delivery status.",
+        "description": "Develop batch processing queue to handle mass communications and track per-recipient delivery.",
+        "backing_tool": "SMTP / Twilio SDK / Bun Queue",
+        "dependency_task_ids": [
+          "TASK-COM-003",
+          "TASK-SEC-001"
+        ],
+        "estimated_complexity": "medium",
+        "completion_criteria": [
+          "Mass email/SMS batches are processed without data loss.",
+          "Delivery status is updated for each attempt in DeliveryAttempt records."
+        ],
+        "write_directory_paths": [],
+        "read_directory_paths": [
+          "${db_url}/message_batches",
+          "${db_url}/recipient_lists"
+        ]
+      },
+      {
+        "id": "TASK-NOTIF-002",
+        "task_type": "standard",
+        "component_id": "cmp-notifications",
+        "component_responsibility": "RSP-012: Resume delivery attempts within 2 hours upon network reconnection.",
+        "description": "Implement retry logic for failed notifications to resume sending within the 2-hour window.",
+        "backing_tool": "Bun Background Worker / Retry Logic",
+        "dependency_task_ids": [
+          "TASK-NOTIF-001",
+          "TASK-SEC-001"
+        ],
+        "estimated_complexity": "medium",
+        "completion_criteria": [
+          "Failed attempts are successfully resumed within 2 hours of network availability.",
+          "Retry counts in DeliveryAttempt reflect all resubmission attempts."
+        ],
+        "write_directory_paths": [],
+        "read_directory_paths": [
+          "${db_url}/delivery_attempts"
+        ]
+      },
+      {
+        "id": "TASK-NOTIF-003",
+        "task_type": "standard",
+        "component_id": "cmp-notifications",
+        "component_responsibility": "RSP-013: Confirm receipt of messages for bounce rate tracking.",
+        "description": "Capture bounce receipts and update delivery status to finalize bounce rate metrics.",
+        "backing_tool": "Email Provider Webhooks / SMS API Webhooks",
+        "dependency_task_ids": [
+          "TASK-NOTIF-001"
+        ],
+        "estimated_complexity": "low",
+        "completion_criteria": [
+          "Bounce rates are accurately calculated based on receipt confirmations.",
+          "MessageBatch status reflects final completion state."
+        ],
+        "write_directory_paths": [],
+        "read_directory_paths": [
+          "${db_url}/delivery_attempts"
+        ]
+      },
+      {
+        "id": "TASK-PAY-001",
+        "task_type": "standard",
+        "component_id": "cmp-payment",
+        "component_responsibility": "RSP-016: Process payment requests for deposits and service fees via integrated payment gateway.",
+        "description": "Integrate Stripe/Square gateway to process deposit and service fee transactions securely.",
+        "backing_tool": "Stripe SDK / Square SDK / Bun Crypto",
+        "dependency_task_ids": [
+          "TASK-SEC-001",
+          "TASK-COM-003",
+          "TASK-NOTIF-001"
+        ],
+        "estimated_complexity": "high",
+        "completion_criteria": [
+          "Payment intents are successfully created and confirmed in the gateway.",
+          "Transaction records are persisted in PaymentIntent data model."
+        ],
+        "write_directory_paths": [
+          "${seaweedfs_root}/payment_records"
+        ],
+        "read_directory_paths": [
+          "${db_url}/payment_intents"
+        ]
+      },
+      {
+        "id": "TASK-PAY-002",
+        "task_type": "standard",
+        "component_id": "cmp-payment",
+        "component_responsibility": "RSP-017: Generate electronic proof of payment and receipt documents.",
+        "description": "Create and store PDF receipt documents after successful payment processing via gateway.",
+        "backing_tool": "PDF Generator / SeaweedFS Storage",
+        "dependency_task_ids": [
+          "TASK-PAY-001",
+          "TASK-NOTIF-003"
+        ],
+        "estimated_complexity": "medium",
+        "completion_criteria": [
+          "ReceiptDocument is generated and accessible via the provided document_url.",
+          "Receipts are linked correctly to the corresponding PaymentIntent."
+        ],
+        "write_directory_paths": [
+          "${seaweedfs_root}/receipts"
+        ],
+        "read_directory_paths": []
+      }
+    ]
+  }
+}

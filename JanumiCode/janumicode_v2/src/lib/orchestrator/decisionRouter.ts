@@ -17,10 +17,15 @@
 import type { OrchestratorEngine, DecisionResolution } from './orchestratorEngine';
 import type { PhaseId, RecordType } from '../types/records';
 import { PHASE_ORDER } from '../types/records';
+import {
+  computeBundleCounters,
+  type MirrorItemDecision,
+  type MenuOptionSelection,
+} from '../types/decisionBundle';
 import { getLogger } from '../logging';
 
 export interface InboundDecision {
-  /** Record id of the surface being resolved (mirror_presented / menu_presented / phase_gate_evaluation). */
+  /** Record id of the surface being resolved (mirror_presented / decision_bundle_presented / phase_gate_evaluation). */
   recordId: string;
   /** Decision type — matches the spec's DecisionType union. */
   type:
@@ -44,7 +49,7 @@ export class DecisionRouter {
     const writer = this.engine.writer;
 
     // 1. Write the decision_trace record.
-    writer.writeRecord({
+    const decisionTraceRecord = writer.writeRecord({
       record_type: 'decision_trace',
       schema_version: '1.0',
       workflow_run_id: runId,
@@ -59,8 +64,9 @@ export class DecisionRouter {
 
     // 2. Write the typed follow-up record.
     const followUpType = this.followUpRecordType(decision.type);
+    let followUpRecordId: string | null = null;
     if (followUpType) {
-      writer.writeRecord({
+      const followUpRecord = writer.writeRecord({
         record_type: followUpType,
         schema_version: '1.0',
         workflow_run_id: runId,
@@ -71,6 +77,45 @@ export class DecisionRouter {
           payload: decision.payload ?? {},
         },
       });
+      followUpRecordId = followUpRecord.id;
+    }
+
+    // 2b. For phase-gate approvals, write the phase_gates row that the
+    //     dependency-closure resolver reads during rollback. Without this
+    //     insert the resolver always sees an empty gate set, so validated
+    //     artifacts never get their gates invalidated on rollback — a
+    //     silent audit-trail hole.
+    //
+    //     We use the phase_gate_approved record's id as phase_gates.id so
+    //     the `validates` memory_edges (which ingestion creates with
+    //     source_record_id = phase_gate_approved record id) line up with
+    //     the resolver's `SELECT target_record_id FROM memory_edge WHERE
+    //     source_record_id = gate.id`.
+    if (decision.type === 'phase_gate_approval' && followUpRecordId) {
+      const run = this.engine.stateMachine.getWorkflowRun(runId);
+      const phaseId = run?.current_phase_id ?? null;
+      if (phaseId) {
+        this.engine.db.prepare(`
+          INSERT INTO phase_gates
+            (id, workflow_run_id, phase_id, sub_phase_id, completed_at,
+             human_approved, approval_record_id, decision_trace_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          followUpRecordId,
+          runId,
+          phaseId,
+          run?.current_sub_phase_id ?? null,
+          new Date().toISOString(),
+          1,
+          followUpRecordId,
+          decisionTraceRecord.id,
+        );
+      } else {
+        getLogger().warn('decision', 'phase_gate_approval without current_phase_id; phase_gates row skipped', {
+          runId,
+          recordId: decision.recordId,
+        });
+      }
     }
 
     // 3. Resolve the pending decision.
@@ -198,6 +243,121 @@ export class DecisionRouter {
       case 'system_proposal_approval':
       case 'system_proposal_rejection':
         return null; // captured solely by the decision_trace record
+    }
+  }
+
+  /**
+   * Route a single decision-bundle submission from the webview into:
+   *   1. N per-item decision_trace records (for audit parity with the
+   *      old mirror/menu pair submission path)
+   *   2. One authoritative `decision_bundle_resolved` record carrying
+   *      every decision + computed counters
+   *   3. Engine.resolveDecision with a `decision_bundle_resolution`
+   *      resolution so the phase handler awaiting this surface unblocks
+   *
+   * Writes happen in this order so the resolved record is the last
+   * thing the stream sees — downstream consumers can trust that when
+   * they observe decision_bundle_resolved, every decision_trace child
+   * is already persisted.
+   */
+  routeBundle(
+    runId: string,
+    payload: {
+      recordId: string;
+      surfaceId: string;
+      mirrorDecisions: MirrorItemDecision[];
+      menuSelections: MenuOptionSelection[];
+    },
+  ): void {
+    const writer = this.engine.writer;
+    const versionSha = this.engine.janumiCodeVersionSha;
+    const run = this.engine.stateMachine.getWorkflowRun(runId);
+    const phaseId = run?.current_phase_id ?? null;
+
+    // 1. Per-item decision_traces — audit-level granularity preserved so
+    //    queries over decision_trace content keep working unchanged.
+    for (const mirror of payload.mirrorDecisions) {
+      writer.writeRecord({
+        record_type: 'decision_trace',
+        schema_version: '1.0',
+        workflow_run_id: runId,
+        phase_id: phaseId,
+        janumicode_version_sha: versionSha,
+        derived_from_record_ids: [payload.recordId],
+        content: {
+          decision_type: this.mirrorActionToDecisionType(mirror.action),
+          target_record_id: payload.recordId,
+          surface_id: payload.surfaceId,
+          item_id: mirror.item_id,
+          payload: mirror.action === 'edited'
+            ? { edited_text: mirror.edited_text ?? '' }
+            : {},
+        },
+      });
+    }
+    for (const sel of payload.menuSelections) {
+      writer.writeRecord({
+        record_type: 'decision_trace',
+        schema_version: '1.0',
+        workflow_run_id: runId,
+        phase_id: phaseId,
+        janumicode_version_sha: versionSha,
+        derived_from_record_ids: [payload.recordId],
+        content: {
+          decision_type: 'menu_selection',
+          target_record_id: payload.recordId,
+          surface_id: payload.surfaceId,
+          option_id: sel.option_id,
+          payload: sel.free_text !== undefined ? { free_text: sel.free_text } : {},
+        },
+      });
+    }
+
+    // 2. The authoritative bundle resolution — one record, counters
+    //    pre-computed so phase handlers don't re-derive them.
+    const counters = computeBundleCounters(payload.mirrorDecisions, payload.menuSelections);
+    writer.writeRecord({
+      record_type: 'decision_bundle_resolved',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      phase_id: phaseId,
+      janumicode_version_sha: versionSha,
+      derived_from_record_ids: [payload.recordId],
+      content: {
+        surface_id: payload.surfaceId,
+        target_record_id: payload.recordId,
+        mirror_decisions: payload.mirrorDecisions,
+        menu_selections: payload.menuSelections,
+        counters,
+      },
+    });
+
+    // 3. Unblock the awaiting phase handler.
+    const resolution: DecisionResolution = {
+      type: 'decision_bundle_resolution',
+      payload: {
+        surface_id: payload.surfaceId,
+        mirror_decisions: payload.mirrorDecisions,
+        menu_selections: payload.menuSelections,
+        counters,
+      },
+    };
+    const resolved = this.engine.resolveDecision(payload.recordId, resolution);
+    if (!resolved) {
+      getLogger().warn('decision', 'routeBundle: no pending decision found for record', {
+        recordId: payload.recordId,
+        surfaceId: payload.surfaceId,
+      });
+    }
+  }
+
+  /** Map per-item Mirror action to the spec's DecisionType. */
+  private mirrorActionToDecisionType(action: MirrorItemDecision['action']): string {
+    switch (action) {
+      case 'accepted': return 'mirror_approval';
+      case 'rejected': return 'mirror_rejection';
+      case 'edited':   return 'mirror_edit';
+      case 'deferred': return 'mirror_approval'; // deferred is a soft-accept with context
     }
   }
 

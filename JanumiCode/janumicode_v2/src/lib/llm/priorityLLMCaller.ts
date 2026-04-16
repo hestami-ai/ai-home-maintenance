@@ -91,7 +91,15 @@ export class PriorityLLMCaller {
       q[lane].push({ request, lane, resolve, reject, enqueuedAt: Date.now() });
 
       const depth = q.phase.length + q.user_query.length;
-      this.eventBus?.emit('llm:queued', { provider, lane, queueDepth: depth });
+      const trace = request.traceContext;
+      this.eventBus?.emit('llm:queued', {
+        provider,
+        lane,
+        queueDepth: depth,
+        label: trace?.label ?? null,
+        agentRole: trace?.agentRole ?? null,
+        subPhaseId: trace?.subPhaseId ?? null,
+      });
 
       this.tick(provider);
     });
@@ -110,7 +118,14 @@ export class PriorityLLMCaller {
     if (!next) return;
 
     this.inFlight.set(provider, inFlight + 1);
-    this.eventBus?.emit('llm:started', { provider, lane: next.lane });
+    const trace = next.request.traceContext;
+    this.eventBus?.emit('llm:started', {
+      provider,
+      lane: next.lane,
+      label: trace?.label ?? null,
+      agentRole: trace?.agentRole ?? null,
+      subPhaseId: trace?.subPhaseId ?? null,
+    });
     const startedAt = Date.now();
 
     void this.runRequest(provider, next, startedAt);
@@ -133,10 +148,14 @@ export class PriorityLLMCaller {
     // the event before the awaiting code runs.
     const after = (this.inFlight.get(provider) ?? 1) - 1;
     this.inFlight.set(provider, after);
+    const trace = next.request.traceContext;
     this.eventBus?.emit('llm:finished', {
       provider,
       lane: next.lane,
       durationMs: Date.now() - startedAt,
+      label: trace?.label ?? null,
+      agentRole: trace?.agentRole ?? null,
+      subPhaseId: trace?.subPhaseId ?? null,
     });
 
     if (result) next.resolve(result);

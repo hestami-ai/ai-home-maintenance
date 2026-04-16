@@ -1,0 +1,335 @@
+{
+  "match": "[JC:SYSTEM SCOPE]\nYou are the [JC:Technical Spec Agent] specifying API Definitions for Sub-Phase 5.2",
+  "key": "technical_spec_agent__5_2__04",
+  "agent_role": "technical_spec_agent",
+  "sub_phase_id": "5.2",
+  "call_sequence": 4,
+  "prompt_context_payload": {
+    "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Technical Spec Agent] specifying API Definitions for Sub-Phase 5.2.\n\nGOVERNING CONSTRAINTS (apply without exception):\n(none)\n\nProduce [JC:API Definitions] for each Component's externally callable interfaces.\n\nREQUIRED OUTPUT: A JSON object matching the `api_definitions` schema:\n- definitions: array, each with:\n  - component_id\n  - endpoints: array of {path, method, inputs, outputs, error_codes, auth_requirement}\n\nRules:\n- Every endpoint must have an explicit aut"
+  },
+  "prompt_context_hash": "78e2d32fee27e0ed",
+  "text": "{\n  \"definitions\": [\n    {\n      \"component_id\": \"COMP-001\",\n      \"endpoints\": [\n        {\n          \"path\": \"/storage/init\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"storage_path\": { \"type\": \"string\", \"description\": \"Path to the storage file\" }\n            },\n            \"required\": [\"storage_path\"]\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"status\": { \"type\": \"string\", \"description\": \"Initialization status\" },\n              \"path\": { \"type\": \"string\", \"description\": \"Created file path\" }\n            }\n          },\n          \"error_codes\": [\n            \"400\",\n            \"404\",\n            \"ERR_FILE_EXISTS\",\n            \"ERR_PERMISSION_DENIED\"\n          ],\n          \"auth_requirement\": \"None\"\n        },\n        {\n          \"path\": \"/tasks\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"task_name\": { \"type\": \"string\", \"description\": \"Name of the task\" },\n              \"description\": { \"type\": \"string\", \"description\": \"Task description\" },\n              \"priority\": { \"type\": \"integer\", \"description\": \"Task priority\" }\n            },\n            \"required\": [\"task_name\"]\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"task_id\": { \"type\": \"string\", \"description\": \"Unique task identifier\" },\n              \"status\": { \"type\": \"string\", \"description\": \"Current task status\" }\n            }\n          },\n          \"error_codes\": [\n            \"400\",\n            \"409\",\n            \"ERR_INVALID_NAME\",\n            \"ERR_STORAGE_FULL\"\n          ],\n          \"auth_requirement\": \"None\"\n        },\n        {\n          \"path\": \"/tasks\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {},\n            \"required\": []\n          },\n          \"outputs\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"task_id\": { \"type\": \"string\" },\n                \"name\": { \"type\": \"string\" },\n                \"status\": { \"type\": \"string\" }\n              }\n            }\n          },\n          \"error_codes\": [\n            \"400\",\n            \"404\",\n            \"ERR_STORAGE_NOT_FOUND\"\n          ],\n          \"auth_requirement\": \"None\"\n        },\n        {\n          \"path\": \"/tasks/{task_id}\",\n          \"method\": \"PATCH\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"status\": { \"type\": \"string\", \"description\": \"New status (e.g., 'completed')\" }\n            },\n            \"required\": [\"status\"]\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"task_id\": { \"type\": \"string\" },\n              \"updated\": { \"type\": \"boolean\" }\n            }\n          },\n          \"error_codes\": [\n            \"400\",\n            \"404\",\n            \"ERR_INVALID_STATUS\",\n            \"ERR_TASK_NOT_FOUND\"\n          ],\n          \"auth_requirement\": \"None\"\n        },\n        {\n          \"path\": \"/tasks/{task_id}\",\n          \"method\": \"DELETE\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {},\n            \"required\": []\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"deleted\": { \"type\": \"boolean\" }\n            }\n          },\n          \"error_codes\": [\n            \"400\",\n            \"404\",\n            \"ERR_TASK_NOT_FOUND\"\n          ],\n          \"auth_requirement\": \"None\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"COMP-002\",\n      \"endpoints\": [\n        {\n          \"path\": \"/validate\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"command\": { \"type\": \"string\", \"description\": \"CLI command string\" },\n              \"args\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } }\n            },\n            \"required\": [\"command\"]\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"valid\": { \"type\": \"boolean\" },\n              \"parsed_args\": { \"type\": \"object\" },\n              \"warnings\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } }\n            }\n          },\n          \"error_codes\": [\n            \"400\",\n            \"ERR_INVALID_COMMAND\",\n            \"ERR_MISSING_ARGS\",\n            \"ERR_SYNTAX_ERROR\"\n          ],\n          \"auth_requirement\": \"None\"\n        },\n        {\n          \"path\": \"/parse\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"input_stream\": { \"type\": \"string\", \"description\": \"UTF-8 text stream\" }\n            },\n            \"required\": [\"input_stream\"]\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"status\": { \"type\": \"string\" },\n              \"data\": { \"type\": \"object\" }\n            }\n          },\n          \"error_codes\": [\n            \"400\",\n            \"ERR_ENCODING_ERROR\",\n            \"ERR_PARSE_FAILURE\"\n          ],\n          \"auth_requirement\": \"None\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"COMP-003\",\n      \"endpoints\": [\n        {\n          \"path\": \"/render\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"task_ids\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } }\n            },\n            \"required\": []\n          },\n          \"outputs\": {\n            \"type\": \"string\",\n            \"description\": \"ANSI Escape Code formatted text\"\n          },\n          \"error_codes\": [\n            \"400\",\n            \"ERR_RENDER_FAILED\",\n            \"ERR_TERMINAL_NOT_SUPPORTED\"\n          ],\n          \"auth_requirement\": \"None\"\n        },\n        {\n          \"path\": \"/render/status\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"task_id\": { \"type\": \"string\" }\n            },\n            \"required\": [\"task_id\"]\n          },\n          \"outputs\": {\n            \"type\": \"string\",\n            \"description\": \"Formatted status message\"\n          },\n          \"error_codes\": [\n            \"400\",\n            \"404\",\n            \"ERR_TASK_NOT_FOUND\"\n          ],\n          \"auth_requirement\": \"None\"\n        }\n      ]\n    }\n  ]\n}",
+  "parsedJson": {
+    "definitions": [
+      {
+        "component_id": "COMP-001",
+        "endpoints": [
+          {
+            "path": "/storage/init",
+            "method": "POST",
+            "inputs": {
+              "type": "object",
+              "properties": {
+                "storage_path": {
+                  "type": "string",
+                  "description": "Path to the storage file"
+                }
+              },
+              "required": [
+                "storage_path"
+              ]
+            },
+            "outputs": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "description": "Initialization status"
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Created file path"
+                }
+              }
+            },
+            "error_codes": [
+              "400",
+              "404",
+              "ERR_FILE_EXISTS",
+              "ERR_PERMISSION_DENIED"
+            ],
+            "auth_requirement": "None"
+          },
+          {
+            "path": "/tasks",
+            "method": "POST",
+            "inputs": {
+              "type": "object",
+              "properties": {
+                "task_name": {
+                  "type": "string",
+                  "description": "Name of the task"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Task description"
+                },
+                "priority": {
+                  "type": "integer",
+                  "description": "Task priority"
+                }
+              },
+              "required": [
+                "task_name"
+              ]
+            },
+            "outputs": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "string",
+                  "description": "Unique task identifier"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Current task status"
+                }
+              }
+            },
+            "error_codes": [
+              "400",
+              "409",
+              "ERR_INVALID_NAME",
+              "ERR_STORAGE_FULL"
+            ],
+            "auth_requirement": "None"
+          },
+          {
+            "path": "/tasks",
+            "method": "GET",
+            "inputs": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "outputs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "task_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "error_codes": [
+              "400",
+              "404",
+              "ERR_STORAGE_NOT_FOUND"
+            ],
+            "auth_requirement": "None"
+          },
+          {
+            "path": "/tasks/{task_id}",
+            "method": "PATCH",
+            "inputs": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "description": "New status (e.g., 'completed')"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "outputs": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                },
+                "updated": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "error_codes": [
+              "400",
+              "404",
+              "ERR_INVALID_STATUS",
+              "ERR_TASK_NOT_FOUND"
+            ],
+            "auth_requirement": "None"
+          },
+          {
+            "path": "/tasks/{task_id}",
+            "method": "DELETE",
+            "inputs": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "outputs": {
+              "type": "object",
+              "properties": {
+                "deleted": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "error_codes": [
+              "400",
+              "404",
+              "ERR_TASK_NOT_FOUND"
+            ],
+            "auth_requirement": "None"
+          }
+        ]
+      },
+      {
+        "component_id": "COMP-002",
+        "endpoints": [
+          {
+            "path": "/validate",
+            "method": "POST",
+            "inputs": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "type": "string",
+                  "description": "CLI command string"
+                },
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "command"
+              ]
+            },
+            "outputs": {
+              "type": "object",
+              "properties": {
+                "valid": {
+                  "type": "boolean"
+                },
+                "parsed_args": {
+                  "type": "object"
+                },
+                "warnings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "error_codes": [
+              "400",
+              "ERR_INVALID_COMMAND",
+              "ERR_MISSING_ARGS",
+              "ERR_SYNTAX_ERROR"
+            ],
+            "auth_requirement": "None"
+          },
+          {
+            "path": "/parse",
+            "method": "POST",
+            "inputs": {
+              "type": "object",
+              "properties": {
+                "input_stream": {
+                  "type": "string",
+                  "description": "UTF-8 text stream"
+                }
+              },
+              "required": [
+                "input_stream"
+              ]
+            },
+            "outputs": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "data": {
+                  "type": "object"
+                }
+              }
+            },
+            "error_codes": [
+              "400",
+              "ERR_ENCODING_ERROR",
+              "ERR_PARSE_FAILURE"
+            ],
+            "auth_requirement": "None"
+          }
+        ]
+      },
+      {
+        "component_id": "COMP-003",
+        "endpoints": [
+          {
+            "path": "/render",
+            "method": "GET",
+            "inputs": {
+              "type": "object",
+              "properties": {
+                "task_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": []
+            },
+            "outputs": {
+              "type": "string",
+              "description": "ANSI Escape Code formatted text"
+            },
+            "error_codes": [
+              "400",
+              "ERR_RENDER_FAILED",
+              "ERR_TERMINAL_NOT_SUPPORTED"
+            ],
+            "auth_requirement": "None"
+          },
+          {
+            "path": "/render/status",
+            "method": "GET",
+            "inputs": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "task_id"
+              ]
+            },
+            "outputs": {
+              "type": "string",
+              "description": "Formatted status message"
+            },
+            "error_codes": [
+              "400",
+              "404",
+              "ERR_TASK_NOT_FOUND"
+            ],
+            "auth_requirement": "None"
+          }
+        ]
+      }
+    ]
+  },
+  "thinking": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Role:** [JC:Technical Spec Agent]\n    *   **Task:** Produce [JC:API Definitions] for Sub-Phase 5.2.\n    *   **Output Format:** JSON object matching `api_definitions` schema.\n    *   **Schema Structure:** `definitions` array, each with `component_id`, `endpoints` array (path, method, inputs, outputs, error_codes, auth_requirement).\n    *   **Constraints:**\n        *   Invariant: API-001 (Every endpoint must have an explicit authentication requirement).\n        *   Consistency with Interface Contracts from Phase 3 (though Phase 3 details aren't explicitly provided in the prompt, I must infer based on the provided \"Interface Contracts\" section).\n        *   Context: Single-file Shell/Python script, CLI-based, text-file storage, no DB, no GUI, no external deps.\n        *   Excluded capabilities: Network services, User Auth Services (Wait, this conflicts with API-001 constraint? I need to handle this carefully. The constraint says \"Every endpoint must have an explicit authentication requirement\". The Context says \"Excluded: ... User Authentication Services\". This implies the *system* doesn't have a login server, but the API definition still needs to specify an auth requirement. Since it's a CLI tool, \"auth_requirement\" might be a flag like `--auth-token` or `false` if it's local. However, the constraint says \"apply without exception\". I will define the auth requirement based on the security posture. If it's a local CLI tool, usually auth is handled via environment variables or flags. But the constraint says \"explicit authentication requirement\". I will define it as `false` or `CLI-Flag` if applicable, but strictly speaking, if I must follow API-001, I need to state what is required. Given \"Excluded: User Authentication Services\", I will set auth_requirement to `false` or `None` but explicitly state it in the field to satisfy the schema requirement, OR I will treat the CLI arguments as the authentication mechanism (e.g., `--secure-mode`). Let's look at the \"Capabilities\": \"Secure Input Validation\". I will set auth_requirement to `false` for local CLI tools but mark it explicitly as per schema, or perhaps `CLI-Argument-Required`. Let's stick to the schema requirement: `auth_requirement` field must exist. I will set it to `false` or `None` if no external auth exists, but since the constraint says \"Every endpoint must have an explicit authentication requirement\", I will define the requirement as `false` (indicating no auth needed) or `CLI-Flag` to be explicit. Actually, looking at the constraint \"apply without exception\", I must include the field. I will set it to `false` if no auth is needed, but the field name implies a requirement. Let's assume `false` is a valid value for \"requirement\". Or better, since it's a CLI tool, the \"auth\" is the command line invocation itself. I will set it to `false` to reflect the \"Excluded: User Authentication Services\" context, but ensure the field is present.)\n        *   Wait, re-reading: \"Excluded: ... User Authentication Services\". This means the system *doesn't* provide login. But API-001 says \"Every endpoint must have an explicit authentication requirement\". This is a conflict. Resolution: In a CLI context without a dedicated auth service, the \"requirement\" is often `false` or `None`. I will use `false` to indicate no external auth is required, but I will explicitly state it in the value to satisfy the \"explicit\" nature of the constraint.\n        *   Actually, a better interpretation for a CLI tool without auth services: The \"requirement\" is the CLI invocation itself. But to be safe and compliant with the schema, I will use `false` or `None`. Let's use `false` to denote no auth needed, but ensure the field is populated.\n        *   Wait, looking at the \"Interface Contracts\":\n            *   IC-001: Storage Manager <-> OS File System (JSON). This is internal to the script logic, but the prompt asks for \"Component's externally callable interfaces\".\n            *   IC-002: CLI-Parser <-> StdIO (Text Stream).\n            *   IC-003: Output-Renderer <-> Terminal (ANSI).\n            *   IC-004: CLI-Parser <-> Task-Engine (In-Memory).\n        *   The prompt asks for \"API Definitions for each Component's externally callable interfaces\".\n        *   Since this is a single-file script, the \"APIs\" are essentially the CLI commands (subcommands) that trigger the components.\n        *   Components:\n            *   COMP-001: TaskStorageManager (File IO).\n            *   COMP-002: TaskCommandParser (CLI Parsing).\n            *   COMP-003: TaskOutputWriter (Output).\n        *   However, usually, API definitions map to the *entry points* of the system. In a CLI tool, the \"endpoints\" are the subcommands (e.g., `add`, `list`, `complete`, `remove`).\n        *   I need to map these subcommands to the components.\n        *   COMP-002 (Parser) handles the input.\n        *   COMP-001 (Storage) handles the data.\n        *   COMP-003 (Output) handles the display.\n        *   The \"API\" is the CLI interface. I should define endpoints that represent the CLI actions.\n        *   Path: Usually `/api/v1/...` or just command names. Since it's a CLI, paths might be subcommands. Let's use `/tasks/{action}` style or just the command names. Given the schema `path`, `method`, I'll use REST-like conventions or CLI conventions. Since it's a CLI tool, `path` could be the command name (e.g., `add`, `list`). `method` could be `POST`, `GET`.\n        *   Let's align with the \"Interface Contracts\". IC-002 is CLI-Parser <-> StdIO. This suggests the API is the CLI interface.\n        *   I will define endpoints for the CLI commands: `add`, `list`, `complete`, `remove`, `init`.\n        *   I need to distribute these across the components.\n        *   COMP-001 (Storage): `add`, `complete`, `remove`, `init`.\n        *   COMP-002 (Parser): `add`, `list`, `complete`, `remove`, `init` (all parse input).\n        *   COMP-003 (Output): `list`, `complete` (maybe status), `remove` (maybe confirmation).\n        *   Actually, the prompt asks for \"API Definitions for each Component's externally callable interfaces\".\n        *   This implies I need to define the interfaces *for* each component.\n        *   However, in a monolithic script, components are internal. The \"externally callable interface\" is the CLI.\n        *   I will structure the JSON to define the CLI endpoints mapped to the logical components involved.\n        *   Wait, the schema says `definitions: array, each with: component_id, endpoints`.\n        *   So I need to list endpoints for COMP-001, COMP-002, COMP-003.\n        *   COMP-002 (Parser) is internal to the CLI flow. Is it externally callable? The prompt says \"Component's externally callable interfaces\".\n        *   If the script is a single file, the \"components\" are logical modules. The \"external interface\" is the CLI.\n        *   I will define the endpoints for the logical components as if they were microservices, but mapped to the CLI actions.\n        *   COMP-001 (Storage): Endpoints for file operations (Init, Read, Write, Update, Delete).\n        *   COMP-002 (Parser): Endpoints for parsing (Validate).\n        *   COMP-003 (Output): Endpoints for rendering.\n        *   But realistically, the user calls the script. The script calls components.\n        *   To satisfy the requirement \"Produce API Definitions for each Component's externally callable interfaces\", I will treat the CLI commands as the endpoints for the components that handle them.\n        *   Let's map:\n            *   COMP-001 (Storage): `POST /tasks` (Add), `GET /tasks` (List), `PATCH /tasks/{id}` (Complete), `DELETE /tasks/{id}` (Remove), `POST /init` (Init).\n            *   COMP-002 (Parser): This is tricky. It's internal. But I must define it. Maybe it exposes validation endpoints? Or I map the same endpoints to it as \"Parser Service\".\n            *   COMP-003 (Output): Same endpoints for rendering.\n        *   Constraint: \"API Definitions must be consistent with Interface Contracts from Phase 3\".\n        *   IC-001: Storage <-> FS.\n        *   IC-002: Parser <-> StdIO.\n        *   IC-003: Output <-> Terminal.\n        *   IC-004: Parser <-> Engine.\n        *   The \"API Definitions\" should reflect the external interface of the system, broken down by component responsibility.\n        *   I will create endpoints for the CLI commands (e.g., `add`, `list`, `status`, `remove`, `init`).\n        *   I will assign them to the components that own the logic.\n        *   COMP-001 owns the data logic.\n        *   COMP-002 owns the input logic.\n        *   COMP-003 owns the output logic.\n        *   I will define the endpoints for each component.\n        *   COMP-001: `POST /tasks`, `GET /tasks`, `PATCH /tasks/{id}`, `DELETE /tasks/{id}`, `POST /storage/init`.\n        *   COMP-002: `POST /validate`, `POST /parse` (Internal logic exposed as API for definition purposes).\n        *   COMP-003: `GET /render`, `POST /render`.\n        *   Wait, the prompt says \"Component's externally callable interfaces\". In a CLI tool, the *only* external interface is the CLI.\n        *   If I define separate APIs for internal components, it might imply they are separate services.\n        *   However, the instruction says \"Produce API Definitions for each Component's externally callable interfaces\".\n        *   I will interpret this as defining the logical API surface for each component's function, even if they run in the same process.\n        *   I will use standard REST paths for clarity.\n        *   Auth Requirement: Since \"User Authentication Services\" are excluded, but API-001 requires explicit auth requirement. I will set `auth_requirement` to `false` (indicating none) or `CLI-Flag` (indicating the requirement is the CLI invocation). I'll use `false` to be safe, or `None`. Let's use `false` to indicate no auth service is needed, but the field is explicit.\n        *   Actually, to be strict with \"explicit authentication requirement\", maybe `false` counts. Or `CLI-Argument`. I'll use `false` with a note in the description if possible, but the schema is strict JSON. I'll use `false`.\n        *   Wait, looking at \"Capabilities\": \"Secure Input Validation\". This might imply some form of auth (e.g., env var). But \"Excluded: User Authentication Services\". I will stick to `false`.\n        *   Error Codes: Need to include for all failure scenarios (e.g., file not found, invalid input, task not found).\n        *   Inputs/Outputs: JSON schemas or descriptions.\n        *   Path/Method: Standard REST verbs.\n\n2.  **Drafting the Content:**\n\n    *   **COMP-001 (TaskStorageManager):**\n        *   Endpoints:\n            *   `POST /storage/init` (RESP-001)\n            *   `POST /tasks` (RESP-002)\n            *   `GET /tasks` (RESP-003)\n            *   `PATCH /tasks/{id}` (RESP-004)\n            *   `DELETE /tasks/{id}` (RESP-005)\n        *   Inputs/Outputs: JSON payloads.\n        *   Errors: FileNotFound, InvalidFormat, TaskNotFound, etc.\n        *   Auth: `false` (No auth service).\n\n    *   **COMP-002 (TaskCommandParser):**\n        *   Endpoints:\n            *   `POST /validate` (RESP-006)\n            *   `POST /parse` (General parsing)\n        *   Inputs: CLI args (simulated as JSON for API def).\n        *   Outputs: Parsed JSON.\n        *   Errors: InvalidArgs, MalformedInput.\n        *   Auth: `false`.\n\n    *   **COMP-003 (TaskOutputWriter):**\n        *   Endpoints:\n            *   `GET /render` (RESP-007)\n            *   `POST /render` (Render specific task)\n        *   Inputs: Task data.\n        *   Outputs: ANSI Text.\n        *   Errors: RenderError.\n        *   Auth: `false`.\n\n    *   **Refining Auth:** The constraint says \"Every endpoint must have an explicit authentication requirement\". I will set the value to `false` to indicate \"No Authentication Required\" but explicitly state it in the field. Or I can use `CLI-Flag-Required`. Let's use `false` as it's a boolean field usually, but the schema says `auth_requirement`. I'll use a string or boolean. Let's use `false` to mean \"None\".\n    *   **Refining Paths:** Since it's a CLI, maybe paths like `/add`, `/list`. But schema asks for `path`, `method`. I'll use REST style for consistency with \"API Definitions\".\n    *   **Refining Inputs/Outputs:** Must be JSON compatible.\n    *   **Refining Error Codes:** Must be explicit.\n\n3.  **Constructing the JSON:**\n    *   Root object: `{ \"definitions\": [ ... ] }`\n    *   Each item: `{ \"component_id\": \"...\", \"endpoints\": [ ... ] }`\n    *   Endpoint: `{ \"path\": \"...\", \"method\": \"...\", \"inputs\": { ... }, \"outputs\": { ... }, \"error_codes\": [ ... ], \"auth_requirement\": \"...\" }`\n    *   Inputs/Outputs: I'll use a simplified structure like `{ \"type\": \"json\", \"schema\": \"...\" }` or just descriptions. The prompt doesn't specify the exact schema for inputs/outputs, just \"matching the `api_definitions` schema\". I will assume a standard structure for inputs/outputs (e.g., `{ \"name\": \"body\", \"type\": \"object\" }`). I will use descriptive JSON structures.\n    *   Wait, the prompt says \"matching the `api_definitions` schema\". It doesn't show the schema. I must infer a reasonable schema based on the description: `definitions: array, each with: component_id, endpoints: array of {path, method, inputs, outputs, error_codes, auth_requirement}`.\n    *   I will structure inputs/outputs as objects describing the payload.\n    *   Error codes: Array of strings (e.g., `400 Bad Request`).\n    *   Auth requirement: String (e.g., `false`, `Bearer`, `None`). I'll use `false` to indicate no auth needed, but since the constraint says \"explicit\", I'll write `false` (boolean) or `\"None\"`. I'll use `\"None\"` to be explicit.\n\n4.  **Final Review against Constraints:**\n    *   JSON object.\n    *   `definitions` array.\n    *   `component_id` present.\n    *   `endpoints` array.\n    *   Endpoint fields: `path`, `method`, `inputs`, `outputs`, `error_codes`, `auth_requirement`.\n    *   API-001: `auth_requirement` present for every endpoint.\n    *   Consistency with Interface Contracts:\n        *   COMP-001 handles Storage (IC-001).\n        *   COMP-002 handles CLI/Parse (IC-002).\n        *   COMP-003 handles Output (IC-003).\n    *   Context: Single-file, CLI, Text files.\n    *   Excluded: DB, GUI, etc. (So inputs/outputs are text/JSON, not binary).\n\n    *   *Self-Correction on Auth:* The constraint says \"apply without exception\". If I say `false`, is that explicit? Yes. If I say `None`, is that explicit? Yes. I will use `\"None\"` to be clear.\n    *   *Self-Correction on Inputs/Outputs:* I need to make them look like valid JSON descriptions.\n    *   *Self-Correction on Paths:* Since it's a CLI, maybe `/api/tasks` is better than just `add`. I'll use `/api/tasks` style to fit the \"API Definitions\" theme.\n\n    *   *Wait, one more check:* \"Interface Contracts from Phase 3\". The prompt lists IC-001 to IC-004.\n        *   IC-001: Storage <-> FS.\n        *   IC-002: Parser <-> StdIO.\n        *   IC-003: Output <-> Terminal.\n        *   IC-004: Parser <-> Engine.\n    *   The API definitions should reflect these.\n    *   COMP-001 (Storage) maps to IC-001.\n    *   COMP-002 (Parser) maps to IC-002 & IC-004.\n    *   COMP-003 (Output) maps to IC-003.\n    *   I will ensure the endpoints reflect these responsibilities.\n\n    *   *Error Codes:* Need to cover failure scenarios (File not found, Invalid input, Task not found, etc.).\n\n    *   *Inputs/Outputs:* I will define them as JSON objects describing the structure.\n\n    *   *Auth:* I will use `\"None\"` for all, as per \"Excluded: User Authentication Services\", but explicitly stated.\n\n    *   *Wait, Constraint Check:* \"Every endpoint must have an explicit authentication requirement\".\n    *   If I put `\"None\"`, is that explicit? Yes.\n    *   If I put `false`, is that explicit? Yes.\n    *   I'll use `\"None\"`.\n\n    *   *Schema Check:* The prompt says \"matching the `api_definitions` schema\". It describes the structure in the text. I will follow that text description strictly.\n    *   `definitions`: array\n    *   `component_id`: string\n    *   `endpoints`: array\n    *   `path`: string\n    *   `method`: string\n    *   `inputs`: object (I'll define structure)\n    *   `outputs`: object (I'll define structure)\n    *   `error_codes`: array of strings\n    *   `auth_requirement`: string/boolean\n\n    *   Let's build the JSON.\n\n5.  **Final Polish:**\n    *   Ensure valid JSON.\n    *   Ensure all fields are present.\n    *   Ensure error codes are realistic for a CLI tool (e.g., `ERR_FILE_NOT_FOUND`, `ERR_INVALID_ARGS`).\n    *   Ensure inputs/outputs are descriptive.\n\n    *   *Wait, one detail:* \"Component Model: PROJECT TYPE: The Shell-Scripted Utility\".\n    *   This implies the API is the CLI.\n    *   So paths might be `/add`, `/list`. But to look like API definitions, `/api/v1/tasks` is better.\n    *   I will use `/api/v1/tasks` style paths to maintain the \"API\" definition format, even if it's a CLI.\n    *   Actually, for a CLI tool, `method` is usually `CLI`. But the schema asks for `method`. I will use `POST`, `GET`, `DELETE` to map to the HTTP-like semantics of the commands (Add, List, Remove).\n    *   Inputs/Outputs: Since it's a CLI, inputs are arguments, outputs are stdout. I will describe them as JSON for the API definition context (simulating the underlying data exchange).\n\n    *   *Wait, Inputs/Outputs Schema:* The prompt doesn't give a schema for inputs/outputs *inside* the endpoint. I will create a standard structure like `{ \"type\": \"object\", \"properties\": ... }` or just `{ \"description\": \"...\" }`. I'll use `{ \"type\": \"string\", \"description\": \"...\" }` for simplicity and clarity.\n    *   Actually, to be robust, I'll define the payload structure.\n    *   Example: `inputs: { \"type\": \"object\", \"properties\": { \"task\": { \"type\": \"string\" } } }`.\n    *   Error codes: `[\"400\", \"500\", \"ERR_FILE_NOT_FOUND\"]`. I'll use descriptive strings.\n\n    *   *Auth:* I will use `\"None\"` to satisfy \"explicit\".\n\n    *   *Components:*\n        *   COMP-001: Storage.\n        *   COMP-002: Parser.\n        *   COMP-003: Output.\n    *   I will create endpoints for each.\n    *   COMP-001: All CRUD operations.\n    *   COMP-002: Validation/Parse operations.\n    *   COMP-003: Render operations.\n    *   This might look redundant, but it satisfies \"API Definitions for each Component\".\n    *   I will ensure the paths/methods make sense for the component's responsibility.\n    *   COMP-002 (Parser) might not have external endpoints, but the prompt says \"Component's externally callable interfaces\". If a component is internal, does it have an external interface?\n    *   The prompt says \"Produce API Definitions for each Component's externally callable interfaces.\"\n    *   If a component is purely internal (like a parser inside a script), it might not have an *external* interface.\n    *   However, the prompt lists \"3 Components\" and asks for definitions for \"each Component\".\n    *   I will assume the CLI commands are the external interface for the *system*, but logically mapped to components.\n    *   To be safe, I will define the endpoints for the components that logically handle the external request flow.\n    *   COMP-001 (Storage): Handles the data.\n    *   COMP-002 (Parser): Handles the input.\n    *   COMP-003 (Output): Handles the output.\n    *   I will define endpoints for all three to ensure compliance with \"each Component\".\n    *   For COMP-002, I'll define endpoints that represent the parsing logic exposed via the CLI interface (e.g., `/validate`).\n    *   For COMP-003, I'll define endpoints that represent the rendering logic.\n\n    *   Let's finalize the JSON structure.\n\n    *   Wait, \"Interface Contracts from Phase 3\". I don't have Phase 3. I have the \"Interface Contracts\" section in the prompt. I must ensure consistency with *those*.\n    *   IC-001: Storage <-> FS.\n    *   IC-002: Parser <-> StdIO.\n    *   IC-003: Output <-> Terminal.\n    *   IC-004: Parser <-> Engine.\n    *   My definitions must align with these.\n    *   COMP-001 (Storage) aligns with IC-001.\n    *   COMP-002 (Parser) aligns with IC-002 & IC-004.\n    *   COMP-003 (Output) aligns with IC-003.\n    *   This looks consistent.\n\n    *   One more check on Auth: \"Excluded: User Authentication Services\".\n    *   Constraint: \"Every endpoint must have an explicit authentication requirement\".\n    *   Resolution: `auth_requirement: \"None\"` is explicit.\n\n    *   One more check on Inputs/Outputs: I will use JSON schema-like descriptions.\n\n    *   One more check on Error Codes: I will include specific codes like `400`, `404`, `500` and specific messages.\n\n    *   Ready to write.",
+  "captured_at": "2026-04-13T16:48:35.854Z",
+  "janumicode_version_sha": "dev",
+  "llm_provider": "ollama",
+  "llm_model": "qwen3.5:9b"
+}

@@ -1,0 +1,15 @@
+{
+  "model": "qwen3.5:9b",
+  "provider": "ollama",
+  "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Systems Agent] specifying Interface Contracts for Sub-Phase 3.3.\n\nGOVERNING CONSTRAINTS (apply without exception):\n(none)\n\nSpecify [JC:Interface Contracts] for every [JC:External System] and between internal Components.\n\nREQUIRED OUTPUT: A JSON object matching the `interface_contracts` schema:\n- contracts: array, each with:\n  - id, systems_involved (at least 2), protocol, data_format, auth_mechanism, error_handling_strategy\n  - error_responses: at least one error response per contract (Invariant)\n\nRules:\n- Every External System must have at least one Interface Contract (Invariant)\n- Every contract must specify at least one error response (Invariant)\n\nCONTEXT:\nSystem Boundary: PROJECT TYPE: Consumer Discovery MVP (Phase 1 Focus): Implementation focused exclusively on Pillar 1 (Home Real Property Assistant) to prioritize user acquisition, property data ingestion (images, 3D splats), and service provider matching for individual homeowners.\n\nSystem Boundary:\nIn scope: Property Asset Ingestion (Images & 3D Splats); AI Agent Service Provider Search & Matching; Bid Estimate Comparison UI (Good-Better-Best); CC&R & Bylaws AI Extraction Module; Action Items Workflow Management (System of Action); Statutory Deadline Tracking & Alert Engine; Mass Email/SMS Communication Channel; Mobile App Client (Offline Queueing); Multi-tenant Security & Authorization (RLS); Payment Processing Integration (Stripe/Square); High-Performance Bun API Backend; SvelteKit Frontend Portal; DBOS Versioned Workflow Engine; Media Asset Storage (SeaweedFS); Regulatory Rules Engine (Notice Requirements)\nOut of scope: Pillar 2 (Financials) implementation for this MVP; Pillar 3 (Accounting) implementation for this MVP; Enterprise Governance MVP features (Phase 3 Focus); Field Service Engine MVP features (Phase 2 Focus); Automated Homeowner Association (HOA) Voting modules (Phase 3); Full offline-first capabilities for Homeowners (Secondary priority); Legacy Vantaca integration for V1 (Replicate 'System of Action' only); Advanced AI extraction beyond CC&Rs/Bylaws for V1; Direct Contractor Portal Access for V1; Real-time Bid Aggregation for non-homeowners\nExternal systems: EXT-001: Payment Gateway (Stripe/Square) (API/Webhook); EXT-002: Communication Provider (Email/SMS) (API/Webhook); EXT-003: Government Regulatory Services (API); EXT-004: AI/ML Service Provider (REST API); EXT-005: Mobile OS SDKs (SDK/Native)\nExternal Systems: EXT-001: Payment Gateway (Stripe/Square) (API/Webhook)\nEXT-002: Communication Provider (Email/SMS) (API/Webhook)\nEXT-003: Government Regulatory Services (API)\nEXT-004: AI/ML Service Provider (REST API)\nEXT-005: Mobile OS SDKs (SDK/Native)",
+  "system": null,
+  "responseFormat": "json",
+  "temperature": 0.4,
+  "traceContext": {
+    "workflowRunId": "ef5a4e8d-2bb6-403e-a7d5-fb7ca6a12d74",
+    "phaseId": "3",
+    "subPhaseId": "3.3",
+    "agentRole": "systems_agent",
+    "label": "Phase 3.3 — Interface Contract Specification"
+  }
+}

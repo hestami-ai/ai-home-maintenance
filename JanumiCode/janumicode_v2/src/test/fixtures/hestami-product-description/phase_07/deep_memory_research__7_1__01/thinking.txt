@@ -1,0 +1,137 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Deep Memory Research Agent] (Stage 1 — Query Decomposition).
+    *   **Task:** Transform the retrieval query into structured retrieval targets for the Governed Stream search.
+    *   **Input Query:** "Test case generation for requirements: 10 User Stories: US-001 [critical]: As a Individual Homeowner, I want I want to upload property images and 3D asset data (Splats), so that so that the AI can analyze my property condition and identify needed services. Acceptance Criteria: AC-001-1: Upload endpoint returns '200 OK' for files under 10MB within 5 seconds; assets indexed in < 10 seconds post-upload. AC-001-2: System reje" (Note: The input seems truncated at "AC-001-2: System reje", but I need to work with what's provided).
+    *   **Scope:** `all_runs` (from the briefing section).
+    *   **Requesting Agent:** `test_design_agent`.
+    *   **Output Format:** Specific JSON structure.
+    *   **Rules:**
+        *   Extract concrete entities (names, IDs, concepts).
+        *   `decision_types_sought` should match historical context needed (e.g., menu_selection, mirror_approval, phase_gate_approval).
+        *   `authority_levels_included`: Always include 5+ (Human-Approved). Include lower if query asks about exploratory/agent-generated content. Since this is test case generation based on requirements (formal specs), authority levels should be high (5+).
+        *   `sources_in_scope`: Depends on `scope_tier` (`all_runs` -> `governed_stream_all_runs`).
+        *   `temporal_scope`: Needs ISO dates. Since "all_runs" implies history, I need to determine the start and end dates. Usually, for historical retrieval, it's the beginning of the project to the current moment. Without explicit dates in the query, I should infer reasonable project start/end or use placeholders if unknown, but the prompt implies I should extract from the context. If no dates are known, I might need to set broad scopes or use current context. However, the instruction says `from`: "ISO-date", `to`: "ISO-date". I will use a reasonable project lifecycle span (e.g., from project kickoff to present).
+        *   `decision_types_sought`: Since this is test case generation for requirements, I likely need historical context regarding requirements approval, acceptance criteria validation, and implementation phases. `phase_gate_approval` seems appropriate for requirements testing. `mirror_approval` might fit if there are specific model validation decisions. `menu_selection` is less relevant. I'll select `phase_gate_approval` and potentially `mirror_approval` if model training/validation data is involved. Let's stick to the most relevant for *requirements* and *test generation*: `phase_gate_approval`.
+
+2.  **Analyze the Input Data:**
+    *   **Query Content:** Test case generation, Requirements, 10 User Stories, US-001, Individual Homeowner, Property Images, 3D asset data (Splats), AI, Acceptance Criteria, Upload endpoint, 200 OK, files < 10MB, 5 seconds, assets indexed < 10 seconds.
+    *   **Scope Parameter:** `all_runs`.
+    *   **Context:** This is a formal requirements specification (US-001) and test generation task.
+
+3.  **Map to JSON Fields:**
+    *   `topic_entities`:
+        *   "US-001" (Requirement ID)
+        *   "Individual Homeowner" (User Persona)
+        *   "property images" (Data Type)
+        *   "3D asset data (Splats)" (Data Type)
+        *   "Upload endpoint" (System Component)
+        *   "AI" (System Capability)
+        *   "test case generation" (Task Type)
+    *   `decision_types_sought`:
+        *   Since we are looking for requirements and acceptance criteria history to generate tests, we need context on how these were approved. `phase_gate_approval` is standard for requirements.
+    *   `temporal_scope`:
+        *   Since scope is `all_runs`, I need start and end. Without specific project dates, I will use logical bounds like "2023-01-01" to "2024-12-31" or similar generic placeholders if not known, BUT the instruction says "Extract concrete entities... from the query". The query doesn't have dates. However, the system instructions imply I should make it actionable. I will use a broad range typical for such systems or indicate current project lifecycle. Let's assume the project is ongoing. I'll use a generic recent range or leave it open? No, JSON requires ISO-date. I will use a safe range representing the full lifecycle or current project span. Let's assume the current run is active. I'll set `from` to a reasonable project start (e.g., 2024-01-01) and `to` to current (e.g., 2024-12-31T23:59:59Z). Actually, for `all_runs`, it should cover the history available. I'll use a placeholder range if exact dates aren't known, but to be precise, I'll use `2024-01-01` to `2024-12-31` as a representative scope for a software project, or better, `1970-01-01` to `9999-12-31`? No, that's too broad. I'll use the current project's likely lifespan. Let's use `2023-01-01` to `2024-12-31` to signify historical data within the current system lifecycle.
+        *   Wait, looking at the instruction: `sources_in_scope depends on scope_tier`. The input says `Scope: all_runs`. So `sources_in_scope` should be `governed_stream_all_runs`.
+        *   For `temporal_scope`, if not specified, I should probably infer the lifespan of the data available. Since I don't know the specific dates, I will use a standard project lifecycle placeholder that allows retrieval of all historical data up to now. `2023-01-01` to `2024-12-31` is safer, or `2024-01-01` to `2024-12-31`. Let's use `2024-01-01` to `2024-12-31` as a current project context, or better, `2020-01-01` to `2024-12-31` to ensure "all_runs" are caught. I will use `2024-01-01` to `2024-12-31` as a generic "current project lifecycle" assumption, or if the system expects specific extraction from the prompt, the prompt doesn't have dates. I will set a broad range to satisfy "all_runs" requirement logic.
+    *   `authority_levels_included`: Rule: "always include 5+ (Human-Approved and above); include lower levels only if the query asks about exploratory or agent-generated content". This is test case generation for requirements (Formal), so I should stick to Human-Approved levels (5+). Let's include 5, 6, 7.
+    *   `sources_in_scope`: `all_runs` -> `governed_stream_all_runs`.
+
+4.  **Refine Entities:**
+    *   US-001
+    *   Upload endpoint
+    *   Acceptance Criteria (AC-001-1, AC-001-2)
+    *   Splats
+    *   Individual Homeowner
+    *   Property Images
+    *   AI Analysis
+
+5.  **Refine Decision Types:**
+    *   This is for test generation based on requirements. We need to know if the requirements were approved (phase_gate_approval).
+    *   `phase_gate_approval` is the most critical for requirements.
+    *   `mirror_approval` could apply if there are validation decisions.
+    *   I'll select `phase_gate_approval` as the primary, maybe `mirror_approval` if validation of the AI is implied. Let's keep it tight: `["phase_gate_approval", "mirror_approval"]`.
+
+6.  **Refine Temporal Scope:**
+    *   Since I cannot know the actual dates of the "all_runs", I will use a representative span that covers the system's operational history in a typical deployment context, or use current date. Let's use `2024-01-01` to `2024-12-31` (Current Year). Or to be safe for "all_runs", maybe `2020-01-01` to `2024-12-31`. I'll choose `2023-01-01` to `2024-12-31` to indicate recent history. Actually, looking at the system behavior expected, if the prompt doesn't give dates, I should probably generate a valid ISO format that represents the available history. I'll use `2024-01-01` to `2024-12-31`T23:59:59Z`.
+
+7.  **Final JSON Construction:**
+    *   Check syntax.
+    *   Check rules compliance.
+
+    *   *Self-Correction on `authority_levels_included`*: Rule says "include lower levels only if the query asks about exploratory or agent-generated content". This query is for "Test case generation for requirements". Requirements are usually Human-Approved specs. I will stick to 5, 6, 7.
+    *   *Self-Correction on `temporal_scope`*: Since I don't have specific dates in the prompt, I must infer a logical start/end. I will use a broad recent range to satisfy "all_runs".
+    *   *Self-Correction on `sources_in_scope`*: Input says `Scope: all_runs`. Output rule says `all_runs -> governed_stream_all_runs`.
+
+8.  **Final Polish:** Ensure valid JSON.
+
+```json
+{
+  "topic_entities": [
+    "US-001",
+    "Individual Homeowner",
+    "property images",
+    "3D asset data (Splats)",
+    "Upload endpoint",
+    "Acceptance Criteria",
+    "AI analysis"
+  ],
+  "decision_types_sought": [
+    "phase_gate_approval",
+    "mirror_approval"
+  ],
+  "temporal_scope": {
+    "from": "2024-01-01T00:00:00Z",
+    "to": "2024-12-31T23:59:59Z"
+  },
+  "authority_levels_included": [5, 6, 7],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}
+```
+Wait, one detail: The prompt input says `Scope: all_runs`. The output rule says `sources_in_scope depends on scope_tier`.
+So `sources_in_scope`: `["governed_stream_all_runs"]`.
+`temporal_scope`: I need to output ISO dates. I'll assume the project started recently or is ongoing. I will use a generic start date for the system context.
+Let's finalize the JSON.
+
+One more check on `authority_levels_included`: The rule says "always include 5+ (Human-Approved and above)". I will include [5, 6, 7].
+`decision_types_sought`: Since it's about requirements and ACs, we are looking for approved requirements history. `phase_gate_approval` is best. `mirror_approval` might be relevant if there are model approvals. I'll keep both to be safe on retrieval context.
+
+Wait, `sources_in_scope` is a list in the example JSON: `["governed_stream_current_run"]`. My derivation says `all_runs -> governed_stream_all_runs`. I will use that.
+
+One detail on dates: Since I am an AI agent processing a query without external time context, I should probably use the current date range or a standard project duration. I will use `2024-01-01` to `2024-12-31` as a safe "current project" window, or perhaps just generic `1970-01-01`? No, ISO-date usually implies specific time. I will use the current system's effective start to present. I'll assume `2023-01-01` to `2024-12-31`.
+Actually, to be most accurate to "all_runs", I should probably cover the entire history available. But I don't know the history. I'll use a representative project duration.
+Okay, ready to generate.
+
+Wait, looking closely at the prompt: `Scope: all_runs`.
+This is a specific parameter in the BRIEF.
+Output rule: `sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs`.
+So I must use `governed_stream_all_runs`.
+
+Final check on JSON structure.
+Looks good.
+
+One nuance: `temporal_scope`. If the system doesn't know the dates, using specific dates might be hallucinated. However, the schema requires it. I will use a standard recent range.
+Let's adjust to `2024-01-01T00:00:00Z` to `2024-12-31T23:59:59Z` to reflect current operational history.
+
+Entities:
+US-001
+Individual Homeowner
+property images
+3D asset data (Splats)
+Upload endpoint
+Acceptance Criteria
+200 OK (Technical Concept)
+10MB (Constraint)
+5 seconds (Constraint)
+
+I will condense entities to high-level concepts for better retrieval targeting.
+`US-001`, `property images`, `3D asset data`, `Upload endpoint`, `Acceptance Criteria`, `AI analysis`.
+
+Decision types:
+`phase_gate_approval` (Requirements validation).
+`mirror_approval` (If model/data validation is implied).
+
+Let's write it.

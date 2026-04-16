@@ -1,0 +1,15 @@
+{
+  "model": "qwen3.5:9b",
+  "provider": "ollama",
+  "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Deep Memory Research Agent] performing Stage 1 — Query Decomposition.\n\nTransform the retrieval query into structured retrieval targets for the Governed Stream search.\n\nRETRIEVAL BRIEF:\nQuery: Test case generation for requirements: 10 User Stories:\n  US-001 [critical]: As a Individual Homeowner, I want I want to upload property images and 3D asset data (Splats), so that so that the AI can analyze my property condition and identify needed services.\n    Acceptance Criteria:\n    AC-001-1: Upload endpoint returns '200 OK' for files under 10MB within 5 seconds; assets indexed in < 10 seconds post-upload.\n    AC-001-2: System reje\nScope: all_runs\nRequesting Agent: test_design_agent\n\nYOUR REQUIRED OUTPUT (JSON):\n```json\n{\n  \"topic_entities\": [\"entity1\", \"entity2\"],\n  \"decision_types_sought\": [\"menu_selection\", \"mirror_approval\", \"phase_gate_approval\"],\n  \"temporal_scope\": {\"from\": \"ISO-date\", \"to\": \"ISO-date\"},\n  \"authority_levels_included\": [5, 6, 7],\n  \"sources_in_scope\": [\"governed_stream_current_run\"]\n}\n```\n\nRules:\n- Extract concrete entities (names, IDs, concepts) from the query\n- decision_types_sought should match the type of historical context needed\n- authority_levels_included: always include 5+ (Human-Approved and above); include lower levels only if the query asks about exploratory or agent-generated content\n- sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs",
+  "system": null,
+  "responseFormat": "json",
+  "temperature": 0.3,
+  "traceContext": {
+    "workflowRunId": "ef5a4e8d-2bb6-403e-a7d5-fb7ca6a12d74",
+    "phaseId": "7",
+    "subPhaseId": "7.1",
+    "agentRole": "deep_memory_research",
+    "label": "DMR Stage 1 — Query Decomposition"
+  }
+}

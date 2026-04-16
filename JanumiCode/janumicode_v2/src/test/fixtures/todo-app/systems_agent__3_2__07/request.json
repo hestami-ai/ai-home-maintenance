@@ -1,0 +1,15 @@
+{
+  "model": "qwen3.5:9b",
+  "provider": "ollama",
+  "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Systems Agent] deriving System Requirements for Sub-Phase 3.2.\n\nGOVERNING CONSTRAINTS (apply without exception):\nNo constraints\n\nDerive formal [JC:System Requirements] from Functional and Non-Functional Requirements, allocated to the [JC:System Boundary].\n\nREQUIRED OUTPUT: A JSON object matching the `system_requirements` schema:\n- items: array, each with:\n  - id (e.g., \"SR-001\"), statement, source_requirement_ids (traceability), priority\n\nRules:\n- Every Functional Requirement must map to at least one System Requirement (Invariant)\n- source_requirement_ids must reference actual FR/NFR IDs\n\nCONTEXT:\nSystem Boundary: In scope: CLI Command Line Interface; Local File Storage Engine; Task Creation Logic; Task Listing Logic; Task Update Logic. External systems: Local Operating System Filesystem\nFunctional Requirements: 7 user stories: Execute the CLI binary without network connectivity; Create a new task via command line arguments; List all stored tasks from the local file; Update an existing task's status or description; Delete a specific task from the local storage",
+  "system": null,
+  "responseFormat": "json",
+  "temperature": 0.4,
+  "traceContext": {
+    "workflowRunId": "40c2ffbf-0a40-4776-beef-4387389a3658",
+    "phaseId": "3",
+    "subPhaseId": "3.2",
+    "agentRole": "systems_agent",
+    "label": "Phase 3.2 — System Requirements Derivation"
+  }
+}

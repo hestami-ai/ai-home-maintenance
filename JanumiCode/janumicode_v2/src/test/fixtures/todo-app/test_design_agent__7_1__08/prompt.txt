@@ -1,0 +1,100 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Test Design Agent] generating Test Case specifications for Sub-Phase 7.1.
+
+GOVERNING CONSTRAINTS (apply without exception):
+(none)
+
+Generate structured [JC:Test Case] specifications for every [JC:Acceptance Criterion]. Test Cases are specifications — NOT code.
+
+REQUIRED OUTPUT: A JSON object matching the `test_plan` schema:
+- test_suites: array, each with:
+  - suite_id, component_id, test_type (unit|integration|end_to_end)
+  - test_cases: array, each with:
+    - test_case_id, type, acceptance_criterion_ids, preconditions (at least one — Invariant), expected_outcome
+
+Rules:
+- Every Acceptance Criterion must have at least one Test Case (Invariant)
+- Every Test Case must have at least one precondition (Invariant)
+- Cover functional behavior only — NFR coverage is Phase 8's responsibility
+
+CONTEXT:
+Functional Requirements: 6 User Stories:
+  US-001 [high]: As a System Administrator, I want I want to add a new task to the list via command line arguments, so that so that the task is recorded in the storage text file for later management
+    Acceptance Criteria:
+    AC-001-01: After executing 'add <task_name>', the storage file line count increases by exactly 1 compared to the state before execution.
+    AC-001-02: The script returns exit code 0 upon successful task creation.
+  US-002 [high]: As a System Administrator, I want I want to view all tasks currently stored in the system, so that so that I can review my pending work and completed items
+    Acceptance Criteria:
+    AC-002-01: Executing 'list' prints every line from the storage file to stdout, excluding empty lines.
+    AC-002-02: If the storage file is empty or missing, the command prints 'No tasks found' and exits with code 0.
+  US-003 [high]: As a System Administrator, I want I want to mark a specific task as completed, so that so that the task status is updated in the storage file
+    Acceptance Criteria:
+    AC-003-01: After executing 'complete <task_id>', the specific line in the storage file corresponding to <task_id> contains the string 'status=done'.
+    AC-003-02: If the provided <task_id> does not exist in the file, the script prints an error message and exits with code 1.
+  US-004 [medium]: As a System Administrator, I want I want to remove a completed or incorrect task from the list, so that so that the storage file remains clean and only contains relevant tasks
+    Acceptance Criteria:
+    AC-004-01: After executing 'delete <task_id>', the line associated with <task_id> is no longer present in the storage file.
+    AC-004-02: If the provided <task_id> does not exist in the file, the script prints an error message and exits with code 1.
+  US-005 [medium]: As a System Administrator, I want I want to initialize the storage file if it does not exist, so that so that I can begin using the utility immediately without pre-configuration
+    Acceptance Criteria:
+    AC-005-01: After executing 'init', a file named 'tasks.txt' (or configured name) exists in the current directory with a size greater than 0 bytes.
+    AC-005-02: If the storage file already exists, the 'init' command exits with code 0 without modifying the file contents.
+  US-006 [high]: As a System Administrator, I want I want to run the utility without installing external libraries, so that so that the script functions on any standard environment with a basic interpreter
+    Acceptance Criteria:
+    AC-006-01: Static analysis of the script source code reveals no imports or require statements for external packages (e.g., no 'import pandas', no 'require external_module').
+    AC-006-02: The script does not invoke external commands that require root privileges or system-wide installations (e.g., 'sudo', 'apt-get').
+Implementation Plan: 7 Implementation Tasks:
+  TASK-001 [medium]: Initialize the storage file at the configured path with default permissions (0644) and JSONL structure containing id:uuid and created_at:timestamp fields. Handles configuration parameters (storage_file_path, storage_file_format, storage_permissions, backup_enabled, backup_path).
+    Component: COMP-001, Responsibility: Create the storage file with a default structure upon first execution
+    Backing tool: Python
+    Dependencies: []
+    Completion criteria: ; ; 
+  TASK-002 [medium]: Generate a new task record with a UUID and timestamp, validate input data against error handling strategies (validation_error), and append the record to the storage file. Implements backup logic if enabled.
+    Component: COMP-001, Responsibility: Append a new task record to the storage file
+    Backing tool: Python
+    Dependencies: ["TASK-001"]
+    Completion criteria: ; ; 
+  TASK-003 [low]: Read the storage file and parse JSONL records into a list of task objects. Handles file not found errors gracefully.
+    Component: COMP-001, Responsibility: Read the storage file and retrieve all stored task records
+    Backing tool: Python
+    Dependencies: ["TASK-001"]
+    Completion criteria: ; 
+  TASK-004 [medium]: Read the storage file, locate the specific task record by ID, update the status attribute to 'completed', and write the changes back. Handles not_found errors for invalid task IDs.
+    Component: COMP-001, Responsibility: Update the status attribute of a specific task record to 'completed'
+    Backing tool: Python
+    Dependencies: ["TASK-001","TASK-003"]
+    Completion criteria: ; ; 
+  TASK-005 [medium]: Read the storage file, locate the specific task record by ID, remove the record, and write the updated file. Handles not_found errors for invalid task IDs.
+    Component: COMP-001, Responsibility: Delete a specific task record from the storage file upon command
+    Backing tool: Python
+    Dependencies: ["TASK-001","TASK-003"]
+    Completion criteria: ; ; 
+  TASK-006 [low]: Parse command line arguments using the configured argument_delimiter and strict_mode. Validates inputs against API definitions and returns validation errors if strict_mode is true.
+    Component: COMP-002, Responsibility: Parse command line arguments to validate inputs
+    Backing tool: Python
+    Dependencies: ["TASK-001"]
+    Completion criteria: ; 
+  TASK-007 [low]: Retrieve task records from COMP-001 and format them for standard output. Handles rendering status queries.
+    Component: COMP-003, Responsibility: Output all stored task records to standard output
+    Backing tool: Python
+    Dependencies: ["TASK-003"]
+    Completion criteria: ; 
+Component Model: 3 Components:
+  COMP-001: TaskStorageManager (domain: DOM-001)
+    Responsibilities:
+    RESP-001: Create the storage file with a default structure upon first execution
+    RESP-002: Append a new task record to the storage file
+    RESP-003: Read the storage file and retrieve all stored task records
+    RESP-004: Update the status attribute of a specific task record to 'completed'
+    RESP-005: Delete a specific task record from the storage file upon command
+    Dependencies: none
+  COMP-002: TaskCommandParser (domain: DOM-001)
+    Responsibilities:
+    RESP-006: Parse command line arguments to validate inputs
+    Dependencies: COMP-001 (control)
+  COMP-003: TaskOutputWriter (domain: DOM-001)
+    Responsibilities:
+    RESP-007: Output all stored task records to standard output
+    Dependencies: COMP-001 (data)
+
+DETAIL FILE: (not available)

@@ -1,0 +1,23 @@
+{
+  "topic_entities": [
+    "cmp-prop-data",
+    "PropertyAsset",
+    "MediaManifest",
+    "OfflineBuffer"
+  ],
+  "decision_types_sought": [
+    "phase_gate_approval"
+  ],
+  "temporal_scope": {
+    "from": "1970-01-01",
+    "to": "9999-12-31"
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}

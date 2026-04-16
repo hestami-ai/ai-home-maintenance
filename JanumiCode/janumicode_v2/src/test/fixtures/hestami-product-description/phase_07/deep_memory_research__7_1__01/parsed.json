@@ -1,0 +1,26 @@
+{
+  "topic_entities": [
+    "US-001",
+    "Individual Homeowner",
+    "property images",
+    "3D asset data (Splats)",
+    "Upload endpoint",
+    "Acceptance Criteria",
+    "AI analysis"
+  ],
+  "decision_types_sought": [
+    "phase_gate_approval"
+  ],
+  "temporal_scope": {
+    "from": "2023-01-01T00:00:00Z",
+    "to": "2024-12-31T23:59:59Z"
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}

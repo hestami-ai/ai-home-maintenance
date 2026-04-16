@@ -4,8 +4,12 @@
   "title": "Workspace Classification",
   "description": "Phase 0.1 output — classifies workspace as greenfield or brownfield",
   "type": "object",
-  "required": ["workspace_type", "janumicode_version_sha"],
+  "required": ["kind", "workspace_type", "janumicode_version_sha"],
   "properties": {
+    "kind": {
+      "type": "string",
+      "const": "workspace_classification"
+    },
     "workspace_type": {
       "type": "string",
       "enum": ["greenfield", "brownfield"]

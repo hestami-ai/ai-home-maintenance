@@ -1,0 +1,268 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Technical Spec Agent] specifying Configuration Parameters for Sub-Phase 5.4.
+    *   **Task:** Produce [JC:Configuration Parameters] for each Component (7 components defined).
+    *   **Output Format:** JSON object matching `configuration_parameters` schema.
+    *   **Schema:** `params`: array of objects with `component_id`, `name`, `type`, `default`, `required`, `description`.
+    *   **Constraints:**
+        *   Apply without exception (though none listed, this implies strict adherence to output format).
+        *   Every Component must have at least connection/initialization parameters.
+        *   Security-sensitive parameters (passwords, keys) must be `required: true`, `default: null`.
+        *   Use concrete types (string, integer, boolean, float, duration, url), not "any" or "object".
+        *   Context: Consumer Discovery MVP (Pillar 1 focus), specific components and data models provided.
+        *   Exclusions: Pillar 2, Pillar 3, Enterprise Governance, Field Service, Voting, Advanced AI, Direct Contractor Portal, Real-time Bid Aggregation (non-homeowners).
+
+2.  **Analyze the Components:**
+    *   `cmp-prop-data`: Property Data Manager (Images, 3D splats, offline sync).
+    *   `cmp-provider-match`: Service Provider Matcher (AI Agent search, bid comparison).
+    *   `cmp-compliance`: Compliance Rules Engine (CC&R/Bylaws extraction, statutory deadlines).
+    *   `cmp-workflow`: Action Workflow Orchestrator (Action items, audit logs).
+    *   `cmp-notifications`: Notification Dispatcher (Email/SMS, retries).
+    *   `cmp-security`: Tenant Security Gateway (RLS, Auth).
+    *   `cmp-payment`: Payment Transaction Processor (Stripe/Square integration).
+
+3.  **Determine Parameters for Each Component:**
+
+    *   **`cmp-prop-data`:**
+        *   DB Connection (Postgres/Vector store for images/3d data).
+        *   Storage Config (SeaweedFS connection).
+        *   Indexing settings (RSP-002: 10s target).
+        *   Upload validation config.
+        *   Offline buffer TTL.
+        *   Security: API Key/Secret.
+
+    *   **`cmp-provider-match`:**
+        *   AI Agent Endpoint URL/Config.
+        *   Search DB Connection.
+        *   Bid Comparison Thresholds.
+        *   Scoring weights.
+        *   Security: API Keys.
+
+    *   **`cmp-compliance`:**
+        *   Document Store DB Connection.
+        *   Statutory Database Connection.
+        *   Alert Thresholds.
+        *   Security: API Keys.
+
+    *   **`cmp-workflow`:**
+        *   DB Connection for Workflow State.
+        *   Audit Log Config.
+        *   UI Sync Latency settings.
+        *   Security: Auth Config.
+
+    *   **`cmp-notifications`:**
+        *   Email Provider (SMTP/SES).
+        *   SMS Provider (Twilio/etc.).
+        *   Retry Config (RSP-012: 2 hours).
+        *   Security: Auth Tokens.
+
+    *   **`cmp-security`:**
+        *   DB Connection.
+        *   RLS Configuration (Policy storage).
+        *   JWT/Token issuer settings.
+        *   Auth Provider (Auth0/Cognito).
+        *   Security: Secrets (API Keys).
+
+    *   **`cmp-payment`:**
+        *   Payment Gateway (Stripe/Square).
+        *   Webhook URL.
+        *   Webhook Secret.
+        *   Currency Config.
+        *   Security: API Keys/Secrets.
+
+4.  **Drafting the Parameters (adhering to constraints):**
+
+    *   *Constraint Check:* Every component needs connection/initialization params.
+    *   *Constraint Check:* Security params (passwords/keys) -> `required: true`, `default: null`.
+    *   *Constraint Check:* Concrete types (string, integer, boolean, float, duration, url).
+
+    *   *Specifics per component:*
+        *   `cmp-prop-data`: Needs SeaweedFS path, DB URL, Indexer TTL, Upload Validation Rules (JSON).
+        *   `cmp-provider-match`: Needs AI Search URL, Bid Min Threshold, Match Confidence Threshold.
+        *   `cmp-compliance`: Needs Rules DB URL, Deadline Check Interval, Alert Channel IDs.
+        *   `cmp-workflow`: Needs Workflow DB URL, Sync Latency Max (ms), Audit Retention Days.
+        *   `cmp-notifications`: Needs SMTP Host, SMTP Port, Twilio SID, Retry Max Count, Retry Window (duration).
+        *   `cmp-security`: Needs Auth Provider URL, RLS Policy Store URL, JWT Expiry, Session Timeout.
+        *   `cmp-payment`: Needs Stripe Publishable Key (Wait, public keys are not secret, but Stripe Secret Key is), Webhook Secret, Currency Code.
+
+5.  **Refining Types and Defaults:**
+    *   `database_url` -> string.
+    *   `storage_path` -> string/url.
+    *   `max_retries` -> integer.
+    *   `retry_window_minutes` -> integer or duration. Let's use integer for minutes.
+    *   `timeout_ms` -> integer.
+    *   `is_active` -> boolean.
+    *   `api_secret` -> string.
+
+    *   *Security Sensitivity:* Any parameter that stores a password, secret key, API token must be `required: true` and `default: null`. Do not provide dummy values for passwords.
+
+6.  **Constructing the JSON:**
+    *   Root structure: `{ "configuration_parameters": { "params": [...] } }`
+    *   Iterate through 7 components.
+    *   Ensure descriptions align with RSPs (Responsibility Statements).
+
+    *   *Self-Correction on `cmp-security`:* Since it's the gateway, it shouldn't store its own API keys necessarily, but might store Auth0 Client Secret. I will add auth provider secrets there as required.
+    *   *Self-Correction on `cmp-payment`:* Stripe requires Publishable Key (client side) and Secret Key (server side). Since this is server config, the Secret Key is the sensitive one. I'll include `stripe_api_secret_key` and `stripe_webhook_secret`.
+    *   *Self-Correction on `cmp-notifications`:* Retry logic needs specific duration types. I'll use `integer` (seconds or minutes). RSP-012 says "within 2 hours", so a duration field makes sense, but schema says concrete types. `integer` (minutes) is safer for config.
+
+7.  **Final Review against Rules:**
+    *   JSON object matching schema? Yes.
+    *   Every Component has at least connection/initialization? Yes (DB URLs, Hosts).
+    *   Security-sensitive required/null? Yes.
+    *   Concrete types? Yes.
+    *   Descriptions human-readable? Yes.
+    *   Context aligned (MVP Phase 1)? Yes (focus on ingestion, matching, basic compliance, workflow, notifications, security, payment).
+
+8.  **Output Generation** (Mental Draft to JSON):
+    *   `cmp-prop-data`: db_url, seaweedfs_root, indexer_ttl_seconds, upload_validation_rules_json (Wait, JSON might be complex. Let's keep it to specific types like string/url/integer). Let's use `upload_validation_config` as string (referring to a config file or JSON string). To be safe on types, `max_image_size_bytes` (integer), `allowed_formats` (string - comma separated).
+    *   `cmp-provider-match`: ai_agent_endpoint (url), min_bid_confidence (float), match_relevance_threshold (float).
+    *   `cmp-compliance`: deadline_check_interval_seconds (integer), alert_threshold_score (float).
+    *   `cmp-workflow`: sync_latency_ms (integer), audit_retention_days (integer).
+    *   `cmp-notifications`: smtp_host (string), smtp_port (integer), twilio_account_sid (string - wait, is this secret? Yes, API side). sms_twilio_api_key (string - secret), sms_twilio_api_secret (string - secret).
+    *   `cmp-security`: auth_provider_url (url), jwt_secret (string - secret), rls_engine_timeout_ms (integer).
+    *   `cmp-payment`: currency_code (string - ISO), stripe_secret_key (string - secret), webhook_secret (string - secret).
+
+    *Wait, one constraint:* "Security-sensitive parameters (passwords, keys) must be marked as required with no default".
+    *   So for `smtp_password`, `stripe_secret_key`, etc., I must set `required: true`, `default: null`.
+    *   For non-sensitive configs like `host`, `port`, I can set defaults or `null`.
+    *   For MVP, usually we want to define the keys exist.
+
+    *Refining types:* `duration` is allowed. I can use `duration` for timeouts.
+
+    *Refining Schema:* The prompt asks for a JSON object matching the `configuration_parameters` schema.
+    Root structure: `{ "configuration_parameters": { "params": [ ... ] } }`
+
+    *Let's build the array.*
+
+    (Self-Correction on `cmp-security`): It is the Tenant Security Gateway. It manages RLS. It connects to an Auth Provider. It needs DB connection.
+    (Self-Correction on `cmp-notifications`): Needs DB for message status (DeliveryAttempt model). Needs SMTP/SMS config.
+
+    *Let's finalize the parameter list for each.*
+
+    *cmp-prop-data:*
+    - `db_url` (string)
+    - `seaweedfs_root` (string/url)
+    - `indexer_timeout_duration` (duration)
+    - `max_upload_size_mb` (integer)
+    - `db_user` (string - required/secret? DB user is sensitive. Yes, usually.)
+    - `db_password` (string - required/secret)
+
+    *cmp-provider-match:*
+    - `search_db_url` (string)
+    - `ai_agent_endpoint` (string/url)
+    - `min_match_score` (float)
+    - `api_key` (string - required/secret)
+
+    *cmp-compliance:*
+    - `regulatory_db_url` (string)
+    - `rule_evaluation_timeout_duration` (duration)
+    - `alert_email_batch_size` (integer)
+    - `api_key` (string - required/secret)
+
+    *cmp-workflow:*
+    - `workflow_db_url` (string)
+    - `ui_sync_interval_seconds` (integer)
+    - `audit_log_retention_days` (integer)
+    - `audit_db_url` (string)
+
+    *cmp-notifications:*
+    - `smtp_host` (string)
+    - `smtp_port` (integer)
+    - `smtp_tls_enabled` (boolean)
+    - `twilio_sid` (string - required/secret)
+    - `twilio_auth_token` (string - required/secret)
+    - `retry_max_attempts` (integer)
+    - `retry_window_hours` (integer)
+
+    *cmp-security:*
+    - `auth_provider_endpoint` (string/url)
+    - `jwt_secret_key` (string - required/secret)
+    - `session_timeout_seconds` (integer)
+    - `rbac_policy_db_url` (string)
+
+    *cmp-payment:*
+    - `currency_default` (string)
+    - `stripe_publishable_key` (string - typically public, but for server side, we need Secret Key). Let's use `stripe_api_secret_key` (string - required/secret).
+    - `webhook_secret` (string - required/secret)
+    - `gateway_region` (string)
+
+    *Reviewing `required`:*
+    - If a parameter has a default, `required` is false.
+    - If it's sensitive (password, secret key), `required` is true, `default` is null.
+    - Connection params like `db_url` often have defaults in dev, but in prod they are config. I will set `required: true` for critical connection strings to ensure they are configured, but the prompt says "Security-sensitive parameters... must be marked as required with no default". It implies non-security params *can* have defaults. However, for a configuration schema, usually connection strings are required. I will mark `required: true` for DB URLs to be safe, or provide a default like `null` if optional. For an MVP spec, connection strings are usually required. I will set `required: true` for DBs and Keys.
+    - Actually, looking at the instruction: "Security-sensitive parameters (passwords, keys) must be marked as required with no default". It does not explicitly force *all* DB URLs to be required, but practically they are. I will mark sensitive ones as required + null default. Non-sensitive config defaults (like timeouts) can have defaults. Connection URLs I will treat as required because an app needs them to run.
+
+    *Wait, instruction:* "Use concrete types, not 'any' or 'object'".
+    *Instruction:* "Every Component should have at least connection/initialization parameters".
+    *Instruction:* "Security-sensitive parameters (passwords, keys) must be marked as required with no default".
+
+    Okay, ready to generate JSON.
+
+    *One detail:* `configuration_parameters` schema implies a root key. I will output the full JSON structure.
+    *Structure:*
+    ```json
+    {
+      "configuration_parameters": {
+        "params": [ ... ]
+      }
+    }
+    ```
+    Wait, the prompt says "Produce [JC:Configuration Parameters] for each Component". And "REQUIRED OUTPUT: A JSON object matching the `configuration_parameters` schema: - params: array".
+    Usually, this implies the root is the object containing `configuration_parameters` -> `params`. Or just the array?
+    "REQUIRED OUTPUT: A JSON object matching the `configuration_parameters` schema: - params: array".
+    I will wrap it in `configuration_parameters` as the root key based on standard config spec patterns, but the description says "matching the `configuration_parameters` schema".
+    Let's assume the schema defines the content of `params`.
+    However, to be safe and complete, I will output:
+    ```json
+    {
+      "configuration_parameters": {
+        "params": [...]
+      }
+    }
+    ```
+    Actually, looking at the schema description: "matching the `configuration_parameters` schema: - params: array". This suggests the root object has a key `params`.
+    I will structure it as `{ "configuration_parameters": { "params": [ ... ] } }`.
+
+    Let's double check parameter counts.
+    cmp-prop-data: db, storage, index, security.
+    cmp-provider-match: db, ai, bid, security.
+    cmp-compliance: db, alert, security.
+    cmp-workflow: db, ui sync, security.
+    cmp-notifications: smtp, sms, retry, security.
+    cmp-security: auth, jwt, policy, security (self ref).
+    cmp-payment: stripe, currency, webhooks.
+
+    Looks good. I will ensure all sensitive ones (secrets) are `required: true`, `default: null`.
+
+    *One more check:* "Use concrete types". `boolean`, `string`, `integer`, `float`, `duration`, `url`.
+    I will use `url` for URLs, `string` for text keys, `integer` for counts/timeouts, `boolean` for flags, `float` for scores, `duration` for timeouts (e.g., 10 seconds -> "10s"). Wait, if `duration` is a type, I should use `duration`. Or `string` with "10s" convention. I'll use `integer` for seconds/minutes unless the schema specifically implies a duration string type. The prompt lists `duration` as a valid type. I'll use `duration` for time-based configs to be explicit.
+
+    *Wait, `duration` type:* If I use `duration`, value might be "10s". If I use `integer`, value is 10 (seconds). I'll stick to `integer` for seconds/minutes to avoid ambiguity unless it's a specific timeout setting. Let's use `integer` for counts and `duration` for things like "connection timeout" if supported, but `integer` (seconds) is often safer for APIs. The prompt says `duration` is a valid type. I'll use `integer` for simple counts and `duration` for specific timeouts to show usage of the constraint.
+    Actually, to be most compatible, `integer` (seconds) is often treated as a duration. I'll use `integer` for seconds/counts to avoid string parsing issues unless strictly needed.
+    I'll use `duration` for things like `max_retry_duration`.
+    Okay, let's just use `integer` for seconds/minutes to keep it simple and concrete.
+
+    *Wait, one constraint:* "Security-sensitive parameters (passwords, keys) must be marked as required with no default".
+    I must ensure I don't put `default: "password123"`. It must be `null`.
+
+    Let's assemble.
+
+    Component IDs:
+    `cmp-prop-data`
+    `cmp-provider-match`
+    `cmp-compliance`
+    `cmp-workflow`
+    `cmp-notifications`
+    `cmp-security`
+    `cmp-payment`
+
+    Let's write the JSON.
+
+    *Note:* I need to make sure I don't accidentally mark non-sensitive params as required if they have defaults. E.g., `timeout` -> default 5000ms -> `required: false`.
+    But DB URLs are essential. I will set `required: true` for DB URLs.
+    Actually, if I set a default, `required` should be false. If I don't set a default, `required` can be true.
+    I will set `required: true` for critical infrastructure (DB, Storage) and `required: false` for optional tuning, with defaults where tuning exists.
+    For secrets, `required: true`, `default: null`.
+
+    Let's finalize the list.

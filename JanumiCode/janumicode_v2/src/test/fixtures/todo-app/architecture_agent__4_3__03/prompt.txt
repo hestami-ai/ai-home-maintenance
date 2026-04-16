@@ -1,0 +1,36 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Architecture Agent] capturing Architectural Decisions for Sub-Phase 4.3.
+
+GOVERNING CONSTRAINTS (apply without exception):
+(none)
+
+Produce [JC:Architectural Decision Records] for every significant choice made during architecture definition.
+
+REQUIRED OUTPUT: A JSON object matching the `architectural_decisions` schema:
+- adrs: array, each with:
+  - id, title, status (proposed|accepted), context, decision, alternatives, rationale, consequences
+
+Rules:
+- Every ADR must have status, decision, and rationale populated (Invariant: ADR-001, ADR-002)
+- Capture technology selections, pattern choices, and structural decisions
+- Every ADR must document at least one alternative that was considered
+
+CONTEXT:
+Component Model: COMP-001: TaskStorageManager (domain: DOM-001)
+  Responsibilities:
+  RESP-001: Create the storage file with a default structure upon first execution
+  RESP-002: Append a new task record to the storage file
+  RESP-003: Read the storage file and retrieve all stored task records
+  RESP-004: Update the status attribute of a specific task record to 'completed'
+  RESP-005: Delete a specific task record from the storage file upon command
+  Dependencies: none
+COMP-002: TaskCommandParser (domain: DOM-001)
+  Responsibilities:
+  RESP-006: Parse command line arguments to validate inputs
+  Dependencies: COMP-001 (control)
+COMP-003: TaskOutputWriter (domain: DOM-001)
+  Responsibilities:
+  RESP-007: Output all stored task records to standard output
+  Dependencies: COMP-001 (data)
+Software Domains: DOM-001: Core Domain (reqs: SR-001)
+  Terms: application: The primary system being built

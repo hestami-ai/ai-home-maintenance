@@ -1,0 +1,29 @@
+{
+  "completeness_findings": [
+    {
+      "field": "what_is_being_built",
+      "status": "present",
+      "severity": "low",
+      "explanation": "Product name 'Hestami AI Real Property OS' is inferred from the referenced filename."
+    },
+    {
+      "field": "who_it_serves",
+      "status": "absent",
+      "severity": "medium",
+      "explanation": "The intent does not specify target users (e.g., agents, developers, tenants, investors)."
+    },
+    {
+      "field": "what_problem_solves",
+      "status": "absent",
+      "severity": "medium",
+      "explanation": "The intent does not articulate specific pain points or value propositions."
+    }
+  ],
+  "consistency_findings": [],
+  "coherence_findings": [],
+  "overall_status": "requires_input",
+  "system_proposal_offered_for": [
+    "who_it_serves",
+    "what_problem_solves"
+  ]
+}

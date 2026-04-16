@@ -1,0 +1,52 @@
+{
+  "$id": "janumicode:prior_decision_summary:1.0",
+  "title": "Prior Decision Summary",
+  "description": "Phase 0.2b output — summary of all governing decisions from prior workflow runs. Feeds Phase 1+ as authority context.",
+  "type": "object",
+  "required": ["kind", "total_prior_runs", "active_constraints", "decision_traces", "superseded_items", "coverage_confidence"],
+  "properties": {
+    "kind": { "type": "string", "const": "prior_decision_summary" },
+    "total_prior_runs": { "type": "integer", "minimum": 0 },
+    "active_constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "authority_level", "source_record_ids"],
+        "properties": {
+          "id": { "type": "string" },
+          "statement": { "type": "string" },
+          "authority_level": { "type": "integer", "minimum": 6, "maximum": 7 },
+          "source_record_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "decision_traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "summary", "record_id"],
+        "properties": {
+          "id": { "type": "string" },
+          "summary": { "type": "string" },
+          "record_id": { "type": "string" },
+          "authority_level": { "type": "integer" }
+        }
+      }
+    },
+    "superseded_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["subject", "current_record_id", "superseded_record_ids"],
+        "properties": {
+          "subject": { "type": "string" },
+          "current_record_id": { "type": "string" },
+          "superseded_record_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "coverage_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "context_packet_record_id": { "type": "string" }
+  },
+  "additionalProperties": false
+}

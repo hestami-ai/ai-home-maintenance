@@ -1,0 +1,99 @@
+{
+  "text": "{\n  \"error_handling_strategies\": [\n    {\n      \"component_id\": \"cmp-prop-data\",\n      \"error_types\": [\n        \"file_format_invalid\",\n        \"upload_size_exceeded\",\n        \"indexing_timeout\",\n        \"storage_quota_exceeded\",\n        \"sync_conflict\"\n      ],\n      \"detection\": \"HTTP middleware validation for MIME type; Async worker try/catch block with timeout; Storage driver check for disk availability\",\n      \"response\": \"Return 400 Bad Request with validation details; Reject with 403 Quota Exceeded; Failover to offline queue for sync; Return 504 Gateway Timeout for indexing failures\",\n      \"surfacing\": \"JSON error payload with field-specific validation messages; Admin dashboard metrics for storage usage; Logs flagged with severity ERROR; User receives 'Asset Failed Upload' toast notification\"\n    },\n    {\n      \"component_id\": \"cmp-provider-match\",\n      \"error_types\": [\n        \"ai_inference_timeout\",\n        \"bid_data_missing\",\n        \"provider_api_down\",\n        \"relevance_score_below_threshold\"\n      ],\n      \"detection\": \"Circuit breaker pattern on provider API calls; Timeout middleware on AI inference; Confidence score threshold check on results\",\n      \"response\": \"Failover to cached results; Retry with exponential backoff for provider API; Propagate empty results with fallback recommendation\",\n      \"surfacing\": \"502 Bad Gateway for external API failures; 'Low Confidence' warning badge on AI results; UI renders fallback list if primary provider unavailable\"\n    },\n    {\n      \"component_id\": \"cmp-compliance\",\n      \"error_types\": [\n        \"extraction_confidence_low\",\n        \"statutory_deadline_missed\",\n        \"notification_queue_full\",\n        \"rule_engine_mismatch\"\n      ],\n      \"detection\": \"AI confidence score validation below 0.7 threshold; Cron job polling for deadline state; Queue depth monitor; Schema validation on extracted text\",\n      \"response\": \"Flag document for manual review; Generate critical alert ticket; Retry notification payload with retry count limit\",\n      \"surfacing\": \"Critical severity logs; Admin alert for missed deadlines; User sees 'Compliance Action Required' banner; Webhook return 500 for critical rule mismatches\"\n    },\n    {\n      \"component_id\": \"cmp-workflow\",\n      \"error_types\": [\n        \"state_transition_invalid\",\n        \"audit_log_write_failed\",\n        \"workflow_timeout\",\n        \"transition_order_violated\"\n      ],\n      \"detection\": \"State machine validator before transition; Transaction rollback on constraint violation; Timeout on state update query\",\n      \"response\": \"Reject transition with 409 Conflict; Queue failed audit write; Compensating transaction to revert to previous state\",\n      \"surfacing\": \"409 Conflict with allowed transitions list; UI shows 'Action Processing Failed' status; Detailed stack trace logged for support ticketing\"\n    },\n    {\n      \"component_id\": \"cmp-notifications\",\n      \"error_types\": [\n        \"smtp_connection_timeout\",\n        \"sms_gateway_unavailable\",\n        \"email_bounce_detected\",\n        \"recipient_list_invalid\"\n      ],\n      \"detection\": \"Transport library timeout response; Batch job status check; Bounce report parsing from gateway; Email address format regex check\",\n      \"response\": \"Queue message with exponential backoff; Partial batch success reporting; Skip invalid recipients and continue batch\",\n      \"surfacing\": \"503 Service Unavailable during gateway outage; Bounce rate percentage in batch summary; Individual recipient delivery status in UI\"\n    },\n    {\n      \"component_id\": \"cmp-security\",\n      \"error_types\": [\n        \"token_expired\",\n        \"scope_insufficient\",\n        \"token_format_invalid\",\n        \"rbac_forbidden\"\n      ],\n      \"detection\": \"Token expiration check in header; Scope validation against RLS policy; Signature verification on request; 405 Method Not Allowed check\",\n      \"response\": \"Immediate 401 Unauthorized or 403 Forbidden; Block request without processing; Log suspicious IP address\",\n      \"surfacing\": \"HTTP 401/403 with security scope reason; No PII logged; Security alert sent to SOC team for repeated violations; WAF block rule trigger\"\n    },\n    {\n      \"component_id\": \"cmp-payment\",\n      \"error_types\": [\n        \"card_declined\",\n        \"idempotency_duplicate\",\n        \"gateway_connection_timeout\",\n        \"insufficient_funds_error\"\n      ],\n      \"detection\": \"Payment gateway error code parsing; Idempotency key check in request header; Timeout on webhook callback; Transaction status polling\",\n      \"response\": \"Return gateway decline reason code; Queue duplicate request for manual review; Retry transient failures with circuit breaker\",\n      \"surfacing\": \"402 Payment Required with specific decline reason; Receipt generation blocked; Admin portal flag for pending payments\"\n    }\n  ]\n}",
+  "parsed": {
+    "error_handling_strategies": [
+      {
+        "component_id": "cmp-prop-data",
+        "error_types": [
+          "file_format_invalid",
+          "upload_size_exceeded",
+          "indexing_timeout",
+          "storage_quota_exceeded",
+          "sync_conflict"
+        ],
+        "detection": "HTTP middleware validation for MIME type; Async worker try/catch block with timeout; Storage driver check for disk availability",
+        "response": "Return 400 Bad Request with validation details; Reject with 403 Quota Exceeded; Failover to offline queue for sync; Return 504 Gateway Timeout for indexing failures",
+        "surfacing": "JSON error payload with field-specific validation messages; Admin dashboard metrics for storage usage; Logs flagged with severity ERROR; User receives 'Asset Failed Upload' toast notification"
+      },
+      {
+        "component_id": "cmp-provider-match",
+        "error_types": [
+          "ai_inference_timeout",
+          "bid_data_missing",
+          "provider_api_down",
+          "relevance_score_below_threshold"
+        ],
+        "detection": "Circuit breaker pattern on provider API calls; Timeout middleware on AI inference; Confidence score threshold check on results",
+        "response": "Failover to cached results; Retry with exponential backoff for provider API; Propagate empty results with fallback recommendation",
+        "surfacing": "502 Bad Gateway for external API failures; 'Low Confidence' warning badge on AI results; UI renders fallback list if primary provider unavailable"
+      },
+      {
+        "component_id": "cmp-compliance",
+        "error_types": [
+          "extraction_confidence_low",
+          "statutory_deadline_missed",
+          "notification_queue_full",
+          "rule_engine_mismatch"
+        ],
+        "detection": "AI confidence score validation below 0.7 threshold; Cron job polling for deadline state; Queue depth monitor; Schema validation on extracted text",
+        "response": "Flag document for manual review; Generate critical alert ticket; Retry notification payload with retry count limit",
+        "surfacing": "Critical severity logs; Admin alert for missed deadlines; User sees 'Compliance Action Required' banner; Webhook return 500 for critical rule mismatches"
+      },
+      {
+        "component_id": "cmp-workflow",
+        "error_types": [
+          "state_transition_invalid",
+          "audit_log_write_failed",
+          "workflow_timeout",
+          "transition_order_violated"
+        ],
+        "detection": "State machine validator before transition; Transaction rollback on constraint violation; Timeout on state update query",
+        "response": "Reject transition with 409 Conflict; Queue failed audit write; Compensating transaction to revert to previous state",
+        "surfacing": "409 Conflict with allowed transitions list; UI shows 'Action Processing Failed' status; Detailed stack trace logged for support ticketing"
+      },
+      {
+        "component_id": "cmp-notifications",
+        "error_types": [
+          "smtp_connection_timeout",
+          "sms_gateway_unavailable",
+          "email_bounce_detected",
+          "recipient_list_invalid"
+        ],
+        "detection": "Transport library timeout response; Batch job status check; Bounce report parsing from gateway; Email address format regex check",
+        "response": "Queue message with exponential backoff; Partial batch success reporting; Skip invalid recipients and continue batch",
+        "surfacing": "503 Service Unavailable during gateway outage; Bounce rate percentage in batch summary; Individual recipient delivery status in UI"
+      },
+      {
+        "component_id": "cmp-security",
+        "error_types": [
+          "token_expired",
+          "scope_insufficient",
+          "token_format_invalid",
+          "rbac_forbidden"
+        ],
+        "detection": "Token expiration check in header; Scope validation against RLS policy; Signature verification on request; 405 Method Not Allowed check",
+        "response": "Immediate 401 Unauthorized or 403 Forbidden; Block request without processing; Log suspicious IP address",
+        "surfacing": "HTTP 401/403 with security scope reason; No PII logged; Security alert sent to SOC team for repeated violations; WAF block rule trigger"
+      },
+      {
+        "component_id": "cmp-payment",
+        "error_types": [
+          "card_declined",
+          "idempotency_duplicate",
+          "gateway_connection_timeout",
+          "insufficient_funds_error"
+        ],
+        "detection": "Payment gateway error code parsing; Idempotency key check in request header; Timeout on webhook callback; Transaction status polling",
+        "response": "Return gateway decline reason code; Queue duplicate request for manual review; Retry transient failures with circuit breaker",
+        "surfacing": "402 Payment Required with specific decline reason; Receipt generation blocked; Admin portal flag for pending payments"
+      }
+    ]
+  },
+  "thinking": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Role:** [JC:Technical Spec Agent].\n    *   **Task:** Produce [JC:Error Handling Strategies] for Sub-Phase 5.3.\n    *   **Output Format:** A JSON object matching the `error_handling_strategies` schema.\n    *   **Schema Requirements:** `strategies` array, each with `component_id`, `error_types`, `detection`, `response`, `surfacing`.\n    *   **Constraints:**\n        *   Every Component must have at least one strategy.\n        *   Error types must be specific (not generic).\n        *   Detection and response strategies must be concrete/implementable.\n        *   Apply governing constraints (none listed, so focus on context).\n    *   **Context:** Consumer Discovery MVP (Phase 1 Focus).\n    *   **Components:** 7 specific components (`cmp-prop-data`, `cmp-provider-match`, `cmp-compliance`, `cmp-workflow`, `cmp-notifications`, `cmp-security`, `cmp-payment`).\n    *   **Capabilities/Exclusions:** Focus on Pillar 1 (Home Real Property Assistant), exclude Pillar 2/3/Field/Advanced features.\n\n2.  **Deconstruct Each Component & Define Errors:**\n\n    *   **cmp-prop-data (Property Data Manager):**\n        *   *Responsibilities:* Upload assets, index assets, offline sync.\n        *   *Potential Errors:* File format invalid, upload size exceeded, index timeout, sync queue full.\n        *   *Error Types:* `validation_error`, `storage_quota_error`, `indexing_timeout_error`, `sync_conflict_error`.\n        *   *Detection:* Try/Catch on upload stream, middleware validation, health check on queue.\n        *   *Response:* Reject with 400, fallback to offline buffer, retry with exponential backoff.\n        *   *Surfacing:* 400/413 status, error payload with field details, logs, admin alerts for sync failures.\n\n    *   **cmp-provider-match (Service Provider Matcher):**\n        *   *Responsibilities:* AI search, bid comparison.\n        *   *Potential Errors:* AI confidence low, bid data missing, provider unavailable, search timeout.\n        *   *Error Types:* `ai_confidence_error`, `bid_missing_error`, `search_timeout_error`, `rate_limit_error`.\n        *   *Detection:* Confidence score threshold check, API timeout catch, empty result validation.\n        *   *Response:* Return partial results, fallback to default providers, circuit breaker on external API, propagate with 5xx.\n        *   *Surfacing:* 502/504 status, \"Low confidence\" warning badge in UI, logs, fallback recommendation.\n\n    *   **cmp-compliance (Compliance Rules Engine):**\n        *   *Responsibilities:* CC&R extraction, deadline monitoring, alerts.\n        *   *Potential Errors:* Extraction failure, deadline missed, notification failure.\n        *   *Error Types:* `extraction_failure_error`, `statutory_deadline_exceeded_error`, `notification_delivery_failure_error`.\n        *   *Detection:* AI confidence score < threshold, cron job check, webhook callback failure.\n        *   *Response:* Escalate to admin, generate alert ticket, retry notification.\n        *   *Surfacing:* Critical severity logs, user-facing alerts (deadline missed), admin dashboard red flags.\n\n    *   **cmp-workflow (Action Workflow Orchestrator):**\n        *   *Responsibilities:* State management, UI status.\n        *   *Potential Errors:* State transition invalid, audit log write failure, DB timeout.\n        *   *Error Types:* `state_transition_error`, `audit_log_write_error`, `db_timeout_error`.\n        *   *Detection:* DB transaction rollback, DB unique constraint violation, timeout on state update.\n        *   *Response:* Compensating transaction, revert to previous state, queue for retry.\n        *   *Surfacing:* 400/409 status, UI shows \"Processing/Failed\", detailed error codes.\n\n    *   **cmp-notifications (Notification Dispatcher):**\n        *   *Responsibilities:* Batch email/SMS, delivery status.\n        *   *Potential Errors:* SMTP/SMS gateway down, batch processing error, bounce.\n        *   *Error Types:* `gateway_unreachable_error`, `batch_processing_error`, `message_bounce_error`.\n        *   *Detection:* Transport error response, status check after job completion.\n        *   *Response:* Queue retry (exponential backoff), partial batch success reporting.\n        *   *Surfacing:* 503 status during outage, bounce rate metrics, user sees specific delivery status.\n\n    *   **cmp-security (Tenant Security Gateway):**\n        *   *Responsibilities:* RLS, auth validation.\n        *   *Potential Errors:* Invalid token, expired token, unauthorized access.\n        *   *Error Types:* `authentication_token_invalid`, `authorization_forbidden`, `session_expired_error`.\n        *   *Detection:* Header validation, token verification logic.\n        *   *Response:* 401/403/400 HTTP response immediately.\n        *   *Surfacing:* HTTP 401/403, JSON error object with scope details, security logs (non-PII).\n\n    *   **cmp-payment (Payment Transaction Processor):**\n        *   *Responsibilities:* Process payments, receipts.\n        *   *Potential Errors:* Gateway decline, duplicate payment, insufficient funds, webhook failure.\n        *   *Error Types:* `payment_gateway_decline`, `duplicate_transaction_error`, `insufficient_funds_error`, `webhook_verification_error`.\n        *   *Detection:* API response code parsing, idempotency key check.\n        *   *Response:* Return decline reason, queue for manual review, generate error receipt.\n        *   *Surfacing:* 402/409 status, error payload with payment gateway code, receipt document marked invalid.\n\n3.  **Draft the JSON Structure:**\n    *   Ensure strict adherence to the schema: `strategies` (array), each item has `component_id`, `error_types`, `detection`, `response`, `surfacing`.\n    *   Ensure error types are specific strings.\n    *   Ensure detection/response are concrete (e.g., \"middleware validation\", \"try/catch\").\n\n4.  **Refine Content against Constraints:**\n    *   Check component IDs match the list.\n    *   Check context (MVP Pillar 1). Don't include Pillar 2/3 errors.\n    *   Keep it implementable (e.g., \"try/catch block\", \"HTTP 4xx\").\n\n5.  **Final Review:**\n    *   JSON validity.\n    *   All 7 components covered.\n    *   Specific error types used.\n    *   Concrete detection/response actions.\n\n6.  **Construct Output:** (Mental check of the JSON structure)\n    ```json\n    {\n      \"error_handling_strategies\": [\n        { \"component_id\": \"cmp-prop-data\", ... },\n        { \"component_id\": \"cmp-provider-match\", ... },\n        ...\n      ]\n    }\n    ```\n    *Wait, the prompt says \"Produce [JC:Error Handling Strategies] for each Component\". The schema says `strategies: array`. I will output the full JSON object.*\n\n    *Self-Correction on Schema:* The prompt says \"REQUIRED OUTPUT: A JSON object matching the `error_handling_strategies` schema\". The schema description implies the top-level key is `error_handling_strategies` containing a `strategies` array. I will follow this structure.\n\n    *Refining Error Types:*\n    *   cmp-prop-data: `file_format_invalid`, `upload_timeout`, `storage_quota_exceeded`.\n    *   cmp-provider-match: `ai_inference_timeout`, `bid_data_missing`, `provider_api_down`.\n    *   cmp-compliance: `extraction_confidence_low`, `statutory_deadline_missed`, `notification_queue_full`.\n    *   cmp-workflow: `state_transition_invalid`, `audit_log_write_failed`, `workflow_timeout`.\n    *   cmp-notifications: `smtp_connection_timeout`, `sms_gateway_unavailable`, `email_bounce_detected`.\n    *   cmp-security: `token_expired`, `scope_insufficient`, `token_format_invalid`.\n    *   cmp-payment: `card_declined`, `idempotency_duplicate`, `gateway_connection_timeout`.\n\n    *Refining Detection/Response/Surfacing:*\n    *   Make sure they align with the component responsibilities (e.g., cmp-security must be fast).\n\n    *Final Polish:* Ensure no generic \"error\" strings are used.\n\n    *Let's write the JSON.*",
+  "provider": "ollama",
+  "model": "qwen3.5:9b",
+  "inputTokens": 1436,
+  "outputTokens": 3016,
+  "usedFallback": false,
+  "retryAttempts": 0
+}

@@ -1,0 +1,248 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Systems Agent] performing System Boundary Definition for Sub-Phase 3.1.
+    *   **Task:** Define the [JC:System Boundary] (what will be built vs. what will be integrated with).
+    *   **Output Format:** JSON object matching `system_boundary` schema.
+    *   **Constraints:**
+        *   `in_scope`: Must cover all Functional Requirements (10 User Stories).
+        *   `out_of_scope`: Must match the Intent Statement's out_of_scope list exactly.
+        *   `external_systems`: Must list systems outside the boundary, each requiring an Interface Contract in Sub-Phase 3.3.
+        *   Governing Constraints: None specified in the prompt's GOVERNING CONSTRAINTS section, but the prompt itself has "Governing Constraints (apply without exception): (none)". However, there are "Confirmed Constraints" in the context. I need to ensure the boundary respects the "Confirmed Constraints" (e.g., SvelteKit, Bun, DBOS, etc.) as they dictate *what* is built (internal scope) vs what is integrated (external).
+    *   **Context:**
+        *   Product: Consumer Discovery MVP (Phase 1 Focus).
+        *   Pillar 1 (Home Real Property Assistant) prioritized.
+        *   Users: Individual homeowners, Small landlords, Property investors, Hestami Staff.
+        *   Key Exclusions: Pillar 2 (Financials), Pillar 3 (Accounting), Enterprise Governance (Phase 3), Field Service Engine (Phase 2), HOA Voting, Full offline-first (Homeowners secondary), Legacy Vantaca integration, Advanced AI beyond CC&R/Bylaws, Direct Contractor Portal Access, Real-time Bid Aggregation for non-homeowners.
+        *   Key Inclusions (from US): AI Analysis, Provider Search/Matching, Bid Comparison, CC&R Extraction, Action Items Workflow, Statutory Alerts, Mass Communication, Mobile App Sync, Security/RLS, Payment Processing (Stripe/Square).
+        *   Key Tech Stack: SvelteKit, Bun, DBOS, SeaweedFS, Cerbos, Traefik, FFmpeg.
+
+2.  **Determine `in_scope`:**
+    *   Based on Functional Requirements (US-001 to US-010).
+    *   Based on Pillar 1 focus (Home Real Property Assistant).
+    *   Based on Confirmed Constraints (Tech stack).
+    *   *Drafting items:*
+        *   Property Asset Ingestion (Images, 3D Splats).
+        *   AI Agent Discovery/Search for Home Real Property providers.
+        *   Bid Estimate Management & Comparison (Good-Better-Best).
+        *   CC&R & Bylaws AI Extraction.
+        *   Action Items Workflow Management (System of Action).
+        *   Statutory Deadline Tracking & Alerts.
+        *   Mass Email/SMS Communication.
+        *   Mobile App Client (Offline queueing).
+        *   Multi-tenant Security (RLS).
+        *   Payment Processing Integration.
+        *   Core Backend API (Bun).
+        *   Workflow Engine (DBOS).
+        *   Media Storage (SeaweedFS).
+        *   Auth Engine (Cerbos).
+        *   Frontend (SvelteKit).
+
+3.  **Determine `out_of_scope`:**
+    *   Must match the Intent Statement's out_of_scope list exactly as provided in the context.
+    *   *List from Context:*
+        *   "Pillar 2 (Financials) implementation for this MVP"
+        *   "Pillar 3 (Accounting) implementation for this MVP"
+        *   "Enterprise Governance MVP features (Phase 3 Focus)"
+        *   "Field Service Engine MVP features (Phase 2 Focus)"
+        *   "Automated Homeowner Association (HOA) Voting modules (Phase 3)"
+        *   "Full offline-first capabilities for Homeowners (Secondary priority)"
+        *   "Legacy Vantaca integration for V1 (Replicate 'System of Action' only)"
+        *   "Advanced AI extraction beyond CC&Rs/Bylaws for V1"
+        *   "Direct Contractor Portal Access for V1"
+        *   "Real-time Bid Aggregation for non-homeowners"
+    *   *Note:* US-010 mentions payment processing. The out_of_scope list says "Pillar 2 (Financials)". US-010 says "process payments for my deposits or service fees". This seems to imply payment *processing* (Stripe integration) is in scope (US-010), while full *Financials/Accounting* (Pillar 2/3) is out of scope. I need to be careful not to contradict the explicit "Out of scope" list provided in the context while ensuring US-010 is covered in `in_scope`. Usually, "Financials" (Pillar 2) implies the GL/Chart of Accounts/Bookkeeping logic, whereas Payment Processing is often an integration. The out_of_scope list explicitly says "Pillar 2 (Financials) implementation for this MVP". US-010 is about processing payments (Stripe). I will include Payment Processing in `in_scope` because US-010 requires it, but keep the broad "Financials/Accounting" (Pillar 2/3) in `out_of_scope` as per the specific list. The prompt instruction says "out_of_scope must match the Intent Statement's out_of_scope list". I will copy the list exactly.
+    *   Wait, looking at the instruction: "out_of_scope must match the Intent Statement's out_of_scope list".
+    *   Intent Statement's out_of_scope list in Context: `["Pillar 2 (Financials) implementation for this MVP","Pillar 3 (Accounting) implementation for this MVP","Enterprise Governance MVP features (Phase 3 Focus)","Field Service Engine MVP features (Phase 2 Focus)","Automated Homeowner Association (HOA) Voting modules (Phase 3)","Full offline-first capabilities for Homeowners (Secondary priority)","Legacy Vantaca integration for V1 (Replicate 'System of Action' only)","Advanced AI extraction beyond CC&Rs/Bylaws for V1","Direct Contractor Portal Access for V1","Real-time Bid Aggregation for non-homeowners"]`
+    *   I will use this exact list.
+
+4.  **Determine `external_systems`:**
+    *   Systems outside the boundary that the built system needs to talk to.
+    *   Based on "Confirmed constraints" and "Functional Requirements":
+        *   Stripe/Square (Payment capture) -> Interface needed for US-010/NFR-005 (security/PCI).
+        *   Email/SMS Providers (Domain 7, US-006/007, US-011) -> Need identity (sendgrid, twilio, etc.).
+        *   Government Services (Permits/BLDS, US-001/ARC domain context) -> "Integration with government services (Permits/BLDS) is critical for the ARC domain."
+        *   Vendor Onboarding (REC-ASS-002 says treated as external process).
+        *   Third-party AI Models (LLM for extraction/analysis) -> If built as a boundary, is the model external? Usually yes.
+        *   Mobile App Store (iOS/Android) -> Distribution.
+        *   Legacy Vantaca (Replicate 'System of Action' only) -> If integrating, it's external. Context says "Legacy Vantaca integration for V1" is out of scope (for the platform itself) but we replicate methodology. Wait, context says "Legacy Vantaca integration for V1 (Replicate 'System of Action' only)" is out of scope. This implies we are not integrating the old Vantaca API, just building our own workflow that mimics it. However, US-006 mentions integration with government services. US-010 mentions Stripe/Square.
+        *   SeaweedFS is specified as "Must use SeaweedFS for media asset storage". If the MVP builds this, it might be internal infrastructure. But often storage providers are external services. However, SeaweedFS can be self-hosted. Given the constraint "Must use SeaweedFS for media asset storage", it's likely an internal component choice unless specified as SaaS. I will list it as internal.
+        *   SvelteKit (Internal).
+        *   Bun (Internal).
+        *   DBOS (Internal).
+        *   Cerbos (Internal/Policy engine).
+        *   Traefik (Internal Proxy).
+        *   Government APIs (Permits/BLDS).
+        *   Payment Gateway (Stripe/Square).
+        *   Comms Provider (Twilio/SendGrid).
+    *   I need to identify at least one interface per External System for Sub-Phase 3.3.
+    *   *Candidate External Systems:*
+        1.  Stripe/Square (Payment Gateway).
+        2.  Email/SMS Provider (Communication).
+        3.  Government Regulatory APIs (Permits/BLDS).
+        4.  AI Provider (LLM/OCR for extraction) - implied by US-001, US-002, US-004.
+        5.  Mobile Device/OS (iOS/Android APIs for the app).
+    *   I should group the payment one.
+    *   Constraint check: "Every External System identified must have at least one Interface Contract in Sub-Phase 3.3". I don't need to define the contract now, just the system info.
+
+5.  **Refining the JSON Structure:**
+    *   `in_scope`: Array of strings (capabilities/features).
+    *   `out_of_scope`: Array of strings (exact match from Intent).
+    *   `external_systems`: Array of objects {id, name, purpose, interface_type}.
+    *   Constraint: "out_of_scope must match the Intent Statement's out_of_scope list". I will copy the provided list.
+    *   Constraint: "in_scope must cover all Functional Requirements". I need to ensure items in `in_scope` correspond to US-001 to US-010.
+
+6.  **Mapping US to In-Scope:**
+    *   US-001 -> Asset Ingestion & AI Analysis.
+    *   US-002 -> AI Agent Search & Matching.
+    *   US-003 -> Bid Comparison UI.
+    *   US-004 -> CC&R/Bylaws AI Extraction.
+    *   US-005 -> Action Items Workflow (Staff).
+    *   US-006 -> Statutory Alerts (Email/SMS).
+    *   US-007 -> Mass Communication.
+    *   US-008 -> Mobile App (Offline Sync).
+    *   US-009 -> RLS/Security/Auth (Cerbos).
+    *   US-010 -> Payment Processing.
+    *   *Backend Core*: DBOS Workflows, Bun API, SvelteKit Frontend.
+
+7.  **Drafting the JSON:**
+
+    *   `in_scope`:
+        *   "AI-Driven Property Asset Ingestion (Images & 3D Splats)"
+        *   "Home Real Property Provider Discovery & Matching"
+        *   "Bid Estimate Comparison Interface (Good-Better-Best)"
+        *   "AI Extraction of CC&R & Bylaws Compliance Data"
+        *   "Action Items Workflow Management ('System of Action')"
+        *   "Statutory Deadline Tracking & Alert Generation"
+        *   "Mass Email & SMS Communication Engine"
+        *   "Multi-tenant Mobile App with Offline Queueing"
+        *   "Policy-Based Authorization (Row-Level Security)"
+        *   "Payment Processing Integration (Deposit/Service Fees)"
+        *   "High-Performance Bun API Backend"
+        *   "SvelteKit Single Page Application Portal"
+        *   "DBOS Versioned Workflow Orchestration"
+        *   "Media Asset Storage Management"
+        *   "Regulatory Rules Engine (Notice Requirements)"
+
+    *   `out_of_scope`: (Copy paste the list from Context).
+        *   "Pillar 2 (Financials) implementation for this MVP"
+        *   "Pillar 3 (Accounting) implementation for this MVP"
+        *   "Enterprise Governance MVP features (Phase 3 Focus)"
+        *   "Field Service Engine MVP features (Phase 2 Focus)"
+        *   "Automated Homeowner Association (HOA) Voting modules (Phase 3)"
+        *   "Full offline-first capabilities for Homeowners (Secondary priority)"
+        *   "Legacy Vantaca integration for V1 (Replicate 'System of Action' only)"
+        *   "Advanced AI extraction beyond CC&Rs/Bylaws for V1"
+        *   "Direct Contractor Portal Access for V1"
+        *   "Real-time Bid Aggregation for non-homeowners"
+
+    *   `external_systems`:
+        *   Payment Gateway (Stripe/Square).
+        *   Communication Provider (Email/SMS).
+        *   Government Regulatory Services (Permits/BLDS).
+        *   AI/ML Model Provider (For Analysis).
+        *   Mobile OS SDKs (For App distribution/capabilities).
+        *   *Self-Correction on AI*: The context says "AI Agent discovery experience". Is the LLM an external system? Yes, typically an API.
+        *   *Self-Correction on Vantaca*: The constraint says "Legacy Vantaca integration for V1" is out of scope. So we don't need to list Vantaca in external systems *unless* we are replicating data. But usually, "System Boundary" implies new system. I will list the third parties needed for the MVP.
+        *   *Interface Types*: API, SDK, Webhook, etc.
+
+8.  **Review against Constraints:**
+    *   JSON object matching schema.
+    *   `in_scope` covers Functional Requirements? Yes, mapped US-001-010.
+    *   `out_of_scope` matches Intent Statement? Yes, using the exact list from "Out of scope" in context.
+    *   `external_systems` has id, name, purpose, interface_type? Yes.
+
+9.  **Final Polish:**
+    *   Ensure no markdown formatting in the JSON output block (unless requested, usually the system expects raw JSON or JSON within markdown code block). The prompt says "REQUIRED OUTPUT: A JSON object". I will provide it within a markdown code block for clarity.
+    *   Check `out_of_scope` list again.
+    *   Context List: `["Pillar 2 (Financials) implementation for this MVP","Pillar 3 (Accounting) implementation for this MVP","Enterprise Governance MVP features (Phase 3 Focus)","Field Service Engine MVP features (Phase 2 Focus)","Automated Homeowner Association (HOA) Voting modules (Phase 3)","Full offline-first capabilities for Homeowners (Secondary priority)","Legacy Vantaca integration for V1 (Replicate 'System of Action' only)","Advanced AI extraction beyond CC&Rs/Bylaws for V1","Direct Contractor Portal Access for V1","Real-time Bid Aggregation for non-homeowners"]`
+    *   Make sure not to modify this list.
+    *   Check `in_scope` wording to be precise.
+
+10. **Constructing the response.**
+
+    *   *Self-Correction on `out_of_scope`*: The prompt instruction says "out_of_scope must match the Intent Statement's out_of_scope list". In the context provided under "Context", there is a section "Out of scope:". I must use that exact list.
+    *   *Self-Correction on `in_scope`*: It says "in_scope must cover all Functional Requirements". I need to make sure every US is represented by a capability in `in_scope`.
+    *   *Self-Correction on `external_systems`*: "Every External System identified must have at least one Interface Contract in Sub-Phase 3.3". This is a constraint on *future* work, but I need to identify them now. I will list the systems that *will* need contracts.
+
+    Let's build the JSON content.
+
+    ```json
+    {
+      "system_boundary": {
+        "in_scope": [
+          "Property Asset Ingestion (Images & 3D Splats)",
+          "AI Agent Service Provider Search & Matching",
+          "Bid Estimate Comparison UI (Good-Better-Best)",
+          "CC&R & Bylaws AI Extraction Module",
+          "Action Items Workflow Management (System of Action)",
+          "Statutory Deadline Tracking & Alert Engine",
+          "Mass Email/SMS Communication Channel",
+          "Mobile App Client (Offline Queueing)",
+          "Multi-tenant Security & Authorization (RLS)",
+          "Payment Processing Integration (Stripe/Square)",
+          "High-Performance Bun API Backend",
+          "SvelteKit Frontend Portal",
+          "DBOS Versioned Workflow Engine",
+          "Media Asset Storage (SeaweedFS)",
+          "Regulatory Rules Engine (Notice Requirements)"
+        ],
+        "out_of_scope": [
+          "Pillar 2 (Financials) implementation for this MVP",
+          "Pillar 3 (Accounting) implementation for this MVP",
+          "Enterprise Governance MVP features (Phase 3 Focus)",
+          "Field Service Engine MVP features (Phase 2 Focus)",
+          "Automated Homeowner Association (HOA) Voting modules (Phase 3)",
+          "Full offline-first capabilities for Homeowners (Secondary priority)",
+          "Legacy Vantaca integration for V1 (Replicate 'System of Action' only)",
+          "Advanced AI extraction beyond CC&Rs/Bylaws for V1",
+          "Direct Contractor Portal Access for V1",
+          "Real-time Bid Aggregation for non-homeowners"
+        ],
+        "external_systems": [
+          {
+            "id": "EXT-001",
+            "name": "Payment Gateway (Stripe/Square)",
+            "purpose": "Secure processing of deposits and service fees per US-010",
+            "interface_type": "API/Webhook"
+          },
+          {
+            "id": "EXT-002",
+            "name": "Communication Provider (Email/SMS)",
+            "purpose": "Delivery of statutory notices and mass alerts per US-006/007",
+            "interface_type": "API/Webhook"
+          },
+          {
+            "id": "EXT-003",
+            "name": "Government Regulatory Services",
+            "purpose": "Permit/BLDS lookup and integration for ARC domain per REC-ASS-008",
+            "interface_type": "API"
+          },
+          {
+            "id": "EXT-004",
+            "name": "AI/ML Service Provider",
+            "purpose": "LLM/OCR services for property analysis and document extraction per US-001/004",
+            "interface_type": "REST API"
+          },
+          {
+            "id": "EXT-005",
+            "name": "Mobile OS SDKs",
+            "purpose": "Native device camera and storage integration for Mobile App per US-008",
+            "interface_type": "SDK/Native"
+          }
+        ]
+      }
+    }
+    ```
+    Wait, I should check if `out_of_scope` string matching is exact.
+    Context: `["Pillar 2 (Financials) implementation for this MVP","Pillar 3 (Accounting) implementation for this MVP","Enterprise Governance MVP features (Phase 3 Focus)","Field Service Engine MVP features (Phase 2 Focus)","Automated Homeowner Association (HOA) Voting modules (Phase 3)","Full offline-first capabilities for Homeowners (Secondary priority)","Legacy Vantaca integration for V1 (Replicate 'System of Action' only)","Advanced AI extraction beyond CC&Rs/Bylaws for V1","Direct Contractor Portal Access for V1","Real-time Bid Aggregation for non-homeowners"]`
+    My draft matches this.
+
+    `in_scope` should probably be slightly more descriptive to ensure coverage, but keep it as capabilities.
+    The prompt asks for `system_boundary` schema. I will wrap it.
+
+    One detail: "Governing Constraints (apply without exception): (none)".
+    "RULES: out_of_scope must match the Intent Statement's out_of_scope list".
+    I will ensure exact strings.
+
+    Ready to generate.

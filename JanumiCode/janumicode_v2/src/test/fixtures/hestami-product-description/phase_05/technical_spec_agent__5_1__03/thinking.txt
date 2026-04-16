@@ -1,0 +1,264 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Technical Spec Agent].
+    *   **Task:** Produce [JC:Data Models] for Sub-Phase 5.1.
+    *   **Input Context:** Component Model, Component Responsibilities, Software Domains, Terms, Constraints (JSON schema for output, specific data model rules).
+    *   **Constraints:**
+        *   No entity field may lack a specified type (Invariant: DM-001).
+        *   Data Models must be consistent with Component Responsibilities.
+        *   Use concrete types (string, integer, boolean, timestamp, uuid).
+        *   Output must be a JSON object matching the `data_models` schema (specifically: `models: array`, each with `component_id`, `entities: array` of `{name, fields: [{name, type, constraints}], relationships}`).
+    *   **Scope:** Consumer Discovery MVP (Phase 1 Focus).
+    *   **Components:** 7 Components (cmp-prop-data, cmp-provider-match, cmp-compliance, cmp-workflow, cmp-notifications, cmp-security, cmp-payment).
+    *   **Domains:** 7 Software Domains corresponding to the components.
+    *   **Terms:** Defined terms for each domain need to be reflected in entities/fields.
+
+2.  **Deconstruct the Components & Domains:**
+
+    *   **cmp-prop-data (Property Data Management):**
+        *   Terms: `PropertyAsset`, `MediaManifest`, `OfflineBuffer`.
+        *   Responsibilities: RSP-001 (Upload/Validate), RSP-002 (Index/Search), RSP-003 (Offline/Sync).
+        *   Entities needed: `PropertyAsset`, `MediaManifest`, `OfflineBuffer`.
+        *   Fields: Need concrete types. Constraints (format, storage location, etc.).
+
+    *   **cmp-provider-match (Service Provider Matching):**
+        *   Terms: `HomeRealProperty`, `ProviderProfile`, `BidEstimate`, `MatchScore`.
+        *   Responsibilities: RSP-004 (Search/Score), RSP-005 (Bid Comparison).
+        *   Entities needed: `ProviderProfile`, `BidEstimate`. (`HomeRealProperty` is a term/category, likely a field or tag, `MatchScore` is a metric/field).
+        *   Fields: `service_type`, `location`, `relevance_score`, `bid_amount`, `status`, etc.
+
+    *   **cmp-compliance (Compliance Rules Engine):**
+        *   Terms: `BylawsClause`, `StatutoryDeadline`, `NoticeRequirement`, `ExtractionConfidence`.
+        *   Responsibilities: RSP-006 (Extract/Validate), RSP-007 (Monitor Deadlines), RSP-008 (Generate Alerts).
+        *   Entities needed: `BylawsClause`, `StatutoryDeadline`, `NoticeRequirement`.
+        *   Fields: `text_content`, `confidence_score`, `jurisdiction`, `deadline_date`, `alert_status`.
+
+    *   **cmp-workflow (Action Workflow Orchestrator):**
+        *   Terms: `ActionItem`, `WorkflowState`, `TransitionLog`.
+        *   Responsibilities: RSP-009 (Manage States), RSP-010 (Status Updates).
+        *   Entities needed: `ActionItem`, `TransitionLog`. (`WorkflowState` is likely an enum/field value).
+        *   Fields: `item_id`, `status`, `created_at`, `updated_at`, `description`.
+        *   Relationships: `TransitionLog` references `ActionItem`.
+
+    *   **cmp-notifications (Notification Dispatcher):**
+        *   Terms: `MessageBatch`, `DeliveryAttempt`, `RecipientList`.
+        *   Responsibilities: RSP-011 (Process Batches), RSP-012 (Resume Delivery), RSP-013 (Confirm Receipt).
+        *   Entities needed: `MessageBatch`, `DeliveryAttempt`, `RecipientList`.
+        *   Fields: `channel_type`, `payload`, `status`, `retry_count`, `recipient_ids`.
+
+    *   **cmp-security (Tenant Security Gateway):**
+        *   Terms: `RLSPolicy`, `TenantBoundary`, `AccessLevel`.
+        *   Responsibilities: RSP-014 (Enforce RLS), RSP-015 (Unauthorized Access Response).
+        *   Entities needed: `RLSPolicy`, `TenantBoundary`. (`AccessLevel` is likely a field/enum).
+        *   Fields: `tenant_id`, `scope`, `permissions`.
+
+    *   **cmp-payment (Payment Transaction Processor):**
+        *   Terms: `PaymentIntent`, `ReceiptDocument`, `DepositFee`.
+        *   Responsibilities: RSP-016 (Process Payments), RSP-017 (Proof of Payment).
+        *   Entities needed: `PaymentIntent`, `ReceiptDocument`. (`DepositFee` is a line item, maybe part of Intent or separate entity; let's make it an entity or field within Transaction). Given "Terms", it suggests a specific entity. Let's create `DepositFee` entity or associate with `PaymentIntent`. Let's make it an entity for granularity).
+        *   Fields: `amount`, `gateway_id`, `authorization_code`, `document_url`.
+
+3.  **Drafting the Data Models (Adhering to Constraints):**
+    *   *Constraint Check:* No entity field may lack a specified type.
+    *   *Constraint Check:* Concrete types (string, integer, boolean, timestamp, uuid).
+    *   *Constraint Check:* Relationships (must be defined in the entities array).
+
+    *   *Schema Structure:*
+        ```json
+        {
+          "models": [
+            {
+              "component_id": "...",
+              "entities": [
+                {
+                  "name": "...",
+                  "fields": [ ... ],
+                  "relationships": [ ... ]
+                }
+              ]
+            }
+          ]
+        }
+        ```
+
+    *   *Refining Fields:* Ensure all types are explicit.
+    *   *Refining Relationships:* Use a standard format (e.g., `{"from": "EntityA", "to": "EntityB", "type": "one-to-many"}`). The prompt says `relationships` inside `entities`, implying self-referencing or cross-referencing. I will define relationships as arrays of objects describing foreign keys or links.
+
+4.  **Step-by-Step Construction:**
+
+    *   **1. cmp-prop-data:**
+        *   Entity: `PropertyAsset`. Fields: `asset_id` (uuid), `property_id` (uuid), `media_type` (string), `storage_path` (string), `status` (string).
+        *   Entity: `MediaManifest`. Fields: `manifest_id` (uuid), `property_asset_id` (uuid), `format` (string), `size_bytes` (integer).
+        *   Entity: `OfflineBuffer`. Fields: `buffer_id` (uuid), `payload_hash` (string), `sync_status` (string), `created_at` (timestamp).
+        *   Rel: `PropertyAsset` - `MediaManifest`.
+
+    *   **2. cmp-provider-match:**
+        *   Entity: `ProviderProfile`. Fields: `provider_id` (uuid), `name` (string), `license_id` (string), `location` (string), `match_score` (float/int? let's use float for score).
+        *   Entity: `BidEstimate`. Fields: `bid_id` (uuid), `provider_id` (uuid), `estimated_cost` (decimal/number? Constraint says integer/string. Let's use `number` or `string`. Better `number` for cost). `bid_amount` (string/decimal). Let's use `integer` cents or `string` for currency to be safe on precision? Constraint: "Use concrete types". Let's use `integer` for cents to avoid float issues, or `string` for currency. Let's use `string` for currency values to allow format. Actually `number` is concrete. Let's use `integer` for amounts to ensure constraint compliance on types. Wait, `decimal` isn't a standard JSON type usually, `number` is. Let's use `string` for currency to be precise on format or `integer` for cents. Let's stick to `integer` for amounts in cents.`
+        *   Entity: `MatchScore`. (This is a metric, probably a field in `BidEstimate` or `ProviderProfile`. The Term says "MatchScore: A calculated relevance metric...". Let's make it an entity `MatchScore` linked to `BidEstimate` to store historical rankings, or a field. Given "Entities" requirement, let's make it an entity if it represents a specific event, but the term definition suggests a property. I will create a `MatchScore` entity for historical tracking of matches, or include as field. To ensure rich modeling, I'll make it a field within `BidEstimate` if it's the result, but the term implies a recordable object. Let's make `MatchScore` a separate entity for detailed AI reasoning logs or just a field. Let's follow the "Terms" strictly. If "MatchScore" is a Term, I should probably have an entity or a field named `match_score`. The instruction says "Use concrete types". I will add `match_score` as a field in `ProviderProfile` or `BidEstimate`. However, to be safe on "Entities", I will create entities based on the Terms provided as nouns that sound like tables. `MatchScore` sounds like a record. `ExtractionConfidence` sounds like a field. I will make `MatchScore` a field in `BidEstimate` to save complexity, or an entity if it stores history. Let's make `ProviderProfile` have the score. Wait, Term: `BidEstimate`. Term: `MatchScore`. Let's make `BidEstimate` the main entity, and `MatchScore` a field. Or create `MatchResult` entity. Let's create `ProviderProfile` and `BidEstimate`. I will merge `MatchScore` concept into `BidEstimate` as a field `ai_match_score` to satisfy data model simplicity unless history is required. Actually, to be robust, I will treat `MatchScore` as a field within `BidEstimate` or `ProviderProfile`. Let's put it in `ProviderProfile`.
+        *   Wait, looking at `cmp-compliance`, `ExtractionConfidence` is a metric. I'll make that a field.
+        *   Re-evaluating: The prompt lists "Terms". I should map these to Entities/Fields.
+        *   `HomeRealProperty`: Category. Maybe a tag/enum field.
+        *   `ProviderProfile`: Entity.
+        *   `BidEstimate`: Entity.
+        *   `MatchScore`: I will define this as a field `match_score` on `ProviderProfile` to keep it normalized, or an association entity if multiple scores exist. Let's use `ProviderProfile` with `match_score`.
+
+    *   **3. cmp-compliance:**
+        *   Entity: `BylawsClause`. Fields: `clause_id` (uuid), `doc_reference` (string), `text` (string), `confidence` (float/int).
+        *   Entity: `StatutoryDeadline`. Fields: `deadline_id` (uuid), `obligation_type` (string), `due_date` (timestamp).
+        *   Entity: `NoticeRequirement`. Fields: `req_id` (uuid), `jurisdiction` (string), `content_template` (string).
+        *   Fields: `extraction_confidence` as a field or separate entity? Term says "ExtractionConfidence". I'll add `confidence_score` field to `BylawsClause`.
+        *   Rel: `BylawsClause` -> `NoticeRequirement` (maybe).
+
+    *   **4. cmp-workflow:**
+        *   Entity: `ActionItem`. Fields: `item_id` (uuid), `status` (enum/string), `description` (string).
+        *   Entity: `TransitionLog`. Fields: `log_id` (uuid), `item_id` (uuid), `prev_status` (string), `new_status` (string), `timestamp` (timestamp).
+        *   Rel: `TransitionLog` references `ActionItem`.
+
+    *   **5. cmp-notifications:**
+        *   Entity: `MessageBatch`. Fields: `batch_id` (uuid), `channel` (string), `status` (string), `created_at` (timestamp).
+        *   Entity: `DeliveryAttempt`. Fields: `attempt_id` (uuid), `batch_id` (uuid), `recipient` (string), `status` (string), `retry_count` (integer).
+        *   Entity: `RecipientList`. Fields: `list_id` (uuid), `batch_id` (uuid), `member_id` (string).
+        *   Rel: `MessageBatch` -> `DeliveryAttempt` (one-to-many).
+
+    *   **6. cmp-security:**
+        *   Entity: `RLSPolicy`. Fields: `policy_id` (uuid), `tenant_id` (uuid), `scope` (string).
+        *   Entity: `TenantBoundary`. Fields: `boundary_id` (uuid), `tenant_id` (uuid), `allowed_resources` (string).
+        *   Term `AccessLevel`: Field `access_level` in `TenantBoundary` or `RLSPolicy`.
+
+    *   **7. cmp-payment:**
+        *   Entity: `PaymentIntent`. Fields: `intent_id` (uuid), `amount` (integer - cents), `status` (string), `gateway_reference` (string).
+        *   Entity: `ReceiptDocument`. Fields: `doc_id` (uuid), `intent_id` (uuid), `document_url` (string), `generated_at` (timestamp).
+        *   Entity: `DepositFee`. (Maybe a line item in `PaymentIntent`? Term suggests entity). Let's make `DepositFee` a child entity of `PaymentIntent` or a separate transaction line. Let's make `DepositFee` an entity linked to `PaymentIntent`.
+
+    *   **Refining Types:**
+        *   UUID: `string`
+        *   Dates: `timestamp`
+        *   Booleans: `boolean`
+        *   Numbers: `integer` (cents), `float` (scores).
+        *   Foreign Keys: `uuid` (string).
+
+    *   **Relationships Format:**
+        *   Prompt example: `relationships`. I will assume an array of objects like `{ to: "EntityName", field: "fk_name", type: "many" }`. Or just text. Standardizing: `[{"type": "foreign_key", "ref_entity": "OtherEntity", "ref_field": "id"}]`.
+        *   Actually, looking at the schema requirement: `entities: array of {name, fields: [{name, type, constraints}], relationships}`. I will define relationships within the entity context.
+
+5.  **Final Review against Constraints:**
+    *   JSON object matching `data_models` schema.
+    *   No entity field may lack a specified type.
+    *   Concrete types.
+    *   Consistent with Component Responsibilities (MVP Phase 1).
+
+    *   *Self-Correction on `MatchScore` and `ExtractionConfidence`:* These are metrics. I will define them as fields within the primary entities (`BidEstimate` and `BylawsClause`) to avoid sparse tables unless they have specific lifecycle beyond the record. However, the Terms list them. I will add a field `match_score` to `ProviderProfile` and `ai_confidence` to `BylawsClause`.
+    *   *Self-Correction on `HomeRealProperty`:* This is a category. I will add a `category` field or `home_real_property` boolean field on `ProviderProfile`.
+    *   *Self-Correction on `DepositFee`:* Will create an entity `DepositFee` linked to `PaymentIntent` to track fees specifically as per Term.
+
+6.  **Constructing the JSON:**
+    *   Assemble the JSON structure.
+    *   Ensure all fields have types.
+    *   Ensure `component_id` is correct.
+
+    *   *Wait, one constraint check:* `data_models` schema in prompt description: `models: array, each with: component_id, entities: array of {name, fields: [{name, type, constraints}], relationships}`.
+    *   I need to make sure `constraints` is included in fields. e.g. `"constraints": ["NOT NULL", "UNIQUE"]`.
+    *   I need to make sure `relationships` is included. e.g. `[{"type": "many-to-one", "target_entity": "Name"}]`.
+
+    *   *Types:*
+        *   `uuid`: `string`
+        *   `timestamp`: `string` (ISO8601)
+        *   `text`: `string`
+        *   `amount`: `integer` (cents)
+        *   `score`: `float` (0.0 to 1.0)
+        *   `status`: `string`
+
+    *   *Constraints:*
+        *   `NOT NULL`, `UNIQUE`, `DEFAULT`, `MAX_LENGTH`.
+
+    *   *Let's write the content.*
+
+    *   **cmp-prop-data:**
+        *   `PropertyAsset`: `asset_id` (uuid, pk), `property_address` (string), `uploaded_at` (timestamp), `status` (string).
+        *   `MediaManifest`: `manifest_id` (uuid, pk), `asset_id` (uuid, fk), `file_format` (string), `storage_path` (string), `size_bytes` (integer).
+        *   `OfflineBuffer`: `buffer_id` (uuid, pk), `asset_id` (uuid, fk), `sync_status` (string), `retry_count` (integer).
+
+    *   **cmp-provider-match:**
+        *   `ProviderProfile`: `profile_id` (uuid, pk), `business_name` (string), `license_number` (string), `match_score` (float), `is_home_real_property` (boolean).
+        *   `BidEstimate`: `estimate_id` (uuid, pk), `provider_id` (uuid, fk), `property_address` (string), `bid_amount` (integer - cents), `timestamp` (timestamp), `ai_confidence` (float).
+
+    *   **cmp-compliance:**
+        *   `BylawsClause`: `clause_id` (uuid, pk), `source_doc_id` (uuid, fk), `extracted_text` (string), `extraction_confidence` (float).
+        *   `StatutoryDeadline`: `deadline_id` (uuid, pk), `jurisdiction` (string), `obligation_type` (string), `deadline_date` (timestamp).
+        *   `NoticeRequirement`: `requirement_id` (uuid, pk), `jurisdiction` (string), `content_template` (string), `is_active` (boolean).
+
+    *   **cmp-workflow:**
+        *   `ActionItem`: `action_item_id` (uuid, pk), `task_description` (string), `workflow_status` (string).
+        *   `TransitionLog`: `log_id` (uuid, pk), `action_item_id` (uuid, fk), `prev_status` (string), `new_status` (string), `occurred_at` (timestamp).
+
+    *   **cmp-notifications:**
+        *   `MessageBatch`: `batch_id` (uuid, pk), `channel` (string), `payload_hash` (string), `status` (string), `created_at` (timestamp).
+        *   `DeliveryAttempt`: `attempt_id` (uuid, pk), `batch_id` (uuid, fk), `recipient_id` (string), `delivery_status` (string), `bounce_status` (string), `retry_count` (integer).
+        *   `RecipientList`: `list_id` (uuid, pk), `batch_id` (uuid, fk), `tenant_member_id` (string).
+
+    *   **cmp-security:**
+        *   `RLSPolicy`: `policy_id` (uuid, pk), `tenant_id` (string), `scope` (string).
+        *   `TenantBoundary`: `boundary_id` (uuid, pk), `tenant_id` (string), `accessible_scope` (string), `access_level` (string).
+
+    *   **cmp-payment:**
+        *   `PaymentIntent`: `intent_id` (uuid, pk), `amount_cents` (integer), `currency` (string), `gateway_response` (string), `created_at` (timestamp), `status` (string).
+        *   `ReceiptDocument`: `receipt_id` (uuid, pk), `intent_id` (uuid, fk), `document_url` (string), `generated_at` (timestamp).
+        *   `DepositFee`: `fee_id` (uuid, pk), `intent_id` (uuid, fk), `fee_amount` (integer), `fee_type` (string).
+
+    *   *Note on `MatchScore` and `ExtractionConfidence`:* I have included them as fields in the main entities.
+    *   *Note on `HomeRealProperty`:* Included as a boolean/flag field `is_home_real_property`.
+    *   *Note on `DepositFee`:* Treated as separate entity linked to `PaymentIntent`.
+    *   *Note on `AccessLevel`:* Included as field `access_level` in `TenantBoundary`.
+
+    *   *Final Check:* Ensure JSON validity. Ensure `constraints` field exists for fields.
+
+    *   *JSON Structure:*
+        ```json
+        {
+          "models": [
+            {
+              "component_id": "cmp-prop-data",
+              "entities": [ ... ]
+            },
+            ...
+          ]
+        }
+        ```
+
+    *   *Constraint Check:* `relationships`. I will add a `relationships` array to each entity defining foreign keys.
+    *   Example: `relationships: [{ "type": "FK", "ref_entity": "PropertyAsset", "field": "asset_id" }]`.
+    *   Actually, for simplicity and standard schema compliance, I'll describe the relationships clearly within the array.
+
+    *   *Wait, one constraint:* "Use concrete types". `float` vs `double`? JSON doesn't have double, just number. I will use `number`. But for scores, `float` is clearer. I'll use `float`. For amounts, `integer`.
+
+    *   *Re-checking Terms:*
+        *   `PropertyAsset`, `MediaManifest`, `OfflineBuffer` -> Used.
+        *   `HomeRealProperty`, `ProviderProfile`, `BidEstimate`, `MatchScore` -> Used (MatchScore as field).
+        *   `BylawsClause`, `StatutoryDeadline`, `NoticeRequirement`, `ExtractionConfidence` -> Used (Confidence as field).
+        *   `ActionItem`, `WorkflowState`, `TransitionLog` -> Used (WorkflowState as field).
+        *   `MessageBatch`, `DeliveryAttempt`, `RecipientList` -> Used.
+        *   `RLSPolicy`, `TenantBoundary`, `AccessLevel` -> Used (AccessLevel as field).
+        *   `PaymentIntent`, `ReceiptDocument`, `DepositFee` -> Used.
+
+    *   *One small detail:* `WorkflowState` is a Term. I'll use it as a field value constraint in `ActionItem`.
+    *   `HomeRealProperty` is a Term. I'll use it as a field name or tag. `property_category` field set to `HomeRealProperty`.
+
+    *   *Formatting:* Ensure proper JSON escaping if needed (none expected).
+    *   *Final Output:* Just the JSON.
+
+    *   *Wait, `constraints` field:* "No entity field may lack a specified type". Does `constraints` need to be present for every field? The schema says `fields: [{name, type, constraints}]`. I will provide constraints for all fields where applicable (e.g. "NOT NULL", "UNIQUE").
+
+    *   *Refining Relationships:* The schema example isn't explicitly shown for relationships content, just `relationships`. I will use a descriptive format.
+    *   Example: `relationships: [{ "relationship_type": "belongs_to", "target_entity": "PropertyAsset" }]`.
+    *   Let's keep it simple: `[{"type": "foreign_key", "target": "TargetEntityName", "field": "fk_field_name"}]`.
+
+    *   *Wait, Schema Check:* `entities: array of {name, fields: [{name, type, constraints}], relationships}`.
+    *   I will populate `constraints` even if empty `[]` to ensure no missing type or constraint field.
+    *   Actually, if the schema allows `constraints` to be optional, I should ensure it matches. I'll fill it with common constraints.
+
+    *   *Wait, `MatchScore`:* If `MatchScore` is a term representing a metric, creating an entity `MatchScore` might be redundant if it's just a score. But if it's a calculated metric, it might be a field. Given "MatchScore: A calculated relevance metric indicating provider quality", it's likely a field. I will add it to `ProviderProfile` or `BidEstimate`. `BidEstimate` seems more relevant to the specific search result. I'll add `ai_match_score` to `BidEstimate`.
+    *   Actually, Term `MatchScore` implies it's a distinct concept. I'll add `match_score` field to `ProviderProfile`.
+
+    *   *Okay, ready to generate.*

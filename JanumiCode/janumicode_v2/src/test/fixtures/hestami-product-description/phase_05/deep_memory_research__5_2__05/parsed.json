@@ -1,0 +1,15 @@
+{
+  "decision_context_summary": "The governing directive [83fd7cad-f74c-4657-a228-68ca3bc6eacc] mandates the review of Hestami AI Real Property OS specifications [17bf4e80-42bd-4549-a0c2-7998dc63aa6e] and preparation for implementation. Produced artifacts include functional requirements [995c1ae7-4f6f-4f71-b447-048dcc870e15], system boundaries [b4069ff4-6d5f-4e24-ae33-3f0cae0df4d5], system requirements [91a1ffd8-3df5-4a44-8625-b7c0738fe8c6], and interface contracts [97841e81-2492-48e7-b991-2db0b2987267]. The MVP scope currently focuses on the Consumer Discovery MVP [3c1eecd6-cf45-4c66-b26f-3e267c439349] rather than full feature parity.",
+  "active_constraints": [],
+  "supersession_chains": [],
+  "contradictions": [],
+  "open_questions": [
+    {
+      "question": "Vector index coverage is 0% (0/132) — semantic similarity results may be incomplete.",
+      "still_unresolved": true,
+      "source_record_id": "3c1eecd6-cf45-4c66-b26f-3e267c439349"
+    }
+  ],
+  "completeness_status": "partial_medium",
+  "completeness_narrative": "Current packet includes functional, system, and non-functional requirements [995c1ae7-4f6f-4f71-b447-048dcc870e15, 56b84cd8-084f-4a7c-984d-0db6b5c6b9da, 91a1ffd8-3df5-4a44-8625-b7c0738fe8c6]. Critical gap identified: Vector index coverage is 0% [knownGaps in coverage assessment], which may impact semantic similarity logic dependent on the data models [ed67c9ba-9228-4ae8-86c9-e8ca979eb478]. No Authority Level 6+ constraints found in provided material findings."
+}

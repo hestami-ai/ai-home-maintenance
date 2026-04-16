@@ -128,3 +128,32 @@ function initializeSidecar(options: DatabaseOptions): Database {
 export function createTestDatabase(): Database {
   return initializeDirect({ path: ':memory:' });
 }
+
+/**
+ * Close a WAL-mode SQLite database cleanly. Runs
+ * `PRAGMA wal_checkpoint(TRUNCATE)` first so the on-disk .db file is
+ * self-contained (no orphaned -wal sidecar) — matters whenever a user
+ * wants to inspect the file with an external tool (online viewers, CLI
+ * against just the .db, filesystem diff between runs).
+ *
+ * Without the explicit TRUNCATE, better-sqlite3's own close() performs
+ * at most a PASSIVE checkpoint, which can leave a non-empty -wal file on
+ * disk. Online SQLite viewers that only accept a single file upload then
+ * see a nearly-empty database and fail with confusing "schema not found"
+ * errors because the tables whose DDL was recorded during startup may
+ * have been written to the .db fine, but their row data still lives in
+ * the WAL. Worse, on an unclean extension shutdown (VS Code kill, crash)
+ * even the initial schema write might not yet have been checkpointed.
+ *
+ * The pragma is best-effort — if it fails (another connection holds a
+ * write lock, etc.) we still call close(), because correctness isn't
+ * affected; only the shape of the .db on disk.
+ */
+export function closeWithCheckpoint(db: Pick<Database, 'pragma' | 'close'>): void {
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+  } catch {
+    /* best-effort */
+  }
+  db.close();
+}

@@ -1,0 +1,15 @@
+{
+  "model": "qwen3.5:9b",
+  "provider": "ollama",
+  "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Orchestrator] performing the Intent Quality Check for Sub-Phase 1.0.\n\nYour job is to assess the [JC:Raw Intent] across three dimensions BEFORE bloom begins:\n\n1. **Completeness:** Are structurally required fields present?\n   Required fields: what is being built, who it serves, what problem it solves.\n\n2. **Consistency:** Are any stated elements internally contradictory?\n\n3. **Coherence:** Does the overall intent form a plausible product?\n\nREQUIRED OUTPUT: A JSON object matching the `intent_quality_report` schema with these fields:\n- completeness_findings: array of {field, status: \"present\"|\"absent\", severity, explanation}\n- consistency_findings: array of {elements_in_conflict, explanation, severity}\n- coherence_findings: array of {concern, explanation, severity}\n- overall_status: \"pass\" | \"requires_input\" | \"blocking\"\n- system_proposal_offered_for: array of field names where the system can propose candidates\n\nRules:\n- If ALL three required fields are present and no contradictions exist: overall_status = \"pass\"\n- If any required field is absent but inferable: overall_status = \"requires_input\", offer system_proposal\n- If contradictions exist: overall_status = \"blocking\"\n- Do NOT bloom or expand the intent. Only assess quality.\n\n[PRODUCT SCOPE]\nRaw Intent:\nReview \"specs/hestami-ai-real-property-os(2)/Hestami AI Real Property OS and Platform Product Description.md\" and prepare for implementation.",
+  "system": null,
+  "responseFormat": "json",
+  "temperature": 0.3,
+  "traceContext": {
+    "workflowRunId": "ef5a4e8d-2bb6-403e-a7d5-fb7ca6a12d74",
+    "phaseId": "1",
+    "subPhaseId": "1.0",
+    "agentRole": "orchestrator",
+    "label": "Phase 1.0 — Intent Quality Check"
+  }
+}

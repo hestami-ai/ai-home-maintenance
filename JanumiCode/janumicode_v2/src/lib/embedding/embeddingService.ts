@@ -28,6 +28,14 @@ export interface EmbeddingServiceConfig {
   maxParallel: number;
   /** Ollama base URL. Default: `http://localhost:11434`. */
   ollamaBaseUrl?: string;
+  /**
+   * Per-request timeout in milliseconds. Default: 30000 (30s). The embedding
+   * endpoint can legitimately take 10+ seconds on first-call model load or
+   * when Ollama is busy serving a concurrent LLM request. Keeping the timeout
+   * permissive avoids the "This operation was aborted" failure cascade seen
+   * when a tighter ceiling collides with a shared Ollama instance.
+   */
+  timeoutMs?: number;
 }
 
 interface QueuedJob {
@@ -96,9 +104,31 @@ export class EmbeddingService {
    * Embed an arbitrary query string for vector search at retrieval time.
    * This call is NOT queued — it runs immediately so the retriever can use
    * the result. Callers should already be inside a priority lane.
+   *
+   * Respects the circuit breaker: if the backend has been declared
+   * unreachable, throws fast instead of hanging on a fresh HTTP request.
+   * Callers should catch and degrade gracefully.
    */
   async embedQuery(text: string): Promise<Float32Array> {
-    return this.callEmbed(text);
+    if (this.disabled) {
+      throw new Error(`Embedding backend disabled: ${this.disabledReason}`);
+    }
+    try {
+      return await this.callEmbed(text);
+    } catch (err) {
+      // Trip the breaker only on genuinely permanent failures — missing
+      // model, connection refused. Aborts (timeout, caller cancel) are
+      // transient: they routinely fire when Ollama is busy serving a
+      // concurrent LLM request, and permanently disabling vector search
+      // on the first one was pernicious. Let the caller retry.
+      const msg = err instanceof Error ? err.message : String(err);
+      const isHard = /ECONNREFUSED|fetch failed|\bmodel\b.*\bnot found\b/i.test(msg);
+      if (isHard) {
+        this.disabled = true;
+        this.disabledReason = msg;
+      }
+      throw err;
+    }
   }
 
   private tick(): void {
@@ -166,29 +196,54 @@ export class EmbeddingService {
       }
 
       if (!this.disabled) {
-        // Transient / unknown failure — log per-record so we notice.
-        getLogger().warn('embedding', 'Failed to embed record', {
-          recordId: job.recordId,
-          error: message,
-        });
+        // Aborts (timeout, caller cancel) are benign and recoverable — the
+        // record will get re-embedded the next time the record is modified,
+        // or vector search will just skip it. Logging them at WARN spammed
+        // the output channel every time Ollama was busy. Log at DEBUG instead.
+        const isAbort = err instanceof Error
+          && (err.name === 'AbortError' || /aborted/i.test(message));
+        if (isAbort) {
+          getLogger().debug('embedding', 'Embed call aborted — record will be retried on next update', {
+            recordId: job.recordId,
+          });
+        } else {
+          getLogger().warn('embedding', 'Failed to embed record', {
+            recordId: job.recordId,
+            error: message,
+          });
+        }
       }
     }
   }
 
   private async callEmbed(text: string): Promise<Float32Array> {
-    const res = await fetch(`${this.baseUrl}/api/embeddings`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ model: this.config.model, prompt: text }),
-    });
-    if (!res.ok) {
-      throw new Error(`Ollama embedding HTTP ${res.status}: ${await res.text()}`);
+    // Hard timeout — Ollama's connect can hang indefinitely without one, which
+    // breaks both interactive flows and tests. Default 30s accommodates
+    // first-call model load and Ollama serving a concurrent LLM request;
+    // callers can tighten via config.timeoutMs for synthetic tests.
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      this.config.timeoutMs ?? 30_000,
+    );
+    try {
+      const res = await fetch(`${this.baseUrl}/api/embeddings`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: this.config.model, prompt: text }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        throw new Error(`Ollama embedding HTTP ${res.status}: ${await res.text()}`);
+      }
+      const json = (await res.json()) as { embedding?: number[] };
+      if (!json.embedding || !Array.isArray(json.embedding)) {
+        throw new Error('Ollama embedding response missing `embedding` array');
+      }
+      return new Float32Array(json.embedding);
+    } finally {
+      clearTimeout(timeout);
     }
-    const json = (await res.json()) as { embedding?: number[] };
-    if (!json.embedding || !Array.isArray(json.embedding)) {
-      throw new Error('Ollama embedding response missing `embedding` array');
-    }
-    return new Float32Array(json.embedding);
   }
 
   /**

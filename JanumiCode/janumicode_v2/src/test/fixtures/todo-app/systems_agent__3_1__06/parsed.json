@@ -1,0 +1,33 @@
+{
+  "in_scope": [
+    "CLI Command Line Interface",
+    "Local File Storage Engine",
+    "Task Creation Logic",
+    "Task Listing Logic",
+    "Task Update Logic",
+    "Task Deletion Logic",
+    "Offline Data Persistence",
+    "Local Security Enforcement",
+    "Performance Optimization (Local I/O)",
+    "Error Handling & Logging",
+    "Command Line Output Formatting",
+    "Usage Help Display"
+  ],
+  "out_of_scope": [
+    "Cloud Synchronization",
+    "Remote API Integration",
+    "Network Connectivity",
+    "Web Dashboard Interface",
+    "Multi-user Server Architecture",
+    "Graphical User Interface (GUI)",
+    "Online Authentication Services"
+  ],
+  "external_systems": [
+    {
+      "id": "EXT-FS-01",
+      "name": "Local Operating System Filesystem",
+      "purpose": "Provides persistent storage for task data and application configuration files",
+      "interface_type": "File I/O"
+    }
+  ]
+}

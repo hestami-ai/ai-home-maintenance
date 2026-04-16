@@ -1,0 +1,15 @@
+{
+  "model": "qwen3.5:9b",
+  "provider": "ollama",
+  "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Deep Memory Research Agent] performing Stage 1 — Query Decomposition.\n\nTransform the retrieval query into structured retrieval targets for the Governed Stream search.\n\nRETRIEVAL BRIEF:\nQuery: Evaluation design for test plan and NFRs: 12 NFRs:\n  NFR-001 [performance]: The Bun-based API backend must maintain low-latency responses for search and asset queries to ensure the 'AI Agent' discovery experience remains responsive. — threshold: P95 API latency must not exceed 200ms for search queries and asset retrieval endpoints.\n  NFR-002 [performance]: Media ingestion endpoints using SeaweedFS must sustain high throughput during concu\nScope: all_runs\nRequesting Agent: eval_design_agent\n\nYOUR REQUIRED OUTPUT (JSON):\n```json\n{\n  \"topic_entities\": [\"entity1\", \"entity2\"],\n  \"decision_types_sought\": [\"menu_selection\", \"mirror_approval\", \"phase_gate_approval\"],\n  \"temporal_scope\": {\"from\": \"ISO-date\", \"to\": \"ISO-date\"},\n  \"authority_levels_included\": [5, 6, 7],\n  \"sources_in_scope\": [\"governed_stream_current_run\"]\n}\n```\n\nRules:\n- Extract concrete entities (names, IDs, concepts) from the query\n- decision_types_sought should match the type of historical context needed\n- authority_levels_included: always include 5+ (Human-Approved and above); include lower levels only if the query asks about exploratory or agent-generated content\n- sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs",
+  "system": null,
+  "responseFormat": "json",
+  "temperature": 0.3,
+  "traceContext": {
+    "workflowRunId": "ef5a4e8d-2bb6-403e-a7d5-fb7ca6a12d74",
+    "phaseId": "8",
+    "subPhaseId": "8.1",
+    "agentRole": "deep_memory_research",
+    "label": "DMR Stage 1 — Query Decomposition"
+  }
+}

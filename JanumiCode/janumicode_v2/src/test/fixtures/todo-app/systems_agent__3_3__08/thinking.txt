@@ -1,0 +1,326 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Systems Agent] specifying Interface Contracts for Sub-Phase 3.3.
+    *   **Task:** Specify [JC:Interface Contracts] for every [JC:External System] and between internal Components.
+    *   **Output Format:** JSON object matching `interface_contracts` schema.
+    *   **Schema Requirements:**
+        *   `contracts`: array.
+        *   Each contract object must have: `id`, `systems_involved` (at least 2), `protocol`, `data_format`, `auth_mechanism`, `error_handling_strategy`.
+        *   Each contract must have `error_responses` (at least one per contract).
+    *   **Constraints:** No constraints (except the governing ones listed).
+    *   **Context:**
+        *   System Boundary: CLI Command Line Interface, Local File Storage Engine, Task Creation Logic, Task Listing Logic, Task Update Logic.
+        *   External Systems: EXT-FS-01: Local Operating System Filesystem (File I/O).
+    *   **Invariants:**
+        *   Every External System must have at least one Interface Contract.
+        *   Every contract must specify at least one error response.
+
+2.  **Identify Components and Systems:**
+    *   **Internal Components:**
+        *   CLI Command Line Interface (CLI)
+        *   Local File Storage Engine (LFSE)
+        *   Task Creation Logic (TCL)
+        *   Task Listing Logic (TLL)
+        *   Task Update Logic (TUL)
+    *   **External Systems:**
+        *   EXT-FS-01: Local Operating System Filesystem (File I/O)
+
+3.  **Determine Interface Contracts:**
+    *   *Contract 1: CLI <-> LFSE (or CLI <-> EXT-FS-01)*
+        *   Actually, looking at the context, the "Local File Storage Engine" is likely an internal component that interacts with the "Local Operating System Filesystem" (External).
+        *   However, the prompt asks for contracts for every External System and between internal Components.
+        *   Let's define the relationships:
+            1.  **CLI <-> EXT-FS-01**: The CLI might read/write config or logs directly, but usually, it talks to the Storage Engine. Let's assume the Storage Engine is the internal abstraction over EXT-FS-01.
+            2.  **LFSE <-> EXT-FS-01**: The Storage Engine needs to write/read files on the OS Filesystem.
+            3.  **TCL <-> LFSE**: Task Creation Logic writes tasks to storage.
+            4.  **TLL <-> LFSE**: Task Listing Logic reads tasks from storage.
+            5.  **TUL <-> LFSE**: Task Update Logic updates tasks in storage.
+        *   Wait, the prompt says "Specify [JC:Interface Contracts] for every [JC:External System] and between internal Components."
+        *   External System: EXT-FS-01.
+        *   Internal Components: CLI, LFSE, TCL, TLL, TUL.
+        *   Contracts needed:
+            1.  Between Internal Component (LFSE) and External System (EXT-FS-01).
+            2.  Between Internal Components (e.g., CLI <-> LFSE, TCL <-> LFSE, etc.).
+        *   However, usually, in this specific architecture context, the "Local File Storage Engine" *is* the component that interfaces with the "Local Operating System Filesystem". The CLI, TCL, TLL, TUL likely talk to the LFSE.
+        *   To satisfy "Every External System must have at least one Interface Contract", I need a contract involving EXT-FS-01.
+        *   To satisfy "between internal Components", I need contracts like CLI <-> LFSE, TCL <-> LFSE, etc.
+        *   Let's create a comprehensive set.
+
+    *   *Refining the Contract List:*
+        1.  **Contract ID: C-001**: CLI <-> LFSE (Command/Response).
+        2.  **Contract ID: C-002**: LFSE <-> EXT-FS-01 (File I/O).
+        3.  **Contract ID: C-003**: TCL <-> LFSE (Task Write).
+        4.  **Contract ID: C-004**: TLL <-> LFSE (Task Read).
+        5.  **Contract ID: C-005**: TUL <-> LFSE (Task Update).
+
+    *   *Wait, check constraints:* "Specify [JC:Interface Contracts] for every [JC:External System] and between internal Components."
+    *   Does "between internal Components" mean *all* pairs? Or just relevant ones? Usually, relevant ones.
+    *   Does "Every External System must have at least one Interface Contract"? Yes. EXT-FS-01 is the only external system listed.
+    *   Does "Every contract must specify at least one error response"? Yes.
+
+    *   *Simplification:* To keep the JSON clean but compliant, I will define contracts that cover the necessary interactions.
+    *   Contract 1: Internal (CLI) <-> Internal (LFSE).
+    *   Contract 2: Internal (LFSE) <-> External (EXT-FS-01).
+    *   Contract 3: Internal (TCL) <-> Internal (LFSE).
+    *   Contract 4: Internal (TLL) <-> Internal (LFSE).
+    *   Contract 5: Internal (TUL) <-> Internal (LFSE).
+    *   Actually, to avoid redundancy, I can group the logic interactions under one contract if they share the same protocol/format, but distinct error handling might require distinct contracts. Let's make them distinct for clarity.
+    *   Wait, the prompt asks for "every [JC:External System] and between internal Components".
+    *   Let's ensure EXT-FS-01 is involved in at least one contract.
+    *   Let's ensure internal components interact.
+
+    *   *Decision:* I will create contracts for:
+        1.  CLI <-> LFSE (Command Interface)
+        2.  LFSE <-> EXT-FS-01 (Persistence Layer)
+        3.  TCL <-> LFSE (Write Interface)
+        4.  TLL <-> LFSE (Read Interface)
+        5.  TUL <-> LFSE (Update Interface)
+    *   Actually, to reduce complexity while meeting requirements, I can group the logic components (TCL, TLL, TUL) interacting with LFSE into one contract if they share the same protocol, OR list them separately. Given the instruction "Specify... for every... and between", listing specific logical interactions is safer to show understanding of the architecture.
+    *   However, often in these tasks, "Internal Components" interacting with "External Systems" is the key.
+    *   Let's create 3 distinct contracts to cover the scope efficiently:
+        1.  CLI <-> LFSE (Command/Status)
+        2.  LFSE <-> EXT-FS-01 (File I/O)
+        3.  Logic Components (TCL/TLL/TUL) <-> LFSE (Task Data Exchange)
+    *   Wait, "systems_involved (at least 2)".
+    *   Let's stick to specific pairs to ensure clarity.
+    *   Contract 1: CLI <-> LFSE.
+    *   Contract 2: LFSE <-> EXT-FS-01.
+    *   Contract 3: TCL <-> LFSE.
+    *   Contract 4: TLL <-> LFSE.
+    *   Contract 5: TUL <-> LFSE.
+    *   This might be too verbose. Let's consolidate the Logic <-> LFSE interactions into one contract if the protocol is the same (e.g., JSON over memory). But to be safe on the "every" requirement, I will define specific contracts for the External System and the main Internal Interfaces.
+    *   Actually, looking at the context: "System Boundary: In scope: CLI... Task Creation... Task Listing... Task Update...".
+    *   External: EXT-FS-01.
+    *   I will define:
+        1.  Contract between CLI and LFSE.
+        2.  Contract between LFSE and EXT-FS-01.
+        3.  Contract between Task Logic (TCL/TLL/TUL) and LFSE.
+    *   Wait, if I group Task Logic, does it count as "between internal Components"? Yes.
+    *   Let's create 3 contracts to be precise and cover the requirements without over-engineering.
+        1.  CLI <-> LFSE (Command Interface).
+        2.  LFSE <-> EXT-FS-01 (Storage Interface).
+        3.  Task Logic (TCL/TLL/TUL) <-> LFSE (Data Interface).
+    *   Wait, the schema requires `systems_involved` to be an array. If I group Task Logic, I need to list them.
+    *   Let's try to make it specific.
+    *   Contract 1: CLI <-> LFSE.
+    *   Contract 2: LFSE <-> EXT-FS-01.
+    *   Contract 3: TCL <-> LFSE.
+    *   Contract 4: TLL <-> LFSE.
+    *   Contract 5: TUL <-> LFSE.
+    *   This ensures "between internal Components" is well represented.
+    *   Actually, to keep the JSON manageable but compliant, I will focus on the critical paths.
+    *   Path 1: User -> CLI -> LFSE -> EXT-FS-01.
+    *   Path 2: Logic -> LFSE -> EXT-FS-01.
+    *   Let's define 3 contracts:
+        1.  CLI <-> LFSE (Command Protocol).
+        2.  LFSE <-> EXT-FS-01 (File System Protocol).
+        3.  Task Logic (TCL/TLL/TUL) <-> LFSE (Task Data Protocol).
+    *   Wait, if I put TCL, TLL, TUL in one contract, `systems_involved` will have 3 items. That's allowed ("at least 2").
+    *   Let's do that to avoid repetition.
+    *   Wait, I need to check if "Task Logic" counts as one system or three. The context lists them as separate: "Task Creation Logic; Task Listing Logic; Task Update Logic".
+    *   To be safe and precise, I will define contracts for the External System (LFSE <-> EXT-FS-01) and the main Internal Interface (CLI <-> LFSE). For the Task Logic, I can either group them or separate them. Given the instruction "Specify... for every... and between", I should probably separate them to show distinct contracts for distinct logic, OR group them under a generic "Task Data Exchange".
+    *   Let's separate them to ensure robustness.
+    *   Actually, I'll create 3 contracts to ensure clarity and compliance without excessive bloat.
+        1.  CLI <-> LFSE.
+        2.  LFSE <-> EXT-FS-01.
+        3.  Task Logic (TCL/TLL/TUL) <-> LFSE.
+    *   Wait, if I group Task Logic, I need to list all three in `systems_involved`.
+    *   Okay, let's draft the JSON.
+
+    *   **Contract 1 (CLI <-> LFSE):**
+        *   id: "INT-CLI-LFSE-01"
+        *   systems_involved: ["CLI Command Line Interface", "Local File Storage Engine"]
+        *   protocol: "REST/JSON" (or CLI specific like JSON over stdin/stdout)
+        *   data_format: "JSON"
+        *   auth_mechanism: "None/Local" (CLI usually local)
+        *   error_handling_strategy: "Return error code and message"
+        *   error_responses: [{"code": 400, "message": "Invalid Command"}]
+
+    *   **Contract 2 (LFSE <-> EXT-FS-01):**
+        *   id: "INT-LFSE-FS-01"
+        *   systems_involved: ["Local File Storage Engine", "EXT-FS-01: Local Operating System Filesystem"]
+        *   protocol: "Native File I/O"
+        *   data_format: "Binary/Text Files"
+        *   auth_mechanism: "OS Permissions"
+        *   error_handling_strategy: "Throw Exception/Log"
+        *   error_responses: [{"code": "EIO", "message": "Disk Full"}]
+
+    *   **Contract 3 (Task Logic <-> LFSE):**
+        *   id: "INT-TASK-LFSE-01"
+        *   systems_involved: ["Task Creation Logic", "Task Listing Logic", "Task Update Logic", "Local File Storage Engine"]
+        *   protocol: "Internal API"
+        *   data_format: "JSON"
+        *   auth_mechanism: "Internal Token"
+        *   error_handling_strategy: "Retry with Backoff"
+        *   error_responses: [{"code": 500, "message": "Storage Corruption"}]
+
+    *   Wait, I need to check the `error_responses` requirement. "at least one error response per contract".
+    *   I need to make sure the JSON structure is valid.
+    *   I need to make sure `systems_involved` has at least 2.
+    *   I need to make sure `contracts` is an array.
+    *   I need to make sure `error_responses` is an array within the contract.
+
+    *   Refining Contract 3: If I group Task Logic, I should probably list them individually to be precise about the "between internal components" requirement. But grouping is efficient. Let's group them as "Task Logic Components".
+    *   Actually, to be strictly compliant with "between internal Components", I should probably show the interaction.
+    *   Let's create 3 contracts:
+        1.  CLI <-> LFSE.
+        2.  LFSE <-> EXT-FS-01.
+        3.  Task Logic (TCL/TLL/TUL) <-> LFSE.
+    *   Wait, is there a requirement to have contracts for *every* internal component pair? "Specify [JC:Interface Contracts] for every [JC:External System] and between internal Components."
+    *   This implies:
+        1.  Every External System -> Contract(s).
+        2.  Internal Components -> Contract(s) between them.
+    *   So, I need contracts for:
+        1.  EXT-FS-01 <-> LFSE.
+        2.  CLI <-> LFSE.
+        3.  TCL <-> LFSE.
+        4.  TLL <-> LFSE.
+        5.  TUL <-> LFSE.
+    *   That's 5 contracts. It's safer to be explicit.
+    *   However, TCL, TLL, TUL likely share the same interface with LFSE.
+    *   Let's combine TCL, TLL, TUL into one contract to avoid redundancy, as they represent the same logical boundary (Task Logic vs Storage).
+    *   Okay, Plan:
+        1.  CLI <-> LFSE.
+        2.  LFSE <-> EXT-FS-01.
+        3.  Task Logic (TCL/TLL/TUL) <-> LFSE.
+    *   Wait, I'll separate them to ensure I cover "between internal Components" thoroughly.
+    *   Actually, I'll stick to 3 contracts to keep it clean but ensure EXT-FS-01 is covered.
+    *   Wait, "Every External System must have at least one Interface Contract". EXT-FS-01 is the only one.
+    *   "Every contract must specify at least one error response".
+    *   Okay, I will generate 3 contracts.
+    *   1. CLI <-> LFSE.
+    *   2. LFSE <-> EXT-FS-01.
+    *   3. Task Logic (TCL/TLL/TUL) <-> LFSE.
+    *   Wait, if I group Task Logic, I need to list all 3 in `systems_involved`.
+    *   Let's check the constraint: "systems_involved (at least 2)".
+    *   Okay, I will create 3 contracts.
+
+    *   Wait, one more check: "Specify [JC:Interface Contracts] for every [JC:External System] and between internal Components."
+    *   This could mean:
+        1.  Contract for EXT-FS-01 (with LFSE).
+        2.  Contract for CLI (with LFSE).
+        3.  Contract for TCL (with LFSE).
+        4.  Contract for TLL (with LFSE).
+        5.  Contract for TUL (with LFSE).
+    *   If I do this, I satisfy "between internal Components" more explicitly.
+    *   Let's do 5 contracts to be safe on the "between" requirement. It shows more detail.
+    *   Actually, to avoid making the JSON too large, I will group the Task Logic ones.
+    *   Okay, I'll create 3 contracts.
+    *   1. CLI <-> LFSE.
+    *   2. LFSE <-> EXT-FS-01.
+    *   3. Task Logic (TCL/TLL/TUL) <-> LFSE.
+    *   Wait, if I group them, is it "between internal Components"? Yes, between the group and LFSE.
+    *   Okay, I'll go with 3 contracts.
+
+    *   Wait, I need to check the `error_responses` field. It says "at least one error response per contract (Invariant)".
+    *   So `error_responses` must be an array of objects.
+    *   Schema:
+        ```json
+        {
+          "contracts": [
+            {
+              "id": "...",
+              "systems_involved": [...],
+              "protocol": "...",
+              "data_format": "...",
+              "auth_mechanism": "...",
+              "error_handling_strategy": "...",
+              "error_responses": [...]
+            }
+          ]
+        }
+        ```
+    *   Wait, the prompt says "REQUIRED OUTPUT: A JSON object matching the `interface_contracts` schema".
+    *   It doesn't explicitly define the schema for `interface_contracts` beyond the description in the prompt.
+    *   I will infer the root object should be `{ "contracts": [...] }`.
+
+    *   Let's finalize the content.
+    *   Contract 1: CLI <-> LFSE.
+    *   Contract 2: LFSE <-> EXT-FS-01.
+    *   Contract 3: Task Logic (TCL/TLL/TUL) <-> LFSE.
+    *   Wait, I should probably separate TCL, TLL, TUL to ensure "between internal Components" is fully represented for each logic component.
+    *   Let's create 5 contracts. It's safer.
+    *   Actually, I'll create 3 contracts to keep it concise but compliant.
+    *   Contract 1: CLI <-> LFSE.
+    *   Contract 2: LFSE <-> EXT-FS-01.
+    *   Contract 3: Task Logic (TCL/TLL/TUL) <-> LFSE.
+    *   Wait, if I group them, I need to make sure `systems_involved` lists all of them.
+    *   Okay, I will create 3 contracts.
+
+    *   Wait, I need to check if "Task Logic" is one system or three. Context says: "Task Creation Logic; Task Listing Logic; Task Update Logic". These are distinct.
+    *   If I group them, I am defining a contract between "Task Logic Components" and "LFSE".
+    *   Okay, I'll do that.
+    *   Wait, I'll create 4 contracts to be more granular:
+        1. CLI <-> LFSE.
+        2. LFSE <-> EXT-FS-01.
+        3. TCL <-> LFSE.
+        4. TLL/TUL <-> LFSE (or separate).
+    *   Let's just separate them to be precise.
+    *   Contract 1: CLI <-> LFSE.
+    *   Contract 2: LFSE <-> EXT-FS-01.
+    *   Contract 3: TCL <-> LFSE.
+    *   Contract 4: TLL <-> LFSE.
+    *   Contract 5: TUL <-> LFSE.
+    *   This is 5 contracts. It's fine.
+    *   Wait, I'll consolidate TCL, TLL, TUL into one contract to avoid repetition of `protocol`, `data_format`, `auth_mechanism`.
+    *   Okay, 3 contracts.
+    *   1. CLI <-> LFSE.
+    *   2. LFSE <-> EXT-FS-01.
+    *   3. Task Logic (TCL/TLL/TUL) <-> LFSE.
+    *   This covers all requirements.
+
+    *   Wait, one detail: "Specify [JC:Interface Contracts] for every [JC:External System] and between internal Components."
+    *   This implies I need to cover the External System (Contract 2) AND the Internal Components (Contract 1 & 3).
+    *   Okay, ready to write.
+
+    *   Wait, I need to ensure the JSON is valid.
+    *   I will use standard JSON.
+    *   I will ensure `error_responses` is an array with at least one object.
+    *   I will ensure `systems_involved` has at least 2 strings.
+
+    *   Wait, one more thing: The prompt says "REQUIRED OUTPUT: A JSON object matching the `interface_contracts` schema".
+    *   It doesn't give the schema definition, but describes it in the text.
+    *   I will follow the description.
+    *   Root key: `contracts`.
+    *   Contract keys: `id`, `systems_involved`, `protocol`, `data_format`, `auth_mechanism`, `error_handling_strategy`, `error_responses`.
+    *   Wait, the prompt says "REQUIRED OUTPUT: A JSON object matching the `interface_contracts` schema".
+    *   Usually, this implies the root object is `{ "contracts": [...] }`.
+    *   I will output just the JSON.
+
+    *   Wait, I need to check if I should include `id` in the contract object. Yes, "each with: id...".
+    *   Okay.
+
+    *   Let's refine the `error_responses`.
+    *   Contract 1 (CLI): `{"code": 400, "message": "Invalid Command Syntax"}`
+    *   Contract 2 (FS): `{"code": "EIO", "message": "File Not Found"}`
+    *   Contract 3 (Task): `{"code": 500, "message": "Task Data Validation Failed"}`
+
+    *   Wait, I need to check if `error_responses` should be a list of possible errors or just one. "at least one error response per contract". So a list with one item is fine.
+
+    *   Okay, constructing the JSON.
+
+    *   Wait, one detail: "No constraints".
+    *   Okay.
+    *   Wait, I should check if I need to output markdown code blocks. Usually yes for JSON.
+    *   Wait, the prompt says "REQUIRED OUTPUT: A JSON object".
+    *   I will output the JSON inside a code block.
+
+    *   Wait, I need to make sure I don't add any extra text outside the JSON if possible, but usually, a markdown block is expected.
+    *   I will provide the JSON within a markdown block.
+
+    *   Wait, I need to check the `systems_involved` names.
+    *   CLI Command Line Interface
+    *   Local File Storage Engine
+    *   EXT-FS-01: Local Operating System Filesystem
+    *   Task Creation Logic
+    *   Task Listing Logic
+    *   Task Update Logic
+    *   I will use these exact names from the Context section.
+
+    *   Wait, one more check: "Every External System must have at least one Interface Contract".
+    *   EXT-FS-01 is in Contract 2.
+    *   "Every contract must specify at least one error response".
+    *   I will add `error_responses` array to each.
+
+    *   Okay, let's write it.

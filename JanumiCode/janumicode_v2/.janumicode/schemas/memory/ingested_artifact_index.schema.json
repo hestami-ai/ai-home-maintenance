@@ -1,0 +1,40 @@
+{
+  "$id": "janumicode:ingested_artifact_index:1.0",
+  "title": "Ingested Artifact Index",
+  "description": "Phase 0.2 output — inventory of workspace artifacts discovered during brownfield artifact ingestion.",
+  "type": "object",
+  "required": ["kind", "workspace_root", "total_files", "files_by_type", "ingested_record_ids"],
+  "properties": {
+    "kind": { "type": "string", "const": "ingested_artifact_index" },
+    "workspace_root": { "type": "string" },
+    "total_files": { "type": "integer", "minimum": 0 },
+    "files_by_type": {
+      "type": "object",
+      "properties": {
+        "source": { "type": "integer", "minimum": 0 },
+        "config": { "type": "integer", "minimum": 0 },
+        "spec": { "type": "integer", "minimum": 0 },
+        "doc": { "type": "integer", "minimum": 0 },
+        "data": { "type": "integer", "minimum": 0 },
+        "other": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ingested_record_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "IDs of external_file_ingested records produced during this scan"
+    },
+    "skipped_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "reason"],
+        "properties": {
+          "path": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

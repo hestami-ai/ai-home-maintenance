@@ -1,0 +1,28 @@
+{
+  "topic_entities": [
+    "Consumer Discovery MVP",
+    "Phase 1",
+    "Pillar 1",
+    "Home Real Property Assistant",
+    "Property Asset Ingestion",
+    "3D Splats",
+    "AI Agent Service Provider Search & Matching",
+    "Bid Estimate Comparison UI"
+  ],
+  "decision_types_sought": [
+    "phase_gate_approval",
+    "mirror_approval"
+  ],
+  "temporal_scope": {
+    "from": "2024-01-01T00:00:00Z",
+    "to": "2024-12-31T23:59:59Z"
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}

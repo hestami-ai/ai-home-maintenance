@@ -96,4 +96,84 @@ export const getAlternatives: Capability<AltParams, GovernedStreamRecord | null>
   },
 };
 
-export const decisionHistoryCapabilities = [explainDecision, listDecisions, getAlternatives];
+// ── escalateInconsistency ────────────────────────────────────────────
+
+interface EscalateParams {
+  /** Natural-language description of the inconsistency the user identified. */
+  description: string;
+  /** Record IDs the user is claiming are in conflict. */
+  conflicting_record_ids: string[];
+}
+
+/**
+ * When a consistency_challenge query reveals a real contradiction, the LLM
+ * invokes this capability to escalate to the Orchestrator (§8.11). The
+ * engine writes a `consistency_challenge_escalation` record and emits an
+ * `inconsistency:escalated` event so the UI banner surfaces. The
+ * Orchestrator then manages the bloom-and-prune resolution flow — Client
+ * Liaison itself cannot unilaterally trigger rollbacks.
+ *
+ * This capability is the ONLY path by which the Client Liaison writes an
+ * escalation record. A silent `escalatedToOrchestrator: true` synthesis
+ * flag without a matching capability call used to be dead code; that
+ * gap is closed here.
+ */
+export const escalateInconsistency: Capability<EscalateParams, {
+  escalationRecordId: string;
+  conflictingRecordIds: string[];
+  description: string;
+}> = {
+  name: 'escalateInconsistency',
+  category: 'decision_history',
+  description:
+    'Escalate a confirmed inconsistency to the Orchestrator. Use this ONLY when the user has identified a real contradiction between records and the retrieval evidence supports their claim. The Orchestrator handles resolution via bloom-and-prune; you cannot roll back directly.',
+  parameters: {
+    type: 'object',
+    properties: {
+      description: {
+        type: 'string',
+        description: 'Human-readable summary of the inconsistency — what the user believes contradicts what.',
+      },
+      conflicting_record_ids: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Record IDs of the artifacts or decisions that are claimed to be in conflict.',
+      },
+    },
+    required: ['description', 'conflicting_record_ids'],
+  },
+  preconditions: (ctx) =>
+    ctx.activeRun ? true : 'No active workflow run — nothing to escalate.',
+  execute: async (params, ctx) => {
+    if (!ctx.activeRun) {
+      throw new Error('No active workflow run');
+    }
+    if (!Array.isArray(params.conflicting_record_ids) || params.conflicting_record_ids.length < 2) {
+      throw new Error('escalateInconsistency requires at least two conflicting record IDs.');
+    }
+    // The engine writes the consistency_challenge_escalation record and
+    // emits both `inconsistency:escalated` and `error:occurred` events.
+    const escalationRecordId = ctx.orchestrator.escalateInconsistency({
+      runId: ctx.activeRun.id,
+      userQueryRecordId: params.conflicting_record_ids[0],
+      conflictingRecordIds: params.conflicting_record_ids,
+      description: params.description,
+    });
+    return {
+      escalationRecordId,
+      conflictingRecordIds: params.conflicting_record_ids,
+      description: params.description,
+    };
+  },
+  formatResponse: (r) => {
+    const idList = r.conflictingRecordIds.map(id => `[ref:${id}]`).join(', ');
+    return `Escalated to Orchestrator [ref:${r.escalationRecordId}]: ${r.description}\n\nConflicting records: ${idList}\n\nThe Orchestrator will resolve this via bloom-and-prune. You will see the resolution options surface in a menu.`;
+  },
+};
+
+export const decisionHistoryCapabilities = [
+  explainDecision,
+  listDecisions,
+  getAlternatives,
+  escalateInconsistency,
+];

@@ -1,0 +1,609 @@
+{
+  "match": "[JC:SYSTEM SCOPE]\nYou are the [JC:Technical Spec Agent] specifying API Definitions for Sub-Phase 5.2",
+  "key": "technical_spec_agent__5_2__06",
+  "agent_role": "technical_spec_agent",
+  "sub_phase_id": "5.2",
+  "call_sequence": 6,
+  "prompt_context_payload": {
+    "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Technical Spec Agent] specifying API Definitions for Sub-Phase 5.2.\n\nGOVERNING CONSTRAINTS (apply without exception):\n(none)\n\nProduce [JC:API Definitions] for each Component's externally callable interfaces.\n\nREQUIRED OUTPUT: A JSON object matching the `api_definitions` schema:\n- definitions: array, each with:\n  - component_id\n  - endpoints: array of {path, method, inputs, outputs, error_codes, auth_requirement}\n\nRules:\n- Every endpoint must have an explicit aut"
+  },
+  "prompt_context_hash": "78e2d32fee27e0ed",
+  "text": "{\n  \"definitions\": [\n    {\n      \"component_id\": \"cmp-prop-data\",\n      \"endpoints\": [\n        {\n          \"path\": \"/assets/upload\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"contentType\": \"multipart/form-data\",\n            \"body\": {\n              \"asset_type\": \"string | image | splat\",\n              \"metadata\": {\n                \"property_address\": \"string\",\n                \"location\": \"GeoJSON\",\n                \"description\": \"string\"\n              },\n              \"files\": \"array of binary\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"asset_id\": \"string\",\n              \"status\": \"string (ingested|indexing)\",\n              \"sync_queue_token\": \"string\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 400, \"description\": \"Invalid file format or size\" },\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 403, \"description\": \"Access forbidden by RLS\" },\n            { \"code\": 409, \"description\": \"Asset already exists or duplicate metadata\" },\n            { \"code\": 503, \"description\": \"Storage quota exceeded or indexing service down\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        },\n        {\n          \"path\": \"/assets/search\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"contentType\": \"application/x-www-form-urlencoded\",\n            \"params\": {\n              \"query\": \"string\",\n              \"asset_type\": \"string (optional)\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"results\": \"array of AssetSummary\",\n              \"total\": \"integer\",\n              \"sync_status\": \"string\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 403, \"description\": \"No permission to view specific property data\" },\n            { \"code\": 404, \"description\": \"Search query not found\" },\n            { \"code\": 500, \"description\": \"Search indexing failure\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        },\n        {\n          \"path\": \"/sync/queue/status\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"params\": {\n              \"queue_token\": \"string\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"queue_status\": \"string\",\n              \"items_count\": \"integer\",\n              \"last_sync\": \"datetime\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 404, \"description\": \"Queue token not found\" },\n            { \"code\": 500, \"description\": \"Sync service unavailable\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-provider-match\",\n      \"endpoints\": [\n        {\n          \"path\": \"/providers/search\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"contentType\": \"application/x-www-form-urlencoded\",\n            \"params\": {\n              \"location\": \"string\",\n              \"service_type\": \"string\",\n              \"sort_by\": \"string\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"providers\": \"array of ProviderSummary\",\n              \"search_metadata\": {\n                \"ai_confidence\": \"float\",\n                \"region_match\": \"boolean\"\n              }\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 404, \"description\": \"Search criteria returned no results\" },\n            { \"code\": 500, \"description\": \"AI Agent service unavailable\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        },\n        {\n          \"path\": \"/bids/compare/{bid_id}\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"params\": {\n              \"bid_id\": \"string (path param)\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"comparison_table\": {\n                \"good\": \"BidData\",\n                \"better\": \"BidData\",\n                \"best\": \"BidData\"\n              },\n              \"thresholds_met\": \"boolean\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 403, \"description\": \"User not allowed to view bid comparison\" },\n            { \"code\": 404, \"description\": \"Bid record not found\" },\n            { \"code\": 500, \"description\": \"Database retrieval error\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-compliance\",\n      \"endpoints\": [\n        {\n          \"path\": \"/compliance/extract\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"text\": \"string (CC&R or Bylaws text)\",\n              \"document_id\": \"string\",\n              \"extraction_target\": \"string (deadline, restriction, fee)\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"clauses\": \"array of Clauses\",\n              \"confidence_score\": \"float\",\n              \"validation_status\": \"string (pass|fail)\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 400, \"description\": \"Text input too short or invalid format\" },\n            { \"code\": 500, \"description\": \"AI Extraction service timeout\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        },\n        {\n          \"path\": \"/compliance/deadlines\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"params\": {\n              \"tenant_id\": \"string (path param)\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"deadlines\": \"array of DeadlineItem\",\n              \"alert_priority\": \"string (high|medium|low)\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 404, \"description\": \"Tenant not found in compliance registry\" },\n            { \"code\": 503, \"description\": \"Regulatory service unreachable\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        },\n        {\n          \"path\": \"/compliance/alerts\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"trigger_id\": \"string\",\n              \"notification_payload\": \"object (email, sms)\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"dispatch_id\": \"string\",\n              \"status\": \"queued|processing|completed\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 403, \"description\": \"Not allowed to trigger compliance alert\" },\n            { \"code\": 500, \"description\": \"Internal alert engine error\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-workflow\",\n      \"endpoints\": [\n        {\n          \"path\": \"/actions\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"params\": {\n              \"status\": \"string\",\n              \"owner_id\": \"string\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"actions\": \"array of ActionItem\",\n              \"total_count\": \"integer\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 403, \"description\": \"Viewing actions outside tenant scope\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        },\n        {\n          \"path\": \"/actions/{action_id}\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"status\": \"string\",\n              \"notes\": \"string\",\n              \"transition_from\": \"string\",\n              \"transition_to\": \"string\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"action_id\": \"string\",\n              \"updated_at\": \"datetime\",\n              \"audit_log_entry\": \"string\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 409, \"description\": \"Invalid state transition\" },\n            { \"code\": 400, \"description\": \"Required fields missing\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-notifications\",\n      \"endpoints\": [\n        {\n          \"path\": \"/dispatch/batch\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"recipients\": \"array of string (email|phone)\",\n              \"template_id\": \"string\",\n              \"content_body\": \"string\",\n              \"priority\": \"string\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"batch_id\": \"string\",\n              \"estimated_delivery\": \"datetime\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 400, \"description\": \"Invalid email or phone number format\" },\n            { \"code\": 503, \"description\": \"External comms provider (SMTP/SMS) down\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        },\n        {\n          \"path\": \"/dispatch/status/{batch_id}\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"params\": {\n              \"batch_id\": \"string\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"status\": \"string\",\n              \"sent\": \"integer\",\n              \"failed\": \"integer\",\n              \"bounced\": \"integer\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 404, \"description\": \"Batch not found\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-security\",\n      \"endpoints\": [\n        {\n          \"path\": \"/auth/validate\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"token\": \"string\",\n              \"client_fingerprint\": \"string (optional)\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"valid\": \"boolean\",\n              \"tenant_id\": \"string\",\n              \"expires_at\": \"datetime\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Invalid or expired token\" },\n            { \"code\": 403, \"description\": \"Token associated with revoked tenant\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        },\n        {\n          \"path\": \"/health\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"params\": {\n              \"check_rls\": \"boolean\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"status\": \"up\",\n              \"tls_version\": \"string\",\n              \"rate_limit_remaining\": \"integer\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 503, \"description\": \"Security gateway overload\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"cmp-payment\",\n      \"endpoints\": [\n        {\n          \"path\": \"/payments/process\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"amount\": \"float\",\n              \"currency\": \"string\",\n              \"payment_intent_id\": \"string\",\n              \"description\": \"string (deposit|fee)\",\n              \"receipt_email\": \"string\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/json\",\n            \"body\": {\n              \"transaction_id\": \"string\",\n              \"status\": \"success|declined\",\n              \"receipt_url\": \"string\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 402, \"description\": \"Insufficient funds\" },\n            { \"code\": 402, \"description\": \"Payment gateway decline\" },\n            { \"code\": 500, \"description\": \"Gateway connection error\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        },\n        {\n          \"path\": \"/payments/receipt/{id}\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"contentType\": \"application/json\",\n            \"params\": {\n              \"id\": \"string\"\n            }\n          },\n          \"outputs\": {\n            \"contentType\": \"application/pdf\",\n            \"body\": {\n              \"receipt_data\": \"PDF Content\",\n              \"timestamp\": \"datetime\"\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 401, \"description\": \"Unauthorized\" },\n            { \"code\": 404, \"description\": \"Transaction ID not found\" },\n            { \"code\": 403, \"description\": \"Receipt visibility restricted by policy\" }\n          ],\n          \"auth_requirement\": \"Bearer Token Required\"\n        }\n      ]\n    }\n  ]\n}",
+  "parsedJson": {
+    "definitions": [
+      {
+        "component_id": "cmp-prop-data",
+        "endpoints": [
+          {
+            "path": "/assets/upload",
+            "method": "POST",
+            "inputs": {
+              "contentType": "multipart/form-data",
+              "body": {
+                "asset_type": "string | image | splat",
+                "metadata": {
+                  "property_address": "string",
+                  "location": "GeoJSON",
+                  "description": "string"
+                },
+                "files": "array of binary"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "asset_id": "string",
+                "status": "string (ingested|indexing)",
+                "sync_queue_token": "string"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 400,
+                "description": "Invalid file format or size"
+              },
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 403,
+                "description": "Access forbidden by RLS"
+              },
+              {
+                "code": 409,
+                "description": "Asset already exists or duplicate metadata"
+              },
+              {
+                "code": 503,
+                "description": "Storage quota exceeded or indexing service down"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          },
+          {
+            "path": "/assets/search",
+            "method": "GET",
+            "inputs": {
+              "contentType": "application/x-www-form-urlencoded",
+              "params": {
+                "query": "string",
+                "asset_type": "string (optional)"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "results": "array of AssetSummary",
+                "total": "integer",
+                "sync_status": "string"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 403,
+                "description": "No permission to view specific property data"
+              },
+              {
+                "code": 404,
+                "description": "Search query not found"
+              },
+              {
+                "code": 500,
+                "description": "Search indexing failure"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          },
+          {
+            "path": "/sync/queue/status",
+            "method": "GET",
+            "inputs": {
+              "contentType": "application/json",
+              "params": {
+                "queue_token": "string"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "queue_status": "string",
+                "items_count": "integer",
+                "last_sync": "datetime"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 404,
+                "description": "Queue token not found"
+              },
+              {
+                "code": 500,
+                "description": "Sync service unavailable"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-provider-match",
+        "endpoints": [
+          {
+            "path": "/providers/search",
+            "method": "GET",
+            "inputs": {
+              "contentType": "application/x-www-form-urlencoded",
+              "params": {
+                "location": "string",
+                "service_type": "string",
+                "sort_by": "string"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "providers": "array of ProviderSummary",
+                "search_metadata": {
+                  "ai_confidence": "float",
+                  "region_match": "boolean"
+                }
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 404,
+                "description": "Search criteria returned no results"
+              },
+              {
+                "code": 500,
+                "description": "AI Agent service unavailable"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          },
+          {
+            "path": "/bids/compare/{bid_id}",
+            "method": "GET",
+            "inputs": {
+              "contentType": "application/json",
+              "params": {
+                "bid_id": "string (path param)"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "comparison_table": {
+                  "good": "BidData",
+                  "better": "BidData",
+                  "best": "BidData"
+                },
+                "thresholds_met": "boolean"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 403,
+                "description": "User not allowed to view bid comparison"
+              },
+              {
+                "code": 404,
+                "description": "Bid record not found"
+              },
+              {
+                "code": 500,
+                "description": "Database retrieval error"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-compliance",
+        "endpoints": [
+          {
+            "path": "/compliance/extract",
+            "method": "POST",
+            "inputs": {
+              "contentType": "application/json",
+              "body": {
+                "text": "string (CC&R or Bylaws text)",
+                "document_id": "string",
+                "extraction_target": "string (deadline, restriction, fee)"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "clauses": "array of Clauses",
+                "confidence_score": "float",
+                "validation_status": "string (pass|fail)"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 400,
+                "description": "Text input too short or invalid format"
+              },
+              {
+                "code": 500,
+                "description": "AI Extraction service timeout"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          },
+          {
+            "path": "/compliance/deadlines",
+            "method": "GET",
+            "inputs": {
+              "contentType": "application/json",
+              "params": {
+                "tenant_id": "string (path param)"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "deadlines": "array of DeadlineItem",
+                "alert_priority": "string (high|medium|low)"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 404,
+                "description": "Tenant not found in compliance registry"
+              },
+              {
+                "code": 503,
+                "description": "Regulatory service unreachable"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          },
+          {
+            "path": "/compliance/alerts",
+            "method": "POST",
+            "inputs": {
+              "contentType": "application/json",
+              "body": {
+                "trigger_id": "string",
+                "notification_payload": "object (email, sms)"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "dispatch_id": "string",
+                "status": "queued|processing|completed"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 403,
+                "description": "Not allowed to trigger compliance alert"
+              },
+              {
+                "code": 500,
+                "description": "Internal alert engine error"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-workflow",
+        "endpoints": [
+          {
+            "path": "/actions",
+            "method": "GET",
+            "inputs": {
+              "contentType": "application/json",
+              "params": {
+                "status": "string",
+                "owner_id": "string"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "actions": "array of ActionItem",
+                "total_count": "integer"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 403,
+                "description": "Viewing actions outside tenant scope"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          },
+          {
+            "path": "/actions/{action_id}",
+            "method": "POST",
+            "inputs": {
+              "contentType": "application/json",
+              "body": {
+                "status": "string",
+                "notes": "string",
+                "transition_from": "string",
+                "transition_to": "string"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "action_id": "string",
+                "updated_at": "datetime",
+                "audit_log_entry": "string"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 409,
+                "description": "Invalid state transition"
+              },
+              {
+                "code": 400,
+                "description": "Required fields missing"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-notifications",
+        "endpoints": [
+          {
+            "path": "/dispatch/batch",
+            "method": "POST",
+            "inputs": {
+              "contentType": "application/json",
+              "body": {
+                "recipients": "array of string (email|phone)",
+                "template_id": "string",
+                "content_body": "string",
+                "priority": "string"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "batch_id": "string",
+                "estimated_delivery": "datetime"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 400,
+                "description": "Invalid email or phone number format"
+              },
+              {
+                "code": 503,
+                "description": "External comms provider (SMTP/SMS) down"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          },
+          {
+            "path": "/dispatch/status/{batch_id}",
+            "method": "GET",
+            "inputs": {
+              "contentType": "application/json",
+              "params": {
+                "batch_id": "string"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "status": "string",
+                "sent": "integer",
+                "failed": "integer",
+                "bounced": "integer"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 404,
+                "description": "Batch not found"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-security",
+        "endpoints": [
+          {
+            "path": "/auth/validate",
+            "method": "POST",
+            "inputs": {
+              "contentType": "application/json",
+              "body": {
+                "token": "string",
+                "client_fingerprint": "string (optional)"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "valid": "boolean",
+                "tenant_id": "string",
+                "expires_at": "datetime"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Invalid or expired token"
+              },
+              {
+                "code": 403,
+                "description": "Token associated with revoked tenant"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          },
+          {
+            "path": "/health",
+            "method": "GET",
+            "inputs": {
+              "contentType": "application/json",
+              "params": {
+                "check_rls": "boolean"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "status": "up",
+                "tls_version": "string",
+                "rate_limit_remaining": "integer"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 503,
+                "description": "Security gateway overload"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          }
+        ]
+      },
+      {
+        "component_id": "cmp-payment",
+        "endpoints": [
+          {
+            "path": "/payments/process",
+            "method": "POST",
+            "inputs": {
+              "contentType": "application/json",
+              "body": {
+                "amount": "float",
+                "currency": "string",
+                "payment_intent_id": "string",
+                "description": "string (deposit|fee)",
+                "receipt_email": "string"
+              }
+            },
+            "outputs": {
+              "contentType": "application/json",
+              "body": {
+                "transaction_id": "string",
+                "status": "success|declined",
+                "receipt_url": "string"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 402,
+                "description": "Insufficient funds"
+              },
+              {
+                "code": 402,
+                "description": "Payment gateway decline"
+              },
+              {
+                "code": 500,
+                "description": "Gateway connection error"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          },
+          {
+            "path": "/payments/receipt/{id}",
+            "method": "GET",
+            "inputs": {
+              "contentType": "application/json",
+              "params": {
+                "id": "string"
+              }
+            },
+            "outputs": {
+              "contentType": "application/pdf",
+              "body": {
+                "receipt_data": "PDF Content",
+                "timestamp": "datetime"
+              }
+            },
+            "error_codes": [
+              {
+                "code": 401,
+                "description": "Unauthorized"
+              },
+              {
+                "code": 404,
+                "description": "Transaction ID not found"
+              },
+              {
+                "code": 403,
+                "description": "Receipt visibility restricted by policy"
+              }
+            ],
+            "auth_requirement": "Bearer Token Required"
+          }
+        ]
+      }
+    ]
+  },
+  "thinking": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Role:** [JC:Technical Spec Agent] specifying API Definitions for Sub-Phase 5.2.\n    *   **Task:** Produce JSON object matching `api_definitions` schema.\n    *   **Components:** 7 specific components defined in the context (cmp-prop-data, cmp-provider-match, cmp-compliance, cmp-workflow, cmp-notifications, cmp-security, cmp-payment).\n    *   **Constraints:**\n        *   Every endpoint must have an explicit authentication requirement (Invariant: API-001).\n        *   API Definitions must be consistent with Interface Contracts from Phase 3 (INT-EXT-xxxx, INT-INT-xxxx).\n        *   Include error codes for all failure scenarios.\n        *   Context: Consumer Discovery MVP (Pillar 1 only).\n    *   **Schema:** `api_definitions` -> `definitions` -> array of `{ component_id, endpoints: array of { path, method, inputs, outputs, error_codes, auth_requirement } }`.\n    *   **Output Format:** JSON object.\n\n2.  **Review Context & Components:**\n    *   **Component 1: cmp-prop-data (Property Data Manager)**\n        *   Responsibilities: Upload/validate assets, Index, Offline sync.\n        *   Contracts: INT-EXT-005-MOBILE (upload queues), INT-INT-001-STORAGE (storage).\n        *   API Needs: Upload endpoint, List endpoint, Status endpoint.\n    *   **Component 2: cmp-provider-match (Service Provider Matcher)**\n        *   Responsibilities: Search providers, Bid comparison.\n        *   API Needs: Search endpoint, Compare bids endpoint.\n    *   **Component 3: cmp-compliance (Compliance Rules Engine)**\n        *   Responsibilities: Extract CC&R/Bylaws, Monitor deadlines, Generate notifications.\n        *   API Needs: Extract endpoint, Status endpoint, Alert endpoint.\n    *   **Component 4: cmp-workflow (Action Workflow Orchestrator)**\n        *   Responsibilities: Manage action items, Status updates.\n        *   API Needs: Create action item, Update status, List items.\n    *   **Component 5: cmp-notifications (Notification Dispatcher)**\n        *   Responsibilities: Process email/SMS, Resumes, Confirm receipt.\n        *   API Needs: Send batch, Check status.\n    *   **Component 6: cmp-security (Tenant Security Gateway)**\n        *   Responsibilities: RLS, Auth check.\n        *   API Needs: (Internal usually, but spec asks for components' externally callable interfaces). Usually Security is internal, but might have a \"Health/Auth Check\" or be the gateway for others. However, the prompt asks for *each Component's externally callable interfaces*. Security components often act as middleware. I will define the endpoints that *external clients* call which interact with security logic (e.g., verifying token), or define its role as a gateway endpoint. Given RSP-014/015, it validates access. I will define endpoints that external users trigger which require auth (e.g., \"validate permission\"). Actually, typically Security Gateways don't have public endpoints users call directly to *do* security, but rather endpoints *protected* by security. However, to satisfy the requirement of \"Each Component\", I will define the interface it exposes to verify credentials or tenant context, or simply define its read-only introspection endpoints if it must have *an* interface. A common pattern is `GET /auth/verify`. Let's assume it exposes a token validation endpoint or is the root of auth. Let's look at the constraints: \"Every endpoint must have an explicit authentication requirement\".\n    *   **Component 7: cmp-payment (Payment Transaction Processor)**\n        *   Responsibilities: Process payments, Generate receipts.\n        *   API Needs: Create payment, Generate receipt.\n\n3.  **Drafting Endpoints (Mental Check against Constraints):**\n    *   **Auth Requirement:** Must be explicit (`required: true` or similar).\n    *   **Error Codes:** Must be included for failure scenarios (4xx, 5xx).\n    *   **Contracts:**\n        *   `INT-INT-001-STORAGE`: SeaweedFS integration (internal). The `cmp-prop-data` handles this. The API exposed shouldn't necessarily expose raw S3, but wrapped logic.\n        *   `INT-EXT-001-PAYMENT`: Stripe/Square. `cmp-payment` handles this.\n        *   `INT-EXT-002-COMMS`: Email/SMS. `cmp-notifications` handles this.\n        *   `INT-EXT-003-REGULATORY`: Gov services. `cmp-compliance` handles this.\n        *   `INT-EXT-004-AI`: AI/ML. `cmp-compliance` / `cmp-provider-match` use this internally or expose results.\n        *   `INT-EXT-005-MOBILE`: Mobile Client. `cmp-prop-data` handles uploads.\n\n    *   *Self-Correction on Security Component:* If `cmp-security` is a Gateway, its \"externally callable interface\" is usually the authentication check itself or a health check. To make it useful and satisfy the schema, I will define an endpoint that validates token validity/tenant context (since that's what it does). Or, since it protects others, I can define it as a service that verifies tokens before routing. I'll create an endpoint like `POST /auth/validate` that external apps call to establish session validity.\n\n4.  **Defining Inputs/Outputs:**\n    *   Use JSON schemas (brief descriptions or types) in `inputs`/`outputs`.\n    *   Inputs/Outputs need to be descriptive (e.g., `MediaType: image/*`, `body: UploadRequest`).\n\n5.  **Defining Error Codes:**\n    *   Standard HTTP codes + specific custom codes (e.g., `ERR_FILE_TYPE_INVALID`, `ERR_AUTH_FORBIDDEN`).\n    *   Format: List of codes with description.\n\n6.  **Constructing the JSON:**\n    *   Structure: `{\"definitions\": [ {...}, ... ]}`.\n    *   Ensure `auth_requirement` is present for *every* endpoint.\n\n7.  **Refining Details based on MVP Scope:**\n    *   Exclude Pillar 2 (Financials) implementation except `cmp-payment` which is specifically listed. Wait, context says \"Excluded: Pillar 2 (Financials)...\". But `cmp-payment` is listed in the 7 components. This seems contradictory.\n    *   *Re-reading Context:* \"Context: Component Model: PROJECT TYPE: Consumer Discovery MVP... Excluded: Pillar 2 (Financials) implementation for this MVP...\".\n    *   *However:* `cmp-payment` is explicitly listed in \"7 Components\". It must be included. The exclusion note likely means *Accounting/Enterprise* financials (Pillar 2 of Phase 3/4?), but `cmp-payment` handles specific MVP needs (deposits/fees via Stripe). I will include `cmp-payment` but keep it scoped to MVP use cases (transaction processing, receipts).\n    *   *Re-reading Excluded:* \"Pillar 2 (Financials) implementation... Payment Processing Integration (Stripe/Square)\". Wait, the capabilities list *includes* \"Payment Processing Integration (Stripe/Square)\". The exclusion list says \"Excluded: Pillar 2 (Financials) implementation for this MVP\". This is ambiguous. Usually, MVPs handle payments. I will interpret the exclusion as \"No complex Financial Management/Accounting Pillar 2\", but `cmp-payment` is the mechanism to handle Stripe/Square as per Capabilities. I will include `cmp-payment` but ensure the logic is MVP-focused (e.g., deposits/fees).\n    *   *Re-reading Excluded:* \"Direct Contractor Portal Access for V1\". This means `cmp-provider-match` shouldn't expose a login for contractors, just search/match for homeowners.\n    *   *Re-reading Excluded:* \"Field Service Engine MVP features\". `cmp-workflow` should focus on Action Items, not Field Service dispatch.\n    *   *Re-reading Excluded:* \"Legacy Vantaca\". Ignore Vantaca.\n\n8.  **Drafting Endpoint Specifics:**\n\n    *   **cmp-prop-data:**\n        *   `POST /assets/upload`: Inputs: FormData (Image/Splat), Metadata. Auth: Required.\n        *   `GET /assets/queue/status`: Check mobile sync queue. Auth: Required.\n        *   `GET /assets/search`: List indexed assets. Auth: Required.\n\n    *   **cmp-provider-match:**\n        *   `POST /providers/search`: Query parameters: Location, Property Type. Auth: Required.\n        *   `GET /bids/compare/{id}`: Comparison data. Auth: Required.\n\n    *   **cmp-compliance:**\n        *   `POST /compliance/extract`: Upload CC&R text for AI extraction. Auth: Required.\n        *   `GET /compliance/deadlines`: Get upcoming statutory deadlines. Auth: Required.\n        *   `POST /compliance/alerts`: Generate payload (calls cmp-notifications internally, but maybe has an external trigger? Let's make it an external read of alerts). `GET /compliance/alerts`. Auth: Required.\n\n    *   **cmp-workflow:**\n        *   `GET /actions/list`: List action items. Auth: Required.\n        *   `POST /actions/update`: Update status. Auth: Required.\n        *   `GET /actions/{id}`: Get details. Auth: Required.\n\n    *   **cmp-notifications:**\n        *   `POST /messages/send`: Send batch (for internal triggering usually, but if exposed externally?). Usually, this is internal. Let's make it `POST /messages/batch` which internal services call, but per spec, this is an *API Definition*. I will define the interface it exposes to other services (like `cmp-workflow` or `cmp-payment` calling it). But the requirement says \"Externally callable interfaces\". Since `cmp-notifications` is a component, I will define the API it offers to the system (which might be internal APIs treated as external interfaces within the domain). However, looking at the Interface Contracts: `INT-EXT-002-COMMS`. The `cmp-notifications` component likely consumes `EXT-002` internally. I will define an endpoint that allows a client (e.g., Admin or Mobile App) to trigger a notification event (like \"Request Receipt\").\n        *   `GET /notifications/status`: Check message delivery status. Auth: Required.\n\n    *   **cmp-security:**\n        *   `POST /auth/validate`: Verify token/tenant context. Auth: Implicitly required (or Bearer). Let's say `Bearer` required.\n        *   `GET /health`: Health check (Auth: Required? Security gateways often don't require auth for health, but constraint API-001 says \"Every endpoint must have an explicit authentication requirement\". I will add auth requirement even for health to be strict).\n        *   Let's use `POST /auth/token/verify` (Validate).\n\n    *   **cmp-payment:**\n        *   `POST /payments/process`: Create Payment Intent (wraps Stripe). Auth: Required.\n        *   `GET /payments/receipt/{id}`: Get receipt. Auth: Required.\n\n9.  **Formatting:**\n    *   JSON Schema compliance.\n    *   Strict JSON (no trailing commas).\n    *   Error codes arrays.\n    *   Inputs/Outputs as strings or objects? Schema says `inputs` and `outputs` are properties of an endpoint object. Usually, these are descriptors. I will use string descriptions or object representations for clarity within the JSON constraint. The prompt example schema implies `inputs` and `outputs` are likely strings or references. I will use concise JSON strings representing the payload structure to keep it valid and descriptive. Actually, standard practice for such specs is often `{\"schema\": {...}}` or just descriptive text. Given the \"JSON object matching the api_definitions schema\", I need to ensure `inputs` and `outputs` fields are valid JSON values. I will use string representations of JSON schemas for clarity, or simple objects if permitted. Let's look at the instruction: \"inputs, outputs, error_codes, auth_requirement\". I will treat `inputs`/`outputs` as JSON string descriptions or simple object keys. To be safe and valid JSON, I'll use strings describing the payload or simplified object structures.\n    *   Wait, looking at the rule: \"Produce [JC:API Definitions] for each Component's externally callable interfaces.\"\n    *   Schema: `definitions: array, each with: component_id, endpoints: array of {path, method, inputs, outputs, error_codes, auth_requirement}`.\n    *   I will make `inputs` and `outputs` strings describing the JSON content (e.g., `\"application/json: { asset_id: string, filename: string }\"`).\n\n10. **Final Review against Constraints:**\n    *   **API-001:** Every endpoint needs `auth_requirement`. I will set this to `\"required\"` or specific token type. Let's use `\"Bearer Token Required\"`.\n    *   **Context:** MVP Pillar 1 only. No HOA voting, no field service engine, no legacy Vantaca.\n    *   **Error Codes:** Include specific failure codes.\n    *   **Components:** All 7 must be in the `definitions` array.\n    *   **Consistency:** Ensure `cmp-payment` aligns with `INT-EXT-001-PAYMENT`. `cmp-notifications` aligns with `INT-EXT-002-COMMS`.\n\n    *   *Self-Correction on Error Codes:* The schema asks for `error_codes` in the endpoint object. This implies a list. I will provide a list of possible error codes and descriptions.\n\n    *   *Self-Correction on Auth Requirement:* Invariant API-001: \"Every endpoint must have an explicit authentication requirement\". I will ensure this field exists for every endpoint.\n\n    *   *Self-Correction on Inputs/Outputs:* To avoid complex nested JSON in the response that might break the outer schema, I will use string representations of the JSON structure for inputs/outputs.\n\n    Let's build the JSON.\n\n    *   *Schema Check:* The prompt says \"REQUIRED OUTPUT: A JSON object matching the `api_definitions` schema\".\n    *   I need to output *only* the JSON object. No markdown text outside? Usually, for system prompts, it's safer to output the JSON block within markdown code blocks if allowed, but the instruction implies \"Produce [JC:API Definitions]\". I will output the JSON block.\n    *   Wait, standard instruction: \"REQUIRED OUTPUT: A JSON object\". I should avoid markdown formatting that breaks parsing if strict JSON is expected. However, most LLM interfaces expect markdown ```json ``` blocks. I will wrap it in markdown to be safe but ensure the content is valid JSON.\n    *   Wait, strict JSON output is often preferred. I will output raw JSON if possible, but usually ```json``` is accepted. I'll use the standard block.\n    *   Wait, looking at the `system` instructions often in this context: \"Produce [JC:API Definitions]\". I will output the JSON structure directly.\n\n    *   *Refining Inputs/Outputs:* To keep it clean, I will use a string representation like `\"{ 'data': string }\"`. Or I can try to format them as JSON Schema fragments within the string value. I will use string values for `inputs` and `outputs` containing JSON descriptions.\n\n    *   *Refining Error Codes:* I will list them as an array of strings with descriptions if possible, or just codes. The schema says `error_codes`. I will make it an array of objects `{code, description}`.\n\n    *   *Refining Auth:* I will make it `\"required\"` or `\"Bearer Token (Bearer)\"`. The rule says \"explicit authentication requirement\". `\"Bearer Token Required\"` is explicit.\n\n    *   *Components:* Ensure `cmp-prop-data`, `cmp-provider-match`, `cmp-compliance`, `cmp-workflow`, `cmp-notifications`, `cmp-security`, `cmp-payment` are all present.\n\n    *   *Component `cmp-security`:* Since this is a gateway, external calls might be token validation.\n    *   *Component `cmp-payment`:* Must respect MVP scope (deposits/fees).\n\n    Let's write the JSON content.\n\n    *   `cmp-prop-data`:\n        *   `POST /api/v1/assets/upload`: Input: `UploadPayload` (files, metadata). Output: `UploadResponse` (id, status).\n        *   `GET /api/v1/assets/{id}`: Get asset.\n        *   `POST /api/v1/assets/sync-queue`: Upload to offline buffer.\n\n    *   `cmp-provider-match`:\n        *   `GET /api/v1/providers/search`: Search results.\n        *   `GET /api/v1/bids/compare/{bid_id}`: Compare table.\n\n    *   `cmp-compliance`:\n        *   `POST /api/v1/compliance/extract`: Analyze CC&R.\n        *   `GET /api/v1/compliance/deadlines`: Upcoming deadlines.\n        *   `GET /api/v1/compliance/alerts`: Notification payload preview.\n\n    *   `cmp-workflow`:\n        *   `GET /api/v1/actions`: List actions.\n        *   `POST /api/v1/actions/{id}/update`: Update status.\n        *   `POST /api/v1/actions/{id}/complete`: Mark complete.\n\n    *   `cmp-notifications`:\n        *   `POST /api/v1/notifications/batch`: Trigger delivery (internal service trigger).\n        *   `GET /api/v1/notifications/{id}`: Check status.\n\n    *   `cmp-security`:\n        *   `POST /api/v1/auth/validate`: Verify credentials.\n        *   `POST /api/v1/auth/token`: Issue token (maybe not externally callable in same way? but `cmp-security` component usually handles auth). Let's assume `cmp-security` exposes an endpoint to verify tenant context.\n        *   `GET /api/v1/health`: Status.\n\n    *   `cmp-payment`:\n        *   `POST /api/v1/payments/charge`: Process Stripe.\n        *   `GET /api/v1/payments/receipt/{payment_intent}`: Receipt.\n\n    *   **Inputs/Outputs format:** I will use stringified JSON for the `inputs` and `outputs` fields to ensure valid JSON structure for the overall response, as embedding complex schemas in object fields without a JSON Schema standard might be risky if the parser expects strings. However, the prompt example schema isn't fully defined. I will use descriptive strings like `\"{ 'body': UploadRequest }\"` or actual JSON objects if the system allows. To be safe, I will use a JSON string representation for the values of `inputs` and `outputs` fields within the main object, or simple objects if the `inputs`/`outputs` keys in the API Definition schema allow objects. The instruction says `inputs`, `outputs` are properties of the endpoint object. I will use string descriptions to be safe.\n\n    *   **Error Codes:** Array of objects `{ code: string, description: string }`.\n    *   **Auth:** String e.g. \"Bearer Token\".\n\n    *   **Final check on Exclusions:**\n        *   No `field-service` endpoints.\n        *   No `hoA-voting` endpoints.\n        *   No `vanataca` endpoints.\n\n    *   **Component `cmp-security`:** Since it's a gateway, its endpoints are the entry points. I will define `POST /validate` and `GET /health`.\n\n    *   **Inputs/Outputs details:** I'll use string values for the JSON payloads to describe them.\n\n    Let's assemble.\n\n    Wait, one constraint: \"Produce [JC:API Definitions] for each Component's externally callable interfaces.\"\n    Component `cmp-security` is likely internal middleware. However, to satisfy the schema, I will define it as the Auth service that external apps call to check permissions or status.\n    Actually, usually `cmp-security` *protects* the others. But if I must define it, I'll define the Auth endpoints.\n\n    Let's ensure the `api_definitions` schema is followed:\n    `definitions`: array.\n    `component_id`: string.\n    `endpoints`: array of objects.\n    `path`, `method`, `inputs`, `outputs`, `error_codes`, `auth_requirement`.\n\n    I will ensure every endpoint has `auth_requirement`.\n\n    Okay, ready to generate.\n\n    Wait, I need to make sure the `error_codes` field is valid JSON. I will put it as an array.\n    I will put `inputs` and `outputs` as strings representing the JSON structure to avoid nesting issues in the parent JSON if the parent schema expects strings, or objects if it allows. Given the instruction \"matching the api_definitions schema\", I will assume `inputs` and `outputs` can be objects. I will use objects for clarity, as that is standard for API definitions. If the schema strictly expects strings for those fields, I'll use strings. Usually, in these tasks, objects are fine. I'll use objects.\n\n    Wait, \"REQUIRED OUTPUT: A JSON object matching the `api_definitions` schema\".\n    The schema provided in the prompt is descriptive: `definitions: array, each with: component_id, endpoints: array of {path, method, inputs, outputs, error_codes, auth_requirement}`.\n    It doesn't specify the type of `inputs` or `outputs` fields specifically (e.g. string vs object). I will use objects for `inputs` and `outputs` to define the shape.\n\n    Wait, the prompt says \"Include error codes for all failure scenarios\".\n    I'll create a standard set (e.g., 400, 401, 403, 404, 500, and domain specific).\n\n    Let's finalize the content.\n\n    *   `cmp-prop-data`:\n        *   `POST /assets`: Upload. Input: `AssetUploadRequest`. Output: `AssetUploadResponse`.\n        *   `GET /assets/{id}`: Get Asset.\n        *   `POST /sync/queue`: Sync Queue.\n    *   `cmp-provider-match`:\n        *   `GET /providers/search`: Search.\n        *   `GET /bids/compare/{id}`: Compare.\n    *   `cmp-compliance`:\n        *   `POST /extract/ccr`: Extract CCR.\n        *   `GET /deadlines`: Get Deadlines.\n    *   `cmp-workflow`:\n        *   `GET /actions`: List Actions.\n        *   `POST /actions/{id}/update`: Update Action.\n    *   `cmp-notifications`:\n        *   `POST /dispatch/batch`: Send Batch.\n        *   `GET /status/{id}`: Check Status.\n    *   `cmp-security`:\n        *   `POST /auth/validate`: Validate Token.\n        *   `GET /tenant/context`: Get Tenant Context.\n    *   `cmp-payment`:\n        *   `POST /payments/process`: Process Charge.\n        *   `GET /receipts/{id}`: Get Receipt.\n\n    All have `auth_requirement: \"Bearer Token Required\"`.\n    `error_codes`: Array of `{ code: number, description: string }`.\n\n    Double Check MVP Scope:\n    *   `cmp-payment`: Process deposits/fees (Stripe). Not full accounting.\n    *   `cmp-workflow`: Action Items only. No Field Service dispatch.\n    *   `cmp-compliance`: CC&R extraction, Statutory deadlines.\n    *   `cmp-prop-data`: Images, 3D Splats, Mobile sync.\n\n    Looks good.\n\n    One final check on `auth_requirement`. The rule is \"Every endpoint must have an explicit authentication requirement (Invariant: API-001)\".\n    I will set `auth_requirement` to a string like `\"Bearer Token (Required)\"`.\n\n    Let's construct the JSON.",
+  "captured_at": "2026-04-16T12:52:00.077Z",
+  "janumicode_version_sha": "dev",
+  "llm_provider": "ollama",
+  "llm_model": "qwen3.5:9b"
+}

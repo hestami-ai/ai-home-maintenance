@@ -1,0 +1,206 @@
+{
+  "match": "[JC:SYSTEM SCOPE]\nYou are the [JC:Test Design Agent] generating Test Case specifications for Sub-Pha",
+  "key": "test_design_agent__7_1__03",
+  "agent_role": "test_design_agent",
+  "sub_phase_id": "7.1",
+  "call_sequence": 3,
+  "prompt_context_payload": {
+    "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Test Design Agent] generating Test Case specifications for Sub-Phase 7.1.\n\nGOVERNING CONSTRAINTS (apply without exception):\n(none)\n\nGenerate structured [JC:Test Case] specifications for every [JC:Acceptance Criterion]. Test Cases are specifications — NOT code.\n\nREQUIRED OUTPUT: A JSON object matching the `test_plan` schema:\n- test_suites: array, each with:\n  - suite_id, component_id, test_type (unit|integration|end_to_end)\n  - test_cases: array, each with:\n    -"
+  },
+  "prompt_context_hash": "b396e0d90ba84579",
+  "text": "{\n  \"test_suites\": [\n    {\n      \"suite_id\": \"PROP-DATA-SUITE\",\n      \"component_id\": \"cmp-prop-data\",\n      \"test_type\": \"integration\",\n      \"test_cases\": [\n        {\n          \"test_case_id\": \"TC-PROP-001\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-001-1\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"API returns 200 OK within 5 seconds; asset indexed in vector store within 10 seconds post-upload.\"\n        },\n        {\n          \"test_case_id\": \"TC-PROP-002\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-001-2\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"System rejects non-.png/.jpg/.gltf files returning specific error code and displaying user-friendly rejection message.\"\n        },\n        {\n          \"test_case_id\": \"TC-PROP-003\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-008-1\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"App allows camera capture/text entry without network; data syncs successfully upon reconnection with no data loss.\"\n        }\n      ]\n    },\n    {\n      \"suite_id\": \"PROVIDER-MATCH-SUITE\",\n      \"component_id\": \"cmp-provider-match\",\n      \"test_type\": \"integration\",\n      \"test_cases\": [\n        {\n          \"test_case_id\": \"TC-PROV-001\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-002-1\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"AI response list displayed on screen within 300ms after query; top 5 providers listed with relevance scores.\"\n        },\n        {\n          \"test_case_id\": \"TC-PROV-002\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-002-2\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"Filter dropdown limits options to 'Home Real Property' categories only; no Pillar 2 (Financials) options appear.\"\n        },\n        {\n          \"test_case_id\": \"TC-PROV-003\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-003-1\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"Comparison table renders with 'Good-Better-Best' columns; minimum 3 bids displayed to render view.\"\n        }\n      ]\n    },\n    {\n      \"suite_id\": \"COMPLIANCE-SUITE\",\n      \"component_id\": \"cmp-compliance\",\n      \"test_type\": \"integration\",\n      \"test_cases\": [\n        {\n          \"test_case_id\": \"TC-COM-001\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-004-1\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"System generates 'Extracted Clauses' view containing text with >90% confidence score; highlights relevant sections.\"\n        },\n        {\n          \"test_case_id\": \"TC-COM-002\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-006-1\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"Email/SMS notification triggered 30 days before deadline date; user receives confirmation receipt acknowledgment.\"\n        },\n        {\n          \"test_case_id\": \"TC-COM-003\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-006-2\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"System saves notification payload to queue when offline; delivery attempts resume upon reconnection within 2 hours.\"\n        },\n        {\n          \"test_case_id\": \"TC-COM-004\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-007-1\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"Batch message processing completes within 2 minutes for 1,000 recipients; bounce rates tracked in dashboard.\"\n        }\n      ]\n    },\n    {\n      \"suite_id\": \"WORKFLOW-SUITE\",\n      \"component_id\": \"cmp-workflow\",\n      \"test_type\": \"integration\",\n      \"test_cases\": [\n        {\n          \"test_case_id\": \"TC-WORK-001\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-005-1\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"Workflow state transitions recorded in audit log every 100ms; status updates (Pending, In-Progress, Complete) reflect immediately in UI.\"\n        }\n      ]\n    },\n    {\n      \"suite_id\": \"SECURITY-SUITE\",\n      \"component_id\": \"cmp-security\",\n      \"test_type\": \"integration\",\n      \"test_cases\": [\n        {\n          \"test_case_id\": \"TC-SEC-001\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-009-1\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"Unauthorized access attempts (e.g., viewing Tenant B data while logged in as Tenant A user) return 403 Forbidden within 50ms.\"\n        }\n      ]\n    },\n    {\n      \"suite_id\": \"PAYMENT-SUITE\",\n      \"component_id\": \"cmp-payment\",\n      \"test_type\": \"integration\",\n      \"test_cases\": [\n        {\n          \"test_case_id\": \"TC-PAY-001\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-010-1\"\n          ],\n          \"preconditions\": [\n            \"System is in a stable operational state with database connection active\"\n          ],\n          \"expected_outcome\": \"Payment authorization response received within 5 seconds; receipt generated and emailed within 1 minute of confirmation.\"\n        }\n      ]\n    }\n  ]\n}",
+  "parsedJson": {
+    "test_suites": [
+      {
+        "suite_id": "PROP-DATA-SUITE",
+        "component_id": "cmp-prop-data",
+        "test_type": "integration",
+        "test_cases": [
+          {
+            "test_case_id": "TC-PROP-001",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-001-1"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "API returns 200 OK within 5 seconds; asset indexed in vector store within 10 seconds post-upload."
+          },
+          {
+            "test_case_id": "TC-PROP-002",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-001-2"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "System rejects non-.png/.jpg/.gltf files returning specific error code and displaying user-friendly rejection message."
+          },
+          {
+            "test_case_id": "TC-PROP-003",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-008-1"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "App allows camera capture/text entry without network; data syncs successfully upon reconnection with no data loss."
+          }
+        ]
+      },
+      {
+        "suite_id": "PROVIDER-MATCH-SUITE",
+        "component_id": "cmp-provider-match",
+        "test_type": "integration",
+        "test_cases": [
+          {
+            "test_case_id": "TC-PROV-001",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-002-1"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "AI response list displayed on screen within 300ms after query; top 5 providers listed with relevance scores."
+          },
+          {
+            "test_case_id": "TC-PROV-002",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-002-2"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "Filter dropdown limits options to 'Home Real Property' categories only; no Pillar 2 (Financials) options appear."
+          },
+          {
+            "test_case_id": "TC-PROV-003",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-003-1"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "Comparison table renders with 'Good-Better-Best' columns; minimum 3 bids displayed to render view."
+          }
+        ]
+      },
+      {
+        "suite_id": "COMPLIANCE-SUITE",
+        "component_id": "cmp-compliance",
+        "test_type": "integration",
+        "test_cases": [
+          {
+            "test_case_id": "TC-COM-001",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-004-1"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "System generates 'Extracted Clauses' view containing text with >90% confidence score; highlights relevant sections."
+          },
+          {
+            "test_case_id": "TC-COM-002",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-006-1"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "Email/SMS notification triggered 30 days before deadline date; user receives confirmation receipt acknowledgment."
+          },
+          {
+            "test_case_id": "TC-COM-003",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-006-2"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "System saves notification payload to queue when offline; delivery attempts resume upon reconnection within 2 hours."
+          },
+          {
+            "test_case_id": "TC-COM-004",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-007-1"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "Batch message processing completes within 2 minutes for 1,000 recipients; bounce rates tracked in dashboard."
+          }
+        ]
+      },
+      {
+        "suite_id": "WORKFLOW-SUITE",
+        "component_id": "cmp-workflow",
+        "test_type": "integration",
+        "test_cases": [
+          {
+            "test_case_id": "TC-WORK-001",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-005-1"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "Workflow state transitions recorded in audit log every 100ms; status updates (Pending, In-Progress, Complete) reflect immediately in UI."
+          }
+        ]
+      },
+      {
+        "suite_id": "SECURITY-SUITE",
+        "component_id": "cmp-security",
+        "test_type": "integration",
+        "test_cases": [
+          {
+            "test_case_id": "TC-SEC-001",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-009-1"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "Unauthorized access attempts (e.g., viewing Tenant B data while logged in as Tenant A user) return 403 Forbidden within 50ms."
+          }
+        ]
+      },
+      {
+        "suite_id": "PAYMENT-SUITE",
+        "component_id": "cmp-payment",
+        "test_type": "integration",
+        "test_cases": [
+          {
+            "test_case_id": "TC-PAY-001",
+            "type": "functional",
+            "acceptance_criterion_ids": [
+              "AC-010-1"
+            ],
+            "preconditions": [
+              "System is in a stable operational state with database connection active"
+            ],
+            "expected_outcome": "Payment authorization response received within 5 seconds; receipt generated and emailed within 1 minute of confirmation."
+          }
+        ]
+      }
+    ]
+  },
+  "thinking": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Role:** [JC:Test Design Agent]\n    *   **Task:** Generate Test Case specifications for Sub-Phase 7.1.\n    *   **Input:** Functional Requirements (10 User Stories with Acceptance Criteria), Implementation Plan (17 Tasks), Component Model (7 Components).\n    *   **Constraint:** Generate JSON object matching `test_plan` schema.\n    *   **Schema Requirements:**\n        *   `test_suites`: array\n        *   `test_cases` (inside suites): array\n        *   Each `test_case` must have: `test_case_id`, `type`, `acceptance_criterion_ids`, `preconditions` (at least one — Invariant), `expected_outcome`.\n        *   Every Acceptance Criterion must have at least one Test Case.\n        *   Every Test Case must have at least one precondition (Invariant).\n        *   Cover functional behavior only (no NFR coverage).\n        *   Test Cases are specifications, NOT code.\n    *   **Output Format:** JSON.\n\n2.  **Analyze the Input Data:**\n\n    *   **User Stories (US) & Acceptance Criteria (AC):**\n        *   US-001 (Critical): Upload (AC-001-1, AC-001-2). Component: `cmp-prop-data`.\n        *   US-002 (High): Search Providers (AC-002-1, AC-002-2). Component: `cmp-provider-match`.\n        *   US-003 (High): Compare Bids (AC-003-1). Component: `cmp-provider-match`.\n        *   US-004 (Medium): CC&R Extract (AC-004-1). Component: `cmp-compliance`.\n        *   US-005 (Critical): Workflow/Action Items (AC-005-1). Component: `cmp-workflow`.\n        *   US-006 (High): Alerts/Notifications (AC-006-1, AC-006-2). Component: `cmp-notifications`.\n        *   US-007 (Medium): Mass Email (AC-007-1). Component: `cmp-notifications`.\n        *   US-008 (High): Mobile Offline (AC-008-1). Component: `cmp-prop-data` (RSP-003).\n        *   US-009 (Critical): Security/Isolation (AC-009-1). Component: `cmp-security`.\n        *   US-010 (Medium): Payments (AC-010-1). Component: `cmp-payment`.\n\n    *   **Components:**\n        *   `cmp-prop-data` (Property Data)\n        *   `cmp-provider-match` (Provider Match)\n        *   `cmp-compliance` (Compliance)\n        *   `cmp-workflow` (Workflow)\n        *   `cmp-notifications` (Notifications)\n        *   `cmp-security` (Security)\n        *   `cmp-payment` (Payment)\n\n    *   **Test Types:** unit, integration, end_to_end.\n        *   Since these are functional requirements covering different components and interactions (upload, search, compare, workflow, security, payment), a mix is appropriate.\n        *   Unit tests often focus on logic within a component (e.g., format validation).\n        *   Integration tests focus on interactions (e.g., upload -> index).\n        *   End-to-end tests focus on user flows (e.g., full search to bid comparison).\n        *   However, given the constraint \"Functional Requirements\", integration and end_to_end are often more representative of ACs that involve multiple steps (like upload + index + search). Unit tests might be too low level for ACs like \"AI response list displayed\". Let's aim for a balanced approach: mostly integration for business logic, unit for specific validation, E2E for critical flows. To keep it clean and aligned with the ACs provided, I will group them by Component for `suite_id` or `suite_id` derived from US/Component logic. Let's use Component names as `component_id` and create suites based on logical grouping (e.g., Property Data Suite, Security Suite, etc.).\n\n3.  **Drafting Test Cases (Mapping ACs to Test Cases):**\n\n    *   **Suite 1: Property Data Management** (Component: `cmp-prop-data`)\n        *   US-001 AC-001-1 (Upload 200 OK, <5s, index <10s).\n        *   US-001 AC-001-2 (Reject bad formats).\n        *   US-008 AC-008-1 (Offline capture/sync).\n        *   *Test Case 1:* Upload valid PNG.\n        *   *Test Case 2:* Upload invalid JPG.\n        *   *Test Case 3:* Upload via offline mode.\n    *   **Suite 2: Security & Tenancy** (Component: `cmp-security`)\n        *   US-009 AC-009-1 (Unauthorized access 403).\n        *   *Test Case:* Cross-tenant data access.\n    *   **Suite 3: Provider Matching** (Component: `cmp-provider-match`)\n        *   US-002 AC-002-1 (Search latency, Top 5).\n        *   US-002 AC-002-2 (Filter categories).\n        *   US-003 AC-003-1 (Comparison table, min 3 bids).\n        *   *Test Case:* Search providers.\n        *   *Test Case:* Filter dropdown validation.\n        *   *Test Case:* Render comparison table.\n    *   **Suite 4: Compliance Engine** (Component: `cmp-compliance`)\n        *   US-004 AC-004-1 (Extract clauses >90% confidence).\n        *   *Test Case:* Extract text and highlight.\n        *   US-006 AC-006-1 (Email 30 days before).\n        *   US-006 AC-006-2 (Offline queue).\n        *   *Test Case:* Check deadline logic (Integration with Notification).\n        *   *Test Case:* Mass email batch (US-007 AC-007-1). (This overlaps with Notifications component, might need a separate suite or grouped).\n    *   **Suite 5: Workflow & Action Items** (Component: `cmp-workflow`)\n        *   US-005 AC-005-1 (Audit log, status UI update).\n        *   *Test Case:* Transition state and log check.\n    *   **Suite 6: Notifications** (Component: `cmp-notifications`)\n        *   US-006 AC-006-1 (Email trigger).\n        *   US-006 AC-006-2 (Retry logic).\n        *   US-007 AC-007-1 (Batch processing).\n        *   *Test Case:* Send alert confirmation.\n        *   *Test Case:* Retry mechanism.\n        *   *Test Case:* Batch processing.\n    *   **Suite 7: Payments** (Component: `cmp-payment`)\n        *   US-010 AC-010-1 (Auth response, receipt email).\n        *   *Test Case:* Process payment and receipt.\n\n    *   **Preconditions:** Every test case needs an invariant precondition.\n        *   Example: \"User is authenticated\", \"System is online\", \"Database is initialized\".\n        *   Let's use a standard system invariant: \"System is in a stable state prior to test execution\". Or specific to the component: \"User session active\", \"Database connection established\". I will use generic invariants like \"System is running\", \"Database connection is active\", \"User is authenticated (where applicable)\". The prompt says \"at least one — Invariant\". I'll use something robust like \"System resources are available\". Let's make it specific to the context: \"Application Server is running and connected to Database\".\n\n4.  **Constructing the JSON:**\n\n    *   Need to ensure `test_case_id`, `type`, `acceptance_criterion_ids`, `preconditions`, `expected_outcome`.\n    *   Grouping: I will group by Component for the `suite_id` to keep it organized.\n    *   Ensure all ACs are covered.\n\n    *   *Refining Test Case IDs:* TC-PROP-001, TC-SEC-001, etc.\n    *   *Refining AC IDs:* Use the provided AC IDs (e.g., AC-001-1).\n\n5.  **Review against Constraints:**\n    *   JSON object matching `test_plan` schema? Yes.\n    *   Every AC has at least one TC? Yes.\n    *   Every TC has at least one precondition (Invariant)? Yes.\n    *   Cover functional behavior only? Yes (no NFRs like performance metrics beyond the logic handling them, but AC-001-1 includes timing. That's a functional requirement constraint, usually treated as performance acceptance. I must include it in expected_outcome).\n    *   No code? Yes, descriptions only.\n\n6.  **Final Polish:**\n    *   Check that `acceptance_criterion_ids` is an array.\n    *   Check that `preconditions` is an array.\n    *   Check `test_type` values (unit, integration, end_to_end).\n    *   Ensure `suite_id` and `component_id` match the Component Model names (normalized to kebab-case).\n\n    *   *Mapping:*\n        *   US-001 -> cmp-prop-data (Suite: Property Data)\n        *   US-002, US-003 -> cmp-provider-match (Suite: Provider Matching)\n        *   US-004 -> cmp-compliance (Suite: Compliance Engine)\n        *   US-005 -> cmp-workflow (Suite: Action Workflow)\n        *   US-006, US-007 -> cmp-notifications (Suite: Notification Dispatcher)\n        *   US-008 -> cmp-prop-data (Integration into upload suite or separate? Let's group by component for cleanliness. US-008 affects `cmp-prop-data` RSP-003).\n        *   US-009 -> cmp-security (Suite: Security Gateway)\n        *   US-010 -> cmp-payment (Suite: Payment Processor)\n\n    *   *Wait, one nuance:* The Component Model lists `cmp-prop-data` and `cmp-security`.\n    *   I will create suites named after the components to keep the structure clear, or maybe suites named after the User Stories? The schema requires `suite_id`, `component_id`. Let's use `component_id` from the Component Model for consistency, and derive `suite_id` similarly.\n    *   Actually, usually `suite_id` groups test cases. Let's use `component_id` as the `suite_id` for simplicity, or a unique ID like \"US-001\". Let's use the Component ID for `component_id` and a descriptive name or the Component ID for `suite_id` to align.\n    *   Wait, `suite_id` and `component_id` are often related. Let's make `suite_id` unique (e.g., \"PROP-DATA-SUITE\") and `component_id` match the Component Model (e.g., \"cmp-prop-data\").\n    *   Actually, looking at the instruction: \"test_suites: array, each with: suite_id, component_id...\".\n    *   I will map each component to a suite.\n\n    *   *Preconditions:* Must be Invariant. \"Database connection is active\", \"Application Server is online\", \"Valid Session Token exists\".\n\n    *   *AC Coverage:*\n        *   AC-001-1 (Prop Data)\n        *   AC-001-2 (Prop Data)\n        *   AC-002-1 (Provider)\n        *   AC-002-2 (Provider)\n        *   AC-003-1 (Provider)\n        *   AC-004-1 (Compliance)\n        *   AC-005-1 (Workflow)\n        *   AC-006-1 (Notification)\n        *   AC-006-2 (Notification)\n        *   AC-007-1 (Notification)\n        *   AC-008-1 (Prop Data - Offline)\n        *   AC-009-1 (Security)\n        *   AC-010-1 (Payment)\n\n    *   *Test Case Count:*\n        *   Prop Data: 3 TCS (Upload Valid, Upload Invalid, Offline Sync).\n        *   Provider: 3 TCS (Search, Filter, Compare).\n        *   Compliance: 1 TC (Extract).\n        *   Workflow: 1 TC (State Log).\n        *   Notification: 3 TCS (Alert, Batch, Retry).\n        *   Security: 1 TC (Access Control).\n        *   Payment: 1 TC (Payment Auth).\n        *   Total: 13 TCS. This seems reasonable.\n\n    *   *Test Types:*\n        *   Unit: Format validation, Logic checks.\n        *   Integration: API calls, DB interactions.\n        *   End_to_end: Full user flow (e.g., Payment).\n        *   I'll distribute them. Since ACs describe system behavior (API responses, UI rendering), they lean towards Integration or E2E. However, \"Format validation\" is Unit. Let's make AC-001-2 (File rejection) a Unit or Integration (depends on endpoint). Let's call Upload/Validate Unit/Integration. Let's classify:\n            *   File Upload/Validation -> Integration (Backend API).\n            *   Search Latency -> Integration (API Response).\n            *   Security 403 -> Integration.\n            *   Payment -> Integration (Payment Gateway).\n            *   Offline/Queue -> Integration.\n            *   Let's use `integration` for most functional behaviors involving API endpoints or UI rendering. Let's use `unit` for specific logic validation like confidence scores or format checks in isolation. Let's use `end_to_end` for complex flows like Payment + Receipt.\n            *   To keep it simple but valid: Most ACs describe API/Response behavior -> Integration. Security -> Integration. Offline sync -> Integration.\n            *   I will use `integration` predominantly as these are system behavior specs. I'll sprinkle `unit` for specific logic assertions if they imply internal component testing, but ACs usually imply system acceptance. I will stick to `integration` for most, maybe `end_to_end` for US-010 and US-008.\n\n    *   Wait, checking constraint: \"Test Cases are specifications — NOT code.\"\n    *   Checking constraint: \"Every Acceptance Criterion must have at least one Test Case (Invariant)\".\n    *   Checking constraint: \"Every Test Case must have at least one precondition (Invariant)\".\n\n    *   Let's write the JSON.\n\n    *   *Precondition Invariant:* I will use \"System is in a stable operational state with connected database and authentication services.\"\n\n    *   *Component IDs:* cmp-prop-data, cmp-provider-match, cmp-compliance, cmp-workflow, cmp-notifications, cmp-security, cmp-payment.\n    *   *Suite IDs:* PROP-DATA-SUITE, PROVIDER-MATCH-SUITE, COMPLIANCE-SUITE, WORKFLOW-SUITE, NOTIFICATIONS-SUITE, SECURITY-SUITE, PAYMENT-SUITE.\n\n    *   *AC Mappings:*\n        *   PROP-DATA: AC-001-1, AC-001-2, AC-008-1.\n        *   PROVIDER-MATCH: AC-002-1, AC-002-2, AC-003-1.\n        *   COMPLIANCE: AC-004-1.\n        *   WORKFLOW: AC-005-1.\n        *   NOTIFICATIONS: AC-006-1, AC-006-2, AC-007-1.\n        *   SECURITY: AC-009-1.\n        *   PAYMENT: AC-010-1.\n\n    *   *Wait, US-005 AC-005-1 mentions audit log.* Component is `cmp-workflow`.\n    *   *US-007 AC-007-1:* Component `cmp-notifications`.\n    *   *US-006 AC-006-1:* Component `cmp-notifications` (payload/queue).\n    *   *US-006 AC-006-2:* Component `cmp-notifications` (retry).\n    *   Note: US-006 involves \"Statutory Deadlines\". This might link to `cmp-compliance` (RSP-007) which triggers notifications. However, the ACs are about the notification delivery and persistence. I'll put US-006 ACs under Notifications component suite as they describe delivery mechanics (Queue, Retry, Confirmation).\n    *   US-004 AC-004-1 (CC&R extraction) -> Compliance Component.\n\n    *   *Double Check:* AC-001-1 mentions \"assets indexed in < 10 seconds post-upload\". This involves `cmp-prop-data` (RSP-002). AC-001-1 covers Upload + Indexing.\n    *   AC-008-1 (Offline mobile). This involves `cmp-prop-data` (RSP-003).\n\n    *   Okay, ready to generate JSON.\n    *   Ensure strict JSON syntax (no trailing commas, proper escaping if needed).\n    *   Ensure all AC IDs match exactly.\n\n    *   *One detail:* `test_plan` schema isn't fully defined in the prompt, but inferred from the description. I will assume standard keys: `test_suites`, `test_cases`. Wait, schema description says: `test_suites: array, each with: suite_id, component_id, test_type...`. Wait, `test_type` is inside `suite`? The prompt says: \"test_suites: array, each with: suite_id, component_id, test_type (unit|integration|end_to_end), test_cases: array...\". Okay, `test_type` belongs to the suite level generally, or can be specific. Usually suites have a type. I will put a dominant type or a generic one, or allow per test case? The prompt says `test_type` is in the object with `suite_id`. I will assign a type to the suite (e.g., integration suite for functional). Or I can vary it? \"each with: ... test_type\". I will assign `integration` for functional suites mostly, or specific if needed. Let's assign `integration` to most as they verify API behaviors.\n\n    *   Wait, the prompt says: `test_suites: array, each with: - suite_id, component_id, test_type ... - test_cases: array ...`.\n    *   Okay, structure:\n        ```json\n        {\n          \"test_suites\": [\n            {\n              \"suite_id\": \"...\",\n              \"component_id\": \"...\",\n              \"test_type\": \"...\",\n              \"test_cases\": [\n                {\n                  \"test_case_id\": \"...\",\n                  \"type\": \"...\",\n                  \"acceptance_criterion_ids\": [\"...\"],\n                  \"preconditions\": [\"...\"],\n                  \"expected_outcome\": \"...\"\n                }\n              ]\n            }\n          ]\n        }\n        ```\n    *   Wait, `type` in `test_cases`? The prompt says `test_cases: array, each with: test_case_id, type, acceptance_criterion_ids, preconditions, expected_outcome`. So `test_case` has `type`. Does `suite` have `test_type`? Yes, the prompt says \"test_suites: array, each with: ... test_type ...\". Okay.\n    *   I will set suite `test_type` to match the dominant nature (Integration for API/Backend), but individual cases can be specific.\n    *   Actually, `test_case` `type` might be redundant with suite type, but I'll include it (e.g., \"functional\").\n    *   Precondition must be \"Invariant\". I will use a generic invariant string.\n\n    *   Let's check the number of ACs:\n        AC-001-1, AC-001-2 (2)\n        AC-002-1, AC-002-2 (2)\n        AC-003-1 (1)\n        AC-004-1 (1)\n        AC-005-1 (1)\n        AC-006-1, AC-006-2 (2)\n        AC-007-1 (1)\n        AC-008-1 (1)\n        AC-009-1 (1)\n        AC-010-1 (1)\n        Total 13 ACs.\n        I will create 13 test cases (or more if splitting, but 1:1 is efficient).\n        Let's stick to 1:1 to ensure coverage is clear.\n\n    *   Wait, one constraint: \"Every Acceptance Criterion must have at least one Test Case (Invariant)\".\n    *   And \"Every Test Case must have at least one precondition (Invariant)\".\n    *   I will use preconditions like \"System is in a stable operational state with database connection active\".\n\n    *   Ready.",
+  "captured_at": "2026-04-16T13:01:29.952Z",
+  "janumicode_version_sha": "dev",
+  "llm_provider": "ollama",
+  "llm_model": "qwen3.5:9b"
+}

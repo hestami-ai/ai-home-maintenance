@@ -22,13 +22,16 @@ import { BloomPruneCoordinator } from './bloomPruneCoordinator';
 import { LoopDetectionMonitor } from './loopDetectionMonitor';
 import { IngestionPipelineRunner } from './ingestionPipelineRunner';
 import { AgentInvoker } from './agentInvoker';
+import { createClaudeCodeParser, createGeminiCliParser } from '../cli/outputParser';
 import { LLMCaller } from '../llm/llmCaller';
 import { EventBus } from '../events/eventBus';
 import { DecisionTraceGenerator } from '../memory/decisionTraceGenerator';
 import { NarrativeMemoryGenerator } from '../memory/narrativeMemoryGenerator';
+import { DeepMemoryResearchAgent, type MaterialityWeights } from '../agents/deepMemoryResearch';
+import type { EmbeddingService } from '../embedding/embeddingService';
 import type { ConfigManager } from '../config/configManager';
 import type { PhaseId, WorkflowRun } from '../types/records';
-import { PHASE_NAMES } from '../types/records';
+import { PHASE_NAMES, PHASE_ORDER } from '../types/records';
 
 // ── Phase Handler Interface ─────────────────────────────────────────
 
@@ -51,7 +54,7 @@ export interface PhaseResult {
 
 // ── Decision Surface Types ──────────────────────────────────────────
 
-export type DecisionSurfaceType = 'mirror' | 'menu' | 'decision_bundle' | 'phase_gate';
+export type DecisionSurfaceType = 'mirror' | 'decision_bundle' | 'phase_gate';
 
 export interface DecisionResolution {
   type: string;
@@ -87,6 +90,8 @@ export class OrchestratorEngine {
   readonly eventBus: EventBus;
   readonly decisionTraceGenerator: DecisionTraceGenerator;
   readonly narrativeMemoryGenerator: NarrativeMemoryGenerator;
+  readonly deepMemoryResearch: DeepMemoryResearchAgent;
+  readonly workspacePath: string;
 
   private readonly phaseHandlers = new Map<PhaseId, PhaseHandler>();
   private readonly versionSha: string;
@@ -106,7 +111,7 @@ export class OrchestratorEngine {
    *                        tests that treat the repo root as both.
    */
   constructor(
-    private readonly db: Database,
+    readonly db: Database,
     private readonly configManager: ConfigManager,
     workspacePath: string,
     extensionPath: string = workspacePath,
@@ -151,6 +156,17 @@ export class OrchestratorEngine {
       idleTimeoutSeconds: config.cli_invocation.idle_timeout_seconds,
       bufferMaxEvents: config.cli_invocation.buffer_max_events,
     });
+    this.agentInvoker.setWriter(this.writer, this.versionSha);
+    // Register the built-in CLI output parsers so Phase 9's executor
+    // can actually spawn the coding agent. Previously these lived as
+    // factory functions that nothing called — the executor's invoke
+    // always failed with "No output parser registered for backing
+    // tool: claude_code_cli" on every task. Registering here (rather
+    // than in Phase 9) means any code path that dispatches through
+    // AgentInvoker — ExecutorAgent, EvalExecutionAgent, future Phase 9
+    // sub-agents — gets the parsers by default.
+    this.agentInvoker.registerOutputParser('claude_code_cli', createClaudeCodeParser());
+    this.agentInvoker.registerOutputParser('gemini_cli', createGeminiCliParser());
 
     this.eventBus = new EventBus();
 
@@ -159,6 +175,16 @@ export class OrchestratorEngine {
     // these to the webview as `addRecord` postMessage payloads.
     this.writer.setEventBus(this.eventBus);
 
+    // Connect the plain LLMCaller to the eventBus too. Phase handlers and
+    // DMR all use this caller (the priority caller is a Liaison-only
+    // thing); without wiring here, the webview's ActivityStrip would
+    // report "Idle" during the ~95% of the workflow where phase LLM calls
+    // are in flight.
+    this.llmCaller.setEventBus(this.eventBus);
+    // CLI agent invocations stream stdout/stderr chunks through the same
+    // eventBus → llm:stream_chunk channel as LLM calls.
+    this.agentInvoker.setEventBus(this.eventBus);
+
     this.decisionTraceGenerator = new DecisionTraceGenerator(db);
     this.narrativeMemoryGenerator = new NarrativeMemoryGenerator(this.llmCaller, this.templateLoader, {
       provider: 'ollama',
@@ -166,6 +192,49 @@ export class OrchestratorEngine {
       temperature: 0.3,
       janumiCodeVersionSha: this.versionSha,
     });
+
+    // Deep Memory Research Agent (§8.4) — always instantiated. Embedding
+    // service is optional and can be attached later via setEmbeddingService()
+    // so the engine can be constructed before the embedding backend is
+    // known to be healthy.
+    const dmrConfig = (config as unknown as Record<string, unknown>).deep_memory_research as
+      { materiality_weights?: MaterialityWeights } | undefined;
+    const weights: MaterialityWeights = dmrConfig?.materiality_weights ?? {
+      semantic_similarity: 0.20,
+      constraint_relevance: 0.25,
+      authority_level: 0.20,
+      temporal_recency: 0.15,
+      causal_relevance: 0.10,
+      contradiction_signal: 0.10,
+    };
+    this.deepMemoryResearch = new DeepMemoryResearchAgent(
+      db, this.llmCaller, weights,
+      { janumiCodeVersionSha: this.versionSha },
+      this.templateLoader,
+      undefined, // embedding service — attached later
+      this.writer,
+    );
+
+    this.workspacePath = workspacePath;
+  }
+
+  /**
+   * Attach an embedding service to the Deep Memory Research Agent. The
+   * agent can run without it (degraded semantic similarity) but attaching
+   * enables vector-based candidate harvest and similarity scoring.
+   */
+  setEmbeddingService(embedding: EmbeddingService): void {
+    const weights = (this.configManager.get() as unknown as Record<string, unknown>).deep_memory_research as
+      { materiality_weights: MaterialityWeights };
+    // Rebuild DMR with the embedding wired. This is idempotent.
+    (this as unknown as { deepMemoryResearch: DeepMemoryResearchAgent }).deepMemoryResearch =
+      new DeepMemoryResearchAgent(
+        this.db, this.llmCaller, weights.materiality_weights,
+        { janumiCodeVersionSha: this.versionSha },
+        this.templateLoader,
+        embedding,
+        this.writer,
+      );
   }
 
   // ── Phase Handler Registry ──────────────────────────────────────
@@ -225,6 +294,10 @@ export class OrchestratorEngine {
     return { run, trace };
   }
 
+  /** Number of phase executions currently in-flight. Used by quiescence detection. */
+  private _executingPhaseCount = 0;
+  get executingPhaseCount(): number { return this._executingPhaseCount; }
+
   /**
    * Execute the current phase of a workflow run.
    */
@@ -239,8 +312,27 @@ export class OrchestratorEngine {
       return { success: false, error: 'No current phase', artifactIds: [] };
     }
 
+    // Phase-limit gate. Also respected by the auto-advance block below,
+    // but enforcing it HERE catches the startWorkflow capability's
+    // fire-and-forget advance → executeCurrentPhase path too. Without
+    // this check, `--phase-limit 0` still runs Phase 1 because the
+    // Client Liaison's startWorkflow capability kicks it off regardless
+    // of the engine's own advance policy.
+    if (this.phaseLimit) {
+      const limitIdx = PHASE_ORDER.indexOf(this.phaseLimit);
+      const phaseIdx = PHASE_ORDER.indexOf(phaseId);
+      if (limitIdx >= 0 && phaseIdx > limitIdx) {
+        getLogger().info('workflow', 'Skipping phase execution (past phase-limit)', {
+          workflow_run_id: runId,
+          phase_id: phaseId,
+          phase_limit: this.phaseLimit,
+        });
+        return { success: true, artifactIds: [] };
+      }
+    }
+
     // Create or update trace context with current phase
-    const phaseTrace = trace 
+    const phaseTrace = trace
       ? { ...trace, phase_id: phaseId }
       : createTraceContext({ workflow_run_id: runId, phase_id: phaseId });
 
@@ -253,25 +345,63 @@ export class OrchestratorEngine {
       };
     }
 
-    this.eventBus.emit('phase:started', {
-      phaseId,
-      phaseName: PHASE_NAMES[phaseId] ?? phaseId,
-    });
-    getLogger().info('workflow', 'Phase started', { workflow_run_id: runId, phase_id: phaseId, phase_name: PHASE_NAMES[phaseId] }, phaseTrace);
-
-    const result = await handler.execute({ workflowRun: run, engine: this });
-
-    if (result.success) {
-      this.eventBus.emit('phase:completed', {
+    this._executingPhaseCount++;
+    try {
+      this.eventBus.emit('phase:started', {
         phaseId,
         phaseName: PHASE_NAMES[phaseId] ?? phaseId,
       });
-      getLogger().info('workflow', 'Phase completed', { workflow_run_id: runId, phase_id: phaseId, artifact_count: result.artifactIds.length }, phaseTrace);
-    } else {
-      getLogger().error('workflow', 'Phase failed', { workflow_run_id: runId, phase_id: phaseId, error: result.error }, phaseTrace);
-    }
+      getLogger().info('workflow', 'Phase started', { workflow_run_id: runId, phase_id: phaseId, phase_name: PHASE_NAMES[phaseId] }, phaseTrace);
 
-    return result;
+      const result = await handler.execute({ workflowRun: run, engine: this });
+
+      if (result.success) {
+        this.eventBus.emit('phase:completed', {
+          phaseId,
+          phaseName: PHASE_NAMES[phaseId] ?? phaseId,
+        });
+        getLogger().info('workflow', 'Phase completed', { workflow_run_id: runId, phase_id: phaseId, artifact_count: result.artifactIds.length }, phaseTrace);
+
+        // In auto-approve mode, chain to the next phase automatically.
+        // In normal (webview) mode, the DecisionRouter handles this when
+        // the human approves the phase gate. We await here (not fire-and-forget)
+        // so the full pipeline completes before the caller returns, which
+        // lets waitForQuiescence track in-flight LLM calls correctly.
+        // Skip Phase 0 — the ClientLiaisonAgent handles 0→1 advancement itself.
+        if (this.autoApproveDecisions && phaseId !== '0') {
+          // phaseLimit stops the chain AFTER the named phase completes,
+          // so the harness can capture phase-N fixtures + assertions in
+          // isolation instead of running the whole pipeline to phase 10.
+          if (this.phaseLimit && phaseId === this.phaseLimit) {
+            getLogger().info('workflow', 'Phase limit reached; halting auto-advance', {
+              workflow_run_id: runId,
+              phase_id: phaseId,
+              phase_limit: this.phaseLimit,
+            }, phaseTrace);
+          } else {
+            const idx = PHASE_ORDER.indexOf(phaseId);
+            if (idx >= 0 && idx < PHASE_ORDER.length - 1) {
+              const nextPhase = PHASE_ORDER[idx + 1];
+              if (this.phaseHandlers.has(nextPhase)) {
+                const advanced = this.advanceToNextPhase(runId, nextPhase);
+                if (advanced) {
+                  await this.executeCurrentPhase(runId, phaseTrace);
+                }
+              }
+            } else if (idx === PHASE_ORDER.length - 1) {
+              this.stateMachine.completeWorkflowRun(runId);
+              this.eventBus.emit('workflow:completed', { workflowRunId: runId });
+            }
+          }
+        }
+      } else {
+        getLogger().error('workflow', 'Phase failed', { workflow_run_id: runId, phase_id: phaseId, error: result.error }, phaseTrace);
+      }
+
+      return result;
+    } finally {
+      this._executingPhaseCount--;
+    }
   }
 
   /**
@@ -296,6 +426,42 @@ export class OrchestratorEngine {
   }
 
   /**
+   * Phase-limit: when set to a PhaseId, the engine's auto-advance loop
+   * stops after completing that phase even if `autoApproveDecisions` is
+   * true. Used by the test harness CLI's `--phase-limit N` so a coder
+   * can debug phase N in isolation (capture fixtures for phase N, assert
+   * against phase N contracts) without the engine sliding into phase
+   * N+1 and masking the signal.
+   *
+   * Null = no limit (default: run to completion).
+   */
+  private phaseLimit: PhaseId | null = null;
+  setPhaseLimit(phase: PhaseId | null): void {
+    this.phaseLimit = phase;
+  }
+  getPhaseLimit(): PhaseId | null { return this.phaseLimit; }
+
+  /**
+   * Per-sub-phase decision overrides, consumed by `pauseForDecision` in
+   * auto-approve mode. The key is a canonical sub-phase id (e.g. "1.3");
+   * the value is an `index_N` selector or a literal option_id. When the
+   * current sub-phase has an override, it wins over the default
+   * "accept-everything" synthesis, so a headless run can deterministically
+   * steer Phase 1's candidate picker (and any future menus) without a
+   * human in the loop.
+   *
+   * Empty map = default behavior (accept all mirror items, no menu
+   * picks). Set via `setDecisionOverrides` from `HeadlessLiaisonAdapter`.
+   */
+  private decisionOverrides: Map<string, string> = new Map();
+  setDecisionOverrides(overrides: Map<string, string>): void {
+    this.decisionOverrides = overrides;
+  }
+  getDecisionOverrideForSubPhase(subPhaseId: string): string | undefined {
+    return this.decisionOverrides.get(subPhaseId);
+  }
+
+  /**
    * Pause the current phase handler until a human decision arrives.
    * Resolves with the user's resolution when DecisionRouter calls
    * `resolveDecision(decisionId, ...)`.
@@ -310,12 +476,47 @@ export class OrchestratorEngine {
     surfaceType: DecisionSurfaceType,
   ): Promise<DecisionResolution> {
     if (this.autoApproveDecisions) {
-      const synthetic: DecisionResolution =
-        surfaceType === 'menu' || surfaceType === 'decision_bundle'
-          ? { type: 'menu_selection', payload: { selected: [] } }
-          : surfaceType === 'phase_gate'
-            ? { type: 'phase_gate_approval' }
-            : { type: 'mirror_approval' };
+      const run = this.stateMachine.getWorkflowRun(runId);
+      const currentSubPhase = run?.current_sub_phase_id ?? null;
+      const overrideSelection = currentSubPhase
+        ? this.decisionOverrides.get(currentSubPhase)
+        : undefined;
+
+      const synthetic = this.synthesizeResolution(
+        decisionId,
+        surfaceType,
+        overrideSelection,
+      );
+
+      // Write an attribution record so the audit trail (and the harness
+      // oracle) can distinguish a headless auto-approval from a human
+      // approval. Without this, the governed stream is silent at every
+      // decision point in auto-approve mode — the gap report can't tell
+      // whether a phase gate was actually approved or just skipped.
+      try {
+        this.writer.writeRecord({
+          record_type: 'decision_trace',
+          schema_version: '1.0',
+          workflow_run_id: runId,
+          phase_id: run?.current_phase_id ?? null,
+          sub_phase_id: currentSubPhase,
+          janumicode_version_sha: this.versionSha,
+          derived_from_record_ids: [decisionId],
+          content: {
+            decision_type: synthetic.type,
+            target_record_id: decisionId,
+            surface_type: surfaceType,
+            attribution: overrideSelection ? 'headless_override' : 'auto_approve',
+            auto_approved: !overrideSelection,
+            auto_approved_by: overrideSelection ? null : 'orchestrator_auto_approve',
+            override_selection: overrideSelection ?? null,
+            payload: synthetic.payload ?? {},
+          },
+        });
+      } catch {
+        // Best-effort — attribution must never block the resolution.
+      }
+
       this.eventBus.emit('decision:requested', { runId, decisionId, surfaceType });
       this.eventBus.emit('decision:resolved', { runId, decisionId, resolution: synthetic });
       return Promise.resolve(synthetic);
@@ -332,6 +533,114 @@ export class OrchestratorEngine {
       });
       this.eventBus.emit('decision:requested', { runId, decisionId, surfaceType });
     });
+  }
+
+  /**
+   * Translate the chosen surface + optional override into a concrete
+   * DecisionResolution. Extracted so `pauseForDecision` stays readable
+   * and the override wiring has one well-tested home.
+   *
+   * Supported override selectors:
+   *   - `index_N` / `N` / `option_N` — pick the Nth option from the
+   *     first menu in a `decision_bundle` (0-indexed).
+   *   - A literal option_id string — pick that option by id.
+   *   - `approve` / `accept` — explicit approval on a mirror or gate.
+   *   - `reject` — mirror_rejection on a mirror surface. Gate rejection
+   *     isn't a supported headless outcome (no downstream handler), so
+   *     a `reject` override on a phase_gate is ignored and falls back
+   *     to approval with a warning — the gap report surfaces the
+   *     mismatch anyway.
+   *
+   * When no override is provided, the legacy "accept everything / empty
+   * menu selections" default applies — matches pre-override behavior.
+   */
+  private synthesizeResolution(
+    decisionId: string,
+    surfaceType: DecisionSurfaceType,
+    overrideSelection: string | undefined,
+  ): DecisionResolution {
+    if (surfaceType === 'phase_gate') {
+      // Phase gates only have "approve" as a headless outcome today.
+      // Any override value collapses to approval.
+      return { type: 'phase_gate_approval' };
+    }
+
+    if (surfaceType === 'mirror') {
+      if (overrideSelection === 'reject' || overrideSelection === 'rejected') {
+        return { type: 'mirror_rejection', payload: { decisions: [] } };
+      }
+      return { type: 'mirror_approval' };
+    }
+
+    // decision_bundle
+    if (!overrideSelection) {
+      return {
+        type: 'decision_bundle_resolution',
+        payload: { mirror_decisions: [], menu_selections: [] },
+      };
+    }
+
+    // Resolve the override into an option_id by reading the presented
+    // bundle record. If the record isn't a bundle surface, fall through
+    // to the default empty payload rather than crashing — the override
+    // was addressed to a sub-phase that doesn't actually present a
+    // menu, so there's nothing to pick.
+    const optionId = this.resolveBundleOptionId(decisionId, overrideSelection);
+    if (!optionId) {
+      return {
+        type: 'decision_bundle_resolution',
+        payload: { mirror_decisions: [], menu_selections: [] },
+      };
+    }
+    return {
+      type: 'decision_bundle_resolution',
+      payload: {
+        mirror_decisions: [],
+        menu_selections: [{ option_id: optionId }],
+      },
+    };
+  }
+
+  /**
+   * Look up the decision_bundle_presented record by id and translate an
+   * override selector (index_N / literal option_id) into the concrete
+   * option_id on its first menu. Returns null when the record isn't a
+   * bundle, has no menu, or the index is out of range.
+   */
+  private resolveBundleOptionId(
+    bundleRecordId: string,
+    selection: string,
+  ): string | null {
+    let row: { content: string } | undefined;
+    try {
+      row = this.db.prepare(
+        `SELECT content FROM governed_stream
+         WHERE id = ? AND record_type = 'decision_bundle_presented'`,
+      ).get(bundleRecordId) as { content: string } | undefined;
+    } catch {
+      return null;
+    }
+    if (!row) return null;
+
+    interface BundleMenuOption { id: string; label?: string }
+    interface BundleContent {
+      menu?: { options?: BundleMenuOption[] };
+    }
+
+    let content: BundleContent;
+    try { content = JSON.parse(row.content) as BundleContent; }
+    catch { return null; }
+    const options = content.menu?.options;
+    if (!Array.isArray(options) || options.length === 0) return null;
+
+    const indexMatch = /^(?:index_|option_)?(\d+)$/.exec(selection);
+    if (indexMatch) {
+      const idx = Number.parseInt(indexMatch[1], 10);
+      return options[idx]?.id ?? null;
+    }
+    // Literal option_id: confirm it exists on this bundle; otherwise
+    // swallow silently so a typo doesn't pick the wrong row.
+    return options.find((o) => o.id === selection)?.id ?? null;
   }
 
   /**
@@ -433,6 +742,44 @@ export class OrchestratorEngine {
 
   get janumiCodeVersionSha(): string {
     return this.versionSha;
+  }
+
+  /**
+   * LLM routing config (§10). Phases that invoke LLMs for specific roles
+   * (Reasoning Review, Domain Compliance Review, etc.) read their
+   * provider/model from here rather than hardcoding. See also
+   * `validateLLMRouting()` for startup-time verification that all
+   * referenced providers are registered.
+   */
+  get llmRouting() {
+    return this.configManager.get().llm_routing;
+  }
+
+  /**
+   * Verify that every provider referenced by `llm_routing` in config is
+   * registered with the LLMCaller. Call this AFTER all providers have been
+   * registered (i.e. after test/CLI/extension bootstrap wires things up).
+   *
+   * Correctness-validation roles (Reasoning Review, Domain Compliance)
+   * cannot silently fall back without undermining the system's trust model.
+   * If validation fails, the engine logs fatal errors and throws — the
+   * caller must either register the missing provider or override the
+   * config before proceeding.
+   *
+   * @throws Error listing every missing provider when validation fails
+   */
+  validateLLMRouting(): void {
+    const registered = new Set(this.llmCaller.getRegisteredProviderNames());
+    const errors = this.configManager.validateLLMRouting(registered);
+    if (errors.length > 0) {
+      for (const e of errors) {
+        getLogger().error('activation', `LLM routing misconfiguration: ${e}`);
+      }
+      throw new Error(
+        `LLM routing misconfiguration — ${errors.length} provider(s) referenced by config ` +
+        `are not registered with the LLMCaller. See logs for details and remediation.`,
+      );
+    }
   }
 
   generateId(): string {

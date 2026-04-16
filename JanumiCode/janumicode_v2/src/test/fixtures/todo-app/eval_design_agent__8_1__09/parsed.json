@@ -1,0 +1,93 @@
+{
+  "functional_evaluation_plan": {
+    "criteria": [
+      {
+        "functional_requirement_id": "FR-001-HELP",
+        "evaluation_method": "Command Line Invocation",
+        "success_condition": "Invocation of script with '--help' flag displays usage instructions, version, and exit code 0 without errors."
+      },
+      {
+        "functional_requirement_id": "FR-002-VALIDATION",
+        "evaluation_method": "Input Stress Testing",
+        "success_condition": "Script rejects task names exceeding maximum length and specific invalid characters with a descriptive error message rather than generic failure."
+      },
+      {
+        "functional_requirement_id": "FR-003-STATUS",
+        "evaluation_method": "Output Inspection",
+        "success_condition": "View command correctly displays task status indicators (e.g., 'pending', 'done') as defined in the storage file format."
+      }
+    ]
+  },
+  "quality_evaluation_plan": {
+    "criteria": [
+      {
+        "nfr_id": "NFR-001",
+        "category": "Performance",
+        "evaluation_tool": "time command / perf",
+        "threshold": "< 200 milliseconds per operation",
+        "measurement_method": "Measure wall-clock time for 10 consecutive add/view/remove operations and calculate average.",
+        "fallback_if_tool_unavailable": "Manual stopwatch measurement for 5 operations; if average exceeds 200ms, mark as failed."
+      },
+      {
+        "nfr_id": "NFR-002",
+        "category": "Security",
+        "evaluation_tool": "bandit / semgrep",
+        "threshold": "0 vulnerabilities detected related to command injection or shell execution",
+        "measurement_method": "Run static analysis on the script source code; verify no unsafe shell calls found.",
+        "fallback_if_tool_unavailable": "Manual code review of all shell command invocations to ensure argument escaping."
+      },
+      {
+        "nfr_id": "NFR-003",
+        "category": "Security",
+        "evaluation_tool": "stat / ls -l",
+        "threshold": "File permissions must be 0600 or 0644 (owner read/write only)",
+        "measurement_method": "Execute 'stat -c %a tasks.txt' immediately after write operation.",
+        "fallback_if_tool_unavailable": "Manual inspection of file listing in terminal."
+      },
+      {
+        "nfr_id": "NFR-004",
+        "category": "Reliability",
+        "evaluation_tool": "stress-ng / custom crash simulator",
+        "threshold": "0 data loss across 1000 simulated crash scenarios",
+        "measurement_method": "Inject interrupts during write operations; verify file integrity post-recovery.",
+        "fallback_if_tool_unavailable": "Manual interruption simulation (Ctrl+C) followed by file checksum verification."
+      },
+      {
+        "nfr_id": "NFR-005",
+        "category": "Maintainability",
+        "evaluation_tool": "pylint / flake8",
+        "threshold": "0 warnings regarding missing docstrings or header comments",
+        "measurement_method": "Run linter on the script; check for header block and function docstrings.",
+        "fallback_if_tool_unavailable": "Manual review of code comments and header block."
+      },
+      {
+        "nfr_id": "NFR-006",
+        "category": "Accessibility",
+        "evaluation_tool": "Manual Inspection / Screen Reader",
+        "threshold": "Help flag output is clear, concise, and compatible with assistive technology",
+        "measurement_method": "Verify output is plain text and does not rely on visual-only elements.",
+        "fallback_if_tool_unavailable": "Manual verification of text output structure."
+      }
+    ]
+  },
+  "reasoning_evaluation_plan": {
+    "scenarios": [
+      {
+        "id": "R-001",
+        "description": "Verify input sanitization logic prevents shell metacharacters from executing unintended commands.",
+        "pass_criteria": "Input containing ';', '|', '&' results in sanitized output or rejection, not command execution."
+      },
+      {
+        "id": "R-002",
+        "description": "Verify atomic write logic ensures file consistency after power loss.",
+        "pass_criteria": "File state remains consistent (no partial writes) after simulated crash during write operation."
+      },
+      {
+        "id": "R-003",
+        "description": "Verify help flag output meets accessibility standards for screen readers.",
+        "pass_criteria": "Output structure is linear and semantic, allowing screen readers to parse usage information correctly."
+      }
+    ],
+    "ai_subsystems_detected": false
+  }
+}

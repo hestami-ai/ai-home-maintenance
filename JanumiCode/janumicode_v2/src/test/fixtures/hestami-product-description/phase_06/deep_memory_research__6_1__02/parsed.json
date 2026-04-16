@@ -1,0 +1,15 @@
+{
+  "decision_context_summary": "The governing directive [83fd7cad-f74c-4657-a228-68ca3bc6eacc] mandates the review of Hestami AI Real Property OS specifications [17bf4e80-42bd-4549-a0c2-7998dc63aa6e] and preparation for implementation. Produced artifacts include functional requirements [995c1ae7-4f6f-4f71-b447-048dcc870e15], system boundaries [b4069ff4-6d5f-4e24-ae33-3f0cae0df4d5], and software domains [c02cf0d4-d23c-42d5-b4d5-3f3429c96177]. A decision bundle [fb4ecd3a-4b12-476c-ad5a-0fa097959a84] was presented for interpretation review, identifying topic entities such as Consumer Discovery MVP and Property Data Ingestion within agent outputs [5fa1bcbe-5650-4cb4-a249-6a8b0fcce66e].",
+  "active_constraints": [],
+  "supersession_chains": [],
+  "contradictions": [],
+  "open_questions": [
+    {
+      "question": "Vector index coverage is 0% (0/165) — semantic similarity results may be incomplete.",
+      "still_unresolved": true,
+      "source_record_id": "83fd7cad-f74c-4657-a228-68ca3bc6eacc"
+    }
+  ],
+  "completeness_status": "incomplete_high",
+  "completeness_narrative": "The implementation mandate [83fd7cad-f74c-4657-a228-68ca3bc6eacc] and associated artifacts (functional requirements [995c1ae7-4f6f-4f71-b447-048dcc870e15], system boundaries [b4069ff4-6d5f-4e24-ae33-3f0cae0df4d5]) are present. However, the vector index coverage remains at 0%, limiting semantic search capabilities for the Consumer Discovery MVP [5fa1bcbe-5650-4cb4-a249-6a8b0fcce66e]."
+}

@@ -1,0 +1,176 @@
+{
+  "match": "[JC:SYSTEM SCOPE]\nYou are the [JC:Requirements Agent] performing Functional Requirements Bloom for S",
+  "key": "requirements_agent__2_1__03",
+  "agent_role": "requirements_agent",
+  "sub_phase_id": "2.1",
+  "call_sequence": 3,
+  "prompt_context_payload": {
+    "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Requirements Agent] performing Functional Requirements Bloom for Sub-Phase 2.1.\n\nGOVERNING CONSTRAINTS (apply without exception):\n(none)\n\nDerive complete, traceable [JC:Functional Requirements] from the [JC:Intent Statement]. Each requirement must be expressed as a [JC:User Story] with [JC:Acceptance Criteria].\n\nREQUIRED OUTPUT: A JSON object matching the `functional_requirements` schema:\n- user_stories: array of User Stories, each with:\n  - id: unique identifie"
+  },
+  "prompt_context_hash": "39f520962e8adb4a",
+  "text": "{\n  \"user_stories\": [\n    {\n      \"id\": \"US-001\",\n      \"role\": \"Individual Homeowner\",\n      \"action\": \"I want to upload property images and 3D asset data (Splats)\",\n      \"outcome\": \"so that the AI can analyze my property condition and identify needed services.\",\n      \"acceptance_criteria\": [\n        {\n          \"id\": \"AC-001-1\",\n          \"description\": \"System accepts and stores image/splat uploads for a specific property record.\",\n          \"measurable_condition\": \"Upload endpoint returns '200 OK' for files under 10MB within 5 seconds; assets indexed in < 10 seconds post-upload.\"\n        },\n        {\n          \"id\": \"AC-001-2\",\n          \"description\": \"System validates image format and storage location.\",\n          \"measurable_condition\": \"System rejects files not in .png/.jpg/.gltf formats with a specific error code and displays a user-friendly message.\"\n        }\n      ],\n      \"priority\": \"critical\"\n    },\n    {\n      \"id\": \"US-002\",\n      \"role\": \"Individual Homeowner\",\n      \"action\": \"I want to use the AI Agent to search for service providers\",\n      \"outcome\": \"so that I receive relevant contractor matches based on my property data.\",\n      \"acceptance_criteria\": [\n        {\n          \"id\": \"AC-002-1\",\n          \"description\": \"AI Agent returns a ranked list of providers matching uploaded property data.\",\n          \"measurable_condition\": \"AI response list displayed on screen within 300ms after query; top 5 providers listed with relevance scores.\"\n        },\n        {\n          \"id\": \"AC-002-2\",\n          \"description\": \"Search filters apply only to Pillar 1 service types.\",\n          \"measurable_condition\": \"Filter dropdown limits options to 'Home Real Property' categories only; no options from Pillar 2 (Financials) appear.\"\n        }\n      ],\n      \"priority\": \"high\"\n    },\n    {\n      \"id\": \"US-003\",\n      \"role\": \"Individual Homeowner\",\n      \"action\": \"I want to view and compare bid estimates from multiple providers.\",\n      \"outcome\": \"so that I can select the best value quote for my property repairs.\",\n      \"acceptance_criteria\": [\n        {\n          \"id\": \"AC-003-1\",\n          \"description\": \"Bid comparison table displays cost breakdown and scope.\",\n          \"measurable_condition\": \"Comparison table renders with 'Good-Better-Best' columns; minimum 3 bids must be displayed to render the comparison view.\"\n        }\n      ],\n      \"priority\": \"high\"\n    },\n    {\n      \"id\": \"US-004\",\n      \"role\": \"Individual Homeowner\",\n      \"action\": \"I want AI to extract and display CC&R and Bylaws information\",\n      \"outcome\": \"so that I am aware of property restrictions and compliance rules for my unit.\",\n      \"acceptance_criteria\": [\n        {\n          \"id\": \"AC-004-1\",\n          \"description\": \"AI extraction tool parses uploaded documents for regulatory text.\",\n          \"measurable_condition\": \"System generates an 'Extracted Clauses' view containing text with >90% confidence score; highlights relevant sections.\"\n        }\n      ],\n      \"priority\": \"medium\"\n    },\n    {\n      \"id\": \"US-005\",\n      \"role\": \"Hestami Staff\",\n      \"action\": \"I want to manage and track service action items across the platform\",\n      \"outcome\": \"so that I can replicate the 'System of Action' methodology for all property owners.\",\n      \"acceptance_criteria\": [\n        {\n          \"id\": \"AC-005-1\",\n          \"description\": \"Action items are queued in the workflow engine with timestamps.\",\n          \"measurable_condition\": \"Workflow state transitions recorded in audit log every 100ms; status updates (Pending, In-Progress, Complete) reflect immediately in UI.\"\n        }\n      ],\n      \"priority\": \"critical\"\n    },\n    {\n      \"id\": \"US-006\",\n      \"role\": \"Individual Homeowner\",\n      \"action\": \"I want to receive alerts about statutory deadlines for my property\",\n      \"outcome\": \"so that I can comply with legal notice requirements and avoid penalties.\",\n      \"acceptance_criteria\": [\n        {\n          \"id\": \"AC-006-1\",\n          \"description\": \"System sends notifications before statutory deadlines expire.\",\n          \"measurable_condition\": \"Email/SMS notification triggered 30 days before deadline date; user receives confirmation receipt acknowledgment.\"\n        },\n        {\n          \"id\": \"AC-006-2\",\n          \"description\": \"Notifications are queued for delivery during offline periods.\",\n          \"measurable_condition\": \"System saves notification payload to queue when offline; delivery attempts resume upon reconnection within 2 hours.\"\n        }\n      ],\n      \"priority\": \"high\"\n    },\n    {\n      \"id\": \"US-007\",\n      \"role\": \"Hestami Staff\",\n      \"action\": \"I want to send mass email/SMS for meeting notices and violation alerts\",\n      \"outcome\": \"so that I can efficiently communicate with owners regarding compliance issues.\",\n      \"acceptance_criteria\": [\n        {\n          \"id\": \"AC-007-1\",\n          \"description\": \"Bulk messaging tool sends domain-authorized emails.\",\n          \"measurable_condition\": \"Batch message processing completes within 2 minutes for 1,000 recipients; bounce rates tracked in dashboard.\"\n        }\n      ],\n      \"priority\": \"medium\"\n    },\n    {\n      \"id\": \"US-008\",\n      \"role\": \"Individual Homeowner\",\n      \"action\": \"I want to use the mobile app to verify data on-site\",\n      \"outcome\": \"so that I can upload evidence and manage tasks away from a desktop environment.\",\n      \"acceptance_criteria\": [\n        {\n          \"id\": \"AC-008-1\",\n          \"description\": \"Mobile app supports offline capture of data and media.\",\n          \"measurable_condition\": \"App allows camera capture and text entry without network; data syncs successfully upon reconnection with no data loss.\"\n        }\n      ],\n      \"priority\": \"high\"\n    },\n    {\n      \"id\": \"US-009\",\n      \"role\": \"Hestami Staff\",\n      \"action\": \"I want to access system functions while restricted by policy\",\n      \"outcome\": \"so that sensitive property data remains isolated between tenants and roles.\",\n      \"acceptance_criteria\": [\n        {\n          \"id\": \"AC-009-1\",\n          \"description\": \"System enforces Row-Level Security on database rows based on user role.\",\n          \"measurable_condition\": \"Unauthorized access attempts (e.g., viewing Tenant B data while logged in as Tenant A user) return '403 Forbidden' within 50ms.\"\n        }\n      ],\n      \"priority\": \"critical\"\n    },\n    {\n      \"id\": \"US-010\",\n      \"role\": \"Individual Homeowner\",\n      \"action\": \"I want to process payments for my deposits or service fees\",\n      \"outcome\": \"so that I can secure a booking or pay for repairs securely.\",\n      \"acceptance_criteria\": [\n        {\n          \"id\": \"AC-010-1\",\n          \"description\": \"Payment gateway integration captures funds securely.\",\n          \"measurable_condition\": \"Payment authorization response received within 5 seconds; receipt generated and emailed within 1 minute of confirmation.\"\n        }\n      ],\n      \"priority\": \"medium\"\n    }\n  ]\n}",
+  "parsedJson": {
+    "user_stories": [
+      {
+        "id": "US-001",
+        "role": "Individual Homeowner",
+        "action": "I want to upload property images and 3D asset data (Splats)",
+        "outcome": "so that the AI can analyze my property condition and identify needed services.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-001-1",
+            "description": "System accepts and stores image/splat uploads for a specific property record.",
+            "measurable_condition": "Upload endpoint returns '200 OK' for files under 10MB within 5 seconds; assets indexed in < 10 seconds post-upload."
+          },
+          {
+            "id": "AC-001-2",
+            "description": "System validates image format and storage location.",
+            "measurable_condition": "System rejects files not in .png/.jpg/.gltf formats with a specific error code and displays a user-friendly message."
+          }
+        ],
+        "priority": "critical"
+      },
+      {
+        "id": "US-002",
+        "role": "Individual Homeowner",
+        "action": "I want to use the AI Agent to search for service providers",
+        "outcome": "so that I receive relevant contractor matches based on my property data.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-002-1",
+            "description": "AI Agent returns a ranked list of providers matching uploaded property data.",
+            "measurable_condition": "AI response list displayed on screen within 300ms after query; top 5 providers listed with relevance scores."
+          },
+          {
+            "id": "AC-002-2",
+            "description": "Search filters apply only to Pillar 1 service types.",
+            "measurable_condition": "Filter dropdown limits options to 'Home Real Property' categories only; no options from Pillar 2 (Financials) appear."
+          }
+        ],
+        "priority": "high"
+      },
+      {
+        "id": "US-003",
+        "role": "Individual Homeowner",
+        "action": "I want to view and compare bid estimates from multiple providers.",
+        "outcome": "so that I can select the best value quote for my property repairs.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003-1",
+            "description": "Bid comparison table displays cost breakdown and scope.",
+            "measurable_condition": "Comparison table renders with 'Good-Better-Best' columns; minimum 3 bids must be displayed to render the comparison view."
+          }
+        ],
+        "priority": "high"
+      },
+      {
+        "id": "US-004",
+        "role": "Individual Homeowner",
+        "action": "I want AI to extract and display CC&R and Bylaws information",
+        "outcome": "so that I am aware of property restrictions and compliance rules for my unit.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-004-1",
+            "description": "AI extraction tool parses uploaded documents for regulatory text.",
+            "measurable_condition": "System generates an 'Extracted Clauses' view containing text with >90% confidence score; highlights relevant sections."
+          }
+        ],
+        "priority": "medium"
+      },
+      {
+        "id": "US-005",
+        "role": "Hestami Staff",
+        "action": "I want to manage and track service action items across the platform",
+        "outcome": "so that I can replicate the 'System of Action' methodology for all property owners.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-005-1",
+            "description": "Action items are queued in the workflow engine with timestamps.",
+            "measurable_condition": "Workflow state transitions recorded in audit log every 100ms; status updates (Pending, In-Progress, Complete) reflect immediately in UI."
+          }
+        ],
+        "priority": "critical"
+      },
+      {
+        "id": "US-006",
+        "role": "Individual Homeowner",
+        "action": "I want to receive alerts about statutory deadlines for my property",
+        "outcome": "so that I can comply with legal notice requirements and avoid penalties.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-006-1",
+            "description": "System sends notifications before statutory deadlines expire.",
+            "measurable_condition": "Email/SMS notification triggered 30 days before deadline date; user receives confirmation receipt acknowledgment."
+          },
+          {
+            "id": "AC-006-2",
+            "description": "Notifications are queued for delivery during offline periods.",
+            "measurable_condition": "System saves notification payload to queue when offline; delivery attempts resume upon reconnection within 2 hours."
+          }
+        ],
+        "priority": "high"
+      },
+      {
+        "id": "US-007",
+        "role": "Hestami Staff",
+        "action": "I want to send mass email/SMS for meeting notices and violation alerts",
+        "outcome": "so that I can efficiently communicate with owners regarding compliance issues.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-007-1",
+            "description": "Bulk messaging tool sends domain-authorized emails.",
+            "measurable_condition": "Batch message processing completes within 2 minutes for 1,000 recipients; bounce rates tracked in dashboard."
+          }
+        ],
+        "priority": "medium"
+      },
+      {
+        "id": "US-008",
+        "role": "Individual Homeowner",
+        "action": "I want to use the mobile app to verify data on-site",
+        "outcome": "so that I can upload evidence and manage tasks away from a desktop environment.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-008-1",
+            "description": "Mobile app supports offline capture of data and media.",
+            "measurable_condition": "App allows camera capture and text entry without network; data syncs successfully upon reconnection with no data loss."
+          }
+        ],
+        "priority": "high"
+      },
+      {
+        "id": "US-009",
+        "role": "Hestami Staff",
+        "action": "I want to access system functions while restricted by policy",
+        "outcome": "so that sensitive property data remains isolated between tenants and roles.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-009-1",
+            "description": "System enforces Row-Level Security on database rows based on user role.",
+            "measurable_condition": "Unauthorized access attempts (e.g., viewing Tenant B data while logged in as Tenant A user) return '403 Forbidden' within 50ms."
+          }
+        ],
+        "priority": "critical"
+      },
+      {
+        "id": "US-010",
+        "role": "Individual Homeowner",
+        "action": "I want to process payments for my deposits or service fees",
+        "outcome": "so that I can secure a booking or pay for repairs securely.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-010-1",
+            "description": "Payment gateway integration captures funds securely.",
+            "measurable_condition": "Payment authorization response received within 5 seconds; receipt generated and emailed within 1 minute of confirmation."
+          }
+        ],
+        "priority": "medium"
+      }
+    ]
+  },
+  "thinking": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Role:** [JC:Requirements Agent]\n    *   **Task:** Functional Requirements Bloom for Sub-Phase 2.1.\n    *   **Input:** [JC:Intent Statement], Governing Constraints, Context Summary (Intent, Assumptions, Constraints, Out of scope), and a reference to a detail file (which I cannot access directly, so I must rely on the provided text).\n    *   **Output Format:** JSON object matching a specific schema (`functional_requirements`).\n    *   **Schema Requirements:** `user_stories` array, each with `id`, `role`, `action`, `outcome`, `acceptance_criteria` (id, description, measurable_condition), `priority`.\n    *   **Constraints:**\n        *   Derive requirements *only* from the Intent Statement provided in the context summary.\n        *   Do NOT include Non-Functional Requirements (NFRs) like \"Must use SvelteKit\" -> these are implementation details/technical constraints, not functional user stories. However, the prompt says \"Do NOT include Non-Functional Requirements (those are Sub-Phase 2.2)\". I need to be careful here. The constraints list technical stack (SvelteKit, Bun, etc.). While the prompt says \"Do NOT include NFR\", often technical constraints manifest as functional capabilities (e.g., \"Offline capabilities\"). I should focus on *functional* behavior from a user perspective, derived from the intent. Technical constraints like \"Must use SvelteKit\" are implementation details, not functional requirements for the user story itself, but the *result* of those constraints (like \"Responsive Web Interface\") might be relevant if phrased correctly. However, strict interpretation says \"Do NOT include Non-Functional Requirements\". So, avoid \"System must use SvelteKit\". Focus on what the user sees/does.\n        *   Trace every User Story to a specific part of the Intent Statement.\n        *   Acceptance Criteria must be measurable.\n        *   Cover ALL functional aspects of the Intent Statement (Completeness shortcut).\n        *   MVP Focus: Consumer Discovery MVP (Phase 1 Focus) — Pillar 1 (Home Real Property Assistant).\n        *   Who it serves: Homeowners, Small landlords, Investors, Hestami Staff.\n        *   Problem: Finding contractors, comparing bids, managing follow-up/scheduling.\n        *   Key Functional Assumptions to cover: AI Agent discovery, Digital Asset ingestion (images/3D), Service provider matching, Action Items methodology, Statutory deadlines, Media storage, Payment capture (integration mentioned), CC&Rs extraction.\n        *   Out of Scope to avoid: Financials Pillar 2/3, Enterprise Governance, Field Service Engine, HOA Voting, Legacy Vantaca integration, Advanced AI beyond CC&Rs, Direct Contractor Portal (for V1), Real-time Bid Aggregation for non-homeowners.\n\n2.  **Deconstruct the Intent Statement:**\n    *   **Product:** Consumer Discovery MVP (Phase 1 Focus) — Implementation focused exclusively on Pillar 1 (Home Real Property Assistant).\n    *   **Users:** Individual homeowners, Small landlords, Property investors, Hestami Staff.\n    *   **Problem:** Wasting time finding contractors, comparing bids, managing follow-up.\n    *   **Core Functionality:**\n        *   AI Agent discovery experience (over manual directory).\n        *   Property data ingestion (images, 3D splats).\n        *   Service provider matching.\n        *   Action Items methodology (Replicate 'System of Action').\n        *   Statutory deadlines (Notice requirements).\n        *   Mass Email/SMS for notices.\n        *   Reserve Studies/Funding Plans (Domain 11) - *Wait, this is often associated with HOA/Financials (Pillar 3)*. The Intent says \"Pillar 1 (Home Real Property Assistant)\". Let's look at the assumptions.\n        *   Assumption 8: Integration with government services (Permits/BLDS) is critical for the ARC domain.\n        *   Assumption 10: AI extraction of documents (CC&Rs, Bylaws) is a core feature.\n        *   Assumption 13: Job Costing and Profitability are required immediately to attract contractors. *Wait, Out of Scope says \"Pillar 2 (Financials)\" implementation for this MVP*. However, Assumption 13 says \"Job Costing... required immediately\". This is conflicting. Let's look closer. Out of Scope: \"Pillar 2 (Financials) implementation for this MVP\", \"Job Costing and Profitability are required immediately to attract contractors\". Assumption 13 seems to imply a contractor-facing need, but Out of Scope says Financials are Pillar 2. If Job Costing is Vantaca model (Action Items), maybe that's Pillar 1 (Operations/Management). I will interpret Job Costing/Profitability as Contractor-facing data visibility which might be Pillar 1 (Home Real Property Assistant) functionality (managing property + jobs). But Out of Scope says \"Pillar 2 (Financials) implementation for this MVP\" is out. I need to respect Out of Scope. I will focus on Property Management/Matching, not accounting GLs. I will treat \"Job Costing\" carefully. Maybe just \"Track Job Progress\" functional, not GL posting.\n        *   Assumption 14: Offline mode with queueing.\n        *   Assumption 12: Mobile App is critical.\n    *   **Tech Constraints (to ignore as NFRs, but respect functional implications):** SvelteKit, Bun, DBOS, RLS, SeaweedFS, Cerbos, Traefik, FFmpeg, Stripe/Square.\n\n    *   **Refining the Scope:** The prompt specifically says \"Product: Consumer Discovery MVP (Phase 1 Focus) — Implementation focused exclusively on Pillar 1 (Home Real Property Assistant)\".\n    *   **Functional Areas:**\n        1.  User Registration/Onboarding (Homeowner/Staff).\n        2.  Property Discovery/Asset Upload (Images, 3D Splats).\n        3.  Service Provider Matching (AI Agent).\n        4.  Document Management (CC&Rs, Bylaws - AI Extraction).\n        5.  Task/Action Management (System of Action).\n        6.  Notification System (Email/SMS for notices).\n        7.  Staff Portal (Coordination).\n        8.  Compliance/Deadlines (Statutory deadlines).\n        9.  Media Processing (Video processing/Evidence).\n        10. Offline Capability (Queueing).\n\n    *   **Exclusions:** Pillar 2/3 Financials, HOA Voting, Field Service Engine, Legacy Vantaca integration (only replicate System of Action), Advanced AI, Contractor Portal, Non-homeowner Bid Aggregation.\n\n    *   **Reconciliation on \"Job Costing\":** Assumption 13 says \"Job Costing and Profitability are required immediately to attract contractors.\" But Out of Scope says \"Pillar 2 (Financials)...\". Usually, Job Costing is Financials. However, if it's for the \"Home Real Property Assistant\" (Homeowner side), maybe it's about *estimating* costs for repairs (Bid comparison). I will frame this as \"Estimate Comparison\" rather than \"General Ledger Accounting\". I will treat \"Job Costing\" as \"Cost Tracking per Job\" for the user (Homeowner) to see if the bid fits their budget, without hitting the Pillar 2 Financial GL scope. Or, I can acknowledge the conflict but prioritize Out of Scope for \"Financials\". Let's stick to the \"Property Discovery\" and \"Service Matching\" core.\n\n    *   **Reconciliation on \"Offsite/Offline\":** Out of Scope says \"Full offline-first capabilities for Homeowners (Secondary priority)\" but Assumption 12/14 say Mobile App is critical and Offline mode is needed. I will include *partial* offline support (queueing) as functional, not \"Full Offline\".\n\n    *   **Reconciliation on \"Financials\":** I must exclude \"Pillar 2 (Financials) implementation\". So no invoices, no GL, no accounting reports. But \"Payment capture (Stripe/Square)\" is in constraints. How do we handle payments without Pillar 2? Maybe just \"Store Payment Method\" or \"Capture Deposit\". Or perhaps the MVP is discovery *before* payment. I will focus on the \"Matching\" and \"Scheduling\" aspects.\n\n3.  **Drafting User Stories:**\n\n    *   *US-001: Property Onboarding.* Homeowner wants to upload property data so AI can analyze it. (Assumption 4, Intent).\n    *   *US-002: AI Discovery.* Homeowner wants AI to find contractors based on uploaded assets. (Assumption 1).\n    *   *US-003: Bid Comparison.* Homeowner wants to compare bids from matched providers. (Problem Statement).\n    *   *US-004: Document Review.* Homeowner wants AI to extract CC&R info. (Assumption 10).\n    *   *US-005: Task Management.* Homeowner wants to manage follow-ups/tasks. (Assumption 6).\n    *   *US-006: Notifications.* Homeowner wants to receive notices (Statutory). (Constraint/Assumption 7).\n    *   *US-007: Staff Coordination.* Staff want to queue requests for review. (Assumption 14/Staff role).\n    *   *US-008: Media Upload.* Homeowner wants to upload images/3D splats. (Intent).\n    *   *US-009: Compliance Checks.* System wants to warn about Statutory deadlines. (Constraint).\n    *   *US-010: Mobile Access.* Homeowner wants to use the app for mobile verification. (Assumption 12).\n\n    *   *Refining Criteria:* Make them measurable.\n        *   \"Upload Images\" -> \"System accepts jpg/png up to 10MB\", \"Thumbnail generation < 5s\".\n        *   \"AI Match\" -> \"Recommendation list displayed within 5s of query\", \"Top 5 providers listed\".\n        *   \"Offline Queue\" -> \"Changes saved locally\", \"Synced when connection restored\".\n        *   \"Deadlines\" -> \"Alert triggered 30 days before date\".\n        *   \"Extraction\" -> \"CC&R text extracted with >90% accuracy\".\n\n4.  **Constructing the JSON:**\n    *   Validate against schema: `user_stories` array.\n    *   Ensure no NFRs like \"Must use SvelteKit\" appear as acceptance criteria. (e.g., \"Responsive Design\" is NFR-ish, but \"View dashboard on mobile device\" is functional).\n    *   Ensure traceability to Intent/Assumptions.\n\n5.  **Review against Constraints:**\n    *   Do NOT include NFR. (Technical stack constraints are implementation, not functional requirements). I will focus on the *behavior* enabled by these constraints (e.g., \"Offline queueing\" is a functional feature).\n    *   Complete functional coverage.\n    *   JSON format.\n\n    *   *Self-Correction on \"Payment Capture\":* Constraint says \"Must integrate with Stripe/Square\". If it's Pillar 1 (Home Real Property), does it involve payments? Probably deposits or fees. If Pillar 2 is out of scope (Financials), does this conflict? Maybe it's \"Payment Link Generation\" rather than \"Accounting Ledger\". I will include a story about \"Secure Payment Processing for Deposits\" but ensure the acceptance criteria focuses on the transaction flow, not accounting logic.\n    *   *Self-Correction on \"Job Costing\":* If Pillar 2 is Financials, Job Costing is likely Pillar 2. Assumption 13 says it's required to attract contractors. This is tricky. Since Out of Scope says \"Pillar 2 (Financials) implementation for this MVP\", I should likely exclude GL-based costing. However, \"Estimates/Bids\" are functional. I will focus on \"Bid Comparison\" rather than \"Costing\". I will interpret Assumption 13 as \"Display Cost Estimates\" (Pillar 1) rather than \"Internal Costing\" (Pillar 2).\n\n    *   *Prioritization:* Critical/High for core discovery and safety/compliance. Medium for secondary features.\n    *   *Traceability:* I need to explicitly mention the Intent/Assumption in the thought process (hidden), but in the JSON output, I just need to make sure they cover the requirements.\n    *   *Measurement:* \"Response time < 200ms\", \"Upload < 5s\", \"Alert 30 days prior\".\n\n6.  **Final Polish:** Check JSON validity. Ensure all keys match the schema.\n\n    *   *Story 1 (Upload/Asset Ingestion)*: Trace to Intent \"property data ingestion (images, 3D splats)\" + Assumption 4.\n    *   *Story 2 (AI Discovery)*: Trace to Assumption 1 (\"AI Agent discovery\").\n    *   *Story 3 (Matching)*: Trace to Intent \"service provider matching\".\n    *   *Story 4 (Action Items)*: Trace to Assumption 6 (\"Replicate 'System of Action'\").\n    *   *Story 5 (Compliance)*: Trace to Constraint \"Statutory deadlines\".\n    *   *Story 6 (Notifications)*: Trace to Constraint \"Mass Email/SMS\".\n    *   *Story 7 (Offline)*: Trace to Assumption 14 \"Offline mode with queueing\".\n    *   *Story 8 (Mobile)*: Trace to Assumption 12.\n    *   *Story 9 (Document AI)*: Trace to Assumption 10.\n    *   *Story 10 (Permissions)*: Trace to Constraint \"Cerbos/RLS\".\n\n    Let's build the JSON content.\n\n    *   **Schema Check:**\n        ```json\n        {\n          \"user_stories\": [\n            {\n              \"id\": \"string\",\n              \"role\": \"string\",\n              \"action\": \"string\",\n              \"outcome\": \"string\",\n              \"acceptance_criteria\": [\n                { \"id\": \"string\", \"description\": \"string\", \"measurable_condition\": \"string\" }\n              ],\n              \"priority\": \"string\"\n            }\n          ]\n        }\n        ```\n\n    *   **Wait, one constraint:** \"Derive complete, traceable [JC:Functional Requirements] from the [JC:Intent Statement].\"\n    *   **Constraint:** \"Do NOT include Non-Functional Requirements (those are Sub-Phase 2.2)\".\n    *   **Constraint:** \"Cover ALL functional aspects of the Intent Statement — completeness_shortcut is a high-severity flaw\".\n\n    *   **Conflict Resolution:** The technical constraints (SvelteKit, Bun, etc.) are NFRs/Architecture. I must not list them as User Stories or AC. However, the *result* of those constraints must be in the stories.\n    *   Example: Constraint \"Must use DBOS for durable, versioned workflows\". Functional equivalent: \"Workflows persist and complete even if server restarts\". This is a Functional Requirement for Data Integrity/Reliability. But usually, \"Durable Workflows\" is NFR. I will focus on \"Track Status of Service Requests\" as the functional story.\n    *   Example: \"Offline mode with queueing\". This is functional. \"Save data locally\" is the AC.\n    *   Example: \"Statutory deadlines\". Functional. \"Show alert\".\n\n    *   **Roles:** Homeowners, Small landlords, Investors, Hestami Staff.\n    *   **Intent:** \"Consumer Discovery MVP\".\n    *   **Pillar 1:** Home Real Property Assistant.\n\n    Let's finalize the list.\n    1.  US-001: Property Asset Ingestion (Images/3D).\n    2.  US-002: AI Contractor Discovery.\n    3.  US-003: Bid/Proposal Comparison.\n    4.  US-004: Document AI (CC&Rs/Bylaws).\n    5.  US-005: Action Item Management (System of Action).\n    6.  US-006: Compliance Deadline Alerts (Statutory).\n    7.  US-007: Notification Delivery (Mass Email/SMS).\n    8.  US-008: Offline Capability (Queueing).\n    9.  US-009: Multi-tenant Isolation (Security).\n    10. US-010: Mobile Access for Field Use.\n\n    I need to ensure the JSON is valid and follows the prompt's instructions strictly.\n\n    *One detail:* \"Acceptance Criteria must be measurable\".\n    *   \"Uploads complete within 5 seconds for images under 10MB\".\n    *   \"AI matches returned within 3 seconds\".\n    *   \"Alerts sent at least 30 days before deadline\".\n    *   \"Offline edits synced upon reconnection within 2 hours\".\n    *   \"Access restricted based on Role (Staff vs Homeowner)\".\n\n    Let's write the JSON.",
+  "captured_at": "2026-04-16T00:03:59.057Z",
+  "janumicode_version_sha": "dev",
+  "llm_provider": "ollama",
+  "llm_model": "qwen3.5:9b"
+}

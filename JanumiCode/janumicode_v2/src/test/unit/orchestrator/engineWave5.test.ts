@@ -100,8 +100,8 @@ describe('OrchestratorEngine — Wave 5 extensions', () => {
       engine.setAutoApproveDecisions(true);
       const r1 = await engine.pauseForDecision('run-1', 'm1', 'mirror');
       expect(r1.type).toBe('mirror_approval');
-      const r2 = await engine.pauseForDecision('run-1', 'menu1', 'menu');
-      expect(r2.type).toBe('menu_selection');
+      const r2 = await engine.pauseForDecision('run-1', 'bundle1', 'decision_bundle');
+      expect(r2.type).toBe('decision_bundle_resolution');
       const r3 = await engine.pauseForDecision('run-1', 'gate1', 'phase_gate');
       expect(r3.type).toBe('phase_gate_approval');
     });

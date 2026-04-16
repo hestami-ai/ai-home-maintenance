@@ -1,0 +1,430 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Test Design Agent]
+    *   **Task:** Generate Test Case specifications for Sub-Phase 7.1.
+    *   **Input:** Functional Requirements (6 User Stories with Acceptance Criteria), Implementation Plan (7 Implementation Tasks), Component Model (3 Components).
+    *   **Output Format:** JSON object matching `test_plan` schema.
+    *   **Constraints:**
+        *   Test Cases are specifications, NOT code.
+        *   Every Acceptance Criterion (AC) must have at least one Test Case.
+        *   Every Test Case must have at least one precondition (Invariant).
+        *   Cover functional behavior only (no NFRs like performance, security, etc., unless specified in ACs).
+        *   JSON structure: `test_suites` -> `suite_id`, `component_id`, `test_type`, `test_cases` -> `test_case_id`, `type`, `acceptance_criterion_ids`, `preconditions`, `expected_outcome`.
+        *   Precondition must include at least one "Invariant".
+
+2.  **Analyze the Input Data:**
+
+    *   **User Stories (US) & Acceptance Criteria (AC):**
+        *   US-001 (Add Task): AC-001-01 (File line count +1), AC-001-02 (Exit code 0).
+        *   US-002 (List Tasks): AC-002-01 (Print lines excluding empty), AC-002-02 (Empty/missing file -> 'No tasks found', exit 0).
+        *   US-003 (Complete Task): AC-003-01 (Status = 'done'), AC-003-02 (Invalid ID -> Error, exit 1).
+        *   US-004 (Delete Task): AC-004-01 (Line removed), AC-004-02 (Invalid ID -> Error, exit 1).
+        *   US-005 (Init): AC-005-01 (File exists, >0 bytes), AC-005-02 (Exists -> exit 0, no mod).
+        *   US-006 (No External Libs): AC-006-01 (No imports), AC-006-02 (No sudo/apt). *Note: These are static analysis/behavioral checks, often integration or end-to-end depending on interpretation, but usually unit/integration for code structure.*
+
+    *   **Components:**
+        *   COMP-001: TaskStorageManager (Storage logic).
+        *   COMP-002: TaskCommandParser (CLI parsing).
+        *   COMP-003: TaskOutputWriter (Output formatting).
+
+    *   **Mapping AC to Components:**
+        *   AC-001-01, AC-001-02 -> COMP-001 (Storage) + COMP-002 (Parser) + COMP-003 (Output).
+        *   AC-002-01, AC-002-02 -> COMP-001 + COMP-003.
+        *   AC-003-01, AC-003-02 -> COMP-001.
+        *   AC-004-01, AC-004-02 -> COMP-001.
+        *   AC-005-01, AC-005-02 -> COMP-001.
+        *   AC-006-01, AC-006-02 -> COMP-001 (Code analysis) / System level.
+
+3.  **Drafting Test Cases (Mental or Scratchpad):**
+
+    *   *Suite 1: TaskStorageManager (COMP-001)*
+        *   TC-001 (Add): AC-001-01, AC-001-02. Precondition: File exists or init done.
+        *   TC-002 (List): AC-002-01, AC-002-02. Precondition: File exists (or not).
+        *   TC-003 (Complete): AC-003-01, AC-003-02. Precondition: Task exists.
+        *   TC-004 (Delete): AC-004-01, AC-004-02. Precondition: Task exists.
+        *   TC-005 (Init): AC-005-01, AC-005-02. Precondition: No file exists.
+        *   TC-006 (Code Check): AC-006-01, AC-006-02. Precondition: Source code available.
+
+    *   *Suite 2: TaskCommandParser (COMP-002)*
+        *   TC-007 (Parse Valid): AC-001-02 (Exit 0).
+        *   TC-008 (Parse Invalid): AC-003-02 (Exit 1).
+        *   *Actually, the schema asks for `component_id` per suite. I should group by Component for the `suite_id`.*
+
+    *   *Suite 3: TaskOutputWriter (COMP-003)*
+        *   TC-009 (Output List): AC-002-01.
+        *   TC-010 (Output Error): AC-003-02.
+
+    *   *Refinement on Test Types:*
+        *   Unit: COMP-001 internal logic (Add, Delete, Read, Write).
+        *   Integration: Interaction between Parser and Storage.
+        *   End-to-End: Full CLI flow (Init -> Add -> List -> Complete).
+
+    *   *Constraint Check:*
+        *   "Every Acceptance Criterion must have at least one Test Case".
+        *   "Every Test Case must have at least one precondition (Invariant)".
+        *   "Cover functional behavior only".
+
+    *   *Mapping AC to Test Cases:*
+        *   AC-001-01: Add task -> File count +1.
+        *   AC-001-02: Add task -> Exit 0.
+        *   AC-002-01: List -> Print lines.
+        *   AC-002-02: List empty -> Print 'No tasks found'.
+        *   AC-003-01: Complete -> Status 'done'.
+        *   AC-003-02: Complete invalid ID -> Error + Exit 1.
+        *   AC-004-01: Delete -> Line removed.
+        *   AC-004-02: Delete invalid ID -> Error + Exit 1.
+        *   AC-005-01: Init -> File exists >0 bytes.
+        *   AC-005-02: Init exists -> Exit 0 no mod.
+        *   AC-006-01: Static analysis -> No imports.
+        *   AC-006-02: No external cmds -> No sudo.
+
+    *   *Precondition Requirement:* "at least one — Invariant". I need to ensure `preconditions` field contains an "Invariant" type or text indicating an invariant state (e.g., "File exists", "File does not exist"). The prompt says "preconditions (at least one — Invariant)". I will interpret this as the precondition must describe an invariant state of the system (e.g., "Storage file exists", "Storage file does not exist").
+
+    *   *JSON Structure:*
+        ```json
+        {
+          "test_suites": [
+            {
+              "suite_id": "TS-001",
+              "component_id": "COMP-001",
+              "test_type": "unit",
+              "test_cases": [...]
+            },
+            ...
+          ]
+        }
+        ```
+
+4.  **Constructing the JSON:**
+
+    *   **Suite 1: COMP-001 (Storage)** - Unit/Integration mix. Let's make it Unit for storage logic.
+        *   TC-001: Add Task (AC-001-01, AC-001-02). Precond: File exists.
+        *   TC-002: List Tasks (AC-002-01, AC-002-02). Precond: File exists/empty.
+        *   TC-003: Complete Task (AC-003-01, AC-003-02). Precond: Task exists.
+        *   TC-004: Delete Task (AC-004-01, AC-004-02). Precond: Task exists.
+        *   TC-005: Init File (AC-005-01, AC-005-02). Precond: File missing.
+        *   TC-006: Code Static Analysis (AC-006-01, AC-006-02). Precond: Source available.
+
+    *   **Suite 2: COMP-002 (Parser)** - Integration (CLI to Storage).
+        *   TC-007: Parse Valid Args (AC-001-02, AC-002-02, AC-003-02, AC-004-02, AC-005-02). *Wait, ACs are specific to US. I should map ACs to the specific component responsible.*
+        *   Actually, AC-001-02 (Exit code) is a system behavior. AC-006 is code structure.
+        *   Let's group by Component ID in the `component_id` field of the suite.
+        *   COMP-002 is responsible for parsing. AC-006-01/02 are about the script itself (Python). AC-001-02/003-02/004-02 involve exit codes triggered by parsing/storage interaction.
+        *   To keep it clean, I will assign ACs to the component that primarily handles the logic described in the AC, or the component that owns the AC's functional requirement.
+        *   US-001 (Add) -> COMP-001 (Storage) + COMP-002 (Parser).
+        *   US-002 (List) -> COMP-001 (Storage) + COMP-003 (Output).
+        *   US-003 (Complete) -> COMP-001 (Storage).
+        *   US-004 (Delete) -> COMP-001 (Storage).
+        *   US-005 (Init) -> COMP-001 (Storage).
+        *   US-006 (Libs) -> COMP-001 (Code).
+
+        *   Let's create suites per Component.
+        *   **TS-001 (COMP-001)**: Storage Logic.
+            *   TC-001 (Add): AC-001-01, AC-001-02.
+            *   TC-002 (List): AC-002-01, AC-002-02.
+            *   TC-003 (Complete): AC-003-01, AC-003-02.
+            *   TC-004 (Delete): AC-004-01, AC-004-02.
+            *   TC-005 (Init): AC-005-01, AC-005-02.
+            *   TC-006 (Static): AC-006-01, AC-006-02.
+        *   **TS-002 (COMP-002)**: Parser Logic.
+            *   TC-007 (Valid Args): AC-001-02 (Exit 0 on success).
+            *   TC-008 (Invalid Args): AC-003-02, AC-004-02 (Exit 1 on error).
+        *   **TS-003 (COMP-003)**: Output Logic.
+            *   TC-009 (List Output): AC-002-01.
+            *   TC-010 (Error Output): AC-003-02, AC-004-02.
+
+        *   *Correction:* The prompt says "Every Acceptance Criterion must have at least one Test Case". It doesn't say every AC must be in a specific component suite, but the `component_id` in the suite implies ownership. I will distribute ACs to the most relevant component suite.
+        *   Also, `test_type` can be unit, integration, end_to_end.
+        *   COMP-001 is core logic -> Unit/Integration.
+        *   COMP-002/003 are I/O -> Integration/End-to-End.
+        *   Let's simplify: One suite per Component.
+        *   Precondition: Must be an "Invariant". Example: "File exists", "File does not exist", "Task ID valid".
+
+    *   **Refining Preconditions:**
+        *   The constraint says: "preconditions (at least one — Invariant)".
+        *   I will write preconditions like: "Storage file exists and is readable", "Storage file does not exist", "Task ID exists in storage".
+        *   I need to make sure the JSON is valid.
+
+    *   **Refining AC Mapping:**
+        *   AC-001-01 (Line count) -> COMP-001.
+        *   AC-001-02 (Exit 0) -> COMP-001/002.
+        *   AC-002-01 (Print lines) -> COMP-001/003.
+        *   AC-002-02 (Empty file) -> COMP-001.
+        *   AC-003-01 (Status done) -> COMP-001.
+        *   AC-003-02 (Invalid ID) -> COMP-001.
+        *   AC-004-01 (Line removed) -> COMP-001.
+        *   AC-004-02 (Invalid ID) -> COMP-001.
+        *   AC-005-01 (File created) -> COMP-001.
+        *   AC-005-02 (File exists) -> COMP-001.
+        *   AC-006-01 (No imports) -> COMP-001.
+        *   AC-006-02 (No sudo) -> COMP-001.
+
+        *   I will consolidate ACs into the Component that owns the logic.
+        *   COMP-001 owns Storage (AC-001-01, 002-01, 002-02, 003-01, 003-02, 004-01, 004-02, 005-01, 005-02, 006-01, 006-02).
+        *   COMP-002 owns Parsing (AC-001-02, 003-02, 004-02, 005-02).
+        *   COMP-003 owns Output (AC-002-01, 003-02, 004-02).
+        *   Wait, AC-001-02 is exit code. That's system behavior. I'll put it in COMP-001 suite as it's the main action.
+        *   Actually, to ensure coverage, I'll create specific test cases for each AC.
+        *   To avoid duplication, I'll group ACs by Component Suite.
+
+    *   **Plan:**
+        *   **TS-001 (COMP-001)**: Storage Operations.
+            *   TC-001: Add (AC-001-01, AC-001-02).
+            *   TC-002: List (AC-002-01, AC-002-02).
+            *   TC-003: Complete (AC-003-01, AC-003-02).
+            *   TC-004: Delete (AC-004-01, AC-004-02).
+            *   TC-005: Init (AC-005-01, AC-005-02).
+            *   TC-006: Static Analysis (AC-006-01, AC-006-02).
+        *   **TS-002 (COMP-002)**: Parsing Operations.
+            *   TC-007: Valid Args (AC-001-02, AC-002-02, AC-003-02, AC-004-02, AC-005-02). *Wait, AC-001-02 is already in TC-001. I should split ACs if they belong to different components.*
+            *   Better approach: Each AC gets its own Test Case or is grouped logically. The constraint says "Every Acceptance Criterion must have at least one Test Case". It doesn't forbid grouping.
+            *   However, to be precise, I will map ACs to the Component that implements the logic.
+            *   COMP-002 is Parser. It handles arguments. AC-001-02 (Exit 0) happens after parsing. AC-003-02 (Error) happens after parsing.
+            *   COMP-003 is Output. AC-002-01 (Print) happens after reading.
+            *   Let's create a Suite for COMP-001 (Storage), COMP-002 (Parser), COMP-003 (Output).
+            *   I will distribute the ACs to the most relevant component suite to ensure `component_id` matches the `suite_id` logic.
+            *   Actually, looking at the schema: `test_suites` -> `suite_id`, `component_id`.
+            *   I will create one suite per Component.
+            *   **TS-001 (COMP-001)**: Core Storage Logic.
+            *   **TS-002 (COMP-002)**: Argument Parsing Logic.
+            *   **TS-003 (COMP-003)**: Output Formatting Logic.
+
+            *   **Mapping ACs to Suites:**
+                *   **TS-001 (COMP-001)**:
+                    *   TC-001: AC-001-01 (File count).
+                    *   TC-002: AC-002-01 (Print lines).
+                    *   TC-003: AC-003-01 (Status done).
+                    *   TC-004: AC-004-01 (Line removed).
+                    *   TC-005: AC-005-01 (File created).
+                    *   TC-006: AC-006-01 (No imports).
+                    *   TC-007: AC-006-02 (No sudo).
+                    *   TC-008: AC-002-02 (Empty file message).
+                    *   TC-009: AC-003-02 (Error message).
+                    *   TC-010: AC-004-02 (Error message).
+                    *   TC-011: AC-001-02 (Exit 0).
+                    *   TC-012: AC-005-02 (Exit 0).
+                    *   TC-013: AC-003-02 (Exit 1).
+                    *   TC-014: AC-004-02 (Exit 1).
+                    *   *Wait, this is too fragmented.*
+                    *   Let's group ACs by functionality within the component suite.
+                    *   **TS-001 (COMP-001)**:
+                        *   TC-001: Add Task (AC-001-01, AC-001-02). Precond: File exists.
+                        *   TC-002: List Tasks (AC-002-01, AC-002-02). Precond: File exists.
+                        *   TC-003: Complete Task (AC-003-01, AC-003-02). Precond: Task exists.
+                        *   TC-004: Delete Task (AC-004-01, AC-004-02). Precond: Task exists.
+                        *   TC-005: Init File (AC-005-01, AC-005-02). Precond: File missing.
+                        *   TC-006: Static Analysis (AC-006-01, AC-006-02). Precond: Source available.
+                    *   **TS-002 (COMP-002)**:
+                        *   TC-007: Parse Valid (AC-001-02, AC-002-02, AC-003-02, AC-004-02, AC-005-02). *Wait, these are exit codes/messages.*
+                        *   Let's move Exit Codes and Messages to COMP-001 (System Behavior) or COMP-002 (Parser).
+                        *   Given the Component Model, COMP-002 is Parser. It validates inputs.
+                        *   Let's put AC-001-02, AC-003-02, AC-004-02, AC-005-02 in TS-002 (Parser) because they depend on argument validation.
+                        *   Let's put AC-002-01, AC-002-02 in TS-003 (Output) because they depend on rendering.
+                        *   Wait, AC-002-02 is "No tasks found". That's logic.
+                        *   Let's try to keep it simple.
+                        *   **TS-001 (COMP-001)**: Storage Logic.
+                            *   TC-001: AC-001-01 (Add).
+                            *   TC-002: AC-002-01 (List).
+                            *   TC-003: AC-003-01 (Complete).
+                            *   TC-004: AC-004-01 (Delete).
+                            *   TC-005: AC-005-01 (Init).
+                            *   TC-006: AC-006-01 (Static).
+                            *   TC-007: AC-006-02 (Static).
+                            *   TC-008: AC-002-02 (Empty).
+                            *   TC-009: AC-003-02 (Error).
+                            *   TC-010: AC-004-02 (Error).
+                            *   TC-011: AC-001-02 (Exit 0).
+                            *   TC-012: AC-005-02 (Exit 0).
+                            *   TC-013: AC-003-02 (Exit 1).
+                            *   TC-014: AC-004-02 (Exit 1).
+                        *   **TS-002 (COMP-002)**: Parser Logic.
+                            *   TC-015: AC-001-02 (Exit 0 on valid).
+                            *   TC-016: AC-003-02 (Exit 1 on invalid).
+                            *   TC-017: AC-004-02 (Exit 1 on invalid).
+                            *   TC-018: AC-005-02 (Exit 0 on exists).
+                        *   **TS-003 (COMP-003)**: Output Logic.
+                            *   TC-019: AC-002-01 (Print lines).
+                            *   TC-020: AC-002-02 (Print message).
+                            *   TC-021: AC-003-02 (Print error).
+                            *   TC-022: AC-004-02 (Print error).
+                        *   *Constraint Check:* "Every Acceptance Criterion must have at least one Test Case".
+                        *   "Every Test Case must have at least one precondition (Invariant)".
+                        *   I need to make sure I don't duplicate ACs in a way that violates the "at least one" rule (which is satisfied if I cover them).
+                        *   To avoid redundancy and keep the JSON clean, I will assign each AC to the Component Suite that owns the primary responsibility for that AC's logic.
+                        *   AC-001-01 (File count) -> COMP-001.
+                        *   AC-001-02 (Exit 0) -> COMP-002 (Parser validates success).
+                        *   AC-002-01 (Print) -> COMP-003.
+                        *   AC-002-02 (Empty) -> COMP-001.
+                        *   AC-003-01 (Status) -> COMP-001.
+                        *   AC-003-02 (Error) -> COMP-002 (Parser validates ID).
+                        *   AC-004-01 (Remove) -> COMP-001.
+                        *   AC-004-02 (Error) -> COMP-002.
+                        *   AC-005-01 (Create) -> COMP-001.
+                        *   AC-005-02 (Exists) -> COMP-001.
+                        *   AC-006-01 (Imports) -> COMP-001.
+                        *   AC-006-02 (Privileges) -> COMP-001.
+
+                        *   Wait, AC-001-02 is "Script returns exit code 0". This is system behavior. I'll put it in COMP-001 suite as it's the main action result.
+                        *   Let's consolidate.
+                        *   **TS-001 (COMP-001)**:
+                            *   TC-001: AC-001-01, AC-001-02.
+                            *   TC-002: AC-002-01, AC-002-02.
+                            *   TC-003: AC-003-01, AC-003-02.
+                            *   TC-004: AC-004-01, AC-004-02.
+                            *   TC-005: AC-005-01, AC-005-02.
+                            *   TC-006: AC-006-01, AC-006-02.
+                        *   **TS-002 (COMP-002)**:
+                            *   TC-007: AC-001-02 (Parser success).
+                            *   TC-008: AC-003-02 (Parser error).
+                            *   TC-009: AC-004-02 (Parser error).
+                            *   TC-010: AC-005-02 (Parser check).
+                        *   **TS-003 (COMP-003)**:
+                            *   TC-011: AC-002-01 (Output).
+                            *   TC-012: AC-002-02 (Output).
+                            *   TC-013: AC-003-02 (Output).
+                            *   TC-014: AC-004-02 (Output).
+                        *   *Problem:* AC-001-02 is in both TS-001 and TS-002. That's fine ("at least one").
+                        *   *Problem:* AC-002-01 is in TS-001 and TS-003.
+                        *   *Constraint:* "Every Acceptance Criterion must have at least one Test Case".
+                        *   I will ensure each AC is listed in at least one TC.
+                        *   I will group them by Component to keep `component_id` consistent.
+                        *   I will make sure `preconditions` contains "Invariant".
+
+    *   **Finalizing Preconditions:**
+        *   Must be "Invariant".
+        *   Examples: "Storage file exists", "Storage file does not exist", "Task ID is valid", "Task ID is invalid", "Source code is accessible".
+        *   I will use specific strings for preconditions.
+
+    *   **Finalizing JSON Structure:**
+        *   `test_suites`: List of objects.
+        *   Each object: `suite_id`, `component_id`, `test_type`, `test_cases`.
+        *   Each `test_case`: `test_case_id`, `type`, `acceptance_criterion_ids`, `preconditions`, `expected_outcome`.
+        *   `acceptance_criterion_ids`: Array of strings (e.g., ["AC-001-01"]).
+        *   `preconditions`: Array of strings (e.g., ["Storage file exists"]).
+
+    *   **Wait, one constraint:** "Every Acceptance Criterion must have at least one Test Case".
+    *   I need to make sure I don't miss any AC.
+    *   AC List:
+        *   AC-001-01
+        *   AC-001-02
+        *   AC-002-01
+        *   AC-002-02
+        *   AC-003-01
+        *   AC-003-02
+        *   AC-004-01
+        *   AC-004-02
+        *   AC-005-01
+        *   AC-005-02
+        *   AC-006-01
+        *   AC-006-02
+    *   Total 12 ACs.
+    *   I will create 12 Test Cases (or fewer if grouping is allowed, but grouping is safer for coverage).
+    *   Actually, grouping is better for "Test Case specifications". One TC can cover multiple ACs if they are related (e.g., AC-001-01 and AC-001-02 are both for Add Task).
+    *   I will group AC-001-01 and AC-001-02 into TC-001.
+    *   I will group AC-002-01 and AC-002-02 into TC-002.
+    *   I will group AC-003-01 and AC-003-02 into TC-003.
+    *   I will group AC-004-01 and AC-004-02 into TC-004.
+    *   I will group AC-005-01 and AC-005-02 into TC-005.
+    *   I will group AC-006-01 and AC-006-02 into TC-006.
+    *   This results in 6 Test Cases.
+    *   I need to assign them to Components.
+    *   COMP-001 (Storage) handles all storage logic.
+    *   COMP-002 (Parser) handles parsing logic.
+    *   COMP-003 (Output) handles output logic.
+    *   I will distribute the 6 TCs across the 3 Components.
+    *   TC-001 (Add) -> COMP-001.
+    *   TC-002 (List) -> COMP-001/003. Let's put in COMP-001.
+    *   TC-003 (Complete) -> COMP-001.
+    *   TC-004 (Delete) -> COMP-001.
+    *   TC-005 (Init) -> COMP-001.
+    *   TC-006 (Static) -> COMP-001.
+    *   This leaves COMP-002 and COMP-003 empty?
+    *   The prompt says "Generate structured [JC:Test Case] specifications for every [JC:Acceptance Criterion]".
+    *   It implies I should cover the ACs.
+    *   I should probably create suites for all components to show I considered them.
+    *   I will move some ACs to COMP-002/003 suites to ensure all components have test suites.
+    *   COMP-002 (Parser): AC-001-02 (Exit 0), AC-003-02 (Error), AC-004-02 (Error), AC-005-02 (Exists).
+    *   COMP-003 (Output): AC-002-01 (Print), AC-002-02 (Empty), AC-003-02 (Error), AC-004-02 (Error).
+    *   COMP-001 (Storage): AC-001-01 (Count), AC-003-01 (Status), AC-004-01 (Remove), AC-005-01 (Create), AC-006-01/02 (Static).
+    *   This ensures all ACs are covered and all components have suites.
+    *   Wait, AC-003-02 and AC-004-02 appear in both COMP-002 and COMP-003. That's fine.
+    *   I will consolidate to avoid redundancy but ensure coverage.
+    *   Actually, to be safe and clean, I will assign each AC to the *primary* component responsible.
+    *   COMP-001: AC-001-01, AC-003-01, AC-004-01, AC-005-01, AC-006-01, AC-006-02, AC-002-02.
+    *   COMP-002: AC-001-02, AC-003-02, AC-004-02, AC-005-02.
+    *   COMP-003: AC-002-01.
+    *   Wait, AC-002-02 is "If empty... prints 'No tasks found'". That's output. So COMP-003.
+    *   AC-003-02 "prints an error message". COMP-003.
+    *   AC-004-02 "prints an error message". COMP-003.
+    *   AC-001-02 "returns exit code". COMP-002 (Parser validates success).
+    *   AC-005-02 "exits with code 0". COMP-002.
+    *   Okay, I will distribute them.
+
+    *   **Revised Plan:**
+        *   **TS-001 (COMP-001)**: Storage Logic.
+            *   TC-001: AC-001-01 (Line count).
+            *   TC-002: AC-003-01 (Status update).
+            *   TC-003: AC-004-01 (Line removal).
+            *   TC-004: AC-005-01 (File creation).
+            *   TC-005: AC-006-01, AC-006-02 (Static).
+            *   TC-006: AC-002-02 (Empty file check).
+        *   **TS-002 (COMP-002)**: Parser Logic.
+            *   TC-007: AC-001-02 (Exit 0 success).
+            *   TC-008: AC-003-02 (Exit 1 error).
+            *   TC-009: AC-004-02 (Exit 1 error).
+            *   TC-010: AC-005-02 (Exit 0 exists).
+        *   **TS-003 (COMP-003)**: Output Logic.
+            *   TC-011: AC-002-01 (Print lines).
+            *   TC-012: AC-003-02 (Error message).
+            *   TC-013: AC-004-02 (Error message).
+            *   TC-014: AC-002-02 (No tasks found message).
+
+    *   Wait, AC-003-02 and AC-004-02 are duplicated in TS-002 and TS-003.
+    *   Constraint: "Every Acceptance Criterion must have at least one Test Case".
+    *   Duplicates are allowed as long as coverage is met.
+    *   However, to keep it clean, I'll assign them to the most logical component.
+    *   Exit codes are often system level, but Parser handles validation.
+    *   Output messages are Output Writer.
+    *   I will assign AC-003-02 and AC-004-02 to COMP-003 (Output) primarily, and COMP-002 (Parser) for the validation aspect?
+    *   Let's just assign them to the component that handles the *response*.
+    *   AC-003-02: "prints an error message". -> COMP-003.
+    *   AC-004-02: "prints an error message". -> COMP-003.
+    *   AC-001-02: "returns exit code". -> COMP-002 (Parser validates success).
+    *   AC-005-02: "exits with code". -> COMP-002.
+    *   AC-002-02: "prints 'No tasks found'". -> COMP-003.
+    *   AC-002-01: "prints every line". -> COMP-003.
+    *   AC-001-01: "line count increases". -> COMP-001.
+    *   AC-003-01: "contains status=done". -> COMP-001.
+    *   AC-004-01: "line no longer present". -> COMP-001.
+    *   AC-005-01: "file exists". -> COMP-001.
+    *   AC-006-01/02: "Static analysis". -> COMP-001.
+
+    *   This looks balanced.
+    *   I will ensure `preconditions` are "Invariant".
+    *   Example: "Storage file exists", "Storage file does not exist", "Task ID exists", "Task ID does not exist".
+    *   I will use these strings.
+
+5.  **Final Review of JSON:**
+    *   Check schema: `test_suites` array.
+    *   Check fields: `suite_id`, `component_id`, `test_type`, `test_cases`.
+    *   Check `test_cases`: `test_case_id`, `type`, `acceptance_criterion_ids`, `preconditions`, `expected_outcome`.
+    *   Check constraints: Every AC covered? Yes. Every TC has precondition? Yes.
+    *   Check `test_type`: unit, integration, end_to_end.
+        *   COMP-001: unit/integration.
+        *   COMP-002: unit/integration.
+        *   COMP-003: unit/integration.
+        *   I'll use "unit" for logic, "integration" for I/O.
+        *   Let's use "unit" for all to keep it simple, or "integration" for CLI flow.
+        *   Given "Functional Requirements", "unit" is safer for code logic, "integration" for CLI.
+        *   I'll use "integration" for the CLI commands (US-001 to US-005) and "unit" for Static Analysis (US-006).
+        *   Actually, the prompt says "Test Cases are specifications".
+        *   I'll use "integration" for the functional ACs and "unit" for the static analysis.
+        *   Wait, "unit|integration|end_to_end".
+        *   I'll use "integration" for the CLI commands (US-001 to US-005) as they involve multiple components (Parser, Storage, Output).
+        *   I'll use "unit" for Static Analysis (US-006) as it's code inspection.
+
+    *   **Wait, one more check:** "preconditions (at least one — Invariant)".
+    *   I will ensure the `preconditions` array contains at least one string that describes an invariant state (e.g., "Storage file exists").
+
+    *   **Let's write the JSON.**

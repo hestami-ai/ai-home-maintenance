@@ -1,0 +1,108 @@
+{
+  "params": [
+    {
+      "component_id": "COMP-001",
+      "name": "storage_file_path",
+      "type": "string",
+      "default": "./tasks.json",
+      "required": false,
+      "description": "The absolute or relative path to the text file used for persistent task storage."
+    },
+    {
+      "component_id": "COMP-001",
+      "name": "storage_file_format",
+      "type": "string",
+      "default": "jsonl",
+      "required": false,
+      "description": "The data serialization format for the storage file (e.g., jsonl, csv, tsv)."
+    },
+    {
+      "component_id": "COMP-001",
+      "name": "storage_permissions",
+      "type": "string",
+      "default": "0644",
+      "required": false,
+      "description": "The octal file permission mode set when creating or updating the storage file."
+    },
+    {
+      "component_id": "COMP-001",
+      "name": "backup_enabled",
+      "type": "boolean",
+      "default": false,
+      "required": false,
+      "description": "Whether to create a backup copy of the storage file before writing changes."
+    },
+    {
+      "component_id": "COMP-001",
+      "name": "backup_path",
+      "type": "string",
+      "default": "./backups",
+      "required": false,
+      "description": "The directory path where backup copies of the storage file are stored."
+    },
+    {
+      "component_id": "COMP-002",
+      "name": "argument_delimiter",
+      "type": "string",
+      "default": "space",
+      "required": false,
+      "description": "The character or sequence used to separate command line arguments during parsing."
+    },
+    {
+      "component_id": "COMP-002",
+      "name": "strict_mode",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "description": "Whether to fail execution immediately if an unknown or invalid command line argument is detected."
+    },
+    {
+      "component_id": "COMP-002",
+      "name": "input_encoding",
+      "type": "string",
+      "default": "utf-8",
+      "required": false,
+      "description": "The character encoding used for reading and writing text input and storage files."
+    },
+    {
+      "component_id": "COMP-002",
+      "name": "max_task_id_length",
+      "type": "integer",
+      "default": 36,
+      "required": false,
+      "description": "The maximum allowed length for a task identifier (UUID) to prevent buffer overflows."
+    },
+    {
+      "component_id": "COMP-003",
+      "name": "output_color_scheme",
+      "type": "string",
+      "default": "auto",
+      "required": false,
+      "description": "The terminal color scheme to use for output formatting (e.g., auto, monochrome, bright)."
+    },
+    {
+      "component_id": "COMP-003",
+      "name": "output_width",
+      "type": "integer",
+      "default": 80,
+      "required": false,
+      "description": "The maximum width in characters for formatted output lines before wrapping."
+    },
+    {
+      "component_id": "COMP-003",
+      "name": "timestamp_format",
+      "type": "string",
+      "default": "iso8601",
+      "required": false,
+      "description": "The string format pattern used to display timestamps in task records and output."
+    },
+    {
+      "component_id": "COMP-003",
+      "name": "verbose_mode",
+      "type": "boolean",
+      "default": false,
+      "required": false,
+      "description": "Whether to output detailed execution logs and intermediate processing steps to standard output."
+    }
+  ]
+}

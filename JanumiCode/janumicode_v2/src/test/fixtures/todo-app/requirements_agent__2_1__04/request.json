@@ -1,0 +1,15 @@
+{
+  "model": "qwen3.5:9b",
+  "provider": "ollama",
+  "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Requirements Agent] performing Functional Requirements Bloom for Sub-Phase 2.1.\n\nGOVERNING CONSTRAINTS (apply without exception):\nNo constraints\n\nDerive complete, traceable [JC:Functional Requirements] from the [JC:Intent Statement]. Each requirement must be expressed as a [JC:User Story] with [JC:Acceptance Criteria].\n\nREQUIRED OUTPUT: A JSON object matching the `functional_requirements` schema:\n- user_stories: array of User Stories, each with:\n  - id: unique identifier (e.g., \"US-001\")\n  - role: who benefits (\"As a [role]\")\n  - action: what they want (\"I want [action]\")\n  - outcome: why (\"so that [outcome]\")\n  - acceptance_criteria: array with at least one criterion, each having:\n    - id, description, measurable_condition (specific, verifiable)\n  - priority: critical | high | medium | low\n\nRules:\n- Every User Story must trace to a specific part of the Intent Statement\n- Acceptance Criteria must be measurable — not subjective (\"response time < 200ms\", not \"fast\")\n- Do NOT include Non-Functional Requirements (those are Sub-Phase 2.2)\n- Cover ALL functional aspects of the Intent Statement — completeness_shortcut is a high-severity flaw\n\nCONTEXT SUMMARY:\nIntent Statement: Local-First Binary: A self-contained CLI application that stores tasks locally on the user's machine using file-based storage, prioritizing speed and offline reliability without requiring network connectivity.\nCompliance: No compliance regimes\n\nDETAIL FILE:\nComplete supporting context at: /dev/null",
+  "system": null,
+  "responseFormat": "json",
+  "temperature": 0.5,
+  "traceContext": {
+    "workflowRunId": "40c2ffbf-0a40-4776-beef-4387389a3658",
+    "phaseId": "2",
+    "subPhaseId": "2.1",
+    "agentRole": "requirements_agent",
+    "label": "Phase 2.1 — Functional Requirements Bloom"
+  }
+}

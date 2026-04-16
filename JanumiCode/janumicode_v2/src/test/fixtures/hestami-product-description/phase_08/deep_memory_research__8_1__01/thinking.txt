@@ -1,0 +1,207 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Deep Memory Research Agent] performing Stage 1 — Query Decomposition.
+    *   **Task:** Transform the retrieval query into structured retrieval targets for the Governed Stream search.
+    *   **Input Query:** "Evaluation design for test plan and NFRs: 12 NFRs: NFR-001 [performance]: The Bun-based API backend must maintain low-latency responses for search and asset queries to ensure the 'AI Agent' discovery experience remains responsive. — threshold: P95 API latency must not exceed 200ms for search queries and asset retrieval endpoints. NFR-002 [performance]: Media ingestion endpoints using SeaweedFS must sustain high throughput during concu..." (Note: The query is cut off, but I must work with what's provided).
+    *   **Input Scope:** `all_runs`
+    *   **Requesting Agent:** `eval_design_agent`
+    *   **Required Output Format:** JSON with specific keys: `topic_entities`, `decision_types_sought`, `temporal_scope`, `authority_levels_included`, `sources_in_scope`.
+    *   **Rules:**
+        *   Extract concrete entities.
+        *   `decision_types_sought` matches historical context needed.
+        *   `authority_levels_included`: Always include 5+ (Human-Approved); include lower levels (e.g., 4, 3) only if exploratory/agent-generated. Given this is an "Evaluation design" for a test plan, it likely needs approved standards, past test plans, or architecture decisions, so authority level 5+ is safest unless specified otherwise. However, the rule says "always include 5+... include lower levels only if...". I should stick to 5+ for formal design docs unless the query asks about draft ideas.
+        *   `sources_in_scope`: Depends on `scope_tier`. Input says `Scope: all_runs`. So `governed_stream_all_runs`.
+
+2.  **Analyze the Query Content:**
+    *   **Subject:** Evaluation design for test plan and Non-Functional Requirements (NFRs).
+    *   **Specific NFRs:**
+        *   NFR-001: Performance (Bun-based API backend, search/asset queries, AI Agent discovery, P95 latency <= 200ms).
+        *   NFR-002: Performance (Media ingestion, SeaweedFS, throughput, concurrency - text cuts off but implies concurrency).
+    *   **Key Concepts:** Test Plan, NFRs, Bun, API Backend, AI Agent, Search, Asset Queries, P95 Latency, SeaweedFS, Media Ingestion, Throughput.
+
+3.  **Determine JSON Fields:**
+
+    *   `topic_entities`:
+        *   Need to extract concrete nouns/concepts from the query.
+        *   Candidates: "Test Plan", "NFRs", "NFR-001", "NFR-002", "Bun-based API backend", "AI Agent", "SeaweedFS", "Media ingestion endpoints", "Search queries", "Asset retrieval endpoints".
+        *   Refinement: Keep it to distinct entities/concepts. "Test Plan", "Non-Functional Requirements", "NFR-001", "NFR-002", "Bun", "API Backend", "AI Agent", "SeaweedFS", "Media Ingestion".
+    *   `decision_types_sought`:
+        *   What kind of historical context is needed? It's an "Evaluation design". The agent needs to look at past decisions, architecture standards, performance baselines, or approved test strategies.
+        *   Options given in schema example: `menu_selection`, `mirror_approval`, `phase_gate_approval`.
+        *   Context: Usually, when designing a test plan and NFRs for a system, you look for previous architectural decisions, performance standards, or approved specifications.
+        *   "Phase_gate_approval" seems most relevant for design specs and NFR sign-offs. "Mirror_approval" could mean looking at mirrored decisions from other projects. Let's select `phase_gate_approval` (for design sign-off) and potentially `mirror_approval` (for cross-project standards). Since the query asks for "Evaluation design", it implies validating against past standards or getting approval on the design. `phase_gate_approval` is strong.
+    *   `temporal_scope`:
+        *   Query doesn't specify a date.
+        *   Rule: `Scope: all_runs` is given in the input block.
+        *   However, the output schema requires `temporal_scope` object. Usually, `all_runs` implies no specific date restriction, but the schema asks for `from` and `to`.
+        *   If `Scope` is `all_runs`, the temporal scope should effectively cover the entire history available. I should probably use ISO dates representing the beginning and end of the dataset, or leave them generic if I don't know the system date.
+        *   Wait, the input block says `Scope: all_runs`. The output schema requires specific dates. Since I am an AI and don't have the actual system dates, I need to infer or use placeholders that make sense in the context of "all_runs". Often, `temporal_scope` defaults to the lifecycle of the project if `all_runs` is set.
+        *   Standard practice for "all_runs" in this context (assuming a continuous stream) might be `"from": "1970-01-01T00:00:00Z", "to": "9999-12-31T23:59:59Z"` or similar, OR I need to check if there's an implicit date range. Since I cannot know the actual system dates, I should look for clues. There are none. However, strict adherence to schema usually requires valid ISO dates. I will use a broad range to satisfy "all_runs".
+        *   Actually, looking at the instruction `sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs`. This applies to `sources_in_scope`.
+        *   For `temporal_scope`: If `all_runs` is the scope, I should probably indicate the full history. I will use `"from": "0001-01-01T00:00:00Z", "to": "9999-12-31T23:59:59Z"` to denote "all time" or simply the max history. Let's assume the "all_runs" implies retrieving from the start of the repository.
+        *   Wait, I need to be careful. The prompt asks me to *perform* the decomposition. I need to output valid JSON. I will set a broad range.
+        *   Correction: Often in these agent tasks, if `all_runs` is specified, the temporal scope is open-ended. But JSON requires strings. I'll use `"from": "1970-01-01T00:00:00Z", "to": "2030-12-31T23:59:59Z"` or similar broad range.
+    *   `authority_levels_included`:
+        *   Rule: "always include 5+ (Human-Approved and above); include lower levels only if the query asks about exploratory or agent-generated content".
+        *   Query: "Evaluation design for test plan". This implies formal design documents, standards, and requirements. These are typically Human-Approved (Level 5). It does not explicitly ask for agent drafts.
+        *   So: `[5, 6, 7]`.
+    *   `sources_in_scope`:
+        *   Rule: `scope_tier` is `all_runs`.
+        *   Rule: `all_runs` → `governed_stream_all_runs`.
+        *   Input says `Scope: all_runs`.
+        *   So: `["governed_stream_all_runs"]`.
+
+4.  **Refine `topic_entities`**:
+    *   From the text: "test plan", "NFRs", "NFR-001", "NFR-002", "Bun-based API backend", "Bun", "AI Agent", "Search queries", "Asset retrieval endpoints", "SeaweedFS", "Media ingestion endpoints".
+    *   Let's group them logically.
+    *   ["Test Plan", "Non-Functional Requirements", "NFR-001", "NFR-002", "Bun-based API backend", "AI Agent", "Search Queries", "Asset Retrieval Endpoints", "SeaweedFS", "Media Ingestion Endpoints", "Latency Thresholds", "Throughput"]
+
+5.  **Refine `decision_types_sought`**:
+    *   What do we need? We are designing an evaluation. We likely need to see past performance standards, architecture decisions, and approved requirements.
+    *   `phase_gate_approval`: Relevant for approved specs.
+    *   `mirror_approval`: Maybe relevant if looking at similar projects' standards.
+    *   Let's stick to `phase_gate_approval` as it fits "Evaluation design".
+    *   Maybe `menu_selection` isn't appropriate (that's for UI decisions usually).
+    *   Let's select `phase_gate_approval`.
+
+6.  **Refine `temporal_scope`**:
+    *   Since `Scope: all_runs`, I will indicate the full available history.
+    *   `from`: "1970-01-01T00:00:00Z" (Standard epoch) or "2000-01-01T00:00:00Z".
+    *   `to`: "9999-12-31T23:59:59Z".
+    *   Wait, is there a specific context for the dates? Usually, "all_runs" means retrieve everything available. I will use the widest reasonable ISO range.
+
+7.  **Refine `authority_levels_included`**:
+    *   `[5, 6, 7]` (Human-Approved).
+
+8.  **Refine `sources_in_scope`**:
+    *   `["governed_stream_all_runs"]`.
+
+9.  **Final Check against Rules:**
+    *   JSON format? Yes.
+    *   Entities extracted? Yes.
+    *   Decision types matched context? Yes.
+    *   Authority levels 5+ only? Yes (unless exploratory, which this isn't).
+    *   Sources based on scope? Yes (`all_runs` -> `all_runs`).
+
+10. **Construct JSON:**
+
+```json
+{
+  "topic_entities": [
+    "Test Plan",
+    "Non-Functional Requirements",
+    "NFR-001",
+    "NFR-002",
+    "Bun-based API backend",
+    "AI Agent",
+    "Search Queries",
+    "Asset Retrieval Endpoints",
+    "SeaweedFS",
+    "Media Ingestion Endpoints",
+    "P95 Latency",
+    "Throughput"
+  ],
+  "decision_types_sought": [
+    "phase_gate_approval"
+  ],
+  "temporal_scope": {
+    "from": "1970-01-01T00:00:00Z",
+    "to": "2050-12-31T23:59:59Z"
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}
+```
+*Self-Correction on Temporal Scope*: Using epoch/9999 might look odd for a specific system. However, without specific metadata about the current date of the "runs", "all_runs" usually implies the lifetime of the repository. I'll stick to a very broad range to ensure "all" is captured.
+*Self-Correction on Decision Types*: The schema example lists `menu_selection`, `mirror_approval`, `phase_gate_approval`. I should probably select the most relevant ones. For design and NFRs, `phase_gate_approval` is key. `mirror_approval` could be used if looking for precedent. I'll include both to be safe or just `phase_gate_approval`. Given the query is about "Evaluation design", `phase_gate_approval` is the most precise for "design of plans". Let's include `phase_gate_approval` and `mirror_approval` (for cross-project standards).
+*Self-Correction on Authority*: The rule says "include lower levels only if...". This is a formal design query. So strictly 5+.
+
+Let's finalize the JSON.
+
+```json
+{
+  "topic_entities": ["Test Plan", "Non-Functional Requirements", "NFR-001", "NFR-002", "Bun-based API backend", "AI Agent", "Search Queries", "Asset Retrieval Endpoints", "SeaweedFS", "Media Ingestion Endpoints", "P95 Latency", "Throughput"],
+  "decision_types_sought": ["phase_gate_approval", "mirror_approval"],
+  "temporal_scope": {
+    "from": "1970-01-01T00:00:00Z",
+    "to": "9999-12-31T23:59:59Z"
+  },
+  "authority_levels_included": [5, 6, 7],
+  "sources_in_scope": ["governed_stream_all_runs"]
+}
+```
+Wait, one detail in the input: `Scope: all_runs`.
+The instruction says: `sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs`.
+So `sources_in_scope` must be `["governed_stream_all_runs"]`.
+
+Final check on `authority_levels_included`: Rule says "always include 5+... include lower levels only if the query asks about exploratory or agent-generated content". This query asks for "Evaluation design for test plan and NFRs". This is formal content. So 5+ is correct.
+
+Final check on `decision_types_sought`: The options in the schema example are `menu_selection`, `mirror_approval`, `phase_gate_approval`. I will select the most relevant ones from this specific set provided in the prompt's `YOUR REQUIRED OUTPUT` example.
+Wait, the prompt example shows a JSON structure with specific strings. I should stick to those string values if they are the only allowed types, or standard values. The prompt says `decision_types_sought` should match the type of historical context needed. The example in the prompt text lists `["menu_selection", "mirror_approval", "phase_gate_approval"]` as *example* content in the JSON block, implying these are the valid values. I will choose from this set. `phase_gate_approval` is the best fit. `mirror_approval` might be useful for "design patterns". I'll include `phase_gate_approval`.
+
+Let's finalize.
+
+```json
+{
+  "topic_entities": [
+    "Test Plan",
+    "Non-Functional Requirements",
+    "NFR-001",
+    "NFR-002",
+    "Bun-based API backend",
+    "AI Agent",
+    "Search Queries",
+    "Asset Retrieval Endpoints",
+    "SeaweedFS",
+    "Media Ingestion Endpoints",
+    "P95 Latency",
+    "Throughput"
+  ],
+  "decision_types_sought": [
+    "phase_gate_approval",
+    "mirror_approval"
+  ],
+  "temporal_scope": {
+    "from": "1970-01-01T00:00:00Z",
+    "to": "9999-12-31T23:59:59Z"
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}
+```
+Wait, checking `temporal_scope`. If the system tracks dates, I should probably check if there is a constraint. The prompt doesn't give dates. Using "all_runs" implies the full history. I will use the broad range.
+Wait, one more thing: `authority_levels_included` should be integers. `[5, 6, 7]`.
+Okay, ready to generate.
+
+One adjustment: The `topic_entities` should be concrete. "Test Plan", "NFRs" are concrete enough. "Bun" is a tech stack entity. "SeaweedFS" is a storage entity. "AI Agent" is a system entity.
+I will clean up the list slightly to be precise.
+"NFR-001", "NFR-002" are IDs.
+"Test Plan" is a document type.
+Okay.
+
+Wait, looking at the `decision_types_sought` rule: "match the type of historical context needed".
+Is it `menu_selection`? No, that's UI/Config.
+`mirror_approval`? Yes, for standards.
+`phase_gate_approval`? Yes, for design specs.
+I'll stick with `["phase_gate_approval", "mirror_approval"]`.
+
+Final verification of `sources_in_scope`. The input says `Scope: all_runs`. The rule says `all_runs → governed_stream_all_runs`.
+So `["governed_stream_all_runs"]`.
+
+One detail: `authority_levels_included` rule: "include 5+... include lower levels only if...".
+The input `Scope: all_runs` doesn't specify level 5 vs 4. But the design query implies formal requirements. So 5+ is correct.
+
+Okay, proceeding to output.

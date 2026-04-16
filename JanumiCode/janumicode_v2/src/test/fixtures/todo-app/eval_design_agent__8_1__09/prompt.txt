@@ -1,0 +1,80 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Eval Design Agent] designing evaluation criteria for Sub-Phase 8.1.
+
+GOVERNING CONSTRAINTS (apply without exception):
+(none)
+
+Design evaluation criteria for quality attributes NOT already covered by the Test Plan. Receive the test_plan as read-only input to ensure no duplication.
+
+REQUIRED OUTPUT: Three JSON objects:
+1. functional_evaluation_plan: {criteria: [{functional_requirement_id, evaluation_method, success_condition}]}
+2. quality_evaluation_plan: {criteria: [{nfr_id, category, evaluation_tool, threshold, measurement_method, fallback_if_tool_unavailable}]}
+3. reasoning_evaluation_plan: {scenarios: [{id, description, pass_criteria}], ai_subsystems_detected: boolean}
+
+Rules:
+- Every NFR must have at least one Quality Evaluation criterion with specified tooling (Invariant)
+- No evaluation criterion should duplicate a Test Case from Phase 7
+- Compliance-related NFRs from compliance_context must have evaluation criteria
+
+CONTEXT:
+Test Plan (read-only — do not duplicate): (read-only — do not duplicate test cases)
+3 Test Suites:
+  TS-001 (integration, component: COMP-001):
+    TC-001-01 [integration]: traces to ["AC-001-01"], expected: Storage file line count increases by exactly 1 after adding a task
+    TC-001-02 [integration]: traces to ["AC-003-01"], expected: Specific line in storage file contains 'status=done' after completing task
+    TC-001-03 [integration]: traces to ["AC-004-01"], expected: Line associated with task ID is no longer present in storage file after deletion
+    TC-001-04 [integration]: traces to ["AC-005-01"], expected: File named 'tasks.txt' exists in current directory with size greater than 0 bytes after init
+    TC-001-05 [unit]: traces to ["AC-006-01","AC-006-02"], expected: Static analysis reveals no external imports and no external commands requiring root privileges
+  TS-002 (integration, component: COMP-002):
+    TC-002-01 [integration]: traces to ["AC-001-02"], expected: Script returns exit code 0 upon successful task creation
+    TC-002-02 [integration]: traces to ["AC-003-02","AC-004-02"], expected: Script prints an error message and exits with code 1
+    TC-002-03 [integration]: traces to ["AC-005-02"], expected: Script exits with code 0 without modifying file contents
+  TS-003 (integration, component: COMP-003):
+    TC-003-01 [integration]: traces to ["AC-002-01"], expected: Command prints every line from the storage file to stdout, excluding empty lines
+    TC-003-02 [integration]: traces to ["AC-002-02"], expected: Command prints 'No tasks found' to stdout and exits with code 0
+    TC-003-03 [integration]: traces to ["AC-003-02"], expected: Script prints an error message to stdout
+    TC-003-04 [integration]: traces to ["AC-004-02"], expected: Script prints an error message to stdout
+Non-Functional Requirements: 6 NFRs:
+  NFR-001 [performance]: The script must execute standard CRUD operations (add, view, mark, remove) within a specified time limit to ensure responsive user interaction. — threshold: Execution time must not exceed 200 milliseconds per operation on a local machine with standard hardware.
+  NFR-002 [security]: The script must prevent command injection attacks by sanitizing all user inputs before passing them to the shell or interpreter. — threshold: All command line arguments must be escaped or validated to reject shell metacharacters (e.g., `;`, `|`, `&`, `[JC:SYSTEM SCOPE]
+You are the [JC:Eval Design Agent] designing evaluation criteria for Sub-Phase 8.1.
+
+GOVERNING CONSTRAINTS (apply without exception):
+(none)
+
+Design evaluation criteria for quality attributes NOT already covered by the Test Plan. Receive the test_plan as read-only input to ensure no duplication.
+
+REQUIRED OUTPUT: Three JSON objects:
+1. functional_evaluation_plan: {criteria: [{functional_requirement_id, evaluation_method, success_condition}]}
+2. quality_evaluation_plan: {criteria: [{nfr_id, category, evaluation_tool, threshold, measurement_method, fallback_if_tool_unavailable}]}
+3. reasoning_evaluation_plan: {scenarios: [{id, description, pass_criteria}], ai_subsystems_detected: boolean}
+
+Rules:
+- Every NFR must have at least one Quality Evaluation criterion with specified tooling (Invariant)
+- No evaluation criterion should duplicate a Test Case from Phase 7
+- Compliance-related NFRs from compliance_context must have evaluation criteria
+
+CONTEXT:
+Test Plan (read-only — do not duplicate): (read-only — do not duplicate test cases)
+3 Test Suites:
+  TS-001 (integration, component: COMP-001):
+    TC-001-01 [integration]: traces to ["AC-001-01"], expected: Storage file line count increases by exactly 1 after adding a task
+    TC-001-02 [integration]: traces to ["AC-003-01"], expected: Specific line in storage file contains 'status=done' after completing task
+    TC-001-03 [integration]: traces to ["AC-004-01"], expected: Line associated with task ID is no longer present in storage file after deletion
+    TC-001-04 [integration]: traces to ["AC-005-01"], expected: File named 'tasks.txt' exists in current directory with size greater than 0 bytes after init
+    TC-001-05 [unit]: traces to ["AC-006-01","AC-006-02"], expected: Static analysis reveals no external imports and no external commands requiring root privileges
+  TS-002 (integration, component: COMP-002):
+    TC-002-01 [integration]: traces to ["AC-001-02"], expected: Script returns exit code 0 upon successful task creation
+    TC-002-02 [integration]: traces to ["AC-003-02","AC-004-02"], expected: Script prints an error message and exits with code 1
+    TC-002-03 [integration]: traces to ["AC-005-02"], expected: Script exits with code 0 without modifying file contents
+  TS-003 (integration, component: COMP-003):
+    TC-003-01 [integration]: traces to ["AC-002-01"], expected: Command prints every line from the storage file to stdout, excluding empty lines
+    TC-003-02 [integration]: traces to ["AC-002-02"], expected: Command prints 'No tasks found' to stdout and exits with code 0
+    TC-003-03 [integration]: traces to ["AC-003-02"], expected: Script prints an error message to stdout
+    TC-003-04 [integration]: traces to ["AC-004-02"], expected: Script prints an error message to stdout
+Non-Functional Requirements: , `` ` ``).
+  NFR-003 [security]: The storage file used for task persistence must be protected from unauthorized access to prevent data leakage or tampering. — threshold: The storage file must have read/write permissions restricted to the owner only (e.g., mode 0600 or 0644 depending on OS policy).
+  NFR-004 [reliability]: The script must ensure data integrity during write operations to prevent corruption or loss of tasks if the process is interrupted. — threshold: Write operations must be atomic (write to temporary file then rename) ensuring 100% data consistency across 1000 simulated crash scenarios.
+  NFR-005 [maintainability]: The single-file script must be self-documenting to reduce the cognitive load for future maintenance or debugging. — threshold: The script must include a header comment block explaining usage, dependencies, and logic structure, and all functions must have docstrings.
+  NFR-006 [accessibility]: The script must provide clear usage information to assist users with different levels of familiarity or assistive technology users. — threshold: A help flag (e.g., `--help`) must be available and display usage instructions, version, and exit codes.
+Compliance: No compliance regimes

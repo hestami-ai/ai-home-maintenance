@@ -1,0 +1,27 @@
+{
+  "topic_entities": [
+    "PropertyAsset",
+    "MediaManifest",
+    "OfflineBuffer",
+    "Property Data Management",
+    "SR-001",
+    "SR-008"
+  ],
+  "decision_types_sought": [
+    "menu_selection",
+    "mirror_approval",
+    "phase_gate_approval"
+  ],
+  "temporal_scope": {
+    "from": "0001-01-01",
+    "to": "9999-12-31"
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}

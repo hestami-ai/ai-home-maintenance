@@ -1,0 +1,15 @@
+{
+  "model": "qwen3.5:9b",
+  "provider": "ollama",
+  "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Technical Spec Agent] specifying Configuration Parameters for Sub-Phase 5.4.\n\nGOVERNING CONSTRAINTS (apply without exception):\n(none)\n\nProduce [JC:Configuration Parameters] for each Component — externally configurable settings with types, defaults, and descriptions.\n\nREQUIRED OUTPUT: A JSON object matching the `configuration_parameters` schema:\n- params: array, each with:\n  - component_id\n  - name: parameter name (e.g., \"database_url\", \"max_retries\")\n  - type: parameter type (string, integer, boolean, float, duration, url)\n  - default: default value (null if required with no default)\n  - required: boolean\n  - description: human-readable description of what this parameter controls\n\nRules:\n- Every Component should have at least connection/initialization parameters\n- Security-sensitive parameters (passwords, keys) must be marked as required with no default\n- Use concrete types, not \"any\" or \"object\"\n\nCONTEXT:\nComponent Model: PROJECT TYPE: The Shell-Scripted Utility: A single-file shell or Python script that manages tasks using standard text files as storage, requiring no installation or external dependencies.\nCapabilities: Task Addition via Command Line Arguments; Task Listing via Command Line Arguments; Task Completion Status Toggle; Task Removal via Command Line Arguments; Storage File Initialization on First Run; Single-File Script Execution (Shell/Python); Text-Based File Storage Persistence; Cross-Platform Compatibility (POSIX/Python); Secure Input Validation; Standard I/O Output Formatting\nExcluded: Database Management Systems; Graphical User Interfaces (GUI); External Library Dependencies; Installation Packages (e.g., .deb, .rpm); Network Service Capabilities; Compiled Binary Distribution; User Authentication Services; Remote Storage Integration\n\n3 Components:\n  COMP-001: TaskStorageManager (domain: DOM-001)\n    Responsibilities:\n    RESP-001: Create the storage file with a default structure upon first execution\n    RESP-002: Append a new task record to the storage file\n    RESP-003: Read the storage file and retrieve all stored task records\n    RESP-004: Update the status attribute of a specific task record to 'completed'\n    RESP-005: Delete a specific task record from the storage file upon command\n    Dependencies: none\n  COMP-002: TaskCommandParser (domain: DOM-001)\n    Responsibilities:\n    RESP-006: Parse command line arguments to validate inputs\n    Dependencies: COMP-001 (control)\n  COMP-003: TaskOutputWriter (domain: DOM-001)\n    Responsibilities:\n    RESP-007: Output all stored task records to standard output\n    Dependencies: COMP-001 (data)\nData Models: Component COMP-001:\n  Record: id:uuid, created_at:timestamp",
+  "system": null,
+  "responseFormat": "json",
+  "temperature": 0.4,
+  "traceContext": {
+    "workflowRunId": "3d516646-d149-4a41-87bf-f9903a146fb3",
+    "phaseId": "5",
+    "subPhaseId": "5.4",
+    "agentRole": "technical_spec_agent",
+    "label": "Phase 5.4 — Configuration Parameters"
+  }
+}

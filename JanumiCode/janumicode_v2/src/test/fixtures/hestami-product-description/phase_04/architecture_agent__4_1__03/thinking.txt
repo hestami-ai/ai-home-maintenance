@@ -1,0 +1,429 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** [JC:Architecture Agent].
+    *   **Task:** Identify [JC:Software Domains] for Sub-Phase 4.1.
+    *   **Output Format:** JSON object matching `software_domains` schema (`domains`: array of `id`, `name`, `ubiquitous_language` (array of `{term, definition}`), `system_requirement_ids`).
+    *   **Constraints:**
+        *   No governing constraints (none specified).
+        *   Clear bounded context per domain.
+        *   Ubiquitous language terms must be unambiguous within the domain.
+        *   **CRITICAL:** Do NOT use terms from the JanumiCode Canonical Vocabulary as domain terms.
+    *   **Context:** Consumer Discovery MVP (Phase 1 Focus). Pillar 1 (Home Real Property Assistant).
+    *   **Capabilities:** Property Asset Ingestion, AI Agent Service Provider Search, Bid Estimate Comparison, CC&R & Bylaws AI Extraction, Action Items Workflow, Statutory Deadline Tracking, Mass Communication, Mobile App Client, Multi-tenant Security, Payment Processing, High-Performance Bun API, SvelteKit Frontend, DBOS Versioned Workflow, Media Storage, Regulatory Rules Engine.
+    *   **Exclusions:** Financials (Pillar 2), Accounting (Pillar 3), Enterprise Governance, Field Service, HOA Voting, Full Offline-First (secondary), Legacy Vantaca, Advanced AI extraction, Direct Contractor Portal, Real-time Bid Aggregation.
+    *   **External Systems:** Payment Gateway, Communication Provider, Gov Regulatory, AI/ML Service, Mobile OS SDKs.
+    *   **System Requirements:** SR-001 to SR-010 provided.
+
+2.  **Analyze the System Boundary & Capabilities:**
+    *   **Core Purpose:** Home Real Property Assistant for individual homeowners (MVP).
+    *   **Key Functional Areas:**
+        1.  **Property Management:** Ingestion of images/3D data, storage, retrieval.
+        2.  **Service Sourcing:** Finding providers, comparing bids (Good-Better-Best).
+        3.  **Compliance & Governance (Home Rules):** CC&R & Bylaws extraction, Regulatory Rules Engine, Statutory Deadline Tracking.
+        4.  **Workflow & Actions:** Managing tasks/action items, versioned workflows.
+        5.  **Communication:** Email/SMS notifications.
+        6.  **Tenant Security:** Multi-tenant auth, RLS.
+        7.  **Mobile:** Offline queueing, data capture.
+        8.  **Payments:** Processing fees/deposits.
+
+3.  **Determine Software Domains:**
+    *   A Domain represents a cohesive grouping of business logic within a bounded context.
+    *   Looking at the requirements (SR-001 to SR-010):
+        *   SR-001 (Asset Upload) -> **Asset Management Domain**
+        *   SR-002, SR-003, SR-010 (Providers, Bids, Payments) -> **Service Sourcing & Matching Domain**
+        *   SR-004 (CC&R/Bylaws) -> **Compliance & Rules Domain**
+        *   SR-005, SR-006, SR-007 (Workflows, Deadlines, Comms) -> **Communication & Compliance Domain** (Could be split or merged. Let's look closer. SR-006 is deadlines/alerts, SR-007 is mass comms, SR-005 is workflow state. SR-009 is Security. SR-008 is Client. SR-002/003/010 involve the core service transaction.)
+        *   SR-008 (Mobile Offline) -> **Client Synchronization Domain** (Or part of UI/UX, but "Offline Queueing" is specific logic).
+        *   SR-009 (Security) -> **Identity & Access Domain** (Usually infrastructure, but here it's business logic for tenancy).
+
+    *   *Refining the Bounded Contexts:*
+        1.  **Property Asset Registry:** Handles Ingestion (SR-001), Storage (SeaweedFS), Retrieval. Focus on the physical property data (images, 3D).
+        2.  **Service Marketplace:** Handles Provider Search (SR-002), Bid Comparison (SR-003), Payment Integration (SR-010). *Note: Payments are often separate, but given SR-010 links to service fees/deposits, it fits with Service Marketplace or a dedicated Payment Orchestrator. Let's look at the constraints. "Do NOT use terms from the JanumiCode Canonical Vocabulary".*
+        3.  **Regulatory Compliance Engine:** Handles CC&R/Bylaws Extraction (SR-004), Statutory Deadlines (SR-006), Rules Engine (Context).
+        4.  **Action Workflow Orchestrator:** Handles Versioned Workflows (SR-005), State Transitions.
+        5.  **Communication Hub:** Handles Mass Email/SMS (SR-007).
+        6.  **Tenant Security Gateway:** Handles RLS/Auth (SR-009).
+        7.  **Mobile Client Adapter:** Handles Offline Queueing (SR-008).
+
+    *   *Optimization:* Too many domains make the system fragmented. Let's group based on Business Capability.
+        *   **Domain 1: Property Asset Ingestion & Storage.** SR-001. Logic: File upload validation, indexing, asset storage logic.
+        *   **Domain 2: Service Provider Matching.** SR-002, SR-003. Logic: AI search, provider ranking, bid aggregation for homeowners.
+        *   **Domain 3: Compliance & Regulatory Tracking.** SR-004, SR-006, Context: Regulatory Rules Engine. Logic: CC&R extraction, deadline tracking, statutory rules.
+        *   **Domain 4: Action & Workflow Management.** SR-005. Logic: Versioned workflow states, audit logging.
+        *   **Domain 5: Communication & Notification.** SR-007. Logic: Queueing, bounce tracking, delivery status.
+        *   **Domain 6: Payment & Transaction.** SR-010. Logic: Integration with gateway, receipt generation.
+        *   **Domain 7: Security & Tenancy.** SR-009. Logic: RLS policies.
+        *   **Domain 8: Client Interface.** SR-008. Logic: Offline buffering.
+
+    *   *Reviewing MVP Focus:* Pillar 1 (Home Real Property Assistant).
+    *   *Grouping:*
+        *   **Asset Domain:** SR-001.
+        *   **Service & Bid Domain:** SR-002, SR-003, SR-010 (Payment is often tied to the service transaction). Let's separate Payment to keep it focused on "Transaction" vs "Service Logic".
+        *   **Compliance Domain:** SR-004, SR-006. (Deadlines are compliance-driven).
+        *   **Workflow Domain:** SR-005.
+        *   **Comm Domain:** SR-007.
+        *   **Security Domain:** SR-009.
+        *   **Client Domain:** SR-008.
+
+    *   *Merging for Cohesion:*
+        *   "Communication" (SR-006, SR-007) could be merged. SR-006 is deadline tracking *triggering* comms. SR-007 is mass batching. They share logic around message delivery. However, SR-006 is also about *Tracking*. Let's keep Compliance separate from Communication logic.
+        *   **Domain 1: Property Asset Manager.** (SR-001).
+        *   **Domain 2: Service Matching Engine.** (SR-002, SR-003).
+        *   **Domain 3: Compliance & Governance.** (SR-004, SR-006).
+        *   **Domain 4: Action Workflows.** (SR-005).
+        *   **Domain 5: Notification Service.** (SR-007).
+        *   **Domain 6: Payment Gateway Integration.** (SR-010).
+        *   **Domain 7: Identity & Access.** (SR-009).
+        *   **Domain 8: Mobile Sync Adapter.** (SR-008).
+
+    *   *Wait, constraints check:* "Do NOT use terms from the JanumiCode Canonical Vocabulary". This implies I need to invent domain-specific terms. The schema requires `ubiquitous_language`.
+    *   *Schema Check:* `domains`: array, each with `id`, `name`, `ubiquitous_language` (array of `{term, definition}`), `system_requirement_ids`.
+    *   *Constraint Check:* "Each domain should have a clear bounded context". "Ubiquitous language terms must be unambiguous within the domain".
+
+    *   *Simplification:* MVP is "Pillar 1". Let's consolidate where possible to avoid over-engineering a V1 system.
+        1.  **Asset & Data Domain:** Uploads, Storage (Images, 3D). (SR-001)
+        2.  **Service Provider Domain:** Search, Matching, Bids. (SR-002, SR-003)
+        3.  **Compliance Domain:** CC&R, Deadlines, Rules. (SR-004, SR-006, Rules Engine)
+        4.  **Workflow Domain:** Action Items, Versioned Engine. (SR-005)
+        5.  **Notification Domain:** Mass Email/SMS. (SR-007)
+        6.  **Security Domain:** RLS, Auth. (SR-009)
+        7.  **Payment Domain:** Fees, Deposits. (SR-010)
+        8.  **Client Domain:** Offline Queueing. (SR-008)
+
+    *   *Actually, looking at standard DDD for an MVP:*
+        *   **Asset Domain:** Property data.
+        *   **Service Domain:** Providers, Bids.
+        *   **Compliance Domain:** Rules, Deadlines.
+        *   **Action Domain:** Workflows.
+        *   **Comms Domain:** Notifications.
+        *   **Identity Domain:** Security.
+        *   **Payment Domain:** Money.
+        *   **Client Domain:** Sync.
+        *   *Wait, SR-010 Payment:* Usually Payments are cross-cutting, but for MVP where fees are a specific transaction type, a Payment Domain is acceptable.
+        *   *Wait, SR-008 Client:* Offline queueing is specific logic, not just UI. It's a domain (Client State Manager).
+        *   *Wait, SR-009 Security:* RLS is often cross-cutting (Policy Engine), but here it's defined as a system requirement enforcing it. A "Security Subdomain" is often implicit, but for domain identification, it's better to group by capability.
+
+    *   *Decision:* Let's define 5-6 high-level domains that cover the requirements cleanly without fragmenting too much.
+        1.  **Property Asset Registry:** (SR-001)
+        2.  **Service Provider Marketplace:** (SR-002, SR-003)
+        3.  **Compliance & Regulation Engine:** (SR-004, SR-006, Regulatory Rules)
+        4.  **Workflow & Action Orchestrator:** (SR-005)
+        5.  **Communication Hub:** (SR-007)
+        6.  **Identity & Access Control:** (SR-009)
+        7.  **Payment Transaction:** (SR-010)
+        8.  **Client Sync Adapter:** (SR-008)
+    *   *Refinement:* Can we merge Client Sync Adapter into UI/UX? No, it involves data integrity and queueing logic. Can we merge Compliance & Communication? SR-006 triggers communication based on deadlines. SR-006 is about tracking deadlines, SR-007 is about sending bulk messages. They are related. Let's create a "Compliance & Communication" domain? No, distinct concerns (Time/Deadline vs Content/Delivery).
+    *   Let's keep it strict.
+    *   Let's ensure UBL terms are unique per domain.
+    *   Let's check SR mapping:
+        *   SR-001 -> Asset Registry
+        *   SR-002, SR-003 -> Service Marketplace
+        *   SR-004, SR-006 -> Compliance Engine
+        *   SR-005 -> Workflow Orchestrator
+        *   SR-007 -> Notification Hub
+        *   SR-008 -> Client Sync Module (Could be part of the "Client" boundary, but logic is distinct)
+        *   SR-009 -> Security Boundary (Cross cutting, but mapped to a specific domain for RLS enforcement logic)
+        *   SR-010 -> Payment Service
+
+    *   *Wait, System Requirement mapping:* "system_requirement_ids" should be arrays of strings like "SR-001".
+    *   *Constraint:* "Do NOT use terms from the JanumiCode Canonical Vocabulary". I don't see the JanumiCode Canonical Vocabulary listed in the prompt explicitly, but I should avoid generic terms like "User", "System", "Order", "Product" if they belong to a canonical set not defined here. However, standard DDD terms like "Asset", "Provider", "Workflow", "Compliance" are usually fine unless specific Canonical Vocab was provided earlier (which it isn't, other than "JanumiCode Canonical Vocabulary" mentioned as a constraint). I will avoid generic "Entity" type names and stick to specific business nouns. I will avoid terms that might look like "JanumiCode" standard (e.g., "Aggregate", "Snapshot"). I will use business terms.
+
+    *   *Drafting Domains:*
+        1.  **Property Asset Registry** (SR-001). UBL: `AssetManifest`, `ImageUpload`, `IndexedProperty`.
+        2.  **Service Matching Engine** (SR-002, SR-003). UBL: `ProviderCandidate`, `BidEstimate`, `ServiceCategory`, `MatchingScore`.
+        3.  **Regulatory Compliance Module** (SR-004, SR-006). UBL: `BylawsClause`, `StatutoryDeadline`, `ExtractionConfidence`, `NoticeRequirement`.
+        4.  **Action Item Workflows** (SR-005). UBL: `ActionItem`, `WorkflowState`, `VersionTransition`, `AuditRecord`.
+        5.  **Notification Dispatcher** (SR-007). UBL: `MessageBatch`, `DeliveryStatus`, `BounceRate`, `RecipientList`.
+        6.  **Tenant Security Policy** (SR-009). UBL: `RLSPolicy`, `TenantScope`, `AccessLevel`, `AuthCheck`.
+        7.  **Transaction Processor** (SR-010). UBL: `PaymentIntent`, `DepositFee`, `ReceiptDocument`.
+        8.  **Offline Data Store** (SR-008). UBL: `LocalQueue`, `SyncPayload`, `ReconnectBuffer`. (Maybe merge into UI/Client? Let's keep it as "Client Synchronization" domain).
+
+    *   *Re-evaluating Domain Count:* Too many might violate "Cohesive groupings".
+    *   Let's try to merge Client Synchronization (SR-008) into **Property Asset** (since assets are captured offline) or keep separate? SR-008 is specifically about "Mobile App Client". It's a bounded context for the mobile capability.
+    *   Let's merge **Notification Dispatcher** (SR-007) with **Regulatory Compliance** (SR-006)? No, deadlines are logic, dispatching is infra. But often combined in MVP. Let's keep separate for clarity of UBL.
+    *   Let's merge **Transaction Processor** (SR-010) with **Service Matching** (SR-002, 003)? SR-003 is UI/Bid comparison. SR-002 is Search. SR-010 is Payment. Payment is distinct enough.
+    *   Let's merge **Security** (SR-009) is usually cross-cutting. But if required as a domain, we can name it **Access Control**.
+    *   Let's consolidate:
+        1.  **Asset Registry:** SR-001.
+        2.  **Service Marketplace:** SR-002, SR-003.
+        3.  **Compliance Engine:** SR-004, SR-006.
+        4.  **Workflow Engine:** SR-005.
+        5.  **Communication Gateway:** SR-007.
+        6.  **Payment Gateway:** SR-010.
+        7.  **Identity & Access:** SR-009.
+        8.  **Mobile Client:** SR-008.
+    *   *Check:* This is 8 domains. Is it too fragmented? For a Phase 1 MVP, it's okay if they are small and distinct.
+    *   *Check:* Are the UBL terms unique? I need to ensure I don't use terms like "System", "User", "Account" if they are canonical. I'll use specific terms like "Homeowner", "PropertyRecord", "ProviderProfile".
+    *   *Wait, SR-010:* "Process payments for deposits and service fees".
+    *   *Wait, SR-008:* "Mobile application client shall allow data capture...".
+    *   *Let's group SR-008 into Client Domain (Mobile Client). It might be better to put it under a "Client Interface" domain, but the requirements emphasize "Offline Queueing". Let's call it "Mobile Data Adapter".*
+    *   *Let's group SR-009 (Security) into "Tenant Identity" domain.*
+    *   *Let's group SR-007 (Comms) into "Notification Service".*
+
+    *   *Refining UBL:*
+        *   Domain: `Property Asset Registry`. Terms: `PropertyManifest`, `ImageAsset`, `3DSplat`, `IndexState`.
+        *   Domain: `Service Provider Marketplace`. Terms: `ProviderCandidate`, `HomeRealProperty`, `BidComparison`, `MatchScore`.
+        *   Domain: `Regulatory Compliance`. Terms: `CC&RClause`, `StatutoryDeadline`, `NoticeType`, `BylawExtraction`.
+        *   Domain: `Action Workflow Orchestrator`. Terms: `ActionItem`, `WorkflowVersion`, `TransitionLog`, `StatusState`.
+        *   Domain: `Notification Dispatcher`. Terms: `MessagePayload`, `DeliveryQueue`, `BounceReport`, `RecipientBatch`.
+        *   Domain: `Transaction Payment`. Terms: `DepositFee`, `PaymentIntent`, `ReceiptDocument`, `AuthResponse`.
+        *   Domain: `Tenant Access Control`. Terms: `RLSRule`, `TenantBoundary`, `AuthToken`.
+        *   Domain: `Mobile Data Sync`. Terms: `OfflineBuffer`, `SyncTrigger`, `SyncError`, `ConnectionState`.
+
+    *   *Review Constraints:* "Do NOT use terms from the JanumiCode Canonical Vocabulary". I don't know exactly what that is, but common safe bets are avoiding generic nouns unless they are specific business concepts. I will ensure the terms are specific to the described capabilities.
+    *   *Check SR IDs:*
+        *   Asset: SR-001
+        *   Service: SR-002, SR-003
+        *   Compliance: SR-004, SR-006
+        *   Workflow: SR-005
+        *   Comms: SR-007
+        *   Payment: SR-010
+        *   Security: SR-009
+        *   Mobile: SR-008
+    *   *Wait, SR-009 (Security) and SR-008 (Mobile)*:
+        *   SR-009 is RLS (Database logic + Auth).
+        *   SR-008 is Client Offline logic.
+    *   *Can we merge Mobile into Asset?* SR-008 allows data capture. The asset ingestion (SR-001) is for uploads. SR-008 handles offline capture. They are distinct.
+    *   *Can we merge Security into Identity?* SR-009 is "Multi-tenant Security".
+    *   *Let's keep them distinct.*
+
+    *   *JSON Structure:*
+        ```json
+        {
+          "domains": [
+            {
+              "id": "string",
+              "name": "string",
+              "ubiquitous_language": [],
+              "system_requirement_ids": []
+            },
+            ...
+          ]
+        }
+        ```
+    *   *Wait, SR IDs in array:* `system_requirement_ids`.
+    *   *Wait, ID naming convention:* The prompt doesn't specify ID format, but I'll use lowercase-kebab or snake_case. Let's use `domain-001` style.
+    *   *Wait, check:* "Do NOT use terms from the JanumiCode Canonical Vocabulary". Since I don't have the list, I will assume standard industry terms like "User", "Order", "OrderItem" might be canonical. I will use domain-specific names like `Homeowner`, `PropertyRecord`, `ServiceProvider`, `ActionTask`, `Clause`, `Deadline`, `Message`, `Tenant`, `Payment`.
+
+    *   *Wait, one more check on SR-008:* "Mobile application client...". If this is the only SR for Mobile, it's a domain. If it's part of the frontend, maybe not. But the requirement implies specific logic ("Offline Queueing", "Sync upon reconnection"). That is a domain logic.
+    *   *Wait, one more check on SR-009:* "Multi-tenant Security". This is often a cross-cutting concern. However, if we need a domain for SR-009, it must exist. We will call it `TenantSecurity` or `AccessControl`.
+    *   *Wait, one more check on SR-006 & SR-004:* CC&R Extraction (SR-004) and Statutory Deadlines (SR-006). These fit well together as `Compliance`.
+    *   *Wait, one more check on SR-002 & SR-003:* Provider Search (SR-002) and Bid Compare (SR-003). `ServiceMatching`.
+    *   *Wait, one more check on SR-001:* Asset Ingestion. `PropertyAsset`.
+
+    *   *Final Plan:*
+        1.  `property-asset-ingestion` (SR-001)
+        2.  `service-provider-matching` (SR-002, SR-003)
+        3.  `compliance-and-deadlines` (SR-004, SR-006)
+        4.  `action-workflow-orchestrator` (SR-005)
+        5.  `notification-dispatcher` (SR-007)
+        6.  `tenant-access-control` (SR-009)
+        7.  `transaction-payment` (SR-010)
+        8.  `mobile-data-synchronization` (SR-008)
+
+    *   *Wait, is 8 domains too many for a single MVP?* Maybe merge Tenant Access Control with Security? It's a single SR (SR-009).
+    *   Let's check if we can merge Mobile Sync with Asset? SR-001 is about upload logic. SR-008 is about offline capture. It's different.
+    *   Let's check if we can merge Comms (SR-007) with Compliance (SR-006)? SR-006 triggers notifications. SR-007 is bulk processing. Merging might dilute the Bulk logic.
+    *   Okay, I will proceed with the 8 domains, ensuring the UBL is strictly local.
+
+    *   *Wait, "JanumiCode Canonical Vocabulary" constraint:* Since I don't have the list, I will strictly avoid generic nouns that often end up in canonical vocabularies (e.g., `User`, `Role`, `System`, `Status`, `Order`, `Product`). I will use `Homeowner`, `Tenant`, `Provider`, `Task`, `Deadline`, `Asset`, `Fee`.
+
+    *   *Wait, JSON Output:* Needs to be valid JSON.
+    *   *Wait, System Requirement IDs:* Array of strings.
+    *   *Wait, Ubiquitous Language:* Array of objects `{term, definition}`.
+
+    *   *Let's Review the Prompt's `software_domains` schema requirement:*
+        ```json
+        - domains: array, each with:
+          - id, name, ubiquitous_language (array of {term, definition}), system_requirement_ids
+        ```
+        (Implicitly: `id`, `name`, `ubiquitous_language`, `system_requirement_ids`).
+
+    *   *Wait, I need to check the SR mappings one last time.*
+        *   SR-001 (Asset) -> Domain 1
+        *   SR-002 (Search) -> Domain 2
+        *   SR-003 (Bid UI) -> Domain 2
+        *   SR-004 (CC&R AI) -> Domain 3
+        *   SR-005 (Workflow) -> Domain 4
+        *   SR-006 (Deadlines) -> Domain 3
+        *   SR-007 (Email/SMS) -> Domain 5
+        *   SR-008 (Mobile Offline) -> Domain 6
+        *   SR-009 (Security/RLS) -> Domain 7
+        *   SR-010 (Payment) -> Domain 8
+    *   Wait, SR-010 is Payment. Is it a domain? Yes, distinct logic from Service Matching.
+    *   Wait, SR-008 is Mobile Client. Is it a domain? It implies an offline queue management system. Yes, `Offline Data Sync` domain.
+    *   Wait, SR-009 is Security. `Security Policy` domain.
+    *   Wait, SR-007 is Comms. `Messaging` domain.
+    *   Wait, SR-005 is Workflow. `Workflow` domain.
+    *   Wait, SR-006/004 are Compliance. `Compliance` domain.
+    *   Wait, SR-002/003 are Service. `Service` domain.
+    *   Wait, SR-001 is Asset. `Asset` domain.
+    *   Wait, Total: 8.
+    *   Is there a way to reduce? Maybe merge Mobile Client into Asset (Asset Capture)? SR-001 is Upload logic. SR-008 is Mobile Offline Capture. They are very similar. `Property Asset Capture` could cover both.
+    *   Let's merge SR-008 into the Asset domain? SR-001 is "System shall accept property image... uploads". SR-008 is "Mobile app client... data capture...". The logic of handling the data offload is similar. However, SR-008 implies *Sync* logic, which is distinct.
+    *   Let's merge SR-009 (Security) into `Identity`?
+    *   Let's merge SR-007 (Comms) into `Compliance`? No, bulk vs deadline.
+    *   Okay, I'll stick to 6-7 domains. Merging Mobile into Asset is risky because "Offline Queueing" is a specific constraint (SR-008) separate from the Upload constraint (SR-001).
+    *   Merging Security into Identity? There's only one SR.
+    *   Let's try to group `Tenant Security` (SR-009) and `Transaction Payment` (SR-010) under `Financial Security`? No, Payment is transactional, Security is Auth/RLS.
+    *   Let's group `Asset` (SR-001) and `Mobile Sync` (SR-008) under `Data Ingestion & Capture`.
+    *   Let's group `Compliance` (SR-004, SR-006) and `Comms` (SR-007)? No, SR-006 is tracking deadlines, SR-007 is sending bulk. They are different.
+    *   Let's group `Service` (SR-002, SR-003) and `Payment` (SR-010)? SR-010 is processing payment for service.
+    *   Okay, I will reduce to **6 Domains** for a cleaner MVP architecture.
+        1.  **Property Asset Capture:** (SR-001, SR-008). Ingest and Offline Capture.
+        2.  **Service Matching & Payment:** (SR-002, SR-003, SR-010). Finding providers and handling fees.
+        3.  **Compliance & Deadline Tracking:** (SR-004, SR-006). Rules and Time.
+        4.  **Action Workflow Management:** (SR-005). Tasks.
+        5.  **Notification Service:** (SR-007). Bulk Messaging.
+        6.  **Tenant Security & Auth:** (SR-009). Access Control.
+
+    *   *Wait, SR-008 (Mobile) implies client side logic.* If I put it in Property Asset, the domain becomes "Asset Management" (Server side mostly) + "Client Sync". Bounded context might separate them. But for MVP, combining them under "Asset Capture" makes sense as they deal with the "Home" data entry.
+    *   *Wait, SR-010 (Payment).* Is it a domain? It's usually a separate gateway integration. If I merge into Service Matching, it creates a "Service Transaction" domain.
+    *   *Let's try to keep them separate if they are distinct enough.* SR-009 is critical. SR-010 is critical.
+    *   Okay, let's look at the "Consumer Discovery MVP" constraint. Focus on Pillar 1.
+    *   I'll output the 6-7 domains but keep them logical. I will not merge Payment and Service Matching if the logic is distinct (Fee vs Service Data). I will merge Mobile and Asset Ingestion to reduce fragmentation.
+    *   Wait, SR-009 (Security) is Cross Cutting. Often Security is not a Domain but a Quality Attribute. However, the schema requires `domains`. If SR-009 traces to a domain, that domain must exist. I will create `TenantSecurity` domain.
+
+    *   *Refining Domain Names:*
+        1.  `property-asset-capture` (SR-001, SR-008)
+        2.  `service-provider-matching` (SR-002, SR-003)
+        3.  `compliance-rules-engine` (SR-004, SR-006)
+        4.  `action-workflow-orchestrator` (SR-005)
+        5.  `notification-dispatcher` (SR-007)
+        6.  `tenant-security-gateway` (SR-009)
+        7.  `payment-transaction-processor` (SR-010)
+
+    *   *Wait, is Payment a domain?* Yes, for MVP where fees are key.
+    *   *Wait, is Security a domain?* Yes, for RLS logic.
+    *   *Wait, is Comms a domain?* Yes, for Bulk Send logic.
+    *   *Wait, is Asset + Mobile one domain?* Yes, "Data Capture & Asset Management".
+    *   *Wait, Compliance + Comms?* No.
+    *   *Okay, final count:* 7 Domains.
+
+    *   *Check UBL:*
+        *   Property-Asset-Capture: `PropertyRecord`, `MediaManifest`, `UploadToken`, `OfflineBuffer`.
+        *   Service-Matching: `ProviderProfile`, `BidEstimate`, `HomeRealProperty`, `MatchScore`.
+        *   Compliance-Rules: `CC&RClause`, `StatutoryDeadline`, `NoticeRequirement`, `ExtractionConfidence`.
+        *   Action-Workflow: `ActionItem`, `WorkflowState`, `TransitionLog`, `TaskDefinition`.
+        *   Notification-Dispatcher: `MessageBatch`, `DeliveryAttempt`, `BounceReport`, `ChannelProvider`.
+        *   Tenant-Security: `RLSPolicy`, `TenantBoundary`, `AccessLevel`, `AuthCheck`.
+        *   Payment-Transaction: `PaymentIntent`, `DepositFee`, `ReceiptDocument`, `AuthResponse`.
+
+    *   *Wait, I need to ensure SR-010 is mapped correctly.* "Payment Processing Integration".
+    *   *Wait, I need to ensure SR-008 is mapped.* "Offline Queueing".
+    *   *Wait, SR-009.* "Multi-tenant Security".
+    *   *Wait, SR-007.* "Mass Email/SMS".
+
+    *   *Final check on Constraints:* "Do NOT use terms from the JanumiCode Canonical Vocabulary". Since I can't verify the list, I will ensure terms are descriptive of the MVP business logic (e.g., `Homeowner` not `User`, `Property` not `Asset` if Asset is generic, `Bid` not `Quote`). I will use terms provided in the prompt's context (e.g., "3D Splats", "CC&R", "RLS", "Good-Better-Best"). I should convert these into UBL terms. e.g., `GoodBetterBestComparison`. `3DSplat`. `CC&RClause`. `StatutoryDeadline`.
+    *   Actually, using prompt-specific nouns is safer than generic ones to avoid violating an unseen "Canonical Vocabulary".
+    *   Wait, SR-001 says `.gltf`, `.png`. UBL term `MediaManifest`.
+    *   SR-002 says 'Home Real Property'. UBL term `HomeRealProperty`.
+    *   SR-003 says 'Good-Better-Best'. UBL term `EstimateComparisonView`.
+    *   SR-004 says 'Extracted Clauses'. UBL term `BylawExtraction`.
+    *   SR-005 says 'Pending, In-Progress, Complete'. UBL term `WorkflowState`.
+    *   SR-006 says '30 days before'. UBL term `StatutoryDeadline`.
+    *   SR-007 says 'Meeting Notices'. UBL term `MessageBatch`.
+    *   SR-008 says 'Sync'. UBL term `SyncPayload`.
+    *   SR-009 says 'RLS'. UBL term `RLSPolicy`.
+    *   SR-010 says 'Receipt'. UBL term `ReceiptDocument`.
+
+    *   *Wait, "Homeowner" is a key concept.* SR-010 mentions "Homeowners". SR-004 mentions "Bylaws" (HOA/Home).
+    *   I will use `Homeowner` and `Property` as core nouns.
+    *   *Check:* "Do NOT use terms from the JanumiCode Canonical Vocabulary". I will assume `User` is canonical. I will use `Homeowner`. I will assume `Order` is canonical. I will use `Transaction`. I will assume `Status` is canonical. I will use `WorkflowState`.
+
+    *   *Wait, System Requirement IDs:* `system_requirement_ids` array of strings. e.g. `["SR-001"]`.
+    *   *Wait, Schema:* `domains` array inside a JSON object.
+    *   *Wait, JSON Formatting:* Indentation.
+    *   *Wait, Output:* Just the JSON object? "REQUIRED OUTPUT: A JSON object matching the `software_domains` schema".
+    *   I will output ONLY the JSON.
+
+    *   *Wait, check:* "System Boundary: ... Pillar 1".
+    *   *Check:* "Excluded: ... Pillar 2, 3 ... Enterprise ... Field Service ...".
+    *   *Okay, proceed with JSON generation.*
+
+    *   *Wait, Double Check SR-008:* "Mobile application client".
+    *   If I put SR-008 in `property-asset-capture`, does it make sense? Yes, "Capture" implies the source, "Mobile" implies the client. But "Offline Queueing" is the logic.
+    *   If I make `Mobile-Data-Sync` a separate domain (6th/7th domain), it's safer to keep the logic isolated.
+    *   I'll make `property-asset-ingestion` (SR-001) and `mobile-offline-sync` (SR-008).
+    *   So I will keep 7 domains.
+
+    *   *Wait, Final Count:*
+        1.  `property-asset-ingestion` (SR-001)
+        2.  `mobile-offline-sync` (SR-008)
+        3.  `service-provider-matching` (SR-002, SR-003)
+        4.  `compliance-rules-engine` (SR-004, SR-006)
+        5.  `action-workflow-orchestrator` (SR-005)
+        6.  `notification-dispatcher` (SR-007)
+        7.  `tenant-security-gateway` (SR-009)
+        8.  `payment-transaction-processor` (SR-010)
+    *   That's 8 domains. Is that okay? Yes, if logic is distinct.
+    *   Wait, "Do NOT use terms from the JanumiCode Canonical Vocabulary".
+    *   I'll create the UBL carefully.
+
+    *   *Wait, JSON Keys:* `domains` (root).
+    *   *Wait, `system_requirement_ids`*: I will map exactly as per SR list.
+    *   *Wait, `id`*: I'll use `domain-001`, etc. Or `property-asset-ingestion`. The latter is more readable.
+    *   *Wait, `name`*: Same as ID or descriptive. Let's use Descriptive Names for `name`, `id` as unique key.
+
+    *   *Wait, one detail:* "system_requirement_ids" traces to specific US (User Stories) and AC (Acceptance Criteria) in the SR text, but the JSON output asks for `system_requirement_ids`. The input says "System Requirements: 10 System Requirements: SR-001...". So I use `["SR-001"]`.
+
+    *   *Wait, check:* "System Requirement 10 SR-010... traces to US-010...". The JSON field is `system_requirement_ids`.
+    *   *Wait, check:* "System Requirement 6 SR-006... traces to US-006...".
+    *   *Wait, I should use the SR-XXX IDs.*
+    *   *Wait, I'll consolidate to 6 domains to avoid over-segmentation.*
+        *   `property-data-management`: SR-001, SR-008. (Capture and Sync logic are data integrity focused).
+        *   `service-orchestration`: SR-002, SR-003. (Search and Matching).
+        *   `compliance-and-tracking`: SR-004, SR-006. (Rules and Deadlines).
+        *   `workflow-automation`: SR-005. (Action Items).
+        *   `communication-engine`: SR-007. (Mass Email).
+        *   `identity-and-access`: SR-009.
+        *   `financial-transactions`: SR-010.
+    *   *Wait, Payment is separate from Service? Yes.*
+    *   *Wait, Security is separate from Identity? It's Identity.*
+    *   *Wait, Is `property-data-management` better than splitting 001 and 008?* SR-001 is "System shall accept property image... uploads". SR-008 is "Mobile application client... offline queueing". The logic of queueing is different from server-side ingestion. But for a MVP, they might share a "Asset Data" model. I'll group them as `property-data-management`.
+    *   *Wait, SR-009 (Security)* vs *SR-010 (Payment)*.
+    *   *Wait, SR-007 (Comms)* vs *SR-006 (Tracking)*. I'll keep them separate. `compliance-and-tracking` (SR-004, SR-006) and `communication-engine` (SR-007).
+    *   *Wait, SR-005 (Workflow)*.
+    *   *Wait, SR-002/003 (Service)*.
+    *   *Wait, Total 7 Domains.*
+    *   *Let's check if I can merge Security into Tenant.* `Tenant-Identity`.
+    *   *Let's check if I can merge Payment into Service.* `Service-Transaction`.
+    *   *Let's keep them separate for MVP clarity.*
+    *   *Wait, one more thing:* SR-008 mentions "data integrity... synchronization". This is `Mobile-Sync`.
+    *   *Wait, I'll stick to the 8 domains derived earlier, maybe merge Mobile into Asset.* I'll merge Mobile into Asset. Why? Because `Offline Queueing` stores the asset data (images, text entry). It's part of the Asset Lifecycle (Capture -> Sync).
+    *   *Decision:* Merge SR-008 into `property-asset-ingestion`. Name: `property-data-management`.
+    *   *Merged:* `property-data-management` (SR-001, SR-008).
+    *   *Total:* 6 Domains?
+        1.  `property-data-management` (SR-001, SR-008)
+        2.  `service-provider-matching` (SR-002, SR-003)
+        3.  `compliance-rules-engine` (SR-004, SR-006)
+        4.  `action-workflow-orchestrator` (SR-005)
+        5.  `notification-dispatcher` (SR-007)
+        6.  `tenant-security-gateway` (SR-009)
+        7.  `payment-transaction-processor` (SR-010)
+    *   *That's 7 domains.*
+    *   *Wait, SR-006 (Deadlines) vs SR-004 (CC&R).* They are both Compliance.
+    *   *Wait, SR-007 (Comms).*
+    *   *Wait, SR-009 (Security).*
+    *   *Wait, SR-010 (Payment).*
+    *   *Wait, SR-002/003 (Service).*
+    *   *Wait, SR-001/008 (Asset).*
+    *   *Wait, SR-005 (Workflow).*
+    *   *This looks solid.* 7 Domains.
+
+    *   *Final Check on UBL:*
+        *   Property: `PropertyAsset`, `ImageUpload`, `MediaManifest`, `OfflineBuffer`.
+        *   Service: `ProviderProfile`, `BidEstimate`, `HomeRealProperty`, `MatchScore`.
+        *   Compliance: `BylawsClause`, `StatutoryDeadline`, `NoticeRequirement`, `ExtractionConfidence`.
+        *   Workflow: `ActionItem`, `WorkflowState`, `TransitionLog`.
+        *   Notification: `MessageBatch`, `DeliveryAttempt`, `RecipientList`.
+        *   Security: `RLSPolicy`, `TenantBoundary`, `AccessLevel`.
+        *   Payment: `PaymentIntent`, `ReceiptDocument`, `DepositFee`.
+
+    *   *Wait, `Homeowner` term.* I'll use `Homeowner`.
+    *   *Wait, `System` term.* Avoid. Use `Platform`? Or just omit.
+    *   *Wait, `User` term.* Avoid. Use `Homeowner` or `Tenant`.
+    *   *Wait, `Order` term.* Avoid. Use `Transaction`.
+
+    *   *Okay, ready to write.*

@@ -135,7 +135,25 @@
       "Bash(pnpm test:probes -- src/test/prompt-probes/reasoningReview.probe.ts -t \"clean\")",
       "Bash(npx tsx:*)",
       "Bash(pnpm exec:*)",
-      "Bash(pnpm build:*)"
+      "Bash(pnpm build:*)",
+      "Bash(pnpm verify:probes)",
+      "Bash(curl -s http://localhost:11434/api/tags)",
+      "Bash(curl -s http://localhost:11434/api/generate -d '{\"model\":\"qwen3.5:9b\",\"prompt\":\"You are a quality checker. Return a JSON object: {\\\\\"intent_quality_report\\\\\": {\\\\\"overall_status\\\\\": \\\\\"pass\\\\\"}}\",\"stream\":false}')",
+      "Bash(JANUMICODE_LOG_LEVEL=debug node dist/cli/janumicode.js run --intent \"Build a simple CLI todo app\" --workspace ./test-workspace --llm-mode real --auto-approve --capture-fixtures --capture-output-dir ./src/test/fixtures/captured --gap-report gap-real.json)",
+      "Bash(rm -rf src/test/fixtures/captured)",
+      "Bash(mkdir -p src/test/fixtures/captured)",
+      "Bash(curl -sS -m 5 http://127.0.0.1:11434/api/tags)",
+      "Bash(rm -rf test-workspace/.janumicode/test-harness)",
+      "Bash(mkdir -p test-workspace/.janumicode/test-harness)",
+      "Bash(rm -rf src/test/fixtures/hestami-product-description-new)",
+      "Bash(mkdir -p src/test/fixtures/hestami-product-description-new)",
+      "Bash(kill -9 1112)",
+      "Bash(rm -rf test-workspace/.janumicode/live test-workspace/.janumicode/req-dump)",
+      "Bash(mkdir -p test-workspace/.janumicode/live test-workspace/.janumicode/req-dump)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(node dist/cli/janumicode.js run --intent 'Review \"specs/hestami-ai-real-property-os\\(2\\)/Hestami AI Real Property OS and Platform Product Description.md\" and prepare for implementation.' --workspace ./test-workspace --llm-mode mock --auto-approve --phase-limit 1 --fixture-dir src/test/fixtures/hestami-product-description --json)",
+      "Read(//tmp/**)",
+      "Bash(pnpm vitest *)"
     ]
   }
 }

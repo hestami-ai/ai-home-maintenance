@@ -1,0 +1,319 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Deep Memory Research Agent] performing Stage 7 — Context Packet Synthesis.
+
+Synthesize the research findings into a structured [JC:Context Packet]. Every claim must cite source record IDs. The packet must be as explicit about what it does NOT know as about what it does know.
+
+QUERY DECOMPOSITION:
+{
+  "topicEntities": [
+    "Test Plan",
+    "Non-Functional Requirements",
+    "NFR-001",
+    "NFR-002",
+    "Bun-based API backend",
+    "AI Agent",
+    "Search Queries",
+    "Asset Retrieval Endpoints",
+    "SeaweedFS",
+    "Media Ingestion Endpoints",
+    "P95 Latency",
+    "Throughput"
+  ],
+  "decisionTypesSought": [
+    "phase_gate_approval",
+    "mirror_approval"
+  ],
+  "temporalScope": {
+    "from": "1970-01-01T00:00:00Z",
+    "to": "9999-12-31T23:59:59Z"
+  },
+  "authorityLevelsIncluded": [
+    5,
+    6,
+    7
+  ],
+  "sourcesInScope": [
+    "governed_stream_all_runs"
+  ]
+}
+
+MATERIAL FINDINGS:
+[
+  {
+    "id": "83fd7cad-f74c-4657-a228-68ca3bc6eacc",
+    "record_type": "raw_intent_received",
+    "authority_level": 5,
+    "governing_status": "active",
+    "summary": "Review \"specs/hestami-ai-real-property-os(2)/Hestami AI Real Property OS and Platform Product Description.md\" and prepare for implementation.",
+    "materiality_score": 0.476
+  },
+  {
+    "id": "995c1ae7-4f6f-4f71-b447-048dcc870e15",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[functional_requirements]",
+    "materiality_score": 0.46
+  },
+  {
+    "id": "b4069ff4-6d5f-4e24-ae33-3f0cae0df4d5",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[system_boundary]",
+    "materiality_score": 0.452
+  },
+  {
+    "id": "c02cf0d4-d23c-42d5-b4d5-3f3429c96177",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[software_domains]",
+    "materiality_score": 0.442
+  },
+  {
+    "id": "97841e81-2492-48e7-b991-2db0b2987267",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[interface_contracts]",
+    "materiality_score": 0.442
+  },
+  {
+    "id": "91a1ffd8-3df5-4a44-8625-b7c0738fe8c6",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[system_requirements]",
+    "materiality_score": 0.442
+  },
+  {
+    "id": "56b84cd8-084f-4a7c-984d-0db6b5c6b9da",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[non_functional_requirements]",
+    "materiality_score": 0.44
+  },
+  {
+    "id": "17bf4e80-42bd-4549-a0c2-7998dc63aa6e",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[intent_statement]",
+    "materiality_score": 0.44
+  },
+  {
+    "id": "ed67c9ba-9228-4ae8-86c9-e8ca979eb478",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[data_models]",
+    "materiality_score": 0.432
+  },
+  {
+    "id": "197b9ab0-803b-4d11-a344-58e62f87b595",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[component_model]",
+    "materiality_score": 0.432
+  },
+  {
+    "id": "258617a8-cd2b-4374-b1a5-3ac9f88836dc",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[api_definitions]",
+    "materiality_score": 0.422
+  },
+  {
+    "id": "23f099aa-f697-4800-98e6-1e30a0c6cd96",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[architectural_decisions]",
+    "materiality_score": 0.422
+  },
+  {
+    "id": "1f2d6027-ac53-4caa-8f9e-ec9f9b717d35",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[configuration_parameters]",
+    "materiality_score": 0.412
+  },
+  {
+    "id": "fb4ecd3a-4b12-476c-ad5a-0fa097959a84",
+    "record_type": "decision_bundle_presented",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "I identified 3 candidate interpretation(s) of your intent. Review the assumptions and open questions below, then approve, reject, defer, or edit each one.",
+    "materiality_score": 0.41
+  },
+  {
+    "id": "b2a15ffe-ae41-497b-b126-cff158f8a7e5",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[implementation_plan]",
+    "materiality_score": 0.402
+  },
+  {
+    "id": "65be4310-2ef6-4e45-b852-5c1d535e0fa8",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[test_plan]",
+    "materiality_score": 0.392
+  },
+  {
+    "id": "227da453-847a-45d4-aa2e-f7f08c334025",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[intent_bloom]",
+    "materiality_score": 0.39
+  },
+  {
+    "id": "d3ee6024-9c9f-44ab-ace7-c9402d59f69a",
+    "record_type": "query_decomposition_record",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[query_decomposition]",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "dc346639-6d3c-4fdb-9562-3aba2bf73003",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "```json\n{\n  \"topic_entities\": [\n    \"Test Plan\",\n    \"Non-Functional Requirements\",\n    \"NFR-001\",\n    \"NFR-002\",\n    \"Bun-based API backend\",\n    \"AI Agent\",\n    \"Search Queries\",\n    \"Asset Retrieval Endpoints\",\n    \"SeaweedFS\",\n    \"Media Ingestion Endpoints\",\n    \"P95 Latency\",\n    \"Throughput\"\n",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "70023eb9-4535-4dcb-8a2c-aacb848f380b",
+    "record_type": "agent_invocation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "e6c261c5-daba-4393-b369-ab20429c52a6",
+    "record_type": "retrieval_brief_record",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "1ea278d2-e677-4e67-b576-d504e9543ebe",
+    "record_type": "phase_gate_evaluation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[phase_gate]",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "435f5d37-ff54-42e4-a242-5ae92994d79d",
+    "record_type": "mirror_presented",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[test_plan_mirror]",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "c270ec6e-b72a-4704-8501-74779711791e",
+    "record_type": "artifact_produced",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "[test_coverage_report]",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "110d335b-93ff-4f6e-91e9-38aec7d1ecde",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "{\n  \"test_suites\": [\n    {\n      \"suite_id\": \"PROP-DATA-SUITE\",\n      \"component_id\": \"cmp-prop-data\",\n      \"test_type\": \"integration\",\n      \"test_cases\": [\n        {\n          \"test_case_id\": \"TC-PROP-001\",\n          \"type\": \"functional\",\n          \"acceptance_criterion_ids\": [\n            \"AC-00",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "a97dd40d-53c6-4905-8a11-0091c56f7398",
+    "record_type": "agent_invocation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "f19bc9c2-fcbd-4367-92cd-5c2b46d3215b",
+    "record_type": "context_packet",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "964d1096-c2ba-47d8-a067-5e1ca80f6e6a",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "{\n  \"decision_context_summary\": \"The governing directive [83fd7cad-f74c-4657-a228-68ca3bc6eacc] mandates the review of specifications [17bf4e80-42bd-4549-a0c2-7998dc63aa6e] and preparation for the Hestami AI Real Property OS implementation. Produced artifacts include functional requirements [995c1ae",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "a9b5c636-053c-4b01-845a-e8df15465c16",
+    "record_type": "agent_invocation",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "",
+    "materiality_score": 0.382
+  },
+  {
+    "id": "68722ada-c4fb-4229-9227-8f44c1eb4e13",
+    "record_type": "agent_output",
+    "authority_level": 2,
+    "governing_status": "active",
+    "summary": "{\n  \"topic_entities\": [\n    \"US-001\",\n    \"Individual Homeowner\",\n    \"property images\",\n    \"3D asset data (Splats)\",\n    \"Upload endpoint\",\n    \"Acceptance Criteria\",\n    \"AI analysis\"\n  ],\n  \"decision_types_sought\": [\n    \"phase_gate_approval\"\n  ],\n  \"temporal_scope\": {\n    \"from\": \"2023-01-01T00",
+    "materiality_score": 0.382
+  }
+]
+
+SUPERSESSION CHAINS:
+[]
+
+CONTRADICTIONS:
+[]
+
+COVERAGE ASSESSMENT:
+{
+  "sourcesQueried": [
+    "governed_stream_all_runs"
+  ],
+  "sourcesUnavailable": [],
+  "knownGaps": [
+    "Vector index coverage is 0% (0/191) — semantic similarity results may be incomplete."
+  ],
+  "confidence": 0.85
+}
+
+YOUR REQUIRED OUTPUT (JSON):
+```json
+{
+  "decision_context_summary": "narrative summary of governing decisions",
+  "active_constraints": [{"statement": "...", "authority_level": 6, "source_record_ids": ["..."]}],
+  "supersession_chains": [{"subject": "...", "chain": [{"record_id": "...", "position": "current_governing"}]}],
+  "contradictions": [{"record_ids": ["..."], "explanation": "...", "resolution_status": "unresolved|resolved_by_recency|resolved_by_authority"}],
+  "open_questions": [{"question": "...", "still_unresolved": true, "source_record_id": "..."}],
+  "completeness_status": "complete|partial_low|partial_medium|incomplete_high",
+  "completeness_narrative": "what was found and what is missing"
+}
+```
+
+Rules:
+- Every claim in decision_context_summary must cite a source_record_id
+- active_constraints include ONLY Authority Level 6+ records that are NOT superseded
+- contradictions must have resolution_status — if unresolved, the hiring agent must be told
+- completeness_status: complete = all sources queried, no gaps; partial_low = minor gaps; partial_medium = notable gaps; incomplete_high = critical gaps that may affect decision quality

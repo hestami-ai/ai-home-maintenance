@@ -1,0 +1,87 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Domain Interpreter Agent] performing Intent Statement Synthesis for Sub-Phase 1.4.
+
+GOVERNING CONSTRAINTS (apply without exception):
+(none)
+
+Your job is to synthesize all prune decisions into a complete, locked [JC:Intent Statement]. This is the definitive specification of what the human means.
+
+REQUIRED OUTPUT: A JSON object matching the `intent_statement` schema:
+- product_concept: {name, description, who_it_serves, problem_it_solves} — from the selected candidate
+- confirmed_assumptions: array of {assumption, confirmed_by_record_id}
+- confirmed_constraints: array of {constraint, type: technical|business|regulatory|preferential}
+- out_of_scope: array of strings
+- scope_classification_ref: reference ID
+- compliance_context_ref: reference ID
+- prior_decision_overrides: array (if any prior decisions were overridden)
+- system_proposed_content_items: array of {field, content, approved: boolean}
+
+Rules:
+- Every field must be populated — no nulls, no empty strings for required fields
+- The product_concept must faithfully represent the HUMAN'S selection, not your preference
+- Assumptions are ONLY those explicitly confirmed by the human in prune decisions
+- Constraints include both human-stated and system-identified (compliance)
+- out_of_scope must explicitly list what was discussed but excluded
+
+[PRODUCT SCOPE]
+Selected Product Concept:
+{
+  "id": "CP-001-consumer-discovery-mvp",
+  "name": "Consumer Discovery MVP (Phase 1 Focus)",
+  "description": "Implementation focused exclusively on Pillar 1 (Home Real Property Assistant) to prioritize user acquisition, property data ingestion (images, 3D splats), and service provider matching for individual homeowners.",
+  "who_it_serves": [
+    "Individual homeowners",
+    "Small landlords",
+    "Property investors managing one or more residences",
+    "Hestami Staff (Coordinators)"
+  ],
+  "problem_it_solves": "Property owners wasting time finding reliable contractors, comparing inconsistent bids, and managing follow-up/scheduling.",
+  "assumptions": [
+    {
+      "inference": "The MVP should prioritize the 'AI Agent' discovery experience over a manual directory.",
+      "basis": "Raw Intent Vision Statement: 'minimize level of effort for both parties' via 'AI Agent or Hestami Staff facilitate service provider discovery'."
+    },
+    {
+      "inference": "Vendor onboarding is treated as an external process (non-internal platform requirement) for V1.",
+      "basis": "Raw Intent Pillar 1 Domain 9: 'External Vendor Coordination - Service provider tracking without onboarding requirements'."
+    },
+    {
+      "inference": "Offline capabilities for homeowners are secondary to the primary web-based experience.",
+      "basis": "Raw Intent Architecture: 'Mobile... Dedicated clients for homeowners and technicians, focusing on task-centric workflows and offline-first capabilities' (Implies offline is critical for Technicians, not necessarily Homeowners)."
+    },
+    {
+      "inference": "The 'Digital Asset' ingestion (3D Gaussian Splats, images) is a prerequisite for the service matching logic.",
+      "basis": "Raw Intent Mission Statement: 'leveraging modern techniques such 3D Gaussian Splats... to minimize friction'."
+    },
+    {
+      "inference": "Accounting/Financials (Pillar 2/3) are strictly out of scope for this MVP.",
+      "basis": "Raw Intent Phasing Strategy: Phase 1 is 'Hestami Home Real Property Assistant' distinct from Phase 2/3."
+    }
+  ],
+  "constraints": [
+    "Must use SvelteKit for the frontend portal.",
+    "Must use Bun for high-performance API execution.",
+    "Must use DBOS versioned workflows for the service call lifecycle.",
+    "Must enforce Row-Level Security (RLS) for multi-tenant isolation.",
+    "Must use SeaweedFS for media asset storage.",
+    "Must strictly follow the defined pillars (Phase 1 only) for feature gating."
+  ],
+  "open_questions": [
+    "How to monetize the consumer-facing MVP without violating privacy or trust models?",
+    "What is the specific retention strategy for homeowners who only use the app for a single service call?",
+    "Does the MVP include the Human Hestami Staff service call execution, or is it fully AI/Agent driven?"
+  ]
+}
+
+Prune Decisions:
+Kept: Consumer Discovery MVP (Phase 1 Focus)
+Kept: Enterprise Governance MVP (Phase 3 Focus)
+Kept: Field Service Engine MVP (Phase 2 Focus)
+
+Confirmed Assumptions:
+The MVP should prioritize the 'AI Agent' discovery experience over a manual directory.; Vendor onboarding is treated as an external process (non-internal platform requirement) for V1.; Offline capabilities for homeowners are secondary to the primary web-based experience.; The 'Digital Asset' ingestion (3D Gaussian Splats, images) is a prerequisite for the service matching logic.; Accounting/Financials (Pillar 2/3) are strictly out of scope for this MVP.; The platform must replicate Vantaca's 'System of Action' (Action Items) methodology.; The MVP targets 'Production Grade' financial handling (Auditable, compliant GL structure).; Integration with government services (Permits/BLDS) is critical for the ARC domain.; The MVP assumes a 'Single Tenant' or 'Multi-Tenant' model where HOAs are distinct tenants.; AI extraction of documents (CC&Rs, Bylaws) is a core feature, not an afterthought.; The MVP must function as an 'Operating System for the Trades' (ServiceTitan Model).; Mobile App is a critical component for offline-first capabilities.; Job Costing and Profitability are required immediately to attract contractors.; The platform must support 'Offline mode with queueing' for remote sites.; The MVP assumes a 'Good-Better-Best' quoting model is needed for estimates.
+
+Confirmed Constraints:
+Must use SvelteKit for the frontend portal.; Must use Bun for high-performance API execution.; Must use DBOS versioned workflows for the service call lifecycle.; Must enforce Row-Level Security (RLS) for multi-tenant isolation.; Must use SeaweedFS for media asset storage.; Must strictly follow the defined pillars (Phase 1 only) for feature gating.; Must use Cerbos for policy-based authorization engine (Board vs. Staff access).; Must support Statutory deadlines (Notice requirements) via Rules Engine.; Must support Mass Email/SMS (Domain 7) for violation notices and meeting notices.; Must adhere to Vantaca model for CAM workflows.; Must support Reserve Studies and Funding Plans (Domain 11).; Must use DBOS for durable, versioned workflows (Domain 3).; Must integrate with Stripe/Square for Payment capture (Domain 7).; Must use Traefik as the sole ingress proxy.; Must use FFmpeg for video processing (evidence capture).; Must strictly follow the ServiceTitan business domains (Identity, Workforce, Pricebook, etc.).
+
+Out of Scope:

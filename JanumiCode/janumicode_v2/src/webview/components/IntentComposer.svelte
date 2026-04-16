@@ -377,77 +377,96 @@
 <style>
   .composer {
     flex-shrink: 0;
-    border-top: 1px solid var(--vscode-panel-border, #333);
-    background: var(--vscode-sideBar-background);
+    background: var(--jc-surface-container-low);
   }
   .composer-body {
     position: relative;
-    padding: 6px 8px 8px;
+    padding: var(--jc-space-lg) var(--jc-space-lg) var(--jc-space-lg);
   }
   textarea {
     width: 100%;
     box-sizing: border-box;
-    min-height: 36px;
+    min-height: 40px;
     max-height: 160px;
     resize: none;
-    background: var(--vscode-input-background);
-    color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border, #555);
-    border-radius: 3px;
-    padding: 6px 8px;
-    font-family: inherit;
-    font-size: inherit;
+    background: var(--jc-surface-container-highest);
+    color: var(--jc-on-surface);
+    border: var(--jc-ghost-border);
+    border-radius: var(--jc-radius-sm);
+    padding: var(--jc-space-lg) var(--jc-space-lg);
+    font-family: var(--jc-font-body);
+    font-size: 0.9em;
+    line-height: 1.5;
+    transition: border-color var(--jc-transition-fast);
+  }
+  textarea::placeholder {
+    color: var(--jc-on-surface-variant);
   }
   textarea:focus {
-    outline: 1px solid var(--vscode-focusBorder);
-    outline-offset: -1px;
+    outline: none;
+    border-color: var(--jc-primary);
   }
   .footer {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-top: 4px;
-    font-size: 0.75em;
+    gap: var(--jc-space-lg);
+    margin-top: var(--jc-space-md);
+    font-size: 0.7em;
   }
   .attach-btn {
     background: transparent;
-    color: var(--vscode-foreground);
-    border: 1px solid var(--vscode-panel-border, #555);
-    border-radius: 3px;
-    width: 24px;
-    height: 22px;
+    color: var(--jc-on-surface-variant);
+    border: var(--jc-ghost-border);
+    border-radius: var(--jc-radius-sm);
+    width: 26px;
+    height: 24px;
     cursor: pointer;
-    font-family: inherit;
+    font-family: var(--jc-font-body);
+    font-weight: 600;
     line-height: 1;
+    transition: all var(--jc-transition-fast);
   }
-  .attach-btn:hover { background: var(--vscode-list-hoverBackground); }
+  .attach-btn:hover {
+    background: var(--jc-surface-container-high);
+    color: var(--jc-primary);
+  }
   .mode-badge {
-    color: var(--vscode-textLink-foreground, #4da6ff);
-    font-weight: bold;
+    color: var(--jc-primary);
+    font-family: var(--jc-font-mono);
+    font-weight: 600;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
   }
-  .tokens, .queue {
-    opacity: 0.6;
+  .tokens {
+    color: var(--jc-outline);
+    font-family: var(--jc-font-mono);
   }
   .queue {
-    color: var(--vscode-charts-orange, #d18616);
-    opacity: 1;
+    color: var(--jc-warning);
+    font-family: var(--jc-font-mono);
+    font-weight: 600;
   }
   .send-btn {
     margin-left: auto;
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background: var(--jc-primary-container);
+    color: var(--jc-on-primary-container);
     border: none;
-    border-radius: 3px;
-    padding: 4px 16px;
+    border-radius: var(--jc-radius-sm);
+    padding: var(--jc-space-md) var(--jc-space-2xl);
     cursor: pointer;
-    font-family: inherit;
-    font-size: 0.95em;
+    font-family: var(--jc-font-body);
+    font-weight: 700;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: filter var(--jc-transition-fast);
   }
   .send-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
   }
   .send-btn:hover:not(:disabled) {
-    background: var(--vscode-button-hoverBackground);
+    filter: brightness(1.15);
   }
 </style>

@@ -1,0 +1,302 @@
+{
+  "configuration_parameters": {
+    "params": [
+      {
+        "component_id": "cmp-prop-data",
+        "name": "db_url",
+        "type": "url",
+        "default": null,
+        "required": true,
+        "description": "Connection string for the primary property asset database (PostgreSQL/Vector Store)."
+      },
+      {
+        "component_id": "cmp-prop-data",
+        "name": "seaweedfs_root",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "Base storage path for SeaweedFS media asset ingestion (images and 3D splats)."
+      },
+      {
+        "component_id": "cmp-prop-data",
+        "name": "indexer_timeout_duration",
+        "type": "duration",
+        "default": "10s",
+        "required": false,
+        "description": "Maximum time allowed to index a valid asset after upload (RSP-002)."
+      },
+      {
+        "component_id": "cmp-prop-data",
+        "name": "db_password",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "Database authentication password (security-sensitive)."
+      },
+      {
+        "component_id": "cmp-prop-data",
+        "name": "max_upload_size_mb",
+        "type": "integer",
+        "default": 500,
+        "required": false,
+        "description": "Maximum allowed file size in MB for property asset ingestion."
+      },
+      {
+        "component_id": "cmp-prop-data",
+        "name": "offline_buffer_ttl_seconds",
+        "type": "integer",
+        "default": 86400,
+        "required": false,
+        "description": "Time-to-live for offline data capture buffers (RSP-003)."
+      },
+      {
+        "component_id": "cmp-provider-match",
+        "name": "search_db_url",
+        "type": "url",
+        "default": null,
+        "required": true,
+        "description": "Connection string for the provider search and bid estimation database."
+      },
+      {
+        "component_id": "cmp-provider-match",
+        "name": "ai_agent_endpoint",
+        "type": "url",
+        "default": null,
+        "required": true,
+        "description": "API endpoint for the AI Agent Service Provider Search & Matching processing."
+      },
+      {
+        "component_id": "cmp-provider-match",
+        "name": "min_match_score",
+        "type": "float",
+        "default": 0.75,
+        "required": false,
+        "description": "Minimum relevance score for service provider results to be returned (RSP-004)."
+      },
+      {
+        "component_id": "cmp-provider-match",
+        "name": "api_secret_key",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "API secret key for the matching service (security-sensitive)."
+      },
+      {
+        "component_id": "cmp-provider-match",
+        "name": "bid_threshold_cents",
+        "type": "integer",
+        "default": 0,
+        "required": false,
+        "description": "Minimum bid amount in cents enforced in UI comparison tables (RSP-005)."
+      },
+      {
+        "component_id": "cmp-compliance",
+        "name": "regulatory_db_url",
+        "type": "url",
+        "default": null,
+        "required": true,
+        "description": "Connection string for the compliance rules and statutory deadline database."
+      },
+      {
+        "component_id": "cmp-compliance",
+        "name": "deadline_check_interval_seconds",
+        "type": "integer",
+        "default": 3600,
+        "required": false,
+        "description": "Frequency (seconds) to monitor statutory deadlines for regulatory obligations (RSP-007)."
+      },
+      {
+        "component_id": "cmp-compliance",
+        "name": "ai_extraction_confidence_min",
+        "type": "float",
+        "default": 0.85,
+        "required": false,
+        "description": "Minimum confidence score for CC&R and Bylaws AI extraction to be trusted (RSP-006)."
+      },
+      {
+        "component_id": "cmp-compliance",
+        "name": "extractor_api_secret",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "Secret key for the AI extraction module integration (security-sensitive)."
+      },
+      {
+        "component_id": "cmp-compliance",
+        "name": "alert_channel_id",
+        "type": "string",
+        "default": null,
+        "required": false,
+        "description": "ID of the default notification channel for compliance alerts."
+      },
+      {
+        "component_id": "cmp-workflow",
+        "name": "workflow_db_url",
+        "type": "url",
+        "default": null,
+        "required": true,
+        "description": "Connection string for the Action Items and Workflow State database."
+      },
+      {
+        "component_id": "cmp-workflow",
+        "name": "ui_sync_latency_target_ms",
+        "type": "integer",
+        "default": 500,
+        "required": false,
+        "description": "Target latency to reflect status updates immediately in the UI (RSP-010)."
+      },
+      {
+        "component_id": "cmp-workflow",
+        "name": "audit_retention_days",
+        "type": "integer",
+        "default": 90,
+        "required": false,
+        "description": "Retention period for workflow audit log transitions (RSP-009)."
+      },
+      {
+        "component_id": "cmp-workflow",
+        "name": "workflow_secret_key",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "Secret key for workflow state verification and auth (security-sensitive)."
+      },
+      {
+        "component_id": "cmp-notifications",
+        "name": "smtp_host",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "SMTP server host for mass email processing (RSP-011)."
+      },
+      {
+        "component_id": "cmp-notifications",
+        "name": "smtp_port",
+        "type": "integer",
+        "default": 587,
+        "required": false,
+        "description": "SMTP server port for email delivery."
+      },
+      {
+        "component_id": "cmp-notifications",
+        "name": "twilio_account_sid",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "Twilio Account SID for SMS communication (RSP-011)."
+      },
+      {
+        "component_id": "cmp-notifications",
+        "name": "twilio_auth_token",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "Twilio API authentication token for SMS (security-sensitive)."
+      },
+      {
+        "component_id": "cmp-notifications",
+        "name": "retry_max_attempts",
+        "type": "integer",
+        "default": 3,
+        "required": false,
+        "description": "Maximum number of delivery attempts for bounce tracking."
+      },
+      {
+        "component_id": "cmp-notifications",
+        "name": "retry_window_hours",
+        "type": "integer",
+        "default": 2,
+        "required": false,
+        "description": "Total window in hours to resume delivery attempts upon reconnection (RSP-012)."
+      },
+      {
+        "component_id": "cmp-notifications",
+        "name": "notification_service_secret",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "Secret key for the notification dispatcher service (security-sensitive)."
+      },
+      {
+        "component_id": "cmp-security",
+        "name": "auth_provider_endpoint",
+        "type": "url",
+        "default": null,
+        "required": true,
+        "description": "Endpoint for the multi-tenant security and authorization gateway."
+      },
+      {
+        "component_id": "cmp-security",
+        "name": "jwt_signing_secret",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "Secret key used to sign and validate JWT tokens (security-sensitive)."
+      },
+      {
+        "component_id": "cmp-security",
+        "name": "rls_policy_store_url",
+        "type": "url",
+        "default": null,
+        "required": true,
+        "description": "Connection for storing and querying Row-Level Security policies (RSP-014)."
+      },
+      {
+        "component_id": "cmp-security",
+        "name": "access_check_timeout_ms",
+        "type": "integer",
+        "default": 50,
+        "required": false,
+        "description": "Maximum time (ms) to enforce unauthorized access responses for restricted data (RSP-015)."
+      },
+      {
+        "component_id": "cmp-security",
+        "name": "session_timeout_seconds",
+        "type": "integer",
+        "default": 1800,
+        "required": false,
+        "description": "Default session timeout duration for authenticated users."
+      },
+      {
+        "component_id": "cmp-payment",
+        "name": "currency_code",
+        "type": "string",
+        "default": "USD",
+        "required": false,
+        "description": "Default currency code for payment transactions (ISO 4217)."
+      },
+      {
+        "component_id": "cmp-payment",
+        "name": "stripe_api_secret_key",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "Stripe API secret key for processing deposits and fees (RSP-016)."
+      },
+      {
+        "component_id": "cmp-payment",
+        "name": "stripe_webhook_secret",
+        "type": "string",
+        "default": null,
+        "required": true,
+        "description": "Secret for verifying Stripe payment event signatures (security-sensitive)."
+      },
+      {
+        "component_id": "cmp-payment",
+        "name": "receipt_template_url",
+        "type": "url",
+        "default": null,
+        "required": false,
+        "description": "Base URL for generating electronic proof of payment and receipts (RSP-017)."
+      },
+      {
+        "component_id": "cmp-payment",
+        "name": "payment_gateway_timeout_seconds",
+        "type": "integer",
+        "default": 30,
+        "required": false,
+        "description": "Timeout for payment gateway connections before failure."
+      }
+    ]
+  }
+}

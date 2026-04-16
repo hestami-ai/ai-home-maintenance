@@ -51,6 +51,18 @@
     }, HIDE_DELAY);
   }
 
+  /**
+   * Click-to-toggle — hover alone was reported as flaky in some VS Code
+   * webview builds. Click gives users a reliable way to open the flyout
+   * regardless of hover dispatch quirks (transient mouseenter loss when
+   * hovering over individual dot buttons, etc.).
+   */
+  function handleTimelineClick() {
+    if (hoverTimeout) clearTimeout(hoverTimeout);
+    showFlyout = !showFlyout;
+    if (showFlyout) updateFlyoutPosition();
+  }
+
   function updateFlyoutPosition() {
     if (!timelineRef) return;
     const rect = timelineRef.getBoundingClientRect();
@@ -87,10 +99,23 @@
   }
 </script>
 
-<div class="phase-indicator">
+<div
+  class="phase-indicator"
+  onmouseenter={handleTimelineEnter}
+  onmouseleave={handleTimelineLeave}
+  role="region"
+  aria-label="Phase indicator"
+>
   {#if phaseStore.hasActiveRun}
-    <!-- Current Phase Display -->
-    <div class="current-phase-area">
+    <!-- Current Phase Display — clickable so users can toggle the flyout
+         via the phase name, not just by hovering the tiny dot row. -->
+    <button
+      type="button"
+      class="current-phase-area"
+      onclick={handleTimelineClick}
+      aria-expanded={showFlyout}
+      aria-haspopup="menu"
+    >
       <div class="current-phase-name">
         {PHASE_NAMES[phaseStore.state.currentPhaseId ?? '0']}
       </div>
@@ -99,14 +124,12 @@
           {getSubPhaseName(phaseStore.state.currentPhaseId ?? '0', phaseStore.state.currentSubPhaseId)}
         </div>
       {/if}
-    </div>
+    </button>
 
     <!-- Mini-Timeline -->
     <div
       class="phase-timeline"
       bind:this={timelineRef}
-      onmouseenter={handleTimelineEnter}
-      onmouseleave={handleTimelineLeave}
       role="navigation"
       aria-label="Phase timeline"
     >
@@ -202,39 +225,54 @@
   .phase-indicator {
     position: relative;
     flex-shrink: 0;
-    background: var(--vscode-sideBar-background);
-    border-bottom: 1px solid var(--vscode-panel-border, #333);
-    padding: 8px 12px;
+    background: var(--jc-surface-container-low);
+    padding: var(--jc-space-lg) var(--jc-space-xl);
     z-index: 20;
   }
 
-  /* Current Phase Display */
+  /* Current Phase Display — rendered as a button for click-to-toggle
+     flyout behavior. Button visual chrome is reset so it matches the
+     original div rendering. */
   .current-phase-area {
-    margin-bottom: 6px;
+    display: block;
+    width: 100%;
+    margin-bottom: var(--jc-space-md);
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+  }
+  .current-phase-area:hover .current-phase-name {
+    color: var(--jc-primary);
   }
 
   .current-phase-name {
+    font-family: var(--jc-font-headline);
     font-size: 1.05em;
-    font-weight: 600;
-    color: var(--vscode-foreground);
-    margin-bottom: 2px;
+    font-weight: 700;
+    color: var(--jc-on-surface);
+    margin-bottom: var(--jc-space-xs);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    letter-spacing: -0.01em;
   }
 
   .current-subphase {
-    font-size: 0.85em;
-    color: var(--vscode-descriptionForeground);
-    opacity: 0.8;
+    font-family: var(--jc-font-mono);
+    font-size: 0.75em;
+    color: var(--jc-on-surface-variant);
   }
 
   /* Mini-Timeline */
   .phase-timeline {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 0;
+    gap: var(--jc-space-sm);
+    padding: var(--jc-space-sm) 0;
     flex-wrap: nowrap;
     overflow-x: auto;
   }
@@ -243,144 +281,129 @@
     min-width: 22px;
     height: 22px;
     border-radius: 50%;
-    border: 1px solid var(--vscode-descriptionForeground);
+    border: 1.5px solid var(--jc-outline);
     background: transparent;
     cursor: default;
-    font-size: 0.65em;
-    font-family: inherit;
-    color: var(--vscode-descriptionForeground);
+    font-family: var(--jc-font-mono);
+    font-size: 0.6em;
+    color: var(--jc-outline);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: all 0.15s ease;
+    transition: all var(--jc-transition-fast);
   }
 
   .phase-dot:hover:not(:disabled) {
     transform: scale(1.15);
-    border-color: var(--vscode-button-background);
+    border-color: var(--jc-primary);
   }
 
-  /* Completed phase - checkmark icon */
+  /* Completed phase */
   .phase-dot.completed {
-    border-color: var(--vscode-terminal-ansiGreen, #4caf50);
-    color: var(--vscode-terminal-ansiGreen, #4caf50);
+    border-color: var(--jc-tertiary);
+    color: var(--jc-tertiary);
+    background: var(--jc-tertiary-tint-soft);
     cursor: pointer;
   }
 
-  /* Current phase - filled dot with pulse */
+  /* Current phase — spec: solid primary dot with pulse ring */
   .phase-dot.current {
-    background: var(--vscode-button-background);
-    border-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background: var(--jc-primary);
+    border-color: var(--jc-primary);
+    color: var(--jc-on-primary);
     font-weight: bold;
-    animation: pulse 2s ease-in-out infinite;
+    animation: jc-pulse-ring 2s ease-in-out infinite;
   }
 
-  @keyframes pulse {
-    0%, 100% { box-shadow: 0 0 4px var(--vscode-button-background); }
-    50% { box-shadow: 0 0 10px var(--vscode-button-background); }
-  }
-
-  /* Future phase - empty outline */
+  /* Future phase — spec: hollow ring */
   .phase-dot.future {
     background: transparent;
-    opacity: 0.4;
+    opacity: 0.35;
   }
 
-  /* Conditional phase (0.5 not triggered) - dashed dimmed */
+  /* Conditional phase (0.5 not triggered) */
   .phase-dot.conditional {
-    opacity: 0.3;
+    opacity: 0.25;
     border-style: dashed;
   }
 
   /* Flyout */
   .phase-flyout {
     position: absolute;
-    left: 12px;
-    right: 12px;
+    left: 14px;
+    right: 14px;
     min-width: 220px;
-    max-width: 260px;
-    background: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    padding: 4px 0;
+    max-width: 280px;
+    background: var(--jc-surface-container-high);
+    backdrop-filter: blur(12px);
+    border: var(--jc-ghost-border);
+    border-radius: var(--jc-radius-md);
+    box-shadow: var(--jc-shadow-float);
+    padding: var(--jc-space-md) 0;
     z-index: 100;
   }
 
   .phase-flyout.above {
     bottom: 100%;
-    margin-bottom: 4px;
+    margin-bottom: var(--jc-space-md);
   }
 
   .phase-flyout.below {
     top: 100%;
-    margin-top: 4px;
+    margin-top: var(--jc-space-md);
   }
 
-  /* Flyout header */
   .phase-flyout-header {
-    padding: 6px 12px;
-    font-size: 0.75em;
-    font-weight: 600;
+    padding: var(--jc-space-md) var(--jc-space-xl);
+    font-family: var(--jc-font-body);
+    font-size: 0.65em;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--vscode-foreground);
-    border-bottom: 1px solid var(--vscode-panel-border);
-    margin-bottom: 4px;
+    letter-spacing: 0.1em;
+    color: var(--jc-outline);
+    margin-bottom: var(--jc-space-xs);
   }
 
-  /* Flyout item */
   .phase-flyout-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: var(--jc-space-md);
+    padding: var(--jc-space-md) var(--jc-space-xl);
     width: 100%;
     border: none;
     background: transparent;
-    color: var(--vscode-foreground);
+    color: var(--jc-on-surface);
     cursor: default;
-    font-family: inherit;
-    font-size: 0.9em;
+    font-family: var(--jc-font-body);
+    font-size: 0.8em;
     text-align: left;
+    transition: background var(--jc-transition-fast);
   }
 
   .phase-flyout-item:hover:not(:disabled) {
-    background: var(--vscode-list-hoverBackground);
+    background: var(--jc-surface-bright);
     cursor: pointer;
   }
 
   .phase-flyout-item:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
   }
 
-  /* Flyout item status icon */
   .phase-flyout-icon {
     width: 16px;
     height: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.9em;
+    font-size: 0.85em;
     flex-shrink: 0;
   }
 
-  .phase-flyout-icon.completed {
-    color: var(--vscode-terminal-ansiGreen, #4caf50);
-  }
+  .phase-flyout-icon.completed { color: var(--jc-tertiary); }
+  .phase-flyout-icon.current { color: var(--jc-primary); }
+  .phase-flyout-icon.future { color: var(--jc-outline); opacity: 0.5; }
 
-  .phase-flyout-icon.current {
-    color: var(--vscode-button-background);
-  }
-
-  .phase-flyout-icon.future {
-    color: var(--vscode-descriptionForeground);
-    opacity: 0.7;
-  }
-
-  /* Flyout item name */
   .phase-flyout-name {
     flex: 1;
     white-space: nowrap;
@@ -390,40 +413,31 @@
 
   .phase-flyout-item.current .phase-flyout-name {
     font-weight: 600;
-    color: var(--vscode-button-background);
+    color: var(--jc-primary);
   }
 
-  /* Flyout item phase number */
   .phase-flyout-number {
+    font-family: var(--jc-font-mono);
     font-size: 0.8em;
-    color: var(--vscode-foreground);
-    opacity: 0.8;
+    color: var(--jc-outline);
     flex-shrink: 0;
   }
 
-  /* Phase group container for sub-phases */
-  .phase-flyout-phase-group {
-    border-bottom: 1px solid var(--vscode-panel-border, #333);
+  .phase-flyout-phase-group + .phase-flyout-phase-group {
+    border-top: 1px solid var(--jc-outline-variant-tint-soft);
   }
 
-  .phase-flyout-phase-group:last-child {
-    border-bottom: none;
-  }
-
-  /* Sub-phases container */
   .phase-flyout-subphases {
-    padding: 0 12px 6px 28px;
+    padding: 0 14px 6px 30px;
   }
 
-  /* Sub-phase item */
   .subphase-item {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 0;
-    font-size: 0.8em;
-    color: var(--vscode-foreground);
-    opacity: 0.85;
+    gap: var(--jc-space-md);
+    padding: var(--jc-space-xs) 0;
+    font-size: 0.75em;
+    color: var(--jc-on-surface-variant);
   }
 
   .subphase-icon {
@@ -432,22 +446,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.85em;
+    font-size: 0.8em;
     flex-shrink: 0;
   }
 
-  .subphase-icon.completed {
-    color: var(--vscode-terminal-ansiGreen, #4caf50);
-  }
-
-  .subphase-icon.current {
-    color: var(--vscode-button-background);
-  }
-
-  .subphase-icon.future {
-    color: var(--vscode-descriptionForeground);
-    opacity: 0.6;
-  }
+  .subphase-icon.completed { color: var(--jc-tertiary); }
+  .subphase-icon.current { color: var(--jc-primary); }
+  .subphase-icon.future { color: var(--jc-outline); opacity: 0.4; }
+  .subphase-icon.skipped { color: var(--jc-outline); opacity: 0.3; }
 
   .subphase-name {
     flex: 1;
@@ -457,50 +463,37 @@
   }
 
   .subphase-item.current .subphase-name {
-    color: var(--vscode-button-background);
+    color: var(--jc-primary);
     font-weight: 500;
   }
 
   .subphase-item.completed .subphase-name {
-    color: var(--vscode-foreground);
-    opacity: 0.85;
+    color: var(--jc-on-surface-variant);
   }
 
   .subphase-item.future .subphase-name {
-    opacity: 0.6;
-  }
-
-  /* Skipped sub-phase */
-  .subphase-icon.skipped {
-    color: var(--vscode-descriptionForeground);
     opacity: 0.5;
   }
 
   .subphase-item.skipped .subphase-name {
-    opacity: 0.5;
+    opacity: 0.4;
     text-decoration: line-through;
   }
 
   .subphase-skipped-label {
-    font-size: 0.85em;
-    color: var(--vscode-descriptionForeground);
-    opacity: 0.6;
-    margin-left: 4px;
+    font-size: 0.8em;
+    color: var(--jc-outline);
+    opacity: 0.5;
+    margin-left: var(--jc-space-sm);
   }
 
   /* No Active Run State */
   .current-phase-name.no-run {
-    color: var(--vscode-descriptionForeground);
+    color: var(--jc-outline);
     font-style: italic;
+    font-weight: 400;
   }
 
-  /* Empty Timeline (no active run) */
-  .phase-timeline.empty {
-    opacity: 0.4;
-  }
-
-  .phase-dot.empty {
-    cursor: default;
-    opacity: 0.3;
-  }
+  .phase-timeline.empty { opacity: 0.3; }
+  .phase-dot.empty { cursor: default; opacity: 0.25; }
 </style>

@@ -1,0 +1,15 @@
+{
+  "model": "qwen3.5:9b",
+  "provider": "ollama",
+  "prompt": "[JC:SYSTEM SCOPE]\nYou are the [JC:Systems Agent] specifying Interface Contracts for Sub-Phase 3.3.\n\nGOVERNING CONSTRAINTS (apply without exception):\nNo constraints\n\nSpecify [JC:Interface Contracts] for every [JC:External System] and between internal Components.\n\nREQUIRED OUTPUT: A JSON object matching the `interface_contracts` schema:\n- contracts: array, each with:\n  - id, systems_involved (at least 2), protocol, data_format, auth_mechanism, error_handling_strategy\n  - error_responses: at least one error response per contract (Invariant)\n\nRules:\n- Every External System must have at least one Interface Contract (Invariant)\n- Every contract must specify at least one error response (Invariant)\n\nCONTEXT:\nSystem Boundary: In scope: CLI Command Line Interface; Local File Storage Engine; Task Creation Logic; Task Listing Logic; Task Update Logic. External systems: Local Operating System Filesystem\nExternal Systems: EXT-FS-01: Local Operating System Filesystem (File I/O)",
+  "system": null,
+  "responseFormat": "json",
+  "temperature": 0.4,
+  "traceContext": {
+    "workflowRunId": "40c2ffbf-0a40-4776-beef-4387389a3658",
+    "phaseId": "3",
+    "subPhaseId": "3.3",
+    "agentRole": "systems_agent",
+    "label": "Phase 3.3 — Interface Contract Specification"
+  }
+}

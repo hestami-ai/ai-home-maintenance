@@ -1,6 +1,6 @@
 <!--
   Card — dispatches to the appropriate card renderer based on record_type.
-  Wave 5 update: routes mirror_presented / menu_presented / phase_gate_evaluation
+  Routes mirror_presented / decision_bundle_presented / phase_gate_evaluation
   to the specialized cards; renders raw_intent_received / open_query_received
   / client_liaison_response with friendlier previews.
 -->
@@ -10,10 +10,10 @@
   import { PHASE_NAMES, type PhaseId } from '../../lib/types/records';
   import { formatTimestamp } from '../utils/timestamps';
   import MirrorCard from './MirrorCard.svelte';
-  import MenuCard from './MenuCard.svelte';
   import PhaseGateCard from './PhaseGateCard.svelte';
   import AgentInvocationCard from './AgentInvocationCard.svelte';
   import PreMortemCard from './PreMortemCard.svelte';
+  import DecisionBundleCard from './DecisionBundleCard.svelte';
 
   interface Props {
     record: SerializedRecord;
@@ -40,7 +40,6 @@
         return 'phase_milestone';
       case 'phase_gate_evaluation':
       case 'mirror_presented':
-      case 'menu_presented':
       case 'decision_bundle_presented':
         return 'human_interaction';
       case 'raw_intent_received':
@@ -93,6 +92,25 @@
 
   const category = $derived(getCategory(record.record_type));
   const roleLabel = $derived(getRoleLabel(record.produced_by_agent_role));
+
+  // "Human" badge surfaces on cards that represent user intent or a
+  // direct human decision. Agent-produced records stay with their agent
+  // role badge. Matches v1's role-human styling.
+  const humanRecordTypes = new Set<string>([
+    'raw_intent_received',
+    'open_query_received',
+    'mirror_approved',
+    'mirror_rejected',
+    'mirror_edited',
+    'phase_gate_approved',
+    'phase_gate_rejected',
+    'decision_trace',
+    'rollback_authorized',
+    'quarantine_override',
+    'warning_acknowledged',
+    'warning_batch_acknowledged',
+  ]);
+  const isHumanRecord = $derived(humanRecordTypes.has(record.record_type));
   const contentPreview = $derived(getContentPreview(record.content));
   const provenanceIds = $derived(
     Array.isArray((record.content as { provenance_record_ids?: string[] }).provenance_record_ids)
@@ -124,9 +142,9 @@
   <div data-record-id={record.id}>
     <MirrorCard {record} {ondecision} {vscode} />
   </div>
-{:else if record.record_type === 'menu_presented' || record.record_type === 'decision_bundle_presented'}
+{:else if record.record_type === 'decision_bundle_presented'}
   <div data-record-id={record.id}>
-    <MenuCard {record} {ondecision} {vscode} />
+    <DecisionBundleCard {record} {vscode} />
   </div>
 {:else if record.record_type === 'phase_gate_evaluation'}
   <div data-record-id={record.id}>
@@ -142,7 +160,11 @@
     data-phase-label={record.phase_id ? PHASE_NAMES[record.phase_id as PhaseId] : undefined}
   >
     <button class="card-header" onclick={() => (collapsed = !collapsed)}>
-      <span class="role-badge">{roleLabel}</span>
+      {#if isHumanRecord}
+        <span class="role-badge role-human">Human</span>
+      {:else}
+        <span class="role-badge">{roleLabel}</span>
+      {/if}
       <span class="record-type">{record.record_type}</span>
       {#if record.phase_id}
         <span class="phase-badge">P{record.phase_id}</span>
@@ -180,103 +202,175 @@
 
 <style>
   .card {
-    border: 1px solid var(--vscode-panel-border, #333);
-    border-radius: 4px;
+    position: relative;
+    background: var(--jc-surface-container-low);
+    border: var(--jc-ghost-border);
+    border-radius: var(--jc-radius-md);
     overflow: hidden;
-    font-size: 0.85em;
+    /* Inherit the 16px body size — no shrink. Earlier iterations used
+       0.85em / 0.92em which compounded through em-based descendants
+       down to 8–10px on output blocks. Cards now read at full body
+       size and badges / meta labels handle their own smaller em
+       reductions independently. */
+    font-size: 1em;
+    transition: background var(--jc-transition-base);
   }
+  .card:hover {
+    background: var(--jc-surface-container);
+  }
+
+  /* ── Status Bar (3px left edge) ──────────────────────────────── */
+  .card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--jc-status-bar-width);
+  }
+
   .card-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    background: var(--vscode-editor-background);
+    gap: var(--jc-space-md);
+    padding: var(--jc-space-lg) var(--jc-space-xl) var(--jc-space-lg) var(--jc-space-xl);
+    background: transparent;
     border: none;
-    color: var(--vscode-foreground);
+    color: var(--jc-on-surface);
     width: 100%;
     text-align: left;
     cursor: pointer;
-    font-family: inherit;
+    font-family: var(--jc-font-body);
     font-size: inherit;
+    transition: background var(--jc-transition-fast);
   }
-  .card-header:hover { background: var(--vscode-list-hoverBackground); }
+  .card-header:hover { background: var(--jc-surface-container-high); }
 
-  .role-badge { font-weight: bold; font-size: 0.85em; }
-  .record-type { opacity: 0.7; font-size: 0.8em; }
+  .role-badge {
+    font-family: var(--jc-font-body);
+    font-weight: 600;
+    font-size: 0.8em;
+    color: var(--jc-on-surface);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .role-badge.role-human {
+    background: var(--jc-primary-container-tint-soft);
+    color: var(--jc-primary);
+    padding: var(--jc-space-xs) var(--jc-space-lg);
+    border-radius: var(--jc-radius-xs);
+    font-size: 0.7em;
+    letter-spacing: 0.08em;
+  }
+  .record-type {
+    font-family: var(--jc-font-mono);
+    font-size: 0.7em;
+    color: var(--jc-outline);
+  }
   .phase-badge {
-    background: var(--vscode-badge-background);
-    color: var(--vscode-badge-foreground);
-    padding: 1px 6px;
-    border-radius: 8px;
-    font-size: 0.75em;
+    background: var(--jc-surface-container-highest);
+    color: var(--jc-on-surface-variant);
+    padding: var(--jc-space-xs) var(--jc-space-md);
+    border-radius: var(--jc-radius-xs);
+    font-family: var(--jc-font-mono);
+    font-size: 0.65em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border: var(--jc-ghost-border);
   }
   .quarantined-badge {
-    background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
-    color: var(--vscode-inputValidation-errorForeground, #f88);
-    padding: 1px 6px;
-    border-radius: 8px;
-    font-size: 0.75em;
+    background: var(--jc-error-container-tint-soft);
+    color: var(--jc-error);
+    padding: var(--jc-space-xs) var(--jc-space-md);
+    border-radius: var(--jc-radius-xs);
+    font-size: 0.65em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
-  .collapse-indicator { margin-left: auto; opacity: 0.5; font-size: 0.7em; }
+  .collapse-indicator {
+    margin-left: auto;
+    color: var(--jc-outline);
+    font-size: 0.65em;
+    transition: transform var(--jc-transition-base);
+  }
 
   .card-content {
-    padding: 8px 10px;
-    border-top: 1px solid var(--vscode-panel-border, #333);
+    padding: var(--jc-space-lg) var(--jc-space-xl);
   }
   .content-preview {
-    margin-bottom: 8px;
+    margin-bottom: var(--jc-space-lg);
     white-space: pre-wrap;
     word-break: break-word;
+    font-size: 0.9em;
+    color: var(--jc-on-surface-variant);
+    line-height: 1.5;
   }
   .provenance {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-bottom: 8px;
+    gap: var(--jc-space-md);
+    margin-bottom: var(--jc-space-lg);
   }
   .ref-chip {
-    font-size: 0.75em;
-    background: var(--vscode-badge-background, #333);
-    color: var(--vscode-badge-foreground, #ddd);
-    padding: 1px 6px;
-    border-radius: 8px;
+    font-family: var(--jc-font-mono);
+    font-size: 0.65em;
+    background: var(--jc-primary-container-tint-soft);
+    color: var(--jc-primary);
+    padding: var(--jc-space-xs) var(--jc-space-md);
+    border-radius: var(--jc-radius-xs);
     cursor: help;
   }
-  .raw-content { margin-top: 8px; }
-  .raw-content summary { cursor: pointer; opacity: 0.6; font-size: 0.85em; }
-  .raw-content pre {
-    background: var(--vscode-textCodeBlock-background);
-    padding: 8px;
-    border-radius: 4px;
-    overflow-x: auto;
+  .raw-content { margin-top: var(--jc-space-lg); }
+  .raw-content summary {
+    cursor: pointer;
+    color: var(--jc-outline);
     font-size: 0.8em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .raw-content pre {
+    background: var(--jc-surface-container-lowest);
+    color: var(--jc-secondary);
+    padding: var(--jc-space-lg) var(--jc-space-lg);
+    border-radius: var(--jc-radius-sm);
+    border: var(--jc-ghost-border);
+    overflow-x: auto;
+    font-family: var(--jc-font-mono);
+    font-size: 0.75em;
     max-height: 300px;
     overflow-y: auto;
+    margin-top: var(--jc-space-md);
   }
   .card-meta {
     display: flex;
-    gap: 12px;
-    margin-top: 8px;
-    opacity: 0.5;
-    font-size: 0.8em;
+    gap: var(--jc-space-lg);
+    margin-top: var(--jc-space-lg);
+    font-family: var(--jc-font-mono);
+    font-size: 0.7em;
+    color: var(--jc-outline);
   }
 
-  /* ── Card Category Accents ─────────────────────────────────── */
-  .card-phase_milestone { border-left: 3px solid var(--vscode-terminal-ansiGreen, #4ec9b0); }
-  .card-agent_output { border-left: 3px solid var(--vscode-terminal-ansiCyan, #9cdcfe); }
-  .card-human_interaction { border-left: 3px solid var(--vscode-terminal-ansiBlue, #569cd6); }
-  .card-review_result { border-left: 3px solid var(--vscode-terminal-ansiYellow, #dcdcaa); }
-  .card-system_event { border-left: 3px solid var(--vscode-descriptionForeground, #888); }
-  .card-warning { border-left: 3px solid var(--vscode-terminal-ansiRed, #f44747); }
-  .card-liaison_response { border-left: 3px solid var(--vscode-terminal-ansiMagenta, #c586c0); }
+  /* ── Card Category Accents (status bar color) ──────────────── */
+  .card-phase_milestone::before { background: var(--jc-tertiary); }
+  .card-agent_output::before { background: var(--jc-primary); }
+  .card-human_interaction::before { background: var(--jc-primary); }
+  .card-review_result::before { background: var(--jc-warning); }
+  .card-system_event::before { background: var(--jc-outline); }
+  .card-warning::before { background: var(--jc-error); }
+  .card-liaison_response::before { background: var(--jc-accent-pink); }
   .card-user_input {
-    border-left: 3px solid var(--vscode-textLink-foreground, #4da6ff);
-    margin-left: 24px;
-    background: var(--vscode-editor-inactiveSelectionBackground, rgba(80, 110, 200, 0.08));
+    margin-left: var(--jc-space-2xl);
+    background: var(--jc-primary-container-tint-soft);
   }
+  .card-user_input::before { background: var(--jc-primary); }
 
   .card.quarantined {
-    border-color: var(--vscode-inputValidation-errorBorder, #f44747);
     opacity: 0.7;
+  }
+  .card.quarantined::before {
+    background: var(--jc-error) !important;
   }
 </style>

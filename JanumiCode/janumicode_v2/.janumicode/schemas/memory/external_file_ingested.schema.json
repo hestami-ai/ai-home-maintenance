@@ -1,0 +1,27 @@
+{
+  "$id": "janumicode:external_file_ingested:1.0",
+  "title": "External File Ingested",
+  "description": "A workspace file ingested as a governed stream record — content available for retrieval by the Deep Memory Research Agent.",
+  "type": "object",
+  "required": ["kind", "path", "relative_path", "size_bytes", "content", "ingested_via"],
+  "properties": {
+    "kind": { "type": "string", "const": "external_file_ingested" },
+    "path": { "type": "string", "description": "Absolute filesystem path" },
+    "relative_path": { "type": "string", "description": "Path relative to workspace root" },
+    "size_bytes": { "type": "integer", "minimum": 0 },
+    "content": { "type": "string", "description": "File content as UTF-8 text; truncated if exceeding content_limit_bytes" },
+    "truncated": { "type": "boolean", "default": false },
+    "content_limit_bytes": { "type": "integer" },
+    "file_type": {
+      "type": "string",
+      "enum": ["source", "config", "spec", "doc", "data", "other"]
+    },
+    "language": { "type": "string", "description": "Detected language for source files (e.g. 'typescript', 'markdown')" },
+    "ingested_via": {
+      "type": "string",
+      "enum": ["explicit_reference", "workspace_scan", "user_attachment"]
+    },
+    "reference_text": { "type": "string", "description": "If ingested via explicit_reference, the exact text that matched" }
+  },
+  "additionalProperties": false
+}

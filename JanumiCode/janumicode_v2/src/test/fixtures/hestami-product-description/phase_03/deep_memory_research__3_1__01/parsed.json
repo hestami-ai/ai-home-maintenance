@@ -1,0 +1,32 @@
+{
+  "topic_entities": [
+    "Consumer Discovery MVP",
+    "Phase 1 Focus",
+    "Pillar 1",
+    "Home Real Property Assistant",
+    "Property Data Ingestion",
+    "Service Provider Matching",
+    "Hestami Staff",
+    "Individual Homeowners",
+    "Small Landlords",
+    "Property Investors",
+    "User Acquisition"
+  ],
+  "decision_types_sought": [
+    "phase_gate_approval",
+    "mirror_approval",
+    "product_scope_approval"
+  ],
+  "temporal_scope": {
+    "from": "2023-01-01T00:00:00Z",
+    "to": "2024-06-15T00:00:00Z"
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}

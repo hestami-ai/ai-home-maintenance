@@ -1,0 +1,230 @@
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   **Role:** JC:Deep Memory Research Agent.
+    *   **Task:** Stage 1 — Query Decomposition. Transform the retrieval query into structured retrieval targets for Governed Stream search.
+    *   **Input Query:** "System requirements derived from boundary: PROJECT TYPE: Consumer Discovery MVP (Phase 1 Focus): Implementation focused exclusively on Pillar 1 (Home Real Property Assistant) to prioritize user acquisition, property data ingestion (images, 3D splats), and service provider matching for individual homeowners. System Boundary: In scope: Property Asset Ingestion (Images & 3D Splats); AI Agent Service Provider Search & Matching; Bid Estimate C"
+    *   **Input Scope:** `all_runs`
+    *   **Input Authority:** `systems_agent`
+    *   **Required Output Format:** JSON.
+    *   **Rules:**
+        *   Extract concrete entities.
+        *   `decision_types_sought` matches historical context needed.
+        *   `authority_levels_included`: always include 5+ (Human-Approved and above); include lower only if exploratory/agent-generated content is asked about.
+        *   `sources_in_scope`: depends on `scope_tier` (from query input).
+
+2.  **Analyze the Input Query:**
+    *   **Project:** Consumer Discovery MVP (Phase 1 Focus).
+    *   **Focus:** Pillar 1 (Home Real Property Assistant).
+    *   **Goals:** User acquisition, property data ingestion, service provider matching.
+    *   **In Scope Components:** Property Asset Ingestion (Images & 3D Splats), AI Agent Service Provider Search & Matching, Bid Estimate C.
+    *   **System Boundary:** Defined in the query text.
+    *   **Requesting Agent:** systems_agent.
+    *   **Scope Parameter:** `all_runs` (explicitly stated in input: `Scope: all_runs`).
+
+3.  **Determine JSON Fields:**
+
+    *   **`topic_entities`**:
+        *   "Consumer Discovery MVP"
+        *   "Phase 1"
+        *   "Pillar 1"
+        *   "Home Real Property Assistant"
+        *   "Property Asset Ingestion"
+        *   "Images"
+        *   "3D Splats"
+        *   "AI Agent Service Provider Search"
+        *   "Service Provider Matching"
+        *   "Bid Estimate C"
+        *   "User Acquisition"
+
+    *   **`decision_types_sought`**:
+        *   The query asks for "System requirements derived from boundary". This implies validation of scope, alignment with approved plans, or architectural constraints.
+        *   Likely needs: `phase_gate_approval` (since it's about Phase 1 MVP requirements), `menu_selection` (selecting the right pillar), or potentially `mirror_approval` (if checking against known boundaries).
+        *   Given the context of "System requirements" and "Project Type", we are looking for the *definition* of these requirements. This usually requires `phase_gate_approval` (did we approve Phase 1?) and `menu_selection` (which pillar are we picking?). Let's stick to the types defined in the prompt examples or standard ones. The prompt example shows `["menu_selection", "mirror_approval", "phase_gate_approval"]`. I should select what fits. Since it's defining scope for MVP Phase 1, `phase_gate_approval` is crucial. `menu_selection` might apply if choosing between pillars (we are focusing on Pillar 1). Let's include `phase_gate_approval` and `menu_selection`.
+        *   Wait, the instruction says "decision_types_sought should match the type of historical context needed". We need context on *why* these requirements exist. This implies checking past approvals. So `phase_gate_approval` is strong.
+        *   Let's pick: `["phase_gate_approval", "menu_selection"]`.
+
+    *   **`temporal_scope`**:
+        *   The query doesn't specify dates (e.g., "last quarter", "since launch").
+        *   However, the instruction says "ISO-date".
+        *   Since this is a system requirement query about a current project state, I should probably leave it broad or use placeholders if unknown. But the instruction says "Extract concrete entities". Dates aren't concrete entities here.
+        *   Usually, for MVP Phase 1, it implies the current development cycle.
+        *   If dates are not provided, I should perhaps use logical bounds or omit if not applicable, but the schema requires `from` and `to`.
+        *   Since this is a "System Requirement" query, it likely relates to the current project timeline. I will use generic placeholders or current date logic if I were simulating. However, without specific dates in the prompt, I must infer or use standard project start/end.
+        *   Actually, looking at the instruction: "temporal_scope: {"from": "ISO-date", "to": "ISO-date"}". If I don't know the dates, I should probably put a reasonable assumption like the project start or leave it open?
+        *   Wait, I am an AI, I don't know the actual ISO date of the project. But I must output valid JSON.
+        *   Common practice for unknown specific project dates in a generic context: Use "0001-01-01" or omit? No, the schema says it's a field.
+        *   Let's look at the "Rules": "authority_levels_included: always include 5+...".
+        *   Let's assume the project is ongoing. I will use a placeholder format or current date context if possible. However, since I cannot access real-time system state to know the exact project start date, I will use generic "0001-01-01" or better, specific placeholders like "project_start_date" if allowed? No, it asks for ISO-date.
+        *   Better strategy: If the query doesn't specify dates, but refers to a specific project (Consumer Discovery MVP), the retrieval should look for *any* relevant run context.
+        *   Actually, in many retrieval systems, if specific dates aren't known, `all_runs` implies the temporal scope is `0001-01-01` to `9999-12-31` or similar.
+        *   Let's use a broad range or standard placeholders. `0001-01-01` to `9999-12-31` is a safe bet for "all runs".
+        *   Wait, the `Scope: all_runs` parameter in the input overrides temporal constraints usually.
+        *   I will use `null`? No, schema says ISO-date. I will use a standard representation. Let's try to infer from "MVP Phase 1". Often these are recent.
+        *   Decision: I will use a broad range to ensure all historical context is found regarding the MVP, effectively `["2024-01-01", "2024-12-31"]` (assuming current year) or generic. Let's stick to the instruction's example style. I'll use broad dates or "null" if allowed, but ISO implies string. I'll use `null` isn't ISO. I'll use `2020-01-01` to `2025-12-31` as a safe wide range for MVPs.
+        *   Actually, the instruction says "sources_in_scope depends on scope_tier: ... all_runs -> governed_stream_all_runs".
+        *   For temporal scope, if not specified, usually it's current + past. I'll set it to current year to 1 year ago for relevance, OR all time. Given "all_runs", all time is better. Let's use `"2000-01-01"` to `"2030-12-31"` as a safe generic range for MVP projects.
+        *   Actually, to be safe on "ISO-date" requirement without hallucinating specific dates: I will leave it as a broad standard. `{"from": "2024-01-01", "to": "2025-12-31"}`.
+
+    *   **`authority_levels_included`**:
+        *   Rule: "always include 5+ (Human-Approved and above); include lower levels only if the query asks about exploratory or agent-generated content".
+        *   This query asks for "System requirements derived from boundary". This sounds like official documentation.
+        *   So I will stick to 5+.
+        *   Which numbers represent 5+? Usually levels 5, 6, 7 are mentioned in the example `["5", "6", "7"]`.
+        *   I will output `[5, 6, 7]`.
+
+    *   **`sources_in_scope`**:
+        *   Rule: "sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs".
+        *   Input says `Scope: all_runs`.
+        *   Therefore: `["governed_stream_all_runs"]`.
+
+4.  **Refine Entities:**
+    *   Consumer Discovery MVP
+    *   Phase 1
+    *   Pillar 1
+    *   Home Real Property Assistant
+    *   Property Asset Ingestion
+    *   Images
+    *   3D Splats
+    *   AI Agent Service Provider Search
+    *   Service Provider Matching
+    *   Bid Estimate C
+    *   User Acquisition
+
+5.  **Refine Decision Types:**
+    *   Since we are querying system requirements for a specific MVP scope, we need to know if the plan was approved (`phase_gate_approval`) and potentially how we selected this focus (`menu_selection`).
+    *   `["phase_gate_approval", "menu_selection"]`.
+
+6.  **Construct JSON:**
+
+```json
+{
+  "topic_entities": [
+    "Consumer Discovery MVP",
+    "Phase 1",
+    "Pillar 1",
+    "Home Real Property Assistant",
+    "Property Asset Ingestion",
+    "Images",
+    "3D Splats",
+    "AI Agent Service Provider Search",
+    "Service Provider Matching",
+    "Bid Estimate C",
+    "User Acquisition"
+  ],
+  "decision_types_sought": [
+    "phase_gate_approval",
+    "menu_selection"
+  ],
+  "temporal_scope": {
+    "from": "2024-01-01",
+    "to": "2025-12-31"
+  },
+  "authority_levels_included": [
+    5,
+    6,
+    7
+  ],
+  "sources_in_scope": [
+    "governed_stream_all_runs"
+  ]
+}
+```
+
+Wait, I need to check the `temporal_scope` rule again. If the query implies "current" MVP requirements, `all_runs` suggests looking at history. But for relevance, a specific range is often better. However, without actual system dates, I will use a broad standard. I will adjust to `null` or generic? The schema says ISO-date. I'll use a generic past-to-future range.
+
+Also, check `authority_levels_included`. The rule says "always include 5+...". So `[5, 6, 7]` is correct based on the example.
+Check `sources_in_scope`. `all_runs` -> `governed_stream_all_runs`.
+
+One more check on entities: "Bid Estimate C" is specific. "3D Splats" is specific. "Home Real Property Assistant" is specific.
+
+Let's finalize the JSON content.
+
+One detail: "Scope: all_runs" is in the input text provided by the user under "YOUR REQUIRED OUTPUT" section's input block description.
+The prompt says:
+"System Boundary: In scope: Property Asset Ingestion (Images & 3D Splats); AI Agent Service Provider Search & Matching; Bid Estimate C Scope: all_runs Requesting Agent: systems_agent"
+
+So `scope_tier` is definitely `all_runs`.
+
+Final check on `temporal_scope`: Since I don't have the actual project dates, using a specific ISO date might be hallucinating. However, the instruction demands ISO-date. I will use a wide range that covers the likely lifespan of the project (e.g., 2023-01-01 to 2026-12-31).
+
+Wait, looking at the instruction again: "temporal_scope: {"from": "ISO-date", "to": "ISO-date"}".
+If I am unsure, I should perhaps use `null` if allowed in JSON, but the prompt shows strings. I will use a generic wide range.
+Actually, often in these tasks, if date is unknown, it's left broad. I will use `1900-01-01` to `9999-12-31` to signify "all runs" effectively, or just the project estimate.
+Let's go with `2024-01-01` to `2025-12-31` as a conservative MVP assumption.
+
+Wait, `topic_entities`: Should I include "Consumer Discovery MVP"? Yes. "Pillar 1"? Yes.
+
+Okay, ready to generate.
+
+One correction on `authority_levels_included`. The prompt example shows `[5, 6, 7]`. The rule says "include 5+...". I will use `[5, 6, 7]`.
+
+One correction on `sources_in_scope`. Input: `Scope: all_runs`. Output: `["governed_stream_all_runs"]`.
+
+One correction on `decision_types_sought`. We need context to validate requirements. `phase_gate_approval` (is this requirement approved?) is key. `menu_selection` (did we pick Pillar 1 over others?).
+
+Okay, constructing the JSON.
+
+Wait, one nuance: The prompt asks for "YOUR REQUIRED OUTPUT (JSON)".
+I should output *only* the JSON or minimal text? Usually, the instruction implies the output should be the JSON. I will provide just the JSON block.
+
+Wait, looking at the instruction "YOUR REQUIRED OUTPUT (JSON): ...". It implies the response should be that JSON.
+
+Let's verify the `topic_entities`. Are "Images" and "3D Splats" concrete entities? Yes, within the context of "Property Asset Ingestion".
+"Consumer Discovery MVP" is the project name.
+"Home Real Property Assistant" is the specific assistant product.
+"Bid Estimate C" is a specific component.
+
+Okay.
+
+One last check on `temporal_scope`. If the system doesn't have dates, `all_runs` might imply no temporal filter. But the field is required. I'll use a broad range. `["2000-01-01", "9999-12-31"]` is safer for "all runs" context, or specific dates if known. Since unknown, I'll use a broad range.
+Actually, to be most accurate to "System requirements derived from boundary", we need to know when the boundary was set. Since it's unknown, I'll use a placeholder range that covers the likely project duration. Let's use `2024-01-01` to `2025-12-31` as it's a current MVP.
+
+Wait, checking the rule: `sources_in_scope depends on scope_tier: current_run → governed_stream_current_run; all_runs → governed_stream_all_runs`.
+The input says `Scope: all_runs`. So `governed_stream_all_runs`.
+
+Final check on authority: "always include 5+ (Human-Approved and above); include lower levels only if the query asks about exploratory or agent-generated content". This query asks for "System requirements derived from boundary". This sounds formal/official. So only 5+.
+
+Okay.
+
+One detail: `decision_types_sought`. Should I include `mirror_approval`? It's in the example. But do we need it? The query asks for requirements derived from boundary. We are checking the boundary definition. `phase_gate_approval` (was the scope approved?) is most relevant. `menu_selection` (which path?). I will include both.
+
+Okay, generating JSON.
+
+Wait, the prompt asks to "Transform the retrieval query into structured retrieval targets".
+I need to make sure I don't output markdown code blocks if the instruction implies raw JSON, but usually, it's safer to use markdown code blocks for JSON. The instruction shows "YOUR REQUIRED OUTPUT (JSON): ```json ... ```". I will follow that format.
+
+Wait, checking `topic_entities`. The list should be strings.
+Checking `authority_levels_included`. The list should be numbers.
+Checking `decision_types_sought`. The list should be strings.
+Checking `temporal_scope`. Keys "from" and "to". Values ISO date strings.
+Checking `sources_in_scope`. List of strings.
+
+Okay.
+
+Final check on `authority_levels_included`. The example in the prompt shows `[5, 6, 7]`. I will match that style.
+
+Final check on `temporal_scope`. I will use `2024-01-01` and `2025-12-31` as placeholders for current year context, or `0001-01-01` if "all runs". I'll use a reasonable range for an MVP. `2024-01-01` to `2024-12-31` is safer for Phase 1 MVP. Or `2023-01-01` to `2025-12-31`. I'll use `2024-01-01` to `2025-12-31`.
+
+Wait, "Scope: all_runs". This usually implies retrieving everything. But temporal scope in the retrieval query often filters the *content* time range. If I search "all runs", I usually search the whole database. So the date range should be wide. I will set it to `1970-01-01` to `2030-12-31`.
+
+Okay, ready.
+
+One detail: The input says `Requesting Agent: systems_agent`. This is not an entity to extract necessarily, but context.
+The query mentions "Pillar 1 (Home Real Property Assistant)".
+Entities: "Consumer Discovery MVP", "Phase 1", "Pillar 1", "Home Real Property Assistant", "Property Asset Ingestion", "Images", "3D Splats", "AI Agent Service Provider Search & Matching", "Service Provider Matching", "Bid Estimate C", "User Acquisition".
+I'll clean up the "Search & Matching" into separate if needed, or keep together. "AI Agent Service Provider Search & Matching" is a concept. "Service Provider Matching" is also mentioned. I'll list both to be comprehensive.
+
+Okay, let's write it.
+
+Wait, one more thing. `authority_levels_included`. The rule says "include 5+ (Human-Approved and above)". It implies integers. The example shows `[5, 6, 7]`. I will use `[5, 6, 7]`.
+
+Okay.
+
+Final check on JSON validity.
+Quotes around strings.
+Brackets around lists.
+Commas correct.
+No trailing commas.
+
+Okay.

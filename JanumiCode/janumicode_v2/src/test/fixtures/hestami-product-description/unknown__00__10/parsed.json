@@ -1,0 +1,12 @@
+{
+  "overall_pass": false,
+  "flaws": [
+    {
+      "flaw_type": "completeness_shortcut",
+      "severity": "high",
+      "description": "The agent failed to construct the required standardized payload objects for regulatory alerts, instead outputting an error regarding the backing tool configuration. This prevents the task from meeting its core completion criteria.",
+      "evidence": "No output parser registered for backing tool: Bun Template Engine",
+      "recommended_action": "escalate"
+    }
+  ]
+}

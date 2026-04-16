@@ -101,7 +101,7 @@ export class ClientLiaisonAgent {
       config,
       () => this.registry.capabilityListing(),
     );
-    this.retriever = new Retriever(this.cdb);
+    this.retriever = new Retriever(this.cdb, this.engine);
     this.synthesizer = new Synthesizer(
       this.priorityLLM,
       this.templates,
@@ -214,7 +214,14 @@ export class ClientLiaisonAgent {
       input.references,
     );
 
-    // 5. Either short-circuit to a forced capability OR run the synthesizer.
+    // 5. Fetch recent conversation turns for multi-turn context. Only
+    //    meaningful when there is an active run; for raw_intent mode this
+    //    returns empty because the run hasn't started yet.
+    const conversationHistory = ctx.activeRun
+      ? this.cdb.getRecentConversationTurns(ctx.activeRun.id, 5)
+      : [];
+
+    // 6. Either short-circuit to a forced capability OR run the synthesizer.
     let synthesis;
     if (input.forceCapability) {
       synthesis = await this.runForcedCapability(input.forceCapability, ctx);
@@ -228,7 +235,9 @@ export class ClientLiaisonAgent {
         { intent: input.text, attachments: input.attachments.map(a => a.uri) },
       );
     } else {
-      synthesis = await this.synthesizer.synthesize(openQuery, classification, retrieval, ctx);
+      synthesis = await this.synthesizer.synthesize(
+        openQuery, classification, retrieval, ctx, conversationHistory,
+      );
     }
 
     // 6. Find the active run AFTER synthesis. The startWorkflow capability
@@ -240,12 +249,35 @@ export class ClientLiaisonAgent {
     //    attach it to — otherwise we'd hit the same FK constraint we just
     //    fixed at step 1.
     if (activeRunAfter) {
+      // For raw_intent mode we deferred writing inputRecord; the
+      // raw_intent_received was instead created inside engine.startWorkflowRun().
+      // Look it up now so the response record has a proper anchor — without
+      // this the conversationalSort in the webview can't pin "Started
+      // workflow run…" beneath the user's intent and it lands at the bottom
+      // of the stream.
+      let anchorId = inputRecord?.id ?? null;
+      if (!anchorId && input.inputMode === 'raw_intent') {
+        const rawIntents = this.cdb.getRecordsByType(
+          'raw_intent_received',
+          activeRunAfter.id,
+        );
+        if (rawIntents.length > 0) {
+          anchorId = rawIntents[rawIntents.length - 1].id;
+        }
+      }
+
       writer.writeRecord({
         record_type: 'client_liaison_response',
         schema_version: '1.0',
         workflow_run_id: activeRunAfter.id,
+        // Stamp phase + agent role so the record isn't a row of NULLs in
+        // the DB. The Liaison runs at the boundary between user and
+        // workflow; for raw_intent mode the natural phase is 0 (the
+        // startWorkflow capability just created the run there).
+        phase_id: ctx.currentPhase ?? '0',
+        produced_by_agent_role: 'client_liaison',
         janumicode_version_sha: versionSha,
-        derived_from_record_ids: inputRecord ? [inputRecord.id] : [],
+        derived_from_record_ids: anchorId ? [anchorId] : [],
         content: {
           query_type: classification.queryType,
           response_text: synthesis.responseText,
@@ -258,15 +290,12 @@ export class ClientLiaisonAgent {
       });
     }
 
-    // 8. Optional escalation.
-    if (synthesis.escalatedToOrchestrator && ctx.activeRun && inputRecord) {
-      this.engine.escalateInconsistency({
-        runId: ctx.activeRun.id,
-        userQueryRecordId: inputRecord.id,
-        conflictingRecordIds: synthesis.provenanceRecordIds,
-        description: input.text,
-      });
-    }
+    // 8. Escalation is now the `escalateInconsistency` capability's
+    //    responsibility (see capabilities/decisionHistory/index.ts). When
+    //    the LLM invokes it during synthesis, that capability's execute()
+    //    calls engine.escalateInconsistency() directly, which writes the
+    //    `consistency_challenge_escalation` record and emits the
+    //    inconsistency:escalated event. We no longer double-write here.
 
     return {
       queryId,

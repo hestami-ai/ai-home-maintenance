@@ -1,0 +1,592 @@
+{
+  "definitions": [
+    {
+      "component_id": "cmp-prop-data",
+      "endpoints": [
+        {
+          "path": "/assets/upload",
+          "method": "POST",
+          "inputs": {
+            "contentType": "multipart/form-data",
+            "body": {
+              "asset_type": "string | image | splat",
+              "metadata": {
+                "property_address": "string",
+                "location": "GeoJSON",
+                "description": "string"
+              },
+              "files": "array of binary"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "asset_id": "string",
+              "status": "string (ingested|indexing)",
+              "sync_queue_token": "string"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 400,
+              "description": "Invalid file format or size"
+            },
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 403,
+              "description": "Access forbidden by RLS"
+            },
+            {
+              "code": 409,
+              "description": "Asset already exists or duplicate metadata"
+            },
+            {
+              "code": 503,
+              "description": "Storage quota exceeded or indexing service down"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        },
+        {
+          "path": "/assets/search",
+          "method": "GET",
+          "inputs": {
+            "contentType": "application/x-www-form-urlencoded",
+            "params": {
+              "query": "string",
+              "asset_type": "string (optional)"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "results": "array of AssetSummary",
+              "total": "integer",
+              "sync_status": "string"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 403,
+              "description": "No permission to view specific property data"
+            },
+            {
+              "code": 404,
+              "description": "Search query not found"
+            },
+            {
+              "code": 500,
+              "description": "Search indexing failure"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        },
+        {
+          "path": "/sync/queue/status",
+          "method": "GET",
+          "inputs": {
+            "contentType": "application/json",
+            "params": {
+              "queue_token": "string"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "queue_status": "string",
+              "items_count": "integer",
+              "last_sync": "datetime"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 404,
+              "description": "Queue token not found"
+            },
+            {
+              "code": 500,
+              "description": "Sync service unavailable"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-provider-match",
+      "endpoints": [
+        {
+          "path": "/providers/search",
+          "method": "GET",
+          "inputs": {
+            "contentType": "application/x-www-form-urlencoded",
+            "params": {
+              "location": "string",
+              "service_type": "string",
+              "sort_by": "string"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "providers": "array of ProviderSummary",
+              "search_metadata": {
+                "ai_confidence": "float",
+                "region_match": "boolean"
+              }
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 404,
+              "description": "Search criteria returned no results"
+            },
+            {
+              "code": 500,
+              "description": "AI Agent service unavailable"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        },
+        {
+          "path": "/bids/compare/{bid_id}",
+          "method": "GET",
+          "inputs": {
+            "contentType": "application/json",
+            "params": {
+              "bid_id": "string (path param)"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "comparison_table": {
+                "good": "BidData",
+                "better": "BidData",
+                "best": "BidData"
+              },
+              "thresholds_met": "boolean"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 403,
+              "description": "User not allowed to view bid comparison"
+            },
+            {
+              "code": 404,
+              "description": "Bid record not found"
+            },
+            {
+              "code": 500,
+              "description": "Database retrieval error"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-compliance",
+      "endpoints": [
+        {
+          "path": "/compliance/extract",
+          "method": "POST",
+          "inputs": {
+            "contentType": "application/json",
+            "body": {
+              "text": "string (CC&R or Bylaws text)",
+              "document_id": "string",
+              "extraction_target": "string (deadline, restriction, fee)"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "clauses": "array of Clauses",
+              "confidence_score": "float",
+              "validation_status": "string (pass|fail)"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 400,
+              "description": "Text input too short or invalid format"
+            },
+            {
+              "code": 500,
+              "description": "AI Extraction service timeout"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        },
+        {
+          "path": "/compliance/deadlines",
+          "method": "GET",
+          "inputs": {
+            "contentType": "application/json",
+            "params": {
+              "tenant_id": "string (path param)"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "deadlines": "array of DeadlineItem",
+              "alert_priority": "string (high|medium|low)"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 404,
+              "description": "Tenant not found in compliance registry"
+            },
+            {
+              "code": 503,
+              "description": "Regulatory service unreachable"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        },
+        {
+          "path": "/compliance/alerts",
+          "method": "POST",
+          "inputs": {
+            "contentType": "application/json",
+            "body": {
+              "trigger_id": "string",
+              "notification_payload": "object (email, sms)"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "dispatch_id": "string",
+              "status": "queued|processing|completed"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 403,
+              "description": "Not allowed to trigger compliance alert"
+            },
+            {
+              "code": 500,
+              "description": "Internal alert engine error"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-workflow",
+      "endpoints": [
+        {
+          "path": "/actions",
+          "method": "GET",
+          "inputs": {
+            "contentType": "application/json",
+            "params": {
+              "status": "string",
+              "owner_id": "string"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "actions": "array of ActionItem",
+              "total_count": "integer"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 403,
+              "description": "Viewing actions outside tenant scope"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        },
+        {
+          "path": "/actions/{action_id}",
+          "method": "POST",
+          "inputs": {
+            "contentType": "application/json",
+            "body": {
+              "status": "string",
+              "notes": "string",
+              "transition_from": "string",
+              "transition_to": "string"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "action_id": "string",
+              "updated_at": "datetime",
+              "audit_log_entry": "string"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 409,
+              "description": "Invalid state transition"
+            },
+            {
+              "code": 400,
+              "description": "Required fields missing"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-notifications",
+      "endpoints": [
+        {
+          "path": "/dispatch/batch",
+          "method": "POST",
+          "inputs": {
+            "contentType": "application/json",
+            "body": {
+              "recipients": "array of string (email|phone)",
+              "template_id": "string",
+              "content_body": "string",
+              "priority": "string"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "batch_id": "string",
+              "estimated_delivery": "datetime"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 400,
+              "description": "Invalid email or phone number format"
+            },
+            {
+              "code": 503,
+              "description": "External comms provider (SMTP/SMS) down"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        },
+        {
+          "path": "/dispatch/status/{batch_id}",
+          "method": "GET",
+          "inputs": {
+            "contentType": "application/json",
+            "params": {
+              "batch_id": "string"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "status": "string",
+              "sent": "integer",
+              "failed": "integer",
+              "bounced": "integer"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 404,
+              "description": "Batch not found"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-security",
+      "endpoints": [
+        {
+          "path": "/auth/validate",
+          "method": "POST",
+          "inputs": {
+            "contentType": "application/json",
+            "body": {
+              "token": "string",
+              "client_fingerprint": "string (optional)"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "valid": "boolean",
+              "tenant_id": "string",
+              "expires_at": "datetime"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Invalid or expired token"
+            },
+            {
+              "code": 403,
+              "description": "Token associated with revoked tenant"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        },
+        {
+          "path": "/health",
+          "method": "GET",
+          "inputs": {
+            "contentType": "application/json",
+            "params": {
+              "check_rls": "boolean"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "status": "up",
+              "tls_version": "string",
+              "rate_limit_remaining": "integer"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 503,
+              "description": "Security gateway overload"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        }
+      ]
+    },
+    {
+      "component_id": "cmp-payment",
+      "endpoints": [
+        {
+          "path": "/payments/process",
+          "method": "POST",
+          "inputs": {
+            "contentType": "application/json",
+            "body": {
+              "amount": "float",
+              "currency": "string",
+              "payment_intent_id": "string",
+              "description": "string (deposit|fee)",
+              "receipt_email": "string"
+            }
+          },
+          "outputs": {
+            "contentType": "application/json",
+            "body": {
+              "transaction_id": "string",
+              "status": "success|declined",
+              "receipt_url": "string"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 402,
+              "description": "Insufficient funds"
+            },
+            {
+              "code": 402,
+              "description": "Payment gateway decline"
+            },
+            {
+              "code": 500,
+              "description": "Gateway connection error"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        },
+        {
+          "path": "/payments/receipt/{id}",
+          "method": "GET",
+          "inputs": {
+            "contentType": "application/json",
+            "params": {
+              "id": "string"
+            }
+          },
+          "outputs": {
+            "contentType": "application/pdf",
+            "body": {
+              "receipt_data": "PDF Content",
+              "timestamp": "datetime"
+            }
+          },
+          "error_codes": [
+            {
+              "code": 401,
+              "description": "Unauthorized"
+            },
+            {
+              "code": 404,
+              "description": "Transaction ID not found"
+            },
+            {
+              "code": 403,
+              "description": "Receipt visibility restricted by policy"
+            }
+          ],
+          "auth_requirement": "Bearer Token Required"
+        }
+      ]
+    }
+  ]
+}
