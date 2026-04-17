@@ -39,4 +39,42 @@ describe('parseJsonWithRecovery', () => {
       ],
     });
   });
+
+  it('recovers mixed quote strings and invalid backslashes in a qwen bloom payload', () => {
+    const raw = `{
+      "candidate_product_concepts": [
+        {
+          "id": "cp-api-platform",
+          "assumptions": [
+            {
+              "assumption": 'The "Single Product Scope" in Context Summary is interpreted as a single product line, not a single executable binary.',
+              "basis": "Context Summary: 'Scope: single_product' usually implies one codebase, but Spec Appendix 'Phase 1, Phase 2, Phase 3' implies distinct product lifecycles."
+            }
+          ],
+          "constraints": [
+            "Must support 'e:\\Projects\\...' directory structure for deployment consistency."
+          ]
+        }
+      ]
+    }`;
+
+    const result = parseJsonWithRecovery(raw);
+    expect(result.recovered).toBe(true);
+    expect(result.parsed).toEqual({
+      candidate_product_concepts: [
+        {
+          id: 'cp-api-platform',
+          assumptions: [
+            {
+              assumption: 'The "Single Product Scope" in Context Summary is interpreted as a single product line, not a single executable binary.',
+              basis: "Context Summary: 'Scope: single_product' usually implies one codebase, but Spec Appendix 'Phase 1, Phase 2, Phase 3' implies distinct product lifecycles.",
+            },
+          ],
+          constraints: [
+            "Must support 'e:\\Projects\\...' directory structure for deployment consistency.",
+          ],
+        },
+      ],
+    });
+  });
 });

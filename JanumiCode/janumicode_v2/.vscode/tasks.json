@@ -31,6 +31,20 @@
       "command": "pnpm test",
       "group": "test",
       "problemMatcher": []
+    },
+    {
+      // Chained preLaunchTask for the harness launch configs: build
+      // the extension bundle THEN compile the e2e TS → out/. The
+      // harness launch uses `--extensionTestsPath=out/test/e2e/harness-suite`
+      // so both outputs must be fresh before VS Code spawns the host.
+      "label": "test:e2e:compile",
+      "type": "shell",
+      "command": "pnpm build && pnpm test:e2e:compile",
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent"
+      }
     }
   ]
 }

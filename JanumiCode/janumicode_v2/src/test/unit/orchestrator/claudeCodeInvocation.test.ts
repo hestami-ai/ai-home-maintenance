@@ -34,6 +34,10 @@ describe('Claude Code CLI invocation wiring', () => {
     const configManager = new ConfigManager();
     const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
     engine = new OrchestratorEngine(db, configManager, workspacePath);
+    // Real-mode path explicitly opts into CLI parser registration —
+    // mock-mode tests keep the default (no parsers registered) so they
+    // don't accidentally spawn a real claude subprocess.
+    engine.registerBuiltinCLIParsers();
   });
 
   afterEach(() => {
@@ -156,5 +160,29 @@ describe('Claude Code CLI invocation wiring', () => {
     const args = (cliInvokerSpy.mock.calls[0][0] as { args: string[] }).args;
     expect(args).toContain('--model');
     expect(args[args.indexOf('--model') + 1]).toBe('claude-sonnet-4-6');
+  });
+
+  it('prefers the per-invocation model over JANUMICODE_CLAUDE_MODEL', async () => {
+    process.env.JANUMICODE_CLAUDE_MODEL = 'claude-sonnet-4-6';
+
+    const cliInvokerSpy = vi.fn().mockResolvedValue({
+      exitCode: 0, timedOut: false, idledOut: false,
+      events: [], stderr: '', durationMs: 1,
+    });
+    (engine.agentInvoker as unknown as { cliInvoker: { invoke: unknown } })
+      .cliInvoker.invoke = cliInvokerSpy;
+
+    await engine.agentInvoker.invoke({
+      agentRole: 'executor_agent',
+      backingTool: 'claude_code_cli',
+      invocationId: 'inv-5',
+      prompt: 'p',
+      cwd: '/tmp/ws',
+      model: 'qwen3.5:9b',
+    });
+
+    const args = (cliInvokerSpy.mock.calls[0][0] as { args: string[] }).args;
+    expect(args).toContain('--model');
+    expect(args[args.indexOf('--model') + 1]).toBe('qwen3.5:9b');
   });
 });

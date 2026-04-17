@@ -57,6 +57,70 @@
       "env": {
         "NODE_OPTIONS": "--trace-deprecation"
       }
+    },
+    {
+      // Drive a full Phase 0→10 pipeline through the live extension
+      // using the JANUMICODE_E2E test-hook commands. Breakpoints in
+      // ClientLiaisonAgent / OrchestratorEngine / phase handlers / the
+      // testHooks module all trigger naturally because everything runs
+      // in the Extension Development Host's debugger.
+      //
+      // Default intent: the todo CLI app (short, fast in mock mode).
+      // Override JANUMICODE_HARNESS_INTENT in the env block or via a
+      // compound-task launcher for Hestami or any other corpus.
+      "name": "Debug Harness in Extension Host (mock)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "${workspaceFolder}/test-workspace",
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--extensionTestsPath=${workspaceFolder}/out/test/e2e/harness-suite"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js",
+        "${workspaceFolder}/out/**/*.js"
+      ],
+      "preLaunchTask": "test:e2e:compile",
+      "sourceMaps": true,
+      "env": {
+        "JANUMICODE_E2E": "1",
+        "JANUMICODE_AUTOSHOW_LOGS": "0",
+        "JANUMICODE_LLM_PROVIDER": "mock",
+        "JANUMICODE_HARNESS_INTENT": "Build a simple CLI todo app with add, list, and complete commands, and JSON file persistence.",
+        "JANUMICODE_HARNESS_GAP_PATH": "${workspaceFolder}/test-workspace/.janumicode/harness-gap.json",
+        "JANUMICODE_HARNESS_TIMEOUT_MS": "60000"
+      }
+    },
+    {
+      // Same as above but flipped to real-mode LLM calls + Claude Code
+      // CLI parser registration. Preconditions: Ollama reachable,
+      // `claude` on PATH, fresh test-workspace so writes don't collide.
+      // Timeout bumped to 1h to accommodate Phase 1-8 Ollama synthesis
+      // + Phase 9 coding agent writes.
+      "name": "Debug Harness in Extension Host (real — todo)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "${workspaceFolder}/test-workspace",
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--extensionTestsPath=${workspaceFolder}/out/test/e2e/harness-suite"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js",
+        "${workspaceFolder}/out/**/*.js"
+      ],
+      "preLaunchTask": "test:e2e:compile",
+      "sourceMaps": true,
+      "env": {
+        "JANUMICODE_E2E": "1",
+        "JANUMICODE_AUTOSHOW_LOGS": "0",
+        "JANUMICODE_LLM_PROVIDER": "ollama",
+        "JANUMICODE_HARNESS_INTENT": "Build a simple CLI todo app with add, list, and complete commands, and JSON file persistence.",
+        "JANUMICODE_HARNESS_GAP_PATH": "${workspaceFolder}/test-workspace/.janumicode/harness-gap.json",
+        "JANUMICODE_HARNESS_REAL_PHASE9": "1",
+        "JANUMICODE_HARNESS_TIMEOUT_MS": "3600000",
+        "JANUMICODE_CLAUDE_SKIP_PERMISSIONS": "1"
+      }
     }
   ]
 }

@@ -38,6 +38,7 @@
   const mirror = $derived(content.mirror ?? null);
   const menu = $derived(content.menu ?? null);
   const surfaceId = $derived(content.surface_id ?? record.id);
+  const isBloomMirror = $derived(mirror?.kind === 'intent_bloom_mirror');
 
   const draft = $derived(bundleStagingStore.getDraft(record.id));
   const pending = $derived(
@@ -117,7 +118,7 @@
   <div class="bundle-counter" class:ready={pending.submittable}>
     {#if mirror}
       <span class="counter-segment">
-        {mirrorDecidedCount}/{mirrorTotal} assumptions decided
+        {mirrorDecidedCount}/{mirrorTotal} {isBloomMirror ? 'interpretations reviewed' : 'assumptions decided'}
       </span>
     {/if}
     {#if mirror && menu}
@@ -133,7 +134,7 @@
   <!-- Mirror section -->
   {#if mirror}
     <section class="bundle-section">
-      <h4 class="section-label">Assumptions</h4>
+      <h4 class="section-label">{isBloomMirror ? 'Candidate Interpretations' : 'Assumptions'}</h4>
       <ul class="item-list">
         {#each mirror.items as item (item.id)}
           {@const action = mirrorAction(item.id)}
@@ -146,6 +147,56 @@
               {/if}
               <span class="row-label">{action === 'edited' ? editedText : item.text}</span>
             </div>
+            {#if isBloomMirror}
+              {#if item.description}
+                <p class="candidate-description">{item.description}</p>
+              {/if}
+              {#if item.who_it_serves || item.problem_it_solves}
+                <div class="candidate-facts">
+                  {#if item.who_it_serves}
+                    <p><strong>Who it serves:</strong> {item.who_it_serves}</p>
+                  {/if}
+                  {#if item.problem_it_solves}
+                    <p><strong>Problem it solves:</strong> {item.problem_it_solves}</p>
+                  {/if}
+                </div>
+              {/if}
+              {#if item.constraints && item.constraints.length > 0}
+                <details class="candidate-detail">
+                  <summary>Constraints</summary>
+                  <ul class="detail-list">
+                    {#each item.constraints as constraint}
+                      <li>{constraint}</li>
+                    {/each}
+                  </ul>
+                </details>
+              {/if}
+              {#if item.open_questions && item.open_questions.length > 0}
+                <details class="candidate-detail">
+                  <summary>Open questions</summary>
+                  <ul class="detail-list">
+                    {#each item.open_questions as question}
+                      <li>{question}</li>
+                    {/each}
+                  </ul>
+                </details>
+              {/if}
+              {#if item.supporting_assumptions && item.supporting_assumptions.length > 0}
+                <details class="candidate-detail">
+                  <summary>Supporting assumptions</summary>
+                  <ul class="detail-list">
+                    {#each item.supporting_assumptions as assumption}
+                      <li>
+                        <span>{assumption.text}</span>
+                        {#if assumption.rationale}
+                          <p class="detail-rationale">{assumption.rationale}</p>
+                        {/if}
+                      </li>
+                    {/each}
+                  </ul>
+                </details>
+              {/if}
+            {/if}
             {#if item.rationale}
               <details class="row-rationale">
                 <summary>Why</summary>
@@ -385,6 +436,41 @@
   .row-rationale p {
     margin: var(--jc-space-sm) 0 0;
     color: var(--jc-on-surface-variant);
+  }
+  .candidate-description {
+    margin: var(--jc-space-sm) 0 0 0;
+    color: var(--jc-on-surface);
+    font-size: 0.95em;
+    line-height: 1.5;
+  }
+  .candidate-facts {
+    display: grid;
+    gap: var(--jc-space-xs);
+    margin-top: var(--jc-space-sm);
+  }
+  .candidate-facts p {
+    margin: 0;
+    color: var(--jc-on-surface-variant);
+    font-size: 0.9em;
+  }
+  .candidate-detail {
+    margin-top: var(--jc-space-sm);
+    font-size: 0.88em;
+    color: var(--jc-on-surface-variant);
+  }
+  .candidate-detail summary {
+    cursor: pointer;
+  }
+  .detail-list {
+    margin: var(--jc-space-sm) 0 0 1.25rem;
+    padding: 0;
+    display: grid;
+    gap: var(--jc-space-xs);
+  }
+  .detail-rationale {
+    margin: var(--jc-space-xs) 0 0 0;
+    color: var(--jc-on-surface-variant);
+    font-size: 0.95em;
   }
 
   .row-edit-area {

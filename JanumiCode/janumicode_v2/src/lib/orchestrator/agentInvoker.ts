@@ -23,7 +23,12 @@ export interface CLITraceContext {
 
 // ── Types ───────────────────────────────────────────────────────────
 
-export type BackingTool = 'claude_code_cli' | 'gemini_cli' | 'codex_cli' | 'direct_llm_api';
+export type BackingTool =
+  | 'claude_code_cli'
+  | 'gemini_cli'
+  | 'goose_cli'
+  | 'codex_cli'
+  | 'direct_llm_api';
 
 export interface AgentInvocationOptions {
   /** Agent role name */
@@ -115,6 +120,15 @@ export class AgentInvoker {
    */
   registerOutputParser(backingTool: string, parser: OutputParser): void {
     this.outputParsers.set(backingTool, parser);
+  }
+
+  /**
+   * Enumerate the backing tools that have an output parser registered.
+   * Used by validateLLMRouting to verify that a role configured with a
+   * CLI backing has the parser it'll need at invocation time.
+   */
+  getRegisteredBackingTools(): string[] {
+    return Array.from(this.outputParsers.keys());
   }
 
   /**
@@ -296,6 +310,7 @@ export class AgentInvoker {
     switch (backingTool) {
       case 'claude_code_cli': return 'Claude Code CLI';
       case 'gemini_cli':      return 'Gemini CLI';
+      case 'goose_cli':       return 'Goose CLI';
       case 'codex_cli':       return 'Codex CLI';
       default:                return backingTool;
     }
@@ -360,8 +375,9 @@ export class AgentInvoker {
    *     harness runs unattended or they aren't headless at all.
    *   - `--add-dir <cwd>` gives Claude Code explicit write access to
    *     the working tree.
-   *   - `JANUMICODE_CLAUDE_MODEL` env var lets operators pin a model
-   *     (defaults to whatever the CLI's own config selects).
+    *   - `options.model` lets callers select a model per invocation.
+    *     `JANUMICODE_CLAUDE_MODEL` remains the process-level fallback
+    *     when the invocation does not specify one explicitly.
    *
    * Two opt-in knobs via env vars to stay conservative by default:
    *
@@ -384,7 +400,7 @@ export class AgentInvoker {
         } else {
           args.push('--permission-mode', 'acceptEdits');
         }
-        const model = process.env.JANUMICODE_CLAUDE_MODEL;
+        const model = options.model ?? process.env.JANUMICODE_CLAUDE_MODEL;
         if (model) args.push('--model', model);
         const extra = process.env.JANUMICODE_CLAUDE_EXTRA_ARGS;
         if (extra) {
@@ -397,6 +413,54 @@ export class AgentInvoker {
           command: 'gemini',
           args: ['--prompt', options.prompt, '--format', 'json'],
         };
+      case 'goose_cli': {
+        // Goose `run` reads the instruction body from stdin when
+        // `-i -` is passed. Same rationale as Claude Code: realistic
+        // Phase 9 prompts run 20-50KB and would blow past the OS
+        // argv-length cap if we inlined them with `-t <text>`.
+        //
+        // Flags:
+        //   --no-session          — headless runs don't want Goose's
+        //                           session DB polluting the workspace
+        //   --output-format stream-json — line-delimited NDJSON for
+        //                           the OutputParser
+        //   --quiet               — suppress Goose's banner + spinner
+        //                           so only the stream-json lines hit
+        //                           stdout (banner goes to stderr)
+        //   --with-builtin developer — wires file/shell tools so the
+        //                           coding agent can actually write
+        //                           to --add-dir (no equivalent flag
+        //                           in Goose; relies on --working-dir
+        //                           + developer extension's sandbox)
+        //
+        // Env knobs mirror the Claude Code hooks so operators can
+        // steer both agents with the same mental model:
+        //   JANUMICODE_GOOSE_PROVIDER — `--provider <name>` override
+        //   JANUMICODE_GOOSE_MODEL    — `--model <name>` override
+        //                               (per-invocation options.model
+        //                               wins if set)
+        //   JANUMICODE_GOOSE_MAX_TURNS — safety cap on unattended runs
+        //   JANUMICODE_GOOSE_EXTRA_ARGS — space-delimited extras
+        const args: string[] = [
+          'run',
+          '-i', '-',
+          '--no-session',
+          '--quiet',
+          '--output-format', 'stream-json',
+          '--with-builtin', 'developer',
+        ];
+        const provider = process.env.JANUMICODE_GOOSE_PROVIDER;
+        if (provider) args.push('--provider', provider);
+        const model = options.model ?? process.env.JANUMICODE_GOOSE_MODEL;
+        if (model) args.push('--model', model);
+        const maxTurns = process.env.JANUMICODE_GOOSE_MAX_TURNS;
+        if (maxTurns) args.push('--max-turns', maxTurns);
+        const extra = process.env.JANUMICODE_GOOSE_EXTRA_ARGS;
+        if (extra) {
+          for (const a of extra.split(/\s+/).filter(Boolean)) args.push(a);
+        }
+        return { command: 'goose', args };
+      }
       case 'codex_cli':
         return {
           command: 'codex',

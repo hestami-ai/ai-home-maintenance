@@ -526,24 +526,30 @@ When the diff is ambiguous (a field is both added and a structurally similar fie
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Context Payload stdin:** Active constraints (Authority Level 6+), `scope_classification`, `compliance_context` summary, `collision_risk_report` aliases, `prior_decision_summary` summary (brownfield)
 - **Context Payload detail file:** Full Context Packet from Deep Memory Research (brownfield, `all_runs` scope); full `prior_decision_summary`
-- **Action:** Applies collision aliases before any generation. Expands Raw Intent into full candidate space. In brownfield runs, checks each candidate against Context Packet `active_constraints` and annotates conflicts inline. System-Proposed Content (from Sub-Phase 1.0 Option B) is included in the bloom but flagged at Authority Level 1.
+- **Action:** Applies collision aliases before any generation. Expands Raw Intent into a set of plausible candidate interpretations of what is being proposed. Each `candidate_product_concept` is a candidate direction for the run, not yet governing intent. In brownfield runs, checks each candidate against Context Packet `active_constraints` and annotates conflicts inline. System-Proposed Content (from Sub-Phase 1.0 Option B) is included in the bloom but flagged at Authority Level 1.
 - **Output Artifact:** `intent_bloom`
 
 **System-Proposed Content Encoding:** System-Proposed Content items are encoded as a dedicated `system_proposed_content` array within `intent_bloom`, separate from `candidate_product_concepts`. Each item has its own `approval_status: pending | approved | rejected` field. This prevents System-Proposed Content from being mixed silently into human-derived content.
 
 When a System-Proposed Content item is approved, `GovernedStreamWriter` elevates its `authority_level` from 1 to 5 and traverses `record_references` forward from the item to clear `derived_from_system_proposal: true` from all downstream artifacts that inherited it due to this item.
 
-#### Sub-Phase 1.3 — Intent Mirror and Menu
+#### Sub-Phase 1.3 — Intent Candidate Review and Menu
 
-- **Interaction:** Annotated Mirror of `intent_bloom`. Mixed-format Menus following the Decision Sequencing Protocol (Section 7.5). System-Proposed Content items require individual explicit approval before they can be used as governing content. Prior decision conflicts highlighted. All Decision Traces recorded.
+- **Interaction:** Annotated Mirror of `intent_bloom` centered on candidate interpretations first. The human reviews, keeps, rejects, edits, or defers candidate directions before downstream synthesis. Assumptions, constraints, and open questions inside a candidate are supporting rationale at this stage unless explicitly elevated into a later assumption-focused surface. Mixed-format Menus follow the Decision Sequencing Protocol (Section 7.5) to prune candidate space. System-Proposed Content items require individual explicit approval before they can be used as governing content. Prior decision conflicts are highlighted. All Decision Traces are recorded.
 
-#### Sub-Phase 1.4 — Intent Statement Synthesis
+#### Sub-Phase 1.4 — Assumption Surfacing and Adjudication
+
+- **[JC:Agent Role]:** Orchestrator + Domain Interpreter Agent
+- **Action:** Extracts the assumption set implied by the kept candidate interpretations, normalizes and deduplicates those assumptions into first-class review objects, and presents them for explicit human adjudication. Only accepted or edited assumptions may become governing inputs to downstream synthesis. Rejected assumptions are excluded. Deferred assumptions remain unresolved and block progression unless explicitly handled by policy.
+- **Output Artifact:** `surfaced_assumptions`, `adjudicated_assumptions`
+
+#### Sub-Phase 1.5 — Intent Statement Synthesis
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
-- **Action:** Synthesizes all prune decisions into complete Intent Statement. Reasoning Review applied. Domain Compliance Reasoning Review applied if `compliance_context` is populated.
-- **Output Artifact:** `intent_statement: {product_concept, confirmed_assumptions, confirmed_constraints, out_of_scope, scope_classification_ref, compliance_context_ref, prior_decision_overrides, system_proposed_content_items: [{field, content, approved: bool}]}`
+- **Action:** Synthesizes all prune decisions into complete Intent Statement using only the kept candidate interpretations and the adjudicated assumption set. Reasoning Review applied. Domain Compliance Reasoning Review applied if `compliance_context` is populated.
+- **Output Artifact:** `intent_statement: {product_concept, confirmed_assumptions: [{assumption_id, assumption, confirmed_by_record_id}], confirmed_constraints, out_of_scope, scope_classification_ref, compliance_context_ref, prior_decision_overrides, system_proposed_content_items: [{field, content, approved: bool}]}`
 
-#### Sub-Phase 1.5 — Intent Statement Approval
+#### Sub-Phase 1.6 — Intent Statement Approval
 
 - **Interaction:** Full Mirror of `intent_statement`. Human approves, rejects, or edits. If rejected: return to 1.2 with rejection context injected.
 

@@ -30,26 +30,27 @@ COLLISION ALIASES (use canonical terms, not these aliases):
 REQUIRED OUTPUT: A JSON object matching the `intent_bloom` schema:
 - candidate_product_concepts: array of product concept candidates, each with:
   - id, name, description, who_it_serves, problem_it_solves
-  - assumptions: inferences you made that were NOT stated — surface ALL of them
+  - assumptions: array of objects with exactly:
+    - assumption: the inference you made that was NOT stated
+    - basis: what in the provided context led you to that inference
   - constraints: conditions the solution must satisfy
   - open_questions: ambiguities that cannot be resolved without human judgment
-- system_proposed_content: array of system-proposed field values (for absent fields), each with approval_status: "pending"
-- prior_decision_conflicts: array of conflicts with prior decisions (brownfield)
 
 Rules:
 - Generate AT LEAST 3 distinct product concept candidates from different angles
 - Surface EVERY assumption — even obvious ones
-- Every assumption must have a basis (what in the Raw Intent led you to this inference)
+- Every assumption object must use the keys `assumption` and `basis`
 - Open questions must be genuinely ambiguous — not rhetorical
 - Do NOT collapse options. If two interpretations are both plausible, include both.
+- Use ONLY the context included in this prompt. Do NOT claim to have read any file path unless the relevant content is quoted inline here.
 
 CONTEXT SUMMARY:
 Scope: {{scope_classification_summary}}
 Compliance: {{compliance_context_summary}}
 
-DETAIL FILE:
-Complete supporting context at: {{detail_file_path}}
-Consult for full prior decision history and compliance details.
+DETAIL FILE REFERENCE:
+Supporting context has been assembled for audit at: {{detail_file_path}}
+Treat this path as a reference only unless its contents are explicitly quoted in this prompt.
 
 [PRODUCT SCOPE]
 Raw Intent:

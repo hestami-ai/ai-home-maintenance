@@ -20,8 +20,9 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["assumption", "confirmed_by_record_id"],
+        "required": ["assumption_id", "assumption", "confirmed_by_record_id"],
         "properties": {
+          "assumption_id": { "type": "string", "minLength": 1 },
           "assumption": { "type": "string" },
           "confirmed_by_record_id": { "type": "string" }
         }

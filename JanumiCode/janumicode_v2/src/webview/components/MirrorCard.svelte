@@ -47,6 +47,7 @@
 
   // ── Staging state for batched submission ───────────────────────
   const stagedCount = $derived(decisionStagingStore.countByCard(record.id));
+  let editOpen = $state<Set<string>>(new Set());
 
   // Derive title + fields from the content. Fallback to legacy "dump all
   // top-level keys" rendering ONLY when content.fields is missing entirely
@@ -119,6 +120,13 @@
     return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
+  function toggleEdit(itemId: string): void {
+    const next = new Set(editOpen);
+    if (next.has(itemId)) next.delete(itemId);
+    else next.add(itemId);
+    editOpen = next;
+  }
+
   function formatValue(value: unknown): string {
     if (value === null || value === undefined) return '—';
     if (typeof value === 'string') return value;
@@ -187,11 +195,13 @@
       {#each assumptions as item (item.id)}
         {@const badge = getSourceBadge(item.source)}
         {@const itemDecision = decisionStagingStore.getItemDecision(record.id, item.id)}
+        {@const isEditOpen = editOpen.has(item.id)}
+        {@const editedText = typeof itemDecision?.payload?.edited_text === 'string' ? itemDecision.payload.edited_text : item.text}
         <div class="assumption-row" class:decided={!!itemDecision}>
           <div class="assumption-header">
             <span class="mmp-category-badge">{item.category}</span>
             <span class="badge-source {badge.cssClass}" title="Source: {item.source}">{badge.label}</span>
-            <span class="assumption-text">{item.text}</span>
+            <span class="assumption-text">{itemDecision?.action === 'edited' ? editedText : item.text}</span>
             {#if itemDecision}
               <span class="staged-badge staged-{itemDecision.action}">
                 {itemDecision.action === 'accepted' ? '✓' : itemDecision.action === 'rejected' ? '✗' : itemDecision.action === 'deferred' ? '⏳' : '✏'}
@@ -205,11 +215,36 @@
               <p>{item.rationale}</p>
             </details>
           {/if}
+          {#if isEditOpen}
+            <textarea
+              class="assumption-edit-area"
+              rows="3"
+              value={editedText}
+              oninput={(e) => decisionStagingStore.stage(record.id, {
+                itemId: item.id,
+                action: 'edited',
+                payload: { edited_text: (e.currentTarget as HTMLTextAreaElement).value },
+              })}
+            ></textarea>
+          {/if}
           <div class="assumption-actions">
             <button class="mmp-btn mmp-accept" class:selected={itemDecision?.action === 'accepted'} onclick={() => decisionStagingStore.stage(record.id, { itemId: item.id, action: 'accepted' })}>✓ Accept</button>
             <button class="mmp-btn mmp-reject" class:selected={itemDecision?.action === 'rejected'} onclick={() => decisionStagingStore.stage(record.id, { itemId: item.id, action: 'rejected' })}>✗ Reject</button>
             <button class="mmp-btn mmp-defer" class:selected={itemDecision?.action === 'deferred'} onclick={() => decisionStagingStore.stage(record.id, { itemId: item.id, action: 'deferred' })}>⏳ Defer</button>
-            <button class="mmp-btn mmp-edit" class:selected={itemDecision?.action === 'edited'} onclick={() => decisionStagingStore.stage(record.id, { itemId: item.id, action: 'edited' })}>✏ Edit</button>
+            <button
+              class="mmp-btn mmp-edit"
+              class:selected={itemDecision?.action === 'edited'}
+              onclick={() => {
+                toggleEdit(item.id);
+                if (!isEditOpen) {
+                  decisionStagingStore.stage(record.id, {
+                    itemId: item.id,
+                    action: 'edited',
+                    payload: { edited_text: editedText },
+                  });
+                }
+              }}
+            >{isEditOpen ? 'Close Edit' : '✏ Edit'}</button>
           </div>
         </div>
       {/each}
@@ -554,6 +589,19 @@
     padding-left: var(--jc-space-lg);
     border-left: 2px solid var(--jc-outline-variant);
     color: var(--jc-on-surface-variant);
+  }
+  .assumption-edit-area {
+    width: 100%;
+    margin-top: var(--jc-space-md);
+    padding: var(--jc-space-md);
+    font: inherit;
+    font-family: var(--jc-font-body);
+    font-size: 0.85em;
+    background: var(--jc-surface-container-lowest);
+    color: var(--jc-on-surface);
+    border: var(--jc-ghost-border);
+    border-radius: var(--jc-radius-xs);
+    resize: vertical;
   }
   .assumption-actions {
     display: flex;

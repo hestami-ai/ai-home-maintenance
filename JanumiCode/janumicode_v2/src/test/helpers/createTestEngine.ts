@@ -79,6 +79,29 @@ export interface TestEngineOptions {
   useRealProviders?: boolean;
   /** Optional phase limit for test isolation. */
   phaseLimit?: PhaseId | null;
+  /**
+   * Override `llm_routing.orchestrator` to steer Phase 1.0's Intent
+   * Quality Check (and any future orchestrator-role LLM work) to a
+   * specific backing. Defaults vary by mode:
+   *
+   *   - mock   → `{ backing_tool: 'direct_llm_api', provider: 'ollama',
+   *                 model: 'qwen3.5:9b' }` so the call routes through
+   *                 MockLLMProvider like every other role.
+   *   - real   → production default (gemini_cli).
+   *   - custom → pass explicit config; test harness real-mode sets
+   *              `{ backing_tool: 'claude_code_cli', model: 'qwen3.5:9b' }`
+   *              to exercise the CLI path with a router proxy.
+   *
+   * When set to a CLI backing, createTestEngine automatically calls
+   * `engine.registerBuiltinCLIParsers()` so `validateLLMRouting()`
+   * passes.
+   */
+  orchestratorRouting?: {
+    backing_tool: string;
+    provider?: string;
+    model?: string;
+    temperature?: number;
+  };
 }
 
 export interface TestEngine {
@@ -115,8 +138,40 @@ export async function createTestEngine(
   // 2. Config
   const configManager = new ConfigManager(workspacePath);
 
+  // 2b. Orchestrator routing override. Production default is
+  // `gemini_cli` which isn't appropriate for most tests — mock mode
+  // needs a direct_llm_api backing so the MockLLMProvider intercepts
+  // the call, and real-mode harnesses steer to a specific CLI via
+  // opts.orchestratorRouting. When the routing is a CLI backing, we
+  // register the builtin parsers so validateLLMRouting passes.
+  const effectiveModeForRouting = opts.llmMode
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    ?? (opts.useRealProviders ? 'real' : 'mock');
+  const orchestratorRouting = opts.orchestratorRouting ?? (
+    effectiveModeForRouting === 'mock'
+      ? { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' }
+      : undefined
+  );
+
   // 3. Engine
   const engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
+  if (orchestratorRouting) {
+    configManager.setOrchestratorRouting({
+      primary: {
+        backing_tool: orchestratorRouting.backing_tool,
+        provider: orchestratorRouting.provider,
+        model: orchestratorRouting.model,
+      },
+      temperature: orchestratorRouting.temperature,
+    });
+  }
+  if (orchestratorRouting && orchestratorRouting.backing_tool !== 'direct_llm_api') {
+    // CLI backing — register the builtin parsers so validateLLMRouting
+    // finds the one the orchestrator is configured to use. Mock mode
+    // stays quiet (no parsers) so Phase 9 still fast-fails without
+    // trying to spawn a real CLI subprocess.
+    engine.registerBuiltinCLIParsers();
+  }
   if (opts.autoApprove !== false) {
     engine.setAutoApproveDecisions(true);
   }

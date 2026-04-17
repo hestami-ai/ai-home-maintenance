@@ -16,12 +16,8 @@ import { OrchestratorEngine } from '../lib/orchestrator/orchestratorEngine';
 import { HeadlessLiaisonAdapter, type HeadlessLiaisonConfig } from '../core/headlessLiaisonAdapter';
 import { createTestEngine } from '../test/helpers/createTestEngine';
 import type { PhaseId } from '../lib/types/records';
-import { validateLineage, buildGapReport } from '../test/harness/lineageValidator';
-import {
-  FULL_WORKFLOW_EXPECTATIONS,
-  validateExpectations,
-} from '../test/harness/hestamiExpectations';
-import { enhanceGapReport, generateLLMGapSuggestion } from '../test/harness/gapReportEnhancer';
+import { generateLLMGapSuggestion } from '../test/harness/gapReportEnhancer';
+import { collectHarnessResult } from '../test/harness/collectResults';
 
 // Re-export types for consumers
 export type { HarnessResult, GapReport, SemanticWarning, DecisionOverride, PipelineRunnerConfig } from '../test/harness/types';
@@ -90,6 +86,12 @@ export async function runPipeline(
   if (llmMode !== 'mock') {
     fs.mkdirSync(liveLogDir, { recursive: true });
     engine.llmCaller.setLiveLogDir(liveLogDir);
+    // Real-mode runs spawn the Claude Code subprocess for Phase 9 task
+    // execution. Mock mode deliberately skips this — Phase 9 should
+    // fail fast with "No output parser registered for backing tool:
+    // claude_code_cli" so fixture-only tests don't hang waiting for a
+    // coding agent that isn't configured in the test env.
+    engine.registerBuiltinCLIParsers();
   }
   const detachMonitor = llmMode !== 'mock'
     ? attachLiveMonitor(engine.eventBus, liveLogDir)
@@ -164,7 +166,10 @@ export async function runPipeline(
       }
     }
 
-    const result = collectResults(db, workflowRunId, startTime, resolvedDbPath);
+    const result = collectHarnessResult(db, workflowRunId, {
+      dbPath: resolvedDbPath,
+      startTimeMs: startTime,
+    });
 
     // Optional LLM-grounded suggested_fix. Runs after the rule-based
     // enhancement so the prompt can reference the already-populated
@@ -408,153 +413,3 @@ function getRecordCount(db: Database, runId: string): number {
   return row?.cnt ?? 0;
 }
 
-/**
- * Collect results from the workflow run by driving the harness oracle
- * (validateLineage + validateExpectations) against the governed stream.
- *
- * A phase is "completed" only if ALL required artifacts landed AND
- * every required expectation passed — heuristic success-by-record-count
- * let real regressions slip through undetected. If the oracle finds
- * missing artifacts, the first phase that broke drives a proper
- * GapReport that names the specific required artifact, invariant, or
- * semantic assertion that didn't hold. Preferred-severity expectation
- * failures surface as SemanticWarnings but don't block.
- */
-function collectResults(
-  db: Database,
-  workflowRunId: string | null,
-  startTime: number,
-  dbPath: string,
-): import('../test/harness/types').HarnessResult {
-  const durationMs = Date.now() - startTime;
-
-  interface StreamRecord {
-    record_type: string;
-    phase_id: string | null;
-    sub_phase_id: string | null;
-    content: string | null;
-  }
-  const records: StreamRecord[] = workflowRunId
-    ? db.prepare(
-        `SELECT record_type, phase_id, sub_phase_id, content
-         FROM governed_stream
-         WHERE workflow_run_id = ?
-         ORDER BY produced_at`,
-      ).all(workflowRunId) as StreamRecord[]
-    : [];
-
-  // Inventory what's present, keyed by phase. Used for the artifacts
-  // summary and the "furthest-seen phase" heuristic for gap locality.
-  const phasesWithRecords = new Set<string>();
-  const artifactsProduced: Record<string, string[]> = {};
-  for (const record of records) {
-    const phaseId = record.phase_id;
-    if (!phaseId) continue;
-    phasesWithRecords.add(phaseId);
-    if (record.record_type === 'artifact_produced') {
-      if (!artifactsProduced[phaseId]) artifactsProduced[phaseId] = [];
-      try {
-        const content = record.content ? JSON.parse(record.content) as Record<string, unknown> : {};
-        const kind = (content.kind as string) ?? record.record_type;
-        artifactsProduced[phaseId].push(kind);
-      } catch {
-        artifactsProduced[phaseId].push(record.record_type);
-      }
-    }
-  }
-
-  const PHASE_ORDER: PhaseId[] = ['0', '0.5', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
-  const observedPhases = PHASE_ORDER.filter((p) => phasesWithRecords.has(p));
-
-  // Drive the oracle over every phase where we saw any activity. Each
-  // phase is only counted as completed when its required_artifacts ALL
-  // landed and its required expectations ALL passed. We scope
-  // expectations to observed phases so phase-limited runs (e.g.
-  // --phase-limit 1) don't emit false-positive semantic warnings
-  // about Phases 2-10 that never ran.
-  const observedPhaseSet = new Set<string>(observedPhases);
-  const scopedExpectations = FULL_WORKFLOW_EXPECTATIONS.filter(
-    (e) => !e.phase || observedPhaseSet.has(e.phase),
-  );
-  const requiredExpectationResults = workflowRunId
-    ? validateExpectations(records, scopedExpectations)
-    : [];
-  const requiredByPhase = new Map<string, boolean>();
-  for (const exp of FULL_WORKFLOW_EXPECTATIONS) {
-    if (exp.severity !== 'required') continue;
-    if (!exp.phase) continue;
-    const result = requiredExpectationResults.find((r) => r.expectationId === exp.id);
-    const passed = result?.passed ?? true;
-    requiredByPhase.set(exp.phase, (requiredByPhase.get(exp.phase) ?? true) && passed);
-  }
-
-  // Lineage check across every observed phase. We don't pre-filter by
-  // "completed" status because a phase partially executed is also useful
-  // to validate — the gap report should point at its first missing req.
-  const lineage = workflowRunId
-    ? validateLineage(db, workflowRunId, observedPhases)
-    : { valid: true, missingRecords: [], violations: [], assertionFailures: [] };
-
-  // A phase is completed when:
-  //   (a) it has records, AND
-  //   (b) no required artifacts from its contract are missing, AND
-  //   (c) every required expectation for that phase passed.
-  const missingByPhase = new Map<string, number>();
-  for (const m of lineage.missingRecords) {
-    missingByPhase.set(m.phase, (missingByPhase.get(m.phase) ?? 0) + 1);
-  }
-  const phasesCompleted = observedPhases.filter((p) => {
-    if ((missingByPhase.get(p) ?? 0) > 0) return false;
-    if ((requiredByPhase.get(p) ?? true) === false) return false;
-    return true;
-  });
-  const phasesFailed = observedPhases.filter((p) => !phasesCompleted.includes(p));
-
-  // Semantic warnings come from preferred expectations that didn't pass.
-  const semanticWarnings = requiredExpectationResults
-    .map((r) => r.warning)
-    .filter((w): w is NonNullable<typeof w> => !!w);
-
-  // Status: success only when every phase we saw passed. If we never saw
-  // Phase 10 complete, the run is partial at best.
-  const allPhasesSeenPassed = observedPhases.length > 0
-    && phasesFailed.length === 0
-    && phasesCompleted.includes('10');
-  const status: 'success' | 'partial' | 'failed' = allPhasesSeenPassed
-    ? 'success'
-    : phasesCompleted.length > 0 ? 'partial' : 'failed';
-
-  // Gap report: pinned to the FIRST phase that broke (after the last
-  // successful one), so the coder's next fix target is obvious.
-  let gapReport: import('../test/harness/types').GapReport | undefined;
-  if (status !== 'success') {
-    const firstBroken = PHASE_ORDER.find((p) => phasesFailed.includes(p));
-    if (firstBroken) {
-      const subPhaseHint = lineage.missingRecords.find((m) => m.phase === firstBroken)?.sub_phase;
-      gapReport = buildGapReport(lineage, firstBroken as PhaseId, subPhaseHint);
-      if (workflowRunId) {
-        // Layer in rule-based diagnostics (missing-record analysis,
-        // assertion context, AI-spend summary, failsafes). LLM-driven
-        // suggested-fix generation is a Stage F follow-up; the base
-        // report's own suggested_fix covers the baseline direction.
-        const enhanced = enhanceGapReport(db, workflowRunId, gapReport);
-        gapReport = { ...gapReport, ...enhanced };
-      }
-    } else {
-      // observedPhases is empty (no records at all). That's a pipeline
-      // bootstrap failure — phase 0 is the natural point of blame.
-      gapReport = buildGapReport(lineage, '0');
-    }
-  }
-
-  return {
-    status,
-    phasesCompleted,
-    phasesFailed,
-    artifactsProduced,
-    gapReport,
-    semanticWarnings,
-    durationMs,
-    governedStreamPath: dbPath,
-  };
-}

@@ -41,7 +41,7 @@ export function parseJsonWithRecovery(text: string): {
       recovered: false,
     };
   } catch (err) {
-    const repaired = repairSingleQuotedJson(jsonText);
+    const repaired = repairJsonCommonModelPathologies(jsonText);
     if (repaired !== jsonText) {
       try {
         return {
@@ -63,7 +63,7 @@ export function parseJsonWithRecovery(text: string): {
   }
 }
 
-function repairSingleQuotedJson(input: string): string {
+function repairJsonCommonModelPathologies(input: string): string {
   const normalizedLines = input
     .split('\n')
     .map((line) => repairSingleQuotedLineValue(line))
@@ -78,14 +78,26 @@ function repairSingleQuotedJson(input: string): string {
     const ch = normalizedLines[i];
 
     if (inDouble) {
-      out += ch;
       if (escaped) {
+        out += isValidJsonEscape(ch)
+          ? `\\${ch}`
+          : `\\\\${ch}`;
         escaped = false;
       } else if (ch === '\\') {
         escaped = true;
-      } else if (ch === '"') {
-        inDouble = false;
+      } else {
+        out += ch;
+        if (ch === '"') {
+          inDouble = false;
+        }
       }
+      i++;
+      continue;
+    }
+
+    if (ch === '\\') {
+      // Outside strings, preserve the backslash as-is.
+      out += ch;
       i++;
       continue;
     }
@@ -114,6 +126,18 @@ function repairSingleQuotedJson(input: string): string {
   }
 
   return out;
+}
+
+function isValidJsonEscape(ch: string): boolean {
+  return ch === '"' ||
+    ch === '\\' ||
+    ch === '/' ||
+    ch === 'b' ||
+    ch === 'f' ||
+    ch === 'n' ||
+    ch === 'r' ||
+    ch === 't' ||
+    ch === 'u';
 }
 
 function repairSingleQuotedLineValue(line: string): string {

@@ -95,10 +95,14 @@ export const DEFAULT_EXPECTATIONS: HestamiExpectation[] = [
     'Phase 1.2 must produce an intent_bloom with candidate product concepts.'),
   expectRecordType('phase1-decision-bundle', '1', 'decision_bundle_presented',
     'Phase 1.3 must present a composite decision bundle (Mirror + optional candidate Menu).'),
+  expectArtifact('phase1-surfaced-assumptions', '1', 'surfaced_assumptions',
+    'Phase 1.4 must surface assumptions implied by the kept candidates.'),
+  expectArtifact('phase1-adjudicated-assumptions', '1', 'adjudicated_assumptions',
+    'Phase 1.4 must record the adjudicated assumption set before synthesis.'),
   expectArtifact('phase1-intent-statement', '1', 'intent_statement',
-    'Phase 1.4 must synthesize the intent statement.'),
+    'Phase 1.5 must synthesize the intent statement from adjudicated assumptions.'),
   expectRecordType('phase1-gate', '1', 'phase_gate_evaluation',
-    'Phase 1.5 must emit a phase gate evaluation.'),
+    'Phase 1.6 must emit a phase gate evaluation.'),
 ];
 
 // ── Full workflow expectations (Phases 0-10) ───────────────────────

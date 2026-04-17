@@ -108,6 +108,38 @@ describe('OutputParser', () => {
       expect(events[0].data.content).toBe('I will create the file.');
     });
 
+    it('unwraps assistant envelope with a thinking block to agent_reasoning_step', () => {
+      const line = JSON.stringify({
+        type: 'assistant',
+        message: { content: [{ type: 'thinking', thinking: 'I should inspect the file before editing it.' }] },
+      });
+      const events = parser.parseLine(line);
+      expect(events).toHaveLength(1);
+      expect(events[0].recordType).toBe('agent_reasoning_step');
+      expect(events[0].data.content).toBe('I should inspect the file before editing it.');
+      expect(events[0].data.text).toBe('I should inspect the file before editing it.');
+    });
+
+    it('unwraps assistant envelope with both thinking and text blocks in order', () => {
+      const line = JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'thinking', thinking: 'First reason about the request.' },
+            { type: 'text', text: 'I will inspect the relevant files now.' },
+          ],
+        },
+      });
+      const events = parser.parseLine(line);
+      expect(events).toHaveLength(2);
+      expect(events.map((e) => e.recordType)).toEqual([
+        'agent_reasoning_step',
+        'agent_reasoning_step',
+      ]);
+      expect(events[0].data.content).toBe('First reason about the request.');
+      expect(events[1].data.content).toBe('I will inspect the relevant files now.');
+    });
+
     it('unwraps assistant envelope with a tool_use block to a tool_call', () => {
       const line = JSON.stringify({
         type: 'assistant',

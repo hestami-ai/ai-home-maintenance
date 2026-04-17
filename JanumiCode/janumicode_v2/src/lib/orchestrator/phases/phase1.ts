@@ -6,9 +6,10 @@
  *   1.0  — Intent Quality Check (Orchestrator LLM call)
  *   1.1b — Scope Bounding and Compliance Context (deterministic placeholder)
  *   1.2  — Intent Domain Bloom (Domain Interpreter Agent — real LLM call)
- *   1.3  — Intent Mirror and Menu (human prune via webview)
- *   1.4  — Intent Statement Synthesis (Domain Interpreter Agent — real LLM call)
- *   1.5  — Intent Statement Approval (human approval via webview)
+ *   1.3  — Intent Candidate Review and Menu (human prune via webview)
+ *   1.4  — Assumption Surfacing and Adjudication (human approval via webview)
+ *   1.5  — Intent Statement Synthesis (Domain Interpreter Agent — real LLM call)
+ *   1.6  — Intent Statement Approval (human approval via webview)
  *
  * Wave 5: Implements the full flow end-to-end. Awaits human decisions via
  * `engine.pauseForDecision`. Phase handlers are idempotent on re-entry —
@@ -27,12 +28,12 @@ import type {
 import { getLogger } from '../../logging';
 import { parseJsonWithRecovery } from '../../llm/jsonRecovery';
 
-/** An assumption may be a plain string or a {statement, basis} object from the LLM. */
-type AssumptionEntry = string | { statement?: string; inference?: string; basis?: string };
+/** An assumption may be a plain string or a structured object from the LLM. */
+type AssumptionEntry = string | { statement?: string; inference?: string; assumption?: string; basis?: string };
 
 function assumptionText(a: AssumptionEntry): string {
   if (typeof a === 'string') return a;
-  return a.statement ?? a.inference ?? JSON.stringify(a);
+  return a.statement ?? a.inference ?? a.assumption ?? JSON.stringify(a);
 }
 
 interface BloomCandidate {
@@ -57,9 +58,27 @@ interface IntentStatementContent {
     who_it_serves: string;
     problem_it_solves: string;
   };
-  confirmed_assumptions: string[];
+  confirmed_assumptions: Array<{
+    assumption_id: string;
+    assumption: string;
+    confirmed_by_record_id: string;
+  }>;
   confirmed_constraints: string[];
   out_of_scope: string[];
+}
+
+interface SurfacedAssumption {
+  id: string;
+  text: string;
+  rationale?: string;
+  source_candidate_ids: string[];
+  source: import('../../types/records').AssumptionSource;
+}
+
+interface AdjudicatedAssumptionSet {
+  confirmed: Array<{ id: string; text: string; rationale?: string; source_candidate_ids: string[] }>;
+  rejected: Array<{ id: string; text: string; rationale?: string; source_candidate_ids: string[] }>;
+  deferred: Array<{ id: string; text: string; rationale?: string; source_candidate_ids: string[] }>;
 }
 
 export class Phase1Handler implements PhaseHandler {
@@ -178,54 +197,26 @@ export class Phase1Handler implements PhaseHandler {
     artifactIds.push(bloomRecord.id);
     engine.ingestionPipeline.ingest(bloomRecord);
 
-    // ── Sub-Phase 1.3 — Intent Mirror & Menu (human prune) ────
+    // ── Sub-Phase 1.3 — Intent Candidate Review & Menu (human prune) ────
     engine.stateMachine.setSubPhase(workflowRun.id, '1.3');
-
-    // Extract assumption rows from each bloom candidate so the MirrorCard
-    // can render v1-style per-row Accept / Reject / Defer / Edit surfaces.
-    const assumptionItems: import('../../types/records').AssumptionItem[] = [];
-    for (const candidate of bloomContent.candidate_product_concepts) {
-      for (let i = 0; i < candidate.assumptions.length; i++) {
-        const entry = candidate.assumptions[i];
-        assumptionItems.push({
-          id: `${candidate.id}-assumption-${i}`,
-          text: assumptionText(entry),
-          category: candidate.name,
-          source: 'ai_proposed',
-          status: 'pending',
-          rationale: typeof entry === 'object' ? entry.basis : undefined,
-        });
-      }
-      // Surface each candidate's open questions as assumptions too (they're
-      // ambiguities the user should consciously accept or reject).
-      for (let i = 0; i < candidate.open_questions.length; i++) {
-        assumptionItems.push({
-          id: `${candidate.id}-openq-${i}`,
-          text: `Open question: ${candidate.open_questions[i]}`,
-          category: candidate.name,
-          source: 'ai_proposed',
-          status: 'pending',
-        });
-      }
-    }
-
-    const assumptionMirror = engine.mirrorGenerator.generateAssumptionMirror({
-      artifactId: bloomRecord.id,
-      artifactType: 'intent_bloom',
-      assumptions: assumptionItems,
-      steelMan: bloomContent.candidate_product_concepts.length > 0
-        ? `I identified ${bloomContent.candidate_product_concepts.length} candidate interpretation(s) of your intent. Review the assumptions and open questions below, then approve, reject, defer, or edit each one.`
-        : undefined,
-    });
 
     // Emit ONE composite decision_bundle_presented instead of a separate
     // mirror + menu pair. The bundle carries both sections atomically, so
     // the user can't resolve the Mirror and accidentally bypass the Menu
     // (the bug the composite surface exists to prevent).
-    const mirrorItems: MirrorItem[] = assumptionMirror.assumptions.map(a => ({
-      id: a.id,
-      text: a.text,
-      rationale: a.rationale,
+    const mirrorItems: MirrorItem[] = bloomContent.candidate_product_concepts.map(candidate => ({
+      id: candidate.id,
+      text: candidate.name,
+      rationale: candidate.description,
+      description: candidate.description,
+      who_it_serves: candidate.who_it_serves,
+      problem_it_solves: candidate.problem_it_solves,
+      constraints: candidate.constraints,
+      open_questions: candidate.open_questions,
+      supporting_assumptions: candidate.assumptions.map(entry => ({
+        text: assumptionText(entry),
+        rationale: typeof entry === 'object' ? entry.basis : undefined,
+      })),
     }));
     const hasMenu = bloomContent.candidate_product_concepts.length > 1;
     const menuOptions: MenuOption[] = hasMenu
@@ -241,10 +232,12 @@ export class Phase1Handler implements PhaseHandler {
       : [];
     const bundleContent: DecisionBundleContent = {
       surface_id: `phase1-bloom-prune-${bloomRecord.id}`,
-      title: 'Confirm bloom assumptions' + (hasMenu ? ' and prune candidates' : ''),
-      summary: assumptionMirror.steelMan,
+      title: 'Review candidate interpretations of your intent',
+      summary: bloomContent.candidate_product_concepts.length > 0
+        ? `I identified ${bloomContent.candidate_product_concepts.length} plausible interpretation(s) of your intent. Review the candidate directions below, then keep the ones that best match what you want to build.`
+        : undefined,
       mirror: {
-        kind: 'assumption_mirror',
+        kind: 'intent_bloom_mirror',
         items: mirrorItems,
       },
       ...(hasMenu ? {
@@ -271,7 +264,7 @@ export class Phase1Handler implements PhaseHandler {
     });
     artifactIds.push(mirrorRecord.id);
     engine.eventBus.emit('mirror:presented', {
-      mirrorId: assumptionMirror.mirrorId,
+      mirrorId: mirrorRecord.id,
       artifactType: 'intent_bloom',
     });
     if (hasMenu) {
@@ -316,12 +309,121 @@ export class Phase1Handler implements PhaseHandler {
       keptCandidates = bloomContent.candidate_product_concepts;
     }
 
-    // ── Sub-Phase 1.4 — Intent Statement Synthesis ────────────
+    // ── Sub-Phase 1.4 — Assumption Surfacing & Adjudication ───
     engine.stateMachine.setSubPhase(workflowRun.id, '1.4');
+
+    const surfacedAssumptions = this.extractSurfacedAssumptions(keptCandidates);
+    const surfacedAssumptionsRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.4',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [bloomRecord.id, mirrorRecord.id],
+      content: {
+        kind: 'surfaced_assumptions',
+        assumptions: surfacedAssumptions,
+      },
+    });
+    artifactIds.push(surfacedAssumptionsRecord.id);
+    engine.ingestionPipeline.ingest(surfacedAssumptionsRecord);
+
+    const assumptionMirror = engine.mirrorGenerator.generateAssumptionMirror({
+      artifactId: surfacedAssumptionsRecord.id,
+      artifactType: 'surfaced_assumptions',
+      assumptions: surfacedAssumptions.map((assumption) => ({
+        id: assumption.id,
+        text: assumption.text,
+        category: 'Phase 1 Assumption',
+        source: assumption.source,
+        status: 'pending',
+        rationale: assumption.rationale,
+      })),
+      steelMan: surfacedAssumptions.length > 0
+        ? `I surfaced ${surfacedAssumptions.length} assumption(s) implied by the kept candidate interpretations. Accept or edit assumptions that should govern downstream work; reject assumptions that should not survive synthesis.`
+        : 'No assumptions were surfaced from the kept candidate interpretations.',
+    });
+
+    const assumptionMirrorRecord = engine.writer.writeRecord({
+      record_type: 'mirror_presented',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.4',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [surfacedAssumptionsRecord.id],
+      content: {
+        kind: 'assumption_mirror',
+        mirror_id: assumptionMirror.mirrorId,
+        artifact_id: surfacedAssumptionsRecord.id,
+        artifact_type: 'surfaced_assumptions',
+        assumptions: assumptionMirror.assumptions,
+        steelMan: assumptionMirror.steelMan,
+      },
+    });
+    artifactIds.push(assumptionMirrorRecord.id);
+    engine.eventBus.emit('mirror:presented', {
+      mirrorId: assumptionMirror.mirrorId,
+      artifactType: 'surfaced_assumptions',
+    });
+
+    let assumptionResolution: { type: string; payload?: Record<string, unknown> };
+    try {
+      assumptionResolution = await engine.pauseForDecision(
+        workflowRun.id,
+        assumptionMirrorRecord.id,
+        'mirror',
+      );
+    } catch (err) {
+      return {
+        success: false,
+        error: `Assumption adjudication failed: ${String(err)}`,
+        artifactIds,
+      };
+    }
+
+    const adjudicatedAssumptions = this.materializeAssumptionAdjudication(
+      surfacedAssumptions,
+      assumptionResolution,
+    );
+    if (adjudicatedAssumptions.deferred.length > 0) {
+      return {
+        success: false,
+        error: 'Deferred assumptions remain unresolved and block intent statement synthesis',
+        artifactIds,
+      };
+    }
+
+    const adjudicatedAssumptionsRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.4',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [surfacedAssumptionsRecord.id, assumptionMirrorRecord.id],
+      content: {
+        kind: 'adjudicated_assumptions',
+        confirmed: adjudicatedAssumptions.confirmed,
+        rejected: adjudicatedAssumptions.rejected,
+        deferred: adjudicatedAssumptions.deferred,
+      },
+    });
+    artifactIds.push(adjudicatedAssumptionsRecord.id);
+    engine.ingestionPipeline.ingest(adjudicatedAssumptionsRecord);
+
+    // ── Sub-Phase 1.5 — Intent Statement Synthesis ────────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.5');
 
     const intentStatement = await this.runIntentStatementSynthesis(
       ctx,
       keptCandidates,
+      adjudicatedAssumptions.confirmed,
+      adjudicatedAssumptionsRecord.id,
       rawIntentText,
     );
 
@@ -330,10 +432,10 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.4',
+      sub_phase_id: '1.5',
       produced_by_agent_role: 'domain_interpreter',
       janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [bloomRecord.id, ...keptCandidates.map(() => mirrorRecord.id)],
+      derived_from_record_ids: [bloomRecord.id, mirrorRecord.id, adjudicatedAssumptionsRecord.id],
       content: {
         kind: 'intent_statement',
         ...intentStatement,
@@ -342,8 +444,8 @@ export class Phase1Handler implements PhaseHandler {
     artifactIds.push(statementRecord.id);
     engine.ingestionPipeline.ingest(statementRecord);
 
-    // ── Sub-Phase 1.5 — Intent Statement Approval ─────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.5');
+    // ── Sub-Phase 1.6 — Intent Statement Approval ─────────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.6');
 
     const approvalMirror = engine.mirrorGenerator.generate({
       artifactId: statementRecord.id,
@@ -356,7 +458,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.5',
+      sub_phase_id: '1.6',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [statementRecord.id],
@@ -400,7 +502,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.5',
+      sub_phase_id: '1.6',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [statementRecord.id, approvalMirrorRecord.id],
@@ -443,10 +545,14 @@ export class Phase1Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return defaultReport;
 
+    // Route via callForRole so the Orchestrator's backing tool (Gemini
+    // CLI in production, Claude Code CLI in the harness, or
+    // direct_llm_api fallback) is governed by llm_routing.orchestrator
+    // config — NOT hardcoded to 'ollama' here. Previous hardcoding
+    // left the extension host tied to a local Ollama daemon even when
+    // operators had keys for better-fit models.
     try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama',
-        model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      const result = await engine.callForRole('orchestrator', {
         prompt: rendered.rendered,
         responseFormat: 'json',
         temperature: 0.3,
@@ -643,10 +749,17 @@ export class Phase1Handler implements PhaseHandler {
   private async runIntentStatementSynthesis(
     ctx: PhaseContext,
     keptCandidates: BloomCandidate[],
+    confirmedAssumptions: Array<{ id: string; text: string; rationale?: string; source_candidate_ids: string[] }>,
+    confirmedAssumptionsRecordId: string,
     rawIntentText: string,
   ): Promise<IntentStatementContent> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('domain_interpreter', '01_4_intent_statement_synthesis');
+    const confirmedAssumptionEntries = confirmedAssumptions.map((assumption) => ({
+      assumption_id: assumption.id,
+      assumption: assumption.text,
+      confirmed_by_record_id: confirmedAssumptionsRecordId,
+    }));
 
     const primary = keptCandidates[0];
     const fallback: IntentStatementContent = {
@@ -656,7 +769,7 @@ export class Phase1Handler implements PhaseHandler {
         who_it_serves: primary?.who_it_serves ?? 'unspecified',
         problem_it_solves: primary?.problem_it_solves ?? 'unspecified',
       },
-      confirmed_assumptions: keptCandidates.flatMap(c => c.assumptions.map(assumptionText)),
+      confirmed_assumptions: confirmedAssumptionEntries,
       confirmed_constraints: keptCandidates.flatMap(c => c.constraints),
       out_of_scope: [],
     };
@@ -667,7 +780,7 @@ export class Phase1Handler implements PhaseHandler {
       active_constraints: '(none)',
       prune_decisions_summary: keptCandidates.map(c => `Kept: ${c.name}`).join('\n'),
       selected_product_concept: JSON.stringify(primary, null, 2),
-      confirmed_assumptions: keptCandidates.flatMap(c => c.assumptions.map(assumptionText)).join('; '),
+      confirmed_assumptions: JSON.stringify(confirmedAssumptionEntries, null, 2),
       confirmed_constraints: keptCandidates.flatMap(c => c.constraints).join('; '),
       out_of_scope_items: '',
       scope_classification_ref: '',
@@ -686,10 +799,10 @@ export class Phase1Handler implements PhaseHandler {
         traceContext: {
           workflowRunId: ctx.workflowRun.id,
           phaseId: '1',
-          subPhaseId: '1.4',
-          agentRole: 'domain_interpreter',
-          label: 'Phase 1.4 — Intent Statement Synthesis',
-        },
+        subPhaseId: '1.5',
+        agentRole: 'domain_interpreter',
+        label: 'Phase 1.5 — Intent Statement Synthesis',
+      },
       });
       const parsed = result.parsed as Record<string, unknown> | null;
       // LLM may wrap response in a top-level key like "intent_statement"
@@ -697,7 +810,7 @@ export class Phase1Handler implements PhaseHandler {
       if (unwrapped?.product_concept) {
         return {
           product_concept: unwrapped.product_concept,
-          confirmed_assumptions: unwrapped.confirmed_assumptions ?? fallback.confirmed_assumptions,
+          confirmed_assumptions: fallback.confirmed_assumptions,
           confirmed_constraints: unwrapped.confirmed_constraints ?? fallback.confirmed_constraints,
           out_of_scope: unwrapped.out_of_scope ?? [],
         };
@@ -707,6 +820,80 @@ export class Phase1Handler implements PhaseHandler {
       getLogger().warn('workflow', 'Synthesis LLM call failed', { error: String(err) });
       return fallback;
     }
+  }
+
+  private extractSurfacedAssumptions(keptCandidates: BloomCandidate[]): SurfacedAssumption[] {
+    const deduped = new Map<string, SurfacedAssumption>();
+    let index = 0;
+    for (const candidate of keptCandidates) {
+      for (const entry of candidate.assumptions) {
+        const text = assumptionText(entry).trim();
+        if (!text) continue;
+        const key = text.toLowerCase();
+        const rationale = typeof entry === 'object' ? entry.basis : undefined;
+        const existing = deduped.get(key);
+        if (existing) {
+          if (!existing.source_candidate_ids.includes(candidate.id)) {
+            existing.source_candidate_ids.push(candidate.id);
+          }
+          if (!existing.rationale && rationale) existing.rationale = rationale;
+          continue;
+        }
+        deduped.set(key, {
+          id: `assumption-${++index}`,
+          text,
+          rationale,
+          source_candidate_ids: [candidate.id],
+          source: 'ai_proposed',
+        });
+      }
+    }
+    return Array.from(deduped.values());
+  }
+
+  private materializeAssumptionAdjudication(
+    surfacedAssumptions: SurfacedAssumption[],
+    resolution: { type: string; payload?: Record<string, unknown> },
+  ): AdjudicatedAssumptionSet {
+    const decisions = Array.isArray(resolution.payload?.decisions)
+      ? resolution.payload?.decisions as Array<{
+          itemId?: string;
+          action?: 'accepted' | 'rejected' | 'deferred' | 'edited';
+          payload?: { edited_text?: string };
+        }>
+      : [];
+
+    if (decisions.length === 0) {
+      return {
+        confirmed: surfacedAssumptions.map((a) => ({ ...a })),
+        rejected: [],
+        deferred: [],
+      };
+    }
+
+    const result: AdjudicatedAssumptionSet = {
+      confirmed: [],
+      rejected: [],
+      deferred: [],
+    };
+    for (const assumption of surfacedAssumptions) {
+      const decision = decisions.find((d) => d.itemId === assumption.id);
+      if (!decision || !decision.action || decision.action === 'deferred') {
+        result.deferred.push({ ...assumption });
+        continue;
+      }
+      if (decision.action === 'rejected') {
+        result.rejected.push({ ...assumption });
+        continue;
+      }
+      result.confirmed.push({
+        ...assumption,
+        text: decision.action === 'edited'
+          ? (decision.payload?.edited_text?.trim() || assumption.text)
+          : assumption.text,
+      });
+    }
+    return result;
   }
 
   /**

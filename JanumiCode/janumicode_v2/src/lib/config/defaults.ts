@@ -65,6 +65,10 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
   },
 
   llm_routing: {
+    orchestrator: {
+      primary: { backing_tool: 'gemini_cli', model: 'gemini-2.5-flash' },
+      temperature: 0.3,
+    },
     reasoning_review: {
       primary: { provider: 'google', model: 'gemini-2.0-flash-thinking' },
       temperature: 0.2,

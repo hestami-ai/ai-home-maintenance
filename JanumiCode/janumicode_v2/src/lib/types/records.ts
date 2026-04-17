@@ -149,9 +149,10 @@ export const SUB_PHASE_NAMES: Record<PhaseId, Record<string, string>> = {
     '1.0': 'Intent Quality Check',
     '1.1b': 'Scope Bounding',
     '1.2': 'Intent Domain Bloom',
-    '1.3': 'Intent Mirror & Menu',
-    '1.4': 'Intent Statement Synthesis',
-    '1.5': 'Intent Statement Approval',
+    '1.3': 'Intent Candidate Review & Menu',
+    '1.4': 'Assumption Surfacing & Adjudication',
+    '1.5': 'Intent Statement Synthesis',
+    '1.6': 'Intent Statement Approval',
   },
   '2': {
     '2.1': 'Functional Requirements Bloom',
@@ -206,7 +207,7 @@ export const SUB_PHASE_NAMES: Record<PhaseId, Record<string, string>> = {
 export const SUB_PHASE_ORDER: Record<PhaseId, string[]> = {
   '0': ['0.1', '0.2', '0.2b', '0.4'],
   '0.5': ['0.5.1', '0.5.2'],
-  '1': ['1.0', '1.1b', '1.2', '1.3', '1.4', '1.5'],
+  '1': ['1.0', '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6'],
   '2': ['2.1', '2.2', '2.3'],
   '3': ['3.1', '3.2', '3.3'],
   '4': ['4.1', '4.2', '4.3'],

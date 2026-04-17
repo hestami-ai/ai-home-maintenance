@@ -90,6 +90,7 @@ export interface FileWriteRecord {
 export type ExecutorBackingTool =
   | 'claude_code_cli'
   | 'gemini_cli'
+  | 'goose_cli'
   | 'codex_cli'
   | 'direct_llm_api';
 

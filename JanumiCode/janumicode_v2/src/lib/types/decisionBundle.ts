@@ -27,6 +27,16 @@ export interface MirrorItem {
   text: string;
   /** Optional rationale the agent attached; shown under the item when expanded. */
   rationale?: string;
+  /** Optional richer fields for candidate-interpretation review surfaces. */
+  description?: string;
+  who_it_serves?: string;
+  problem_it_solves?: string;
+  constraints?: string[];
+  open_questions?: string[];
+  supporting_assumptions?: Array<{
+    text: string;
+    rationale?: string;
+  }>;
 }
 
 export interface MirrorSection {

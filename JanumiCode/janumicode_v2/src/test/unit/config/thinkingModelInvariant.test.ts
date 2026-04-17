@@ -35,9 +35,11 @@ const REASONING_MODEL_PATTERNS: RegExp[] = [
   // etc.) are trained with thinking-mode. Qwen2 and older are NOT.
   /^qwen3/i,
   // Google Gemini thinking tier. The `-thinking` suffix is explicit;
-  // `gemini-2.5-pro` and above default to reasoning mode.
+  // `gemini-2.5-pro` and `gemini-2.5-flash` both default to reasoning
+  // mode (thinking tokens enabled by default per Google's Gemini 2.5
+  // release notes). Gemini 3+ is assumed reasoning.
   /^gemini-[2-9][.-][0-9].*thinking/i,
-  /^gemini-2\.5-pro/i,
+  /^gemini-2\.5-(pro|flash)/i,
   /^gemini-[3-9]/i,
   // Anthropic Claude thinking-capable tiers. Sonnet 3.7+ and Opus 4+
   // support extended thinking.

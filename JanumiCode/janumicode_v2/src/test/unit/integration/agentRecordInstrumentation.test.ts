@@ -38,7 +38,13 @@ const SYNTHESIS_FIXTURE = {
       who_it_serves: 'Solo developers',
       problem_it_solves: 'Terminal-native task management',
     },
-    confirmed_assumptions: ['Local storage'],
+    confirmed_assumptions: [
+      {
+        assumption_id: 'assumption-001',
+        assumption: 'Local storage',
+        confirmed_by_record_id: 'adjudicated-001',
+      },
+    ],
     confirmed_constraints: ['No network'],
     out_of_scope: [],
   },
@@ -153,11 +159,11 @@ describe('Section B — LLMCaller agent record instrumentation', () => {
 
     try {
       const invocations = recordsOfType(stream, 'agent_invocation');
-      // Phase 1 makes calls in sub-phases 1.0, 1.2, 1.4.
+      // Phase 1 makes calls in sub-phases 1.0, 1.2, 1.5.
       const subPhases = invocations.map((i) => i.sub_phase_id).filter(Boolean);
       expect(subPhases).toContain('1.0');
       expect(subPhases).toContain('1.2');
-      expect(subPhases).toContain('1.4');
+      expect(subPhases).toContain('1.5');
 
       // Phase 1 invocations are in phase '1' (Phase 2 may also chain in auto-approve mode).
       const phase1Invocations = invocations.filter(i => i.phase_id === '1');
@@ -183,7 +189,7 @@ describe('Section B — LLMCaller agent record instrumentation', () => {
     try {
       const invocations = recordsOfType(stream, 'agent_invocation');
       const roles = invocations.map((i) => i.produced_by_agent_role).filter(Boolean);
-      // Phase 1.0 is run by orchestrator, 1.2 and 1.4 by domain_interpreter.
+      // Phase 1.0 is run by orchestrator, 1.2 and 1.5 by domain_interpreter.
       expect(roles).toContain('orchestrator');
       expect(roles).toContain('domain_interpreter');
     } finally {

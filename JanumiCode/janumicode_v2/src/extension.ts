@@ -48,6 +48,7 @@ import {
   type WorkflowSession,
 } from './lib/webview/governedStreamViewProvider';
 import { CanvasEditorProvider } from './lib/canvas/canvasEditorProvider';
+import { registerTestHookCommands } from './testHooks';
 
 let provider: GovernedStreamViewProvider | null = null;
 let liaison: ClientLiaisonAgent | null = null;
@@ -161,6 +162,12 @@ async function bootstrap(
   engine.llmCaller.registerProvider(new AnthropicProvider());
   engine.llmCaller.registerProvider(new GoogleProvider());
   log.info('activation', 'Bootstrap step 8/14: LLM provider adapters registered');
+
+  // Register builtin CLI output parsers BEFORE validateLLMRouting so
+  // any llm_routing entry with a CLI backing (default orchestrator
+  // routing is gemini_cli — see config/defaults.ts) resolves without
+  // hitting the "parser not registered" validation error.
+  engine.registerBuiltinCLIParsers();
 
   // Validate that every provider referenced by llm_routing config is
   // registered. Correctness-validation roles (Reasoning Review, Domain
@@ -287,6 +294,21 @@ async function bootstrap(
       }
     }),
   );
+
+  // 13c. Test-hook commands (JANUMICODE_E2E=1 only). Gives the
+  // in-extension harness suite a scripted way to drive a Phase 0→10
+  // run through the real liaison / decision router / engine — no
+  // commands are registered when the env var isn't set, so production
+  // installs never see `janumicode._test.*` in their command palette.
+  const testHookDisposables = registerTestHookCommands({
+    engine,
+    liaison,
+    db,
+    provider,
+    dbPath,
+    workspacePath,
+  });
+  context.subscriptions.push(...testHookDisposables);
 
   // 14. Cleanup — checkpoint the WAL before closing so the .db file on
   // disk is self-contained. See closeWithCheckpoint() for the rationale.

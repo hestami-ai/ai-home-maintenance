@@ -19,7 +19,18 @@ describe('Probe: Intent Statement Synthesis', () => {
         active_constraints: 'No prior constraints',
         prune_decisions_summary: 'Human selected concept c2 (TaskFlow). Confirmed assumptions: web-based, multi-tenant. Rejected mobile-first interpretation.',
         selected_product_concept: 'TaskFlow — A web-based task management platform for small software development teams',
-        confirmed_assumptions: '- Web-based (basis: implied by browser-first workflow)\n- Multi-tenant (basis: small team scale)',
+        confirmed_assumptions: JSON.stringify([
+          {
+            assumption_id: 'assumption-001',
+            assumption: 'Web-based',
+            confirmed_by_record_id: 'adjudicated-001',
+          },
+          {
+            assumption_id: 'assumption-002',
+            assumption: 'Multi-tenant',
+            confirmed_by_record_id: 'adjudicated-001',
+          },
+        ], null, 2),
         confirmed_constraints: '- Must support kanban boards (technical)\n- Must integrate with GitHub (technical)',
         out_of_scope_items: '- Mobile applications\n- Enterprise SSO',
         scope_classification_ref: 'sc-001',
@@ -47,7 +58,7 @@ describe('Probe: Intent Statement Synthesis', () => {
         criteria: [
           'product_concept.name reflects the human selection (TaskFlow)',
           'product_concept.who_it_serves matches "small software development teams"',
-          'confirmed_assumptions includes "web-based" and "multi-tenant" (the human-confirmed ones)',
+          'confirmed_assumptions includes "web-based" and "multi-tenant" with stable assumption_id values',
           'confirmed_constraints includes the kanban boards and GitHub integration items',
           'out_of_scope includes mobile applications and Enterprise SSO',
           'No invented assumptions or constraints not present in the input prune decisions',

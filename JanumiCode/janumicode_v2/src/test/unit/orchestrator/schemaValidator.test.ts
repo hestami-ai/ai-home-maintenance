@@ -132,7 +132,13 @@ describe('SchemaValidator', () => {
           who_it_serves: 'Software developers',
           problem_it_solves: 'Organizing daily work tasks',
         },
-        confirmed_assumptions: [],
+        confirmed_assumptions: [
+          {
+            assumption_id: 'assumption-001',
+            assumption: 'Web-based delivery model',
+            confirmed_by_record_id: 'rec-001',
+          },
+        ],
         confirmed_constraints: [
           { constraint: 'Must work offline', type: 'technical' },
         ],
@@ -149,7 +155,13 @@ describe('SchemaValidator', () => {
           who_it_serves: 'Software developers',
           problem_it_solves: 'Organizing daily work tasks',
         },
-        confirmed_assumptions: [],
+        confirmed_assumptions: [
+          {
+            assumption_id: 'assumption-001',
+            assumption: 'Web-based delivery model',
+            confirmed_by_record_id: 'rec-001',
+          },
+        ],
         confirmed_constraints: [],
         out_of_scope: [],
       });

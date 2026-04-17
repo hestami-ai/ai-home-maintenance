@@ -22,7 +22,11 @@ import { BloomPruneCoordinator } from './bloomPruneCoordinator';
 import { LoopDetectionMonitor } from './loopDetectionMonitor';
 import { IngestionPipelineRunner } from './ingestionPipelineRunner';
 import { AgentInvoker } from './agentInvoker';
-import { createClaudeCodeParser, createGeminiCliParser } from '../cli/outputParser';
+import {
+  createClaudeCodeParser,
+  createGeminiCliParser,
+  createGooseCliParser,
+} from '../cli/outputParser';
 import { LLMCaller } from '../llm/llmCaller';
 import { EventBus } from '../events/eventBus';
 import { DecisionTraceGenerator } from '../memory/decisionTraceGenerator';
@@ -112,7 +116,7 @@ export class OrchestratorEngine {
    */
   constructor(
     readonly db: Database,
-    private readonly configManager: ConfigManager,
+    readonly configManager: ConfigManager,
     workspacePath: string,
     extensionPath: string = workspacePath,
   ) {
@@ -157,16 +161,6 @@ export class OrchestratorEngine {
       bufferMaxEvents: config.cli_invocation.buffer_max_events,
     });
     this.agentInvoker.setWriter(this.writer, this.versionSha);
-    // Register the built-in CLI output parsers so Phase 9's executor
-    // can actually spawn the coding agent. Previously these lived as
-    // factory functions that nothing called — the executor's invoke
-    // always failed with "No output parser registered for backing
-    // tool: claude_code_cli" on every task. Registering here (rather
-    // than in Phase 9) means any code path that dispatches through
-    // AgentInvoker — ExecutorAgent, EvalExecutionAgent, future Phase 9
-    // sub-agents — gets the parsers by default.
-    this.agentInvoker.registerOutputParser('claude_code_cli', createClaudeCodeParser());
-    this.agentInvoker.registerOutputParser('gemini_cli', createGeminiCliParser());
 
     this.eventBus = new EventBus();
 
@@ -423,6 +417,22 @@ export class OrchestratorEngine {
   private autoApproveDecisions = false;
   setAutoApproveDecisions(enabled: boolean): void {
     this.autoApproveDecisions = enabled;
+  }
+
+  /**
+   * Opt-in: register the built-in CLI output parsers so Phase 9's
+   * executor (and any other CLI-backed agent) can actually spawn a real
+   * coding agent subprocess. Gated behind an explicit call because
+   * mock-mode tests (e.g. createTestEngine in vitest) don't want the
+   * executor to reach the point of spawning `claude` — they expect the
+   * invoker to fail fast with "No output parser registered". Real
+   * pipeline runs (the CLI's --llm-mode real path) call this before
+   * Phase 9 runs so the Claude Code subprocess is reachable.
+   */
+  registerBuiltinCLIParsers(): void {
+    this.agentInvoker.registerOutputParser('claude_code_cli', createClaudeCodeParser());
+    this.agentInvoker.registerOutputParser('gemini_cli', createGeminiCliParser());
+    this.agentInvoker.registerOutputParser('goose_cli', createGooseCliParser());
   }
 
   /**
@@ -770,19 +780,157 @@ export class OrchestratorEngine {
    */
   validateLLMRouting(): void {
     const registered = new Set(this.llmCaller.getRegisteredProviderNames());
-    const errors = this.configManager.validateLLMRouting(registered);
+    const backingTools = new Set(this.agentInvoker.getRegisteredBackingTools());
+    const errors = this.configManager.validateLLMRouting(registered, backingTools);
     if (errors.length > 0) {
       for (const e of errors) {
         getLogger().error('activation', `LLM routing misconfiguration: ${e}`);
       }
+      // Include the specific validation errors in the thrown message
+      // so callers asserting on the failure don't have to scrape the
+      // logger output. The umbrella summary goes first, then every
+      // individual error on its own line for readability.
       throw new Error(
-        `LLM routing misconfiguration — ${errors.length} provider(s) referenced by config ` +
-        `are not registered with the LLMCaller. See logs for details and remediation.`,
+        `LLM routing misconfiguration — ${errors.length} issue(s) in config:\n  - ` +
+        errors.join('\n  - '),
       );
     }
+  }
+
+  /**
+   * Call the configured backing — API or CLI — for a specific role.
+   * Today supports the `orchestrator` role (Intent Quality Check,
+   * future phase-gate reasoning). Looks up `llm_routing[role]` and
+   * dispatches to LLMCaller or AgentInvoker transparently, so the
+   * caller doesn't branch on backing type.
+   *
+   * Returns a uniform `LLMCallResult`-shaped envelope. For CLI
+   * backings, the `text` field is the best-effort final synthesized
+   * output (result envelope for Claude Code, concatenated text blocks
+   * otherwise), and `parsed` is the JSON parse of that text when
+   * responseFormat='json'.
+   */
+  async callForRole(
+    role: 'orchestrator',
+    options: {
+      prompt: string;
+      responseFormat?: 'json' | 'text';
+      temperature?: number;
+      traceContext?: import('../llm/llmCaller').LLMTraceContext;
+      cwd?: string;
+    },
+  ): Promise<import('../llm/llmCaller').LLMCallResult> {
+    const routing = this.configManager.getLLMRouting();
+    const roleRouting = routing[role];
+    if (!roleRouting?.primary) {
+      throw new Error(
+        `No llm_routing entry for role '${role}'. Set llm_routing.${role} in ` +
+        `.janumicode/config.json or DEFAULT_CONFIG.`,
+      );
+    }
+    const { backing_tool, provider, model } = roleRouting.primary;
+    const temperature = options.temperature ?? roleRouting.temperature ?? 0.3;
+
+    if (backing_tool === 'direct_llm_api') {
+      if (!provider) {
+        throw new Error(`role '${role}' direct_llm_api backing requires a provider`);
+      }
+      return this.llmCaller.call({
+        provider,
+        model: model ?? '',
+        prompt: options.prompt,
+        responseFormat: options.responseFormat,
+        temperature,
+        traceContext: options.traceContext,
+      });
+    }
+
+    // CLI dispatch: agentInvoker.invoke() returns cliResult with
+    // parsed events. Pull the final text + parse JSON so callers get
+    // the same shape as a direct LLM call.
+    const invocationId = randomUUID();
+    // LLMTraceContext's `phaseId` is a loose string; CLITraceContext
+    // wants a PhaseId literal. The values are identical at runtime,
+    // so the narrowing cast is safe.
+    const cliTraceContext = options.traceContext
+      ? {
+          workflowRunId: options.traceContext.workflowRunId,
+          phaseId: options.traceContext.phaseId as PhaseId | null | undefined,
+          subPhaseId: options.traceContext.subPhaseId,
+          agentRole: options.traceContext.agentRole,
+          label: options.traceContext.label,
+        }
+      : undefined;
+    const result = await this.agentInvoker.invoke({
+      agentRole: role,
+      backingTool: backing_tool as import('./agentInvoker').BackingTool,
+      invocationId,
+      prompt: options.prompt,
+      cwd: options.cwd ?? this.workspacePath,
+      model,
+      responseFormat: options.responseFormat,
+      temperature,
+      traceContext: cliTraceContext,
+    });
+
+    const text = extractFinalText(result.cliResult?.events ?? []);
+    let parsed: Record<string, unknown> | null = null;
+    if (options.responseFormat === 'json' && text) {
+      try { parsed = JSON.parse(text) as Record<string, unknown>; }
+      catch { parsed = null; }
+    }
+    return {
+      text,
+      parsed,
+      toolCalls: [],
+      provider: backing_tool,
+      model: model ?? '',
+      inputTokens: null,
+      outputTokens: null,
+      usedFallback: false,
+      retryAttempts: 0,
+    };
   }
 
   generateId(): string {
     return randomUUID();
   }
+}
+
+/**
+ * Extract the final synthesized text from a CLI invocation's parsed
+ * events. Priority order:
+ *   1. Terminal `result` envelope with `data.result` (Claude Code).
+ *   2. Last `text`-typed content item (Goose + flat fallback).
+ *   3. Concatenation of all `text` content items.
+ *
+ * Thinking-only events are excluded — they describe reasoning, not
+ * the model's final answer, and would pollute a JSON parse attempt.
+ */
+function extractFinalText(
+  events: ReadonlyArray<import('../cli/outputParser').ParsedEvent>,
+): string {
+  // Prefer the terminal result envelope (Claude Code).
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (e.data.type === 'result' && typeof e.data.result === 'string') {
+      return e.data.result;
+    }
+  }
+  // Fall back to the last text content item.
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (e.data.type === 'text' && typeof e.data.text === 'string') {
+      return e.data.text;
+    }
+  }
+  // Concatenate every text content item (Goose streams these
+  // one-token-per-event, so concatenation reassembles the response).
+  const parts: string[] = [];
+  for (const e of events) {
+    if (e.data.type === 'text' && typeof e.data.text === 'string') {
+      parts.push(e.data.text);
+    }
+  }
+  return parts.join('');
 }

@@ -3,7 +3,7 @@
  *
  * Pins that Sub-Phase 1.3 emits exactly ONE `decision_bundle_presented`
  * record (never the old mirror_presented + menu_presented pair), that
- * the bundle's Mirror section carries the per-candidate assumptions,
+ * the bundle's Mirror section carries per-candidate interpretations,
  * and that the Menu section is conditional — present with >1 candidate,
  * absent with a single candidate.
  *
@@ -117,7 +117,34 @@ const SYNTHESIS_FIXTURE = {
       who_it_serves: 'Solo developers',
       problem_it_solves: 'Terminal-native task management',
     },
-    confirmed_assumptions: ['Local SQLite storage'],
+    confirmed_assumptions: [
+      {
+        assumption_id: 'assumption-001',
+        assumption: 'Local SQLite storage',
+        confirmed_by_record_id: 'adjudicated-001',
+      },
+    ],
+    confirmed_constraints: ['No network calls'],
+    out_of_scope: [],
+  },
+};
+
+const SYNTHESIS_WITH_UNAPPROVED_ASSUMPTION_FIXTURE = {
+  match: 'Intent Statement Synthesis',
+  parsedJson: {
+    product_concept: {
+      name: 'CLI todo',
+      description: 'Personal task tracker',
+      who_it_serves: 'Solo developers',
+      problem_it_solves: 'Terminal-native task management',
+    },
+    confirmed_assumptions: [
+      {
+        assumption_id: 'invented-001',
+        assumption: 'LLM invented assumption that was never adjudicated',
+        confirmed_by_record_id: 'invented-record',
+      },
+    ],
     confirmed_constraints: ['No network calls'],
     out_of_scope: [],
   },
@@ -153,12 +180,17 @@ describe('Phase 1 — bloom prune surface (decision bundle emission)', () => {
         .filter(r => r.sub_phase_id === '1.3');
       expect(mirrorsAt13).toHaveLength(0);
 
-      // Bundle content sanity: Mirror section carries at least one
-      // assumption, Menu section carries both candidates with the first
-      // marked recommended.
+      // Bundle content sanity: Mirror section carries candidate
+      // interpretations, Menu section carries both candidates with the
+      // first marked recommended.
       const content = bundles[0].content as unknown as DecisionBundleContent;
       expect(content.surface_id).toContain('phase1-bloom-prune-');
-      expect(content.mirror?.items.length ?? 0).toBeGreaterThan(0);
+      expect(content.title).toBe('Review candidate interpretations of your intent');
+      expect(content.mirror?.kind).toBe('intent_bloom_mirror');
+      expect(content.mirror?.items).toHaveLength(2);
+      expect(content.mirror?.items[0]?.text).toBe('Personal CLI todo');
+      expect(content.mirror?.items[0]?.description).toBe('Local terminal-native task tracker.');
+      expect(content.mirror?.items[0]?.supporting_assumptions?.[0]?.text).toBe('Local SQLite storage');
       expect(content.menu).toBeDefined();
       expect(content.menu?.options).toHaveLength(2);
       expect(content.menu?.options[0].recommended).toBe(true);
@@ -186,13 +218,15 @@ describe('Phase 1 — bloom prune surface (decision bundle emission)', () => {
 
       const content = bundles[0].content as unknown as DecisionBundleContent;
       expect(content.mirror).toBeDefined();
+      expect(content.mirror?.kind).toBe('intent_bloom_mirror');
+      expect(content.mirror?.items[0]?.text).toBe('Personal CLI todo');
       expect(content.menu).toBeUndefined();
     } finally {
       tearDown();
     }
   });
 
-  it('pass-to-pass: preserves rationale for already-valid assumption objects', async () => {
+  it('pass-to-pass: preserves supporting assumption rationale for already-valid bloom objects', async () => {
     stream = await driveWorkflow({
       intent: 'Build a CLI todo app',
       phaseLimit: '1',
@@ -210,8 +244,9 @@ describe('Phase 1 — bloom prune surface (decision bundle emission)', () => {
 
       const content = bundles[0].content as unknown as DecisionBundleContent;
       expect(content.mirror?.items).toHaveLength(1);
-      expect(content.mirror?.items[0]?.text).toBe('A valid JSON bloom should keep its assumption text.');
-      expect(content.mirror?.items[0]?.rationale).toBe('This is the baseline pass-to-pass behavior for the happy path.');
+      expect(content.mirror?.items[0]?.text).toBe('Valid candidate');
+      expect(content.mirror?.items[0]?.supporting_assumptions?.[0]?.text).toBe('A valid JSON bloom should keep its assumption text.');
+      expect(content.mirror?.items[0]?.supporting_assumptions?.[0]?.rationale).toBe('This is the baseline pass-to-pass behavior for the happy path.');
     } finally {
       tearDown();
     }
@@ -242,15 +277,16 @@ describe('Phase 1 — bloom prune surface (decision bundle emission)', () => {
       expect(bundles).toHaveLength(1);
       const content = bundles[0].content as unknown as DecisionBundleContent;
       expect(content.mirror?.items).toHaveLength(1);
-      expect(content.mirror?.items[0]?.text).toContain('A malformed JSON string from qwen should still be usable.');
-      expect(content.mirror?.items[0]?.rationale).toContain('single-quoted string delimiters');
-      expect(content.summary).toContain('I identified 1 candidate interpretation(s) of your intent.');
+      expect(content.mirror?.items[0]?.text).toBe('Recovered candidate');
+      expect(content.mirror?.items[0]?.supporting_assumptions?.[0]?.text).toContain('A malformed JSON string from qwen should still be usable.');
+      expect(content.mirror?.items[0]?.supporting_assumptions?.[0]?.rationale).toContain('single-quoted string delimiters');
+      expect(content.summary).toContain('I identified 1 plausible interpretation(s) of your intent.');
     } finally {
       tearDown();
     }
   });
 
-  it('regression: malformed bloom recovery still emits a populated mirror instead of the old 0/0 assumptions surface', async () => {
+  it('regression: malformed bloom recovery still emits a populated candidate-review surface instead of the old 0/0 assumptions card', async () => {
     stream = await driveWorkflow({
       intent: 'Build a CLI todo app',
       phaseLimit: '1',
@@ -267,15 +303,87 @@ describe('Phase 1 — bloom prune surface (decision bundle emission)', () => {
       expect(bundles).toHaveLength(1);
       const content = bundles[0].content as unknown as DecisionBundleContent;
       expect(content.mirror?.items.length ?? 0).toBeGreaterThan(0);
+      expect(content.mirror?.kind).toBe('intent_bloom_mirror');
       expect(content.mirror?.items.some(item => item.text.includes('Open question:'))).toBe(false);
     } finally {
       tearDown();
     }
   });
 
-  it('preserves Sub-Phase 1.5 intent-statement mirror as a plain mirror_presented (not a bundle)', async () => {
+  it('emits surfaced assumption artifacts and a mirror at Sub-Phase 1.4', async () => {
+    stream = await driveWorkflow({
+      intent: 'Build a CLI todo app',
+      phaseLimit: '1',
+      llmFixtures: { bloom: VALID_OBJECT_ASSUMPTION_BLOOM, synthesis: SYNTHESIS_FIXTURE },
+    });
+
+    try {
+      const runId = stream.workflowRunId;
+      if (!runId) throw new Error('driveWorkflow did not start a run');
+      const db = stream.liaison.getDB();
+
+      const surfaced = db.getRecordsByType('artifact_produced', runId)
+        .filter(r => r.sub_phase_id === '1.4' && (r.content as { kind?: string }).kind === 'surfaced_assumptions');
+      expect(surfaced).toHaveLength(1);
+      const surfacedContent = surfaced[0].content as {
+        assumptions: Array<{ text: string; rationale?: string; source_candidate_ids: string[] }>;
+      };
+      expect(surfacedContent.assumptions).toHaveLength(1);
+      expect(surfacedContent.assumptions[0]?.text).toBe('A valid JSON bloom should keep its assumption text.');
+      expect(surfacedContent.assumptions[0]?.rationale).toBe('This is the baseline pass-to-pass behavior for the happy path.');
+
+      const assumptionMirrors = db.getRecordsByType('mirror_presented', runId)
+        .filter(r => r.sub_phase_id === '1.4');
+      expect(assumptionMirrors).toHaveLength(1);
+      expect((assumptionMirrors[0].content as { kind?: string }).kind).toBe('assumption_mirror');
+
+      const adjudicated = db.getRecordsByType('artifact_produced', runId)
+        .filter(r => r.sub_phase_id === '1.4' && (r.content as { kind?: string }).kind === 'adjudicated_assumptions');
+      expect(adjudicated).toHaveLength(1);
+      const adjudicatedContent = adjudicated[0].content as {
+        confirmed: Array<{ text: string }>;
+        deferred: Array<{ text: string }>;
+      };
+      expect(adjudicatedContent.confirmed[0]?.text).toBe('A valid JSON bloom should keep its assumption text.');
+      expect(adjudicatedContent.deferred).toHaveLength(0);
+    } finally {
+      tearDown();
+    }
+  });
+
+  it('fail-to-pass: intent statement confirmed_assumptions only come from adjudicated assumptions, not synthesis invention', async () => {
+    stream = await driveWorkflow({
+      intent: 'Build a CLI todo app',
+      phaseLimit: '1',
+      llmFixtures: { bloom: SINGLE_CANDIDATE_BLOOM, synthesis: SYNTHESIS_WITH_UNAPPROVED_ASSUMPTION_FIXTURE },
+    });
+
+    try {
+      const runId = stream.workflowRunId;
+      if (!runId) throw new Error('driveWorkflow did not start a run');
+      const db = stream.liaison.getDB();
+
+      const statements = db.getRecordsByType('artifact_produced', runId)
+        .filter(r => r.sub_phase_id === '1.5' && (r.content as { kind?: string }).kind === 'intent_statement');
+      expect(statements).toHaveLength(1);
+      const statement = statements[0].content as {
+        confirmed_assumptions: Array<{ assumption_id: string; assumption: string; confirmed_by_record_id: string }>;
+      };
+      expect(statement.confirmed_assumptions).toEqual([
+        {
+          assumption_id: 'assumption-1',
+          assumption: 'Local SQLite storage',
+          confirmed_by_record_id: expect.any(String),
+        },
+      ]);
+    } finally {
+      tearDown();
+    }
+  });
+
+  it('preserves Sub-Phase 1.6 intent-statement mirror as a plain mirror_presented (not a bundle)', async () => {
     // Sanity check that the Stage-3 migration is scoped to 1.3 and didn't
-    // accidentally convert the 1.5 approval surface too. 1.5 is a
+    // accidentally convert the 1.6 approval surface too. 1.6 is a
     // Mirror-only surface with no Menu, so it stays a mirror_presented.
     stream = await driveWorkflow({
       intent: 'Build a CLI todo app',
@@ -288,14 +396,14 @@ describe('Phase 1 — bloom prune surface (decision bundle emission)', () => {
       if (!runId) throw new Error('driveWorkflow did not start a run');
       const db = stream.liaison.getDB();
 
-      const mirrorsAt15 = db.getRecordsByType('mirror_presented', runId)
-        .filter(r => r.sub_phase_id === '1.5');
-      expect(mirrorsAt15.length).toBeGreaterThan(0);
+      const mirrorsAt16 = db.getRecordsByType('mirror_presented', runId)
+        .filter(r => r.sub_phase_id === '1.6');
+      expect(mirrorsAt16.length).toBeGreaterThan(0);
 
-      // And 1.5 must NOT have been converted to a bundle.
-      const bundlesAt15 = db.getRecordsByType('decision_bundle_presented', runId)
-        .filter(r => r.sub_phase_id === '1.5');
-      expect(bundlesAt15).toHaveLength(0);
+      // And 1.6 must NOT have been converted to a bundle.
+      const bundlesAt16 = db.getRecordsByType('decision_bundle_presented', runId)
+        .filter(r => r.sub_phase_id === '1.6');
+      expect(bundlesAt16).toHaveLength(0);
     } finally {
       tearDown();
     }

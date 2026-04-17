@@ -78,6 +78,37 @@ export interface JanumiCodeConfig {
    * mask configuration errors that matter for trust in the system.
    */
   llm_routing: {
+    /**
+     * Orchestrator-role routing. Covers cross-cutting quality-gate LLM
+     * work that's not specific to one phase agent — today that's the
+     * Intent Quality Check (Phase 1.0). Distinct from `reasoning_review`
+     * which audits other agents' traces.
+     *
+     * `primary.backing_tool` selects the execution path:
+     *   - `direct_llm_api` routes through LLMCaller with the named
+     *     provider + model. Used for headless mock-mode tests and for
+     *     environments where Ollama is the only LLM available.
+     *   - `claude_code_cli` / `gemini_cli` / `goose_cli` spawn the
+     *     corresponding CLI as a subprocess. The CLI handles its own
+     *     model selection; we pass `--model <model>` when set.
+     *
+     * Production default: `gemini_cli` with `gemini-2.5-flash` — the
+     * gemini CLI is the production target. Operators override to
+     * `claude_code_cli` + `qwen3.5:9b` (via a router proxy like
+     * claude-code-router) for harness runs that exercise the CLI
+     * path without Gemini API keys.
+     */
+    orchestrator: {
+      primary: {
+        /** 'direct_llm_api' | 'claude_code_cli' | 'gemini_cli' | 'goose_cli' */
+        backing_tool: string;
+        /** Provider name — required only when backing_tool === 'direct_llm_api'. */
+        provider?: string;
+        /** Model override. CLIs have their own defaults; omit to use them. */
+        model?: string;
+      };
+      temperature?: number;
+    };
     reasoning_review: {
       /** Primary provider + model used for ReasoningReview LLM calls. */
       primary: { provider: string; model: string };
@@ -162,6 +193,16 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
   // engine startup, validateLLMRouting() logs a startup error and the
   // phase will fail loudly at invocation time (not silently skip).
   llm_routing: {
+    // Production default: Gemini CLI. Replaces the previous API-only
+    // path that required a registered 'ollama' or 'google' provider
+    // adapter — production Orchestrator work (Intent Quality Check,
+    // phase-gate reasoning) now spawns the gemini CLI as a subprocess
+    // so we can use the same flow across mock + real + CLI-routed
+    // harnesses without a direct API key in the extension host.
+    orchestrator: {
+      primary: { backing_tool: 'gemini_cli', model: 'gemini-2.5-flash' },
+      temperature: 0.3,
+    },
     reasoning_review: {
       primary: { provider: 'google', model: 'gemini-2.0-flash-thinking' },
       temperature: 0.2,
@@ -242,6 +283,18 @@ export class ConfigManager {
   getLLMRouting() { return this.config.llm_routing; }
 
   /**
+   * Override `llm_routing.orchestrator` at runtime. Used by
+   * createTestEngine to steer the Orchestrator role to a mock or a
+   * specific CLI backing without requiring a `.janumicode/config.json`
+   * on disk. Production callers should prefer a workspace config file;
+   * this method is here so tests don't have to touch the filesystem
+   * just to change a one-field routing.
+   */
+  setOrchestratorRouting(override: JanumiCodeConfig['llm_routing']['orchestrator']): void {
+    this.config.llm_routing.orchestrator = override;
+  }
+
+  /**
    * Validate that every provider referenced in `llm_routing` is actually
    * registered with the LLMCaller. Called by OrchestratorEngine at startup
    * once all providers have been registered.
@@ -251,10 +304,52 @@ export class ConfigManager {
    * roles (Reasoning Review, Domain Compliance Review) cannot fall back
    * silently without undermining the system's trust model.
    */
-  validateLLMRouting(registeredProviders: ReadonlySet<string>): string[] {
+  validateLLMRouting(
+    registeredProviders: ReadonlySet<string>,
+    registeredBackingTools: ReadonlySet<string> = new Set(),
+  ): string[] {
     const errors: string[] = [];
     const routing = this.config.llm_routing;
     if (!routing) return errors;
+
+    // Orchestrator — direct_llm_api requires a provider; CLI backing
+    // tools require a registered parser (via registerBuiltinCLIParsers).
+    // The backing_tool check stays a warning when the parser set is
+    // empty (opt-in surface) so mock-mode tests don't fail on config
+    // validation alone.
+    const orch = routing.orchestrator;
+    if (orch?.primary) {
+      const tool = orch.primary.backing_tool;
+      if (tool === 'direct_llm_api') {
+        if (!orch.primary.provider) {
+          errors.push(
+            `llm_routing.orchestrator.primary.backing_tool='direct_llm_api' requires ` +
+            `a 'provider' field. Fix: set llm_routing.orchestrator.primary.provider ` +
+            `(e.g. 'ollama') in .janumicode/config.json.`,
+          );
+        } else if (!registeredProviders.has(orch.primary.provider)) {
+          errors.push(
+            `llm_routing.orchestrator.primary references provider '${orch.primary.provider}' ` +
+            `which is not registered. Registered: ${Array.from(registeredProviders).sort((a, b) => a.localeCompare(b)).join(', ')}.`,
+          );
+        }
+      } else if (
+        tool !== 'claude_code_cli' &&
+        tool !== 'gemini_cli' &&
+        tool !== 'goose_cli'
+      ) {
+        errors.push(
+          `llm_routing.orchestrator.primary.backing_tool='${tool}' is not a supported ` +
+          `backing tool. Use 'direct_llm_api', 'claude_code_cli', 'gemini_cli', or 'goose_cli'.`,
+        );
+      } else if (registeredBackingTools.size > 0 && !registeredBackingTools.has(tool)) {
+        errors.push(
+          `llm_routing.orchestrator.primary.backing_tool='${tool}' has no output ` +
+          `parser registered. Fix: call engine.registerBuiltinCLIParsers() before ` +
+          `executing a phase that invokes the Orchestrator role.`,
+        );
+      }
+    }
 
     const rr = routing.reasoning_review;
     if (rr?.primary && !registeredProviders.has(rr.primary.provider)) {

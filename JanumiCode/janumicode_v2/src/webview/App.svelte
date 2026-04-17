@@ -17,7 +17,6 @@
   import { streamingStore } from './stores/streaming.svelte';
   import type { PhaseId } from '../lib/types/records';
   import Card from './components/Card.svelte';
-  import VirtualScroll from './components/VirtualScroll.svelte';
   import IntentComposer from './components/IntentComposer.svelte';
   import PhaseIndicator from './components/PhaseIndicator.svelte';
   import ActivityStrip from './components/ActivityStrip.svelte';
@@ -244,12 +243,6 @@
         <p>Governed Stream — Ready</p>
         <p class="hint">Type your intent below to start a new workflow.</p>
       </div>
-    {:else if recordsStore.records.length > 200}
-      <VirtualScroll items={recordsStore.records} estimatedItemHeight={120} bufferCount={10}>
-        {#snippet children({ item })}
-          <Card record={item} ondecision={handleDecision} {vscode} />
-        {/snippet}
-      </VirtualScroll>
     {:else}
       {#each recordsStore.records as record (record.id)}
         <Card {record} ondecision={handleDecision} {vscode} />
@@ -276,11 +269,18 @@
   .stream {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    min-width: 0;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+    overscroll-behavior: contain;
     padding: var(--jc-space-lg);
     display: flex;
     flex-direction: column;
     gap: var(--jc-space-lg);
+  }
+  .stream > :global(*) {
+    flex: 0 0 auto;
   }
   .empty-state {
     display: flex;

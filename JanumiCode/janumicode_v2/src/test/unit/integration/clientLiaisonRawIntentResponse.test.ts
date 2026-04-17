@@ -52,7 +52,13 @@ const SYNTHESIS_FIXTURE = {
       who_it_serves: 'Solo developers',
       problem_it_solves: 'Terminal-native task management',
     },
-    confirmed_assumptions: ['Local SQLite storage'],
+    confirmed_assumptions: [
+      {
+        assumption_id: 'assumption-001',
+        assumption: 'Local SQLite storage',
+        confirmed_by_record_id: 'adjudicated-001',
+      },
+    ],
     confirmed_constraints: ['No network calls'],
     out_of_scope: [],
   },
