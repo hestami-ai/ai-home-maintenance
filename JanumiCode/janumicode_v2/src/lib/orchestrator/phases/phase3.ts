@@ -299,37 +299,33 @@ export class Phase3Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama',
-        model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.4,
-        traceContext: {
-          workflowRunId: ctx.workflowRun.id,
-          phaseId: '3',
-          subPhaseId: '3.1',
-          agentRole: 'systems_agent',
-          label: 'Phase 3.1 — System Boundary Definition',
-        },
-      });
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama',
+      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.4,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '3',
+        subPhaseId: '3.1',
+        agentRole: 'systems_agent',
+        label: 'Phase 3.1 — System Boundary Definition',
+      },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const boundary = parsed?.system_boundary ?? parsed;
-      const sb = (Array.isArray(boundary) ? boundary[0] : boundary) as Partial<SystemBoundary> | null;
-      if (sb?.in_scope && Array.isArray(sb.in_scope)) {
-        return {
-          in_scope: sb.in_scope,
-          out_of_scope: sb.out_of_scope ?? [],
-          external_systems: (sb.external_systems ?? []) as ExternalSystem[],
-        };
-      }
-      return fallback;
-    } catch (err) {
-      getLogger().warn('workflow', 'System boundary definition failed', { error: String(err) });
-      return fallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const boundary = parsed?.system_boundary ?? parsed;
+    const sb = (Array.isArray(boundary) ? boundary[0] : boundary) as Partial<SystemBoundary> | null;
+    if (sb?.in_scope && Array.isArray(sb.in_scope)) {
+      return {
+        in_scope: sb.in_scope,
+        out_of_scope: sb.out_of_scope ?? [],
+        external_systems: (sb.external_systems ?? []) as ExternalSystem[],
+      };
     }
+    return fallback;
   }
 
   private async runSystemRequirementsDerivation(
@@ -360,33 +356,29 @@ export class Phase3Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama',
-        model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.4,
-        traceContext: {
-          workflowRunId: ctx.workflowRun.id,
-          phaseId: '3',
-          subPhaseId: '3.2',
-          agentRole: 'systems_agent',
-          label: 'Phase 3.2 — System Requirements Derivation',
-        },
-      });
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama',
+      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.4,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '3',
+        subPhaseId: '3.2',
+        agentRole: 'systems_agent',
+        label: 'Phase 3.2 — System Requirements Derivation',
+      },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const sr = parsed?.system_requirements ?? parsed;
-      const data = (Array.isArray(sr) ? sr[0] : sr) as Partial<SystemRequirements> | null;
-      if (data?.items && Array.isArray(data.items) && data.items.length > 0) {
-        return { items: data.items as SystemRequirementItem[] };
-      }
-      return fallback;
-    } catch (err) {
-      getLogger().warn('workflow', 'System requirements derivation failed', { error: String(err) });
-      return fallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const sr = parsed?.system_requirements ?? parsed;
+    const data = (Array.isArray(sr) ? sr[0] : sr) as Partial<SystemRequirements> | null;
+    if (data?.items && Array.isArray(data.items) && data.items.length > 0) {
+      return { items: data.items as SystemRequirementItem[] };
     }
+    return fallback;
   }
 
   private async runInterfaceContractSpecification(
@@ -418,33 +410,29 @@ export class Phase3Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama',
-        model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.4,
-        traceContext: {
-          workflowRunId: ctx.workflowRun.id,
-          phaseId: '3',
-          subPhaseId: '3.3',
-          agentRole: 'systems_agent',
-          label: 'Phase 3.3 — Interface Contract Specification',
-        },
-      });
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama',
+      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.4,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '3',
+        subPhaseId: '3.3',
+        agentRole: 'systems_agent',
+        label: 'Phase 3.3 — Interface Contract Specification',
+      },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const ic = parsed?.interface_contracts ?? parsed;
-      const data = (Array.isArray(ic) ? ic[0] : ic) as Partial<InterfaceContracts> | null;
-      if (data?.contracts && Array.isArray(data.contracts) && data.contracts.length > 0) {
-        return { contracts: data.contracts as InterfaceContract[] };
-      }
-      return fallback;
-    } catch (err) {
-      getLogger().warn('workflow', 'Interface contract specification failed', { error: String(err) });
-      return fallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const ic = parsed?.interface_contracts ?? parsed;
+    const data = (Array.isArray(ic) ? ic[0] : ic) as Partial<InterfaceContracts> | null;
+    if (data?.contracts && Array.isArray(data.contracts) && data.contracts.length > 0) {
+      return { contracts: data.contracts as InterfaceContract[] };
     }
+    return fallback;
   }
 
   /**

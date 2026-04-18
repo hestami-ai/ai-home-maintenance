@@ -177,30 +177,30 @@ export class ConsistencyChecker {
       `[${a.type}] (id: ${a.id}):\n${JSON.stringify(a.content, null, 2).slice(0, 2000)}`
     ).join('\n\n---\n\n');
 
-    try {
-      const renderResult = this.templateLoader.render(template, {
-        artifact_summaries: artifactSummaries,
-        janumicode_version_sha: 'dev',
-      });
+    // LLM throws propagate — a failed semantic consistency check
+    // leaves the pipeline unable to say whether artifacts contradict
+    // each other, which is the whole point of the check. Halt rather
+    // than silently report "no findings" on a broken backing.
+    const renderResult = this.templateLoader.render(template, {
+      artifact_summaries: artifactSummaries,
+      janumicode_version_sha: 'dev',
+    });
 
-      const result = await this.llmCaller.call({
-        provider: 'ollama',
-        model: 'qwen3.5:9b',
-        prompt: renderResult.rendered,
-        responseFormat: 'json',
-        temperature: 0.2,
-      });
+    const result = await this.llmCaller.call({
+      provider: 'ollama',
+      model: 'qwen3.5:9b',
+      prompt: renderResult.rendered,
+      responseFormat: 'json',
+      temperature: 0.2,
+    });
 
-      if (result.parsed && Array.isArray(result.parsed.findings)) {
-        return (result.parsed.findings as Record<string, unknown>[]).map(f => ({
-          severity: (f.severity as 'critical' | 'warning') ?? 'warning',
-          description: (f.description as string) ?? '',
-          artifactIdsInvolved: (f.artifact_ids as string[]) ?? [],
-          recommendedAction: (f.recommended_action as string) ?? '',
-        }));
-      }
-    } catch {
-      // LLM failure is not blocking — semantic check is supplementary
+    if (result.parsed && Array.isArray(result.parsed.findings)) {
+      return (result.parsed.findings as Record<string, unknown>[]).map(f => ({
+        severity: (f.severity as 'critical' | 'warning') ?? 'warning',
+        description: (f.description as string) ?? '',
+        artifactIdsInvolved: (f.artifact_ids as string[]) ?? [],
+        recommendedAction: (f.recommended_action as string) ?? '',
+      }));
     }
 
     return [];

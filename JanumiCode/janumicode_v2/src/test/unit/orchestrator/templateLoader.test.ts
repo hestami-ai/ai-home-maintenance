@@ -24,9 +24,12 @@ describe('TemplateLoader', () => {
     });
 
     it('loads intent quality check template', () => {
-      const template = loader.getTemplate(
-        'cross_cutting/intent_quality_check.system'
-      );
+      // IQC lives under phases/phase_01_intent_capture/, not cross_cutting/
+      // — the duplicate at cross_cutting/intent_quality_check.system.md was
+      // removed because two templates with the same agent_role + sub_phase
+      // metadata made `findTemplate` behaviour depend on directory scan
+      // order.
+      const template = loader.findTemplate('orchestrator', '01_0_intent_quality_check');
       expect(template).not.toBeNull();
       expect(template!.metadata.agent_role).toBe('orchestrator');
       expect(template!.metadata.required_variables).toContain('raw_intent_text');

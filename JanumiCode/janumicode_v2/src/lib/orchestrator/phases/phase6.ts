@@ -234,33 +234,29 @@ export class Phase6Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama',
-        model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.4,
-        traceContext: {
-          workflowRunId: ctx.workflowRun.id,
-          phaseId: '6',
-          subPhaseId: '6.1',
-          agentRole: 'implementation_planner',
-          label: 'Phase 6.1 — Implementation Task Decomposition',
-        },
-      });
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama',
+      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.4,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '6',
+        subPhaseId: '6.1',
+        agentRole: 'implementation_planner',
+        label: 'Phase 6.1 — Implementation Task Decomposition',
+      },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const ip = parsed?.implementation_plan ?? parsed;
-      const data = (Array.isArray(ip) ? ip[0] : ip) as Partial<ImplementationPlan> | null;
-      if (data?.tasks && Array.isArray(data.tasks) && data.tasks.length > 0) {
-        return { tasks: data.tasks as ImplementationTask[] };
-      }
-      return fallback;
-    } catch (err) {
-      getLogger().warn('workflow', 'Task decomposition failed', { error: String(err) });
-      return fallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const ip = parsed?.implementation_plan ?? parsed;
+    const data = (Array.isArray(ip) ? ip[0] : ip) as Partial<ImplementationPlan> | null;
+    if (data?.tasks && Array.isArray(data.tasks) && data.tasks.length > 0) {
+      return { tasks: data.tasks as ImplementationTask[] };
     }
+    return fallback;
   }
 
   /** Deterministic consistency check. */

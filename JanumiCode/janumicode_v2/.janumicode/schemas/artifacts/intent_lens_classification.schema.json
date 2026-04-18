@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "intent_lens_classification.schema.json",
+  "title": "IntentLensClassification",
+  "description": "Phase 1.0a artifact — routes the intent into one of six lenses so Phase 1.2 bloom and Phase 1.5 synthesis can pick lens-tailored prompt templates.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "lens", "confidence", "rationale", "fallback_lens"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "intent_lens_classification"
+    },
+    "lens": {
+      "type": "string",
+      "enum": ["product", "feature", "bug", "infra", "legal", "unclassified"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fallback_lens": {
+      "type": "string",
+      "enum": ["product", "feature", "bug", "infra", "legal"],
+      "description": "Lens actually used by downstream handlers. Equals `lens` when lens != 'unclassified', otherwise 'product'."
+    }
+  }
+}

@@ -321,33 +321,29 @@ export class Phase4Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama',
-        model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.4,
-        traceContext: {
-          workflowRunId: ctx.workflowRun.id,
-          phaseId: '4',
-          subPhaseId: '4.1',
-          agentRole: 'architecture_agent',
-          label: 'Phase 4.1 — Software Domain Identification',
-        },
-      });
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama',
+      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.4,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '4',
+        subPhaseId: '4.1',
+        agentRole: 'architecture_agent',
+        label: 'Phase 4.1 — Software Domain Identification',
+      },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const sd = parsed?.software_domains ?? parsed;
-      const data = (Array.isArray(sd) ? sd[0] : sd) as Partial<SoftwareDomains> | null;
-      if (data?.domains && Array.isArray(data.domains) && data.domains.length > 0) {
-        return { domains: data.domains as SoftwareDomain[] };
-      }
-      return fallback;
-    } catch (err) {
-      getLogger().warn('workflow', 'Software domain identification failed', { error: String(err) });
-      return fallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const sd = parsed?.software_domains ?? parsed;
+    const data = (Array.isArray(sd) ? sd[0] : sd) as Partial<SoftwareDomains> | null;
+    if (data?.domains && Array.isArray(data.domains) && data.domains.length > 0) {
+      return { domains: data.domains as SoftwareDomain[] };
     }
+    return fallback;
   }
 
   private async runComponentDecomposition(
@@ -379,33 +375,29 @@ export class Phase4Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama',
-        model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.4,
-        traceContext: {
-          workflowRunId: ctx.workflowRun.id,
-          phaseId: '4',
-          subPhaseId: '4.2',
-          agentRole: 'architecture_agent',
-          label: 'Phase 4.2 — Component Decomposition',
-        },
-      });
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama',
+      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.4,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '4',
+        subPhaseId: '4.2',
+        agentRole: 'architecture_agent',
+        label: 'Phase 4.2 — Component Decomposition',
+      },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const cm = parsed?.component_model ?? parsed;
-      const data = (Array.isArray(cm) ? cm[0] : cm) as Partial<ComponentModel> | null;
-      if (data?.components && Array.isArray(data.components) && data.components.length > 0) {
-        return { components: data.components as Component[] };
-      }
-      return fallback;
-    } catch (err) {
-      getLogger().warn('workflow', 'Component decomposition failed', { error: String(err) });
-      return fallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const cm = parsed?.component_model ?? parsed;
+    const data = (Array.isArray(cm) ? cm[0] : cm) as Partial<ComponentModel> | null;
+    if (data?.components && Array.isArray(data.components) && data.components.length > 0) {
+      return { components: data.components as Component[] };
     }
+    return fallback;
   }
 
   private async runADRCapture(
@@ -440,33 +432,29 @@ export class Phase4Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama',
-        model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.4,
-        traceContext: {
-          workflowRunId: ctx.workflowRun.id,
-          phaseId: '4',
-          subPhaseId: '4.3',
-          agentRole: 'architecture_agent',
-          label: 'Phase 4.3 — Architectural Decision Capture',
-        },
-      });
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama',
+      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.4,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '4',
+        subPhaseId: '4.3',
+        agentRole: 'architecture_agent',
+        label: 'Phase 4.3 — Architectural Decision Capture',
+      },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const ad = parsed?.architectural_decisions ?? parsed;
-      const data = (Array.isArray(ad) ? ad[0] : ad) as Partial<ArchitecturalDecisions> | null;
-      if (data?.adrs && Array.isArray(data.adrs) && data.adrs.length > 0) {
-        return { adrs: data.adrs as ADR[] };
-      }
-      return fallback;
-    } catch (err) {
-      getLogger().warn('workflow', 'ADR capture failed', { error: String(err) });
-      return fallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const ad = parsed?.architectural_decisions ?? parsed;
+    const data = (Array.isArray(ad) ? ad[0] : ad) as Partial<ArchitecturalDecisions> | null;
+    if (data?.adrs && Array.isArray(data.adrs) && data.adrs.length > 0) {
+      return { adrs: data.adrs as ADR[] };
     }
+    return fallback;
   }
 
   /**

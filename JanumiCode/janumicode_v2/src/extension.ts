@@ -49,6 +49,7 @@ import {
 } from './lib/webview/governedStreamViewProvider';
 import { CanvasEditorProvider } from './lib/canvas/canvasEditorProvider';
 import { registerTestHookCommands } from './testHooks';
+import { loadDotenv } from './lib/config/dotenv';
 
 let provider: GovernedStreamViewProvider | null = null;
 let liaison: ClientLiaisonAgent | null = null;
@@ -327,31 +328,6 @@ export function deactivate(): void {
   getLogger().info('activation', 'JanumiCode v2 deactivated.');
 }
 
-// ── .env loader (existing) ──────────────────────────────────────────
-
-function loadDotenv(extensionPath: string): void {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fsLocal = require('fs');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pathLocal = require('path');
-    const envPath = pathLocal.join(extensionPath, '.env');
-    if (!fsLocal.existsSync(envPath)) return;
-
-    const content = fsLocal.readFileSync(envPath, 'utf-8');
-    for (const line of content.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const cleaned = trimmed.replace(/^export\s+/, '');
-      const eqIndex = cleaned.indexOf('=');
-      if (eqIndex === -1) continue;
-      const key = cleaned.slice(0, eqIndex).trim();
-      const value = cleaned.slice(eqIndex + 1).trim();
-      if (!process.env[key]) {
-        process.env[key] = value;
-      }
-    }
-  } catch {
-    /* .env loading is optional */
-  }
-}
+// loadDotenv moved to src/lib/config/dotenv.ts so the CLI entry
+// point can reuse it — `node dist/cli/janumicode.js` needs the same
+// API-key-injection path the extension host gets on activate().

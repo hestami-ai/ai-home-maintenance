@@ -41,6 +41,12 @@ export interface PromptTemplate {
 export interface TemplateMetadata {
   agent_role: string;
   sub_phase: string;
+  /**
+   * Optional intent-lens discriminator. When set, the template is chosen only
+   * when the runtime lens matches; templates without this field are treated
+   * as lens-neutral fallbacks.
+   */
+  lens?: string;
   schema_version: string;
   co_invocation_exception: boolean;
   co_invocation_rationale?: string;
@@ -198,6 +204,7 @@ export class TemplateLoader {
     return {
       agent_role: (result.agent_role as string) ?? 'unknown',
       sub_phase: (result.sub_phase as string) ?? 'unknown',
+      lens: result.lens as string | undefined,
       schema_version: (result.schema_version as string) ?? '1.0',
       co_invocation_exception: (result.co_invocation_exception as boolean) ?? false,
       co_invocation_rationale: result.co_invocation_rationale as string | undefined,
@@ -218,16 +225,36 @@ export class TemplateLoader {
   }
 
   /**
-   * Get a template by agent role and sub-phase.
+   * Get a template by agent role, sub-phase, and optional lens.
+   *
+   * Lookup order when `lens` is provided:
+   *   1. exact (agent_role, sub_phase, lens) match
+   *   2. lens-neutral (agent_role, sub_phase, lens unset) fallback
+   *
+   * When `lens` is omitted, only lens-neutral templates match.
    */
-  findTemplate(agentRole: string, subPhase: string): PromptTemplate | null {
+  findTemplate(
+    agentRole: string,
+    subPhase: string,
+    lens?: string,
+  ): PromptTemplate | null {
+    let lensNeutralFallback: PromptTemplate | null = null;
+
     for (const template of this.templates.values()) {
-      if (template.metadata.agent_role === agentRole &&
-          template.metadata.sub_phase === subPhase) {
+      if (template.metadata.agent_role !== agentRole) continue;
+      if (template.metadata.sub_phase !== subPhase) continue;
+
+      const tLens = template.metadata.lens;
+
+      if (lens && tLens === lens) {
         return template;
       }
+      if (!tLens && !lensNeutralFallback) {
+        lensNeutralFallback = template;
+      }
     }
-    return null;
+
+    return lensNeutralFallback;
   }
 
   /**

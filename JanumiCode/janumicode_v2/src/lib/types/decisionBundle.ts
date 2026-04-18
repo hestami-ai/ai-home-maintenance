@@ -20,6 +20,21 @@
 
 // ── Mirror section ─────────────────────────────────────────────────
 
+/**
+ * MirrorItem category, ported from v1's Mirror & Menu Protocol. Used by the
+ * Phase 1.3 interpretation-assumption mirror to let the human see at a glance
+ * *what kind* of assumption each row represents. Optional — surfaces that
+ * don't carry categorical mirror items (e.g. candidate-review surfaces before
+ * the lens-aware refactor) simply leave it unset.
+ */
+export type MirrorItemCategory =
+  | 'lens'
+  | 'scope'
+  | 'anti_goal'
+  | 'persona'
+  | 'constraint'
+  | 'priority';
+
 export interface MirrorItem {
   /** Stable id within the bundle — used by resolution to point back at the row. */
   id: string;
@@ -27,6 +42,8 @@ export interface MirrorItem {
   text: string;
   /** Optional rationale the agent attached; shown under the item when expanded. */
   rationale?: string;
+  /** Optional category chip surfaced on interpretation-assumption mirrors. */
+  category?: MirrorItemCategory;
   /** Optional richer fields for candidate-interpretation review surfaces. */
   description?: string;
   who_it_serves?: string;

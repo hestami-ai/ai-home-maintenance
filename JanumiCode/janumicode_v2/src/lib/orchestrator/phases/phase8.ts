@@ -230,32 +230,28 @@ export class Phase8Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-        traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '8', subPhaseId: '8.1', agentRole: 'eval_design_agent', label: 'Phase 8.1-8.3 — Evaluation Design' },
-      });
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '8', subPhaseId: '8.1', agentRole: 'eval_design_agent', label: 'Phase 8.1-8.3 — Evaluation Design' },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      if (!parsed) return fallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    if (!parsed) return fallback;
 
-      // Extract the three plans from the response — LLM may nest them
-      const funcPlan = (parsed.functional_evaluation_plan ?? { criteria: parsed.criteria ?? [] }) as { criteria: FunctionalEvalCriterion[] };
-      const qualPlan = (parsed.quality_evaluation_plan ?? { criteria: [] }) as { criteria: QualityEvalCriterion[] };
-      const reasPlan = (parsed.reasoning_evaluation_plan ?? { scenarios: [], ai_subsystems_detected: false }) as { scenarios: ReasoningScenario[]; ai_subsystems_detected: boolean };
+    // Extract the three plans from the response — LLM may nest them
+    const funcPlan = (parsed.functional_evaluation_plan ?? { criteria: parsed.criteria ?? [] }) as { criteria: FunctionalEvalCriterion[] };
+    const qualPlan = (parsed.quality_evaluation_plan ?? { criteria: [] }) as { criteria: QualityEvalCriterion[] };
+    const reasPlan = (parsed.reasoning_evaluation_plan ?? { scenarios: [], ai_subsystems_detected: false }) as { scenarios: ReasoningScenario[]; ai_subsystems_detected: boolean };
 
-      return {
-        functional_evaluation_plan: { criteria: Array.isArray(funcPlan.criteria) ? funcPlan.criteria : [] },
-        quality_evaluation_plan: { criteria: Array.isArray(qualPlan.criteria) ? qualPlan.criteria : [] },
-        reasoning_evaluation_plan: {
-          scenarios: Array.isArray(reasPlan.scenarios) ? reasPlan.scenarios : [],
-          ai_subsystems_detected: reasPlan.ai_subsystems_detected ?? false,
-        },
-      };
-    } catch (err) {
-      getLogger().warn('workflow', 'Evaluation design failed', { error: String(err) });
-      return fallback;
-    }
+    return {
+      functional_evaluation_plan: { criteria: Array.isArray(funcPlan.criteria) ? funcPlan.criteria : [] },
+      quality_evaluation_plan: { criteria: Array.isArray(qualPlan.criteria) ? qualPlan.criteria : [] },
+      reasoning_evaluation_plan: {
+        scenarios: Array.isArray(reasPlan.scenarios) ? reasPlan.scenarios : [],
+        ai_subsystems_detected: reasPlan.ai_subsystems_detected ?? false,
+      },
+    };
   }
 }

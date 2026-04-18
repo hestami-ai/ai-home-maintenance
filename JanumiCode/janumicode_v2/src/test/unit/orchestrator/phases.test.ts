@@ -21,6 +21,28 @@ describe('Phase Handlers 2-5', () => {
     engine = new OrchestratorEngine(db, configManager, workspacePath);
     engine.setAutoApproveDecisions(true);
 
+    // Stub the Orchestrator backing — see fullPipeline.test.ts for
+    // rationale. The default `gemini_cli` would spawn the real binary.
+    engine.configManager.setOrchestratorRouting({
+      primary: { backing_tool: 'direct_llm_api', provider: 'stub', model: 'stub' },
+    });
+    const stubProvider = {
+      call: () => Promise.resolve({
+        text: '', parsed: null, toolCalls: [],
+        provider: 'stub', model: 'stub',
+        inputTokens: null, outputTokens: null,
+        usedFallback: false, retryAttempts: 0,
+      }),
+    };
+    engine.llmCaller.registerProvider({ name: 'stub', ...stubProvider });
+    // Phase 2-8 helpers hardcode `provider: 'ollama'`. After removing
+    // the silent fallback catches (correctness invariant: unrecoverable
+    // LLM failures halt the workflow), an unregistered ollama provider
+    // throws and propagates. Register a no-op stub under 'ollama' so
+    // those helpers hit their inner empty-response fallback path and
+    // the phase flow runs end-to-end.
+    engine.llmCaller.registerProvider({ name: 'ollama', ...stubProvider });
+
     // Register all phases
     engine.registerPhase(new Phase0Handler());
     engine.registerPhase(new Phase1Handler());

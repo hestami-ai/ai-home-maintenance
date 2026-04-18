@@ -125,6 +125,67 @@ function repairJsonCommonModelPathologies(input: string): string {
     i++;
   }
 
+  return stripTrailingCommas(out);
+}
+
+/**
+ * Strip trailing commas before `}` / `]`. qwen3.5:9b + gemini reliably
+ * emit JSON like:
+ *   { "a": "b", }
+ *   [ 1, 2, 3, ]
+ *   { "a": { "b": 1, }, }
+ * which is invalid strict JSON. The parser walks in/out of double-quoted
+ * strings so commas inside string values (e.g. `"tuple-like, values"`)
+ * are not touched.
+ *
+ * This is the pathology that caused the Hestami Phase 1.2 bloom to
+ * fall through to the c1/Primary-interpretation placeholder — a 9KB
+ * response with three real candidate concepts had one trailing comma
+ * and JSON.parse rejected the whole thing at position 7217.
+ */
+function stripTrailingCommas(input: string): string {
+  let out = '';
+  let inDouble = false;
+  let escaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+
+    if (inDouble) {
+      if (escaped) {
+        out += ch;
+        escaped = false;
+      } else if (ch === '\\') {
+        out += ch;
+        escaped = true;
+      } else {
+        out += ch;
+        if (ch === '"') inDouble = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      out += ch;
+      inDouble = true;
+      continue;
+    }
+
+    if (ch === ',') {
+      // Peek past whitespace/newlines for the next non-ws char.
+      let j = i + 1;
+      while (j < input.length && /\s/.test(input[j])) j++;
+      if (j < input.length && (input[j] === '}' || input[j] === ']')) {
+        // Drop this trailing comma. Keep the whitespace intact so
+        // error-position reporting (if anything later fails) stays
+        // aligned with the original text roughly.
+        continue;
+      }
+    }
+
+    out += ch;
+  }
+
   return out;
 }
 

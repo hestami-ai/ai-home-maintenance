@@ -137,30 +137,30 @@ export class UnstickingAgent {
     const template = this.templateLoader.getTemplate(TOOL_REVIEW_TEMPLATE_KEY);
     if (!template) return { misinterpretationConfirmed: false };
 
-    try {
-      const renderResult = this.templateLoader.render(template, {
-        stuck_agent_trace: input.stuckAgentTrace,
-        tool_results: input.toolResults ?? '',
-        reasoning_review_findings: input.reasoningReviewFindings,
-        janumicode_version_sha: 'dev',
-      });
+    // LLM throws propagate — a failed unsticking call is unrecoverable
+    // because the pipeline can't decide whether the stuck agent
+    // misinterpreted its tool result without this review. Better to
+    // halt than to silently return "no misinterpretation confirmed".
+    const renderResult = this.templateLoader.render(template, {
+      stuck_agent_trace: input.stuckAgentTrace,
+      tool_results: input.toolResults ?? '',
+      reasoning_review_findings: input.reasoningReviewFindings,
+      janumicode_version_sha: 'dev',
+    });
 
-      const result = await this.llmCaller.call({
-        provider: this.config.provider,
-        model: this.config.model,
-        prompt: renderResult.rendered,
-        responseFormat: 'json',
-        temperature: 0.2,
-      });
+    const result = await this.llmCaller.call({
+      provider: this.config.provider,
+      model: this.config.model,
+      prompt: renderResult.rendered,
+      responseFormat: 'json',
+      temperature: 0.2,
+    });
 
-      if (result.parsed) {
-        return {
-          misinterpretationConfirmed: (result.parsed.misinterpretation_confirmed as boolean) ?? false,
-          correction: result.parsed.correction as string | undefined,
-        };
-      }
-    } catch {
-      // LLM failure — cannot confirm
+    if (result.parsed) {
+      return {
+        misinterpretationConfirmed: (result.parsed.misinterpretation_confirmed as boolean) ?? false,
+        correction: result.parsed.correction as string | undefined,
+      };
     }
 
     return { misinterpretationConfirmed: false };
@@ -173,27 +173,27 @@ export class UnstickingAgent {
     const template = this.templateLoader.getTemplate(SOCRATIC_TEMPLATE_KEY);
     if (!template) return null;
 
-    try {
-      const renderResult = this.templateLoader.render(template, {
-        loop_status: input.loopStatus,
-        sub_phase_id: input.subPhaseId,
-        reasoning_review_findings: input.reasoningReviewFindings,
-        stuck_agent_trace_summary: input.stuckAgentTrace,
-        turn_number: String(turnNumber + 1),
-        janumicode_version_sha: 'dev',
-      });
+    // LLM throws propagate — a failed Socratic-question generation
+    // means we can't ask the human the right question, which is the
+    // whole point of this path. Halting is better than asking a
+    // fallback question.
+    const renderResult = this.templateLoader.render(template, {
+      loop_status: input.loopStatus,
+      sub_phase_id: input.subPhaseId,
+      reasoning_review_findings: input.reasoningReviewFindings,
+      stuck_agent_trace_summary: input.stuckAgentTrace,
+      turn_number: String(turnNumber + 1),
+      janumicode_version_sha: 'dev',
+    });
 
-      const result = await this.llmCaller.call({
-        provider: this.config.provider,
-        model: this.config.model,
-        prompt: renderResult.rendered,
-        temperature: 0.5,
-      });
+    const result = await this.llmCaller.call({
+      provider: this.config.provider,
+      model: this.config.model,
+      prompt: renderResult.rendered,
+      temperature: 0.5,
+    });
 
-      return result.text || null;
-    } catch {
-      return null;
-    }
+    return result.text || null;
   }
 
   private async analyzeSocraticResponse(

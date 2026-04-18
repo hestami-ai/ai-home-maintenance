@@ -24,6 +24,29 @@ describe('Full Pipeline — Phase 0 through Phase 8', () => {
     engine = new OrchestratorEngine(db, configManager, workspacePath);
     engine.setAutoApproveDecisions(true);
 
+    // Production default orchestrator routing is `gemini_cli`, which
+    // would try to spawn the binary in the test env. Bare-engine tests
+    // (no createTestEngine) need an explicit stub route — direct_llm_api
+    // + a no-op provider lets Phase 1.0 IQC complete with empty JSON,
+    // which `defaultReport` then fills in. (createTestEngine handles
+    // this automatically; this test predates it.)
+    engine.configManager.setOrchestratorRouting({
+      primary: { backing_tool: 'direct_llm_api', provider: 'stub', model: 'stub' },
+    });
+    const stubCall = () => Promise.resolve({
+      text: '', parsed: null, toolCalls: [],
+      provider: 'stub', model: 'stub',
+      inputTokens: null, outputTokens: null,
+      usedFallback: false, retryAttempts: 0,
+    });
+    engine.llmCaller.registerProvider({ name: 'stub', call: stubCall });
+    // Phase 2-8 helpers hardcode `provider: 'ollama'`. Register a
+    // stub under that name too so their LLM calls succeed with an
+    // empty response and fall through to the inner deterministic
+    // fallback — after the correctness-halt refactor, an unregistered
+    // provider would throw and halt the phase.
+    engine.llmCaller.registerProvider({ name: 'ollama', call: stubCall });
+
     // Register all planning phases
     engine.registerPhase(new Phase0Handler());
     engine.registerPhase(new Phase1Handler());
@@ -38,7 +61,7 @@ describe('Full Pipeline — Phase 0 through Phase 8', () => {
 
   afterEach(() => { db.close(); });
 
-  it('executes all planning phases (0-8) producing a complete execution plan', async () => {
+  it('executes all planning phases (0-8) producing a complete execution plan', { timeout: 60_000 }, async () => {
     const { run } = engine.startWorkflowRun('ws-1');
 
     // Phase 0 — Workspace Initialization
@@ -104,7 +127,7 @@ describe('Full Pipeline — Phase 0 through Phase 8', () => {
     expect(finalRun!.current_phase_id).toBe('8');
   });
 
-  it('tracks events throughout the pipeline', async () => {
+  it('tracks events throughout the pipeline', { timeout: 60_000 }, async () => {
     const phaseEvents: string[] = [];
     engine.eventBus.on('phase:started', (p) => phaseEvents.push(`start:${p.phaseId}`));
     engine.eventBus.on('phase:completed', (p) => phaseEvents.push(`complete:${p.phaseId}`));

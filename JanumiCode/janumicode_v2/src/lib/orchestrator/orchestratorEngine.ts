@@ -28,6 +28,7 @@ import {
   createGooseCliParser,
 } from '../cli/outputParser';
 import { LLMCaller } from '../llm/llmCaller';
+import { parseJsonWithRecovery } from '../llm/jsonRecovery';
 import { EventBus } from '../events/eventBus';
 import { DecisionTraceGenerator } from '../memory/decisionTraceGenerator';
 import { NarrativeMemoryGenerator } from '../memory/narrativeMemoryGenerator';
@@ -347,7 +348,33 @@ export class OrchestratorEngine {
       });
       getLogger().info('workflow', 'Phase started', { workflow_run_id: runId, phase_id: phaseId, phase_name: PHASE_NAMES[phaseId] }, phaseTrace);
 
-      const result = await handler.execute({ workflowRun: run, engine: this });
+      // Convert thrown errors from the handler into `success: false`
+      // phase results. Serial-pipeline invariant: an unrecoverable LLM /
+      // CLI failure at any sub-phase HALTS the workflow — downstream
+      // phases reason on upstream artifacts, so a silent fallback
+      // corrupts every phase that follows. Phase handlers therefore
+      // let LLM helpers throw instead of returning default values;
+      // this catch is the engine-level seam that turns those throws
+      // into gap-reportable phase failures.
+      let result: PhaseResult;
+      try {
+        result = await handler.execute({ workflowRun: run, engine: this });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const subPhase = this.stateMachine.getWorkflowRun(runId)?.current_sub_phase_id;
+        const location = subPhase ? `Phase ${subPhase}` : `Phase ${phaseId}`;
+        getLogger().error('workflow', 'Phase handler threw — halting workflow', {
+          workflow_run_id: runId,
+          phase_id: phaseId,
+          sub_phase_id: subPhase,
+          error: message,
+        }, phaseTrace);
+        result = {
+          success: false,
+          error: `${location} halted: ${message}`,
+          artifactIds: [],
+        };
+      }
 
       if (result.success) {
         this.eventBus.emit('phase:completed', {
@@ -873,11 +900,42 @@ export class OrchestratorEngine {
       traceContext: cliTraceContext,
     });
 
-    const text = extractFinalText(result.cliResult?.events ?? []);
+    // Surface CLI invocation failures as thrown errors. Without this,
+    // a non-zero exit (gemini arg-parse error, missing binary, timeout)
+    // silently produced `{text:'', parsed:null}` and the caller saw a
+    // success-shaped result — phase handlers then fell through on
+    // `result.parsed ?? defaultReport` and the workflow kept running
+    // with an invalid default. A CLI failure at the Orchestrator role
+    // is a hard stop, not a soft fallback.
+    if (!result.success || (result.cliResult && result.cliResult.exitCode !== 0)) {
+      const exitCode = result.cliResult?.exitCode ?? 'null';
+      const stderr = (result.cliResult?.stderr ?? '').trim().slice(0, 400);
+      const reason = result.error ?? `process exited with code ${exitCode}`;
+      throw new Error(
+        `callForRole('${role}') backing '${backing_tool}' failed: ${reason}` +
+        (stderr ? `\nstderr: ${stderr}` : ''),
+      );
+    }
+
+    // Prefer the raw stdout (stdoutText) over the line-per-event
+    // reconstruction. The per-line parser is shape-specific (Claude
+    // stream-json vs Goose message envelopes); Gemini emits plain
+    // text so its events land as typeless fragments that
+    // extractFinalText's type-filter couldn't concatenate. stdoutText
+    // captures the full output losslessly — extractFinalText remains
+    // the fallback for cases where the CLI invoker didn't populate
+    // stdoutText (older code paths / tests with stubbed cliInvoker).
+    const stdoutText = result.cliResult?.stdoutText ?? '';
+    const text = stdoutText || extractFinalText(result.cliResult?.events ?? []);
     let parsed: Record<string, unknown> | null = null;
     if (options.responseFormat === 'json' && text) {
-      try { parsed = JSON.parse(text) as Record<string, unknown>; }
-      catch { parsed = null; }
+      // Use parseJsonWithRecovery so trailing commas, code-fence
+      // wrappers, and single-quoted strings survive the round trip.
+      // Bare JSON.parse lost a Phase 1.2 bloom worth 9KB of real
+      // content to a single trailing comma at position 7217 — the
+      // Orchestrator's 1.0 IQC is just as vulnerable.
+      const recovered = parseJsonWithRecovery(text);
+      parsed = recovered.parsed;
     }
     return {
       text,

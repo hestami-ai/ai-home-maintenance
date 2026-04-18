@@ -50,6 +50,15 @@ export interface CLIInvocationResult {
   idledOut: boolean;
   /** All parsed events from stdout */
   events: ParsedEvent[];
+  /**
+   * Full concatenated stdout bytes, decoded as UTF-8. Preserved
+   * alongside `events` so callers can reconstruct the raw model
+   * output when the per-line parser was fed something it can't
+   * structure (e.g. Gemini CLI emits plain text, not stream-json,
+   * so the parsed events lose the shape needed for JSON recovery).
+   * `extractFinalText` uses this as its ultimate fallback.
+   */
+  stdoutText: string;
   /** Raw stderr output */
   stderr: string;
   /** Duration in milliseconds */
@@ -89,6 +98,12 @@ export class CLIInvoker {
       // ── Stdout handling ──────────────────────────────────────
 
       let stdoutBuffer = '';
+      // Full concatenation of every stdout byte we see, preserved
+      // independently of the per-line parser output. Gemini CLI
+      // streams plain text (not stream-json), so the parser's
+      // invalid-JSON fallback yields text-fragment events that lose
+      // the reassembled shape a JSON-recovery pass needs.
+      let stdoutText = '';
 
       child.stdout?.on('data', (chunk: Buffer) => {
         // Reset idle timer on any output
@@ -96,6 +111,7 @@ export class CLIInvoker {
 
         const chunkText = chunk.toString('utf-8');
         stdoutBuffer += chunkText;
+        stdoutText += chunkText;
 
         // Forward the raw chunk to the live callback so the webview card
         // sees it immediately, before parsing / record-type classification.
@@ -139,6 +155,7 @@ export class CLIInvoker {
           timedOut,
           idledOut,
           events,
+          stdoutText,
           stderr,
           durationMs: Date.now() - startTime,
         });
@@ -152,6 +169,7 @@ export class CLIInvoker {
           timedOut,
           idledOut,
           events,
+          stdoutText,
           stderr,
           durationMs: Date.now() - startTime,
         });

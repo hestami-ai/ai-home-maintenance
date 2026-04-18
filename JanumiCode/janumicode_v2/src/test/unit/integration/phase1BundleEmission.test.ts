@@ -2,10 +2,12 @@
  * Regression test for Phase 1's bloom-prune surface migration.
  *
  * Pins that Sub-Phase 1.3 emits exactly ONE `decision_bundle_presented`
- * record (never the old mirror_presented + menu_presented pair), that
- * the bundle's Mirror section carries per-candidate interpretations,
- * and that the Menu section is conditional — present with >1 candidate,
- * absent with a single candidate.
+ * record (never the old mirror_presented + menu_presented pair). After
+ * the lens refactor, the bundle's Mirror section carries interpretation
+ * assumptions (lens framing, scope framing, cross-cutting assumptions)
+ * while the Menu section carries the candidate concepts themselves —
+ * the Menu is still conditional (present with >1 candidate, absent with
+ * a single candidate so there's nothing to prune).
  *
  * Why this matters: the whole point of the composite bundle is the user
  * can't resolve the Mirror and accidentally bypass the Menu. If the
@@ -180,19 +182,18 @@ describe('Phase 1 — bloom prune surface (decision bundle emission)', () => {
         .filter(r => r.sub_phase_id === '1.3');
       expect(mirrorsAt13).toHaveLength(0);
 
-      // Bundle content sanity: Mirror section carries candidate
-      // interpretations, Menu section carries both candidates with the
-      // first marked recommended.
+      // Bundle content sanity: Mirror section carries interpretation
+      // assumptions (lens + scope framing); Menu section carries both
+      // candidates with the first marked recommended.
       const content = bundles[0].content as unknown as DecisionBundleContent;
       expect(content.surface_id).toContain('phase1-bloom-prune-');
       expect(content.title).toBe('Review candidate interpretations of your intent');
       expect(content.mirror?.kind).toBe('intent_bloom_mirror');
-      expect(content.mirror?.items).toHaveLength(2);
-      expect(content.mirror?.items[0]?.text).toBe('Personal CLI todo');
-      expect(content.mirror?.items[0]?.description).toBe('Local terminal-native task tracker.');
-      expect(content.mirror?.items[0]?.supporting_assumptions?.[0]?.text).toBe('Local SQLite storage');
+      expect(content.mirror?.items[0]?.category).toBe('lens');
+      expect(content.mirror?.items[0]?.id).toBe('lens-assumption');
       expect(content.menu).toBeDefined();
       expect(content.menu?.options).toHaveLength(2);
+      expect(content.menu?.options[0].label).toBe('Personal CLI todo');
       expect(content.menu?.options[0].recommended).toBe(true);
       expect(content.menu?.multi_select).toBe(true);
     } finally {
@@ -219,7 +220,8 @@ describe('Phase 1 — bloom prune surface (decision bundle emission)', () => {
       const content = bundles[0].content as unknown as DecisionBundleContent;
       expect(content.mirror).toBeDefined();
       expect(content.mirror?.kind).toBe('intent_bloom_mirror');
-      expect(content.mirror?.items[0]?.text).toBe('Personal CLI todo');
+      // Mirror now carries interpretation assumptions, not the candidate itself.
+      expect(content.mirror?.items[0]?.category).toBe('lens');
       expect(content.menu).toBeUndefined();
     } finally {
       tearDown();
@@ -242,11 +244,19 @@ describe('Phase 1 — bloom prune surface (decision bundle emission)', () => {
         .filter(r => r.sub_phase_id === '1.3');
       expect(bundles).toHaveLength(1);
 
-      const content = bundles[0].content as unknown as DecisionBundleContent;
-      expect(content.mirror?.items).toHaveLength(1);
-      expect(content.mirror?.items[0]?.text).toBe('Valid candidate');
-      expect(content.mirror?.items[0]?.supporting_assumptions?.[0]?.text).toBe('A valid JSON bloom should keep its assumption text.');
-      expect(content.mirror?.items[0]?.supporting_assumptions?.[0]?.rationale).toBe('This is the baseline pass-to-pass behavior for the happy path.');
+      // Post-refactor: per-candidate assumption rationale lives on the
+      // bloom artifact (and later flows into surfaced_assumptions at 1.4).
+      // The Mirror now carries interpretation assumptions, not candidates.
+      const blooms = db.getRecordsByType('artifact_produced', runId)
+        .filter(r => r.sub_phase_id === '1.2' && (r.content as { kind?: string }).kind === 'intent_bloom');
+      expect(blooms).toHaveLength(1);
+      const bloom = blooms[0].content as {
+        candidate_product_concepts: Array<{ name: string; assumptions: Array<{ statement?: string; basis?: string } | string> }>;
+      };
+      expect(bloom.candidate_product_concepts[0]?.name).toBe('Valid candidate');
+      const firstAssumption = bloom.candidate_product_concepts[0]?.assumptions[0];
+      expect(typeof firstAssumption === 'object' && firstAssumption?.statement).toBe('A valid JSON bloom should keep its assumption text.');
+      expect(typeof firstAssumption === 'object' && firstAssumption?.basis).toBe('This is the baseline pass-to-pass behavior for the happy path.');
     } finally {
       tearDown();
     }
@@ -276,10 +286,14 @@ describe('Phase 1 — bloom prune surface (decision bundle emission)', () => {
         .filter(r => r.sub_phase_id === '1.3');
       expect(bundles).toHaveLength(1);
       const content = bundles[0].content as unknown as DecisionBundleContent;
-      expect(content.mirror?.items).toHaveLength(1);
-      expect(content.mirror?.items[0]?.text).toBe('Recovered candidate');
-      expect(content.mirror?.items[0]?.supporting_assumptions?.[0]?.text).toContain('A malformed JSON string from qwen should still be usable.');
-      expect(content.mirror?.items[0]?.supporting_assumptions?.[0]?.rationale).toContain('single-quoted string delimiters');
+      // Mirror carries interpretation assumptions (lens row + scope row).
+      expect((content.mirror?.items?.length ?? 0)).toBeGreaterThan(0);
+      expect(content.mirror?.items[0]?.category).toBe('lens');
+      // The recovered candidate lives on the bloom record — verify the
+      // malformed-JSON recovery preserved the assumption rationale there.
+      expect(bloom.candidate_product_concepts[0]?.assumptions[0]).toMatchObject({
+        basis: expect.stringContaining('single-quoted string delimiters'),
+      });
       expect(content.summary).toContain('I identified 1 plausible interpretation(s) of your intent.');
     } finally {
       tearDown();

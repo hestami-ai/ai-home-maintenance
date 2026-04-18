@@ -13,7 +13,7 @@
  */
 
 import type { Database } from '../database/init';
-import type { PhaseId, WorkflowRun, WorkflowRunStatus } from '../types/records';
+import type { IntentLens, PhaseId, WorkflowRun, WorkflowRunStatus } from '../types/records';
 import { PHASE_ORDER } from '../types/records';
 
 // ── Valid Transitions ───────────────────────────────────────────────
@@ -78,6 +78,7 @@ export class StateMachine {
       scope_classification_ref: null,
       compliance_context_ref: null,
       cross_run_impact_triggered: false,
+      intent_lens: null,
     };
   }
 
@@ -104,6 +105,7 @@ export class StateMachine {
       scope_classification_ref: (row.scope_classification_ref as string) || null,
       compliance_context_ref: (row.compliance_context_ref as string) || null,
       cross_run_impact_triggered: !!(row.cross_run_impact_triggered as number),
+      intent_lens: (row.intent_lens as IntentLens) || null,
     };
   }
 
@@ -181,6 +183,16 @@ export class StateMachine {
     this.db.prepare(`
       UPDATE workflow_runs SET current_sub_phase_id = ? WHERE id = ?
     `).run(subPhaseId, runId);
+  }
+
+  /**
+   * Set the intent lens classification on the workflow run.
+   * Written by Phase 1.0a so downstream handlers can route lens-aware templates.
+   */
+  setIntentLens(runId: string, lens: IntentLens): void {
+    this.db.prepare(`
+      UPDATE workflow_runs SET intent_lens = ? WHERE id = ?
+    `).run(lens, runId);
   }
 
   /**

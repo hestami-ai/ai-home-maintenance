@@ -164,6 +164,53 @@ describe('OrchestratorEngine.callForRole — orchestrator dispatcher', () => {
       engine.callForRole('orchestrator', { prompt: 'p' }),
     ).rejects.toThrow(/direct_llm_api backing requires a provider/);
   });
+
+  it('throws when the CLI invocation exits non-zero (prevents silent pass-through)', async () => {
+    // This is the regression the screenshot surfaced: gemini errored
+    // with "Cannot use both a positional prompt and the --prompt flag
+    // together" and exited 1, but the old dispatcher coerced empty
+    // events into `{text:'',parsed:null}` — phase1 then fell through
+    // to its defaultReport and the workflow kept running past a
+    // failed Orchestrator backing. callForRole() must now throw so
+    // the phase handler sees the failure.
+    engine.configManager.setOrchestratorRouting({
+      primary: { backing_tool: 'gemini_cli', model: 'gemini-2.5-flash' },
+    });
+    engine.registerBuiltinCLIParsers();
+
+    const invokeSpy = vi.fn().mockResolvedValue({
+      exitCode: 1, timedOut: false, idledOut: false,
+      events: [],
+      stderr: 'Cannot use both a positional prompt and the --prompt (-p) flag together',
+      durationMs: 5,
+    });
+    (engine.agentInvoker as unknown as { cliInvoker: { invoke: unknown } })
+      .cliInvoker.invoke = invokeSpy;
+
+    await expect(
+      engine.callForRole('orchestrator', { prompt: 'p', responseFormat: 'json' }),
+    ).rejects.toThrow(/backing 'gemini_cli' failed/);
+  });
+
+  it('throws when the CLI invocation times out', async () => {
+    engine.configManager.setOrchestratorRouting({
+      primary: { backing_tool: 'claude_code_cli', model: 'qwen3.5:9b' },
+    });
+    engine.registerBuiltinCLIParsers();
+
+    const invokeSpy = vi.fn().mockResolvedValue({
+      exitCode: null, timedOut: true, idledOut: false,
+      events: [],
+      stderr: '',
+      durationMs: 600000,
+    });
+    (engine.agentInvoker as unknown as { cliInvoker: { invoke: unknown } })
+      .cliInvoker.invoke = invokeSpy;
+
+    await expect(
+      engine.callForRole('orchestrator', { prompt: 'p' }),
+    ).rejects.toThrow(/claude_code_cli/);
+  });
 });
 
 describe('ConfigManager.validateLLMRouting — orchestrator', () => {

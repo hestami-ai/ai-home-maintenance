@@ -237,24 +237,20 @@ export class Phase7Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-        traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '7', subPhaseId: '7.1', agentRole: 'test_design_agent', label: 'Phase 7.1 — Test Case Generation' },
-      });
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '7', subPhaseId: '7.1', agentRole: 'test_design_agent', label: 'Phase 7.1 — Test Case Generation' },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const tp = parsed?.test_plan ?? parsed;
-      const data = (Array.isArray(tp) ? tp[0] : tp) as Partial<TestPlan> | null;
-      if (data?.test_suites && Array.isArray(data.test_suites) && data.test_suites.length > 0) {
-        return { test_suites: data.test_suites as TestSuite[] };
-      }
-      return fallback;
-    } catch (err) {
-      getLogger().warn('workflow', 'Test case generation failed', { error: String(err) });
-      return fallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const tp = parsed?.test_plan ?? parsed;
+    const data = (Array.isArray(tp) ? tp[0] : tp) as Partial<TestPlan> | null;
+    if (data?.test_suites && Array.isArray(data.test_suites) && data.test_suites.length > 0) {
+      return { test_suites: data.test_suites as TestSuite[] };
     }
+    return fallback;
   }
 
   /** Deterministic coverage analysis: check every AC ID is referenced by at least one test case. */

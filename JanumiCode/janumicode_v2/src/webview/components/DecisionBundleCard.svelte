@@ -118,7 +118,7 @@
   <div class="bundle-counter" class:ready={pending.submittable}>
     {#if mirror}
       <span class="counter-segment">
-        {mirrorDecidedCount}/{mirrorTotal} {isBloomMirror ? 'interpretations reviewed' : 'assumptions decided'}
+        {mirrorDecidedCount}/{mirrorTotal} {isBloomMirror ? 'interpretation assumptions reviewed' : 'assumptions decided'}
       </span>
     {/if}
     {#if mirror && menu}
@@ -134,7 +134,7 @@
   <!-- Mirror section -->
   {#if mirror}
     <section class="bundle-section">
-      <h4 class="section-label">{isBloomMirror ? 'Candidate Interpretations' : 'Assumptions'}</h4>
+      <h4 class="section-label">{isBloomMirror ? 'Interpretation Assumptions' : 'Assumptions'}</h4>
       <ul class="item-list">
         {#each mirror.items as item (item.id)}
           {@const action = mirrorAction(item.id)}
@@ -144,6 +144,9 @@
             <div class="row-text">
               {#if action === 'edited'}
                 <span class="edited-indicator" aria-hidden="true">✎</span>
+              {/if}
+              {#if item.category}
+                <span class="category-chip category-{item.category}">{item.category.replace('_', ' ')}</span>
               {/if}
               <span class="row-label">{action === 'edited' ? editedText : item.text}</span>
             </div>
@@ -427,6 +430,19 @@
     color: var(--jc-warning);
     font-weight: 700;
   }
+  .category-chip {
+    font-family: var(--jc-font-mono);
+    font-size: 0.65em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: var(--jc-space-xs) var(--jc-space-sm);
+    border-radius: var(--jc-radius-xs);
+    background: var(--jc-surface-container-highest);
+    color: var(--jc-on-surface-variant);
+    white-space: nowrap;
+  }
+  .category-lens { background: var(--jc-tertiary-tint-soft); color: var(--jc-tertiary); }
+  .category-anti_goal, .category-persona { background: var(--jc-primary-tint-soft); color: var(--jc-primary); }
   .row-rationale {
     margin-top: var(--jc-space-sm);
     font-size: 0.85em;

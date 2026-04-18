@@ -50,6 +50,13 @@ interface InboundMessage {
 export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
   private webview: vscode.Webview | null = null;
   private readonly disposers: Array<() => void> = [];
+  /**
+   * Tracks the last sub-phase id we posted to the webview so the
+   * record:added handler can detect transitions cheaply (only re-posts
+   * when the sub-phase actually changes, not on every governed-stream
+   * write). Reset on workflow:started.
+   */
+  private lastPostedSubPhaseId: string | null = null;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -116,8 +123,42 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     });
 
     // Outbound: forward eventBus events to the webview.
+    //
+    // Sub-phase change detection: stateMachine.setSubPhase() updates
+    // workflow_runs.current_sub_phase_id but emits NO event, so the
+    // webview's PhaseIndicator never learned that 1.0 → 1.1b → 1.2
+    // happened — Phase 1's sub-list stayed unticked all the way to
+    // 1.3. We piggy-back on `record:added` (every record carries a
+    // sub_phase_id when one applies) and detect the transition by
+    // comparing against the last-posted value. The recompute queries
+    // are cheap (single DISTINCT scan keyed by run id), and we only
+    // re-post the phaseUpdate when the sub-phase actually changes.
     const off1 = this.engine.eventBus.on('record:added', (p) => {
       this.post({ type: 'addRecord', record: p.record });
+      const newSubPhase = (p.record as { sub_phase_id?: string | null }).sub_phase_id ?? null;
+      if (
+        this.session.currentRunId &&
+        newSubPhase &&
+        newSubPhase !== this.lastPostedSubPhaseId
+      ) {
+        this.lastPostedSubPhaseId = newSubPhase;
+        const completedPhases = this.getCompletedPhases(this.session.currentRunId);
+        const completedSubPhases = this.getCompletedSubPhases(this.session.currentRunId);
+        const skippedSubPhases = this.getSkippedSubPhases(this.session.currentRunId);
+        const run = this.engine.stateMachine.getWorkflowRun(this.session.currentRunId);
+        this.post({
+          type: 'phaseUpdate',
+          event: 'sub_phase:changed',
+          payload: {
+            phaseId: run?.current_phase_id ?? undefined,
+            subPhaseId: newSubPhase,
+            completedPhases,
+            completedSubPhases,
+            skippedSubPhases,
+            workflowRunId: this.session.currentRunId,
+          },
+        });
+      }
     });
     // workflow:started fires BEFORE phase:started during intent submission.
     // Sync the session run id here so the phaseUpdate payloads emitted by
@@ -125,6 +166,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     // the webview's PhaseIndicator hides itself when workflowRunId is null.
     const off0 = this.engine.eventBus.on('workflow:started', (p) => {
       this.session.currentRunId = p.workflowRunId;
+      this.lastPostedSubPhaseId = null;
       this.post({
         type: 'phaseUpdate',
         event: 'workflow:started',

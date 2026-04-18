@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
   raw_intent_record_id          TEXT,
   scope_classification_ref      TEXT,
   compliance_context_ref        TEXT,
-  cross_run_impact_triggered    INTEGER DEFAULT 0
+  cross_run_impact_triggered    INTEGER DEFAULT 0,
+  intent_lens                   TEXT
 );
 
 -- ── Universal record store — the Governed Stream (lossless) ─────────

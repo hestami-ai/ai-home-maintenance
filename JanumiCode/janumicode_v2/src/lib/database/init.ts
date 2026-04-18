@@ -102,9 +102,37 @@ function initializeDirect(options: DatabaseOptions): Database {
   if (!options.readonly) {
     db.exec(SCHEMA_DDL);
     db.exec(VECTOR_SEARCH_DDL);
+    ensureSchemaColumns(db);
   }
 
   return db as Database;
+}
+
+/**
+ * Apply additive column migrations for columns introduced after the
+ * initial schema. `CREATE TABLE IF NOT EXISTS` in SCHEMA_DDL leaves
+ * pre-existing tables untouched, so new optional columns are added
+ * here with tolerated-duplicate behaviour.
+ *
+ * Add new entries at the bottom. Never rename or drop columns here —
+ * that requires a proper migration with data rewrite.
+ */
+function ensureSchemaColumns(db: { exec: (sql: string) => void }): void {
+  const additive: ReadonlyArray<{ table: string; column: string; ddl: string }> = [
+    // Phase 1.0a Intent Lens Classification stores its chosen lens on
+    // the workflow run so downstream phase handlers can read it
+    // without re-querying the artifact_produced record.
+    { table: 'workflow_runs', column: 'intent_lens', ddl: 'TEXT' },
+  ];
+  for (const { table, column, ddl } of additive) {
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('duplicate column name')) continue;
+      throw err;
+    }
+  }
 }
 
 function initializeSidecar(options: DatabaseOptions): Database {

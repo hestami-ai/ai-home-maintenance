@@ -87,6 +87,53 @@ class RecordsStore {
     );
   }
 
+  /**
+   * True when the given record is referenced by a sibling `dmr_pipeline`
+   * container record — either via `stages[].output_record_id` (the
+   * Stage 1 / 7 detail records) or via `retrieval_brief_record_id` on
+   * the pipeline content, or because the record's `derived_from` chain
+   * leads back to a DMR detail record that itself is referenced.
+   *
+   * Used by the Card dispatcher to suppress DMR detail records at the
+   * top level — they render inline inside DmrPipelineCard so the
+   * whole DMR run reads as one composite card.
+   */
+  isReferencedByDmrPipeline(record: SerializedRecord): boolean {
+    const pipelineDetailIds = this.collectDmrPipelineDetailIds();
+    if (pipelineDetailIds.has(record.id)) return true;
+    // Also suppress agent_invocation records whose child is a detail
+    // record referenced by a pipeline (Stage 1 + Stage 7 each open an
+    // agent_invocation that owns a detail-record child).
+    if (record.record_type === 'agent_invocation') {
+      return this.hasDmrDetailChild(record.id, pipelineDetailIds);
+    }
+    return false;
+  }
+
+  private collectDmrPipelineDetailIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const r of this.records) {
+      if (r.record_type !== 'dmr_pipeline') continue;
+      const c = r.content as {
+        stages?: Array<{ output_record_id?: string }>;
+        retrieval_brief_record_id?: string;
+      };
+      if (c.retrieval_brief_record_id) ids.add(c.retrieval_brief_record_id);
+      for (const s of c.stages ?? []) {
+        if (s.output_record_id) ids.add(s.output_record_id);
+      }
+    }
+    return ids;
+  }
+
+  private hasDmrDetailChild(parentId: string, detailIds: Set<string>): boolean {
+    for (const child of this.records) {
+      if (!child.derived_from_record_ids.includes(parentId)) continue;
+      if (detailIds.has(child.id)) return true;
+    }
+    return false;
+  }
+
   get count(): number {
     return this.records.length;
   }

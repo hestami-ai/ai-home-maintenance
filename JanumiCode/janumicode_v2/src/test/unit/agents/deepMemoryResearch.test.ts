@@ -448,6 +448,77 @@ describe('DeepMemoryResearchAgent', () => {
       ).get() as { n: number };
       expect(briefs.n).toBe(0);
     });
+
+    it('writes a single dmr_pipeline container record with all 7 stages', async () => {
+      // Regression: before this, the UI saw only Stage 1 and Stage 7
+      // cards because stages 2-6 are deterministic and wrote no
+      // records. The container record makes all 7 stages visible.
+      const agentWithWriter = new DeepMemoryResearchAgent(
+        db, new LLMCaller({ maxRetries: 0 }), defaultWeights,
+        { janumiCodeVersionSha: 'abc' },
+        undefined, undefined, writer,
+      );
+
+      await agentWithWriter.research(baseBrief({ query: 'test query' }));
+
+      const pipelines = db.prepare(
+        `SELECT * FROM governed_stream WHERE record_type = 'dmr_pipeline'`,
+      ).all() as Array<Record<string, unknown>>;
+      expect(pipelines.length).toBe(1);
+
+      const pipeline = pipelines[0];
+      expect(pipeline.produced_by_agent_role).toBe('deep_memory_research');
+      expect(pipeline.sub_phase_id).toBe('1.2');
+      const content = JSON.parse(pipeline.content as string) as {
+        kind: string;
+        pipeline_id: string;
+        stages: Array<{ stage: number; kind: string; status: string; name: string; output_summary?: string }>;
+        completeness_status?: string;
+      };
+      expect(content.kind).toBe('dmr_pipeline');
+      // pipeline_id should be patched to the record's own id via json_set.
+      expect(content.pipeline_id).toBe(pipeline.id);
+      expect(content.stages).toHaveLength(7);
+      // Stage kinds: 1 + 7 are LLM, 2-6 are deterministic. The
+      // webview uses this to show "kind" chips so the user
+      // understands why only 2 stages produce nested cards.
+      expect(content.stages[0].kind).toBe('llm');
+      expect(content.stages[1].kind).toBe('deterministic');
+      expect(content.stages[5].kind).toBe('deterministic');
+      expect(content.stages[6].kind).toBe('llm');
+      // Every stage must be marked completed at pipeline-write time.
+      for (const s of content.stages) expect(s.status).toBe('completed');
+      // Completeness carries through from the Context Packet.
+      expect(content.completeness_status).toBeDefined();
+    });
+
+    it('dmr_pipeline stages[].output_record_id link to the Stage 1 + 7 detail records', async () => {
+      // The webview's isReferencedByDmrPipeline() suppresses these
+      // detail records at top-level and inlines them in DmrPipelineCard
+      // — that visual grouping only works if output_record_id is set.
+      const agentWithWriter = new DeepMemoryResearchAgent(
+        db, new LLMCaller({ maxRetries: 0 }), defaultWeights,
+        { janumiCodeVersionSha: 'abc' },
+        undefined, undefined, writer,
+      );
+
+      await agentWithWriter.research(baseBrief({ query: 'test query' }));
+
+      const decomp = db.prepare(
+        `SELECT id FROM governed_stream WHERE record_type = 'query_decomposition_record'`,
+      ).get() as { id: string };
+      const packet = db.prepare(
+        `SELECT id FROM governed_stream WHERE record_type = 'context_packet'`,
+      ).get() as { id: string };
+      const pipeline = db.prepare(
+        `SELECT content FROM governed_stream WHERE record_type = 'dmr_pipeline'`,
+      ).get() as { content: string };
+      const content = JSON.parse(pipeline.content) as {
+        stages: Array<{ stage: number; output_record_id?: string }>;
+      };
+      expect(content.stages[0].output_record_id).toBe(decomp.id);
+      expect(content.stages[6].output_record_id).toBe(packet.id);
+    });
   });
 
   // ── contextPacketToJson — snake_case conversion ──────────────────

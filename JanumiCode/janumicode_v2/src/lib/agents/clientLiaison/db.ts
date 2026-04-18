@@ -481,6 +481,7 @@ export class ClientLiaisonDBImpl implements ClientLiaisonDB {
       scope_classification_ref: (row.scope_classification_ref as string) || null,
       compliance_context_ref: (row.compliance_context_ref as string) || null,
       cross_run_impact_triggered: !!(row.cross_run_impact_triggered as number),
+      intent_lens: (row.intent_lens as import('../../types/records').IntentLens) || null,
     };
   }
 }

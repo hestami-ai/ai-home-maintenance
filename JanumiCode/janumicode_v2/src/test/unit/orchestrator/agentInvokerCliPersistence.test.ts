@@ -119,7 +119,11 @@ describe('AgentInvoker — CLI invocation persistence', () => {
     expect(invocation).toBeDefined();
     expect(invocation!.content.command).toBe('gemini');
     expect(Array.isArray(invocation!.content.args)).toBe(true);
-    expect((invocation!.content.args as string[]).join(' ')).toContain('--prompt');
+    // Gemini CLI is now stdin-only (passing --prompt alongside piped
+    // stdin triggered the "both positional AND --prompt" error). The
+    // prompt is still persisted on `content.prompt` for audit — we
+    // just don't embed it on the command line.
+    expect(invocation!.content.args).not.toContain('--prompt');
     expect(invocation!.content.command_line).toContain('gemini');
     expect(invocation!.content.cwd).toBe('/ws');
     expect(invocation!.content.prompt).toBe('review spec file');

@@ -408,11 +408,34 @@ export class AgentInvoker {
         }
         return { command: 'claude', args };
       }
-      case 'gemini_cli':
-        return {
-          command: 'gemini',
-          args: ['--prompt', options.prompt, '--format', 'json'],
-        };
+      case 'gemini_cli': {
+        // Gemini CLI treats piped stdin as a positional prompt. Passing
+        // `--prompt` AT THE SAME TIME makes it error with
+        //   Cannot use both a positional prompt and the --prompt (-p) flag together
+        // Since `options.prompt` is always piped to stdin by
+        // CLIInvoker, we route the prompt through stdin only. Gemini
+        // auto-detects non-interactive mode when stdin is piped, so
+        // `-p` is not required.
+        //
+        // Env knobs mirror the Claude Code / Goose hooks for symmetry:
+        //   JANUMICODE_GEMINI_MODEL      — `--model <name>` (per-invocation
+        //                                  options.model wins)
+        //   JANUMICODE_GEMINI_YOLO=1     — add `--yolo` to auto-approve
+        //                                  tool calls unattended (Phase 9
+        //                                  executor). Off by default so the
+        //                                  Orchestrator's JSON-only calls
+        //                                  don't need a dangerous flag.
+        //   JANUMICODE_GEMINI_EXTRA_ARGS — verbatim space-delimited flags
+        const args: string[] = [];
+        if (process.env.JANUMICODE_GEMINI_YOLO === '1') args.push('--yolo');
+        const model = options.model ?? process.env.JANUMICODE_GEMINI_MODEL;
+        if (model) args.push('--model', model);
+        const extra = process.env.JANUMICODE_GEMINI_EXTRA_ARGS;
+        if (extra) {
+          for (const a of extra.split(/\s+/).filter(Boolean)) args.push(a);
+        }
+        return { command: 'gemini', args };
+      }
       case 'goose_cli': {
         // Goose `run` reads the instruction body from stdin when
         // `-i -` is passed. Same rationale as Claude Code: realistic

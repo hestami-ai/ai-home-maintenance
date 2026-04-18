@@ -18,7 +18,17 @@ import { Command } from 'commander';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { runPipeline } from './runner';
+import { loadDotenv } from '../lib/config/dotenv';
 import type { PipelineRunnerConfig } from '../test/harness/types';
+
+// Load .env BEFORE any subprocess could spawn. The Gemini CLI
+// (Orchestrator backing), Claude Code (Phase 9 executor), and Ollama
+// provider all read API keys from process.env — they see whatever is
+// set when this Node process hands off to the child. The extension
+// host does this in activate(); the CLI needs the same injection.
+// `--workspace` points at the run's working dir; API keys live in the
+// repo's own .env (alongside this entry point's compiled bundle).
+loadDotenv(path.resolve(__dirname, '..', '..'));
 
 const program = new Command();
 

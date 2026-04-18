@@ -1,0 +1,117 @@
+{
+  "candidate_product_concepts": [
+    {
+      "id": "CAND_001",
+      "name": "Sequential Phased Implementation",
+      "description": "This concept prioritizes strict adherence to the 'Phasing Strategy' outlined in the documentation, releasing Pillar 1 (Home Assistant) as a standalone product first to validate the ecosystem, followed by Pillar 2 (FSM), and finally Pillar 3 (CAM) once the first two are stable. This allows for focused QA on each complex domain (ServiceTitan/Vantaca modeled pillars) separately.",
+      "who_it_serves": "Individual homeowners (Phase 1), Contracting businesses (Phase 2), Association Boards/Managers (Phase 3).",
+      "problem_it_solves": "Reduces initial implementation complexity and risk by validating the 'Home Assistant' friction reduction before scaling to enterprise-grade FSM/CAM operations.",
+      "assumptions": [
+        {
+          "assumption": "The pillars can be released sequentially without losing the 'holistic integrated platform' value proposition.",
+          "basis": "The document states 'The product will be built in three major phases representing the three major pillars' and 'Phase 1 - Hestami Home Real Property Assistant'..."
+        },
+        {
+          "assumption": "The 'Common Data Model' will be stable enough to support Pillar 1 first.",
+          "basis": "The document describes 'This is the logical domain model for the entire system. Each domain below includes...' and defines domains for all pillars."
+        },
+        {
+          "assumption": "The technical stack (Bun, Postgres, DBOS) will remain consistent across all phases.",
+          "basis": "The 'Core Technological Infrastructure and Stack' section defines these layers as foundational for the 'entire system'."
+        },
+        {
+          "assumption": "Phase 2 and 3 will eventually require the full integration of the pillars to meet the 'Success Factors'.",
+          "basis": "Under 'Success Factors', it states 'the complete and correct implementation of each of the pillars into a holistic integrated platform'."
+        }
+      ],
+      "constraints": [
+        "Must implement using SvelteKit, Bun, PostgreSQL, DBOS, and Cerbos as specified.",
+        "Must adhere to 'No direct client access to the origin IP is permitted' (Cloudflare CDN only).",
+        "Must implement the 'Common Data Model' logical structure defined in the context.",
+        "Must support the 'Digital Assets' exchange (Gaussian Splats, Images) as per Vision.",
+        "Must adhere to 'No compliance regimes' constraint from the context summary."
+      ],
+      "open_questions": [
+        "What specific functionality is available in Pillar 1 regarding 'Vendor Coordination' without Pillar 2 being implemented?",
+        "How does the 'Success Factor' of 'complete and correct implementation' interact with the decision to release Pillar 1 as a standalone product?",
+        "Will the 'Digital Assets Exchange' (3D Gaussian Splats) be available in Phase 1 or only in subsequent phases?"
+      ]
+    },
+    {
+      "id": "CAND_002",
+      "name": "Unified Infrastructure First",
+      "description": "This concept interprets 'prepare for implementation' as building the 'Core Technological Infrastructure' (CDM, API, DBOS) first, creating a unified backend that allows all three pillars to be deployed concurrently or in any order. This approach focuses on the 'holistic integrated platform' success factor by ensuring the 'Common Data Model' is robust before feature development.",
+      "who_it_serves": "Enterprise Management Companies, Large Property Owners, Large Contractor Organizations requiring a single integrated system.",
+      "problem_it_solves": "Ensures multi-tenancy and data isolation are secure from the start, preventing technical debt associated with refactoring the database for each pillar.",
+      "assumptions": [
+        {
+          "assumption": "Building the CDM and API layer first will enable faster delivery of all pillars.",
+          "basis": "The document lists 'Common Data Model (Hestami CDM)' and 'API Layer: oRPC' as foundational layers engineered to handle the 'eternal perspective'."
+        },
+        {
+          "assumption": "The 'Success Factor' of a holistic platform requires the backend to be unified before frontend differentiation.",
+          "basis": "The document states 'Success Factors' in principle will be 'the complete and correct implementation of each of the pillars into a holistic integrated platform'."
+        },
+        {
+          "assumption": "Row-Level Security (RLS) in PostgreSQL is sufficient for multi-tenant isolation across all phases.",
+          "basis": "The document specifies 'PostgreSQL ... utilizing Row-Level Security (RLS) to enforce strict multi-tenant isolation'."
+        },
+        {
+          "assumption": "AI-driven extraction can be applied across all domains simultaneously once the CDM is ready.",
+          "basis": "The document states 'AI-driven extraction, classification, and summarization are core enhancement features' under Domain 10."
+        }
+      ],
+      "constraints": [
+        "Must implement using SvelteKit, Bun, PostgreSQL, DBOS, and Cerbos as specified.",
+        "Must adhere to 'No direct client access to the origin IP is permitted' (Cloudflare CDN only).",
+        "Must implement the 'Common Data Model' logical structure defined in the context.",
+        "Must support the 'Digital Assets' exchange (Gaussian Splats, Images) as per Vision.",
+        "Must adhere to 'No compliance regimes' constraint from the context summary.",
+        "Must ensure 'Offline-first capabilities' for Mobile clients as per requirements."
+      ],
+      "open_questions": [
+        "How to prioritize feature development across the three pillars if the backend is built first?",
+        "Does the 'Unified Infrastructure' strategy allow for the 'Phase 1' to be released as a consumer product while 'Phase 2' is still an internal contractor tool?",
+        "What specific 'External Integrations' (Nextdoor, etc.) are prioritized if they are 'To Be Determined'?"
+      ]
+    },
+    {
+      "id": "CAND_003",
+      "name": "AI-Agent Native Platform",
+      "description": "This concept interprets the product intent as prioritizing the 'AI-driven extraction' and 'Agentic AI' capabilities mentioned in the context. The implementation focuses on the AI's ability to automate workflows (Vantaca HOAi style) and process 'Digital Assets' (images/videos) as the primary driver, using the CDM to store the context generated by the agents.",
+      "who_it_serves": "Property Owners who value speed/convenience (AI matching), Management companies wanting to reduce administrative overhead (Automated workflows).",
+      "problem_it_solves": "Reduces manual effort for 'Finding reliable contractors', 'Coordinating site visits', and 'Managing follow-up' through autonomous agents.",
+      "assumptions": [
+        {
+          "assumption": "The 'AI Agents' will be the primary value proposition compared to the traditional FSM/CAM competitors.",
+          "basis": "The document mentions 'AI-driven extraction' and 'AI-parsed statutory logic' and Vantaca reference to 'Vantaca HOAi'.",
+        },
+        {
+          "assumption": "The 'Workflow Engine: DBOS' is specifically chosen for AI agent state management.",
+          "basis": "The document states 'DBOS ... ensures idempotency and monotonic state transitions for multi-step processes' and 'AI-driven extraction' are core features."
+        },
+        {
+          "assumption": "The 'OpenTelementry' (Observability) is required to debug AI Agent behavior.",
+          "basis": "The document lists 'Observability | OpenTelementry' under the tech stack."
+        },
+        {
+          "assumption": "The 'Digital Assets Exchange' (Gaussian Splats) is the key differentiator for property matching.",
+          "basis": "The Vision states 'minimized level of effort for both parties' through 'digital assets such as comprehensive current and historical images... leveraging modern techniques such 3D Gaussian Splats'."
+        }
+      ],
+      "constraints": [
+        "Must implement using SvelteKit, Bun, PostgreSQL, DBOS, and Cerbos as specified.",
+        "Must adhere to 'No direct client access to the origin IP is permitted' (Cloudflare CDN only).",
+        "Must implement the 'Common Data Model' logical structure defined in the context.",
+        "Must support the 'Digital Assets' exchange (Gaussian Splats, Images) as per Vision.",
+        "Must adhere to 'No compliance regimes' constraint from the context summary.",
+        "Must support 'Offline mode with queueing' for mobile operations."
+      ],
+      "open_questions": [
+        "How are AI agent failures or hallucinations handled within the 'Trust Ledger'?",
+        "What is the latency requirement for 'AI matching' compared to traditional FSM dispatching?",
+        "Will the AI agents be pre-trained or fine-tuned on domain specific trade data (HVAC vs Plumbing)?"
+      ]
+    }
+  ]
+}

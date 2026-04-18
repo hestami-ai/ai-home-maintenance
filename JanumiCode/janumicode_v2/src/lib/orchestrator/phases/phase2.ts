@@ -352,36 +352,33 @@ export class Phase2Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama',
-        model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.5,
-        traceContext: {
-          workflowRunId: ctx.workflowRun.id,
-          phaseId: '2',
-          subPhaseId: '2.1',
-          agentRole: 'requirements_agent',
-          label: 'Phase 2.1 — Functional Requirements Bloom',
-        },
-      });
+    // LLM throws propagate to phase catch (halts workflow). Only the
+    // parse / empty-response fallbacks stay local.
+    const result = await engine.llmCaller.call({
+      provider: 'ollama',
+      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.5,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '2',
+        subPhaseId: '2.1',
+        agentRole: 'requirements_agent',
+        label: 'Phase 2.1 — Functional Requirements Bloom',
+      },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      // The LLM may wrap the output: { functional_requirements: [{ user_stories }] }
-      // or return directly: { user_stories }. Handle both.
-      const fr = parsed?.functional_requirements;
-      const stories = parsed?.user_stories
-        ?? (Array.isArray(fr) ? (fr[0] as Record<string, unknown>)?.user_stories : (fr as Record<string, unknown>)?.user_stories);
-      if (Array.isArray(stories) && stories.length > 0) {
-        return { user_stories: stories as UserStory[] };
-      }
-      return fallback;
-    } catch (err) {
-      getLogger().warn('workflow', 'Functional requirements bloom failed', { error: String(err) });
-      return fallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    // The LLM may wrap the output: { functional_requirements: [{ user_stories }] }
+    // or return directly: { user_stories }. Handle both.
+    const fr = parsed?.functional_requirements;
+    const stories = parsed?.user_stories
+      ?? (Array.isArray(fr) ? (fr[0] as Record<string, unknown>)?.user_stories : (fr as Record<string, unknown>)?.user_stories);
+    if (Array.isArray(stories) && stories.length > 0) {
+      return { user_stories: stories as UserStory[] };
     }
+    return fallback;
   }
 
   /**
@@ -420,36 +417,32 @@ export class Phase2Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama',
-        model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.5,
-        traceContext: {
-          workflowRunId: ctx.workflowRun.id,
-          phaseId: '2',
-          subPhaseId: '2.2',
-          agentRole: 'requirements_agent',
-          label: 'Phase 2.2 — Non-Functional Requirements Bloom',
-        },
-      });
+    // LLM throws propagate to phase catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama',
+      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.5,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '2',
+        subPhaseId: '2.2',
+        agentRole: 'requirements_agent',
+        label: 'Phase 2.2 — Non-Functional Requirements Bloom',
+      },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      // The LLM may wrap: { non_functional_requirements: [...] }
-      // or return directly: { requirements: [...] }. Handle both.
-      const nfr = parsed?.non_functional_requirements;
-      const reqs = parsed?.requirements
-        ?? (Array.isArray(nfr) ? nfr : (nfr as Record<string, unknown>)?.requirements);
-      if (Array.isArray(reqs) && reqs.length > 0) {
-        return { requirements: reqs as NonFunctionalRequirement[] };
-      }
-      return fallback;
-    } catch (err) {
-      getLogger().warn('workflow', 'Non-functional requirements bloom failed', { error: String(err) });
-      return fallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    // The LLM may wrap: { non_functional_requirements: [...] }
+    // or return directly: { requirements: [...] }. Handle both.
+    const nfr = parsed?.non_functional_requirements;
+    const reqs = parsed?.requirements
+      ?? (Array.isArray(nfr) ? nfr : (nfr as Record<string, unknown>)?.requirements);
+    if (Array.isArray(reqs) && reqs.length > 0) {
+      return { requirements: reqs as NonFunctionalRequirement[] };
     }
+    return fallback;
   }
 
   /**

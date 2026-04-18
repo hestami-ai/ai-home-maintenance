@@ -14,6 +14,7 @@
   import AgentInvocationCard from './AgentInvocationCard.svelte';
   import PreMortemCard from './PreMortemCard.svelte';
   import DecisionBundleCard from './DecisionBundleCard.svelte';
+  import DmrPipelineCard from './DmrPipelineCard.svelte';
 
   interface Props {
     record: SerializedRecord;
@@ -123,11 +124,26 @@
   // are rendered nested inside their parent AgentInvocationCard, NOT as
   // top-level cards. If this record is a child of an invocation, skip it.
   const isAgentChild = $derived(recordsStore.isChildOfInvocation(record));
+
+  // DMR detail records (retrieval_brief_record, query_decomposition_record,
+  // context_packet, or the Stage 1/7 agent_invocation cards themselves)
+  // are rendered inline inside DmrPipelineCard when a sibling
+  // dmr_pipeline record references them via `output_record_id`. Hide
+  // them from top-level so the DMR pipeline surfaces as one card.
+  const isDmrDetailChild = $derived(recordsStore.isReferencedByDmrPipeline(record));
 </script>
 
 <!-- Agent child records: skip at top level (rendered nested by AgentInvocationCard) -->
 {#if isAgentChild}
   <!-- deliberately empty — rendered by parent AgentInvocationCard -->
+<!-- DMR detail records: skip at top level (rendered inline by DmrPipelineCard) -->
+{:else if isDmrDetailChild}
+  <!-- deliberately empty — rendered by DmrPipelineCard -->
+<!-- DMR pipeline composite card -->
+{:else if record.record_type === 'dmr_pipeline'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <DmrPipelineCard {record} />
+  </div>
 <!-- Agent invocation card (always expanded, owns its children) -->
 {:else if record.record_type === 'agent_invocation'}
   <div data-record-id={record.id} data-phase-id={record.phase_id}>

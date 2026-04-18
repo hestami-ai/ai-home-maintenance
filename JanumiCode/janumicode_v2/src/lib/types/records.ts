@@ -147,6 +147,7 @@ export const SUB_PHASE_NAMES: Record<PhaseId, Record<string, string>> = {
   },
   '1': {
     '1.0': 'Intent Quality Check',
+    '1.0a': 'Intent Lens Classification',
     '1.1b': 'Scope Bounding',
     '1.2': 'Intent Domain Bloom',
     '1.3': 'Intent Candidate Review & Menu',
@@ -207,7 +208,7 @@ export const SUB_PHASE_NAMES: Record<PhaseId, Record<string, string>> = {
 export const SUB_PHASE_ORDER: Record<PhaseId, string[]> = {
   '0': ['0.1', '0.2', '0.2b', '0.4'],
   '0.5': ['0.5.1', '0.5.2'],
-  '1': ['1.0', '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6'],
+  '1': ['1.0', '1.0a', '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6'],
   '2': ['2.1', '2.2', '2.3'],
   '3': ['3.1', '3.2', '3.3'],
   '4': ['4.1', '4.2', '4.3'],
@@ -261,6 +262,7 @@ export type RecordType =
   | 'retrieval_brief_record'
   | 'context_packet'
   | 'query_decomposition_record'
+  | 'dmr_pipeline'
   | 'memory_edge_proposed'
   | 'memory_edge_confirmed'
   | 'intent_quality_report'
@@ -364,6 +366,12 @@ export interface WorkflowRun {
   scope_classification_ref: string | null;
   compliance_context_ref: string | null;
   cross_run_impact_triggered: boolean;
+  /**
+   * Intent lens selected by Phase 1.0a classification. Null until the
+   * classification step runs. Downstream phase handlers read this to
+   * pick lens-variant prompt templates.
+   */
+  intent_lens: IntentLens | null;
 }
 
 export type WorkflowRunStatus =
@@ -435,4 +443,68 @@ export interface PreMortemItem {
   mitigation?: string;
   status: 'pending' | 'accepted' | 'rejected';
   rationale?: string;
+}
+
+// ── Intent Lens (Part B of the lens+DMR plan) ───────────────────────
+//
+// Phase 1.0a classifies the raw intent into one of these lenses. Each
+// lens can drive a different prompt template variant for downstream
+// sub-phases (bloom, synthesis). First pass ships real templates only
+// for `product` and `feature`; other lenses classify correctly but
+// fall back to product templates with a logged warning. `unclassified`
+// is the classifier's escape hatch when confidence is low.
+export type IntentLens =
+  | 'product'
+  | 'feature'
+  | 'bug'
+  | 'infra'
+  | 'legal'
+  | 'unclassified';
+
+export interface IntentLensClassificationContent {
+  kind: 'intent_lens_classification';
+  lens: IntentLens;
+  /** 0.0–1.0 model-reported confidence. */
+  confidence: number;
+  /** Short human-readable rationale citing the raw intent / attached files. */
+  rationale: string;
+  /** Lens actually used downstream (= `lens` unless it's `unclassified`, in which case = 'product'). */
+  fallback_lens: IntentLens;
+}
+
+// ── DMR Pipeline container (Part A of the lens+DMR plan) ────────────
+//
+// DMR has 7 stages. Stages 1 and 7 are LLM-backed; Stages 2–6 are
+// deterministic (FTS5 + vector harvest, materiality scoring,
+// relationship expansion, supersession analysis, gap detection).
+// Without a container record, the UI sees only Stage 1 and Stage 7
+// cards and the pipeline looks like it jumps 1 → 7. The container
+// record surfaces all 7 stages with timing + output summary so the
+// whole pipeline is visible as a single card.
+export type DmrStageNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type DmrStageKind = 'llm' | 'deterministic' | 'skipped';
+export type DmrStageStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface DmrStageEntry {
+  stage: DmrStageNumber;
+  name: string;
+  kind: DmrStageKind;
+  status: DmrStageStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  output_summary?: string;
+  /** Link to the detail record this stage emitted (e.g. query_decomposition_record id). */
+  output_record_id?: string;
+  error?: string;
+}
+
+export interface DmrPipelineContent {
+  kind: 'dmr_pipeline';
+  pipeline_id: string;
+  requesting_agent_role: string;
+  scope_tier: string;
+  query: string;
+  stages: DmrStageEntry[];
+  completeness_status?: string;
+  retrieval_brief_record_id?: string;
 }

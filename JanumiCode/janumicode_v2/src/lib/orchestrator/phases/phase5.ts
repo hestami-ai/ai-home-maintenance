@@ -327,18 +327,17 @@ export class Phase5Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-        traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.1', agentRole: 'technical_spec_agent', label: 'Phase 5.1 — Data Model Specification' },
-      });
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const dm = parsed?.data_models ?? parsed;
-      const data = (Array.isArray(dm) ? dm[0] : dm) as Partial<DataModels> | null;
-      if (data?.models && Array.isArray(data.models) && data.models.length > 0) return { models: data.models as DataModels['models'] };
-      return fallback;
-    } catch (err) { getLogger().warn('workflow', 'Data model specification failed', { error: String(err) }); return fallback; }
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.1', agentRole: 'technical_spec_agent', label: 'Phase 5.1 — Data Model Specification' },
+    });
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const dm = parsed?.data_models ?? parsed;
+    const data = (Array.isArray(dm) ? dm[0] : dm) as Partial<DataModels> | null;
+    if (data?.models && Array.isArray(data.models) && data.models.length > 0) return { models: data.models as DataModels['models'] };
+    return fallback;
   }
 
   private async runApiDefinition(
@@ -357,18 +356,17 @@ export class Phase5Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-        traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.2', agentRole: 'technical_spec_agent', label: 'Phase 5.2 — API Definition' },
-      });
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const ad = parsed?.api_definitions ?? parsed;
-      const data = (Array.isArray(ad) ? ad[0] : ad) as Partial<ApiDefinitions> | null;
-      if (data?.definitions && Array.isArray(data.definitions) && data.definitions.length > 0) return { definitions: data.definitions as ApiDefinitions['definitions'] };
-      return fallback;
-    } catch (err) { getLogger().warn('workflow', 'API definition failed', { error: String(err) }); return fallback; }
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.2', agentRole: 'technical_spec_agent', label: 'Phase 5.2 — API Definition' },
+    });
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const ad = parsed?.api_definitions ?? parsed;
+    const data = (Array.isArray(ad) ? ad[0] : ad) as Partial<ApiDefinitions> | null;
+    if (data?.definitions && Array.isArray(data.definitions) && data.definitions.length > 0) return { definitions: data.definitions as ApiDefinitions['definitions'] };
+    return fallback;
   }
 
   private async runErrorHandlingStrategy(
@@ -387,18 +385,17 @@ export class Phase5Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-        traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.3', agentRole: 'technical_spec_agent', label: 'Phase 5.3 — Error Handling Strategy' },
-      });
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const eh = parsed?.error_handling_strategies ?? parsed;
-      const data = (Array.isArray(eh) ? eh[0] : eh) as Partial<ErrorHandlingStrategies> | null;
-      if (data?.strategies && Array.isArray(data.strategies) && data.strategies.length > 0) return { strategies: data.strategies as ErrorHandlingStrategies['strategies'] };
-      return fallback;
-    } catch (err) { getLogger().warn('workflow', 'Error handling strategy failed', { error: String(err) }); return fallback; }
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.3', agentRole: 'technical_spec_agent', label: 'Phase 5.3 — Error Handling Strategy' },
+    });
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const eh = parsed?.error_handling_strategies ?? parsed;
+    const data = (Array.isArray(eh) ? eh[0] : eh) as Partial<ErrorHandlingStrategies> | null;
+    if (data?.strategies && Array.isArray(data.strategies) && data.strategies.length > 0) return { strategies: data.strategies as ErrorHandlingStrategies['strategies'] };
+    return fallback;
   }
 
   private async runConfigurationParameters(
@@ -417,18 +414,17 @@ export class Phase5Handler implements PhaseHandler {
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
-    try {
-      const result = await engine.llmCaller.call({
-        provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-        prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-        traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.4', agentRole: 'technical_spec_agent', label: 'Phase 5.4 — Configuration Parameters' },
-      });
-      const parsed = result.parsed as Record<string, unknown> | null;
-      const cp = parsed?.configuration_parameters ?? parsed;
-      const data = (Array.isArray(cp) ? cp[0] : cp) as Partial<ConfigurationParameters> | null;
-      if (data?.params && Array.isArray(data.params) && data.params.length > 0) return { params: data.params as ConfigurationParameters['params'] };
-      return fallback;
-    } catch (err) { getLogger().warn('workflow', 'Configuration parameters failed', { error: String(err) }); return fallback; }
+    // LLM throws propagate to engine catch (halts workflow).
+    const result = await engine.llmCaller.call({
+      provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.4', agentRole: 'technical_spec_agent', label: 'Phase 5.4 — Configuration Parameters' },
+    });
+    const parsed = result.parsed as Record<string, unknown> | null;
+    const cp = parsed?.configuration_parameters ?? parsed;
+    const data = (Array.isArray(cp) ? cp[0] : cp) as Partial<ConfigurationParameters> | null;
+    if (data?.params && Array.isArray(data.params) && data.params.length > 0) return { params: data.params as ConfigurationParameters['params'] };
+    return fallback;
   }
 
   /** Deterministic consistency check across Phase 5 artifacts. */

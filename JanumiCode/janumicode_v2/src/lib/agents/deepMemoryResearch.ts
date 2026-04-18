@@ -27,6 +27,27 @@ import type { TemplateLoader } from '../orchestrator/templateLoader';
 import type { EmbeddingService } from '../embedding/embeddingService';
 import { cosineSimilarity } from '../embedding/embeddingService';
 import { getLogger } from '../logging';
+import type { DmrPipelineContent, DmrStageEntry } from '../types/records';
+
+const DMR_STAGE_NAMES: Record<number, string> = {
+  1: 'Query Decomposition',
+  2: 'Broad Candidate Harvest',
+  3: 'Materiality Scoring',
+  4: 'Relationship Expansion',
+  5: 'Supersession Analysis',
+  6: 'Gap Detection',
+  7: 'Context Packet Synthesis',
+};
+
+const DMR_STAGE_KINDS: Record<number, DmrStageEntry['kind']> = {
+  1: 'llm',
+  2: 'deterministic',
+  3: 'deterministic',
+  4: 'deterministic',
+  5: 'deterministic',
+  6: 'deterministic',
+  7: 'llm',
+};
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -195,36 +216,91 @@ export class DeepMemoryResearchAgent {
    *   - `context_packet` after Stage 7
    */
   async research(brief: RetrievalBrief): Promise<ContextPacket> {
+    // Build a per-stage journal as we go. Stages 2–6 are deterministic
+    // and previously emitted no governed-stream records, so the UI saw
+    // only Stage 1 and Stage 7 cards and the pipeline looked like it
+    // jumped 1 → 7. We now emit a single `dmr_pipeline` container
+    // record at the end with status + timing + output pointers for
+    // all 7 stages so the whole run is legible as one card.
+    const stages: DmrStageEntry[] = [1, 2, 3, 4, 5, 6, 7].map((n) => ({
+      stage: n as DmrStageEntry['stage'],
+      name: DMR_STAGE_NAMES[n],
+      kind: DMR_STAGE_KINDS[n],
+      status: 'pending',
+      started_at: null,
+      completed_at: null,
+    }));
+    const markStart = (n: number): void => {
+      const entry = stages[n - 1];
+      entry.status = 'running';
+      entry.started_at = new Date().toISOString();
+    };
+    const markDone = (n: number, patch: Partial<DmrStageEntry>): void => {
+      const entry = stages[n - 1];
+      entry.status = 'completed';
+      entry.completed_at = new Date().toISOString();
+      Object.assign(entry, patch);
+    };
+
     // Write the retrieval brief to the governed stream so the invocation is
     // itself auditable. The hiring entity can see exactly what was asked.
     const briefRecordId = this.writeRetrievalBriefRecord(brief);
 
     // Stage 1 — Query Decomposition
+    markStart(1);
     const decomposition = await this.decomposeQuery(brief);
     const decompRecordId = this.writeQueryDecompositionRecord(brief, decomposition, briefRecordId);
+    markDone(1, {
+      output_summary: `${decomposition.topicEntities.length} topic entit(ies), ${decomposition.decisionTypesSought.length} decision type(s) sought`,
+      output_record_id: decompRecordId ?? undefined,
+    });
 
     // Stage 2 — Broad Candidate Harvest
+    markStart(2);
     const candidates = await this.harvestCandidates(brief, decomposition);
+    markDone(2, { output_summary: `${candidates.length} candidate finding(s) harvested (FTS5 + vector + graph)` });
 
     // Stage 3 — Materiality Scoring
+    markStart(3);
     const scored = await this.scoreCandidates(candidates, brief);
+    markDone(3, { output_summary: `${scored.length} scored (threshold applied)` });
 
     // Stage 4 — Relationship Expansion
+    markStart(4);
     const expanded = this.expandRelationships(scored);
+    markDone(4, { output_summary: `${expanded.length} finding(s) after memory_edge expansion` });
 
     // Stage 5 — Supersession and Contradiction Analysis
+    markStart(5);
     const { supersessionChains, contradictions } = this.analyzeSupersession(expanded);
+    markDone(5, {
+      output_summary: `${supersessionChains.length} chain(s), ${contradictions.length} contradiction(s)`,
+    });
 
     // Stage 6 — Gap Detection
+    markStart(6);
     const { unavailableSources, knownGaps } = this.detectGaps(brief);
+    markDone(6, {
+      output_summary: `${unavailableSources.length} unavailable source(s), ${knownGaps.length} known gap(s)`,
+    });
 
     // Stage 7 — Context Packet Synthesis
+    markStart(7);
     const packet = await this.synthesize(
       decomposition, expanded, supersessionChains,
       contradictions, unavailableSources, knownGaps, brief,
     );
+    const contextPacketRecordId = this.writeContextPacketRecord(brief, packet, briefRecordId, decompRecordId);
+    markDone(7, {
+      output_summary: `completeness: ${packet.completenessStatus}`,
+      output_record_id: contextPacketRecordId ?? undefined,
+    });
 
-    this.writeContextPacketRecord(brief, packet, briefRecordId, decompRecordId);
+    // One-shot pipeline container record — writes once at the end with
+    // the full 7-stage journal. The webview's DmrPipelineCard renders
+    // this as a single composite card and inlines the detail records
+    // (query_decomposition_record, context_packet) by their ids.
+    this.writeDmrPipelineRecord(brief, stages, packet.completenessStatus, briefRecordId);
     return packet;
   }
 
@@ -258,47 +334,44 @@ export class DeepMemoryResearchAgent {
     });
     if (rendered.missing_variables.length > 0) return deterministicFallback;
 
-    try {
-      const result = await this.llmCaller.call({
-        provider: this.provider,
-        model: this.model,
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.3,
-        traceContext: {
-          workflowRunId: brief.workflowRunId,
-          phaseId: brief.phaseId,
-          subPhaseId: brief.subPhaseId,
-          agentRole: 'deep_memory_research',
-          label: 'DMR Stage 1 — Query Decomposition',
-        },
-      });
+    // LLM throws propagate to the engine's phase catch (halts the
+    // workflow). Empty/unparseable parsed JSON still falls back to
+    // the deterministic decomposition — that's a successful call with
+    // garbage output, not an unrecoverable failure.
+    const result = await this.llmCaller.call({
+      provider: this.provider,
+      model: this.model,
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.3,
+      traceContext: {
+        workflowRunId: brief.workflowRunId,
+        phaseId: brief.phaseId,
+        subPhaseId: brief.subPhaseId,
+        agentRole: 'deep_memory_research',
+        label: 'DMR Stage 1 — Query Decomposition',
+      },
+    });
 
-      const parsed = result.parsed as Record<string, unknown> | null;
-      if (!parsed) return deterministicFallback;
+    const parsed = result.parsed as Record<string, unknown> | null;
+    if (!parsed) return deterministicFallback;
 
-      return {
-        topicEntities: Array.isArray(parsed.topic_entities)
-          ? (parsed.topic_entities as unknown[]).map(String)
-          : deterministicFallback.topicEntities,
-        decisionTypesSought: Array.isArray(parsed.decision_types_sought)
-          ? (parsed.decision_types_sought as unknown[]).map(String)
-          : deterministicFallback.decisionTypesSought,
-        temporalScope: (parsed.temporal_scope as { from: string; to: string } | undefined)
-          ?? deterministicFallback.temporalScope,
-        authorityLevelsIncluded: Array.isArray(parsed.authority_levels_included)
-          ? (parsed.authority_levels_included as unknown[]).map(n => Number(n)).filter(n => !isNaN(n))
-          : deterministicFallback.authorityLevelsIncluded,
-        sourcesInScope: Array.isArray(parsed.sources_in_scope)
-          ? (parsed.sources_in_scope as unknown[]).map(String)
-          : deterministicFallback.sourcesInScope,
-      };
-    } catch (err) {
-      getLogger().warn('dmr', 'Stage 1 query decomposition LLM call failed', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return deterministicFallback;
-    }
+    return {
+      topicEntities: Array.isArray(parsed.topic_entities)
+        ? (parsed.topic_entities as unknown[]).map(String)
+        : deterministicFallback.topicEntities,
+      decisionTypesSought: Array.isArray(parsed.decision_types_sought)
+        ? (parsed.decision_types_sought as unknown[]).map(String)
+        : deterministicFallback.decisionTypesSought,
+      temporalScope: (parsed.temporal_scope as { from: string; to: string } | undefined)
+        ?? deterministicFallback.temporalScope,
+      authorityLevelsIncluded: Array.isArray(parsed.authority_levels_included)
+        ? (parsed.authority_levels_included as unknown[]).map(n => Number(n)).filter(n => !isNaN(n))
+        : deterministicFallback.authorityLevelsIncluded,
+      sourcesInScope: Array.isArray(parsed.sources_in_scope)
+        ? (parsed.sources_in_scope as unknown[]).map(String)
+        : deterministicFallback.sourcesInScope,
+    };
   }
 
   // ── Stage 2: Broad Candidate Harvest ────────────────────────────
@@ -1042,6 +1115,61 @@ export class DeepMemoryResearchAgent {
       return rec.id;
     } catch (err) {
       getLogger().warn('dmr', 'Failed to write query_decomposition_record', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * One-shot container record summarising all 7 stages of the DMR
+   * pipeline. Written at the end of `research()` after every stage
+   * journal entry has its final status + timing. The webview's
+   * DmrPipelineCard routes on `record_type === 'dmr_pipeline'` and
+   * renders the stages inline, with the detail records it references
+   * (via `stages[].output_record_id`) nested visually.
+   */
+  private writeDmrPipelineRecord(
+    brief: RetrievalBrief,
+    stages: DmrStageEntry[],
+    completenessStatus: CompletenessStatus,
+    briefRecordId: string | null,
+  ): string | null {
+    if (!this.writer) return null;
+    try {
+      const content: DmrPipelineContent = {
+        kind: 'dmr_pipeline',
+        // `pipeline_id` is filled with the record's own id below — keep
+        // the field on content too so consumers that only have the
+        // content don't need to reach for the envelope.
+        pipeline_id: '',
+        requesting_agent_role: brief.requestingAgentRole,
+        scope_tier: brief.scopeTier,
+        query: brief.query,
+        stages,
+        completeness_status: completenessStatus,
+        retrieval_brief_record_id: briefRecordId ?? undefined,
+      };
+      const rec = this.writer.writeRecord({
+        record_type: 'dmr_pipeline',
+        schema_version: '1.0',
+        workflow_run_id: brief.workflowRunId,
+        phase_id: brief.phaseId as never,
+        sub_phase_id: brief.subPhaseId,
+        produced_by_agent_role: 'deep_memory_research',
+        janumicode_version_sha: this.config.janumiCodeVersionSha,
+        derived_from_record_ids: briefRecordId ? [briefRecordId] : [],
+        content: { ...content, pipeline_id: '' } as unknown as Record<string, unknown>,
+      });
+      // Patch pipeline_id to the actual record id. The UPDATE keeps
+      // the record's identity stable — the content field is the only
+      // surface the webview reads for pipeline_id.
+      this.db.prepare(
+        `UPDATE governed_stream SET content = json_set(content, '$.pipeline_id', ?) WHERE id = ?`,
+      ).run(rec.id, rec.id);
+      return rec.id;
+    } catch (err) {
+      getLogger().warn('dmr', 'Failed to write dmr_pipeline record', {
         error: err instanceof Error ? err.message : String(err),
       });
       return null;
