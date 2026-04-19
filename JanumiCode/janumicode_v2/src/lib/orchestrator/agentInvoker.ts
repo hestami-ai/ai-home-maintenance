@@ -484,11 +484,27 @@ export class AgentInvoker {
         }
         return { command: 'goose', args };
       }
-      case 'codex_cli':
+      case 'codex_cli': {
+        // `codex exec --sandbox read-only --json -` runs non-interactively
+        // and reads the prompt from stdin (the `-` sentinel). Ported from
+        // v1 (janumicode/src/lib/cli/providers/codexCli.ts:buildCodexArgs).
+        //   --sandbox read-only  — OS-level read-only enforcement
+        //   --json               — JSONL event output (Responses API shape)
+        //   -                    — consume stdin as prompt
+        // The cliInvoker always pipes `options.prompt` to stdin, so argv
+        // stays small. Critical on Windows where cmd.exe's ~8191-char
+        // ARG_MAX kills invocations that put the whole spec-inlined
+        // prompt on the command line.
+        const codexArgs = ['exec', '--sandbox', 'read-only', '--json'];
+        if (options.model) {
+          codexArgs.push('--model', options.model);
+        }
+        codexArgs.push('-');
         return {
           command: 'codex',
-          args: ['-q', options.prompt],
+          args: codexArgs,
         };
+      }
       default:
         throw new Error(`Unknown backing tool: ${options.backingTool}`);
     }

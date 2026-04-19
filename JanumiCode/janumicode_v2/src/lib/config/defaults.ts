@@ -69,6 +69,10 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
       primary: { backing_tool: 'gemini_cli', model: 'gemini-2.5-flash' },
       temperature: 0.3,
     },
+    domain_interpreter: {
+      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      temperature: 0.5,
+    },
     reasoning_review: {
       primary: { provider: 'google', model: 'gemini-2.0-flash-thinking' },
       temperature: 0.2,

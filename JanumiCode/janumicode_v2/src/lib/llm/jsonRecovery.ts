@@ -41,8 +41,18 @@ export function parseJsonWithRecovery(text: string): {
       recovered: false,
     };
   } catch (err) {
-    const repaired = repairJsonCommonModelPathologies(jsonText);
-    if (repaired !== jsonText) {
+    // Progressive repair: try each repair layer, accept the first one that
+    // parses. We run them in order of "least invasive" → "most invasive"
+    // so we don't corrupt output by over-repairing. Each layer is a no-op
+    // when its pathology isn't present, so chaining is safe.
+    const repairs: Array<(s: string) => string> = [
+      repairJsonCommonModelPathologies,
+      escapeUnescapedInternalQuotes,
+      (s) => escapeUnescapedInternalQuotes(repairJsonCommonModelPathologies(s)),
+    ];
+    for (const repair of repairs) {
+      const repaired = repair(jsonText);
+      if (repaired === jsonText) continue;
       try {
         return {
           parsed: JSON.parse(repaired) as Record<string, unknown>,
@@ -50,8 +60,7 @@ export function parseJsonWithRecovery(text: string): {
           recovered: true,
         };
       } catch {
-        // Fall through to the original parse error so callers see the
-        // first failure, not a secondary repaired failure.
+        // Next repair layer.
       }
     }
     return {
@@ -186,6 +195,77 @@ function stripTrailingCommas(input: string): string {
     out += ch;
   }
 
+  return out;
+}
+
+/**
+ * Escape unescaped double quotes that appear INSIDE a JSON string value.
+ *
+ * Common model pathology, especially from thinking-mode models: the LLM
+ * emits `"rationale": "Central to Vision ("AI-native OS"). Supports ..."`
+ * without escaping the interior `"AI-native OS"` quotes. JSON.parse sees
+ * the inner `"` as the end of the string value and throws.
+ *
+ * Heuristic: walk the stream. When inside a string, a `"` is treated as
+ * the terminator ONLY when the next non-whitespace character is a JSON
+ * structural token (`,`, `}`, `]`, `:`) or end-of-input. Otherwise it's
+ * emitted as `\"` (escaped). This is safe for well-formed input (a real
+ * terminating quote is always followed by one of those structural chars)
+ * and fixes the typical "literal quoted phrase inside value" case.
+ *
+ * Not idempotent in the rare case a value legitimately ends with
+ * `…token".` — but such a value is itself invalid JSON, so there's
+ * nothing better we could do without richer context.
+ */
+export function escapeUnescapedInternalQuotes(input: string): string {
+  let out = '';
+  let i = 0;
+  let inString = false;
+  let escaped = false;
+
+  while (i < input.length) {
+    const ch = input[i];
+
+    if (!inString) {
+      out += ch;
+      if (ch === '"') inString = true;
+      i++;
+      continue;
+    }
+
+    // Inside a string.
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      i++;
+      continue;
+    }
+    if (ch === '\\') {
+      out += ch;
+      escaped = true;
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      // Peek forward past whitespace to find the next non-ws char.
+      let j = i + 1;
+      while (j < input.length && /\s/.test(input[j])) j++;
+      const next = j < input.length ? input[j] : '';
+      if (next === '' || next === ',' || next === '}' || next === ']' || next === ':') {
+        // Legitimate terminator.
+        out += ch;
+        inString = false;
+        i++;
+        continue;
+      }
+      // Internal unescaped quote — escape it and stay in-string.
+      out += '\\"';
+      i++;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
   return out;
 }
 

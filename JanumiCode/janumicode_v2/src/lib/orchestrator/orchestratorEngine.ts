@@ -24,6 +24,7 @@ import { IngestionPipelineRunner } from './ingestionPipelineRunner';
 import { AgentInvoker } from './agentInvoker';
 import {
   createClaudeCodeParser,
+  createCodexCliParser,
   createGeminiCliParser,
   createGooseCliParser,
 } from '../cli/outputParser';
@@ -460,6 +461,7 @@ export class OrchestratorEngine {
     this.agentInvoker.registerOutputParser('claude_code_cli', createClaudeCodeParser());
     this.agentInvoker.registerOutputParser('gemini_cli', createGeminiCliParser());
     this.agentInvoker.registerOutputParser('goose_cli', createGooseCliParser());
+    this.agentInvoker.registerOutputParser('codex_cli', createCodexCliParser());
   }
 
   /**
@@ -838,7 +840,7 @@ export class OrchestratorEngine {
    * responseFormat='json'.
    */
   async callForRole(
-    role: 'orchestrator',
+    role: 'orchestrator' | 'domain_interpreter',
     options: {
       prompt: string;
       responseFormat?: 'json' | 'text';
@@ -888,9 +890,12 @@ export class OrchestratorEngine {
           label: options.traceContext.label,
         }
       : undefined;
+    // Normalize friendly alias — config may use 'openai_codex_cli'; the
+    // agentInvoker switch expects 'codex_cli'.
+    const normalizedBackingTool = backing_tool === 'openai_codex_cli' ? 'codex_cli' : backing_tool;
     const result = await this.agentInvoker.invoke({
       agentRole: role,
-      backingTool: backing_tool as import('./agentInvoker').BackingTool,
+      backingTool: normalizedBackingTool as import('./agentInvoker').BackingTool,
       invocationId,
       prompt: options.prompt,
       cwd: options.cwd ?? this.workspacePath,
@@ -925,8 +930,17 @@ export class OrchestratorEngine {
     // captures the full output losslessly — extractFinalText remains
     // the fallback for cases where the CLI invoker didn't populate
     // stdoutText (older code paths / tests with stubbed cliInvoker).
+    //
+    // Exception: codex_cli --json emits pure JSONL, so stdoutText is
+    // multi-event NDJSON that would break parseJsonWithRecovery (first-
+    // brace-to-last-brace spans all events). For codex we reach through
+    // to extractFinalText which knows the agent_message shape.
+    const events = result.cliResult?.events ?? [];
     const stdoutText = result.cliResult?.stdoutText ?? '';
-    const text = stdoutText || extractFinalText(result.cliResult?.events ?? []);
+    const useEventsFirst = normalizedBackingTool === 'codex_cli';
+    const text = useEventsFirst
+      ? (extractFinalText(events) || stdoutText)
+      : (stdoutText || extractFinalText(events));
     let parsed: Record<string, unknown> | null = null;
     if (options.responseFormat === 'json' && text) {
       // Use parseJsonWithRecovery so trailing commas, code-fence
@@ -973,6 +987,19 @@ function extractFinalText(
     const e = events[i];
     if (e.data.type === 'result' && typeof e.data.result === 'string') {
       return e.data.result;
+    }
+  }
+  // Codex Responses API: item.completed with nested agent_message.
+  // Ported from v1 codexCli.ts:parseCodexOutput — scan from the end
+  // for the most recent agent_message so reasoning-intermediate
+  // messages don't shadow the final answer.
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (e.data.type === 'item.completed') {
+      const item = (e.data as { item?: { type?: string; text?: string } }).item;
+      if (item?.type === 'agent_message' && typeof item.text === 'string') {
+        return item.text;
+      }
     }
   }
   // Fall back to the last text content item.

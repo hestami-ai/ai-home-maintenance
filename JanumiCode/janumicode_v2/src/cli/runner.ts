@@ -92,6 +92,40 @@ export async function runPipeline(
     // claude_code_cli" so fixture-only tests don't hang waiting for a
     // coding agent that isn't configured in the test env.
     engine.registerBuiltinCLIParsers();
+
+    // Real-mode routing overrides from env vars. Lets operators steer
+    // the Orchestrator and Domain Interpreter roles to specific CLI
+    // backings (e.g. OpenAI Codex for a gold-capture run) without
+    // editing config.json. Unset → role uses DEFAULT_CONFIG routing.
+    //
+    //   JANUMICODE_ORCHESTRATOR_BACKING        — 'claude_code_cli' | 'codex_cli' | 'openai_codex_cli' | 'gemini_cli' | 'goose_cli' | 'direct_llm_api'
+    //   JANUMICODE_ORCHESTRATOR_MODEL          — model id for CLI / direct backing
+    //   JANUMICODE_ORCHESTRATOR_PROVIDER       — only for direct_llm_api
+    //   JANUMICODE_DOMAIN_INTERPRETER_BACKING  — same enum as above
+    //   JANUMICODE_DOMAIN_INTERPRETER_MODEL
+    //   JANUMICODE_DOMAIN_INTERPRETER_PROVIDER
+    const orchBacking = process.env.JANUMICODE_ORCHESTRATOR_BACKING;
+    if (orchBacking) {
+      engine.configManager.setOrchestratorRouting({
+        primary: {
+          backing_tool: orchBacking,
+          provider: process.env.JANUMICODE_ORCHESTRATOR_PROVIDER,
+          model: process.env.JANUMICODE_ORCHESTRATOR_MODEL,
+        },
+        temperature: 0.3,
+      });
+    }
+    const diBacking = process.env.JANUMICODE_DOMAIN_INTERPRETER_BACKING;
+    if (diBacking) {
+      engine.configManager.setDomainInterpreterRouting({
+        primary: {
+          backing_tool: diBacking,
+          provider: process.env.JANUMICODE_DOMAIN_INTERPRETER_PROVIDER,
+          model: process.env.JANUMICODE_DOMAIN_INTERPRETER_MODEL,
+        },
+        temperature: 0.5,
+      });
+    }
   }
   const detachMonitor = llmMode !== 'mock'
     ? attachLiveMonitor(engine.eventBus, liveLogDir)

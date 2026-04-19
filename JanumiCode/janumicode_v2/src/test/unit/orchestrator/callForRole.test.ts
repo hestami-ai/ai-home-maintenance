@@ -241,6 +241,9 @@ describe('ConfigManager.validateLLMRouting — orchestrator', () => {
       primary: { backing_tool: 'claude_code_cli', model: 'qwen3.5:9b' },
     });
     engine.llmCaller.registerProvider({ name: 'google', call: () => Promise.reject(new Error('stub')) });
+    // Register ollama too so the iter-3 default domain_interpreter
+    // routing (direct_llm_api + ollama) also validates.
+    engine.llmCaller.registerProvider({ name: 'ollama', call: () => Promise.reject(new Error('stub')) });
     engine.registerBuiltinCLIParsers();
     expect(() => engine.validateLLMRouting()).not.toThrow();
   });

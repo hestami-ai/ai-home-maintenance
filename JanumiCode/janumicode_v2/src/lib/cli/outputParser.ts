@@ -315,3 +315,39 @@ export function createGenericParser(): OutputParser {
     recordMapping: {},
   });
 }
+
+/**
+ * OpenAI Codex CLI output parser.
+ *
+ * Codex invoked as `codex exec --json -` emits Responses-API-style
+ * events as newline-delimited JSON (JSONL). The model's final answer
+ * arrives inside an `item.completed` event whose nested `item.type` is
+ * `agent_message` and whose `item.text` holds the actual content.
+ * Ported from v1 (janumicode/src/lib/cli/providers/codexCli.ts
+ * parseCodexOutput).
+ *
+ * Event shapes we care about:
+ *   { type: 'thread.started',   thread_id: '…' }
+ *   { type: 'turn.started' }
+ *   { type: 'item.completed',   item: { type: 'agent_message', text: '…' } }
+ *   { type: 'item.completed',   item: { type: 'command_execution', … } }
+ *   { type: 'turn.completed',   usage: { input_tokens, output_tokens } }
+ *
+ * We map `item.completed` → `artifact_produced` so callForRole's text
+ * extractor (`extractFinalText`) picks up the agent_message text as
+ * the final response. Other types flow through as reasoning steps for
+ * the live-log trail.
+ */
+export function createCodexCliParser(): OutputParser {
+  return new OutputParser({
+    outputFormat: 'stream-json',
+    recordMapping: {
+      'item.completed': 'artifact_produced',
+      'item.created': 'agent_reasoning_step',
+      'item.input_completed': 'agent_reasoning_step',
+      'turn.started': 'agent_reasoning_step',
+      'turn.completed': 'agent_reasoning_step',
+      'thread.started': 'agent_reasoning_step',
+    },
+  });
+}

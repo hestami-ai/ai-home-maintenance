@@ -153,7 +153,10 @@
       "Bash(echo \"exit=$?\")",
       "Bash(node dist/cli/janumicode.js run --intent 'Review \"specs/hestami-ai-real-property-os\\(2\\)/Hestami AI Real Property OS and Platform Product Description.md\" and prepare for implementation.' --workspace ./test-workspace --llm-mode mock --auto-approve --phase-limit 1 --fixture-dir src/test/fixtures/hestami-product-description --json)",
       "Read(//tmp/**)",
-      "Bash(pnpm vitest *)"
+      "Bash(pnpm vitest *)",
+      "Bash(codex --help)",
+      "Bash(codex exec *)"
     ]
-  }
+  },
+  "showThinkingSummaries": true
 }

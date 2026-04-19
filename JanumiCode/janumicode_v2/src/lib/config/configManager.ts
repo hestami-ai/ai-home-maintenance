@@ -100,11 +100,27 @@ export interface JanumiCodeConfig {
      */
     orchestrator: {
       primary: {
-        /** 'direct_llm_api' | 'claude_code_cli' | 'gemini_cli' | 'goose_cli' */
+        /** 'direct_llm_api' | 'claude_code_cli' | 'gemini_cli' | 'goose_cli' | 'codex_cli' */
         backing_tool: string;
         /** Provider name — required only when backing_tool === 'direct_llm_api'. */
         provider?: string;
         /** Model override. CLIs have their own defaults; omit to use them. */
+        model?: string;
+      };
+      temperature?: number;
+    };
+    /**
+     * Domain Interpreter role — Phase 1 product-lens bloom rounds (1.0b
+     * discovery, 1.2 domains, 1.3 journeys, 1.4 entities, 1.5 integrations,
+     * 1.6 narrative refinement) and Phase 1 default-lens bloom/synthesis.
+     * Optional so legacy configs keep working; falls back to
+     * `{ backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' }`
+     * when absent.
+     */
+    domain_interpreter?: {
+      primary: {
+        backing_tool: string;
+        provider?: string;
         model?: string;
       };
       temperature?: number;
@@ -203,6 +219,14 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
       primary: { backing_tool: 'gemini_cli', model: 'gemini-2.5-flash' },
       temperature: 0.3,
     },
+    // Default: local Ollama with qwen3.5:9b. Suitable for fixture-based
+    // mock tests and single-phase dev runs; override to a capable CLI
+    // backing for gold-capture / real-mode harness runs (see the CLI
+    // runner env-var wiring).
+    domain_interpreter: {
+      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      temperature: 0.5,
+    },
     reasoning_review: {
       primary: { provider: 'google', model: 'gemini-2.0-flash-thinking' },
       temperature: 0.2,
@@ -218,6 +242,24 @@ export class ConfigManager {
 
   constructor(workspacePath?: string) {
     this.config = { ...DEFAULT_CONFIG };
+
+    // Env-var overrides for CLI invocation timeouts. Applied before the
+    // workspace file so file overrides still win. Useful for real-mode
+    // CLI harness runs where a capable model (gpt-5.4 via codex_cli) can
+    // reason silently for longer than the default 120s idle window,
+    // tripping cliInvoker's idle-timeout guard.
+    //   JANUMICODE_CLI_IDLE_TIMEOUT_SECONDS
+    //   JANUMICODE_CLI_TIMEOUT_SECONDS
+    const idleEnv = process.env.JANUMICODE_CLI_IDLE_TIMEOUT_SECONDS;
+    if (idleEnv) {
+      const n = Number.parseInt(idleEnv, 10);
+      if (Number.isFinite(n) && n > 0) this.config.cli_invocation.idle_timeout_seconds = n;
+    }
+    const totalEnv = process.env.JANUMICODE_CLI_TIMEOUT_SECONDS;
+    if (totalEnv) {
+      const n = Number.parseInt(totalEnv, 10);
+      if (Number.isFinite(n) && n > 0) this.config.cli_invocation.timeout_seconds = n;
+    }
 
     if (workspacePath) {
       this.loadOverrides(workspacePath);
@@ -295,6 +337,16 @@ export class ConfigManager {
   }
 
   /**
+   * Override `llm_routing.domain_interpreter` at runtime. Mirrors
+   * `setOrchestratorRouting`. Used by the CLI runner (env-var driven)
+   * and by tests that route Phase 1 bloom + 1.6 narrative calls through
+   * a non-default backing.
+   */
+  setDomainInterpreterRouting(override: NonNullable<JanumiCodeConfig['llm_routing']['domain_interpreter']>): void {
+    this.config.llm_routing.domain_interpreter = override;
+  }
+
+  /**
    * Validate that every provider referenced in `llm_routing` is actually
    * registered with the LLMCaller. Called by OrchestratorEngine at startup
    * once all providers have been registered.
@@ -317,39 +369,54 @@ export class ConfigManager {
     // The backing_tool check stays a warning when the parser set is
     // empty (opt-in surface) so mock-mode tests don't fail on config
     // validation alone.
-    const orch = routing.orchestrator;
-    if (orch?.primary) {
-      const tool = orch.primary.backing_tool;
+    // Shared validator for any role entry that accepts the same backing
+    // shape (orchestrator + domain_interpreter today).
+    const validateRolePrimary = (
+      role: 'orchestrator' | 'domain_interpreter',
+      primary: { backing_tool: string; provider?: string; model?: string } | undefined,
+    ): void => {
+      if (!primary) return;
+      const tool = primary.backing_tool;
       if (tool === 'direct_llm_api') {
-        if (!orch.primary.provider) {
+        if (!primary.provider) {
           errors.push(
-            `llm_routing.orchestrator.primary.backing_tool='direct_llm_api' requires ` +
-            `a 'provider' field. Fix: set llm_routing.orchestrator.primary.provider ` +
+            `llm_routing.${role}.primary.backing_tool='direct_llm_api' requires ` +
+            `a 'provider' field. Fix: set llm_routing.${role}.primary.provider ` +
             `(e.g. 'ollama') in .janumicode/config.json.`,
           );
-        } else if (!registeredProviders.has(orch.primary.provider)) {
+        } else if (!registeredProviders.has(primary.provider)) {
           errors.push(
-            `llm_routing.orchestrator.primary references provider '${orch.primary.provider}' ` +
+            `llm_routing.${role}.primary references provider '${primary.provider}' ` +
             `which is not registered. Registered: ${Array.from(registeredProviders).sort((a, b) => a.localeCompare(b)).join(', ')}.`,
           );
         }
       } else if (
         tool !== 'claude_code_cli' &&
         tool !== 'gemini_cli' &&
-        tool !== 'goose_cli'
+        tool !== 'goose_cli' &&
+        tool !== 'codex_cli' &&
+        tool !== 'openai_codex_cli'
       ) {
         errors.push(
-          `llm_routing.orchestrator.primary.backing_tool='${tool}' is not a supported ` +
-          `backing tool. Use 'direct_llm_api', 'claude_code_cli', 'gemini_cli', or 'goose_cli'.`,
+          `llm_routing.${role}.primary.backing_tool='${tool}' is not a supported ` +
+          `backing tool. Use 'direct_llm_api', 'claude_code_cli', 'gemini_cli', ` +
+          `'goose_cli', or 'codex_cli'.`,
         );
-      } else if (registeredBackingTools.size > 0 && !registeredBackingTools.has(tool)) {
-        errors.push(
-          `llm_routing.orchestrator.primary.backing_tool='${tool}' has no output ` +
-          `parser registered. Fix: call engine.registerBuiltinCLIParsers() before ` +
-          `executing a phase that invokes the Orchestrator role.`,
-        );
+      } else if (registeredBackingTools.size > 0) {
+        // 'openai_codex_cli' is an alias for 'codex_cli' — accept both at
+        // the config surface; runtime uses codex_cli in agentInvoker.
+        const effective = tool === 'openai_codex_cli' ? 'codex_cli' : tool;
+        if (!registeredBackingTools.has(effective)) {
+          errors.push(
+            `llm_routing.${role}.primary.backing_tool='${tool}' has no output ` +
+            `parser registered. Fix: call engine.registerBuiltinCLIParsers() before ` +
+            `executing a phase that invokes the ${role} role.`,
+          );
+        }
       }
-    }
+    };
+    validateRolePrimary('orchestrator', routing.orchestrator?.primary);
+    validateRolePrimary('domain_interpreter', routing.domain_interpreter?.primary);
 
     const rr = routing.reasoning_review;
     if (rr?.primary && !registeredProviders.has(rr.primary.provider)) {

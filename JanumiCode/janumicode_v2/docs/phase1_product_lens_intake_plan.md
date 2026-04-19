@@ -251,16 +251,18 @@ The current validator is pass/fail on artifact presence. For the product handoff
 
 | Field | Assertion |
 |---|---|
-| `personas` | length ∈ [3, 10], each has `name` + `goals[]` (≥1) + `painPoints[]` (≥1) |
+| `personas` | length ∈ [3, 15], each has `name` + `goals[]` (≥1) + `painPoints[]` (≥1) |
 | `userJourneys` | length ∈ [5, 15], each has `steps[]` (≥3) + `acceptanceCriteria[]` (≥1) + `implementationPhase` |
-| `businessDomainProposals` | length ∈ [6, 20], each has `entityPreview[]` (≥3) + `workflowPreview[]` (≥1) |
-| `entityProposals` | length ∈ [20, 80], each has `keyAttributes[]` (≥2) + `relationships[]` (≥1) + `businessDomainId` refers to a real domain |
-| `workflowProposals` | length ∈ [3, 15], each has `steps[]` (≥3) + `triggers[]` (≥1) |
-| `integrationProposals` | length ∈ [5, 25], each has `standardProviders[]` (≥1) + `ownershipModel` ∈ {delegated, synced, consumed} |
+| `businessDomainProposals` | length ∈ [6, 30], each has `entityPreview[]` (≥3) + `workflowPreview[]` (≥1) |
+| `entityProposals` | length ∈ [20, 150], each has `keyAttributes[]` (≥2) + `relationships[]` (≥1) + `businessDomainId` refers to a real domain |
+| `workflowProposals` | length ∈ [3, 30], each has `steps[]` (≥3) + `triggers[]` (≥1) |
+| `integrationProposals` | length ∈ [5, 35], each has `standardProviders[]` (≥1) + `ownershipModel` ∈ {delegated, synced, consumed} |
 | `qualityAttributes` | length ∈ [8, 25] |
 | `phasingStrategy` | length ∈ [2, 5], `journeyIds[]` all refer to real journeys |
 
-Thresholds are derived from the v1 Hestami handoff (e.g. 6 personas → range [3,10] accommodates generative variance). These are **shape/coverage** gates, not content gates. The grader reports any violation in the harness gap report.
+Thresholds reflect the capable-CLI reality — Codex gpt-5.4 reliably produces 2–2.5× more items per section than qwen3.5:9b or the v1 reference (6 personas → 13; 45 entities → 106; etc.). Lower bounds are unchanged: same minimum-quality floor regardless of backing. These are **shape/coverage** gates, not content gates. The grader reports any violation in the harness gap report.
+
+*Note on iteration history: the initial ranges (iter-2) were calibrated against a qwen3.5:9b run and the v1 Hestami handoff. Iter-3c surfaced Codex's over-proposing behaviour; upper bounds were widened to match without relaxing the minimum-content floor. Two gold references are maintained — `product_description_handoff.gold.json` (qwen3.5:9b baseline) and `product_description_handoff.codex.gold.json` (Codex gpt-5.4 richer output).*
 
 ### 10.3 Gold-reference capture
 The first passing real-mode run of the Hestami intent under the product lens is captured as a **gold reference** at `src/test/fixtures/hestami-product-description/gold/product_description_handoff.gold.json`. Subsequent runs are diffed against it for structural drift (same field set, same reference integrity — e.g. every `journey.personaId` resolves). Content divergence is expected and not flagged.

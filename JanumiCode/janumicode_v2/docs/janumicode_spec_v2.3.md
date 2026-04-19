@@ -483,9 +483,18 @@ When the diff is ambiguous (a field is both added and a structurally similar fie
 
 ### Phase 1 — Intent Capture and Convergence
 
-**Purpose:** Transform the Raw Intent into a locked, unambiguous Intent Statement through Intent Quality Check, Scope Bounding, maximal Bloom, and structured Prune.
+**Purpose:** Transform the Raw Intent into a locked, unambiguous Intent Statement (and, under the product lens, a full Product Description Handoff) through Intent Quality Check, Lens Classification, Scope Bounding, maximal Bloom, and structured Prune.
 
 **Entry Criterion:** Phase 0 Phase Gate passed.
+
+**Lens-Conditional Sub-Phase Topology:** Sub-Phases 1.0 (Intent Quality Check) and 1.0a (Intent Lens Classification) are common to every run. After 1.0a classifies the intent into one of six lenses (`product`, `feature`, `bug`, `infra`, `legal`, `unclassified`), the downstream Phase 1 sub-phase topology is resolved against that lens:
+
+| Lens | Downstream flow |
+|---|---|
+| `product` | Product-lens flow: 1.0b silent discovery → 1.1b scope → four proposer/prune rounds (1.2 domains+personas, 1.3 journeys+workflows, 1.4 entities, 1.5 integrations+QAs) → 1.6 handoff synthesis → 1.7 handoff approval. Emits both `product_description_handoff` AND a derived `intent_statement`. |
+| `feature` / `bug` / `infra` / `legal` / `unclassified` | Default collapsed flow: 1.1b scope → 1.2 bloom → 1.3 candidate review → 1.4 assumption adjudication → 1.5 intent-statement synthesis → 1.6 intent-statement approval. |
+
+Every lens-conditional variant carries the same Phase 1 semantics — a locked intent usable by Phase 2 — but the topology is tuned to the shape of the intent. Non-product lenses may receive dedicated bespoke flows in future revisions; until then they follow the default collapsed flow.
 
 #### Sub-Phase 1.0 — Intent Quality Check
 
@@ -502,10 +511,24 @@ When the diff is ambiguous (a field is both added and a structurally similar fie
 
 **If contradictory intent detected:** The contradiction must be resolved before bloom proceeds. Mirror presents the contradiction with the specific conflicting elements identified. Menu presents resolution options. Proceeding with unresolved contradictions is blocked.
 
+#### Sub-Phase 1.0a — Intent Lens Classification
+
+- **[JC:Agent Role]:** Orchestrator (LLM API call)
+- **Action:** Classifies the Raw Intent into one of six lenses — `product`, `feature`, `bug`, `infra`, `legal`, `unclassified` — to resolve which downstream Phase 1 topology applies. The classifier reads the Raw Intent plus any files ingested in Phase 0 (inlined inline), emits a lens + confidence score + rationale grounded in quoted evidence, and persists the chosen lens on the Workflow Run.
+- **Fallback Rule:** Lenses for which a bespoke flow has not yet shipped resolve to a `fallback_lens`. Both the classified lens (for audit) and the fallback lens (drives template routing) are carried on the artifact. Default fallback today: `product` for unsupported classifications, `feature` for explicit feature classifications.
+- **Output Artifact:** `intent_lens_classification: {lens, confidence, rationale, fallback_lens}`
+- **State Effect:** Writes `workflow_runs.intent_lens` so every downstream sub-phase resolves lens-aware templates and contracts without re-reading the raw intent.
+
 #### Sub-Phase 1.1 — Raw Intent Reception
 
 - **[JC:Agent Role]:** Orchestrator
 - **Action:** Logs Raw Intent as Governed Stream Record. Triggers Sub-Phase 1.1b.
+
+---
+
+#### Default-Flow Sub-Phases (lens ∈ {feature, bug, infra, legal, unclassified})
+
+The sub-phases below apply when Lens Classification does NOT select `product`. They form the collapsed single-round bloom/prune flow: one bloom, one candidate prune, one assumption adjudication, one synthesis, one approval.
 
 #### Sub-Phase 1.1b — Scope Bounding and Compliance Context
 
@@ -553,15 +576,79 @@ When a System-Proposed Content item is approved, `GovernedStreamWriter` elevates
 
 - **Interaction:** Full Mirror of `intent_statement`. Human approves, rejects, or edits. If rejected: return to 1.2 with rejection context injected.
 
+---
+
+#### Product-Lens Sub-Phases (lens = product)
+
+The sub-phases below replace the default 1.1b–1.6 flow when Lens Classification selects `product`. They implement a **v1-style four-round proposer/prune loop** so the intent capture output matches what Phase 2+ consumers need for a full product: personas, user journeys, business domains, entities, workflows, integrations, and quality attributes — not just a thin product concept.
+
+Every proposer round emits its own bloom artifact and presents a dedicated `decision_bundle_presented` prune gate. The prune gate accepts three resolutions:
+
+- **Accept-all / menu prune** — human keeps a subset of proposed items; loop proceeds to the next round.
+- **Free-text feedback** — human types textual guidance instead of using the Menu. The current round's proposer re-runs with `{{human_feedback}}` injected; a new bloom artifact is written; the prune gate is re-presented. Capped at 3 feedback iterations per round to prevent livelock; exhaustion halts with `requires_input`.
+- **Mirror rejection** — human rejects the round's framing (lens assumption, scope framing). Halts with `requires_input`; the re-bloom loop cannot recover a framing error by definition.
+
+#### Sub-Phase 1.0b — Intent Discovery *(product lens)*
+
+- **[JC:Agent Role]:** Domain Interpreter Agent
+- **Action:** Silent homework pass. Reads the Raw Intent plus every inlined referenced file and produces a comprehensive product brief: vision, description, seed personas, seed user journeys, phasing strategy, success metrics, UX requirements, and extracted requirements / decisions / constraints / open questions. Seeds Sub-Phases 1.2–1.5 with structured context so the proposer rounds do not re-read source documents.
+- **Output Artifact:** `artifact_produced[kind=intent_discovery]`
+
+#### Sub-Phase 1.1b — Scope Bounding and Compliance Context *(reused from default flow)*
+
+Identical to Sub-Phase 1.1b above. Emitted under both lens topologies.
+
+#### Sub-Phase 1.2 — Business Domains and Personas Bloom *(product lens, Round 1)*
+
+- **[JC:Agent Role]:** Domain Interpreter Agent
+- **Action:** Proposer Round 1. Expands the validated product intent into the complete set of business domains and personas the product could encompass. Intentionally over-proposes — the human prunes. Each domain carries a short `entityPreview` and `workflowPreview` to surface what downstream rounds will expand on.
+- **Output Artifact:** `artifact_produced[kind=business_domains_bloom]` followed by `decision_bundle_presented` prune gate.
+
+#### Sub-Phase 1.3 — User Journeys and System Workflows Bloom *(product lens, Round 2)*
+
+- **[JC:Agent Role]:** Domain Interpreter Agent
+- **Action:** Proposer Round 2. Takes the accepted domains + personas from Round 1 and proposes user journeys (with steps, actors, acceptance criteria, and `implementationPhase` tag) plus system workflows (with steps, triggers, actors). Journeys are tagged against the validated phasing strategy from 1.0b.
+- **Output Artifact:** `artifact_produced[kind=journeys_workflows_bloom]` followed by `decision_bundle_presented` prune gate.
+
+#### Sub-Phase 1.4 — Business Entities Bloom *(product lens, Round 3)*
+
+- **[JC:Agent Role]:** Domain Interpreter Agent
+- **Action:** Proposer Round 3. Takes the accepted domains and workflows from prior rounds and proposes the full entity catalog needed to implement them — core entities, junction entities, audit/history entities, configuration entities — each linked to its owning business domain.
+- **Output Artifact:** `artifact_produced[kind=entities_bloom]` followed by `decision_bundle_presented` prune gate.
+
+#### Sub-Phase 1.5 — Integrations and Quality Attributes Bloom *(product lens, Round 4)*
+
+- **[JC:Agent Role]:** Domain Interpreter Agent
+- **Action:** Proposer Round 4. Takes everything accepted from prior rounds and proposes external-system integrations (with category, suggested providers, ownership model) plus cross-cutting quality attributes (NFRs — multi-tenancy, RBAC, encryption, accessibility, performance SLOs, compliance, observability).
+- **Output Artifact:** `artifact_produced[kind=integrations_qa_bloom]` followed by `decision_bundle_presented` prune gate.
+
+#### Sub-Phase 1.6 — Product Description Synthesis *(product lens)*
+
+- **[JC:Agent Role]:** Domain Interpreter Agent
+- **Action:** Silent consolidation. Carries forward every accepted item from Rounds 1–4 verbatim (no summarization, no MVP pruning — the human prunes during review, not during synthesis) and refines the narrative fields (vision, description, summary) against the settled product shape. Resolves open questions that were answered during the bloom rounds and flags the remainder as open loops. Also derives a compatibility `intent_statement` projection so Phases 2–9 can continue reading their existing interface unchanged.
+- **Output Artifacts:**
+  - `product_description_handoff`: full v1-shaped finalized plan — productVision, productDescription, summary, personas, userJourneys, phasingStrategy, successMetrics, businessDomainProposals, entityProposals, workflowProposals, integrationProposals, qualityAttributes, uxRequirements, requirements, decisions, constraints, openQuestions, humanDecisions, openLoops.
+  - `artifact_produced[kind=intent_statement]`: derived compatibility record with `product_concept` (name, description, who_it_serves, problem_it_solves) + `confirmed_assumptions` + `confirmed_constraints` + `out_of_scope`.
+
+#### Sub-Phase 1.7 — Handoff Approval *(product lens)*
+
+- **Interaction:** Full Mirror of the `product_description_handoff` with section-level summaries (personas count, journeys count, domains count, entities count, etc.). Human approves, rejects, or edits sections. On approval → Phase Gate. On rejection → `requires_input`; the re-bloom loop does not apply at approval.
+
 **Phase Gate Criteria:**
-- `intent_statement` schema-valid; Invariant Check passed
+
+Common across all lenses:
 - `intent_quality_report` has `overall_status: pass` (no blocking contradictions remain)
+- `intent_lens_classification` recorded with a lens value (may be `unclassified` if confidence is low)
 - All System-Proposed Content items have explicit human approval (Level 5) or are marked as excluded
 - No `derived_from_system_proposal: true` artifacts in governing position without explicit approval
 - Reasoning Review: zero high-severity flaws or all resolved; no quarantined records in governing position
 - All `prior_decision_override` Decision Traces recorded with rationale
-- Human explicitly approved
+- Human explicitly approved the final approval surface (1.6 under default flow, 1.7 under product-lens flow)
 - Narrative Memory and Decision Trace generated and stored
+
+Lens-conditional:
+- **Default flow:** `intent_statement` schema-valid; Invariant Check passed.
+- **Product-lens flow:** `product_description_handoff` schema-valid; shape/coverage invariants passed (personas, journeys, domains, entities, workflows, integrations, quality attributes all within expected ranges; all foreign-key-like references — `entity.businessDomainId`, `phasingStrategy.journeyIds` — resolve to real items in the same handoff). Derived `intent_statement` also emitted for Phase 2–9 compatibility.
 
 *If Prior Decision Overrides reference Phase-Gate-Certified Interface Contracts, API Definitions, or Data Models: Phase 0.5 executes before Phase 2.*
 

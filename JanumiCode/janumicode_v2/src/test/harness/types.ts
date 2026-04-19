@@ -41,6 +41,16 @@ export interface GapReport {
   schema_violations: SchemaViolation[];
   /** Assertion failures from phase contracts */
   assertion_failures: AssertionFailure[];
+  /**
+   * Structured per-gap entries (added in Wave 4 of the product-lens plan).
+   * Additive to the legacy `missing_records` / `schema_violations` /
+   * `assertion_failures` arrays — every item in this array is ALSO
+   * represented in one of those legacy arrays, so existing consumers
+   * keep working. Rich consumers (the virtuous-cycle AI coding agent)
+   * read this for `likely_source` pointers + `reproduce` command so they
+   * can act on a gap without re-deriving context.
+   */
+  gaps?: StructuredGap[];
   /** AI-generated fix suggestion */
   suggested_fix: string;
   /**
@@ -77,6 +87,55 @@ export interface SchemaViolation {
   error: string;
   /** Expected schema version */
   schema_version: string;
+}
+
+/**
+ * Structured gap entry — the load-bearing artifact in the virtuous-cycle
+ * loop. The harness defines the contract; an AI coding agent (in a later
+ * Claude Code session) reads these gaps, edits the indicated files, and
+ * re-runs the harness until zero gaps remain. Every field is designed so
+ * an agent picking up a gap cold — no prior context — can act on it.
+ */
+export type StructuredGapCategory =
+  | 'missing_artifact'
+  | 'shape_violation'
+  | 'coverage_violation'
+  | 'invariant_violation'
+  | 'schema_violation';
+
+export interface StructuredGap {
+  /** Stable hash so later runs can deduplicate vs prior gap reports. */
+  gap_id: string;
+  phase_id: string;
+  sub_phase_id?: string;
+  severity: 'error' | 'warning';
+  category: StructuredGapCategory;
+  /** One-sentence headline — what the gap is, in plain English. */
+  summary: string;
+  /**
+   * The contract entry that failed — e.g. `{ record_type, content_kind, sub_phase_id }`
+   * for missing_artifact gaps, or `{ field, expected_range, expected_shape }` for
+   * shape_violation / coverage_violation gaps.
+   */
+  expected: Record<string, unknown>;
+  /** The observed state — either `missing` or the problematic artifact content. */
+  observed: Record<string, unknown>;
+  /**
+   * Best-effort pointer to the code / prompt / schema the fixer should
+   * look at first. Not authoritative — but saves the agent 80% of the
+   * search. Empty arrays when the gap doesn't map to one.
+   */
+  likely_source: {
+    templates: string[];
+    handlers: string[];
+    schemas: string[];
+  };
+  /** How to reproduce this gap — the command + run context. */
+  reproduce: {
+    command: string;
+    run_id?: string;
+    gold_reference_path?: string;
+  };
 }
 
 export interface AssertionFailure {
@@ -227,6 +286,12 @@ export interface PhaseInvariant {
   validator: string;
   /** Whether this is a hard failure or warning */
   severity: 'error' | 'warning';
+  /**
+   * Optional sub_phase_id so the gap report can report locality for
+   * invariants that relate to a specific sub-phase artifact (e.g. the
+   * product description handoff shape/coverage oracle lives at 1.6).
+   */
+  sub_phase_id?: string;
 }
 
 export interface AuthorityRule {

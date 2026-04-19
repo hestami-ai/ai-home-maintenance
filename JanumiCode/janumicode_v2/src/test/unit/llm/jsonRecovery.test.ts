@@ -153,4 +153,41 @@ describe('parseJsonWithRecovery', () => {
       }
     });
   });
+
+  describe('escapeUnescapedInternalQuotes repair layer', () => {
+    it('recovers a JSON object whose string value contains unescaped internal quotes', () => {
+      // Real pathology captured from Hestami iter-1 run: the LLM wrote
+      // `"rationale": "Central to Vision ("AI-native OS")..."` — the
+      // inner quotes close the value prematurely for JSON.parse.
+      const raw = `{
+        "id": "DOM-AI-ENGINE",
+        "rationale": "Central to Vision ("AI-native operating system"). Supports AI verification."
+      }`;
+      const result = parseJsonWithRecovery(raw);
+      expect(result.parsed, result.error).not.toBeNull();
+      expect(result.recovered).toBe(true);
+      expect((result.parsed as { rationale: string }).rationale).toContain('AI-native operating system');
+    });
+
+    it('leaves well-formed JSON untouched — quote-escape repair is a no-op when the input parses', () => {
+      const clean = '{"a":"b","c":{"d":"e"}}';
+      const result = parseJsonWithRecovery(clean);
+      expect(result.recovered).toBe(false);
+      expect(result.parsed).toEqual({ a: 'b', c: { d: 'e' } });
+    });
+
+    it('handles multiple internal quotes across multiple fields', () => {
+      const raw = `{
+        "one": "Cites "v1 Hestami" reference.",
+        "two": "Quotes "a" and "b" together.",
+        "three": "clean value"
+      }`;
+      const result = parseJsonWithRecovery(raw);
+      expect(result.parsed, result.error).not.toBeNull();
+      const p = result.parsed as { one: string; two: string; three: string };
+      expect(p.one).toContain('v1 Hestami');
+      expect(p.two).toContain('a');
+      expect(p.three).toBe('clean value');
+    });
+  });
 });

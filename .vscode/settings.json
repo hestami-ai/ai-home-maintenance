@@ -2,5 +2,7 @@
     "terminal.integrated.defaultProfile.windows": "PowerShell",
     "terminal.integrated.suggest.enabled": true,
     "chatgpt.commentCodeLensEnabled": false,
-    "codium.codeCompletion.enable": false
+    "codium.codeCompletion.enable": false,
+    "claudeCode.showThinkingSummaries":true,
+    "claudeCode.environmentVariables": []
 }

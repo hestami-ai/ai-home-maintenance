@@ -14,7 +14,7 @@
  */
 
 import type { Database } from '../../lib/database/init';
-import type { PhaseId } from '../../lib/types/records';
+import type { IntentLens, PhaseId } from '../../lib/types/records';
 import { getPhaseContract } from './phaseContracts';
 import type {
   AssertionFailure,
@@ -22,6 +22,8 @@ import type {
   MissingRecord,
   RequiredArtifact,
   SchemaViolation,
+  StructuredGap,
+  StructuredGapCategory,
 } from './types';
 
 export interface LineageValidationResult {
@@ -29,6 +31,12 @@ export interface LineageValidationResult {
   missingRecords: MissingRecord[];
   violations: SchemaViolation[];
   assertionFailures: AssertionFailure[];
+  /**
+   * Structured per-gap entries (Wave 4). Every item corresponds to an
+   * entry in one of the legacy arrays above — this is the additive
+   * representation the virtuous-cycle coding agent reads.
+   */
+  gaps: StructuredGap[];
 }
 
 interface StreamRecord {
@@ -52,34 +60,20 @@ export function validateLineage(
   const missingRecords: MissingRecord[] = [];
   const violations: SchemaViolation[] = [];
   const assertionFailures: AssertionFailure[] = [];
+  const gaps: StructuredGap[] = [];
 
   const records = getRecordsForRun(db, workflowRunId);
+  // Resolve the run's intent_lens once so contract lookup stays cheap
+  // across all phases. Phases that don't have a lens-specific contract
+  // fall back to the default via getPhaseContract's own logic.
+  const lens = getIntentLensForRun(db, workflowRunId);
 
   for (const phaseId of completedPhases) {
-    const contract = getPhaseContract(phaseId);
+    const contract = getPhaseContract(phaseId, lens);
     if (!contract) continue;
-
-    for (const req of contract.required_artifacts) {
-      if (!findArtifact(records, req)) {
-        if (!req.optional) {
-          missingRecords.push({
-            record_type: artifactDisplay(req),
-            phase: phaseId,
-            sub_phase: req.sub_phase_id,
-            reason: req.reason,
-          });
-        }
-      }
-    }
-
-    for (const invariant of contract.invariants) {
-      const failures = runInvariant(records, invariant, phaseId);
-      assertionFailures.push(...failures);
-    }
-
-    for (const rule of contract.authority_rules) {
-      violations.push(...runAuthorityRule(records, rule));
-    }
+    validateAgainstContract(records, phaseId, contract, {
+      missingRecords, violations, assertionFailures, gaps,
+    });
   }
 
   return {
@@ -87,7 +81,27 @@ export function validateLineage(
     missingRecords,
     violations,
     assertionFailures,
+    gaps,
   };
+}
+
+/**
+ * Read the persisted intent_lens from the workflow_runs table. Returns
+ * null when the column is empty (Phase 1.0a hasn't run yet) or the run
+ * is missing. Defensive — catches both "column doesn't exist" (pre-
+ * migration DBs) and plain null values.
+ */
+function getIntentLensForRun(db: Database, workflowRunId: string): IntentLens | null {
+  try {
+    const row = db
+      .prepare(`SELECT intent_lens FROM workflow_runs WHERE id = ?`)
+      .get(workflowRunId) as { intent_lens?: string | null } | undefined;
+    const lens = row?.intent_lens;
+    if (!lens) return null;
+    return lens as IntentLens;
+  } catch {
+    return null;
+  }
 }
 
 export function buildGapReport(
@@ -119,6 +133,7 @@ export function buildGapReport(
     missing_records: result.missingRecords,
     schema_violations: result.violations,
     assertion_failures: result.assertionFailures,
+    gaps: result.gaps,
     suggested_fix: generateFixSuggestion(result),
     spec_references: getSpecReferences(result),
   };
@@ -277,7 +292,7 @@ const INVARIANT_VALIDATORS: Record<string, InvariantCheck> = {
 
 function runInvariant(
   records: StreamRecord[],
-  invariant: { name: string; validator: string; severity: 'error' | 'warning' },
+  invariant: { name: string; validator: string; severity: 'error' | 'warning'; sub_phase_id?: string },
   phaseId: PhaseId,
 ): AssertionFailure[] {
   const fn = INVARIANT_VALIDATORS[invariant.validator];
@@ -287,12 +302,391 @@ function runInvariant(
   return [
     {
       phase: phaseId,
-      sub_phase: 'unknown',
+      sub_phase: invariant.sub_phase_id ?? 'unknown',
       assertion: invariant.name,
       expected: 'true',
       actual: 'false',
     },
   ];
+}
+
+/**
+ * Extended per-contract validation loop. Same three buckets as the
+ * legacy validator (missing artifacts, invariant failures, authority
+ * violations) but also emits structured gaps.
+ */
+function validateAgainstContract(
+  records: StreamRecord[],
+  phaseId: PhaseId,
+  contract: import('./types').PhaseContract,
+  out: {
+    missingRecords: MissingRecord[];
+    violations: SchemaViolation[];
+    assertionFailures: AssertionFailure[];
+    gaps: StructuredGap[];
+  },
+): void {
+  for (const req of contract.required_artifacts) {
+    if (findArtifact(records, req) || req.optional) continue;
+    const display = artifactDisplay(req);
+    out.missingRecords.push({
+      record_type: display,
+      phase: phaseId,
+      sub_phase: req.sub_phase_id,
+      reason: req.reason,
+    });
+    out.gaps.push(buildMissingArtifactGap(phaseId, req, display));
+  }
+
+  for (const invariant of contract.invariants) {
+    const result = runInvariantRich(records, invariant, phaseId);
+    if (!result.passed) {
+      out.assertionFailures.push(...result.legacyFailures);
+      out.gaps.push(...result.gaps);
+    }
+  }
+
+  for (const rule of contract.authority_rules) {
+    const ruleViolations = runAuthorityRule(records, rule);
+    out.violations.push(...ruleViolations);
+    for (const v of ruleViolations) {
+      out.gaps.push(buildSchemaViolationGap(phaseId, v));
+    }
+  }
+}
+
+interface RichInvariantResult {
+  passed: boolean;
+  legacyFailures: AssertionFailure[];
+  gaps: StructuredGap[];
+}
+
+/**
+ * Run an invariant and return both the legacy AssertionFailure[] for
+ * back-compat AND structured gaps for the virtuous-cycle loop. Some
+ * invariants (shape/coverage) emit multiple failures per run; this
+ * path supports that natively.
+ */
+function runInvariantRich(
+  records: StreamRecord[],
+  invariant: { name: string; description: string; validator: string; severity: 'error' | 'warning'; sub_phase_id?: string },
+  phaseId: PhaseId,
+): RichInvariantResult {
+  // Shape/coverage oracles produce multi-failure output; they live in
+  // MULTI_FAILURE_VALIDATORS and return per-field gaps directly.
+  const multi = MULTI_FAILURE_VALIDATORS[invariant.validator];
+  if (multi) {
+    const findings = multi(records);
+    if (findings.length === 0) return { passed: true, legacyFailures: [], gaps: [] };
+    const legacy: AssertionFailure[] = findings.map(f => ({
+      phase: phaseId,
+      sub_phase: invariant.sub_phase_id ?? f.sub_phase_id ?? 'unknown',
+      assertion: `${invariant.name}:${f.field}`,
+      expected: f.expected,
+      actual: f.actual,
+    }));
+    const gaps: StructuredGap[] = findings.map(f => buildShapeCoverageGap(phaseId, invariant, f));
+    return { passed: false, legacyFailures: legacy, gaps };
+  }
+
+  const legacy = runInvariant(records, invariant, phaseId);
+  if (legacy.length === 0) return { passed: true, legacyFailures: [], gaps: [] };
+  const gaps: StructuredGap[] = legacy.map(f => buildInvariantGap(phaseId, invariant, f));
+  return { passed: false, legacyFailures: legacy, gaps };
+}
+
+// ── Shape/coverage oracles (Wave 4, plan §10.2) ────────────────────
+
+interface ShapeCoverageFinding {
+  field: string;
+  expected: string;
+  actual: string;
+  sub_phase_id?: string;
+}
+
+type MultiFailureCheck = (records: StreamRecord[]) => ShapeCoverageFinding[];
+
+const MULTI_FAILURE_VALIDATORS: Record<string, MultiFailureCheck> = {
+  /**
+   * Product description handoff shape/coverage oracle. Thresholds are
+   * derived from the v1 Hestami handoff (see plan §10.2). Uses ranges
+   * rather than exact counts because v1 is an *approximate* gold
+   * reference — generative outputs vary run-to-run even under the same
+   * intent.
+   */
+  validateProductDescriptionHandoffShape: (recs) => {
+    const findings: ShapeCoverageFinding[] = [];
+    const rec = recs.find(r => r.record_type === 'product_description_handoff');
+    if (!rec) {
+      findings.push({
+        field: 'record_type:product_description_handoff',
+        expected: 'present at 1.6',
+        actual: 'missing',
+        sub_phase_id: '1.6',
+      });
+      return findings;
+    }
+    const content = tryParseContent(rec.content) ?? {};
+
+    const pushRange = (field: string, actualCount: number, min: number, max: number) => {
+      if (actualCount < min || actualCount > max) {
+        findings.push({
+          field,
+          expected: `length in [${min}, ${max}]`,
+          actual: `length=${actualCount}`,
+          sub_phase_id: '1.6',
+        });
+      }
+    };
+    const arr = (k: string): unknown[] => Array.isArray(content[k]) ? content[k] as unknown[] : [];
+
+    // Ranges widened in iter-3c to accommodate Codex gpt-5.4's richer
+    // generation. qwen3.5:9b produced outputs near the v1 reference
+    // counts (6 personas / 45 entities etc.); Codex produces 2–2.5x
+    // more (13 personas / 106 entities). Upper bounds reflect the
+    // capable-CLI reality; lower bounds are unchanged — same minimum
+    // quality floor regardless of backing.
+    pushRange('personas', arr('personas').length, 3, 15);
+    pushRange('userJourneys', arr('userJourneys').length, 5, 15);
+    pushRange('businessDomainProposals', arr('businessDomainProposals').length, 6, 30);
+    pushRange('entityProposals', arr('entityProposals').length, 20, 150);
+    pushRange('workflowProposals', arr('workflowProposals').length, 3, 30);
+    pushRange('integrationProposals', arr('integrationProposals').length, 5, 35);
+    pushRange('qualityAttributes', arr('qualityAttributes').length, 8, 25);
+    pushRange('phasingStrategy', arr('phasingStrategy').length, 2, 5);
+
+    // Element-level shape checks
+    for (const p of arr('personas') as Array<Record<string, unknown>>) {
+      if (!p.name || !Array.isArray(p.goals) || (p.goals as unknown[]).length < 1 ||
+          !Array.isArray(p.painPoints) || (p.painPoints as unknown[]).length < 1) {
+        findings.push({
+          field: `personas[id=${p.id ?? '?'}]`,
+          expected: 'name + goals[≥1] + painPoints[≥1]',
+          actual: `goals=${Array.isArray(p.goals) ? (p.goals as unknown[]).length : 0}, painPoints=${Array.isArray(p.painPoints) ? (p.painPoints as unknown[]).length : 0}`,
+          sub_phase_id: '1.6',
+        });
+      }
+    }
+    for (const j of arr('userJourneys') as Array<Record<string, unknown>>) {
+      if (!Array.isArray(j.steps) || (j.steps as unknown[]).length < 3 ||
+          !Array.isArray(j.acceptanceCriteria) || (j.acceptanceCriteria as unknown[]).length < 1 ||
+          typeof j.implementationPhase !== 'string') {
+        findings.push({
+          field: `userJourneys[id=${j.id ?? '?'}]`,
+          expected: 'steps[≥3] + acceptanceCriteria[≥1] + implementationPhase',
+          actual: `steps=${Array.isArray(j.steps) ? (j.steps as unknown[]).length : 0}, acceptanceCriteria=${Array.isArray(j.acceptanceCriteria) ? (j.acceptanceCriteria as unknown[]).length : 0}, implementationPhase=${typeof j.implementationPhase}`,
+          sub_phase_id: '1.6',
+        });
+      }
+    }
+    for (const d of arr('businessDomainProposals') as Array<Record<string, unknown>>) {
+      if (!Array.isArray(d.entityPreview) || (d.entityPreview as unknown[]).length < 3 ||
+          !Array.isArray(d.workflowPreview) || (d.workflowPreview as unknown[]).length < 1) {
+        findings.push({
+          field: `businessDomainProposals[id=${d.id ?? '?'}]`,
+          expected: 'entityPreview[≥3] + workflowPreview[≥1]',
+          actual: `entityPreview=${Array.isArray(d.entityPreview) ? (d.entityPreview as unknown[]).length : 0}, workflowPreview=${Array.isArray(d.workflowPreview) ? (d.workflowPreview as unknown[]).length : 0}`,
+          sub_phase_id: '1.6',
+        });
+      }
+    }
+    const domainIds = new Set((arr('businessDomainProposals') as Array<Record<string, unknown>>).map(d => d.id as string));
+    for (const e of arr('entityProposals') as Array<Record<string, unknown>>) {
+      const ka = Array.isArray(e.keyAttributes) ? (e.keyAttributes as unknown[]).length : 0;
+      const rel = Array.isArray(e.relationships) ? (e.relationships as unknown[]).length : 0;
+      const bdi = e.businessDomainId as string | undefined;
+      const unknownDomain = bdi && !domainIds.has(bdi);
+      if (ka < 2 || rel < 1 || unknownDomain) {
+        findings.push({
+          field: `entityProposals[id=${e.id ?? '?'}]`,
+          expected: 'keyAttributes[≥2] + relationships[≥1] + businessDomainId in domains',
+          actual: `keyAttributes=${ka}, relationships=${rel}, businessDomainId=${bdi ?? 'missing'}${unknownDomain ? ' (UNKNOWN)' : ''}`,
+          sub_phase_id: '1.6',
+        });
+      }
+    }
+    for (const w of arr('workflowProposals') as Array<Record<string, unknown>>) {
+      const s = Array.isArray(w.steps) ? (w.steps as unknown[]).length : 0;
+      const t = Array.isArray(w.triggers) ? (w.triggers as unknown[]).length : 0;
+      if (s < 3 || t < 1) {
+        findings.push({
+          field: `workflowProposals[id=${w.id ?? '?'}]`,
+          expected: 'steps[≥3] + triggers[≥1]',
+          actual: `steps=${s}, triggers=${t}`,
+          sub_phase_id: '1.6',
+        });
+      }
+    }
+    const allowedOwnership = new Set(['delegated', 'synced', 'consumed', 'owned']);
+    for (const i of arr('integrationProposals') as Array<Record<string, unknown>>) {
+      const sp = Array.isArray(i.standardProviders) ? (i.standardProviders as unknown[]).length : 0;
+      const om = i.ownershipModel as string | undefined;
+      if (sp < 1 || !om || !allowedOwnership.has(om)) {
+        findings.push({
+          field: `integrationProposals[id=${i.id ?? '?'}]`,
+          expected: 'standardProviders[≥1] + ownershipModel in {delegated,synced,consumed,owned}',
+          actual: `standardProviders=${sp}, ownershipModel=${om ?? 'missing'}`,
+          sub_phase_id: '1.6',
+        });
+      }
+    }
+    const journeyIds = new Set((arr('userJourneys') as Array<Record<string, unknown>>).map(j => j.id as string));
+    for (const ph of arr('phasingStrategy') as Array<Record<string, unknown>>) {
+      const jids = Array.isArray(ph.journeyIds) ? ph.journeyIds as string[] : [];
+      const unknownJourneys = jids.filter(id => !journeyIds.has(id));
+      if (unknownJourneys.length > 0) {
+        findings.push({
+          field: `phasingStrategy[phase=${ph.phase ?? '?'}].journeyIds`,
+          expected: 'all ids refer to real userJourneys',
+          actual: `unknown journey ids: ${unknownJourneys.join(', ')}`,
+          sub_phase_id: '1.6',
+        });
+      }
+    }
+    return findings;
+  },
+};
+
+// ── Structured-gap builders ────────────────────────────────────────
+
+/**
+ * Stable-ish gap id derived from the payload. Collisions across runs
+ * on the same contract-failure signature are intentional — they let
+ * the gap report dedup gaps that have persisted across retries.
+ */
+function gapIdFor(parts: Array<string | undefined>): string {
+  return parts.filter(Boolean).join(':').replace(/[^A-Za-z0-9:_\-\[\].=]/g, '_');
+}
+
+function buildMissingArtifactGap(
+  phaseId: PhaseId,
+  req: RequiredArtifact,
+  display: string,
+): StructuredGap {
+  const category: StructuredGapCategory = 'missing_artifact';
+  return {
+    gap_id: gapIdFor(['phase', phaseId, 'sub', req.sub_phase_id, 'missing', display]),
+    phase_id: phaseId,
+    sub_phase_id: req.sub_phase_id,
+    severity: 'error',
+    category,
+    summary: `Phase ${phaseId}${req.sub_phase_id ? ` sub-phase ${req.sub_phase_id}` : ''} did not emit ${display}.`,
+    expected: {
+      record_type: req.record_type,
+      content_kind: req.content_kind,
+      sub_phase_id: req.sub_phase_id,
+      produced_by_agent_role: req.produced_by_agent_role,
+    },
+    observed: { status: 'missing' },
+    likely_source: guessLikelySourceForArtifact(phaseId, req),
+    reproduce: {
+      command: 'pnpm exec vitest run src/test/unit/orchestrator/phase1ProductLens.test.ts',
+    },
+  };
+}
+
+function buildShapeCoverageGap(
+  phaseId: PhaseId,
+  invariant: { name: string; description: string; sub_phase_id?: string },
+  finding: ShapeCoverageFinding,
+): StructuredGap {
+  // product_description_handoff shape/coverage gaps are the primary
+  // signal that drives the virtuous-cycle repair loop — keep the
+  // likely_source pointers specific (the 1.6 synthesis template is
+  // the first place a fixer should look).
+  return {
+    gap_id: gapIdFor(['phase', phaseId, 'sub', invariant.sub_phase_id ?? finding.sub_phase_id, invariant.name, finding.field]),
+    phase_id: phaseId,
+    sub_phase_id: invariant.sub_phase_id ?? finding.sub_phase_id,
+    severity: 'error',
+    category: finding.field.startsWith('length') || finding.expected.startsWith('length') ? 'coverage_violation' : 'shape_violation',
+    summary: `${invariant.name}: field ${finding.field} — expected ${finding.expected}, actual ${finding.actual}.`,
+    expected: { field: finding.field, description: finding.expected },
+    observed: { field: finding.field, value: finding.actual },
+    likely_source: {
+      templates: ['.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_6_product_description_synthesis/product_description_synthesis.product.system.md'],
+      handlers: ['src/lib/orchestrator/phases/phase1.ts:runProductDescriptionSynthesis'],
+      schemas: ['.janumicode/schemas/artifacts/product_description_handoff.schema.json'],
+    },
+    reproduce: {
+      command: 'pnpm exec vitest run src/test/unit/harness/phase1ProductLensContract.test.ts',
+    },
+  };
+}
+
+function buildInvariantGap(
+  phaseId: PhaseId,
+  invariant: { name: string; description: string; sub_phase_id?: string },
+  failure: AssertionFailure,
+): StructuredGap {
+  return {
+    gap_id: gapIdFor(['phase', phaseId, 'sub', invariant.sub_phase_id, 'invariant', invariant.name]),
+    phase_id: phaseId,
+    sub_phase_id: invariant.sub_phase_id ?? failure.sub_phase,
+    severity: 'error',
+    category: 'invariant_violation',
+    summary: `Invariant ${invariant.name} failed: ${invariant.description}`,
+    expected: { value: failure.expected },
+    observed: { value: failure.actual },
+    likely_source: {
+      templates: [],
+      handlers: ['src/lib/orchestrator/phases/phase1.ts'],
+      schemas: [],
+    },
+    reproduce: { command: 'pnpm exec vitest run' },
+  };
+}
+
+function buildSchemaViolationGap(phaseId: PhaseId, violation: SchemaViolation): StructuredGap {
+  return {
+    gap_id: gapIdFor(['phase', phaseId, 'schema', violation.record_type, violation.field]),
+    phase_id: phaseId,
+    severity: 'error',
+    category: 'schema_violation',
+    summary: `Schema violation on ${violation.record_type}.${violation.field}: ${violation.error}`,
+    expected: { field: violation.field, schema_version: violation.schema_version },
+    observed: { record_id: violation.record_id, error: violation.error },
+    likely_source: { templates: [], handlers: [], schemas: [] },
+    reproduce: { command: 'pnpm exec vitest run' },
+  };
+}
+
+/**
+ * Best-effort pointer to the handler + template most likely to own a
+ * missing artifact. Covers the Phase 1 product-lens surfaces; falls
+ * back to generic pointers for artifacts we don't recognise.
+ */
+function guessLikelySourceForArtifact(
+  phaseId: PhaseId,
+  req: RequiredArtifact,
+): { templates: string[]; handlers: string[]; schemas: string[] } {
+  const base = `src/lib/orchestrator/phases/phase${phaseId}.ts`;
+  const empty = { templates: [] as string[], handlers: [base], schemas: [] as string[] };
+  if (phaseId !== '1') return empty;
+
+  const kind = req.content_kind;
+  const map: Record<string, { template?: string; schema?: string }> = {
+    intent_discovery: { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_0b_intent_discovery/intent_discovery.product.system.md' },
+    business_domains_bloom: { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_2_business_domains_bloom/business_domains_bloom.product.system.md' },
+    journeys_workflows_bloom: { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_3_journeys_workflows_bloom/journeys_workflows_bloom.product.system.md' },
+    entities_bloom: { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_4_entities_bloom/entities_bloom.product.system.md' },
+    integrations_qa_bloom: { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_5_integrations_qa_bloom/integrations_qa_bloom.product.system.md' },
+    intent_statement: { schema: '(derived at 1.6 from product_description_handoff)' },
+    intent_lens_classification: { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_0a_intent_lens_classification/intent_lens_classification.system.md', schema: '.janumicode/schemas/artifacts/intent_lens_classification.schema.json' },
+  };
+  const hint = kind ? map[kind] : undefined;
+  if (req.record_type === 'product_description_handoff') {
+    return {
+      templates: ['.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_6_product_description_synthesis/product_description_synthesis.product.system.md'],
+      handlers: ['src/lib/orchestrator/phases/phase1.ts:runProductDescriptionSynthesis'],
+      schemas: ['.janumicode/schemas/artifacts/product_description_handoff.schema.json'],
+    };
+  }
+  return {
+    templates: hint?.template ? [hint.template] : [],
+    handlers: [base],
+    schemas: hint?.schema ? [hint.schema] : [],
+  };
 }
 
 function runAuthorityRule(

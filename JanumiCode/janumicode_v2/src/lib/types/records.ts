@@ -148,12 +148,14 @@ export const SUB_PHASE_NAMES: Record<PhaseId, Record<string, string>> = {
   '1': {
     '1.0': 'Intent Quality Check',
     '1.0a': 'Intent Lens Classification',
+    '1.0b': 'Intent Discovery',
     '1.1b': 'Scope Bounding',
     '1.2': 'Intent Domain Bloom',
     '1.3': 'Intent Candidate Review & Menu',
     '1.4': 'Assumption Surfacing & Adjudication',
     '1.5': 'Intent Statement Synthesis',
     '1.6': 'Intent Statement Approval',
+    '1.7': 'Handoff Approval',
   },
   '2': {
     '2.1': 'Functional Requirements Bloom',
@@ -220,6 +222,80 @@ export const SUB_PHASE_ORDER: Record<PhaseId, string[]> = {
   '10': ['10.1', '10.2', '10.3'],
 };
 
+// ── Lens-conditional sub-phase topology (Phase 1 product lens) ───────
+//
+// Phase 1's sub-phase list and the human-facing names of 1.2–1.6 depend
+// on the classified intent lens. The product lens runs a v1-style bloom/
+// prune proposer loop: silent intent discovery (1.0b) + four bloom rounds
+// (1.2 domains, 1.3 journeys, 1.4 entities, 1.5 integrations) + silent
+// synthesis (1.6) + handoff approval (1.7). Non-product lenses keep the
+// default collapsed flow.
+//
+// The defaults above (SUB_PHASE_NAMES + SUB_PHASE_ORDER) are the fallback;
+// callers resolve lens-aware values via getSubPhaseName / getSubPhaseOrder.
+
+/**
+ * Per-phase, per-lens overrides for sub-phase human-facing names. If a
+ * lens isn't listed here for a given phase, fall back to SUB_PHASE_NAMES.
+ */
+export const SUB_PHASE_NAMES_BY_LENS: Partial<Record<PhaseId, Partial<Record<IntentLens, Record<string, string>>>>> = {
+  '1': {
+    product: {
+      '1.0': 'Intent Quality Check',
+      '1.0a': 'Intent Lens Classification',
+      '1.0b': 'Intent Discovery',
+      '1.1b': 'Scope Bounding',
+      '1.2': 'Business Domains & Personas Bloom',
+      '1.3': 'User Journeys & Workflows Bloom',
+      '1.4': 'Business Entities Bloom',
+      '1.5': 'Integrations & Quality Attributes Bloom',
+      '1.6': 'Product Description Synthesis',
+      '1.7': 'Handoff Approval',
+    },
+  },
+};
+
+/**
+ * Per-phase, per-lens overrides for the ordered sub-phase list.
+ */
+export const SUB_PHASE_ORDER_BY_LENS: Partial<Record<PhaseId, Partial<Record<IntentLens, string[]>>>> = {
+  '1': {
+    product: ['1.0', '1.0a', '1.0b', '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7'],
+  },
+};
+
+/**
+ * Resolve the human-facing name for a sub-phase. Prefers the lens-specific
+ * override when `lens` is given and an override exists; otherwise falls
+ * back to the default SUB_PHASE_NAMES entry; otherwise returns the raw id.
+ */
+export function getSubPhaseName(
+  phaseId: PhaseId,
+  subPhaseId: string,
+  lens?: IntentLens | null,
+): string {
+  if (lens) {
+    const lensOverride = SUB_PHASE_NAMES_BY_LENS[phaseId]?.[lens]?.[subPhaseId];
+    if (lensOverride) return lensOverride;
+  }
+  return SUB_PHASE_NAMES[phaseId]?.[subPhaseId] ?? subPhaseId;
+}
+
+/**
+ * Resolve the ordered sub-phase list for a phase. Prefers the lens-specific
+ * override when one exists; otherwise falls back to the default ordering.
+ */
+export function getSubPhaseOrder(
+  phaseId: PhaseId,
+  lens?: IntentLens | null,
+): string[] {
+  if (lens) {
+    const lensOverride = SUB_PHASE_ORDER_BY_LENS[phaseId]?.[lens];
+    if (lensOverride) return lensOverride;
+  }
+  return SUB_PHASE_ORDER[phaseId] ?? [];
+}
+
 // ── Record Types (§6) ───────────────────────────────────────────────
 
 export type RecordType =
@@ -263,6 +339,7 @@ export type RecordType =
   | 'context_packet'
   | 'query_decomposition_record'
   | 'dmr_pipeline'
+  | 'product_description_handoff'
   | 'memory_edge_proposed'
   | 'memory_edge_confirmed'
   | 'intent_quality_report'
@@ -507,4 +584,189 @@ export interface DmrPipelineContent {
   stages: DmrStageEntry[];
   completeness_status?: string;
   retrieval_brief_record_id?: string;
+}
+
+// ── Product Description Handoff (Phase 1 product lens) ──────────────
+//
+// Produced at Sub-Phase 1.6 under the product lens. Consolidates the
+// outputs of 1.0b Intent Discovery + the four bloom rounds (1.2–1.5)
+// into a single authoritative record describing the product to be
+// built. Shape mirrors v1's `IntakePlanDocument.finalizedPlan` so the
+// v1 Hestami handoff can serve as an approximate gold reference for
+// the virtuous-cycle test harness (shape/coverage oracle, §10.2 of
+// the product-lens plan).
+//
+// Phases 2–9 continue reading the compatibility `intent_statement`
+// record (also emitted at 1.6). Upgrading Phase 2+ to read this
+// handoff directly is a tracked follow-up.
+
+/**
+ * Source of a proposed item — carried through from v1 so downstream
+ * phases can tell user-stated items from AI-proposed ones.
+ */
+export type ProductItemSource =
+  | 'user-specified'
+  | 'document-specified'
+  | 'ai-proposed'
+  | 'domain-standard'
+  | 'synthesized';
+
+export interface Persona {
+  id: string;
+  name: string;
+  description: string;
+  goals: string[];
+  painPoints: string[];
+  source?: ProductItemSource;
+}
+
+export interface UserJourneyStep {
+  stepNumber: number;
+  actor: string;
+  action: string;
+  expectedOutcome: string;
+}
+
+export interface UserJourney {
+  id: string;
+  personaId: string;
+  title: string;
+  scenario: string;
+  steps: UserJourneyStep[];
+  acceptanceCriteria: string[];
+  /** Phase tag from the phasingStrategy (e.g. "Phase 1"). */
+  implementationPhase: string;
+  priority?: string;
+  source?: ProductItemSource;
+}
+
+export interface PhasingPhase {
+  /** "Phase 1", "Phase 2", etc. */
+  phase: string;
+  description: string;
+  /** References `UserJourney.id` entries. */
+  journeyIds: string[];
+  rationale: string;
+}
+
+export interface BusinessDomain {
+  id: string;
+  name: string;
+  description: string;
+  rationale: string;
+  /** Short-preview of entities expected in this domain (for the bloom gate). */
+  entityPreview: string[];
+  /** Short-preview of workflows that live in this domain. */
+  workflowPreview: string[];
+  source?: ProductItemSource;
+}
+
+export interface Entity {
+  id: string;
+  /** References `BusinessDomain.id`. */
+  businessDomainId: string;
+  name: string;
+  description: string;
+  keyAttributes: string[];
+  relationships: string[];
+  source?: ProductItemSource;
+}
+
+export interface Workflow {
+  id: string;
+  /** References `BusinessDomain.id`. */
+  businessDomainId: string;
+  name: string;
+  description: string;
+  steps: string[];
+  triggers: string[];
+  actors: string[];
+  source?: ProductItemSource;
+}
+
+export type IntegrationOwnershipModel = 'delegated' | 'synced' | 'consumed' | 'owned';
+
+export interface Integration {
+  id: string;
+  name: string;
+  /** Coarse category — payment, erp, identity, maps, storage, ai, etc. */
+  category: string;
+  description: string;
+  /** Example third-party providers that fit the integration slot. */
+  standardProviders: string[];
+  ownershipModel: IntegrationOwnershipModel;
+  rationale: string;
+  source?: ProductItemSource;
+}
+
+/**
+ * Free-form extracted items (requirements / decisions / constraints /
+ * open questions). Shape is flat by design so downstream consumers
+ * don't need to normalise.
+ */
+export interface ExtractedItem {
+  id: string;
+  type: 'REQUIREMENT' | 'DECISION' | 'CONSTRAINT' | 'OPEN_QUESTION';
+  text: string;
+  /** Turn id in the originating dialogue, if any — preserved for audit. */
+  extractedFromTurnId?: number;
+  timestamp: string;
+}
+
+/**
+ * Captured per decision_bundle_resolved on the prune gates — lets the
+ * handoff carry a condensed record of what the human accepted / rejected
+ * across the four bloom rounds without dragging every resolution record.
+ */
+export interface HumanDecisionSummary {
+  action: 'accepted' | 'rejected' | 'edited' | 'deferred';
+  /** Which round the decision happened in — e.g. "1.2", "1.3", "1.4", "1.5". */
+  sub_phase_id: string;
+  /** Id of the item the decision applied to (domain id, journey id, etc.). */
+  target_id: string;
+  rationale?: string;
+}
+
+/**
+ * Items that remained unresolved at the end of Phase 1 — carried into
+ * Phase 2 so requirements discovery can close them out.
+ */
+export interface OpenLoop {
+  category: 'deferred_decision' | 'missing_info' | 'unresolved_risk' | 'followup';
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+export interface ProductDescriptionHandoffContent {
+  kind: 'product_description_handoff';
+  schemaVersion: '1.0';
+  /** Always 'product_or_feature' under the product lens; preserved for v1 parity. */
+  requestCategory: 'product_or_feature';
+
+  // Narrative layer (from 1.0b Intent Discovery, refined through synthesis)
+  productVision: string;
+  productDescription: string;
+  summary: string;
+
+  // Product structure (from the four bloom rounds)
+  personas: Persona[];
+  userJourneys: UserJourney[];
+  phasingStrategy: PhasingPhase[];
+  successMetrics: string[];
+  businessDomainProposals: BusinessDomain[];
+  entityProposals: Entity[];
+  workflowProposals: Workflow[];
+  integrationProposals: Integration[];
+  qualityAttributes: string[];
+  uxRequirements: string[];
+
+  // Extracted items (from 1.0b Intent Discovery + refined during synthesis)
+  requirements: ExtractedItem[];
+  decisions: ExtractedItem[];
+  constraints: ExtractedItem[];
+  openQuestions: ExtractedItem[];
+
+  // Cross-cutting — condensed human decisions + unresolved loops
+  humanDecisions: HumanDecisionSummary[];
+  openLoops: OpenLoop[];
 }

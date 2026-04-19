@@ -1,0 +1,2354 @@
+{
+  "kind": "product_description_handoff",
+  "schemaVersion": "1.0",
+  "requestCategory": "product_or_feature",
+  "productVision": "The Hestami AI Real Property OS is created to be the integrated holistic end-to-end home services operating system that minimizes friction for property owners and associations by intelligently matching needs with trusted service providers.",
+  "productDescription": "Hestami AI Real Property OS and Platform is an AI-native ecosystem composed of three interconnected pillars: Hestami Home Real Property Assistant for property owners to manage service calls and vendors, Hestami Service Provider Field Services Management for contractors to manage operations, and Hestami Community Association Management for HOAs to handle governance, accounting, and compliance. It utilizes AI to automate complex workflows like licensing verification, bid comparison, and financial posting while maintaining a persistent, secure data model for long-lived real estate history.",
+  "summary": "The Hestami AI Real Property OS is a holistic, integrated platform designed to minimize friction across three major pillars: the Home Real Property Assistant, Field Services Management, and Community Association Management (CAM). The product serves a broad ecosystem including individual homeowners, property investors, contractors, association managers, boards, and Hestami staff. It combines modern AI automation with durable workflow engines (DBOS) to create a 'System of Action' for real estate maintenance and governance. Source documents clearly define the functional domains (from accounting to violations) and the target technical stack (SvelteKit, Node/Bun, PostgreSQL, Cloudflare). The phasing strategy is explicit: start with the Home Assistant, expand to Service Provider FSM, then CAM. Ambiguities remain regarding the specific scope of AI agent capabilities in Phase 1 and how 'HOA Context' is tracked externally.",
+  "personas": [
+    {
+      "id": "P-1",
+      "name": "Homeowner / Property Investor",
+      "description": "Individual owners or small landlords managing one or more residences who need to find reliable contractors and manage maintenance requests.",
+      "goals": [
+        "Minimize time spent finding and vetting contractors",
+        "Coordinate site visits and manage repair schedules",
+        "Track service costs and payments"
+      ],
+      "painPoints": [
+        "Wasting time on finding reliable contractors",
+        "Risk from inconsistent or incomplete bids",
+        "Difficulty verifying vendor legitimacy"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "P-2",
+      "name": "Service Provider / Contractor",
+      "description": "Tradespeople or business owners (HVAC, plumbing, electrical) who need to manage work orders, scheduling, estimates, and invoicing.",
+      "goals": [
+        "Manage customer-facing interactions and backend operations from one platform",
+        "Minimize travel time through intelligent dispatching",
+        "Generate accurate estimates and invoices in the field"
+      ],
+      "painPoints": [
+        "Underserved industry processes (pen and paper)",
+        "Lack of integrated financial tools",
+        "Difficulty managing recurring service contracts"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "P-3",
+      "name": "Community Association Manager",
+      "description": "Management company staff responsible for handling HOA finances, compliance, governance, and member support.",
+      "goals": [
+        "Automate routine workflows to focus on relationships",
+        "Ensure statutory deadline compliance",
+        "Process financials and AR/AP efficiently"
+      ],
+      "painPoints": [
+        "Manual data entry in financials",
+        "Missing governance documentation or minutes",
+        "Difficulty tracking violations or architectural requests"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "P-4",
+      "name": "Board Member",
+      "description": "Owners elected to the HOA board who need to review documents, vote on resolutions, and oversee governance.",
+      "goals": [
+        "Review financial reports and minutes",
+        "Approve budgets and resolutions securely",
+        "Communicate with the community transparently"
+      ],
+      "painPoints": [
+        "Disorganized communication channels",
+        "Difficulty accessing archival documents",
+        "Confusion over voting rules or compliance"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "P-5",
+      "name": "Hestami Staff / Admin",
+      "description": "Platform support or operations team members responsible for maintaining system integrity, workflows, and user support.",
+      "goals": [
+        "Monitor system health and workflows",
+        "Manage user access and permissions",
+        "Ensure compliance with security policies"
+      ],
+      "painPoints": [
+        "Tracking system-wide workflow anomalies",
+        "Managing complex permission matrices"
+      ],
+      "source": "document-specified"
+    },
+    {
+      "id": "P-6",
+      "name": "Property Manager",
+      "description": "Professional managers for single-family or multi-unit assets who bridge owner and vendor gaps.",
+      "goals": [
+        "Oversee maintenance schedules for multiple properties",
+        "Liaise between owners (P-1) and contractors (P-2)",
+        "Manage tenant communications"
+      ],
+      "painPoints": [
+        "Lack of centralized platform for tenant requests",
+        "Difficulty enforcing lease compliance",
+        "Manual tenant screening and documentation"
+      ],
+      "source": "ai-proposed"
+    }
+  ],
+  "userJourneys": [
+    {
+      "id": "UJ-1",
+      "personaId": "P-1",
+      "title": "Create Home Repair Request",
+      "scenario": "When a homeowner needs maintenance done, they submit a request via the app to initiate the matching engine.",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "actor": "P-1",
+          "action": "Navigate to New Request screen",
+          "expectedOutcome": "Request form displayed"
+        },
+        {
+          "stepNumber": 2,
+          "actor": "P-1",
+          "action": "Describe issue and upload photos",
+          "expectedOutcome": "Details recorded in DOM-REQUEST"
+        },
+        {
+          "stepNumber": 3,
+          "actor": "System",
+          "action": "Submit request to matching engine",
+          "expectedOutcome": "Request queued for vendor matching"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Request is visible to vendors within 1 hour",
+        "Photos are securely stored in DOM-DOCUMENT"
+      ],
+      "implementationPhase": "Phase 1",
+      "priority": "Phase 1",
+      "source": "domain-standard"
+    },
+    {
+      "id": "UJ-2",
+      "personaId": "P-1",
+      "title": "View Matched Vendor Proposals",
+      "scenario": "After submission, the homeowner receives bids from vetted vendors and selects one.",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "actor": "System",
+          "action": "Push proposals from DOM-VENDOR",
+          "expectedOutcome": "List of 3-5 vendors displayed"
+        },
+        {
+          "stepNumber": 2,
+          "actor": "P-1",
+          "action": "Review pricing and insurance status",
+          "expectedOutcome": "Homeowner evaluates trust indicators"
+        },
+        {
+          "stepNumber": 3,
+          "actor": "P-1",
+          "action": "Select and Accept Vendor",
+          "expectedOutcome": "Request status changes to In Progress"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Vendor insurance is verified via DOM-RISK",
+        "Homeowner can reject a vendor without penalty"
+      ],
+      "implementationPhase": "Phase 1",
+      "priority": "Phase 1",
+      "source": "domain-standard"
+    },
+    {
+      "id": "UJ-3",
+      "personaId": "P-2",
+      "title": "Accept Field Service Job",
+      "scenario": "A service provider receives a dispatch alert and accepts the work order.",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "actor": "System",
+          "action": "Send push notification to P-2",
+          "expectedOutcome": "Alert delivered via DOM-NOTIFY"
+        },
+        {
+          "stepNumber": 2,
+          "actor": "P-2",
+          "action": "Review job location and details",
+          "expectedOutcome": "Job details verified on mobile"
+        },
+        {
+          "stepNumber": 3,
+          "actor": "P-2",
+          "action": "Tap 'Accept Job'",
+          "expectedOutcome": "Job assigned to P-2 calendar"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Job appears in P-2 schedule immediately",
+        "P-2 confirms location via GPS"
+      ],
+      "implementationPhase": "Phase 2",
+      "priority": "Phase 2",
+      "source": "ai-proposed"
+    },
+    {
+      "id": "UJ-4",
+      "personaId": "P-2",
+      "title": "Complete Job and Submit Invoice",
+      "scenario": "The contractor finishes the work and generates a bill through the app.",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "actor": "P-2",
+          "action": "Mark job as complete",
+          "expectedOutcome": "Status updates in DOM-OPERATIONS"
+        },
+        {
+          "stepNumber": 2,
+          "actor": "P-2",
+          "action": "Upload work report and signature",
+          "expectedOutcome": "Proof of work stored"
+        },
+        {
+          "stepNumber": 3,
+          "actor": "P-2",
+          "action": "Generate and Submit Invoice",
+          "expectedOutcome": "Invoice sent to DOM-FINANCE for processing"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Invoice matches labor and material costs",
+        "Work report is timestamped"
+      ],
+      "implementationPhase": "Phase 2",
+      "priority": "Phase 2",
+      "source": "domain-standard"
+    },
+    {
+      "id": "UJ-5",
+      "personaId": "P-1",
+      "title": "Approve and Pay Invoice",
+      "scenario": "The homeowner reviews the submitted invoice and confirms payment.",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "actor": "System",
+          "action": "Notify P-1 of pending invoice",
+          "expectedOutcome": "Push notification sent"
+        },
+        {
+          "stepNumber": 2,
+          "actor": "P-1",
+          "action": "Review invoice details",
+          "expectedOutcome": "Line items and total visible"
+        },
+        {
+          "stepNumber": 3,
+          "actor": "P-1",
+          "action": "Confirm Payment Authorization",
+          "expectedOutcome": "Payment processed via DOM-FINANCE"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Payment is deducted from saved card",
+        "Receipt is generated for record"
+      ],
+      "implementationPhase": "Phase 1",
+      "priority": "Phase 1",
+      "source": "ai-proposed"
+    },
+    {
+      "id": "UJ-6",
+      "personaId": "P-3",
+      "title": "Process HOA Monthly Payment",
+      "scenario": "Community Association Manager reconciles monthly dues and vendor invoices.",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "actor": "P-3",
+          "action": "Run AR reconciliation batch",
+          "expectedOutcome": "Outstanding invoices listed"
+        },
+        {
+          "stepNumber": 2,
+          "actor": "P-3",
+          "action": "Post payments to ledger",
+          "expectedOutcome": "DOM-FINANCE ledger updated"
+        },
+        {
+          "stepNumber": 3,
+          "actor": "P-3",
+          "action": "Export statement for Board",
+          "expectedOutcome": "PDF generated in DOM-REPORTING"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Reconciliation matches bank feed",
+        "Statement includes all approved expenses"
+      ],
+      "implementationPhase": "Phase 3",
+      "priority": "Phase 3",
+      "source": "domain-standard"
+    },
+    {
+      "id": "UJ-7",
+      "personaId": "P-3",
+      "title": "Issue Violation Notice",
+      "scenario": "Manager documents a rule violation and issues a formal notice.",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "actor": "P-3",
+          "action": "Input violation details",
+          "expectedOutcome": "Case created in DOM-COMPLIANCE"
+        },
+        {
+          "stepNumber": 2,
+          "actor": "System",
+          "action": "Trigger deadline alerts",
+          "expectedOutcome": "DOM-NOTIFY schedules reminders"
+        },
+        {
+          "stepNumber": 3,
+          "actor": "P-3",
+          "action": "File formal notice",
+          "expectedOutcome": "Owner receives notice via DOM-NOTIFY"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Notice is statutory compliant",
+        "Copy archived in DOM-DOCUMENT"
+      ],
+      "implementationPhase": "Phase 3",
+      "priority": "Phase 3",
+      "source": "domain-standard"
+    },
+    {
+      "id": "UJ-8",
+      "personaId": "P-4",
+      "title": "Vote on Resolutions",
+      "scenario": "Board Member reviews and votes on community financial or structural resolutions.",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "actor": "System",
+          "action": "Load active resolutions",
+          "expectedOutcome": "DOM-COMMUNITY dashboard updated"
+        },
+        {
+          "stepNumber": 2,
+          "actor": "P-4",
+          "action": "Review attached documents",
+          "expectedOutcome": "Context from DOM-DOCUMENT loaded"
+        },
+        {
+          "stepNumber": 3,
+          "actor": "P-4",
+          "action": "Cast Vote",
+          "expectedOutcome": "Vote recorded in DOM-COMMUNITY"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Vote result is encrypted",
+        "Minutes updated automatically"
+      ],
+      "implementationPhase": "Phase 3",
+      "priority": "Phase 3",
+      "source": "ai-proposed"
+    },
+    {
+      "id": "UJ-9",
+      "personaId": "P-6",
+      "title": "Manage Tenant Maintenance",
+      "scenario": "Property Manager coordinates maintenance requests from multiple tenants.",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "actor": "P-6",
+          "action": "Receive tenant ticket",
+          "expectedOutcome": "Ticket logged in DOM-REQUEST"
+        },
+        {
+          "stepNumber": 2,
+          "actor": "P-6",
+          "action": "Dispatch vendor P-2",
+          "expectedOutcome": "Job assigned to P-2 in DOM-OPERATIONS"
+        },
+        {
+          "stepNumber": 3,
+          "actor": "P-6",
+          "action": "Verify completion with tenant",
+          "expectedOutcome": "Tenant confirms satisfaction"
+        }
+      ],
+      "acceptanceCriteria": [
+        "Lease compliance check passed",
+        "All costs billed to owner"
+      ],
+      "implementationPhase": "Phase 2",
+      "priority": "Phase 2",
+      "source": "ai-proposed"
+    },
+    {
+      "id": "UJ-10",
+      "personaId": "P-5",
+      "title": "Onboard New User",
+      "scenario": "Hestami Admin adds a new vendor or owner to the system.",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "actor": "P-5",
+          "action": "Input user credentials",
+          "expectedOutcome": "DOM-AUTH generates account"
+        },
+        {
+          "stepNumber": 2,
+          "actor": "System",
+          "action": "Send welcome email",
+          "expectedOutcome": "DOM-NOTIFY triggers onboarding sequence"
+        },
+        {
+          "stepNumber": 3,
+          "actor": "P-5",
+          "action": "Verify license status",
+          "expectedOutcome": "DOM-VENDOR confirms validity"
+        }
+      ],
+      "acceptanceCriteria": [
+        "User can log in successfully",
+        "Permissions matrix is correct"
+      ],
+      "implementationPhase": "Phase 1",
+      "priority": "Phase 1",
+      "source": "ai-proposed"
+    }
+  ],
+  "phasingStrategy": [
+    {
+      "phase": "Phase 1",
+      "description": "Hestami Home Real Property Assistant. Focuses on the core value of connecting owners with reliable services, handling onboarding, intake, and matching.",
+      "journeyIds": [
+        "UJ-1",
+        "UJ-2"
+      ],
+      "rationale": "Delivers immediate relief to the largest number of potential users (homeowners) by solving the most common pain points (finding contractors, managing repairs)."
+    },
+    {
+      "phase": "Phase 2",
+      "description": "Hestami Service Provider Field Services Management. Expands capabilities to the contractors and tradespeople who execute the work.",
+      "journeyIds": [
+        "UJ-3"
+      ],
+      "rationale": "Captures value from the service providers side, improving their operational efficiency and profitability, creating a network effect."
+    },
+    {
+      "phase": "Phase 3",
+      "description": "Hestami Community Association Management. Delivers the comprehensive HOA governance and financial management suite.",
+      "journeyIds": [
+        "UJ-4"
+      ],
+      "rationale": "Complex domain requiring deep compliance and accounting integrations, suitable for after the core matching engine is proven."
+    }
+  ],
+  "successMetrics": [
+    "Reduction in property owner time spent finding service providers.",
+    "Increase in contractor dispatching efficiency (reduced travel time).",
+    "Decrease in administrative overhead for CAMs (automated AR/AP).",
+    "User adoption rate across all three pillars.",
+    "Number of service calls resolved without human intervention."
+  ],
+  "businessDomainProposals": [
+    {
+      "id": "DOM-PROPERTY",
+      "name": "Property Asset Registry",
+      "description": "Core registry for real estate assets, addresses, and inventory management within multi-tenant isolation.",
+      "rationale": "Essential for UJ-1 (Onboarding). Maps to P-1 and P-8. Covers asset ingestion and versioning.",
+      "entityPreview": [
+        "Property Record",
+        "Address Entity",
+        "Asset Inventory"
+      ],
+      "workflowPreview": [
+        "Onboarding",
+        "Asset Update"
+      ],
+      "source": "user-specified"
+    },
+    {
+      "id": "DOM-VENDOR",
+      "name": "Vendor Management & Vetting",
+      "description": "Profiles for service providers, license verification, insurance validation, and capability tracking.",
+      "rationale": "Core to UJ-2 (Vendor Matching). Enables P-1 to vet providers and P-2 to manage operations.",
+      "entityPreview": [
+        "Contractor Profile",
+        "Vendor License",
+        "Business Entity"
+      ],
+      "workflowPreview": [
+        "Vendor Onboarding",
+        "Vetting Check"
+      ],
+      "source": "user-specified"
+    },
+    {
+      "id": "DOM-REQUEST",
+      "name": "Service Request Intake",
+      "description": "Service call creation, triage, prioritization, and initial matching engine logic.",
+      "rationale": "Directly supports UJ-2. Central pillar of Hestami Home Real Property Assistant.",
+      "entityPreview": [
+        "Service Call",
+        "Intake Form",
+        "Matching Ticket"
+      ],
+      "workflowPreview": [
+        "Request Submission",
+        "Vendor Assignment"
+      ],
+      "source": "user-specified"
+    },
+    {
+      "id": "DOM-OPERATIONS",
+      "name": "Field Service Operations",
+      "description": "Work order execution, dispatching, scheduling, and job completion workflows.",
+      "rationale": "Enables UJ-3. Critical for P-2 to manage operations and travel time.",
+      "entityPreview": [
+        "Work Order",
+        "Job Ticket",
+        "Dispatch Log"
+      ],
+      "workflowPreview": [
+        "Dispatch",
+        "Job Completion"
+      ],
+      "source": "user-specified"
+    },
+    {
+      "id": "DOM-FINANCE",
+      "name": "Financial Services",
+      "description": "Invoicing, payments, AR/AP, budgeting, and financial posting for owners and HOAs.",
+      "rationale": "Required for CAM (P-3) and Owner cost tracking (P-1). Covers AR/AP and payment processing.",
+      "entityPreview": [
+        "Invoice",
+        "Payment Record",
+        "Budget Ledger"
+      ],
+      "workflowPreview": [
+        "Billing Generation",
+        "Payment Capture"
+      ],
+      "source": "user-specified"
+    },
+    {
+      "id": "DOM-COMPLIANCE",
+      "name": "Governance & Compliance",
+      "description": "HOA rules, violation tracking, notice sequences, and statutory deadline management.",
+      "rationale": "Addresses P-3 and P-4 goals. Supports requirements for tracking violations and notices.",
+      "entityPreview": [
+        "Violation Ticket",
+        "Notice Document",
+        "Bylaw Record"
+      ],
+      "workflowPreview": [
+        "Violation Notice",
+        "Compliance Audit"
+      ],
+      "source": "user-specified"
+    },
+    {
+      "id": "DOM-DOCUMENT",
+      "name": "Document Management",
+      "description": "Secure storage for contracts, photos, permits, reports, and archival documents.",
+      "rationale": "Implied by P-3 and P-4 need to access archival documents. Supports compliance and reporting.",
+      "entityPreview": [
+        "Contract",
+        "Permit",
+        "Report"
+      ],
+      "workflowPreview": [
+        "Upload",
+        "Document Retrieval"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "DOM-NOTIFY",
+      "name": "Notification Engine",
+      "description": "Push, email, SMS, and in-app alerts for status updates, deadline reminders, and announcements.",
+      "rationale": "Implied by UJ-1 and UJ-2 communication needs. Essential for maintaining engagement.",
+      "entityPreview": [
+        "Alert Push",
+        "Email Template",
+        "SMS Message"
+      ],
+      "workflowPreview": [
+        "Status Update",
+        "Reminder"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "DOM-AUTH",
+      "name": "Identity & Access",
+      "description": "Multi-tenant isolation, SSO, permission matrices, and security policy enforcement.",
+      "rationale": "Required by requirements (Multi-tenant isolation). Foundational for all personas.",
+      "entityPreview": [
+        "User Record",
+        "Role Group",
+        "Tenant Context"
+      ],
+      "workflowPreview": [
+        "Login",
+        "Permission Grant"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "DOM-REPORTING",
+      "name": "Analytics & Reporting",
+      "description": "Dashboards, financial reports, activity logs, and insights for boards and admins.",
+      "rationale": "Supports P-3 and P-4 goals to review reports. Provides P-5 system health data.",
+      "entityPreview": [
+        "Financial Report",
+        "Usage Dashboard",
+        "Violation Log"
+      ],
+      "workflowPreview": [
+        "Report Generation",
+        "Insight Delivery"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "DOM-COMMUNITY",
+      "name": "Community Hub",
+      "description": "Forums, announcements, voting, and transparent communication channels for HOA governance.",
+      "rationale": "Enables P-4 goals to communicate transparently. Supports community engagement.",
+      "entityPreview": [
+        "Announcement",
+        "Discussion Thread",
+        "Vote Session"
+      ],
+      "workflowPreview": [
+        "Post Announcement",
+        "Vote Cast"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "DOM-RISK",
+      "name": "Insurance & Liability",
+      "description": "Verification of insurance coverage and liability management during work order execution.",
+      "rationale": "Addresses P-2 and P-1 pain points regarding vendor legitimacy and risk.",
+      "entityPreview": [
+        "Insurance Certificate",
+        "Liability Claim",
+        "Policy Verification"
+      ],
+      "workflowPreview": [
+        "Coverage Check",
+        "Claim Filing"
+      ],
+      "source": "user-specified"
+    }
+  ],
+  "entityProposals": [
+    {
+      "id": "ENT-USER",
+      "businessDomainId": "DOM-AUTH",
+      "name": "User",
+      "description": "Represents a human actor in the system including owners, contractors, admins, and board members with authentication credentials.",
+      "keyAttributes": [
+        "id",
+        "email",
+        "emailAddress"
+      ],
+      "relationships": [
+        "belongs_to Tenancy",
+        "has_many Sessions",
+        "linked_via ManyToMany Roles"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-USER-PROFILE",
+      "businessDomainId": "DOM-AUTH",
+      "name": "User Profile",
+      "description": "Extends user identity with display names, avatars, and contact preferences for field operations.",
+      "keyAttributes": [
+        "userId",
+        "firstName",
+        "lastName"
+      ],
+      "relationships": [
+        "belongs_to User",
+        "linked_via Notification Preferences"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-ROLE",
+      "businessDomainId": "DOM-AUTH",
+      "name": "Role",
+      "description": "Defines a collection of permissions for system access levels such as Admin, BoardMember, Vendor, or Homeowner.",
+      "keyAttributes": [
+        "id",
+        "name",
+        "description"
+      ],
+      "relationships": [
+        "defined_by Permissions",
+        "assigned_to Users"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-PERMISSION",
+      "businessDomainId": "DOM-AUTH",
+      "name": "Permission",
+      "description": "Granular access control entry defining specific actions allowed on resources like ReadInvoice or CreateRequest.",
+      "keyAttributes": [
+        "id",
+        "resourceType",
+        "action"
+      ],
+      "relationships": [
+        "linked_to Role",
+        "defines_access_for Domains"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-SESSION",
+      "businessDomainId": "DOM-AUTH",
+      "name": "Active Session",
+      "description": "Tracks active login sessions for security revocation and concurrent usage limits.",
+      "keyAttributes": [
+        "sessionId",
+        "userId",
+        "expiryTime"
+      ],
+      "relationships": [
+        "initiated_by User",
+        "revoked_by Admin"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-TENANCY",
+      "businessDomainId": "DOM-AUTH",
+      "name": "Tenancy",
+      "description": "Defines the legal tenancy relationship between a user and a property for lease compliance tracking.",
+      "keyAttributes": [
+        "id",
+        "propertyId",
+        "status"
+      ],
+      "relationships": [
+        "owned_by Property",
+        "associated_with User"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-PROPERTY",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "Property",
+      "description": "Master registry for real estate assets including addresses, ownership structures, and unit definitions.",
+      "keyAttributes": [
+        "id",
+        "addressId",
+        "status"
+      ],
+      "relationships": [
+        "contains Units",
+        "linked_to Addresses"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-BUILDING",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "Building",
+      "description": "Structural container for units and addresses within a multi-unit asset management scope.",
+      "keyAttributes": [
+        "id",
+        "propertyId",
+        "buildingName"
+      ],
+      "relationships": [
+        "contains Units",
+        "part_of Property"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-ADDRESS",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "Address",
+      "description": "Standardized physical location data including geocoordinates and validation status.",
+      "keyAttributes": [
+        "id",
+        "street",
+        "city"
+      ],
+      "relationships": [
+        "belongs_to Property",
+        "linked_to Unit"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-UNIT",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "Unit",
+      "description": "Individual residential or commercial space within a property used for billing and maintenance targeting.",
+      "keyAttributes": [
+        "id",
+        "buildingId",
+        "unitNumber"
+      ],
+      "relationships": [
+        "located_in Building",
+        "managed_by Property"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-LEASE",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "Lease",
+      "description": "Contractual agreement defining rights and obligations between owner, tenant, and service provider.",
+      "keyAttributes": [
+        "id",
+        "startDate",
+        "endDate"
+      ],
+      "relationships": [
+        "covers Unit",
+        "references Owner"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-PERMIT",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "Permit",
+      "description": "Regulatory approval documents attached to a property or specific work order for compliance verification.",
+      "keyAttributes": [
+        "id",
+        "permitNumber",
+        "issuingAuthority"
+      ],
+      "relationships": [
+        "applies_to Unit",
+        "linked_to Document"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-VENDOR",
+      "businessDomainId": "DOM-VENDOR",
+      "name": "Vendor",
+      "description": "Profiles for service providers, contractors, and vendors registered in the marketplace.",
+      "keyAttributes": [
+        "id",
+        "businessName",
+        "taxId"
+      ],
+      "relationships": [
+        "offers Services",
+        "vetted_by Compliance"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-VENDOR-CERTIFICATE",
+      "businessDomainId": "DOM-VENDOR",
+      "name": "Vendor Certificate",
+      "description": "Holds scanned copies of license or business registration for vetting verification.",
+      "keyAttributes": [
+        "id",
+        "vendorId",
+        "issueDate"
+      ],
+      "relationships": [
+        "issued_to Vendor",
+        "stored_as Document"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-VENDOR-INSURANCE",
+      "businessDomainId": "DOM-VENDOR",
+      "name": "Vendor Insurance",
+      "description": "Tracks liability and property insurance policy details required for risk mitigation.",
+      "keyAttributes": [
+        "id",
+        "vendorId",
+        "carrier"
+      ],
+      "relationships": [
+        "covers Vendor",
+        "verified_by Risk"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-VENDOR-PRICING",
+      "businessDomainId": "DOM-VENDOR",
+      "name": "Pricing Tier",
+      "description": "Defines hourly rates or fixed price structures for specific trade skills.",
+      "keyAttributes": [
+        "id",
+        "vendorId",
+        "hourlyRate"
+      ],
+      "relationships": [
+        "applies_to Vendor",
+        "used_in Estimate"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-SERVICE-REQUEST",
+      "businessDomainId": "DOM-REQUEST",
+      "name": "Service Request",
+      "description": "Intake form for maintenance needs created by homeowners or property managers for triage.",
+      "keyAttributes": [
+        "id",
+        "propertyId",
+        "requestType"
+      ],
+      "relationships": [
+        "created_by User",
+        "matches_with WorkOrder"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-REQUEST-SCOPE",
+      "businessDomainId": "DOM-REQUEST",
+      "name": "Scope of Work",
+      "description": "Detailed description and requirements attached to the service request for vendor matching.",
+      "keyAttributes": [
+        "id",
+        "requestId",
+        "priority"
+      ],
+      "relationships": [
+        "defines Scope of ServiceRequest",
+        "linked_to Materials"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-BID-OPTION",
+      "businessDomainId": "DOM-REQUEST",
+      "name": "Bid Option",
+      "description": "Proposed solution and pricing submitted by a vendor for a specific service request.",
+      "keyAttributes": [
+        "id",
+        "requestId",
+        "vendorId"
+      ],
+      "relationships": [
+        "submitted_by Vendor",
+        "accepted_as WorkOrder"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-WORK-ORDER",
+      "businessDomainId": "DOM-OPERATIONS",
+      "name": "Work Order",
+      "description": "Execution plan derived from matched bids representing the approved service job.",
+      "keyAttributes": [
+        "id",
+        "requestId",
+        "status"
+      ],
+      "relationships": [
+        "created_from ServiceRequest",
+        "assigned_to Technician"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-ASSIGNMENT",
+      "businessDomainId": "DOM-OPERATIONS",
+      "name": "Field Assignment",
+      "description": "Specific dispatch instruction sent to a vendor or technician to accept the work order.",
+      "keyAttributes": [
+        "id",
+        "workOrderId",
+        "vendorId"
+      ],
+      "relationships": [
+        "sent_to Vendor",
+        "confirmed_by Technician"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-MATERIAL-INVENTORY",
+      "businessDomainId": "DOM-OPERATIONS",
+      "name": "Material",
+      "description": "Track parts or supplies required for the completion of the work order.",
+      "keyAttributes": [
+        "id",
+        "materialName",
+        "sku"
+      ],
+      "relationships": [
+        "used_in WorkOrder",
+        "tracked_by Inventory"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-TIME-ENTRY",
+      "businessDomainId": "DOM-OPERATIONS",
+      "name": "Time Entry",
+      "description": "Logs labor hours worked on the field job for billing and payroll processing.",
+      "keyAttributes": [
+        "id",
+        "workOrderId",
+        "startTime"
+      ],
+      "relationships": [
+        "part_of WorkOrder",
+        "linked_to Technician"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-LEDGER",
+      "businessDomainId": "DOM-FINANCE",
+      "name": "Ledger",
+      "description": "Core accounting ledger tracking all financial transactions for AP and AR.",
+      "keyAttributes": [
+        "id",
+        "accountName",
+        "currency"
+      ],
+      "relationships": [
+        "holds Transactions",
+        "linked_to Organization"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-TRANSACTION",
+      "businessDomainId": "DOM-FINANCE",
+      "name": "Transaction",
+      "description": "Immutably recorded financial event such as payments, refunds, or adjustments.",
+      "keyAttributes": [
+        "id",
+        "amount",
+        "referenceNumber"
+      ],
+      "relationships": [
+        "categorized_to Ledger",
+        "derived_from Invoice"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-INVOICE",
+      "businessDomainId": "DOM-FINANCE",
+      "name": "Invoice",
+      "description": "Billing document generated from completed work orders requesting payment from owner or HOA.",
+      "keyAttributes": [
+        "id",
+        "workOrderId",
+        "dueDate"
+      ],
+      "relationships": [
+        "based_on WorkOrder",
+        "paid_via Transaction"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-PAYMENT-RECORD",
+      "businessDomainId": "DOM-FINANCE",
+      "name": "Payment Record",
+      "description": "History of payments processed towards an invoice or monthly dues.",
+      "keyAttributes": [
+        "id",
+        "invoiceId",
+        "status"
+      ],
+      "relationships": [
+        "settles Invoice",
+        "logged_as Transaction"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-BUDGET-HEADER",
+      "businessDomainId": "DOM-FINANCE",
+      "name": "Budget Header",
+      "description": "Master budget definition for an HOA or entity for a fiscal year.",
+      "keyAttributes": [
+        "id",
+        "year",
+        "currency"
+      ],
+      "relationships": [
+        "contains Budget Lines",
+        "managed_by Board"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-BUDGET-LINE",
+      "businessDomainId": "DOM-FINANCE",
+      "name": "Budget Line",
+      "description": "Individual line item within a budget for expenses or revenue categories.",
+      "keyAttributes": [
+        "id",
+        "budgetHeaderId",
+        "limit"
+      ],
+      "relationships": [
+        "part_of BudgetHeader",
+        "compared_to Transactions"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-RULE-SET",
+      "businessDomainId": "DOM-COMPLIANCE",
+      "name": "Rule Set",
+      "description": "Collection of governing documents and bylaws for a specific community.",
+      "keyAttributes": [
+        "id",
+        "communityId",
+        "version"
+      ],
+      "relationships": [
+        "defined_by Board",
+        "applies_to Units"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-RULE-CLAUSE",
+      "businessDomainId": "DOM-COMPLIANCE",
+      "name": "Rule Clause",
+      "description": "Specific enforcement criteria within the rule set regarding conduct or aesthetics.",
+      "keyAttributes": [
+        "id",
+        "ruleSetId",
+        "clauseText"
+      ],
+      "relationships": [
+        "part_of RuleSet",
+        "cited_in Violation"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-VIOLATION-REPORT",
+      "businessDomainId": "DOM-COMPLIANCE",
+      "name": "Violation Report",
+      "description": "Documented instance of non-compliance with rules requiring formal notice.",
+      "keyAttributes": [
+        "id",
+        "ruleClauseId",
+        "severity"
+      ],
+      "relationships": [
+        "based_on RuleClause",
+        "escalated_to Notice"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-COMPLIANCE-NOTICE",
+      "businessDomainId": "DOM-COMPLIANCE",
+      "name": "Notice",
+      "description": "Formal legal notification sequence tracking deadlines and resident actions.",
+      "keyAttributes": [
+        "id",
+        "violationId",
+        "deadline"
+      ],
+      "relationships": [
+        "follows ViolationReport",
+        "sent_via Notify"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-APPEAL-REQUEST",
+      "businessDomainId": "DOM-COMPLIANCE",
+      "name": "Appeal",
+      "description": "Formal request to waive or modify a compliance penalty or notice.",
+      "keyAttributes": [
+        "id",
+        "violationId",
+        "date"
+      ],
+      "relationships": [
+        "targets ViolationReport",
+        "reviewed_by Board"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-DOCUMENT-REPO",
+      "businessDomainId": "DOM-DOCUMENT",
+      "name": "Repository",
+      "description": "Container holding all documents, photos, and files within a secure archive.",
+      "keyAttributes": [
+        "id",
+        "repositoryName",
+        "type"
+      ],
+      "relationships": [
+        "contains Documents",
+        "linked_to Entity"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-FOLDER-STRUCTURE",
+      "businessDomainId": "DOM-DOCUMENT",
+      "name": "Folder",
+      "description": "Hierarchical organization node within the document repository.",
+      "keyAttributes": [
+        "id",
+        "parentId",
+        "path"
+      ],
+      "relationships": [
+        "nested_in Repository",
+        "contains Documents"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-DOCUMENT",
+      "businessDomainId": "DOM-DOCUMENT",
+      "name": "Document",
+      "description": "Single file or record version stored securely with retention policy applied.",
+      "keyAttributes": [
+        "id",
+        "folderId",
+        "fileName"
+      ],
+      "relationships": [
+        "stored_in Folder",
+        "uploaded_via Notification"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-NOTIFICATION-CHANNEL",
+      "businessDomainId": "DOM-NOTIFY",
+      "name": "Channel",
+      "description": "Configuration for delivery method such as push, email, SMS, or in-app alerts.",
+      "keyAttributes": [
+        "id",
+        "channelType",
+        "provider"
+      ],
+      "relationships": [
+        "defined_by System",
+        "used_for Delivery"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-NOTIFICATION-TEMPLATE",
+      "businessDomainId": "DOM-NOTIFY",
+      "name": "Template",
+      "description": "Message blueprint defining content and variables for notifications.",
+      "keyAttributes": [
+        "id",
+        "channelId",
+        "subject"
+      ],
+      "relationships": [
+        "used_by Channel",
+        "instantiates Delivery"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-NOTIFICATION-JOB",
+      "businessDomainId": "DOM-NOTIFY",
+      "name": "Notification Job",
+      "description": "Executed instance of sending a notification to a user or group.",
+      "keyAttributes": [
+        "id",
+        "templateId",
+        "status"
+      ],
+      "relationships": [
+        "based_on Template",
+        "triggered_by Event"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-COMMUNITY-GROUP",
+      "businessDomainId": "DOM-COMMUNITY",
+      "name": "Community Group",
+      "description": "Logical grouping for members such as HOA board, neighbors, or committee.",
+      "keyAttributes": [
+        "id",
+        "groupId",
+        "name"
+      ],
+      "relationships": [
+        "part_of Community",
+        "hosts Forum"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-FORUM",
+      "businessDomainId": "DOM-COMMUNITY",
+      "name": "Forum",
+      "description": "Public or private discussion board for community questions and announcements.",
+      "keyAttributes": [
+        "id",
+        "groupId",
+        "topic"
+      ],
+      "relationships": [
+        "created_in Group",
+        "contains Posts"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-FORUM-POST",
+      "businessDomainId": "DOM-COMMUNITY",
+      "name": "Post",
+      "description": "Individual message or thread within the community forum.",
+      "keyAttributes": [
+        "id",
+        "forumId",
+        "authorId"
+      ],
+      "relationships": [
+        "posted_in Forum",
+        "replied_by Users"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-VOTE",
+      "businessDomainId": "DOM-COMMUNITY",
+      "name": "Vote",
+      "description": "Record of a ballot cast by a member on a community resolution.",
+      "keyAttributes": [
+        "id",
+        "resolutionId",
+        "option"
+      ],
+      "relationships": [
+        "cast_on Resolution",
+        "belongs_to Member"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-RESOLUTION",
+      "businessDomainId": "DOM-COMMUNITY",
+      "name": "Resolution",
+      "description": "Formal proposal requiring a vote for board decisions or policy changes.",
+      "keyAttributes": [
+        "id",
+        "groupId",
+        "status"
+      ],
+      "relationships": [
+        "voted_on_by Members",
+        "requires Vote Count"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-ANNOUNCEMENT",
+      "businessDomainId": "DOM-COMMUNITY",
+      "name": "Announcement",
+      "description": "System-generated or board-issued updates for community-wide visibility.",
+      "keyAttributes": [
+        "id",
+        "groupId",
+        "type"
+      ],
+      "relationships": [
+        "targeted_to Members",
+        "published_in Group"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-INSURANCE-POLICY",
+      "businessDomainId": "DOM-RISK",
+      "name": "Insurance Policy",
+      "description": "Policy details for vendor liability or property coverage during job execution.",
+      "keyAttributes": [
+        "id",
+        "policyNumber",
+        "expiration"
+      ],
+      "relationships": [
+        "covers Vendor",
+        "checked_by Risk"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-LIABILITY-CERT",
+      "businessDomainId": "DOM-RISK",
+      "name": "Liability Certificate",
+      "description": "Proof of insurance document required before vendor dispatch.",
+      "keyAttributes": [
+        "id",
+        "policyId",
+        "fileId"
+      ],
+      "relationships": [
+        "references InsurancePolicy",
+        "stored_as Document"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-DASHBOARD",
+      "businessDomainId": "DOM-REPORTING",
+      "name": "Dashboard",
+      "description": "Visualized view for analytics aggregating metrics for board or admin consumption.",
+      "keyAttributes": [
+        "id",
+        "viewName",
+        "userId"
+      ],
+      "relationships": [
+        "viewed_by User",
+        "compiles Metrics"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-METRIC",
+      "businessDomainId": "DOM-REPORTING",
+      "name": "Metric",
+      "description": "Defined measurement unit for reporting like cost per job or response time.",
+      "keyAttributes": [
+        "id",
+        "dashboardId",
+        "formula"
+      ],
+      "relationships": [
+        "displayed_on Dashboard",
+        "derived from Ledgers"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-SYSTEM-SETTING",
+      "businessDomainId": "DOM-REPORTING",
+      "name": "System Setting",
+      "description": "Global or tenant-level configurations for behavior, thresholds, and defaults.",
+      "keyAttributes": [
+        "id",
+        "settingKey",
+        "value"
+      ],
+      "relationships": [
+        "applies_to System",
+        "defined_by Admin"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-AUDIT-LOG",
+      "businessDomainId": "DOM-AUTH",
+      "name": "Audit Log",
+      "description": "Immutable record of security events such as login attempts or data changes.",
+      "keyAttributes": [
+        "id",
+        "userId",
+        "eventType"
+      ],
+      "relationships": [
+        "created_on Action",
+        "reviewed_by Admin"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-PROPERTY-VENDOR",
+      "businessDomainId": "DOM-OPERATIONS",
+      "name": "Property Vendor Link",
+      "description": "Many-to-many junction recording which vendors are authorized to service which properties.",
+      "keyAttributes": [
+        "id",
+        "propertyId",
+        "vendorId"
+      ],
+      "relationships": [
+        "links Property and Vendor",
+        "managed_by Dispatch"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-USER-PROPERTY",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "User Property Link",
+      "description": "Defines ownership or management rights for a user across multiple properties.",
+      "keyAttributes": [
+        "id",
+        "userId",
+        "propertyId"
+      ],
+      "relationships": [
+        "links User and Property",
+        "sets Access Level"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-TENANT-OPTION",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "Tenant Option",
+      "description": "Preferences or rules specific to a tenant such as payment schedule or repair request type.",
+      "keyAttributes": [
+        "id",
+        "tenancyId",
+        "optionKey"
+      ],
+      "relationships": [
+        "linked_to Tenancy",
+        "stored_as Setting"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-BILLING-UNIT",
+      "businessDomainId": "DOM-FINANCE",
+      "name": "Billing Unit",
+      "description": "Sub-division for utility or HOA fee allocation distinct from physical property units.",
+      "keyAttributes": [
+        "id",
+        "propertyId",
+        "chargeType"
+      ],
+      "relationships": [
+        "part_of Property",
+        "billed_as Invoice"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-MONTHLY-DUE",
+      "businessDomainId": "DOM-FINANCE",
+      "name": "Monthly Due",
+      "description": "Recurring billing schedule for HOA dues calculated for the month.",
+      "keyAttributes": [
+        "id",
+        "period",
+        "amount"
+      ],
+      "relationships": [
+        "grouped_as Billing",
+        "linked_to Budget"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "ENT-SERVICE-CATALOG",
+      "businessDomainId": "DOM-VENDOR",
+      "name": "Service Catalog",
+      "description": "List of standard services available for selection during request intake.",
+      "keyAttributes": [
+        "id",
+        "category",
+        "name"
+      ],
+      "relationships": [
+        "selected_in Request",
+        "listed_by Vendor"
+      ],
+      "source": "ai-proposed"
+    }
+  ],
+  "workflowProposals": [
+    {
+      "id": "WF-1",
+      "businessDomainId": "DOM-REQUEST",
+      "name": "Intake Triage Workflow",
+      "description": "Processes incoming service requests, validates data, and queues for matching.",
+      "steps": [
+        "Validate form input against schema",
+        "Check address geolocation accuracy",
+        "Assign priority based on urgency flags",
+        "Push to matching engine"
+      ],
+      "triggers": [
+        "User submits form",
+        "Tenant uploads ticket"
+      ],
+      "actors": [
+        "DOM-AUTH",
+        "DOM-NOTIFY",
+        "Matching Engine"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "WF-2",
+      "businessDomainId": "DOM-VENDOR",
+      "name": "Vendor Vetting Process",
+      "description": "Automated checks to ensure contractors are licensed and insured.",
+      "steps": [
+        "Scan license numbers against state DB",
+        "Validate insurance policy active date",
+        "Check background flag status",
+        "Update vendor profile status"
+      ],
+      "triggers": [
+        "Vendor profile created",
+        "Request for re-verification"
+      ],
+      "actors": [
+        "DOM-AUTH",
+        "DOM-RISK",
+        "DOM-VENDOR"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "WF-3",
+      "businessDomainId": "DOM-OPERATIONS",
+      "name": "Smart Dispatch Engine",
+      "description": "Matches available technicians to requests based on skills and proximity.",
+      "steps": [
+        "Filter vendors by skill set required",
+        "Calculate travel time from current location",
+        "Score vendors by availability and rating",
+        "Send invitation to top 3 vendors"
+      ],
+      "triggers": [
+        "New request approved",
+        "Vendor accepts previous job"
+      ],
+      "actors": [
+        "DOM-OPERATIONS",
+        "DOM-NOTIFY",
+        "P-2"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "WF-4",
+      "businessDomainId": "DOM-FINANCE",
+      "name": "Invoice Generation and Posting",
+      "description": "Creates invoices from completed work orders and posts them to AP ledger.",
+      "steps": [
+        "Aggregate labor and material costs",
+        "Apply tax rules based on location",
+        "Generate invoice number",
+        "Send to DOM-NOTIFY for owner approval"
+      ],
+      "triggers": [
+        "Job marked complete",
+        "Payment due date"
+      ],
+      "actors": [
+        "DOM-FINANCE",
+        "DOM-DOCUMENT",
+        "DOM-NOTIFY"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "WF-5",
+      "businessDomainId": "DOM-NOTIFY",
+      "name": "Alert and Reminder Distribution",
+      "description": "Sends relevant push, email, or SMS notifications based on system events.",
+      "steps": [
+        "Retrieve user channel preferences",
+        "Format message template",
+        "Dispatch via preferred channel",
+        "Log delivery success/failure"
+      ],
+      "triggers": [
+        "Request matched",
+        "Invoice overdue",
+        "Job delayed"
+      ],
+      "actors": [
+        "DOM-NOTIFY",
+        "DOM-AUTH",
+        "DOM-REQUEST"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "WF-6",
+      "businessDomainId": "DOM-COMPLIANCE",
+      "name": "Statutory Notice Sequencer",
+      "description": "Manages the timeline for legal notices to ensure HOA compliance.",
+      "steps": [
+        "Calculate notice deadline based on rule type",
+        "Issue first notice via DOM-NOTIFY",
+        "Track response window",
+        "Escalate to second notice if ignored"
+      ],
+      "triggers": [
+        "Violation reported",
+        "Annual rule update"
+      ],
+      "actors": [
+        "DOM-COMPLIANCE",
+        "DOM-NOTIFY",
+        "DOM-DOCUMENT"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "WF-7",
+      "businessDomainId": "DOM-COMMUNITY",
+      "name": "Resolution Voting Workflow",
+      "description": "Enables board and members to propose and vote on community decisions.",
+      "steps": [
+        "Draft resolution text",
+        "Publish to DOM-COMMUNITY feed",
+        "Set voting window start/end",
+        "Close vote and tally results"
+      ],
+      "triggers": [
+        "Board proposal submitted",
+        "Member request"
+      ],
+      "actors": [
+        "DOM-COMMUNITY",
+        "DOM-AUTH",
+        "DOM-REPORTING"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "WF-8",
+      "businessDomainId": "DOM-RISK",
+      "name": "Insurance Coverage Verification",
+      "description": "Checks vendor liability and property insurance before job assignment.",
+      "steps": [
+        "Scan job request for risk type",
+        "Query DOM-VENDOR for policy details",
+        "Validate coverage limits",
+        "Flag job if insurance insufficient"
+      ],
+      "triggers": [
+        "Job dispatch initiated",
+        "New vendor added"
+      ],
+      "actors": [
+        "DOM-RISK",
+        "DOM-VENDOR",
+        "DOM-OPERATIONS"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "WF-9",
+      "businessDomainId": "DOM-DOCUMENT",
+      "name": "Secure Document Archiving",
+      "description": "Stores contracts, permits, and work reports securely with retention policies.",
+      "steps": [
+        "Receive file upload from user",
+        "Scan for sensitive data",
+        "Apply encryption and hashing",
+        "Link to specific work order ID"
+      ],
+      "triggers": [
+        "Contract signed",
+        "Work report completed"
+      ],
+      "actors": [
+        "DOM-DOCUMENT",
+        "DOM-AUTH",
+        "DOM-NOTIFY"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "WF-10",
+      "businessDomainId": "DOM-REPORTING",
+      "name": "Financial Dashboard Generation",
+      "description": "Compiles spending and revenue data into monthly reports for boards.",
+      "steps": [
+        "Pull AR/AP data from DOM-FINANCE",
+        "Filter by date range and domain",
+        "Calculate KPI metrics",
+        "Render chart and PDF"
+      ],
+      "triggers": [
+        "Monthly schedule",
+        "Ad-hoc request"
+      ],
+      "actors": [
+        "DOM-REPORTING",
+        "DOM-FINANCE",
+        "DOM-AUTH"
+      ],
+      "source": "ai-proposed"
+    },
+    {
+      "id": "WF-11",
+      "businessDomainId": "DOM-AUTH",
+      "name": "Access Provisioning and Revoking",
+      "description": "Handles SSO and permission changes for users entering or leaving the platform.",
+      "steps": [
+        "Receive role assignment request",
+        "Map permissions to DOM-AUTH policy",
+        "Generate access tokens",
+        "Log audit trail entry"
+      ],
+      "triggers": [
+        "User added",
+        "Role change",
+        "User termination"
+      ],
+      "actors": [
+        "DOM-AUTH",
+        "DOM-OPERATIONS",
+        "P-5"
+      ],
+      "source": "domain-standard"
+    },
+    {
+      "id": "WF-12",
+      "businessDomainId": "DOM-PROPERTY",
+      "name": "Asset Registry Sync",
+      "description": "Updates property details like address or ownership status across the system.",
+      "steps": [
+        "Receive address update event",
+        "Validate against DOM-PROPERTY schema",
+        "Update multi-tenant isolation records",
+        "Trigger notification of change"
+      ],
+      "triggers": [
+        "Title transfer event",
+        "New construction report"
+      ],
+      "actors": [
+        "DOM-PROPERTY",
+        "DOM-AUTH",
+        "DOM-NOTIFY"
+      ],
+      "source": "ai-proposed"
+    }
+  ],
+  "integrationProposals": [
+    {
+      "id": "INT-IDP-SAML",
+      "name": "Identity Provider Integration",
+      "category": "identity",
+      "description": "Manages multi-tenant isolation and SSO for users via external IDP.",
+      "standardProviders": [
+        "Okta",
+        "Azure AD",
+        "Ping Identity"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Supports WF-11 Access Provisioning for P-5 Admin and P-4 Board security requirements.",
+      "source": "document-specified"
+    },
+    {
+      "id": "INT-GEOCODING",
+      "name": "Geocoding and Map Services",
+      "category": "geocoding",
+      "description": "Validates addresses and provides geocoordinates for property assets.",
+      "standardProviders": [
+        "Google Maps API",
+        "Mapbox",
+        "HERE Maps"
+      ],
+      "ownershipModel": "consumed",
+      "rationale": "Critical for WF-3 Smart Dispatch Engine proximity matching and DOM-PROPERTY Address entities.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-OBJECT-STORAGE",
+      "name": "Object Storage Service",
+      "category": "storage",
+      "description": "Secure archival for contracts, photos, and reports with retention policies.",
+      "standardProviders": [
+        "AWS S3",
+        "Azure Blob",
+        "Google Cloud Storage"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Supports WF-9 Secure Document Archiving for DOM-DOCUMENT Repository entities.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-INSURANCE-API",
+      "name": "Insurance Verification Service",
+      "category": "other",
+      "description": "Checks vendor liability and property insurance policy validity.",
+      "standardProviders": [
+        "Policygenius",
+        "Insurify",
+        "SureCert"
+      ],
+      "ownershipModel": "consumed",
+      "rationale": "Enables WF-8 Insurance Coverage Verification for DOM-RISK domain compliance.",
+      "source": "ai-proposed"
+    },
+    {
+      "id": "INT-LICENSE-VERIFY",
+      "name": "License Verification Engine",
+      "category": "compliance",
+      "description": "Automated checks to ensure contractors hold valid trade licenses.",
+      "standardProviders": [
+        "State Licensing API",
+        "ContractorCheck",
+        "LicensesCheck"
+      ],
+      "ownershipModel": "consumed",
+      "rationale": "Supports WF-2 Vendor Vetting Process for DOM-VENDOR entities.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-PAYMENT-GW",
+      "name": "Payment Gateway",
+      "category": "payment",
+      "description": "Processes homeowner and HOA payments for invoices and dues.",
+      "standardProviders": [
+        "Stripe",
+        "Braintree",
+        "Adyen"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Directly enables UJ-5 Approve and Pay Invoice and UJ-6 HOA Monthly Payment flows.",
+      "source": "document-specified"
+    },
+    {
+      "id": "INT-ERP-SYNC",
+      "name": "Accounting ERP Connector",
+      "category": "erp",
+      "description": "Syncs financial transactions, AR/AP, and ledgers to external accounting software.",
+      "standardProviders": [
+        "QuickBooks API",
+        "Xero API",
+        "NetSuite"
+      ],
+      "ownershipModel": "synced",
+      "rationale": "Facilitates WF-4 Invoice Generation and Posting for DOM-FINANCE Ledger entities.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-EMAIL-SPG",
+      "name": "Transactional Email Service",
+      "category": "communication",
+      "description": "Sends invoices, receipts, and formal notices via email.",
+      "standardProviders": [
+        "SendGrid",
+        "Mailgun",
+        "Amazon SES"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Required for WF-5 Alert Distribution and DOM-NOTIFY channel delivery.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-SMS-PROV",
+      "name": "SMS Gateway",
+      "category": "messaging",
+      "description": "Delivers urgent dispatch alerts and violation reminders via text.",
+      "standardProviders": [
+        "Twilio",
+        "Vonage",
+        "Kazaa"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Supports DOM-NOTIFY urgent notifications for UJ-1 Request creation context.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-PUSH-FB",
+      "name": "Push Notification Service",
+      "category": "communication",
+      "description": "Manages in-app alerts for status updates and deadlines.",
+      "standardProviders": [
+        "Firebase Cloud Messaging",
+        "APNs",
+        "OneSignal"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Enables DOM-NOTIFY Push channel for UJ-2 Vendor Proposals acceptance.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-VOICE-PROV",
+      "name": "VoIP Verification Service",
+      "category": "communication",
+      "description": "Handles voice calls for vendor onboarding and verification.",
+      "standardProviders": [
+        "Twilio Voice",
+        "Plivo",
+        "Voxip"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Assists P-1 Homeowner and P-2 Vendor interactions during UJ-1 Onboarding.",
+      "source": "ai-proposed"
+    },
+    {
+      "id": "INT-DIGIT-SIGN",
+      "name": "Digital Signature Provider",
+      "category": "compliance",
+      "description": "Secure e-signatures for contracts, leases, and work order acceptances.",
+      "standardProviders": [
+        "DocuSign",
+        "Adobe Sign",
+        "HelloSign"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Required for DOM-DOCUMENT Lease and Work Order approvals in workflows.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-CREDIT-CHECK",
+      "name": "Credit Check API",
+      "category": "other",
+      "description": "Validates creditworthiness of homeowners or vendors for financial risk.",
+      "standardProviders": [
+        "Experian",
+        "TransUnion",
+        "Equifax"
+      ],
+      "ownershipModel": "consumed",
+      "rationale": "Supports risk mitigation for UJ-5 Invoice approval and vendor onboarding.",
+      "source": "ai-proposed"
+    },
+    {
+      "id": "INT-BI-CONNECT",
+      "name": "Business Intelligence Connector",
+      "category": "analytics",
+      "description": "Feeds data to external dashboards for financial reporting and insights.",
+      "standardProviders": [
+        "Tableau Connector",
+        "PowerBI",
+        "Looker"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Enables WF-10 Financial Dashboard Generation for P-4 Board Members.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-CALENDAR-GCAL",
+      "name": "Calendar Sync Service",
+      "category": "other",
+      "description": "Synchronizes technician schedules and work order assignments.",
+      "standardProviders": [
+        "Google Calendar API",
+        "iCal",
+        "Microsoft Graph"
+      ],
+      "ownershipModel": "consumed",
+      "rationale": "Critical for WF-3 Smart Dispatch scheduling for P-2 Service Providers.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-AUDIT-LOG",
+      "name": "Immutable Audit Logging",
+      "category": "compliance",
+      "description": "Stores tamper-proof security event logs for compliance verification.",
+      "standardProviders": [
+        "Datadog",
+        "ELK Stack",
+        "Spectro Cloud"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Required for DOM-AUTH Audit Log entity integrity and security policy enforcement.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-VENDOR-CRM",
+      "name": "Vendor Relationship Manager",
+      "category": "crm",
+      "description": "Manages lifecycle of vendors, ratings, and performance metrics.",
+      "standardProviders": [
+        "Salesforce",
+        "HubSpot",
+        "Zoho CRM"
+      ],
+      "ownershipModel": "synced",
+      "rationale": "Supports P-3 Community Association Manager vendor oversight workflows.",
+      "source": "ai-proposed"
+    },
+    {
+      "id": "INT-ROUTE-OPT",
+      "name": "Route Optimization Engine",
+      "category": "iot",
+      "description": "Plans efficient paths for field technicians to minimize travel time.",
+      "standardProviders": [
+        "GraphHopper",
+        "Route4Me",
+        "OptimoRoute"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Optimizes P-2 Service Provider travel for UJ-3 Accept Field Service Job.",
+      "source": "ai-proposed"
+    },
+    {
+      "id": "INT-TIME-TRACK",
+      "name": "Field Time Tracking",
+      "category": "other",
+      "description": "Captures labor hours and job completion timestamps for billing.",
+      "standardProviders": [
+        "Toggl",
+        "Hubstaff",
+        "Clockify"
+      ],
+      "ownershipModel": "consumed",
+      "rationale": "Supports ENT-TIME-ENTRY logging for billing in WF-4 Invoice Generation.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-LEGAL-CLAUSE",
+      "name": "Legal Clause Database",
+      "category": "compliance",
+      "description": "Provides searchable HOA rules and bylaws for violation checks.",
+      "standardProviders": [
+        "LexisNexis",
+        "Westlaw",
+        "Edmunds Legal"
+      ],
+      "ownershipModel": "consumed",
+      "rationale": "Enables WF-6 Statutory Notice Sequencer for DOM-COMPLIANCE Rule Sets.",
+      "source": "ai-proposed"
+    },
+    {
+      "id": "INT-VOICE-VIEW",
+      "name": "Voice Call Recording",
+      "category": "communication",
+      "description": "Stores call recordings for dispute resolution and compliance.",
+      "standardProviders": [
+        "Twilio Recordings",
+        "Asterisk",
+        "Agora"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Supports P-1 Homeowner interactions for UJ-1 Intake and dispute resolution.",
+      "source": "ai-proposed"
+    },
+    {
+      "id": "INT-PAYMENT-ADJ",
+      "name": "Payment Adjustment Service",
+      "category": "payment",
+      "description": "Manages refunds, credits, and transaction reversals securely.",
+      "standardProviders": [
+        "Stripe Radar",
+        "Braintree Risk",
+        "Adyen Fallback"
+      ],
+      "ownershipModel": "delegated",
+      "rationale": "Enables P-1 Homeowner refund requests and WF-4 Ledger adjustments.",
+      "source": "domain-standard"
+    },
+    {
+      "id": "INT-RECOVERY-SMTP",
+      "name": "Email Bounceback Handler",
+      "category": "messaging",
+      "description": "Processes bounced emails to update notification channel status.",
+      "standardProviders": [
+        "SendGrid Bounce API",
+        "Mailgun Stats",
+        "Amazon SNS"
+      ],
+      "ownershipModel": "consumed",
+      "rationale": "Ensures DOM-NOTIFY Email channel reliability for DOM-COMMUNITY announcements.",
+      "source": "ai-proposed"
+    }
+  ],
+  "qualityAttributes": [
+    "System response time under 200ms for 95th percentile API requests",
+    "All data at rest encrypted using AES-256 standard",
+    "Multi-tenant data isolation verified via logical schema separation",
+    "Payment transaction audit log retention minimum 7 years",
+    "Email delivery failure rate below 1% within 24 hours",
+    "Backup recovery point objective RPO less than 15 minutes",
+    "User session timeout automatically after 30 minutes of inactivity",
+    "SSL TLS 1 3 enforced for all external connections",
+    "Cross-region replication latency under 50ms for active active databases",
+    "Disk capacity usage alerts triggered at 80% utilization",
+    "Database write throughput minimum 10k transactions per second",
+    "Search index latency below 100ms for 99% of queries",
+    "Zero trust network access enforced for all admin portals",
+    "PCI DSS Level 1 compliance certification maintained annually",
+    "Automated vulnerability scanning runs weekly",
+    "Notification delivery success rate above 98% within 5 minutes",
+    "GDPR data processing agreements signed with all third party processors",
+    "Audit logs tamper proof using hash chaining mechanism"
+  ],
+  "uxRequirements": [
+    "Mobile-first design for homeowners and technicians.",
+    "Offline-first capabilities for field operations.",
+    "High-performance, reactive displays for admin portals.",
+    "Secure, multi-tenant isolation visualized clearly.",
+    "AI interactions must explain reasoning or show evidence."
+  ],
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "type": "REQUIREMENT",
+      "text": "System must support durable, versioned workflows via DBOS for idempotency.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "REQ-2",
+      "type": "REQUIREMENT",
+      "text": "System must enforce multi-tenant isolation via PostgreSQL Row-Level Security.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "REQ-3",
+      "type": "REQUIREMENT",
+      "text": "System must verify vendor licenses and insurance automatically.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "REQ-4",
+      "type": "REQUIREMENT",
+      "text": "System must handle periodic assessment posting automatically.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "REQ-5",
+      "type": "REQUIREMENT",
+      "text": "System must track violations and notice sequences.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "DEC-1",
+      "type": "DECISION",
+      "text": "The platform will use DBOS for all stateful logic to guarantee durability.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "DEC-2",
+      "type": "DECISION",
+      "text": "Cloudflare is the sole public entry point for all traffic.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "DEC-3",
+      "type": "DECISION",
+      "text": "Nextdoor integration is explicitly out of scope for Phase 1.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "DEC-4",
+      "type": "DECISION",
+      "text": "The Common Data Model is logical and persistent, not ephemeral.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    }
+  ],
+  "constraints": [
+    {
+      "id": "CON-1",
+      "type": "CONSTRAINT",
+      "text": "No direct client access to origin IP; must tunnel through Cloudflare.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "CON-2",
+      "type": "CONSTRAINT",
+      "text": "Malware scanning must be performed via ClamAV before processing files.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "CON-3",
+      "type": "CONSTRAINT",
+      "text": "System must respect statutory deadlines for HOA notices and voting.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "CON-4",
+      "type": "CONSTRAINT",
+      "text": "Nextdoor integration is out-of-scope at this time.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "CON-5",
+      "type": "CONSTRAINT",
+      "text": "Platform must support offline mode for mobile operations.",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    }
+  ],
+  "openQuestions": [
+    {
+      "id": "Q-1",
+      "type": "OPEN_QUESTION",
+      "text": "How should the system handle external HOA contexts where the HOA is not a direct platform participant?",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "Q-2",
+      "type": "OPEN_QUESTION",
+      "text": "Which external AI providers or self-hosted models will power the 'AI Native' features in Phase 1?",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "Q-3",
+      "type": "OPEN_QUESTION",
+      "text": "What specific regulatory jurisdictions will the Compliance domain support initially (federal vs. state vs. local)?",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    },
+    {
+      "id": "Q-4",
+      "type": "OPEN_QUESTION",
+      "text": "How will the 'Decision, Rationale & Trust Ledger' be displayed to the user to ensure transparency?",
+      "timestamp": "2026-04-18T21:36:08.092Z"
+    }
+  ],
+  "humanDecisions": [],
+  "openLoops": [
+    {
+      "category": "deferred_decision",
+      "description": "How should the system handle external HOA contexts where the HOA is not a direct platform participant?",
+      "priority": "medium"
+    },
+    {
+      "category": "deferred_decision",
+      "description": "Which external AI providers or self-hosted models will power the 'AI Native' features in Phase 1?",
+      "priority": "medium"
+    },
+    {
+      "category": "deferred_decision",
+      "description": "What specific regulatory jurisdictions will the Compliance domain support initially (federal vs. state vs. local)?",
+      "priority": "medium"
+    },
+    {
+      "category": "deferred_decision",
+      "description": "How will the 'Decision, Rationale & Trust Ledger' be displayed to the user to ensure transparency?",
+      "priority": "medium"
+    }
+  ]
+}

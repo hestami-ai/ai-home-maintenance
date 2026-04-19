@@ -17,7 +17,22 @@
  */
 
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
-import type { IntentLens, PhaseId } from '../../types/records';
+import type {
+  GovernedStreamRecord,
+  IntentLens,
+  PhaseId,
+  ProductDescriptionHandoffContent,
+  Persona,
+  UserJourney,
+  PhasingPhase,
+  BusinessDomain,
+  Entity,
+  Workflow,
+  Integration,
+  ExtractedItem,
+  HumanDecisionSummary,
+  OpenLoop,
+} from '../../types/records';
 import type {
   DecisionBundleContent,
   MirrorItem,
@@ -180,6 +195,23 @@ export class Phase1Handler implements PhaseHandler {
     // templates against `fallback_lens` so the pipeline keeps moving with a
     // product-shaped bloom + synthesis while lens-specific templates land.
     const activeLens = lensClassification.fallback_lens;
+
+    // ── Lens dispatch ─────────────────────────────────────────
+    // Product-classified intents run the v1-style proposer loop:
+    // 1.0b discovery → 1.1b scope → 1.2/1.3/1.4/1.5 bloom+prune →
+    // 1.6 handoff synthesis → 1.7 approval. Every other lens
+    // (feature / bug / infra / legal / unclassified) continues on
+    // the default collapsed flow below.
+    if (lensClassification.lens === 'product') {
+      return this.executeProductLens(ctx, {
+        rawIntent,
+        rawIntentText,
+        qualityRecord,
+        lensRecord,
+        lensClassification,
+        artifactIds,
+      });
+    }
 
     // ── Sub-Phase 1.1b — Scope Bounding ───────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '1.1b');
@@ -1179,4 +1211,1078 @@ export class Phase1Handler implements PhaseHandler {
       return null;
     }
   }
+
+  // ══════════════════════════════════════════════════════════════════
+  // Product-lens flow (Phase 1 under lens='product')
+  //
+  // Replaces the default 1.1b–1.6 collapsed flow with a v1-style
+  // proposer loop: 1.0b silent discovery → 1.1b scope → four bloom
+  // rounds with human prune gates (1.2 domains+personas, 1.3
+  // journeys+workflows, 1.4 entities, 1.5 integrations+QAs) → 1.6
+  // silent synthesis into a product_description_handoff (+ derived
+  // intent_statement for Phase 2–9 compatibility) → 1.7 handoff
+  // approval gate.
+  //
+  // Wave 3 scope: happy path only. Free-text feedback on any prune
+  // gate returns requires_input (the re-bloom loop is Wave 5). Mirror
+  // rejection on any gate also returns requires_input.
+  // ══════════════════════════════════════════════════════════════════
+
+  private async executeProductLens(
+    ctx: PhaseContext,
+    state: {
+      rawIntent: GovernedStreamRecord;
+      rawIntentText: string;
+      qualityRecord: GovernedStreamRecord;
+      lensRecord: GovernedStreamRecord;
+      lensClassification: { lens: IntentLens; confidence: number; rationale: string; fallback_lens: IntentLens };
+      artifactIds: string[];
+    },
+  ): Promise<PhaseResult> {
+    const { workflowRun, engine } = ctx;
+    const { rawIntent, rawIntentText, lensRecord, artifactIds } = state;
+    const humanDecisions: HumanDecisionSummary[] = [];
+
+    // ── 1.0b Intent Discovery (silent) ──────────────────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.0b');
+    let discovery: IntentDiscoveryResult;
+    try {
+      discovery = await this.runIntentDiscovery(ctx, rawIntentText);
+    } catch (err) {
+      return { success: false, error: `Intent Discovery failed: ${err instanceof Error ? err.message : String(err)}`, artifactIds };
+    }
+    const discoveryRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.0b',
+      produced_by_agent_role: 'domain_interpreter',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [rawIntent.id, lensRecord.id],
+      content: { kind: 'intent_discovery', ...discovery } as unknown as Record<string, unknown>,
+    });
+    artifactIds.push(discoveryRecord.id);
+    engine.ingestionPipeline.ingest(discoveryRecord);
+
+    // ── 1.1b Scope Bounding + Compliance (deterministic) ────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.1b');
+    const scopeRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.1b',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      content: { kind: 'scope_classification', breadth: 'single_product', depth: 'production_grade' },
+    });
+    artifactIds.push(scopeRecord.id);
+    engine.ingestionPipeline.ingest(scopeRecord);
+    const complianceRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.1b',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      content: { kind: 'compliance_context', regimes: [] },
+    });
+    artifactIds.push(complianceRecord.id);
+    engine.ingestionPipeline.ingest(complianceRecord);
+
+    // ── 1.2 Business Domains & Personas Bloom (Round 1) ─────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.2');
+    const round12 = await this.runBloomRoundWithFeedbackLoop<{ domains: BusinessDomain[]; personas: Persona[] }>(ctx, {
+      subPhaseId: '1.2',
+      roundLabel: 'Business Domains',
+      lensRationale: state.lensClassification.rationale,
+      humanDecisions,
+      artifactIds,
+      priorRecordIds: [discoveryRecord.id],
+      runProposer: (feedback) => this.runBusinessDomainsBloom(ctx, discovery, feedback),
+      writeBloomRecord: (bloom, derivedFrom) => {
+        const rec = engine.writer.writeRecord({
+          record_type: 'artifact_produced',
+          schema_version: '1.0',
+          workflow_run_id: workflowRun.id,
+          phase_id: '1',
+          sub_phase_id: '1.2',
+          produced_by_agent_role: 'domain_interpreter',
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+          derived_from_record_ids: derivedFrom,
+          content: { kind: 'business_domains_bloom', ...bloom } as unknown as Record<string, unknown>,
+        });
+        artifactIds.push(rec.id);
+        return rec;
+      },
+      mapItems: (bloom) => [
+        ...bloom.domains.map(d => ({ id: d.id, label: `[Domain] ${d.name}`, description: d.description, tradeoffs: d.rationale })),
+        ...bloom.personas.map(p => ({ id: p.id, label: `[Persona] ${p.name}`, description: p.description })),
+      ],
+      buildTitle: () => 'Review Business Domains and Personas',
+      buildSummary: (bloom) => `${bloom.domains.length} business domain(s) and ${bloom.personas.length} persona(s) proposed. Keep what belongs in your product; reject what doesn't.`,
+    });
+    if (!round12.success) return { success: false, error: round12.error, artifactIds };
+    const domainsBloom = round12.bloom;
+    const domainsRecord = round12.record;
+    const keptDomainIds = new Set(round12.keptIds);
+    const acceptedDomains = domainsBloom.domains.filter(d => keptDomainIds.has(d.id));
+    const acceptedPersonas = domainsBloom.personas.filter(p => keptDomainIds.has(p.id));
+    const safeDomains = acceptedDomains.length > 0 ? acceptedDomains : domainsBloom.domains;
+    const safePersonas = acceptedPersonas.length > 0 ? acceptedPersonas : domainsBloom.personas;
+
+    // ── 1.3 User Journeys & Workflows Bloom (Round 2) ───────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.3');
+    const round13 = await this.runBloomRoundWithFeedbackLoop<{ userJourneys: UserJourney[]; workflows: Workflow[] }>(ctx, {
+      subPhaseId: '1.3',
+      roundLabel: 'Journeys/Workflows',
+      lensRationale: state.lensClassification.rationale,
+      humanDecisions,
+      artifactIds,
+      priorRecordIds: [domainsRecord.id],
+      runProposer: (feedback) => this.runJourneysWorkflowsBloom(ctx, safeDomains, safePersonas, discovery.phasingStrategy ?? [], feedback),
+      writeBloomRecord: (bloom, derivedFrom) => {
+        const rec = engine.writer.writeRecord({
+          record_type: 'artifact_produced',
+          schema_version: '1.0',
+          workflow_run_id: workflowRun.id,
+          phase_id: '1',
+          sub_phase_id: '1.3',
+          produced_by_agent_role: 'domain_interpreter',
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+          derived_from_record_ids: derivedFrom,
+          content: { kind: 'journeys_workflows_bloom', ...bloom } as unknown as Record<string, unknown>,
+        });
+        artifactIds.push(rec.id);
+        return rec;
+      },
+      mapItems: (bloom) => [
+        ...bloom.userJourneys.map(j => ({ id: j.id, label: `[Journey] ${j.title}`, description: j.scenario, tradeoffs: `${j.implementationPhase} • persona ${j.personaId}` })),
+        ...bloom.workflows.map(w => ({ id: w.id, label: `[Workflow] ${w.name}`, description: w.description, tradeoffs: `domain ${w.businessDomainId}` })),
+      ],
+      buildTitle: () => 'Review User Journeys and System Workflows',
+      buildSummary: (bloom) => `${bloom.userJourneys.length} user journey(s) and ${bloom.workflows.length} system workflow(s) proposed across the accepted domains.`,
+    });
+    if (!round13.success) return { success: false, error: round13.error, artifactIds };
+    const journeysBloom = round13.bloom;
+    const journeysRecord = round13.record;
+    const keptJourneyIds = new Set(round13.keptIds);
+    const acceptedJourneys = journeysBloom.userJourneys.filter(j => keptJourneyIds.has(j.id));
+    const acceptedWorkflows = journeysBloom.workflows.filter(w => keptJourneyIds.has(w.id));
+    const safeJourneys = acceptedJourneys.length > 0 ? acceptedJourneys : journeysBloom.userJourneys;
+    const safeWorkflows = acceptedWorkflows.length > 0 ? acceptedWorkflows : journeysBloom.workflows;
+
+    // ── 1.4 Business Entities Bloom (Round 3) ───────────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.4');
+    const round14 = await this.runBloomRoundWithFeedbackLoop<{ entities: Entity[] }>(ctx, {
+      subPhaseId: '1.4',
+      roundLabel: 'Entities',
+      lensRationale: state.lensClassification.rationale,
+      humanDecisions,
+      artifactIds,
+      priorRecordIds: [journeysRecord.id],
+      runProposer: (feedback) => this.runEntitiesBloom(ctx, safeDomains, safeWorkflows, safePersonas, safeJourneys, feedback),
+      writeBloomRecord: (bloom, derivedFrom) => {
+        const rec = engine.writer.writeRecord({
+          record_type: 'artifact_produced',
+          schema_version: '1.0',
+          workflow_run_id: workflowRun.id,
+          phase_id: '1',
+          sub_phase_id: '1.4',
+          produced_by_agent_role: 'domain_interpreter',
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+          derived_from_record_ids: derivedFrom,
+          content: { kind: 'entities_bloom', ...bloom } as unknown as Record<string, unknown>,
+        });
+        artifactIds.push(rec.id);
+        return rec;
+      },
+      mapItems: (bloom) => bloom.entities.map(e => ({ id: e.id, label: `[Entity] ${e.name}`, description: e.description, tradeoffs: `domain ${e.businessDomainId}` })),
+      buildTitle: () => 'Review Business Entities',
+      buildSummary: (bloom) => `${bloom.entities.length} entity/entities proposed across the accepted domains.`,
+    });
+    if (!round14.success) return { success: false, error: round14.error, artifactIds };
+    const entitiesBloom = round14.bloom;
+    const entitiesRecord = round14.record;
+    const keptEntityIds = new Set(round14.keptIds);
+    const acceptedEntities = entitiesBloom.entities.filter(e => keptEntityIds.has(e.id));
+    const safeEntities = acceptedEntities.length > 0 ? acceptedEntities : entitiesBloom.entities;
+
+    // ── 1.5 Integrations + Quality Attributes Bloom (Round 4) ──
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.5');
+    // Hoist the id-generator so the QA synthetic ids are stable across
+    // feedback iterations — a re-bloom produces a new array, but the
+    // same id scheme resolves accept/reject consistently.
+    const buildQaItems = (qas: string[]) => qas.map((q, i) => ({
+      id: `QA-${i + 1}`,
+      label: `[Quality] ${q.slice(0, 80)}${q.length > 80 ? '…' : ''}`,
+      description: q,
+    }));
+    let lastQaItems: Array<{ id: string; label: string; description: string }> = [];
+    const round15 = await this.runBloomRoundWithFeedbackLoop<{ integrations: Integration[]; qualityAttributes: string[] }>(ctx, {
+      subPhaseId: '1.5',
+      roundLabel: 'Integrations/QA',
+      lensRationale: state.lensClassification.rationale,
+      humanDecisions,
+      artifactIds,
+      priorRecordIds: [entitiesRecord.id],
+      runProposer: (feedback) => this.runIntegrationsQaBloom(ctx, safeDomains, safeEntities, safeWorkflows, safePersonas, safeJourneys, feedback),
+      writeBloomRecord: (bloom, derivedFrom) => {
+        const rec = engine.writer.writeRecord({
+          record_type: 'artifact_produced',
+          schema_version: '1.0',
+          workflow_run_id: workflowRun.id,
+          phase_id: '1',
+          sub_phase_id: '1.5',
+          produced_by_agent_role: 'domain_interpreter',
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+          derived_from_record_ids: derivedFrom,
+          content: { kind: 'integrations_qa_bloom', ...bloom } as unknown as Record<string, unknown>,
+        });
+        artifactIds.push(rec.id);
+        return rec;
+      },
+      mapItems: (bloom) => {
+        lastQaItems = buildQaItems(bloom.qualityAttributes);
+        return [
+          ...bloom.integrations.map(i => ({ id: i.id, label: `[Integration] ${i.name}`, description: i.description, tradeoffs: `${i.category} • ${i.ownershipModel}` })),
+          ...lastQaItems,
+        ];
+      },
+      buildTitle: () => 'Review Integrations and Quality Attributes',
+      buildSummary: (bloom) => `${bloom.integrations.length} integration(s) and ${bloom.qualityAttributes.length} quality attribute(s) proposed.`,
+    });
+    if (!round15.success) return { success: false, error: round15.error, artifactIds };
+    const integrationsBloom = round15.bloom;
+    const keptIntegrationIds = new Set(round15.keptIds);
+    const acceptedIntegrations = integrationsBloom.integrations.filter(i => keptIntegrationIds.has(i.id));
+    const acceptedQAs = lastQaItems.filter(q => keptIntegrationIds.has(q.id)).map(q => q.description);
+    const safeIntegrations = acceptedIntegrations.length > 0 ? acceptedIntegrations : integrationsBloom.integrations;
+    const safeQAs = acceptedQAs.length > 0 ? acceptedQAs : integrationsBloom.qualityAttributes;
+
+    // ── 1.6 Product Description Synthesis (silent) ──────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.6');
+    let handoff: ProductDescriptionHandoffContent;
+    try {
+      handoff = await this.runProductDescriptionSynthesis(ctx, {
+        discovery,
+        domains: safeDomains,
+        personas: safePersonas,
+        journeys: safeJourneys,
+        workflows: safeWorkflows,
+        entities: safeEntities,
+        integrations: safeIntegrations,
+        qualityAttributes: safeQAs,
+        humanDecisions,
+      });
+    } catch (err) {
+      return { success: false, error: `Product description synthesis failed: ${err instanceof Error ? err.message : String(err)}`, artifactIds };
+    }
+    const handoffRecord = engine.writer.writeRecord({
+      record_type: 'product_description_handoff',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.6',
+      produced_by_agent_role: 'domain_interpreter',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [discoveryRecord.id, domainsRecord.id, journeysRecord.id, entitiesRecord.id, round15.record.id],
+      content: handoff as unknown as Record<string, unknown>,
+    });
+    artifactIds.push(handoffRecord.id);
+    engine.ingestionPipeline.ingest(handoffRecord);
+
+    // Derive a compatibility intent_statement at 1.6 so Phases 2–9
+    // keep reading their existing interface unchanged.
+    const derivedIntentStatement = this.deriveIntentStatementFromHandoff(handoff);
+    const statementRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.6',
+      produced_by_agent_role: 'domain_interpreter',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [handoffRecord.id],
+      content: { kind: 'intent_statement', ...derivedIntentStatement },
+    });
+    artifactIds.push(statementRecord.id);
+    engine.ingestionPipeline.ingest(statementRecord);
+
+    // ── 1.7 Handoff Approval ────────────────────────────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.7');
+    const approvalMirror = engine.mirrorGenerator.generate({
+      artifactId: handoffRecord.id,
+      artifactType: 'product_description_handoff',
+      content: handoff as unknown as Record<string, unknown>,
+    });
+    const approvalMirrorRecord = engine.writer.writeRecord({
+      record_type: 'mirror_presented',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.7',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [handoffRecord.id],
+      content: {
+        kind: 'product_description_handoff_mirror',
+        mirror_id: approvalMirror.mirrorId,
+        artifact_id: handoffRecord.id,
+        artifact_type: 'product_description_handoff',
+        fields: approvalMirror.fields,
+        handoff_summary: {
+          productVision: handoff.productVision,
+          personas_count: handoff.personas.length,
+          userJourneys_count: handoff.userJourneys.length,
+          businessDomains_count: handoff.businessDomainProposals.length,
+          entities_count: handoff.entityProposals.length,
+          workflows_count: handoff.workflowProposals.length,
+          integrations_count: handoff.integrationProposals.length,
+          qualityAttributes_count: handoff.qualityAttributes.length,
+        },
+      },
+    });
+    artifactIds.push(approvalMirrorRecord.id);
+    engine.eventBus.emit('mirror:presented', {
+      mirrorId: approvalMirror.mirrorId,
+      artifactType: 'product_description_handoff',
+    });
+
+    let approvalResolution: { type: string; payload?: Record<string, unknown> };
+    try {
+      approvalResolution = await engine.pauseForDecision(workflowRun.id, approvalMirrorRecord.id, 'mirror');
+    } catch (err) {
+      return { success: false, error: `Handoff approval failed: ${String(err)}`, artifactIds };
+    }
+    if (approvalResolution.type === 'mirror_rejection') {
+      return { success: false, error: 'User rejected the product description handoff', artifactIds };
+    }
+
+    // ── Phase Gate ──────────────────────────────────────────
+    const gateRecord = engine.writer.writeRecord({
+      record_type: 'phase_gate_evaluation',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.7',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [handoffRecord.id, statementRecord.id, approvalMirrorRecord.id],
+      content: {
+        kind: 'phase_gate',
+        phase_id: '1',
+        intent_statement_record_id: statementRecord.id,
+        product_description_handoff_record_id: handoffRecord.id,
+        has_unresolved_warnings: false,
+        has_unapproved_proposals: false,
+        has_high_severity_flaws: false,
+      },
+    });
+    artifactIds.push(gateRecord.id);
+    engine.eventBus.emit('phase_gate:pending', { phaseId: '1' });
+    return { success: true, artifactIds };
+  }
+
+  // ── Product-lens helpers ───────────────────────────────────────
+
+  /**
+   * Present a bloom prune gate as a decision_bundle_presented. Returns
+   * success + the kept item ids, or failure when the user rejected an
+   * interpretation assumption (the re-bloom loop is Wave 5). Writes
+   * the bundle record onto `artifactIds` as a side effect.
+   */
+  private async presentProductBloomGate(
+    ctx: PhaseContext,
+    opts: {
+      subPhaseId: string;
+      derivedFromRecordId: string;
+      title: string;
+      summary: string;
+      items: Array<{ id: string; label: string; description?: string; tradeoffs?: string }>;
+      lensRationale: string;
+      humanDecisions: HumanDecisionSummary[];
+      artifactIds: string[];
+    },
+  ): Promise<
+    | { success: true; keptIds: string[]; freeTextFeedback?: string }
+    | { success: false; error: string }
+  > {
+    const { workflowRun, engine } = ctx;
+    const mirrorItems: MirrorItem[] = [
+      {
+        id: 'lens-framing',
+        text: `This list is proposed expansively under the **product** lens — reject anything that does not belong in your product.`,
+        rationale: opts.lensRationale,
+        category: 'lens',
+      },
+    ];
+    const menuOptions: MenuOption[] = opts.items.map((it, i) => ({
+      id: it.id,
+      label: it.label,
+      description: it.description,
+      tradeoffs: it.tradeoffs,
+      recommended: i === 0,
+    }));
+    const bundleContent: DecisionBundleContent = {
+      surface_id: `phase1-product-${opts.subPhaseId}-${opts.derivedFromRecordId}`,
+      title: opts.title,
+      summary: opts.summary,
+      mirror: { kind: 'product_bloom_mirror', items: mirrorItems },
+      menu: {
+        question: 'Keep the items that belong in your product; reject anything that does not:',
+        context: `${opts.items.length} item(s) proposed. The product lens intentionally over-proposes — pruning is your job.`,
+        multi_select: true,
+        allow_free_text: false,
+        options: menuOptions,
+      },
+    };
+    const bundleRecord = engine.writer.writeRecord({
+      record_type: 'decision_bundle_presented',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: opts.subPhaseId,
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [opts.derivedFromRecordId],
+      content: bundleContent as unknown as Record<string, unknown>,
+    });
+    opts.artifactIds.push(bundleRecord.id);
+    engine.eventBus.emit('mirror:presented', { mirrorId: bundleRecord.id, artifactType: 'product_bloom_mirror' });
+    engine.eventBus.emit('menu:presented', { menuId: bundleRecord.id, options: opts.items.map(i => i.id) });
+
+    let resolution: {
+      type: string;
+      payload?: {
+        mirror_decisions?: MirrorItemDecision[];
+        menu_selections?: MenuOptionSelection[];
+        /** Wave 5 — optional free-text feedback channel. When present, the
+         *  caller re-runs the proposer with this text injected as
+         *  `{{human_feedback}}` rather than accepting the menu as-is. */
+        free_text_feedback?: string;
+      };
+    };
+    try {
+      resolution = await engine.pauseForDecision(
+        workflowRun.id,
+        bundleRecord.id,
+        'decision_bundle',
+      ) as typeof resolution;
+    } catch (err) {
+      return { success: false, error: `Sub-phase ${opts.subPhaseId} prune decisions failed: ${String(err)}` };
+    }
+
+    const mirrorDecisions = resolution.payload?.mirror_decisions ?? [];
+    const rejected = mirrorDecisions.filter(d => d.action === 'rejected');
+    if (rejected.length > 0) {
+      // Mirror-item rejection is the "this framing is wrong" signal — no
+      // proposer re-run will fix it. Halts with requires_input so a human
+      // can re-state the intent. Free-text feedback is a separate, softer
+      // channel handled below.
+      getLogger().info('workflow', `Sub-phase ${opts.subPhaseId} interpretation mirror had rejections — halting`, {
+        workflow_run_id: workflowRun.id,
+        rejected_ids: rejected.map(r => r.item_id),
+      });
+      return { success: false, error: `User rejected interpretation assumption at sub-phase ${opts.subPhaseId}` };
+    }
+
+    const freeTextFeedback = resolution.payload?.free_text_feedback?.trim();
+    if (freeTextFeedback && freeTextFeedback.length > 0) {
+      // Feedback channel: the caller loops and re-runs the proposer. We do
+      // NOT record any accept/reject decisions here — the user has explicitly
+      // asked for a re-bloom, so the current items are considered superseded.
+      return { success: true, keptIds: [], freeTextFeedback };
+    }
+
+    const menuSelections = resolution.payload?.menu_selections ?? [];
+    const keptIds = menuSelections.map(s => s.option_id);
+    for (const s of menuSelections) {
+      opts.humanDecisions.push({ action: 'accepted', sub_phase_id: opts.subPhaseId, target_id: s.option_id });
+    }
+    for (const item of opts.items) {
+      if (!keptIds.includes(item.id) && menuSelections.length > 0) {
+        opts.humanDecisions.push({ action: 'rejected', sub_phase_id: opts.subPhaseId, target_id: item.id });
+      }
+    }
+    return { success: true, keptIds };
+  }
+
+  /**
+   * Wrap a bloom round in the proposer/gate feedback loop: run the
+   * proposer, write its artifact, present the prune gate, and either
+   * return the kept items OR re-run with free-text feedback. Capped at
+   * MAX_FEEDBACK_ITERATIONS so a stubborn user can't livelock the phase.
+   *
+   * Each iteration writes a NEW bloom artifact_produced record — no
+   * supersession logic. Downstream consumers read state from the kept
+   * items returned by this helper, not by re-scanning the stream.
+   */
+  private async runBloomRoundWithFeedbackLoop<T>(
+    ctx: PhaseContext,
+    spec: {
+      subPhaseId: string;
+      roundLabel: string;
+      lensRationale: string;
+      humanDecisions: HumanDecisionSummary[];
+      artifactIds: string[];
+      priorRecordIds: string[];
+      /** Called once per iteration; receives the accumulated feedback. */
+      runProposer: (feedback: string) => Promise<T>;
+      /** Writes the proposer output as an artifact_produced record. */
+      writeBloomRecord: (bloom: T, derivedFrom: string[]) => GovernedStreamRecord;
+      mapItems: (bloom: T) => Array<{ id: string; label: string; description?: string; tradeoffs?: string }>;
+      buildSummary: (bloom: T) => string;
+      buildTitle: () => string;
+    },
+  ): Promise<
+    | { success: true; bloom: T; record: GovernedStreamRecord; keptIds: string[] }
+    | { success: false; error: string }
+  > {
+    const MAX_FEEDBACK_ITERATIONS = 3;
+    let accumulatedFeedback = '';
+    let lastBloom: T | null = null;
+    let lastRecord: GovernedStreamRecord | null = null;
+
+    for (let iter = 1; iter <= MAX_FEEDBACK_ITERATIONS + 1; iter++) {
+      let bloom: T;
+      try {
+        bloom = await spec.runProposer(accumulatedFeedback);
+      } catch (err) {
+        return { success: false, error: `${spec.roundLabel} bloom failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
+      const derivedFrom = [
+        ...spec.priorRecordIds,
+        ...(lastRecord ? [lastRecord.id] : []),
+      ];
+      const record = spec.writeBloomRecord(bloom, derivedFrom);
+      ctx.engine.ingestionPipeline.ingest(record);
+      lastBloom = bloom;
+      lastRecord = record;
+
+      const gate = await this.presentProductBloomGate(ctx, {
+        subPhaseId: spec.subPhaseId,
+        derivedFromRecordId: record.id,
+        title: spec.buildTitle(),
+        summary: spec.buildSummary(bloom),
+        items: spec.mapItems(bloom),
+        lensRationale: spec.lensRationale,
+        humanDecisions: spec.humanDecisions,
+        artifactIds: spec.artifactIds,
+      });
+      if (!gate.success) return gate;
+
+      if (!gate.freeTextFeedback) {
+        return { success: true, bloom, record, keptIds: gate.keptIds };
+      }
+
+      if (iter > MAX_FEEDBACK_ITERATIONS) {
+        getLogger().info('workflow', `Sub-phase ${spec.subPhaseId} exhausted ${MAX_FEEDBACK_ITERATIONS} feedback iterations — halting`, {
+          workflow_run_id: ctx.workflowRun.id,
+        });
+        return { success: false, error: `Sub-phase ${spec.subPhaseId} reached max feedback iterations (${MAX_FEEDBACK_ITERATIONS}); human intervention required.` };
+      }
+
+      getLogger().info('workflow', `Sub-phase ${spec.subPhaseId} received free-text feedback — re-running proposer (iteration ${iter + 1})`, {
+        workflow_run_id: ctx.workflowRun.id,
+        feedback_chars: gate.freeTextFeedback.length,
+      });
+      accumulatedFeedback = accumulateFeedback(accumulatedFeedback, gate.freeTextFeedback);
+    }
+
+    // Unreachable — loop always returns via success or max-iterations path.
+    return { success: false, error: `Sub-phase ${spec.subPhaseId} feedback loop exited unexpectedly`, };
+  }
+
+  /**
+   * 1.0b — silent product discovery. Reads raw intent + inlined
+   * referenced files; produces vision, description, seed personas /
+   * journeys / phasing, and extracted items.
+   */
+  private async runIntentDiscovery(ctx: PhaseContext, rawIntentText: string): Promise<IntentDiscoveryResult> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_0b_intent_discovery', 'product');
+    if (!template) throw new Error('1.0b intent_discovery product-lens template not found');
+    const ingestedFiles = await this.collectIngestedFileContent(ctx);
+    const enrichedIntent = this.buildEnrichedIntentText(rawIntentText, ingestedFiles);
+    const rendered = engine.templateLoader.render(template, {
+      raw_intent_text: enrichedIntent,
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) throw new Error(`1.0b missing variables: ${rendered.missing_variables.join(', ')}`);
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.4,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.0b', agentRole: 'domain_interpreter', label: 'Phase 1.0b — Intent Discovery' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('Intent Discovery returned unparseable JSON');
+    return {
+      analysisSummary: (parsed.analysisSummary as string) ?? '',
+      productVision: (parsed.productVision as string) ?? '',
+      productDescription: (parsed.productDescription as string) ?? '',
+      personas: (parsed.personas as Persona[] | undefined) ?? [],
+      userJourneys: (parsed.userJourneys as UserJourney[] | undefined) ?? [],
+      phasingStrategy: (parsed.phasingStrategy as PhasingPhase[] | undefined) ?? [],
+      successMetrics: (parsed.successMetrics as string[] | undefined) ?? [],
+      uxRequirements: (parsed.uxRequirements as string[] | undefined) ?? [],
+      requirements: this.normalizeExtractedItems(parsed.requirements, 'REQUIREMENT', 'REQ'),
+      decisions: this.normalizeExtractedItems(parsed.decisions, 'DECISION', 'DEC'),
+      constraints: this.normalizeExtractedItems(parsed.constraints, 'CONSTRAINT', 'CON'),
+      openQuestions: this.normalizeExtractedItems(parsed.openQuestions, 'OPEN_QUESTION', 'Q'),
+    };
+  }
+
+  private async runBusinessDomainsBloom(
+    ctx: PhaseContext,
+    discovery: IntentDiscoveryResult,
+    humanFeedback: string = '',
+  ): Promise<{ domains: BusinessDomain[]; personas: Persona[] }> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_2_business_domains_bloom', 'product');
+    if (!template) throw new Error('1.2 business_domains_bloom product-lens template not found');
+    const rendered = engine.templateLoader.render(template, {
+      product_vision: discovery.productVision,
+      product_description: discovery.productDescription,
+      discovered_personas: this.formatPersonas(discovery.personas),
+      discovered_journeys: this.formatJourneys(discovery.userJourneys),
+      phasing_strategy: this.formatPhasing(discovery.phasingStrategy),
+      requirements: this.formatExtractedItems(discovery.requirements),
+      human_feedback: humanFeedback.trim().length > 0 ? humanFeedback : '(none)',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) throw new Error(`1.2 missing variables: ${rendered.missing_variables.join(', ')}`);
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.5,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.2', agentRole: 'domain_interpreter', label: 'Phase 1.2 — Business Domains & Personas Bloom' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('Business Domains bloom returned unparseable JSON');
+    return {
+      domains: (parsed.domains as BusinessDomain[] | undefined) ?? [],
+      personas: (parsed.personas as Persona[] | undefined) ?? [],
+    };
+  }
+
+  private async runJourneysWorkflowsBloom(
+    ctx: PhaseContext,
+    acceptedDomains: BusinessDomain[],
+    acceptedPersonas: Persona[],
+    phasingStrategy: PhasingPhase[],
+    humanFeedback: string = '',
+  ): Promise<{ userJourneys: UserJourney[]; workflows: Workflow[] }> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_3_journeys_workflows_bloom', 'product');
+    if (!template) throw new Error('1.3 journeys_workflows_bloom product-lens template not found');
+    const rendered = engine.templateLoader.render(template, {
+      accepted_domains: this.formatDomains(acceptedDomains),
+      accepted_personas: this.formatPersonas(acceptedPersonas),
+      phasing_strategy: this.formatPhasing(phasingStrategy),
+      human_feedback: humanFeedback.trim().length > 0 ? humanFeedback : '(none)',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) throw new Error(`1.3 missing variables: ${rendered.missing_variables.join(', ')}`);
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.5,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.3', agentRole: 'domain_interpreter', label: 'Phase 1.3 — Journeys & Workflows Bloom' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('Journeys/Workflows bloom returned unparseable JSON');
+    return {
+      userJourneys: (parsed.userJourneys as UserJourney[] | undefined) ?? [],
+      workflows: (parsed.workflows as Workflow[] | undefined) ?? [],
+    };
+  }
+
+  private async runEntitiesBloom(
+    ctx: PhaseContext,
+    acceptedDomains: BusinessDomain[],
+    acceptedWorkflows: Workflow[],
+    acceptedPersonas: Persona[],
+    acceptedJourneys: UserJourney[],
+    humanFeedback: string = '',
+  ): Promise<{ entities: Entity[] }> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_4_entities_bloom', 'product');
+    if (!template) throw new Error('1.4 entities_bloom product-lens template not found');
+    const rendered = engine.templateLoader.render(template, {
+      accepted_domains: this.formatDomains(acceptedDomains),
+      accepted_workflows: this.formatWorkflows(acceptedWorkflows),
+      accepted_personas: this.formatPersonas(acceptedPersonas),
+      accepted_journeys: this.formatJourneys(acceptedJourneys),
+      human_feedback: humanFeedback.trim().length > 0 ? humanFeedback : '(none)',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) throw new Error(`1.4 missing variables: ${rendered.missing_variables.join(', ')}`);
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.5,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.4', agentRole: 'domain_interpreter', label: 'Phase 1.4 — Entities Bloom' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('Entities bloom returned unparseable JSON');
+    return { entities: (parsed.entities as Entity[] | undefined) ?? [] };
+  }
+
+  private async runIntegrationsQaBloom(
+    ctx: PhaseContext,
+    acceptedDomains: BusinessDomain[],
+    acceptedEntities: Entity[],
+    acceptedWorkflows: Workflow[],
+    acceptedPersonas: Persona[],
+    acceptedJourneys: UserJourney[],
+    humanFeedback: string = '',
+  ): Promise<{ integrations: Integration[]; qualityAttributes: string[] }> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_5_integrations_qa_bloom', 'product');
+    if (!template) throw new Error('1.5 integrations_qa_bloom product-lens template not found');
+    const rendered = engine.templateLoader.render(template, {
+      accepted_domains: this.formatDomains(acceptedDomains),
+      accepted_entities: this.formatEntities(acceptedEntities),
+      accepted_workflows: this.formatWorkflows(acceptedWorkflows),
+      accepted_personas: this.formatPersonas(acceptedPersonas),
+      accepted_journeys: this.formatJourneys(acceptedJourneys),
+      human_feedback: humanFeedback.trim().length > 0 ? humanFeedback : '(none)',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) throw new Error(`1.5 missing variables: ${rendered.missing_variables.join(', ')}`);
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.5,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.5', agentRole: 'domain_interpreter', label: 'Phase 1.5 — Integrations & QA Bloom' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('Integrations/QA bloom returned unparseable JSON');
+    return {
+      integrations: (parsed.integrations as Integration[] | undefined) ?? [],
+      qualityAttributes: Array.isArray(parsed.qualityAttributes) ? parsed.qualityAttributes as string[] : [],
+    };
+  }
+
+  /**
+   * 1.6 — assemble the product description handoff.
+   *
+   * Mirrors v1's `materializeIntakeHandoff` pattern: arrays are composed
+   * DETERMINISTICALLY from the accepted bloom outputs. The LLM is only
+   * asked to refine NARRATIVE fields (`productVision`,
+   * `productDescription`, `summary`, `openLoops`) using a compact
+   * summary of the blooms. This keeps 1.6 model-agnostic and eliminates
+   * the class of "synthesis LLM drops arrays" failures that v1 also had
+   * to work around (see janumicode/src/lib/curation/narrativeCurator.ts
+   * lines 941–961 — v1's fallback to `draft_plan`).
+   *
+   * If the narrative LLM call fails (unparseable JSON, missing
+   * variables, CLI error), we fall back to the 1.0b Intent Discovery
+   * seed values for vision/description/summary. The handoff arrays
+   * remain intact.
+   */
+  private async runProductDescriptionSynthesis(
+    ctx: PhaseContext,
+    input: {
+      discovery: IntentDiscoveryResult;
+      domains: BusinessDomain[];
+      personas: Persona[];
+      journeys: UserJourney[];
+      workflows: Workflow[];
+      entities: Entity[];
+      integrations: Integration[];
+      qualityAttributes: string[];
+      humanDecisions: HumanDecisionSummary[];
+    },
+  ): Promise<ProductDescriptionHandoffContent> {
+    // 1. Always assemble the base handoff deterministically.
+    const base = this.assembleHandoffFromBloomOutputs(input);
+
+    // 2. Try to refine narrative fields via a small LLM call. This is
+    //    advisory — failures keep the 1.0b seed narrative.
+    try {
+      const refined = await this.refineHandoffNarrative(ctx, input, base);
+      return { ...base, ...refined };
+    } catch (err) {
+      getLogger().warn('workflow', '1.6 narrative refinement failed; keeping 1.0b seed values', {
+        workflow_run_id: ctx.workflowRun.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return base;
+    }
+  }
+
+  /**
+   * LLM-backed narrative refinement for 1.6. Inputs are a compact
+   * summary of the bloom shape (counts + names + id-only references,
+   * not full JSON); outputs are a small object with refined narrative
+   * fields only. Small in, small out — model-agnostic.
+   */
+  private async refineHandoffNarrative(
+    ctx: PhaseContext,
+    input: {
+      discovery: IntentDiscoveryResult;
+      domains: BusinessDomain[];
+      personas: Persona[];
+      journeys: UserJourney[];
+      workflows: Workflow[];
+      entities: Entity[];
+      integrations: Integration[];
+      qualityAttributes: string[];
+    },
+    base: ProductDescriptionHandoffContent,
+  ): Promise<Partial<ProductDescriptionHandoffContent>> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_6_product_description_synthesis', 'product');
+    if (!template) {
+      throw new Error('1.6 product_description_synthesis product-lens template not found');
+    }
+
+    // Compact summary of the bloom shape — names + counts only, no full
+    // JSON payload. Keeps input tokens ~1 K and output tokens ~500.
+    const bloomSummary = [
+      `Personas (${input.personas.length}): ${input.personas.map(p => `${p.id} ${p.name}`).join('; ')}`,
+      `User Journeys (${input.journeys.length}): ${input.journeys.map(j => `${j.id} ${j.title}`).join('; ')}`,
+      `Business Domains (${input.domains.length}): ${input.domains.map(d => `${d.id} ${d.name}`).join('; ')}`,
+      `Entities: ${input.entities.length}`,
+      `Workflows (${input.workflows.length}): ${input.workflows.map(w => `${w.id} ${w.name}`).join('; ')}`,
+      `Integrations (${input.integrations.length}): ${input.integrations.map(i => `${i.id} ${i.name}`).join('; ')}`,
+      `Quality Attributes: ${input.qualityAttributes.length}`,
+    ].join('\n');
+
+    const rendered = engine.templateLoader.render(template, {
+      seed_vision: input.discovery.productVision,
+      seed_description: input.discovery.productDescription,
+      seed_summary: input.discovery.analysisSummary,
+      bloom_summary: bloomSummary,
+      open_questions_seed: input.discovery.openQuestions.map(q => `- ${q.id}: ${q.text}`).join('\n') || '(none)',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) {
+      throw new Error(`1.6 narrative template missing variables: ${rendered.missing_variables.join(', ')}`);
+    }
+
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.3,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.6', agentRole: 'domain_interpreter', label: 'Phase 1.6 — Product Description Narrative Refinement' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('1.6 narrative LLM returned unparseable JSON');
+
+    const refined: Partial<ProductDescriptionHandoffContent> = {};
+    if (typeof parsed.productVision === 'string' && parsed.productVision.trim().length > 0) {
+      refined.productVision = parsed.productVision.trim();
+    }
+    if (typeof parsed.productDescription === 'string' && parsed.productDescription.trim().length > 0) {
+      refined.productDescription = parsed.productDescription.trim();
+    }
+    if (typeof parsed.summary === 'string' && parsed.summary.trim().length > 0) {
+      refined.summary = parsed.summary.trim();
+    }
+    if (Array.isArray(parsed.openLoops) && parsed.openLoops.length > 0) {
+      refined.openLoops = parsed.openLoops as OpenLoop[];
+    }
+    return refined;
+  }
+
+  private assembleHandoffFromBloomOutputs(input: {
+    discovery: IntentDiscoveryResult;
+    domains: BusinessDomain[];
+    personas: Persona[];
+    journeys: UserJourney[];
+    workflows: Workflow[];
+    entities: Entity[];
+    integrations: Integration[];
+    qualityAttributes: string[];
+    humanDecisions: HumanDecisionSummary[];
+  }): ProductDescriptionHandoffContent {
+    // Refresh phasing's journeyIds against the accepted journeys — journeys
+    // pruned in 1.3 must not linger in any phase's journeyIds list. This
+    // replaces v1's finalized-plan merge behaviour deterministically.
+    const acceptedJourneyIds = new Set(input.journeys.map(j => j.id));
+    const phasingStrategy = input.discovery.phasingStrategy.map(phase => ({
+      ...phase,
+      journeyIds: (phase.journeyIds ?? []).filter(id => acceptedJourneyIds.has(id)),
+    }));
+
+    return {
+      kind: 'product_description_handoff',
+      schemaVersion: '1.0',
+      requestCategory: 'product_or_feature',
+      productVision: input.discovery.productVision,
+      productDescription: input.discovery.productDescription,
+      summary: input.discovery.analysisSummary,
+      personas: input.personas,
+      userJourneys: input.journeys,
+      phasingStrategy,
+      successMetrics: input.discovery.successMetrics,
+      businessDomainProposals: input.domains,
+      entityProposals: input.entities,
+      workflowProposals: input.workflows,
+      integrationProposals: input.integrations,
+      qualityAttributes: input.qualityAttributes,
+      uxRequirements: input.discovery.uxRequirements,
+      requirements: input.discovery.requirements,
+      decisions: input.discovery.decisions,
+      constraints: input.discovery.constraints,
+      openQuestions: input.discovery.openQuestions,
+      humanDecisions: input.humanDecisions,
+      openLoops: input.discovery.openQuestions.map(q => ({
+        category: 'deferred_decision' as const,
+        description: q.text,
+        priority: 'medium' as const,
+      })),
+    };
+  }
+
+  /**
+   * Project a product_description_handoff into the IntentStatementContent
+   * shape that Phase 2+ reads today. A follow-up can upgrade specific
+   * downstream phases to read the richer handoff directly.
+   */
+  private deriveIntentStatementFromHandoff(handoff: ProductDescriptionHandoffContent): Record<string, unknown> {
+    const primaryPersona = handoff.personas[0];
+    const whoItServes = primaryPersona ? `${primaryPersona.name} — ${primaryPersona.description}` : 'unspecified';
+    const problemItSolves = handoff.productDescription.length > 0 ? handoff.productDescription : handoff.summary;
+    return {
+      product_concept: {
+        name: handoff.productVision || 'Untitled product',
+        description: handoff.productDescription || handoff.summary,
+        who_it_serves: whoItServes,
+        problem_it_solves: problemItSolves,
+      },
+      confirmed_assumptions: handoff.decisions.map(d => ({
+        assumption_id: d.id,
+        assumption: d.text,
+        confirmed_by_record_id: d.id,
+      })),
+      confirmed_constraints: handoff.constraints.map(c => c.text),
+      out_of_scope: handoff.openLoops
+        .filter(l => l.category === 'deferred_decision' || l.category === 'followup')
+        .map(l => l.description),
+    };
+  }
+
+  // ── Format helpers (human-readable context blocks for templates) ──
+
+  private formatPersonas(ps: Persona[]): string {
+    if (!ps.length) return '(none)';
+    return ps.map(p => {
+      const goals = (p.goals ?? []).length > 0 ? `\n  Goals: ${(p.goals ?? []).join('; ')}` : '';
+      const pains = (p.painPoints ?? []).length > 0 ? `\n  Pain points: ${(p.painPoints ?? []).join('; ')}` : '';
+      return `- **${p.id}**: ${p.name} — ${p.description}${goals}${pains}`;
+    }).join('\n');
+  }
+
+  private formatJourneys(js: UserJourney[]): string {
+    if (!js.length) return '(none)';
+    return js.map(j => `- **${j.id}** [${j.implementationPhase ?? 'TBD'}] ${j.title} (${j.personaId}): ${j.scenario}`).join('\n');
+  }
+
+  private formatPhasing(ps: PhasingPhase[]): string {
+    if (!ps.length) return '(none — to be derived)';
+    return ps.map(p => {
+      const jids = (p.journeyIds ?? []).length > 0 ? ` (journeys: ${p.journeyIds.join(', ')})` : '';
+      return `- **${p.phase}**: ${p.description}${jids}\n  Rationale: ${p.rationale ?? ''}`;
+    }).join('\n');
+  }
+
+  private formatExtractedItems(items: ExtractedItem[]): string {
+    if (!items.length) return '(none)';
+    return items.slice(0, 25).map(i => `- ${i.text}`).join('\n');
+  }
+
+  private formatDomains(ds: BusinessDomain[]): string {
+    if (!ds.length) return '(none)';
+    return ds.map(d => `- **${d.id}**: ${d.name} — ${d.description}`).join('\n');
+  }
+
+  private formatWorkflows(ws: Workflow[]): string {
+    if (!ws.length) return '(none)';
+    return ws.map(w => `- **${w.id}** (${w.businessDomainId}): ${w.name} — ${w.description}`).join('\n');
+  }
+
+  private formatEntities(es: Entity[]): string {
+    if (!es.length) return '(none)';
+    return es.map(e => `- **${e.id}** (${e.businessDomainId}): ${e.name} — ${e.description}`).join('\n');
+  }
+
+  /**
+   * Coerce an arbitrary JSON array into our ExtractedItem[] shape,
+   * generating stable ids + ISO timestamps when the LLM omits them.
+   * Falls back to `fallback` when the input is empty or missing.
+   */
+  private normalizeExtractedItems(
+    raw: unknown,
+    type: ExtractedItem['type'],
+    idPrefix: string,
+    fallback: ExtractedItem[] = [],
+  ): ExtractedItem[] {
+    if (!Array.isArray(raw) || raw.length === 0) return fallback;
+    const now = new Date().toISOString();
+    return raw.map((r, i) => {
+      if (typeof r === 'string') {
+        return { id: `${idPrefix}-${i + 1}`, type, text: r, timestamp: now };
+      }
+      const obj = r as Record<string, unknown>;
+      return {
+        id: (obj.id as string) ?? `${idPrefix}-${i + 1}`,
+        type,
+        text: (obj.text as string) ?? '',
+        extractedFromTurnId: typeof obj.extractedFromTurnId === 'number' ? obj.extractedFromTurnId : undefined,
+        timestamp: (obj.timestamp as string) ?? now,
+      };
+    });
+  }
+
+  /**
+   * Best-effort parse of an LLM result — prefers the SDK-parsed value,
+   * falls back to parseJsonWithRecovery on the raw text, returns null
+   * if neither yields an object.
+   */
+  private safeParseJson(result: { parsed?: unknown; text?: string }): Record<string, unknown> | null {
+    if (result.parsed && typeof result.parsed === 'object' && !Array.isArray(result.parsed)) {
+      return result.parsed as Record<string, unknown>;
+    }
+    if (typeof result.text === 'string' && result.text.trim().length > 0) {
+      const recovered = parseJsonWithRecovery(result.text);
+      if (recovered.parsed && typeof recovered.parsed === 'object' && !Array.isArray(recovered.parsed)) {
+        return recovered.parsed as Record<string, unknown>;
+      }
+    }
+    return null;
+  }
+}
+
+// ── Types local to the product-lens flow ───────────────────────────
+
+/**
+ * Concatenate prior feedback with the newest batch. Each iteration's
+ * feedback is appended, not replaced — the LLM sees the full history so
+ * it knows the user's refinement trajectory, not just the latest message.
+ */
+function accumulateFeedback(existing: string, next: string): string {
+  if (!existing) return next.trim();
+  return `${existing}\n\n---\n\n${next.trim()}`;
+}
+
+interface IntentDiscoveryResult {
+  analysisSummary: string;
+  productVision: string;
+  productDescription: string;
+  personas: Persona[];
+  userJourneys: UserJourney[];
+  phasingStrategy: PhasingPhase[];
+  successMetrics: string[];
+  uxRequirements: string[];
+  requirements: ExtractedItem[];
+  decisions: ExtractedItem[];
+  constraints: ExtractedItem[];
+  openQuestions: ExtractedItem[];
 }

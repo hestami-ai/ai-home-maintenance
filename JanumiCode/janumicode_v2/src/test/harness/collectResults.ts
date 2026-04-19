@@ -101,7 +101,7 @@ export function collectHarnessResult(
 
   const lineage = workflowRunId
     ? validateLineage(db, workflowRunId, observedPhases)
-    : { valid: true, missingRecords: [], violations: [], assertionFailures: [] };
+    : { valid: true, missingRecords: [], violations: [], assertionFailures: [], gaps: [] };
 
   const missingByPhase = new Map<string, number>();
   for (const m of lineage.missingRecords) {

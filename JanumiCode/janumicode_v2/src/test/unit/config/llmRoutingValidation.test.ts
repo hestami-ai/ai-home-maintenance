@@ -41,6 +41,9 @@ describe('validateLLMRouting', () => {
       const engine = new OrchestratorEngine(db, configManager, process.cwd());
       const mock = new MockLLMProvider();
       engine.llmCaller.registerProvider(mock.bindAsProvider('google'));
+      // domain_interpreter routing defaults to ollama (iter-3 default);
+      // register it so the validator's referenced-provider check passes.
+      engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
       // Should not throw.
       expect(() => engine.validateLLMRouting()).not.toThrow();
     } finally {

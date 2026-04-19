@@ -18,7 +18,7 @@
  * handler when updating a contract.
  */
 
-import type { PhaseId } from '../../lib/types/records';
+import type { IntentLens, PhaseId } from '../../lib/types/records';
 import type { PhaseContract, PhaseInvariant, AuthorityRule, RequiredArtifact } from './types';
 
 const art = (
@@ -125,6 +125,110 @@ export const PHASE1_CONTRACT: PhaseContract = {
       description: 'Intent statement artifact must carry a product_concept with name + description.',
       validator: 'validateIntentStatementScope',
       severity: 'error',
+    },
+  ],
+  authority_rules: [],
+};
+
+// ── Phase 1 (product lens) — v1-style bloom/prune proposer loop ────
+//
+// Replaces the default Phase 1 contract when the run's intent_lens is
+// 'product'. Ten sub-phases: 1.0 IQC, 1.0a lens classification, 1.0b
+// intent discovery (silent), 1.1b scope, four bloom/prune rounds
+// (1.2 domains+personas, 1.3 journeys+workflows, 1.4 entities, 1.5
+// integrations+QAs), 1.6 handoff synthesis (+ derived intent_statement),
+// 1.7 handoff approval. See docs/phase1_product_lens_intake_plan.md §3.
+export const PHASE1_CONTRACT_PRODUCT: PhaseContract = {
+  phase: '1',
+  required_artifacts: [
+    {
+      record_type: 'intent_quality_report',
+      sub_phase_id: '1.0',
+      produced_by_agent_role: 'orchestrator',
+      reason: 'Phase 1.0 Intent Quality Check emits a dedicated report record.',
+    },
+    art('intent_lens_classification', '1.0a',
+      'Phase 1.0a classifies the intent into a lens; under product lens this record drives PHASE1_CONTRACT_PRODUCT selection.',
+      { produced_by_agent_role: 'orchestrator' }),
+    art('intent_discovery', '1.0b',
+      'Phase 1.0b silent product discovery — seeds vision / description / personas / journeys / phasing + extracted items.',
+      { produced_by_agent_role: 'domain_interpreter' }),
+    art('scope_classification', '1.1b',
+      'Phase 1.1b classifies scope so compliance context can be attached.'),
+    art('compliance_context', '1.1b',
+      'Phase 1.1b attaches compliance constraints for the classified scope.'),
+    art('business_domains_bloom', '1.2',
+      'Phase 1.2 proposer round 1 — business domains and personas bloom.',
+      { produced_by_agent_role: 'domain_interpreter' }),
+    {
+      record_type: 'decision_bundle_presented',
+      sub_phase_id: '1.2',
+      produced_by_agent_role: 'orchestrator',
+      reason: 'Phase 1.2 presents the bloom prune gate for domains + personas.',
+    },
+    art('journeys_workflows_bloom', '1.3',
+      'Phase 1.3 proposer round 2 — user journeys and system workflows bloom.',
+      { produced_by_agent_role: 'domain_interpreter' }),
+    {
+      record_type: 'decision_bundle_presented',
+      sub_phase_id: '1.3',
+      produced_by_agent_role: 'orchestrator',
+      reason: 'Phase 1.3 presents the bloom prune gate for journeys + workflows.',
+    },
+    art('entities_bloom', '1.4',
+      'Phase 1.4 proposer round 3 — business entities bloom.',
+      { produced_by_agent_role: 'domain_interpreter' }),
+    {
+      record_type: 'decision_bundle_presented',
+      sub_phase_id: '1.4',
+      produced_by_agent_role: 'orchestrator',
+      reason: 'Phase 1.4 presents the bloom prune gate for entities.',
+    },
+    art('integrations_qa_bloom', '1.5',
+      'Phase 1.5 proposer round 4 — integrations and quality attributes bloom.',
+      { produced_by_agent_role: 'domain_interpreter' }),
+    {
+      record_type: 'decision_bundle_presented',
+      sub_phase_id: '1.5',
+      produced_by_agent_role: 'orchestrator',
+      reason: 'Phase 1.5 presents the bloom prune gate for integrations + QAs.',
+    },
+    {
+      record_type: 'product_description_handoff',
+      sub_phase_id: '1.6',
+      produced_by_agent_role: 'domain_interpreter',
+      reason: 'Phase 1.6 synthesizes the full product description handoff from the four accepted bloom outputs.',
+    },
+    art('intent_statement', '1.6',
+      'Phase 1.6 derives a compatibility intent_statement record (Option A downstream-compat strategy) so Phase 2+ keep reading their existing interface.',
+      { produced_by_agent_role: 'domain_interpreter' }),
+    {
+      record_type: 'mirror_presented',
+      sub_phase_id: '1.7',
+      produced_by_agent_role: 'orchestrator',
+      reason: 'Phase 1.7 presents the full handoff document for final approval.',
+    },
+    {
+      record_type: 'phase_gate_evaluation',
+      sub_phase_id: '1.7',
+      produced_by_agent_role: 'orchestrator',
+      reason: 'Phase 1 closes at 1.7 with a gate evaluation before advancing to Phase 2.',
+    },
+  ],
+  invariants: [
+    {
+      name: 'intent_statement_has_scope',
+      description: 'Derived intent_statement at 1.6 must carry a product_concept with name + description (Phase 2+ reads this).',
+      validator: 'validateIntentStatementScope',
+      severity: 'error',
+      sub_phase_id: '1.6',
+    },
+    {
+      name: 'product_description_handoff_shape_coverage',
+      description: 'Handoff must satisfy the shape/coverage ranges derived from the v1 Hestami gold reference (plan §10.2) — personas 3–10, journeys 5–15, domains 6–20, entities 20–80, workflows 3–15, integrations 5–25, quality attributes 8–25, phasing 2–5.',
+      validator: 'validateProductDescriptionHandoffShape',
+      severity: 'error',
+      sub_phase_id: '1.6',
     },
   ],
   authority_rules: [],
@@ -494,18 +598,24 @@ export const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
   '10': PHASE10_CONTRACT,
 };
 
-export function getPhaseContract(phaseId: PhaseId): PhaseContract | undefined {
+/**
+ * Resolve a phase contract, preferring a lens-specific variant when one
+ * exists. Today only Phase 1 has a product-lens variant; other lenses
+ * and other phases fall back to the default in `PHASE_CONTRACTS`.
+ */
+export function getPhaseContract(phaseId: PhaseId, lens?: IntentLens | null): PhaseContract | undefined {
+  if (phaseId === '1' && lens === 'product') return PHASE1_CONTRACT_PRODUCT;
   return PHASE_CONTRACTS[phaseId];
 }
 
-export function getRequiredArtifacts(phaseId: PhaseId): RequiredArtifact[] {
-  return PHASE_CONTRACTS[phaseId]?.required_artifacts ?? [];
+export function getRequiredArtifacts(phaseId: PhaseId, lens?: IntentLens | null): RequiredArtifact[] {
+  return getPhaseContract(phaseId, lens)?.required_artifacts ?? [];
 }
 
-export function getPhaseInvariants(phaseId: PhaseId): PhaseInvariant[] {
-  return PHASE_CONTRACTS[phaseId]?.invariants ?? [];
+export function getPhaseInvariants(phaseId: PhaseId, lens?: IntentLens | null): PhaseInvariant[] {
+  return getPhaseContract(phaseId, lens)?.invariants ?? [];
 }
 
-export function getAuthorityRules(phaseId: PhaseId): AuthorityRule[] {
-  return PHASE_CONTRACTS[phaseId]?.authority_rules ?? [];
+export function getAuthorityRules(phaseId: PhaseId, lens?: IntentLens | null): AuthorityRule[] {
+  return getPhaseContract(phaseId, lens)?.authority_rules ?? [];
 }
