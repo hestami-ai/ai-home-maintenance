@@ -92,6 +92,26 @@ describe('Phase 1 — product-lens end-to-end flow', () => {
         openQuestions: [{ id: 'Q-1', type: 'OPEN_QUESTION', text: 'What is the MVP surface?' }],
       },
     });
+    // iter-4 decomposed extraction fixtures — each sibling pass
+    // returns an empty-but-valid array so the pipeline exercises the
+    // new 1.0c/1.0d/1.0e/1.0f sub-phases without requiring Hestami-
+    // scale content in a unit test.
+    mock.setFixture('technical', {
+      match: 'TECHNICAL CONSTRAINT EXTRACTOR',
+      parsedJson: { kind: 'technical_constraints_discovery', technicalConstraints: [] },
+    });
+    mock.setFixture('compliance', {
+      match: 'COMPLIANCE & RETENTION EXTRACTOR',
+      parsedJson: { kind: 'compliance_retention_discovery', complianceExtractedItems: [] },
+    });
+    mock.setFixture('vv', {
+      match: 'VERIFICATION & VALIDATION REQUIREMENTS EXTRACTOR',
+      parsedJson: { kind: 'vv_requirements_discovery', vvRequirements: [] },
+    });
+    mock.setFixture('vocabulary', {
+      match: 'CANONICAL VOCABULARY EXTRACTOR',
+      parsedJson: { kind: 'canonical_vocabulary_discovery', canonicalVocabulary: [] },
+    });
     mock.setFixture('domains', {
       match: 'PRODUCT DOMAIN PROPOSER',
       parsedJson: {
@@ -205,6 +225,12 @@ describe('Phase 1 — product-lens end-to-end flow', () => {
     // Every product-lens sub-phase writes its expected artifact kind.
     expect(findByKind('intent_lens_classification')?.sub_phase_id).toBe('1.0a');
     expect(findByKind('intent_discovery')?.sub_phase_id).toBe('1.0b');
+    // iter-4 decomposed extraction sub-phases each emit a record.
+    expect(findByKind('technical_constraints_discovery')?.sub_phase_id).toBe('1.0c');
+    expect(findByKind('compliance_retention_discovery')?.sub_phase_id).toBe('1.0d');
+    expect(findByKind('vv_requirements_discovery')?.sub_phase_id).toBe('1.0e');
+    expect(findByKind('canonical_vocabulary_discovery')?.sub_phase_id).toBe('1.0f');
+    expect(findByKind('intent_discovery_bundle')?.sub_phase_id).toBe('1.0g');
     expect(findByKind('scope_classification')?.sub_phase_id).toBe('1.1b');
     expect(findByKind('compliance_context')?.sub_phase_id).toBe('1.1b');
     expect(findByKind('business_domains_bloom')?.sub_phase_id).toBe('1.2');

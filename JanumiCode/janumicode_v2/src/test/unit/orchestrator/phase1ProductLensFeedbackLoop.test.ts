@@ -99,6 +99,23 @@ describe('Phase 1 — product-lens free-text feedback re-bloom loop', () => {
         requirements: [], decisions: [], constraints: [], openQuestions: [],
       },
     });
+    // iter-4 decomposed extraction fixtures.
+    mock.setFixture('technical', {
+      match: 'TECHNICAL CONSTRAINT EXTRACTOR',
+      parsedJson: { kind: 'technical_constraints_discovery', technicalConstraints: [] },
+    });
+    mock.setFixture('compliance', {
+      match: 'COMPLIANCE & RETENTION EXTRACTOR',
+      parsedJson: { kind: 'compliance_retention_discovery', complianceExtractedItems: [] },
+    });
+    mock.setFixture('vv', {
+      match: 'VERIFICATION & VALIDATION REQUIREMENTS EXTRACTOR',
+      parsedJson: { kind: 'vv_requirements_discovery', vvRequirements: [] },
+    });
+    mock.setFixture('vocabulary', {
+      match: 'CANONICAL VOCABULARY EXTRACTOR',
+      parsedJson: { kind: 'canonical_vocabulary_discovery', canonicalVocabulary: [] },
+    });
     mock.setFixture('journeys', {
       match: 'PRODUCT JOURNEY & WORKFLOW PROPOSER',
       parsedJson: {

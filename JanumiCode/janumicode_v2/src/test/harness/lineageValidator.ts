@@ -454,6 +454,15 @@ const MULTI_FAILURE_VALIDATORS: Record<string, MultiFailureCheck> = {
     pushRange('integrationProposals', arr('integrationProposals').length, 5, 35);
     pushRange('qualityAttributes', arr('qualityAttributes').length, 8, 25);
     pushRange('phasingStrategy', arr('phasingStrategy').length, 2, 5);
+    // iter-4 decomposed extraction fields — lower bound is 0 because a
+    // simple intent (e.g. a one-line "build a todo app") legitimately
+    // has no stated technical constraints / compliance regimes / V&V
+    // targets / vocabulary. Upper bounds reflect what Codex produces
+    // for a rich spec like Hestami.
+    pushRange('technicalConstraints', arr('technicalConstraints').length, 0, 40);
+    pushRange('complianceExtractedItems', arr('complianceExtractedItems').length, 0, 30);
+    pushRange('vvRequirements', arr('vvRequirements').length, 0, 40);
+    pushRange('canonicalVocabulary', arr('canonicalVocabulary').length, 0, 60);
 
     // Element-level shape checks
     for (const p of arr('personas') as Array<Record<string, unknown>>) {
@@ -543,6 +552,32 @@ const MULTI_FAILURE_VALIDATORS: Record<string, MultiFailureCheck> = {
         });
       }
     }
+
+    // iter-4 traceability spine: each captured item in the decomposed
+    // extraction categories SHOULD carry source_ref.excerpt (load-
+    // bearing for downstream drift-detection chains). A missing
+    // source_ref is a warning, not a hard failure — extraction passes
+    // running against intents with no external source doc legitimately
+    // lack provenance targets.
+    const provenanceCheck = (field: string, items: Array<Record<string, unknown>>) => {
+      const missing = items.filter(it => {
+        const ref = it.source_ref as Record<string, unknown> | undefined;
+        return !ref || typeof ref.excerpt !== 'string' || (ref.excerpt as string).length === 0;
+      });
+      if (missing.length > 0 && items.length > 0) {
+        findings.push({
+          field: `${field}[].source_ref`,
+          expected: `each item has source_ref.excerpt (traceability spine)`,
+          actual: `${missing.length}/${items.length} items missing source_ref.excerpt`,
+          sub_phase_id: '1.6',
+        });
+      }
+    };
+    provenanceCheck('technicalConstraints', arr('technicalConstraints') as Array<Record<string, unknown>>);
+    provenanceCheck('complianceExtractedItems', arr('complianceExtractedItems') as Array<Record<string, unknown>>);
+    provenanceCheck('vvRequirements', arr('vvRequirements') as Array<Record<string, unknown>>);
+    provenanceCheck('canonicalVocabulary', arr('canonicalVocabulary') as Array<Record<string, unknown>>);
+
     return findings;
   },
 };

@@ -149,6 +149,11 @@ export const SUB_PHASE_NAMES: Record<PhaseId, Record<string, string>> = {
     '1.0': 'Intent Quality Check',
     '1.0a': 'Intent Lens Classification',
     '1.0b': 'Intent Discovery',
+    '1.0c': 'Technical Constraints Discovery',
+    '1.0d': 'Compliance & Retention Discovery',
+    '1.0e': 'V&V Requirements Discovery',
+    '1.0f': 'Canonical Vocabulary Discovery',
+    '1.0g': 'Intent Discovery Synthesis',
     '1.1b': 'Scope Bounding',
     '1.2': 'Intent Domain Bloom',
     '1.3': 'Intent Candidate Review & Menu',
@@ -243,7 +248,12 @@ export const SUB_PHASE_NAMES_BY_LENS: Partial<Record<PhaseId, Partial<Record<Int
     product: {
       '1.0': 'Intent Quality Check',
       '1.0a': 'Intent Lens Classification',
-      '1.0b': 'Intent Discovery',
+      '1.0b': 'Product Intent Discovery',
+      '1.0c': 'Technical Constraints Discovery',
+      '1.0d': 'Compliance & Retention Discovery',
+      '1.0e': 'V&V Requirements Discovery',
+      '1.0f': 'Canonical Vocabulary Discovery',
+      '1.0g': 'Intent Discovery Synthesis',
       '1.1b': 'Scope Bounding',
       '1.2': 'Business Domains & Personas Bloom',
       '1.3': 'User Journeys & Workflows Bloom',
@@ -260,7 +270,14 @@ export const SUB_PHASE_NAMES_BY_LENS: Partial<Record<PhaseId, Partial<Record<Int
  */
 export const SUB_PHASE_ORDER_BY_LENS: Partial<Record<PhaseId, Partial<Record<IntentLens, string[]>>>> = {
   '1': {
-    product: ['1.0', '1.0a', '1.0b', '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7'],
+    product: [
+      '1.0', '1.0a',
+      // Decomposed intent-discovery extraction passes (iter-4).
+      '1.0b', '1.0c', '1.0d', '1.0e', '1.0f',
+      // Deterministic composer merges 1.0b–1.0f into the discovery bundle.
+      '1.0g',
+      '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7',
+    ],
   },
 };
 
@@ -700,6 +717,34 @@ export interface Integration {
 }
 
 /**
+ * Traceability spine — every item extracted from a source document in
+ * Phase 1 carries a `source_ref` so downstream phases (Phase 2 reqs,
+ * Phase 5 tech spec, Phase 8 eval design) can trace their derived
+ * artifacts back to verbatim source material. Phase 8 uses the chain
+ * `source_ref → extracted_item → requirement → component → test_result`
+ * to detect drift mechanically rather than via free-form review.
+ *
+ * Offsets are byte-level into the ingested file content if the
+ * extraction agent can compute them; they're optional because not all
+ * source documents support precise offset addressing (diagrams, tables,
+ * lists that normalise on ingestion). The `excerpt` field is the
+ * canonical anchor — if offsets drift between ingestion and later
+ * verification, the excerpt can still be located by substring search.
+ */
+export interface SourceRef {
+  /** Workspace-relative path of the source document. */
+  document_path: string;
+  /** Heading of the containing section, if the doc is hierarchical. */
+  section_heading?: string;
+  /** Verbatim text span supporting the extracted item. */
+  excerpt: string;
+  /** Byte offset of the excerpt's start (inclusive), when available. */
+  excerpt_start?: number;
+  /** Byte offset of the excerpt's end (exclusive), when available. */
+  excerpt_end?: number;
+}
+
+/**
  * Free-form extracted items (requirements / decisions / constraints /
  * open questions). Shape is flat by design so downstream consumers
  * don't need to normalise.
@@ -711,6 +756,67 @@ export interface ExtractedItem {
   /** Turn id in the originating dialogue, if any — preserved for audit. */
   extractedFromTurnId?: number;
   timestamp: string;
+  /** Provenance into the source document for drift-detection chains. */
+  source_ref?: SourceRef;
+}
+
+/**
+ * Stated-not-invented technical decisions extracted from source docs
+ * at Phase 1.0c Technical Constraints Discovery. Downstream phases
+ * (esp. Phase 4 Architecture + Phase 5 Technical Specification) read
+ * these as authoritative pre-approved constraints — they're not
+ * proposals the LLM invented, they're transcriptions from the source.
+ */
+export interface TechnicalConstraint {
+  id: string;                 // TECH-1, TECH-2, …
+  /**
+   * Stack slot the constraint applies to. Open-ended string so
+   * source-unique categories (e.g. 'workflow_engine', 'dns') don't
+   * need an allowlist update.
+   */
+  category: string;           // 'frontend' | 'backend' | 'database' | 'infrastructure' | 'security' | 'deployment' | 'cdn' | 'workflow_engine' | 'mobile' | …
+  /** Full human-readable constraint as stated in the source. */
+  text: string;
+  /** Specific technology or vendor named in the source, when applicable. */
+  technology?: string;
+  version?: string;
+  /** Why this was chosen — copied from the source if rationale is stated. */
+  rationale?: string;
+  source_ref?: SourceRef;
+}
+
+/**
+ * Verification & Validation requirements extracted at Phase 1.0e.
+ * Distinct from `qualityAttributes[]` strings in that each V&V item
+ * has a measurable threshold + measurement method — the data a test
+ * planner (Phase 7) or evaluation designer (Phase 8) needs to
+ * mechanically verify drift.
+ */
+export interface VVRequirement {
+  id: string;                 // VV-1, VV-2, …
+  category: string;           // 'performance' | 'availability' | 'reliability' | 'security' | 'compliance' | 'accessibility' | 'observability' | …
+  /** What the system must achieve (goal). */
+  target: string;
+  /** How we know if it's met (observable signal). */
+  measurement: string;
+  /** Pass criterion — the boundary between satisfied and violated. */
+  threshold?: string;
+  source_ref?: SourceRef;
+}
+
+/**
+ * Canonical vocabulary extracted at Phase 1.0f. Terms defined in the
+ * source doc — consumed by Phase 0.4 Vocabulary Collision Check to
+ * protect against naming drift and by Phase 4 Architecture to keep
+ * component names aligned with the stakeholder mental model.
+ */
+export interface VocabularyTerm {
+  id: string;                 // VOC-1, VOC-2, …
+  term: string;
+  definition: string;
+  /** Equivalent / near-equivalent terms from the same source. */
+  synonyms: string[];
+  source_ref?: SourceRef;
 }
 
 /**
@@ -739,11 +845,11 @@ export interface OpenLoop {
 
 export interface ProductDescriptionHandoffContent {
   kind: 'product_description_handoff';
-  schemaVersion: '1.0';
+  schemaVersion: '1.1';
   /** Always 'product_or_feature' under the product lens; preserved for v1 parity. */
   requestCategory: 'product_or_feature';
 
-  // Narrative layer (from 1.0b Intent Discovery, refined through synthesis)
+  // Narrative layer (from 1.0b Product Intent Discovery, refined through synthesis)
   productVision: string;
   productDescription: string;
   summary: string;
@@ -760,11 +866,25 @@ export interface ProductDescriptionHandoffContent {
   qualityAttributes: string[];
   uxRequirements: string[];
 
-  // Extracted items (from 1.0b Intent Discovery + refined during synthesis)
+  // Extracted items — product-level (from 1.0b Product Intent Discovery)
   requirements: ExtractedItem[];
   decisions: ExtractedItem[];
   constraints: ExtractedItem[];
   openQuestions: ExtractedItem[];
+
+  // Decomposed Phase 1.0 extraction passes (iter-4). Each field is the
+  // frozen output of a focused extraction sub-phase; every item carries
+  // `source_ref` provenance for drift-detection chains. Empty arrays are
+  // meaningful — they mean "this category was scanned and nothing was
+  // extractable", not "the category was skipped".
+  /** Phase 1.0c — stated-not-invented technical stack / infra / security decisions. */
+  technicalConstraints: TechnicalConstraint[];
+  /** Phase 1.0d — compliance regimes + retention obligations (beyond Phase 1.1b's context hint). */
+  complianceExtractedItems: ExtractedItem[];
+  /** Phase 1.0e — Verification & Validation requirements with measurable thresholds. */
+  vvRequirements: VVRequirement[];
+  /** Phase 1.0f — canonical vocabulary terms defined in the source docs. */
+  canonicalVocabulary: VocabularyTerm[];
 
   // Cross-cutting — condensed human decisions + unresolved loops
   humanDecisions: HumanDecisionSummary[];

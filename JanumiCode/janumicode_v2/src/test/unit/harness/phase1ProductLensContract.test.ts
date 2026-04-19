@@ -125,7 +125,7 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
     }));
     return {
       kind: 'product_description_handoff',
-      schemaVersion: '1.0',
+      schemaVersion: '1.1',
       requestCategory: 'product_or_feature',
       productVision: 'v',
       productDescription: 'd',
@@ -147,6 +147,12 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
       decisions: [],
       constraints: [],
       openQuestions: [],
+      // iter-4 decomposed extraction fields — empty arrays are valid
+      // under the oracle (lower bound 0 for all four).
+      technicalConstraints: [],
+      complianceExtractedItems: [],
+      vvRequirements: [],
+      canonicalVocabulary: [],
       humanDecisions: [],
       openLoops: [],
     };
@@ -193,6 +199,11 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
     };
     stub('1.0a', 'intent_lens_classification', 'orchestrator');
     stub('1.0b', 'intent_discovery');
+    stub('1.0c', 'technical_constraints_discovery');
+    stub('1.0d', 'compliance_retention_discovery');
+    stub('1.0e', 'vv_requirements_discovery');
+    stub('1.0f', 'canonical_vocabulary_discovery');
+    stub('1.0g', 'intent_discovery_bundle', 'orchestrator');
     stub('1.1b', 'scope_classification', 'orchestrator');
     stub('1.1b', 'compliance_context', 'orchestrator');
     stub('1.2', 'business_domains_bloom');

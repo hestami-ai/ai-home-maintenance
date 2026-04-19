@@ -32,6 +32,10 @@ import type {
   ExtractedItem,
   HumanDecisionSummary,
   OpenLoop,
+  SourceRef,
+  TechnicalConstraint,
+  VVRequirement,
+  VocabularyTerm,
 } from '../../types/records';
 import type {
   DecisionBundleContent,
@@ -1243,13 +1247,13 @@ export class Phase1Handler implements PhaseHandler {
     const { rawIntent, rawIntentText, lensRecord, artifactIds } = state;
     const humanDecisions: HumanDecisionSummary[] = [];
 
-    // ── 1.0b Intent Discovery (silent) ──────────────────────
+    // ── 1.0b Product Intent Discovery (silent) ──────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '1.0b');
     let discovery: IntentDiscoveryResult;
     try {
       discovery = await this.runIntentDiscovery(ctx, rawIntentText);
     } catch (err) {
-      return { success: false, error: `Intent Discovery failed: ${err instanceof Error ? err.message : String(err)}`, artifactIds };
+      return { success: false, error: `Product Intent Discovery failed: ${err instanceof Error ? err.message : String(err)}`, artifactIds };
     }
     const discoveryRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -1264,6 +1268,149 @@ export class Phase1Handler implements PhaseHandler {
     });
     artifactIds.push(discoveryRecord.id);
     engine.ingestionPipeline.ingest(discoveryRecord);
+
+    // ── 1.0c Technical Constraints Discovery (silent) ───────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.0c');
+    let technicalConstraints: TechnicalConstraint[] = [];
+    try {
+      technicalConstraints = await this.runTechnicalConstraintsDiscovery(ctx, rawIntentText);
+    } catch (err) {
+      // Non-fatal: tech-extraction failure degrades gracefully — we
+      // log the gap but the product flow continues. Harness oracle
+      // will flag missing captures for the virtuous-cycle loop to
+      // address.
+      getLogger().warn('workflow', 'Phase 1.0c Technical Constraints Discovery failed — continuing with empty captures', {
+        workflow_run_id: workflowRun.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    const techRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.0c',
+      produced_by_agent_role: 'domain_interpreter',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [rawIntent.id, lensRecord.id],
+      content: { kind: 'technical_constraints_discovery', technicalConstraints } as unknown as Record<string, unknown>,
+    });
+    artifactIds.push(techRecord.id);
+    engine.ingestionPipeline.ingest(techRecord);
+
+    // ── 1.0d Compliance & Retention Discovery (silent) ──────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.0d');
+    let complianceExtractedItems: ExtractedItem[] = [];
+    try {
+      complianceExtractedItems = await this.runComplianceRetentionDiscovery(ctx, rawIntentText);
+    } catch (err) {
+      getLogger().warn('workflow', 'Phase 1.0d Compliance & Retention Discovery failed — continuing with empty captures', {
+        workflow_run_id: workflowRun.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    const complianceRecord_extraction = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.0d',
+      produced_by_agent_role: 'domain_interpreter',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [rawIntent.id, lensRecord.id],
+      content: { kind: 'compliance_retention_discovery', complianceExtractedItems } as unknown as Record<string, unknown>,
+    });
+    artifactIds.push(complianceRecord_extraction.id);
+    engine.ingestionPipeline.ingest(complianceRecord_extraction);
+
+    // ── 1.0e V&V Requirements Discovery (silent) ────────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.0e');
+    let vvRequirements: VVRequirement[] = [];
+    try {
+      vvRequirements = await this.runVVRequirementsDiscovery(ctx, rawIntentText);
+    } catch (err) {
+      getLogger().warn('workflow', 'Phase 1.0e V&V Requirements Discovery failed — continuing with empty captures', {
+        workflow_run_id: workflowRun.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    const vvRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.0e',
+      produced_by_agent_role: 'domain_interpreter',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [rawIntent.id, lensRecord.id],
+      content: { kind: 'vv_requirements_discovery', vvRequirements } as unknown as Record<string, unknown>,
+    });
+    artifactIds.push(vvRecord.id);
+    engine.ingestionPipeline.ingest(vvRecord);
+
+    // ── 1.0f Canonical Vocabulary Discovery (silent) ────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.0f');
+    let canonicalVocabulary: VocabularyTerm[] = [];
+    try {
+      canonicalVocabulary = await this.runCanonicalVocabularyDiscovery(ctx, rawIntentText);
+    } catch (err) {
+      getLogger().warn('workflow', 'Phase 1.0f Canonical Vocabulary Discovery failed — continuing with empty captures', {
+        workflow_run_id: workflowRun.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    const vocabRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.0f',
+      produced_by_agent_role: 'domain_interpreter',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [rawIntent.id, lensRecord.id],
+      content: { kind: 'canonical_vocabulary_discovery', canonicalVocabulary } as unknown as Record<string, unknown>,
+    });
+    artifactIds.push(vocabRecord.id);
+    engine.ingestionPipeline.ingest(vocabRecord);
+
+    // ── 1.0g Intent Discovery Synthesis (deterministic compose) ──
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.0g');
+    const discoveryBundle: IntentDiscoveryBundle = this.composeDiscoveryBundle(
+      discovery,
+      technicalConstraints,
+      complianceExtractedItems,
+      vvRequirements,
+      canonicalVocabulary,
+    );
+    const bundleRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.0g',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [discoveryRecord.id, techRecord.id, complianceRecord_extraction.id, vvRecord.id, vocabRecord.id],
+      content: {
+        kind: 'intent_discovery_bundle',
+        product_extraction_id: discoveryRecord.id,
+        technical_extraction_id: techRecord.id,
+        compliance_extraction_id: complianceRecord_extraction.id,
+        vv_extraction_id: vvRecord.id,
+        vocabulary_extraction_id: vocabRecord.id,
+        counts: {
+          personas: discoveryBundle.product.personas.length,
+          userJourneys: discoveryBundle.product.userJourneys.length,
+          phasingStrategy: discoveryBundle.product.phasingStrategy.length,
+          technicalConstraints: discoveryBundle.technicalConstraints.length,
+          complianceExtractedItems: discoveryBundle.complianceExtractedItems.length,
+          vvRequirements: discoveryBundle.vvRequirements.length,
+          canonicalVocabulary: discoveryBundle.canonicalVocabulary.length,
+        },
+      },
+    });
+    artifactIds.push(bundleRecord.id);
+    engine.ingestionPipeline.ingest(bundleRecord);
 
     // ── 1.1b Scope Bounding + Compliance (deterministic) ────
     engine.stateMachine.setSubPhase(workflowRun.id, '1.1b');
@@ -1476,6 +1623,11 @@ export class Phase1Handler implements PhaseHandler {
         integrations: safeIntegrations,
         qualityAttributes: safeQAs,
         humanDecisions,
+        // Decomposed extraction slots — threaded from 1.0g bundle.
+        technicalConstraints: discoveryBundle.technicalConstraints,
+        complianceExtractedItems: discoveryBundle.complianceExtractedItems,
+        vvRequirements: discoveryBundle.vvRequirements,
+        canonicalVocabulary: discoveryBundle.canonicalVocabulary,
       });
     } catch (err) {
       return { success: false, error: `Product description synthesis failed: ${err instanceof Error ? err.message : String(err)}`, artifactIds };
@@ -1836,6 +1988,249 @@ export class Phase1Handler implements PhaseHandler {
     };
   }
 
+  /**
+   * 1.0c — Technical Constraints Discovery. Transcribes stated-not-
+   * invented technical decisions (stack, infra, security, deployment)
+   * from the source docs. Every captured TechnicalConstraint carries a
+   * `source_ref.excerpt` for downstream drift-detection chains.
+   */
+  private async runTechnicalConstraintsDiscovery(
+    ctx: PhaseContext,
+    rawIntentText: string,
+  ): Promise<TechnicalConstraint[]> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate(
+      'domain_interpreter', '01_0c_technical_constraints_discovery', 'product',
+    );
+    if (!template) throw new Error('1.0c technical_constraints_discovery product-lens template not found');
+    const ingestedFiles = await this.collectIngestedFileContent(ctx);
+    const enrichedIntent = this.buildEnrichedIntentText(rawIntentText, ingestedFiles);
+    const rendered = engine.templateLoader.render(template, {
+      raw_intent_text: enrichedIntent,
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) {
+      throw new Error(`1.0c missing variables: ${rendered.missing_variables.join(', ')}`);
+    }
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.2,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.0c', agentRole: 'domain_interpreter', label: 'Phase 1.0c — Technical Constraints Discovery' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('Technical Constraints Discovery returned unparseable JSON');
+    const raw = Array.isArray(parsed.technicalConstraints) ? parsed.technicalConstraints : [];
+    return this.normalizeTechnicalConstraints(raw);
+  }
+
+  /**
+   * 1.0d — Compliance & Retention Discovery. Captures regulatory
+   * regimes, legal retention obligations, and audit requirements as
+   * ExtractedItem records (type=CONSTRAINT/DECISION/REQUIREMENT/OPEN_QUESTION).
+   */
+  private async runComplianceRetentionDiscovery(
+    ctx: PhaseContext,
+    rawIntentText: string,
+  ): Promise<ExtractedItem[]> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate(
+      'domain_interpreter', '01_0d_compliance_retention_discovery', 'product',
+    );
+    if (!template) throw new Error('1.0d compliance_retention_discovery product-lens template not found');
+    const ingestedFiles = await this.collectIngestedFileContent(ctx);
+    const enrichedIntent = this.buildEnrichedIntentText(rawIntentText, ingestedFiles);
+    const rendered = engine.templateLoader.render(template, {
+      raw_intent_text: enrichedIntent,
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) {
+      throw new Error(`1.0d missing variables: ${rendered.missing_variables.join(', ')}`);
+    }
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.2,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.0d', agentRole: 'domain_interpreter', label: 'Phase 1.0d — Compliance & Retention Discovery' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('Compliance & Retention Discovery returned unparseable JSON');
+    const raw = Array.isArray(parsed.complianceExtractedItems) ? parsed.complianceExtractedItems : [];
+    // Preserve any source_ref on each item during normalization.
+    return this.normalizeExtractedItemsWithProvenance(raw, 'COMP');
+  }
+
+  /**
+   * 1.0e — V&V Requirements Discovery. Captures measurable
+   * performance / availability / reliability / security / accessibility
+   * targets with explicit threshold + measurement method.
+   */
+  private async runVVRequirementsDiscovery(
+    ctx: PhaseContext,
+    rawIntentText: string,
+  ): Promise<VVRequirement[]> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate(
+      'domain_interpreter', '01_0e_vv_requirements_discovery', 'product',
+    );
+    if (!template) throw new Error('1.0e vv_requirements_discovery product-lens template not found');
+    const ingestedFiles = await this.collectIngestedFileContent(ctx);
+    const enrichedIntent = this.buildEnrichedIntentText(rawIntentText, ingestedFiles);
+    const rendered = engine.templateLoader.render(template, {
+      raw_intent_text: enrichedIntent,
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) {
+      throw new Error(`1.0e missing variables: ${rendered.missing_variables.join(', ')}`);
+    }
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.2,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.0e', agentRole: 'domain_interpreter', label: 'Phase 1.0e — V&V Requirements Discovery' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('V&V Requirements Discovery returned unparseable JSON');
+    const raw = Array.isArray(parsed.vvRequirements) ? parsed.vvRequirements : [];
+    return this.normalizeVVRequirements(raw);
+  }
+
+  /**
+   * 1.0f — Canonical Vocabulary Discovery. Captures domain-specific
+   * terms + definitions from the source docs.
+   */
+  private async runCanonicalVocabularyDiscovery(
+    ctx: PhaseContext,
+    rawIntentText: string,
+  ): Promise<VocabularyTerm[]> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate(
+      'domain_interpreter', '01_0f_canonical_vocabulary_discovery', 'product',
+    );
+    if (!template) throw new Error('1.0f canonical_vocabulary_discovery product-lens template not found');
+    const ingestedFiles = await this.collectIngestedFileContent(ctx);
+    const enrichedIntent = this.buildEnrichedIntentText(rawIntentText, ingestedFiles);
+    const rendered = engine.templateLoader.render(template, {
+      raw_intent_text: enrichedIntent,
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) {
+      throw new Error(`1.0f missing variables: ${rendered.missing_variables.join(', ')}`);
+    }
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.2,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.0f', agentRole: 'domain_interpreter', label: 'Phase 1.0f — Canonical Vocabulary Discovery' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('Canonical Vocabulary Discovery returned unparseable JSON');
+    const raw = Array.isArray(parsed.canonicalVocabulary) ? parsed.canonicalVocabulary : [];
+    return this.normalizeVocabularyTerms(raw);
+  }
+
+  /**
+   * 1.0g — deterministic composer. Merges the five extraction outputs
+   * into a single IntentDiscoveryBundle. No LLM call — just structural
+   * assembly + id-uniqueness cleanup.
+   */
+  private composeDiscoveryBundle(
+    product: IntentDiscoveryResult,
+    technicalConstraints: TechnicalConstraint[],
+    complianceExtractedItems: ExtractedItem[],
+    vvRequirements: VVRequirement[],
+    canonicalVocabulary: VocabularyTerm[],
+  ): IntentDiscoveryBundle {
+    return { product, technicalConstraints, complianceExtractedItems, vvRequirements, canonicalVocabulary };
+  }
+
+  // ── Extraction normalizers (id reassignment + provenance preservation) ──
+
+  private normalizeTechnicalConstraints(raw: unknown[]): TechnicalConstraint[] {
+    return raw.map((r, i) => {
+      const o = (r ?? {}) as Record<string, unknown>;
+      return {
+        id: typeof o.id === 'string' && o.id.length > 0 ? o.id : `TECH-${i + 1}`,
+        category: typeof o.category === 'string' ? o.category : 'uncategorized',
+        text: typeof o.text === 'string' ? o.text : '',
+        technology: typeof o.technology === 'string' ? o.technology : undefined,
+        version: typeof o.version === 'string' ? o.version : undefined,
+        rationale: typeof o.rationale === 'string' ? o.rationale : undefined,
+        source_ref: this.normalizeSourceRef(o.source_ref),
+      };
+    }).filter(t => t.text.length > 0);
+  }
+
+  private normalizeVVRequirements(raw: unknown[]): VVRequirement[] {
+    return raw.map((r, i) => {
+      const o = (r ?? {}) as Record<string, unknown>;
+      return {
+        id: typeof o.id === 'string' && o.id.length > 0 ? o.id : `VV-${i + 1}`,
+        category: typeof o.category === 'string' ? o.category : 'uncategorized',
+        target: typeof o.target === 'string' ? o.target : '',
+        measurement: typeof o.measurement === 'string' ? o.measurement : '',
+        threshold: typeof o.threshold === 'string' ? o.threshold : undefined,
+        source_ref: this.normalizeSourceRef(o.source_ref),
+      };
+    }).filter(v => v.target.length > 0 && v.measurement.length > 0);
+  }
+
+  private normalizeVocabularyTerms(raw: unknown[]): VocabularyTerm[] {
+    return raw.map((r, i) => {
+      const o = (r ?? {}) as Record<string, unknown>;
+      return {
+        id: typeof o.id === 'string' && o.id.length > 0 ? o.id : `VOC-${i + 1}`,
+        term: typeof o.term === 'string' ? o.term : '',
+        definition: typeof o.definition === 'string' ? o.definition : '',
+        synonyms: Array.isArray(o.synonyms) ? o.synonyms.filter(s => typeof s === 'string') as string[] : [],
+        source_ref: this.normalizeSourceRef(o.source_ref),
+      };
+    }).filter(v => v.term.length > 0 && v.definition.length > 0);
+  }
+
+  /**
+   * Preserve `source_ref` provenance on ExtractedItem captures (used by
+   * compliance discovery). The existing `normalizeExtractedItems` drops
+   * source_ref; this variant retains it.
+   */
+  private normalizeExtractedItemsWithProvenance(
+    raw: unknown[],
+    idPrefix: string,
+  ): ExtractedItem[] {
+    const now = new Date().toISOString();
+    return raw.map((r, i) => {
+      const o = (r ?? {}) as Record<string, unknown>;
+      const typeRaw = typeof o.type === 'string' ? o.type.toUpperCase() : 'CONSTRAINT';
+      const type: ExtractedItem['type'] =
+        typeRaw === 'REQUIREMENT' || typeRaw === 'DECISION' || typeRaw === 'CONSTRAINT' || typeRaw === 'OPEN_QUESTION'
+          ? typeRaw
+          : 'CONSTRAINT';
+      return {
+        id: typeof o.id === 'string' && o.id.length > 0 ? o.id : `${idPrefix}-${i + 1}`,
+        type,
+        text: typeof o.text === 'string' ? o.text : '',
+        extractedFromTurnId: typeof o.extractedFromTurnId === 'number' ? o.extractedFromTurnId : undefined,
+        timestamp: typeof o.timestamp === 'string' && o.timestamp.length > 0 ? o.timestamp : now,
+        source_ref: this.normalizeSourceRef(o.source_ref),
+      };
+    }).filter(x => x.text.length > 0);
+  }
+
+  private normalizeSourceRef(raw: unknown): SourceRef | undefined {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const o = raw as Record<string, unknown>;
+    const document_path = typeof o.document_path === 'string' ? o.document_path : '';
+    const excerpt = typeof o.excerpt === 'string' ? o.excerpt : '';
+    if (!document_path || !excerpt) return undefined;
+    return {
+      document_path,
+      section_heading: typeof o.section_heading === 'string' ? o.section_heading : undefined,
+      excerpt,
+      excerpt_start: typeof o.excerpt_start === 'number' ? o.excerpt_start : undefined,
+      excerpt_end: typeof o.excerpt_end === 'number' ? o.excerpt_end : undefined,
+    };
+  }
+
   private async runBusinessDomainsBloom(
     ctx: PhaseContext,
     discovery: IntentDiscoveryResult,
@@ -1997,6 +2392,12 @@ export class Phase1Handler implements PhaseHandler {
       integrations: Integration[];
       qualityAttributes: string[];
       humanDecisions: HumanDecisionSummary[];
+      // Decomposed 1.0 extraction slots — threaded from the discovery
+      // bundle so the deterministic assembler can carry them forward.
+      technicalConstraints?: TechnicalConstraint[];
+      complianceExtractedItems?: ExtractedItem[];
+      vvRequirements?: VVRequirement[];
+      canonicalVocabulary?: VocabularyTerm[];
     },
   ): Promise<ProductDescriptionHandoffContent> {
     // 1. Always assemble the base handoff deterministically.
@@ -2101,6 +2502,13 @@ export class Phase1Handler implements PhaseHandler {
     integrations: Integration[];
     qualityAttributes: string[];
     humanDecisions: HumanDecisionSummary[];
+    // Decomposed Phase 1.0 extraction slots (iter-4). Optional so legacy
+    // call sites that don't yet thread the bundle compile; handler
+    // refactor below will populate them.
+    technicalConstraints?: TechnicalConstraint[];
+    complianceExtractedItems?: ExtractedItem[];
+    vvRequirements?: VVRequirement[];
+    canonicalVocabulary?: VocabularyTerm[];
   }): ProductDescriptionHandoffContent {
     // Refresh phasing's journeyIds against the accepted journeys — journeys
     // pruned in 1.3 must not linger in any phase's journeyIds list. This
@@ -2113,7 +2521,7 @@ export class Phase1Handler implements PhaseHandler {
 
     return {
       kind: 'product_description_handoff',
-      schemaVersion: '1.0',
+      schemaVersion: '1.1',
       requestCategory: 'product_or_feature',
       productVision: input.discovery.productVision,
       productDescription: input.discovery.productDescription,
@@ -2132,6 +2540,14 @@ export class Phase1Handler implements PhaseHandler {
       decisions: input.discovery.decisions,
       constraints: input.discovery.constraints,
       openQuestions: input.discovery.openQuestions,
+      // New extraction fields — populated by the decomposed 1.0c–1.0f
+      // extraction passes. Defaulted to empty on the union type so
+      // existing tests that pre-date the bundle wiring keep compiling;
+      // the handler refactor below threads real values through.
+      technicalConstraints: input.technicalConstraints ?? [],
+      complianceExtractedItems: input.complianceExtractedItems ?? [],
+      vvRequirements: input.vvRequirements ?? [],
+      canonicalVocabulary: input.canonicalVocabulary ?? [],
       humanDecisions: input.humanDecisions,
       openLoops: input.discovery.openQuestions.map(q => ({
         category: 'deferred_decision' as const,
@@ -2272,6 +2688,12 @@ function accumulateFeedback(existing: string, next: string): string {
   return `${existing}\n\n---\n\n${next.trim()}`;
 }
 
+/**
+ * Output of Phase 1.0b Product Intent Discovery — the product slice of
+ * the decomposed extraction. Tech stack / compliance / V&V / vocabulary
+ * arrive as sibling extraction outputs and are composed alongside this
+ * into the IntentDiscoveryBundle at Sub-Phase 1.0g.
+ */
 interface IntentDiscoveryResult {
   analysisSummary: string;
   productVision: string;
@@ -2285,4 +2707,24 @@ interface IntentDiscoveryResult {
   decisions: ExtractedItem[];
   constraints: ExtractedItem[];
   openQuestions: ExtractedItem[];
+}
+
+/**
+ * Composite output of the five Phase 1.0b–1.0f extraction passes,
+ * assembled deterministically at Sub-Phase 1.0g. This bundle is the
+ * authoritative intent-discovery surface that downstream Phase 1 work
+ * (1.1b scope, 1.2–1.5 blooms, 1.6 synthesis) consumes.
+ *
+ * Decomposition rationale: a single monolithic "1.0b capture everything"
+ * pass suffered from probabilistic drift — iter-3c's Codex run nailed
+ * product but silently dropped the entire tech-stack section. Splitting
+ * the pass into five narrow focused extractions bounds drift per
+ * category and lets each pass be graded independently by the harness.
+ */
+interface IntentDiscoveryBundle {
+  product: IntentDiscoveryResult;
+  technicalConstraints: TechnicalConstraint[];
+  complianceExtractedItems: ExtractedItem[];
+  vvRequirements: VVRequirement[];
+  canonicalVocabulary: VocabularyTerm[];
 }

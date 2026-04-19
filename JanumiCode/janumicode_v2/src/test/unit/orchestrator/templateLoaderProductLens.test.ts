@@ -31,6 +31,12 @@ describe('TemplateLoader — product-lens Phase 1 templates', () => {
     { subPhase: '01_3_journeys_workflows_bloom',         requires: ['accepted_domains', 'accepted_personas'] },
     { subPhase: '01_4_entities_bloom',                   requires: ['accepted_domains', 'accepted_workflows'] },
     { subPhase: '01_5_integrations_qa_bloom',            requires: ['accepted_entities', 'accepted_workflows'] },
+    // iter-4 decomposed extraction passes (1.0c/1.0d/1.0e/1.0f) — each
+    // takes the same raw_intent_text input, narrow-scoped prompts.
+    { subPhase: '01_0c_technical_constraints_discovery', requires: ['raw_intent_text'] },
+    { subPhase: '01_0d_compliance_retention_discovery',  requires: ['raw_intent_text'] },
+    { subPhase: '01_0e_vv_requirements_discovery',       requires: ['raw_intent_text'] },
+    { subPhase: '01_0f_canonical_vocabulary_discovery',  requires: ['raw_intent_text'] },
     // 1.6 refactored in iter-3 to narrative-only — arrays are assembled
     // deterministically in the handler, LLM only refines
     // vision/description/summary/openLoops from a compact bloom summary.

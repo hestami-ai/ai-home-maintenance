@@ -1,0 +1,38 @@
+{
+  "phase": "1",
+  "failed_at_phase": "1",
+  "missing_records": [],
+  "schema_violations": [],
+  "assertion_failures": [],
+  "gaps": [],
+  "suggested_fix": "No issues found.",
+  "spec_references": [],
+  "missing_record_analysis": [],
+  "violation_categories": {
+    "authority": [],
+    "schema": [],
+    "semantic": []
+  },
+  "assertion_context": [],
+  "ai_spend_analysis": {
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "estimated_cost_usd": 0,
+    "by_phase": {
+      "1": {
+        "input": 0,
+        "output": 0
+      }
+    },
+    "cost_breakdown": []
+  },
+  "ci_failsafe_triggers": [
+    {
+      "type": "max_duration_exceeded",
+      "threshold": 300000,
+      "actual": 838367,
+      "message": "Workflow duration 838367ms exceeds limit 300000ms",
+      "action": "warn"
+    }
+  ]
+}

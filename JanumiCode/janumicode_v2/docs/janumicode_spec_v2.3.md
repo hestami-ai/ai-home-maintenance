@@ -588,11 +588,49 @@ Every proposer round emits its own bloom artifact and presents a dedicated `deci
 - **Free-text feedback** — human types textual guidance instead of using the Menu. The current round's proposer re-runs with `{{human_feedback}}` injected; a new bloom artifact is written; the prune gate is re-presented. Capped at 3 feedback iterations per round to prevent livelock; exhaustion halts with `requires_input`.
 - **Mirror rejection** — human rejects the round's framing (lens assumption, scope framing). Halts with `requires_input`; the re-bloom loop cannot recover a framing error by definition.
 
-#### Sub-Phase 1.0b — Intent Discovery *(product lens)*
+#### Intent Discovery Decomposition (Sub-Phases 1.0b – 1.0g) *(product lens)*
+
+Under the product lens, Phase 1 source-document extraction is **decomposed** into five focused passes plus a deterministic composer. Rationale: a single monolithic "capture everything" pass is vulnerable to probabilistic drift at scale — empirically a capable frontier LLM will nail one category and silently drop another when the source doc is long. Decomposing bounds drift per category and lets the harness grade each extraction independently.
+
+The system invariant holds: **only Phase 0 (ingestion) and Phase 1.0* extraction passes read source documents directly.** All downstream phases read the governed stream. The Deep Memory Research Agent is the sanctioned on-demand retrieval channel for long-tail context.
+
+Each extraction pass captures items with a **`source_ref`** containing `document_path`, optional `section_heading`, and a verbatim `excerpt`. This traceability spine lets Phase 8 Evaluation walk `source_ref → extracted_item → requirement → component → test_result` chains mechanically and detect drift per segment.
+
+#### Sub-Phase 1.0b — Product Intent Discovery *(product lens)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
-- **Action:** Silent homework pass. Reads the Raw Intent plus every inlined referenced file and produces a comprehensive product brief: vision, description, seed personas, seed user journeys, phasing strategy, success metrics, UX requirements, and extracted requirements / decisions / constraints / open questions. Seeds Sub-Phases 1.2–1.5 with structured context so the proposer rounds do not re-read source documents.
+- **Action:** Silent homework pass. Extracts the **product slice**: vision, description, seed personas, seed user journeys, phasing strategy, success metrics, UX requirements, and product-level requirements / decisions / constraints / open questions. **Does not capture** technical stack, compliance regimes, V&V targets, or vocabulary — those are sibling passes' responsibility.
 - **Output Artifact:** `artifact_produced[kind=intent_discovery]`
+
+#### Sub-Phase 1.0c — Technical Constraints Discovery *(product lens)*
+
+- **[JC:Agent Role]:** Domain Interpreter Agent
+- **Action:** Transcribes stated-not-invented technical decisions from the source documents — chosen stack, mandatory infrastructure, security models, deployment constraints, integration protocols. Explicitly transcription, not design; Phase 4 (Architecture) and Phase 5 (Technical Specification) consume these as pre-approved authoritative constraints.
+- **Output Artifact:** `artifact_produced[kind=technical_constraints_discovery]` carrying `technicalConstraints[]`.
+
+#### Sub-Phase 1.0d — Compliance & Retention Discovery *(product lens)*
+
+- **[JC:Agent Role]:** Domain Interpreter Agent
+- **Action:** Captures regulatory regimes (HIPAA, SOC2, GDPR, WCAG, etc.), legal retention obligations, audit requirements, and jurisdictional constraints stated in source documents. Downstream consumers: Phase 1.1b (scope/compliance context augmentation), Phase 5 (data model retention wiring), Phase 7 (test planning), Phase 8 (evaluation design).
+- **Output Artifact:** `artifact_produced[kind=compliance_retention_discovery]` carrying `complianceExtractedItems[]`.
+
+#### Sub-Phase 1.0e — V&V Requirements Discovery *(product lens)*
+
+- **[JC:Agent Role]:** Domain Interpreter Agent
+- **Action:** Captures Verification & Validation requirements with measurable threshold + measurement method — distinct from free-prose `qualityAttributes[]` in that each V&V item is structured `{ target, measurement, threshold }` for direct consumption by Phase 7 Test Planning and Phase 8 Evaluation Design.
+- **Output Artifact:** `artifact_produced[kind=vv_requirements_discovery]` carrying `vvRequirements[]`.
+
+#### Sub-Phase 1.0f — Canonical Vocabulary Discovery *(product lens)*
+
+- **[JC:Agent Role]:** Domain Interpreter Agent
+- **Action:** Captures domain-specific terms + definitions from source documents. Consumed by Phase 0.4 Vocabulary Collision Check and by Phase 4 Architecture naming to keep component names aligned with stakeholder mental model.
+- **Output Artifact:** `artifact_produced[kind=canonical_vocabulary_discovery]` carrying `canonicalVocabulary[]`.
+
+#### Sub-Phase 1.0g — Intent Discovery Synthesis *(product lens)*
+
+- **[JC:Agent Role]:** Orchestrator (deterministic)
+- **Action:** No LLM call — merges the five extraction outputs into a single `IntentDiscoveryBundle` that the remaining Phase 1 sub-phases (1.1b scope + 1.2–1.5 blooms + 1.6 handoff synthesis) consume. Writes an `intent_discovery_bundle` record that points at each extraction artifact via `derived_from_record_ids` and captures per-category counts as a summary.
+- **Output Artifact:** `artifact_produced[kind=intent_discovery_bundle]`
 
 #### Sub-Phase 1.1b — Scope Bounding and Compliance Context *(reused from default flow)*
 

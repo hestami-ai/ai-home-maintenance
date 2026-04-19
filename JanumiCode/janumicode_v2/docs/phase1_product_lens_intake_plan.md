@@ -39,7 +39,12 @@ This plan replaces v2's Phase 1.2–1.6 flow under the **product** lens with a v
 |---|---|---|---|
 | 1.0 | Intent Quality Check | yes (Orchestrator) | findings review only if non-pass |
 | 1.0a | Intent Lens Classification | yes (Orchestrator) | none (silent) |
-| **1.0b** | **Intent Discovery** — silent synthesis of vision, description, seed personas, seed journeys, phasing, requirements/decisions/constraints/open-questions | yes (Domain Interpreter) | none (silent) |
+| **1.0b** | **Product Intent Discovery** — narrow product-slice: vision, description, seed personas, seed journeys, phasing, product-level requirements/decisions/constraints/open-questions | yes (Domain Interpreter) | none (silent) |
+| **1.0c** | **Technical Constraints Discovery** — stated-not-invented technical stack / infrastructure / security / deployment decisions | yes (Domain Interpreter) | none (silent) |
+| **1.0d** | **Compliance & Retention Discovery** — regulatory regimes, legal retention obligations, audit requirements | yes (Domain Interpreter) | none (silent) |
+| **1.0e** | **V&V Requirements Discovery** — measurable targets with threshold + measurement | yes (Domain Interpreter) | none (silent) |
+| **1.0f** | **Canonical Vocabulary Discovery** — domain-specific terms + definitions | yes (Domain Interpreter) | none (silent) |
+| **1.0g** | **Intent Discovery Synthesis** — deterministic composer that merges 1.0b–1.0f outputs into the `IntentDiscoveryBundle` consumed by downstream sub-phases | **no (deterministic)** | none |
 | 1.1b | Scope Bounding + Compliance | deterministic | none |
 | **1.2** | **Business Domains + Personas Bloom** | yes (Domain Interpreter) | decision_bundle (MMP prune) |
 | **1.3** | **User Journeys + Workflows Bloom** | yes (Domain Interpreter) | decision_bundle (MMP prune) |
@@ -263,6 +268,10 @@ The current validator is pass/fail on artifact presence. For the product handoff
 Thresholds reflect the capable-CLI reality — Codex gpt-5.4 reliably produces 2–2.5× more items per section than qwen3.5:9b or the v1 reference (6 personas → 13; 45 entities → 106; etc.). Lower bounds are unchanged: same minimum-quality floor regardless of backing. These are **shape/coverage** gates, not content gates. The grader reports any violation in the harness gap report.
 
 *Note on iteration history: the initial ranges (iter-2) were calibrated against a qwen3.5:9b run and the v1 Hestami handoff. Iter-3c surfaced Codex's over-proposing behaviour; upper bounds were widened to match without relaxing the minimum-content floor. Two gold references are maintained — `product_description_handoff.gold.json` (qwen3.5:9b baseline) and `product_description_handoff.codex.gold.json` (Codex gpt-5.4 richer output).*
+
+*Iter-4 added decomposition: iter-3c's analysis showed that a single monolithic 1.0b pass silently dropped entire categories (tech stack completely absent despite being in the source doc's "Core Technological Infrastructure and Stack" section). Phase 1.0 was split into five focused extraction passes (1.0b product / 1.0c technical / 1.0d compliance / 1.0e V&V / 1.0f vocabulary) plus a deterministic composer (1.0g). Each extraction pass is narrow enough that probabilistic drift is bounded per category. The oracle grades each category independently against its own length range, with `[0, N]` lower bounds that allow legitimate emptiness for simple intents.*
+
+*Iter-4 also introduced the traceability spine — every extracted item in `technicalConstraints[]`, `complianceExtractedItems[]`, `vvRequirements[]`, and `canonicalVocabulary[]` carries a `source_ref` with `document_path` + verbatim `excerpt`, so downstream drift chains (`source_excerpt → extracted_item → requirement → component → test_result`) can be walked mechanically by Phase 8 Evaluation.*
 
 ### 10.3 Gold-reference capture
 The first passing real-mode run of the Hestami intent under the product lens is captured as a **gold reference** at `src/test/fixtures/hestami-product-description/gold/product_description_handoff.gold.json`. Subsequent runs are diffed against it for structural drift (same field set, same reference integrity — e.g. every `journey.personaId` resolves). Content divergence is expected and not flagged.

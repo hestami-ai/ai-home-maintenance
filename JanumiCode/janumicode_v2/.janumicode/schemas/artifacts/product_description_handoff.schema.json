@@ -26,12 +26,16 @@
     "decisions",
     "constraints",
     "openQuestions",
+    "technicalConstraints",
+    "complianceExtractedItems",
+    "vvRequirements",
+    "canonicalVocabulary",
     "humanDecisions",
     "openLoops"
   ],
   "properties": {
     "kind": { "type": "string", "const": "product_description_handoff" },
-    "schemaVersion": { "type": "string", "const": "1.0" },
+    "schemaVersion": { "type": "string", "enum": ["1.0", "1.1"] },
     "requestCategory": { "type": "string", "const": "product_or_feature" },
 
     "productVision": { "type": "string", "minLength": 1 },
@@ -85,6 +89,23 @@
     "openQuestions": {
       "type": "array",
       "items": { "$ref": "#/definitions/ExtractedItem" }
+    },
+
+    "technicalConstraints": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/TechnicalConstraint" }
+    },
+    "complianceExtractedItems": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ExtractedItem" }
+    },
+    "vvRequirements": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/VVRequirement" }
+    },
+    "canonicalVocabulary": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/VocabularyTerm" }
     },
 
     "humanDecisions": {
@@ -235,7 +256,63 @@
         },
         "text": { "type": "string", "minLength": 1 },
         "extractedFromTurnId": { "type": "integer", "minimum": 0 },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "timestamp": { "type": "string", "format": "date-time" },
+        "source_ref": { "$ref": "#/definitions/SourceRef" }
+      }
+    },
+
+    "SourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_path", "excerpt"],
+      "properties": {
+        "document_path": { "type": "string", "minLength": 1 },
+        "section_heading": { "type": "string" },
+        "excerpt": { "type": "string", "minLength": 1 },
+        "excerpt_start": { "type": "integer", "minimum": 0 },
+        "excerpt_end": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "TechnicalConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "text"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^TECH-[0-9]+$" },
+        "category": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 },
+        "technology": { "type": "string" },
+        "version": { "type": "string" },
+        "rationale": { "type": "string" },
+        "source_ref": { "$ref": "#/definitions/SourceRef" }
+      }
+    },
+
+    "VVRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "target", "measurement"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^VV-[0-9]+$" },
+        "category": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 },
+        "measurement": { "type": "string", "minLength": 1 },
+        "threshold": { "type": "string" },
+        "source_ref": { "$ref": "#/definitions/SourceRef" }
+      }
+    },
+
+    "VocabularyTerm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "term", "definition"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^VOC-[0-9]+$" },
+        "term": { "type": "string", "minLength": 1 },
+        "definition": { "type": "string", "minLength": 1 },
+        "synonyms": { "type": "array", "items": { "type": "string" } },
+        "source_ref": { "$ref": "#/definitions/SourceRef" }
       }
     },
 
