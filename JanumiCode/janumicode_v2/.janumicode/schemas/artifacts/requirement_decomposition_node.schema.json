@@ -1,0 +1,55 @@
+{
+  "$id": "janumicode:requirement_decomposition_node:1.0",
+  "title": "Requirement Decomposition Node",
+  "description": "Single node in a recursive FR decomposition tree (Wave 6). Append-only — frozen on creation. status indicates whether this node was further decomposed, met atomic-leaf criteria, was pruned by the human at the depth-2 mirror gate, or was deferred.",
+  "type": "object",
+  "required": ["kind", "node_id", "parent_node_id", "root_fr_id", "depth", "pass_number", "status", "user_story", "surfaced_assumption_ids"],
+  "properties": {
+    "kind": { "const": "requirement_decomposition_node" },
+    "node_id": { "type": "string" },
+    "parent_node_id": { "type": ["string", "null"] },
+    "root_fr_id": { "type": "string" },
+    "depth": { "type": "integer", "minimum": 0, "maximum": 10 },
+    "pass_number": { "type": "integer", "minimum": 0 },
+    "status": { "type": "string", "enum": ["pending", "decomposed", "atomic", "pruned", "deferred", "downgraded"] },
+    "tier": { "type": "string", "enum": ["A", "B", "C", "D"] },
+    "root_kind": { "type": "string", "enum": ["fr", "nfr"] },
+    "user_story": {
+      "type": "object",
+      "required": ["id", "role", "action", "outcome", "acceptance_criteria", "priority"],
+      "properties": {
+        "id": { "type": "string" },
+        "role": { "type": "string" },
+        "action": { "type": "string" },
+        "outcome": { "type": "string" },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "description", "measurable_condition"],
+            "properties": {
+              "id": { "type": "string" },
+              "description": { "type": "string" },
+              "measurable_condition": { "type": "string" }
+            }
+          }
+        },
+        "priority": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+        "traces_to": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "decomposition_rationale": { "type": "string" },
+    "surfaced_assumption_ids": { "type": "array", "items": { "type": "string" } },
+    "atomic_criteria_satisfied": {
+      "type": "object",
+      "required": ["ac_testable", "single_operation", "regime_cited", "assumptions_listed"],
+      "properties": {
+        "ac_testable": { "type": "boolean" },
+        "single_operation": { "type": "boolean" },
+        "regime_cited": { "type": "boolean" },
+        "assumptions_listed": { "type": "boolean" }
+      }
+    },
+    "pruning_reason": { "type": "string" }
+  }
+}

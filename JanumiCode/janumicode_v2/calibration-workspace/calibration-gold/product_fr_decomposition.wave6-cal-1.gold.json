@@ -1,0 +1,4232 @@
+{
+  "root_kind": "fr",
+  "run_id": "e104ecb1-1f1f-4e7c-bf49-c498cbd697fb",
+  "nodes": [
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-001",
+      "parent_node_id": null,
+      "root_fr_id": "US-001",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-001",
+        "role": "Homeowner",
+        "action": "Initiate a repair request with address and key details",
+        "outcome": "System creates a Service Call Case Lifecycle record for the homeowner",
+        "acceptance_criteria": [
+          {
+            "id": "AC-001",
+            "description": "Request creation is recorded and verified",
+            "measurable_condition": "POST /repair-requests returns 201 and record exists in database within '1 second'"
+          },
+          {
+            "id": "AC-002",
+            "description": "Homeowner receives confirmation for the new request",
+            "measurable_condition": "Notification message delivered to user inbox within '15 minutes'"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "ENT-REPAIR-REQUEST",
+          "WF-1"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002",
+      "parent_node_id": null,
+      "root_fr_id": "US-002",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-002",
+        "role": "Homeowner",
+        "action": "View status updates on active repair",
+        "outcome": "User sees real-time progress and evidence updates on the Service Call Case Lifecycle",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003",
+            "description": "Status updates occur automatically upon job stage change",
+            "measurable_condition": "UI reflects new status within '10 seconds' of backend state change"
+          },
+          {
+            "id": "AC-004",
+            "description": "Evidence is viewable before payment",
+            "measurable_condition": "GET /work-orders/{id} returns media list populated before invoice generation"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-2",
+          "ENT-WORK-ORDER",
+          "ENT-MEDIA-ITEM"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-003",
+      "parent_node_id": null,
+      "root_fr_id": "US-003",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-003",
+        "role": "Investor",
+        "action": "View portfolio risk and budget variance metrics",
+        "outcome": "Dashboard displays accurate risk scores and financial metrics for multiple assets",
+        "acceptance_criteria": [
+          {
+            "id": "AC-005",
+            "description": "Risk scores are accurate within 5%",
+            "measurable_condition": "Calculated Risk Score deviates from Ground Truth by < '5%' across all assets"
+          },
+          {
+            "id": "AC-006",
+            "description": "Cost vs Budget variance is reported correctly",
+            "measurable_condition": "Report variance matches GL records with '0.01' precision"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-3",
+          "ENT-RISK-SCORE",
+          "ENT-METRIC"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-004",
+      "parent_node_id": null,
+      "root_fr_id": "US-004",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-004",
+        "role": "Provider",
+        "action": "Manage field schedule and dispatch",
+        "outcome": "System assigns jobs and resolves schedule conflicts automatically",
+        "acceptance_criteria": [
+          {
+            "id": "AC-007",
+            "description": "Dispatch conflicts are resolved automatically",
+            "measurable_condition": "System rejects booking attempt if technician is double-booked within '30 minutes'"
+          },
+          {
+            "id": "AC-008",
+            "description": "Schedule Slot is reserved and released correctly",
+            "measurable_condition": "ENT-SCHEDULE-SLOT availability updated within '2 seconds' of job assignment"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-4",
+          "ENT-SCHEDULE-SLOT",
+          "WF-3"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-005",
+      "parent_node_id": null,
+      "root_fr_id": "US-005",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-005",
+        "role": "Provider",
+        "action": "Close job and upload compliance evidence",
+        "outcome": "Evidence is immutable and compliance check gates job completion",
+        "acceptance_criteria": [
+          {
+            "id": "AC-009",
+            "description": "Evidence is immutable after upload",
+            "measurable_condition": "System hash mismatch triggers rejection for modified files after initial storage"
+          },
+          {
+            "id": "AC-010",
+            "description": "Compliance check fails job if missing docs",
+            "measurable_condition": "Job status remains 'Incomplete' if mandatory fields in ENT-MEDIA-ITEM are null"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-5",
+          "ENT-MEDIA-ITEM",
+          "ENT-EVIDENCE-CASE",
+          "WF-6"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-006",
+      "parent_node_id": null,
+      "root_fr_id": "US-006",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-006",
+        "role": "Board Member",
+        "action": "Review compliance documents and motions",
+        "outcome": "System enforces verified document status for approval",
+        "acceptance_criteria": [
+          {
+            "id": "AC-011",
+            "description": "Only verified documents can be approved",
+            "measurable_condition": "Approve action button is disabled for documents with 'Pending Verification' status"
+          },
+          {
+            "id": "AC-012",
+            "description": "Voting record is immutable",
+            "measurable_condition": "ENT-VOTE record hash is locked after submission and cannot be altered"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-6",
+          "ENT-MOTION",
+          "ENT-VOTE",
+          "ENT-DOCUMENT"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-007",
+      "parent_node_id": null,
+      "root_fr_id": "US-007",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-007",
+        "role": "Board Member",
+        "action": "Cast vote on annual budget",
+        "outcome": "Budget passes only if 2/3 majority threshold is met",
+        "acceptance_criteria": [
+          {
+            "id": "AC-013",
+            "description": "Budget requires 2/3 majority vote",
+            "measurable_condition": "System calculates weighted votes and blocks finalization if ratio < '66.67%'"
+          },
+          {
+            "id": "AC-014",
+            "description": "Signature linked to Trust Ledger",
+            "measurable_condition": "ENT-TRANSACTION generated for digital signature event with immutable timestamp"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-7",
+          "ENT-BUDGET",
+          "ENT-VOTE",
+          "COMP-4"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-008",
+      "parent_node_id": null,
+      "root_fr_id": "US-008",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-008",
+        "role": "Community Member",
+        "action": "Report common issue or request repair",
+        "outcome": "Request linked to tenant fees and logged in Comm Channel",
+        "acceptance_criteria": [
+          {
+            "id": "AC-015",
+            "description": "Tenant can view fees paid for request",
+            "measurable_condition": "ENT-TENANT display shows associated Assessment balance for active requests"
+          },
+          {
+            "id": "AC-016",
+            "description": "Communication is logged in Comm Channel",
+            "measurable_condition": "ENT-MESSAGE created in channel associated with ENT-ASSOCIATION ID"
+          }
+        ],
+        "priority": "medium",
+        "traces_to": [
+          "UJ-8",
+          "ENT-ASSOCIATION",
+          "ENT-TENANT",
+          "ENT-MESSAGE",
+          "VOC-6"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-009",
+      "parent_node_id": null,
+      "root_fr_id": "US-009",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-009",
+        "role": "Association Manager",
+        "action": "Run procurement cycle for supplies",
+        "outcome": "PO stays within budget limits and vendor is pre-compliance verified",
+        "acceptance_criteria": [
+          {
+            "id": "AC-017",
+            "description": "PO stays within budget limits",
+            "measurable_condition": "System rejects PO if sum exceeds remaining ENT-BUDGET allocation"
+          },
+          {
+            "id": "AC-018",
+            "description": "Vendor list is pre-compliance verified",
+            "measurable_condition": "Vendors from unverified list return 'Vendor Not Authorized' status"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-9",
+          "ENT-PURCHASE-ORDER",
+          "ENT-VENDOR",
+          "WF-11"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-010",
+      "parent_node_id": null,
+      "root_fr_id": "US-010",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-010",
+        "role": "Platform Staff",
+        "action": "Review audit logs and data",
+        "outcome": "Discrepancies logged and access restricted by role",
+        "acceptance_criteria": [
+          {
+            "id": "AC-019",
+            "description": "All discrepancies are logged",
+            "measurable_condition": "ENT-AUDIT-LOG entry created for every data modification event"
+          },
+          {
+            "id": "AC-020",
+            "description": "Audit access is role-restricted",
+            "measurable_condition": "Non-admin roles receive 'Access Denied' when querying ENT-AUDIT-LOG"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-10",
+          "ENT-AUDIT-LOG",
+          "COMP-5"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-011",
+      "parent_node_id": null,
+      "root_fr_id": "US-011",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-011",
+        "role": "Investor",
+        "action": "Receive predictive maintenance alert",
+        "outcome": "Alert sent 30 days before predicted failure to prevent cost",
+        "acceptance_criteria": [
+          {
+            "id": "AC-021",
+            "description": "Alerts are sent 30 days before predicted failure",
+            "measurable_condition": "ENT-AI-ALERT trigger time = Current Date - '30 days' relative to Failure Probability"
+          },
+          {
+            "id": "AC-022",
+            "description": "Preventive cost is lower than repair cost",
+            "measurable_condition": "System recommendation logic indicates ROI > '1.0' for preventive action"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-11",
+          "ENT-AI-ALERT",
+          "WF-8"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-012",
+      "parent_node_id": null,
+      "root_fr_id": "US-012",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-012",
+        "role": "Homeowner",
+        "action": "Complete payment after job",
+        "outcome": "Payment confirmed in real time and receipt generated for Trust Ledger",
+        "acceptance_criteria": [
+          {
+            "id": "AC-023",
+            "description": "Payment is confirmed in real time",
+            "measurable_condition": "ENT-TRANSACTION status updates to 'Success' within '500ms' of gateway response"
+          },
+          {
+            "id": "AC-024",
+            "description": "Receipt is generated for Trust Ledger",
+            "measurable_condition": "Receipt document downloaded from server within '1 second' of transaction"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-12",
+          "ENT-INVOICE",
+          "ENT-TRANSACTION",
+          "WF-4"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-013",
+      "parent_node_id": null,
+      "root_fr_id": "US-013",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-013",
+        "role": "System",
+        "action": "Store metadata on digital asset upload",
+        "outcome": "Digital asset rights flagged in metadata record for future decision",
+        "acceptance_criteria": [
+          {
+            "id": "AC-025",
+            "description": "Ownership rights flag persists in metadata",
+            "measurable_condition": "ENT-MEDIA-ITEM contains 'asset_rights_owner' field populated on upload"
+          }
+        ],
+        "priority": "medium",
+        "traces_to": [
+          "Q-2",
+          "ENT-STORAGE",
+          "ENT-MEDIA-ITEM"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-014",
+      "parent_node_id": null,
+      "root_fr_id": "US-014",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-014",
+        "role": "System",
+        "action": "Connect to external data provider",
+        "outcome": "Connection status tracked for integration readiness",
+        "acceptance_criteria": [
+          {
+            "id": "AC-026",
+            "description": "Provider API connection status tracked",
+            "measurable_condition": "System status field reflects 'Active' or 'Inactive' for data source ENT-METRIC"
+          }
+        ],
+        "priority": "medium",
+        "traces_to": [
+          "Q-3",
+          "ENT-METRIC"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-015",
+      "parent_node_id": null,
+      "root_fr_id": "US-015",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-015",
+        "role": "System",
+        "action": "Coordinate with external vendor for non-participant HOA",
+        "outcome": "Workflow initiates for external entity without requiring direct HOA integration",
+        "acceptance_criteria": [
+          {
+            "id": "AC-027",
+            "description": "Workflow allows external HOA entity creation",
+            "measurable_condition": "System creates 'External Entity' record type for HOA without direct account"
+          }
+        ],
+        "priority": "medium",
+        "traces_to": [
+          "Q-6",
+          "ENT-ASSOCIATION"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-016",
+      "parent_node_id": null,
+      "root_fr_id": "US-016",
+      "depth": 0,
+      "pass_number": 0,
+      "status": "pending",
+      "user_story": {
+        "id": "US-016",
+        "role": "System",
+        "action": "Validate statutory deadlines for notices",
+        "outcome": "System enforces hardcoded regulatory time limits on notices",
+        "acceptance_criteria": [
+          {
+            "id": "AC-028",
+            "description": "Notice deadlines hardcoded to statutory values",
+            "measurable_condition": "System prevents sending notice if current date + 'Notice Period' < Statutory Deadline"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "Q-5",
+          "COMP-2",
+          "COMP-3",
+          "ENT-DOCUMENT"
+        ]
+      },
+      "surfaced_assumption_ids": []
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.1",
+      "parent_node_id": "US-001",
+      "root_fr_id": "US-001",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.1",
+        "role": "System Validator",
+        "action": "Validate incoming address and details against canonical schema",
+        "outcome": "Request proceeds only if all fields match CDM patterns",
+        "acceptance_criteria": [
+          {
+            "id": "AC-001",
+            "description": "Validation rejects malformed address strings.",
+            "measurable_condition": "HTTP 400 returned for any field failing Zod schema validation"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "ENT-INTAKE-ITEM",
+          "ENT-PROPERTY"
+        ]
+      },
+      "decomposition_rationale": "Input validation is a concrete implementation decision (Tier C) that gates the persistence flow; without this, DB consistency is violated.",
+      "surfaced_assumption_ids": [
+        "A-0001",
+        "A-0002",
+        "A-0003"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.2",
+      "parent_node_id": "US-001",
+      "root_fr_id": "US-001",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.2",
+        "role": "Data Persistence Engine",
+        "action": "Persist new Repair Request record to database",
+        "outcome": "Record exists in database within '1 second' of request",
+        "acceptance_criteria": [
+          {
+            "id": "AC-002",
+            "description": "Record is inserted into ENT-REPAIR-REQUEST table.",
+            "measurable_condition": "SELECT COUNT(*) FROM repair_requests WHERE id = NEW_ID returns 1 within 1000ms of POST"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "ENT-REPAIR-REQUEST",
+          "WF-1"
+        ]
+      },
+      "decomposition_rationale": "Persistence is the core state-change commitment required to satisfy AC-001; this is implementation-specific (Tier C).",
+      "surfaced_assumption_ids": [
+        "A-0001",
+        "A-0002",
+        "A-0003"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.3",
+      "parent_node_id": "US-001",
+      "root_fr_id": "US-001",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.3",
+        "role": "Notification Dispatcher",
+        "action": "Queue delivery of confirmation to user inbox",
+        "outcome": "Notification message delivered to user inbox within '15 minutes'",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003",
+            "description": "User receives email or push notification.",
+            "measurable_condition": "ENT-NOTIFICATION entity created with status 'SENT' or 'DELIVERED' within 900000ms of event"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-1",
+          "ENT-NOTIFICATION"
+        ]
+      },
+      "decomposition_rationale": "Notification is an atomic delivery task (Tier C) distinct from the core case creation; timing constraint is verified.",
+      "surfaced_assumption_ids": [
+        "A-0001",
+        "A-0002",
+        "A-0003"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.4",
+      "parent_node_id": "US-001",
+      "root_fr_id": "US-001",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.4",
+        "role": "Workflow Orchestrator",
+        "action": "Trigger WF-1 (Intake Verification) durable workflow",
+        "outcome": "Workflow instance starts immediately to begin verification",
+        "acceptance_criteria": [
+          {
+            "id": "AC-004",
+            "description": "Workflow DBOS instance initialized.",
+            "measurable_condition": "DBOS workflow 'WF-1' shows status 'RUNNING' in metadata store within 50ms of persistence"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "WF-1",
+          "ENT-REPAIR-REQUEST"
+        ]
+      },
+      "decomposition_rationale": "Workflow initiation is a specific architectural consequence (Tier C) of record creation, ensuring the verification flow begins.",
+      "surfaced_assumption_ids": [
+        "A-0001",
+        "A-0002",
+        "A-0003"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002.C.001",
+      "parent_node_id": "US-002",
+      "root_fr_id": "US-002",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-002.C.001",
+        "role": "System Architect",
+        "action": "Enforce 10-second latency budget on status event propagation from backend to UI",
+        "outcome": "Every status change event triggers an update signal that reaches the client view within 10 seconds of backend state transition",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003-01",
+            "description": "Status update latency is bounded at 10 seconds.",
+            "measurable_condition": "timestamp(Client UI Render) - timestamp(Backend Event Persisted) <= 10000ms"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-2",
+          "US-002"
+        ]
+      },
+      "decomposition_rationale": "AC-003 specifies a hard latency constraint; this child commits to the architectural strategy (push vs poll) required to meet it.",
+      "surfaced_assumption_ids": [
+        "A-0004",
+        "A-0005",
+        "A-0006"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002.C.002",
+      "parent_node_id": "US-002",
+      "root_fr_id": "US-002",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-002.C.002",
+        "role": "Data Engineer",
+        "action": "Configure media list inclusion in work-order endpoint prior to Invoice generation",
+        "outcome": "GET /work-orders/{id} includes populated media list regardless of payment state",
+        "acceptance_criteria": [
+          {
+            "id": "AC-004-01",
+            "description": "Media list is populated before invoice generation.",
+            "measurable_condition": "SELECT media_list FROM work_orders WHERE id = '{id}' AND invoice_state IS NULL ORDER BY id LIMIT 1 HAVING media_list IS NOT NULL"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-2",
+          "US-002"
+        ]
+      },
+      "decomposition_rationale": "AC-004 defines data access policy (evidence visibility) independent of financial state; this child commits to the implementation of the query logic.",
+      "surfaced_assumption_ids": [
+        "A-0004",
+        "A-0005",
+        "A-0006"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002.C.003",
+      "parent_node_id": "US-002",
+      "root_fr_id": "US-002",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-002.C.003",
+        "role": "Platform Engineer",
+        "action": "Implement SSE or Polling strategy for UI refresh based on event bus topic availability",
+        "outcome": "UI reflects new status without excessive battery drain or polling overhead",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003-02",
+            "description": "UI refresh mechanism supports event bus or polling configuration.",
+            "measurable_condition": "System supports event-streaming protocol (SSE/WSP) or configured polling interval < 5 seconds"
+          }
+        ],
+        "priority": "medium",
+        "traces_to": [
+          "UJ-2",
+          "US-004"
+        ]
+      },
+      "decomposition_rationale": "Selects the specific communication mechanism (Engineering Sub-strategy) to satisfy the latency constraint of Child C.001 without consuming mobile resources excessively.",
+      "surfaced_assumption_ids": [
+        "A-0004",
+        "A-0005",
+        "A-0006"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-003-1",
+      "parent_node_id": "US-003",
+      "root_fr_id": "US-003",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-003-1",
+        "role": "Investor Analyst",
+        "action": "Invoke Risk Prediction Engine (WF-8) to compute asset-level risk scores",
+        "outcome": "Risk Score entity (ENT-RISK-SCORE) populated with calculated probability value",
+        "acceptance_criteria": [
+          {
+            "id": "AC-010",
+            "description": "Risk score matches WF-8 output within acceptable latency",
+            "measurable_condition": "ENT-RISK-SCORE.value === WF-8.predicted_value AND (abs(ENT-RISK-SCORE.value - ground_truth) / ground_truth) < 0.05"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-3",
+          "WF-8",
+          "ENT-RISK-SCORE"
+        ]
+      },
+      "decomposition_rationale": "Risk scores are the result of a specific calculation engine (WF-8); this child commits to using that specific source rather than a manual or alternative calculation.",
+      "surfaced_assumption_ids": [
+        "A-0007",
+        "A-0008"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-003-2",
+      "parent_node_id": "US-003",
+      "root_fr_id": "US-003",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-003-2",
+        "role": "Investor Analyst",
+        "action": "Calculate Cost vs Budget variance using General Ledger records",
+        "outcome": "Variance metric displayed against BUDGET plan",
+        "acceptance_criteria": [
+          {
+            "id": "AC-011",
+            "description": "Variance matches GL records with 0.01 precision",
+            "measurable_condition": "abs(variance_reported - (sum(actual_spends) - sum(plan_budget))) < 0.01"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-3",
+          "COMP-1",
+          "ENT-BUDGET",
+          "ENT-ACCOUNT"
+        ]
+      },
+      "decomposition_rationale": "Budget variance is a financial accounting commitment (Tier B) but decomposes into a specific implementation choice: summing GL transactions versus other estimation methods (Tier C).",
+      "surfaced_assumption_ids": [
+        "A-0007",
+        "A-0008"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-003-3",
+      "parent_node_id": "US-003",
+      "root_fr_id": "US-003",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-003-3",
+        "role": "Dashboard Service",
+        "action": "Aggregate metrics into single ENT-METRIC view for Investor UI",
+        "outcome": "Dashboard renders combined view of Risk and Variance",
+        "acceptance_criteria": [
+          {
+            "id": "AC-012",
+            "description": "Aggregated data reflects latest state without data loss",
+            "measurable_condition": "dashboard_metrics.id === ENT-METRIC.unique_id AND dashboard_metrics.timestamp > ENT-RISK-SCORE.last_update AND dashboard_metrics.last_gl_sync > ENT-ACCOUNT.last_posting"
+          }
+        ],
+        "priority": "medium",
+        "traces_to": [
+          "UJ-3",
+          "ENT-METRIC"
+        ]
+      },
+      "decomposition_rationale": "This child binds the presentation layer (UI) to the data logic, enforcing the architectural choice that dashboard metrics are derived from downstream entities rather than being stored redundantly.",
+      "surfaced_assumption_ids": [
+        "A-0007",
+        "A-0008"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-004-1",
+      "parent_node_id": "US-004",
+      "root_fr_id": "US-004",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-004-1",
+        "role": "CAM operator",
+        "action": "reject booking attempts if technician is double-booked within 30 minutes",
+        "outcome": "Invalid booking requests are immediately denied by the Dispatch Engine",
+        "acceptance_criteria": [
+          {
+            "id": "AC-007",
+            "description": "System rejects booking if conflict exists.",
+            "measurable_condition": "booking_request.rejected == true if exists overlapping SLOT within 30 minutes"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-4",
+          "AC-007",
+          "WF-3"
+        ]
+      },
+      "decomposition_rationale": "AC-007 defines the conflict resolution policy; this child commits to the specific rejection logic implementation.",
+      "surfaced_assumption_ids": [
+        "A-0009",
+        "A-0010",
+        "A-0011"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-004-2",
+      "parent_node_id": "US-004",
+      "root_fr_id": "US-004",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-004-2",
+        "role": "CAM operator",
+        "action": "update schedule slot availability immediately after job assignment",
+        "outcome": "SLOT availability reflects new assignment without race conditions",
+        "acceptance_criteria": [
+          {
+            "id": "AC-008",
+            "description": "Availability updates within 2 seconds.",
+            "measurable_condition": "timestamp(slot_updated) - timestamp(job_assigned) <= 2000ms"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-4",
+          "AC-008",
+          "ENT-SCHEDULE-SLOT"
+        ]
+      },
+      "decomposition_rationale": "AC-008 defines the latency requirement; this child commits to the implementation of the slot state propagation logic.",
+      "surfaced_assumption_ids": [
+        "A-0009",
+        "A-0010",
+        "A-0011"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-004-3",
+      "parent_node_id": "US-004",
+      "root_fr_id": "US-004",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-004-3",
+        "role": "CAM operator",
+        "action": "verify technician qualifications against job requirements",
+        "outcome": "Only qualified and active technicians are considered for assignment",
+        "acceptance_criteria": [
+          {
+            "id": "AC-009",
+            "description": "Unqualified technicians are excluded from candidate pool.",
+            "measurable_condition": "technician.eligible == true implies technician.license == job.license_requirement"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-4",
+          "ENT-TECHNICIAN",
+          "ENT-TECHNICIAN-QUALIFICATION"
+        ]
+      },
+      "decomposition_rationale": "This child commits to the pre-assignment eligibility filtering strategy to ensure compliance and safety.",
+      "surfaced_assumption_ids": [
+        "A-0009",
+        "A-0010",
+        "A-0011"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-004-4",
+      "parent_node_id": "US-004",
+      "root_fr_id": "US-004",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "B",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-004-4",
+        "role": "system architect",
+        "action": "utilize WF-3 Dispatch Scheduling Engine for all scheduling logic",
+        "outcome": "All dispatch decisions are routed through the durable workflow engine",
+        "acceptance_criteria": [
+          {
+            "id": "AC-010",
+            "description": "Dispatch logic executes within the WF-3 workflow version.",
+            "measurable_condition": "workflow_execution_id == 'WF-3' for every dispatch event"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "WF-3",
+          "UJ-4",
+          "TECH-10"
+        ]
+      },
+      "decomposition_rationale": "This is a commitment on the architectural infrastructure (DBOS/Workflow) used to implement the scheduling logic.",
+      "surfaced_assumption_ids": [
+        "A-0009",
+        "A-0010",
+        "A-0011"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-005-1",
+      "parent_node_id": "US-005",
+      "root_fr_id": "US-005",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-005-1",
+        "role": "CAM operator",
+        "action": "enforce write-once-read-many storage constraint on evidence files",
+        "outcome": "Modified files trigger hash mismatch and storage rejection",
+        "acceptance_criteria": [
+          {
+            "id": "AC-009-DERIV",
+            "description": "Upload request rejected if file hash on disk differs from hash at ingest time",
+            "measurable_condition": "sha256(file_at_storage) === hash_in_db_entry"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-5",
+          "ENT-MEDIA-ITEM"
+        ]
+      },
+      "decomposition_rationale": "AC-009 requires a specific storage behavior (immutability). This child commits to the storage layer strategy to ensure that verification is not just a UI check but a storage constraint.",
+      "surfaced_assumption_ids": [
+        "A-0012",
+        "A-0013",
+        "A-0014"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-005-2",
+      "parent_node_id": "US-005",
+      "root_fr_id": "US-005",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "B",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-005-2",
+        "role": "CAM operator",
+        "action": "define mandatory documentation rules for job completion",
+        "outcome": "Job status transitions to 'Incomplete' if required media attributes are missing",
+        "acceptance_criteria": [
+          {
+            "id": "AC-010-DEF",
+            "description": "Job status query returns 'Incomplete' when ENT-MEDIA-ITEM mandatory columns contain NULL",
+            "measurable_condition": "SELECT status FROM work_orders WHERE media_id IN (SELECT id FROM media_items WHERE required_field IS NULL) = 'Incomplete'"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-5",
+          "WF-6",
+          "ENT-EVIDENCE-CASE"
+        ]
+      },
+      "decomposition_rationale": "AC-010 describes a business rule defining the system state policy. It determines what constitutes 'compliance' rather than how the system technically stores data.",
+      "surfaced_assumption_ids": [
+        "A-0012",
+        "A-0013",
+        "A-0014"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-005-3",
+      "parent_node_id": "US-005",
+      "root_fr_id": "US-005",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-005-3",
+        "role": "CAM operator",
+        "action": "compute and persist cryptographic hash on upload endpoint",
+        "outcome": "Audit trail contains proof of file content at time of ingestion",
+        "acceptance_criteria": [
+          {
+            "id": "AC-009-IMPLEMENT",
+            "description": "Hash string generated and stored before job transition to 'Closed'",
+            "measurable_condition": "work_orders.cryptographic_hash IS NOT NULL AND work_orders.upload_timestamp <= work_orders.hash_computed_timestamp"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "ENT-MEDIA-ITEM",
+          "WF-6"
+        ]
+      },
+      "decomposition_rationale": "To support the immutability commitment, the system must explicitly calculate and store the hash. This is a concrete implementation decision on the endpoint logic.",
+      "surfaced_assumption_ids": [
+        "A-0012",
+        "A-0013",
+        "A-0014"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-006-01",
+      "parent_node_id": "US-006",
+      "root_fr_id": "US-006",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-006-01",
+        "role": "CAM operator",
+        "action": "Disable approve control for pending documents",
+        "outcome": "User cannot modify motion state to approved without verification",
+        "acceptance_criteria": [
+          {
+            "id": "AC-001",
+            "description": "Approve button disabled for unverified status",
+            "measurable_condition": "UI button state === 'disabled' if ENT-DOCUMENT.status !== 'Verified'"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-6",
+          "ENT-DOCUMENT",
+          "WF-5"
+        ]
+      },
+      "decomposition_rationale": "Implements AC-011 directly; binds the UI behavior to the document state without defining the state logic itself, ensuring the policy is executable at the interface layer.",
+      "surfaced_assumption_ids": [
+        "A-0015",
+        "A-0016"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-006-02",
+      "parent_node_id": "US-006",
+      "root_fr_id": "US-006",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-006-02",
+        "role": "CAM operator",
+        "action": "Lock voting record hash on write",
+        "outcome": "Vote record hash remains constant across all reads",
+        "acceptance_criteria": [
+          {
+            "id": "AC-002",
+            "description": "Stored hash matches current vote data",
+            "measurable_condition": "hash(ENT-VOTE.data) === ENT-VOTE.store_hash for every read operation"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-6",
+          "ENT-VOTE",
+          "WF-5"
+        ]
+      },
+      "decomposition_rationale": "Implements AC-012 directly; enforces the immutability commitment via a concrete data integrity check that is testable independently of the workflow logic.",
+      "surfaced_assumption_ids": [
+        "A-0015",
+        "A-0016"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-006-03",
+      "parent_node_id": "US-006",
+      "root_fr_id": "US-006",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "B",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-006-03",
+        "role": "CAM operator",
+        "action": "Ensure workflow status propagation before approval",
+        "outcome": "Verification status update is visible before approval action is accepted",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003",
+            "description": "Status query returns latest workflow state",
+            "measurable_condition": "read(ENT-DOCUMENT.status) returns current WF-5 state within 500ms of transaction commit"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-6",
+          "ENT-MOTION",
+          "ENT-DOCUMENT"
+        ]
+      },
+      "decomposition_rationale": "Defines the sub-area of status consistency required to support the Tier C implementations; commits to the timing constraint needed for the UI logic to function correctly.",
+      "surfaced_assumption_ids": [
+        "A-0015",
+        "A-0016"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-007-01",
+      "parent_node_id": "US-007",
+      "root_fr_id": "US-007",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-007-01",
+        "role": "CAM operator",
+        "action": "Calculate and validate weighted vote ratio on finalization",
+        "outcome": "Budget finalization fails if weighted vote ratio is below 66.67%",
+        "acceptance_criteria": [
+          {
+            "id": "AC-001",
+            "description": "Vote ratio threshold is enforced",
+            "measurable_condition": "sum(ENT-VOTE.weight) / ENT-VOTE.total_weight >= 0.6667 for all votes cast"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-7",
+          "COMP-4"
+        ]
+      },
+      "decomposition_rationale": "This is the primary implementation commitment to enforce the policy choice in the Acceptance Criteria (AC-013). It commits to the specific algorithm for calculating the ratio.",
+      "surfaced_assumption_ids": [
+        "A-0017",
+        "A-0018",
+        "A-0019"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-007-02",
+      "parent_node_id": "US-007",
+      "root_fr_id": "US-007",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-007-02",
+        "role": "CAM operator",
+        "action": "Generate Trust Ledger transaction for vote signature",
+        "outcome": "Every vote cast generates an immutable ENT-TRANSACTION record",
+        "acceptance_criteria": [
+          {
+            "id": "AC-002",
+            "description": "Signature event linked to budget finalization",
+            "measurable_condition": "ENT-TRANSACTION.id generated and timestamp < ENT-BUDGET.finalization_time"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-7",
+          "ENT-VOTE",
+          "ENT-BUDGET"
+        ]
+      },
+      "decomposition_rationale": "This is the primary implementation commitment to enforce the policy choice in Acceptance Criteria (AC-014). It commits to the specific data model (ENT-TRANSACTION) and temporal relationship for compliance.",
+      "surfaced_assumption_ids": [
+        "A-0017",
+        "A-0018",
+        "A-0019"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-007-03",
+      "parent_node_id": "US-007",
+      "root_fr_id": "US-007",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-007-03",
+        "role": "CAM operator",
+        "action": "Persist individual vote record cast",
+        "outcome": "Vote cast is recorded in ENT-VOTE entity",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003",
+            "description": "Vote record is created for cast",
+            "measurable_condition": "INSERT INTO ENT-VOTE returns unique row with voter_id, vote_option, and hash"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-7",
+          "ENT-VOTE"
+        ]
+      },
+      "decomposition_rationale": "This is an atomic action (Leaf) representing the storage consequence of a user cast vote. It is testable independently of the ratio calculation logic.",
+      "surfaced_assumption_ids": [
+        "A-0017",
+        "A-0018",
+        "A-0019"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-007-04",
+      "parent_node_id": "US-007",
+      "root_fr_id": "US-007",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-007-04",
+        "role": "CAM operator",
+        "action": "Enforce read-only budget state when threshold not met",
+        "outcome": "ENT-BUDGET status remains non-finalized",
+        "acceptance_criteria": [
+          {
+            "id": "AC-004",
+            "description": "Budget status blocked from change",
+            "measurable_condition": "ENT-BUDGET.status = 'PENDING' OR 'VOTING' when vote_ratio < 0.6667"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-7",
+          "ENT-BUDGET",
+          "COMP-4"
+        ]
+      },
+      "decomposition_rationale": "This is the verification condition for the guardrail logic. It ensures the system state adheres to the 2/3 majority constraint defined in the parent.",
+      "surfaced_assumption_ids": [
+        "A-0017",
+        "A-0018",
+        "A-0019"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-008.C-01",
+      "parent_node_id": "US-008",
+      "root_fr_id": "US-008",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-008.C-01",
+        "role": "Logic Component",
+        "action": "Bind Repair Request to Tenant Assessment Entity",
+        "outcome": "The repair request record references the specific assessment account for the requesting tenant",
+        "acceptance_criteria": [
+          {
+            "id": "AC-001",
+            "description": "Request record references a valid assessment account for the tenant.",
+            "measurable_condition": "request_record.assessment_id === tenant_record.assessment_id AND assessment_status is ACTIVE"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-8"
+        ]
+      },
+      "decomposition_rationale": "AC-015 mandates fee visibility; binding the request to the assessment is the logical implementation that enables this view. This child commits to the data relationship required.",
+      "surfaced_assumption_ids": [
+        "A-0020",
+        "A-0021",
+        "A-0022"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-008.C-02",
+      "parent_node_id": "US-008",
+      "root_fr_id": "US-008",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-008.C-02",
+        "role": "Logic Component",
+        "action": "Persist Communication Event to Association Channel",
+        "outcome": "A new message record is created and persisted within the active community chat thread",
+        "acceptance_criteria": [
+          {
+            "id": "AC-002",
+            "description": "Message record is created with the correct association channel context.",
+            "measurable_condition": "message_record.channel_id === association_channel_id AND message_type === 'repair_report'"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-8"
+        ]
+      },
+      "decomposition_rationale": "AC-016 requires logging to a channel; this child commits to the persistence logic that maps the request to the association's specific communication infrastructure.",
+      "surfaced_assumption_ids": [
+        "A-0020",
+        "A-0021",
+        "A-0022"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-008.C-03",
+      "parent_node_id": "US-008",
+      "root_fr_id": "US-008",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-008.C-03",
+        "role": "UI Renderer",
+        "action": "Render Fee Balance Display to Authorized Tenant",
+        "outcome": "Tenant view renders the associated assessment balance for active requests in the UI",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003",
+            "description": "Fee balance is displayed to the tenant who submitted the request.",
+            "measurable_condition": "UI_display.balance_value === request_record.assessment.balance AND request_submitter_id === tenant_id"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-8"
+        ]
+      },
+      "decomposition_rationale": "The display operation is the atomic termination of the data flow; it is testable as a UI render action without further decomposition into UI component logic.",
+      "surfaced_assumption_ids": [
+        "A-0020",
+        "A-0021",
+        "A-0022"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-009-01",
+      "parent_node_id": "US-009",
+      "root_fr_id": "US-009",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-009-01",
+        "role": "CAM operator",
+        "action": "Validate ENT-BUDGET remaining allocation against PO total cost",
+        "outcome": "Transaction commits only if cost <= remaining budget",
+        "acceptance_criteria": [
+          {
+            "id": "AC-001",
+            "description": "PO creation fails with budget error when sum exceeds limit",
+            "measurable_condition": "total_po_amount <= (ENT-BUDGET.total - ENT-BUDGET.spent) at write time"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-9",
+          "ENT-BUDGET"
+        ]
+      },
+      "decomposition_rationale": "Direct mapping of AC-017. This child binds the financial constraint to the transaction flow.",
+      "surfaced_assumption_ids": [
+        "A-0023",
+        "A-0024"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-009-02",
+      "parent_node_id": "US-009",
+      "root_fr_id": "US-009",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-009-02",
+        "role": "CAM operator",
+        "action": "Verify ENT-VENDOR status in verification store",
+        "outcome": "Returns 'Vendor Not Authorized' if entity not found in verified list",
+        "acceptance_criteria": [
+          {
+            "id": "AC-002",
+            "description": "PO creation blocked for unverified vendor",
+            "measurable_condition": "status(ENT-VENDOR) == 'AUTHORIZED' must be true before WF-11 invocation"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-9",
+          "WF-11",
+          "ENT-VENDOR"
+        ]
+      },
+      "decomposition_rationale": "Direct mapping of AC-018. This child commits to the pre-compliance verification logic referenced in the user journey.",
+      "surfaced_assumption_ids": [
+        "A-0023",
+        "A-0024"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-009-03",
+      "parent_node_id": "US-009",
+      "root_fr_id": "US-009",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-009-03",
+        "role": "CAM operator",
+        "action": "Initialize WF-11 Vendor Supply Chain Check for new PO",
+        "outcome": "WF-11 status reflects verification progress for downstream steps",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003",
+            "description": "Workflow instance created with valid context",
+            "measurable_condition": "WF-11 instance exists in DB with status CHECK_STARTED upon PO request"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-9",
+          "WF-11"
+        ]
+      },
+      "decomposition_rationale": "Orchestrates the compliance engine (WF-11) required for the vendor check logic.",
+      "surfaced_assumption_ids": [
+        "A-0023",
+        "A-0024"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-009-04",
+      "parent_node_id": "US-009",
+      "root_fr_id": "US-009",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-009-04",
+        "role": "Leaf operation",
+        "action": "Persist ENT-PURCHASE-ORDER record to ENT-PURCHASE-ORDER",
+        "outcome": "PO record exists with immutable timestamp",
+        "acceptance_criteria": [
+          {
+            "id": "AC-004",
+            "description": "Single PO record stored successfully",
+            "measurable_condition": "SELECT count(*) FROM ENT-PURCHASE-ORDER WHERE order_number = {PO_NUM} AND id IS NOT NULL = 1"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "ENT-PURCHASE-ORDER",
+          "UJ-9"
+        ]
+      },
+      "decomposition_rationale": "The terminal success path: the atomic data persistence event after all validation passes.",
+      "surfaced_assumption_ids": [
+        "A-0023",
+        "A-0024"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-010-01",
+      "parent_node_id": "US-010",
+      "root_fr_id": "US-010",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-010-01",
+        "role": "System",
+        "action": "Ingest data modification events into ENT-AUDIT-LOG upon transaction commit",
+        "outcome": "Every data modification event creates a corresponding entry in the audit log entity",
+        "acceptance_criteria": [
+          {
+            "id": "AC-019",
+            "description": "All discrepancies and modification events generate a log entry.",
+            "measurable_condition": "count(ENT-AUDIT-LOG) >= count(data_modification_events) within any time window"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-10",
+          "COMP-5",
+          "ENT-AUDIT-LOG"
+        ]
+      },
+      "decomposition_rationale": "Distinguishes the logging mechanism (system action) from the access policy. This child commits to the ingestion strategy required for AC-019.",
+      "surfaced_assumption_ids": [
+        "A-0025",
+        "A-0026",
+        "A-0027"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-010-02",
+      "parent_node_id": "US-010",
+      "root_fr_id": "US-010",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-010-02",
+        "role": "System",
+        "action": "Enforce role-based access control (RBAC) on ENT-AUDIT-LOG queries",
+        "outcome": "Non-admin roles are blocked from viewing audit logs, returning an Access Denied response",
+        "acceptance_criteria": [
+          {
+            "id": "AC-020",
+            "description": "Query access is restricted to authorized roles only.",
+            "measurable_condition": "response.status === 403 if user_role NOT IN ['admin', 'platform_staff']"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-10",
+          "COMP-5",
+          "TECH-13"
+        ]
+      },
+      "decomposition_rationale": "Distinguishes the access enforcement logic. This child binds the system to the Cerbos engine (TECH-13) and policy logic required for AC-020.",
+      "surfaced_assumption_ids": [
+        "A-0025",
+        "A-0026",
+        "A-0027"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ALERT-01",
+      "parent_node_id": "US-011",
+      "root_fr_id": "US-011",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ALERT-01",
+        "role": "CAM operator",
+        "action": "compute trigger timestamp 30 days prior to predicted failure",
+        "outcome": "Alert entry is queued exactly 30 days before failure_date",
+        "acceptance_criteria": [
+          {
+            "id": "AC-ALERT-TIME",
+            "description": "Trigger timestamp equals predicted_failure_date minus 30 days.",
+            "measurable_condition": "trigger_timestamp === failure_probability_date - 30"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-11",
+          "ENT-AI-ALERT",
+          "WF-8"
+        ]
+      },
+      "decomposition_rationale": "This child binds the timing constraint from AC-021. It forces the system to implement a specific temporal window calculation before alert dispatch, relying on the AI engine output.",
+      "surfaced_assumption_ids": [
+        "A-0028"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ALERT-02",
+      "parent_node_id": "US-011",
+      "root_fr_id": "US-011",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ALERT-02",
+        "role": "CAM operator",
+        "action": "evaluate ROI threshold on preventive action",
+        "outcome": "Alert only generated if cost(remedy) < cost(failure) and ROI > 1.0",
+        "acceptance_criteria": [
+          {
+            "id": "AC-ALERT-ROI",
+            "description": "Alert generation logic validates ROI > 1.0.",
+            "measurable_condition": "(repair_cost_estimate - preventive_cost_estimate) / preventive_cost_estimate > 1.0"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-11",
+          "ENT-AI-ALERT",
+          "WF-8"
+        ]
+      },
+      "decomposition_rationale": "This child binds the economic viability constraint from AC-022. It rules out sending alerts for repairs with negative or marginal economic value, ensuring cost-effectiveness.",
+      "surfaced_assumption_ids": [
+        "A-0028"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ALERT-03",
+      "parent_node_id": "US-011",
+      "root_fr_id": "US-011",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ALERT-03",
+        "role": "CAM operator",
+        "action": "dispatch notification to Investor inbox",
+        "outcome": "Alert delivered via ENT-NOTIFICATION channel",
+        "acceptance_criteria": [
+          {
+            "id": "AC-ALERT-DELIVER",
+            "description": "Notification status reflects sent event in system log.",
+            "measurable_condition": "notification_status === 'sent' AND notification_recipient_id === investor_user_id"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-11",
+          "ENT-AI-ALERT",
+          "WF-8"
+        ]
+      },
+      "decomposition_rationale": "This child binds the delivery mechanism. It ensures the AI advisory output reaches the user via the configured notification channel associated with the User Journey.",
+      "surfaced_assumption_ids": [
+        "A-0028"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-012.1",
+      "parent_node_id": "US-012",
+      "root_fr_id": "US-012",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-012.1",
+        "role": "CAM operator",
+        "action": "Update ENT-TRANSACTION status to 'Success' on gateway response",
+        "outcome": "ENT-TRANSACTION record reflects confirmed status within 500ms of network event",
+        "acceptance_criteria": [
+          {
+            "id": "AC-023-EXEC",
+            "description": "ENT-TRANSACTION status reflects Success within gateway response time.",
+            "measurable_condition": "transaction.status === 'Success' when queried within 500ms window of gateway_response_time"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-12",
+          "ENT-TRANSACTION",
+          "WF-4"
+        ]
+      },
+      "decomposition_rationale": "Directly addresses AC-023. Decomposes the 'real-time confirmation' requirement into the specific state transition action.",
+      "surfaced_assumption_ids": [
+        "A-0029",
+        "A-0030"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-012.2",
+      "parent_node_id": "US-012",
+      "root_fr_id": "US-012",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-012.2",
+        "role": "CAM operator",
+        "action": "Generate ENT-DOCUMENT (Receipt) for Trust Ledger",
+        "outcome": "Receipt document is available for download immediately after generation",
+        "acceptance_criteria": [
+          {
+            "id": "AC-024-EXEC",
+            "description": "Receipt document is downloadable within 1 second of transaction.",
+            "measurable_condition": "ent_document.is_downloadable === true within 1000ms of transaction_commit_time"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-12",
+          "ENT-INVOICE",
+          "ENT-DOCUMENT"
+        ]
+      },
+      "decomposition_rationale": "Addresses AC-024. Separates document creation from financial posting to allow distinct latency budgeting.",
+      "surfaced_assumption_ids": [
+        "A-0029",
+        "A-0030"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-012.3",
+      "parent_node_id": "US-012",
+      "root_fr_id": "US-012",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-012.3",
+        "role": "CAM operator",
+        "action": "Validate Gateway Payment Integrity before Commit",
+        "outcome": "Transaction is rejected or quarantined if gateway response indicates error",
+        "acceptance_criteria": [
+          {
+            "id": "AC-025-GW",
+            "description": "No Success state is persisted for invalid gateway responses.",
+            "measurable_condition": "gateway_response_code in ['error', 'timeout'] triggers reject path"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-12",
+          "ENT-TRANSACTION"
+        ]
+      },
+      "decomposition_rationale": "Ensures integrity of the 'Confirmed' state before writing to ledger or triggering receipt.",
+      "surfaced_assumption_ids": [
+        "A-0029",
+        "A-0030"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-012.4",
+      "parent_node_id": "US-012",
+      "root_fr_id": "US-012",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-012.4",
+        "role": "CAM operator",
+        "action": "Persist Immutable Entry to Trust Ledger",
+        "outcome": "Financial movement is recorded immutably with audit trail",
+        "acceptance_criteria": [
+          {
+            "id": "AC-026-LED",
+            "description": "Transaction hash and timestamp are immutable upon commit.",
+            "measurable_condition": "transaction_hash === SHA-256(source_data) and timestamp_generated_by_platform_clock"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-12",
+          "ENT-TRUST-LEDGER",
+          "WF-4"
+        ]
+      },
+      "decomposition_rationale": "Satisfies the 'Trust Ledger' requirement by committing to the immutability constraint defined in VOC-14.",
+      "surfaced_assumption_ids": [
+        "A-0029",
+        "A-0030"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-013-01",
+      "parent_node_id": "US-013",
+      "root_fr_id": "US-013",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "B",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-013-01",
+        "role": "Data Modeler",
+        "action": "Define ENT-MEDIA-ITEM schema extension for 'asset_rights_owner'",
+        "outcome": "ENT-MEDIA-ITEM schema includes 'asset_rights_owner' column",
+        "acceptance_criteria": [
+          {
+            "id": "AC-01",
+            "description": "Schema validation confirms 'asset_rights_owner' column exists.",
+            "measurable_condition": "Query ENT-MEDIA-ITEM schema returns 'asset_rights_owner' field at all times."
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "ENT-MEDIA-ITEM",
+          "COMP-1"
+        ]
+      },
+      "decomposition_rationale": "This commits the specific data structure required by the parent, defining the 'what' before implementation details.",
+      "surfaced_assumption_ids": [
+        "A-0031",
+        "A-0032",
+        "A-0033"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-013-02",
+      "parent_node_id": "US-013",
+      "root_fr_id": "US-013",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-013-02",
+        "role": "Infrastructure Engineer",
+        "action": "Configure ExifTool for metadata extraction on upload",
+        "outcome": "Rights data populated from file headers automatically",
+        "acceptance_criteria": [
+          {
+            "id": "AC-02",
+            "description": "Upload completes with rights data extracted from file.",
+            "measurable_condition": "ENT-MEDIA-ITEM.asset_rights_owner matches EXIF header value within 50ms of upload trigger."
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "TECH-23",
+          "WF-9"
+        ]
+      },
+      "decomposition_rationale": "Commits the technical approach for data ingestion, resolving the 'how' of rights extraction.",
+      "surfaced_assumption_ids": [
+        "A-0031",
+        "A-0032",
+        "A-0033"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-013-03",
+      "parent_node_id": "US-013",
+      "root_fr_id": "US-013",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-013-03",
+        "role": "Backend Developer",
+        "action": "Enforce transactional persistence before upload commit",
+        "outcome": "Rights flag persisted atomically with upload state",
+        "acceptance_criteria": [
+          {
+            "id": "AC-03",
+            "description": "No partial uploads occur where rights flag is missing.",
+            "measurable_condition": "Transaction commits only if ENT-MEDIA-ITEM.asset_rights_owner is non-null."
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "ENT-STORAGE",
+          "TECH-24"
+        ]
+      },
+      "decomposition_rationale": "Commits the architectural choice for data integrity, ensuring the flag is part of the upload transaction.",
+      "surfaced_assumption_ids": [
+        "A-0031",
+        "A-0032",
+        "A-0033"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-013-04",
+      "parent_node_id": "US-013",
+      "root_fr_id": "US-013",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "B",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-013-04",
+        "role": "Compliance Officer",
+        "action": "Validate rights owner ID against ENT-USER or ENT-ASSOCIATION",
+        "outcome": "Invalid owner references reject the upload",
+        "acceptance_criteria": [
+          {
+            "id": "AC-04",
+            "description": "Upload rejects if owner ID does not resolve to an entity.",
+            "measurable_condition": "INSERT into ENT-MEDIA-ITEM fails if 'asset_rights_owner' value not found in ENT-USER or ENT-ASSOCIATION."
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "ENT-USER",
+          "ENT-ASSOCIATION",
+          "COMP-3"
+        ]
+      },
+      "decomposition_rationale": "Commits a governing rule for data validity, ensuring rights are assigned to legitimate entities.",
+      "surfaced_assumption_ids": [
+        "A-0031",
+        "A-0032",
+        "A-0033"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-013-05",
+      "parent_node_id": "US-013",
+      "root_fr_id": "US-013",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "A",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-013-05",
+        "role": "Product Manager",
+        "action": "Sub-function: Manage Asset Rights Lifecycle",
+        "outcome": "System supports future decisions on asset rights",
+        "acceptance_criteria": [
+          {
+            "id": "AC-05",
+            "description": "System allows querying assets by rights status.",
+            "measurable_condition": "Search API returns 'asset_rights_owner' value for all ENT-MEDIA-ITEMs."
+          }
+        ],
+        "priority": "medium",
+        "traces_to": [
+          "UJ-1",
+          "UJ-5"
+        ]
+      },
+      "decomposition_rationale": "Subdivides the parent's functional scope into the lifecycle management sub-area without committing to specific algorithms yet.",
+      "surfaced_assumption_ids": [
+        "A-0031",
+        "A-0032",
+        "A-0033"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-INT-1.1",
+      "parent_node_id": "US-014",
+      "root_fr_id": "US-014",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-INT-1.1",
+        "role": "System Admin",
+        "action": "Implement secure authentication handshake",
+        "outcome": "Provider API accepts requests with valid credentials",
+        "acceptance_criteria": [
+          {
+            "id": "AC-INT-001",
+            "description": "API calls include valid Authorization tokens.",
+            "measurable_condition": "Request header contains 'Authorization: Bearer <token>' or 'Authorization: Basic <encoded>'."
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "ENT-METRIC",
+          "ENT-ASSOCIATION"
+        ]
+      },
+      "decomposition_rationale": "Authentication is the prerequisite engineering sub-strategy; without it, the integration strategy cannot be enacted.",
+      "surfaced_assumption_ids": [
+        "A-0034",
+        "A-0035",
+        "A-0036",
+        "A-0037"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-INT-1.2",
+      "parent_node_id": "US-014",
+      "root_fr_id": "US-014",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-INT-1.2",
+        "role": "System Daemon",
+        "action": "Poll provider endpoint for health status",
+        "outcome": "System detects provider outages or latency spikes",
+        "acceptance_criteria": [
+          {
+            "id": "AC-INT-002",
+            "description": "Health check succeeds within timeout window.",
+            "measurable_condition": "HTTP 200 returned within 30 seconds of scheduled check initiation or webhook confirmation."
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "ENT-METRIC",
+          "ENT-ASSOCIATION"
+        ]
+      },
+      "decomposition_rationale": "Monitoring is the implementation commitment that enables the 'Active/Inactive' state verification in ENT-METRIC.",
+      "surfaced_assumption_ids": [
+        "A-0034",
+        "A-0035",
+        "A-0036",
+        "A-0037"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-INT-1.3",
+      "parent_node_id": "US-014",
+      "root_fr_id": "US-014",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-INT-1.3",
+        "role": "System Scheduler",
+        "action": "Sync external data metadata",
+        "outcome": "System metadata reflects provider catalog",
+        "acceptance_criteria": [
+          {
+            "id": "AC-INT-003",
+            "description": "External entity list updates within SLA.",
+            "measurable_condition": "ENT-METRIC record shows 'Inactive' status within 60 seconds if provider API returns 5xx error."
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "ENT-METRIC",
+          "ENT-ASSOCIATION"
+        ]
+      },
+      "decomposition_rationale": "Data synchronization is the downstream consequence of a successful connection strategy; defines when the status changes.",
+      "surfaced_assumption_ids": [
+        "A-0034",
+        "A-0035",
+        "A-0036",
+        "A-0037"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-US015-1",
+      "parent_node_id": "US-015",
+      "root_fr_id": "US-015",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-US015-1",
+        "role": "Architect",
+        "action": "Define External Entity schema fields",
+        "outcome": "System creates record with specific limited fields",
+        "acceptance_criteria": [
+          {
+            "id": "AC-027-1",
+            "description": "External entity schema maps 1:1 with external vendor JSON payload",
+            "measurable_condition": "schema.fields === vendor.payload.fields for every created record"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "ENT-ASSOCIATION",
+          "Q-6"
+        ]
+      },
+      "decomposition_rationale": "Defines the concrete data contract for the 'External Entity' record type mentioned in AC-027; specific enough to test without further decomposition.",
+      "surfaced_assumption_ids": [
+        "A-0038",
+        "A-0039"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-US015-2",
+      "parent_node_id": "US-015",
+      "root_fr_id": "US-015",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "B",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-US015-2",
+        "role": "Engineer",
+        "action": "Define Vendor Coordination strategy",
+        "outcome": "API handshake established for data sync",
+        "acceptance_criteria": [
+          {
+            "id": "AC-027-2",
+            "description": "Vendor API endpoint reachable and authenticated",
+            "measurable_condition": "HTTP 200 OK response received on POST to vendor integration endpoint"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "ENT-VENDOR",
+          "Q-6"
+        ]
+      },
+      "decomposition_rationale": "Architectural choice on how coordination occurs (API vs Agent) without imposing specific tech stack yet, committing to external connectivity as the strategy.",
+      "surfaced_assumption_ids": [
+        "A-0038",
+        "A-0039"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-US015-3",
+      "parent_node_id": "US-015",
+      "root_fr_id": "US-015",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-US015-3",
+        "role": "Developer",
+        "action": "Configure Workflow Trigger listener",
+        "outcome": "Workflow initiates on external record creation event",
+        "acceptance_criteria": [
+          {
+            "id": "AC-027-3",
+            "description": "Workflow status changes to 'Initiated' upon event receipt",
+            "measurable_condition": "Workflow state transition to 'Initiated' occurs within 50ms of event emission"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "WF-1",
+          "Q-6"
+        ]
+      },
+      "decomposition_rationale": "Implements the 'Workflow initiates' AC; commits to a specific trigger logic mechanism tied to the external record event.",
+      "surfaced_assumption_ids": [
+        "A-0038",
+        "A-0039"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-US015-4",
+      "parent_node_id": "US-015",
+      "root_fr_id": "US-015",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "B",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-US015-4",
+        "role": "Compliance Officer",
+        "action": "Enforce Data Isolation policy",
+        "outcome": "External data does not mix with internal accounts",
+        "acceptance_criteria": [
+          {
+            "id": "AC-027-4",
+            "description": "External entity records are not visible to internal user portals",
+            "measurable_condition": "SELECT * FROM external_entities WHERE user_role in ('owner','tenant') returns 0 rows"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "ENT-ASSOCIATION"
+        ]
+      },
+      "decomposition_rationale": "Governing rule ensuring non-participant HOAs remain isolated from core governance flows per 'without requiring direct HOA integration' AC.",
+      "surfaced_assumption_ids": [
+        "A-0038",
+        "A-0039"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-016-1",
+      "parent_node_id": "US-016",
+      "root_fr_id": "US-016",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "B",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-016-1",
+        "role": "Policy Mapper",
+        "action": "Map specific statutory deadlines to each notice type (e.g., Violation Notice vs. Budget Notice).",
+        "outcome": "All notice types have a defined regulatory deadline associated with them for validation",
+        "acceptance_criteria": [
+          {
+            "id": "AC-001",
+            "description": "Every notice type is linked to a statutory rule in the policy mapping.",
+            "measurable_condition": "Query ENT-NOTIFICATION type definitions returns a non-empty 'regulatory_deadline' or 'statutory_code' reference."
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "COMP-2",
+          "COMP-3"
+        ]
+      },
+      "decomposition_rationale": "Deciding which law applies to which notice is a policy choice (Tier B) rather than an implementation detail. This separates the rule definition from the enforcement logic.",
+      "surfaced_assumption_ids": [
+        "A-0040",
+        "A-0041",
+        "A-0042"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-016-2",
+      "parent_node_id": "US-016",
+      "root_fr_id": "US-016",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-016-2",
+        "role": "Validation Engine",
+        "action": "Enforce deadline check at the moment of notice generation or queue insertion.",
+        "outcome": "System prevents a notice from being queued if the calculated date exceeds the statutory deadline",
+        "acceptance_criteria": [
+          {
+            "id": "AC-002",
+            "description": "Notice transaction fails validation if deadline is not met.",
+            "measurable_condition": "System returns validation_error.code == 'DEADLINE_EXCEEDED' if (current_date - created_date) > statutory_limit."
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "ENT-NOTIFICATION",
+          "COMP-2"
+        ]
+      },
+      "decomposition_rationale": "This child commits to the technical strategy of 'validation at commit time' which is testable and distinct from the policy mapping.",
+      "surfaced_assumption_ids": [
+        "A-0040",
+        "A-0041",
+        "A-0042"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-016-3",
+      "parent_node_id": "US-016",
+      "root_fr_id": "US-016",
+      "depth": 1,
+      "pass_number": 1,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-016-3",
+        "role": "Atomic Gate",
+        "action": "Reject the specific notice submission request when deadline is exceeded.",
+        "outcome": "Client receives an immediate error response preventing the save operation.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003",
+            "description": "API request returns 400 Bad Request for expired notice.",
+            "measurable_condition": "HTTP status 400 and body contains message 'Notice Period Expiry Prevented'."
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "ENT-NOTIFICATION",
+          "COMP-3"
+        ]
+      },
+      "decomposition_rationale": "This is the terminal leaf operation that represents the system's refusal state, meeting the leaf criteria where further decomposition yields no atomic actions.",
+      "surfaced_assumption_ids": [
+        "A-0040",
+        "A-0041",
+        "A-0042"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.1.1",
+      "parent_node_id": "FR-ACCT-1.1",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.1.1",
+        "role": "CAM operator",
+        "action": "check address string against canonical Zod regex patterns",
+        "outcome": "Address string conforms to canonical address schema format",
+        "acceptance_criteria": [
+          {
+            "id": "AC-001",
+            "description": "Address Line 1/2/3 matches Zod regex.",
+            "measurable_condition": "address.address_line[1-3].matches(canonical_address_schema) === true"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "ENT-INTAKE-ITEM"
+        ]
+      },
+      "decomposition_rationale": "Splits the high-level schema validation commitment into specific field-level string validation checks, which are individually testable leaf operations.",
+      "surfaced_assumption_ids": [
+        "A-0043"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.1.2",
+      "parent_node_id": "FR-ACCT-1.1",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.1.2",
+        "role": "CAM operator",
+        "action": "verify property ID validity against ENT-PROPERTY registry",
+        "outcome": "Provided property ID exists in ENT-PROPERTY database",
+        "acceptance_criteria": [
+          {
+            "id": "AC-002",
+            "description": "Property ID is resolved in ENT-PROPERTY table.",
+            "measurable_condition": "property_id in (SELECT id FROM properties) === true"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "ENT-PROPERTY"
+        ]
+      },
+      "decomposition_rationale": "Separates the property existence check from the string format check, acknowledging A-0001's requirement that validation relies on property lookup.",
+      "surfaced_assumption_ids": [
+        "A-0043"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.1.3",
+      "parent_node_id": "FR-ACCT-1.1",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.1.3",
+        "role": "CAM operator",
+        "action": "map Zod schema errors to HTTP 400 response code",
+        "outcome": "Client receives HTTP 400 when schema validation fails",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003",
+            "description": "Response status is 400 on validation failure.",
+            "measurable_condition": "http_status_code === 400 AND response_body.errors !== null"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "ENT-INTAKE-ITEM"
+        ]
+      },
+      "decomposition_rationale": "Defines the architectural decision (implementation commitment) on how to signal validation failure, committing to a specific HTTP status mapping strategy.",
+      "surfaced_assumption_ids": [
+        "A-0043"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.2.1",
+      "parent_node_id": "FR-ACCT-1.2",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "B",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.2.1",
+        "role": "Architect",
+        "action": "Define latency measurement boundary",
+        "outcome": "System clock used for latency calculation is agreed upon",
+        "acceptance_criteria": [
+          {
+            "id": "AC-1.2.1.1",
+            "description": "Latency measured from origin server receipt of request.",
+            "measurable_condition": "start_time === request_timestamp_at_origin_server"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "TECH-16"
+        ]
+      },
+      "decomposition_rationale": "Defines the architectural boundary for the 1-second SLA, ruling out client-side measurement which would introduce uncontrolled variance or require NTP trust assumptions.",
+      "surfaced_assumption_ids": [
+        "A-0044"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.2.2",
+      "parent_node_id": "FR-ACCT-1.2",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.2.2",
+        "role": "Validation Layer",
+        "action": "Enforce schema validation on incoming payload",
+        "outcome": "Invalid payloads are rejected before persistence",
+        "acceptance_criteria": [
+          {
+            "id": "AC-1.2.2.1",
+            "description": "All payload fields match CDM patterns.",
+            "measurable_condition": "payload === validate_schema(payload)"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "ENT-REPAIR-REQUEST"
+        ]
+      },
+      "decomposition_rationale": "Ensures data quality and prevents dirty data from entering the persistence engine; a concrete implementation choice regarding validation logic.",
+      "surfaced_assumption_ids": [
+        "A-0044"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.2.3",
+      "parent_node_id": "FR-ACCT-1.2",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.2.3",
+        "role": "Data Layer",
+        "action": "Write row to ENT-REPAIR-REQUEST table",
+        "outcome": "Record exists in database immediately after commit",
+        "acceptance_criteria": [
+          {
+            "id": "AC-1.2.3.1",
+            "description": "Row exists in table within 1000ms.",
+            "measurable_condition": "SELECT COUNT(*) FROM repair_requests WHERE id = NEW_ID returns 1 at commit_time + 1000ms"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "ENT-REPAIR-REQUEST"
+        ]
+      },
+      "decomposition_rationale": "The atomic action of state change; the most fundamental verification that the persistence requirement was met.",
+      "surfaced_assumption_ids": [
+        "A-0044"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.2.4",
+      "parent_node_id": "FR-ACCT-1.2",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.2.4",
+        "role": "Audit Layer",
+        "action": "Log persistence event to audit trail",
+        "outcome": "Commit event is recorded for forensic analysis",
+        "acceptance_criteria": [
+          {
+            "id": "AC-1.2.4.1",
+            "description": "Log entry created at transaction commit.",
+            "measurable_condition": "ENT-AUDIT-LOG entry created at same timestamp as transaction commit"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "WF-1",
+          "ENT-AUDIT-LOG"
+        ]
+      },
+      "decomposition_rationale": "Ensures compliance with audit requirements by capturing the exact timing and success of the persistence operation.",
+      "surfaced_assumption_ids": [
+        "A-0044"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.3.1",
+      "parent_node_id": "FR-ACCT-1.3",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.3.1",
+        "role": "CAM operator",
+        "action": "Create ENT-NOTIFICATION record with initial status on event trigger",
+        "outcome": "ENT-NOTIFICATION record exists with status 'QUEUED' or 'SENT' immediately after event",
+        "acceptance_criteria": [
+          {
+            "id": "AC-1.3.1",
+            "description": "Record persists to ENT-NOTIFICATION table within 100ms of event.",
+            "measurable_condition": "SELECT COUNT(*) FROM ENT-NOTIFICATION WHERE event_id = ? AND status IN ('QUEUED','SENT') GROUP BY status HAVING COUNT(*) > 0"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "ENT-NOTIFICATION"
+        ]
+      },
+      "decomposition_rationale": "This atomic DB write initiates the tracking lifecycle; verification can be performed immediately without external dependencies.",
+      "surfaced_assumption_ids": [
+        "A-0045"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.3.2",
+      "parent_node_id": "FR-ACCT-1.3",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.3.2",
+        "role": "CAM operator",
+        "action": "Publish message to delivery queue topic",
+        "outcome": "Message event is visible in the queue for processing within 50ms of creation",
+        "acceptance_criteria": [
+          {
+            "id": "AC-1.3.2",
+            "description": "Message successfully published to internal queue without error.",
+            "measurable_condition": "queue_count(topic) > 0 after 50ms post-insert"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-1",
+          "ENT-NOTIFICATION"
+        ]
+      },
+      "decomposition_rationale": "Decouples database commit from external delivery; aligns with [A-0002] scope constraint that delivery is complete upon insertion.",
+      "surfaced_assumption_ids": [
+        "A-0045"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.3.3",
+      "parent_node_id": "FR-ACCT-1.3",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.3.3",
+        "role": "CAM operator",
+        "action": "Invoke external SMTP or Push SDK to deliver payload",
+        "outcome": "Payload sent to external provider or device token endpoint within 900000ms of event",
+        "acceptance_criteria": [
+          {
+            "id": "AC-1.3.3",
+            "description": "External provider SDK returns success or enters retry queue.",
+            "measurable_condition": "sdk_response.status_code in (200, 202) OR retry_queue_count > 0 within 900s"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "ENT-USER"
+        ]
+      },
+      "decomposition_rationale": "Performs the actual outbound delivery; measurable against SLA threshold of 15 minutes.",
+      "surfaced_assumption_ids": [
+        "A-0045"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.3.4",
+      "parent_node_id": "FR-ACCT-1.3",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.3.4",
+        "role": "CAM operator",
+        "action": "Update ENT-NOTIFICATION status to 'DELIVERED' on success",
+        "outcome": "Status field reflects 'DELIVERED' or 'SENT' based on outcome",
+        "acceptance_criteria": [
+          {
+            "id": "AC-1.3.4",
+            "description": "ENT-NOTIFICATION status updated to final state.",
+            "measurable_condition": "UPDATE ENT-NOTIFICATION SET status = 'DELIVERED' WHERE id = ?"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-1",
+          "ENT-NOTIFICATION"
+        ]
+      },
+      "decomposition_rationale": "Finalizes the record state; allows verification that the SLA was met or failure recorded.",
+      "surfaced_assumption_ids": [
+        "A-0045"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.4.1",
+      "parent_node_id": "FR-ACCT-1.4",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.4.1",
+        "role": "Context Validator",
+        "action": "Validate Repair Request context and payload for eligibility",
+        "outcome": "Trigger request validated against ENT-REPAIR-REQUEST schema constraints",
+        "acceptance_criteria": [
+          {
+            "id": "AC-004.1",
+            "description": "Trigger payload validated against Entitlement rules.",
+            "measurable_condition": "ENT-REPAIR-REQUEST record exists and is associated with valid ENT-HOMEOWNER before spawn"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "WF-1",
+          "ENT-REPAIR-REQUEST"
+        ]
+      },
+      "decomposition_rationale": "Ensures only valid request contexts are escalated to the workflow engine, preventing invalid state propagation.",
+      "surfaced_assumption_ids": [
+        "A-0046",
+        "A-0047",
+        "A-0048"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.4.2",
+      "parent_node_id": "FR-ACCT-1.4",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.4.2",
+        "role": "Workflow Spawner",
+        "action": "Initiate DBOS Workflow Instance",
+        "outcome": "DBOS 'RUNNING' instance registered in metadata store",
+        "acceptance_criteria": [
+          {
+            "id": "AC-004.2",
+            "description": "Workflow engine acknowledges spawn request.",
+            "measurable_condition": "Workflow instance ID returned by DBOS API matches expected pattern within 5ms"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "WF-1"
+        ]
+      },
+      "decomposition_rationale": "The core action of the parent requirement is the execution of the durable workflow engine; this child captures the engine interaction step.",
+      "surfaced_assumption_ids": [
+        "A-0046",
+        "A-0047",
+        "A-0048"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-ACCT-1.4.3",
+      "parent_node_id": "FR-ACCT-1.4",
+      "root_fr_id": "US-001",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-ACCT-1.4.3",
+        "role": "State Publisher",
+        "action": "Update Metadata Store Status Flag",
+        "outcome": "External read sees 'RUNNING' status on metadata table",
+        "acceptance_criteria": [
+          {
+            "id": "AC-004.3",
+            "description": "Status query reads 'RUNNING' immediately.",
+            "measurable_condition": "SELECT status FROM workflow_registry WHERE instance_id=... returns 'RUNNING' within 45ms of spawn ACK"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-1",
+          "WF-1",
+          "ENT-REPAIR-REQUEST"
+        ]
+      },
+      "decomposition_rationale": "Satisfies the latency AC by ensuring the 'shows status' criterion is met before the 50ms deadline.",
+      "surfaced_assumption_ids": [
+        "A-0046",
+        "A-0047",
+        "A-0048"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002.C.001.1",
+      "parent_node_id": "US-002.C.001",
+      "root_fr_id": "US-002",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-002.C.001.1",
+        "role": "Backend Service",
+        "action": "Persist status event with precise UTC timestamp at database commit",
+        "outcome": "The `event_persisted_time` field is set exactly at the moment of the DB transaction commit in the primary region",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003-1.1",
+            "description": "Backend event timestamp matches origin server clock within 1ms precision.",
+            "measurable_condition": "abs(DB COMMIT TIMESTAMP - SYSTEM CLOCK AT COMMIT) <= 1ms for every event log entry"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-2",
+          "US-002"
+        ]
+      },
+      "decomposition_rationale": "Establishes the 'start point' of the latency budget. Without an accurate server-side timestamp, the 'backend event persisted' component of the AC cannot be reliably measured or enforced.",
+      "surfaced_assumption_ids": [
+        "A-0049",
+        "A-0050",
+        "A-0051"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002.C.001.2",
+      "parent_node_id": "US-002.C.001",
+      "root_fr_id": "US-002",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-002.C.001.2",
+        "role": "Event Delivery Layer",
+        "action": "Serialize status payloads with minimal JSON footprint",
+        "outcome": "Event message size does not introduce serialization latency or bandwidth throttling that violates the propagation budget",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003-1.2",
+            "description": "Event payload serialization overhead is under 50ms on standard load.",
+            "measurable_condition": "(Serialization_TIME - Event_Persisted_TIME) <= 50ms for every event batch under 100KB"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "US-002.C.003",
+          "US-002"
+        ]
+      },
+      "decomposition_rationale": "Addresses the network transport component. While C.003 defines the protocol (SSE/Polling), this child addresses the specific payload efficiency required to meet the budget under that protocol.",
+      "surfaced_assumption_ids": [
+        "A-0049",
+        "A-0050",
+        "A-0051"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002.C.001.3",
+      "parent_node_id": "US-002.C.001",
+      "root_fr_id": "US-002",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-002.C.001.3",
+        "role": "Client Rendering Engine",
+        "action": "Process status update signal as high-priority UI task",
+        "outcome": "The UI thread prioritizes the render of status changes over low-priority background tasks",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003-1.3",
+            "description": "Client-side event parsing and DOM update completes within 100ms of network receipt.",
+            "measurable_condition": "(UI_RENDER_COMPLETE_TIMESTAMP - Network_Response_Received_TIMESTAMP) <= 100ms on mobile devices"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-2",
+          "US-002"
+        ]
+      },
+      "decomposition_rationale": "Addresses the client-side rendering component. Since A-0004 states client-side time is included in the budget, this child commits to prioritizing the client thread to keep this portion of the latency under the 10s total.",
+      "surfaced_assumption_ids": [
+        "A-0049",
+        "A-0050",
+        "A-0051"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002.C.001.4",
+      "parent_node_id": "US-002.C.001",
+      "root_fr_id": "US-002",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-002.C.001.4",
+        "role": "Observability System",
+        "action": "Calculate end-to-end latency per event and compare against 10s threshold",
+        "outcome": "System flags and logs any event that exceeds the 10s propagation window",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003-1.4",
+            "description": "Latency violations generate an alert in the platform monitoring system.",
+            "measurable_condition": "alert_count > 0 if (Client_Receive_Time - Backend_Persist_Time) > 10000ms within a rolling 1-minute window"
+          }
+        ],
+        "priority": "medium",
+        "traces_to": [
+          "TECH-16",
+          "US-002"
+        ]
+      },
+      "decomposition_rationale": "Ensures the 'verification' aspect of the parent requirement is actionable. This child implements the observation mechanism required to determine if the system is 'Enforcing' the budget defined in the parent.",
+      "surfaced_assumption_ids": [
+        "A-0049",
+        "A-0050",
+        "A-0051"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-WO-MEDIA-001",
+      "parent_node_id": "US-002.C.002",
+      "root_fr_id": "US-002",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-WO-MEDIA-001",
+        "role": "Data Engineer",
+        "action": "Persist media_id reference in ENT-WORK-ORDER table during state update.",
+        "outcome": "Work order entity records a valid link to media items upon creation or update.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-M01",
+            "description": "Every persisted work order contains a populated media_list reference.",
+            "measurable_condition": "SELECT media_id FROM work_orders WHERE id = ? IS NOT NULL"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-2",
+          "US-002"
+        ]
+      },
+      "decomposition_rationale": "Binds the functional need for data presence to the data model layer, ruling out scenarios where media exists only in temporary storage.",
+      "surfaced_assumption_ids": [
+        "A-0052",
+        "A-0053"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-WO-GET-002",
+      "parent_node_id": "US-002.C.002",
+      "root_fr_id": "US-002",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-WO-GET-002",
+        "role": "Backend API Layer",
+        "action": "Configure GET endpoint query to join media table independently of invoice state.",
+        "outcome": "API response includes media_list array even for work orders with invoice_state.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-M02",
+            "description": "API response contains 'media_list' populated for work orders regardless of invoice_state.",
+            "measurable_condition": "GET /work-orders/{id} returns non-empty media_list array when invoice_state != NULL"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "US-002.C.003",
+          "TECH-12"
+        ]
+      },
+      "decomposition_rationale": "Defines the specific API behavior required to satisfy the 'regardless of payment state' requirement, leveraging the existing join requirement in A-0005.",
+      "surfaced_assumption_ids": [
+        "A-0052",
+        "A-0053"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-WO-INV-003",
+      "parent_node_id": "US-002.C.002",
+      "root_fr_id": "US-002",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-WO-INV-003",
+        "role": "Workflow Engine",
+        "action": "Validate media presence as a precondition for Invoice Generation trigger.",
+        "outcome": "Invoice generation workflow validates media count before creating financial document.",
+        "acceptance_criteria": [
+          {
+            "id": "AC-M03",
+            "description": "Invoice generation does not fail if media list is populated prior to trigger.",
+            "measurable_condition": "Workflow execution logs 'media_check_passed' flag before creating ENT-INVOICE record"
+          }
+        ],
+        "priority": "medium",
+        "traces_to": [
+          "UJ-2",
+          "US-002.C.001"
+        ]
+      },
+      "decomposition_rationale": "Ensures the 'before invoice generation' AC is met by adding a validation step in the workflow, rather than relying solely on storage logic.",
+      "surfaced_assumption_ids": [
+        "A-0052",
+        "A-0053"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002.C.003-01",
+      "parent_node_id": "US-002.C.003",
+      "root_fr_id": "US-002",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-002.C.003-01",
+        "role": "Transport Layer",
+        "action": "Implement Server-Sent Events (SSE) endpoint with automatic reconnection logic",
+        "outcome": "Client receives real-time status updates via persistent HTTP connection",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003-02-01",
+            "description": "SSE stream adheres to protocol specification with defined reconnection headers.",
+            "measurable_condition": "HTTP 200 response with Content-Type text/event-stream and Retry header present on every 200 OK"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-2",
+          "US-004"
+        ]
+      },
+      "decomposition_rationale": "Establishes the primary push mechanism defined in the parent. This child binds the implementation to the event bus publisher workflow.",
+      "surfaced_assumption_ids": [
+        "A-0054",
+        "A-0055",
+        "A-0056"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002.C.003-02",
+      "parent_node_id": "US-002.C.003",
+      "root_fr_id": "US-002",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-002.C.003-02",
+        "role": "Configuration",
+        "action": "Enforce maximum polling interval threshold of 5000ms for legacy fallback or connection loss scenarios",
+        "outcome": "Polling frequency does not exceed system battery safety constraints or defined limits",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003-02-02",
+            "description": "Polling interval variable capped at 5 seconds regardless of backend availability.",
+            "measurable_condition": "System clock timer for poll loop is set via config key `polling_interval_max_ms` bounded by 5000"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-2",
+          "US-002.C.001"
+        ]
+      },
+      "decomposition_rationale": "Decides the boundary for polling behavior to prevent excessive battery drain mentioned in parent goal. Traces to latency budget sibling to ensure consistency in update timing.",
+      "surfaced_assumption_ids": [
+        "A-0054",
+        "A-0055",
+        "A-0056"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002.C.003-03",
+      "parent_node_id": "US-002.C.003",
+      "root_fr_id": "US-002",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-002.C.003-03",
+        "role": "Fallback Strategy",
+        "action": "Transition client to polling mode upon detection of SSE stream closure or error",
+        "outcome": "UI continues to reflect state without total disconnect, utilizing polling as failover",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003-02-03",
+            "description": "Client initiates HTTP GET request when SSE stream terminates.",
+            "measurable_condition": "Next HTTP GET request sent to work-order endpoint within 2 seconds of receiving SSE error event"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-2",
+          "US-004"
+        ]
+      },
+      "decomposition_rationale": "Ensures reliability (Service Continuity). Defines the transition logic from push to pull.",
+      "surfaced_assumption_ids": [
+        "A-0054",
+        "A-0055",
+        "A-0056"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-002.C.003-04",
+      "parent_node_id": "US-002.C.003",
+      "root_fr_id": "US-002",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-002.C.003-04",
+        "role": "Optimization",
+        "action": "Adapt polling frequency based on device battery state (Background Fetch mode)",
+        "outcome": "Reduced power consumption on mobile devices for users on low battery",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003-02-04",
+            "description": "Polling interval increases when device battery level is below 20%.",
+            "measurable_condition": "Device Battery API check returns <20% value => Polling interval set to 60s instead of 5s"
+          }
+        ],
+        "priority": "medium",
+        "traces_to": [
+          "UJ-2"
+        ]
+      },
+      "decomposition_rationale": "Addresses 'battery drain' requirement in parent description. Requires OS-specific API interaction.",
+      "surfaced_assumption_ids": [
+        "A-0054",
+        "A-0055",
+        "A-0056"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-003-1.1",
+      "parent_node_id": "US-003-1",
+      "root_fr_id": "US-003",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-003-1.1",
+        "role": "Data Preprocessing",
+        "action": "Extract and validate feature data for WF-8 inference",
+        "outcome": "Clean feature vectors are ready for model consumption",
+        "acceptance_criteria": [
+          {
+            "id": "AC-001",
+            "description": "All required input fields are populated and typed correctly.",
+            "measurable_condition": "input_data.schema_valid === true AND input_data.null_count === 0 at request time"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-3",
+          "WF-8",
+          "ENT-RISK-SCORE"
+        ]
+      },
+      "decomposition_rationale": "Input quality is a prerequisite for accurate WF-8 output; ensures the 'matches WF-8 output' AC is testable by ensuring the input matches expected schema.",
+      "surfaced_assumption_ids": [
+        "A-0057",
+        "A-0058"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-003-1.2",
+      "parent_node_id": "US-003-1",
+      "root_fr_id": "US-003",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-003-1.2",
+        "role": "Inference Execution",
+        "action": "Invoke WF-8 workflow and compute risk probability",
+        "outcome": "Raw predicted probability value generated",
+        "acceptance_criteria": [
+          {
+            "id": "AC-002",
+            "description": "WF-8 workflow executes successfully and returns a value.",
+            "measurable_condition": "wf-8.status === 'completed' AND wf-8.predicted_value IS NOT NULL"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-3",
+          "WF-8",
+          "ENT-RISK-SCORE"
+        ]
+      },
+      "decomposition_rationale": "Direct mapping of the parent's core function 'Invoke Risk Prediction Engine' to a specific implementation step using the named workflow.",
+      "surfaced_assumption_ids": [
+        "A-0057",
+        "A-0058"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-003-1.3",
+      "parent_node_id": "US-003-1",
+      "root_fr_id": "US-003",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-003-1.3",
+        "role": "Latency Enforcement",
+        "action": "Measure and enforce inference response time",
+        "outcome": "Risk score returned within availability budget",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003",
+            "description": "Inference completes within the system availability SLA.",
+            "measurable_condition": "execution_time_ms <= 2000 AND execution_time_ms measured against origin application server clock"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-3",
+          "WF-8",
+          "ENT-RISK-SCORE"
+        ]
+      },
+      "decomposition_rationale": "Addresses the 'acceptable latency' clause in AC-010, utilizing existing A-0010 constraint for availability budget measurement.",
+      "surfaced_assumption_ids": [
+        "A-0057",
+        "A-0058"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-003-1.4",
+      "parent_node_id": "US-003-1",
+      "root_fr_id": "US-003",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-003-1.4",
+        "role": "Persistence",
+        "action": "Commit calculated score to ENT-RISK-SCORE entity",
+        "outcome": "Risk Score entity updated with latest calculation",
+        "acceptance_criteria": [
+          {
+            "id": "AC-004",
+            "description": "Entity ENT-RISK-SCORE reflects the calculated value immediately.",
+            "measurable_condition": "ENT-RISK-SCORE.value === wf-8.predicted_value AFTER commit AND ENT-RISK-SCORE.updated_at >= current_timestamp"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-3",
+          "WF-8",
+          "ENT-RISK-SCORE"
+        ]
+      },
+      "decomposition_rationale": "Addresses the 'so that Risk Score entity... populated' clause. Ensures the output is stored correctly for UI consumption.",
+      "surfaced_assumption_ids": [
+        "A-0057",
+        "A-0058"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-003-1.5",
+      "parent_node_id": "US-003-1",
+      "root_fr_id": "US-003",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-003-1.5",
+        "role": "Accuracy Constraint",
+        "action": "Validate score deviation against ground truth or historical baseline",
+        "outcome": "Ensured score accuracy remains within error margin",
+        "acceptance_criteria": [
+          {
+            "id": "AC-005",
+            "description": "Calculated score deviation from ground truth is within 5%.",
+            "measurable_condition": "abs(ENT-RISK-SCORE.value - ground_truth) / ground_truth < 0.05 when ground_truth is available"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-3",
+          "WF-8",
+          "ENT-RISK-SCORE"
+        ]
+      },
+      "decomposition_rationale": "Addresses the accuracy clause in AC-010. Note: ground_truth availability is an external assumption.",
+      "surfaced_assumption_ids": [
+        "A-0057",
+        "A-0058"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-003-2-1",
+      "parent_node_id": "US-003-2",
+      "root_fr_id": "US-003",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-003-2-1",
+        "role": "Backend Calculation Engine",
+        "action": "Apply debit-credit balancing logic to actuals and budget",
+        "outcome": "Variance metric is mathematically accurate based on committed GL entries",
+        "acceptance_criteria": [
+          {
+            "id": "AC-001",
+            "description": "Variance calculation uses (Sum Actual - Sum Budget)",
+            "measurable_condition": "calc(entropy(actual_spends) - entropy(plan_budget)) === variance_value for all rows at commit time"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-3",
+          "COMP-1"
+        ]
+      },
+      "decomposition_rationale": "Defines the core mathematical strategy for variance, distinct from data sourcing or display.",
+      "surfaced_assumption_ids": [
+        "A-0059"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-003-2-2",
+      "parent_node_id": "US-003-2",
+      "root_fr_id": "US-003",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-003-2-2",
+        "role": "Data Aggregator",
+        "action": "Fetch budget and actual GL records from committed state",
+        "outcome": "System retrieves only posted records for accurate comparison",
+        "acceptance_criteria": [
+          {
+            "id": "AC-002",
+            "description": "GL records used must have status 'Posted'.",
+            "measurable_condition": "query(SELECT * FROM ENT-TRANSACTION WHERE status = 'Posted') for variance computation"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-3",
+          "ENT-TRANSACTION",
+          "ENT-ACCOUNT"
+        ]
+      },
+      "decomposition_rationale": "Separates the data retrieval commitment from the calculation logic; enforces state constraint.",
+      "surfaced_assumption_ids": [
+        "A-0059"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-003-2-3",
+      "parent_node_id": "US-003-2",
+      "root_fr_id": "US-003",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-003-2-3",
+        "role": "Dashboard Renderer",
+        "action": "Inject variance value into ENT-METRIC entity for UI display",
+        "outcome": "Investor UI renders the final Variance metric with correct formatting",
+        "acceptance_criteria": [
+          {
+            "id": "AC-003",
+            "description": "Variance displayed in ENT-METRIC view",
+            "measurable_condition": "GET /dashboard/metrics/US-003-2 returns variance field populated with AC-001 value"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "US-003-3",
+          "UJ-3"
+        ]
+      },
+      "decomposition_rationale": "Maps the calculated metric to the reporting view defined in sibling US-003-3.",
+      "surfaced_assumption_ids": [
+        "A-0059"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-INV-3.1",
+      "parent_node_id": "US-003-3",
+      "root_fr_id": "US-003",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "B",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-INV-3.1",
+        "role": "Scope Definition",
+        "action": "Designate ENT-METRIC as the canonical aggregated view for Investor UI",
+        "outcome": "All combined Risk and Variance data is persisted and retrieved via ENT-METRIC",
+        "acceptance_criteria": [
+          {
+            "id": "AC-012-B",
+            "description": "ENT-METRIC is the single source for the Investor Dashboard view",
+            "measurable_condition": "queries for investor metrics return data from ENT-METRIC.id"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "UJ-3",
+          "ENT-METRIC"
+        ]
+      },
+      "decomposition_rationale": "Establishes the entity scope for the aggregation feature, distinguishing it from the raw data entities.",
+      "surfaced_assumption_ids": [
+        "A-0060"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-INV-3.2",
+      "parent_node_id": "US-003-3",
+      "root_fr_id": "US-003",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-INV-3.2",
+        "role": "Implementation Constraint",
+        "action": "Enforce temporal ordering between dashboard metric and source risk score",
+        "outcome": "Dashboard rejects stale risk scores where metric timestamp <= source last_update",
+        "acceptance_criteria": [
+          {
+            "id": "AC-012-RISK",
+            "description": "Metric timestamp exceeds risk score update time",
+            "measurable_condition": "dashboard_metrics.timestamp > ENT-RISK-SCORE.last_update"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-3",
+          "ENT-RISK-SCORE"
+        ]
+      },
+      "decomposition_rationale": "Implements the first half of AC-012, defining the specific algorithmic verification for data freshness regarding risk data.",
+      "surfaced_assumption_ids": [
+        "A-0060"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "FR-INV-3.3",
+      "parent_node_id": "US-003-3",
+      "root_fr_id": "US-003",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "FR-INV-3.3",
+        "role": "Implementation Constraint",
+        "action": "Enforce temporal ordering between dashboard metric and general ledger sync",
+        "outcome": "Dashboard rejects stale GL data where metric sync timestamp <= account last_posting",
+        "acceptance_criteria": [
+          {
+            "id": "AC-012-GL",
+            "description": "Metric sync timestamp exceeds GL posting time",
+            "measurable_condition": "dashboard_metrics.last_gl_sync > ENT-ACCOUNT.last_posting"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-3",
+          "ENT-ACCOUNT"
+        ]
+      },
+      "decomposition_rationale": "Implements the second half of AC-012, defining the specific algorithmic verification for financial data consistency.",
+      "surfaced_assumption_ids": [
+        "A-0060"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-004-1.1",
+      "parent_node_id": "US-004-1",
+      "root_fr_id": "US-004",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-004-1.1",
+        "role": "Conflict Detector",
+        "action": "Query ENT-SCHEDULE-SLOT records for overlapping time blocks",
+        "outcome": "Return list of conflicting slots for current booking attempt",
+        "acceptance_criteria": [
+          {
+            "id": "AC-007-C1",
+            "description": "All overlapping slots for the technician are retrieved within the request timeout.",
+            "measurable_condition": "Conflict query response time < 200ms and result includes all slots where (start_time <= request_time <= end_time + 30m) AND technician_id matches"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "WF-3",
+          "AC-007"
+        ]
+      },
+      "decomposition_rationale": "The logic to determine *if* a conflict exists is the primary sub-strategy for this requirement; it requires direct database queries into the schedule entity.",
+      "surfaced_assumption_ids": [
+        "A-0061",
+        "A-0062"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-004-1.2",
+      "parent_node_id": "US-004-1",
+      "root_fr_id": "US-004",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "pending",
+      "tier": "C",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-004-1.2",
+        "role": "Time Window Enforcer",
+        "action": "Calculate time difference against the active conflict window (30 minutes)",
+        "outcome": "Determine binary state of 'conflict exists' based on UTC timestamps",
+        "acceptance_criteria": [
+          {
+            "id": "AC-007-C2",
+            "description": "Conflict is flagged only if the proposed slot intersects the existing active window by the configured threshold.",
+            "measurable_condition": "absolute(request_time - slot_start_time) < 30 minutes AND slot_status == active implies conflict == true"
+          }
+        ],
+        "priority": "high",
+        "traces_to": [
+          "WF-3",
+          "AC-007",
+          "UJ-4"
+        ]
+      },
+      "decomposition_rationale": "The policy choice of 30 minutes is a constraint (A-0009), but the implementation of the comparison logic is an implementation commitment requiring a dedicated check.",
+      "surfaced_assumption_ids": [
+        "A-0061",
+        "A-0062"
+      ]
+    },
+    {
+      "kind": "requirement_decomposition_node",
+      "node_id": "US-004-1.3",
+      "parent_node_id": "US-004-1",
+      "root_fr_id": "US-004",
+      "depth": 2,
+      "pass_number": 2,
+      "status": "atomic",
+      "tier": "D",
+      "root_kind": "fr",
+      "user_story": {
+        "id": "US-004-1.3",
+        "role": "Booking Gatekeeper",
+        "action": "Set booking_request.rejected flag and terminate booking flow",
+        "outcome": "Invalid request state persisted, preventing further processing of the booking",
+        "acceptance_criteria": [
+          {
+            "id": "AC-007-C3",
+            "description": "Request cannot transition to 'Confirmed' or 'In Progress' once rejected.",
+            "measurable_condition": "booking_request.rejected == true AND workflow_state != 'confirmed' AND booking_request.id == [request_id]"
+          }
+        ],
+        "priority": "critical",
+        "traces_to": [
+          "UJ-4",
+          "AC-007",
+          "WF-3"
+        ]
+      },
+      "decomposition_rationale": "This is the terminal action (Leaf operation) that enforces the requirement outcome; it changes the request state permanently upon conflict detection.",
+      "surfaced_assumption_ids": [
+        "A-0061",
+        "A-0062"
+      ]
+    }
+  ],
+  "assumption_snapshots": [
+    {
+      "kind": "assumption_set_snapshot",
+      "pass_number": 1,
+      "root_fr_id": "*",
+      "assumptions": [
+        {
+          "id": "A-0001",
+          "text": "Address validation logic relies on property lookup in ENT-PROPERTY rather than strict string format checks alone.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-001",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": []
+        },
+        {
+          "id": "A-0002",
+          "text": "Notification delivery is considered complete upon successful queue insertion, not external email server receipt.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-001",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": []
+        },
+        {
+          "id": "A-0003",
+          "text": "User inbox access requires active ENT-USER session or verified device token.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-001",
+          "surfaced_at_pass": 1,
+          "category": "domain_regime",
+          "citations": []
+        },
+        {
+          "id": "A-0004",
+          "text": "Status update propagation latency budget includes client-side rendering time and network round-trip.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-002",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": []
+        },
+        {
+          "id": "A-0005",
+          "text": "Media items for work orders are decoupled from Work Order state in storage, requiring a join or cache for UI retrieval.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-002",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": []
+        },
+        {
+          "id": "A-0006",
+          "text": "Payment state is independent of evidence availability; evidence is visible regardless of financial posting state.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-002",
+          "surfaced_at_pass": 1,
+          "category": "domain_regime",
+          "citations": []
+        },
+        {
+          "id": "A-0007",
+          "text": "WF-8 Risk Prediction Engine output is treated as the sole source of truth for ENT-RISK-SCORE values.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-003",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": [
+            "WF-8"
+          ]
+        },
+        {
+          "id": "A-0008",
+          "text": "Budget variance calculation requires GL records to be fully posted (committed) before dashboard retrieval.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-003",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": [
+            "COMP-1",
+            "ENT-ACCOUNT"
+          ]
+        },
+        {
+          "id": "A-0009",
+          "text": "The 30-minute conflict window is measured against active slot status, not calendar time alone.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-004",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": [
+            "AC-007"
+          ]
+        },
+        {
+          "id": "A-0010",
+          "text": "The 2-second availability update budget does not include client-side render latency.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-004",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": [
+            "AC-008"
+          ]
+        },
+        {
+          "id": "A-0011",
+          "text": "Technician qualification checks are performed synchronously before candidate generation.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-004",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": [
+            "ENT-TECHNICIAN-QUALIFICATION"
+          ]
+        },
+        {
+          "id": "A-0012",
+          "text": "Evidence storage layer supports object locking or checksum verification on write to prevent modification after initial ingestion.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-005",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": [
+            "UJ-5"
+          ]
+        },
+        {
+          "id": "A-0013",
+          "text": "Mandatory field definitions for evidence are stored in the database schema of ENT-MEDIA-ITEM.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-005",
+          "surfaced_at_pass": 1,
+          "category": "domain_regime",
+          "citations": [
+            "ENT-MEDIA-ITEM"
+          ]
+        },
+        {
+          "id": "A-0014",
+          "text": "Compliance check logic executes synchronously during the upload transaction before the DB transaction commits.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-005",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": [
+            "WF-6",
+            "UJ-5"
+          ]
+        },
+        {
+          "id": "A-0015",
+          "text": "Verification status state change propagation occurs asynchronously relative to UI render time.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-006",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": [
+            "US-006-03"
+          ]
+        },
+        {
+          "id": "A-0016",
+          "text": "Document verification status is derived from WF-6 Safety Compliance Audit completion rather than manual flagging.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-006",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": [
+            "US-006-01"
+          ]
+        },
+        {
+          "id": "A-0017",
+          "text": "Voting weights are assigned uniformly to all Board Members without differentiation by property or class.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-007",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": []
+        },
+        {
+          "id": "A-0018",
+          "text": "Trust Ledger immutable timestamp is generated by the platform's internal clock, not external.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-007",
+          "surfaced_at_pass": 1,
+          "category": "domain_regime",
+          "citations": []
+        },
+        {
+          "id": "A-0019",
+          "text": "The 66.67% threshold is calculated on decimal precision rather than rounded integers.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-007",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": []
+        },
+        {
+          "id": "A-0020",
+          "text": "Repair request submission by a tenant persona implies ownership of the associated Assessment ID within the tenant record.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-008",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": []
+        },
+        {
+          "id": "A-0021",
+          "text": "Comm Channel ID is derived directly from the Association ID via a static configuration lookup.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-008",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": []
+        },
+        {
+          "id": "A-0022",
+          "text": "Tenant view access for repair request fees requires authorization check based on request_submitter_id.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-008",
+          "surfaced_at_pass": 1,
+          "category": "compliance",
+          "citations": []
+        },
+        {
+          "id": "A-0023",
+          "text": "Budget calculation excludes pending transactions not yet committed.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-009",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": []
+        },
+        {
+          "id": "A-0024",
+          "text": "Vendor verification status is evaluated at the moment of PO creation request, not cached from a prior session.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-009",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": []
+        },
+        {
+          "id": "A-0025",
+          "text": "Audit log entry creation happens at the transaction commit boundary to ensure immutability.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-010",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": []
+        },
+        {
+          "id": "A-0026",
+          "text": "Role authorization checks are performed server-side via Cerbos policy engine before data retrieval.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-010",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": [
+            "TECH-13"
+          ]
+        },
+        {
+          "id": "A-0027",
+          "text": "Platform Staff persona requires elevated role privileges ('admin' or 'platform_staff') to query ENT-AUDIT-LOG.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-010",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": [
+            "UJ-10"
+          ]
+        },
+        {
+          "id": "A-0028",
+          "text": "Preventive repair costs are derived from ENT-PRICEBOOK at the moment of alert generation.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-011",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": []
+        },
+        {
+          "id": "A-0029",
+          "text": "Receipt generation pipeline is asynchronous and does not block transaction commit success.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-012",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": [
+            "US-012.2"
+          ]
+        },
+        {
+          "id": "A-0030",
+          "text": "Gateway response parsing is performed synchronously before the ENT-TRANSACTION status update.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-012",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": [
+            "US-012.1"
+          ]
+        },
+        {
+          "id": "A-0031",
+          "text": "Rights owner ID must resolve to an existing ENT-USER or ENT-ASSOCIATION record.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-013",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": [
+            "ENT-USER",
+            "ENT-ASSOCIATION"
+          ]
+        },
+        {
+          "id": "A-0032",
+          "text": "Metadata fields are read-only after transaction commit to maintain audit integrity.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-013",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": [
+            "TECH-25",
+            "COMP-1"
+          ]
+        },
+        {
+          "id": "A-0033",
+          "text": "Upload transaction timing budget allows 10s for ExifTool extraction and write.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-013",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": [
+            "UJ-1",
+            "UJ-5"
+          ]
+        },
+        {
+          "id": "A-0034",
+          "text": "External provider API availability is treated as an out-of-scope dependency not guaranteed by the system.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-014",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": []
+        },
+        {
+          "id": "A-0035",
+          "text": "ENT-METRIC schema must support an 'status' field that accepts 'Active' or 'Inactive' string values.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-014",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": []
+        },
+        {
+          "id": "A-0036",
+          "text": "Authentication tokens must be stored securely and refreshed asynchronously before expiration.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-014",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": []
+        },
+        {
+          "id": "A-0037",
+          "text": "Connection status updates occur at the database commit boundary to ensure consistency with audit logs.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-014",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": []
+        },
+        {
+          "id": "A-0038",
+          "text": "External entity creation does not trigger internal financial journal entry immediately.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-015",
+          "surfaced_at_pass": 1,
+          "category": "scope",
+          "citations": []
+        },
+        {
+          "id": "A-0039",
+          "text": "External vendor authentication relies on mutual TLS or shared secret keys, not standard SSO.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-015",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": []
+        },
+        {
+          "id": "A-0040",
+          "text": "Statutory deadline values are immutable and stored outside the main write path (hardcoded or read-only config) to prevent modification by user workflows.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-016",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": []
+        },
+        {
+          "id": "A-0041",
+          "text": "System clock synchronization (NTP) is maintained within <1 second of UTC for deadline calculations to be legally defensible.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-016",
+          "surfaced_at_pass": 1,
+          "category": "domain_regime",
+          "citations": []
+        },
+        {
+          "id": "A-0042",
+          "text": "Jurisdiction lookup is derived from the Association ID (ENT-ASSOCIATION) linked to the notice, not from the notice creator's location.",
+          "source": "decomposition",
+          "surfaced_at_node": "US-016",
+          "surfaced_at_pass": 1,
+          "category": "constraint",
+          "citations": []
+        }
+      ],
+      "delta_from_previous_pass": 42
+    }
+  ],
+  "audit_records": [],
+  "telemetry": {
+    "total_nodes": 110,
+    "atomic_leaves": 13,
+    "pending": 97,
+    "pruned": 0,
+    "downgraded": 0,
+    "deferred": 0,
+    "by_tier": {
+      "A": 1,
+      "B": 10,
+      "C": 70,
+      "D": 13,
+      "root": 16
+    }
+  }
+}

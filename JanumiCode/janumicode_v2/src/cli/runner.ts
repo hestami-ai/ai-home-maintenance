@@ -126,6 +126,19 @@ export async function runPipeline(
         temperature: 0.5,
       });
     }
+    // Wave 5 — Phase 2 Requirements Agent routing override.
+    //   JANUMICODE_REQUIREMENTS_AGENT_BACKING / _PROVIDER / _MODEL
+    const raBacking = process.env.JANUMICODE_REQUIREMENTS_AGENT_BACKING;
+    if (raBacking) {
+      engine.configManager.setRequirementsAgentRouting({
+        primary: {
+          backing_tool: raBacking,
+          provider: process.env.JANUMICODE_REQUIREMENTS_AGENT_PROVIDER,
+          model: process.env.JANUMICODE_REQUIREMENTS_AGENT_MODEL,
+        },
+        temperature: 0.5,
+      });
+    }
   }
   const detachMonitor = llmMode !== 'mock'
     ? attachLiveMonitor(engine.eventBus, liveLogDir)
@@ -158,8 +171,41 @@ export async function runPipeline(
         throw new Error(`Could not advance to Phase ${targetPhase}. Current: ${run?.current_phase_id}`);
       }
 
-      // Execute the target phase (auto-advance chains to subsequent phases).
-      await engine.executeCurrentPhase(workflowRunId);
+      // Session abort plumbing: create a controller, hand it to the
+      // engine so every LLM call this session makes receives its
+      // signal, and race the phase execution against waitForQuiescence.
+      // On stall detection, abortSession() cancels the in-flight
+      // ollama call, the saturation loop catches the abort, writes a
+      // deferred supersession for the hung node, and executeCurrentPhase
+      // unwinds. Without this, a hung ollama call holds the await
+      // forever and the watchdog can only log (not intervene).
+      const abortController = new AbortController();
+      engine.setSessionAbortController(abortController);
+
+      const mockCapMs = llmMode === 'mock' ? 10000 : null;
+      const stableThreshold = llmMode === 'mock' ? 3 : 100;
+      const recordsIdleStallMs = engine.configManager.get().workflow.records_idle_stall_ms;
+      const phasePromise = engine.executeCurrentPhase(workflowRunId)
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[resume] Phase execution ended: ${msg}`);
+        });
+      const quiescencePromise = waitForQuiescence(engine, db, workflowRunId, {
+        mockCapMs, stableThreshold, recordsIdleStallMs,
+      }).then(() => {
+        // Stall detected or workflow completed — abort any in-flight
+        // LLM call so the phase promise unwinds. The abortSession call
+        // is a no-op if nothing is in flight, so this is safe in the
+        // clean-completion case too.
+        engine.abortSession('waitForQuiescence exited (stall or completion)');
+      });
+      await Promise.race([phasePromise, quiescencePromise]);
+      // After race wins, give the other side ~3 seconds to unwind
+      // (HTTP abort → saturation loop catch → supersession write).
+      await Promise.race([
+        Promise.all([phasePromise, quiescencePromise]),
+        new Promise<void>((r) => setTimeout(r, 3000)),
+      ]);
     } else {
       // ── Normal mode: full pipeline from intent ──
       const headlessConfig: HeadlessLiaisonConfig = {
@@ -177,11 +223,25 @@ export async function runPipeline(
       const result = await headlessAdapter.bootstrapIntent(headlessConfig);
       workflowRunId = result.workflowRunId;
 
-      // Wait for quiescence (fire-and-forget phases to complete).
-      const timeout = llmMode === 'mock' ? 10000 : 3600000;
+      // Wait for quiescence. No wall-clock cap in real mode — we
+      // exit when the workflow reports completed/failed OR the stream
+      // goes silent for `records_idle_stall_ms` (default 15 min) which
+      // is the real "something is stuck" signal. Mock mode retains a
+      // short safety cap because mock runs should complete in seconds.
+      // Session abort: plumb a controller so stall detection can
+      // cancel any in-flight LLM call (same pattern as resume mode).
+      const abortController = new AbortController();
+      engine.setSessionAbortController(abortController);
+      const mockCapMs = 10000;
       const stableThreshold = llmMode === 'mock' ? 3 : 100;
+      const recordsIdleStallMs = engine.configManager.get().workflow.records_idle_stall_ms;
       if (workflowRunId) {
-        await waitForQuiescence(engine, db, workflowRunId, timeout, stableThreshold);
+        await waitForQuiescence(engine, db, workflowRunId, {
+          mockCapMs: llmMode === 'mock' ? mockCapMs : null,
+          stableThreshold,
+          recordsIdleStallMs,
+        });
+        engine.abortSession('waitForQuiescence exited (stall or completion)');
       }
     }
 
@@ -379,65 +439,132 @@ function findLatestRunId(db: Database): string | null {
  * hasn't changed for `phaseStallMs` while a phase is supposedly running,
  * we declare a stall and exit (the phase handler likely errored silently).
  */
+interface QuiescenceOptions {
+  /**
+   * Hard wall-clock cap in ms. When null, no wall-clock cap — the loop
+   * runs until the workflow completes/fails or the stream goes silent
+   * for `recordsIdleStallMs`. Set to a short value (e.g. 10s) for mock
+   * mode where runs should finish in seconds.
+   */
+  mockCapMs: number | null;
+  /**
+   * Polls of same-subphase + no-in-flight + no-pending-decisions
+   * required before declaring graceful quiescence.
+   */
+  stableThreshold: number;
+  /**
+   * Records-idle stall threshold. If no new governed_stream record
+   * has been written for this long, declare the run stalled and exit
+   * even while counters show a phase "executing" or an LLM call
+   * "in-flight" — those can hang invisibly. Pending human decisions
+   * suspend the check (waiting for a gate submit is not a stall).
+   */
+  recordsIdleStallMs: number;
+}
+
+interface QuiescenceLoopState {
+  lastSubPhase: string | null | undefined;
+  stableCount: number;
+  lastRecordCount: number;
+  lastProgressAt: number;
+  lastHeartbeatAt: number;
+}
+
+/**
+ * Decide what the loop should do this tick. Extracted to keep
+ * waitForQuiescence's cognitive complexity within bounds.
+ * Returns 'done' to exit the loop, 'continue' to poll again, or
+ * 'tick' to fall through to the graceful-quiescence check.
+ */
+function evaluateQuiescenceTick(
+  engine: OrchestratorEngine,
+  run: { status: string; current_phase_id: string | null; current_sub_phase_id: string | null },
+  state: QuiescenceLoopState,
+  currentRecordCount: number,
+  pendingCount: number,
+  opts: QuiescenceOptions,
+): 'done' | 'continue' | 'tick' {
+  if (run.status === 'completed' || run.status === 'failed' || run.status === 'rolled_back') {
+    return 'done';
+  }
+  const timeSinceProgress = Date.now() - state.lastProgressAt;
+
+  if (Date.now() - state.lastHeartbeatAt >= 60000) {
+    console.warn(
+      `[waitForQuiescence] heartbeat: records=${currentRecordCount} ` +
+      `idle=${(timeSinceProgress / 1000).toFixed(0)}s ` +
+      `phase=${run.current_phase_id}/${run.current_sub_phase_id ?? '-'} ` +
+      `executing=${engine.executingPhaseCount} in_flight=${engine.llmCaller.inFlightCount} ` +
+      `pending_decisions=${pendingCount}`,
+    );
+    state.lastHeartbeatAt = Date.now();
+  }
+
+  if (timeSinceProgress > opts.recordsIdleStallMs && pendingCount === 0) {
+    console.warn(
+      `[waitForQuiescence] Records-idle stall: no new records for ` +
+      `${(timeSinceProgress / 1000).toFixed(0)}s ` +
+      `(executing=${engine.executingPhaseCount}, in_flight=${engine.llmCaller.inFlightCount}). ` +
+      `Treating as stuck and exiting.`,
+    );
+    return 'done';
+  }
+
+  if (engine.executingPhaseCount > 0 || engine.llmCaller.inFlightCount > 0) {
+    state.stableCount = 0;
+    return 'continue';
+  }
+  return 'tick';
+}
+
 async function waitForQuiescence(
   engine: OrchestratorEngine,
   db: Database,
   runId: string,
-  timeoutMs: number,
-  stableThreshold = 3,
+  opts: QuiescenceOptions,
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  const phaseStallMs = 600000; // 10 min with no new records = stalled
-  let lastSubPhase: string | null | undefined = undefined;
-  let stableCount = 0;
-  let lastRecordCount = getRecordCount(db, runId);
-  let lastProgressAt = Date.now();
+  const mockDeadline = opts.mockCapMs ? Date.now() + opts.mockCapMs : null;
+  const state: QuiescenceLoopState = {
+    lastSubPhase: undefined,
+    stableCount: 0,
+    lastRecordCount: getRecordCount(db, runId),
+    lastProgressAt: Date.now(),
+    lastHeartbeatAt: Date.now(),
+  };
 
-  while (Date.now() < deadline) {
+  while (true) {
+    if (mockDeadline !== null && Date.now() > mockDeadline) {
+      console.warn(`[waitForQuiescence] Mock-mode cap ${(opts.mockCapMs! / 1000).toFixed(0)}s reached — exiting`);
+      return;
+    }
+
     const run = engine.stateMachine.getWorkflowRun(runId);
     if (!run) return;
-    if (run.status === 'completed' || run.status === 'failed' || run.status === 'rolled_back') {
-      return;
-    }
 
-    // Check progress: are new records being written?
     const currentRecordCount = getRecordCount(db, runId);
-    if (currentRecordCount > lastRecordCount) {
-      lastRecordCount = currentRecordCount;
-      lastProgressAt = Date.now();
+    if (currentRecordCount > state.lastRecordCount) {
+      state.lastRecordCount = currentRecordCount;
+      state.lastProgressAt = Date.now();
     }
+    const pendingCount = (engine as unknown as { pendingDecisions: Map<string, unknown> }).pendingDecisions?.size ?? 0;
 
-    // Stall detection: if nothing has been written for phaseStallMs and
-    // there's no active work, the pipeline is stuck.
-    const timeSinceProgress = Date.now() - lastProgressAt;
-    if (timeSinceProgress > phaseStallMs
-        && engine.executingPhaseCount === 0
-        && engine.llmCaller.inFlightCount === 0) {
-      console.warn(`[waitForQuiescence] Stall detected: no new records for ${(timeSinceProgress / 1000).toFixed(0)}s`);
-      return;
-    }
-
-    // Never declare quiescence while phases are executing or LLM calls
-    // are in-flight.
-    if (engine.executingPhaseCount > 0 || engine.llmCaller.inFlightCount > 0) {
-      stableCount = 0;
+    const decision = evaluateQuiescenceTick(engine, run, state, currentRecordCount, pendingCount, opts);
+    if (decision === 'done') return;
+    if (decision === 'continue') {
       await new Promise((r) => setTimeout(r, 50));
       continue;
     }
 
-    const pendingCount = (engine as unknown as { pendingDecisions: Map<string, unknown> }).pendingDecisions?.size ?? 0;
-    if (run.current_sub_phase_id === lastSubPhase && pendingCount === 0) {
-      stableCount++;
-      if (stableCount >= stableThreshold) return;
+    // 'tick' — graceful quiescence check: same sub-phase N times + no pending decisions.
+    if (run.current_sub_phase_id === state.lastSubPhase && pendingCount === 0) {
+      state.stableCount++;
+      if (state.stableCount >= opts.stableThreshold) return;
     } else {
-      stableCount = 0;
-      lastSubPhase = run.current_sub_phase_id;
+      state.stableCount = 0;
+      state.lastSubPhase = run.current_sub_phase_id;
     }
-
     await new Promise((r) => setTimeout(r, 50));
   }
-
-  console.warn(`[waitForQuiescence] Timeout after ${(timeoutMs / 1000).toFixed(0)}s`);
 }
 
 function getRecordCount(db: Database, runId: string): number {

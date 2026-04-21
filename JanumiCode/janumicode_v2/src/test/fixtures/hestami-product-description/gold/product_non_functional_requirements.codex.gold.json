@@ -1,0 +1,267 @@
+{
+  "kind": "non_functional_requirements",
+  "requirements": [
+    {
+      "id": "NFR-001",
+      "category": "security",
+      "description": "Public web ingress shall be exposed only through the approved CDN edge, with no alternate public entry path for application endpoints.",
+      "threshold": "100% of externally reachable production HTTP and HTTPS application endpoints resolve through the approved CDN; zero alternate public ingress endpoints are reachable in quarterly external reachability tests.",
+      "measurement_method": "Network ingress configuration review and quarterly external reachability scanning of public endpoints.",
+      "traces_to": [
+        "VV-1",
+        "TECH-2"
+      ]
+    },
+    {
+      "id": "NFR-002",
+      "category": "security",
+      "description": "All CDN-to-origin connections shall use encrypted transport.",
+      "threshold": "100% of production CDN-to-origin connections negotiate TLS 1.2 or higher; zero plaintext origin connections are observed in configuration review or transport validation tests.",
+      "measurement_method": "Ingress proxy and edge configuration review plus transport security validation on origin connections.",
+      "traces_to": [
+        "VV-2",
+        "TECH-3",
+        "QA-5"
+      ]
+    },
+    {
+      "id": "NFR-003",
+      "category": "security",
+      "description": "Direct client access to origin infrastructure shall be blocked.",
+      "threshold": "0 direct client connections to the origin IP succeed from external probes across HTTP, HTTPS, and known application ports in quarterly perimeter tests.",
+      "measurement_method": "External network probing and firewall or proxy rule inspection against origin IP exposure.",
+      "traces_to": [
+        "VV-3",
+        "TECH-4"
+      ]
+    },
+    {
+      "id": "NFR-004",
+      "category": "security",
+      "description": "All application reads and writes shall enforce tenant-scoped isolation at the data layer, and cross-tenant access attempts shall be denied and audit logged.",
+      "threshold": "100% of cross-tenant read and write authorization tests fail at the database policy layer; 100% of denied cross-tenant attempts create an audit event with actor, tenant context, target, and timestamp.",
+      "measurement_method": "PostgreSQL schema and policy inspection, automated authorization tests across tenant boundaries, and audit-log verification.",
+      "traces_to": [
+        "VV-4",
+        "TECH-12",
+        "QA-1",
+        "COMP-2"
+      ]
+    },
+    {
+      "id": "NFR-005",
+      "category": "security",
+      "description": "Delegated authority and role-based authorization changes shall be scope-bounded, time-bounded, revocable, and reflected promptly in authorization decisions.",
+      "threshold": "100% of delegated actions record both acting user and represented principal; 100% of out-of-scope or expired delegated actions are denied; newly issued authorization decisions reflect permission or role changes within 60 seconds of commit in 99.9% of trials.",
+      "measurement_method": "Authorization integration tests covering grant, revoke, expiry, scope boundaries, and permission propagation timing.",
+      "traces_to": [
+        "QA-2",
+        "QA-3"
+      ]
+    },
+    {
+      "id": "NFR-006",
+      "category": "security",
+      "description": "Customer-uploaded documents and media shall be encrypted at rest, and all client-facing network traffic carrying authentication tokens, payment references, PII, or case content shall use modern TLS.",
+      "threshold": "100% of stored customer-uploaded documents and media are encrypted at rest with KMS-backed keys; 100% of client-facing sessions carrying sensitive content negotiate TLS 1.2 or higher; zero plaintext exceptions in monthly control review.",
+      "measurement_method": "Storage encryption configuration inspection, object-sample verification, and transport security scans of client-facing endpoints.",
+      "traces_to": [
+        "QA-4",
+        "QA-5"
+      ]
+    },
+    {
+      "id": "NFR-007",
+      "category": "security",
+      "description": "Search, document retrieval, and entity-level views shall enforce record visibility based on authorized property, community, case, and role scope.",
+      "threshold": "100% of unauthorized retrieval attempts for documents and indexed search results are denied in authorization regression tests; zero unauthorized records appear in sampled search results across supported roles.",
+      "measurement_method": "Access-control regression suite across search and retrieval endpoints plus seeded visibility test datasets.",
+      "traces_to": [
+        "QA-15"
+      ]
+    },
+    {
+      "id": "NFR-008",
+      "category": "performance",
+      "description": "Authenticated interactive read APIs shall meet low-latency response targets under normal operating load.",
+      "threshold": "p95 server response time for authenticated interactive read operations is 500 ms or less over rolling 5-minute windows at normal operating load.",
+      "measurement_method": "Server-side timing histograms with synthetic and production-load sampling, backed by SLO alerting.",
+      "traces_to": [
+        "QA-7"
+      ]
+    },
+    {
+      "id": "NFR-009",
+      "category": "performance",
+      "description": "AI-assisted intake normalization shall complete within a user-visible latency budget for typical homeowner submissions.",
+      "threshold": "p95 end-user visible completion time is 15 seconds or less for intake submissions containing up to 10 attachments under normal operating load.",
+      "measurement_method": "End-to-end synthetic intake benchmarks and production transaction timing for normalized submission flows.",
+      "traces_to": [
+        "QA-8"
+      ]
+    },
+    {
+      "id": "NFR-010",
+      "category": "reliability",
+      "description": "Outbound messaging state shall be persisted promptly after provider delivery callbacks are received.",
+      "threshold": "95% of outbound email and SMS delivery-status updates are persisted within 2 minutes of provider callback receipt, and 99.9% within 10 minutes.",
+      "measurement_method": "Callback-to-persistence latency instrumentation and periodic reconciliation of provider callback logs against stored message state.",
+      "traces_to": [
+        "QA-9"
+      ]
+    },
+    {
+      "id": "NFR-011",
+      "category": "reliability",
+      "description": "Workflow-driven payment, messaging, provider-sync, and other multi-step operations shall be idempotent, monotonic, and recoverable from integration failures without losing the primary case record.",
+      "threshold": "100% of tested replayed operations with the same idempotency key produce a single business outcome; 100% of tested state transitions follow the defined monotonic path; 100% of simulated integration failures leave the primary case record intact and place the external action in retry or manual-review state.",
+      "measurement_method": "Workflow engine behavior tests on repeated execution, failure-injection scenarios, and state-transition audit review.",
+      "traces_to": [
+        "VV-5",
+        "QA-10",
+        "QA-11",
+        "TECH-1",
+        "TECH-11"
+      ]
+    },
+    {
+      "id": "NFR-012",
+      "category": "durability",
+      "description": "Scheduling events and core transactional records shall be durably persisted and recoverable within the defined data-loss objective.",
+      "threshold": "100% of committed scheduling events are durably recorded before workflow completion acknowledgement; demonstrated recovery point objective for core transactional data is 15 minutes or less in disaster-recovery exercises.",
+      "measurement_method": "Scheduling event persistence tests, workflow storage inspection, backup and restore validation, and quarterly disaster-recovery drills.",
+      "traces_to": [
+        "VV-7",
+        "TECH-25",
+        "QA-12",
+        "COMP-2"
+      ]
+    },
+    {
+      "id": "NFR-013",
+      "category": "availability",
+      "description": "Core case management, portal access, and messaging workflows shall be restorable within the defined service recovery objective after a major outage.",
+      "threshold": "Demonstrated recovery time objective is 4 hours or less for restoration of case management, portal access, and messaging workflows in quarterly disaster-recovery exercises.",
+      "measurement_method": "Quarterly disaster-recovery drills with timed restoration checkpoints for the defined workflow set.",
+      "traces_to": [
+        "QA-13"
+      ]
+    },
+    {
+      "id": "NFR-014",
+      "category": "reliability",
+      "description": "Mobile field operations shall remain usable in low-connectivity conditions through offline queuing and safe synchronization.",
+      "threshold": "100% of tested offline job updates, notes, photos, and status changes are queued locally when connectivity is unavailable and synchronize within 5 minutes of reconnect in 95% of degraded-connectivity test runs, with zero duplicate records or backward state transitions.",
+      "measurement_method": "Native mobile offline and degraded-connectivity scenario tests covering queued operations and synchronization outcomes.",
+      "traces_to": [
+        "VV-8",
+        "TECH-9"
+      ]
+    },
+    {
+      "id": "NFR-015",
+      "category": "accessibility",
+      "description": "Board, resident, and homeowner portals shall conform to WCAG 2.1 AA for keyboard navigation, color contrast, and screen-reader support.",
+      "threshold": "100% of critical user journeys pass WCAG 2.1 AA automated checks with no Sev-1 accessibility defects, and all manual audit findings blocking keyboard-only or screen-reader completion are remediated before release.",
+      "measurement_method": "Automated accessibility scanning plus manual keyboard and screen-reader audits on release candidates.",
+      "traces_to": [
+        "QA-14",
+        "TECH-8"
+      ]
+    },
+    {
+      "id": "NFR-016",
+      "category": "auditability",
+      "description": "Case workflows, approvals, communications, admin actions, and payment state changes shall produce immutable audit history retained for long-term review.",
+      "threshold": "100% of case status changes, approvals, admin actions, workflow actions, communications, and payment state changes create immutable audit events; audit records are retained for at least 7 years; zero tested delete or update operations can alter finalized audit entries.",
+      "measurement_method": "Workflow history inspection, audit-log integrity tests, retention-policy verification, and tamper-resistance testing.",
+      "traces_to": [
+        "VV-9",
+        "QA-6",
+        "QA-18",
+        "COMP-10",
+        "COMP-12"
+      ]
+    },
+    {
+      "id": "NFR-017",
+      "category": "auditability",
+      "description": "Financial records shall maintain an auditable general ledger structure with currency-safe precision and full allocation traceability.",
+      "threshold": "100% of posted financial events create balanced ledger entries traceable to source business records; 100% of stored and computed externally visible monetary amounts use fixed-point decimal precision; 100% of payment allocations are reconstructable from immutable history.",
+      "measurement_method": "Accounting data model inspection, ledger traceability tests, precision-validation tests, and financial audit sampling.",
+      "traces_to": [
+        "VV-6",
+        "QA-16",
+        "COMP-1",
+        "COMP-6",
+        "COMP-11"
+      ]
+    },
+    {
+      "id": "NFR-018",
+      "category": "compliance",
+      "description": "Configured statutory deadlines and required notices shall be computed, tracked, and evidenced so compliance obligations are not missed.",
+      "threshold": "100% of records subject to configured statutory deadlines or notice requirements receive a due date, status, and responsible party; 100% of required notices record issuance timestamp and delivery status; 0 overdue statutory items lack an alert in compliance regression tests.",
+      "measurement_method": "Rules-engine validation against representative compliance scenarios, deadline-monitoring tests, and notice trail inspection.",
+      "traces_to": [
+        "COMP-3",
+        "COMP-4",
+        "COMP-13"
+      ]
+    },
+    {
+      "id": "NFR-019",
+      "category": "compliance",
+      "description": "Board voting workflows shall enforce configured eligibility, quorum, and outcome rules and preserve evidence of the final result.",
+      "threshold": "100% of voting regression scenarios enforce configured voter eligibility and quorum rules before a result is finalized; 100% of finalized vote outcomes retain voter responses, timestamps, and outcome calculation evidence.",
+      "measurement_method": "Governance workflow rule tests using representative board voting scenarios and audit-trail verification.",
+      "traces_to": [
+        "COMP-5"
+      ]
+    },
+    {
+      "id": "NFR-020",
+      "category": "compliance",
+      "description": "Resale packet workflows shall produce complete, traceable records aligned to configured packet requirements and delivery obligations.",
+      "threshold": "100% of generated resale packets include all configured required artifacts before release; 100% of packet releases record issuer, timestamp, included artifacts, and recipient or delivery event.",
+      "measurement_method": "Packet completeness validation against configured requirements and release-audit inspection.",
+      "traces_to": [
+        "COMP-7"
+      ]
+    },
+    {
+      "id": "NFR-021",
+      "category": "compliance",
+      "description": "Provider qualification and regulatory-compliance data used for matching or scheduling shall be current, provenance-tagged, and capable of blocking non-compliant work.",
+      "threshold": "100% of externally sourced qualification records include source provenance and last-verified timestamp before influencing matching recommendations; 100% of tested providers missing required active qualifications are blocked from schedulable appointment states; compliance alerts for expirations or non-compliant status changes are generated within 1 workflow run.",
+      "measurement_method": "Qualification data inspection, matching and scheduling rule tests, and alert-generation workflow tests.",
+      "traces_to": [
+        "QA-19",
+        "COMP-8",
+        "COMP-9"
+      ]
+    },
+    {
+      "id": "NFR-022",
+      "category": "observability",
+      "description": "The platform shall expose operational telemetry and compliance evidence sufficient to detect performance regressions and audit control failures without impairing transactional workflows.",
+      "threshold": "100% of critical APIs, workflow executions, messaging callbacks, and compliance-alert jobs emit trace, metric, and error telemetry with correlated identifiers; reporting snapshot refresh jobs add no more than 5% latency overhead to transactional p95 response time during scheduled runs.",
+      "measurement_method": "Telemetry coverage review, trace sampling, metrics dashboard inspection, and controlled load tests during reporting snapshot refreshes.",
+      "traces_to": [
+        "QA-20",
+        "TECH-17",
+        "COMP-10"
+      ]
+    },
+    {
+      "id": "NFR-023",
+      "category": "reliability",
+      "description": "Scheduled appointments and related participant-facing times shall be stored and rendered with correct timezone semantics.",
+      "threshold": "100% of appointment records store timezone-aware timestamps; 100% of tested participant views render appointment time correctly for the participant profile timezone or property timezone across daylight-saving transitions.",
+      "measurement_method": "Data-model inspection and automated timezone rendering tests across supported locales and daylight-saving boundaries.",
+      "traces_to": [
+        "QA-17"
+      ]
+    }
+  ]
+}

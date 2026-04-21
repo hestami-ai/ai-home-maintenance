@@ -12,7 +12,7 @@
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
 import type { PhaseId } from '../../types/records';
 import { getLogger } from '../../logging';
-import { extractPriorPhaseContext } from './phaseContext';
+import { extractPriorPhaseContext, buildEffectiveFrView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
@@ -62,13 +62,19 @@ export class Phase7Handler implements PhaseHandler {
     const allArtifacts = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
     const prior = extractPriorPhaseContext(allArtifacts);
 
-    const frSummary = prior.functionalRequirements?.summary ?? 'No functional requirements available';
+    // Wave 6 — prefer frozen leaves when Phase 2.1a produced a
+    // decomposition tree; fall back to root FRs otherwise. Test coverage
+    // benefits most from the leaf-level AC set because each leaf carries
+    // individually-testable acceptance criteria.
+    const decompositionNodes = engine.writer.getRecordsByType(workflowRun.id, 'requirement_decomposition_node');
+    const frView = buildEffectiveFrView(decompositionNodes, prior);
+    const frSummary = frView.summary;
     const planSummary = prior.implementationPlan?.summary ?? 'No implementation plan available';
     const componentSummary = prior.componentModel?.summary ?? 'No component model available';
 
     // Collect all acceptance criterion IDs for coverage analysis
     const allAcIds: string[] = [];
-    const frStories = (prior.functionalRequirements?.content.user_stories as Array<Record<string, unknown>>) ?? [];
+    const frStories = frView.stories;
     for (const story of frStories) {
       for (const ac of (story.acceptance_criteria as Array<Record<string, unknown>>) ?? []) {
         if (ac.id) allAcIds.push(ac.id as string);

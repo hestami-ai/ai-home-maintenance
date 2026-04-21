@@ -11,10 +11,12 @@
         "required": ["id", "category", "description", "threshold"],
         "properties": {
           "id": { "type": "string" },
-          "category": { "type": "string", "enum": ["performance", "security", "reliability", "scalability", "accessibility", "maintainability"] },
+          "category": { "type": "string", "enum": ["performance", "security", "reliability", "scalability", "accessibility", "maintainability", "availability", "durability", "auditability", "observability", "compliance"] },
           "description": { "type": "string" },
           "threshold": { "type": "string" },
-          "measurement_method": { "type": "string" }
+          "measurement_method": { "type": "string" },
+          "traces_to": { "type": "array", "items": { "type": "string" } },
+          "applies_to_requirements": { "type": "array", "items": { "type": "string" } }
         }
       }
     }

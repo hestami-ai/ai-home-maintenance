@@ -1,0 +1,442 @@
+{
+  "kind": "functional_requirements",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "role": "Homeowner",
+      "action": "initiate property onboarding with address details",
+      "outcome": "Hestami maintains persistent property context for all service coordination",
+      "acceptance_criteria": [
+        {
+          "id": "AC-001",
+          "description": "Property record is created in active state",
+          "measurable_condition": "POST /properties returns 201 and GET /properties/{id} returns the stored record within 1 second"
+        },
+        {
+          "id": "AC-002",
+          "description": "Address matches utility records for verification",
+          "measurable_condition": "System validates address against utility feed before activating property record"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-1",
+        "ENT-PROPERTY",
+        "ENT-ADDRESS-LOC"
+      ]
+    },
+    {
+      "id": "US-002",
+      "role": "Homeowner",
+      "action": "attach initial key photos to property record",
+      "outcome": "Property is fully documented upon creation",
+      "acceptance_criteria": [
+        {
+          "id": "AC-003",
+          "description": "Image files are stored and linked",
+          "measurable_condition": "POST /properties/{id}/assets returns 201 when image size < 10MB"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-1",
+        "ENT-DIGITAL-FILE"
+      ]
+    },
+    {
+      "id": "US-003",
+      "role": "Homeowner",
+      "action": "create a new service request for maintenance",
+      "outcome": "Request moves to pending status in the Work Order queue",
+      "acceptance_criteria": [
+        {
+          "id": "AC-004",
+          "description": "Request status updates to pending",
+          "measurable_condition": "GET /requests/{id} returns status 'pending' within 5 seconds of submission"
+        },
+        {
+          "id": "AC-005",
+          "description": "Photos are attached to request",
+          "measurable_condition": "Request object contains non-empty image asset array"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-2",
+        "ENT-REQUEST",
+        "ENT-DIGITAL-FILE"
+      ]
+    },
+    {
+      "id": "US-004",
+      "role": "System (AI)",
+      "action": "generate AI vendor match suggestions for request",
+      "outcome": "Top vendors are notified with matching scores above threshold",
+      "acceptance_criteria": [
+        {
+          "id": "AC-006",
+          "description": "Matching score exceeds 80% for top suggestions",
+          "measurable_condition": "Response object includes 'match_score' > 80 for at least 3 vendors"
+        },
+        {
+          "id": "AC-007",
+          "description": "Matching notification is sent",
+          "measurable_condition": "Vendor receives push notification or email within 10 minutes of request creation"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-5",
+        "WF-2",
+        "ENT-MATCH-SUGGESTION"
+      ]
+    },
+    {
+      "id": "US-005",
+      "role": "Service Provider",
+      "action": "complete vendor onboarding with certifications",
+      "outcome": "Vendor organization is active in the marketplace",
+      "acceptance_criteria": [
+        {
+          "id": "AC-008",
+          "description": "Vendor profile is published",
+          "measurable_condition": "GET /vendors/{id} returns complete profile with 'status' = 'active'"
+        },
+        {
+          "id": "AC-009",
+          "description": "Certifications are stored",
+          "measurable_condition": "Vendor profile contains verified insurance and license documents"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-3",
+        "WF-2",
+        "ENT-VENDOR-ORG",
+        "ENT-VENDOR-CERT",
+        "COMP-3"
+      ]
+    },
+    {
+      "id": "US-006",
+      "role": "Service Provider",
+      "action": "submit a formal estimate for a Work Order",
+      "outcome": "Quoting calculator generates a formal quote with clear terms",
+      "acceptance_criteria": [
+        {
+          "id": "AC-010",
+          "description": "Estimate is generated accurately",
+          "measurable_condition": "POST /estimates returns 201 with line items matching pricebook"
+        },
+        {
+          "id": "AC-011",
+          "description": "Terms are legally clear",
+          "measurable_condition": "Estimate text contains disclaimer and liability clauses"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-3",
+        "WF-4",
+        "ENT-ESTIMATE",
+        "VOC-12"
+      ]
+    },
+    {
+      "id": "US-007",
+      "role": "Service Provider",
+      "action": "perform work and log completion on field device",
+      "outcome": "Job is marked complete and invoice is generated",
+      "acceptance_criteria": [
+        {
+          "id": "AC-012",
+          "description": "Job status updates to closed",
+          "measurable_condition": "Work Order status changes to 'complete' upon photo upload or GPS check-in"
+        },
+        {
+          "id": "AC-013",
+          "description": "Invoice is generated",
+          "measurable_condition": "POST /jobs/{id}/close triggers invoice generation in < 2 seconds"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-4",
+        "WF-5",
+        "ENT-JOB-TASK",
+        "ENT-INVOICE"
+      ]
+    },
+    {
+      "id": "US-008",
+      "role": "Service Provider",
+      "action": "update field data with connectivity loss",
+      "outcome": "No data loss occurs during offline operation",
+      "acceptance_criteria": [
+        {
+          "id": "AC-014",
+          "description": "Offline indicators clear after sync",
+          "measurable_condition": "Sync completes successfully and queue is empty within 30 minutes of connectivity"
+        },
+        {
+          "id": "AC-015",
+          "description": "No data loss",
+          "measurable_condition": "GET /requests shows identical data before and after sync"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-7",
+        "ENT-SYNC-STATE-LOCAL"
+      ]
+    },
+    {
+      "id": "US-009",
+      "role": "CAM Manager",
+      "action": "upload meeting documents and agendas",
+      "outcome": "Documents are accessible to Board with permissions enforced",
+      "acceptance_criteria": [
+        {
+          "id": "AC-016",
+          "description": "Document accessible to Board",
+          "measurable_condition": "GET /docs/{id} returns 200 for Board Role, 403 for Member Role"
+        },
+        {
+          "id": "AC-017",
+          "description": "Audit trail logged",
+          "measurable_condition": "WF-8 captures the upload event in audit log"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-8",
+        "WF-6",
+        "ENT-DOC-VERSION"
+      ]
+    },
+    {
+      "id": "US-010",
+      "role": "CAM Manager",
+      "action": "log a code violation for non-compliance",
+      "outcome": "Violation is linked to property and resolution timeline tracked",
+      "acceptance_criteria": [
+        {
+          "id": "AC-018",
+          "description": "Violation linked to property",
+          "measurable_condition": "GET /violations/{id} returns associated property UUID"
+        },
+        {
+          "id": "AC-019",
+          "description": "Notification sent",
+          "measurable_condition": "Violation status 'reported' triggers notification to Owner within 5 minutes"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-9",
+        "WF-7",
+        "ENT-COMPLIANCE-VIOLATION"
+      ]
+    },
+    {
+      "id": "US-011",
+      "role": "Board Member",
+      "action": "cast vote on annual budget",
+      "outcome": "Votes are recorded immutably and budget status reflected",
+      "acceptance_criteria": [
+        {
+          "id": "AC-020",
+          "description": "Vote recorded immutably",
+          "measurable_condition": "Audit log entry is cryptographically signed"
+        },
+        {
+          "id": "AC-021",
+          "description": "Budget status reflected",
+          "measurable_condition": "GET /budgets/{id} shows vote tallies immediately"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-10",
+        "COMP-2",
+        "ENT-LEDGER-ENTRY"
+      ]
+    },
+    {
+      "id": "US-012",
+      "role": "System (Integration)",
+      "action": "sync government permit status via API",
+      "outcome": "Permit record matches official government record",
+      "acceptance_criteria": [
+        {
+          "id": "AC-022",
+          "description": "Status matches official record",
+          "measurable_condition": "GET /permits/{id} returns 'active' if external API reports 'active'"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-11",
+        "WF-10",
+        "ENT-GOV-PERMIT",
+        "COMP-3"
+      ]
+    },
+    {
+      "id": "US-013",
+      "role": "Landlord",
+      "action": "download warranty documents and guides",
+      "outcome": "Digital assets are retrieved securely with access logs updated",
+      "acceptance_criteria": [
+        {
+          "id": "AC-023",
+          "description": "Download successful",
+          "measurable_condition": "GET /assets/{id}/download returns 200 within 2 seconds"
+        },
+        {
+          "id": "AC-024",
+          "description": "Access logs updated",
+          "measurable_condition": "GET /audit-logs returns entry for file access request"
+        }
+      ],
+      "priority": "normal",
+      "traces_to": [
+        "UJ-14",
+        "ENT-DIGITAL-FILE",
+        "ENT-AUDIT-LOG-EVENT"
+      ]
+    },
+    {
+      "id": "US-014",
+      "role": "Admin",
+      "action": "export system logs for compliance review",
+      "outcome": "Logs are immutable and contain all state changes",
+      "acceptance_criteria": [
+        {
+          "id": "AC-025",
+          "description": "Logs are immutable",
+          "measurable_condition": "POST /logs/export returns read-only archive with integrity hash"
+        },
+        {
+          "id": "AC-026",
+          "description": "Access restricted to Admin",
+          "measurable_condition": "GET /logs exports return 403 for non-admin roles"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-15",
+        "WF-8",
+        "COMP-1",
+        "ENT-AUDIT-LOG-EVENT"
+      ]
+    },
+    {
+      "id": "US-015",
+      "role": "System (RLS)",
+      "action": "enforce multi-tenant isolation at database level",
+      "outcome": "Row-level security prevents data leakage between tenants",
+      "acceptance_criteria": [
+        {
+          "id": "AC-027",
+          "description": "RLS enforced",
+          "measurable_condition": "SQL query on tenant A cannot retrieve tenant B data"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "COMP-5",
+        "COMP-4"
+      ]
+    },
+    {
+      "id": "US-016",
+      "role": "System (Tax)",
+      "action": "calculate tax liability based on jurisdiction",
+      "outcome": "Tax compliance is met for ledger entries",
+      "acceptance_criteria": [
+        {
+          "id": "AC-028",
+          "description": "Tax calculated correctly",
+          "measurable_condition": "Ledger Entry includes correct tax amount based on Tax Jurisdiction config"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "COMP-6",
+        "ENT-TAX-JURISDICTION"
+      ]
+    },
+    {
+      "id": "US-017",
+      "role": "System (Compliance)",
+      "action": "issue compliance notices for covenant violations",
+      "outcome": "Notice sequence and hearing dates are tracked",
+      "acceptance_criteria": [
+        {
+          "id": "AC-029",
+          "description": "Notice sent",
+          "measurable_condition": "Notification sent via ENT-NOTIFICATION within statutory deadline"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "COMP-2",
+        "COMP-7",
+        "COMP-8",
+        "ENT-NOTIFICATION"
+      ]
+    },
+    {
+      "id": "US-018",
+      "role": "Product Owner",
+      "action": "select monetization model configuration",
+      "outcome": "Pricing slice is applied to Service Estimate",
+      "acceptance_criteria": [
+        {
+          "id": "AC-030",
+          "description": "Model selected",
+          "measurable_condition": "Configuration parameter 'pricing_model' exists and is read-only"
+        }
+      ],
+      "priority": "open",
+      "traces_to": [
+        "Q-1"
+      ]
+    },
+    {
+      "id": "US-019",
+      "role": "Product Owner",
+      "action": "define external partner integration timeline",
+      "outcome": "Scope for Nextdoor integration is documented",
+      "acceptance_criteria": [
+        {
+          "id": "AC-031",
+          "description": "Timeline defined",
+          "measurable_condition": "Product Roadmap document contains 'Nextdoor Integration' start date"
+        }
+      ],
+      "priority": "open",
+      "traces_to": [
+        "Q-2"
+      ]
+    },
+    {
+      "id": "US-020",
+      "role": "Product Owner",
+      "action": "define ARC committee workflow rules",
+      "outcome": "Review and approval workflow is configured",
+      "acceptance_criteria": [
+        {
+          "id": "AC-032",
+          "description": "Workflow configured",
+          "measurable_condition": "Workflow definition file exists for ARC review process"
+        }
+      ],
+      "priority": "open",
+      "traces_to": [
+        "Q-3"
+      ]
+    }
+  ]
+}

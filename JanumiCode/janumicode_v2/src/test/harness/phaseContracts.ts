@@ -292,6 +292,69 @@ export const PHASE2_CONTRACT: PhaseContract = {
   authority_rules: [],
 };
 
+// ── Phase 2 (product lens) — requirements derived from handoff ─────
+//
+// When Phase 1 ran under the product lens, Phase 2 consumes the
+// `product_description_handoff` directly (journeys / entities /
+// workflows / V&V / tech / compliance / vocabulary). Each FR and NFR
+// carries `traces_to[]` referencing handoff item ids, which Phase 8
+// Evaluation walks for drift detection.
+export const PHASE2_CONTRACT_PRODUCT: PhaseContract = {
+  phase: '2',
+  required_artifacts: [
+    art('functional_requirements', '2.1',
+      'Phase 2.1 (product lens) derives functional user stories from the accepted journeys + entities + workflows + vocabulary in the handoff.',
+      { produced_by_agent_role: 'requirements_agent' }),
+    art('non_functional_requirements', '2.2',
+      'Phase 2.2 (product lens) synthesizes NFRs from handoff vvRequirements + qualityAttributes + complianceExtractedItems + technicalConstraints (context).',
+      { produced_by_agent_role: 'requirements_agent' }),
+    {
+      record_type: 'mirror_presented',
+      sub_phase_id: '2.3',
+      produced_by_agent_role: 'orchestrator',
+      reason: 'Phase 2.3 presents the combined requirements for human review.',
+    },
+    art('consistency_report', '2.4',
+      'Phase 2.4 consistency-checker output over the requirements set.',
+      { produced_by_agent_role: 'consistency_checker' }),
+    {
+      record_type: 'mirror_presented',
+      sub_phase_id: '2.5',
+      produced_by_agent_role: 'orchestrator',
+      reason: 'Phase 2.5 domain attestation mirror — user signs off on compliance coverage.',
+    },
+    {
+      record_type: 'phase_gate_evaluation',
+      sub_phase_id: '2.5',
+      produced_by_agent_role: 'orchestrator',
+      reason: 'Phase 2 closes with a gate evaluation before Phase 3.',
+    },
+  ],
+  invariants: [
+    {
+      name: 'requirements_have_sources',
+      description: 'Each functional requirement must trace to a source record id.',
+      validator: 'validateRequirementSources',
+      severity: 'warning',
+    },
+    {
+      name: 'requirements_product_traceability',
+      description: 'Every functional requirement and NFR must carry a non-empty traces_to[] array with ids that resolve to real handoff items (UJ-*, ENT-*, WF-*, VV-*, TECH-*, COMP-*, VOC-*, QA-#).',
+      validator: 'validateRequirementsProductTraceability',
+      severity: 'error',
+      sub_phase_id: '2.2',
+    },
+    {
+      name: 'journey_coverage_by_functional_requirements',
+      description: 'Every accepted user journey in the handoff should have at least one functional requirement tracing to it (warning — graduate to error when confidence is higher).',
+      validator: 'validateJourneyCoverageByFRs',
+      severity: 'warning',
+      sub_phase_id: '2.1',
+    },
+  ],
+  authority_rules: [],
+};
+
 // ── Phase 3 — System Specification ─────────────────────────────────
 export const PHASE3_CONTRACT: PhaseContract = {
   phase: '3',
@@ -620,6 +683,7 @@ export const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
  */
 export function getPhaseContract(phaseId: PhaseId, lens?: IntentLens | null): PhaseContract | undefined {
   if (phaseId === '1' && lens === 'product') return PHASE1_CONTRACT_PRODUCT;
+  if (phaseId === '2' && lens === 'product') return PHASE2_CONTRACT_PRODUCT;
   return PHASE_CONTRACTS[phaseId];
 }
 

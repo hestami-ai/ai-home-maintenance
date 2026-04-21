@@ -45,6 +45,21 @@ export interface JanumiCodeConfig {
     loop_detection_threshold: number;
     require_human_approval_all_phase_gates: boolean;
     rollback_closure_max_artifacts: number;
+    /**
+     * Records-idle stall threshold (ms). The CLI's waitForQuiescence
+     * declares the run stalled when no new governed_stream record has
+     * been written for this long, EVEN IF a phase is supposedly
+     * executing or LLM calls are in-flight — because forward progress
+     * is measured by records landing in the stream, not by in-flight
+     * counters that can hang. Pending human decisions suspend the
+     * check (waiting on a webview submit isn't a stall).
+     *
+     * Wave 6 recursive decomposition can legitimately run for many
+     * hours end-to-end against slow backends; the previous hard
+     * 1-hour wall-clock cap killed runs that were still making
+     * progress. Default here is 15 minutes of complete stream silence.
+     */
+    records_idle_stall_ms: number;
   };
 
   deep_memory_research: {
@@ -67,6 +82,39 @@ export interface JanumiCodeConfig {
     timeout_seconds: number;
     idle_timeout_seconds: number;
     buffer_max_events: number;
+  };
+
+  /**
+   * Wave 6 — recursive requirements decomposition safety rails. The
+   * primary terminator is assumption-saturation (pass with zero-delta
+   * assumption set means stop). These caps are belt-and-suspenders for
+   * pathological cases where the decomposer either loops or fans out
+   * uncontrollably.
+   *
+   * - depth_cap: hard ceiling on tree depth across any branch.
+   * - budget_cap: max LLM calls across all passes for one root FR.
+   * - fanout_cap: max children produced from a single parent in one pass.
+   * - mirror_gate_depth: depth at which the human prune gate fires.
+   *   Below this depth all branches recurse autonomously to fixed point.
+   */
+  decomposition: {
+    depth_cap: number;
+    budget_cap: number;
+    fanout_cap: number;
+    mirror_gate_depth: number;
+    /**
+     * Wave 6 Step 4c — when true, after each post-gate decomposition
+     * pass produces Tier-C/D children under a previously-accepted
+     * Tier-B parent, run a Reasoning Review pass to audit whether the
+     * children's acceptance criteria are verification-shaped ("does the
+     * system do X correctly?") or policy-shaped ("did we already decide
+     * X?"). Policy-shaped ACs indicate commitments hiding as
+     * implementation — the residual failure mode Step 4b cannot catch.
+     *
+     * Off by default because it adds one LLM API call per post-gate
+     * pass. Enable for runs where latent-commitment detection matters.
+     */
+    reasoning_review_on_tier_c: boolean;
   };
 
   /**
@@ -125,6 +173,20 @@ export interface JanumiCodeConfig {
       };
       temperature?: number;
     };
+    /**
+     * Requirements Agent role — Phase 2 functional and non-functional
+     * requirements bloom. Added in wave 5 when Phase 2 was upgraded to
+     * consume the `product_description_handoff` directly under the
+     * product lens.
+     */
+    requirements_agent?: {
+      primary: {
+        backing_tool: string;
+        provider?: string;
+        model?: string;
+      };
+      temperature?: number;
+    };
     reasoning_review: {
       /** Primary provider + model used for ReasoningReview LLM calls. */
       primary: { provider: string; model: string };
@@ -174,6 +236,7 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
   },
 
   workflow: {
+    records_idle_stall_ms: 900000,
     max_retry_attempts_per_subphase: 3,
     loop_detection_threshold: 3,
     require_human_approval_all_phase_gates: true,
@@ -202,6 +265,14 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     buffer_max_events: 1000,
   },
 
+  decomposition: {
+    depth_cap: 10,
+    budget_cap: 500,
+    fanout_cap: 8,
+    mirror_gate_depth: 2,
+    reasoning_review_on_tier_c: false,
+  },
+
   // Spec §10 canonical:
   //   "primary": { "provider": "google", "model": "gemini-2.0-flash-thinking" }
   // The provider name MUST match an LLMProviderAdapter.name (GoogleProvider
@@ -224,6 +295,12 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     // backing for gold-capture / real-mode harness runs (see the CLI
     // runner env-var wiring).
     domain_interpreter: {
+      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      temperature: 0.5,
+    },
+    // Requirements Agent default — matches domain_interpreter. Override
+    // via JANUMICODE_REQUIREMENTS_AGENT_BACKING for CLI-backed runs.
+    requirements_agent: {
       primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
       temperature: 0.5,
     },
@@ -347,6 +424,16 @@ export class ConfigManager {
   }
 
   /**
+   * Override `llm_routing.requirements_agent` at runtime. Mirrors
+   * `setOrchestratorRouting` and `setDomainInterpreterRouting`. Used by
+   * the CLI runner (env-var driven) and by tests that route Phase 2
+   * FR/NFR bloom calls through a non-default backing.
+   */
+  setRequirementsAgentRouting(override: NonNullable<JanumiCodeConfig['llm_routing']['requirements_agent']>): void {
+    this.config.llm_routing.requirements_agent = override;
+  }
+
+  /**
    * Validate that every provider referenced in `llm_routing` is actually
    * registered with the LLMCaller. Called by OrchestratorEngine at startup
    * once all providers have been registered.
@@ -370,9 +457,9 @@ export class ConfigManager {
     // empty (opt-in surface) so mock-mode tests don't fail on config
     // validation alone.
     // Shared validator for any role entry that accepts the same backing
-    // shape (orchestrator + domain_interpreter today).
+    // shape (orchestrator + domain_interpreter + requirements_agent today).
     const validateRolePrimary = (
-      role: 'orchestrator' | 'domain_interpreter',
+      role: 'orchestrator' | 'domain_interpreter' | 'requirements_agent',
       primary: { backing_tool: string; provider?: string; model?: string } | undefined,
     ): void => {
       if (!primary) return;
@@ -417,6 +504,7 @@ export class ConfigManager {
     };
     validateRolePrimary('orchestrator', routing.orchestrator?.primary);
     validateRolePrimary('domain_interpreter', routing.domain_interpreter?.primary);
+    validateRolePrimary('requirements_agent', routing.requirements_agent?.primary);
 
     const rr = routing.reasoning_review;
     if (rr?.primary && !registeredProviders.has(rr.primary.provider)) {

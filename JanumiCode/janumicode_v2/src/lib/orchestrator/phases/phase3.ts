@@ -13,7 +13,7 @@
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
 import type { GovernedStreamRecord, PhaseId } from '../../types/records';
 import { getLogger } from '../../logging';
-import { extractPriorPhaseContext } from './phaseContext';
+import { extractPriorPhaseContext, buildEffectiveFrView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
@@ -71,9 +71,15 @@ export class Phase3Handler implements PhaseHandler {
     const prior = extractPriorPhaseContext(allArtifacts);
 
     const intentSummary = prior.intentStatement?.summary ?? 'No intent statement available';
-    const frSummary = prior.functionalRequirements?.summary ?? 'No functional requirements available';
+    // Wave 6 — prefer the frozen leaf tree from Phase 2.1a when it
+    // exists; fall back to root FRs otherwise. buildEffectiveFrView
+    // returns {source, stories, summary} so downstream code treats both
+    // sources interchangeably.
+    const decompositionNodes = engine.writer.getRecordsByType(workflowRun.id, 'requirement_decomposition_node');
+    const frView = buildEffectiveFrView(decompositionNodes, prior);
+    const frSummary = frView.summary;
     const nfrSummary = prior.nonFunctionalRequirements?.summary ?? 'No NFRs available';
-    const frStories = (prior.functionalRequirements?.content.user_stories as Array<Record<string, unknown>>) ?? [];
+    const frStories = frView.stories;
     const derivedFromIds = prior.allRecordIds;
 
     // ── 3.1 — System Boundary Definition ──────────────────────

@@ -403,3 +403,168 @@ function buildProjectTypeDescription(ctx: PriorPhaseContext): string {
 
   return parts.join('\n') || 'No project type information available';
 }
+
+// ── Product Description Handoff reader (wave 5) ────────────────────
+//
+// Downstream phase handlers (Phase 2 first; 3–9 follow in later waves)
+// consult this helper to locate the latest product_description_handoff
+// record for a workflow run. When the run ran under the product lens
+// this record is dense (all the decomposed extractions + bloom outputs
+// composed into one handoff); when the run used the default lens,
+// no handoff exists and consumers fall back to reading
+// `intent_statement` via `extractPriorPhaseContext`.
+
+/**
+ * Locate the latest `product_description_handoff` record in the
+ * workflow's stream. Returns null when the handoff isn't present —
+ * callers then fall back to the thin `intent_statement` path.
+ *
+ * Shape-wise, the returned record has its `content` already parsed as
+ * the ProductDescriptionHandoffContent object. We don't typecast to
+ * that specific type here to keep this helper lens-agnostic; callers
+ * can narrow via `import type` when they need specific fields.
+ */
+export function findProductDescriptionHandoff(
+  records: ReadonlyArray<GovernedStreamRecord>,
+): { recordId: string; content: Record<string, unknown> } | null {
+  // Walk newest-first so a re-run (rare under phase-limit 1, but
+  // possible on partial resume) picks up the latest.
+  for (let i = records.length - 1; i >= 0; i--) {
+    const r = records[i];
+    if (r.record_type !== 'product_description_handoff') continue;
+    if (!r.content || typeof r.content !== 'object') continue;
+    return { recordId: r.id, content: r.content };
+  }
+  return null;
+}
+
+// ── Wave 6 — frozen-leaf projection for downstream phases ──────────
+
+/**
+ * Shape returned from the frozen-leaf projection. Each leaf carries its
+ * node_id so callers can key back into the decomposition tree when they
+ * need parent context. The `user_story` shape matches the FR artifact's
+ * `user_stories[]` shape, so callers can treat it interchangeably.
+ */
+export interface FrozenFrLeaf {
+  node_id: string;
+  root_fr_id: string;
+  depth: number;
+  tier: 'A' | 'B' | 'C' | 'D' | null;
+  user_story: {
+    id: string;
+    role: string;
+    action: string;
+    outcome: string;
+    acceptance_criteria: Array<{ id: string; description: string; measurable_condition: string }>;
+    priority: string;
+    traces_to?: string[];
+  };
+}
+
+/**
+ * Wave 6 — walk all requirement_decomposition_node records and return
+ * the set of frozen leaves: nodes whose current-version status is
+ * `atomic`. Used by downstream phase handlers (4/5/7/8) that want to
+ * consume the leaf-level FR tree rather than the coarse root FRs from
+ * the `functional_requirements` artifact.
+ *
+ * Fallback behavior: if there are no decomposition-node records (e.g.
+ * default-lens runs that skipped Phase 2.1a), returns an empty array.
+ * Callers should check `.length === 0` and fall back to the root FRs
+ * from `extractPriorPhaseContext(...).functionalRequirements`.
+ *
+ * Supersession handling: records with the same `content.node_id` may
+ * appear multiple times (e.g. a `pending` record superseded by
+ * `pruned` / `deferred` / `downgraded` / `atomic`). We pick the latest
+ * version per `node_id` by `produced_at` and only include nodes whose
+ * latest version has `status: 'atomic'`.
+ */
+/**
+ * Compute the "effective FR set" for a downstream phase handler: a pair
+ * of (stories, summary) sourced from the frozen leaves when present,
+ * otherwise from the root `functional_requirements` artifact. `source`
+ * indicates which path was taken so callers can log or attribute
+ * accordingly. Writer-type note: `decompositionNodes` is whatever
+ * `getRecordsByType(runId, 'requirement_decomposition_node')` returns;
+ * the caller passes it in rather than this helper reaching into the
+ * engine to keep this module framework-agnostic.
+ */
+export interface EffectiveFrView {
+  stories: Array<Record<string, unknown>>;
+  summary: string;
+  source: 'leaves' | 'roots' | 'none';
+  leafCount: number;
+  rootCount: number;
+}
+
+export function buildEffectiveFrView(
+  decompositionNodes: GovernedStreamRecord[],
+  prior: PriorPhaseContext,
+): EffectiveFrView {
+  const leaves = getFrozenFrLeaves(decompositionNodes);
+  const rootStories = (prior.functionalRequirements?.content.user_stories as Array<Record<string, unknown>>) ?? [];
+  if (leaves.length > 0) {
+    const storyRecords = leaves.map(l => l.user_story as unknown as Record<string, unknown>);
+    const summaryLines = leaves.map(l =>
+      `${l.user_story.id} [${l.user_story.priority}] (Tier ${l.tier ?? '?'} leaf under ${l.root_fr_id}): As a ${l.user_story.role}, I want ${l.user_story.action}, so that ${l.user_story.outcome}.`,
+    );
+    return {
+      stories: storyRecords,
+      summary: summaryLines.join('\n'),
+      source: 'leaves',
+      leafCount: leaves.length,
+      rootCount: rootStories.length,
+    };
+  }
+  if (rootStories.length > 0) {
+    return {
+      stories: rootStories,
+      summary: prior.functionalRequirements?.summary ?? '',
+      source: 'roots',
+      leafCount: 0,
+      rootCount: rootStories.length,
+    };
+  }
+  return {
+    stories: [],
+    summary: 'No functional requirements available',
+    source: 'none',
+    leafCount: 0,
+    rootCount: 0,
+  };
+}
+
+export function getFrozenFrLeaves(
+  allArtifacts: GovernedStreamRecord[],
+): FrozenFrLeaf[] {
+  // Collect current version per node_id.
+  const latestByNodeId = new Map<string, GovernedStreamRecord>();
+  for (const r of allArtifacts) {
+    if (r.record_type !== 'requirement_decomposition_node') continue;
+    const c = r.content as Record<string, unknown>;
+    const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
+    if (!nodeId) continue;
+    const existing = latestByNodeId.get(nodeId);
+    if (!existing || r.produced_at > existing.produced_at) {
+      latestByNodeId.set(nodeId, r);
+    }
+  }
+  const leaves: FrozenFrLeaf[] = [];
+  for (const r of latestByNodeId.values()) {
+    const c = r.content as Record<string, unknown>;
+    if (c.status !== 'atomic') continue;
+    const story = c.user_story as FrozenFrLeaf['user_story'] | undefined;
+    if (!story) continue;
+    leaves.push({
+      node_id: typeof c.node_id === 'string' ? c.node_id : '',
+      root_fr_id: typeof c.root_fr_id === 'string' ? c.root_fr_id : '',
+      depth: typeof c.depth === 'number' ? c.depth : 0,
+      tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
+        ? c.tier as FrozenFrLeaf['tier']
+        : null,
+      user_story: story,
+    });
+  }
+  return leaves;
+}

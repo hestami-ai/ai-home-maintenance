@@ -1,0 +1,29 @@
+{
+  "$id": "janumicode:assumption_set_snapshot:1.0",
+  "title": "Assumption Set Snapshot",
+  "description": "Wave 6 — one record per decomposition pass capturing the cumulative assumption set A_n. Termination criterion: pass N writes delta_from_previous_pass === 0 means the decomposition reached assumption-saturation fixed-point.",
+  "type": "object",
+  "required": ["kind", "pass_number", "root_fr_id", "assumptions", "delta_from_previous_pass"],
+  "properties": {
+    "kind": { "const": "assumption_set_snapshot" },
+    "pass_number": { "type": "integer", "minimum": 0 },
+    "root_fr_id": { "type": "string" },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "source", "surfaced_at_pass", "category"],
+        "properties": {
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "source": { "type": "string", "enum": ["handoff", "bloom", "decomposition", "human"] },
+          "surfaced_at_node": { "type": "string" },
+          "surfaced_at_pass": { "type": "integer", "minimum": 0 },
+          "category": { "type": "string", "enum": ["domain_regime", "constraint", "compliance", "scope", "open_question"] },
+          "citations": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "delta_from_previous_pass": { "type": "integer", "minimum": 0 }
+  }
+}

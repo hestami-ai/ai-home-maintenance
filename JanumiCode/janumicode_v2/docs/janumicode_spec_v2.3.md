@@ -694,21 +694,31 @@ Lens-conditional:
 
 ### Phase 2 — Requirements Definition
 
-**Purpose:** Derive complete, traceable Functional Requirements and Non-Functional Requirements from the Intent Statement.
+**Purpose:** Derive complete, traceable Functional Requirements and Non-Functional Requirements from the Intent Statement (and, under the product lens, the full Product Description Handoff).
 
-**Entry Criterion:** Phase 1 Phase Gate passed (and Phase 0.5 if triggered). `intent_statement`, `compliance_context` available. Vocabulary Collision Check re-run.
+**Entry Criterion:** Phase 1 Phase Gate passed (and Phase 0.5 if triggered). `intent_statement`, `compliance_context` available. Under product lens, `product_description_handoff` is also available and consumed directly. Vocabulary Collision Check re-run.
+
+**Lens-Conditional Input Consumption (wave 5):** Phase 2 detects the presence of a `product_description_handoff` record in the governed stream. When present (product-lens runs), the FR and NFR bloom templates resolve to lens-tagged `lens: product` variants that consume the handoff's rich sections (journeys, entities, workflows, V&V requirements, compliance extracted items, technical constraints as context, canonical vocabulary). When absent (default lens), Phase 2 continues to read only `intent_statement` using the existing templates. The invariant that downstream phases do NOT scan source documents directly is preserved — Phase 2 always reads the governed stream.
+
+**Traceability Spine (wave 5):** Under the product lens every `UserStory` and every `NonFunctionalRequirement` MUST carry a `traces_to: string[]` array referencing handoff item ids:
+- `UJ-*` (user journeys), `ENT-*` (entities), `WF-*` (workflows), `COMP-*` (compliance items), `VOC-*` (canonical vocabulary), `Q-*` (open questions) for FRs.
+- `VV-*` (V&V requirements), `QA-#` (indexed qualityAttribute), `TECH-*` (technical constraints), `COMP-*`, `UJ-*` for NFRs.
+
+This completes the traceability chain `source_ref (1.0*) → handoff_item (1.6) → requirement (2.1/2.2) → [future: component (4) → test_result (9)]` that Phase 8 Evaluation walks for drift detection. The harness invariant `validateRequirementsProductTraceability` rejects FRs/NFRs with empty or unknown `traces_to`; `validateJourneyCoverageByFRs` warns when an accepted journey has no FR tracing to it.
 
 #### Sub-Phase 2.1 — Functional Requirements Bloom
 
 - **[JC:Agent Role]:** Requirements Agent
-- **Context Payload stdin:** Active constraints; `compliance_context` summary; `intent_statement` summary
-- **Context Payload detail file:** Full `intent_statement`; full `compliance_context`; full Context Packet
-- **Output Artifact:** `functional_requirements`
+- **Context Payload stdin (default lens):** Active constraints; `compliance_context` summary; `intent_statement` summary
+- **Context Payload stdin (product lens):** Active constraints; `product_vision`; accepted `userJourneys` (with steps + acceptance criteria); accepted `entityProposals`; accepted `workflowProposals`; `complianceExtractedItems`; `canonicalVocabulary` (for naming alignment); `openQuestions`
+- **Context Payload detail file:** Full `intent_statement`; full `compliance_context`; full Context Packet; full handoff (product lens)
+- **Output Artifact:** `functional_requirements` — user stories each carry `traces_to[]` under product lens
 
 #### Sub-Phase 2.2 — Non-Functional Requirements Bloom
 
 - **[JC:Agent Role]:** Requirements Agent
-- **Output Artifact:** `non_functional_requirements`
+- **Context Payload stdin (product lens):** `qualityAttributes[]` (free-prose NFR seeds), `vvRequirements[]` (structured target + measurement + threshold — primary seed), `technicalConstraints[]` (CONTEXT only — do not re-propose as requirements), `complianceExtractedItems[]`
+- **Output Artifact:** `non_functional_requirements` — each NFR carries `traces_to[]` under product lens
 
 #### Sub-Phase 2.3 — Requirements Mirror and Menu
 

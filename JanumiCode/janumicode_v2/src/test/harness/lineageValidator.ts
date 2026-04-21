@@ -580,6 +580,155 @@ const MULTI_FAILURE_VALIDATORS: Record<string, MultiFailureCheck> = {
 
     return findings;
   },
+
+  /**
+   * Phase 2 product-lens traceability invariant (wave 5).
+   * Every FR user_story and every NFR must carry a non-empty
+   * `traces_to[]` whose ids resolve against the handoff. Walks the
+   * handoff catalog once, then verifies each FR / NFR entry.
+   */
+  validateRequirementsProductTraceability: (recs) => {
+    const findings: ShapeCoverageFinding[] = [];
+    // Build the set of valid trace-target ids from the latest handoff.
+    const handoff = recs.find(r => r.record_type === 'product_description_handoff');
+    if (!handoff) return findings; // Non-product lens — invariant doesn't apply.
+    const h = tryParseContent(handoff.content) ?? {};
+    const collectIds = (key: string): string[] => {
+      const a = Array.isArray(h[key]) ? h[key] as Array<Record<string, unknown>> : [];
+      return a.map(x => typeof x.id === 'string' ? x.id : '').filter(Boolean);
+    };
+    const validIds = new Set<string>([
+      ...collectIds('personas'),
+      ...collectIds('userJourneys'),
+      ...collectIds('businessDomainProposals'),
+      ...collectIds('entityProposals'),
+      ...collectIds('workflowProposals'),
+      ...collectIds('integrationProposals'),
+      ...collectIds('technicalConstraints'),
+      ...collectIds('vvRequirements'),
+      ...collectIds('complianceExtractedItems'),
+      ...collectIds('canonicalVocabulary'),
+      ...collectIds('requirements'),
+      ...collectIds('decisions'),
+      ...collectIds('constraints'),
+      ...collectIds('openQuestions'),
+    ]);
+    // QA-# ids are synthetic — build them by index.
+    const qaCount = Array.isArray(h.qualityAttributes) ? (h.qualityAttributes as unknown[]).length : 0;
+    for (let i = 1; i <= qaCount; i++) validIds.add(`QA-${i}`);
+
+    const checkItem = (artifactKind: string, items: Array<Record<string, unknown>>, subPhase: string) => {
+      for (const it of items) {
+        const id = typeof it.id === 'string' ? it.id : '?';
+        const traces = Array.isArray(it.traces_to) ? it.traces_to as string[] : [];
+        if (traces.length === 0) {
+          findings.push({
+            field: `${artifactKind}[id=${id}].traces_to`,
+            expected: 'non-empty traces_to[] referencing handoff item ids',
+            actual: 'empty',
+            sub_phase_id: subPhase,
+          });
+          continue;
+        }
+        const unknown = traces.filter(t => !validIds.has(t));
+        if (unknown.length > 0) {
+          findings.push({
+            field: `${artifactKind}[id=${id}].traces_to`,
+            expected: 'all traces_to ids resolve to real handoff items',
+            actual: `unknown trace ids: ${unknown.join(', ')}`,
+            sub_phase_id: subPhase,
+          });
+        }
+      }
+    };
+
+    const fr = recs.find(r => r.record_type === 'artifact_produced'
+      && tryParseContent(r.content)?.kind === 'functional_requirements');
+    if (fr) {
+      const frc = tryParseContent(fr.content) ?? {};
+      const stories = Array.isArray(frc.user_stories) ? frc.user_stories as Array<Record<string, unknown>> : [];
+      checkItem('functional_requirements.user_stories', stories, '2.1');
+    }
+    // Build the set of FR user_story ids for applies_to_requirements validation.
+    const frStoryIds = new Set<string>();
+    if (fr) {
+      const frc = tryParseContent(fr.content) ?? {};
+      const stories = Array.isArray(frc.user_stories) ? frc.user_stories as Array<Record<string, unknown>> : [];
+      for (const s of stories) if (typeof s.id === 'string') frStoryIds.add(s.id);
+    }
+
+    const nfr = recs.find(r => r.record_type === 'artifact_produced'
+      && tryParseContent(r.content)?.kind === 'non_functional_requirements');
+    if (nfr) {
+      const nfrc = tryParseContent(nfr.content) ?? {};
+      const items = Array.isArray(nfrc.requirements) ? nfrc.requirements as Array<Record<string, unknown>> : [];
+      checkItem('non_functional_requirements.requirements', items, '2.2');
+      // Wave 5 trace-id fix: applies_to_requirements (when present) must
+      // reference real FR user_story ids. This catches the qwen failure
+      // mode where US-* ids were stuffed into traces_to.
+      for (const it of items) {
+        const id = typeof it.id === 'string' ? it.id : '?';
+        const applies = Array.isArray(it.applies_to_requirements)
+          ? it.applies_to_requirements as string[] : [];
+        if (applies.length === 0) continue;
+        const unknownFr = applies.filter(a => !frStoryIds.has(a));
+        if (unknownFr.length > 0) {
+          findings.push({
+            field: `non_functional_requirements.requirements[id=${id}].applies_to_requirements`,
+            expected: 'all ids resolve to FR user_story ids from sub-phase 2.1',
+            actual: `unknown FR ids: ${unknownFr.join(', ')}`,
+            sub_phase_id: '2.2',
+          });
+        }
+      }
+    }
+    return findings;
+  },
+
+  /**
+   * Warning-level coverage invariant: every accepted userJourney in
+   * the handoff should have at least one user_story tracing to it.
+   * Reports per-journey coverage failures.
+   */
+  validateJourneyCoverageByFRs: (recs) => {
+    const findings: ShapeCoverageFinding[] = [];
+    const handoff = recs.find(r => r.record_type === 'product_description_handoff');
+    if (!handoff) return findings;
+    const h = tryParseContent(handoff.content) ?? {};
+    const journeys = Array.isArray(h.userJourneys) ? h.userJourneys as Array<Record<string, unknown>> : [];
+    if (journeys.length === 0) return findings;
+
+    const fr = recs.find(r => r.record_type === 'artifact_produced'
+      && tryParseContent(r.content)?.kind === 'functional_requirements');
+    if (!fr) {
+      findings.push({
+        field: 'functional_requirements',
+        expected: 'present for product-lens journey coverage check',
+        actual: 'missing',
+        sub_phase_id: '2.1',
+      });
+      return findings;
+    }
+    const frc = tryParseContent(fr.content) ?? {};
+    const stories = Array.isArray(frc.user_stories) ? frc.user_stories as Array<Record<string, unknown>> : [];
+    const coveredJourneys = new Set<string>();
+    for (const s of stories) {
+      const traces = Array.isArray(s.traces_to) ? s.traces_to as string[] : [];
+      for (const t of traces) if (t.startsWith('UJ-')) coveredJourneys.add(t);
+    }
+    for (const j of journeys) {
+      const jid = typeof j.id === 'string' ? j.id : '?';
+      if (!coveredJourneys.has(jid)) {
+        findings.push({
+          field: `userJourneys[id=${jid}].coverage`,
+          expected: `≥ 1 user_story with traces_to containing ${jid}`,
+          actual: 'no functional requirement covers this journey',
+          sub_phase_id: '2.1',
+        });
+      }
+    }
+    return findings;
+  },
 };
 
 // ── Structured-gap builders ────────────────────────────────────────

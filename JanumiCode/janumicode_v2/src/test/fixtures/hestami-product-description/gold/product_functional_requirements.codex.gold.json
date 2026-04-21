@@ -1,0 +1,720 @@
+{
+  "kind": "functional_requirements",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "role": "Homeowner",
+      "action": "submit Owner Intent & Request Intake from free-form text, media, and documents",
+      "outcome": "a Service Call Case Lifecycle record is created with reviewable structured context in one session",
+      "acceptance_criteria": [
+        {
+          "id": "AC-001",
+          "description": "Free-form intake creates a durable service case",
+          "measurable_condition": "When a homeowner submits a new intake with at least one problem description, the system creates exactly one Intake Submission, one Intake Normalization, and one Service Case linked to the same property before the session ends"
+        },
+        {
+          "id": "AC-002",
+          "description": "Normalization output is reviewable",
+          "measurable_condition": "The created service case shows extracted issue type, urgency, location, and constraints as editable structured fields before the homeowner confirms submission"
+        },
+        {
+          "id": "AC-003",
+          "description": "Evidence is retained with the case",
+          "measurable_condition": "Each uploaded photo, video, file, or note appears as an Intake Evidence Item linked to the Service Case and remains retrievable from the case record after submission"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-1",
+        "WF-3",
+        "WF-4",
+        "ENT-INTAKE-SUBMISSION",
+        "ENT-INTAKE-NORMALIZATION",
+        "ENT-INTAKE-EVIDENCE-ITEM",
+        "ENT-SERVICE-CASE",
+        "VOC-7",
+        "VOC-8"
+      ]
+    },
+    {
+      "id": "US-002",
+      "role": "Homeowner",
+      "action": "maintain structured property context for a property, unit, physical system, property asset, and property history event",
+      "outcome": "downstream maintenance and coordination workflows use persistent property context instead of re-collecting the same facts",
+      "acceptance_criteria": [
+        {
+          "id": "AC-004",
+          "description": "Property context can be created and enriched over time",
+          "measurable_condition": "A homeowner can create a Property with Address and later add or edit Unit, Physical System, Property Asset, Property Media, and Property History Event records without creating a duplicate property record"
+        },
+        {
+          "id": "AC-005",
+          "description": "Case creation reuses stored property context",
+          "measurable_condition": "When a new Service Case is opened for an existing property, the case can be linked to at least one existing Unit, Physical System, or Property Asset selected from stored property context"
+        },
+        {
+          "id": "AC-006",
+          "description": "Mandatory onboarding scope is configurable",
+          "measurable_condition": "The system enforces one configured onboarding rule set for property creation, with each required field visibly marked as required and each optional field accepted as deferred enrichment"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-1",
+        "WF-1",
+        "ENT-PROPERTY",
+        "ENT-UNIT",
+        "ENT-PHYSICAL-SYSTEM",
+        "ENT-PROPERTY-ASSET",
+        "ENT-PROPERTY-MEDIA",
+        "ENT-PROPERTY-HISTORY-EVENT",
+        "ENT-ADDRESS",
+        "Q-7"
+      ]
+    },
+    {
+      "id": "US-003",
+      "role": "Homeowner",
+      "action": "coordinate External Vendor Coordination for a service case",
+      "outcome": "provider options, outreach, estimates, and execution follow-up stay in one case record whether or not the provider is onboarded",
+      "acceptance_criteria": [
+        {
+          "id": "AC-007",
+          "description": "Provider recommendations are case-specific",
+          "measurable_condition": "For a service case with a defined trade and service location, the system can display one or more Match Recommendation records linked to the case and the recommended Service Provider records"
+        },
+        {
+          "id": "AC-008",
+          "description": "Off-platform vendor outreach is preserved",
+          "measurable_condition": "Each outreach attempt to a provider creates a Vendor Outreach record with timestamp, outreach channel, responsible actor, and linked service case"
+        },
+        {
+          "id": "AC-009",
+          "description": "Estimate collection supports configured launch mode",
+          "measurable_condition": "The product can operate in exactly one configured Phase 1 estimate mode per tenant: provider matching only, or estimate collection with Estimate Request and Estimate records visible in the service case"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-1",
+        "UJ-8",
+        "WF-5",
+        "WF-6",
+        "ENT-SERVICE-PROVIDER",
+        "ENT-MATCH-RECOMMENDATION",
+        "ENT-VENDOR-OUTREACH",
+        "ENT-ESTIMATE-REQUEST",
+        "ENT-ESTIMATE",
+        "VOC-10",
+        "Q-1",
+        "Q-4",
+        "Q-6"
+      ]
+    },
+    {
+      "id": "US-004",
+      "role": "Homeowner",
+      "action": "record provider and budget decisions in the Decision, Rationale & Trust Ledger",
+      "outcome": "material decisions are transparent, reviewable, and connected to their evidence",
+      "acceptance_criteria": [
+        {
+          "id": "AC-010",
+          "description": "Decision records preserve alternatives",
+          "measurable_condition": "For any service case decision marked material, the system stores one Decision Record with at least one Decision Option and a final outcome state of approved, rejected, or selected"
+        },
+        {
+          "id": "AC-011",
+          "description": "Rationale and evidence are required for material decisions",
+          "measurable_condition": "A material decision cannot be marked final until the record includes one Decision Rationale entry and at least one Decision Evidence Link to an estimate, message, document, or case artifact"
+        },
+        {
+          "id": "AC-012",
+          "description": "Approvals are attributable",
+          "measurable_condition": "Each approval, rejection, or acknowledgment on a material decision creates a Decision Approval record that stores actor identity, timestamp, and decision outcome"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-1",
+        "UJ-3",
+        "WF-7",
+        "ENT-DECISION-RECORD",
+        "ENT-DECISION-OPTION",
+        "ENT-DECISION-RATIONALE",
+        "ENT-DECISION-EVIDENCE-LINK",
+        "ENT-DECISION-APPROVAL",
+        "VOC-11",
+        "COMP-12"
+      ]
+    },
+    {
+      "id": "US-005",
+      "role": "Homeowner",
+      "action": "track a service case from intake through completion in one workspace",
+      "outcome": "status, documents, communications, appointments, and closure history remain visible without leaving the platform",
+      "acceptance_criteria": [
+        {
+          "id": "AC-013",
+          "description": "Lifecycle stages are durable",
+          "measurable_condition": "Each service case displays its current case stage and a complete Case Status History showing every stage change with actor and timestamp"
+        },
+        {
+          "id": "AC-014",
+          "description": "Case context is unified",
+          "measurable_condition": "The case detail view can display linked property context, documents, message threads, appointments, estimates, and decision records from the same service case record"
+        },
+        {
+          "id": "AC-015",
+          "description": "Completion produces a retrievable closure record",
+          "measurable_condition": "When a case is marked complete or closed, the system preserves closure date, final outcome, and all prior linked records, and the closed case remains searchable by property and issue type"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-1",
+        "WF-4",
+        "WF-8",
+        "WF-10",
+        "WF-11",
+        "ENT-SERVICE-CASE",
+        "ENT-CASE-STAGE",
+        "ENT-CASE-STATUS-HISTORY",
+        "ENT-DOCUMENT-RECORD",
+        "ENT-MESSAGE-THREAD",
+        "ENT-APPOINTMENT"
+      ]
+    },
+    {
+      "id": "US-006",
+      "role": "Small Landlord",
+      "action": "manage open work across multiple properties from one Property Portfolio Management workspace",
+      "outcome": "tenant issues, vendor coordination, and records are organized across several residences",
+      "acceptance_criteria": [
+        {
+          "id": "AC-016",
+          "description": "Portfolio workspace rolls up active work",
+          "measurable_condition": "A landlord portfolio view lists open Service Case records across all linked properties and shows at minimum property, current status, priority, and latest update for each case"
+        },
+        {
+          "id": "AC-017",
+          "description": "Prioritization can be recorded across properties",
+          "measurable_condition": "The landlord can create or update a Portfolio Priority Item tied to a property and service case, and the saved ranking is reflected in the portfolio work list"
+        },
+        {
+          "id": "AC-018",
+          "description": "Portfolio operating mode is explicit",
+          "measurable_condition": "The product supports one configured portfolio mode per account type, either shared workflow behavior for small landlords and investors or differentiated workflow behavior with role-specific fields and views"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-2",
+        "WF-9",
+        "ENT-PORTFOLIO",
+        "ENT-PORTFOLIO-PROPERTY",
+        "ENT-PORTFOLIO-PRIORITY-ITEM",
+        "ENT-SERVICE-CASE",
+        "VOC-6",
+        "Q-8"
+      ]
+    },
+    {
+      "id": "US-007",
+      "role": "Property Investor",
+      "action": "compare maintenance activity and outcomes across multiple properties",
+      "outcome": "repeatable decisions and durable historical records protect portfolio value",
+      "acceptance_criteria": [
+        {
+          "id": "AC-019",
+          "description": "Cross-property history is retrievable",
+          "measurable_condition": "An investor can filter closed and open service cases by property, property asset, service provider, and issue type and retrieve matching records from the portfolio workspace"
+        },
+        {
+          "id": "AC-020",
+          "description": "Comparable portfolio metrics are available",
+          "measurable_condition": "The system can generate a Portfolio Snapshot showing at least case count, total estimate value, total approved value, and completion count for a selected date range across portfolio properties"
+        },
+        {
+          "id": "AC-021",
+          "description": "Decision records remain attached to portfolio comparisons",
+          "measurable_condition": "From a cross-property comparison view, the investor can open the linked Decision Record and supporting evidence for each compared case without leaving the portfolio context"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-3",
+        "WF-7",
+        "WF-9",
+        "WF-19",
+        "ENT-PORTFOLIO",
+        "ENT-PORTFOLIO-SNAPSHOT",
+        "ENT-KPI-SNAPSHOT",
+        "ENT-DECISION-RECORD",
+        "ENT-SERVICE-CASE"
+      ]
+    },
+    {
+      "id": "US-008",
+      "role": "Tenant",
+      "action": "report a rental maintenance issue and coordinate access",
+      "outcome": "the owner can remain responsible while the tenant can submit evidence, receive updates, and provide entry details",
+      "acceptance_criteria": [
+        {
+          "id": "AC-022",
+          "description": "Tenant intake does not require owner intervention at submission time",
+          "measurable_condition": "A tenant associated with a property occupancy record can create a new Intake Submission and linked Service Case without a prior owner approval action in the same session"
+        },
+        {
+          "id": "AC-023",
+          "description": "Occupancy and access details persist through the case",
+          "measurable_condition": "The service case stores linked Property Occupancy and Access Requirement records, and both remain visible after scheduling and after completion"
+        },
+        {
+          "id": "AC-024",
+          "description": "Tenant sees permitted updates and appointment information",
+          "measurable_condition": "When a case status changes or an appointment is scheduled, rescheduled, or canceled, the tenant can view the updated status and appointment window in their case view if their visibility role permits it"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-4",
+        "WF-2",
+        "WF-3",
+        "WF-10",
+        "WF-11",
+        "ENT-PROPERTY-OCCUPANCY",
+        "ENT-SERVICE-CASE",
+        "ENT-ACCESS-REQUIREMENT",
+        "ENT-APPOINTMENT"
+      ]
+    },
+    {
+      "id": "US-009",
+      "role": "Property Owner",
+      "action": "grant and control delegated authority for a household delegate",
+      "outcome": "delegated representatives can act within defined scope while the owner retains approval control and attribution visibility",
+      "acceptance_criteria": [
+        {
+          "id": "AC-025",
+          "description": "Delegated authority is scoped",
+          "measurable_condition": "An owner can create a Delegated Authority record that specifies delegate identity, property scope, allowed actions, effective start date, and optional end date"
+        },
+        {
+          "id": "AC-026",
+          "description": "Out-of-scope actions are blocked",
+          "measurable_condition": "If a delegate attempts an action outside the granted scope, the system denies the action and records the denied attempt with actor, target record, and timestamp"
+        },
+        {
+          "id": "AC-027",
+          "description": "Approval thresholds route back to the owner",
+          "measurable_condition": "For any action type marked owner approval required, the delegate can submit the action for review but the final state remains pending until the owner records an approval or rejection"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-5",
+        "WF-2",
+        "WF-7",
+        "ENT-DELEGATED-AUTHORITY",
+        "ENT-MEMBERSHIP",
+        "ENT-PERMISSION",
+        "ENT-DECISION-APPROVAL",
+        "COMP-12"
+      ]
+    },
+    {
+      "id": "US-010",
+      "role": "Internal Hestami Staff",
+      "action": "facilitate complex service cases and escalations",
+      "outcome": "manual interventions, off-platform follow-up, and customer-visible updates remain in the same operational record",
+      "acceptance_criteria": [
+        {
+          "id": "AC-028",
+          "description": "Staff can access full case context before acting",
+          "measurable_condition": "A staff case workspace shows linked intake details, property context, provider activity, message history, appointments, documents, and current case stage for the selected service case"
+        },
+        {
+          "id": "AC-029",
+          "description": "Manual interventions are captured durably",
+          "measurable_condition": "Each manual intervention creates either a Support Ticket, Escalation Record, Admin Action Log entry, or case note linked to the service case with actor and timestamp"
+        },
+        {
+          "id": "AC-030",
+          "description": "Customer-facing status is updated after staff action",
+          "measurable_condition": "When staff changes the case stage or appointment state, the new status appears in the customer-visible case view and in Case Status History without requiring a second manual sync step"
+        }
+      ],
+      "priority": "critical",
+      "traces_to": [
+        "UJ-8",
+        "WF-4",
+        "WF-10",
+        "WF-20",
+        "ENT-SUPPORT-TICKET",
+        "ENT-ESCALATION-RECORD",
+        "ENT-ADMIN-ACTION-LOG",
+        "ENT-SERVICE-CASE",
+        "COMP-12"
+      ]
+    },
+    {
+      "id": "US-011",
+      "role": "Internal Hestami Staff",
+      "action": "configure the Phase 1 homeowner release mode for Service Call Case Lifecycle coverage and mediation policy",
+      "outcome": "the launch boundary is explicit and enforced instead of being implied by ad hoc operational practice",
+      "acceptance_criteria": [
+        {
+          "id": "AC-031",
+          "description": "Lifecycle scope is configurable",
+          "measurable_condition": "The platform stores exactly one active Phase 1 lifecycle scope mode per tenant, chosen from staff-assisted intake and matching only, or end-to-end service call management including scheduling and resolution"
+        },
+        {
+          "id": "AC-032",
+          "description": "Automation policy is configurable",
+          "measurable_condition": "The platform stores an active mediation policy that marks intake normalization, provider outreach, customer communication, and scheduling as either automated, staff-mediated, or mixed with rule-based routing"
+        },
+        {
+          "id": "AC-033",
+          "description": "Supported homeowner request types are explicit",
+          "measurable_condition": "The platform stores one active launch taxonomy for homeowner request types, and intake submission only allows categories that belong to the configured set of urgent repairs, routine maintenance, planned improvements, or all supported categories"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-1",
+        "UJ-8",
+        "Q-1",
+        "Q-2",
+        "Q-3",
+        "Q-14",
+        "WF-20",
+        "ENT-PLATFORM-SETTING",
+        "ENT-TENANT-SETTING",
+        "VOC-8"
+      ]
+    },
+    {
+      "id": "US-012",
+      "role": "Service Provider",
+      "action": "manage contractor work from opportunity to scheduled job, execution, and invoice inside FSM",
+      "outcome": "customer, property, schedule, execution, and billing context stay connected through lead-to-cash operations",
+      "acceptance_criteria": [
+        {
+          "id": "AC-034",
+          "description": "Opportunity converts into scheduled work",
+          "measurable_condition": "A provider can convert an accepted opportunity or estimate into a Job or Work Order with a scheduled Appointment linked to the same customer and property records"
+        },
+        {
+          "id": "AC-035",
+          "description": "Execution context is retained",
+          "measurable_condition": "Each job record can store Job Task, Job Material, dispatch assignment, appointment history, and completion notes without losing the original linked service case reference"
+        },
+        {
+          "id": "AC-036",
+          "description": "Billing is generated from completed work",
+          "measurable_condition": "A completed job can generate an Invoice with one or more Invoice Line Item records tied to the same provider, property, and job"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-6",
+        "WF-12",
+        "WF-11",
+        "WF-17",
+        "ENT-JOB",
+        "ENT-JOB-TASK",
+        "ENT-JOB-MATERIAL",
+        "ENT-WORK-ORDER",
+        "ENT-APPOINTMENT",
+        "ENT-INVOICE",
+        "ENT-INVOICE-LINE-ITEM",
+        "VOC-2",
+        "Q-9"
+      ]
+    },
+    {
+      "id": "US-013",
+      "role": "Community Association Manager",
+      "action": "run CAM operations from intake through governance-ready records",
+      "outcome": "resident requests, violations, approvals, vendor work, and correspondence remain connected to the right community context",
+      "acceptance_criteria": [
+        {
+          "id": "AC-037",
+          "description": "Community work is routed into one queue",
+          "measurable_condition": "A manager workspace can display Community Work Queue Item records for at least resident requests, Violation Case records, ARC requests, and vendor work orders with current owner and status"
+        },
+        {
+          "id": "AC-038",
+          "description": "Community context is preserved",
+          "measurable_condition": "Each community work item can be linked to the relevant Community, Unit, owner or resident, vendor, governing document, and correspondence records from the same case or queue item"
+        },
+        {
+          "id": "AC-039",
+          "description": "Board escalation preserves support context",
+          "measurable_condition": "A manager can escalate a board-facing matter into a meeting or packet workflow while retaining all linked documents, recommendations, and prior correspondence"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-7",
+        "WF-13",
+        "WF-14",
+        "WF-15",
+        "ENT-COMMUNITY-WORK-QUEUE-ITEM",
+        "ENT-VIOLATION-CASE",
+        "ENT-ARC-REQUEST",
+        "ENT-COMMUNITY",
+        "ENT-CORRESPONDENCE-RECORD",
+        "VOC-1",
+        "VOC-4",
+        "Q-10"
+      ]
+    },
+    {
+      "id": "US-014",
+      "role": "Board Member",
+      "action": "review board matters and record approvals or votes with supporting rationale",
+      "outcome": "governance decisions are limited to board-relevant information and remain auditable",
+      "acceptance_criteria": [
+        {
+          "id": "AC-040",
+          "description": "Board access is scoped to governance materials",
+          "measurable_condition": "A board member can open assigned Board Packet, Agenda Item, Vote, and supporting document records but cannot access operational records that are not linked to a board matter"
+        },
+        {
+          "id": "AC-041",
+          "description": "Votes and approvals are recorded with attribution",
+          "measurable_condition": "Each board vote or approval creates a Vote Response or Decision Approval record containing member identity, response value, and timestamp"
+        },
+        {
+          "id": "AC-042",
+          "description": "Manager recommendation is visible before action",
+          "measurable_condition": "Before a board member records a vote or approval, the system displays the linked manager recommendation and supporting documents in the same board matter view"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-9",
+        "WF-15",
+        "ENT-BOARD-PACKET",
+        "ENT-AGENDA-ITEM",
+        "ENT-VOTE",
+        "ENT-VOTE-RESPONSE",
+        "ENT-DECISION-APPROVAL",
+        "COMP-5",
+        "COMP-12"
+      ]
+    },
+    {
+      "id": "US-015",
+      "role": "Community Association Management Company Leader",
+      "action": "oversee community operations across a management company portfolio",
+      "outcome": "standard workflows, metrics, and bottlenecks are visible across multiple associations and managers",
+      "acceptance_criteria": [
+        {
+          "id": "AC-043",
+          "description": "Portfolio metrics aggregate across communities",
+          "measurable_condition": "A portfolio dashboard can show standardized KPI Snapshot or Portfolio Snapshot records across multiple communities for a selected reporting period"
+        },
+        {
+          "id": "AC-044",
+          "description": "Workflow controls can be applied across communities",
+          "measurable_condition": "A leadership user can assign a shared workflow template, policy, or setting to more than one community and the applied control becomes visible in each target community configuration"
+        },
+        {
+          "id": "AC-045",
+          "description": "Bottlenecks are filterable by operating dimension",
+          "measurable_condition": "Leadership can filter open community work by manager, community, and workflow type and view counts for overdue or escalated items in each filter result"
+        }
+      ],
+      "priority": "medium",
+      "traces_to": [
+        "UJ-10",
+        "WF-9",
+        "WF-14",
+        "WF-19",
+        "ENT-PORTFOLIO",
+        "ENT-PORTFOLIO-SNAPSHOT",
+        "ENT-KPI-SNAPSHOT",
+        "ENT-COMMUNITY-WORK-QUEUE-ITEM",
+        "VOC-1"
+      ]
+    },
+    {
+      "id": "US-016",
+      "role": "Resident",
+      "action": "use a resident portal to access notices, documents, requests, payments, and responsibilities",
+      "outcome": "association interactions are handled from one account-specific self-service experience",
+      "acceptance_criteria": [
+        {
+          "id": "AC-046",
+          "description": "Portal content is account-specific",
+          "measurable_condition": "A resident portal shows only records linked to the resident's Portal Access Profile, including notices, documents, requests, charges, invoices, payments, and responsibility items"
+        },
+        {
+          "id": "AC-047",
+          "description": "Portal submissions route into the correct workflow",
+          "measurable_condition": "A request, document upload, or payment initiated from the portal creates the corresponding operational record and links it to the correct community, unit, and resident account context"
+        },
+        {
+          "id": "AC-048",
+          "description": "Residents can complete required tasks",
+          "measurable_condition": "For any open Responsibility Item assigned to a resident, the portal exposes the required action state and records completion when the resident uploads the required document, acknowledges the notice, or makes the required payment"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-11",
+        "WF-16",
+        "WF-17",
+        "ENT-PORTAL-ACCESS-PROFILE",
+        "ENT-RESPONSIBILITY-ITEM",
+        "ENT-DOCUMENT-RECORD",
+        "ENT-CHARGE",
+        "ENT-INVOICE",
+        "ENT-PAYMENT"
+      ]
+    },
+    {
+      "id": "US-017",
+      "role": "Homeowner",
+      "action": "track External HOA Context Tracking for work that may require HOA rules, approvals, notices, or governing documents",
+      "outcome": "HOA constraints remain visible even when the HOA is not a platform participant",
+      "acceptance_criteria": [
+        {
+          "id": "AC-049",
+          "description": "HOA-related constraints can be attached to a case",
+          "measurable_condition": "A service case can store one or more Approval Requirement or Compliance Policy records tied to HOA rules, permit needs, or policy gates before work proceeds"
+        },
+        {
+          "id": "AC-050",
+          "description": "Governing documents are retrievable in context",
+          "measurable_condition": "A homeowner can link CC&Rs or other governing documents to the relevant property or service case and open the linked document from the case workspace"
+        },
+        {
+          "id": "AC-051",
+          "description": "Notice and approval actions are recorded",
+          "measurable_condition": "Each HOA-related submission, approval, denial, or notice creates an Approval Action or Correspondence Record linked to the same property and service case"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "UJ-1",
+        "WF-8",
+        "WF-18",
+        "ENT-APPROVAL-REQUIREMENT",
+        "ENT-COMPLIANCE-POLICY",
+        "ENT-APPROVAL-ACTION",
+        "ENT-CORRESPONDENCE-RECORD",
+        "ENT-DOCUMENT-RECORD",
+        "VOC-9",
+        "VOC-17",
+        "COMP-4",
+        "COMP-13"
+      ]
+    },
+    {
+      "id": "US-018",
+      "role": "Compliance Administrator",
+      "action": "monitor provider licensing, insurance, approved vendor status, and scheduling blocks",
+      "outcome": "providers that do not meet required compliance conditions are flagged before work is scheduled or approved",
+      "acceptance_criteria": [
+        {
+          "id": "AC-052",
+          "description": "Provider qualifications are tracked with effective dates",
+          "measurable_condition": "A Service Provider record can store Provider Qualification entries for license, insurance, bonding, certification, and approved vendor status, each with effective date and expiration date when applicable"
+        },
+        {
+          "id": "AC-053",
+          "description": "Scheduling blocks are enforced",
+          "measurable_condition": "If a provider linked to a case has an expired or missing required qualification, the system prevents creation of a schedulable appointment state and records the blocking reason on the case or provider record"
+        },
+        {
+          "id": "AC-054",
+          "description": "Compliance alerts are generated for changes in status",
+          "measurable_condition": "When a tracked provider qualification expires or changes to a non-compliant status, the system creates an alert or task linked to the provider within 1 workflow run and makes the blocking condition visible to staff"
+        }
+      ],
+      "priority": "high",
+      "traces_to": [
+        "WF-5",
+        "WF-11",
+        "WF-18",
+        "ENT-SERVICE-PROVIDER",
+        "ENT-PROVIDER-QUALIFICATION",
+        "ENT-APPOINTMENT",
+        "COMP-8",
+        "COMP-9",
+        "COMP-10"
+      ]
+    },
+    {
+      "id": "US-019",
+      "role": "Finance Administrator",
+      "action": "track operational billing and payment outcomes under a configurable Phase 1 business model",
+      "outcome": "the platform can record who owes what and why for homeowner, provider, or concierge-side charges without hard-coding a single monetization model",
+      "acceptance_criteria": [
+        {
+          "id": "AC-055",
+          "description": "Billing model is configurable",
+          "measurable_condition": "The platform stores one active billing model per tenant that can assign billable responsibility to homeowner, service provider, staff-assisted concierge service, or a supported combination"
+        },
+        {
+          "id": "AC-056",
+          "description": "Charges and invoices retain operational context",
+          "measurable_condition": "Each Charge or Invoice created under the active billing model is linked to the related property, service case, provider, or community record that caused the charge"
+        },
+        {
+          "id": "AC-057",
+          "description": "Payments are allocatable and auditable",
+          "measurable_condition": "A recorded Payment can be allocated to one or more invoice line items or charges through Payment Allocation records, and the full allocation history remains retrievable for audit"
+        }
+      ],
+      "priority": "medium",
+      "traces_to": [
+        "WF-17",
+        "ENT-CHARGE",
+        "ENT-INVOICE",
+        "ENT-INVOICE-LINE-ITEM",
+        "ENT-PAYMENT",
+        "ENT-PAYMENT-ALLOCATION",
+        "Q-5",
+        "Q-13",
+        "COMP-1",
+        "COMP-6",
+        "COMP-11"
+      ]
+    },
+    {
+      "id": "US-020",
+      "role": "Operations Leader",
+      "action": "define and run product-level operational reports for each pillar phase",
+      "outcome": "success outcomes are measured through explicit report definitions instead of broad implementation claims",
+      "acceptance_criteria": [
+        {
+          "id": "AC-058",
+          "description": "Success outcomes are captured as saved reporting definitions",
+          "measurable_condition": "An operations leader can create one or more Report Definition records that specify metric name, source scope, date range logic, and owning phase or pillar"
+        },
+        {
+          "id": "AC-059",
+          "description": "Report runs produce dated evidence",
+          "measurable_condition": "Executing a saved report creates a Report Run with generation timestamp and stored metric outputs for the selected scope"
+        },
+        {
+          "id": "AC-060",
+          "description": "Metrics can be compared across reporting periods",
+          "measurable_condition": "The system can display at least two KPI Snapshot values for the same metric across different reporting dates for the same property, portfolio, community, provider, or workflow scope"
+        }
+      ],
+      "priority": "medium",
+      "traces_to": [
+        "WF-19",
+        "ENT-REPORT-DEFINITION",
+        "ENT-REPORT-RUN",
+        "ENT-KPI-SNAPSHOT",
+        "Q-12"
+      ]
+    }
+  ]
+}

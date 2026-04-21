@@ -164,7 +164,9 @@ export const SUB_PHASE_NAMES: Record<PhaseId, Record<string, string>> = {
   },
   '2': {
     '2.1': 'Functional Requirements Bloom',
+    '2.1a': 'Functional Requirements Decomposition',
     '2.2': 'Non-Functional Requirements Bloom',
+    '2.2a': 'Non-Functional Requirements Decomposition',
     '2.3': 'Requirements Mirror and Menu',
   },
   '3': {
@@ -279,6 +281,12 @@ export const SUB_PHASE_ORDER_BY_LENS: Partial<Record<PhaseId, Partial<Record<Int
       '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7',
     ],
   },
+  // Wave 6 — product-lens Phase 2 inserts 2.1a (recursive FR
+  // decomposition) between root FR bloom and NFR bloom. Default lens
+  // skips 2.1a since there's no handoff to drive the decomposition.
+  '2': {
+    product: ['2.1', '2.1a', '2.2', '2.2a', '2.3'],
+  },
 };
 
 /**
@@ -357,6 +365,9 @@ export type RecordType =
   | 'query_decomposition_record'
   | 'dmr_pipeline'
   | 'product_description_handoff'
+  | 'requirement_decomposition_node'
+  | 'assumption_set_snapshot'
+  | 'requirement_decomposition_pipeline'
   | 'memory_edge_proposed'
   | 'memory_edge_confirmed'
   | 'intent_quality_report'
@@ -601,6 +612,149 @@ export interface DmrPipelineContent {
   stages: DmrStageEntry[];
   completeness_status?: string;
   retrieval_brief_record_id?: string;
+}
+
+// ── Wave 6: Recursive Requirements Decomposition ──────────────────
+//
+// Phase 2.1 + 2.2 evolve from single-pass FR/NFR bloom into a recursive
+// decomposition driven by an assumption-saturation termination criterion
+// (see project memory project_wave6_recursive_decomposition.md).
+//
+// Three append-only record types collaborate:
+//   - requirement_decomposition_pipeline: container card for a root FR
+//   - requirement_decomposition_node: one per node in the tree (root +
+//     descendants); never mutated post-creation
+//   - assumption_set_snapshot: written once per pass; saturation
+//     detected when delta_from_previous_pass === 0
+//
+// NFRs ship single-pass in Wave 6 against the frozen FR tree; recursive
+// NFR decomposition is expected as a follow-up wave.
+
+export type DecompositionNodeStatus =
+  | 'pending'
+  | 'decomposed'
+  | 'atomic'
+  | 'pruned'
+  | 'deferred'
+  /**
+   * Wave 6 Step 4b — the orchestrator detected post-gate that this node
+   * (previously accepted by the human as a Tier-B commitment) still has
+   * commitment layers underneath. The original acceptance stands, but
+   * the human is being shown a follow-up gate for the sub-commitments
+   * with a context note explaining the situation.
+   */
+  | 'downgraded';
+
+/**
+ * Semantic tier label for a decomposition node (Wave 6). The tier is
+ * assigned by the decomposer and drives the orchestrator's routing:
+ *   - Tier A (functional sub-area) → keep recursing.
+ *   - Tier B (scope commitment) → mirror-gate the human.
+ *   - Tier C (implementation commitment) → keep recursing or freeze if atomic.
+ *   - Tier D (leaf operation) → freeze after atomic-criteria check.
+ * Depth in the tree is a SECONDARY signal; tier is the primary driver.
+ */
+export type DecompositionTier = 'A' | 'B' | 'C' | 'D';
+
+export interface DecompositionAtomicCriteria {
+  ac_testable: boolean;
+  single_operation: boolean;
+  regime_cited: boolean;
+  assumptions_listed: boolean;
+}
+
+export interface DecompositionUserStory {
+  id: string;
+  role: string;
+  action: string;
+  outcome: string;
+  acceptance_criteria: Array<{ id: string; description: string; measurable_condition: string }>;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  traces_to?: string[];
+}
+
+export interface RequirementDecompositionNodeContent {
+  kind: 'requirement_decomposition_node';
+  node_id: string;
+  parent_node_id: string | null;
+  root_fr_id: string;
+  depth: number;
+  pass_number: number;
+  status: DecompositionNodeStatus;
+  /**
+   * Semantic tier assigned by the decomposer (Wave 6 Step 4a+). Absent on
+   * depth-0 root nodes (roots are tier-agnostic "the whole epic"). Present
+   * on every depth-1+ node. Drives orchestrator routing; see DecompositionTier.
+   */
+  tier?: DecompositionTier;
+  /**
+   * Wave 6 NFR extension — which kind of root this subtree descends from.
+   * Absent / 'fr' for Functional Requirement trees (backward compatible);
+   * 'nfr' for Non-Functional Requirement trees seeded from Phase 2.2.
+   * Used by downstream projection (getFrozenFrLeaves vs future
+   * getFrozenNfrLeaves) and by the webview to colour trees distinctly.
+   */
+  root_kind?: 'fr' | 'nfr';
+  user_story: DecompositionUserStory;
+  decomposition_rationale?: string;
+  surfaced_assumption_ids: string[];
+  atomic_criteria_satisfied?: DecompositionAtomicCriteria;
+  pruning_reason?: string;
+}
+
+export type AssumptionCategory =
+  | 'domain_regime'
+  | 'constraint'
+  | 'compliance'
+  | 'scope'
+  | 'open_question';
+
+export type DecompositionAssumptionSource = 'handoff' | 'bloom' | 'decomposition' | 'human';
+
+export interface AssumptionEntry {
+  id: string;
+  text: string;
+  source: DecompositionAssumptionSource;
+  surfaced_at_node?: string;
+  surfaced_at_pass: number;
+  category: AssumptionCategory;
+  citations?: string[];
+}
+
+export interface AssumptionSetSnapshotContent {
+  kind: 'assumption_set_snapshot';
+  pass_number: number;
+  root_fr_id: string;
+  assumptions: AssumptionEntry[];
+  delta_from_previous_pass: number;
+}
+
+export type DecompositionPassStatus = 'pending' | 'running' | 'completed' | 'terminated';
+
+export type DecompositionTerminationReason =
+  | 'fixed_point'
+  | 'depth_cap'
+  | 'budget_cap'
+  | 'human_pruned_all';
+
+export interface DecompositionPassEntry {
+  pass_number: number;
+  status: DecompositionPassStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  nodes_produced: number;
+  assumption_delta: number;
+  termination_reason?: DecompositionTerminationReason;
+}
+
+export interface RequirementDecompositionPipelineContent {
+  kind: 'requirement_decomposition_pipeline';
+  pipeline_id: string;
+  root_fr_id: string;
+  passes: DecompositionPassEntry[];
+  final_leaf_count?: number;
+  final_max_depth?: number;
+  total_llm_calls?: number;
 }
 
 // ── Product Description Handoff (Phase 1 product lens) ──────────────

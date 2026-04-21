@@ -1,0 +1,305 @@
+{
+  "kind": "non_functional_requirements",
+  "requirements": [
+    {
+      "id": "NFR-001",
+      "category": "security",
+      "description": "All public traffic must enter the system via Cloudflare CDN with no direct origin IP exposure.",
+      "threshold": "Cloudflare CDN is the only public entry point; No direct client access to the origin IP is permitted.",
+      "measurement_method": "Network ingress inspection and origin IP exposure verification.",
+      "traces_to": [
+        "VV-1",
+        "COMP-4",
+        "TECH-1",
+        "TECH-3"
+      ]
+    },
+    {
+      "id": "NFR-002",
+      "category": "security",
+      "description": "All uploaded assets must be scanned for malware before processing.",
+      "threshold": "Malware scanning enabled via ClamAV for all incoming file uploads.",
+      "measurement_method": "File processing log audit and malware scanner status check.",
+      "traces_to": [
+        "VV-2",
+        "TECH-19"
+      ]
+    },
+    {
+      "id": "NFR-003",
+      "category": "security",
+      "description": "Multi-tenant data isolation enforced at database level to prevent cross-tenant data leakage.",
+      "threshold": "Row-Level Security (RLS) prevents any SQL query on tenant A from retrieving tenant B data with 100% isolation success rate.",
+      "measurement_method": "Database security policy review and query isolation testing using automated harness.",
+      "traces_to": [
+        "VV-3",
+        "QA-3",
+        "COMP-5",
+        "TECH-8"
+      ]
+    },
+    {
+      "id": "NFR-004",
+      "category": "reliability",
+      "description": "Mobile applications must function without active network connectivity with full offline support.",
+      "threshold": "Mobile clients supporting offline-first capabilities with zero data loss during disconnection.",
+      "measurement_method": "Network disconnection simulation test on mobile build.",
+      "traces_to": [
+        "VV-4",
+        "QA-13",
+        "TECH-5"
+      ]
+    },
+    {
+      "id": "NFR-005",
+      "category": "reliability",
+      "description": "Multi-step workflows must maintain state consistency and allow retrying without side effects.",
+      "threshold": "Ensures idempotency and monotonic state transitions for all multi-step processes.",
+      "measurement_method": "Replay test of workflow execution and state log consistency verification.",
+      "traces_to": [
+        "VV-5",
+        "TECH-7"
+      ]
+    },
+    {
+      "id": "NFR-006",
+      "category": "durability",
+      "description": "Property data and governance history must persist despite tenant changes over time.",
+      "threshold": "Property data and governance history must remain persistent and isolated across tenant lifecycle.",
+      "measurement_method": "Long-term data retention audit and tenant change isolation test.",
+      "traces_to": [
+        "VV-6",
+        "COMP-2"
+      ]
+    },
+    {
+      "id": "NFR-007",
+      "category": "observability",
+      "description": "System telemetry must be collected and aggregated via a designated OTel collector.",
+      "threshold": "Observability services implemented via OpenTelementry with 100% critical stack trace capture.",
+      "measurement_method": "OTel pipeline connectivity and log integrity verification.",
+      "traces_to": [
+        "VV-7",
+        "QA-14",
+        "TECH-13"
+      ]
+    },
+    {
+      "id": "NFR-008",
+      "category": "performance",
+      "description": "Interactive API latency must remain low for user-facing endpoints.",
+      "threshold": "p95 API response time must not exceed 200 milliseconds.",
+      "measurement_method": "Server-side timing histogram; Prometheus-style SLO burn-rate alerts.",
+      "traces_to": [
+        "QA-1"
+      ]
+    },
+    {
+      "id": "NFR-009",
+      "category": "security",
+      "description": "All sensitive data at rest must be encrypted using industry standard algorithms.",
+      "threshold": "data at rest must be encrypted using AES-256 standard.",
+      "measurement_method": "Ciphertext verification and KMS key audit.",
+      "traces_to": [
+        "QA-2"
+      ]
+    },
+    {
+      "id": "NFR-010",
+      "category": "security",
+      "description": "Active session tokens must expire automatically after a defined period of inactivity.",
+      "threshold": "Session tokens must expire automatically after 15 minutes of inactivity.",
+      "measurement_method": "Session refresh tracking and timeout event log analysis.",
+      "traces_to": [
+        "QA-4"
+      ]
+    },
+    {
+      "id": "NFR-011",
+      "category": "security",
+      "description": "All external API communications must use the latest secure transport protocol.",
+      "threshold": "all external API calls must use TLS 1.3 or higher encryption.",
+      "measurement_method": "TLS handshake inspection and certificate chain verification.",
+      "traces_to": [
+        "QA-5",
+        "TECH-2"
+      ]
+    },
+    {
+      "id": "NFR-012",
+      "category": "security",
+      "description": "Payment gateway must maintain compliance with global financial security standards.",
+      "threshold": "Payment gateway must maintain PCI-DSS Level 1 certification status.",
+      "measurement_method": "Vendor attestation and periodic PCI audit review.",
+      "traces_to": [
+        "QA-6"
+      ]
+    },
+    {
+      "id": "NFR-013",
+      "category": "auditability",
+      "description": "Audit logs must be immutable to prevent tampering or deletion of state change records.",
+      "threshold": "audit logs must be immutable and append-only with no write access controls.",
+      "measurement_method": "Write audit log integrity check and access control verification.",
+      "traces_to": [
+        "QA-7"
+      ]
+    },
+    {
+      "id": "NFR-014",
+      "category": "availability",
+      "description": "System backups must occur frequently to ensure recoverability after disaster events.",
+      "threshold": "Backup frequency must occur at least once every 6 hours.",
+      "measurement_method": "Backup completion job monitoring and log verification.",
+      "traces_to": [
+        "QA-8"
+      ]
+    },
+    {
+      "id": "NFR-015",
+      "category": "availability",
+      "description": "Recovery time objective (RTO) must be met to minimize downtime.",
+      "threshold": "recovery time objective (RTO) must be under 4 hours after disaster event.",
+      "measurement_method": "Disaster recovery simulation test.",
+      "traces_to": [
+        "QA-9"
+      ]
+    },
+    {
+      "id": "NFR-016",
+      "category": "durability",
+      "description": "Recovery point objective (RPO) must be met to minimize data loss.",
+      "threshold": "recovery point objective (RPO) must be under 5 minutes for critical ledgers.",
+      "measurement_method": "Last backup timestamp vs failure point verification.",
+      "traces_to": [
+        "QA-10"
+      ]
+    },
+    {
+      "id": "NFR-017",
+      "category": "compliance",
+      "description": "Data subject access requests (DSAR) must be processed within regulatory timelines.",
+      "threshold": "GDPR data subject access request response must be initiated within 72 hours.",
+      "measurement_method": "DSAR intake timestamp to response initiation timestamp measurement.",
+      "traces_to": [
+        "QA-11"
+      ]
+    },
+    {
+      "id": "NFR-018",
+      "category": "security",
+      "description": "User credentials must be hashed and salted before storage to prevent reverse engineering.",
+      "threshold": "all user passwords must be salted and hashed using bcrypt algorithm.",
+      "measurement_method": "Database schema inspection for password hash format verification.",
+      "traces_to": [
+        "QA-12"
+      ]
+    },
+    {
+      "id": "NFR-019",
+      "category": "scalability",
+      "description": "API ingestion must be rate-limited to protect against abuse.",
+      "threshold": "rate limiting must allow max 100 requests per minute per user ID.",
+      "measurement_method": "Inbound request rate log analysis.",
+      "traces_to": [
+        "QA-15"
+      ]
+    },
+    {
+      "id": "NFR-020",
+      "category": "security",
+      "description": "Cross-origin requests must be restricted to approved domains only.",
+      "threshold": "cross-origin resource sharing (CORS) policy must strictly whitelist approved domains.",
+      "measurement_method": "CORS header configuration review and test.",
+      "traces_to": [
+        "QA-16"
+      ]
+    },
+    {
+      "id": "NFR-021",
+      "category": "compliance",
+      "description": "Sensitive financial records must be retained for the legally required duration.",
+      "threshold": "data retention for sensitive financial records must be exactly 7 years.",
+      "measurement_method": "Data archival policy review and retention tag audit.",
+      "traces_to": [
+        "QA-17",
+        "COMP-2"
+      ]
+    },
+    {
+      "id": "NFR-022",
+      "category": "security",
+      "description": "Role-based access control must enforce least privilege for all users.",
+      "threshold": "RBAC permissions must enforce least privilege principle for all user roles.",
+      "measurement_method": "Policy engine audit and permission set review.",
+      "traces_to": [
+        "QA-18",
+        "TECH-11"
+      ]
+    },
+    {
+      "id": "NFR-023",
+      "category": "security",
+      "description": "All login forms must be protected against cross-site request forgery attacks.",
+      "threshold": "cross-site request forgery (CSRF) protection must be enabled on all login forms.",
+      "measurement_method": "Form input inspection for CSRF token validation.",
+      "traces_to": [
+        "QA-19"
+      ]
+    },
+    {
+      "id": "NFR-024",
+      "category": "maintainability",
+      "description": "Schema migrations must ensure service continuity during updates.",
+      "threshold": "database schema migrations must not cause downtime during major versions.",
+      "measurement_method": "Migration deployment log analysis for downtime measurement.",
+      "traces_to": [
+        "QA-20"
+      ]
+    },
+    {
+      "id": "NFR-025",
+      "category": "compliance",
+      "description": "The system ledger structure must be auditable and compliant with accounting standards.",
+      "threshold": "Auditable, compliant GL structure with cryptographic integrity hashes.",
+      "measurement_method": "GL entry audit and hash verification.",
+      "traces_to": [
+        "COMP-1"
+      ]
+    },
+    {
+      "id": "NFR-026",
+      "category": "compliance",
+      "description": "Statutory notices and meeting agendas must be issued and logged within regulatory deadlines.",
+      "threshold": "Statutory deadlines, notice requirements, and voting rules must be respected.",
+      "measurement_method": "Notice issuance timestamp vs. statutory deadline verification.",
+      "traces_to": [
+        "COMP-2",
+        "COMP-7",
+        "COMP-8"
+      ]
+    },
+    {
+      "id": "NFR-027",
+      "category": "security",
+      "description": "Vendor partners must maintain valid certifications and insurance coverage.",
+      "threshold": "State/county licensing, Trade certifications, Insurance and bonding compliance monitoring.",
+      "measurement_method": "Vendor profile review for valid document status.",
+      "traces_to": [
+        "COMP-3",
+        "US-005"
+      ]
+    },
+    {
+      "id": "NFR-028",
+      "category": "compliance",
+      "description": "System tax calculations must align with jurisdictional configuration.",
+      "threshold": "Ledger Entry includes correct tax amount based on Tax Jurisdiction config.",
+      "measurement_method": "Ledger tax amount vs. Jurisdiction config verification.",
+      "traces_to": [
+        "COMP-6",
+        "US-016"
+      ]
+    }
+  ]
+}

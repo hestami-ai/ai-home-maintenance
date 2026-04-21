@@ -365,3 +365,21 @@ This plan assumes the answers given earlier in the conversation:
 Outstanding:
 - Is Wave 1 OK to kick off as soon as this plan is approved, or do you want to sequence differently?
 - For Wave 4 (harness oracle shape/coverage thresholds), are the ranges in §10.2 acceptable, or do you want to tighten/loosen them?
+
+---
+
+## 14. Wave 5 — Phase 2 product-lens upgrade *(post-implementation notes)*
+
+Wave 5 extends the traceability spine one phase downstream. Summary:
+
+- **`Phase2Handler`** now detects `product_description_handoff` presence in the governed stream. When found, the FR/NFR bloom helpers resolve `lens: product` templates that consume the handoff's rich sections directly rather than re-deriving from `intent_statement`. When absent (default lens), behavior is unchanged — minimal-risk isolation.
+- **`traces_to[]`** added to every `UserStory` (FR) and `NonFunctionalRequirement` (NFR). Valid id prefixes: `UJ-*` / `ENT-*` / `WF-*` / `COMP-*` / `VOC-*` / `Q-*` for FRs; `VV-*` / `QA-#` / `TECH-*` / `COMP-*` / `UJ-*` for NFRs.
+- **`requirements_agent` role** added to `llm_routing` with its own CLI env-var plumbing (`JANUMICODE_REQUIREMENTS_AGENT_BACKING/PROVIDER/MODEL`). Mirrors the orchestrator + domain_interpreter routing pattern.
+- **`PHASE2_CONTRACT_PRODUCT`** + two new multi-failure oracle validators:
+  - `validateRequirementsProductTraceability` (error): every FR/NFR has non-empty `traces_to[]` and all ids resolve against the handoff catalog.
+  - `validateJourneyCoverageByFRs` (warning): every accepted `userJourney` has ≥1 FR tracing to it.
+- **Two gold references captured at Wave 5.10** — `product_requirements.qwen.gold.json` (baseline, qwen3.5:9b) and `product_requirements.codex.gold.json` (rich, Codex gpt-5.4).
+
+Downstream implication: when Phase 3–9 are upgraded in future waves, they'll follow the same pattern — detect handoff presence, resolve lens-tagged templates, carry `traces_to[]` on every derived artifact. Phase 8 Evaluation walks the resulting chain `source_ref → extracted_item → requirement → component → test_result` for mechanical drift detection.
+
+**Deferred** (tracked for follow-up): recursive requirements decomposition within Phase 2 — currently FR and NFR are each single LLM passes. If the product-lens run shows signs of probabilistic drift (missing journey coverage, unclassified NFRs), decompose further (e.g. 2.2a security / 2.2b performance / 2.2c compliance).

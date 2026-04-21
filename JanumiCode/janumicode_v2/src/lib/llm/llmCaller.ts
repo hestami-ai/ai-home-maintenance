@@ -84,6 +84,14 @@ export interface LLMCallOptions {
    * when no writer is attached, instrumentation is skipped silently.
    */
   traceContext?: LLMTraceContext;
+  /**
+   * Optional AbortSignal. When fired, the underlying provider is
+   * expected to cancel the in-flight HTTP request. Ollama streaming
+   * honors this via fetch/http.request aborts. Used by the CLI's
+   * session abort plumbing so `waitForQuiescence` stall detection
+   * can unblock a hung LLM call.
+   */
+  abortSignal?: AbortSignal;
 }
 
 export interface LLMCallResult {
@@ -317,6 +325,31 @@ export class LLMCaller {
       const loopDetector = new LoopDetector();
       const abortController = new AbortController();
       let abortReason: string | null = null;
+      // Union the caller-provided abort signal (e.g. session abort from
+      // waitForQuiescence stall) with our internal one. When the caller's
+      // signal fires, we abort the internal controller so the provider's
+      // HTTP request tears down cleanly.
+      if (options.abortSignal) {
+        const external = options.abortSignal;
+        const onExternalAbort = () => {
+          abortReason ??= 'session abort (external signal)';
+          if (!abortController.signal.aborted) abortController.abort();
+        };
+        if (external.aborted) onExternalAbort();
+        else external.addEventListener('abort', onExternalAbort, { once: true });
+      }
+      // Runtime size-budget cap — a third stall signature complementing
+      // records-idle (silent hang) and LoopDetector (n-gram repetition).
+      // When a call's cumulative streamed chars exceed this budget, the
+      // model is almost certainly stuck in verbose-but-not-converging
+      // thinking mode: it's actively emitting tokens but given the
+      // context window (e.g. 262144 for qwen3.5:9b), there's no
+      // budget left for a final response. Observed cal-3 signature:
+      // 2.3MB .log file, 228K thinking chars, no FINAL TEXT ever
+      // produced. Default 800000 chars (~200K tokens) leaves headroom
+      // for legitimate long outputs while aborting runaway thinking.
+      const maxResponseChars = Number.parseInt(
+        process.env.JANUMICODE_LLM_MAX_RESPONSE_CHARS ?? '800000', 10);
       const streamingOptions: LLMStreamingCallOptions = {
         ...options,
         abortSignal: abortController.signal,
@@ -333,6 +366,11 @@ export class LLMCaller {
             const reason = loopDetector.observe(chunk.text);
             if (reason) {
               abortReason = reason;
+              abortController.abort();
+              return;
+            }
+            if (maxResponseChars > 0 && cumulativeChars > maxResponseChars) {
+              abortReason = `max_response_chars exceeded (${cumulativeChars} > ${maxResponseChars}) — likely context-budget starvation in thinking mode`;
               abortController.abort();
             }
           }

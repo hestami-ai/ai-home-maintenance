@@ -15,6 +15,9 @@
   import PreMortemCard from './PreMortemCard.svelte';
   import DecisionBundleCard from './DecisionBundleCard.svelte';
   import DmrPipelineCard from './DmrPipelineCard.svelte';
+  import DecompositionNodeCard from './DecompositionNodeCard.svelte';
+  import AssumptionSnapshotCard from './AssumptionSnapshotCard.svelte';
+  import DecompositionPipelineCard from './DecompositionPipelineCard.svelte';
 
   interface Props {
     record: SerializedRecord;
@@ -131,6 +134,18 @@
   // dmr_pipeline record references them via `output_record_id`. Hide
   // them from top-level so the DMR pipeline surfaces as one card.
   const isDmrDetailChild = $derived(recordsStore.isReferencedByDmrPipeline(record));
+
+  // Wave 6 — decomposition-tree descendants (depth ≥ 1) render nested
+  // inside their root node's card, so suppress at top level.
+  const isNonRootDecomp = $derived(recordsStore.isNonRootDecompositionNode(record));
+
+  // Wave 6 follow-up — a decomposition pipeline container owns the
+  // tree + snapshot records for its root_kind. When the container
+  // exists, suppress the owned records at top level (they render nested
+  // inside the pipeline card). Superseded pipeline versions are also
+  // hidden so only the latest pipeline card appears.
+  const isSupersededPipeline = $derived(recordsStore.isSupersededDecompositionPipeline(record));
+  const isOwnedByPipeline = $derived(recordsStore.isOwnedByDecompositionPipeline(record));
 </script>
 
 <!-- Agent child records: skip at top level (rendered nested by AgentInvocationCard) -->
@@ -139,10 +154,34 @@
 <!-- DMR detail records: skip at top level (rendered inline by DmrPipelineCard) -->
 {:else if isDmrDetailChild}
   <!-- deliberately empty — rendered by DmrPipelineCard -->
+<!-- Wave 6: non-root decomposition nodes render inside root DecompositionNodeCard -->
+{:else if isNonRootDecomp}
+  <!-- deliberately empty — rendered nested by the root's DecompositionNodeCard -->
+<!-- Wave 6 follow-up: superseded pipeline container records are hidden -->
+{:else if isSupersededPipeline}
+  <!-- deliberately empty — only the latest pipeline record per pipeline_id renders -->
+<!-- Wave 6 follow-up: nodes + snapshots owned by a pipeline render nested inside its card -->
+{:else if isOwnedByPipeline}
+  <!-- deliberately empty — rendered inside DecompositionPipelineCard -->
 <!-- DMR pipeline composite card -->
 {:else if record.record_type === 'dmr_pipeline'}
   <div data-record-id={record.id} data-phase-id={record.phase_id}>
     <DmrPipelineCard {record} />
+  </div>
+<!-- Wave 6 follow-up: decomposition pipeline composite (latest per pipeline_id) -->
+{:else if record.record_type === 'requirement_decomposition_pipeline'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <DecompositionPipelineCard {record} />
+  </div>
+<!-- Wave 6: decomposition root (depth-0) when no pipeline card exists -->
+{:else if record.record_type === 'requirement_decomposition_node'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <DecompositionNodeCard {record} />
+  </div>
+<!-- Wave 6: assumption snapshot per saturation pass when no pipeline card exists -->
+{:else if record.record_type === 'assumption_set_snapshot'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <AssumptionSnapshotCard {record} />
   </div>
 <!-- Agent invocation card (always expanded, owns its children) -->
 {:else if record.record_type === 'agent_invocation'}

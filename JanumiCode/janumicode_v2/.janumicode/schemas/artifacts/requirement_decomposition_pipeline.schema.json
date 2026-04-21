@@ -1,0 +1,31 @@
+{
+  "$id": "janumicode:requirement_decomposition_pipeline:1.0",
+  "title": "Requirement Decomposition Pipeline",
+  "description": "Wave 6 — container card for a recursive FR decomposition. One record per root FR; passes[] grows incrementally as recursion proceeds. final_* fields populated when pipeline reaches terminal status.",
+  "type": "object",
+  "required": ["kind", "pipeline_id", "root_fr_id", "passes"],
+  "properties": {
+    "kind": { "const": "requirement_decomposition_pipeline" },
+    "pipeline_id": { "type": "string" },
+    "root_fr_id": { "type": "string" },
+    "passes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pass_number", "status", "started_at", "completed_at", "nodes_produced", "assumption_delta"],
+        "properties": {
+          "pass_number": { "type": "integer", "minimum": 0 },
+          "status": { "type": "string", "enum": ["pending", "running", "completed", "terminated"] },
+          "started_at": { "type": ["string", "null"] },
+          "completed_at": { "type": ["string", "null"] },
+          "nodes_produced": { "type": "integer", "minimum": 0 },
+          "assumption_delta": { "type": "integer", "minimum": 0 },
+          "termination_reason": { "type": "string", "enum": ["fixed_point", "depth_cap", "budget_cap", "human_pruned_all"] }
+        }
+      }
+    },
+    "final_leaf_count": { "type": "integer", "minimum": 0 },
+    "final_max_depth": { "type": "integer", "minimum": 0 },
+    "total_llm_calls": { "type": "integer", "minimum": 0 }
+  }
+}

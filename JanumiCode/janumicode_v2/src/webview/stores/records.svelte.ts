@@ -134,9 +134,104 @@ class RecordsStore {
     return false;
   }
 
+  /**
+   * Wave 6 — decomposition-tree child records (depth ≥ 1) are rendered
+   * nested inside their root (depth 0) node's card, not at the top
+   * level. The Card dispatcher calls this to suppress them. Also
+   * suppresses supersession records for already-rendered nodes so the
+   * tree shows one entry per node_id (latest version) — earlier
+   * versions open as history inside the card.
+   */
+  isNonRootDecompositionNode(record: SerializedRecord): boolean {
+    if (record.record_type !== 'requirement_decomposition_node') return false;
+    const content = record.content as { depth?: number };
+    return typeof content.depth === 'number' && content.depth > 0;
+  }
+
+  /**
+   * Wave 6 — a decomposition pipeline record is rendered only in its
+   * latest version per pipeline_id. Earlier versions (incremental
+   * updates through the saturation loop) should be suppressed at top
+   * level so the user sees the ONE current composite card per run.
+   */
+  isSupersededDecompositionPipeline(record: SerializedRecord): boolean {
+    if (record.record_type !== 'requirement_decomposition_pipeline') return false;
+    const c = record.content as { pipeline_id?: string };
+    if (!c.pipeline_id) return false;
+    for (const r of this.records) {
+      if (r.record_type !== 'requirement_decomposition_pipeline') continue;
+      const rc = r.content as { pipeline_id?: string };
+      if (rc.pipeline_id !== c.pipeline_id) continue;
+      if (r.produced_at > record.produced_at) return true;
+    }
+    return false;
+  }
+
+  /**
+   * True when a decomposition-node or assumption-snapshot record is
+   * owned by an emitted pipeline container (i.e. there's a current
+   * decomposition_pipeline record for this run that covers the same
+   * root_kind). Used by Card.svelte to suppress per-node / per-snapshot
+   * cards at top level when the pipeline card is present — the pipeline
+   * card renders them nested.
+   */
+  isOwnedByDecompositionPipeline(record: SerializedRecord): boolean {
+    if (record.record_type !== 'requirement_decomposition_node'
+      && record.record_type !== 'assumption_set_snapshot') return false;
+    const rootKind = resolveRecordRootKind(record);
+    return this.records.some(
+      r => r.record_type === 'requirement_decomposition_pipeline'
+        && resolveRecordRootKind(r) === rootKind,
+    );
+  }
+
+  /**
+   * Return all decomposition-node records whose parent_node_id matches
+   * the given node_id, ordered by produced_at. Supersession records
+   * (same node_id but newer) are kept — the consumer decides whether
+   * to render history.
+   */
+  getDecompositionChildren(parentNodeId: string): SerializedRecord[] {
+    return this.records
+      .filter(r => r.record_type === 'requirement_decomposition_node'
+        && (r.content as { parent_node_id?: string }).parent_node_id === parentNodeId);
+  }
+
+  /**
+   * Return the latest (current) version of each decomposition node
+   * matching the given node_id. Used by the tree renderer to show
+   * exactly one entry per node_id. Earlier versions can be fetched
+   * via getDecompositionNodeHistory for inline history.
+   */
+  getLatestDecompositionNode(nodeId: string): SerializedRecord | undefined {
+    let latest: SerializedRecord | undefined;
+    for (const r of this.records) {
+      if (r.record_type !== 'requirement_decomposition_node') continue;
+      const c = r.content as { node_id?: string };
+      if (c.node_id !== nodeId) continue;
+      if (!latest || r.produced_at > latest.produced_at) latest = r;
+    }
+    return latest;
+  }
+
   get count(): number {
     return this.records.length;
   }
+}
+
+/**
+ * Resolve the effective `root_kind` ('fr' | 'nfr') for a decomposition-
+ * related record. Decomposition nodes carry `root_kind` directly.
+ * Assumption snapshots and pipeline containers encode it via the
+ * `root_fr_id` marker ('*' → FR, '*nfr*' → NFR) because the snapshot
+ * schema predates the `root_kind` field. Returns 'fr' as the default
+ * for records that don't carry either signal.
+ */
+function resolveRecordRootKind(record: SerializedRecord): 'fr' | 'nfr' {
+  const direct = (record.content as { root_kind?: string }).root_kind;
+  if (direct === 'fr' || direct === 'nfr') return direct;
+  const marker = (record.content as { root_fr_id?: string }).root_fr_id ?? '*';
+  return marker === '*nfr*' ? 'nfr' : 'fr';
 }
 
 export const recordsStore = new RecordsStore();

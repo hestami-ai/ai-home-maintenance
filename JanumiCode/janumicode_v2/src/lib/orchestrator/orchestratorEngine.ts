@@ -104,6 +104,42 @@ export class OrchestratorEngine {
   private readonly pendingDecisions = new Map<string, PendingDecision>();
 
   /**
+   * Session-scoped abort signal, plumbed into LLM calls via
+   * `callForRole` / `llmCaller.call`. The CLI's waitForQuiescence
+   * stall detector fires `this.abortSession()` when a run goes
+   * records-silent past the threshold — that cancels any in-flight
+   * ollama streaming call, the saturation loop's catch block writes
+   * a deferred supersession for the offending node, and the phase
+   * handler unwinds cleanly. Without this, a hung ollama generation
+   * holds the await indefinitely and the quiescence watchdog can
+   * only log (not intervene).
+   */
+  private sessionAbortController: AbortController | null = null;
+
+  /**
+   * Set the session abort controller. Called once per CLI invocation
+   * before any phase execution starts. The signal is attached to every
+   * LLM call this engine makes thereafter.
+   */
+  setSessionAbortController(controller: AbortController): void {
+    this.sessionAbortController = controller;
+  }
+
+  /**
+   * Abort the current session — fires the session abort signal,
+   * cancelling any in-flight LLM call that observes the signal
+   * (today: ollama streaming). Callers should abort, then wait for
+   * the phase promise to resolve/reject (it will reject with an
+   * AbortError the saturation loop catches).
+   */
+  abortSession(reason: string): void {
+    if (this.sessionAbortController && !this.sessionAbortController.signal.aborted) {
+      getLogger().warn('workflow', `Session abort: ${reason}`);
+      this.sessionAbortController.abort(new Error(reason));
+    }
+  }
+
+  /**
    * @param db              SQLite database (direct or sidecar-backed)
    * @param configManager   Loaded configuration
    * @param workspacePath   The user's workspace folder. The governed_stream
@@ -840,7 +876,7 @@ export class OrchestratorEngine {
    * responseFormat='json'.
    */
   async callForRole(
-    role: 'orchestrator' | 'domain_interpreter',
+    role: 'orchestrator' | 'domain_interpreter' | 'requirements_agent',
     options: {
       prompt: string;
       responseFormat?: 'json' | 'text';
@@ -871,6 +907,7 @@ export class OrchestratorEngine {
         responseFormat: options.responseFormat,
         temperature,
         traceContext: options.traceContext,
+        abortSignal: this.sessionAbortController?.signal,
       });
     }
 

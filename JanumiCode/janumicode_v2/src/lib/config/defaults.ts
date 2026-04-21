@@ -36,6 +36,7 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
   },
 
   workflow: {
+    records_idle_stall_ms: 900000,
     max_retry_attempts_per_subphase: 3,
     loop_detection_threshold: 3,
     require_human_approval_all_phase_gates: true,
@@ -64,12 +65,24 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     buffer_max_events: 1000,
   },
 
+  decomposition: {
+    depth_cap: 10,
+    budget_cap: 500,
+    fanout_cap: 8,
+    mirror_gate_depth: 2,
+    reasoning_review_on_tier_c: false,
+  },
+
   llm_routing: {
     orchestrator: {
       primary: { backing_tool: 'gemini_cli', model: 'gemini-2.5-flash' },
       temperature: 0.3,
     },
     domain_interpreter: {
+      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      temperature: 0.5,
+    },
+    requirements_agent: {
       primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
       temperature: 0.5,
     },

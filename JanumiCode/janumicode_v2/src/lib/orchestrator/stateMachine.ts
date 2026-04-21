@@ -196,6 +196,24 @@ export class StateMachine {
   }
 
   /**
+   * Persist Wave 6 saturation-loop telemetry (LLM budget used + max
+   * decomposition depth reached) so operators can inspect per-run
+   * decomposition load without scanning the governed stream.
+   */
+  updateDecompositionTelemetry(
+    runId: string,
+    llmCallsUsed: number,
+    maxDepthReached: number,
+  ): void {
+    this.db.prepare(`
+      UPDATE workflow_runs
+         SET decomposition_budget_calls_used = ?,
+             decomposition_max_depth_reached = ?
+       WHERE id = ?
+    `).run(llmCallsUsed, maxDepthReached, runId);
+  }
+
+  /**
    * Mark the workflow run as completed.
    */
   completeWorkflowRun(runId: string): void {
