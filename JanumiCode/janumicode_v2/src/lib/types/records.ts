@@ -477,6 +477,18 @@ export interface WorkflowRun {
    * pick lens-variant prompt templates.
    */
   intent_lens: IntentLens | null;
+  /**
+   * Wave 6 decomposition telemetry. `decomposition_budget_calls_used`
+   * holds the sum of FR + NFR calls for display; the per-kind slices
+   * drive resume-state reconstruction so a completed FR loop doesn't
+   * clobber NFR's baseline. Per-root-within-kind counters are
+   * in-memory only (reset per saturation-loop invocation / resume
+   * session — budget_cap is enforced per-root-per-session).
+   */
+  decomposition_budget_calls_used: number;
+  decomposition_fr_calls_used: number;
+  decomposition_nfr_calls_used: number;
+  decomposition_max_depth_reached: number;
 }
 
 export type WorkflowRunStatus =
@@ -675,8 +687,29 @@ export interface DecompositionUserStory {
 
 export interface RequirementDecompositionNodeContent {
   kind: 'requirement_decomposition_node';
+  /**
+   * Canonical logical identity for this decomposition node. Stable across
+   * revisions (e.g. a Step 4b downgrade re-emit keeps the same node_id).
+   * Minted at first write as a UUID — NOT the LLM's `story.id`, which is
+   * unreliable (LLMs collide on "natural" names like `FR-ACCT-1.1` across
+   * unrelated subtrees). Each subsequent governed_stream revision of the
+   * same logical node shares this value; only `is_current_version=1`
+   * rows participate in the live tree.
+   */
   node_id: string;
+  /**
+   * Parent node's canonical logical UUID (or null at depth 0). Uses
+   * node_id identity, not the LLM's `story.id`.
+   */
   parent_node_id: string | null;
+  /**
+   * Short human-readable label — the LLM's emitted `story.id` with a
+   * collision suffix (`#ab12`) applied when a sibling under the same
+   * parent already uses the same bare label. Presentation-only: logs,
+   * markdown exporter, webview headings, prompt interpolations. Never
+   * used for joins, tree walks, or supersession identity.
+   */
+  display_key: string;
   root_fr_id: string;
   depth: number;
   pass_number: number;
@@ -719,6 +752,17 @@ export interface AssumptionEntry {
   surfaced_at_pass: number;
   category: AssumptionCategory;
   citations?: string[];
+  /**
+   * Wave 6 dedup (flag-but-don't-merge) — when an embedding-similarity
+   * check finds this assumption's text too close to a prior canonical
+   * assumption, we keep the row AND tag it with the canonical id. The
+   * decomposer's raw output is preserved (no data loss); downstream
+   * semantic_delta is computed by filtering to entries where this
+   * field is absent. Null/undefined means "not flagged as duplicate."
+   */
+  duplicate_of?: string;
+  /** Cosine similarity with the canonical entry; populated when duplicate_of is set. */
+  duplicate_similarity?: number;
 }
 
 export interface AssumptionSetSnapshotContent {
@@ -726,7 +770,22 @@ export interface AssumptionSetSnapshotContent {
   pass_number: number;
   root_fr_id: string;
   assumptions: AssumptionEntry[];
+  /**
+   * Raw count: how many entries the decomposer added this pass,
+   * regardless of whether they were flagged as duplicates. Historical /
+   * audit value — preserved even after dedup flagging.
+   */
   delta_from_previous_pass: number;
+  /**
+   * Wave 6 dedup — the count of newly-added entries this pass that were
+   * NOT flagged as duplicates of prior assumptions (via embedding
+   * similarity against the existing set). This is the signal the
+   * saturation terminator gates on: `semantic_delta === 0` means the
+   * model surfaced no genuinely new ideas this pass. When absent (old
+   * snapshots or dedup disabled), callers fall back to
+   * `delta_from_previous_pass`.
+   */
+  semantic_delta?: number;
 }
 
 export type DecompositionPassStatus = 'pending' | 'running' | 'completed' | 'terminated';

@@ -68,7 +68,25 @@ If an NFR leaf applies to ALL FR leaves in a particular subtree, say so in `deco
 
 # Surfacing assumptions
 
-Same mechanism as the FR decomposer. Each surfaced item carries `text`, `category` (`domain_regime` / `constraint` / `compliance` / `scope` / `open_question`), and optional `citations`.
+Same mechanism as the FR decomposer. Each surfaced item carries `text`, `category` (see precise definitions below), and optional `citations`.
+
+## Category definitions — use these precisely, do not mix
+
+Category choice is semantic, not stylistic. A single underlying fact belongs in exactly ONE category; re-tagging the same fact under a different category creates a duplicate that pollutes downstream analysis.
+
+- **`domain_regime`** — a named external standard, law, or domain invariant. Examples: *"NIST 800-53 audit control requirements"*, *"SOTIF obligations under ISO 21448"*, *"HIPAA minimum-necessary disclosure"*.
+- **`compliance`** — a regulatory retention, audit, reporting, or legal-record obligation. Examples: *"7-year audit-record retention per IRS §6001"*, *"GDPR breach-notification clock"*.
+- **`constraint`** — a system-internal or architectural restriction with no external authority. Examples: *"Audit trail is cryptographically chained and append-only"*, *"p99 latency ≤ 2s measured at the edge"*.
+- **`scope`** — what IS or IS NOT covered by this decomposition. Examples: *"Offline-first mobile sync is in scope for v1"*, *"Cross-region replication deferred to v2"*.
+- **`open_question`** — an unresolved decision the human must make. Examples: *"Which SLO target for read-path latency?"*, *"Retention window for security events: 90d or 1y?"*.
+
+**Disambiguation checklist before you emit a category:**
+
+1. Is this fact tied to a **named external authority** (statute, standard body, regulation)? → `domain_regime` or `compliance` (compliance if about retention/audit/disclosure; domain_regime otherwise).
+2. Is this fact a **system-side restriction** with no external authority? → `constraint`.
+3. Is this fact about **what's in or out of the work itself**? → `scope`.
+4. Is this fact an **unanswered question** blocking progress? → `open_question`.
+5. Is the text you're about to write semantically equivalent to an item ALREADY in `existing_assumptions`, just rephrased or category-shifted? → **don't emit it**; it's a duplicate.
 
 # Required output
 

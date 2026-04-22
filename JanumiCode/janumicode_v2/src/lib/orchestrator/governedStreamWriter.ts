@@ -201,6 +201,35 @@ export class GovernedStreamWriter {
   }
 
   /**
+   * Retire any prior current-version `requirement_decomposition_node`
+   * rows whose `content.node_id` (the logical UUID) matches the supplied
+   * id. Invoked after writing a new revision of a logical decomposition
+   * node (Step 4b downgrade, pruned supersession, deferred supersession,
+   * or any future status change) so that at most one row per
+   * (workflow_run_id, content.node_id) is current at a time. Initial
+   * writes of brand-new logical nodes are harmless no-ops — no prior
+   * row matches the freshly-minted UUID.
+   */
+  supersedeDecompositionNodeByLogicalId(
+    workflowRunId: string,
+    logicalNodeId: string,
+    supersedingRecordId: string,
+  ): void {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      UPDATE governed_stream
+         SET is_current_version = 0,
+             superseded_by_id = ?,
+             superseded_at = ?
+       WHERE workflow_run_id = ?
+         AND record_type = 'requirement_decomposition_node'
+         AND is_current_version = 1
+         AND id != ?
+         AND json_extract(content, '$.node_id') = ?
+    `).run(supersedingRecordId, now, workflowRunId, supersedingRecordId, logicalNodeId);
+  }
+
+  /**
    * Mark a record as semantically superseded (across workflow runs).
    */
   semanticSupersession(recordId: string, supersededByRecordId: string): void {

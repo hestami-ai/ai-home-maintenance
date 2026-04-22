@@ -15,7 +15,7 @@ import { join } from 'path';
 import path from 'path';
 
 const WORKSPACE_PATH = path.resolve(__dirname, '..', '..', '..');
-const OUTPUT_DIR = join(WORKSPACE_PATH, 'test-output', 'prompt-probes');
+const OUTPUT_DIR = join(WORKSPACE_PATH, 'test-and-evaluation', 'prompt-probe-output');
 
 // ── Types ───────────────────────────────────────────────────────────
 

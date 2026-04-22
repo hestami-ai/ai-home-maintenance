@@ -51,8 +51,12 @@ function makeNodeRecord(opts: {
     sanitized_fields: null,
     content: {
       kind: 'requirement_decomposition_node',
+      // Synthetic test records use opts.node_id as the logical ID
+      // directly (treated opaquely by getFrozenFrLeaves — any unique
+      // string works). Real runs use minted UUIDs.
       node_id: opts.node_id,
       parent_node_id: opts.parent_node_id ?? null,
+      display_key: opts.node_id,
       root_fr_id: opts.node_id,
       depth: opts.depth,
       pass_number: opts.depth,

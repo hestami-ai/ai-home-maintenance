@@ -2,10 +2,11 @@
   // VS Code Extension Development Host configurations for JanumiCode v2.
   //
   // The first positional arg in `args` is the folder the dev host opens as
-  // its active workspace. We always point it at v2's own `test-workspace/`
-  // so state from v1 sessions (which live under JanumiCode/janumicode/
-  // test-workspace) never leaks in, and so the sidecar writes its sqlite
-  // database somewhere predictable and gitignored.
+  // its active workspace. We always point it at v2's own
+  // `test-and-evaluation/test-workspace/` so state from v1 sessions (which
+  // live under JanumiCode/janumicode/test-workspace) never leaks in, and so
+  // the sidecar writes its sqlite database somewhere predictable and
+  // gitignored.
   "version": "0.2.0",
   "configurations": [
     {
@@ -13,7 +14,7 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "${workspaceFolder}/test-workspace",
+        "${workspaceFolder}/test-and-evaluation/test-workspace",
         "--extensionDevelopmentPath=${workspaceFolder}"
       ],
       "outFiles": [
@@ -30,7 +31,7 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "${workspaceFolder}/test-workspace",
+        "${workspaceFolder}/test-and-evaluation/test-workspace",
         "--extensionDevelopmentPath=${workspaceFolder}"
       ],
       "outFiles": [
@@ -72,7 +73,7 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "${workspaceFolder}/test-workspace",
+        "${workspaceFolder}/test-and-evaluation/test-workspace",
         "--extensionDevelopmentPath=${workspaceFolder}",
         "--extensionTestsPath=${workspaceFolder}/out/test/e2e/harness-suite"
       ],
@@ -87,7 +88,7 @@
         "JANUMICODE_AUTOSHOW_LOGS": "0",
         "JANUMICODE_LLM_PROVIDER": "mock",
         "JANUMICODE_HARNESS_INTENT": "Build a simple CLI todo app with add, list, and complete commands, and JSON file persistence.",
-        "JANUMICODE_HARNESS_GAP_PATH": "${workspaceFolder}/test-workspace/.janumicode/harness-gap.json",
+        "JANUMICODE_HARNESS_GAP_PATH": "${workspaceFolder}/test-and-evaluation/test-workspace/.janumicode/harness-gap.json",
         "JANUMICODE_HARNESS_TIMEOUT_MS": "60000"
       }
     },
@@ -101,7 +102,7 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "${workspaceFolder}/test-workspace",
+        "${workspaceFolder}/test-and-evaluation/test-workspace",
         "--extensionDevelopmentPath=${workspaceFolder}",
         "--extensionTestsPath=${workspaceFolder}/out/test/e2e/harness-suite"
       ],
@@ -116,7 +117,7 @@
         "JANUMICODE_AUTOSHOW_LOGS": "0",
         "JANUMICODE_LLM_PROVIDER": "ollama",
         "JANUMICODE_HARNESS_INTENT": "Build a simple CLI todo app with add, list, and complete commands, and JSON file persistence.",
-        "JANUMICODE_HARNESS_GAP_PATH": "${workspaceFolder}/test-workspace/.janumicode/harness-gap.json",
+        "JANUMICODE_HARNESS_GAP_PATH": "${workspaceFolder}/test-and-evaluation/test-workspace/.janumicode/harness-gap.json",
         "JANUMICODE_HARNESS_REAL_PHASE9": "1",
         "JANUMICODE_HARNESS_TIMEOUT_MS": "3600000",
         "JANUMICODE_CLAUDE_SKIP_PERMISSIONS": "1"

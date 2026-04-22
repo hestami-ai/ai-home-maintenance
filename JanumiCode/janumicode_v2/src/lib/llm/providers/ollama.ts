@@ -30,28 +30,30 @@ export class OllamaProvider implements LLMProviderAdapter {
       return this.chatCall(options);
     }
 
-    const isQwen = options.model.toLowerCase().startsWith('qwen');
+    const modelLc = options.model.toLowerCase();
+    const isQwen = modelLc.startsWith('qwen');
+    // Gemma (e.g. `gemma4:e4b`, `gemma3n:e4b`) has a 128K context
+    // ceiling and its own sampling profile. Applied here rather than
+    // in a routing-level override so any caller that points at a gemma
+    // model gets the right defaults automatically.
+    const isGemma = modelLc.startsWith('gemma');
     const onChunk = (options as LLMStreamingCallOptions).onChunk;
 
-    // Qwen thinking models: match the Postman-verified payload exactly.
-    // The user confirmed the canonical Hestami IQC prompt converges in
-    // ~1min with `temperature: 1.0, presence_penalty: 1.5, top_p: 0.95,
-    // top_k: 20, num_ctx: 262144, think: true` — and loops past 10min
-    // when the caller sneaks in a lower temperature (0.3 for structured
-    // JSON output in Phase 1's IQC). Low temp + presence_penalty 1.5
-    // is toxic for qwen3 thinking: the model can't sample its way out
-    // of self-correction because entropy is too low to break recency
-    // penalties. We therefore ignore the caller's temperature on qwen
-    // and apply the Postman baseline. Non-qwen providers still honor
-    // options.temperature as usual.
-    const temperature = isQwen ? 1 : (options.temperature ?? 0.7);
+    // Model-family temperature overrides. Qwen thinking models loop at
+    // low temperatures (see big comment in the original impl). Gemma's
+    // sampling recommendation is temperature=1 with top_k=64, top_p=0.95.
+    // Non-family callers keep their own temperature.
+    let temperature: number;
+    if (isQwen) temperature = 1;
+    else if (isGemma) temperature = 1;
+    else temperature = options.temperature ?? 0.7;
 
     // Token cap (`num_predict`) — off by default to match the
     // Postman-verified payload that works reliably. The original
     // reason we set it was to bound the qwen3 thinking spiral, but
     // the real cause of that spiral was a temperature mismatch (see
     // temperature comment above). With correct temperature + the
-    // streaming loop detector + idle-stall timer, we don't need a
+    // size-cap + idle-stall timer, we don't need a
     // server-side token cap. Env opt-in kept for emergencies; pass
     // `options.maxTokens` explicitly when a specific phase legit
     // needs to bound long outputs.
@@ -74,19 +76,23 @@ export class OllamaProvider implements LLMProviderAdapter {
       think: true,
       options: {
         temperature,
-        num_ctx: 262144,
+        // Gemma maxes out at 128K context; qwen + others get the large
+        // 256K allocation the rest of the pipeline expects.
+        num_ctx: isGemma ? 131072 : 262144,
         ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95 } : {}),
+        ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
         ...(numPredict > 0 ? { num_predict: numPredict } : {}),
       },
     };
 
     if (options.system) body.system = options.system;
-    // Skip format: json for qwen thinking models — when set, Ollama
-    // merges the thinking and response into a single `thinking` field
-    // with an empty `response`, losing the ability to judge both the
-    // reasoning chain and the output. Instead we rely on the prompt
-    // template to request JSON and parse it from the response text.
-    if (options.responseFormat === 'json' && !isQwen) {
+    // Skip format: json for thinking-mode models (qwen, gemma) — when
+    // set, Ollama merges the thinking and response into a single
+    // `thinking` field with an empty `response`, losing the ability to
+    // judge both the reasoning chain and the output. Instead we rely
+    // on the prompt template to request JSON and parse it from the
+    // response text.
+    if (options.responseFormat === 'json' && !isQwen && !isGemma) {
       body.format = 'json';
     }
 
@@ -287,18 +293,18 @@ export class OllamaProvider implements LLMProviderAdapter {
         reject(new LLMError(`Ollama connection error: ${err.message}`, 'network_timeout', undefined, true));
       });
 
-      // Abort wiring: when the LLMCaller's loop detector trips its
-      // signal, kill the in-flight request so qwen3 thinking spirals
-      // can't keep emitting tokens forever. Marked non-retryable —
-      // retrying a confirmed loop would just hit the same trap.
+      // Abort wiring: LLMCaller trips this signal for size-cap,
+      // tiny-chunk flailing, or session abort. Kill the in-flight
+      // request; LLMCaller decides retryability based on its own
+      // abortReason (it overrides this error on the way out).
       if (abortSignal) {
         const onAbort = (): void => {
           req.destroy();
           reject(new LLMError(
-            'Ollama stream aborted by loop detector',
+            'Ollama stream aborted',
             'context_exceeded',
             undefined,
-            false,
+            true,
           ));
         };
         if (abortSignal.aborted) onAbort();
@@ -315,16 +321,23 @@ export class OllamaProvider implements LLMProviderAdapter {
    * a model that supports function calling (e.g. qwen3.5, llama3.1+).
    */
   private chatCall(options: LLMCallOptions): Promise<LLMCallResult> {
-    const isQwen = options.model.toLowerCase().startsWith('qwen');
+    const modelLc = options.model.toLowerCase();
+    const isQwen = modelLc.startsWith('qwen');
+    const isGemma = modelLc.startsWith('gemma');
     const messages: Array<Record<string, unknown>> = [];
     if (options.system) messages.push({ role: 'system', content: options.system });
     messages.push({ role: 'user', content: options.prompt });
+
+    let temperature: number;
+    if (isQwen) temperature = 1;
+    else if (isGemma) temperature = 1;
+    else temperature = options.temperature ?? 0.7;
 
     const body: Record<string, unknown> = {
       model: options.model,
       messages,
       stream: false,
-      ...(isQwen ? { think: true } : {}),
+      ...(isQwen || isGemma ? { think: true } : {}),
       tools: options.tools!.map(t => ({
         type: 'function',
         function: {
@@ -334,9 +347,10 @@ export class OllamaProvider implements LLMProviderAdapter {
         },
       })),
       options: {
-        temperature: options.temperature ?? (isQwen ? 1 : 0.7),
-        num_ctx: 262144,
+        temperature,
+        num_ctx: isGemma ? 131072 : 262144,
         ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95 } : {}),
+        ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
         ...(options.maxTokens ? { num_predict: options.maxTokens } : {}),
       },
     };

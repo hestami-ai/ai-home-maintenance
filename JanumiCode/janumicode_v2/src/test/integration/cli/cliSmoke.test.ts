@@ -32,7 +32,7 @@ const HESTAMI_FIXTURE_DIR = path.join(
   'fixtures',
   'hestami-product-description',
 );
-const WORKSPACE = path.join(REPO_ROOT, 'test-workspace');
+const WORKSPACE = path.join(REPO_ROOT, 'test-and-evaluation', 'test-workspace');
 
 const cliBuilt = fs.existsSync(CLI_PATH);
 const hestamiFixturesPresent = fs.existsSync(HESTAMI_FIXTURE_DIR);

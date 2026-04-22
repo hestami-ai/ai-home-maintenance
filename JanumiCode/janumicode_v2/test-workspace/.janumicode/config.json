@@ -1,9 +1,0 @@
-{
-  "llm_routing": {
-    "reasoning_review": {
-      "primary": { "provider": "ollama", "model": "qwen3.5:9b" },
-      "temperature": 0.2,
-      "trace_max_tokens": 8000
-    }
-  }
-}

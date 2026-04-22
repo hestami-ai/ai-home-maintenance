@@ -75,7 +75,7 @@ const DEFAULT_CONFIG: FailureHandlerConfig = {
   unstickingEnabled: true,
   unstickingConfig: {
     provider: 'google',
-    model: 'gemini-2.0-flash-thinking',
+    model: 'gemini-2.5-flash',
     maxSocraticTurns: 3,
   },
 };

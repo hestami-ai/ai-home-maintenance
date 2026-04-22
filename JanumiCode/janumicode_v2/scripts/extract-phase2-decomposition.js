@@ -17,7 +17,7 @@
  *
  * Usage:
  *   node scripts/extract-phase2-decomposition.js \
- *     --db test-workspace/.janumicode/test-harness/<file>.db \
+ *     --db test-and-evaluation/test-workspace/.janumicode/test-harness/<file>.db \
  *     --out-fr src/test/fixtures/hestami-product-description/gold/product_fr_decomposition.<tag>.gold.json \
  *     --out-nfr src/test/fixtures/hestami-product-description/gold/product_nfr_decomposition.<tag>.gold.json
  *

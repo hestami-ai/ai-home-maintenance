@@ -20,7 +20,7 @@ const rootDir = path.dirname(new URL(import.meta.url).pathname);
 
 export default defineConfig({
   files: 'out/test/e2e/suite/**/*.smoke.test.js',
-  workspaceFolder: path.join(rootDir, 'test-workspace'),
+  workspaceFolder: path.join(rootDir, 'test-and-evaluation', 'test-workspace'),
   mocha: {
     ui: 'bdd',
     color: true,

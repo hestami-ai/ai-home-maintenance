@@ -132,7 +132,7 @@ describe('JanumiCode v2 — virtuous cycle harness', function () {
 
     // 5. Write gap report to disk — the launching process reads this.
     const workspaceFolder = vscodeMod.workspace.workspaceFolders?.[0]?.uri.fsPath
-      ?? path.join(__dirname, '..', '..', '..', '..', 'test-workspace');
+      ?? path.join(__dirname, '..', '..', '..', '..', 'test-and-evaluation', 'test-workspace');
     const gapPath = process.env.JANUMICODE_HARNESS_GAP_PATH
       ?? path.join(workspaceFolder, '.janumicode', 'harness-gap.json');
     fs.mkdirSync(path.dirname(gapPath), { recursive: true });

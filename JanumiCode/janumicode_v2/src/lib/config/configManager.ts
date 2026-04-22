@@ -92,7 +92,9 @@ export interface JanumiCodeConfig {
    * uncontrollably.
    *
    * - depth_cap: hard ceiling on tree depth across any branch.
-   * - budget_cap: max LLM calls across all passes for one root FR.
+   * - budget_cap: max LLM calls across all passes PER ROOT (applied
+   *   independently to each root FR / root NFR). Resets per resume
+   *   session — the in-memory per-root counter is not persisted.
    * - fanout_cap: max children produced from a single parent in one pass.
    * - mirror_gate_depth: depth at which the human prune gate fires.
    *   Below this depth all branches recurse autonomously to fixed point.
@@ -274,7 +276,7 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
   },
 
   // Spec §10 canonical:
-  //   "primary": { "provider": "google", "model": "gemini-2.0-flash-thinking" }
+  //   "primary": { "provider": "google", "model": "gemini-2.5-flash" }
   // The provider name MUST match an LLMProviderAdapter.name (GoogleProvider
   // registers as 'google'). If the named provider is not registered at
   // engine startup, validateLLMRouting() logs a startup error and the
@@ -305,7 +307,7 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
       temperature: 0.5,
     },
     reasoning_review: {
-      primary: { provider: 'google', model: 'gemini-2.0-flash-thinking' },
+      primary: { provider: 'google', model: 'gemini-2.5-flash' },
       temperature: 0.2,
       trace_max_tokens: 8000,
     },

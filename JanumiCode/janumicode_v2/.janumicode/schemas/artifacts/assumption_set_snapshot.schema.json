@@ -20,10 +20,13 @@
           "surfaced_at_node": { "type": "string" },
           "surfaced_at_pass": { "type": "integer", "minimum": 0 },
           "category": { "type": "string", "enum": ["domain_regime", "constraint", "compliance", "scope", "open_question"] },
-          "citations": { "type": "array", "items": { "type": "string" } }
+          "citations": { "type": "array", "items": { "type": "string" } },
+          "duplicate_of": { "type": "string" },
+          "duplicate_similarity": { "type": "number", "minimum": 0, "maximum": 1 }
         }
       }
     },
-    "delta_from_previous_pass": { "type": "integer", "minimum": 0 }
+    "delta_from_previous_pass": { "type": "integer", "minimum": 0 },
+    "semantic_delta": { "type": "integer", "minimum": 0 }
   }
 }

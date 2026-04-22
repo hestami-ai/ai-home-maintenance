@@ -87,7 +87,7 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
       temperature: 0.5,
     },
     reasoning_review: {
-      primary: { provider: 'google', model: 'gemini-2.0-flash-thinking' },
+      primary: { provider: 'google', model: 'gemini-2.5-flash' },
       temperature: 0.2,
       trace_max_tokens: 8000,
     },

@@ -126,6 +126,30 @@ export class OrchestratorEngine {
   }
 
   /**
+   * Read-only accessor for the session abort signal. Phase handlers
+   * pass this into embedding calls and other long-running ops so the
+   * same abort that cancels the main LLM call also cancels those.
+   */
+  getSessionAbortSignal(): AbortSignal | undefined {
+    return this.sessionAbortController?.signal;
+  }
+
+  /**
+   * Wave 6 dedup — optional override for the embedding client used by
+   * Phase 2.1a / 2.2a's flag-but-don't-merge dedup pass. Tests inject
+   * a fake client to exercise the dedup code paths without requiring
+   * a live ollama instance. Production code leaves this unset; the
+   * saturation loop constructs a default `OllamaEmbeddingClient()`.
+   */
+  private embeddingClientOverride: import('../llm/embeddings').EmbeddingClient | null = null;
+  setEmbeddingClientOverride(client: import('../llm/embeddings').EmbeddingClient | null): void {
+    this.embeddingClientOverride = client;
+  }
+  getEmbeddingClientOverride(): import('../llm/embeddings').EmbeddingClient | null {
+    return this.embeddingClientOverride;
+  }
+
+  /**
    * Abort the current session — fires the session abort signal,
    * cancelling any in-flight LLM call that observes the signal
    * (today: ollama streaming). Callers should abort, then wait for

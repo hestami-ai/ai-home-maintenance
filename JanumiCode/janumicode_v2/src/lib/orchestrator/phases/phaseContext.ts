@@ -447,8 +447,14 @@ export function findProductDescriptionHandoff(
  * `user_stories[]` shape, so callers can treat it interchangeably.
  */
 export interface FrozenFrLeaf {
+  /** Logical UUID (content.node_id) — stable across revisions. */
   node_id: string;
+  /** Root's logical UUID. */
   root_fr_id: string;
+  /** Sibling-unique human label (content.display_key) — for summaries + UIs. */
+  display_key: string;
+  /** Root's human label, if resolvable from the stream. Falls back to root_fr_id (UUID). */
+  root_display_key: string;
   depth: number;
   tier: 'A' | 'B' | 'C' | 'D' | null;
   user_story: {
@@ -507,7 +513,7 @@ export function buildEffectiveFrView(
   if (leaves.length > 0) {
     const storyRecords = leaves.map(l => l.user_story as unknown as Record<string, unknown>);
     const summaryLines = leaves.map(l =>
-      `${l.user_story.id} [${l.user_story.priority}] (Tier ${l.tier ?? '?'} leaf under ${l.root_fr_id}): As a ${l.user_story.role}, I want ${l.user_story.action}, so that ${l.user_story.outcome}.`,
+      `${l.display_key} [${l.user_story.priority}] (Tier ${l.tier ?? '?'} leaf under ${l.root_display_key}): As a ${l.user_story.role}, I want ${l.user_story.action}, so that ${l.user_story.outcome}.`,
     );
     return {
       stories: storyRecords,
@@ -538,7 +544,7 @@ export function buildEffectiveFrView(
 export function getFrozenFrLeaves(
   allArtifacts: GovernedStreamRecord[],
 ): FrozenFrLeaf[] {
-  // Collect current version per node_id.
+  // Collect current version per node_id (logical UUID).
   const latestByNodeId = new Map<string, GovernedStreamRecord>();
   for (const r of allArtifacts) {
     if (r.record_type !== 'requirement_decomposition_node') continue;
@@ -550,15 +556,29 @@ export function getFrozenFrLeaves(
       latestByNodeId.set(nodeId, r);
     }
   }
+  // Root display-key lookup: root's logical UUID → its display_key (if
+  // available). Roots are depth-0 nodes; their display_key is the LLM's
+  // raw story.id (sibling-collision-suffixed if required).
+  const rootDisplayKeyByUuid = new Map<string, string>();
+  for (const r of latestByNodeId.values()) {
+    const c = r.content as Record<string, unknown>;
+    if (c.depth !== 0) continue;
+    const rootUuid = typeof c.node_id === 'string' ? c.node_id : null;
+    const display = typeof c.display_key === 'string' ? c.display_key : null;
+    if (rootUuid && display) rootDisplayKeyByUuid.set(rootUuid, display);
+  }
   const leaves: FrozenFrLeaf[] = [];
   for (const r of latestByNodeId.values()) {
     const c = r.content as Record<string, unknown>;
     if (c.status !== 'atomic') continue;
     const story = c.user_story as FrozenFrLeaf['user_story'] | undefined;
     if (!story) continue;
+    const rootFrId = typeof c.root_fr_id === 'string' ? c.root_fr_id : '';
     leaves.push({
       node_id: typeof c.node_id === 'string' ? c.node_id : '',
-      root_fr_id: typeof c.root_fr_id === 'string' ? c.root_fr_id : '',
+      root_fr_id: rootFrId,
+      display_key: typeof c.display_key === 'string' ? c.display_key : (story.id ?? ''),
+      root_display_key: rootDisplayKeyByUuid.get(rootFrId) ?? rootFrId,
       depth: typeof c.depth === 'number' ? c.depth : 0,
       tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
         ? c.tier as FrozenFrLeaf['tier']

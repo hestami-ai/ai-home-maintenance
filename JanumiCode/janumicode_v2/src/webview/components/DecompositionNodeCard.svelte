@@ -20,8 +20,11 @@
   const { record }: Props = $props();
 
   interface NodeContent {
+    /** Logical UUID — stable across revisions, used only for tree joins. */
     node_id: string;
     parent_node_id: string | null;
+    /** Sibling-unique human label — the thing we actually display. */
+    display_key: string;
     root_fr_id: string;
     depth: number;
     pass_number: number;
@@ -89,7 +92,7 @@
   <button class="header" onclick={() => (collapsed = !collapsed)}>
     <span class="toggle">{collapsed ? '▶' : '▼'}</span>
     <span class="status-icon" title={content.status}>{statusIcon(content.status)}</span>
-    <span class="node-id">{content.node_id}</span>
+    <span class="node-id" title={content.node_id}>{content.display_key ?? content.user_story?.id ?? content.node_id}</span>
     {#if content.tier}
       <span class="tier-badge {tierColor(content.tier)}">Tier {content.tier}</span>
     {:else}

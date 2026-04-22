@@ -13,10 +13,15 @@
  * Usage:
  *   node scripts/wave6-calibration-run.js \
  *     --intent <path-to-intent.md> \
- *     --workspace <workspace-path> \
- *     --out-dir <path-for-gold-files> \
- *     [--tag <tag>]       # suffix for gold file names, defaults to timestamp
- *     [--skip-run]        # skip the CLI run, extract from existing DB only
+ *     [--workspace <path>]   # defaults to
+ *                            # test-and-evaluation/calibration-workspaces/calibration-workspace-<tag>
+ *     [--out-dir <path>]     # defaults to <workspace>/calibration-gold
+ *     [--tag <tag>]          # suffix for gold file names, defaults to timestamp
+ *     [--skip-run]           # skip the CLI run, extract from existing DB only
+ *     [--budget-cap <N>]     # override decomposition.budget_cap for this run;
+ *                            # pass a large number (e.g. 5000) to let
+ *                            # saturation run to natural fixed-point instead
+ *                            # of tripping the conservative 500 default.
  *
  * Environment variables the operator should set before running:
  *   OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY
@@ -46,13 +51,14 @@ function parseArgs(argv) {
     else if (a === '--out-dir') out.outDir = argv[++i];
     else if (a === '--tag') out.tag = argv[++i];
     else if (a === '--skip-run') out.skipRun = true;
+    else if (a === '--budget-cap') out.budgetCap = Number.parseInt(argv[++i], 10);
     else if (a === '--help' || a === '-h') {
       console.log(fs.readFileSync(__filename, 'utf-8').split('\n').slice(1, 30).join('\n'));
       process.exit(0);
     }
   }
-  if (!out.workspace) {
-    console.error('--workspace <path> is required');
+  if (out.budgetCap != null && (!Number.isFinite(out.budgetCap) || out.budgetCap < 1)) {
+    console.error('--budget-cap must be a positive integer');
     process.exit(2);
   }
   if (!out.skipRun && !out.intent) {
@@ -60,6 +66,18 @@ function parseArgs(argv) {
     process.exit(2);
   }
   out.tag = out.tag ?? new Date().toISOString().replace(/[:.]/g, '-');
+  // When --workspace is omitted, auto-place the calibration workspace
+  // under the repo's test-and-evaluation/ convention directory, keyed by
+  // tag. Explicit --workspace still wins. Resolution is relative to the
+  // repo root (two dirs up from scripts/).
+  if (!out.workspace) {
+    const repoRoot = path.resolve(__dirname, '..');
+    out.workspace = path.join(
+      repoRoot, 'test-and-evaluation', 'calibration-workspaces',
+      `calibration-workspace-${out.tag}`,
+    );
+    console.error(`[calibration] --workspace not provided; defaulting to ${out.workspace}`);
+  }
   out.outDir = out.outDir ?? path.join(out.workspace, 'calibration-gold');
   return out;
 }
@@ -82,8 +100,35 @@ function patchConfigFlag(workspace) {
   }
   cfg.decomposition = cfg.decomposition ?? {};
   cfg.decomposition.reasoning_review_on_tier_c = true;
+  // Optional per-run override of the decomposer LLM-call budget. The
+  // default in src/lib/config/defaults.ts (500) is a safety rail tuned
+  // conservatively; calibration runs often want headroom to let
+  // saturation reach natural fixed-point before auto-deferring the tail.
+  // Pass e.g. `--budget-cap 5000` on large specs.
+  if (args.budgetCap != null) {
+    cfg.decomposition.budget_cap = args.budgetCap;
+  }
+
+  // Local-calibration LLM routing: reasoning_review runs on ollama with
+  // gemma4:e4b (128K context, gemma sampling profile applied by the
+  // ollama provider based on model name prefix). Production defaults in
+  // src/lib/config/defaults.ts stay on google/gemini-2.5-flash so this
+  // override does NOT leak beyond calibration workspaces. Deep-merge
+  // behaviour in ConfigManager.loadConfig replaces only reasoning_review
+  // while preserving the other role routes.
+  cfg.llm_routing = cfg.llm_routing ?? {};
+  cfg.llm_routing.reasoning_review = {
+    primary: { provider: 'ollama', model: 'gemma4:e4b' },
+    temperature: 1,
+    trace_max_tokens: 8000,
+  };
+
   fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
   console.error(`[calibration] enabled decomposition.reasoning_review_on_tier_c in ${cfgPath}`);
+  console.error(`[calibration] routed reasoning_review → ollama/gemma4:e4b (local calibration override)`);
+  if (args.budgetCap != null) {
+    console.error(`[calibration] decomposition.budget_cap override = ${args.budgetCap}`);
+  }
 }
 
 // ── Step 2: invoke the CLI ────────────────────────────────────────

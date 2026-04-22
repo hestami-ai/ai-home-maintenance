@@ -59,12 +59,22 @@ export interface InvocationLogFinal {
 export class InvocationLogFile {
   private readonly filePath: string;
   private opened = false;
+  private _bytesWritten = 0;
 
   constructor(private readonly logDir: string, invocationId: string) {
     this.filePath = path.join(logDir, `${invocationId}.log`);
   }
 
   get path(): string { return this.filePath; }
+
+  /**
+   * Running total of bytes appended to the log file across header +
+   * chunks + trailer. Exposed so LLMCaller can trip a retryable abort
+   * when a single invocation's log balloons past a sanity ceiling —
+   * that's the surest signal a thinking-mode loop is stuck, since the
+   * log grows monotonically whenever the model keeps streaming.
+   */
+  get bytesWritten(): number { return this._bytesWritten; }
 
   /** Write the header block. Call once at invocation start. */
   writeHeader(header: InvocationLogHeader): void {
@@ -86,7 +96,9 @@ export class InvocationLogFile {
         'STREAM (channel | ms-since-start | cumulative-chars | text):',
         '',
       ].filter((s) => s !== '').join('\n');
-      fs.writeFileSync(this.filePath, lines + '\n', { flag: 'w' });
+      const payload = lines + '\n';
+      fs.writeFileSync(this.filePath, payload, { flag: 'w' });
+      this._bytesWritten = Buffer.byteLength(payload);
       this.opened = true;
     } catch {
       // Best-effort — logging must never break the call path.
@@ -113,6 +125,7 @@ export class InvocationLogFile {
         .toString()
         .padStart(6)}  ${preview}\n`;
       fs.appendFileSync(this.filePath, line);
+      this._bytesWritten += Buffer.byteLength(line);
     } catch {
       // Best-effort.
     }
@@ -139,7 +152,9 @@ export class InvocationLogFile {
         final.thinking ?? '',
         '═'.repeat(72),
       ].filter((s) => s !== '').join('\n');
-      fs.appendFileSync(this.filePath, parts + '\n');
+      const payload = parts + '\n';
+      fs.appendFileSync(this.filePath, payload);
+      this._bytesWritten += Buffer.byteLength(payload);
     } catch {
       // Best-effort.
     }
@@ -162,94 +177,12 @@ export class InvocationLogFile {
         `  abort_reason    : ${reason}`,
         '═'.repeat(72),
       ].join('\n');
-      fs.appendFileSync(this.filePath, parts + '\n');
+      const payload = parts + '\n';
+      fs.appendFileSync(this.filePath, payload);
+      this._bytesWritten += Buffer.byteLength(payload);
     } catch {
       // Best-effort.
     }
   }
 }
 
-// ── Streaming loop detector (B4) ───────────────────────────────────
-
-/**
- * Rolling-buffer n-gram repetition detector. Catches the qwen3
- * thinking-mode pathology where the model produces fluent tokens that
- * cycle through the same self-correction phrase (e.g. "Wait, let me
- * check…") without converging. Idle-timer detection misses this case
- * because tokens ARE arriving — they're just semantically stuck.
- *
- * Algorithm: keep the last N chars of streamed text. When the buffer
- * is full, count how many times the most-recent K-char window appears
- * in the buffer. If ≥ THRESHOLD, declare a loop.
- *
- * Defaults are tuned for thinking-mode prose: 50-char window, 4KB
- * buffer, 6 occurrences. A real (non-loop) stream rarely repeats the
- * same 50-char substring more than twice in 4KB even when discussing
- * the same topic. Tunable via env so capture runs on slow models can
- * relax the threshold.
- */
-export class LoopDetector {
-  private readonly buffer: string[] = [];
-  private cumulativeChars = 0;
-
-  constructor(
-    // Window widened from 50→80 chars so JSON schema fragments
-    // (e.g. `"field": "present", "severity": "none"`) don't register
-    // as loops. 80 chars forces the repeated content to be prose-like.
-    private readonly windowChars: number = Number.parseInt(
-      process.env.JANUMICODE_LOOP_WINDOW ?? '80', 10),
-    private readonly bufferChars: number = Number.parseInt(
-      process.env.JANUMICODE_LOOP_BUFFER ?? '4096', 10),
-    // Threshold raised from 6→15 after observing that qwen3's healthy
-    // thinking repeats "Wait, check:" style phrases 3-5× naturally when
-    // listing fields in a JSON schema. 15× within a 4KB window means
-    // the model is genuinely stuck in a cycle of the same long phrase.
-    private readonly threshold: number = Number.parseInt(
-      process.env.JANUMICODE_LOOP_THRESHOLD ?? '15', 10),
-    /**
-     * Don't run detection until the stream has produced at least this
-     * many chars. Avoids false positives during the model's natural
-     * preamble (`{`, `"completeness_findings": [` etc.) which can
-     * recur across short outputs. Raised from 8KB→16KB because qwen3
-     * thinking-mode emits 4-6KB of structured planning before the real
-     * content begins; tripping during that phase is a false alarm.
-     */
-    private readonly warmupChars: number = Number.parseInt(
-      process.env.JANUMICODE_LOOP_WARMUP ?? '16384', 10),
-  ) {}
-
-  /**
-   * Append a chunk and check for loop. Returns a non-null reason
-   * string when a loop is detected — the caller should abort the
-   * in-flight request.
-   */
-  observe(text: string): string | null {
-    if (!text) return null;
-    this.cumulativeChars += text.length;
-    this.buffer.push(text);
-    let bufLen = this.buffer.reduce((n, s) => n + s.length, 0);
-    while (bufLen > this.bufferChars && this.buffer.length > 1) {
-      bufLen -= this.buffer.shift()!.length;
-    }
-    if (this.cumulativeChars < this.warmupChars) return null;
-
-    const joined = this.buffer.join('');
-    if (joined.length < this.windowChars * 2) return null;
-
-    const recent = joined.slice(-this.windowChars);
-    let count = 0;
-    let idx = 0;
-    while ((idx = joined.indexOf(recent, idx)) !== -1) {
-      count++;
-      if (count >= this.threshold) {
-        return (
-          `Loop suspected: ${this.windowChars}-char window appeared ` +
-          `${count}× in last ${this.bufferChars} chars — ` +
-          `recent="${recent.replace(/\n/g, '\\n').slice(0, 60)}…"`
-        );
-      }
-      idx += 1;
-    }
-    return null;
-  }
-}

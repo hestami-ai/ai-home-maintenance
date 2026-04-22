@@ -109,7 +109,7 @@
     "test:e2e:compile": "tsc -p tsconfig.e2e.json",
     "test:e2e": "pnpm build && pnpm test:e2e:compile && vscode-test",
     "harness:e2e": "pnpm build && pnpm test:e2e:compile && vscode-test --config .vscode-test.harness.mjs",
-    "test:harness": "pnpm build && node dist/cli/janumicode.js run --intent 'Build a simple CLI todo app' --workspace ./test-workspace --llm-mode mock --auto-approve --fixture-dir src/test/fixtures/todo-app",
+    "test:harness": "pnpm build && node dist/cli/janumicode.js run --intent 'Build a simple CLI todo app' --workspace ./test-and-evaluation/test-workspace --llm-mode mock --auto-approve --fixture-dir src/test/fixtures/todo-app",
     "janumicode": "node dist/cli/janumicode.js",
     "verify:probes": "tsx scripts/verifyProbeVariables.ts",
     "lint": "eslint src/",

@@ -24,7 +24,7 @@ const rootDir = path.dirname(new URL(import.meta.url).pathname);
 
 export default defineConfig({
   files: 'out/test/e2e/harness-suite/**/*.harness.test.js',
-  workspaceFolder: path.join(rootDir, 'test-workspace'),
+  workspaceFolder: path.join(rootDir, 'test-and-evaluation', 'test-workspace'),
   mocha: {
     ui: 'bdd',
     color: true,
@@ -45,7 +45,7 @@ export default defineConfig({
     JANUMICODE_HARNESS_INTENT: process.env.JANUMICODE_HARNESS_INTENT
       ?? 'Build a simple CLI todo app with add, list, and complete commands, and JSON file persistence.',
     JANUMICODE_HARNESS_GAP_PATH: process.env.JANUMICODE_HARNESS_GAP_PATH
-      ?? path.join(rootDir, 'test-workspace', '.janumicode', 'harness-gap.json'),
+      ?? path.join(rootDir, 'test-and-evaluation', 'test-workspace', '.janumicode', 'harness-gap.json'),
     // Pass through the optional knobs so terminal callers can steer:
     ...(process.env.JANUMICODE_HARNESS_FIXTURE_DIR && {
       JANUMICODE_HARNESS_FIXTURE_DIR: process.env.JANUMICODE_HARNESS_FIXTURE_DIR,

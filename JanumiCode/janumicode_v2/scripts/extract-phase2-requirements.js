@@ -6,7 +6,7 @@
  *
  * Usage:
  *   node scripts/extract-phase2-requirements.js \
- *     --db test-workspace/.janumicode/test-harness/<file>.db \
+ *     --db test-and-evaluation/test-workspace/.janumicode/test-harness/<file>.db \
  *     --out-fr src/test/fixtures/hestami-product-description/gold/product_functional_requirements.<tag>.gold.json \
  *     --out-nfr src/test/fixtures/hestami-product-description/gold/product_non_functional_requirements.<tag>.gold.json
  */

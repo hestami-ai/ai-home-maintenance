@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
   compliance_context_ref        TEXT,
   cross_run_impact_triggered    INTEGER DEFAULT 0,
   intent_lens                   TEXT,
-  decomposition_budget_calls_used INTEGER DEFAULT 0,
+  decomposition_budget_calls_used INTEGER DEFAULT 0,  -- sum of fr + nfr
+  decomposition_fr_calls_used     INTEGER DEFAULT 0,
+  decomposition_nfr_calls_used    INTEGER DEFAULT 0,
   decomposition_max_depth_reached INTEGER DEFAULT 0
 );
 

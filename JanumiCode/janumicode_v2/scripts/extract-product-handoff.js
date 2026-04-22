@@ -7,7 +7,7 @@
  *
  * Usage:
  *   node scripts/extract-product-handoff.js \
- *     --db test-workspace/.janumicode/test-harness/<file>.db \
+ *     --db test-and-evaluation/test-workspace/.janumicode/test-harness/<file>.db \
  *     [--out src/test/fixtures/hestami-product-description/gold/product_description_handoff.gold.json]
  */
 /* eslint-disable @typescript-eslint/no-require-imports */

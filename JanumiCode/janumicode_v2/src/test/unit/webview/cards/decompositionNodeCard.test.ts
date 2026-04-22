@@ -26,8 +26,13 @@ function makeNodeRecord(overrides: {
     produced_by_agent_role: 'requirements_agent' as never,
     content: {
       kind: 'requirement_decomposition_node',
+      // Synthetic test records pass the intended node_id straight through
+      // (the card treats it as opaque). Real runs mint UUIDs + carry the
+      // human label in display_key; here we set both so the card's
+      // display lookup finds a label either way.
       node_id: overrides.node_id,
       parent_node_id: overrides.parent_node_id ?? null,
+      display_key: overrides.node_id,
       root_fr_id: overrides.node_id,
       depth: overrides.depth,
       pass_number: overrides.depth,

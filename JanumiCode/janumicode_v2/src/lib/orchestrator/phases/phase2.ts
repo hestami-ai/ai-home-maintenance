@@ -38,6 +38,40 @@ import type {
 } from '../../types/records';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import type { DecisionBundleContent, MirrorItem, MirrorItemDecision } from '../../types/decisionBundle';
+import { OllamaEmbeddingClient, findNearestAbove, type EmbeddingClient } from '../../llm/embeddings';
+import { randomUUID } from 'node:crypto';
+
+// ── Logical-identity helpers ───────────────────────────────────────
+
+/**
+ * Mint a fresh canonical UUID for the logical identity of a new
+ * decomposition node. The `node_id` / `parent_node_id` / `root_fr_id`
+ * fields on RequirementDecompositionNodeContent ALL store UUIDs minted
+ * this way — never LLM-emitted `story.id` values, which collide
+ * across unrelated subtrees (e.g., the LLM names different children
+ * `FR-ACCT-1.1` at many parents). LLM IDs live in `display_key` and
+ * `user_story.id` for presentation only.
+ */
+function mintLogicalNodeId(): string {
+  return randomUUID();
+}
+
+/**
+ * Compute a sibling-unique display label from the LLM's raw `story.id`.
+ * If no sibling already uses the same bare label, return as-is. On
+ * collision, append a short hex suffix (`#ab12`) derived from the new
+ * node's logical UUID so repeated collisions of the same bare label
+ * get distinct suffixes. Purely presentational — never used for joins
+ * or supersession.
+ */
+function collisionSafeDisplayKey(
+  rawStoryId: string,
+  siblingDisplayKeys: Set<string>,
+  logicalNodeId: string,
+): string {
+  if (!siblingDisplayKeys.has(rawStoryId)) return rawStoryId;
+  return `${rawStoryId}#${logicalNodeId.slice(0, 4)}`;
+}
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -236,11 +270,18 @@ export class Phase2Handler implements PhaseHandler {
     // root FR. These are the seeds for sub-phase 2.1a recursive
     // decomposition. Skipped on resume (nodes already exist in the stream).
     let rootNodeIds: string[];
+    let rootLogicalIds: string[];
     if (resumingFr) {
       rootNodeIds = existingRootNodes.map(r => r.id);
+      rootLogicalIds = existingRootNodes.map(r => (r.content as unknown as RequirementDecompositionNodeContent).node_id);
     } else {
       rootNodeIds = [];
+      rootLogicalIds = [];
+      const rootDisplayKeys = new Set<string>();
       for (const story of frContent.user_stories) {
+        const logicalNodeId = mintLogicalNodeId();
+        const displayKey = collisionSafeDisplayKey(story.id, rootDisplayKeys, logicalNodeId);
+        rootDisplayKeys.add(displayKey);
         const node = engine.writer.writeRecord({
           record_type: 'requirement_decomposition_node',
           schema_version: '1.0',
@@ -252,9 +293,10 @@ export class Phase2Handler implements PhaseHandler {
           derived_from_record_ids: [frRecord.id],
           content: {
             kind: 'requirement_decomposition_node',
-            node_id: story.id,
+            node_id: logicalNodeId,
             parent_node_id: null,
-            root_fr_id: story.id,
+            display_key: displayKey,
+            root_fr_id: logicalNodeId,
             depth: 0,
             pass_number: 0,
             status: 'pending',
@@ -263,6 +305,7 @@ export class Phase2Handler implements PhaseHandler {
           } satisfies RequirementDecompositionNodeContent,
         });
         rootNodeIds.push(node.id);
+        rootLogicalIds.push(logicalNodeId);
       }
     }
 
@@ -275,6 +318,7 @@ export class Phase2Handler implements PhaseHandler {
         handoff,
         frContent.user_stories,
         rootNodeIds,
+        rootLogicalIds,
       );
     }
 
@@ -359,12 +403,19 @@ export class Phase2Handler implements PhaseHandler {
     // on sub-phase id + template id + root_kind.
     if (handoff) {
       let nfrRootNodeIds: string[];
+      let nfrRootLogicalIds: string[];
       const nfrAsStories: UserStory[] = nfrContent.requirements.map(adaptNfrToUserStory);
       if (resumingNfr) {
         nfrRootNodeIds = existingNfrRootNodes.map(r => r.id);
+        nfrRootLogicalIds = existingNfrRootNodes.map(r => (r.content as unknown as RequirementDecompositionNodeContent).node_id);
       } else {
         nfrRootNodeIds = [];
+        nfrRootLogicalIds = [];
+        const nfrRootDisplayKeys = new Set<string>();
         for (const story of nfrAsStories) {
+          const logicalNodeId = mintLogicalNodeId();
+          const displayKey = collisionSafeDisplayKey(story.id, nfrRootDisplayKeys, logicalNodeId);
+          nfrRootDisplayKeys.add(displayKey);
           const node = engine.writer.writeRecord({
             record_type: 'requirement_decomposition_node',
             schema_version: '1.0',
@@ -376,9 +427,10 @@ export class Phase2Handler implements PhaseHandler {
             derived_from_record_ids: [nfrRecord.id],
             content: {
               kind: 'requirement_decomposition_node',
-              node_id: story.id,
+              node_id: logicalNodeId,
               parent_node_id: null,
-              root_fr_id: story.id,
+              display_key: displayKey,
+              root_fr_id: logicalNodeId,
               depth: 0,
               pass_number: 0,
               status: 'pending',
@@ -388,6 +440,7 @@ export class Phase2Handler implements PhaseHandler {
             } satisfies RequirementDecompositionNodeContent,
           });
           nfrRootNodeIds.push(node.id);
+          nfrRootLogicalIds.push(logicalNodeId);
         }
       }
 
@@ -397,6 +450,7 @@ export class Phase2Handler implements PhaseHandler {
         handoff,
         nfrAsStories,
         nfrRootNodeIds,
+        nfrRootLogicalIds,
         {
           recordSubPhaseId: '2.2a',
           templateSubPhase: '02_2a_non_functional_requirements_decomposition',
@@ -573,20 +627,20 @@ export class Phase2Handler implements PhaseHandler {
   private writePrunedSupersession(
     ctx: PhaseContext,
     parentNodeId: string,
-    child: { nodeRecordId: string; childNodeId: string },
+    child: { nodeRecordId: string; logicalNodeId: string; displayKey: string },
     reasonCode: string,
     config: SaturationLoopConfig,
   ): void {
     const { engine, workflowRun } = ctx;
-    // Retrieve the original child content to carry its user_story
-    // forward into the supersession record (supersession records are
-    // self-contained — downstream consumers shouldn't have to join back
-    // to the superseded record to read the story).
+    // Retrieve the original child content to carry its user_story +
+    // root_fr_id forward into the supersession record (supersession
+    // records are self-contained — downstream consumers shouldn't have
+    // to join back to the superseded record to read the story).
     const allNodes = engine.writer.getRecordsByType(workflowRun.id, 'requirement_decomposition_node', false);
     const original = allNodes.find(r => r.id === child.nodeRecordId);
     if (!original) return;
     const originalContent = original.content as unknown as RequirementDecompositionNodeContent;
-    engine.writer.writeRecord({
+    const prunedRec = engine.writer.writeRecord({
       record_type: 'requirement_decomposition_node',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
@@ -597,11 +651,12 @@ export class Phase2Handler implements PhaseHandler {
       derived_from_record_ids: [child.nodeRecordId],
       content: {
         kind: 'requirement_decomposition_node',
-        node_id: child.childNodeId,
+        node_id: child.logicalNodeId,
         parent_node_id: parentNodeId,
+        display_key: child.displayKey,
         root_fr_id: originalContent.root_fr_id,
-        depth: 2,
-        pass_number: 2,
+        depth: originalContent.depth,
+        pass_number: originalContent.pass_number,
         status: 'pruned',
         root_kind: config.rootKind,
         user_story: originalContent.user_story,
@@ -609,6 +664,11 @@ export class Phase2Handler implements PhaseHandler {
         pruning_reason: reasonCode,
       } satisfies RequirementDecompositionNodeContent,
     });
+    // Retire the prior version of this logical node so only the 'pruned'
+    // row remains is_current_version=1.
+    engine.writer.supersedeDecompositionNodeByLogicalId(
+      workflowRun.id, child.logicalNodeId, prunedRec.id,
+    );
   }
 
   /**
@@ -650,6 +710,7 @@ export class Phase2Handler implements PhaseHandler {
     handoff: ProductDescriptionHandoffContent,
     rootStories: UserStory[],
     rootNodeRecordIds: string[],
+    rootLogicalIds: string[],
     config: SaturationLoopConfig = {
       recordSubPhaseId: '2.1a',
       templateSubPhase: '02_1a_functional_requirements_decomposition',
@@ -676,12 +737,13 @@ export class Phase2Handler implements PhaseHandler {
     const handoffSummary = formatHandoffForDecomposition(handoff);
 
     interface QueueEntry {
-      parentRecordId: string;
-      nodeId: string;                 // id carried on the decomposition node (= user_story.id for roots)
-      parentNodeId: string | null;
-      rootFrId: string;
+      parentRecordId: string;           // governed-stream row UUID of the parent record revision
+      nodeId: string;                   // logical UUID (content.node_id) — stable across revisions
+      parentNodeId: string | null;      // parent's logical UUID
+      rootFrId: string;                 // root's logical UUID
       depth: number;
-      userStory: DecompositionUserStory;
+      userStory: DecompositionUserStory; // carries LLM's raw story.id for display / prompt context
+      displayKey: string;                // sibling-unique human label (content.display_key)
       tierHint: DecompositionTier | 'root';
     }
 
@@ -700,21 +762,32 @@ export class Phase2Handler implements PhaseHandler {
     const newAssumptionId = (): string => `A-${String(++assumptionSeq).padStart(4, '0')}`;
 
     // Seed queue: fresh from rootStories, OR resumed from pending stream nodes.
+    // Fresh roots pair with rootLogicalIds 1:1 (minted when the depth-0 node
+    // was written). On resume the queue comes pre-populated with logical UUIDs
+    // reconstructed from governed_stream content by rebuildSaturationStateFromStream.
     const queue: QueueEntry[] = resumed?.queue ?? rootStories.map((s, i) => ({
       parentRecordId: rootNodeRecordIds[i],
-      nodeId: s.id,
+      nodeId: rootLogicalIds[i],
       parentNodeId: null,
-      rootFrId: s.id,
+      rootFrId: rootLogicalIds[i],
       depth: 0,
       userStory: s as DecompositionUserStory,
+      displayKey: s.id,
       tierHint: 'root',
     }));
+    // siblingsByParent is keyed by logical parent UUID (or null for roots).
     const siblingsByParent = resumed?.siblingsByParent ?? new Map<string | null, DecompositionUserStory[]>();
     if (!resumed) {
       siblingsByParent.set(null, rootStories.map(s => s as DecompositionUserStory));
     }
 
-    let llmCallsUsed = resumed?.llmCallsUsed ?? 0;
+    // Per-root LLM-call budget. `budget_cap` applies PER ROOT within
+    // this root_kind (matches the docstring on configManager.decomposition).
+    // Counters are in-memory only — a fresh resume session gets a fresh
+    // budget per root. The telemetry write at loop end records the sum
+    // in the kind-specific workflow_runs column so operators can inspect
+    // aggregate load without walking the stream.
+    const callsByRoot = new Map<string, number>();
     let maxDepthReached = resumed?.maxDepthReached ?? 0;
     let passNumber = resumed?.passNumber ?? 0;
 
@@ -744,9 +817,64 @@ export class Phase2Handler implements PhaseHandler {
         queueSize: queue.length,
         assumptions: allAssumptions.length,
         passNumber,
-        llmCallsUsed,
+        // Per-root LLM-call counters do NOT persist across resumes —
+        // each resume session starts with a fresh per-root budget.
         maxDepthReached,
       });
+    }
+
+    // Wave 6 dedup — embedding cache for flag-but-don't-merge. On
+    // resume we batch-embed the existing assumption set to rebuild the
+    // cache; on fresh run it starts empty. Failures degrade gracefully:
+    // we log and continue with no dedup (raw delta is the fallback
+    // termination signal). Threshold intentionally conservative (0.92)
+    // to minimize false-merge risk; tunable via env.
+    const embeddingClient: EmbeddingClient = engine.getEmbeddingClientOverride() ?? new OllamaEmbeddingClient();
+    const embeddingCache = new Map<string, number[]>();
+    const dedupThreshold = Number.parseFloat(
+      process.env.JANUMICODE_ASSUMPTION_DEDUP_THRESHOLD ?? '0.92');
+    // Dedup is on by default wherever it can reach ollama. The embedding
+    // client has short connect + idle timeouts so environments without
+    // ollama degrade gracefully to no-dedup (raw delta remains as the
+    // fallback termination signal). Set JANUMICODE_ASSUMPTION_DEDUP_DISABLED=1
+    // to turn it off explicitly.
+    const dedupEnabled = Number.isFinite(dedupThreshold)
+      && dedupThreshold > 0
+      && (process.env.JANUMICODE_ASSUMPTION_DEDUP_DISABLED ?? '') !== '1';
+    if (dedupEnabled && allAssumptions.length > 0) {
+      try {
+        const vecs = await embeddingClient.embed(
+          allAssumptions.map(a => a.text),
+          { signal: engine.getSessionAbortSignal() },
+        );
+        allAssumptions.forEach((a, i) => {
+          if (vecs[i]) embeddingCache.set(a.id, vecs[i]);
+        });
+        getLogger().info('workflow', `Phase ${config.recordSubPhaseId}: dedup cache seeded from existing assumptions`, {
+          cached: embeddingCache.size, total: allAssumptions.length,
+        });
+      } catch (err) {
+        getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: dedup seed failed — continuing without dedup`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    // Node parent-chain map — logical-UUID → logical-parent-UUID. Used
+    // for scoped-assumption injection so each decomposer call sees only
+    // assumptions surfaced at nodes in its own ancestor chain. The map
+    // is seeded from the governed_stream (picks up both the fresh roots
+    // just written and any prior-pass nodes on resume), then kept in
+    // sync as new children are written during the loop.
+    const parentChain = new Map<string, string | null>();
+    {
+      const existingNodes = engine.writer.getRecordsByType(
+        workflowRun.id, 'requirement_decomposition_node',
+      );
+      for (const r of existingNodes) {
+        const c = r.content as unknown as RequirementDecompositionNodeContent;
+        if ((c.root_kind ?? 'fr') !== config.rootKind) continue;
+        parentChain.set(c.node_id, c.parent_node_id);
+      }
     }
 
     while (queue.length > 0) {
@@ -757,6 +885,8 @@ export class Phase2Handler implements PhaseHandler {
       const passAssumptions: AssumptionEntry[] = [];
       const pendingGateByParent = new Map<string, Array<{
         nodeRecordId: string;
+        logicalNodeId: string;
+        displayKey: string;
         story: DecompositionUserStory;
         rationale?: string;
       }>>();
@@ -773,6 +903,8 @@ export class Phase2Handler implements PhaseHandler {
       // produced implementation-shaped output, but the ACs themselves
       // may still encode un-made policy choices.
       const postGateCleanAudits: Array<{
+        parentLogicalNodeId: string;
+        parentDisplayKey: string;
         parentStory: DecompositionUserStory;
         children: DecompositionUserStory[];
       }> = [];
@@ -781,15 +913,19 @@ export class Phase2Handler implements PhaseHandler {
         // Depth cap: freeze without decomposing further.
         if (entry.depth >= caps.depth_cap) {
           getLogger().warn('workflow', 'Phase 2.1a: depth cap reached on branch — freezing as deferred', {
-            nodeId: entry.nodeId, depth: entry.depth, cap: caps.depth_cap,
+            nodeId: entry.nodeId, displayKey: entry.displayKey, depth: entry.depth, cap: caps.depth_cap,
           });
           this.writeDeferredSupersession(ctx, entry, passNumber, 'depth_cap_reached', config);
           continue;
         }
-        // Budget cap: defer remaining nodes and exit the loop.
-        if (llmCallsUsed >= caps.budget_cap) {
-          getLogger().warn('workflow', 'Phase 2.1a: budget cap reached — deferring remaining queue', {
-            remaining: passEntries.length, used: llmCallsUsed, cap: caps.budget_cap,
+        // Budget cap (per-root): defer this entry if its root has hit the
+        // per-root LLM-call budget. Other roots continue until each hits
+        // its own cap. Matches the docstring intent of "max LLM calls
+        // across all passes for one root FR".
+        const rootCalls = callsByRoot.get(entry.rootFrId) ?? 0;
+        if (rootCalls >= caps.budget_cap) {
+          getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: per-root budget cap reached — deferring`, {
+            rootFrId: entry.rootFrId, rootCalls, cap: caps.budget_cap,
           });
           this.writeDeferredSupersession(ctx, entry, passNumber, 'budget_cap_reached', config);
           continue;
@@ -797,18 +933,40 @@ export class Phase2Handler implements PhaseHandler {
 
         try {
           const siblings = siblingsByParent.get(entry.parentNodeId) ?? [];
+          // Scoped assumption injection — restrict the existing-set passed
+          // to this decomposer call to assumptions surfaced at nodes in
+          // this entry's ancestor chain (including itself) + assumptions
+          // with no surfaced_at_node (global / seed). Rationale: sibling
+          // branches' assumptions are often not relevant here and feeding
+          // them in encourages the decomposer to re-surface / rephrase
+          // them, driving duplicate growth. Bounds prompt size regardless
+          // of total assumption count.
+          const ancestorIds = new Set<string | null>();
+          ancestorIds.add(entry.nodeId);
+          let cursor: string | null | undefined = entry.parentNodeId;
+          while (cursor) {
+            if (ancestorIds.has(cursor)) break; // cycle guard
+            ancestorIds.add(cursor);
+            cursor = parentChain.get(cursor) ?? null;
+          }
+          const scopedAssumptions = [...allAssumptions, ...passAssumptions]
+            .filter(a => !a.duplicate_of) // never inject flagged duplicates
+            .filter(a => a.surfaced_at_node == null || ancestorIds.has(a.surfaced_at_node));
           const variables: Record<string, string> = {
             active_constraints: '(none — wave 6 step 4a minimal)',
             parent_story: formatRootStoryForDecomposition(entry.userStory as UserStory),
             parent_tier_hint: entry.tierHint,
+            // Sibling context uses the LLM's raw `story.id` strings — the
+            // decomposer prompt speaks the LLM's own ID vocabulary, not
+            // our canonical UUIDs.
             sibling_context: siblings.length <= 1
               ? '(none — sole child under this parent)'
-              : siblings.filter(s => s.id !== entry.nodeId)
+              : siblings.filter(s => s.id !== entry.userStory.id)
                   .map(s => `- ${s.id}: ${s.action} -> ${s.outcome}`).join('\n'),
             handoff_context: handoffSummary,
-            existing_assumptions: (allAssumptions.length + passAssumptions.length) === 0
+            existing_assumptions: scopedAssumptions.length === 0
               ? '(none yet)'
-              : [...allAssumptions, ...passAssumptions]
+              : scopedAssumptions
                   .map(a => `- [${a.id}] (${a.category}) ${a.text}`).join('\n'),
             current_depth: String(entry.depth),
             janumicode_version_sha: engine.janumiCodeVersionSha,
@@ -821,7 +979,11 @@ export class Phase2Handler implements PhaseHandler {
             );
           }
 
-          llmCallsUsed++;
+          // Increment this root's per-root counter BEFORE dispatching
+          // the decomposer call. Matches the sequential cap-check above
+          // so a second pass that starts at N and makes a call goes to
+          // N+1 before checking the cap again.
+          callsByRoot.set(entry.rootFrId, (callsByRoot.get(entry.rootFrId) ?? 0) + 1);
           const result = await engine.callForRole('requirements_agent', {
             prompt: rendered.rendered,
             responseFormat: 'json',
@@ -829,9 +991,12 @@ export class Phase2Handler implements PhaseHandler {
             traceContext: {
               workflowRunId: workflowRun.id,
               phaseId: '2',
-              subPhaseId: '2.1a',
+              // Route trace context by the configured sub-phase id so NFR
+              // decomposer calls land under 2.2a rather than masquerading
+              // as 2.1a in the invocation log + agent_invocation records.
+              subPhaseId: config.recordSubPhaseId,
               agentRole: 'requirements_agent',
-              label: `Phase 2.1a Pass-${passNumber} — decomposition of ${entry.nodeId} (depth ${entry.depth}, hint ${entry.tierHint})`,
+              label: `Phase ${config.recordSubPhaseId} Pass-${passNumber} — decomposition of ${entry.displayKey} (depth ${entry.depth}, hint ${entry.tierHint})`,
             },
           });
 
@@ -844,7 +1009,7 @@ export class Phase2Handler implements PhaseHandler {
           if (tierAssessment && tierAssessment.agrees_with_hint === false) {
             // Log disagreement for Step 4b; no action in 4a.
             getLogger().warn('workflow', 'Phase 2.1a: decomposer disagrees with tier hint', {
-              nodeId: entry.nodeId, hint: entry.tierHint,
+              nodeId: entry.nodeId, displayKey: entry.displayKey, hint: entry.tierHint,
               assessed: tierAssessment.tier, rationale: tierAssessment.rationale,
             });
           }
@@ -875,16 +1040,21 @@ export class Phase2Handler implements PhaseHandler {
           const childDepth = entry.depth + 1;
           maxDepthReached = Math.max(maxDepthReached, childDepth);
           const emittedChildren: DecompositionUserStory[] = [];
-          const emittedChildrenWithTier: Array<{ story: DecompositionUserStory; tier: DecompositionTier }> = [];
+          const emittedChildrenWithTier: Array<{ story: DecompositionUserStory; tier: DecompositionTier; logicalNodeId: string; displayKey: string }> = [];
+          // Track display-key collisions within THIS sibling batch so the
+          // LLM's repeated use of e.g. `FR-ACCT-1.1` for multiple children
+          // under the same parent resolves to distinct display labels.
+          const siblingDisplayKeys = new Set<string>();
           let fanoutCount = 0;
           for (const c of childrenRaw) {
             if (++fanoutCount > caps.fanout_cap) {
               getLogger().warn('workflow', 'Phase 2.1a: fanout cap reached — dropping remaining children', {
-                parentNodeId: entry.nodeId, cap: caps.fanout_cap, totalOffered: childrenRaw.length,
+                parentNodeId: entry.nodeId, parentDisplayKey: entry.displayKey,
+                cap: caps.fanout_cap, totalOffered: childrenRaw.length,
               });
               break;
             }
-            const story = sanitizeChildStory(c, { rootId: entry.nodeId, childIndex: fanoutCount });
+            const story = sanitizeChildStory(c, { rootId: entry.displayKey, childIndex: fanoutCount });
             if (!story) continue;
             const tier = normalizeTier(c.tier);
             const rationale = typeof c.decomposition_rationale === 'string'
@@ -893,6 +1063,9 @@ export class Phase2Handler implements PhaseHandler {
             // Tier A/B/C nodes start 'pending'; B joins pending-gate batch
             // rather than the next-pass queue.
             const initialStatus: DecompositionNodeStatus = tier === 'D' ? 'atomic' : 'pending';
+            const logicalNodeId = mintLogicalNodeId();
+            const displayKey = collisionSafeDisplayKey(story.id, siblingDisplayKeys, logicalNodeId);
+            siblingDisplayKeys.add(displayKey);
             const childRec = engine.writer.writeRecord({
               record_type: 'requirement_decomposition_node',
               schema_version: '1.0',
@@ -904,8 +1077,9 @@ export class Phase2Handler implements PhaseHandler {
               derived_from_record_ids: [entry.parentRecordId],
               content: {
                 kind: 'requirement_decomposition_node',
-                node_id: story.id,
+                node_id: logicalNodeId,
                 parent_node_id: entry.nodeId,
+                display_key: displayKey,
                 root_fr_id: entry.rootFrId,
                 depth: childDepth,
                 pass_number: passNumber,
@@ -918,21 +1092,28 @@ export class Phase2Handler implements PhaseHandler {
               } satisfies RequirementDecompositionNodeContent,
             });
             emittedChildren.push(story);
-            emittedChildrenWithTier.push({ story, tier });
+            emittedChildrenWithTier.push({ story, tier, logicalNodeId, displayKey });
+            // Keep parentChain current for scoped-assumption lookups
+            // within this same pass (subsequent entries processed this
+            // pass may need to resolve ancestors through newly-written
+            // nodes). Keyed by logical UUID so ancestor walks match.
+            parentChain.set(logicalNodeId, entry.nodeId);
 
             if (tier === 'A') {
               queue.push({
-                parentRecordId: childRec.id, nodeId: story.id, parentNodeId: entry.nodeId,
-                rootFrId: entry.rootFrId, depth: childDepth, userStory: story, tierHint: 'A',
+                parentRecordId: childRec.id, nodeId: logicalNodeId, parentNodeId: entry.nodeId,
+                rootFrId: entry.rootFrId, depth: childDepth, userStory: story,
+                displayKey, tierHint: 'A',
               });
             } else if (tier === 'B') {
               const batch = pendingGateByParent.get(entry.nodeId) ?? [];
-              batch.push({ nodeRecordId: childRec.id, story, rationale });
+              batch.push({ nodeRecordId: childRec.id, logicalNodeId, displayKey, story, rationale });
               pendingGateByParent.set(entry.nodeId, batch);
             } else if (tier === 'C') {
               queue.push({
-                parentRecordId: childRec.id, nodeId: story.id, parentNodeId: entry.nodeId,
-                rootFrId: entry.rootFrId, depth: childDepth, userStory: story, tierHint: 'C',
+                parentRecordId: childRec.id, nodeId: logicalNodeId, parentNodeId: entry.nodeId,
+                rootFrId: entry.rootFrId, depth: childDepth, userStory: story,
+                displayKey, tierHint: 'C',
               });
             }
             // Tier D: already frozen atomic — no queue insertion.
@@ -961,11 +1142,11 @@ export class Phase2Handler implements PhaseHandler {
                 ? `tier_downgrade: decomposer_assessed_${tierAssessment?.tier}_not_B`
                 : 'tier_downgrade: post_gate_children_still_tier_B';
               getLogger().warn('workflow', `Phase ${config.recordSubPhaseId} Step 4b: downgrading previously-accepted Tier-B parent`, {
-                nodeId: entry.nodeId, reason,
+                nodeId: entry.nodeId, displayKey: entry.displayKey, reason,
                 producedTierB: pendingGateByParent.get(entry.nodeId)?.length ?? 0,
                 explicitDisagreement,
               });
-              engine.writer.writeRecord({
+              const downgradedRec = engine.writer.writeRecord({
                 record_type: 'requirement_decomposition_node',
                 schema_version: '1.0',
                 workflow_run_id: workflowRun.id,
@@ -978,6 +1159,7 @@ export class Phase2Handler implements PhaseHandler {
                   kind: 'requirement_decomposition_node',
                   node_id: entry.nodeId,
                   parent_node_id: entry.parentNodeId,
+                  display_key: entry.displayKey,
                   root_fr_id: entry.rootFrId,
                   depth: entry.depth,
                   pass_number: passNumber,
@@ -988,12 +1170,17 @@ export class Phase2Handler implements PhaseHandler {
                   pruning_reason: reason,
                 } satisfies RequirementDecompositionNodeContent,
               });
+              // Retire the prior pending version of this logical node so
+              // only the downgraded row remains is_current_version=1.
+              engine.writer.supersedeDecompositionNodeByLogicalId(
+                workflowRun.id, entry.nodeId, downgradedRec.id,
+              );
               if (producedTierBChildren) {
                 downgradeNotesByParent.set(
                   entry.nodeId,
-                  `The commitment '${entry.nodeId}' you accepted earlier turned out to ` +
+                  `The commitment '${entry.displayKey}' you accepted earlier turned out to ` +
                   `have its own commitment layer underneath. The items below are ` +
-                  `sub-commitments within '${entry.nodeId}' that need your review as well.`,
+                  `sub-commitments within '${entry.displayKey}' that need your review as well.`,
                 );
               }
             } else if (emittedChildrenWithTier.length > 0) {
@@ -1002,6 +1189,8 @@ export class Phase2Handler implements PhaseHandler {
               // mislabel). Queue the children's ACs for structural audit
               // after the pass finishes writing nodes.
               postGateCleanAudits.push({
+                parentLogicalNodeId: entry.nodeId,
+                parentDisplayKey: entry.displayKey,
                 parentStory: entry.userStory,
                 children: emittedChildrenWithTier.map(x => x.story),
               });
@@ -1010,7 +1199,7 @@ export class Phase2Handler implements PhaseHandler {
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: decomposition failed — marking node deferred`, {
-            nodeId: entry.nodeId, error: reason,
+            nodeId: entry.nodeId, displayKey: entry.displayKey, error: reason,
           });
           this.writeDeferredSupersession(ctx, entry, passNumber, `decomposition_failed: ${reason}`, config);
         }
@@ -1048,7 +1237,47 @@ export class Phase2Handler implements PhaseHandler {
       engine.writer.supersedByRollback(currentPipelineRecordId, passUpdateRecord.id);
       currentPipelineRecordId = passUpdateRecord.id;
 
-      // Per-pass assumption snapshot. delta = new assumptions THIS pass.
+      // Wave 6 dedup pass — compute embeddings for the new assumptions,
+      // compare against the cached prior-set + any already-flagged
+      // pass-local ones, and flag near-dupes in place. We NEVER remove
+      // entries (flag-but-don't-merge); `duplicate_of` is just an
+      // annotation so the downstream semantic_delta can exclude flagged
+      // rows. Any failure in the embedding call degrades gracefully:
+      // raw delta remains as the fallback termination signal.
+      if (dedupEnabled && passAssumptions.length > 0) {
+        try {
+          const newVecs = await embeddingClient.embed(
+            passAssumptions.map(a => a.text),
+            { signal: engine.getSessionAbortSignal() },
+          );
+          for (let i = 0; i < passAssumptions.length; i++) {
+            const a = passAssumptions[i];
+            const v = newVecs[i];
+            if (!v) continue;
+            const priors = [...embeddingCache.entries()].map(([id, vector]) => ({ id, vector }));
+            const match = findNearestAbove(v, priors, dedupThreshold);
+            if (match) {
+              a.duplicate_of = match.id;
+              a.duplicate_similarity = match.similarity;
+              getLogger().info('workflow', `Phase ${config.recordSubPhaseId}: assumption flagged as duplicate`, {
+                id: a.id, of: match.id, similarity: Number(match.similarity.toFixed(3)),
+              });
+            }
+            // Cache regardless — whether canonical or duplicate, future
+            // passes should be able to match against this embedding.
+            embeddingCache.set(a.id, v);
+          }
+        } catch (err) {
+          getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: dedup embed failed this pass — flags skipped`, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      const semanticDelta = passAssumptions.filter(a => !a.duplicate_of).length;
+
+      // Per-pass assumption snapshot. delta = raw count added; semantic_delta
+      // = count minus flagged duplicates (what gates saturation termination).
       allAssumptions.push(...passAssumptions);
       engine.writer.writeRecord({
         record_type: 'assumption_set_snapshot',
@@ -1065,6 +1294,7 @@ export class Phase2Handler implements PhaseHandler {
           root_fr_id: config.rootKind === 'nfr' ? '*nfr*' : '*',
           assumptions: [...allAssumptions],
           delta_from_previous_pass: passAssumptions.length,
+          semantic_delta: semanticDelta,
         } satisfies AssumptionSetSnapshotContent,
       });
 
@@ -1073,7 +1303,15 @@ export class Phase2Handler implements PhaseHandler {
       // audit costs one reasoning_review LLM call.
       if (caps.reasoning_review_on_tier_c && postGateCleanAudits.length > 0) {
         for (const audit of postGateCleanAudits) {
-          await this.runTierCAcShapeAudit(ctx, audit.parentStory, audit.children, passNumber, config.recordSubPhaseId);
+          await this.runTierCAcShapeAudit(
+            ctx,
+            audit.parentLogicalNodeId,
+            audit.parentDisplayKey,
+            audit.parentStory,
+            audit.children,
+            passNumber,
+            config.recordSubPhaseId,
+          );
         }
       }
 
@@ -1100,11 +1338,12 @@ export class Phase2Handler implements PhaseHandler {
             } else {
               queue.push({
                 parentRecordId: child.nodeRecordId,
-                nodeId: child.childNodeId,
+                nodeId: child.logicalNodeId,
                 parentNodeId: plan.parentNodeId,
                 rootFrId: child.rootFrId,
                 depth: child.depth,
                 userStory: child.userStory,
+                displayKey: child.displayKey,
                 tierHint: 'B',
               });
             }
@@ -1116,14 +1355,20 @@ export class Phase2Handler implements PhaseHandler {
       // assumptions AND queue is empty → terminate. Queue-empty alone is
       // the real terminator; the other signals just tell us the loop
       // converged cleanly rather than running out of work by accident.
-      if (passAssumptions.length === 0 && queue.length === 0) break;
+      // Saturation termination — gated on semantic_delta (new ideas) not
+      // raw delta (new rows). With dedup flagging in place, a pass that
+      // only surfaces duplicates has semantic_delta === 0 and fires
+      // termination correctly even though delta_from_previous_pass > 0.
+      if (semanticDelta === 0 && queue.length === 0) break;
     }
 
     // Finalize the pipeline container: derive termination reason + final
     // counts. Written as a new supersession record with the same
     // pipeline_id so the webview picks the latest.
+    const totalLlmCalls = [...callsByRoot.values()].reduce((a, b) => a + b, 0);
+    const maxRootCalls = callsByRoot.size > 0 ? Math.max(...callsByRoot.values()) : 0;
     const terminationReason: DecompositionTerminationReason =
-      llmCallsUsed >= caps.budget_cap ? 'budget_cap'
+      maxRootCalls >= caps.budget_cap ? 'budget_cap'
       : maxDepthReached >= caps.depth_cap ? 'depth_cap'
       : 'fixed_point';
     const finalNodes = engine.writer.getRecordsByType(workflowRun.id, 'requirement_decomposition_node');
@@ -1152,17 +1397,20 @@ export class Phase2Handler implements PhaseHandler {
         ),
         final_leaf_count: atomicLeafCount,
         final_max_depth: maxDepthReached,
-        total_llm_calls: llmCallsUsed,
+        total_llm_calls: totalLlmCalls,
       } satisfies RequirementDecompositionPipelineContent,
     });
     engine.writer.supersedByRollback(currentPipelineRecordId, pipelineFinalRecord.id);
 
     // Persist budget telemetry back to the workflow_runs row so operators
     // can see per-run decomposition load without walking the stream.
+    // Per-kind column so a completed FR loop doesn't clobber NFR's
+    // baseline (the resume path reads per-kind, not the aggregate).
     try {
       engine.stateMachine.updateDecompositionTelemetry(
         workflowRun.id,
-        llmCallsUsed,
+        config.rootKind,
+        totalLlmCalls,
         maxDepthReached,
       );
     } catch {
@@ -1192,11 +1440,12 @@ export class Phase2Handler implements PhaseHandler {
     },
   ): Array<{
     bundleRecordId: string;
-    parentNodeId: string;
+    parentNodeId: string;              // parent's logical UUID
     childItems: Array<{
-      itemId: string;
-      nodeRecordId: string;
-      childNodeId: string;
+      itemId: string;                  // bundle-local id (`child-${idx}`)
+      nodeRecordId: string;            // governed-stream row UUID of the child decomposition node
+      logicalNodeId: string;           // child's logical UUID (content.node_id)
+      displayKey: string;              // sibling-unique human label (content.display_key)
       userStory: DecompositionUserStory;
       rootFrId: string;
       depth: number;
@@ -1209,40 +1458,42 @@ export class Phase2Handler implements PhaseHandler {
       childItems: Array<{
         itemId: string;
         nodeRecordId: string;
-        childNodeId: string;
+        logicalNodeId: string;
+        displayKey: string;
         userStory: DecompositionUserStory;
         rootFrId: string;
         depth: number;
       }>;
     }> = [];
-    // Look up each parent node record so we can carry its root_fr_id and
-    // depth into the child queue entries on acceptance.
+    // Look up each parent node record so we can carry its root_fr_id,
+    // depth, and display_key into the gate presentation layer.
     const allNodes = engine.writer.getRecordsByType(workflowRun.id, 'requirement_decomposition_node');
-    const byNodeId = new Map<string, RequirementDecompositionNodeContent>();
+    const byLogicalId = new Map<string, RequirementDecompositionNodeContent>();
     for (const r of allNodes) {
       const c = r.content as unknown as RequirementDecompositionNodeContent;
-      byNodeId.set(c.node_id, c);
+      byLogicalId.set(c.node_id, c);
     }
 
     for (const [parentNodeId, children] of pendingGateByParent) {
-      const parentContent = byNodeId.get(parentNodeId);
+      const parentContent = byLogicalId.get(parentNodeId);
+      const parentDisplayKey = parentContent?.display_key ?? parentNodeId;
       const mirrorItems: MirrorItem[] = children.map((c, idx) => ({
         id: `child-${idx}`,
-        text: `${c.story.id} [Tier B commitment]: ${c.story.action} -> ${c.story.outcome}`,
+        text: `${c.displayKey} [Tier B commitment]: ${c.story.action} -> ${c.story.outcome}`,
         rationale: c.rationale,
         category: 'scope',
       }));
-      const childItems = children.map((c, idx) => {
-        const childContent = byNodeId.get(c.story.id);
-        return {
-          itemId: `child-${idx}`,
-          nodeRecordId: c.nodeRecordId,
-          childNodeId: c.story.id,
-          userStory: c.story,
-          rootFrId: childContent?.root_fr_id ?? parentContent?.root_fr_id ?? parentNodeId,
-          depth: childContent?.depth ?? ((parentContent?.depth ?? 0) + 1),
-        };
-      });
+      const childItems = children.map((c, idx) => ({
+        itemId: `child-${idx}`,
+        nodeRecordId: c.nodeRecordId,
+        logicalNodeId: c.logicalNodeId,
+        displayKey: c.displayKey,
+        userStory: c.story,
+        rootFrId: byLogicalId.get(c.logicalNodeId)?.root_fr_id
+          ?? parentContent?.root_fr_id ?? parentNodeId,
+        depth: byLogicalId.get(c.logicalNodeId)?.depth
+          ?? ((parentContent?.depth ?? 0) + 1),
+      }));
 
       const parentAssumptions = passAssumptions.filter(a => a.surfaced_at_node === parentNodeId);
       const summaryLines: string[] = [];
@@ -1260,8 +1511,11 @@ export class Phase2Handler implements PhaseHandler {
         for (const a of parentAssumptions) summaryLines.push(`- (${a.category}) ${a.text}`);
       }
       const bundleContent: DecisionBundleContent = {
+        // surface_id uses the parent's logical UUID so repeated gates for
+        // the same parent (e.g., after a 4b downgrade) collapse cleanly
+        // on any deduping surface-id store.
         surface_id: `${config.gateSurfacePrefix}${parentNodeId}`,
-        title: `Scope commitments under ${parentNodeId}`,
+        title: `Scope commitments under ${parentDisplayKey}`,
         summary: summaryLines.length > 0 ? summaryLines.join('\n') : undefined,
         mirror: { kind: 'assumption_mirror', items: mirrorItems },
       };
@@ -1300,13 +1554,14 @@ export class Phase2Handler implements PhaseHandler {
       rootFrId: string;
       depth: number;
       userStory: DecompositionUserStory;
+      displayKey: string;
     },
     passNumber: number,
     reasonCode: string,
     config: SaturationLoopConfig,
   ): void {
     const { engine, workflowRun } = ctx;
-    engine.writer.writeRecord({
+    const deferredRec = engine.writer.writeRecord({
       record_type: 'requirement_decomposition_node',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
@@ -1319,6 +1574,7 @@ export class Phase2Handler implements PhaseHandler {
         kind: 'requirement_decomposition_node',
         node_id: entry.nodeId,
         parent_node_id: entry.parentNodeId,
+        display_key: entry.displayKey,
         root_fr_id: entry.rootFrId,
         depth: entry.depth,
         pass_number: passNumber,
@@ -1329,6 +1585,10 @@ export class Phase2Handler implements PhaseHandler {
         pruning_reason: reasonCode,
       } satisfies RequirementDecompositionNodeContent,
     });
+    // Retire the prior pending version of this logical node.
+    engine.writer.supersedeDecompositionNodeByLogicalId(
+      workflowRun.id, entry.nodeId, deferredRec.id,
+    );
   }
 
   /**
@@ -1346,6 +1606,8 @@ export class Phase2Handler implements PhaseHandler {
    */
   private async runTierCAcShapeAudit(
     ctx: PhaseContext,
+    parentLogicalNodeId: string,
+    parentDisplayKey: string,
     parentStory: DecompositionUserStory,
     children: DecompositionUserStory[],
     passNumber: number,
@@ -1358,7 +1620,7 @@ export class Phase2Handler implements PhaseHandler {
     );
     if (!template) {
       getLogger().warn('workflow', 'Phase 2.1a/2.2a Step 4c: AC-shape audit template missing — skipping', {
-        parentId: parentStory.id,
+        parentLogicalNodeId, parentDisplayKey,
       });
       return;
     }
@@ -1370,7 +1632,7 @@ export class Phase2Handler implements PhaseHandler {
     const rendered = engine.templateLoader.render(template, variables);
     if (rendered.missing_variables.length > 0) {
       getLogger().warn('workflow', 'Phase 2.1a/2.2a Step 4c: audit template has unfilled variables', {
-        parentId: parentStory.id, missing: rendered.missing_variables,
+        parentLogicalNodeId, parentDisplayKey, missing: rendered.missing_variables,
       });
       return;
     }
@@ -1387,7 +1649,7 @@ export class Phase2Handler implements PhaseHandler {
           phaseId: '2',
           subPhaseId,
           agentRole: 'reasoning_review',
-          label: `Phase ${subPhaseId} Step 4c — AC-shape audit under ${parentStory.id}`,
+          label: `Phase ${subPhaseId} Step 4c — AC-shape audit under ${parentDisplayKey}`,
         },
       });
 
@@ -1409,7 +1671,7 @@ export class Phase2Handler implements PhaseHandler {
 
       if (policyCount > 0) {
         getLogger().warn('workflow', 'Phase 2.1a/2.2a Step 4c: policy-shaped ACs detected under Tier-B parent', {
-          parentId: parentStory.id,
+          parentLogicalNodeId, parentDisplayKey,
           policyCount,
           totalChildren: findings.length,
           summary,
@@ -1427,7 +1689,8 @@ export class Phase2Handler implements PhaseHandler {
         derived_from_record_ids: [],
         content: {
           kind: 'tier_c_ac_shape_audit',
-          parent_node_id: parentStory.id,
+          parent_node_id: parentLogicalNodeId,
+          parent_display_key: parentDisplayKey,
           pass_number: passNumber,
           children_reviewed: children.map(c => c.id),
           findings,
@@ -1437,7 +1700,7 @@ export class Phase2Handler implements PhaseHandler {
       });
     } catch (err) {
       getLogger().warn('workflow', 'Phase 2.1a/2.2a Step 4c: AC-shape audit call failed — advisory skipped', {
-        parentId: parentStory.id,
+        parentLogicalNodeId, parentDisplayKey,
         error: err instanceof Error ? err.message : String(err),
       });
     }
@@ -1840,12 +2103,16 @@ interface SaturationResumeState {
     rootFrId: string;
     depth: number;
     userStory: DecompositionUserStory;
+    displayKey: string;
     tierHint: DecompositionTier | 'root';
   }>;
   allAssumptions: AssumptionEntry[];
   assumptionSeq: number;
   siblingsByParent: Map<string | null, DecompositionUserStory[]>;
-  llmCallsUsed: number;
+  // Per-root LLM-call counters do NOT resume — each resume session
+  // gets a fresh per-root budget. Operators who want a strict global
+  // cap across all sessions can track it via the workflow_runs
+  // per-kind columns, which do persist.
   maxDepthReached: number;
   passNumber: number;
   pipelinePasses: DecompositionPassEntry[];
@@ -1908,6 +2175,11 @@ export function rebuildSaturationStateFromStream(
       rootFrId: c.root_fr_id,
       depth: c.depth,
       userStory: c.user_story,
+      // Reuse persisted display_key (post-fix runs). Fall back to the
+      // raw user_story.id for nodes persisted before display_key was
+      // introduced — those pre-fix rows won't exist in fresh cal runs,
+      // but the fallback keeps the resume path robust to hand-edited DBs.
+      displayKey: c.display_key ?? c.user_story?.id ?? c.node_id,
       tierHint,
     });
   }
@@ -1965,23 +2237,20 @@ export function rebuildSaturationStateFromStream(
   const latestRecord = matchingPipelines
     .reduce((acc, r) => !acc || r.produced_at > acc.produced_at ? r : acc);
   const pipelinePasses = [...(latestRecord.content as unknown as RequirementDecompositionPipelineContent).passes];
-  // Max depth / LLM calls — walk all latest nodes for this kind.
+  // Max depth — walk all latest nodes for this kind. Per-root LLM-call
+  // counters intentionally do NOT resume; each resume session starts
+  // with a fresh per-root budget (see runSaturationLoop).
   let maxDepth = 0;
   for (const r of latestByNodeId.values()) {
     const c = r.content as unknown as RequirementDecompositionNodeContent;
     if (c.depth > maxDepth) maxDepth = c.depth;
   }
-  // LLM calls is stored on workflow_runs — best-effort read.
-  const run = engine.stateMachine.getWorkflowRun(workflowRun.id);
-  const llmCallsUsed = (run as unknown as { decomposition_budget_calls_used?: number })
-    ?.decomposition_budget_calls_used ?? pipelinePasses.reduce((a, p) => a + (p.nodes_produced ?? 0), 0);
 
   return {
     queue,
     allAssumptions,
     assumptionSeq,
     siblingsByParent: siblings,
-    llmCallsUsed,
     maxDepthReached: maxDepth,
     passNumber,
     pipelinePasses,

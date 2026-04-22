@@ -70,8 +70,30 @@ You have been given `parent_tier_hint`. Use it as context for what kind of child
 
 For each child you produce, list any **assumption, constraint, compliance citation, or open question** the child surfaces that is NOT already in `existing_assumptions`. Each surfaced item must include:
 - `text`: the assumption in plain prose
-- `category`: one of `domain_regime` | `constraint` | `compliance` | `scope` | `open_question`
+- `category`: one of `domain_regime` | `constraint` | `compliance` | `scope` | `open_question` — see definitions below, use them consistently
 - `citations`: optional list of handoff item ids
+
+## Category definitions — use these precisely, do not mix
+
+Category choice is semantic, not stylistic. A single underlying fact belongs in exactly ONE category; re-tagging the same fact under a different category creates a duplicate that pollutes downstream analysis.
+
+- **`domain_regime`** — a named external standard, law, or domain invariant the system MUST honour. The test: is there a named authority (a body of standards, a statute, a regulatory citation, a well-established domain convention)? Examples: *"GAAP-compliant double-entry posting"*, *"IRS Rev. Rul. 70-604 election handling"*, *"SOTIF obligations under ISO 21448"*, *"HIPAA minimum-necessary disclosure"*, *"WCAG 2.1 AA contrast requirements"*.
+
+- **`compliance`** — a regulatory retention, audit, reporting, or legal-record obligation. Examples: *"7-year audit-record retention per IRS §6001"*, *"SOC 2 Type II audit trail immutability"*, *"Breach notification within 72 hours per GDPR Article 33"*. Distinct from `domain_regime` in that compliance items are usually about record-keeping / disclosure / auditing, whereas domain_regime is about how the system behaves when doing its primary work.
+
+- **`constraint`** — a system-internal or architectural restriction the implementer must honour. No external authority required; the constraint binds because of architectural choices or operational needs. Examples: *"Multi-tenant isolation enforced at the database level"*, *"Audit trail writes are append-only"*, *"All workflow state transitions are durable (DBOS)"*.
+
+- **`scope`** — what IS or IS NOT covered by this decomposition. Scope items define the boundary of the current work, not rules about its behaviour. Examples: *"HOA accounting is in scope for v1"*, *"Nextdoor integration is out of scope"*, *"State-specific NSF rule variations deferred to v2"*.
+
+- **`open_question`** — an unresolved decision the human must make. Until answered, the system cannot proceed correctly. Examples: *"Which states' NSF statutes apply to the initial rollout?"*, *"What cadence for the 70-604 election — annual board meeting or rolling?"*, *"Which billing platform for subscription management?"*.
+
+**Disambiguation checklist before you emit a category:**
+
+1. Is this fact tied to a **named external authority** (statute, standard body, regulation)? → `domain_regime` or `compliance` (compliance if it's about retention/audit/disclosure; domain_regime otherwise).
+2. Is this fact a **system-side restriction** with no external authority? → `constraint`.
+3. Is this fact about **what's in or out of the work itself**? → `scope`.
+4. Is this fact an **unanswered question** blocking progress? → `open_question`.
+5. Is the text you're about to write semantically equivalent to an item ALREADY in `existing_assumptions`, just rephrased or category-shifted? → **don't emit it**; it's a duplicate.
 
 # Required output
 

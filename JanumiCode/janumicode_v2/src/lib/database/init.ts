@@ -128,6 +128,8 @@ function ensureSchemaColumns(db: { exec: (sql: string) => void }): void {
     // are written by the orchestrator at pass entry/exit and used to
     // enforce budget_cap / depth_cap safety rails.
     { table: 'workflow_runs', column: 'decomposition_budget_calls_used', ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'decomposition_fr_calls_used',     ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'decomposition_nfr_calls_used',    ddl: 'INTEGER DEFAULT 0' },
     { table: 'workflow_runs', column: 'decomposition_max_depth_reached', ddl: 'INTEGER DEFAULT 0' },
   ];
   for (const { table, column, ddl } of additive) {

@@ -106,6 +106,10 @@ export class StateMachine {
       compliance_context_ref: (row.compliance_context_ref as string) || null,
       cross_run_impact_triggered: !!(row.cross_run_impact_triggered as number),
       intent_lens: (row.intent_lens as IntentLens) || null,
+      decomposition_budget_calls_used: (row.decomposition_budget_calls_used as number) ?? 0,
+      decomposition_fr_calls_used: (row.decomposition_fr_calls_used as number) ?? 0,
+      decomposition_nfr_calls_used: (row.decomposition_nfr_calls_used as number) ?? 0,
+      decomposition_max_depth_reached: (row.decomposition_max_depth_reached as number) ?? 0,
     };
   }
 
@@ -202,15 +206,33 @@ export class StateMachine {
    */
   updateDecompositionTelemetry(
     runId: string,
-    llmCallsUsed: number,
+    rootKind: 'fr' | 'nfr',
+    kindCallsUsed: number,
     maxDepthReached: number,
   ): void {
+    // Per-kind telemetry lives in its own column so a completed FR
+    // saturation loop doesn't clobber NFR's baseline on resume (and
+    // vice-versa). The aggregate `decomposition_budget_calls_used`
+    // stays as a display-convenience sum, recomputed here.
+    const kindCol = rootKind === 'nfr'
+      ? 'decomposition_nfr_calls_used'
+      : 'decomposition_fr_calls_used';
+    const existing = this.db.prepare(
+      `SELECT decomposition_fr_calls_used AS fr,
+              decomposition_nfr_calls_used AS nfr,
+              decomposition_max_depth_reached AS max_depth
+         FROM workflow_runs WHERE id = ?`,
+    ).get(runId) as { fr?: number; nfr?: number; max_depth?: number } | undefined;
+    const fr = rootKind === 'fr' ? kindCallsUsed : (existing?.fr ?? 0);
+    const nfr = rootKind === 'nfr' ? kindCallsUsed : (existing?.nfr ?? 0);
+    const combinedMaxDepth = Math.max(existing?.max_depth ?? 0, maxDepthReached);
     this.db.prepare(`
       UPDATE workflow_runs
-         SET decomposition_budget_calls_used = ?,
+         SET ${kindCol} = ?,
+             decomposition_budget_calls_used = ?,
              decomposition_max_depth_reached = ?
        WHERE id = ?
-    `).run(llmCallsUsed, maxDepthReached, runId);
+    `).run(kindCallsUsed, fr + nfr, combinedMaxDepth, runId);
   }
 
   /**

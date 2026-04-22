@@ -21,7 +21,7 @@
 
 import type { GovernedStreamWriter } from '../orchestrator/governedStreamWriter';
 import type { AgentRole } from '../types/records';
-import { InvocationLogFile, LoopDetector } from './invocationLogger';
+import { InvocationLogFile } from './invocationLogger';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -137,9 +137,9 @@ export interface LLMStreamingCallOptions extends LLMCallOptions {
   /**
    * Optional abort signal — providers that support it should listen
    * for `aborted` and tear down the in-flight HTTP request. The
-   * LLMCaller wires this to a loop detector so a runaway stream
-   * (qwen3 thinking spiral) can be killed without waiting on the
-   * idle-stall timer (which doesn't fire when chunks are arriving).
+   * LLMCaller wires this to the 1.5 MB size cap and the session abort
+   * signal, so runaway thinking spirals can be killed without waiting
+   * on the outer records-idle stall timer.
    */
   abortSignal?: AbortSignal;
 }
@@ -315,69 +315,66 @@ export class LLMCaller {
       // agent_output_chunk records as tokens arrive. Adapters that don't
       // stream just ignore the extra field on the options object.
       let chunkSequence = 0;
-      let cumulativeChars = 0;
-      // Loop detector + abort controller. The detector watches the
-      // streamed text for n-gram repetition; if it fires, we trip the
-      // abort signal so the provider can tear down the in-flight HTTP
-      // request. Otherwise a runaway qwen3 thinking spiral keeps
-      // emitting plausible tokens forever and the stall timer never
-      // fires (chunks ARE arriving — they're just semantically stuck).
-      const loopDetector = new LoopDetector();
-      const abortController = new AbortController();
-      let abortReason: string | null = null;
-      // Union the caller-provided abort signal (e.g. session abort from
-      // waitForQuiescence stall) with our internal one. When the caller's
-      // signal fires, we abort the internal controller so the provider's
-      // HTTP request tears down cleanly.
-      if (options.abortSignal) {
-        const external = options.abortSignal;
-        const onExternalAbort = () => {
-          abortReason ??= 'session abort (external signal)';
-          if (!abortController.signal.aborted) abortController.abort();
-        };
-        if (external.aborted) onExternalAbort();
-        else external.addEventListener('abort', onExternalAbort, { once: true });
-      }
-      // Runtime size-budget cap — a third stall signature complementing
-      // records-idle (silent hang) and LoopDetector (n-gram repetition).
-      // When a call's cumulative streamed chars exceed this budget, the
-      // model is almost certainly stuck in verbose-but-not-converging
-      // thinking mode: it's actively emitting tokens but given the
-      // context window (e.g. 262144 for qwen3.5:9b), there's no
-      // budget left for a final response. Observed cal-3 signature:
-      // 2.3MB .log file, 228K thinking chars, no FINAL TEXT ever
-      // produced. Default 800000 chars (~200K tokens) leaves headroom
-      // for legitimate long outputs while aborting runaway thinking.
-      const maxResponseChars = Number.parseInt(
-        process.env.JANUMICODE_LLM_MAX_RESPONSE_CHARS ?? '800000', 10);
-      const streamingOptions: LLMStreamingCallOptions = {
-        ...options,
-        abortSignal: abortController.signal,
-        onChunk: (chunk) => {
-          cumulativeChars += chunk.text.length;
-          logFile?.writeChunk({
-            channel: chunk.channel,
-            msSinceStart: Date.now() - startedAt,
-            cumulativeChars,
-            text: chunk.text,
-          });
-          this.writeOutputChunk(invocationId, options, chunk, chunkSequence++);
-          if (!abortReason) {
-            const reason = loopDetector.observe(chunk.text);
-            if (reason) {
-              abortReason = reason;
-              abortController.abort();
-              return;
-            }
-            if (maxResponseChars > 0 && cumulativeChars > maxResponseChars) {
-              abortReason = `max_response_chars exceeded (${cumulativeChars} > ${maxResponseChars}) — likely context-budget starvation in thinking mode`;
-              abortController.abort();
-            }
-          }
-        },
-      };
+      // Invocation-log size cap — primary in-stream stall signature.
+      // We measure the bytes written to the per-invocation .log file
+      // (prompt + chunk metadata + streamed text), not just cumulative
+      // stream chars, because a thinking-mode loop keeps growing the
+      // log monotonically even when individual tokens are tiny. 1.5 MB
+      // of log file = practically certain to be stuck. Retryable up to
+      // maxRetries so sampling variance can rescue the next attempt.
+      const maxLogFileBytes = Number.parseInt(
+        process.env.JANUMICODE_LLM_MAX_LOG_FILE_BYTES ?? '1572864', 10);
 
       for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
+        // Per-attempt abort + stream state so a retry starts with a
+        // fresh budget. bytesBaseline captures the log-file size at
+        // attempt start so the size-cap only measures THIS attempt's
+        // growth — otherwise a failed attempt 1 at 1.5 MB would
+        // instantly re-trip attempt 2 on the very first chunk.
+        let cumulativeChars = 0;
+        const bytesBaseline = logFile?.bytesWritten ?? 0;
+        const abortController = new AbortController();
+        let abortReason: string | null = null;
+        // Union the caller-provided abort signal (session abort from
+        // waitForQuiescence) with our internal one. Session abort is
+        // non-retryable: the outer orchestrator is shutting down.
+        let sessionAborted = false;
+        let externalCleanup: (() => void) | null = null;
+        if (options.abortSignal) {
+          const external = options.abortSignal;
+          const onExternalAbort = () => {
+            sessionAborted = true;
+            abortReason ??= 'session abort (external signal)';
+            if (!abortController.signal.aborted) abortController.abort();
+          };
+          if (external.aborted) onExternalAbort();
+          else {
+            external.addEventListener('abort', onExternalAbort, { once: true });
+            externalCleanup = () => external.removeEventListener('abort', onExternalAbort);
+          }
+        }
+        const streamingOptions: LLMStreamingCallOptions = {
+          ...options,
+          abortSignal: abortController.signal,
+          onChunk: (chunk) => {
+            cumulativeChars += chunk.text.length;
+            logFile?.writeChunk({
+              channel: chunk.channel,
+              msSinceStart: Date.now() - startedAt,
+              cumulativeChars,
+              text: chunk.text,
+            });
+            this.writeOutputChunk(invocationId, options, chunk, chunkSequence++);
+            if (!abortReason && maxLogFileBytes > 0 && logFile) {
+              const attemptBytes = logFile.bytesWritten - bytesBaseline;
+              if (attemptBytes > maxLogFileBytes) {
+                abortReason = `invocation log size exceeded (${attemptBytes} > ${maxLogFileBytes} bytes this attempt) — likely runaway thinking`;
+                abortController.abort();
+              }
+            }
+          },
+        };
+
         try {
           const result = await adapter.call(streamingOptions);
           result.retryAttempts = retryAttempts;
@@ -394,10 +391,22 @@ export class LLMCaller {
           return result;
         } catch (err) {
           retryAttempts++;
-          lastError = err instanceof LLMError ? err : new LLMError(
-            err instanceof Error ? err.message : String(err),
-            'unknown',
-          );
+          // Stream was aborted by our in-stream detectors — override the
+          // provider's error with our own, marking session-aborts as
+          // non-retryable and size/flail aborts as retryable.
+          if (abortReason) {
+            lastError = new LLMError(
+              `LLM stream aborted: ${abortReason}`,
+              sessionAborted ? 'unknown' : 'context_exceeded',
+              undefined,
+              !sessionAborted,
+            );
+          } else if (err instanceof LLMError) {
+            lastError = err;
+          } else {
+            const msg = err instanceof Error ? err.message : String(err);
+            lastError = new LLMError(msg, 'unknown');
+          }
 
           if (!this.isRetryable(lastError)) break;
 
@@ -406,6 +415,8 @@ export class LLMCaller {
           if (delay > 0) {
             await this.sleep(delay);
           }
+        } finally {
+          externalCleanup?.();
         }
       }
 

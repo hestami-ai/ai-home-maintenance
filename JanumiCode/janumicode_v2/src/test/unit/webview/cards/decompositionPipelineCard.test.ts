@@ -90,7 +90,7 @@ describe('DecompositionPipelineCard', () => {
       produced_by_agent_role: 'requirements_agent' as never,
       content: {
         kind: 'requirement_decomposition_node',
-        node_id: 'FR-ROOT', parent_node_id: null, root_fr_id: 'FR-ROOT',
+        node_id: 'FR-ROOT', parent_node_id: null, display_key: 'FR-ROOT', root_fr_id: 'FR-ROOT',
         depth: 0, pass_number: 0, status: 'pending', root_kind: 'fr',
         user_story: {
           id: 'FR-ROOT', role: 'op', action: 'root action', outcome: 'root outcome',
@@ -106,7 +106,7 @@ describe('DecompositionPipelineCard', () => {
       produced_by_agent_role: 'requirements_agent' as never,
       content: {
         kind: 'requirement_decomposition_node',
-        node_id: 'NFR-ROOT', parent_node_id: null, root_fr_id: 'NFR-ROOT',
+        node_id: 'NFR-ROOT', parent_node_id: null, display_key: 'NFR-ROOT', root_fr_id: 'NFR-ROOT',
         depth: 0, pass_number: 0, status: 'pending', root_kind: 'nfr',
         user_story: {
           id: 'NFR-ROOT', role: 'system', action: 'nfr action', outcome: 'nfr outcome',

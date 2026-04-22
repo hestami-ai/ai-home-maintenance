@@ -253,17 +253,20 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       (n.content as { depth?: number }).depth === 0
       && (n.content as { root_kind?: string }).root_kind !== 'nfr');
     expect(roots, 'expected one depth-0 FR root node').toHaveLength(1);
-    expect(roots[0].content.node_id).toBe('FR-ACCT-0');
+    // node_id is now a logical UUID — identity is asserted via display_key.
+    const rootContent = roots[0].content as { node_id: string; display_key: string };
+    expect(rootContent.display_key).toBe('FR-ACCT-0');
+    expect(rootContent.node_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/i);
     expect(roots[0].sub_phase_id).toBe('2.1');
 
     const children = nodes.filter(n => (n.content as { depth?: number }).depth === 1);
     expect(children).toHaveLength(2);
     expect(children.every(c => c.sub_phase_id === '2.1a')).toBe(true);
-    expect(children.every(c => (c.content as { parent_node_id?: string }).parent_node_id === 'FR-ACCT-0')).toBe(true);
+    expect(children.every(c => (c.content as { parent_node_id?: string }).parent_node_id === rootContent.node_id)).toBe(true);
     // Tier-D children are written with status='atomic' (terminal).
     expect(children.every(c => (c.content as { tier: string }).tier === 'D')).toBe(true);
     expect(children.every(c => (c.content as { status: string }).status === 'atomic')).toBe(true);
-    expect(children.map(c => (c.content as { node_id: string }).node_id).sort((a, b) => a.localeCompare(b)))
+    expect(children.map(c => (c.content as { display_key: string }).display_key).sort((a, b) => a.localeCompare(b)))
       .toEqual(['FR-ACCT-1', 'FR-ACCT-2']);
 
     const snapshots = engine.writer.getRecordsByType(run.id, 'assumption_set_snapshot');
@@ -433,10 +436,18 @@ describe('Phase 2 — product-lens handoff consumption', () => {
 
     const allNodes = engine.writer.getRecordsByType(run.id, 'requirement_decomposition_node', false);
     const pruned = allNodes.filter(n =>
-      (n.content as { node_id: string }).node_id === 'FR-L2-DROP'
+      (n.content as { display_key: string }).display_key === 'FR-L2-DROP'
       && (n.content as { status: string }).status === 'pruned');
     expect(pruned, 'expected a pruned supersession record for FR-L2-DROP').toHaveLength(1);
     expect((pruned[0].content as { pruning_reason?: string }).pruning_reason).toBe('human-rejected');
+    // Supersession invariant: the logical node has exactly ONE current
+    // version after pruning (the pruned row), not two.
+    const prunedLogicalId = (pruned[0].content as { node_id: string }).node_id;
+    const currentForLogical = allNodes.filter(n =>
+      (n.content as { node_id: string }).node_id === prunedLogicalId
+      && n.is_current_version,
+    );
+    expect(currentForLogical, 'exactly one current-version row per logical node_id').toHaveLength(1);
   });
 
   it('Wave 6 Step 4b — accepted Tier-B whose children are also Tier-B is downgraded and flagged with context note', async () => {
@@ -499,24 +510,41 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     // A supersession record with status='downgraded' should exist for FR-B1.
     const allNodes = engine.writer.getRecordsByType(run.id, 'requirement_decomposition_node', false);
     const downgraded = allNodes.filter(n =>
-      (n.content as { node_id: string }).node_id === 'FR-B1'
+      (n.content as { display_key: string }).display_key === 'FR-B1'
       && (n.content as { status: string }).status === 'downgraded');
     expect(downgraded, 'expected a downgraded supersession record for FR-B1').toHaveLength(1);
+    // Supersession invariant: only the downgraded revision is current.
+    const dgLogicalId = (downgraded[0].content as { node_id: string }).node_id;
+    const currentForDg = allNodes.filter(n =>
+      (n.content as { node_id: string }).node_id === dgLogicalId
+      && n.is_current_version,
+    );
+    expect(currentForDg).toHaveLength(1);
     expect((downgraded[0].content as { pruning_reason?: string }).pruning_reason)
       .toMatch(/^tier_downgrade:/);
 
     // The follow-up gate bundle for FR-B1 (gating its Tier-B child FR-B2)
     // should carry the [Scope expansion] context note in its summary.
+    // Surface IDs are now keyed on the parent's logical UUID; look up
+    // FR-B1's UUID via display_key first.
+    const frB1Node = allNodes.find(n =>
+      (n.content as { display_key?: string }).display_key === 'FR-B1'
+      && (n.content as { status?: string }).status === 'downgraded',
+    );
+    expect(frB1Node, 'expected FR-B1 decomposition node').toBeDefined();
+    const frB1Uuid = (frB1Node!.content as { node_id: string }).node_id;
     const bundles = engine.writer.getRecordsByType(run.id, 'decision_bundle_presented');
     const followupBundle = bundles.find(b => {
       const c = b.content as { surface_id?: string };
-      return c.surface_id === 'decomp-gate-FR-B1';
+      return c.surface_id === `decomp-gate-${frB1Uuid}`;
     });
     expect(followupBundle, 'expected a follow-up gate bundle for FR-B1').toBeDefined();
-    const bundleContent = followupBundle!.content as { summary?: string };
+    const bundleContent = followupBundle!.content as { summary?: string; title?: string };
     expect(bundleContent.summary).toBeDefined();
     expect(bundleContent.summary ?? '').toContain('[Scope expansion]');
+    // Human-readable strings (summary + title) use display_key, not UUIDs.
     expect(bundleContent.summary ?? '').toContain('FR-B1');
+    expect(bundleContent.title ?? '').toContain('FR-B1');
   });
 
   it('Wave 6 NFR — Phase 2.2 emits depth-0 NFR nodes and 2.2a runs the saturation loop with root_kind=nfr', async () => {
@@ -594,7 +622,8 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       && (n.content as { root_kind?: string }).root_kind === 'nfr');
     expect(nfrRoot, 'expected a depth-0 NFR root node').toBeDefined();
     expect(nfrRoot!.sub_phase_id).toBe('2.2');
-    expect((nfrRoot!.content as { node_id: string }).node_id).toBe('NFR-AUDIT');
+    expect((nfrRoot!.content as { display_key: string }).display_key).toBe('NFR-AUDIT');
+    expect((nfrRoot!.content as { node_id: string }).node_id).toMatch(/^[0-9a-f]{8}-/i);
 
     // Depth-1 NFR leaf exists with root_kind='nfr' under sub-phase 2.2a.
     const nfrLeaves = nodes.filter(n =>
@@ -707,11 +736,15 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     expect(auditRecords, 'expected a 4c AC-shape audit record').toHaveLength(1);
     const audit = auditRecords[0].content as {
       parent_node_id: string;
+      parent_display_key: string;
       children_reviewed: string[];
       findings: Array<{ child_id: string; verdict: string }>;
       policy_count: number;
     };
-    expect(audit.parent_node_id).toBe('FR-COMMITMENT');
+    // parent_node_id now stores the parent's logical UUID; the human
+    // label is surfaced separately via parent_display_key.
+    expect(audit.parent_node_id).toMatch(/^[0-9a-f]{8}-/i);
+    expect(audit.parent_display_key).toBe('FR-COMMITMENT');
     expect(audit.children_reviewed.sort()).toEqual(['FR-IMPL-1', 'FR-IMPL-2']);
     expect(audit.policy_count).toBe(1);
     const imp2 = audit.findings.find(f => f.child_id === 'FR-IMPL-2');
@@ -891,14 +924,103 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     const result2 = await handler.execute(ctx);
     expect(result2.success, `resume execute should succeed; error=${result2.error}`).toBe(true);
 
-    // Still exactly ONE FR-ROOT after re-execute.
+    // Still exactly ONE FR-ROOT after re-execute (idempotency via
+    // display_key, not node_id — fresh UUIDs would otherwise appear to
+    // be distinct nodes).
     const finalFrNodes = engine.writer.getRecordsByType(run.id, 'requirement_decomposition_node')
       .filter(n => {
-        const c = n.content as unknown as { depth?: number; root_kind?: string; node_id?: string };
-        return c.depth === 0 && (c.root_kind ?? 'fr') === 'fr' && c.node_id === 'FR-ROOT';
+        const c = n.content as unknown as {
+          depth?: number; root_kind?: string; display_key?: string;
+        };
+        return c.depth === 0 && (c.root_kind ?? 'fr') === 'fr' && c.display_key === 'FR-ROOT';
       });
     expect(finalFrNodes.length, 'still exactly one FR-ROOT after re-execute').toBe(1);
   });
+
+  // Live-ollama integration test. All Phase 2 tests exercise the dedup
+  // path (higher testing fidelity) — requires `ollama serve` with
+  // qwen3-embedding:8b pulled. Assumes no concurrent calibration run
+  // (operator responsibility — ollama is singleton-ish on the dev box).
+  it('Wave 6 dedup [live-ollama] — near-duplicate assumptions get flagged; semantic_delta excludes them',
+    async () => {
+    // Integration test against a running ollama instance with the
+    // qwen3-embedding:8b model. Skipped gracefully when ollama isn't
+    // reachable — the saturation loop's own error handling flows
+    // through and the assertion pivots on whether embeddings were
+    // actually produced. Requires `ollama serve` + `qwen3-embedding:8b`
+    // pulled locally.
+    const mock = new MockLLMProvider();
+    mock.setFixture('fr-product', {
+      match: 'product-lens Functional Requirements Bloom',
+      parsedJson: {
+        user_stories: [{
+          id: 'FR-ROOT', role: 'op', action: 'manage thing', outcome: 'thing',
+          acceptance_criteria: [{ id: 'AC-001', description: 'd', measurable_condition: 'c' }],
+          priority: 'high', traces_to: ['UJ-1'],
+        }],
+      },
+    });
+    // Near-duplicate pair mirrors the real cal-4 A-0524 / A-0531
+    // observation: same underlying fact, different category framing.
+    // Third assumption is semantically distinct (different subject
+    // matter). qwen3-embedding:8b should place 1+2 well above the
+    // 0.92 threshold and 3 well below.
+    mock.setFixture('decompose-root', {
+      match: 'FR-ROOT',
+      parsedJson: {
+        parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
+        children: [{
+          id: 'FR-CHILD', tier: 'D', role: 'op', action: 'do', outcome: 'done',
+          acceptance_criteria: [{ id: 'AC-001', description: 'd', measurable_condition: 'c' }],
+          priority: 'high', traces_to: ['UJ-1'],
+        }],
+        surfaced_assumptions: [
+          { text: 'CAM operator role possesses write permissions on the Traefik configuration directory without human intervention.', category: 'scope' },
+          { text: 'CAM operator role has write access to the Traefik config directory without human intervention.', category: 'constraint' },
+          { text: 'Budget variance alerts fire when spending exceeds approved reserves by more than 5 percent.', category: 'domain_regime' },
+        ],
+      },
+    });
+    mock.setFixture('nfr-product', {
+      match: 'product-lens Non-Functional Requirements Bloom',
+      parsedJson: { requirements: [] },
+    });
+
+    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.configManager.setRequirementsAgentRouting({
+      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      temperature: 0.5,
+    });
+
+    const { run } = engine.startWorkflowRun('ws', 'test');
+    engine.advanceToNextPhase(run.id, '1');
+    seedPriorPhaseRecords(run.id, tinyHandoff());
+    engine.advanceToNextPhase(run.id, '2');
+    const result = await engine.executeCurrentPhase(run.id);
+    expect(result.success, `error=${result.error}`).toBe(true);
+
+    const snaps = engine.writer.getRecordsByType(run.id, 'assumption_set_snapshot');
+    const frSnap = snaps.find(s => (s.content as { root_fr_id?: string }).root_fr_id === '*');
+    expect(frSnap, 'expected an FR assumption snapshot').toBeDefined();
+    const content = frSnap!.content as {
+      delta_from_previous_pass: number;
+      semantic_delta?: number;
+      assumptions: Array<{ id: string; text: string; duplicate_of?: string; duplicate_similarity?: number }>;
+    };
+    // All three rows were added (raw delta).
+    expect(content.delta_from_previous_pass).toBe(3);
+    // Exactly one of the Traefik-permission pair should be flagged;
+    // the budget-alert assumption is semantically distinct and stays clean.
+    const traefikPair = content.assumptions.filter(a =>
+      a.text.toLowerCase().includes('traefik'));
+    expect(traefikPair).toHaveLength(2);
+    const flagged = content.assumptions.filter(a => a.duplicate_of);
+    expect(flagged, 'exactly one near-dupe should be flagged').toHaveLength(1);
+    expect(flagged[0].text.toLowerCase()).toContain('traefik');
+    expect(flagged[0].duplicate_similarity).toBeGreaterThan(0.92);
+    // semantic_delta = raw - flagged = 2
+    expect(content.semantic_delta).toBe(2);
+  }, 60_000);
 
   it('Wave 6 Step 2 — drops malformed children and still decomposes the valid ones', async () => {
     const mock = new MockLLMProvider();
@@ -947,7 +1069,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     const nodes = engine.writer.getRecordsByType(run.id, 'requirement_decomposition_node');
     const children = nodes.filter(n => (n.content as { depth?: number }).depth === 1);
     expect(children).toHaveLength(1);
-    expect((children[0].content as { node_id: string }).node_id).toBe('FR-OK');
+    expect((children[0].content as { display_key: string }).display_key).toBe('FR-OK');
   });
 
   it('Wave 6 Step 2 — default-lens (no handoff) skips 2.1a and emits no decomposition records beyond depth-0', async () => {

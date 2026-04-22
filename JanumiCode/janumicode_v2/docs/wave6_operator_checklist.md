@@ -7,7 +7,7 @@ One-page procedure for the **first live run** that exercises Wave 6's recursive 
 
 ## Prerequisites
 
-- [ ] Workspace directory exists (e.g. `e:/Projects/hestami-ai/test-workspace/calibration`).
+- [ ] Workspace directory exists under `test-and-evaluation/calibration-workspaces/<tag>` (the cal script auto-creates this when `--workspace` is omitted).
 - [ ] Intent file prepared (e.g. the Hestami spec at `JanumiCode/janumicode_v2/src/test/fixtures/hestami-product-description/intent.md`).
 - [ ] Latest dist built: `node esbuild.js` — produces `dist/cli/janumicode.js` and `dist/webview/main.js`.
 - [ ] Strong-model CLI available in PATH (one of `codex`, `claude-code`, `gemini`) OR a direct API key for the configured `requirements_agent` provider.
@@ -31,9 +31,11 @@ export GOOGLE_API_KEY=<key>            # default production uses gemini-2.0-flas
 ```bash
 node scripts/wave6-calibration-run.js \
   --intent /path/to/intent.md \
-  --workspace /path/to/workspace \
-  --out-dir /path/to/workspace/calibration-gold \
   --tag codex-iter-1
+# Workspace auto-defaults to
+#   test-and-evaluation/calibration-workspaces/calibration-workspace-<tag>/
+# Override with --workspace <path> if you need a different location.
+# Override with --out-dir <path> if you need gold files outside the workspace.
 ```
 
 The script will:
@@ -44,7 +46,7 @@ The script will:
 4. Print a calibration summary (tier distribution, audit verdict tally, per-kind telemetry).
 
 Expected run time: 5–30 minutes depending on model + spec complexity. Watch for:
-- Budget-cap trips (look for `termination_reason: budget_cap` in the pipeline summary) → sign the spec is richer than 500 LLM calls/root; either raise the cap or investigate decomposer bloat.
+- Budget-cap trips (look for `termination_reason: budget_cap` in the pipeline summary) → at least one root exceeded the per-root LLM-call budget (500 default). Either raise the cap (`--budget-cap N` on the calibration script, or patch `decomposition.budget_cap` in the workspace config) or investigate decomposer bloat on the specific root(s).
 - Zero NFR nodes in the tree → Phase 2.2 didn't produce any root NFRs; check `non_functional_requirements` artifact in the DB.
 
 ## Post-run review

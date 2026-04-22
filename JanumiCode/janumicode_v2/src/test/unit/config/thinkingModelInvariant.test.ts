@@ -34,6 +34,10 @@ const REASONING_MODEL_PATTERNS: RegExp[] = [
   // Qwen3 family — all variants (qwen3, qwen3.5, qwen3-coder, qwen3-30b-a3b,
   // etc.) are trained with thinking-mode. Qwen2 and older are NOT.
   /^qwen3/i,
+  // Google Gemma 3n+ — multimodal thinking-capable edge models. The
+  // `:e2b` / `:e4b` suffixes denote effective-parameter size in
+  // Ollama's tag format. Gemma 2 and Gemma 1 are NOT reasoning models.
+  /^gemma[34]/i,
   // Google Gemini thinking tier. The `-thinking` suffix is explicit;
   // `gemini-2.5-pro` and `gemini-2.5-flash` both default to reasoning
   // mode (thinking tokens enabled by default per Google's Gemini 2.5
@@ -152,7 +156,7 @@ describe('Model policy — every configured LLM must be a thinking/reasoning mod
     // Sanity check: these are the strings we EXPECT to see. If a production
     // model literal ever changes, this list should be updated so we don't
     // regress on coverage.
-    const expectedSeen = ['qwen3.5:9b', 'gemini-2.0-flash-thinking'];
+    const expectedSeen = ['qwen3.5:9b', 'gemini-2.5-flash'];
     const found = new Set(literals.map((l) => l.model));
     for (const name of expectedSeen) {
       expect(found.has(name), `Expected to see production model ${name}`).toBe(true);
@@ -177,6 +181,8 @@ describe('Model policy — every configured LLM must be a thinking/reasoning mod
       'claude-3.5-sonnet',
       'mistral:7b',
       'deepseek-v3',
+      'gemma:7b',   // Gemma 1 — no thinking mode
+      'gemma2:9b',  // Gemma 2 — no thinking mode
     ];
     for (const m of shouldReject) {
       expect(
@@ -192,6 +198,9 @@ describe('Model policy — every configured LLM must be a thinking/reasoning mod
       'qwen3.5:9b',
       'qwen3-coder:7b',
       'qwen3-30b-a3b',
+      'gemma3n:e4b',
+      'gemma4:e4b',
+      'gemma4:e2b',
       'gemini-2.0-flash-thinking',
       'gemini-2.5-pro',
       'gemini-3',

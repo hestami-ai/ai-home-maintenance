@@ -11,3 +11,9 @@ out/
 .env
 coverage/
 test-output/
+
+# All generated test + evaluation artifacts land under this convention
+# directory (harness test-workspace, per-run calibration workspaces,
+# gap reports, prompt-probe output). Fixtures that need to be tracked
+# live under src/test/fixtures/ instead.
+test-and-evaluation/
