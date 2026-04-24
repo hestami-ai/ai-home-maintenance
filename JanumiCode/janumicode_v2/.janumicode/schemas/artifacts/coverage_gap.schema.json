@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "janumicode:coverage_gap:1.0",
+  "title": "Coverage Gap",
+  "description": "Emitted by deterministic coverage verifiers in Phase 1 (Sub-Phase 1.3c for journey/workflow coverage, Sub-Phase 1.8 verifier for release-manifest coverage) when a structural assertion fails. Routes to an MMP card where the human chooses between 'accepted_as_scope_cut' (the gap is intentional; recorded in the handoff as an explicit exclusion) or 'rebloom_requested' (targeted re-run of the preceding sub-phase with the gap as human_feedback). Severity 'blocking' pauses phase progression until resolved; severity 'advisory' logs the gap but does not block.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "schemaVersion", "sub_phase_id", "assertion", "severity", "check", "expected", "actual", "missing"],
+  "properties": {
+    "kind": { "const": "coverage_gap" },
+    "schemaVersion": { "const": "1.0" },
+    "sub_phase_id": {
+      "type": "string",
+      "enum": ["1.3c", "1.8"]
+    },
+    "assertion": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One-line description of the structural rule that tripped."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["blocking", "advisory"]
+    },
+    "check": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short machine-tag classifying the check (e.g. 'persona_coverage', 'automatable_step_backing', 'release_exact_coverage')."
+    },
+    "details": {
+      "type": "object",
+      "description": "Optional structured details the MMP card or re-bloom prompt may render."
+    },
+    "expected": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Artifact ids that should have been covered by the rule."
+    },
+    "actual": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Artifact ids that were actually covered."
+    },
+    "missing": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "expected ∖ actual — ids the rule requires but did not find."
+    },
+    "extra": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "actual ∖ expected — only populated for exclusivity/double-count checks."
+    },
+    "resolution": {
+      "type": "string",
+      "enum": ["accepted_as_scope_cut", "rebloom_requested", "pending"]
+    },
+    "resolution_note": { "type": "string" },
+    "resolved_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

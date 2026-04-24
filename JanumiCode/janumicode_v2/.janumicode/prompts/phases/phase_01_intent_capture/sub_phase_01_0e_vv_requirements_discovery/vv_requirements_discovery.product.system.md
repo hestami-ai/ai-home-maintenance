@@ -55,7 +55,7 @@ Every V&V requirement MUST carry a `source_ref` with a verbatim `excerpt`. No pa
   "kind": "vv_requirements_discovery",
   "vvRequirements": [
     {
-      "id": "VV-1",
+      "id": "VV-API-LATENCY",
       "category": "performance",
       "target": "Authenticated web and mobile API responses must complete quickly under normal operating load.",
       "measurement": "Server-side p95 latency for authenticated, non-upload, non-export API responses.",
@@ -70,7 +70,7 @@ Every V&V requirement MUST carry a `source_ref` with a verbatim `excerpt`. No pa
 }
 ```
 
-`id`: `VV-<n>` starting at `VV-1`.
+`id`: a semantic slug of the form `VV-<UPPER-SLUG>` — evocative of the requirement itself, NOT a running number. Use the target/measurement concept uppercased with hyphens (e.g. `VV-API-LATENCY`, `VV-INTEGRITY-CHAIN`, `VV-UPTIME-SLO`, `VV-ANOMALY-DETECTION`). Slug MUST match `^VV-[A-Z0-9_-]+$`. If two requirements would slug identically, suffix the second with `-2`, the third with `-3`, etc.
 `category`: `performance`, `availability`, `reliability`, `security`, `compliance`, `accessibility`, `observability`, `scale`, `durability`, `auditability`, or source-specific.
 
 Empty array is valid if the source states no measurable targets. Do NOT invent targets from prose — that's downstream bloom's job.

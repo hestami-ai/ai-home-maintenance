@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "janumicode:release_plan:2.0",
+  "title": "Release Plan (v2 — widened manifest)",
+  "description": "Phase 1.8 widened release plan. Replaces the 1.0 schema's journey-only trace surface with a full manifest: every accepted handoff artifact (journeys, workflows, entities, compliance items, integrations, vocabulary terms) is assigned to exactly one release's `contains[type]` array OR to the top-level `cross_cutting` bucket for artifacts that legitimately span all releases. Eliminates the silent-null release-assignment failure mode in Phase 2 `assignReleaseToRoot` for FRs whose traces_to points at non-journey artifacts. Gated by the human via MMP after a deterministic Phase 1.8 coverage-and-coherence verifier passes. Once approved, Phase 2 assigns each FR / NFR root to a release by looking up any trace id against the manifest; descendants inherit release_id through parent_node_id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "schemaVersion", "releases", "cross_cutting", "approved"],
+  "properties": {
+    "kind": { "const": "release_plan" },
+    "schemaVersion": { "const": "2.0" },
+    "releases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/Release" }
+    },
+    "cross_cutting": { "$ref": "#/definitions/CrossCuttingContents" },
+    "approved": {
+      "type": "boolean",
+      "description": "True once the human gate accepts the plan. Only approved plans drive downstream Phase 2 assignment."
+    },
+    "approval_note": {
+      "type": "string",
+      "description": "Free-text note from the human at approval time."
+    }
+  },
+  "definitions": {
+    "Release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_id", "ordinal", "name", "description", "rationale", "contains"],
+      "properties": {
+        "release_id": { "type": "string", "description": "Canonical logical UUID." },
+        "ordinal": { "type": "integer", "minimum": 1, "description": "1-based contiguous; no gaps." },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "contains": { "$ref": "#/definitions/ReleaseContents" }
+      }
+    },
+    "ReleaseContents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["journeys", "workflows", "entities", "compliance", "integrations", "vocabulary"],
+      "properties": {
+        "journeys":     { "type": "array", "items": { "type": "string" }, "description": "References UserJourney.id (UJ-*)." },
+        "workflows":    { "type": "array", "items": { "type": "string" }, "description": "References WorkflowV2.id (WF-*)." },
+        "entities":     { "type": "array", "items": { "type": "string" }, "description": "References Entity.id (ENT-*)." },
+        "compliance":   { "type": "array", "items": { "type": "string" }, "description": "References compliance item ids (COMP-*)." },
+        "integrations": { "type": "array", "items": { "type": "string" }, "description": "References Integration.id (INT-*)." },
+        "vocabulary":   { "type": "array", "items": { "type": "string" }, "description": "References VocabularyTerm.id (VOC-*)." }
+      }
+    },
+    "CrossCuttingContents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workflows", "compliance", "integrations", "vocabulary"],
+      "description": "Artifacts that span all releases by design. Journeys and entities intentionally absent — see ReleasePlanContentV2 docstring in records.ts.",
+      "properties": {
+        "workflows":    { "type": "array", "items": { "type": "string" } },
+        "compliance":   { "type": "array", "items": { "type": "string" } },
+        "integrations": { "type": "array", "items": { "type": "string" } },
+        "vocabulary":   { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

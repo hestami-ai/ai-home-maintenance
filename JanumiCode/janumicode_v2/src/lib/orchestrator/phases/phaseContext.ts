@@ -262,7 +262,7 @@ function summarizeFunctionalRequirements(c: Record<string, unknown>): string {
   const lines = stories.map(s => {
     const acs = (s.acceptance_criteria as Array<Record<string, unknown>>) ?? [];
     const acList = acs.map(ac => `    ${ac.id}: ${ac.measurable_condition ?? ac.description}`).join('\n');
-    return `  ${s.id} [${s.priority}]: As a ${s.role}, I want ${s.action}, so that ${s.outcome}\n    Acceptance Criteria:\n${acList}`;
+    return `  ${s.id} [${s.priority}]: As a ${s.role}, I want to ${s.action}, so that ${s.outcome}\n    Acceptance Criteria:\n${acList}`;
   });
   return `${stories.length} User Stories:\n${lines.join('\n')}`;
 }
@@ -457,6 +457,10 @@ export interface FrozenFrLeaf {
   root_display_key: string;
   depth: number;
   tier: 'A' | 'B' | 'C' | 'D' | null;
+  /** Release assigned to this leaf (null = backlog). Inherited from the root. */
+  release_id: string | null;
+  /** Cached release ordinal for sort convenience (null = backlog). */
+  release_ordinal: number | null;
   user_story: {
     id: string;
     role: string;
@@ -511,10 +515,20 @@ export function buildEffectiveFrView(
   const leaves = getFrozenFrLeaves(decompositionNodes);
   const rootStories = (prior.functionalRequirements?.content.user_stories as Array<Record<string, unknown>>) ?? [];
   if (leaves.length > 0) {
-    const storyRecords = leaves.map(l => l.user_story as unknown as Record<string, unknown>);
-    const summaryLines = leaves.map(l =>
-      `${l.display_key} [${l.user_story.priority}] (Tier ${l.tier ?? '?'} leaf under ${l.root_display_key}): As a ${l.user_story.role}, I want ${l.user_story.action}, so that ${l.user_story.outcome}.`,
-    );
+    // Sort by release_ordinal (null → backlog → last), then root+display
+    // for stability. Downstream phases iterate in release order.
+    const sortedLeaves = [...leaves].sort((a, b) => {
+      const ao = a.release_ordinal ?? Number.MAX_SAFE_INTEGER;
+      const bo = b.release_ordinal ?? Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      const rd = a.root_display_key.localeCompare(b.root_display_key);
+      return rd !== 0 ? rd : a.display_key.localeCompare(b.display_key);
+    });
+    const storyRecords = sortedLeaves.map(l => l.user_story as unknown as Record<string, unknown>);
+    const summaryLines = sortedLeaves.map(l => {
+      const release = l.release_ordinal != null ? `Release ${l.release_ordinal}` : 'Backlog';
+      return `[${release}] ${l.display_key} [${l.user_story.priority}] (Tier ${l.tier ?? '?'} leaf under ${l.root_display_key}): As a ${l.user_story.role}, I want to ${l.user_story.action}, so that ${l.user_story.outcome}.`;
+    });
     return {
       stories: storyRecords,
       summary: summaryLines.join('\n'),
@@ -583,6 +597,8 @@ export function getFrozenFrLeaves(
       tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
         ? c.tier as FrozenFrLeaf['tier']
         : null,
+      release_id: typeof c.release_id === 'string' ? c.release_id : null,
+      release_ordinal: typeof c.release_ordinal === 'number' ? c.release_ordinal : null,
       user_story: story,
     });
   }

@@ -50,7 +50,7 @@ Every vocabulary term MUST carry a `source_ref` with a verbatim `excerpt` contai
   "kind": "canonical_vocabulary_discovery",
   "canonicalVocabulary": [
     {
-      "id": "VOC-1",
+      "id": "VOC-ACCRUAL",
       "term": "Assessment",
       "definition": "A recurring charge levied by a community association on its members for operating and capital expenses.",
       "synonyms": ["dues", "periodic fee"],
@@ -64,7 +64,7 @@ Every vocabulary term MUST carry a `source_ref` with a verbatim `excerpt` contai
 }
 ```
 
-`id`: `VOC-<n>` starting at `VOC-1`.
+`id`: a semantic slug of the form `VOC-<UPPER-SLUG>` — evocative of the term itself, NOT a running number. Use the term uppercased with hyphens (e.g. `VOC-ACCRUAL`, `VOC-WATERFALL`, `VOC-EMR`, `VOC-RBAC`). Slug MUST match `^VOC-[A-Z0-9_-]+$`. If two terms would slug identically, suffix the second with `-2`, the third with `-3`, etc.
 `synonyms`: include equivalents / near-equivalents the source doc uses interchangeably. Empty array when there are none.
 
 Empty `canonicalVocabulary` array is valid if the source doc introduces no domain-specific terms.

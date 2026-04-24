@@ -18,25 +18,37 @@
 
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
 import type {
+  CoverageGapContent,
+  CrossCuttingContents,
   GovernedStreamRecord,
   IntentLens,
   PhaseId,
   ProductDescriptionHandoffContent,
   Persona,
   UserJourney,
+  UserJourneyStep,
   PhasingPhase,
   BusinessDomain,
   Entity,
-  Workflow,
+  WorkflowV2,
+  WorkflowStep,
+  WorkflowTrigger,
   Integration,
   ExtractedItem,
   HumanDecisionSummary,
   OpenLoop,
+  ReleaseV2,
+  ReleaseContents,
+  ReleasePlanContentV2,
   SourceRef,
   TechnicalConstraint,
   VVRequirement,
   VocabularyTerm,
 } from '../../types/records';
+import { verifyCoverage } from './phase1/verifyCoverage';
+import { verifyReleaseManifest } from './phase1/verifyReleaseManifest';
+import { buildReleaseManifest, type LlmReleaseSkeleton } from './phase1/buildReleaseManifest';
+import { randomUUID } from 'node:crypto';
 import type {
   DecisionBundleContent,
   MirrorItem,
@@ -1480,46 +1492,161 @@ export class Phase1Handler implements PhaseHandler {
     const safeDomains = acceptedDomains.length > 0 ? acceptedDomains : domainsBloom.domains;
     const safePersonas = acceptedPersonas.length > 0 ? acceptedPersonas : domainsBloom.personas;
 
-    // ── 1.3 User Journeys & Workflows Bloom (Round 2) ───────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.3');
-    const round13 = await this.runBloomRoundWithFeedbackLoop<{ userJourneys: UserJourney[]; workflows: Workflow[] }>(ctx, {
-      subPhaseId: '1.3',
-      roundLabel: 'Journeys/Workflows',
+    // ── Wave 7 Phase 1.3 — split into 1.3a (journeys) + 1.3b (workflows) + 1.3c (verifier) ──
+    // Inputs discovered upstream (1.0d compliance + retention, 1.0e V&V). Integrations
+    // come from 1.5 which runs AFTER 1.3 in the current flow — passed as empty here;
+    // integration_coverage check no-ops on empty input. Moving 1.5 ahead of 1.3 is a
+    // deferred reorder (see docs/wave7_phase1_redesign.md roadmap).
+    const complianceInputs = discoveryBundle.complianceExtractedItems;
+    const retentionInputs = complianceInputs.filter(c => /retention|retain|archiv|purge|delet/i.test(c.text));
+    const vvInputs = discoveryBundle.vvRequirements;
+    const integrationInputs: Integration[] = [];
+
+    // ── 1.3a — User Journey Bloom ─────────────────────────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.3a');
+    let bloom13aMeta: { unreachedPersonas: string[]; unreachedDomains: string[] } = { unreachedPersonas: [], unreachedDomains: [] };
+    const round13a = await this.runBloomRoundWithFeedbackLoop<{ userJourneys: UserJourney[]; unreachedPersonas: string[]; unreachedDomains: string[] }>(ctx, {
+      subPhaseId: '1.3a',
+      roundLabel: 'User Journeys',
       lensRationale: state.lensClassification.rationale,
       humanDecisions,
       artifactIds,
       priorRecordIds: [domainsRecord.id],
-      runProposer: (feedback) => this.runJourneysWorkflowsBloom(ctx, safeDomains, safePersonas, discovery.phasingStrategy ?? [], feedback),
+      runProposer: async (feedback) => {
+        const r = await this.runJourneyBloom13a(ctx, {
+          acceptedDomains: safeDomains,
+          acceptedPersonas: safePersonas,
+          phasingStrategy: discovery.phasingStrategy ?? [],
+          complianceItems: complianceInputs,
+          retentionRules: retentionInputs,
+          vvRequirements: vvInputs,
+          integrations: integrationInputs,
+        }, feedback);
+        bloom13aMeta = { unreachedPersonas: r.unreachedPersonas, unreachedDomains: r.unreachedDomains };
+        return r;
+      },
       writeBloomRecord: (bloom, derivedFrom) => {
         const rec = engine.writer.writeRecord({
           record_type: 'artifact_produced',
           schema_version: '1.0',
           workflow_run_id: workflowRun.id,
           phase_id: '1',
-          sub_phase_id: '1.3',
+          sub_phase_id: '1.3a',
           produced_by_agent_role: 'domain_interpreter',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: derivedFrom,
-          content: { kind: 'journeys_workflows_bloom', ...bloom } as unknown as Record<string, unknown>,
+          content: {
+            kind: 'user_journey_bloom',
+            userJourneys: bloom.userJourneys,
+            unreached_personas: bloom.unreachedPersonas.map(id => ({ personaId: id })),
+            unreached_domains: bloom.unreachedDomains.map(id => ({ domainId: id })),
+          } as unknown as Record<string, unknown>,
         });
         artifactIds.push(rec.id);
         return rec;
       },
-      mapItems: (bloom) => [
-        ...bloom.userJourneys.map(j => ({ id: j.id, label: `[Journey] ${j.title}`, description: j.scenario, tradeoffs: `${j.implementationPhase} • persona ${j.personaId}` })),
-        ...bloom.workflows.map(w => ({ id: w.id, label: `[Workflow] ${w.name}`, description: w.description, tradeoffs: `domain ${w.businessDomainId}` })),
-      ],
-      buildTitle: () => 'Review User Journeys and System Workflows',
-      buildSummary: (bloom) => `${bloom.userJourneys.length} user journey(s) and ${bloom.workflows.length} system workflow(s) proposed across the accepted domains.`,
+      mapItems: (bloom) => bloom.userJourneys.map(j => ({
+        id: j.id, label: `[Journey] ${j.title}`, description: j.scenario,
+        tradeoffs: `${j.implementationPhase} • persona ${j.personaId}`,
+      })),
+      buildTitle: () => 'Review User Journeys',
+      buildSummary: (bloom) => `${bloom.userJourneys.length} user journey(s) proposed across the accepted domains.`,
     });
-    if (!round13.success) return { success: false, error: round13.error, artifactIds };
-    const journeysBloom = round13.bloom;
-    const journeysRecord = round13.record;
-    const keptJourneyIds = new Set(round13.keptIds);
-    const acceptedJourneys = journeysBloom.userJourneys.filter(j => keptJourneyIds.has(j.id));
-    const acceptedWorkflows = journeysBloom.workflows.filter(w => keptJourneyIds.has(w.id));
-    const safeJourneys = acceptedJourneys.length > 0 ? acceptedJourneys : journeysBloom.userJourneys;
-    const safeWorkflows = acceptedWorkflows.length > 0 ? acceptedWorkflows : journeysBloom.workflows;
+    if (!round13a.success) return { success: false, error: round13a.error, artifactIds };
+    const journeyBloom = round13a.bloom;
+    const journeysRecord = round13a.record;
+    const keptJourneyIds = new Set(round13a.keptIds);
+    const acceptedJourneys = journeyBloom.userJourneys.filter(j => keptJourneyIds.has(j.id));
+    const safeJourneys = acceptedJourneys.length > 0 ? acceptedJourneys : journeyBloom.userJourneys;
+
+    // ── 1.3b — System Workflow Bloom ──────────────────────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.3b');
+    const round13b = await this.runBloomRoundWithFeedbackLoop<{ workflows: WorkflowV2[] }>(ctx, {
+      subPhaseId: '1.3b',
+      roundLabel: 'System Workflows',
+      lensRationale: state.lensClassification.rationale,
+      humanDecisions,
+      artifactIds,
+      priorRecordIds: [journeysRecord.id],
+      runProposer: (feedback) => this.runWorkflowBloom13b(ctx, {
+        acceptedJourneys: safeJourneys,
+        acceptedPersonas: safePersonas,
+        acceptedDomains: safeDomains,
+        complianceItems: complianceInputs,
+        retentionRules: retentionInputs,
+        vvRequirements: vvInputs,
+        integrations: integrationInputs,
+      }, feedback),
+      writeBloomRecord: (bloom, derivedFrom) => {
+        const rec = engine.writer.writeRecord({
+          record_type: 'artifact_produced',
+          schema_version: '1.0',
+          workflow_run_id: workflowRun.id,
+          phase_id: '1',
+          sub_phase_id: '1.3b',
+          produced_by_agent_role: 'domain_interpreter',
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+          derived_from_record_ids: derivedFrom,
+          content: {
+            kind: 'system_workflow_bloom',
+            workflows: bloom.workflows,
+          } as unknown as Record<string, unknown>,
+        });
+        artifactIds.push(rec.id);
+        return rec;
+      },
+      mapItems: (bloom) => bloom.workflows.map(w => ({
+        id: w.id, label: `[Workflow] ${w.name}`, description: w.description,
+        tradeoffs: `domain ${w.businessDomainId} • ${w.triggers.length} trigger(s)`,
+      })),
+      buildTitle: () => 'Review System Workflows',
+      buildSummary: (bloom) => `${bloom.workflows.length} system workflow(s) proposed — every workflow carries at least one typed trigger. Any workflow whose automatable step-backing cannot be verified will surface in the 1.3c coverage pass.`,
+    });
+    if (!round13b.success) return { success: false, error: round13b.error, artifactIds };
+    const workflowBloom = round13b.bloom;
+    const workflowsRecord = round13b.record;
+    const keptWorkflowIds = new Set(round13b.keptIds);
+    const acceptedWorkflowsV2 = workflowBloom.workflows.filter(w => keptWorkflowIds.has(w.id));
+    const safeWorkflowsV2 = acceptedWorkflowsV2.length > 0 ? acceptedWorkflowsV2 : workflowBloom.workflows;
+
+    // ── 1.3c — Coverage Verifier (deterministic) ─────────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.3c');
+    const coverageGaps = verifyCoverage({
+      personas: safePersonas,
+      domainIds: safeDomains.map(d => d.id),
+      journeys: safeJourneys,
+      workflows: safeWorkflowsV2,
+      complianceItems: complianceInputs,
+      retentionRules: retentionInputs,
+      vvRequirements: vvInputs,
+      integrations: integrationInputs,
+      vocabulary: discoveryBundle.canonicalVocabulary,
+      bloomExplicitlyUnreachedPersonas: bloom13aMeta.unreachedPersonas,
+      blomExplicitlyUnreachedDomains: bloom13aMeta.unreachedDomains,
+    });
+    const blockingGaps = coverageGaps.filter(g => g.severity === 'blocking');
+    if (blockingGaps.length > 0) {
+      const gapRecIds = this.persistCoverageGaps(ctx, coverageGaps, [journeysRecord.id, workflowsRecord.id]);
+      getLogger().warn('workflow', 'Phase 1.3c: blocking coverage gaps detected', {
+        workflow_run_id: workflowRun.id,
+        gap_count: blockingGaps.length,
+        advisory_count: coverageGaps.length - blockingGaps.length,
+        gap_record_ids: gapRecIds,
+      });
+      return {
+        success: false,
+        error: `Phase 1.3c coverage verifier: ${blockingGaps.length} blocking gap(s) detected — ${blockingGaps.map(g => g.check).join(', ')}. Review the coverage_gap records and re-run with feedback targeting the missing items.`,
+        artifactIds,
+      };
+    }
+    if (coverageGaps.length > 0) {
+      // Advisory-only — persist but don't block.
+      this.persistCoverageGaps(ctx, coverageGaps, [journeysRecord.id, workflowsRecord.id]);
+      getLogger().info('workflow', 'Phase 1.3c: advisory-only coverage notes', {
+        workflow_run_id: workflowRun.id,
+        advisory_count: coverageGaps.length,
+      });
+    }
 
     // ── 1.4 Business Entities Bloom (Round 3) ───────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '1.4');
@@ -1530,7 +1657,7 @@ export class Phase1Handler implements PhaseHandler {
       humanDecisions,
       artifactIds,
       priorRecordIds: [journeysRecord.id],
-      runProposer: (feedback) => this.runEntitiesBloom(ctx, safeDomains, safeWorkflows, safePersonas, safeJourneys, feedback),
+      runProposer: (feedback) => this.runEntitiesBloom(ctx, safeDomains, safeWorkflowsV2, safePersonas, safeJourneys, feedback),
       writeBloomRecord: (bloom, derivedFrom) => {
         const rec = engine.writer.writeRecord({
           record_type: 'artifact_produced',
@@ -1575,7 +1702,7 @@ export class Phase1Handler implements PhaseHandler {
       humanDecisions,
       artifactIds,
       priorRecordIds: [entitiesRecord.id],
-      runProposer: (feedback) => this.runIntegrationsQaBloom(ctx, safeDomains, safeEntities, safeWorkflows, safePersonas, safeJourneys, feedback),
+      runProposer: (feedback) => this.runIntegrationsQaBloom(ctx, safeDomains, safeEntities, safeWorkflowsV2, safePersonas, safeJourneys, feedback),
       writeBloomRecord: (bloom, derivedFrom) => {
         const rec = engine.writer.writeRecord({
           record_type: 'artifact_produced',
@@ -1618,7 +1745,7 @@ export class Phase1Handler implements PhaseHandler {
         domains: safeDomains,
         personas: safePersonas,
         journeys: safeJourneys,
-        workflows: safeWorkflows,
+        workflows: safeWorkflowsV2,
         entities: safeEntities,
         integrations: safeIntegrations,
         qualityAttributes: safeQAs,
@@ -1713,21 +1840,167 @@ export class Phase1Handler implements PhaseHandler {
       return { success: false, error: 'User rejected the product description handoff', artifactIds };
     }
 
+    // ── 1.8 Release Plan v2 — widened manifest proposal + deterministic verifier + approval ──
+    engine.stateMachine.setSubPhase(workflowRun.id, '1.8');
+    // Derive full input surface from handoff + discovery.
+    const acceptedWorkflowsForPlan = safeWorkflowsV2;
+    const acceptedEntitiesForPlan = safeEntities;
+    const acceptedIntegrationsForPlan = safeIntegrations;
+    const acceptedComplianceForPlan = discoveryBundle.complianceExtractedItems;
+    const acceptedVocabularyForPlan = discoveryBundle.canonicalVocabulary;
+    let lastCrossCutting: CrossCuttingContents = { workflows: [], compliance: [], integrations: [], vocabulary: [] };
+    const round18 = await this.runBloomRoundWithFeedbackLoop<{ releases: ReleaseV2[]; crossCutting: CrossCuttingContents }>(ctx, {
+      subPhaseId: '1.8',
+      roundLabel: 'Release Plan (v2)',
+      lensRationale: state.lensClassification.rationale,
+      humanDecisions,
+      artifactIds,
+      priorRecordIds: [handoffRecord.id],
+      runProposer: async (feedback) => {
+        const r = await this.runReleasePlanProposalV2_18(ctx, {
+          productVision: handoff.productVision,
+          productDescription: handoff.productDescription,
+          phasingStrategy: discovery.phasingStrategy ?? [],
+          journeys: safeJourneys,
+          workflows: acceptedWorkflowsForPlan,
+          entities: acceptedEntitiesForPlan,
+          complianceItems: acceptedComplianceForPlan,
+          integrations: acceptedIntegrationsForPlan,
+          vocabulary: acceptedVocabularyForPlan,
+          domains: safeDomains,
+        }, feedback);
+        lastCrossCutting = r.crossCutting;
+        return r;
+      },
+      writeBloomRecord: (bloom, derivedFrom) => {
+        const rec = engine.writer.writeRecord({
+          record_type: 'artifact_produced',
+          schema_version: '2.0',
+          workflow_run_id: workflowRun.id,
+          phase_id: '1',
+          sub_phase_id: '1.8',
+          produced_by_agent_role: 'orchestrator',
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+          derived_from_record_ids: derivedFrom,
+          content: {
+            kind: 'release_plan',
+            schemaVersion: '2.0',
+            releases: bloom.releases,
+            cross_cutting: bloom.crossCutting,
+            approved: false,
+          } satisfies ReleasePlanContentV2 as unknown as Record<string, unknown>,
+        });
+        artifactIds.push(rec.id);
+        return rec;
+      },
+      mapItems: (bloom) => bloom.releases.map(r => ({
+        id: r.release_id,
+        label: `Release ${r.ordinal}: ${r.name}`,
+        description: r.description,
+        tradeoffs: `${r.rationale} • contains ${r.contains.journeys.length}j/${r.contains.workflows.length}w/${r.contains.entities.length}e/${r.contains.compliance.length}c/${r.contains.integrations.length}i/${r.contains.vocabulary.length}v`,
+      })),
+      buildTitle: () => 'Review the proposed release plan (v2 manifest)',
+      buildSummary: (bloom) => `${bloom.releases.length} release(s) proposed. Every accepted handoff artifact is assigned to exactly one release OR to the cross_cutting bucket. The deterministic 1.8 verifier will confirm exact coverage, ordinal integrity, and forward-only dependencies before final approval.`,
+    });
+    if (!round18.success) return { success: false, error: round18.error, artifactIds };
+    const releasePlan = round18.bloom;
+    const keptReleaseIds = new Set(round18.keptIds);
+    const approvedReleases: ReleaseV2[] = releasePlan.releases
+      .filter(r => keptReleaseIds.size === 0 || keptReleaseIds.has(r.release_id));
+    approvedReleases.sort((a, b) => a.ordinal - b.ordinal);
+    approvedReleases.forEach((r, i) => { r.ordinal = i + 1; });
+    if (approvedReleases.length === 0) {
+      return {
+        success: false,
+        error: 'Phase 1.8: no releases remain after human review — re-run with feedback',
+        artifactIds,
+      };
+    }
+
+    // Run the deterministic 1.8 verifier BEFORE minting the approved
+    // record. If any blocking gaps, fail with a description pointing at
+    // the coverage_gap records.
+    const draftPlan: ReleasePlanContentV2 = {
+      kind: 'release_plan',
+      schemaVersion: '2.0',
+      releases: approvedReleases,
+      cross_cutting: lastCrossCutting,
+      approved: false,
+    };
+    const manifestGaps = verifyReleaseManifest({
+      plan: draftPlan,
+      journeys: safeJourneys,
+      workflows: acceptedWorkflowsForPlan,
+      entityIds: acceptedEntitiesForPlan.map(e => e.id),
+      complianceIds: acceptedComplianceForPlan.map(c => c.id),
+      integrations: acceptedIntegrationsForPlan,
+      vocabulary: acceptedVocabularyForPlan,
+    });
+    const blockingManifestGaps = manifestGaps.filter(g => g.severity === 'blocking');
+    if (blockingManifestGaps.length > 0) {
+      const gapRecIds = this.persistCoverageGaps(ctx, manifestGaps, [round18.record.id]);
+      getLogger().warn('workflow', 'Phase 1.8 verifier: blocking coverage/coherence gaps detected', {
+        workflow_run_id: workflowRun.id,
+        gap_count: blockingManifestGaps.length,
+        advisory_count: manifestGaps.length - blockingManifestGaps.length,
+        gap_record_ids: gapRecIds,
+      });
+      return {
+        success: false,
+        error: `Phase 1.8 manifest verifier: ${blockingManifestGaps.length} blocking gap(s) — ${blockingManifestGaps.map(g => g.check).join(', ')}. Review coverage_gap records and re-run with feedback.`,
+        artifactIds,
+      };
+    }
+    if (manifestGaps.length > 0) {
+      this.persistCoverageGaps(ctx, manifestGaps, [round18.record.id]);
+      getLogger().info('workflow', 'Phase 1.8 verifier: advisory-only findings', {
+        workflow_run_id: workflowRun.id,
+        advisory_count: manifestGaps.length,
+      });
+    }
+
+    // Final approved record. Phase 2+ reads this via
+    // workflow_runs.active_release_plan_record_id.
+    const approvedReleasePlanRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '2.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: '1.8',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [round18.record.id],
+      content: {
+        kind: 'release_plan',
+        schemaVersion: '2.0',
+        releases: approvedReleases,
+        cross_cutting: lastCrossCutting,
+        approved: true,
+      } satisfies ReleasePlanContentV2 as unknown as Record<string, unknown>,
+    });
+    artifactIds.push(approvedReleasePlanRecord.id);
+    engine.stateMachine.setActiveReleasePlanRecordId(workflowRun.id, approvedReleasePlanRecord.id);
+    engine.ingestionPipeline.ingest(approvedReleasePlanRecord);
+
     // ── Phase Gate ──────────────────────────────────────────
     const gateRecord = engine.writer.writeRecord({
       record_type: 'phase_gate_evaluation',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.7',
+      sub_phase_id: '1.8',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [handoffRecord.id, statementRecord.id, approvalMirrorRecord.id],
+      derived_from_record_ids: [
+        handoffRecord.id, statementRecord.id, approvalMirrorRecord.id,
+        approvedReleasePlanRecord.id,
+      ],
       content: {
         kind: 'phase_gate',
         phase_id: '1',
         intent_statement_record_id: statementRecord.id,
         product_description_handoff_record_id: handoffRecord.id,
+        active_release_plan_record_id: approvedReleasePlanRecord.id,
         has_unresolved_warnings: false,
         has_unapproved_proposals: false,
         has_high_severity_flaws: false,
@@ -2264,42 +2537,10 @@ export class Phase1Handler implements PhaseHandler {
     };
   }
 
-  private async runJourneysWorkflowsBloom(
-    ctx: PhaseContext,
-    acceptedDomains: BusinessDomain[],
-    acceptedPersonas: Persona[],
-    phasingStrategy: PhasingPhase[],
-    humanFeedback: string = '',
-  ): Promise<{ userJourneys: UserJourney[]; workflows: Workflow[] }> {
-    const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_3_journeys_workflows_bloom', 'product');
-    if (!template) throw new Error('1.3 journeys_workflows_bloom product-lens template not found');
-    const rendered = engine.templateLoader.render(template, {
-      accepted_domains: this.formatDomains(acceptedDomains),
-      accepted_personas: this.formatPersonas(acceptedPersonas),
-      phasing_strategy: this.formatPhasing(phasingStrategy),
-      human_feedback: humanFeedback.trim().length > 0 ? humanFeedback : '(none)',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-    });
-    if (rendered.missing_variables.length > 0) throw new Error(`1.3 missing variables: ${rendered.missing_variables.join(', ')}`);
-    const result = await engine.callForRole('domain_interpreter', {
-      prompt: rendered.rendered,
-      responseFormat: 'json',
-      temperature: 0.5,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.3', agentRole: 'domain_interpreter', label: 'Phase 1.3 — Journeys & Workflows Bloom' },
-    });
-    const parsed = this.safeParseJson(result);
-    if (!parsed) throw new Error('Journeys/Workflows bloom returned unparseable JSON');
-    return {
-      userJourneys: (parsed.userJourneys as UserJourney[] | undefined) ?? [],
-      workflows: (parsed.workflows as Workflow[] | undefined) ?? [],
-    };
-  }
-
   private async runEntitiesBloom(
     ctx: PhaseContext,
     acceptedDomains: BusinessDomain[],
-    acceptedWorkflows: Workflow[],
+    acceptedWorkflows: WorkflowV2[],
     acceptedPersonas: Persona[],
     acceptedJourneys: UserJourney[],
     humanFeedback: string = '',
@@ -2309,7 +2550,7 @@ export class Phase1Handler implements PhaseHandler {
     if (!template) throw new Error('1.4 entities_bloom product-lens template not found');
     const rendered = engine.templateLoader.render(template, {
       accepted_domains: this.formatDomains(acceptedDomains),
-      accepted_workflows: this.formatWorkflows(acceptedWorkflows),
+      accepted_workflows: this.formatWorkflowsV2(acceptedWorkflows),
       accepted_personas: this.formatPersonas(acceptedPersonas),
       accepted_journeys: this.formatJourneys(acceptedJourneys),
       human_feedback: humanFeedback.trim().length > 0 ? humanFeedback : '(none)',
@@ -2331,7 +2572,7 @@ export class Phase1Handler implements PhaseHandler {
     ctx: PhaseContext,
     acceptedDomains: BusinessDomain[],
     acceptedEntities: Entity[],
-    acceptedWorkflows: Workflow[],
+    acceptedWorkflows: WorkflowV2[],
     acceptedPersonas: Persona[],
     acceptedJourneys: UserJourney[],
     humanFeedback: string = '',
@@ -2342,7 +2583,7 @@ export class Phase1Handler implements PhaseHandler {
     const rendered = engine.templateLoader.render(template, {
       accepted_domains: this.formatDomains(acceptedDomains),
       accepted_entities: this.formatEntities(acceptedEntities),
-      accepted_workflows: this.formatWorkflows(acceptedWorkflows),
+      accepted_workflows: this.formatWorkflowsV2(acceptedWorkflows),
       accepted_personas: this.formatPersonas(acceptedPersonas),
       accepted_journeys: this.formatJourneys(acceptedJourneys),
       human_feedback: humanFeedback.trim().length > 0 ? humanFeedback : '(none)',
@@ -2387,7 +2628,7 @@ export class Phase1Handler implements PhaseHandler {
       domains: BusinessDomain[];
       personas: Persona[];
       journeys: UserJourney[];
-      workflows: Workflow[];
+      workflows: WorkflowV2[];
       entities: Entity[];
       integrations: Integration[];
       qualityAttributes: string[];
@@ -2430,7 +2671,7 @@ export class Phase1Handler implements PhaseHandler {
       domains: BusinessDomain[];
       personas: Persona[];
       journeys: UserJourney[];
-      workflows: Workflow[];
+      workflows: WorkflowV2[];
       entities: Entity[];
       integrations: Integration[];
       qualityAttributes: string[];
@@ -2497,7 +2738,7 @@ export class Phase1Handler implements PhaseHandler {
     domains: BusinessDomain[];
     personas: Persona[];
     journeys: UserJourney[];
-    workflows: Workflow[];
+    workflows: WorkflowV2[];
     entities: Entity[];
     integrations: Integration[];
     qualityAttributes: string[];
@@ -2619,11 +2860,6 @@ export class Phase1Handler implements PhaseHandler {
     return ds.map(d => `- **${d.id}**: ${d.name} — ${d.description}`).join('\n');
   }
 
-  private formatWorkflows(ws: Workflow[]): string {
-    if (!ws.length) return '(none)';
-    return ws.map(w => `- **${w.id}** (${w.businessDomainId}): ${w.name} — ${w.description}`).join('\n');
-  }
-
   private formatEntities(es: Entity[]): string {
     if (!es.length) return '(none)';
     return es.map(e => `- **${e.id}** (${e.businessDomainId}): ${e.name} — ${e.description}`).join('\n');
@@ -2673,6 +2909,505 @@ export class Phase1Handler implements PhaseHandler {
       }
     }
     return null;
+  }
+
+  // ── Wave 7 Phase 1.3 redesign — 1.3a + 1.3b + 1.3c ────────────────
+
+  /**
+   * 1.3a — User Journey Bloom proposer. Replaces the journey-half of
+   * the legacy `runJourneysWorkflowsBloom`. Produces journeys only; the
+   * human accepts/rejects via MMP before 1.3b consumes them.
+   */
+  private async runJourneyBloom13a(
+    ctx: PhaseContext,
+    inputs: {
+      acceptedDomains: BusinessDomain[];
+      acceptedPersonas: Persona[];
+      phasingStrategy: PhasingPhase[];
+      complianceItems: ExtractedItem[];
+      retentionRules: ExtractedItem[];
+      vvRequirements: VVRequirement[];
+      integrations: Integration[];
+    },
+    humanFeedback: string = '',
+  ): Promise<{ userJourneys: UserJourney[]; unreachedPersonas: string[]; unreachedDomains: string[] }> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_3a_user_journey_bloom', 'product');
+    if (!template) throw new Error('1.3a user_journey_bloom product-lens template not found');
+    const rendered = engine.templateLoader.render(template, {
+      accepted_personas: this.formatPersonas(inputs.acceptedPersonas),
+      accepted_domains: this.formatDomains(inputs.acceptedDomains),
+      phasing_strategy: this.formatPhasing(inputs.phasingStrategy),
+      compliance_regimes: this.formatExtractedItems(inputs.complianceItems),
+      retention_rules: this.formatExtractedItems(inputs.retentionRules),
+      vv_requirements: this.formatVVRequirements(inputs.vvRequirements),
+      integrations: this.formatIntegrations(inputs.integrations),
+      human_feedback: humanFeedback.trim().length > 0 ? humanFeedback : '(none)',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) throw new Error(`1.3a missing variables: ${rendered.missing_variables.join(', ')}`);
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.5,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.3a', agentRole: 'domain_interpreter', label: 'Phase 1.3a — User Journey Bloom' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('1.3a bloom returned unparseable JSON');
+    const unreachedPersonas = Array.isArray(parsed.unreached_personas)
+      ? (parsed.unreached_personas as Array<{ personaId?: string }>).map(u => u.personaId ?? '').filter(Boolean)
+      : [];
+    const unreachedDomains = Array.isArray(parsed.unreached_domains)
+      ? (parsed.unreached_domains as Array<{ domainId?: string }>).map(u => u.domainId ?? '').filter(Boolean)
+      : [];
+    // Self-heal filter: drop any surfaces[*] id that isn't in the
+    // accepted set for its type. Mirrors the Path C 1.8 filter. When
+    // the LLM emits free-text ("Compliance monitoring rules") or a
+    // close-but-wrong slug (COMP-MALWARE-SCAN vs accepted COMP-SEC-MALWARE)
+    // we drop it silently with an aggregated WARN rather than letting
+    // the 1.3c verifier reject the whole output.
+    const acceptedCompliance = new Set(inputs.complianceItems.map(c => c.id));
+    const acceptedRetention = new Set(inputs.retentionRules.map(r => r.id));
+    const acceptedVV = new Set(inputs.vvRequirements.map(v => v.id));
+    const acceptedIntegrations = new Set(inputs.integrations.map(i => i.id));
+    const rawJourneys = (parsed.userJourneys as Array<Record<string, unknown>> | undefined) ?? [];
+    const droppedBySurfaceType: Record<string, string[]> = {
+      compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [],
+    };
+    const userJourneys: UserJourney[] = rawJourneys.map(j => {
+      const s = (j as { surfaces?: Record<string, unknown> }).surfaces;
+      if (s && typeof s === 'object') {
+        const filterArr = (key: string, accepted: Set<string>, mergeAccepted?: Set<string>) => {
+          const xs = Array.isArray((s as Record<string, unknown>)[key])
+            ? (s as Record<string, string[]>)[key].filter(x => typeof x === 'string')
+            : [];
+          const kept: string[] = [];
+          for (const x of xs) {
+            if (accepted.has(x) || (mergeAccepted && mergeAccepted.has(x))) kept.push(x);
+            else droppedBySurfaceType[key].push(x);
+          }
+          (s as Record<string, string[]>)[key] = kept;
+        };
+        // Retention-rule ids may also resolve against the compliance set
+        // (retention is a subset of compliance in our extraction model).
+        filterArr('compliance_regimes', acceptedCompliance);
+        filterArr('retention_rules', acceptedRetention, acceptedCompliance);
+        filterArr('vv_requirements', acceptedVV);
+        filterArr('integrations', acceptedIntegrations);
+      }
+      return j as unknown as UserJourney;
+    });
+    const totalDropped = Object.values(droppedBySurfaceType).reduce((a, b) => a + b.length, 0);
+    if (totalDropped > 0) {
+      getLogger().warn('workflow', `Phase 1.3a: dropped ${totalDropped} non-accepted id(s) from journey surfaces`, {
+        workflow_run_id: ctx.workflowRun.id,
+        compliance_dropped: droppedBySurfaceType.compliance_regimes.slice(0, 20),
+        retention_dropped: droppedBySurfaceType.retention_rules.slice(0, 20),
+        vv_dropped: droppedBySurfaceType.vv_requirements.slice(0, 20),
+        integration_dropped: droppedBySurfaceType.integrations.slice(0, 20),
+      });
+    }
+    return {
+      userJourneys,
+      unreachedPersonas,
+      unreachedDomains,
+    };
+  }
+
+  /**
+   * 1.3b — System Workflow Bloom proposer. Runs after the human has
+   * accepted a set of journeys via 1.3a MMP. Every workflow MUST carry
+   * at least one typed trigger; the coverage verifier (1.3c) enforces
+   * structural correctness of the triggers post-MMP.
+   */
+  private async runWorkflowBloom13b(
+    ctx: PhaseContext,
+    inputs: {
+      acceptedJourneys: UserJourney[];
+      acceptedPersonas: Persona[];
+      acceptedDomains: BusinessDomain[];
+      complianceItems: ExtractedItem[];
+      retentionRules: ExtractedItem[];
+      vvRequirements: VVRequirement[];
+      integrations: Integration[];
+    },
+    humanFeedback: string = '',
+  ): Promise<{ workflows: WorkflowV2[] }> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_3b_system_workflow_bloom', 'product');
+    if (!template) throw new Error('1.3b system_workflow_bloom product-lens template not found');
+    const rendered = engine.templateLoader.render(template, {
+      accepted_journeys: this.formatJourneysWithSteps(inputs.acceptedJourneys),
+      accepted_personas: this.formatPersonas(inputs.acceptedPersonas),
+      accepted_domains: this.formatDomains(inputs.acceptedDomains),
+      compliance_regimes: this.formatExtractedItems(inputs.complianceItems),
+      retention_rules: this.formatExtractedItems(inputs.retentionRules),
+      vv_requirements: this.formatVVRequirements(inputs.vvRequirements),
+      integrations: this.formatIntegrations(inputs.integrations),
+      human_feedback: humanFeedback.trim().length > 0 ? humanFeedback : '(none)',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) throw new Error(`1.3b missing variables: ${rendered.missing_variables.join(', ')}`);
+    const result = await engine.callForRole('domain_interpreter', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.5,
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.3b', agentRole: 'domain_interpreter', label: 'Phase 1.3b — System Workflow Bloom' },
+    });
+    const parsed = this.safeParseJson(result);
+    if (!parsed) throw new Error('1.3b bloom returned unparseable JSON');
+    const rawWfs = (parsed.workflows as Array<Record<string, unknown>> | undefined) ?? [];
+    // Build accepted-id sets for the self-heal filter.
+    const acceptedJourneyIds = new Set(inputs.acceptedJourneys.map(j => j.id));
+    const stepCountByJourney = new Map<string, number>();
+    for (const j of inputs.acceptedJourneys) stepCountByJourney.set(j.id, j.steps.length);
+    const acceptedCompliance = new Set(inputs.complianceItems.map(c => c.id));
+    const acceptedRetention = new Set(inputs.retentionRules.map(r => r.id));
+    const acceptedVV = new Set(inputs.vvRequirements.map(v => v.id));
+    const acceptedIntegrations = new Set(inputs.integrations.map(i => i.id));
+    const acceptedDomains = new Set(inputs.acceptedDomains.map(d => d.id));
+
+    const droppedTriggers: string[] = [];
+    const droppedWorkflows: string[] = [];
+    const droppedSurfaces: string[] = [];
+    const workflows: WorkflowV2[] = [];
+    for (const raw of rawWfs) {
+      const w = this.normalizeWorkflowV2(raw);
+      // Filter triggers against accepted sets. A journey_step trigger is
+      // valid if the journey is accepted AND the step_number is within
+      // the journey's steps. Compliance/integration triggers must point
+      // at accepted ids. Schedule/event triggers carry no id refs and
+      // always pass.
+      const keptTriggers = w.triggers.filter(t => {
+        if (t.kind === 'journey_step') {
+          if (!acceptedJourneyIds.has(t.journey_id)) {
+            droppedTriggers.push(`${w.id}:journey_step:${t.journey_id}#${t.step_number}:journey-not-accepted`);
+            return false;
+          }
+          const n = stepCountByJourney.get(t.journey_id) ?? 0;
+          if (t.step_number < 1 || t.step_number > n) {
+            droppedTriggers.push(`${w.id}:journey_step:${t.journey_id}#${t.step_number}:step-out-of-range`);
+            return false;
+          }
+          return true;
+        }
+        if (t.kind === 'compliance') {
+          if (!acceptedCompliance.has(t.regime_id)) {
+            droppedTriggers.push(`${w.id}:compliance:${t.regime_id}:regime-not-accepted`);
+            return false;
+          }
+          return true;
+        }
+        if (t.kind === 'integration') {
+          if (!acceptedIntegrations.has(t.integration_id)) {
+            droppedTriggers.push(`${w.id}:integration:${t.integration_id}:integration-not-accepted`);
+            return false;
+          }
+          return true;
+        }
+        return true; // schedule, event
+      });
+      // A workflow with zero valid triggers can't exist — drop it.
+      if (keptTriggers.length === 0) {
+        droppedWorkflows.push(w.id);
+        continue;
+      }
+      // Re-derive backs_journeys from the filtered trigger set.
+      const derivedBacks = Array.from(new Set(keptTriggers
+        .filter((t): t is Extract<WorkflowTrigger, { kind: 'journey_step' }> => t.kind === 'journey_step')
+        .map(t => t.journey_id)));
+      // Filter surfaces[*] against accepted sets.
+      const raws = (raw as { surfaces?: Record<string, unknown> }).surfaces;
+      const filterSurfaces = (key: string, accepted: Set<string>, mergeAccepted?: Set<string>): string[] => {
+        const xs = (raws && Array.isArray(raws[key]))
+          ? (raws[key] as unknown[]).filter((x): x is string => typeof x === 'string')
+          : [];
+        const kept: string[] = [];
+        for (const x of xs) {
+          if (accepted.has(x) || (mergeAccepted && mergeAccepted.has(x))) kept.push(x);
+          else droppedSurfaces.push(`${w.id}:${key}:${x}`);
+        }
+        return kept;
+      };
+      const surfaces = {
+        compliance_regimes: filterSurfaces('compliance_regimes', acceptedCompliance),
+        retention_rules:    filterSurfaces('retention_rules', acceptedRetention, acceptedCompliance),
+        vv_requirements:    filterSurfaces('vv_requirements', acceptedVV),
+        integrations:       filterSurfaces('integrations', acceptedIntegrations),
+      };
+      // Drop workflows whose businessDomainId is not accepted (another
+      // referential-integrity class — the verifier would block on this
+      // but the self-heal approach is to drop with WARN instead).
+      if (!acceptedDomains.has(w.businessDomainId)) {
+        droppedWorkflows.push(w.id);
+        droppedTriggers.push(`${w.id}:domain:${w.businessDomainId}:domain-not-accepted`);
+        continue;
+      }
+      workflows.push({
+        ...w,
+        triggers: keptTriggers,
+        backs_journeys: derivedBacks,
+        // Re-attach filtered surfaces (casting — surfaces aren't in
+        // WorkflowV2's public type yet, but are set on the content record
+        // via the cast-through from raw LLM output).
+        ...(raws ? { surfaces } as unknown as Partial<WorkflowV2> : {}),
+      });
+    }
+    if (droppedTriggers.length > 0) {
+      getLogger().warn('workflow', `Phase 1.3b: dropped ${droppedTriggers.length} invalid workflow trigger ref(s)`, {
+        workflow_run_id: ctx.workflowRun.id,
+        dropped_triggers: droppedTriggers.slice(0, 30),
+      });
+    }
+    if (droppedSurfaces.length > 0) {
+      getLogger().warn('workflow', `Phase 1.3b: dropped ${droppedSurfaces.length} non-accepted id(s) from workflow surfaces`, {
+        workflow_run_id: ctx.workflowRun.id,
+        dropped_surfaces: droppedSurfaces.slice(0, 30),
+      });
+    }
+    if (droppedWorkflows.length > 0) {
+      getLogger().warn('workflow', `Phase 1.3b: dropped ${droppedWorkflows.length} workflow(s) with zero valid triggers or invalid domain`, {
+        workflow_run_id: ctx.workflowRun.id,
+        dropped_workflows: droppedWorkflows,
+      });
+    }
+    return { workflows };
+  }
+
+  /**
+   * 1.8 v2 — Widened release-plan proposer. Assigns every accepted
+   * handoff artifact to exactly one release's `contains[type]` OR to
+   * the top-level `cross_cutting` bucket. Replaces the journey-only
+   * legacy `runReleasePlanProposal`.
+   */
+  private async runReleasePlanProposalV2_18(
+    ctx: PhaseContext,
+    inputs: {
+      productVision: string;
+      productDescription: string;
+      phasingStrategy: PhasingPhase[];
+      journeys: UserJourney[];
+      workflows: WorkflowV2[];
+      entities: Entity[];
+      complianceItems: ExtractedItem[];
+      integrations: Integration[];
+      vocabulary: VocabularyTerm[];
+      domains: BusinessDomain[];
+    },
+    feedback: string,
+  ): Promise<{ releases: ReleaseV2[]; crossCutting: CrossCuttingContents }> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate('orchestrator', '01_8_release_plan', 'product');
+    if (!template) throw new Error('1.8 v2 release_plan product-lens template not found');
+    const rendered = engine.templateLoader.render(template, {
+      product_vision: inputs.productVision || '(none)',
+      product_description: inputs.productDescription || '(none)',
+      phasing_strategy: this.formatPhasing(inputs.phasingStrategy),
+      accepted_journeys: this.formatJourneys(inputs.journeys),
+      accepted_domains: this.formatDomains(inputs.domains),
+      human_feedback: feedback || '(none)',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) {
+      throw new Error(`1.8 v2 template has unfilled variables: ${rendered.missing_variables.join(', ')}`);
+    }
+    const result = await engine.callForRole('orchestrator', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.3,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '1',
+        subPhaseId: '1.8',
+        agentRole: 'orchestrator',
+        label: 'Phase 1.8 — Release Plan v2 proposer (narrow scope)',
+      },
+    });
+    // The 1.8 LLM output is a NARROW skeleton: release structure +
+    // journey placement only. Everything else (workflows, entities,
+    // compliance, integrations, vocabulary) is computed deterministically
+    // by `buildReleaseManifest` from the journey placement + upstream
+    // trigger/domain references. This matches JanumiCode's
+    // "deterministic where possible" principle and eliminates the class
+    // of small-model drift (invented ids, prose-as-compliance) observed
+    // in cal-14..cal-17.
+    const parsed = result.parsed as { releases?: unknown } | null;
+    const rawReleases = Array.isArray(parsed?.releases)
+      ? parsed.releases as Array<Record<string, unknown>>
+      : [];
+    const acceptedJourneyIds = new Set(inputs.journeys.map(j => j.id));
+    const skeleton: LlmReleaseSkeleton[] = rawReleases.map((r, i) => {
+      const ord = typeof r.ordinal === 'number' ? r.ordinal : i + 1;
+      const contains_journeys = Array.isArray(r.contains_journeys)
+        ? (r.contains_journeys as unknown[])
+            .filter((x): x is string => typeof x === 'string' && acceptedJourneyIds.has(x))
+        : [];
+      return {
+        release_id: typeof r.release_id === 'string' && r.release_id.length > 0 ? r.release_id : `REL-${ord}`,
+        ordinal: ord,
+        name: typeof r.name === 'string' && r.name.length > 0 ? r.name : `Release ${i + 1}`,
+        description: typeof r.description === 'string' ? r.description : '',
+        rationale: typeof r.rationale === 'string' ? r.rationale : '',
+        contains_journeys,
+      };
+    });
+
+    const built = buildReleaseManifest({
+      releases: skeleton,
+      journeys: inputs.journeys,
+      workflows: inputs.workflows,
+      entities: inputs.entities,
+      complianceIds: inputs.complianceItems.map(c => c.id),
+      integrations: inputs.integrations,
+      vocabulary: inputs.vocabulary,
+    });
+
+    if (built.unplacedJourneys.length > 0) {
+      getLogger().warn('workflow', `Phase 1.8: ${built.unplacedJourneys.length} accepted journey(s) not placed by LLM — defaulted to first release`, {
+        workflow_run_id: ctx.workflowRun.id,
+        unplaced: built.unplacedJourneys.slice(0, 20),
+      });
+    }
+    if (built.orphanEntities.length > 0) {
+      getLogger().warn('workflow', `Phase 1.8: ${built.orphanEntities.length} entity/entities had no domain surface — defaulted to first release`, {
+        workflow_run_id: ctx.workflowRun.id,
+        orphans: built.orphanEntities.slice(0, 20),
+      });
+    }
+
+    // Mint canonical UUIDs now (the LLM's REL-N short form was only for
+    // its own reasoning; stored ids are fresh UUIDs so downstream
+    // tree-joins don't collide across runs).
+    const releasesWithUuid: ReleaseV2[] = built.releases.map(r => ({
+      ...r,
+      release_id: randomUUID(),
+    }));
+    return { releases: releasesWithUuid, crossCutting: built.crossCutting };
+  }
+
+  // ── Wave 7 helpers ───────────────────────────────────────────────
+
+  private normalizeWorkflowV2(w: Record<string, unknown>): WorkflowV2 {
+    const rawTriggers = Array.isArray(w.triggers) ? w.triggers as Array<Record<string, unknown>> : [];
+    const triggers: WorkflowTrigger[] = rawTriggers
+      .map(t => this.normalizeWorkflowTrigger(t))
+      .filter((t): t is WorkflowTrigger => t !== null);
+    const rawSteps = Array.isArray(w.steps) ? w.steps as Array<Record<string, unknown>> : [];
+    const steps: WorkflowStep[] = rawSteps.map((s, i) => ({
+      stepNumber: typeof s.stepNumber === 'number' ? s.stepNumber : i + 1,
+      actor: typeof s.actor === 'string' ? s.actor : 'System',
+      action: typeof s.action === 'string' ? s.action : '',
+      expectedOutcome: typeof s.expectedOutcome === 'string' ? s.expectedOutcome : '',
+    }));
+    const rawActors = Array.isArray(w.actors) ? w.actors.filter((x): x is string => typeof x === 'string') : [];
+    // Always derive backs_journeys from triggers; the LLM-supplied list
+    // is a hint and frequently drifts (extras without matching triggers,
+    // missing entries when the LLM forgets to populate it). The verifier
+    // compares against derived truth, so we normalize unconditionally.
+    const backs_journeys = Array.from(new Set(triggers
+      .filter((t): t is Extract<WorkflowTrigger, { kind: 'journey_step' }> => t.kind === 'journey_step')
+      .map(t => t.journey_id)));
+    return {
+      id: typeof w.id === 'string' ? w.id : '',
+      businessDomainId: typeof w.businessDomainId === 'string' ? w.businessDomainId : '',
+      name: typeof w.name === 'string' ? w.name : '',
+      description: typeof w.description === 'string' ? w.description : '',
+      steps,
+      triggers,
+      actors: rawActors,
+      backs_journeys,
+      source: (typeof w.source === 'string' ? w.source : undefined) as WorkflowV2['source'],
+    };
+  }
+
+  private normalizeWorkflowTrigger(t: Record<string, unknown>): WorkflowTrigger | null {
+    const kind = t.kind;
+    if (kind === 'journey_step' && typeof t.journey_id === 'string' && typeof t.step_number === 'number') {
+      return { kind, journey_id: t.journey_id, step_number: t.step_number };
+    }
+    if (kind === 'schedule' && typeof t.cadence === 'string') {
+      return { kind, cadence: t.cadence };
+    }
+    if (kind === 'event' && typeof t.event_type === 'string') {
+      return { kind, event_type: t.event_type };
+    }
+    if (kind === 'compliance' && typeof t.regime_id === 'string' && typeof t.rule === 'string') {
+      return { kind, regime_id: t.regime_id, rule: t.rule };
+    }
+    if (kind === 'integration' && typeof t.integration_id === 'string' && typeof t.event === 'string') {
+      return { kind, integration_id: t.integration_id, event: t.event };
+    }
+    return null;
+  }
+
+  private formatJourneysWithSteps(js: UserJourney[]): string {
+    if (!js.length) return '(none)';
+    return js.map(j => {
+      const steps = j.steps
+        .map((s: UserJourneyStep) =>
+          `    ${s.stepNumber}. [${s.actor}${s.automatable === true ? ' · automatable' : ''}] ${s.action} → ${s.expectedOutcome}`)
+        .join('\n');
+      return `- **${j.id}** (persona ${j.personaId}) — ${j.title}\n    scenario: ${j.scenario}\n${steps}`;
+    }).join('\n');
+  }
+
+  private formatWorkflowsV2(ws: WorkflowV2[]): string {
+    if (!ws.length) return '(none)';
+    return ws.map(w => {
+      const triggers = w.triggers.map(t => {
+        if (t.kind === 'journey_step') return `journey_step(${t.journey_id}#${t.step_number})`;
+        if (t.kind === 'schedule') return `schedule(${t.cadence})`;
+        if (t.kind === 'event') return `event(${t.event_type})`;
+        if (t.kind === 'compliance') return `compliance(${t.regime_id}:${t.rule})`;
+        return `integration(${t.integration_id}:${t.event})`;
+      }).join(', ');
+      return `- **${w.id}** (${w.businessDomainId}): ${w.name} — ${w.description}\n    triggers: ${triggers}`;
+    }).join('\n');
+  }
+
+  private formatVVRequirements(vvs: VVRequirement[]): string {
+    if (!vvs.length) return '(none)';
+    return vvs.map(v => `- **${v.id}** (${v.category}): ${v.target} — ${v.measurement}${v.threshold ? ` (threshold: ${v.threshold})` : ''}`).join('\n');
+  }
+
+  private formatIntegrations(ints: Integration[]): string {
+    if (!ints.length) return '(none)';
+    return ints.map(i => `- **${i.id}** (${i.category}, ${i.ownershipModel}): ${i.name} — ${i.description}`).join('\n');
+  }
+
+  private formatVocabulary(vs: VocabularyTerm[]): string {
+    if (!vs.length) return '(none)';
+    return vs.map(v => `- **${v.id}**: ${v.term} — ${v.definition}`).join('\n');
+  }
+
+  /**
+   * Write one `coverage_gap` governed-stream record per gap returned by
+   * a deterministic verifier (1.3c or the 1.8 verifier). Returns the
+   * written record ids so the caller can include them in derived_from
+   * chains.
+   */
+  private persistCoverageGaps(
+    ctx: PhaseContext,
+    gaps: CoverageGapContent[],
+    derivedFrom: string[],
+  ): string[] {
+    const ids: string[] = [];
+    for (const gap of gaps) {
+      const rec = ctx.engine.writer.writeRecord({
+        record_type: 'coverage_gap',
+        schema_version: '1.0',
+        workflow_run_id: ctx.workflowRun.id,
+        phase_id: '1',
+        sub_phase_id: gap.sub_phase_id,
+        produced_by_agent_role: 'orchestrator',
+        janumicode_version_sha: ctx.engine.janumiCodeVersionSha,
+        derived_from_record_ids: derivedFrom,
+        content: gap as unknown as Record<string, unknown>,
+      });
+      ctx.engine.ingestionPipeline.ingest(rec);
+      ids.push(rec.id);
+    }
+    return ids;
   }
 }
 
@@ -2728,3 +3463,4 @@ interface IntentDiscoveryBundle {
   vvRequirements: VVRequirement[];
   canonicalVocabulary: VocabularyTerm[];
 }
+

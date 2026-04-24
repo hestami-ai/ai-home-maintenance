@@ -131,6 +131,9 @@ function ensureSchemaColumns(db: { exec: (sql: string) => void }): void {
     { table: 'workflow_runs', column: 'decomposition_fr_calls_used',     ddl: 'INTEGER DEFAULT 0' },
     { table: 'workflow_runs', column: 'decomposition_nfr_calls_used',    ddl: 'INTEGER DEFAULT 0' },
     { table: 'workflow_runs', column: 'decomposition_max_depth_reached', ddl: 'INTEGER DEFAULT 0' },
+    // Phase 1.7 release plan — pointer to the approved ReleasePlan
+    // governed_stream row. Null until 1.7 completes.
+    { table: 'workflow_runs', column: 'active_release_plan_record_id',   ddl: 'TEXT' },
   ];
   for (const { table, column, ddl } of additive) {
     try {

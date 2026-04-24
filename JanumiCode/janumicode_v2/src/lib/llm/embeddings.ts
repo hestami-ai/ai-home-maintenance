@@ -46,12 +46,23 @@ export class OllamaEmbeddingClient implements EmbeddingClient {
     // Connection + idle timeouts. The request fails fast when ollama
     // isn't reachable (unit-test envs, misconfigured ops, etc.) so the
     // dedup path can degrade cleanly to no-dedup rather than blocking
-    // the saturation loop. Configurable; defaults are generous enough
-    // for a cold 8B-embedding model on a local box.
+    // the saturation loop.
+    //
+    // Defaults are tuned for a single-GPU host with multiple heavy
+    // models in rotation. When ollama serves qwen3.5:9b (decomposer),
+    // gemma4:e4b (reasoning review), and qwen3-embedding:8b (this
+    // client) from one GPU slot, calling /api/embed forces a model
+    // swap that typically takes 10–30 seconds. The previous 2000 ms
+    // connect timeout caused every embed call to fail with a silent
+    // "connect timeout" warning, leaving assumption dedup permanently
+    // offline and breaking saturation termination (semantic_delta
+    // always equaled raw delta). Raised to 60 s so legitimate slot
+    // swaps complete; a hard reachability failure still surfaces
+    // quickly because ollama rejects at the socket layer.
     const connectTimeoutMs = Number.parseInt(
-      process.env.JANUMICODE_EMBEDDING_CONNECT_TIMEOUT_MS ?? '2000', 10);
+      process.env.JANUMICODE_EMBEDDING_CONNECT_TIMEOUT_MS ?? '60000', 10);
     const idleTimeoutMs = Number.parseInt(
-      process.env.JANUMICODE_EMBEDDING_IDLE_TIMEOUT_MS ?? '60000', 10);
+      process.env.JANUMICODE_EMBEDDING_IDLE_TIMEOUT_MS ?? '180000', 10);
     return new Promise<number[][]>((resolve, reject) => {
       const req = client.request(url, {
         method: 'POST',

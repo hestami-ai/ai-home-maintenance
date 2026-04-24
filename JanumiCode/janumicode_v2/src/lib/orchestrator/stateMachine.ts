@@ -79,6 +79,11 @@ export class StateMachine {
       compliance_context_ref: null,
       cross_run_impact_triggered: false,
       intent_lens: null,
+      decomposition_budget_calls_used: 0,
+      decomposition_fr_calls_used: 0,
+      decomposition_nfr_calls_used: 0,
+      decomposition_max_depth_reached: 0,
+      active_release_plan_record_id: null,
     };
   }
 
@@ -110,7 +115,19 @@ export class StateMachine {
       decomposition_fr_calls_used: (row.decomposition_fr_calls_used as number) ?? 0,
       decomposition_nfr_calls_used: (row.decomposition_nfr_calls_used as number) ?? 0,
       decomposition_max_depth_reached: (row.decomposition_max_depth_reached as number) ?? 0,
+      active_release_plan_record_id: (row.active_release_plan_record_id as string) || null,
     };
+  }
+
+  /**
+   * Record the approved ReleasePlan's governed_stream id on the run.
+   * Called by Phase 1.7's gate handler after the human approves the
+   * plan. Phase 2+ reads via `getWorkflowRun(runId).active_release_plan_record_id`.
+   */
+  setActiveReleasePlanRecordId(runId: string, recordId: string): void {
+    this.db.prepare(
+      `UPDATE workflow_runs SET active_release_plan_record_id = ? WHERE id = ?`,
+    ).run(recordId, runId);
   }
 
   // ── Phase transitions ──────────────────────────────────────────

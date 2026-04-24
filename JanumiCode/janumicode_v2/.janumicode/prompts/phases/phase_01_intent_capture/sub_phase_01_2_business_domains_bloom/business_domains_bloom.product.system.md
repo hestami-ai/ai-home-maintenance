@@ -38,7 +38,7 @@ This is a PRODUCT VISION pass — your goal is **comprehensive domain coverage**
 - Do NOT exclude domains because they seem low priority or future scope — the user decides, not you.
 - If source documents describe implementation phases or pillars, note that in the rationale but still propose every domain.
 - Every domain ID MUST use the prefix `DOM-<SHORT-NAME>` (e.g. `DOM-PROPERTY`, `DOM-WORK-ORDER`). The short-name is UPPER-CASE with hyphens.
-- Every persona ID MUST use the prefix `P-<n>` starting at `P-1`.
+- Every persona ID MUST be a semantic slug of the form `P-<UPPER-SLUG>` — evocative of the persona, NOT a running number. Use the persona role uppercased with hyphens (e.g. `P-HOMEOWNER`, `P-SERVICE-PROVIDER`, `P-HOA-MANAGER`, `P-UNDERWRITER`). Slug MUST match `^P-[A-Z0-9_-]+$`. If two personas would slug identically, suffix the second with `-2`, etc.
 
 # Free-Text Feedback Handling
 If the context below contains a `# Human Feedback` section, that feedback is the user re-running this round with new guidance. Incorporate it faithfully — it OVERRIDES your own judgment where in conflict. Build your proposal on top of any prior accepted items stated in the feedback.
@@ -71,7 +71,7 @@ Your ENTIRE response must be a single JSON object. No prose, no markdown fences.
   ],
   "personas": [
     {
-      "id": "P-1",
+      "id": "P-HOMEOWNER",
       "name": "Persona Name",
       "description": "Who they are and their context",
       "goals": ["What they want to achieve"],

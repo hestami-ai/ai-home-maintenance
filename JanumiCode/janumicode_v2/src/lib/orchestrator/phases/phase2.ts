@@ -18,7 +18,7 @@ import type {
   ProductDescriptionHandoffContent,
   UserJourney,
   Entity,
-  Workflow,
+  WorkflowV2,
   TechnicalConstraint,
   VVRequirement,
   VocabularyTerm,
@@ -35,6 +35,7 @@ import type {
   DecompositionPassEntry,
   DecompositionTerminationReason,
   GovernedStreamRecord,
+  ReleasePlanContentV2,
 } from '../../types/records';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import type { DecisionBundleContent, MirrorItem, MirrorItemDecision } from '../../types/decisionBundle';
@@ -71,6 +72,85 @@ function collisionSafeDisplayKey(
 ): string {
   if (!siblingDisplayKeys.has(rawStoryId)) return rawStoryId;
   return `${rawStoryId}#${logicalNodeId.slice(0, 4)}`;
+}
+
+// ── Release-plan propagation (Wave 6 — release prioritization) ─────
+
+/**
+ * Resolve a root decomposition node's `(release_id, release_ordinal)`
+ * by matching its `user_story.traces_to` against the approved
+ * ReleasePlan. Rules:
+ *
+ *   - Pick the lowest-ordinal release whose `traces_to_journeys`
+ *     intersects the root story's `traces_to`. Ties go to the earliest
+ *     release.
+ *   - If no release matches (no journey overlap): backlog — return
+ *     both fields null. Downstream phases treat backlog as "lowest
+ *     priority, surface for re-planning".
+ *   - If no ReleasePlan is passed (null — e.g. a mock-mode run that
+ *     skipped Phase 1.8, or a default-lens run with no release plan):
+ *     backlog for every root.
+ *
+ * Children inherit from their parent; this helper is only called at
+ * depth-0 root writes.
+ */
+function assignReleaseToRoot(
+  rootStory: DecompositionUserStory | { traces_to?: string[] },
+  plan: ReleasePlanContentV2 | null,
+): { release_id: string | null; release_ordinal: number | null } {
+  if (!plan || !plan.approved) return { release_id: null, release_ordinal: null };
+  const traces = rootStory.traces_to ?? [];
+  if (traces.length === 0) return { release_id: null, release_ordinal: null };
+  // Widened manifest lookup: an FR root's `traces_to[]` can cite any
+  // handoff artifact type (journey, workflow, entity, compliance,
+  // integration, vocabulary). For each release (ascending ordinal),
+  // test whether any of the root's trace ids appear in any of that
+  // release's `contains[type]` arrays. First match wins.
+  //
+  // `cross_cutting` intentionally does NOT anchor a root to a release:
+  // a workflow / compliance item / integration / vocab term marked
+  // cross-cutting is available in every release, so it gives no
+  // release-ordering signal. If a root's only trace is into
+  // cross_cutting, it remains backlog (release_id: null). Callers
+  // treat that as "spans all releases / not release-scheduled".
+  const sortedReleases = [...plan.releases].sort((a, b) => a.ordinal - b.ordinal);
+  const traceSet = new Set(traces);
+  for (const r of sortedReleases) {
+    const c = r.contains;
+    const anyMatch =
+      c.journeys.some((id: string) => traceSet.has(id)) ||
+      c.workflows.some((id: string) => traceSet.has(id)) ||
+      c.entities.some((id: string) => traceSet.has(id)) ||
+      c.compliance.some((id: string) => traceSet.has(id)) ||
+      c.integrations.some((id: string) => traceSet.has(id)) ||
+      c.vocabulary.some((id: string) => traceSet.has(id));
+    if (anyMatch) return { release_id: r.release_id, release_ordinal: r.ordinal };
+  }
+  return { release_id: null, release_ordinal: null };
+}
+
+/**
+ * Read the approved ReleasePlan (v2 widened manifest) for a run from
+ * the governed stream. Returns null when the pointer is unset
+ * (default-lens runs; or runs that haven't reached Phase 1.8 yet —
+ * e.g. unit tests that seed the minimum fixtures). Callers treat null
+ * as "assign every root to backlog".
+ *
+ * Accepts only schemaVersion '2.0' records. Legacy v1.0 plans are
+ * treated as absent (null) — the caller will fall back to
+ * backlog-for-every-root, which is identical to what the legacy flow
+ * did when `plan.releases[].traces_to_journeys` didn't match. No old
+ * calibration workspaces need to survive this transition (per design).
+ */
+function readActiveReleasePlan(ctx: PhaseContext): ReleasePlanContentV2 | null {
+  const { engine, workflowRun } = ctx;
+  const ptr = engine.stateMachine.getWorkflowRun(workflowRun.id)?.active_release_plan_record_id;
+  if (!ptr) return null;
+  const rec = engine.writer.getRecord(ptr);
+  if (!rec) return null;
+  const c = rec.content as unknown as ReleasePlanContentV2;
+  if (c?.kind !== 'release_plan' || c.schemaVersion !== '2.0' || !c.approved) return null;
+  return c;
 }
 
 // ── Artifact shape interfaces ──────────────────────────────────────
@@ -278,10 +358,17 @@ export class Phase2Handler implements PhaseHandler {
       rootNodeIds = [];
       rootLogicalIds = [];
       const rootDisplayKeys = new Set<string>();
+      // Resolve the approved ReleasePlan once — all FR roots for this
+      // run match against the same plan. Null (no pointer on
+      // workflow_runs, or default-lens run) → backlog for every root.
+      const releasePlan = readActiveReleasePlan(ctx);
       for (const story of frContent.user_stories) {
         const logicalNodeId = mintLogicalNodeId();
         const displayKey = collisionSafeDisplayKey(story.id, rootDisplayKeys, logicalNodeId);
         rootDisplayKeys.add(displayKey);
+        const { release_id, release_ordinal } = assignReleaseToRoot(
+          story as DecompositionUserStory, releasePlan,
+        );
         const node = engine.writer.writeRecord({
           record_type: 'requirement_decomposition_node',
           schema_version: '1.0',
@@ -302,6 +389,8 @@ export class Phase2Handler implements PhaseHandler {
             status: 'pending',
             user_story: story as DecompositionUserStory,
             surfaced_assumption_ids: [],
+            release_id,
+            release_ordinal,
           } satisfies RequirementDecompositionNodeContent,
         });
         rootNodeIds.push(node.id);
@@ -336,7 +425,7 @@ export class Phase2Handler implements PhaseHandler {
 
     // Build a rich FR summary for the NFR prompt
     const frSummary = frContent.user_stories.map(s =>
-      `${s.id} [${s.priority}]: As a ${s.role}, I want ${s.action}, so that ${s.outcome}. ACs: ${s.acceptance_criteria.map(ac => `${ac.id}: ${ac.measurable_condition}`).join('; ')}`,
+      `${s.id} [${s.priority}]: As a ${s.role}, I want to ${s.action}, so that ${s.outcome}. ACs: ${s.acceptance_criteria.map(ac => `${ac.id}: ${ac.measurable_condition}`).join('; ')}`,
     ).join('\n');
 
     let nfrContent: NonFunctionalRequirements;
@@ -412,10 +501,14 @@ export class Phase2Handler implements PhaseHandler {
         nfrRootNodeIds = [];
         nfrRootLogicalIds = [];
         const nfrRootDisplayKeys = new Set<string>();
+        const nfrReleasePlan = readActiveReleasePlan(ctx);
         for (const story of nfrAsStories) {
           const logicalNodeId = mintLogicalNodeId();
           const displayKey = collisionSafeDisplayKey(story.id, nfrRootDisplayKeys, logicalNodeId);
           nfrRootDisplayKeys.add(displayKey);
+          const { release_id, release_ordinal } = assignReleaseToRoot(
+            story as DecompositionUserStory, nfrReleasePlan,
+          );
           const node = engine.writer.writeRecord({
             record_type: 'requirement_decomposition_node',
             schema_version: '1.0',
@@ -437,6 +530,8 @@ export class Phase2Handler implements PhaseHandler {
               root_kind: 'nfr',
               user_story: story as DecompositionUserStory,
               surfaced_assumption_ids: [],
+              release_id,
+              release_ordinal,
             } satisfies RequirementDecompositionNodeContent,
           });
           nfrRootNodeIds.push(node.id);
@@ -662,6 +757,10 @@ export class Phase2Handler implements PhaseHandler {
         user_story: originalContent.user_story,
         surfaced_assumption_ids: originalContent.surfaced_assumption_ids,
         pruning_reason: reasonCode,
+        // Preserve release assignment across the supersession (Q2 from
+        // the design doc — release is a commitment, not a derivation).
+        release_id: originalContent.release_id ?? null,
+        release_ordinal: originalContent.release_ordinal ?? null,
       } satisfies RequirementDecompositionNodeContent,
     });
     // Retire the prior version of this logical node so only the 'pruned'
@@ -745,6 +844,11 @@ export class Phase2Handler implements PhaseHandler {
       userStory: DecompositionUserStory; // carries LLM's raw story.id for display / prompt context
       displayKey: string;                // sibling-unique human label (content.display_key)
       tierHint: DecompositionTier | 'root';
+      // Release assignment — inherited from this entry's root. Children
+      // of this entry inherit the same (release_id, release_ordinal).
+      // Preserved across supersessions (see design doc Q2: preserve).
+      releaseId: string | null;
+      releaseOrdinal: number | null;
     }
 
     const pipelineId = `decomp-pipe-${config.rootKind}-${workflowRun.id.slice(0, 8)}`;
@@ -764,17 +868,26 @@ export class Phase2Handler implements PhaseHandler {
     // Seed queue: fresh from rootStories, OR resumed from pending stream nodes.
     // Fresh roots pair with rootLogicalIds 1:1 (minted when the depth-0 node
     // was written). On resume the queue comes pre-populated with logical UUIDs
-    // reconstructed from governed_stream content by rebuildSaturationStateFromStream.
-    const queue: QueueEntry[] = resumed?.queue ?? rootStories.map((s, i) => ({
-      parentRecordId: rootNodeRecordIds[i],
-      nodeId: rootLogicalIds[i],
-      parentNodeId: null,
-      rootFrId: rootLogicalIds[i],
-      depth: 0,
-      userStory: s as DecompositionUserStory,
-      displayKey: s.id,
-      tierHint: 'root',
-    }));
+    // reconstructed from governed_stream content by rebuildSaturationStateFromStream
+    // — including the release assignment that was persisted to the root.
+    const releasePlanForSeed = readActiveReleasePlan(ctx);
+    const queue: QueueEntry[] = resumed?.queue ?? rootStories.map((s, i) => {
+      const { release_id, release_ordinal } = assignReleaseToRoot(
+        s as DecompositionUserStory, releasePlanForSeed,
+      );
+      return {
+        parentRecordId: rootNodeRecordIds[i],
+        nodeId: rootLogicalIds[i],
+        parentNodeId: null,
+        rootFrId: rootLogicalIds[i],
+        depth: 0,
+        userStory: s as DecompositionUserStory,
+        displayKey: s.id,
+        tierHint: 'root',
+        releaseId: release_id,
+        releaseOrdinal: release_ordinal,
+      };
+    });
     // siblingsByParent is keyed by logical parent UUID (or null for roots).
     const siblingsByParent = resumed?.siblingsByParent ?? new Map<string | null, DecompositionUserStory[]>();
     if (!resumed) {
@@ -790,6 +903,32 @@ export class Phase2Handler implements PhaseHandler {
     const callsByRoot = new Map<string, number>();
     let maxDepthReached = resumed?.maxDepthReached ?? 0;
     let passNumber = resumed?.passNumber ?? 0;
+
+    // ── Divergence + dedup-offline tracking (Wave 6 safety) ─────────
+    //
+    // The saturation loop is supposed to peak then decline — each
+    // pass's `nodes_produced` crossing the previous pass's value
+    // once, then shrinking until `semantic_delta === 0`. When the
+    // decomposer instead doubles output every pass, it's diverging
+    // (common cause: dedup silently failed, so every paraphrased
+    // assumption counts as net-new, and `semantic_delta` never drops).
+    // These counters let us WARN at 3 consecutive growth/failure
+    // passes and hard-terminate at 4+ with an explicit termination
+    // reason — instead of letting the loop burn to budget_cap and
+    // leaving the operator guessing. `growthThreshold` and
+    // `divergeTerminatePasses` are env-tunable for experiments.
+    const divergeGrowthRatio = Number.parseFloat(
+      process.env.JANUMICODE_DIVERGE_GROWTH_RATIO ?? '1.2');
+    const divergeWarnPasses = Number.parseInt(
+      process.env.JANUMICODE_DIVERGE_WARN_PASSES ?? '3', 10);
+    const divergeTerminatePasses = Number.parseInt(
+      process.env.JANUMICODE_DIVERGE_TERMINATE_PASSES ?? '4', 10);
+    const dedupOfflineWarnPasses = Number.parseInt(
+      process.env.JANUMICODE_DEDUP_OFFLINE_WARN_PASSES ?? '3', 10);
+    let consecutiveGrowthPasses = 0;
+    let consecutiveDedupOfflinePasses = 0;
+    let dedupOfflineAnnounced = false;
+    let divergingEarlyTerminate = false;
 
     const pipelinePasses: DecompositionPassEntry[] = resumed?.pipelinePasses ?? [];
     // The pipeline container: either carry forward the resumed one, or
@@ -1089,6 +1228,10 @@ export class Phase2Handler implements PhaseHandler {
                 user_story: story,
                 decomposition_rationale: rationale,
                 surfaced_assumption_ids: childAssumptionIds,
+                // Inherit release assignment from parent. Preserved
+                // across revisions (Q2 = preserve in the design doc).
+                release_id: entry.releaseId,
+                release_ordinal: entry.releaseOrdinal,
               } satisfies RequirementDecompositionNodeContent,
             });
             emittedChildren.push(story);
@@ -1104,6 +1247,7 @@ export class Phase2Handler implements PhaseHandler {
                 parentRecordId: childRec.id, nodeId: logicalNodeId, parentNodeId: entry.nodeId,
                 rootFrId: entry.rootFrId, depth: childDepth, userStory: story,
                 displayKey, tierHint: 'A',
+                releaseId: entry.releaseId, releaseOrdinal: entry.releaseOrdinal,
               });
             } else if (tier === 'B') {
               const batch = pendingGateByParent.get(entry.nodeId) ?? [];
@@ -1114,6 +1258,7 @@ export class Phase2Handler implements PhaseHandler {
                 parentRecordId: childRec.id, nodeId: logicalNodeId, parentNodeId: entry.nodeId,
                 rootFrId: entry.rootFrId, depth: childDepth, userStory: story,
                 displayKey, tierHint: 'C',
+                releaseId: entry.releaseId, releaseOrdinal: entry.releaseOrdinal,
               });
             }
             // Tier D: already frozen atomic — no queue insertion.
@@ -1168,6 +1313,8 @@ export class Phase2Handler implements PhaseHandler {
                   user_story: entry.userStory,
                   surfaced_assumption_ids: [],
                   pruning_reason: reason,
+                  release_id: entry.releaseId,
+                  release_ordinal: entry.releaseOrdinal,
                 } satisfies RequirementDecompositionNodeContent,
               });
               // Retire the prior pending version of this logical node so
@@ -1244,6 +1391,7 @@ export class Phase2Handler implements PhaseHandler {
       // annotation so the downstream semantic_delta can exclude flagged
       // rows. Any failure in the embedding call degrades gracefully:
       // raw delta remains as the fallback termination signal.
+      let dedupFailedThisPass = false;
       if (dedupEnabled && passAssumptions.length > 0) {
         try {
           const newVecs = await embeddingClient.embed(
@@ -1268,6 +1416,7 @@ export class Phase2Handler implements PhaseHandler {
             embeddingCache.set(a.id, v);
           }
         } catch (err) {
+          dedupFailedThisPass = true;
           getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: dedup embed failed this pass — flags skipped`, {
             error: err instanceof Error ? err.message : String(err),
           });
@@ -1345,10 +1494,82 @@ export class Phase2Handler implements PhaseHandler {
                 userStory: child.userStory,
                 displayKey: child.displayKey,
                 tierHint: 'B',
+                releaseId: child.releaseId,
+                releaseOrdinal: child.releaseOrdinal,
               });
             }
           }
         }
+      }
+
+      // ── Dedup-offline detection ────────────────────────────────
+      // If the embed client keeps timing out (single-GPU slot swapping,
+      // ollama not running, etc.), semantic_delta collapses to raw
+      // delta and the saturation gate can never fire. Track consecutive
+      // failures; WARN after `dedupOfflineWarnPasses` so the operator
+      // sees the signal. Advisory only — does NOT early-terminate on
+      // its own (budget_cap / depth_cap / diverging are the hard
+      // rails). On a successful dedup pass the counter resets.
+      if (dedupFailedThisPass) {
+        consecutiveDedupOfflinePasses++;
+        if (consecutiveDedupOfflinePasses >= dedupOfflineWarnPasses && !dedupOfflineAnnounced) {
+          getLogger().warn('workflow',
+            `Phase ${config.recordSubPhaseId}: assumption dedup has been offline for ${consecutiveDedupOfflinePasses} consecutive passes — semantic_delta equals raw delta; saturation termination is likely unreachable. Check JANUMICODE_EMBEDDING_URL reachability + timeouts.`,
+            { consecutiveDedupOfflinePasses, passNumber });
+          dedupOfflineAnnounced = true;
+        }
+      } else {
+        if (dedupOfflineAnnounced) {
+          getLogger().info('workflow',
+            `Phase ${config.recordSubPhaseId}: assumption dedup is back online after ${consecutiveDedupOfflinePasses} offline passes`,
+            { passNumber });
+          dedupOfflineAnnounced = false;
+        }
+        consecutiveDedupOfflinePasses = 0;
+      }
+
+      // ── Divergence detection ───────────────────────────────────
+      // Healthy Wave 6 saturation peaks mid-run and declines to
+      // fixed-point. Every pass growing by ≥ `divergeGrowthRatio`
+      // over the prior pass means the decomposer is expanding, not
+      // converging — usually a downstream signal that dedup is dead
+      // or the prompt is over-eagerly splitting. After N consecutive
+      // growth passes WARN; at N+1 (divergeTerminatePasses) hard
+      // terminate with a named reason and defer the queue.
+      const priorPass = pipelinePasses.length >= 2
+        ? pipelinePasses[pipelinePasses.length - 2]
+        : null;
+      const growthObserved = priorPass
+        && priorPass.nodes_produced > 0
+        && nodesProducedThisPass > priorPass.nodes_produced * divergeGrowthRatio;
+      if (growthObserved) {
+        consecutiveGrowthPasses++;
+        if (consecutiveGrowthPasses >= divergeWarnPasses) {
+          const ratios = pipelinePasses.slice(-divergeWarnPasses - 1)
+            .map((p, i, arr) => i === 0 ? null : (p.nodes_produced / (arr[i - 1].nodes_produced || 1)))
+            .slice(1).map(r => r?.toFixed(2));
+          getLogger().warn('workflow',
+            `Phase ${config.recordSubPhaseId}: saturation loop appears to be diverging — ${consecutiveGrowthPasses} consecutive passes with > ${divergeGrowthRatio}× node growth`,
+            {
+              passNumber,
+              consecutiveGrowthPasses,
+              recent_ratios: ratios,
+              recent_nodes_produced: pipelinePasses.slice(-5).map(p => p.nodes_produced),
+              dedupOffline: consecutiveDedupOfflinePasses > 0,
+            });
+        }
+        if (consecutiveGrowthPasses >= divergeTerminatePasses) {
+          getLogger().warn('workflow',
+            `Phase ${config.recordSubPhaseId}: EARLY TERMINATE — diverging loop after ${consecutiveGrowthPasses} consecutive growth passes. Marking remaining queue as deferred with reason='diverging'.`,
+            { passNumber, remainingQueueSize: queue.length });
+          for (const remaining of queue) {
+            this.writeDeferredSupersession(ctx, remaining, passNumber, 'diverging', config);
+          }
+          queue.length = 0;
+          divergingEarlyTerminate = true;
+        }
+      } else {
+        consecutiveGrowthPasses = 0;
       }
 
       // Fixed-point check: pass produced zero new children AND zero new
@@ -1359,6 +1580,7 @@ export class Phase2Handler implements PhaseHandler {
       // raw delta (new rows). With dedup flagging in place, a pass that
       // only surfaces duplicates has semantic_delta === 0 and fires
       // termination correctly even though delta_from_previous_pass > 0.
+      if (divergingEarlyTerminate) break;
       if (semanticDelta === 0 && queue.length === 0) break;
     }
 
@@ -1367,10 +1589,16 @@ export class Phase2Handler implements PhaseHandler {
     // pipeline_id so the webview picks the latest.
     const totalLlmCalls = [...callsByRoot.values()].reduce((a, b) => a + b, 0);
     const maxRootCalls = callsByRoot.size > 0 ? Math.max(...callsByRoot.values()) : 0;
-    const terminationReason: DecompositionTerminationReason =
-      maxRootCalls >= caps.budget_cap ? 'budget_cap'
-      : maxDepthReached >= caps.depth_cap ? 'depth_cap'
-      : 'fixed_point';
+    // Termination reason priority (matches detection order inside the
+    // loop): diverging-early-terminate > budget_cap > depth_cap >
+    // dedup_offline (if chronic but loop still exited for another
+    // reason) > fixed_point.
+    let terminationReason: DecompositionTerminationReason;
+    if (divergingEarlyTerminate) terminationReason = 'diverging';
+    else if (maxRootCalls >= caps.budget_cap) terminationReason = 'budget_cap';
+    else if (maxDepthReached >= caps.depth_cap) terminationReason = 'depth_cap';
+    else if (dedupOfflineAnnounced) terminationReason = 'dedup_offline';
+    else terminationReason = 'fixed_point';
     const finalNodes = engine.writer.getRecordsByType(workflowRun.id, 'requirement_decomposition_node');
     const atomicLeafCount = finalNodes
       .filter(n => {
@@ -1427,6 +1655,8 @@ export class Phase2Handler implements PhaseHandler {
     ctx: PhaseContext,
     pendingGateByParent: Map<string, Array<{
       nodeRecordId: string;
+      logicalNodeId: string;
+      displayKey: string;
       story: DecompositionUserStory;
       rationale?: string;
     }>>,
@@ -1449,6 +1679,8 @@ export class Phase2Handler implements PhaseHandler {
       userStory: DecompositionUserStory;
       rootFrId: string;
       depth: number;
+      releaseId: string | null;
+      releaseOrdinal: number | null;
     }>;
   }> {
     const { engine, workflowRun } = ctx;
@@ -1463,6 +1695,8 @@ export class Phase2Handler implements PhaseHandler {
         userStory: DecompositionUserStory;
         rootFrId: string;
         depth: number;
+        releaseId: string | null;
+        releaseOrdinal: number | null;
       }>;
     }> = [];
     // Look up each parent node record so we can carry its root_fr_id,
@@ -1483,17 +1717,23 @@ export class Phase2Handler implements PhaseHandler {
         rationale: c.rationale,
         category: 'scope',
       }));
-      const childItems = children.map((c, idx) => ({
-        itemId: `child-${idx}`,
-        nodeRecordId: c.nodeRecordId,
-        logicalNodeId: c.logicalNodeId,
-        displayKey: c.displayKey,
-        userStory: c.story,
-        rootFrId: byLogicalId.get(c.logicalNodeId)?.root_fr_id
-          ?? parentContent?.root_fr_id ?? parentNodeId,
-        depth: byLogicalId.get(c.logicalNodeId)?.depth
-          ?? ((parentContent?.depth ?? 0) + 1),
-      }));
+      const childItems = children.map((c, idx) => {
+        const childContent = byLogicalId.get(c.logicalNodeId);
+        return {
+          itemId: `child-${idx}`,
+          nodeRecordId: c.nodeRecordId,
+          logicalNodeId: c.logicalNodeId,
+          displayKey: c.displayKey,
+          userStory: c.story,
+          rootFrId: childContent?.root_fr_id ?? parentContent?.root_fr_id ?? parentNodeId,
+          depth: childContent?.depth ?? ((parentContent?.depth ?? 0) + 1),
+          // Release was stamped onto the child when it was written;
+          // read it back here so the queue push for accepted children
+          // carries the inheritance forward.
+          releaseId: childContent?.release_id ?? parentContent?.release_id ?? null,
+          releaseOrdinal: childContent?.release_ordinal ?? parentContent?.release_ordinal ?? null,
+        };
+      });
 
       const parentAssumptions = passAssumptions.filter(a => a.surfaced_at_node === parentNodeId);
       const summaryLines: string[] = [];
@@ -1555,6 +1795,8 @@ export class Phase2Handler implements PhaseHandler {
       depth: number;
       userStory: DecompositionUserStory;
       displayKey: string;
+      releaseId: string | null;
+      releaseOrdinal: number | null;
     },
     passNumber: number,
     reasonCode: string,
@@ -1583,6 +1825,9 @@ export class Phase2Handler implements PhaseHandler {
         user_story: entry.userStory,
         surfaced_assumption_ids: [],
         pruning_reason: reasonCode,
+        // Preserve release assignment across the supersession (Q2).
+        release_id: entry.releaseId,
+        release_ordinal: entry.releaseOrdinal,
       } satisfies RequirementDecompositionNodeContent,
     });
     // Retire the prior pending version of this logical node.
@@ -2029,9 +2274,18 @@ function formatEntities(es: Entity[]): string {
   return es.map(e => `- ${e.id} (${e.businessDomainId}) ${e.name}: ${e.description}`).join('\n');
 }
 
-function formatWorkflows(ws: Workflow[]): string {
+function formatWorkflows(ws: WorkflowV2[]): string {
   if (!ws.length) return '(none)';
-  return ws.map(w => `- ${w.id} (${w.businessDomainId}) ${w.name}: ${w.description}`).join('\n');
+  return ws.map(w => {
+    const triggers = w.triggers.map(t => {
+      if (t.kind === 'journey_step') return `journey_step(${t.journey_id}#${t.step_number})`;
+      if (t.kind === 'schedule') return `schedule(${t.cadence})`;
+      if (t.kind === 'event') return `event(${t.event_type})`;
+      if (t.kind === 'compliance') return `compliance(${t.regime_id}:${t.rule})`;
+      return `integration(${t.integration_id}:${t.event})`;
+    }).join(', ');
+    return `- ${w.id} (${w.businessDomainId}) ${w.name}: ${w.description}\n  triggers: ${triggers}`;
+  }).join('\n');
 }
 
 function formatExtractedItems(items: ExtractedItem[]): string {
@@ -2105,6 +2359,8 @@ interface SaturationResumeState {
     userStory: DecompositionUserStory;
     displayKey: string;
     tierHint: DecompositionTier | 'root';
+    releaseId: string | null;
+    releaseOrdinal: number | null;
   }>;
   allAssumptions: AssumptionEntry[];
   assumptionSeq: number;
@@ -2181,6 +2437,10 @@ export function rebuildSaturationStateFromStream(
       // but the fallback keeps the resume path robust to hand-edited DBs.
       displayKey: c.display_key ?? c.user_story?.id ?? c.node_id,
       tierHint,
+      // Release assignment persists — reuse from the stream so
+      // downstream children of this node inherit the same release.
+      releaseId: c.release_id ?? null,
+      releaseOrdinal: c.release_ordinal ?? null,
     });
   }
 
@@ -2286,7 +2546,7 @@ function formatRootStoryForDecomposition(s: UserStory): string {
     .join('\n');
   const traces = (s.traces_to ?? []).join(', ') || '(none)';
   return `${s.id} [${s.priority}]
-As a ${s.role}, I want ${s.action}, so that ${s.outcome}.
+As a ${s.role}, I want to ${s.action}, so that ${s.outcome}.
 Acceptance criteria:
 ${acs}
 Traces to: ${traces}`;

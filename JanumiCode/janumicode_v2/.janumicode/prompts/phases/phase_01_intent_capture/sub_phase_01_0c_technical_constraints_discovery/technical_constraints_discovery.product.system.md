@@ -68,7 +68,7 @@ If you can't ground a capture in a verbatim excerpt, DO NOT emit it.
   "kind": "technical_constraints_discovery",
   "technicalConstraints": [
     {
-      "id": "TECH-1",
+      "id": "TECH-POSTGRES-16",
       "category": "cdn",
       "text": "Cloudflare CDN is the only public entry point to the system.",
       "technology": "Cloudflare",
@@ -83,7 +83,7 @@ If you can't ground a capture in a verbatim excerpt, DO NOT emit it.
 }
 ```
 
-`id`: `TECH-<n>` starting at `TECH-1`.
+`id`: a semantic slug of the form `TECH-<UPPER-SLUG>` — evocative of the constraint itself, NOT a running number. Use the technology/concept name uppercased with hyphens (e.g. `TECH-REACT-19`, `TECH-POSTGRES-16`, `TECH-SOC2`, `TECH-REDIS-STREAMS`). Slug MUST match `^TECH-[A-Z0-9_-]+$`. If two constraints would slug identically, suffix the second with `-2`, the third with `-3`, etc. for deterministic disambiguation.
 `category`: open-ended — `frontend`, `backend`, `database`, `infrastructure`, `security`, `deployment`, `cdn`, `workflow_engine`, `mobile`, `identity`, `monitoring`, `integration_protocol`, `build_ci`, or a source-specific category when none of those fit.
 `technology`: named vendor / product / library, when applicable. Omit if the constraint is architectural rather than vendor-specific.
 `version`: only when the source states it.

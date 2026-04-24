@@ -1,8 +1,10 @@
 # JanumiCode Master Product Specification
 
-**Version 2.3 — Implementation-Ready, Consolidated**
+**Version 2.4 — Implementation-Ready, Consolidated**
 
-*This document is a complete, self-contained consolidation of versions 2.0, 2.1, and 2.2. All "Identical to v2.x" references have been resolved inline. No external spec documents are required to implement JanumiCode from this specification.*
+*This document is a complete, self-contained consolidation of versions 2.0 through 2.4. All "Identical to v2.x" references have been resolved inline. No external spec documents are required to implement JanumiCode from this specification.*
+
+*Changes from v2.3: Wave 6 recursive requirements decomposition (§4 Phase 2.1a / 2.2a) — tier-based saturation loop with assumption-saturation termination, depth/fanout/per-root budget caps, mirror gate at depth 2, Step 4b tier-downgrade detection, Step 4c AC-shape audit; UUID-based logical identity for decomposition nodes (`node_id` is a minted UUID; `display_key` holds the human label with sibling-collision suffix) with exactly-one-current-version supersession invariant (§5, §15); Phase 1.0 extraction decomposition into five focused passes plus composer (Sub-Phases 1.0b–1.0g — §4); Phase 1.8 Release Plan Approval (§4) producing a `release_plan` artifact with a human gate, and the release_id / release_ordinal propagation contract through every downstream decomposition tree (§4, §7, §15); new record types — requirement_decomposition_node, requirement_decomposition_pipeline, assumption_set_snapshot, release_plan, intent_lens_classification, tier_c_ac_shape_audit (§6, §15); canonical vocabulary expanded (§2) — Release, Release Plan, Decomposition Node, Logical Node Identity, Assumption Saturation, Tier (A/B/C/D); stall detection replaced the retired n-gram LoopDetector and tiny-chunk flailing heuristics with an invocation-log-file-size cap (1.5 MB/attempt, retryable) complemented by records-idle session abort (§8.5); per-root LLM call budget + per-kind telemetry columns on workflow_runs (§10, §11); Phase 1.7 renamed to Handoff Approval; Phase 1.6 renamed to Product Description Synthesis; new workflow_runs columns — intent_lens, decomposition telemetry quartet, active_release_plan_record_id (§11); configuration additions — decomposition block, invocation-log-size env override, gemma-family sampling profile auto-detection in the ollama provider, per-workspace `config.json` deep-merge override pattern (§10); VS Code card additions — DecompositionNodeCard, DecompositionPipelineCard, deferred ReleasePlanCard (§17); test-and-evaluation/ path convention for generated artifacts.*
 
 *Changes from v2.2: All previously deferred "Identical to v2.x" sections resolved inline from v2.0/v2.1 source material; Eval Design and Execution Agent cross-cutting specification inlined (§8.9); all record schemas consolidated in Appendix (§15); Version Management expanded with sub-sections (§13); Section 8 Cross-Cutting Role Specifications expanded to 14 subsections with full Ingestion Pipeline (§8.12), Mirror Generator (§8.13), Memory Edge Lifecycle (§8.14); CLI Agent Invocation Protocol (§16); VS Code Extension UI Contract (§17); Phase 0.5 state machine representation (§4); modification_type determination rules (§4); System-Proposed Content encoding in Phase 1 (§4); Phase 2 warning acknowledgment protocol (§4); Phase 9 test execution ordering (§4); Phase 10 file system mapping and rollback reversion (§4); Dependency Closure edge cases — cycle detection, cross-run boundary, Phase Gate invalidation, closure size limit (§5.3); source_workflow_run_id clarification (§5.4); new system record types (§6.6); token counting implementation, detail file format, uniform stride sampling (§7.2–7.3); Tool Availability Registry and SCOPE_BLIND detection (§7.9); DIVERGING trend definition (§7.10); Phase Gate evaluation order with short-circuit (§7.11); LLM API failure recovery protocol with fallback models (§7.12); Verification Ensemble severity disagreement handling (§8.1); Ingestion Pipeline Failure added to failure taxonomy (§8.5); SQLite WAL concurrency model (§11); file_system_writes and llm_api_calls tables (§11); effective_at assignment rules (§13.3); new deferred items (§14); new appendix schemas (§15.10–15.12); config schema updates — bloom_confidence_threshold removed, tool_availability, rollback_closure_max_artifacts, detail_file_max_bytes, fallback models, cli_invocation added (§10).*
 
@@ -145,6 +147,23 @@ All [JC:Prompt Templates], schema fields, agent instructions, and UI labels must
 | **Acceptance Criterion** | A verifiable condition that must be true for a User Story to be considered complete | "done criteria", "success condition" |
 | **Use Case** | A named interaction sequence between an actor and the system that achieves a goal | "scenario", "flow", "journey" |
 | **Priority Level** | The relative importance of a Functional Requirement: Critical / High / Medium / Low | "MoSCoW", "importance", "ranking" |
+
+### Layer 3a — Release Planning and Decomposition Terms
+
+| Canonical Term | Definition | Prohibited Aliases |
+|---|---|---|
+| **Release** | An ordered unit of shippable scope — what goes live together as a coherent user-value deliverable. Has a 1-based ordinal and a stable `release_id` (UUID). Earlier-ordinal Releases must not depend on later-ordinal Releases (forward-only dependency). | "pillar" (product-specific), "milestone" (vague), "Release Train" / "PI" (framework-coupled) |
+| **Release Plan** | The ordered list of Releases proposed in Phase 1.8 and human-approved via MMP gate. Persisted as a `release_plan` Governed Stream Record with `approved: true`; the active plan is pinned on the Workflow Run via `active_release_plan_record_id`. Drives release_id / release_ordinal propagation through Phase 2+. | "roadmap" (too broad), "delivery plan" |
+| **Backlog** | The bucket for work not assigned to any current Release (`release_id: null`). Decomposition nodes whose root doesn't trace to any Release's `traces_to_journeys` land here. Downstream phases render the Backlog last and surface it for re-planning. | "unreleased", "out of scope" |
+| **Decomposition Node** | A single entry in a Phase 2.1a (FR) or Phase 2.2a (NFR) recursive decomposition tree — a User Story plus tier, status, release assignment, and parent/root linkage. Logical identity is a UUID; presentation uses `display_key`. | "requirement node" (ambiguous), "tree node" |
+| **Logical Node Identity** | The UUID stored in `content.node_id` on every `requirement_decomposition_node` record. Stable across revisions (downgrade / pruned / deferred / atomic). Never confused with the governed_stream row `id` (per-revision) or with `display_key` (presentational). | "node id" (ambiguous — could mean row id), "tree id" |
+| **Display Key** | The human-readable label for a Decomposition Node, stored in `content.display_key`. Derived from the LLM's emitted `user_story.id` with a `#<4-hex>` sibling-collision suffix when required. Used in all logs, markdown exports, webview cards, and prompt interpolations. Never used for joins or supersession. | "node name" (ambiguous), "slug" |
+| **Tier** | The semantic classification assigned to a depth ≥ 1 Decomposition Node: **A** (functional sub-area, requires further decomposition), **B** (scope commitment, human-gated at depth 2), **C** (pending atomic — one more decomposition pass), **D** (atomic leaf — terminal). Drives orchestrator routing in the saturation loop. | "level" (ambiguous), "kind" |
+| **Assumption Saturation** | The primary termination criterion for the Wave 6 recursive decomposition loop: a pass whose `semantic_delta` (newly-surfaced non-duplicate assumptions) is zero AND whose work queue is empty. Safe-rail caps (depth, budget, fanout) can also terminate, but saturation is the desired exit path. | "convergence", "steady state" |
+| **Semantic Delta** | Count of assumptions newly surfaced during a saturation-loop pass, excluding those the embedding dedup flagged as duplicates of prior assumptions. Distinct from `delta_from_previous_pass` (raw row count) — only semantic_delta gates termination. | "new assumption count" (ambiguous) |
+| **Tier-B Scope Commitment** | A Decomposition Node classified Tier B — represents a bounded scope commitment that materially affects what the product does. Human accepts or rejects at the depth-2 mirror gate before the loop proceeds. Tier-B rejection writes a pruned supersession; acceptance queues the node for further decomposition under the Tier-B hint. | "scope choice", "feature toggle" |
+| **Tier-Downgrade (Step 4b)** | The orchestrator's response when a previously-accepted Tier-B Decomposition Node is decomposed and produces further Tier-B children (mis-labeled at original gate). Writes a `status: 'downgraded'` supersession and prepends a "scope expansion" note to the follow-up gate. | "re-gate", "mislabel fix" |
+| **AC-Shape Audit (Step 4c)** | A Reasoning Review pass auditing whether a post-gate Tier-B parent's Tier-C/D children carry verification-shaped ACs (measurable) or policy-shaped ACs (hidden scope decisions). Advisory only — writes a `tier_c_ac_shape_audit` reasoning_review_record; no automatic tree changes. | "AC review" |
 
 ### Layer 4 — Systems Engineering Terms
 
@@ -534,12 +553,12 @@ The sub-phases below apply when Lens Classification does NOT select `product`. T
 
 - **[JC:Agent Role]:** Orchestrator (LLM API call) + Domain Interpreter Agent
 - **Action — Step 1, Scope Classification:** Classifies the Raw Intent's breadth (single feature / single product / multi-product ecosystem) and depth (proof of concept / MVP / production-grade). Identifies cross-scope dependencies if breadth is multi-product.
-- **Action — Step 2, Dependency Closure Analysis:** If breadth is multi-product and the human may choose to scope to a subset, the Domain Interpreter identifies concepts and data from out-of-scope pillars that the scoped pillar depends on. These dependencies must be explicitly resolved in the scoping decision.
+- **Action — Step 2, Dependency Closure Analysis:** If breadth is multi-product and the human may choose to scope to a subset, the Domain Interpreter identifies concepts and data from out-of-scope product areas that the scoped product area depends on. These dependencies must be explicitly resolved in the scoping decision.
 - **Action — Step 3, Compliance Context Identification:** Identifies domain-specific compliance regimes that apply to the product being built (accounting standards, legal regulations, industry standards, accessibility requirements, data privacy laws). Presents identified regimes for human confirmation.
 - **Output Artifact:** `scope_classification`, `compliance_context: {regimes: [{name, description, applicable_phases, relevant_artifacts}]}`
 
 **Scope Menu (if multi-product detected):**
-> "Your intent describes a multi-product ecosystem. Options: (A) Scope this run to [Pillar N] — note: the following concepts from other pillars must be stubbed or declared as External Systems: [dependency closure list], (B) Scope this run to a cross-cutting shared foundation used by all pillars, (C) Proceed with full ecosystem scope and allow the bloom to surface natural decomposition."
+> "Your intent describes a multi-product ecosystem. Options: (A) Scope this run to [Product Area N] — note: the following concepts from other product areas must be stubbed or declared as External Systems: [dependency closure list], (B) Scope this run to a cross-cutting shared foundation used by all product areas, (C) Proceed with full ecosystem scope and allow the bloom to surface natural decomposition."
 
 **Compliance Menu:**
 > "The following compliance regimes appear applicable. Confirm, add, or remove: [list with checkboxes]."
@@ -580,7 +599,7 @@ When a System-Proposed Content item is approved, `GovernedStreamWriter` elevates
 
 #### Product-Lens Sub-Phases (lens = product)
 
-The sub-phases below replace the default 1.1b–1.6 flow when Lens Classification selects `product`. They implement a **v1-style four-round proposer/prune loop** so the intent capture output matches what Phase 2+ consumers need for a full product: personas, user journeys, business domains, entities, workflows, integrations, and quality attributes — not just a thin product concept.
+The sub-phases below replace the default 1.1b–1.6 flow when Lens Classification selects `product`, extending through 1.7 Handoff Approval and 1.8 Release Plan Approval before the Phase Gate evaluates. They implement a **v1-style four-round proposer/prune loop** so the intent capture output matches what Phase 2+ consumers need for a full product: personas, user journeys, business domains, entities, workflows, integrations, quality attributes, and an ordered release plan — not just a thin product concept.
 
 Every proposer round emits its own bloom artifact and presents a dedicated `decision_bundle_presented` prune gate. The prune gate accepts three resolutions:
 
@@ -670,7 +689,21 @@ Identical to Sub-Phase 1.1b above. Emitted under both lens topologies.
 
 #### Sub-Phase 1.7 — Handoff Approval *(product lens)*
 
-- **Interaction:** Full Mirror of the `product_description_handoff` with section-level summaries (personas count, journeys count, domains count, entities count, etc.). Human approves, rejects, or edits sections. On approval → Phase Gate. On rejection → `requires_input`; the re-bloom loop does not apply at approval.
+- **Interaction:** Full Mirror of the `product_description_handoff` with section-level summaries (personas count, journeys count, domains count, entities count, etc.). Human approves, rejects, or edits sections. On approval → Sub-Phase 1.8. On rejection → `requires_input`; the re-bloom loop does not apply at approval.
+
+#### Sub-Phase 1.8 — Release Plan Approval *(product lens)*
+
+- **[JC:Agent Role]:** Orchestrator (LLM proposer + human gate).
+- **Entry Criterion:** 1.7 Handoff Approval passed — approved `product_description_handoff` available.
+- **Action:** LLM proposer reads the handoff's `productVision`, `productDescription`, `phasingStrategy`, `userJourneys`, and `businessDomainProposals`, and proposes an ordered list of Releases (2–5 by default) that partition the accepted journeys. Every accepted journey must be assigned to exactly one Release; a fallback "Future / Post-Launch" Release is added when some journeys cannot fit the shippable ordinals. The proposer treats the 1.0b `phasingStrategy` as a strong hint but owns the final shape (merges, splits, rename). `release_id` values emitted by the LLM (e.g. `REL-1`) are canonical short forms for reasoning only; the orchestrator mints a fresh UUID per Release at write time — the UUID is the persisted `release_id`.
+- **Interaction:** MMP `decision_bundle_presented` with one mirror item per proposed Release (label: `Release N: <name>`, description: Release description, tradeoffs: rationale). Gate supports three resolutions:
+  - **Accept-all / subset** — human keeps a subset of proposed Releases (MVP: partial acceptance is tolerated; orphaned subsets are renumbered 1..N at approval time. Full split/merge/move-journey operations are deferred to a v2 `ReleasePlanCard` surface).
+  - **Free-text feedback** — proposer re-runs with `{{human_feedback}}` injected; new `release_plan` artifact written with `approved: false`; gate re-presented. Capped at 3 iterations.
+  - **Mirror rejection** — halts with `requires_input`.
+- **Output Artifacts:**
+  - Each proposer iteration: `artifact_produced[kind=release_plan]` with `approved: false` + an accompanying `decision_bundle_presented`.
+  - On final approval: a new `artifact_produced[kind=release_plan]` with `approved: true` — the governing Release Plan. Its row id is persisted on the Workflow Run via `workflow_runs.active_release_plan_record_id`.
+- **Downstream Contract (Release Propagation):** Phase 2 root-decomposition writes resolve each root's `release_id` + `release_ordinal` by matching the root's `user_story.traces_to` against each Release's `traces_to_journeys` (lowest-ordinal release wins on tie; no match → Backlog). Every descendant inherits the parent's `release_id` verbatim. Supersession revisions (downgrade / pruned / deferred / atomic) PRESERVE the `release_id` — tree-structure changes do not silently move work across Releases. See `docs/release_prioritization_design.md` for the full design.
 
 **Phase Gate Criteria:**
 
@@ -681,12 +714,12 @@ Common across all lenses:
 - No `derived_from_system_proposal: true` artifacts in governing position without explicit approval
 - Reasoning Review: zero high-severity flaws or all resolved; no quarantined records in governing position
 - All `prior_decision_override` Decision Traces recorded with rationale
-- Human explicitly approved the final approval surface (1.6 under default flow, 1.7 under product-lens flow)
+- Human explicitly approved the final approval surface (1.6 under default flow, 1.7 under product-lens flow; under the product lens the 1.8 Release Plan Approval also completes before the Phase Gate evaluates)
 - Narrative Memory and Decision Trace generated and stored
 
 Lens-conditional:
 - **Default flow:** `intent_statement` schema-valid; Invariant Check passed.
-- **Product-lens flow:** `product_description_handoff` schema-valid; shape/coverage invariants passed (personas, journeys, domains, entities, workflows, integrations, quality attributes all within expected ranges; all foreign-key-like references — `entity.businessDomainId`, `phasingStrategy.journeyIds` — resolve to real items in the same handoff). Derived `intent_statement` also emitted for Phase 2–9 compatibility.
+- **Product-lens flow:** `product_description_handoff` schema-valid; shape/coverage invariants passed (personas, journeys, domains, entities, workflows, integrations, quality attributes all within expected ranges; all foreign-key-like references — `entity.businessDomainId`, `phasingStrategy.journeyIds` — resolve to real items in the same handoff). Derived `intent_statement` also emitted for Phase 2–9 compatibility. An approved `release_plan` (`approved: true`) exists and `workflow_runs.active_release_plan_record_id` points to it; every accepted journey appears in exactly one Release's `traces_to_journeys` or is captured in a Backlog bucket.
 
 *If Prior Decision Overrides reference Phase-Gate-Certified Interface Contracts, API Definitions, or Data Models: Phase 0.5 executes before Phase 2.*
 
@@ -714,11 +747,55 @@ This completes the traceability chain `source_ref (1.0*) → handoff_item (1.6) 
 - **Context Payload detail file:** Full `intent_statement`; full `compliance_context`; full Context Packet; full handoff (product lens)
 - **Output Artifact:** `functional_requirements` — user stories each carry `traces_to[]` under product lens
 
+#### Sub-Phase 2.1a — Recursive Functional Requirements Decomposition *(product lens, Wave 6)*
+
+- **[JC:Agent Role]:** Requirements Agent
+- **Entry Criterion:** `functional_requirements` bloom output available; depth-0 `requirement_decomposition_node` records written for each root FR User Story (each carries the root's `release_id` + `release_ordinal` resolved via `traces_to` → journey → Release; unmatched roots land in Backlog).
+- **Goal:** Decompose each root FR into a tree of atomic, testable leaves via a saturation loop, surfacing scope commitments to the human at depth 2 and freezing branches that hit atomic-leaf criteria.
+
+**Tier model (A / B / C / D)** — the decomposer assigns one tier per emitted child:
+
+| Tier | Meaning | Orchestrator routing |
+|---|---|---|
+| **A** | Functional sub-area — more decomposition required | Queued for next-pass decomposition (hint = A). |
+| **B** | Scope commitment — materially bounded scope that the human must endorse | Accumulated in the depth-2 pending-gate batch per parent; presented as a `decision_bundle_presented` mirror; accept → re-queue with hint = B; reject → `writePrunedSupersession` emits `status: 'pruned'`. |
+| **C** | Implementation-level commitment, pending one more pass to become atomic | Queued for decomposition (hint = C). |
+| **D** | Atomic leaf | Written with `status: 'atomic'` immediately; never re-queued. |
+
+**Safety rails (config.decomposition):**
+- `depth_cap` (default 10) — hard ceiling on tree depth. On trip: `writeDeferredSupersession` with `pruning_reason: 'depth_cap_reached'`.
+- `budget_cap` (default 500) — **per-root** limit on LLM decomposer calls. Counters are in-memory-only within a saturation-loop invocation and do NOT persist across resume sessions (resumes get a fresh per-root budget). On trip: remaining queue entries for that root become `status: 'deferred'` with `pruning_reason: 'budget_cap_reached'`.
+- `fanout_cap` (default 8) — max children emitted per parent per pass. Excess children dropped with a warning log.
+
+**Termination:** Assumption saturation — a pass where `semantic_delta === 0 && queue.length === 0` exits cleanly with pipeline `termination_reason: 'fixed_point'`. Cap trips write `termination_reason: 'budget_cap'` or `'depth_cap'`. Healthy runs should reach fixed-point naturally; cap trips are signals to investigate decomposer bloat or raise the cap per-workspace via `config.json`.
+
+**Assumption dedup (flag-but-don't-merge):** Each pass's newly-surfaced assumptions are batch-embedded (ollama `qwen3-embedding:8b` by default) and scored against prior-pass embeddings. Cosine similarity ≥ 0.92 flags the new assumption with `duplicate_of` + `duplicate_similarity`; it's NEVER deleted — the flag lets `semantic_delta` exclude duplicates from the saturation gate while preserving the audit trail. Embedding failures degrade cleanly (dedup skipped for that pass; raw `delta_from_previous_pass` is the fallback signal).
+
+**Scoped assumption injection:** Each decomposer call sees only assumptions surfaced at the current node's ancestor chain (plus global / seed assumptions with no `surfaced_at_node`). Sibling-branch assumptions are excluded to bound prompt size and reduce cross-branch contamination that drives duplicate growth.
+
+**Step 4b — Tier-Downgrade Detection:** When an accepted Tier-B parent is decomposed and produces further Tier-B children (either explicit `parent_tier_assessment.agrees_with_hint: false` from the decomposer, or implicit when this pass's `pendingGateByParent` for the parent is non-empty), the orchestrator writes a `status: 'downgraded'` supersession for the parent and prepends a "scope expansion" context note to the follow-up gate so the human can tell it apart from the original gate.
+
+**Step 4c — AC-Shape Audit:** For clean post-gate decompositions (Tier-B parent produced only Tier-C/D children, no 4b signal), an optional `reasoning_review_on_tier_c` Reasoning Review call audits whether the children's ACs are verification-shaped or policy-shaped. Policy-shaped ACs indicate residual scope commitments hiding as implementation. Advisory only — writes a `reasoning_review_record[kind=tier_c_ac_shape_audit]`; no automatic tree changes. Off by default (one LLM API call per post-gate pass).
+
+**Release propagation:** Every child write inherits `release_id` + `release_ordinal` from its parent's `QueueEntry`. Supersession records (pruned / deferred / downgraded) preserve the release assignment from the prior revision (design doc Q2: preserve). Subtree-level release reassignment is a v2 feature exposed through a `ReleasePlanCard` surface; v1 enforces at-write-time inheritance only.
+
+**Output Artifacts (per pass):**
+- `requirement_decomposition_node` records for each child emitted (initial status = `pending` for A/B/C, `atomic` for D).
+- `requirement_decomposition_pipeline` container record — one per root_kind per run; updated incrementally through the saturation loop via `supersedByRollback` so the latest version always reflects current pass state.
+- `assumption_set_snapshot` — one per pass carrying full cumulative `assumptions[]`, `delta_from_previous_pass`, and `semantic_delta`.
+- `decision_bundle_presented` — one per parent that accumulated Tier-B children this pass (the depth-2 scope-commitment mirror gate).
+- `reasoning_review_record[kind=tier_c_ac_shape_audit]` — optional, when Step 4c fires.
+- Per-kind telemetry on `workflow_runs`: `decomposition_fr_calls_used`, `decomposition_nfr_calls_used` (aggregate of per-root counters at loop end), `decomposition_budget_calls_used` (sum), `decomposition_max_depth_reached` (max across both kinds).
+
 #### Sub-Phase 2.2 — Non-Functional Requirements Bloom
 
 - **[JC:Agent Role]:** Requirements Agent
 - **Context Payload stdin (product lens):** `qualityAttributes[]` (free-prose NFR seeds), `vvRequirements[]` (structured target + measurement + threshold — primary seed), `technicalConstraints[]` (CONTEXT only — do not re-propose as requirements), `complianceExtractedItems[]`
 - **Output Artifact:** `non_functional_requirements` — each NFR carries `traces_to[]` under product lens
+
+#### Sub-Phase 2.2a — Recursive Non-Functional Requirements Decomposition *(product lens, Wave 6)*
+
+Structurally identical to Sub-Phase 2.1a: the same saturation loop, tier model, safety rails, assumption dedup, Step 4b / 4c, and release propagation — parameterized with `config.rootKind = 'nfr'`, `sub_phase_id = '2.2a'`, `templateSubPhase = '02_2a_non_functional_requirements_decomposition'`, and `gateSurfacePrefix = 'nfr-decomp-gate-'`. NFR decomposition nodes carry `root_kind: 'nfr'` for downstream projection (`getFrozenFrLeaves` vs. future `getFrozenNfrLeaves`).
 
 #### Sub-Phase 2.3 — Requirements Mirror and Menu
 
@@ -1179,6 +1256,34 @@ These are distinct mechanisms that must not be conflated:
 | **Governing mechanism** | Newer record in same run is canonical | `supersedes` Memory Edge created |
 | **Human involvement** | Rollback authorization recorded | `prior_decision_override` Decision Trace recorded |
 
+#### 5.2.1 Decomposition Node Supersession Invariant *(Wave 6)*
+
+In addition to rollback and semantic supersession, Wave 6 introduces a third, record-type-specific supersession mechanism for `requirement_decomposition_node` records: **logical-identity supersession**.
+
+The motivation is that a single logical Decomposition Node can be revised several times during a saturation run without constituting a phase rollback — e.g. a `pending` node written at pass 2 gets flipped to `downgraded` by Step 4b at pass 3, and possibly to `deferred` by a cap trip later. Each revision writes a NEW governed_stream row to preserve the audit trail, but exactly one row per Logical Node Identity must be `is_current_version: 1` at any time — otherwise downstream consumers (tree walks, gold extractors, markdown exporter) see phantom duplicate nodes.
+
+The invariant is enforced by `supersedeDecompositionNodeByLogicalId(workflow_run_id, logical_node_id, superseding_record_id)` on the governed-stream writer, which runs:
+
+```sql
+UPDATE governed_stream
+   SET is_current_version = 0, superseded_by_id = ?, superseded_at = ?
+ WHERE workflow_run_id = ?
+   AND record_type = 'requirement_decomposition_node'
+   AND is_current_version = 1
+   AND id != ?
+   AND json_extract(content, '$.node_id') = ?
+```
+
+Every supersession write site in Phase 2.1a / 2.2a calls this helper immediately after writing the new revision:
+
+- `writePrunedSupersession` (human rejected a Tier-B child at the depth-2 gate)
+- `writeDeferredSupersession` (depth cap / budget cap / decomposition failure — any cap trip path)
+- Step 4b tier-downgrade re-emit (`status: 'downgraded'`)
+
+Initial writes of brand-new logical nodes are no-ops: the query matches zero rows because no prior revision exists for the freshly-minted UUID. The supersession is keyed on `content.node_id` — the Logical Node Identity — not on the governed_stream row id, which is per-revision.
+
+**Invariant (enforced):** For every `(workflow_run_id, content.node_id)` pair in the `requirement_decomposition_node` space, exactly one row has `is_current_version = 1` at any time. Downstream consumers that filter `is_current_version = 1` see exactly one row per logical node.
+
 ### 5.3 Dependency Closure Rollback
 
 When the Orchestrator performs a rollback targeting artifact X, it must traverse the `memory_edge` table for all `derives_from` edges originating from X recursively and include all reachable artifacts in the invalidation set. The human is shown the complete invalidation set before confirming.
@@ -1314,6 +1419,24 @@ Every entry has a canonical `record_type`. Maximum granularity — one record pe
 
 **`mirror_presented` field addition:** Add `system_proposed_content_count: integer` to the existing `mirror_presented` record type.
 
+### 6.7 Wave 6 Recursive Decomposition Records *(product lens, Phase 1–2)*
+
+| Record Type | Description |
+|---|---|
+| `intent_lens_classification` | Phase 1.0a output — the lens chosen for this run (`product` / `feature` / `bug` / `infra` / `legal` / `unclassified`) with confidence score, rationale, and `fallback_lens` (used when confidence is too low to trust the primary classification). |
+| `requirement_decomposition_node` | A single node in the Phase 2.1a (FR) or 2.2a (NFR) decomposition tree. Logical identity is `content.node_id` (UUID, stable across revisions); presentation uses `content.display_key`. Parent linkage via `content.parent_node_id`. Release assignment via `content.release_id` + `content.release_ordinal` inherited from parent. Status: `pending` \| `decomposed` \| `atomic` \| `pruned` \| `deferred` \| `downgraded`. Tier: `A` \| `B` \| `C` \| `D` (absent on depth-0 roots). Supersession by logical id enforces the exactly-one-current-version invariant (§5.2.1). |
+| `requirement_decomposition_pipeline` | Per-kind saturation-loop container (one per root_kind per run). Updated incrementally via `supersedByRollback` as passes complete; the latest version reflects current pipeline state. Content includes `passes[]` (per-pass delta + semantic_delta + node count), `termination_reason` (`fixed_point` \| `budget_cap` \| `depth_cap`), `final_leaf_count`, `final_max_depth`, `total_llm_calls`. |
+| `assumption_set_snapshot` | Per-pass record of the cumulative assumption set for a root_kind. Fields: `pass_number`, `root_fr_id` (kind marker — `*` for FR, `*nfr*` for NFR), full `assumptions[]` list, `delta_from_previous_pass` (raw count), `semantic_delta` (count excluding duplicate_of-flagged rows). The saturation-loop termination gate reads `semantic_delta`; `delta_from_previous_pass` is retained for audit. |
+| `release_plan` | Phase 1.8 Release Plan artifact. `releases[]` is an ordered list of Release entries (each with `release_id` UUID, `ordinal`, `name`, `description`, `rationale`, `traces_to_journeys[]`, optional `traces_to_domains[]`). Only records with `approved: true` drive Phase 2 assignment. The active plan is pinned on the Workflow Run via `workflow_runs.active_release_plan_record_id`. Iterations during the Phase 1.8 feedback loop write additional `approved: false` records for audit. |
+
+### 6.8 Wave 6 Reasoning-Review Sub-Types *(product lens)*
+
+The existing `reasoning_review_record` record type gains two `content.kind` variants emitted during Phase 2.1a / 2.2a:
+
+| `content.kind` | Description |
+|---|---|
+| `tier_c_ac_shape_audit` | Step 4c structural AC-shape audit for clean post-gate Tier-B decompositions. Content: `parent_node_id` (parent's logical UUID), `parent_display_key`, `pass_number`, `children_reviewed[]` (child user_story ids), `findings[{ child_id, verdict: 'verification'\|'policy'\|'ambiguous', rationale }]`, `summary`, `policy_count`. Advisory only — no automatic tree changes. |
+
 ---
 
 ## 7. Orchestrator Specification
@@ -1344,13 +1467,15 @@ The Orchestrator is a TypeScript class — `OrchestratorEngine` — whose state 
 
 CLI-backed agents receive context through two channels. LLM API call roles (Reasoning Review, Narrative Memory Generator, Orchestrator reasoning calls, Client Liaison Agent, Unsticking Agent) receive narrow purpose-built context and are not subject to the two-channel model.
 
+**Release-Ordered Requirement Projection *(Wave 6, product lens)*:** For Sub-Phases downstream of Phase 2 that consume the FR / NFR trees (Phases 3, 4, 5, 7, 8), `ContextBuilder` sorts the projected work by `content.release_ordinal` ascending (null = Backlog, rendered last), with `root_display_key` + `display_key` as the secondary key for stability. Release ordering is the **primary downstream sort key**; per-story `priority` (critical / high / medium / low) is the secondary sort within a Release. This means a Phase 7 Implementation Plan synthesized from frozen FR leaves inherits the human-approved Release ordering by construction — no extra routing logic required. Downstream consumers access this projection via `buildEffectiveFrView(decompositionNodes, prior)`, which also surfaces per-leaf `release_id` + `release_ordinal` on the `FrozenFrLeaf` shape.
+
 **Channel 1 — Context Payload Stdin (directive channel):**
 
 The `ContextBuilder` constructs the stdin directive with the following content in strict order:
 
 1. **Governing Constraints (never omitted):** Constitutional Invariants relevant to this Sub-Phase; active constraints from the Context Packet at Authority Level 6+; `derived_from_system_proposal` warnings for any provisional content in scope; any Invariant Violation findings from prior retry
 2. **Required Output Specification:** The Sub-Phase's required output from the Prompt Template header
-3. **Summary Context:** Structured summary fields from the Deep Memory Research Context Packet (`decision_context_summary`, `active_constraints`, `supersession_chains`, `contradictions`, `open_questions`); Narrative Memory from the immediately prior Phase (summary only); `compliance_context` summary
+3. **Summary Context:** Structured summary fields from the Deep Memory Research Context Packet (`decision_context_summary`, `active_constraints`, `supersession_chains`, `contradictions`, `open_questions`); Narrative Memory from the immediately prior Phase (summary only); `compliance_context` summary; approved `release_plan` Release ordering (ordinals + names + short descriptions) when present — drives release-ordered projection of requirements / components / tasks downstream
 4. **Detail File Reference:** Path to the detail file; description of its contents; explicit conditions under which the agent should consult it
 
 The stdin directive is designed to remain within the configured `stdin_max_tokens` limit. Governing Constraints (item 1) are never truncated — if they alone approach the limit, the Orchestrator escalates to human before invoking the agent.
@@ -1492,7 +1617,7 @@ Each Orchestrator LLM API call is stateless and scoped. Context budgeting is enf
 The `BloomPruneCoordinator` sequences all Menu interactions within a Phase using the following priority ordering. Higher-priority decisions are presented first because they eliminate or constrain branches of subsequent decisions.
 
 **Priority 1 — Scope and boundary decisions:**
-Decisions that eliminate entire branches of the candidate space (scope bounding, pillar selection, in-scope vs. out-of-scope determinations). Always presented individually — never bundled.
+Decisions that eliminate entire branches of the candidate space (scope bounding, Release Plan approval, in-scope vs. out-of-scope determinations). Always presented individually — never bundled.
 
 **Priority 2 — Compliance and constraint decisions:**
 Decisions that constrain the solution space for all downstream artifacts (compliance regime confirmation, Constitutional Invariant acknowledgments, Prior Decision Override confirmations). Always presented individually — never bundled.
@@ -1632,7 +1757,7 @@ All LLM API calls (Reasoning Review, Narrative Memory, Domain Compliance Review,
 
 ```json
 "reasoning_review": {
-  "primary": { "provider": "google", "model": "gemini-2.0-flash-thinking" },
+  "primary": { "provider": "google", "model": "gemini-2.5-flash" },
   "fallback": { "provider": "anthropic", "model": "claude-sonnet-4-20250514" },
   "max_retries": 3
 }
@@ -2067,6 +2192,18 @@ When `tool_result_misinterpretation_suspected` is flagged by the Reasoning Revie
 2. Unsticking Agent compares the actual tool results against the agent's stated conclusions in its `agent_reasoning_step` records
 3. If misinterpretation is confirmed, the Unsticking Agent generates a `unsticking_tool_result_review` record documenting the specific discrepancy
 4. The stuck agent is provided with the correct interpretation of the tool result via the Unsticking Agent's next Socratic turn, injected into its Context Payload
+
+**Streaming Stall Detection Protocol:** A thinking-mode LLM can keep emitting tokens without making semantic progress — the stream itself isn't hung, so idle-socket timers don't trip, but the output never converges. Two independent signals catch these in-stream, with Loop Detection Monitor as the cross-invocation signal:
+
+1. **Invocation log size cap (per LLM call, retryable).** The orchestrator's `LLMCaller.call` watches the bytes written to the per-invocation `.log` file (prompt + chunk metadata + streamed text). When `bytesWritten > maxLogFileBytes` for this attempt exceeds the threshold (`JANUMICODE_LLM_MAX_LOG_FILE_BYTES`, default **1,572,864 bytes ≈ 1.5 MB**), the in-flight HTTP stream is aborted and the error is reported as retryable. `LLMCaller` retries up to `maxRetries` (default 3), each retry starting from a fresh `bytesBaseline` so a failed attempt-1 doesn't immediately re-trip attempt-2. Rationale: healthy qwen3.5:9b invocations top out at ~100–200 KB log file; anything past 1.5 MB is practically certain to be runaway thinking. Variance between attempts often allows the next retry to converge.
+
+2. **Records-idle session abort (per Workflow Run, non-retryable).** The CLI runner's `waitForQuiescence` watches the `governed_stream` table for new rows. When no new record has landed for `records_idle_stall_ms` (default **900,000 ms = 15 min**), the session AbortController is tripped — propagates into any in-flight LLMCaller, tears down the HTTP stream, and the phase returns `requires_input`. Unlike the log-size cap this is a SESSION-level signal; no retry. Progress is measured by records landing in the stream, so long-running legitimate LLM calls (thinking-mode prose) that ARE making progress but haven't yet finished don't trigger records-idle as long as their emitted decomposition-node / assumption-set records are landing.
+
+3. **Loop Detection Monitor (cross-invocation).** The existing retry-based Loop Detector classifies Loop Status as `STALLED` / `DIVERGING` / `SCOPE_BLIND` using retry-count / flaw-trend / tool-call-sequence heuristics across multiple Agent Invocations. Triggers the Unsticking Agent (Sections 8.5 / 8.6).
+
+Retired from prior Wave iterations:
+- **N-gram streaming loop detector** — retired after false-positiving on legitimate Phase 1.3 JSON-bloom output whose schema-repetitive fragments (`",\n  "actors": [\n    "`) read as prose loops. The log-size cap catches the same pathology without the false positive.
+- **Tiny-chunk flailing detector** — retired after triggering on qwen3.5:9b's natural JSON-streaming tokenization (3–5 chars/chunk is normal for structured output; the heuristic at `JANUMICODE_LLM_FLAIL_MAX_AVG_CHARS=6` mis-identified this as a spiral).
 
 ---
 
@@ -2610,19 +2747,19 @@ The `[JC:SYSTEM SCOPE]` section contains JanumiCode framework instructions — g
     "unsticking_agent":            {
       "backing_tool": "direct_llm_api",
       "provider": "google",
-      "model": "gemini-2.0-flash-thinking"
+      "model": "gemini-2.5-flash"
     },
     "client_liaison":              {
       "backing_tool": "direct_llm_api",
       "provider": "google",
-      "model": "gemini-2.0-flash-thinking"
+      "model": "gemini-2.5-flash"
     },
     "orchestrator":                { "reasoning_llm_provider": "...", "reasoning_model": "..." }
   },
 
   "llm_routing": {
     "reasoning_review": {
-      "primary":                   { "provider": "google", "model": "gemini-2.0-flash-thinking" },
+      "primary":                   { "provider": "google", "model": "gemini-2.5-flash" },
       "trace_inclusion": {
         "enabled":                          true,
         "self_corrections_always_included": true,
@@ -2686,7 +2823,16 @@ The `[JC:SYSTEM SCOPE]` section contains JanumiCode framework instructions — g
     "max_retry_attempts_per_subphase":  3,
     "loop_detection_threshold":         3,
     "require_human_approval_all_phase_gates": true,
-    "rollback_closure_max_artifacts":   50
+    "rollback_closure_max_artifacts":   50,
+    "records_idle_stall_ms":            900000
+  },
+
+  "decomposition": {
+    "depth_cap":                        10,
+    "budget_cap":                       500,
+    "fanout_cap":                       8,
+    "mirror_gate_depth":                2,
+    "reasoning_review_on_tier_c":       false
   },
 
   "tool_availability": {
@@ -2727,6 +2873,55 @@ The `[JC:SYSTEM SCOPE]` section contains JanumiCode framework instructions — g
 }
 ```
 
+**Config loading order (deep-merge):** `DEFAULT_CONFIG` (compiled into `src/lib/config/defaults.ts`) is loaded first; if `<workspace>/.janumicode/config.json` exists, its values are deep-merged on top of defaults. This lets operators override any leaf without restating the full config. Per-workspace overrides are the standard mechanism for calibration runs (see §10.3 — calibration script override convention).
+
+#### 10.1.1 Environment Variable Overrides
+
+Runtime tunables that should vary per deployment or per calibration session are read from environment variables. These override both `DEFAULT_CONFIG` and `config.json`:
+
+| Env Var | Default | Purpose |
+|---|---|---|
+| `JANUMICODE_LLM_MAX_LOG_FILE_BYTES` | `1572864` (1.5 MB) | Per-LLM-invocation log-file size cap; retryable abort when exceeded. See §8.5 Streaming Stall Detection Protocol. |
+| `JANUMICODE_EMBEDDING_URL` | `http://127.0.0.1:11434` | Ollama base URL for Wave 6 assumption dedup embeddings. |
+| `JANUMICODE_EMBEDDING_MODEL` | `qwen3-embedding:8b` | Embedding model id for dedup. |
+| `JANUMICODE_EMBEDDING_CONNECT_TIMEOUT_MS` | `2000` | TCP-connect timeout for the embedding client. |
+| `JANUMICODE_EMBEDDING_IDLE_TIMEOUT_MS` | `60000` | Idle timeout for the embedding client. |
+| `JANUMICODE_ASSUMPTION_DEDUP_DISABLED` | unset | Set to `1` to disable assumption dedup (emergency fallback — saturation will use raw `delta_from_previous_pass` as the termination signal). |
+
+#### 10.1.2 Ollama Provider — Model-Family Sampling Profiles
+
+The Ollama provider (`src/lib/llm/providers/ollama.ts`) applies family-specific sampling defaults based on the model name prefix. This keeps model-specific tuning co-located with the provider rather than scattered across call sites:
+
+| Family | Detection | num_ctx | Sampling params | think |
+|---|---|---|---|---|
+| **Qwen3** | model name starts with `qwen` | 262144 | `temperature: 1`, `presence_penalty: 1.5`, `top_k: 20`, `top_p: 0.95` | `true` |
+| **Gemma 3/4** | model name starts with `gemma` | **131072** (128K ceiling) | `temperature: 1`, `top_k: 64`, `top_p: 0.95` | `true` |
+| other | — | 262144 | `temperature: options.temperature ?? 0.7` | `false` |
+
+`options.responseFormat === 'json'` is **skipped** for thinking-family models (Qwen, Gemma) because Ollama merges the thinking + response into a single `thinking` field when `format: 'json'` is set, losing the ability to judge both the reasoning chain and the structured output. Thinking-family prompts must request JSON via prompt instruction and the caller parses response text directly.
+
+#### 10.1.3 Calibration-Run Overrides (Local Development)
+
+The `scripts/wave6-calibration-run.js` driver patches the per-workspace `config.json` with calibration-specific overrides before invoking the CLI:
+
+```jsonc
+{
+  "decomposition": {
+    "reasoning_review_on_tier_c": true   // enable Step 4c audits
+    // "budget_cap": 5000              // optional: raise via --budget-cap <N>
+  },
+  "llm_routing": {
+    "reasoning_review": {
+      "primary": { "provider": "ollama", "model": "gemma4:e4b" },
+      "temperature": 1,
+      "trace_max_tokens": 8000
+    }
+  }
+}
+```
+
+This routes Step 4c Reasoning Review at local Ollama gemma4:e4b (128K context) for hermetic calibration without consuming external API credits; production runs continue to use Google gemini-2.5-flash as the default.
+
 ### 10.2 `janumicode.specialists.json`
 
 ```json
@@ -2749,6 +2944,28 @@ The `[JC:SYSTEM SCOPE]` section contains JanumiCode framework instructions — g
   ]
 }
 ```
+
+### 10.3 Test-and-Evaluation Path Convention
+
+All generated test and evaluation artifacts — harness workspaces, per-run calibration workspaces, prompt-probe outputs, and auxiliary reports — live under a dedicated `test-and-evaluation/` directory at the repository root, gitignored as a unit:
+
+```
+janumicode_v2/
+├── test-and-evaluation/              # gitignored
+│   ├── test-workspace/               # E2E harness workspace (hermetic CI target)
+│   ├── calibration-workspaces/       # per-run cal workspaces
+│   │   ├── calibration-workspace-cal-9/
+│   │   └── calibration-workspace-cal-10/
+│   └── prompt-probe-output/          # probe runner emits here
+```
+
+Tooling that writes to this tree:
+- VS Code E2E harness configs (`.vscode-test.mjs`, `.vscode-test.harness.mjs`) open `test-and-evaluation/test-workspace/` as the dev-host workspace.
+- `package.json` `test:harness` script runs the CLI against `test-and-evaluation/test-workspace/`.
+- `scripts/wave6-calibration-run.js --tag <tag>` auto-creates `test-and-evaluation/calibration-workspaces/calibration-workspace-<tag>/` when `--workspace` is omitted.
+- `src/test/prompt-probes/probeRunner.ts` emits to `test-and-evaluation/prompt-probe-output/`.
+
+Test FIXTURES (captured LLM inputs + gold files for regression comparison) live separately under `src/test/fixtures/` — those are tracked in git and do NOT move under this convention. Test artifacts (generated output, not input) do.
 
 ---
 
@@ -2789,18 +3006,36 @@ CREATE TABLE governed_stream (
 
 -- Workflow Run registry
 CREATE TABLE workflow_runs (
-  id                            TEXT PRIMARY KEY,
-  workspace_id                  TEXT NOT NULL,
-  janumicode_version_sha        TEXT NOT NULL,
-  initiated_at                  TEXT NOT NULL,
-  completed_at                  TEXT,
-  status                        TEXT NOT NULL,
-  current_phase_id              TEXT,
-  current_sub_phase_id          TEXT,
-  raw_intent_record_id          TEXT,
-  scope_classification_ref      TEXT,
-  compliance_context_ref        TEXT,
-  cross_run_impact_triggered    INTEGER DEFAULT 0
+  id                                TEXT PRIMARY KEY,
+  workspace_id                      TEXT NOT NULL,
+  janumicode_version_sha            TEXT NOT NULL,
+  initiated_at                      TEXT NOT NULL,
+  completed_at                      TEXT,
+  status                            TEXT NOT NULL,
+  current_phase_id                  TEXT,
+  current_sub_phase_id              TEXT,
+  raw_intent_record_id              TEXT,
+  scope_classification_ref          TEXT,
+  compliance_context_ref            TEXT,
+  cross_run_impact_triggered        INTEGER DEFAULT 0,
+  -- Phase 1.0a Intent Lens Classification result.
+  -- One of 'product' | 'feature' | 'bug' | 'infra' | 'legal' | 'unclassified'.
+  -- Null until 1.0a runs. Drives lens-conditional sub-phase topology.
+  intent_lens                       TEXT,
+  -- Wave 6 decomposition telemetry. Updated at the end of each
+  -- saturation-loop invocation. The _fr / _nfr columns persist
+  -- separately so a completed FR loop does NOT clobber NFR's
+  -- baseline on resume; the aggregate column is the sum for
+  -- display-convenience.
+  decomposition_budget_calls_used   INTEGER DEFAULT 0,
+  decomposition_fr_calls_used       INTEGER DEFAULT 0,
+  decomposition_nfr_calls_used      INTEGER DEFAULT 0,
+  decomposition_max_depth_reached   INTEGER DEFAULT 0,
+  -- Phase 1.8 active Release Plan — governed_stream row id of the
+  -- approved release_plan record for this run. Null until 1.8
+  -- completes. Read by Phase 2+ via
+  -- stateMachine.getWorkflowRun(runId).active_release_plan_record_id.
+  active_release_plan_record_id     TEXT
 );
 
 -- Phase Gate completion registry
@@ -3471,6 +3706,160 @@ If JanumiCode is upgraded between the start and completion of a Phase 0.5 refact
 }
 ```
 
+### 15.13 Intent Lens Classification *(Phase 1.0a)*
+
+```json
+{
+  "kind": "intent_lens_classification",
+  "lens": "product | feature | bug | infra | legal | unclassified",
+  "confidence": 0.92,
+  "rationale": "The intent frames a new product...",
+  "fallback_lens": "product"
+}
+```
+
+Written as `artifact_produced` with `sub_phase_id: '1.0a'`. Persisted on the Workflow Run via `workflow_runs.intent_lens = lens`.
+
+### 15.14 Requirement Decomposition Node *(Wave 6)*
+
+```json
+{
+  "kind": "requirement_decomposition_node",
+  "node_id":          "550e8400-e29b-41d4-a716-446655440000",
+  "parent_node_id":   "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+  "display_key":      "FR-ACCT-1.1",
+  "root_fr_id":       "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+  "depth":            2,
+  "pass_number":      3,
+  "status":           "pending | decomposed | atomic | pruned | deferred | downgraded",
+  "tier":             "A | B | C | D",
+  "root_kind":        "fr | nfr",
+  "user_story": {
+    "id":             "FR-ACCT-1.1",
+    "role":           "...",
+    "action":         "...",
+    "outcome":        "...",
+    "acceptance_criteria": [
+      { "id": "AC-001", "description": "...", "measurable_condition": "..." }
+    ],
+    "priority":       "critical | high | medium | low",
+    "traces_to":      ["UJ-1", "VV-3"]
+  },
+  "decomposition_rationale":     "Why this child is a cohesive commitment...",
+  "surfaced_assumption_ids":     ["A-0124"],
+  "atomic_criteria_satisfied":   { "ac_testable": true, "single_operation": true, "regime_cited": true, "assumptions_listed": true },
+  "pruning_reason":              "human-rejected | budget_cap_reached | depth_cap_reached | tier_downgrade: ...",
+  "release_id":                  "<release UUID or null = backlog>",
+  "release_ordinal":             2
+}
+```
+
+**Identity:** `node_id` is a minted UUID — stable across revisions (pending → downgraded → pruned etc.). The governed_stream row `id` is per-revision; `node_id` is the **logical** identity. Supersession by logical id enforces exactly-one-current-version (§5.2.1).
+
+**Presentation:** `display_key` is the human label — the LLM's `user_story.id` with a `#<4-hex>` sibling-collision suffix applied when multiple siblings under the same parent emit the same label. All user-facing output (logs, markdown export, webview cards, prompt interpolations) uses `display_key`; all tree joins use `node_id` / `parent_node_id`.
+
+**Release propagation:** `release_id` + `release_ordinal` are inherited from the parent at write time. Depth-0 roots resolve via `traces_to` → journey → Release match against the approved Release Plan (lowest-ordinal release wins on tie; no match → Backlog with `release_id: null`). Preserved across supersession revisions.
+
+### 15.15 Requirement Decomposition Pipeline *(Wave 6)*
+
+```json
+{
+  "kind": "requirement_decomposition_pipeline",
+  "pipeline_id":     "decomp-pipe-fr-d3a6c2f5",
+  "root_fr_id":      "*",
+  "passes": [
+    {
+      "pass_number":        1,
+      "status":             "completed",
+      "started_at":         "2026-04-22T16:30:00.000Z",
+      "completed_at":       "2026-04-22T16:35:00.000Z",
+      "nodes_produced":     58,
+      "assumption_delta":   49,
+      "termination_reason": "fixed_point"
+    }
+  ],
+  "final_leaf_count":  535,
+  "final_max_depth":   4,
+  "total_llm_calls":   434
+}
+```
+
+One per root_kind per run. Updated incrementally via `writer.supersedByRollback` as each pass completes — the latest version is the canonical view. `root_fr_id` is the kind marker: `*` for FR, `*nfr*` for NFR. The final record after the loop terminates carries the aggregate telemetry (`final_leaf_count`, `final_max_depth`, `total_llm_calls`) and the final-pass `termination_reason`.
+
+### 15.16 Assumption Set Snapshot *(Wave 6)*
+
+```json
+{
+  "kind": "assumption_set_snapshot",
+  "pass_number":              3,
+  "root_fr_id":               "*",
+  "assumptions": [
+    {
+      "id":                   "A-0124",
+      "text":                 "GAAP double-entry applies.",
+      "source":               "decomposition | handoff | bloom | human",
+      "surfaced_at_node":     "<logical UUID>",
+      "surfaced_at_pass":     3,
+      "category":             "domain_regime | constraint | compliance | scope | open_question",
+      "citations":            ["handoff:requirement:REQ-1.2"],
+      "duplicate_of":         "A-0031",
+      "duplicate_similarity": 0.94
+    }
+  ],
+  "delta_from_previous_pass": 17,
+  "semantic_delta":           12
+}
+```
+
+One per saturation-loop pass per root_kind. `delta_from_previous_pass` is the raw new-row count; `semantic_delta` subtracts assumptions flagged `duplicate_of` (cosine similarity ≥ 0.92 against prior-pass embeddings). Saturation termination reads `semantic_delta`; `delta_from_previous_pass` is audit.
+
+### 15.17 Release Plan *(Phase 1.8)*
+
+```json
+{
+  "kind": "release_plan",
+  "schemaVersion": "1.0",
+  "releases": [
+    {
+      "release_id":            "<UUID>",
+      "ordinal":               1,
+      "name":                  "Home Real Property Assistant",
+      "description":           "Homeowners can match to verified service providers...",
+      "rationale":             "Solves the #1 pain point; required foundation for Release 2.",
+      "traces_to_journeys":    ["UJ-1", "UJ-2"],
+      "traces_to_domains":     ["DOM-HOME"]
+    }
+  ],
+  "approved":      true,
+  "approval_note": "Human validated release order; accepted all three releases."
+}
+```
+
+Written as `artifact_produced` with `sub_phase_id: '1.8'`. Only records with `approved: true` drive Phase 2 assignment; iterations during the feedback loop write additional `approved: false` records for audit. The active plan is pinned on the Workflow Run via `workflow_runs.active_release_plan_record_id`. `release_id` is a server-minted UUID (the LLM's `REL-N` short form is discarded at write time).
+
+### 15.18 Tier-C AC-Shape Audit *(Wave 6 Step 4c)*
+
+```json
+{
+  "kind": "tier_c_ac_shape_audit",
+  "parent_node_id":     "<parent logical UUID>",
+  "parent_display_key": "FR-COMMITMENT",
+  "pass_number":        3,
+  "children_reviewed":  ["FR-IMPL-1", "FR-IMPL-2"],
+  "findings": [
+    {
+      "child_id":  "FR-IMPL-1",
+      "verdict":   "verification | policy | ambiguous",
+      "rationale": "AC threshold is testable against system output."
+    }
+  ],
+  "summary":        "1 of 2 children have policy-shaped ACs.",
+  "policy_count":   1
+}
+```
+
+Written as a `reasoning_review_record` (content carries `kind: 'tier_c_ac_shape_audit'`). Advisory only — no automatic tree changes. Consumed by gap-report generators to surface residual Tier-B mislabels that Step 4b could not detect via the tier-distribution signal.
+
 ---
 
 ## 16. CLI Agent Invocation Protocol
@@ -3595,6 +3984,9 @@ Every Governed Stream Record renders as a card. Card type is determined by `reco
 | **Agent Output** | `artifact_produced`, `agent_reasoning_step` | Collapsible card with agent role color accent; artifact content in structured format |
 | **Human Interaction** | `mirror_presented`, `menu_presented`, `decision_trace` | Interactive card with form elements (buttons, checkboxes, text areas); blue accent |
 | **Review Result** | `reasoning_review_record`, `invariant_check_record`, `consistency_report` | Pass/fail badge; collapsible flaw list; red accent for failures |
+| **Decomposition Node** | `requirement_decomposition_node` | Tree-indented card; shows `display_key` as primary identifier (with `node_id` UUID in hover tooltip); tier badge (A/B/C/D or Root); status chip (`atomic` / `pending` / `pruned` / `deferred` / `downgraded`); depth badge; expandable AC list; release badge (`Release N` or `Backlog`). Children rendered nested via `getDecompositionChildren(node_id)`. Superseded revisions folded under a "+history" counter. |
+| **Decomposition Pipeline** | `requirement_decomposition_pipeline` | One composite card per root_kind — renders all 7 saturation-loop passes as status rows with per-pass `nodes_produced` + `semantic_delta`; expandable to show each root's tree via nested DecompositionNodeCards. Container card suppresses per-node and per-snapshot cards at top level (they render inside this card via `recordsStore.isOwnedByDecompositionPipeline`). |
+| **Release Plan** *(deferred to v2)* | `release_plan` | Card listing the approved releases with ordinal, name, description, rationale, traces_to_journeys. v1 uses the generic `artifact_produced` rendering; a dedicated editable card with reorder / rename / merge / split / move-journey operations is a v2 deliverable (see `docs/release_prioritization_design.md`). |
 | **System Event** | `llm_api_failure`, `ingestion_pipeline_record`, `file_system_write_record` | Compact card; gray accent; collapsible detail |
 | **Unsticking** | `unsticking_session_open`, `unsticking_socratic_turn`, `unsticking_resolution` | Purple accent; conversation thread layout |
 | **Warning/Error** | `warning_acknowledged`, `ingestion_pipeline_failure` | Yellow (warning) or red (error) accent bar |

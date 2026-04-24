@@ -482,6 +482,11 @@ export class ClientLiaisonDBImpl implements ClientLiaisonDB {
       compliance_context_ref: (row.compliance_context_ref as string) || null,
       cross_run_impact_triggered: !!(row.cross_run_impact_triggered as number),
       intent_lens: (row.intent_lens as import('../../types/records').IntentLens) || null,
+      decomposition_budget_calls_used: (row.decomposition_budget_calls_used as number) ?? 0,
+      decomposition_fr_calls_used: (row.decomposition_fr_calls_used as number) ?? 0,
+      decomposition_nfr_calls_used: (row.decomposition_nfr_calls_used as number) ?? 0,
+      decomposition_max_depth_reached: (row.decomposition_max_depth_reached as number) ?? 0,
+      active_release_plan_record_id: (row.active_release_plan_record_id as string) || null,
     };
   }
 }

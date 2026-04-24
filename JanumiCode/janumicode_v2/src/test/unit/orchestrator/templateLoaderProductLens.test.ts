@@ -28,7 +28,8 @@ describe('TemplateLoader — product-lens Phase 1 templates', () => {
   const productLensTemplates: Array<{ subPhase: string; requires: string[] }> = [
     { subPhase: '01_0b_intent_discovery',                requires: ['raw_intent_text'] },
     { subPhase: '01_2_business_domains_bloom',           requires: ['product_vision', 'discovered_personas'] },
-    { subPhase: '01_3_journeys_workflows_bloom',         requires: ['accepted_domains', 'accepted_personas'] },
+    { subPhase: '01_3a_user_journey_bloom',              requires: ['accepted_domains', 'accepted_personas'] },
+    { subPhase: '01_3b_system_workflow_bloom',           requires: ['accepted_domains', 'accepted_journeys'] },
     { subPhase: '01_4_entities_bloom',                   requires: ['accepted_domains', 'accepted_workflows'] },
     { subPhase: '01_5_integrations_qa_bloom',            requires: ['accepted_entities', 'accepted_workflows'] },
     // iter-4 decomposed extraction passes (1.0c/1.0d/1.0e/1.0f) — each

@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
   decomposition_budget_calls_used INTEGER DEFAULT 0,  -- sum of fr + nfr
   decomposition_fr_calls_used     INTEGER DEFAULT 0,
   decomposition_nfr_calls_used    INTEGER DEFAULT 0,
-  decomposition_max_depth_reached INTEGER DEFAULT 0
+  decomposition_max_depth_reached INTEGER DEFAULT 0,
+  active_release_plan_record_id   TEXT
 );
 
 -- ── Universal record store — the Governed Stream (lossless) ─────────

@@ -128,20 +128,74 @@ describe('Phase 1 — product-lens end-to-end flow', () => {
         ],
       },
     });
-    mock.setFixture('journeys', {
-      match: 'PRODUCT JOURNEY & WORKFLOW PROPOSER',
+    // Wave 7 — 1.3a journey bloom. Every accepted persona initiates ≥1
+    // journey; every accepted domain hosts ≥1 journey. Steps tagged
+    // automatable so 1.3b can back them with workflows.
+    mock.setFixture('journeys-1.3a', {
+      match: 'PRODUCT USER-JOURNEY PROPOSER',
       parsedJson: {
+        kind: 'user_journey_bloom',
         userJourneys: [
           { id: 'UJ-1', personaId: 'P-1', title: 'Onboard the operator', scenario: 'First login',
-            steps: [{ stepNumber: 1, actor: 'Operator', action: 'sign up', expectedOutcome: 'account created' }],
-            acceptanceCriteria: ['operator can log in'], implementationPhase: 'Phase 1', source: 'document-specified' },
+            businessDomainIds: ['DOM-IDENTITY'],
+            steps: [
+              { stepNumber: 1, actor: 'P-1', action: 'sign up', expectedOutcome: 'account created', automatable: false },
+              { stepNumber: 2, actor: 'System', action: 'provision identity', expectedOutcome: 'account persisted', automatable: true },
+            ],
+            acceptanceCriteria: ['operator can log in'], implementationPhase: 'Phase 1', umbrella: false, source: 'document-specified',
+            surfaces: { compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [] } },
           { id: 'UJ-2', personaId: 'P-2', title: 'Place an order', scenario: 'Customer places first order',
-            steps: [{ stepNumber: 1, actor: 'Customer', action: 'search catalog', expectedOutcome: 'results shown' }],
-            acceptanceCriteria: ['order persists'], implementationPhase: 'Phase 1', source: 'ai-proposed' },
+            businessDomainIds: ['DOM-OPS'],
+            steps: [
+              { stepNumber: 1, actor: 'P-2', action: 'search catalog', expectedOutcome: 'results shown', automatable: false },
+              { stepNumber: 2, actor: 'System', action: 'persist order', expectedOutcome: 'order recorded', automatable: true },
+            ],
+            acceptanceCriteria: ['order persists'], implementationPhase: 'Phase 1', umbrella: false, source: 'ai-proposed',
+            surfaces: { compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [] } },
+          { id: 'UJ-3', personaId: 'P-3', title: 'Manage tenants', scenario: 'Admin provisions a tenant',
+            businessDomainIds: ['DOM-IDENTITY', 'DOM-OPS'],
+            steps: [
+              { stepNumber: 1, actor: 'P-3', action: 'create tenant', expectedOutcome: 'tenant created', automatable: true },
+            ],
+            acceptanceCriteria: ['admin can provision a tenant'], implementationPhase: 'Phase 1', umbrella: false, source: 'ai-proposed',
+            surfaces: { compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [] } },
         ],
+        unreached_personas: [],
+        unreached_domains: [],
+      },
+    });
+    // Wave 7 — 1.3b workflow bloom. Every automatable step backed by
+    // ≥1 workflow with a journey_step trigger; domain coverage for
+    // both DOM-IDENTITY and DOM-OPS.
+    mock.setFixture('workflows-1.3b', {
+      match: 'PRODUCT SYSTEM-WORKFLOW PROPOSER',
+      parsedJson: {
+        kind: 'system_workflow_bloom',
         workflows: [
-          { id: 'WF-1', businessDomainId: 'DOM-IDENTITY', name: 'Sign-up', description: 'Account creation',
-            steps: ['Validate email', 'Create account'], triggers: ['signup request'], actors: ['User'], source: 'domain-standard' },
+          { id: 'WF-1', businessDomainId: 'DOM-IDENTITY', name: 'Provision identity',
+            description: 'Create the persisted account for a signing-up user',
+            steps: [{ stepNumber: 1, actor: 'System', action: 'validate email', expectedOutcome: 'email format accepted' },
+                    { stepNumber: 2, actor: 'System', action: 'persist user record', expectedOutcome: 'account row committed' }],
+            triggers: [{ kind: 'journey_step', journey_id: 'UJ-1', step_number: 2 }],
+            actors: ['System'], backs_journeys: ['UJ-1'], umbrella: false, source: 'domain-standard',
+            surfaces: { compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [] } },
+          { id: 'WF-2', businessDomainId: 'DOM-OPS', name: 'Persist order',
+            description: 'Record a new customer order',
+            steps: [{ stepNumber: 1, actor: 'System', action: 'persist order record', expectedOutcome: 'order committed' }],
+            triggers: [{ kind: 'journey_step', journey_id: 'UJ-2', step_number: 2 }],
+            actors: ['System'], backs_journeys: ['UJ-2'], umbrella: false, source: 'ai-proposed',
+            surfaces: { compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [] } },
+          { id: 'WF-3', businessDomainId: 'DOM-IDENTITY', name: 'Provision tenant',
+            description: 'Create a new tenant scope',
+            steps: [{ stepNumber: 1, actor: 'System', action: 'create tenant row', expectedOutcome: 'tenant committed' }],
+            triggers: [{ kind: 'journey_step', journey_id: 'UJ-3', step_number: 1 }],
+            actors: ['System'], backs_journeys: ['UJ-3'], umbrella: false, source: 'ai-proposed',
+            surfaces: { compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [] } },
+        ],
+        step_backing_map: [
+          { journey_id: 'UJ-1', step_number: 2, workflow_ids: ['WF-1'] },
+          { journey_id: 'UJ-2', step_number: 2, workflow_ids: ['WF-2'] },
+          { journey_id: 'UJ-3', step_number: 1, workflow_ids: ['WF-3'] },
         ],
       },
     });
@@ -173,6 +227,35 @@ describe('Phase 1 — product-lens end-to-end flow', () => {
         ],
       },
     });
+    // Wave 7 Path C — 1.8 is now narrow: LLM outputs release structure
+    // + journey placement only. Everything else (workflows, entities,
+    // compliance, integrations, vocabulary) is computed deterministically
+    // from triggers + domain references by buildReleaseManifest.
+    mock.setFixture('release-plan', {
+      match: 'RELEASE PLANNER',
+      parsedJson: {
+        kind: 'release_plan',
+        schemaVersion: '2.0',
+        releases: [
+          {
+            release_id: 'REL-1',
+            ordinal: 1,
+            name: 'Onboarding',
+            description: 'Operators and customers can sign up and authenticate.',
+            rationale: 'Identity and signup must ship first for any other capability to land.',
+            contains_journeys: ['UJ-1', 'UJ-3'],
+          },
+          {
+            release_id: 'REL-2',
+            ordinal: 2,
+            name: 'Core Ordering',
+            description: 'Customers can browse and place orders.',
+            rationale: 'Requires onboarding (Release 1) before orders can be attributed.',
+            contains_journeys: ['UJ-2'],
+          },
+        ],
+      },
+    });
     mock.setFixture('synthesis', {
       match: 'PRODUCT DESCRIPTION SYNTHESIZER',
       parsedJson: {
@@ -194,7 +277,7 @@ describe('Phase 1 — product-lens end-to-end flow', () => {
     });
   }
 
-  it('routes a product-classified intent through 1.0b → 1.7 and emits every expected artifact', async () => {
+  it('routes a product-classified intent through 1.0b → 1.8 and emits every expected artifact', async () => {
     const mock = new MockLLMProvider();
     seedProductLensFixtures(mock);
     engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
@@ -234,7 +317,9 @@ describe('Phase 1 — product-lens end-to-end flow', () => {
     expect(findByKind('scope_classification')?.sub_phase_id).toBe('1.1b');
     expect(findByKind('compliance_context')?.sub_phase_id).toBe('1.1b');
     expect(findByKind('business_domains_bloom')?.sub_phase_id).toBe('1.2');
-    expect(findByKind('journeys_workflows_bloom')?.sub_phase_id).toBe('1.3');
+    // Wave 7 — 1.3 is split into 1.3a (journeys) + 1.3b (workflows).
+    expect(findByKind('user_journey_bloom')?.sub_phase_id).toBe('1.3a');
+    expect(findByKind('system_workflow_bloom')?.sub_phase_id).toBe('1.3b');
     expect(findByKind('entities_bloom')?.sub_phase_id).toBe('1.4');
     expect(findByKind('integrations_qa_bloom')?.sub_phase_id).toBe('1.5');
     expect(findByKind('intent_statement')?.sub_phase_id).toBe('1.6');
@@ -258,17 +343,40 @@ describe('Phase 1 — product-lens end-to-end flow', () => {
     expect((handoff.entityProposals as unknown[]).length).toBeGreaterThanOrEqual(2);
     expect((handoff.integrationProposals as unknown[]).length).toBeGreaterThanOrEqual(1);
 
-    // 1.3 prune gate emitted a decision_bundle at 1.3 (one of four).
+    // Decision bundles: 1.2 + 1.3a + 1.3b + 1.4 + 1.5 + 1.8 (Wave 7 split).
     const bundles = engine.writer.getRecordsByType(run.id, 'decision_bundle_presented');
     const bundleSubPhases = bundles.map(b => b.sub_phase_id).sort();
-    expect(bundleSubPhases).toEqual(['1.2', '1.3', '1.4', '1.5']);
+    expect(bundleSubPhases).toEqual(['1.2', '1.3a', '1.3b', '1.4', '1.5', '1.8']);
 
-    // 1.7 approval emitted its mirror + phase gate.
+    // 1.7 handoff approval emitted its mirror; phase gate now fires at 1.8.
     const mirrors = engine.writer.getRecordsByType(run.id, 'mirror_presented');
     const mirrorAt17 = mirrors.find(m => m.sub_phase_id === '1.7');
     expect(mirrorAt17).toBeDefined();
     const gates = engine.writer.getRecordsByType(run.id, 'phase_gate_evaluation');
-    expect(gates.some(g => g.sub_phase_id === '1.7')).toBe(true);
+    expect(gates.some(g => g.sub_phase_id === '1.8')).toBe(true);
+
+    // 1.8 release plan: at least two artifact_produced records of
+    // kind=release_plan (the proposer output + the final approved
+    // record). The approved record has approved=true and is pointed
+    // at by workflow_runs.active_release_plan_record_id.
+    const releasePlans = artifacts.filter(a =>
+      (a.content as { kind?: string }).kind === 'release_plan');
+    expect(releasePlans.length).toBeGreaterThanOrEqual(2);
+    const approvedPlan = releasePlans.find(a =>
+      (a.content as { approved?: boolean }).approved === true);
+    expect(approvedPlan, 'final approved release plan').toBeDefined();
+    const approvedContent = approvedPlan!.content as {
+      releases: Array<{ ordinal: number; name: string; release_id: string }>;
+    };
+    expect(approvedContent.releases.length).toBe(2);
+    expect(approvedContent.releases.map(r => r.ordinal).sort((a, b) => a - b)).toEqual([1, 2]);
+    // The active pointer on workflow_runs matches the approved record.
+    expect(updatedRun?.active_release_plan_record_id).toBe(approvedPlan!.id);
+    // Release IDs on the approved record are server-minted UUIDs (the
+    // LLM's `REL-1` short form is discarded).
+    for (const r of approvedContent.releases) {
+      expect(r.release_id).toMatch(/^[0-9a-f]{8}-/i);
+    }
   });
 
   it('does NOT route non-product lenses into the product-lens flow', async () => {

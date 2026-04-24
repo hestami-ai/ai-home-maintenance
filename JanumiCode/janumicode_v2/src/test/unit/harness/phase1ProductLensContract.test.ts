@@ -52,9 +52,8 @@ describe('Wave 4 — lens-aware Phase 1 contract resolution', () => {
         .map(r => r.sub_phase_id)
         .filter((s): s is string => typeof s === 'string')),
     );
-    // The plan's §3 table — all ten sub-phases must appear somewhere
-    // in the required-artifacts list.
-    for (const sp of ['1.0', '1.0a', '1.0b', '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7']) {
+    // Wave 7 — 1.3 is split into 1.3a (journeys) + 1.3b (workflows) + 1.3c (verifier).
+    for (const sp of ['1.0', '1.0a', '1.0b', '1.1b', '1.2', '1.3a', '1.3b', '1.4', '1.5', '1.6', '1.7']) {
       expect(subPhases.has(sp), `product contract missing sub-phase ${sp}`).toBe(true);
     }
   });
@@ -110,9 +109,14 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
       businessDomainId: 'DOM-1',
       name: `WF ${i + 1}`,
       description: 'desc',
-      steps: ['s1', 's2', 's3'],
-      triggers: ['t1'],
+      steps: [
+        { stepNumber: 1, actor: 'System', action: 'a', expectedOutcome: 'o' },
+        { stepNumber: 2, actor: 'System', action: 'a', expectedOutcome: 'o' },
+        { stepNumber: 3, actor: 'System', action: 'a', expectedOutcome: 'o' },
+      ],
+      triggers: [{ kind: 'schedule' as const, cadence: 'daily' }],
       actors: ['System'],
+      backs_journeys: [],
     }));
     const integrations = Array.from({ length: 6 }, (_, i) => ({
       id: `INT-${i + 1}`,
@@ -207,11 +211,13 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
     stub('1.1b', 'scope_classification', 'orchestrator');
     stub('1.1b', 'compliance_context', 'orchestrator');
     stub('1.2', 'business_domains_bloom');
-    stub('1.3', 'journeys_workflows_bloom');
+    // Wave 7 — 1.3 split into 1.3a (journeys) + 1.3b (workflows) + 1.3c (deterministic verifier).
+    stub('1.3a', 'user_journey_bloom');
+    stub('1.3b', 'system_workflow_bloom');
     stub('1.4', 'entities_bloom');
     stub('1.5', 'integrations_qa_bloom');
-    // 1.2–1.5 decision bundles
-    for (const sp of ['1.2', '1.3', '1.4', '1.5']) {
+    // 1.2/1.3a/1.3b/1.4/1.5 decision bundles
+    for (const sp of ['1.2', '1.3a', '1.3b', '1.4', '1.5']) {
       writer.writeRecord({
         record_type: 'decision_bundle_presented',
         schema_version: '1.0',

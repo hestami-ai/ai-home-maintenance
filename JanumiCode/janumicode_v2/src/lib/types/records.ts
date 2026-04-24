@@ -263,6 +263,7 @@ export const SUB_PHASE_NAMES_BY_LENS: Partial<Record<PhaseId, Partial<Record<Int
       '1.5': 'Integrations & Quality Attributes Bloom',
       '1.6': 'Product Description Synthesis',
       '1.7': 'Handoff Approval',
+      '1.8': 'Release Plan Approval',
     },
   },
 };
@@ -278,7 +279,7 @@ export const SUB_PHASE_ORDER_BY_LENS: Partial<Record<PhaseId, Partial<Record<Int
       '1.0b', '1.0c', '1.0d', '1.0e', '1.0f',
       // Deterministic composer merges 1.0b–1.0f into the discovery bundle.
       '1.0g',
-      '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7',
+      '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8',
     ],
   },
   // Wave 6 — product-lens Phase 2 inserts 2.1a (recursive FR
@@ -373,6 +374,7 @@ export type RecordType =
   | 'intent_quality_report'
   | 'cross_run_impact_report'
   | 'cross_run_modification'
+  | 'coverage_gap'
   // Client Liaison Records (§6.4)
   | 'open_query_received'
   | 'query_classification_record'
@@ -489,6 +491,13 @@ export interface WorkflowRun {
   decomposition_fr_calls_used: number;
   decomposition_nfr_calls_used: number;
   decomposition_max_depth_reached: number;
+  /**
+   * Governed-stream row id of the approved ReleasePlan record for this
+   * run, or null until Phase 1.7 completes. Phase 2+ reads this to
+   * assign `release_id` to decomposition-node writes; downstream
+   * markdown/gold exporters group output by release ordinal.
+   */
+  active_release_plan_record_id: string | null;
 }
 
 export type WorkflowRunStatus =
@@ -733,6 +742,22 @@ export interface RequirementDecompositionNodeContent {
   surfaced_assumption_ids: string[];
   atomic_criteria_satisfied?: DecompositionAtomicCriteria;
   pruning_reason?: string;
+  /**
+   * Release assignment — inherited from parent at write time. Null =
+   * backlog (root didn't match any release's `traces_to_journeys`, or
+   * no active ReleasePlan on this run). Preserved across supersessions:
+   * downgrade / pruned / deferred / atomic revisions all carry the
+   * prior revision's release_id forward unchanged. Human re-assignment
+   * happens via a dedicated gate surface (subtree-level moves only).
+   */
+  release_id: string | null;
+  /**
+   * Cached release ordinal at the time this node was most recently
+   * written. Denormalized for downstream sort-by-release without a
+   * ReleasePlan join. Refreshed when a subtree is moved to a new
+   * release at the human gate.
+   */
+  release_ordinal: number | null;
 }
 
 export type AssumptionCategory =
@@ -794,7 +819,26 @@ export type DecompositionTerminationReason =
   | 'fixed_point'
   | 'depth_cap'
   | 'budget_cap'
-  | 'human_pruned_all';
+  | 'human_pruned_all'
+  /**
+   * The saturation loop's pass-over-pass node-production ratio has been
+   * growing (rather than peaking + declining) for enough consecutive
+   * passes to conclude that the decomposer is diverging, not converging.
+   * Surfaces as an early termination with the remaining queue marked
+   * deferred — prevents the loop from burning budget on exponential
+   * fanout. Most often caused by assumption dedup being silently
+   * offline (see `dedup_offline` for that specific signal).
+   */
+  | 'diverging'
+  /**
+   * The assumption dedup embedding client has failed for enough
+   * consecutive passes that `semantic_delta` is effectively equal to
+   * raw `delta_from_previous_pass` — the saturation termination gate
+   * cannot fire because dedup isn't contributing. Advisory — logged as
+   * a WARN but does NOT early-terminate on its own (the loop still has
+   * depth_cap / budget_cap / diverging as hard safety rails).
+   */
+  | 'dedup_offline';
 
 export interface DecompositionPassEntry {
   pass_number: number;
@@ -855,6 +899,19 @@ export interface UserJourneyStep {
   actor: string;
   action: string;
   expectedOutcome: string;
+  /**
+   * True when this step's behavior is backed by a system workflow
+   * (rather than a purely persona-facing UI interaction). Populated
+   * by 1.3a and consumed by 1.3b + 1.3c:
+   *   - 1.3b reads `automatable=true` steps as the seeds for
+   *     workflow proposals with `journey_step` triggers.
+   *   - 1.3c enforces the coverage rule "every automatable step is
+   *     claimed by at least one workflow with a journey_step trigger
+   *     pointing at (journey_id, step_number)".
+   * Absent/undefined during migration from the legacy 1.3 single-shot
+   * bloom; new 1.3a output always populates it.
+   */
+  automatable?: boolean;
 }
 
 export interface UserJourney {
@@ -877,6 +934,128 @@ export interface PhasingPhase {
   /** References `UserJourney.id` entries. */
   journeyIds: string[];
   rationale: string;
+}
+
+// ── Release Plan (Phase 1.8, Wave 7 widened manifest) ──────────────
+//
+// Industry-standard term for "what ships together, in which order".
+// Framework-neutral (distinct from SAFe's Release Train / PI), has a
+// natural ordinal, and does not collide with JanumiCode's workflow
+// phases. Proposed in Phase 1.8 after the intent statement is approved;
+// gated by the human for reorder / rename / accept.
+//
+// Wave 7 widened shape: assigns every accepted handoff artifact to
+// exactly one release's `contains[type]` OR to the top-level
+// `cross_cutting` bucket for artifacts that legitimately span all
+// releases (e.g. a retention policy, a continuous-audit workflow, a
+// shared vocabulary term). With that shape, Phase 2 resolves an FR's
+// release via a flat lookup across all trace types — no silent nulls
+// when the trace points at a non-journey artifact.
+
+export interface ReleaseContents {
+  /** References `UserJourney.id` (UJ-*). */
+  journeys: string[];
+  /** References `WorkflowV2.id` (WF-*). */
+  workflows: string[];
+  /** References `Entity.id` (ENT-*). */
+  entities: string[];
+  /** References compliance item ids (COMP-*). */
+  compliance: string[];
+  /** References `Integration.id` (INT-*). */
+  integrations: string[];
+  /** References `VocabularyTerm.id` (VOC-*). */
+  vocabulary: string[];
+}
+
+/**
+ * Artifacts that span all releases by design (not release-specific).
+ *
+ * Journeys are intentionally absent: a user journey is a persona-facing
+ * end-to-end flow and must belong to the release it first becomes
+ * available in (even if later releases enrich it). Entities are also
+ * absent: an entity that spans releases is still introduced in a
+ * specific release (the earliest one that writes to it) and inherited
+ * forward. Only workflows, compliance, integrations, and vocabulary
+ * have legitimate cross-cutting semantics — a nightly integrity check
+ * workflow runs across all releases' data; a retention regime applies
+ * to everything; a shared integration is consumed by many releases; a
+ * vocabulary term is canonical product-wide.
+ */
+export interface CrossCuttingContents {
+  workflows: string[];
+  compliance: string[];
+  integrations: string[];
+  vocabulary: string[];
+}
+
+export interface ReleaseV2 {
+  /** Canonical logical UUID — stable across revisions of this Release entry. */
+  release_id: string;
+  /** 1-based contiguous ordinal; strict ordering within the plan. */
+  ordinal: number;
+  name: string;
+  description: string;
+  rationale: string;
+  contains: ReleaseContents;
+}
+
+export interface ReleasePlanContentV2 {
+  kind: 'release_plan';
+  schemaVersion: '2.0';
+  releases: ReleaseV2[];
+  cross_cutting: CrossCuttingContents;
+  approved: boolean;
+  approval_note?: string;
+}
+
+/**
+ * Emitted by deterministic coverage verifiers in Phase 1 (1.3c for
+ * journey/workflow coverage, 1.8 verifier for release-manifest coverage)
+ * when a structural assertion fails. Routes to an MMP card where the
+ * human chooses between:
+ *   - `accepted_as_scope_cut` — the gap is intentional; record it in
+ *     the handoff as an explicit exclusion; continue to next sub-phase.
+ *   - `rebloom_requested` — targeted re-run of the preceding sub-phase
+ *     with the gap as human_feedback.
+ *
+ * `blocking` severity pauses phase progression until resolved;
+ * `advisory` severity logs the gap but does not block (used for
+ * trace-coherence warnings where a legitimate cross-release trace is
+ * possible).
+ */
+export interface CoverageGapContent {
+  kind: 'coverage_gap';
+  schemaVersion: '1.0';
+  /** Which sub-phase emitted the gap. */
+  sub_phase_id: '1.3c' | '1.8';
+  /** One-line description of the structural rule that tripped. */
+  assertion: string;
+  severity: 'blocking' | 'advisory';
+  /**
+   * Short machine-tag classifying the check. Examples:
+   *   'persona_coverage', 'domain_coverage',
+   *   'automatable_step_backing', 'compliance_coverage',
+   *   'integration_coverage', 'retention_coverage', 'vv_coverage',
+   *   'referential_integrity',
+   *   'release_exact_coverage', 'release_double_count',
+   *   'release_ordinal_integrity', 'release_backward_dependency',
+   *   'release_trace_coherence'.
+   */
+  check: string;
+  /** Optional structured details the MMP card / re-bloom prompt may render. */
+  details?: Record<string, unknown>;
+  /** Artifact ids that should have been covered by the rule. */
+  expected: string[];
+  /** Artifact ids that were actually covered. */
+  actual: string[];
+  /** `expected ∖ actual` — ids the rule requires but did not find. */
+  missing: string[];
+  /** `actual ∖ expected` — only populated for exclusivity/double-count checks. */
+  extra?: string[];
+  resolution?: 'accepted_as_scope_cut' | 'rebloom_requested' | 'pending';
+  resolution_note?: string;
+  /** When the human routed this gap (ISO-8601). */
+  resolved_at?: string;
 }
 
 export interface BusinessDomain {
@@ -902,15 +1081,82 @@ export interface Entity {
   source?: ProductItemSource;
 }
 
-export interface Workflow {
+// ── Phase 1.3 (Wave 7) — system workflow shapes ───────────────────
+//
+// 1.3 is split across three sub-phases:
+//   1.3a — User Journey Bloom + Decomposition  (produces UserJourney[])
+//   1.3b — System Workflow Bloom + Decomposition (produces WorkflowV2[])
+//   1.3c — Coverage verifier (deterministic; emits CoverageGapContent)
+//
+// `WorkflowV2` replaces the legacy workflow shape by:
+//   - structured `WorkflowStep[]` (same shape as `UserJourneyStep`)
+//     so step actors/outcomes are addressable rather than embedded in
+//     prose;
+//   - typed discriminated union `WorkflowTrigger[]` so every workflow
+//     is provably rooted in an upstream artifact (journey step,
+//     schedule, event, compliance regime, or integration) rather than
+//     floating free; and
+//   - `backs_journeys[]` — a cached index of journeys the workflow
+//     participates in (derivable from triggers but cached for fast
+//     coverage checks in 1.3c and downstream phases).
+
+export interface WorkflowStep {
+  stepNumber: number;
+  /** Persona id, "System", or integration id — mirrors UserJourneyStep.actor. */
+  actor: string;
+  action: string;
+  expectedOutcome: string;
+}
+
+export type WorkflowTrigger =
+  | {
+      kind: 'journey_step';
+      /** References `UserJourney.id`. */
+      journey_id: string;
+      /** 1-based step number into the referenced journey's `steps[]`. */
+      step_number: number;
+    }
+  | {
+      kind: 'schedule';
+      /** Free-form cadence description (e.g. "daily at 02:00 UTC", "monthly on last weekday"). */
+      cadence: string;
+    }
+  | {
+      kind: 'event';
+      /** Domain-event name (e.g. "invoice.posted", "claim.submitted"). */
+      event_type: string;
+    }
+  | {
+      kind: 'compliance';
+      /** References a compliance item id (COMP-*). */
+      regime_id: string;
+      /** Specific rule within that regime the workflow enforces. */
+      rule: string;
+    }
+  | {
+      kind: 'integration';
+      /** References `Integration.id`. */
+      integration_id: string;
+      /** Event on the integration that kicks this workflow off. */
+      event: string;
+    };
+
+export interface WorkflowV2 {
   id: string;
   /** References `BusinessDomain.id`. */
   businessDomainId: string;
   name: string;
   description: string;
-  steps: string[];
-  triggers: string[];
+  steps: WorkflowStep[];
+  triggers: WorkflowTrigger[];
   actors: string[];
+  /**
+   * Cached index of UserJourney.id values this workflow participates
+   * in — the set of distinct `journey_id` values across all
+   * `kind: 'journey_step'` entries in `triggers`. Empty for purely
+   * schedule/event/compliance/integration-driven workflows.
+   */
+  backs_journeys?: string[];
   source?: ProductItemSource;
 }
 
@@ -1074,7 +1320,7 @@ export interface ProductDescriptionHandoffContent {
   successMetrics: string[];
   businessDomainProposals: BusinessDomain[];
   entityProposals: Entity[];
-  workflowProposals: Workflow[];
+  workflowProposals: WorkflowV2[];
   integrationProposals: Integration[];
   qualityAttributes: string[];
   uxRequirements: string[];

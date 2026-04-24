@@ -41,6 +41,8 @@
     },
     "decomposition_rationale": { "type": "string" },
     "surfaced_assumption_ids": { "type": "array", "items": { "type": "string" } },
+    "release_id": { "type": ["string", "null"], "description": "Release assignment (inherited from parent; null = backlog)." },
+    "release_ordinal": { "type": ["integer", "null"], "minimum": 1, "description": "Cached ordinal of the assigned release for sort convenience." },
     "atomic_criteria_satisfied": {
       "type": "object",
       "required": ["ac_testable", "single_operation", "regime_cited", "assumptions_listed"],

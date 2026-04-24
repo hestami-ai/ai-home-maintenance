@@ -129,7 +129,7 @@
       "additionalProperties": false,
       "required": ["id", "name", "description", "goals", "painPoints"],
       "properties": {
-        "id": { "type": "string", "pattern": "^P-[0-9]+$" },
+        "id": { "type": "string", "pattern": "^P-[A-Z0-9_-]+$" },
         "name": { "type": "string", "minLength": 1 },
         "description": { "type": "string", "minLength": 1 },
         "goals": { "type": "array", "items": { "type": "string" } },
@@ -146,8 +146,29 @@
         "stepNumber": { "type": "integer", "minimum": 1 },
         "actor": { "type": "string", "minLength": 1 },
         "action": { "type": "string", "minLength": 1 },
+        "expectedOutcome": { "type": "string", "minLength": 1 },
+        "automatable": { "type": "boolean", "description": "True when the step is backed by a system workflow (Wave 7)." }
+      }
+    },
+    "WorkflowStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stepNumber", "actor", "action", "expectedOutcome"],
+      "properties": {
+        "stepNumber": { "type": "integer", "minimum": 1 },
+        "actor": { "type": "string", "minLength": 1 },
+        "action": { "type": "string", "minLength": 1 },
         "expectedOutcome": { "type": "string", "minLength": 1 }
       }
+    },
+    "WorkflowTrigger": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["kind", "journey_id", "step_number"], "properties": { "kind": { "const": "journey_step" }, "journey_id": { "type": "string" }, "step_number": { "type": "integer", "minimum": 1 } } },
+        { "type": "object", "additionalProperties": false, "required": ["kind", "cadence"],                     "properties": { "kind": { "const": "schedule" },     "cadence": { "type": "string", "minLength": 1 } } },
+        { "type": "object", "additionalProperties": false, "required": ["kind", "event_type"],                  "properties": { "kind": { "const": "event" },        "event_type": { "type": "string", "minLength": 1 } } },
+        { "type": "object", "additionalProperties": false, "required": ["kind", "regime_id", "rule"],           "properties": { "kind": { "const": "compliance" },   "regime_id": { "type": "string" }, "rule": { "type": "string", "minLength": 1 } } },
+        { "type": "object", "additionalProperties": false, "required": ["kind", "integration_id", "event"],     "properties": { "kind": { "const": "integration" },  "integration_id": { "type": "string" }, "event": { "type": "string", "minLength": 1 } } }
+      ]
     },
 
     "UserJourney": {
@@ -155,7 +176,7 @@
       "additionalProperties": false,
       "required": ["id", "personaId", "title", "scenario", "steps", "acceptanceCriteria", "implementationPhase"],
       "properties": {
-        "id": { "type": "string", "pattern": "^UJ-[0-9]+$" },
+        "id": { "type": "string", "pattern": "^UJ-[A-Z0-9_-]+$" },
         "personaId": { "type": "string" },
         "title": { "type": "string" },
         "scenario": { "type": "string" },
@@ -213,14 +234,16 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "businessDomainId", "name", "description", "steps", "triggers", "actors"],
+      "description": "WorkflowV2 (Wave 7) — structured steps + typed triggers. Replaces the legacy free-string shape.",
       "properties": {
-        "id": { "type": "string", "pattern": "^WF-[0-9]+$" },
+        "id": { "type": "string", "pattern": "^WF-[A-Z0-9_-]+$" },
         "businessDomainId": { "type": "string" },
         "name": { "type": "string" },
         "description": { "type": "string" },
-        "steps": { "type": "array", "items": { "type": "string" } },
-        "triggers": { "type": "array", "items": { "type": "string" } },
+        "steps": { "type": "array", "items": { "$ref": "#/definitions/WorkflowStep" } },
+        "triggers": { "type": "array", "items": { "$ref": "#/definitions/WorkflowTrigger" } },
         "actors": { "type": "array", "items": { "type": "string" } },
+        "backs_journeys": { "type": "array", "items": { "type": "string" }, "description": "Distinct UserJourney ids across all kind:journey_step triggers." },
         "source": { "$ref": "#/definitions/ProductItemSource" }
       }
     },
@@ -279,7 +302,7 @@
       "additionalProperties": false,
       "required": ["id", "category", "text"],
       "properties": {
-        "id": { "type": "string", "pattern": "^TECH-[0-9]+$" },
+        "id": { "type": "string", "pattern": "^TECH-[A-Z0-9_-]+$" },
         "category": { "type": "string", "minLength": 1 },
         "text": { "type": "string", "minLength": 1 },
         "technology": { "type": "string" },
@@ -294,7 +317,7 @@
       "additionalProperties": false,
       "required": ["id", "category", "target", "measurement"],
       "properties": {
-        "id": { "type": "string", "pattern": "^VV-[0-9]+$" },
+        "id": { "type": "string", "pattern": "^VV-[A-Z0-9_-]+$" },
         "category": { "type": "string", "minLength": 1 },
         "target": { "type": "string", "minLength": 1 },
         "measurement": { "type": "string", "minLength": 1 },
@@ -308,7 +331,7 @@
       "additionalProperties": false,
       "required": ["id", "term", "definition"],
       "properties": {
-        "id": { "type": "string", "pattern": "^VOC-[0-9]+$" },
+        "id": { "type": "string", "pattern": "^VOC-[A-Z0-9_-]+$" },
         "term": { "type": "string", "minLength": 1 },
         "definition": { "type": "string", "minLength": 1 },
         "synonyms": { "type": "array", "items": { "type": "string" } },

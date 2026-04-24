@@ -266,7 +266,7 @@ function renderNode(node, byParent, out, visited) {
   }
 }
 
-function renderSection(title, rootKind, tree, allForKind) {
+function renderSection(title, rootKind, tree, allForKind, releasePlan) {
   const out = [];
   const telem = telemetry(allForKind);
   out.push(`## ${title} (${telem.rootCount} roots · ${telem.total} total nodes · ${telem.by_status.atomic} atomic leaves)`);
@@ -276,7 +276,36 @@ function renderSection(title, rootKind, tree, allForKind) {
     return out.join('\n');
   }
   const visited = new Set();
-  for (const r of tree.roots) renderNode(r, tree.byParent, out, visited);
+  // Group roots by release_ordinal — sorted ascending, null (backlog)
+  // last. When no ReleasePlan has been approved, all roots land in one
+  // "Unassigned" bucket which renders without the Release header.
+  const byReleaseOrd = new Map();
+  for (const r of tree.roots) {
+    const ord = r.content.release_ordinal ?? null;
+    if (!byReleaseOrd.has(ord)) byReleaseOrd.set(ord, []);
+    byReleaseOrd.get(ord).push(r);
+  }
+  const orderedOrdinals = [...byReleaseOrd.keys()].sort((a, b) => {
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a - b;
+  });
+  const planHasReleases = Array.isArray(releasePlan?.releases) && releasePlan.releases.length > 0;
+  for (const ord of orderedOrdinals) {
+    const rootsInRelease = byReleaseOrd.get(ord);
+    if (planHasReleases) {
+      if (ord === null) {
+        out.push(`### Backlog (${rootsInRelease.length} root${rootsInRelease.length === 1 ? '' : 's'})`);
+      } else {
+        const rel = releasePlan.releases.find(r => r.ordinal === ord);
+        const name = rel ? `${rel.name}` : `(unnamed)`;
+        out.push(`### Release ${ord}: ${name} (${rootsInRelease.length} root${rootsInRelease.length === 1 ? '' : 's'})`);
+        if (rel?.description) out.push(`*${rel.description}*`);
+      }
+      out.push('');
+    }
+    for (const r of rootsInRelease) renderNode(r, tree.byParent, out, visited);
+  }
   return out.join('\n');
 }
 
@@ -299,10 +328,29 @@ function telemetry(nodes) {
 
 // ── Business context ───────────────────────────────────────────────
 
-function renderBusinessContext(db, runId) {
+function renderBusinessContext(db, runId, releasePlan) {
   const out = [];
   out.push('## Business Context');
   out.push('');
+
+  // Release plan — rendered early so the reader sees the delivery
+  // ordering before diving into the FR / NFR trees.
+  if (releasePlan && Array.isArray(releasePlan.releases) && releasePlan.releases.length) {
+    out.push(`### Release Plan (${releasePlan.releases.length} releases)`);
+    const sorted = [...releasePlan.releases].sort((a, b) => a.ordinal - b.ordinal);
+    for (const r of sorted) {
+      out.push(`#### Release ${r.ordinal}: ${r.name}`);
+      if (r.description) { out.push(r.description); out.push(''); }
+      if (r.rationale) { out.push(`**Rationale:** ${r.rationale}`); out.push(''); }
+      if (Array.isArray(r.traces_to_journeys) && r.traces_to_journeys.length) {
+        out.push(`**Journeys:** ${r.traces_to_journeys.join(', ')}`);
+      }
+      if (Array.isArray(r.traces_to_domains) && r.traces_to_domains.length) {
+        out.push(`**Domains:** ${r.traces_to_domains.join(', ')}`);
+      }
+      out.push('');
+    }
+  }
 
   const lens = fetchPhase1Artifact(db, runId, 'intent_lens_classification');
   if (lens) {
@@ -451,19 +499,24 @@ function main() {
     const parts = [];
     parts.push(renderDocumentHeader(wf));
 
+    // Fetch the approved ReleasePlan (if any) once. Drives release
+    // grouping in the FR / NFR sections and the Business Context block.
+    const releasePlan = fetchPhase1Artifact(db, runId, 'release_plan');
+    const approvedReleasePlan = releasePlan && releasePlan.approved ? releasePlan : null;
+
     if (args.includeContext) {
-      const ctx = renderBusinessContext(db, runId);
+      const ctx = renderBusinessContext(db, runId, approvedReleasePlan);
       if (ctx) parts.push(ctx);
     }
 
     const want = args.rootKind;
     if (want === 'fr' || want === 'both') {
       const tree = buildTree(nodes, 'fr');
-      parts.push(renderSection('Functional Requirements', 'fr', tree, tree.filtered));
+      parts.push(renderSection('Functional Requirements', 'fr', tree, tree.filtered, approvedReleasePlan));
     }
     if (want === 'nfr' || want === 'both') {
       const tree = buildTree(nodes, 'nfr');
-      parts.push(renderSection('Non-Functional Requirements', 'nfr', tree, tree.filtered));
+      parts.push(renderSection('Non-Functional Requirements', 'nfr', tree, tree.filtered, approvedReleasePlan));
     }
 
     parts.push(renderSummaryTable(nodes));

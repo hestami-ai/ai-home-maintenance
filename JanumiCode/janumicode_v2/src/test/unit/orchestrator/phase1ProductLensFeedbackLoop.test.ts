@@ -116,13 +116,49 @@ describe('Phase 1 — product-lens free-text feedback re-bloom loop', () => {
       match: 'CANONICAL VOCABULARY EXTRACTOR',
       parsedJson: { kind: 'canonical_vocabulary_discovery', canonicalVocabulary: [] },
     });
-    mock.setFixture('journeys', {
-      match: 'PRODUCT JOURNEY & WORKFLOW PROPOSER',
+    // Wave 7 — 1.3a and 1.3b fixtures. Cover every persona (P-1, P-2)
+    // and every domain (DOM-IDENTITY, DOM-OPS); every automatable step
+    // backed by ≥1 workflow with a journey_step trigger.
+    mock.setFixture('journeys-1.3a', {
+      match: 'PRODUCT USER-JOURNEY PROPOSER',
       parsedJson: {
-        userJourneys: [{ id: 'UJ-1', personaId: 'P-1', title: 't', scenario: 's',
-          steps: [{ stepNumber: 1, actor: 'a', action: 'a', expectedOutcome: 'o' }],
-          acceptanceCriteria: ['ac'], implementationPhase: 'Phase 1', source: 'ai-proposed' }],
-        workflows: [{ id: 'WF-1', businessDomainId: 'DOM-IDENTITY', name: 'w', description: 'd', steps: ['s'], triggers: ['t'], actors: ['a'], source: 'domain-standard' }],
+        kind: 'user_journey_bloom',
+        userJourneys: [
+          { id: 'UJ-1', personaId: 'P-1', title: 'Operator flow', scenario: 's',
+            businessDomainIds: ['DOM-IDENTITY', 'DOM-OPS'],
+            steps: [{ stepNumber: 1, actor: 'System', action: 'a', expectedOutcome: 'o', automatable: true }],
+            acceptanceCriteria: ['ac'], implementationPhase: 'Phase 1', umbrella: false, source: 'ai-proposed',
+            surfaces: { compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [] } },
+          { id: 'UJ-2', personaId: 'P-2', title: 'Customer flow', scenario: 's',
+            businessDomainIds: ['DOM-OPS'],
+            steps: [{ stepNumber: 1, actor: 'System', action: 'a', expectedOutcome: 'o', automatable: true }],
+            acceptanceCriteria: ['ac'], implementationPhase: 'Phase 1', umbrella: false, source: 'ai-proposed',
+            surfaces: { compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [] } },
+        ],
+        unreached_personas: [],
+        unreached_domains: [],
+      },
+    });
+    mock.setFixture('workflows-1.3b', {
+      match: 'PRODUCT SYSTEM-WORKFLOW PROPOSER',
+      parsedJson: {
+        kind: 'system_workflow_bloom',
+        workflows: [
+          { id: 'WF-1', businessDomainId: 'DOM-IDENTITY', name: 'w1', description: 'd',
+            steps: [{ stepNumber: 1, actor: 'System', action: 'a', expectedOutcome: 'o' }],
+            triggers: [{ kind: 'journey_step', journey_id: 'UJ-1', step_number: 1 }],
+            actors: ['System'], backs_journeys: ['UJ-1'], umbrella: false, source: 'domain-standard',
+            surfaces: { compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [] } },
+          { id: 'WF-2', businessDomainId: 'DOM-OPS', name: 'w2', description: 'd',
+            steps: [{ stepNumber: 1, actor: 'System', action: 'a', expectedOutcome: 'o' }],
+            triggers: [{ kind: 'journey_step', journey_id: 'UJ-2', step_number: 1 }],
+            actors: ['System'], backs_journeys: ['UJ-2'], umbrella: false, source: 'ai-proposed',
+            surfaces: { compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [] } },
+        ],
+        step_backing_map: [
+          { journey_id: 'UJ-1', step_number: 1, workflow_ids: ['WF-1'] },
+          { journey_id: 'UJ-2', step_number: 1, workflow_ids: ['WF-2'] },
+        ],
       },
     });
     mock.setFixture('entities', {
@@ -147,6 +183,19 @@ describe('Phase 1 — product-lens free-text feedback re-bloom loop', () => {
         productVision: 'v', productDescription: 'd', summary: 's',
         requirements: [], decisions: [], constraints: [], openQuestions: [],
         humanDecisions: [], openLoops: [],
+      },
+    });
+    // Wave 7 Path C — narrow 1.8 shape: release structure + journey
+    // placement only. Everything else computed by buildReleaseManifest.
+    mock.setFixture('release-plan', {
+      match: 'RELEASE PLANNER',
+      parsedJson: {
+        kind: 'release_plan',
+        schemaVersion: '2.0',
+        releases: [
+          { release_id: 'REL-1', ordinal: 1, name: 'R1', description: 'd', rationale: 'r',
+            contains_journeys: ['UJ-1', 'UJ-2'] },
+        ],
       },
     });
 

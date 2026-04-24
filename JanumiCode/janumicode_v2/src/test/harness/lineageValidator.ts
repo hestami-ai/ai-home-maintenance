@@ -852,7 +852,8 @@ function guessLikelySourceForArtifact(
   const map: Record<string, { template?: string; schema?: string }> = {
     intent_discovery: { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_0b_intent_discovery/intent_discovery.product.system.md' },
     business_domains_bloom: { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_2_business_domains_bloom/business_domains_bloom.product.system.md' },
-    journeys_workflows_bloom: { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_3_journeys_workflows_bloom/journeys_workflows_bloom.product.system.md' },
+    user_journey_bloom:     { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_3a_user_journey_bloom/user_journey_bloom.product.system.md' },
+    system_workflow_bloom:  { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_3b_system_workflow_bloom/system_workflow_bloom.product.system.md' },
     entities_bloom: { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_4_entities_bloom/entities_bloom.product.system.md' },
     integrations_qa_bloom: { template: '.janumicode/prompts/phases/phase_01_intent_capture/sub_phase_01_5_integrations_qa_bloom/integrations_qa_bloom.product.system.md' },
     intent_statement: { schema: '(derived at 1.6 from product_description_handoff)' },

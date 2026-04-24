@@ -105,10 +105,10 @@ Your ENTIRE response must be a single JSON object. No prose, no markdown fences.
   "productVision": "Why this product should exist — the north star (1-2 sentences).",
   "productDescription": "Self-contained paragraph a stranger could understand.",
   "personas": [
-    { "id": "P-1", "name": "Persona Name", "description": "Who they are and their context", "goals": ["What they want to achieve"], "painPoints": ["What frustrates them today"], "source": "document-specified|ai-proposed|domain-standard" }
+    { "id": "P-HOMEOWNER", "name": "Persona Name", "description": "Who they are and their context", "goals": ["What they want to achieve"], "painPoints": ["What frustrates them today"], "source": "document-specified|ai-proposed|domain-standard" }
   ],
   "userJourneys": [
-    { "id": "UJ-1", "personaId": "P-1", "title": "Verb-phrase journey title",
+    { "id": "UJ-SUBMIT-CLAIM", "personaId": "P-HOMEOWNER", "title": "Verb-phrase journey title",
       "scenario": "When/why this journey happens",
       "steps": [{ "stepNumber": 1, "actor": "Persona or System", "action": "What the actor does", "expectedOutcome": "What should happen" }],
       "acceptanceCriteria": ["Measurable condition that proves this journey works"],
@@ -118,7 +118,7 @@ Your ENTIRE response must be a single JSON object. No prose, no markdown fences.
     }
   ],
   "phasingStrategy": [
-    { "phase": "Phase 1", "description": "What this phase delivers", "journeyIds": ["UJ-1"], "rationale": "Why this delivers the most user value earliest" }
+    { "phase": "Phase 1", "description": "What this phase delivers", "journeyIds": ["UJ-SUBMIT-CLAIM"], "rationale": "Why this delivers the most user value earliest" }
   ],
   "successMetrics": ["Measurable outcome tied to user value"],
   "uxRequirements": ["Design principle or experience constraint"],
