@@ -39,6 +39,35 @@ export interface ClientLiaisonDB {
   traverseEdges(fromId: string, edgeType?: MemoryEdgeType, depth?: number): MemoryEdge[];
   getDownstreamDependencies(entityId: string, depth?: number): GovernedStreamRecord[];
   getCurrentWorkflowRun(): WorkflowRun | null;
+  /**
+   * DB-as-truth resolver for "which run should the UI focus on right now?".
+   * Tiered resolution, deterministic, single read path:
+   *   1. The user-focused run from `ui_state.focused_run_id`, IF that id
+   *      still exists in `workflow_runs`. Otherwise the focus is treated
+   *      as stale and ignored — handles DB-swap cleanly.
+   *   2. The unique active run (`status IN ('initiated','in_progress')`).
+   *   3. Most recent run by `initiated_at` that owns ≥ 1
+   *      `requirement_decomposition_node` record (the "post-mortem"
+   *      viewing case for a completed cal run).
+   *   4. Most recent run of any kind by `initiated_at`.
+   *   5. null when the DB has no runs at all.
+   * Used by the DecompViewer + GovernedStreamView so they Just Work
+   * after a DB swap without any in-memory session state.
+   */
+  getActiveWorkflowRun(): WorkflowRun | null;
+  /**
+   * Persist the user's currently-focused run. Stored in the `ui_state`
+   * key/value table so it travels with the DB (never in extension
+   * memory or VS Code workspaceState — DB swap automatically resets).
+   * Pass `null` to clear the focus.
+   */
+  setFocusedWorkflowRun(runId: string | null): void;
+  /**
+   * Read the `ui_state.focused_run_id` raw — does NOT validate that the
+   * id still exists in `workflow_runs`. Most callers want
+   * `getActiveWorkflowRun()` instead.
+   */
+  getFocusedWorkflowRunId(): string | null;
   getWorkflowStatus(runId: string): WorkflowStatus;
   getPendingDecisions(runId: string): GovernedStreamRecord[];
   vectorSearch(query: string, opts?: { workflowRunId?: string; limit?: number }): Promise<GovernedStreamRecord[]>;
@@ -302,6 +331,72 @@ export class ClientLiaisonDBImpl implements ClientLiaisonDB {
       )
       .get() as Record<string, unknown> | undefined;
     return row ? this.rowToWorkflowRun(row) : null;
+  }
+
+  getFocusedWorkflowRunId(): string | null {
+    try {
+      const row = this.db
+        .prepare(`SELECT value FROM ui_state WHERE key = ?`)
+        .get('focused_run_id') as { value: string | null } | undefined;
+      return row?.value ?? null;
+    } catch {
+      // Older DB without ui_state — treat as no focus.
+      return null;
+    }
+  }
+
+  setFocusedWorkflowRun(runId: string | null): void {
+    if (runId === null) {
+      this.db.prepare(`DELETE FROM ui_state WHERE key = ?`).run('focused_run_id');
+      return;
+    }
+    this.db
+      .prepare(
+        `INSERT INTO ui_state(key, value, updated_at) VALUES(?, ?, datetime('now'))
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      )
+      .run('focused_run_id', runId);
+  }
+
+  getActiveWorkflowRun(): WorkflowRun | null {
+    // Tier 1 — user-focused run (DB-persisted). Validate it still
+    // exists; if it doesn't, the focus is from a prior DB and should
+    // be ignored (DB-swap-safe).
+    const focusedId = this.getFocusedWorkflowRunId();
+    if (focusedId) {
+      const focusedRow = this.db
+        .prepare(`SELECT * FROM workflow_runs WHERE id = ?`)
+        .get(focusedId) as Record<string, unknown> | undefined;
+      if (focusedRow) return this.rowToWorkflowRun(focusedRow);
+      // Stale focus — clear so we stop checking on every call.
+      try { this.setFocusedWorkflowRun(null); } catch { /* readonly DB tolerated */ }
+    }
+
+    // Tier 2 — active run.
+    const active = this.getCurrentWorkflowRun();
+    if (active) return active;
+
+    // Tier 3 — most recent run with ≥ 1 decomposition node.
+    const withDecomp = this.db
+      .prepare(
+        `SELECT wr.* FROM workflow_runs wr
+          WHERE EXISTS (
+            SELECT 1 FROM governed_stream gs
+              WHERE gs.workflow_run_id = wr.id
+                AND gs.record_type = 'requirement_decomposition_node'
+                AND gs.is_current_version = 1
+            LIMIT 1
+          )
+          ORDER BY wr.initiated_at DESC LIMIT 1`,
+      )
+      .get() as Record<string, unknown> | undefined;
+    if (withDecomp) return this.rowToWorkflowRun(withDecomp);
+
+    // Tier 4 — any run.
+    const anyRun = this.db
+      .prepare(`SELECT * FROM workflow_runs ORDER BY initiated_at DESC LIMIT 1`)
+      .get() as Record<string, unknown> | undefined;
+    return anyRun ? this.rowToWorkflowRun(anyRun) : null;
   }
 
   getWorkflowStatus(runId: string): WorkflowStatus {

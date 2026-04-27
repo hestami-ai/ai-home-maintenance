@@ -31,6 +31,7 @@ const sveltePlugin = require('esbuild-svelte');
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
 const ENTRY = path.join(REPO_ROOT, 'src', 'webview', 'main.ts');
 const CANVAS_ENTRY = path.join(REPO_ROOT, 'src', 'webview', 'canvas', 'main.ts');
+const DECOMP_VIEWER_ENTRY = path.join(REPO_ROOT, 'src', 'webview', 'decompViewer', 'main.ts');
 
 /** Expected Svelte components that should end up defined in the bundle. */
 const EXPECTED_COMPONENTS = [
@@ -145,20 +146,21 @@ describe('Webview bundle — component import integrity', () => {
   it(
     'every .svelte import in a .svelte file resolves to a definition in the bundle that owns it',
     async () => {
-      // The webview ships as TWO bundles (main + canvas) — see esbuild.js.
-      // Canvas components (DetailPanel, Toolbar) live in the canvas bundle
-      // and must be validated against it; checking them against the main
-      // bundle produces false "missing" positives. Bundle both entries and
-      // route each .svelte file to the bundle that actually owns it.
-      const [mainBundle, canvasBundle] = await Promise.all([
+      // The webview ships as THREE bundles (main + canvas + decompViewer) —
+      // see esbuild.js. Each .svelte file must be validated against the
+      // bundle that owns it; checking against the wrong bundle produces
+      // false "missing" positives.
+      const [mainBundle, canvasBundle, decompViewerBundle] = await Promise.all([
         bundleEntry(ENTRY, 'fixed'),
         bundleEntry(CANVAS_ENTRY, 'fixed'),
+        bundleEntry(DECOMP_VIEWER_ENTRY, 'fixed'),
       ]);
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = require('node:fs') as typeof import('node:fs');
       const webviewDir = path.join(REPO_ROOT, 'src', 'webview');
       const canvasDir = path.join(REPO_ROOT, 'src', 'webview', 'canvas');
+      const decompViewerDir = path.join(REPO_ROOT, 'src', 'webview', 'decompViewer');
 
       const svelteFiles: string[] = [];
       const walk = (dir: string) => {
@@ -182,8 +184,9 @@ describe('Webview bundle — component import integrity', () => {
 
         // Pick the bundle that actually contains this file.
         const inCanvas = file.startsWith(canvasDir + path.sep) || file === canvasDir;
-        const bundle = inCanvas ? canvasBundle : mainBundle;
-        const bundleName = inCanvas ? 'canvas' : 'main';
+        const inDecompViewer = file.startsWith(decompViewerDir + path.sep) || file === decompViewerDir;
+        const bundle = inCanvas ? canvasBundle : inDecompViewer ? decompViewerBundle : mainBundle;
+        const bundleName = inCanvas ? 'canvas' : inDecompViewer ? 'decompViewer' : 'main';
 
         let match: RegExpExecArray | null;
         while ((match = importRegex.exec(script)) !== null) {

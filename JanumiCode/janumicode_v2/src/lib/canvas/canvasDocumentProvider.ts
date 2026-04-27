@@ -9,15 +9,26 @@ import * as vscode from 'vscode';
 
 export interface CanvasDocument {
   readonly uri: vscode.Uri;
+  /** Specific workflow_run_id when the URI pins one; null for `/active`. */
+  readonly pinnedWorkflowRunId: string | null;
+  /** @deprecated use pinnedWorkflowRunId */
   readonly workflowRunId: string;
 }
 
 /**
  * Custom document for Architecture Canvas.
  * Backed by the workflow_runs table, not a physical file.
+ *
+ * Two URI shapes are supported (mirrors DecompViewer):
+ *   - `janumicode-canvas:/active`                              → run-agnostic;
+ *     editor resolves the run dynamically via the DB resolver.
+ *   - `janumicode-canvas:<id>?workflowRunId=<id>`              → pinned to a
+ *     specific run (legacy form, still used when the user picks an old run).
  */
 export class CanvasCustomDocument implements vscode.CustomDocument, CanvasDocument {
   readonly uri: vscode.Uri;
+  readonly pinnedWorkflowRunId: string | null;
+  /** @deprecated use pinnedWorkflowRunId */
   readonly workflowRunId: string;
 
   private _isDisposed = false;
@@ -26,9 +37,20 @@ export class CanvasCustomDocument implements vscode.CustomDocument, CanvasDocume
 
   constructor(uri: vscode.Uri) {
     this.uri = uri;
-    // Extract workflow run ID from URI query parameter
+    // /active is the run-agnostic form (host resolves dynamically).
+    // Both `janumicode-canvas:/active` and `janumicode-canvas:active` are
+    // accepted because the URI scheme's path normalization differs.
+    if (uri.path === '/active' || uri.path === 'active' || uri.path.endsWith('/active')) {
+      this.pinnedWorkflowRunId = null;
+      this.workflowRunId = '';
+      return;
+    }
     const query = new URLSearchParams(uri.query);
-    this.workflowRunId = query.get('workflowRunId') ?? uri.path.split('/').pop() ?? '';
+    const fromQuery = query.get('workflowRunId');
+    const fromPath = uri.path.split('/').pop() ?? '';
+    const id = fromQuery ?? fromPath;
+    this.pinnedWorkflowRunId = id || null;
+    this.workflowRunId = id;
   }
 
   dispose(): void {

@@ -15,6 +15,7 @@
     onZoomOut: () => void;
     onFitAll: () => void;
     onToggleDependencyEdges: () => void;
+    onResetLayout: () => void;
   }
 
   let {
@@ -24,6 +25,7 @@
     onZoomOut,
     onFitAll,
     onToggleDependencyEdges,
+    onResetLayout,
   }: Props = $props();
 
   function formatZoom(value: number): string {
@@ -69,6 +71,14 @@
         <path d="M1 1h5v1H2v4H1zm14 0v5h-1V2h-4V1zm0 14h-5v-1h4v-4h1zM2 14h4v1H1v-5h1z"/>
       </svg>
     </button>
+    <button
+      class="toolbar-btn"
+      onclick={onResetLayout}
+      aria-label="Reset layout"
+      title="Reset layout — clears saved positions and re-runs auto-layout"
+    >
+      <span class="btn-label">Reset Layout</span>
+    </button>
   </div>
 
   <div class="toolbar-separator"></div>
@@ -100,8 +110,8 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    background: var(--surface-container);
-    border: 1px solid var(--outline);
+    background: var(--jc-surface-container, #202020);
+    border: 1px solid var(--jc-outline, #5C5C5C);
     border-radius: 8px;
     padding: 4px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -116,7 +126,7 @@
   .toolbar-separator {
     width: 1px;
     height: 24px;
-    background: var(--outline);
+    background: var(--jc-outline, #5C5C5C);
     margin: 0 4px;
   }
 
@@ -129,26 +139,26 @@
     background: transparent;
     border: none;
     border-radius: 4px;
-    color: var(--on-surface);
+    color: var(--jc-on-surface, #E5E2E1);
     cursor: pointer;
     transition: background 0.15s ease;
   }
 
   .toolbar-btn:hover {
-    background: var(--surface-container-high);
+    background: var(--jc-surface-container-high, #2A2A2A);
   }
 
   .toolbar-btn:active {
-    background: var(--surface-container-highest);
+    background: var(--jc-surface-container-highest, #353535);
   }
 
   .toggle-btn.active {
-    background: var(--primary-container);
-    color: var(--on-primary-container);
+    background: var(--jc-primary-container, #1B3A5F);
+    color: var(--jc-on-primary-container, #BFD8FF);
   }
 
   .toggle-btn.active:hover {
-    background: var(--primary-container);
+    background: var(--jc-primary-container, #1B3A5F);
   }
 
   .zoom-value {
@@ -156,7 +166,7 @@
     text-align: center;
     font-size: 12px;
     font-weight: 500;
-    color: var(--on-surface);
+    color: var(--jc-on-surface, #E5E2E1);
     font-variant-numeric: tabular-nums;
   }
 

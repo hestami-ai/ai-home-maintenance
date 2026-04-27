@@ -171,6 +171,7 @@ export type LLMErrorType =
   | 'schema_error'      // HTTP 400
   | 'model_error'       // HTTP 500
   | 'context_exceeded'  // HTTP 400 with context length message
+  | 'runaway_thinking'  // In-stream abort: invocation log size cap tripped (sampling variance can rescue next attempt)
   | 'network_timeout'
   | 'unknown';
 
@@ -395,9 +396,20 @@ export class LLMCaller {
           // provider's error with our own, marking session-aborts as
           // non-retryable and size/flail aborts as retryable.
           if (abortReason) {
+            // Our in-stream detectors triggered an abort. Classify:
+            //   - session abort → not retryable (outer orchestrator shutting down)
+            //   - runaway-thinking (log-size cap tripped) → retryable; a
+            //     fresh attempt gets a fresh log-file baseline and sampling
+            //     variance can rescue it. This is distinct from a true
+            //     HTTP 400 context_exceeded where the server itself
+            //     rejects the request.
+            const isRunawayThinking = (abortReason as string).includes('invocation log size exceeded');
+            const errorType: LLMErrorType = sessionAborted
+              ? 'unknown'
+              : (isRunawayThinking ? 'runaway_thinking' : 'context_exceeded');
             lastError = new LLMError(
               `LLM stream aborted: ${abortReason}`,
-              sessionAborted ? 'unknown' : 'context_exceeded',
+              errorType,
               undefined,
               !sessionAborted,
             );
@@ -630,6 +642,8 @@ export class LLMCaller {
         return true;
       case 'model_error':       // 500 — retry once
         return true;
+      case 'runaway_thinking':  // In-stream log-size cap — sampling variance can rescue
+        return true;
       case 'auth_error':        // 401/403 — no retry
       case 'schema_error':      // 400 — no retry (prompt template bug)
       case 'context_exceeded':  // 400 — no retry (escalate)
@@ -652,6 +666,8 @@ export class LLMCaller {
         return 0; // Retry immediately once
       case 'model_error':
         return 5000; // Fixed 5s
+      case 'runaway_thinking':
+        return 2000; // Short pause — fresh attempt gets fresh baseline; sampling variance is the mechanism, not time
       default:
         return 5000 * Math.pow(2, attempt);
     }

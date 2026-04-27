@@ -310,10 +310,17 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleWebviewReady(): Promise<void> {
-    // Recover the latest workflow run if the session lost its currentRunId
-    // (e.g. on a webview reload).
+    // DB-as-truth recovery — covers three scenarios:
+    //   1. Webview reload mid-run (session was alive; recover same run).
+    //   2. Fresh extension activation against a workspace whose DB has
+    //      a completed run from a prior session (e.g. copied calibration
+    //      DB) — getActiveWorkflowRun() falls through to most-recent
+    //      run with decomp records, so the sidebar lights up instead of
+    //      staying empty.
+    //   3. Active in-progress run after restart (matches Tier 2 of the
+    //      resolver, identical to the old getCurrentWorkflowRun() path).
     if (!this.session.currentRunId) {
-      const latest = this.liaison.getDB().getCurrentWorkflowRun();
+      const latest = this.liaison.getDB().getActiveWorkflowRun();
       if (latest) {
         this.session.currentRunId = latest.id;
       }

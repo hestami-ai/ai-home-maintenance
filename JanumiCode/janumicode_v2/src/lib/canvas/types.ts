@@ -158,11 +158,13 @@ export type CanvasOutboundMessage =
  * Messages from canvas webview to extension host.
  */
 export type CanvasInboundMessage =
+  | { type: 'ready' }
   | { type: 'persistPosition'; nodeId: string; x: number; y: number }
   | { type: 'getNodeDetails'; nodeId: string }
   | { type: 'fitAll' }
   | { type: 'fitPhase'; phaseId: string }
-  | { type: 'toggleDependencyEdges'; visible: boolean };
+  | { type: 'toggleDependencyEdges'; visible: boolean }
+  | { type: 'resetLayout' };
 
 // -- Color Palette for Canvas 2D --
 

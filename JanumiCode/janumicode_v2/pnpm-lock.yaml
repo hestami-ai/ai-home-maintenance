@@ -20,6 +20,9 @@ importers:
       commander:
         specifier: ^13.0.0
         version: 13.1.0
+      elkjs:
+        specifier: ^0.11.1
+        version: 0.11.1
     devDependencies:
       '@anthropic-ai/sdk':
         specifier: ^0.88.0
@@ -985,6 +988,9 @@ packages:
 
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
+
+  elkjs@0.11.1:
+    resolution: {integrity: sha512-zxxR9k+rx5ktMwT/FwyLdPCrq7xN6e4VGGHH8hA01vVYKjTFik7nHOxBnAYtrgYUB1RpAiLvA1/U2YraWxyKKg==}
 
   emoji-regex@10.6.0:
     resolution: {integrity: sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A==}
@@ -2678,6 +2684,8 @@ snapshots:
   diff@7.0.0: {}
 
   eastasianwidth@0.2.0: {}
+
+  elkjs@0.11.1: {}
 
   emoji-regex@10.6.0: {}
 

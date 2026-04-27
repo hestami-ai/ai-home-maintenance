@@ -269,6 +269,21 @@ CREATE TABLE IF NOT EXISTS canvas_layout_state (
   last_modified_at    TEXT NOT NULL,
   PRIMARY KEY (workflow_run_id, node_id)
 );
+
+-- ── UI state (DB-as-truth) ────────────────────────────────────────
+-- Small key/value table used by the extension UI to persist state
+-- that should travel with the DB and reset cleanly on DB swap.
+-- Examples:
+--   focused_run_id   — the workflow_run the user is currently viewing
+--                      (DecompViewer / GovernedStreamView). Cleared
+--                      automatically by getActiveWorkflowRun() if the
+--                      id no longer exists in workflow_runs.
+-- Adding new keys is forward-compatible (consumers tolerate absent rows).
+CREATE TABLE IF NOT EXISTS ui_state (
+  key                 TEXT PRIMARY KEY,
+  value               TEXT,
+  updated_at          TEXT NOT NULL
+);
 `;
 
 /**

@@ -1027,7 +1027,7 @@ export interface CoverageGapContent {
   kind: 'coverage_gap';
   schemaVersion: '1.0';
   /** Which sub-phase emitted the gap. */
-  sub_phase_id: '1.3c' | '1.8';
+  sub_phase_id: '1.3c' | '1.8' | '2.1c' | '2.2c';
   /** One-line description of the structural rule that tripped. */
   assertion: string;
   severity: 'blocking' | 'advisory';

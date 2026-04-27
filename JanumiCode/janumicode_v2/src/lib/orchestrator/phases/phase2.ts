@@ -36,8 +36,12 @@ import type {
   DecompositionTerminationReason,
   GovernedStreamRecord,
   ReleasePlanContentV2,
+  CoverageGapContent,
 } from '../../types/records';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
+import { runFrBloomThreePass } from './phase2/frBloomThreePass';
+import { runNfrBloomThreePass } from './phase2/nfrBloomThreePass';
+import type { NfrSkeleton } from './phase2/verifyNfrCoverage';
 import type { DecisionBundleContent, MirrorItem, MirrorItemDecision } from '../../types/decisionBundle';
 import { OllamaEmbeddingClient, findNearestAbove, type EmbeddingClient } from '../../llm/embeddings';
 import { randomUUID } from 'node:crypto';
@@ -268,19 +272,22 @@ export class Phase2Handler implements PhaseHandler {
 
     const intentSummary = prior.intentStatement?.summary ?? 'No intent statement available';
 
-    // Wave 5 — under the product lens, Phase 1 also emits a
-    // product_description_handoff record. When present we thread it
-    // into the FR/NFR bloom helpers so they can pull journey /
-    // entity / workflow / V&V / tech / compliance / vocabulary data
-    // directly from it (instead of re-deriving from the thin
-    // intent_statement). Null under other lenses — bloom helpers then
-    // follow the default-lens path unchanged.
+    // Phase 1 (post-Wave 8) hard-fails on any non-product lens, so every
+    // run that reaches Phase 2 MUST carry a product_description_handoff.
+    // If one is missing, the pipeline is in a broken state — hard-fail
+    // rather than fall back to a legacy lens-neutral path that produces
+    // lossy output without coverage contracts.
     const allHandoffRecords = engine.writer.getRecordsByType(workflowRun.id, 'product_description_handoff');
     const handoffHit = findProductDescriptionHandoff(allHandoffRecords);
-    const handoff = handoffHit
-      ? (handoffHit.content as unknown as ProductDescriptionHandoffContent)
-      : null;
-    const handoffRecordId = handoffHit?.recordId ?? null;
+    if (!handoffHit) {
+      return {
+        success: false,
+        error: 'Phase 2 requires a product_description_handoff from Phase 1. None found — the pipeline should have hard-failed at Phase 1 lens dispatch if a non-product lens was classified. This indicates an upstream orchestration bug.',
+        artifactIds,
+      };
+    }
+    const handoff = handoffHit.content as unknown as ProductDescriptionHandoffContent;
+    const handoffRecordId = handoffHit.recordId;
 
     // ── 2.1 — Functional Requirements Bloom ───────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '2.1');
@@ -299,6 +306,7 @@ export class Phase2Handler implements PhaseHandler {
     const resumingFr = existingRootNodes.length > 0;
 
     let frContent: FunctionalRequirements;
+    let frCoverageGaps: CoverageGapContent[] = [];
     if (resumingFr) {
       getLogger().info('workflow', 'Phase 2.1 RESUME: using existing depth-0 FR nodes; skipping bloom', {
         existingRoots: existingRootNodes.length,
@@ -318,7 +326,15 @@ export class Phase2Handler implements PhaseHandler {
         detailFileLabel: 'p2_1_func_req',
         requiredOutputSpec: 'functional_requirements JSON — user_stories with acceptance_criteria',
       });
-      frContent = await this.runFunctionalRequirementsBloom(ctx, intentSummary, dmr21, handoff);
+      // Wave 8 — product-lens three-pass flow (skeleton → self-heal →
+      // AC enrichment → verifier). Handoff presence is guaranteed by
+      // the Phase 2 entry check above.
+      const three = await runFrBloomThreePass({
+        ctx, handoff, dmr: dmr21, intentSummary,
+        format: { formatJourneys, formatEntities, formatWorkflows, formatExtractedItems, formatVocabulary },
+      });
+      frContent = { user_stories: three.userStories as UserStory[] };
+      frCoverageGaps = three.coverageGaps;
     }
 
     // Include both the intent_statement id AND (when available) the
@@ -345,6 +361,32 @@ export class Phase2Handler implements PhaseHandler {
     });
     artifactIds.push(frRecord.id);
     engine.ingestionPipeline.ingest(frRecord);
+
+    // Wave 8 Pass 3 — persist coverage_gap records from the deterministic
+    // verifier. Blocking severity halts the phase; advisory severity logs
+    // but proceeds. Only runs on non-resume product-lens paths; resume
+    // replays from the stream and does not re-verify.
+    if (frCoverageGaps.length > 0) {
+      const blockingGaps = frCoverageGaps.filter(g => g.severity === 'blocking');
+      const gapRecIds = this.persistCoverageGaps(ctx, frCoverageGaps, [frRecord.id]);
+      if (blockingGaps.length > 0) {
+        getLogger().warn('workflow', 'Phase 2.1c: blocking coverage gaps detected', {
+          workflow_run_id: workflowRun.id,
+          gap_count: blockingGaps.length,
+          advisory_count: frCoverageGaps.length - blockingGaps.length,
+          gap_record_ids: gapRecIds,
+        });
+        return {
+          success: false,
+          error: `Phase 2.1c FR coverage verifier: ${blockingGaps.length} blocking gap(s) — ${blockingGaps.map(g => g.check).join(', ')}. Review coverage_gap records and re-run.`,
+          artifactIds,
+        };
+      }
+      getLogger().info('workflow', 'Phase 2.1c: advisory-only coverage notes', {
+        workflow_run_id: workflowRun.id,
+        advisory_count: frCoverageGaps.length,
+      });
+    }
 
     // Wave 6 — emit depth-0 decomposition node records mirroring each
     // root FR. These are the seeds for sub-phase 2.1a recursive
@@ -398,18 +440,16 @@ export class Phase2Handler implements PhaseHandler {
       }
     }
 
-    // ── 2.1a — Functional Requirements Decomposition (product lens) ──
-    // Wave 6 Pass-1 Level-1 decomposition. Skipped on default lens.
-    if (handoff) {
-      engine.stateMachine.setSubPhase(workflowRun.id, '2.1a');
-      await this.runSaturationLoop(
-        ctx,
-        handoff,
-        frContent.user_stories,
-        rootNodeIds,
-        rootLogicalIds,
-      );
-    }
+    // ── 2.1a — Functional Requirements Decomposition ──
+    // Wave 6 Pass-1 Level-1 decomposition. Handoff always present post-Wave 8.
+    engine.stateMachine.setSubPhase(workflowRun.id, '2.1a');
+    await this.runSaturationLoop(
+      ctx,
+      handoff,
+      frContent.user_stories,
+      rootNodeIds,
+      rootLogicalIds,
+    );
 
     // ── 2.2 — Non-Functional Requirements Bloom ───────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '2.2');
@@ -429,6 +469,7 @@ export class Phase2Handler implements PhaseHandler {
     ).join('\n');
 
     let nfrContent: NonFunctionalRequirements;
+    let nfrCoverageGaps: CoverageGapContent[] = [];
     if (resumingNfr) {
       getLogger().info('workflow', 'Phase 2.2 RESUME: using existing depth-0 NFR nodes; skipping bloom', {
         existingRoots: existingNfrRootNodes.length,
@@ -459,15 +500,27 @@ export class Phase2Handler implements PhaseHandler {
         detailFileLabel: 'p2_2_nfr',
         requiredOutputSpec: 'non_functional_requirements JSON — performance, security, reliability, etc.',
       });
-      nfrContent = await this.runNonFunctionalRequirementsBloom(
-        ctx, intentSummary, frSummary, dmr22, handoff,
-      );
+      // Wave 8 — product-lens three-pass NFR flow.
+      const three = await runNfrBloomThreePass({
+        ctx, handoff, dmr: dmr22, intentSummary, frSummary,
+        acceptedFrIds: frContent.user_stories.map(s => s.id),
+        format: { formatExtractedItems, formatVVRequirements, formatTechnicalConstraints },
+      });
+      nfrContent = {
+        requirements: three.nfrs.map((n: NfrSkeleton) => ({
+          id: n.id,
+          category: n.category as NonFunctionalRequirement['category'],
+          description: n.description,
+          threshold: n.threshold ?? '',
+          measurement_method: n.measurement_method,
+          traces_to: n.traces_to,
+          applies_to_requirements: n.applies_to_requirements,
+        })),
+      };
+      nfrCoverageGaps = three.coverageGaps;
     }
 
-    const nfrDerivedFrom = [
-      frRecord.id,
-      ...(handoffRecordId ? [handoffRecordId] : []),
-    ];
+    const nfrDerivedFrom = [frRecord.id, handoffRecordId];
     const nfrRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
@@ -485,12 +538,36 @@ export class Phase2Handler implements PhaseHandler {
     artifactIds.push(nfrRecord.id);
     engine.ingestionPipeline.ingest(nfrRecord);
 
+    // Wave 8 Pass 3 — persist NFR coverage_gap records. Blocking halts
+    // the phase; advisory logs and proceeds. Only runs on non-resume
+    // product-lens paths.
+    if (nfrCoverageGaps.length > 0) {
+      const blockingGaps = nfrCoverageGaps.filter(g => g.severity === 'blocking');
+      const gapRecIds = this.persistCoverageGaps(ctx, nfrCoverageGaps, [nfrRecord.id]);
+      if (blockingGaps.length > 0) {
+        getLogger().warn('workflow', 'Phase 2.2c: blocking NFR coverage gaps detected', {
+          workflow_run_id: workflowRun.id,
+          gap_count: blockingGaps.length,
+          advisory_count: nfrCoverageGaps.length - blockingGaps.length,
+          gap_record_ids: gapRecIds,
+        });
+        return {
+          success: false,
+          error: `Phase 2.2c NFR coverage verifier: ${blockingGaps.length} blocking gap(s) — ${blockingGaps.map(g => g.check).join(', ')}. Review coverage_gap records and re-run.`,
+          artifactIds,
+        };
+      }
+      getLogger().info('workflow', 'Phase 2.2c: advisory-only NFR coverage notes', {
+        workflow_run_id: workflowRun.id,
+        advisory_count: nfrCoverageGaps.length,
+      });
+    }
+
     // Wave 6 — emit depth-0 NFR decomposition node records (one per
     // root NFR) and run the NFR saturation loop under sub-phase 2.2a.
-    // Skipped on default-lens runs (no handoff). The saturation loop is
-    // the same method that drives FR decomposition; it's parameterized
-    // on sub-phase id + template id + root_kind.
-    if (handoff) {
+    // The saturation loop is the same method that drives FR decomposition;
+    // it's parameterized on sub-phase id + template id + root_kind.
+    {
       let nfrRootNodeIds: string[];
       let nfrRootLogicalIds: string[];
       const nfrAsStories: UserStory[] = nfrContent.requirements.map(adaptNfrToUserStory);
@@ -1951,208 +2028,6 @@ export class Phase2Handler implements PhaseHandler {
     }
   }
 
-  /**
-   * Sub-Phase 2.1: Generate Functional Requirements from the Intent Statement.
-   */
-  private async runFunctionalRequirementsBloom(
-    ctx: PhaseContext,
-    intentSummary: string,
-    dmr: PhaseContextPacketResult,
-    handoff: ProductDescriptionHandoffContent | null = null,
-  ): Promise<FunctionalRequirements> {
-    const { engine } = ctx;
-    // Under the product lens (handoff present) we resolve a lens-tagged
-    // template that renders the richer handoff sections. Otherwise we
-    // keep the default-lens template which reads only intent_statement.
-    const lens = handoff ? 'product' : undefined;
-    const template = engine.templateLoader.findTemplate(
-      'requirements_agent',
-      '02_1_functional_requirements',
-      lens,
-    );
-
-    const fallback: FunctionalRequirements = {
-      user_stories: [{
-        id: 'US-001',
-        role: 'user',
-        action: 'use the core functionality',
-        outcome: 'achieve the primary goal described in the intent',
-        acceptance_criteria: [{
-          id: 'AC-001',
-          description: 'Core functionality is available',
-          measurable_condition: 'System responds within 2 seconds',
-        }],
-        priority: 'high',
-        traces_to: [],
-      }],
-    };
-
-    if (!template) return fallback;
-
-    const variables: Record<string, string> = {
-      active_constraints: dmr.activeConstraintsText,
-      intent_statement_summary: intentSummary,
-      compliance_context_summary: '(none)',
-      detail_file_path: dmr.detailFilePath,
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-    };
-    if (handoff) {
-      Object.assign(variables, {
-        product_vision: handoff.productVision ?? '',
-        accepted_journeys: formatJourneys(handoff.userJourneys ?? []),
-        accepted_entities: formatEntities(handoff.entityProposals ?? []),
-        accepted_workflows: formatWorkflows(handoff.workflowProposals ?? []),
-        compliance_extracted_items: formatExtractedItems(handoff.complianceExtractedItems ?? []),
-        canonical_vocabulary: formatVocabulary(handoff.canonicalVocabulary ?? []),
-        open_questions: formatExtractedItems(handoff.openQuestions ?? []),
-      });
-    }
-    const rendered = engine.templateLoader.render(template, variables);
-    if (rendered.missing_variables.length > 0) return fallback;
-
-    // Product-lens path uses callForRole so the env-var routing hooks
-    // (JANUMICODE_REQUIREMENTS_AGENT_BACKING / ...) apply. Default path
-    // keeps the legacy hardcoded ollama call to avoid regression risk
-    // in non-product tests that don't register a requirements_agent route.
-    const result = handoff
-      ? await engine.callForRole('requirements_agent', {
-          prompt: rendered.rendered,
-          responseFormat: 'json',
-          temperature: 0.5,
-          traceContext: {
-            workflowRunId: ctx.workflowRun.id,
-            phaseId: '2',
-            subPhaseId: '2.1',
-            agentRole: 'requirements_agent',
-            label: 'Phase 2.1 — Functional Requirements Bloom (product lens)',
-          },
-        })
-      : await engine.llmCaller.call({
-          provider: 'ollama',
-          model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-          prompt: rendered.rendered,
-          responseFormat: 'json',
-          temperature: 0.5,
-          traceContext: {
-            workflowRunId: ctx.workflowRun.id,
-            phaseId: '2',
-            subPhaseId: '2.1',
-            agentRole: 'requirements_agent',
-            label: 'Phase 2.1 — Functional Requirements Bloom',
-          },
-        });
-
-    const parsed = result.parsed as Record<string, unknown> | null;
-    // The LLM may wrap the output: { functional_requirements: [{ user_stories }] }
-    // or return directly: { user_stories }. Handle both.
-    const fr = parsed?.functional_requirements;
-    const stories = parsed?.user_stories
-      ?? (Array.isArray(fr) ? (fr[0] as Record<string, unknown>)?.user_stories : (fr as Record<string, unknown>)?.user_stories);
-    if (Array.isArray(stories) && stories.length > 0) {
-      return { user_stories: stories as UserStory[] };
-    }
-    return fallback;
-  }
-
-  /**
-   * Sub-Phase 2.2: Generate Non-Functional Requirements.
-   */
-  private async runNonFunctionalRequirementsBloom(
-    ctx: PhaseContext,
-    intentSummary: string,
-    frSummary: string,
-    dmr: PhaseContextPacketResult,
-    handoff: ProductDescriptionHandoffContent | null = null,
-  ): Promise<NonFunctionalRequirements> {
-    const { engine } = ctx;
-    const lens = handoff ? 'product' : undefined;
-    const template = engine.templateLoader.findTemplate(
-      'requirements_agent',
-      '02_2_nonfunctional_requirements',
-      lens,
-    );
-
-    const fallback: NonFunctionalRequirements = {
-      requirements: [{
-        id: 'NFR-001',
-        category: 'performance',
-        description: 'System response time',
-        threshold: 'p95 response time < 500ms',
-        measurement_method: 'Load testing with representative workload',
-        traces_to: [],
-      }],
-    };
-
-    if (!template) return fallback;
-
-    const variables: Record<string, string> = {
-      active_constraints: dmr.activeConstraintsText,
-      intent_statement_summary: intentSummary,
-      functional_requirements_summary: frSummary,
-      compliance_context_summary: 'No compliance regimes',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-    };
-    if (handoff) {
-      Object.assign(variables, {
-        quality_attributes: (handoff.qualityAttributes ?? [])
-          .map((q, i) => `- [QA-${i + 1}] ${q}`).join('\n') || '(none)',
-        vv_requirements: formatVVRequirements(handoff.vvRequirements ?? []),
-        technical_constraints: formatTechnicalConstraints(handoff.technicalConstraints ?? []),
-        compliance_extracted_items: formatExtractedItems(handoff.complianceExtractedItems ?? []),
-      });
-    }
-    const rendered = engine.templateLoader.render(template, variables);
-    if (rendered.missing_variables.length > 0) return fallback;
-
-    // Same routing pattern as FR bloom: product-lens via callForRole,
-    // default-lens via legacy hardcoded path for regression safety.
-    const result = handoff
-      ? await engine.callForRole('requirements_agent', {
-          prompt: rendered.rendered,
-          responseFormat: 'json',
-          temperature: 0.5,
-          traceContext: {
-            workflowRunId: ctx.workflowRun.id,
-            phaseId: '2',
-            subPhaseId: '2.2',
-            agentRole: 'requirements_agent',
-            label: 'Phase 2.2 — Non-Functional Requirements Bloom (product lens)',
-          },
-        })
-      : await engine.llmCaller.call({
-          provider: 'ollama',
-          model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-          prompt: rendered.rendered,
-          responseFormat: 'json',
-          temperature: 0.5,
-          traceContext: {
-            workflowRunId: ctx.workflowRun.id,
-            phaseId: '2',
-            subPhaseId: '2.2',
-            agentRole: 'requirements_agent',
-            label: 'Phase 2.2 — Non-Functional Requirements Bloom',
-          },
-        });
-
-    const parsed = result.parsed as Record<string, unknown> | null;
-    // The LLM may wrap: { non_functional_requirements: [...] }
-    // or return directly: { requirements: [...] }. Handle both.
-    const nfr = parsed?.non_functional_requirements;
-    const reqs = parsed?.requirements
-      ?? (Array.isArray(nfr) ? nfr : (nfr as Record<string, unknown>)?.requirements);
-    if (Array.isArray(reqs) && reqs.length > 0) {
-      const normalized = (reqs as Array<Record<string, unknown>>).map(r => {
-        const out = { ...r } as Record<string, unknown>;
-        if (Array.isArray(r.applies_to_requirements)) {
-          out.applies_to_requirements = (r.applies_to_requirements as unknown[])
-            .filter((x): x is string => typeof x === 'string' && x.length > 0);
-        }
-        return out;
-      });
-      return { requirements: normalized as unknown as NonFunctionalRequirement[] };
-    }
-    return fallback;
-  }
 
   /**
    * Sub-Phase 2.4: Deterministic consistency check across FR and NFR artifacts.
@@ -2251,6 +2126,36 @@ export class Phase2Handler implements PhaseHandler {
       blocking_failures: blockingFailures,
       warnings,
     };
+  }
+
+  /**
+   * Write one `coverage_gap` governed-stream record per gap returned by
+   * a deterministic Phase-2 verifier (2.1c or 2.2c). Returns the
+   * written record ids so the caller can include them in derived_from
+   * chains. Mirrors Phase1Handler.persistCoverageGaps.
+   */
+  private persistCoverageGaps(
+    ctx: PhaseContext,
+    gaps: CoverageGapContent[],
+    derivedFrom: string[],
+  ): string[] {
+    const ids: string[] = [];
+    for (const gap of gaps) {
+      const rec = ctx.engine.writer.writeRecord({
+        record_type: 'coverage_gap',
+        schema_version: '1.0',
+        workflow_run_id: ctx.workflowRun.id,
+        phase_id: '2',
+        sub_phase_id: gap.sub_phase_id,
+        produced_by_agent_role: 'orchestrator',
+        janumicode_version_sha: ctx.engine.janumiCodeVersionSha,
+        derived_from_record_ids: derivedFrom,
+        content: gap as unknown as Record<string, unknown>,
+      });
+      ctx.engine.ingestionPipeline.ingest(rec);
+      ids.push(rec.id);
+    }
+    return ids;
   }
 }
 

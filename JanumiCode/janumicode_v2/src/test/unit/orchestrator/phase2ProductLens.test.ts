@@ -580,7 +580,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
           description: 'Tamper-evident audit trail',
           threshold: '0 undetected historical rewrites per audit replay',
           measurement_method: 'scheduled audit-chain replay',
-          traces_to: ['VV-12'],
+          traces_to: ['VV-1'],
         }],
       },
     });
@@ -869,7 +869,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     // terminates cleanly with FR-CHILD still pending.
     mock.setFixture('nfr-product', {
       match: 'product-lens Non-Functional Requirements Bloom',
-      parsedJson: { requirements: [] },
+      parsedJson: { requirements: [{ id: 'NFR-1', category: 'security', description: 'd', threshold: 't', measurement_method: 'm', traces_to: ['VV-1'] }] },
     });
     engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
     engine.configManager.setRequirementsAgentRouting({
@@ -983,7 +983,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     });
     mock.setFixture('nfr-product', {
       match: 'product-lens Non-Functional Requirements Bloom',
-      parsedJson: { requirements: [] },
+      parsedJson: { requirements: [{ id: 'NFR-1', category: 'security', description: 'd', threshold: 't', measurement_method: 'm', traces_to: ['VV-1'] }] },
     });
 
     engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
@@ -1072,78 +1072,13 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     expect((children[0].content as { display_key: string }).display_key).toBe('FR-OK');
   });
 
-  it('Wave 6 Step 2 — default-lens (no handoff) skips 2.1a and emits no decomposition records beyond depth-0', async () => {
-    const mock = new MockLLMProvider();
-    mock.setFixture('fr-default', {
-      match: 'Functional Requirements Bloom for Sub-Phase 2.1',
-      parsedJson: {
-        user_stories: [{
-          id: 'US-001', role: 'user', action: 'use it', outcome: 'get value',
-          acceptance_criteria: [{ id: 'AC-001', description: 'works', measurable_condition: 'responds within 2s' }],
-          priority: 'high',
-        }],
-      },
-    });
-    mock.setFixture('nfr-default', {
-      match: 'Non-Functional Requirements Bloom for Sub-Phase 2.2',
-      parsedJson: {
-        requirements: [{ id: 'NFR-001', category: 'performance', description: 'latency', threshold: '<500ms', measurement_method: 'load test' }],
-      },
-    });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
-
-    const { run } = engine.startWorkflowRun('ws', 'test');
-    engine.advanceToNextPhase(run.id, '1');
-    seedPriorPhaseRecords(run.id, null);
-    engine.advanceToNextPhase(run.id, '2');
-    const result = await engine.executeCurrentPhase(run.id);
-    expect(result.success, `error=${result.error}`).toBe(true);
-
-    const nodes = engine.writer.getRecordsByType(run.id, 'requirement_decomposition_node');
-    expect(nodes).toHaveLength(1);
-    expect((nodes[0].content as { depth: number }).depth).toBe(0);
-    const snapshots = engine.writer.getRecordsByType(run.id, 'assumption_set_snapshot');
-    expect(snapshots).toHaveLength(0);
-  });
-
-  it('keeps the default-lens path when no handoff is present (regression isolation)', async () => {
-    const mock = new MockLLMProvider();
-    // Default template match — the existing non-product template is matched
-    // by "Functional Requirements Bloom" without the "product-lens" suffix.
-    mock.setFixture('fr-default', {
-      match: 'Functional Requirements Bloom for Sub-Phase 2.1',
-      parsedJson: {
-        user_stories: [{
-          id: 'US-001', role: 'user', action: 'use it', outcome: 'get value',
-          acceptance_criteria: [{ id: 'AC-001', description: 'works', measurable_condition: 'responds within 2s' }],
-          priority: 'high',
-        }],
-      },
-    });
-    mock.setFixture('nfr-default', {
-      match: 'Non-Functional Requirements Bloom for Sub-Phase 2.2',
-      parsedJson: {
-        requirements: [{
-          id: 'NFR-001', category: 'performance', description: 'latency',
-          threshold: '<500ms p95', measurement_method: 'load test',
-        }],
-      },
-    });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
-
+  it('Wave 8 hard-fail — Phase 2 without a product_description_handoff returns a structured error (the default-lens fallback path has been retired)', async () => {
     const { run } = engine.startWorkflowRun('ws', 'test');
     engine.advanceToNextPhase(run.id, '1');
     seedPriorPhaseRecords(run.id, null); // NO handoff
     engine.advanceToNextPhase(run.id, '2');
     const result = await engine.executeCurrentPhase(run.id);
-
-    expect(result.success, `phase 2 should succeed without handoff; error=${result.error}`).toBe(true);
-    const artifacts = engine.writer.getRecordsByType(run.id, 'artifact_produced');
-    const fr = artifacts.find(a => (a.content as { kind?: string }).kind === 'functional_requirements');
-    expect(fr).toBeDefined();
-    // Default-lens FR has no traces_to (or empty).
-    const frContent = fr!.content as { user_stories: Array<{ traces_to?: string[] }> };
-    const t = frContent.user_stories[0].traces_to ?? [];
-    expect(t).toEqual([]);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/product_description_handoff/);
   });
 });

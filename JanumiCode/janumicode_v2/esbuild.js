@@ -254,10 +254,44 @@ const canvasWebviewBuild = {
   ],
 };
 
+// 5. Decomposition Viewer Webview Client -- Browser IIFE with Svelte
+//    Wave 7 Phase 2 visualization (Option 7 Multi-Level Accordion).
+const decompViewerWebviewBuild = {
+  ...sharedOptions,
+  entryPoints: ['src/webview/decompViewer/main.ts'],
+  outfile: 'dist/webview/decompViewer.js',
+  platform: 'browser',
+  format: 'iife',
+  target: 'es2022',
+  mainFields: ['svelte', 'browser', 'module', 'main'],
+  conditions: ['svelte', 'browser'],
+  plugins: [
+    sveltePlugin({
+      preprocess: tsScriptPreprocessor(),
+      compilerOptions: {
+        css: 'injected',
+      },
+    }),
+    {
+      name: 'copy-design-system-css-for-decomp-viewer',
+      setup(build) {
+        build.onEnd(() => {
+          const src = path.join(__dirname, 'src', 'webview', 'design-system.css');
+          const dest = path.join(__dirname, 'dist', 'webview', 'design-system.css');
+          fs.mkdirSync(path.dirname(dest), { recursive: true });
+          if (!fs.existsSync(dest)) {
+            fs.copyFileSync(src, dest);
+          }
+        });
+      },
+    },
+  ],
+};
+
 // ── Execute Builds ──────────────────────────────────────────────────
 
 async function build() {
-  const configs = [extensionBuild, sidecarBuild, rpcWorkerBuild, cliBuild, webviewBuild, canvasWebviewBuild];
+  const configs = [extensionBuild, sidecarBuild, rpcWorkerBuild, cliBuild, webviewBuild, canvasWebviewBuild, decompViewerWebviewBuild];
 
   if (isWatch) {
     const contexts = await Promise.all(

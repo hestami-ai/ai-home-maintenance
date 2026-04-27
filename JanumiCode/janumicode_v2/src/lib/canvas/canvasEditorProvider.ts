@@ -9,6 +9,8 @@
 
 import * as vscode from 'vscode';
 import type { Database } from '../database/init';
+import type { ClientLiaisonDB } from '../agents/clientLiaison/db';
+import { getLogger } from '../logging';
 import {
   CanvasCustomDocument,
   CanvasDocumentProvider,
@@ -27,9 +29,28 @@ export class CanvasEditorProvider
   constructor(
     private readonly extensionUri: vscode.Uri,
     db: Database,
+    /**
+     * DB-as-truth resolver for the active workflow run. Used when the
+     * canvas URI is the run-agnostic `/active` form. Optional only for
+     * backward compatibility with older callers; production registration
+     * always passes the liaison DB so the canvas can self-resolve.
+     */
+    private readonly liaisonDb: ClientLiaisonDB | null = null,
   ) {
     this.documentProvider = new CanvasDocumentProvider();
     this.dataProvider = new CanvasDataProvider(db);
+  }
+
+  /** Run-agnostic URI — editor resolves the run dynamically. */
+  static buildActiveUri(): vscode.Uri {
+    return vscode.Uri.parse('janumicode-canvas:/active');
+  }
+
+  /** Pinned URI — used when the user explicitly picks an older run. */
+  static buildPinnedUri(workflowRunId: string): vscode.Uri {
+    return vscode.Uri.parse(
+      `janumicode-canvas:${workflowRunId}?workflowRunId=${encodeURIComponent(workflowRunId)}`,
+    );
   }
 
   /**
@@ -38,8 +59,9 @@ export class CanvasEditorProvider
   static register(
     context: vscode.ExtensionContext,
     db: Database,
+    liaisonDb: ClientLiaisonDB,
   ): vscode.Disposable {
-    const provider = new CanvasEditorProvider(context.extensionUri, db);
+    const provider = new CanvasEditorProvider(context.extensionUri, db, liaisonDb);
 
     return vscode.window.registerCustomEditorProvider(
       'janumicode.canvas',
@@ -65,6 +87,39 @@ export class CanvasEditorProvider
   }
 
   /**
+   * Resolve which workflow_run_id this canvas should attach to:
+   *   - pinned URI (`/workflow/<id>`) → that exact id; if it no longer
+   *     exists in the DB, surface a stale-id error frame.
+   *   - run-agnostic URI (`/active`) → call the resolver. Pick whatever
+   *     run is currently most relevant.
+   * Returns null when there's no run to show.
+   */
+  private resolveRunId(
+    document: CanvasCustomDocument,
+  ): { id: string | null; reason: 'pinned' | 'active' | 'pinned_stale' | 'empty_db' | 'no_resolver' } {
+    if (document.pinnedWorkflowRunId) {
+      // For pinned URIs, fall back to the data provider as a presence
+      // probe. Loading nodes is cheap; if any record exists for that
+      // run the canvas can render. Treats absent runs as stale.
+      const probe = this.dataProvider.loadNodes(document.pinnedWorkflowRunId);
+      if (probe.length > 0) return { id: document.pinnedWorkflowRunId, reason: 'pinned' };
+      // Probe miss may also mean "run exists but has no architecture
+      // records yet" — let the resolver confirm. If the liaison DB
+      // confirms the workflow_run row exists, treat it as a valid pin
+      // (early-stage run, not stale).
+      if (this.liaisonDb) {
+        const status = this.liaisonDb.getWorkflowStatus(document.pinnedWorkflowRunId);
+        if (status.run !== null) return { id: document.pinnedWorkflowRunId, reason: 'pinned' };
+      }
+      return { id: null, reason: 'pinned_stale' };
+    }
+    if (!this.liaisonDb) return { id: null, reason: 'no_resolver' };
+    const active = this.liaisonDb.getActiveWorkflowRun();
+    if (active) return { id: active.id, reason: 'active' };
+    return { id: null, reason: 'empty_db' };
+  }
+
+  /**
    * Resolve the custom editor for a document.
    */
   resolveCustomEditor(
@@ -72,6 +127,12 @@ export class CanvasEditorProvider
     webviewPanel: vscode.WebviewPanel,
     token: vscode.CancellationToken,
   ): Thenable<void> {
+    const log = getLogger();
+    log.info('ui', 'canvas resolveCustomEditor called', {
+      mode: document.pinnedWorkflowRunId ? 'pinned' : 'active',
+      pinnedWorkflowRunId: document.pinnedWorkflowRunId,
+    });
+    webviewPanel.title = 'Architecture Canvas';
     // Configure webview
     webviewPanel.webview.options = {
       enableScripts: true,
@@ -83,12 +144,29 @@ export class CanvasEditorProvider
     };
 
     // Build and set HTML
-    const html = this.buildCanvasHtml(webviewPanel.webview, document.workflowRunId);
+    const html = this.buildCanvasHtml(webviewPanel.webview);
     webviewPanel.webview.html = html;
 
-    // Handle messages from webview
+    // Handle messages from webview. The 'ready' handshake is the
+    // signal to push the init payload — without it, posting init
+    // synchronously here races the webview script load and the
+    // message gets dropped on the floor (silent blank canvas).
+    let initialized = false;
+    const sendInit = (): void => {
+      if (initialized) return;
+      initialized = true;
+      void this.initializeCanvas(document, webviewPanel, token);
+    };
     const messageDisposable = webviewPanel.webview.onDidReceiveMessage(
-      (message) => this.handleWebviewMessage(document, message),
+      (message) => {
+        const m = message as { type?: string };
+        if (m?.type === 'ready') {
+          log.info('ui', 'canvas: received ready handshake — posting init');
+          sendInit();
+          return;
+        }
+        this.handleWebviewMessage(document, message);
+      },
     );
 
     // Clean up on dispose
@@ -96,8 +174,19 @@ export class CanvasEditorProvider
       messageDisposable.dispose();
     });
 
-    // Initialize canvas data
-    return this.initializeCanvas(document, webviewPanel, token);
+    // Belt-and-suspenders: if for some reason the webview never sends
+    // 'ready' (e.g. it crashed before mount), still post init after a
+    // short timeout so the user sees data rather than a permanent
+    // blank. The `initialized` guard keeps the ready path from
+    // double-posting.
+    setTimeout(() => {
+      if (!initialized) {
+        log.warn('ui', 'canvas: ready handshake not received within 2s — posting init anyway');
+        sendInit();
+      }
+    }, 2000);
+
+    return Promise.resolve();
   }
 
   /**
@@ -105,7 +194,7 @@ export class CanvasEditorProvider
    *
    * Uses the JanumiCode design system CSS for styling.
    */
-  private buildCanvasHtml(webview: vscode.Webview, workflowRunId: string): string {
+  private buildCanvasHtml(webview: vscode.Webview): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'canvas.js'),
     );
@@ -139,7 +228,7 @@ export class CanvasEditorProvider
     }
   </style>
 </head>
-<body data-workflow-run-id="${workflowRunId}">
+<body>
   <div id="app"></div>
   <script src="${scriptUri}"></script>
 </body>
@@ -154,10 +243,46 @@ export class CanvasEditorProvider
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken,
   ): Promise<void> {
-    // Load data from database
-    const nodes = this.dataProvider.loadNodes(document.workflowRunId);
-    const edges = this.dataProvider.loadEdges(document.workflowRunId);
-    const layout = this.dataProvider.loadLayout(document.workflowRunId);
+    const log = getLogger();
+    const resolved = this.resolveRunId(document);
+    if (resolved.id === null) {
+      let message: string;
+      if (resolved.reason === 'pinned_stale') {
+        message = `Workflow run '${document.pinnedWorkflowRunId}' was not found in the current database. The DB may have been swapped, or the run was removed. Use the JanumiCode: Open Architecture Canvas command to switch to the active run.`;
+      } else if (resolved.reason === 'no_resolver') {
+        message = 'Architecture Canvas is missing the workflow-run resolver. Reload the window or report this if it persists.';
+      } else {
+        message = 'No workflow runs found in the current database. Start a workflow or open a different database.';
+      }
+      log.warn('ui', 'canvas: no resolvable run', {
+        reason: resolved.reason,
+        pinned: document.pinnedWorkflowRunId,
+      });
+      // Canvas inbound messages don't include an explicit "error" type
+      // (yet) — surface as an init with empty arrays and an
+      // info-message banner via VS Code, so the user gets actionable
+      // feedback. Webview shows the empty state cleanly.
+      const emptyInit: CanvasOutboundMessage = {
+        type: 'init',
+        nodes: [],
+        edges: [],
+        layout: [],
+      };
+      webviewPanel.webview.postMessage(emptyInit);
+      void vscode.window.showWarningMessage(message);
+      return;
+    }
+
+    // Load data from database for the resolved run.
+    const runId = resolved.id;
+    log.info('ui', 'canvas: loading data', {
+      workflowRunId: runId,
+      reason: resolved.reason,
+    });
+    const t0 = Date.now();
+    const nodes = this.dataProvider.loadNodes(runId);
+    const edges = this.dataProvider.loadEdges(runId);
+    const layout = this.dataProvider.loadLayout(runId);
 
     const initMessage: CanvasOutboundMessage = {
       type: 'init',
@@ -166,6 +291,13 @@ export class CanvasEditorProvider
       layout,
     };
 
+    log.info('ui', 'canvas: posting init payload', {
+      workflowRunId: runId,
+      nodes: nodes.length,
+      edges: edges.length,
+      layout: layout.length,
+      load_ms: Date.now() - t0,
+    });
     webviewPanel.webview.postMessage(initMessage);
   }
 
@@ -181,18 +313,32 @@ export class CanvasEditorProvider
     switch (msg.type) {
       case 'persistPosition':
         if (msg.nodeId && msg.x !== undefined && msg.y !== undefined) {
-          this.dataProvider.saveLayoutPosition(
-            document.workflowRunId,
-            msg.nodeId,
-            msg.x,
-            msg.y,
-          );
+          // Resolve the run id at message-handling time so layout
+          // positions are persisted against whichever run is currently
+          // displayed. Skip the write if the run can't be resolved.
+          const resolved = this.resolveRunId(document);
+          if (resolved.id) {
+            this.dataProvider.saveLayoutPosition(
+              resolved.id,
+              msg.nodeId,
+              msg.x,
+              msg.y,
+            );
+          }
         }
         break;
 
       case 'getNodeDetails':
         // Wave 11: Return node details for detail panel
         break;
+
+      case 'resetLayout': {
+        const resolved = this.resolveRunId(document);
+        if (resolved.id) {
+          this.dataProvider.clearLayout(resolved.id);
+        }
+        break;
+      }
 
       case 'fitAll':
         // Wave 12: Fit all nodes in viewport

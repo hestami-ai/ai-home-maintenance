@@ -1,8 +1,24 @@
 # JanumiCode Master Product Specification
 
-**Version 2.4 — Implementation-Ready, Consolidated**
+**Version 2.5 — Implementation-Ready, Consolidated**
 
-*This document is a complete, self-contained consolidation of versions 2.0 through 2.4. All "Identical to v2.x" references have been resolved inline. No external spec documents are required to implement JanumiCode from this specification.*
+*This document is a complete, self-contained consolidation of versions 2.0 through 2.5. All "Identical to v2.x" references have been resolved inline. No external spec documents are required to implement JanumiCode from this specification.*
+
+*Changes from v2.4 (Wave 7 + Wave 8):*
+- *__Phase 1.3 split (Wave 7)__ — `Sub-Phase 1.3` (combined User Journeys + System Workflows bloom) is replaced by three sequential sub-phases: __1.3a__ User Journey Bloom (journeys + automatable-step flags), __1.3b__ System Workflow Bloom (workflows that back automatable steps + own-triggered workflows), __1.3c__ Coverage Verifier (deterministic; emits `coverage_gap` records for journey/workflow/compliance/integration/V&V/persona/domain coverage shortfalls; severity `blocking` halts the phase and severity `advisory` proceeds — see §4).*
+- *__Phase 1.8 widened release manifest (Wave 7)__ — `release_plan` schema bumps to `2.0` with a per-Release `contains` block covering journeys + workflows + entities + compliance + integrations + vocabulary, plus a `cross_cutting` block for items that span all releases. Deterministic `buildReleaseManifest` post-validation rejects duplicates and missing accepted items; LLM proposer runs a narrowed prompt focused on grouping, not exact mapping (§4).*
+- *__Phase 2 three-pass restructure (Wave 8)__ — Phase 2.1 (Functional Requirements) and Phase 2.2 (Non-Functional Requirements) bloom each split into three internal passes:*
+  - *__Pass 1 (Skeleton)__ — narrow output: `id / role / action / outcome / priority / traces_to` (FR) or `id / category / description / priority / traces_to / seed_threshold` (NFR), plus `unreached_journeys[]` (FR) or `unreached_seeds[]` (NFR) declarations. MUST-coverage contract: every accepted journey (FR) / V&V requirement + compliance item (NFR) traces to ≥1 requirement OR is explicitly declared as unreached/absorbed.*
+  - *__Pass 2 (Enrichment)__ — per-requirement LLM call. FR enrichment expands the seed AC into 3–7 measurable acceptance criteria; NFR enrichment expands `seed_threshold` into the full `threshold` + `measurement_method` strings. Echo-unchanged contract for skeleton fields. Semantic-aware retry: if the parsed result lacks required fields, the call retries up to 3 times before falling back to skeleton.*
+  - *__Pass 3 (Verifier)__ — deterministic `verifyFrCoverage` (sub-phase 2.1c) / `verifyNfrCoverage` (sub-phase 2.2c) emit `coverage_gap` records for journey/seed coverage shortfalls, dangling `traces_to` references, FR-id leakage in NFR `traces_to`, missing measurable conditions, missing thresholds/measurement methods, and id-uniqueness violations. Blocking severity halts Phase 2; advisory severity logs and proceeds (§4, §6).*
+- *__Self-heal filter (Wave 8)__ — invalid `traces_to` ids drop silently with a single aggregated WARN log (`{count, sample[]}`) so LLM drift is observable without flooding the stream. Unknown id prefixes and dangling references caught by the verifier as blocking gaps.*
+- *__Classify-first decomposition (Wave 8)__ — Phase 2.1a / 2.2a decomposer prompts (`schema_version: 2.0`) elevate the atomic-leaf decision to a first-class top-level branch. Output begins with `parent_branch_classification: "atomic_leaf" | "decomposable" | "invalid_parent"`; only the rules of the chosen branch then apply. Reduces small-model attention overload and surfaces the leaf escape hatch consistently. Output schema is backward-compatible — adds one top-level field; `parent_tier_assessment`, `children[]`, and `surfaced_assumptions[]` unchanged (§4).*
+- *__Hard-fail on non-product lens (Wave 8)__ — Phase 1 hard-fails with a structured error when `intent_lens_classification.lens !== 'product'`. The legacy lens-neutral fallback flow (`Sub-Phase 1.2 Intent Domain Bloom` via the `intent_domain_bloom.system.md` template, `Sub-Phase 1.4 Intent Statement Synthesis` via `intent_statement_synthesis.system.md`) is retired — only the product-lens pipeline (`executeProductLens`) is reachable. Phase 2 hard-fails when `product_description_handoff` is missing; the legacy `runFunctionalRequirementsBloom` / `runNonFunctionalRequirementsBloom` methods and their non-product templates (`functional_requirements_bloom.system.md`, `nonfunctional_requirements_bloom.system.md`) are removed. Operators with a non-product intent receive a clear "lens not yet supported" error rather than silently degraded output (§4, §10).*
+- *__Runaway-thinking retry classification (Wave 8)__ — In-stream invocation-log-size aborts (the cap that fires when a single attempt's log file exceeds 1.5 MB — typically a thinking spiral) are now classified as a new retryable `LLMErrorType: 'runaway_thinking'` rather than the non-retryable `'context_exceeded'`. Each retry starts with a fresh per-attempt log baseline so sampling variance can rescue the spiral. `getBackoffDelay('runaway_thinking') = 2000` ms. True HTTP-400 `context_exceeded` from a server rejection remains non-retryable (§7, §8.5).*
+- *__Coverage gap record family expansion__ — `coverage_gap.sub_phase_id` widens to `'1.3c' | '1.8' | '2.1c' | '2.2c'` (§6, §15).*
+- *__Decomposition Viewer (VS Code custom editor)__ — readonly custom editor (`janumicode.decompViewer`, viewType `*.janumicode-decomp`) renders the Multi-Level Accordion visualization (per `docs/requirements viewer/decomp-viewer-visualization.md`). Polls the governed-stream DB at `pollIntervalMs` (default 3000) and pushes a snapshot to a Svelte 5 webview when the SHA-256 revision hash over load-bearing fields changes. Surfaces FR/NFR roots, decomposition trees with status/tier badges, surfaced assumptions, release rail, summary strip, and detail drawer. Status-bar button + command palette entry for discoverability (`janumicode.openDecompViewer`). Read-only access uses `better-sqlite3` `{ readonly: true, fileMustExist: true }` so it can attach to a calibration DB while the writer is live (§17).*
+- *__Visual design system migration__ — UI tokens migrated to the `--jc-*` design-token system per `docs/visual design/DESIGN.md` (Logical Architect): surface hierarchy via tonal background steps, "No-Line" rule (no internal borders — separation through tonal step), 3 px primary-tinted left-edge status bar for selection, Editorial Contrast typography (Space Grotesk display, Inter body, Source Code Pro mono), max 6 px radius (§17).*
+- *__Phase 1 lens dispatch records__ — `intent_lens_classification.fallback_lens` is still emitted by the classifier for audit, but the orchestrator no longer consults it; classification is the single dispatch signal (§4 Phase 1.0a, §15).*
 
 *Changes from v2.3: Wave 6 recursive requirements decomposition (§4 Phase 2.1a / 2.2a) — tier-based saturation loop with assumption-saturation termination, depth/fanout/per-root budget caps, mirror gate at depth 2, Step 4b tier-downgrade detection, Step 4c AC-shape audit; UUID-based logical identity for decomposition nodes (`node_id` is a minted UUID; `display_key` holds the human label with sibling-collision suffix) with exactly-one-current-version supersession invariant (§5, §15); Phase 1.0 extraction decomposition into five focused passes plus composer (Sub-Phases 1.0b–1.0g — §4); Phase 1.8 Release Plan Approval (§4) producing a `release_plan` artifact with a human gate, and the release_id / release_ordinal propagation contract through every downstream decomposition tree (§4, §7, §15); new record types — requirement_decomposition_node, requirement_decomposition_pipeline, assumption_set_snapshot, release_plan, intent_lens_classification, tier_c_ac_shape_audit (§6, §15); canonical vocabulary expanded (§2) — Release, Release Plan, Decomposition Node, Logical Node Identity, Assumption Saturation, Tier (A/B/C/D); stall detection replaced the retired n-gram LoopDetector and tiny-chunk flailing heuristics with an invocation-log-file-size cap (1.5 MB/attempt, retryable) complemented by records-idle session abort (§8.5); per-root LLM call budget + per-kind telemetry columns on workflow_runs (§10, §11); Phase 1.7 renamed to Handoff Approval; Phase 1.6 renamed to Product Description Synthesis; new workflow_runs columns — intent_lens, decomposition telemetry quartet, active_release_plan_record_id (§11); configuration additions — decomposition block, invocation-log-size env override, gemma-family sampling profile auto-detection in the ollama provider, per-workspace `config.json` deep-merge override pattern (§10); VS Code card additions — DecompositionNodeCard, DecompositionPipelineCard, deferred ReleasePlanCard (§17); test-and-evaluation/ path convention for generated artifacts.*
 
@@ -534,7 +550,7 @@ Every lens-conditional variant carries the same Phase 1 semantics — a locked i
 
 - **[JC:Agent Role]:** Orchestrator (LLM API call)
 - **Action:** Classifies the Raw Intent into one of six lenses — `product`, `feature`, `bug`, `infra`, `legal`, `unclassified` — to resolve which downstream Phase 1 topology applies. The classifier reads the Raw Intent plus any files ingested in Phase 0 (inlined inline), emits a lens + confidence score + rationale grounded in quoted evidence, and persists the chosen lens on the Workflow Run.
-- **Fallback Rule:** Lenses for which a bespoke flow has not yet shipped resolve to a `fallback_lens`. Both the classified lens (for audit) and the fallback lens (drives template routing) are carried on the artifact. Default fallback today: `product` for unsupported classifications, `feature` for explicit feature classifications.
+- **Hard-Fail Dispatch (Wave 8):** Only the `product` lens has a complete specialized pipeline. Any other classified lens (`feature`, `bug`, `infra`, `legal`, `unclassified`) causes Phase 1 to return a structured error and halt — the legacy lens-neutral fallback flow has been retired. The previously-emitted `fallback_lens` field remains on the artifact for audit but is **not** consulted by the dispatch logic. Operators receive a clear "lens not yet supported" error rather than silently degraded output.
 - **Output Artifact:** `intent_lens_classification: {lens, confidence, rationale, fallback_lens}`
 - **State Effect:** Writes `workflow_runs.intent_lens` so every downstream sub-phase resolves lens-aware templates and contracts without re-reading the raw intent.
 
@@ -545,9 +561,9 @@ Every lens-conditional variant carries the same Phase 1 semantics — a locked i
 
 ---
 
-#### Default-Flow Sub-Phases (lens ∈ {feature, bug, infra, legal, unclassified})
+#### Default-Flow Sub-Phases — RETIRED (Wave 8)
 
-The sub-phases below apply when Lens Classification does NOT select `product`. They form the collapsed single-round bloom/prune flow: one bloom, one candidate prune, one assumption adjudication, one synthesis, one approval.
+The default-flow sub-phases (`Sub-Phase 1.2 Intent Domain Bloom`, `Sub-Phase 1.4 Intent Statement Synthesis`, etc.) and their lens-neutral templates (`intent_domain_bloom.system.md`, `intent_statement_synthesis.system.md`) are **retired**. Phase 1 hard-fails at lens dispatch (1.0a) when the classified lens is not `product`. The product-lens flow below is the only reachable path. The retired sub-phases are documented in the version history; the product-lens flow is now the single Phase 1 specification.
 
 #### Sub-Phase 1.1b — Scope Bounding and Compliance Context
 
@@ -661,11 +677,35 @@ Identical to Sub-Phase 1.1b above. Emitted under both lens topologies.
 - **Action:** Proposer Round 1. Expands the validated product intent into the complete set of business domains and personas the product could encompass. Intentionally over-proposes — the human prunes. Each domain carries a short `entityPreview` and `workflowPreview` to surface what downstream rounds will expand on.
 - **Output Artifact:** `artifact_produced[kind=business_domains_bloom]` followed by `decision_bundle_presented` prune gate.
 
-#### Sub-Phase 1.3 — User Journeys and System Workflows Bloom *(product lens, Round 2)*
+#### Sub-Phase 1.3a — User Journey Bloom *(product lens, Wave 7)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
-- **Action:** Proposer Round 2. Takes the accepted domains + personas from Round 1 and proposes user journeys (with steps, actors, acceptance criteria, and `implementationPhase` tag) plus system workflows (with steps, triggers, actors). Journeys are tagged against the validated phasing strategy from 1.0b.
-- **Output Artifact:** `artifact_produced[kind=journeys_workflows_bloom]` followed by `decision_bundle_presented` prune gate.
+- **Action:** Proposer Round 2a. Takes the accepted domains + personas from Round 1 and proposes user journeys with steps, actors, acceptance criteria, `implementationPhase` tag, and `automatable: boolean` per step (Wave 7 — flags the steps Sub-Phase 1.3b will be expected to back). Coverage targets are: every accepted persona initiates ≥1 journey, every accepted domain hosts ≥1 journey. Journeys that legitimately don't apply MUST be declared in `unreachedPersonas[]` / `unreachedDomains[]` with a reason — silent omission is caught by the 1.3c verifier as `persona_coverage` / `domain_journey_coverage` advisory gaps.
+- **Output Artifact:** `artifact_produced[kind=user_journey_bloom]` followed by `decision_bundle_presented` prune gate.
+
+#### Sub-Phase 1.3b — System Workflow Bloom *(product lens, Wave 7)*
+
+- **[JC:Agent Role]:** Domain Interpreter Agent
+- **Entry Criterion:** 1.3a accepted (`accepted_journeys` + accepted personas + accepted domains available).
+- **Action:** Proposer Round 2b. Proposes system workflows that **back** automatable journey steps (one workflow per step flagged `automatable: true` in 1.3a, with a `triggers[]` entry of kind `journey_step` pointing at `(journey_id, step_number)`), plus own-triggered workflows seeded by `compliance_extracted_items` (kind `compliance` triggers), `integrations` (kind `integration` triggers), `schedule` triggers (cadence-based: nightly retention sweeps, weekly billing batches), or `event` triggers. Each workflow declares `surfaces: { compliance_regimes[], retention_rules[], vv_requirements[], integrations[] }` so 1.3c can deterministically verify coverage.
+- **Output Artifact:** `artifact_produced[kind=system_workflow_bloom]` followed by `decision_bundle_presented` prune gate.
+
+#### Sub-Phase 1.3c — Coverage Verifier *(product lens, Wave 7, deterministic)*
+
+- **[JC:Agent Role]:** Orchestrator (deterministic — pure function, no LLM call).
+- **Entry Criterion:** Both 1.3a and 1.3b accepted.
+- **Action:** Runs `verifyCoverage` in [src/lib/orchestrator/phases/phase1/verifyCoverage.ts](src/lib/orchestrator/phases/phase1/verifyCoverage.ts) — exhaustive structural checks across both bloom outputs. One `coverage_gap` record is emitted per failed predicate. Severity-tagged: `blocking` halts the phase (`return success: false` with the gap-rec ids); `advisory` logs and proceeds.
+- **Predicates checked:**
+  - **`persona_coverage`** (advisory) — every accepted persona initiates ≥1 journey or appears in `bloomExplicitlyUnreachedPersonas[]`.
+  - **`domain_journey_coverage`** / **`domain_workflow_coverage`** (advisory) — every accepted domain hosts ≥1 journey AND ≥1 workflow, or appears in `bloomExplicitlyUnreachedDomains[]`.
+  - **`automatable_step_backing`** (advisory) — every journey step explicitly flagged `automatable: true` is claimed by ≥1 workflow with a `journey_step` trigger pointing at it. Workflow-backed-but-not-flagged is treated as implicit promotion (not a gap).
+  - **`compliance_coverage`** / **`retention_coverage`** / **`integration_coverage`** / **`vv_coverage`** (advisory) — every accepted compliance item, retention rule, integration, V&V requirement is surfaced by ≥1 journey or workflow via `surfaces.*[]` arrays or workflow `triggers`.
+  - **`referential_integrity_*`** (blocking) — `journey.personaId`, `journey.businessDomainIds[]`, journey-step `actor`, workflow `businessDomainId`, workflow `triggers[]`, workflow-step `actor`, `workflow.backs_journeys[]`, and every id in `surfaces.*[]` arrays must resolve to accepted upstream items. A single gap record per category aggregates all offenders to keep blast radius small.
+- **Output Artifacts:** `coverage_gap` records (zero or more) with `sub_phase_id: '1.3c'`. Empty array means all checks passed.
+
+#### Combined Sub-Phase 1.3 (legacy reference) — RETIRED
+
+The combined `Sub-Phase 1.3 — User Journeys and System Workflows Bloom` from the v2.4 spec is replaced by the three-step 1.3a/1.3b/1.3c sequence above. The combined `journeys_workflows_bloom` artifact kind is no longer produced.
 
 #### Sub-Phase 1.4 — Business Entities Bloom *(product lens, Round 3)*
 
@@ -696,6 +736,7 @@ Identical to Sub-Phase 1.1b above. Emitted under both lens topologies.
 - **[JC:Agent Role]:** Orchestrator (LLM proposer + human gate).
 - **Entry Criterion:** 1.7 Handoff Approval passed — approved `product_description_handoff` available.
 - **Action:** LLM proposer reads the handoff's `productVision`, `productDescription`, `phasingStrategy`, `userJourneys`, and `businessDomainProposals`, and proposes an ordered list of Releases (2–5 by default) that partition the accepted journeys. Every accepted journey must be assigned to exactly one Release; a fallback "Future / Post-Launch" Release is added when some journeys cannot fit the shippable ordinals. The proposer treats the 1.0b `phasingStrategy` as a strong hint but owns the final shape (merges, splits, rename). `release_id` values emitted by the LLM (e.g. `REL-1`) are canonical short forms for reasoning only; the orchestrator mints a fresh UUID per Release at write time — the UUID is the persisted `release_id`.
+- **Widened Manifest (Wave 7, schemaVersion `2.0`):** The release plan's `releases[].contains` block carries six arrays — `journeys[]`, `workflows[]`, `entities[]`, `compliance[]`, `integrations[]`, `vocabulary[]` — plus a top-level `cross_cutting: { workflows[], compliance[], integrations[], vocabulary[] }` block for items that span every release. Phase 2 root-decomposition's `assignReleaseToRoot` matches an FR/NFR root's `traces_to[]` against any of the six per-release arrays (lowest-ordinal release wins on tie); items in `cross_cutting` do NOT anchor a root to a release (they are available everywhere — no release-ordering signal — so `traces_to` consisting only of cross-cutting items resolves to Backlog). The deterministic `buildReleaseManifest` post-validation (run after the LLM proposer) catches duplicate assignments and accepted-but-unassigned items; failures are emitted as `coverage_gap` records with `sub_phase_id: '1.8'`.
 - **Interaction:** MMP `decision_bundle_presented` with one mirror item per proposed Release (label: `Release N: <name>`, description: Release description, tradeoffs: rationale). Gate supports three resolutions:
   - **Accept-all / subset** — human keeps a subset of proposed Releases (MVP: partial acceptance is tolerated; orphaned subsets are renumbered 1..N at approval time. Full split/merge/move-journey operations are deferred to a v2 `ReleasePlanCard` surface).
   - **Free-text feedback** — proposer re-runs with `{{human_feedback}}` injected; new `release_plan` artifact written with `approved: false`; gate re-presented. Capped at 3 iterations.
@@ -739,19 +780,45 @@ Lens-conditional:
 
 This completes the traceability chain `source_ref (1.0*) → handoff_item (1.6) → requirement (2.1/2.2) → [future: component (4) → test_result (9)]` that Phase 8 Evaluation walks for drift detection. The harness invariant `validateRequirementsProductTraceability` rejects FRs/NFRs with empty or unknown `traces_to`; `validateJourneyCoverageByFRs` warns when an accepted journey has no FR tracing to it.
 
-#### Sub-Phase 2.1 — Functional Requirements Bloom
+#### Sub-Phase 2.1 — Functional Requirements Bloom *(Wave 8 — three-pass)*
 
+Phase 2.1 under Wave 8 is split into three internal passes (skeleton → enrichment → verifier) to fit small-model attention budgets while preserving correctness. The driver lives at [src/lib/orchestrator/phases/phase2/frBloomThreePass.ts](src/lib/orchestrator/phases/phase2/frBloomThreePass.ts).
+
+**Sub-Phase 2.1 — Pass 1 (Skeleton Bloom)**
 - **[JC:Agent Role]:** Requirements Agent
-- **Context Payload stdin (default lens):** Active constraints; `compliance_context` summary; `intent_statement` summary
-- **Context Payload stdin (product lens):** Active constraints; `product_vision`; accepted `userJourneys` (with steps + acceptance criteria); accepted `entityProposals`; accepted `workflowProposals`; `complianceExtractedItems`; `canonicalVocabulary` (for naming alignment); `openQuestions`
-- **Context Payload detail file:** Full `intent_statement`; full `compliance_context`; full Context Packet; full handoff (product lens)
-- **Output Artifact:** `functional_requirements` — user stories each carry `traces_to[]` under product lens
+- **Context Payload stdin:** Active constraints; `product_vision`; `intent_statement_summary`; accepted `userJourneys` (with steps + acceptance criteria); accepted `entityProposals`; accepted `workflowProposals`; `complianceExtractedItems`; `canonicalVocabulary`; `openQuestions`; `detail_file_path`.
+- **Action:** Narrow output contract — produce `user_stories[]` where each entry carries `{id, role, action, outcome, priority, traces_to[]}` plus exactly ONE seed `acceptance_criterion` (the most essential measurable condition; Pass 2 expands the rest). MUST-coverage contract: every accepted user journey traces to ≥1 FR OR appears in `unreached_journeys[]` with a reason. Non-transactional journeys (governance, review, audit, read-only, lifecycle) are FIRST-CLASS — the prompt explicitly counteracts the small-model bias toward `create/submit/update` actions.
+- **Output (returned in-memory; not yet persisted as `functional_requirements` artifact):** `{user_stories[], unreached_journeys[]}`.
+
+**Sub-Phase 2.1 — Self-Heal Filter (deterministic, Wave 8)**
+- **Action:** Drops any `traces_to` id that doesn't resolve to an accepted upstream artifact (UJ/ENT/WF/COMP/VOC/OPEN/Q). Single aggregated WARN log (`{count, sample[]}`) so drift is observable without flooding. Unknown id prefixes and dangling refs propagate to the Pass-3 verifier as blocking gaps.
+
+**Sub-Phase 2.1b — Pass 2 (AC Enrichment)**
+- **[JC:Agent Role]:** Requirements Agent (per-FR sequential calls).
+- **Action:** For each skeleton produced by Pass 1, render the `02_1b_functional_requirements_ac_enrichment` template with the FR skeleton + the upstream context it traces to (resolved journeys with their steps + their own acceptance criteria, traced entities, traced workflows, traced compliance items, canonical vocabulary). The model echoes all skeleton fields unchanged and produces 3–7 measurable acceptance criteria per FR. Echo-unchanged contract is enforced by the prompt; AC discipline forbids invented thresholds not grounded in upstream artifacts.
+- **Semantic-Aware Retry (Wave 8):** If the parsed result returns the bare skeleton (parser fallback when the LLM output lacks `acceptance_criteria` expansion), the call retries up to 3 times. Sampling variance typically rescues content-quality failures distinct from transport-level failures. After 3 attempts, the FR is kept as skeleton (single seed AC) and the Pass-3 verifier will surface it as a `traces_to_non_empty` advisory or `ac_presence` blocking gap depending on what content remained.
+- **Output (returned in-memory):** Enriched `user_stories[]` with full `acceptance_criteria[]` per FR.
+
+**Sub-Phase 2.1c — Pass 3 (Coverage Verifier, deterministic)**
+- **[JC:Agent Role]:** Orchestrator (deterministic — pure function, no LLM call).
+- **Action:** Runs `verifyFrCoverage` in [src/lib/orchestrator/phases/phase2/verifyFrCoverage.ts](src/lib/orchestrator/phases/phase2/verifyFrCoverage.ts). Emits `coverage_gap` records with `sub_phase_id: '2.1c'`. Blocking severity halts Phase 2 with a structured error citing the gap-record ids; advisory severity logs and proceeds.
+- **Predicates checked:**
+  - **`fr_id_uniqueness`** (blocking) — FR ids unique within `user_stories[]`.
+  - **`ac_presence`** (blocking) — every FR carries ≥1 AC with non-empty `measurable_condition`.
+  - **`journey_fr_coverage`** (blocking) — every accepted journey is traced by ≥1 FR or appears in `unreached_journeys[]`.
+  - **`unreached_journeys_integrity`** (blocking) — `unreached_journeys[]` entries reference accepted journeys with non-empty reasons.
+  - **`traces_to_unknown_prefix`** / **`traces_to_dangling`** (blocking) — every `traces_to` id uses a known prefix and resolves to an accepted upstream artifact.
+  - **`traces_to_non_empty`** (advisory) — every FR carries ≥1 `traces_to` reference.
+
+**Output Artifact (after Pass 3 passes):** `artifact_produced[kind=functional_requirements]` — `user_stories[]` with `traces_to[]` and full `acceptance_criteria[]`. Depth-0 `requirement_decomposition_node` records are then written for each root FR, seeding Sub-Phase 2.1a.
 
 #### Sub-Phase 2.1a — Recursive Functional Requirements Decomposition *(product lens, Wave 6)*
 
 - **[JC:Agent Role]:** Requirements Agent
 - **Entry Criterion:** `functional_requirements` bloom output available; depth-0 `requirement_decomposition_node` records written for each root FR User Story (each carries the root's `release_id` + `release_ordinal` resolved via `traces_to` → journey → Release; unmatched roots land in Backlog).
 - **Goal:** Decompose each root FR into a tree of atomic, testable leaves via a saturation loop, surfacing scope commitments to the human at depth 2 and freezing branches that hit atomic-leaf criteria.
+
+**Classify-First Branching (Wave 8, schema `2.0`):** Before producing children, the decomposer prompt asks for `parent_branch_classification: "atomic_leaf" | "decomposable" | "invalid_parent"`. Only the rules of the chosen branch then apply. This elevates the atomic-leaf decision from a buried rule to a first-class branch — small models more reliably terminate branches that don't need further decomposition, reducing fanout noise and saturation runtime. The output schema is backward-compatible: the new `parent_branch_classification` field is added at the top level alongside `parent_tier_assessment`, `children[]`, and `surfaced_assumptions[]`. Same restructure applies to Sub-Phase 2.2a.
 
 **Tier model (A / B / C / D)** — the decomposer assigns one tier per emitted child:
 
@@ -787,11 +854,39 @@ This completes the traceability chain `source_ref (1.0*) → handoff_item (1.6) 
 - `reasoning_review_record[kind=tier_c_ac_shape_audit]` — optional, when Step 4c fires.
 - Per-kind telemetry on `workflow_runs`: `decomposition_fr_calls_used`, `decomposition_nfr_calls_used` (aggregate of per-root counters at loop end), `decomposition_budget_calls_used` (sum), `decomposition_max_depth_reached` (max across both kinds).
 
-#### Sub-Phase 2.2 — Non-Functional Requirements Bloom
+#### Sub-Phase 2.2 — Non-Functional Requirements Bloom *(Wave 8 — three-pass)*
 
+Phase 2.2 mirrors the Wave 8 three-pass restructure of Phase 2.1: skeleton → threshold/measurement enrichment → verifier. The driver lives at [src/lib/orchestrator/phases/phase2/nfrBloomThreePass.ts](src/lib/orchestrator/phases/phase2/nfrBloomThreePass.ts).
+
+**Sub-Phase 2.2 — Pass 1 (Skeleton Bloom)**
 - **[JC:Agent Role]:** Requirements Agent
-- **Context Payload stdin (product lens):** `qualityAttributes[]` (free-prose NFR seeds), `vvRequirements[]` (structured target + measurement + threshold — primary seed), `technicalConstraints[]` (CONTEXT only — do not re-propose as requirements), `complianceExtractedItems[]`
-- **Output Artifact:** `non_functional_requirements` — each NFR carries `traces_to[]` under product lens
+- **Context Payload stdin:** Active constraints; `intent_statement_summary`; `functional_requirements_summary`; `qualityAttributes[]` (free-prose NFR seeds); `vvRequirements[]` (structured target + measurement + threshold — primary seed); `technicalConstraints[]` (CONTEXT only — do not re-propose as requirements); `complianceExtractedItems[]`; `detail_file_path`.
+- **Action:** Narrow output contract — produce `requirements[]` where each entry carries `{id, category, description, priority, traces_to[], applies_to_requirements[], seed_threshold}`. MUST-coverage contract: every V&V requirement and every material compliance item is the seed of ≥1 NFR OR appears in `unreached_seeds[]` with `absorbed_into` pointing at an NFR id that genuinely covers it. Categories are honoured equitably — small models bias toward `performance`/`security`; the prompt explicitly counteracts and demands category breadth where the upstream artifacts demand it (auditability, observability, durability, accessibility, maintainability). FR-id leakage in `traces_to` (using `US-*` instead of handoff ids) is forbidden — FR linkage belongs in `applies_to_requirements`.
+- **Output (returned in-memory):** `{nfrs[], unreached_seeds[]}`.
+
+**Sub-Phase 2.2 — Self-Heal Filter (deterministic, Wave 8)**
+- **Action:** Drops any invalid `traces_to` ref (unknown prefix, dangling reference, or `US-*` FR-id leakage) and any `applies_to_requirements` ref that doesn't resolve to an accepted FR id. Single aggregated WARN log.
+
+**Sub-Phase 2.2b — Pass 2 (Threshold Enrichment)**
+- **[JC:Agent Role]:** Requirements Agent (per-NFR sequential calls).
+- **Action:** For each skeleton produced by Pass 1, render the `02_2b_nonfunctional_requirements_threshold_enrichment` template with the NFR skeleton + the upstream context it traces to (resolved V&V requirements, traced quality attributes by index, traced technical constraints, traced compliance items). The model echoes all skeleton fields unchanged and produces a final `threshold` (the boundary between satisfied and violated, in observable / numerical / categorical terms) plus a `measurement_method` (the instrument / cadence / artifact that produces the signal). The prompt explicitly forbids inventing numeric thresholds that aren't grounded in the traced V&V requirements; categorical thresholds (`"100% of X"`, `"zero Y"`) are preferred over fabricated latency budgets when no upstream number exists.
+- **Semantic-Aware Retry (Wave 8):** If the parsed result is missing `threshold` or `measurement_method` (parser fallback), the call retries up to 3 times. After 3 attempts the NFR is kept as skeleton (empty threshold + measurement_method) and the Pass-3 verifier surfaces it as a blocking `nfr_threshold_presence` gap, flagging the affected NFR for human review.
+- **Output (returned in-memory):** Enriched `nfrs[]` with full `threshold` + `measurement_method` per NFR.
+
+**Sub-Phase 2.2c — Pass 3 (Coverage Verifier, deterministic)**
+- **[JC:Agent Role]:** Orchestrator (deterministic — pure function, no LLM call).
+- **Action:** Runs `verifyNfrCoverage` in [src/lib/orchestrator/phases/phase2/verifyNfrCoverage.ts](src/lib/orchestrator/phases/phase2/verifyNfrCoverage.ts). Emits `coverage_gap` records with `sub_phase_id: '2.2c'`. Blocking severity halts Phase 2; advisory logs and proceeds.
+- **Predicates checked:**
+  - **`nfr_id_uniqueness`** (blocking) — NFR ids unique.
+  - **`nfr_threshold_presence`** (blocking) — every NFR has non-empty `threshold` AND `measurement_method`.
+  - **`vv_nfr_coverage`** (blocking) — every accepted V&V requirement traced by ≥1 NFR or absorbed via `unreached_seeds[]`.
+  - **`compliance_nfr_coverage`** (blocking) — every accepted compliance item traced by ≥1 NFR or absorbed.
+  - **`unreached_seeds_integrity`** (blocking) — `unreached_seeds[]` entries reference accepted seeds and absorbing NFR ids that exist.
+  - **`nfr_traces_to_unknown_prefix`** / **`nfr_traces_to_dangling`** / **`nfr_traces_to_fr_leakage`** (blocking) — referential integrity of `traces_to[]`; `US-*` FR-ids in `traces_to` are flagged as leakage (belong in `applies_to_requirements`).
+  - **`nfr_applies_to_requirements_dangling`** (blocking) — `applies_to_requirements[]` entries reference accepted FR ids.
+  - **`nfr_traces_to_non_empty`** (advisory) — every NFR carries ≥1 `traces_to` reference.
+
+**Output Artifact (after Pass 3 passes):** `artifact_produced[kind=non_functional_requirements]` — `requirements[]` with full `threshold`, `measurement_method`, `traces_to[]`, `applies_to_requirements[]`. Depth-0 NFR `requirement_decomposition_node` records are then written, seeding Sub-Phase 2.2a.
 
 #### Sub-Phase 2.2a — Recursive Non-Functional Requirements Decomposition *(product lens, Wave 6)*
 
@@ -1427,7 +1522,8 @@ Every entry has a canonical `record_type`. Maximum granularity — one record pe
 | `requirement_decomposition_node` | A single node in the Phase 2.1a (FR) or 2.2a (NFR) decomposition tree. Logical identity is `content.node_id` (UUID, stable across revisions); presentation uses `content.display_key`. Parent linkage via `content.parent_node_id`. Release assignment via `content.release_id` + `content.release_ordinal` inherited from parent. Status: `pending` \| `decomposed` \| `atomic` \| `pruned` \| `deferred` \| `downgraded`. Tier: `A` \| `B` \| `C` \| `D` (absent on depth-0 roots). Supersession by logical id enforces the exactly-one-current-version invariant (§5.2.1). |
 | `requirement_decomposition_pipeline` | Per-kind saturation-loop container (one per root_kind per run). Updated incrementally via `supersedByRollback` as passes complete; the latest version reflects current pipeline state. Content includes `passes[]` (per-pass delta + semantic_delta + node count), `termination_reason` (`fixed_point` \| `budget_cap` \| `depth_cap`), `final_leaf_count`, `final_max_depth`, `total_llm_calls`. |
 | `assumption_set_snapshot` | Per-pass record of the cumulative assumption set for a root_kind. Fields: `pass_number`, `root_fr_id` (kind marker — `*` for FR, `*nfr*` for NFR), full `assumptions[]` list, `delta_from_previous_pass` (raw count), `semantic_delta` (count excluding duplicate_of-flagged rows). The saturation-loop termination gate reads `semantic_delta`; `delta_from_previous_pass` is retained for audit. |
-| `release_plan` | Phase 1.8 Release Plan artifact. `releases[]` is an ordered list of Release entries (each with `release_id` UUID, `ordinal`, `name`, `description`, `rationale`, `traces_to_journeys[]`, optional `traces_to_domains[]`). Only records with `approved: true` drive Phase 2 assignment. The active plan is pinned on the Workflow Run via `workflow_runs.active_release_plan_record_id`. Iterations during the Phase 1.8 feedback loop write additional `approved: false` records for audit. |
+| `release_plan` | Phase 1.8 Release Plan artifact. `releases[]` is an ordered list of Release entries. **schemaVersion `2.0` (Wave 7)** widens the per-Release content from `traces_to_journeys[]` to `contains: { journeys[], workflows[], entities[], compliance[], integrations[], vocabulary[] }` plus a top-level `cross_cutting: { workflows[], compliance[], integrations[], vocabulary[] }` block. Only records with `approved: true` drive Phase 2 assignment. The active plan is pinned on the Workflow Run via `workflow_runs.active_release_plan_record_id`. Iterations during the Phase 1.8 feedback loop write additional `approved: false` records for audit. |
+| `coverage_gap` | Output of a deterministic coverage verifier. `sub_phase_id ∈ {'1.3c', '1.8', '2.1c', '2.2c'}` identifies which verifier emitted the gap. Carries `check` (machine tag — e.g. `journey_fr_coverage`, `nfr_threshold_presence`, `referential_integrity_*`), `severity ∈ {blocking, advisory}`, `expected[]` / `actual[]` / `missing[]` arrays of artifact ids, optional `extra[]` for double-count checks, optional `details{}`. Blocking gaps halt the parent phase with `success: false`; advisory gaps log and proceed. The orchestrator routes blocking gaps to MMP for human resolution (`accepted_as_scope_cut` / `rebloom_requested`) when an interactive UI is attached. |
 
 ### 6.8 Wave 6 Reasoning-Review Sub-Types *(product lens)*
 
@@ -2195,7 +2291,7 @@ When `tool_result_misinterpretation_suspected` is flagged by the Reasoning Revie
 
 **Streaming Stall Detection Protocol:** A thinking-mode LLM can keep emitting tokens without making semantic progress — the stream itself isn't hung, so idle-socket timers don't trip, but the output never converges. Two independent signals catch these in-stream, with Loop Detection Monitor as the cross-invocation signal:
 
-1. **Invocation log size cap (per LLM call, retryable).** The orchestrator's `LLMCaller.call` watches the bytes written to the per-invocation `.log` file (prompt + chunk metadata + streamed text). When `bytesWritten > maxLogFileBytes` for this attempt exceeds the threshold (`JANUMICODE_LLM_MAX_LOG_FILE_BYTES`, default **1,572,864 bytes ≈ 1.5 MB**), the in-flight HTTP stream is aborted and the error is reported as retryable. `LLMCaller` retries up to `maxRetries` (default 3), each retry starting from a fresh `bytesBaseline` so a failed attempt-1 doesn't immediately re-trip attempt-2. Rationale: healthy qwen3.5:9b invocations top out at ~100–200 KB log file; anything past 1.5 MB is practically certain to be runaway thinking. Variance between attempts often allows the next retry to converge.
+1. **Invocation log size cap (per LLM call, retryable).** The orchestrator's `LLMCaller.call` watches the bytes written to the per-invocation `.log` file (prompt + chunk metadata + streamed text). When `bytesWritten > maxLogFileBytes` for this attempt exceeds the threshold (`JANUMICODE_LLM_MAX_LOG_FILE_BYTES`, default **1,572,864 bytes ≈ 1.5 MB**), the in-flight HTTP stream is aborted. **Wave 8 classification:** the abort is classified as `LLMErrorType: 'runaway_thinking'` (a new retryable type) — distinct from a true HTTP-400 `'context_exceeded'` (server-side rejection, non-retryable). `LLMCaller.isRetryable('runaway_thinking') === true`; `getBackoffDelay('runaway_thinking') === 2000` ms; `LLMCaller` retries up to `maxRetries` (default 3), each retry starting from a fresh `bytesBaseline` so a failed attempt-1 doesn't immediately re-trip attempt-2. Rationale: healthy qwen3.5:9b invocations top out at ~100–200 KB log file; anything past 1.5 MB is practically certain to be runaway thinking. Variance between attempts often allows the next retry to converge — calibration runs commonly observe 1-retry rescues with 0 final failures.
 
 2. **Records-idle session abort (per Workflow Run, non-retryable).** The CLI runner's `waitForQuiescence` watches the `governed_stream` table for new rows. When no new record has landed for `records_idle_stall_ms` (default **900,000 ms = 15 min**), the session AbortController is tripped — propagates into any in-flight LLMCaller, tears down the HTTP stream, and the phase returns `requires_input`. Unlike the log-size cap this is a SESSION-level signal; no retry. Progress is measured by records landing in the stream, so long-running legitimate LLM calls (thinking-mode prose) that ARE making progress but haven't yet finished don't trigger records-idle as long as their emitted decomposition-node / assumption-set records are landing.
 
@@ -3668,7 +3764,7 @@ If JanumiCode is upgraded between the start and completion of a Phase 0.5 refact
   "role": "reasoning_review | narrative_memory | domain_compliance_review | orchestrator | deep_memory_research | ingestion_pipeline_stage3",
   "provider": "google | anthropic | openai",
   "model": "...",
-  "error_type": "rate_limit | service_unavailable | auth_error | schema_error | model_error | context_exceeded | network_timeout",
+  "error_type": "rate_limit | service_unavailable | auth_error | schema_error | model_error | context_exceeded | runaway_thinking | network_timeout",
   "http_status": 429,
   "error_message": "...",
   "retry_attempt": 1,
@@ -4029,9 +4125,45 @@ The event bus (`eventBus.ts`) emits `workflow:command` events. The webview's `po
 - Keyboard navigation: Tab through cards; Enter to expand/collapse; Space to select Menu options
 - Screen reader: Card content is structured with headings and semantic HTML
 
+### 17.7 Decomposition Viewer *(Wave 8)*
+
+A separate VS Code custom editor — distinct from the sidebar GovernedStreamPanel — provides a high-level, real-time visualization of the requirements-decomposition tree as it is being produced or has been produced for any given Workflow Run.
+
+**Registration:**
+- Custom editor view type: `janumicode.decompViewer`.
+- Activated via filename pattern `*.janumicode-decomp` (the URI scheme `janumicode-decomp-viewer:` is opened by the `janumicode.openDecompViewer` command).
+- Discoverable via two surfaces:
+  - **Status-bar button** — `$(list-tree) Decomp` icon, always visible when an extension instance is active.
+  - **Command palette** — `JanumiCode: Open Decomposition Viewer`.
+
+**Architecture:**
+- `CustomReadonlyEditorProvider` — read-only by design (the viewer is a window into the governed stream, not a mutator).
+- Webview bundle compiled separately at `dist/webview/decompViewer.js` (Svelte 5, runes mode).
+- DB attachment via `better-sqlite3` opened with `{ readonly: true, fileMustExist: true }` so the viewer can attach to a calibration workspace's live DB without contending with the live writer (SQLite WAL allows concurrent readers).
+- Polling cadence configurable via `janumicode.decompViewer.pollIntervalMs` (default `3000`). Each tick computes a SHA-256 revision hash over load-bearing snapshot fields (`nodes` + `assumptions` + `pipeline.passes` + `roots`); the snapshot is pushed to the webview only when the hash changes (no work-thrash on idle DBs).
+
+**Snapshot shape (extension-host → webview message):**
+- `totals: { nodes, roots, atomic, pending, pruned, deferred, downgraded, assumptions, duplicate_assumptions }`
+- `nodes[]: ViewerDecompositionNode` — one entry per `requirement_decomposition_node` (latest revision), with derived fields `tier`, `tier_hint`, `tier_rationale`, `display_key`, `parent_display_key`, `children_display_keys[]`, `surfaced_assumption_ids[]`, `acceptance_criteria[]`, `traces_to[]`, `release_id`, `release_ordinal`, `pruning_reason`, `downgrade_reason`.
+- `roots[]: ViewerRootSummary` — one per FR/NFR root with `display_key`, `root_kind`, `node_count_total`, `release_id` / `release_ordinal`.
+- `assumptions[]: ViewerAssumption` — flat list across all snapshots, with `category`, `text`, `citations[]`, `surfaced_at_pass`, `surfaced_at_node`, `duplicate_of`, `duplicate_similarity`.
+- `pipelines[]: ViewerPipelineSummary` — one per `requirement_decomposition_pipeline`, with per-pass `pass_number`, `status`, `nodes_produced`, `assumption_delta`, `started_at`, `completed_at`, plus `termination_reason`.
+- `releases[]: ViewerRelease` — denormalized release entries from the active `release_plan` (`approved: true`).
+
+**Visualization (Multi-Level Accordion per `docs/requirements viewer/decomp-viewer-visualization.md`):**
+- Layout: 240 px **release rail** (left) | 1 fr **tree view** (center) | 400 px **detail drawer** (right). Top **header** with active-tab switch (Tree / Assumptions / Summary). Tab content swaps in the center column.
+- **TreeView** renders one card per FR/NFR root with a 3 px primary-tinted left-edge status bar (`--jc-primary` for FR roots, `--jc-tertiary` for NFR roots). Children expand inline by depth via `expandedRoots` / `expandedTierBands` Svelte stores.
+- **NodeRow** carries: tier badge (A/B/C/D), display_key (mono), story_action snippet, priority chip, surfaced-assumption count chip, MMP control toolbar (`role="toolbar"` — disabled in v1, reserved for accept/reject/defer/edit).
+- **DetailDrawer** (right) shows the selected node's full user_story, acceptance_criteria, traces_to chips, surfaced assumptions, children list, and disabled MMP grid.
+- **AssumptionsPanel** (Assumptions tab) — searchable across `id`, `text`, `category`, with filters for category dropdown and `onlyDuplicates` checkbox.
+- **SummaryStrip** (Summary tab) — totals grid, by-tier histogram (A/B/C/D + null), by-depth distribution, root-size histogram (sorted), per-pipeline pass trajectory with start/end timestamps.
+- **FilterBar** — text search + tier / status / priority / release multi-select chips + clear button. Filters apply across TreeView + AssumptionsPanel.
+
+**Visual-design tokens:** the viewer uses the `--jc-*` design-token system (`docs/visual design/DESIGN.md`): tonal background steps (`--jc-surface`, `--jc-surface-container-low`, `-container`, `-container-high`, `-container-highest`, `-bright`) for hierarchy, "No-Line" rule (separation through tonal step, no internal borders), 3 px primary-tinted left-edge status bar pattern for selection, Editorial Contrast typography (Space Grotesk for headlines and tabular numerics, Inter for body, Source Code Pro for mono), max 6 px radius, `font-variant-numeric: tabular-nums` on counts.
+
 ---
 
-*JanumiCode Master Product Specification — Version 2.3 (Consolidated)*
+*JanumiCode Master Product Specification — Version 2.5 (Consolidated)*
 *All sections subject to revision through bloom-and-prune with human approval.*
 *Deferred items catalogued in Section 14.*
-*Consolidated from v2.0, v2.1, and v2.2 with all "Identical to" references resolved.*
+*Consolidated from v2.0–v2.5 with all "Identical to" references resolved.*

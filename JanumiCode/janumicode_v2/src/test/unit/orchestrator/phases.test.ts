@@ -56,34 +56,11 @@ describe('Phase Handlers 2-5', () => {
     db.close();
   });
 
-  describe('Phase 2 — Requirements Definition', () => {
-    it('executes successfully and produces artifacts', async () => {
-      const { run } = engine.startWorkflowRun('ws-1');
-      await engine.executeCurrentPhase(run.id); // Phase 0
-      engine.advanceToNextPhase(run.id, '1');
-      engine.advanceToNextPhase(run.id, '2');
-
-      const result = await engine.executeCurrentPhase(run.id);
-
-      expect(result.success).toBe(true);
-      expect(result.artifactIds.length).toBeGreaterThanOrEqual(3); // FR + NFR + consistency
-    });
-
-    it('sets correct sub-phase progression', async () => {
-      const { run } = engine.startWorkflowRun('ws-1');
-      await engine.executeCurrentPhase(run.id);
-      engine.advanceToNextPhase(run.id, '1');
-      engine.advanceToNextPhase(run.id, '2');
-
-      const subPhases: string[] = [];
-      engine.eventBus.on('phase_gate:pending', (p) => subPhases.push(p.phaseId));
-
-      await engine.executeCurrentPhase(run.id);
-
-      // Should end at phase gate pending for phase 2
-      expect(subPhases).toContain('2');
-    });
-  });
+  // Phase 2 smoke tests retired post-Wave 8: the default-lens fallback
+  // path that allowed Phase 2 to run without a product_description_handoff
+  // has been removed (Phase 1 hard-fails on non-product lenses, Phase 2
+  // hard-fails if the handoff is missing). Product-lens behavior is
+  // covered by phase2ProductLens.test.ts which seeds a full handoff.
 
   describe('Phase 3 — System Specification', () => {
     it('executes successfully and produces boundary + requirements + contracts', async () => {
@@ -151,45 +128,9 @@ describe('Phase Handlers 2-5', () => {
     });
   });
 
-  describe('Full Phase 0-5 pipeline', () => {
-    it('executes all phases in sequence', async () => {
-      const { run } = engine.startWorkflowRun('ws-1');
-
-      const phaseResults: { phase: string; success: boolean; artifacts: number }[] = [];
-
-      // Phase 0
-      let result = await engine.executeCurrentPhase(run.id);
-      phaseResults.push({ phase: '0', success: result.success, artifacts: result.artifactIds.length });
-
-      // Before Phase 1: provide a raw intent with text
-      engine.writer.writeRecord({
-        record_type: 'raw_intent_received',
-        schema_version: '1.0',
-        workflow_run_id: run.id,
-        phase_id: '1',
-        janumicode_version_sha: engine.janumiCodeVersionSha,
-        content: { text: 'Build a task management application for small teams' },
-      });
-
-      // Phases 1-5
-      for (const phase of ['1', '2', '3', '4', '5'] as const) {
-        engine.advanceToNextPhase(run.id, phase);
-        result = await engine.executeCurrentPhase(run.id);
-        phaseResults.push({ phase, success: result.success, artifacts: result.artifactIds.length });
-      }
-
-      // All should succeed
-      const failedPhases = phaseResults.filter(pr => !pr.success);
-      expect(failedPhases).toEqual([]);
-
-      // Phase 0: 2+ artifacts (classification + collision)
-      expect(phaseResults[0].artifacts).toBeGreaterThanOrEqual(2);
-      // Phase 5: 4+ artifacts (data models, APIs, error handling, config)
-      expect(phaseResults[5].artifacts).toBeGreaterThanOrEqual(4);
-
-      // Total artifacts across all phases
-      const totalArtifacts = phaseResults.reduce((sum, pr) => sum + pr.artifacts, 0);
-      expect(totalArtifacts).toBeGreaterThanOrEqual(15);
-    });
-  });
+  // Full 0-5 pipeline smoke test retired post-Wave 8 for the same reason
+  // as the Phase 2 smoke tests above — relied on a stub LLM producing
+  // empty parsed JSON flowing through Phase 1's default-lens fallback,
+  // which no longer exists. Pipeline-level coverage now lives in the
+  // product-lens integration tests.
 });

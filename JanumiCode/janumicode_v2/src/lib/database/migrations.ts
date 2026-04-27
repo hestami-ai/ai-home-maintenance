@@ -82,6 +82,8 @@ export function validateSchema(db: Database): { valid: boolean; issues: string[]
     'memory_edge', 'file_system_writes',
     // Architecture Canvas tables
     'sub_artifact', 'sub_artifact_edge', 'canvas_layout_state',
+    // UI state (DB-as-truth) — focused_run_id and other key/value UI state
+    'ui_state',
   ];
 
   const tables = db.prepare(

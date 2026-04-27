@@ -48,6 +48,7 @@ import {
   type WorkflowSession,
 } from './lib/webview/governedStreamViewProvider';
 import { CanvasEditorProvider } from './lib/canvas/canvasEditorProvider';
+import { DecompViewerEditorProvider } from './lib/decompViewer/decompViewerEditorProvider';
 import { registerTestHookCommands } from './testHooks';
 import { loadDotenv } from './lib/config/dotenv';
 
@@ -239,8 +240,24 @@ async function bootstrap(
   log.info('activation', 'Bootstrap step 13/14: webview view provider registered');
 
   // 13b. Architecture Canvas custom editor
-  context.subscriptions.push(CanvasEditorProvider.register(context, db));
+  context.subscriptions.push(CanvasEditorProvider.register(context, db, liaison.getDB()));
   log.info('activation', 'Architecture Canvas custom editor registered');
+
+  // 13b2. Decomposition Viewer custom editor
+  context.subscriptions.push(DecompViewerEditorProvider.register(context, db, liaison.getDB()));
+  log.info('activation', 'Decomposition Viewer custom editor registered');
+
+  // Status-bar button — opens the decomposition viewer for the current
+  // workflow run (or prompts if no current run is known).
+  const decompStatusBarItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    99,
+  );
+  decompStatusBarItem.text = '$(list-tree) Decomp';
+  decompStatusBarItem.tooltip = 'Open Decomposition Viewer';
+  decompStatusBarItem.command = 'janumicode.openDecompViewer';
+  decompStatusBarItem.show();
+  context.subscriptions.push(decompStatusBarItem);
 
   // 13. Commands
   context.subscriptions.push(
@@ -273,25 +290,155 @@ async function bootstrap(
     vscode.commands.registerCommand('janumicode.showLogs', () => {
       outputHandler.show();
     }),
-    vscode.commands.registerCommand('janumicode.openArchitectureCanvas', async () => {
-      // Open canvas for current workflow run or prompt for selection
-      if (session.currentRunId) {
-        const uri = vscode.Uri.parse(`janumicode-canvas:${session.currentRunId}?workflowRunId=${session.currentRunId}`);
-        await vscode.commands.executeCommand('vscode.openWith', uri, 'janumicode.canvas');
-      } else {
-        const runs = db.prepare('SELECT id, intent_summary FROM workflow_runs ORDER BY created_at DESC LIMIT 10').all() as Array<{ id: string; intent_summary: string }>;
-        if (runs.length === 0) {
-          void vscode.window.showInformationMessage('No workflow runs found. Start a workflow first.');
+    vscode.commands.registerCommand('janumicode.openDecompViewer', async () => {
+      // DB-as-truth: open the run-agnostic `/active` URI by default.
+      // The viewer's resolver picks the right run on every tick, so
+      // this works whether the workspace has 0, 1, or N runs and is
+      // robust to DB swaps. The picker is offered as a follow-up to
+      // pin a specific older run when the user wants post-mortem
+      // viewing of a non-active run.
+      if (!liaison) return;
+      const ldb = liaison.getDB();
+      const active = ldb.getActiveWorkflowRun();
+      // workflow_runs has no intent_summary column — schema carries
+      // raw_intent_record_id pointing at the raw_intent_received record
+      // in governed_stream where the human-readable text lives. We
+      // LEFT JOIN to get a short label per run; runs without a raw-intent
+      // pointer still show via the id-prefix fallback in the label.
+      // .all() on the sidecar RPC client may return undefined on query
+      // error (rather than throwing) — defensively coerce to [].
+      let runs: Array<{ id: string; current_phase_id: string | null; status: string | null; intent_text: string | null }> = [];
+      try {
+        const rows = db.prepare(
+          `SELECT wr.id, wr.current_phase_id, wr.status,
+                  json_extract(gs.content, '$.text') AS intent_text
+             FROM workflow_runs wr
+             LEFT JOIN governed_stream gs ON gs.id = wr.raw_intent_record_id
+            ORDER BY wr.initiated_at DESC LIMIT 10`,
+        ).all() as Array<{ id: string; current_phase_id: string | null; status: string | null; intent_text: string | null }> | null | undefined;
+        runs = Array.isArray(rows) ? rows : [];
+      } catch (err) {
+        log.warn('ui', 'workflow_runs query failed in openDecompViewer; falling back to /active', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      if (runs.length === 0) {
+        if (active) {
+          // Resolver found something but the picker query failed — open
+          // /active anyway so the user still sees the data.
+          await vscode.commands.executeCommand(
+            'vscode.openWith', DecompViewerEditorProvider.buildActiveUri(), 'janumicode.decompViewer');
           return;
         }
-        const selected = await vscode.window.showQuickPick(
-          runs.map(r => ({ label: r.intent_summary ?? r.id, id: r.id })),
-          { placeHolder: 'Select a workflow run to visualize' },
-        );
-        if (selected) {
-          const uri = vscode.Uri.parse(`janumicode-canvas:${selected.id}?workflowRunId=${selected.id}`);
-          await vscode.commands.executeCommand('vscode.openWith', uri, 'janumicode.canvas');
+        void vscode.window.showInformationMessage('No workflow runs found in this database. Start a workflow or copy in a calibration DB.');
+        return;
+      }
+      // Single-run shortcut: skip the picker entirely.
+      if (runs.length === 1) {
+        await vscode.commands.executeCommand(
+          'vscode.openWith', DecompViewerEditorProvider.buildActiveUri(), 'janumicode.decompViewer');
+        return;
+      }
+      // Multi-run: let the user pick. First option is always "Active
+      // (auto-resolve)" so the default flow stays DB-as-truth.
+      const summarize = (text: string | null, id: string): string => {
+        const trimmed = (text ?? '').trim().replace(/\s+/g, ' ');
+        return trimmed.length > 0 ? trimmed.slice(0, 80) : `Run ${id.slice(0, 8)}…`;
+      };
+      const items: Array<vscode.QuickPickItem & { runId: string | null }> = [
+        {
+          label: '$(refresh) Active run (auto-resolve)',
+          description: active ? `Currently: ${active.id.slice(0, 8)}…` : 'No runs to resolve',
+          runId: null,
+        },
+        ...runs.map(r => ({
+          label: summarize(r.intent_text, r.id),
+          description: `Phase ${r.current_phase_id ?? '?'} · ${r.status ?? '?'} · ${r.id.slice(0, 8)}…`,
+          runId: r.id,
+        })),
+      ];
+      const selected = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Open viewer for the active run, or pin a specific past run',
+      });
+      if (!selected) return;
+      // "Active" choice persists the focus as null (clears any prior
+      // pin); specific-run choice writes the focus to ui_state so the
+      // selection survives across viewer re-opens until cleared.
+      if (selected.runId === null) {
+        ldb.setFocusedWorkflowRun(null);
+        await vscode.commands.executeCommand(
+          'vscode.openWith', DecompViewerEditorProvider.buildActiveUri(), 'janumicode.decompViewer');
+      } else {
+        ldb.setFocusedWorkflowRun(selected.runId);
+        await vscode.commands.executeCommand(
+          'vscode.openWith', DecompViewerEditorProvider.buildPinnedUri(selected.runId), 'janumicode.decompViewer');
+      }
+    }),
+    vscode.commands.registerCommand('janumicode.openArchitectureCanvas', async () => {
+      // DB-as-truth: same pattern as openDecompViewer — open the
+      // run-agnostic `/active` URI by default, offer a picker only when
+      // the DB has multiple runs and the user might want to pin a
+      // specific one. Survives DB swaps.
+      if (!liaison) return;
+      const ldb = liaison.getDB();
+      const active = ldb.getActiveWorkflowRun();
+      let runs: Array<{ id: string; current_phase_id: string | null; status: string | null; intent_text: string | null }> = [];
+      try {
+        const rows = db.prepare(
+          `SELECT wr.id, wr.current_phase_id, wr.status,
+                  json_extract(gs.content, '$.text') AS intent_text
+             FROM workflow_runs wr
+             LEFT JOIN governed_stream gs ON gs.id = wr.raw_intent_record_id
+            ORDER BY wr.initiated_at DESC LIMIT 10`,
+        ).all() as Array<{ id: string; current_phase_id: string | null; status: string | null; intent_text: string | null }> | null | undefined;
+        runs = Array.isArray(rows) ? rows : [];
+      } catch (err) {
+        log.warn('ui', 'workflow_runs query failed in openArchitectureCanvas; falling back to /active', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      if (runs.length === 0) {
+        if (active) {
+          await vscode.commands.executeCommand(
+            'vscode.openWith', CanvasEditorProvider.buildActiveUri(), 'janumicode.canvas');
+          return;
         }
+        void vscode.window.showInformationMessage('No workflow runs found in this database. Start a workflow or copy in a calibration DB.');
+        return;
+      }
+      if (runs.length === 1) {
+        await vscode.commands.executeCommand(
+          'vscode.openWith', CanvasEditorProvider.buildActiveUri(), 'janumicode.canvas');
+        return;
+      }
+      const summarize = (text: string | null, id: string): string => {
+        const trimmed = (text ?? '').trim().replaceAll(/\s+/g, ' ');
+        return trimmed.length > 0 ? trimmed.slice(0, 80) : `Run ${id.slice(0, 8)}…`;
+      };
+      const items: Array<vscode.QuickPickItem & { runId: string | null }> = [
+        {
+          label: '$(refresh) Active run (auto-resolve)',
+          description: active ? `Currently: ${active.id.slice(0, 8)}…` : 'No runs to resolve',
+          runId: null,
+        },
+        ...runs.map(r => ({
+          label: summarize(r.intent_text, r.id),
+          description: `Phase ${r.current_phase_id ?? '?'} · ${r.status ?? '?'} · ${r.id.slice(0, 8)}…`,
+          runId: r.id,
+        })),
+      ];
+      const selected = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Open canvas for the active run, or pin a specific past run',
+      });
+      if (!selected) return;
+      if (selected.runId === null) {
+        ldb.setFocusedWorkflowRun(null);
+        await vscode.commands.executeCommand(
+          'vscode.openWith', CanvasEditorProvider.buildActiveUri(), 'janumicode.canvas');
+      } else {
+        ldb.setFocusedWorkflowRun(selected.runId);
+        await vscode.commands.executeCommand(
+          'vscode.openWith', CanvasEditorProvider.buildPinnedUri(selected.runId), 'janumicode.canvas');
       }
     }),
   );

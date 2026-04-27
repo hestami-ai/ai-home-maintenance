@@ -46,6 +46,11 @@
         "command": "janumicode.openArchitectureCanvas",
         "title": "Open Architecture Canvas",
         "category": "JanumiCode"
+      },
+      {
+        "command": "janumicode.openDecompViewer",
+        "title": "Open Decomposition Viewer",
+        "category": "JanumiCode"
       }
     ],
     "keybindings": [
@@ -92,8 +97,29 @@
             "filenamePattern": "*.janumicode-canvas"
           }
         ]
+      },
+      {
+        "viewType": "janumicode.decompViewer",
+        "displayName": "Decomposition Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.janumicode-decomp"
+          }
+        ]
       }
-    ]
+    ],
+    "configuration": {
+      "title": "JanumiCode",
+      "properties": {
+        "janumicode.decompViewer.pollIntervalMs": {
+          "type": "number",
+          "default": 3000,
+          "minimum": 500,
+          "maximum": 60000,
+          "description": "How often (ms) the Decomposition Viewer polls SQLite for updates. Lower = more responsive while a run is active; higher = less DB load."
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "tsc --noEmit && node esbuild.js",
@@ -144,6 +170,6 @@
     "ajv-formats": "^3.0.0",
     "better-sqlite3": "^12.8.0",
     "commander": "^13.0.0",
-    "elkjs": "^0.9.3"
+    "elkjs": "^0.11.1"
   }
 }
