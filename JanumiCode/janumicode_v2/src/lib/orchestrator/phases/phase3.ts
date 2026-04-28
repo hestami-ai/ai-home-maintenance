@@ -15,6 +15,7 @@ import type { GovernedStreamRecord, PhaseId } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveFrView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
+import { pickItemsArray, pickEnvelope } from '../parsedResponseHelpers';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -27,7 +28,20 @@ interface ExternalSystem {
 
 interface SystemBoundary {
   in_scope: string[];
+  /**
+   * True scope decisions (e.g. "Tenant payment processing — deferred
+   * to Phase 2"). Items that read like unresolved questions get
+   * routed to `open_questions` instead so reviewers don't mistake
+   * them for concluded decisions. See classifyOutOfScopeEntries().
+   */
   out_of_scope: string[];
+  /**
+   * Unresolved Phase 1 questions that the Systems Agent surfaced
+   * while drafting boundary. Distinct from out_of_scope so the
+   * reviewer knows these still need an answer. Empty array when the
+   * agent's out_of_scope[] looked like genuine scope decisions.
+   */
+  open_questions: string[];
   external_systems: ExternalSystem[];
 }
 
@@ -93,9 +107,22 @@ export class Phase3Handler implements PhaseHandler {
       requiredOutputSpec: 'system_boundary JSON — in_scope, out_of_scope, external_systems',
     });
 
-    const boundaryContent = await this.runSystemBoundaryDefinition(
+    const llmBoundary = await this.runSystemBoundaryDefinition(
       ctx, intentSummary, frSummary, nfrSummary, dmr31,
     );
+
+    // Deterministic-merge step. The LLM is good at judgment
+    // (grouping, descriptions) but unreliable at exhaustive lookup
+    // (cal-21 captured Cloudflare from technical_constraints but
+    // dropped Postgres / ClamAV / SeaweedFS / Cerbos). Pull the
+    // canonical externals list from Phase 1 artifacts directly and
+    // merge — LLM-elaborated descriptions win for shared ids; every
+    // deterministic id is guaranteed to appear.
+    const deterministicExternals = gatherDeterministicExternals(allArtifacts);
+    const boundaryContent: SystemBoundary = {
+      ...llmBoundary,
+      external_systems: mergeExternals(llmBoundary.external_systems, deterministicExternals),
+    };
 
     const boundaryRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -114,7 +141,17 @@ export class Phase3Handler implements PhaseHandler {
     // ── 3.2 — System Requirements Derivation ──────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '3.2');
 
-    const boundarySummary = `PROJECT TYPE: ${prior.projectTypeDescription}\n\nSystem Boundary:\nIn scope: ${boundaryContent.in_scope.join('; ')}\nOut of scope: ${boundaryContent.out_of_scope.join('; ')}\nExternal systems: ${boundaryContent.external_systems.map(e => `${e.id}: ${e.name} (${e.interface_type})`).join('; ') || 'none'}`;
+    const boundarySummary = [
+      `PROJECT TYPE: ${prior.projectTypeDescription}`,
+      ``,
+      `System Boundary:`,
+      `In scope: ${boundaryContent.in_scope.join('; ')}`,
+      `Out of scope: ${boundaryContent.out_of_scope.join('; ') || 'none'}`,
+      boundaryContent.open_questions.length > 0
+        ? `Open questions (unresolved Phase 1 items): ${boundaryContent.open_questions.join('; ')}`
+        : ``,
+      `External systems: ${boundaryContent.external_systems.map(e => `${e.id}: ${e.name} (${e.interface_type})`).join('; ') || 'none'}`,
+    ].filter(Boolean).join('\n');
 
     const dmr32 = await buildPhaseContextPacket(ctx, {
       subPhaseId: '3.2',
@@ -290,6 +327,7 @@ export class Phase3Handler implements PhaseHandler {
     const fallback: SystemBoundary = {
       in_scope: ['Core application functionality as described in requirements'],
       out_of_scope: ['Third-party integrations not specified in requirements'],
+      open_questions: [],
       external_systems: [],
     };
 
@@ -306,9 +344,11 @@ export class Phase3Handler implements PhaseHandler {
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama',
-      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    // Route through requirements_agent routing so cal-22+ can target
+    // llamacpp via llama-swap. Falls back to ollama+qwen3.5:9b dev
+    // defaults when no workspace-config override is set. callForRole
+    // forwards provider/model/base_url from llm_routing.requirements_agent.
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.4,
@@ -321,13 +361,24 @@ export class Phase3Handler implements PhaseHandler {
       },
     });
 
+    // 3.1 has no array-vs-object envelope ambiguity (system_boundary
+    // is a single object, not a list), but use the same pickEnvelope
+    // helper for symmetry with 3.2/3.3 and to tolerate the agent
+    // wrapping the boundary in either `{ system_boundary: {...} }` or
+    // emitting the boundary fields at the top level.
     const parsed = result.parsed as Record<string, unknown> | null;
-    const boundary = parsed?.system_boundary ?? parsed;
-    const sb = (Array.isArray(boundary) ? boundary[0] : boundary) as Partial<SystemBoundary> | null;
+    const sb = pickEnvelope<Partial<SystemBoundary>>(parsed, ['system_boundary']);
     if (sb?.in_scope && Array.isArray(sb.in_scope)) {
+      // Split LLM out_of_scope[] into real scope decisions vs open
+      // questions. cal-21 surfaced this gap: items like "Determine
+      // monetization model…" are unresolved Phase 1 questions
+      // leaking into Phase 3 as if they were boundary decisions.
+      // The reviewer needs to see them but they're not commitments.
+      const { decisions, questions } = classifyOutOfScopeEntries(sb.out_of_scope ?? []);
       return {
         in_scope: sb.in_scope,
-        out_of_scope: sb.out_of_scope ?? [],
+        out_of_scope: decisions,
+        open_questions: questions,
         external_systems: (sb.external_systems ?? []) as ExternalSystem[],
       };
     }
@@ -363,9 +414,11 @@ export class Phase3Handler implements PhaseHandler {
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama',
-      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    // Route through requirements_agent routing so cal-22+ can target
+    // llamacpp via llama-swap. Falls back to ollama+qwen3.5:9b dev
+    // defaults when no workspace-config override is set. callForRole
+    // forwards provider/model/base_url from llm_routing.requirements_agent.
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.4,
@@ -378,12 +431,17 @@ export class Phase3Handler implements PhaseHandler {
       },
     });
 
+    // Parse defensively — qwen-3.5:9b emits the array under whichever
+    // envelope name reads naturally to it (the agent has been observed
+    // returning `{ system_requirements: [...] }` directly while the
+    // schema property is `items`). cal-21 lost all 16 SRs to this
+    // mismatch (reading sr[0] as a single-SR object then checking
+    // .items, which doesn't exist on a single SR). Order: try the
+    // envelope key, then the schema key, then fall through to parsed.
+    // Whichever first contains a non-empty array wins.
     const parsed = result.parsed as Record<string, unknown> | null;
-    const sr = parsed?.system_requirements ?? parsed;
-    const data = (Array.isArray(sr) ? sr[0] : sr) as Partial<SystemRequirements> | null;
-    if (data?.items && Array.isArray(data.items) && data.items.length > 0) {
-      return { items: data.items as SystemRequirementItem[] };
-    }
+    const items = pickItemsArray<SystemRequirementItem>(parsed, ['system_requirements', 'items']);
+    if (items && items.length > 0) return { items };
     return fallback;
   }
 
@@ -417,9 +475,11 @@ export class Phase3Handler implements PhaseHandler {
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama',
-      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    // Route through requirements_agent routing so cal-22+ can target
+    // llamacpp via llama-swap. Falls back to ollama+qwen3.5:9b dev
+    // defaults when no workspace-config override is set. callForRole
+    // forwards provider/model/base_url from llm_routing.requirements_agent.
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.4,
@@ -432,12 +492,16 @@ export class Phase3Handler implements PhaseHandler {
       },
     });
 
+    // Defensive parsing — same pattern as 3.2 (see SR derivation
+    // comment). 3.3 happens to currently emit `{ contracts: [...] }`
+    // directly so the previous single-form parse worked, but the
+    // model is free to wrap in `{ interface_contracts: [...] }` on
+    // any retry. Use the same envelope-vs-schema-key resolver so
+    // either form is accepted and we never silently fall back when
+    // the model produced real output.
     const parsed = result.parsed as Record<string, unknown> | null;
-    const ic = parsed?.interface_contracts ?? parsed;
-    const data = (Array.isArray(ic) ? ic[0] : ic) as Partial<InterfaceContracts> | null;
-    if (data?.contracts && Array.isArray(data.contracts) && data.contracts.length > 0) {
-      return { contracts: data.contracts as InterfaceContract[] };
-    }
+    const contracts = pickItemsArray<InterfaceContract>(parsed, ['interface_contracts', 'contracts']);
+    if (contracts && contracts.length > 0) return { contracts };
     return fallback;
   }
 
@@ -514,3 +578,160 @@ export class Phase3Handler implements PhaseHandler {
     };
   }
 }
+
+// ── Phase 3.1 helpers ────────────────────────────────────────────
+
+/**
+ * Verbs that mark an out_of_scope entry as actually an unresolved
+ * question rather than a scope decision. cal-21 surfaced these as
+ * "Determine monetization model…", "Establish prioritized
+ * integrations…", "Clarify differentiation…". An unresolved Phase 1
+ * MMP item leaking into Phase 3's out_of_scope[] reads exactly like a
+ * boundary decision but is not — calibration smell, not a
+ * commitment.
+ *
+ * Heuristic intentionally narrow: imperative leading verbs that are
+ * meta-decisions ("decide what to do") rather than feature
+ * descriptions ("Tenant payment processing"). False negatives
+ * preferred over false positives — a real scope decision
+ * misclassified as a question is harmless; a question
+ * misclassified as scope is the bug we're trying to surface.
+ */
+const OPEN_QUESTION_LEADERS = new Set([
+  'determine', 'establish', 'clarify', 'decide', 'evaluate',
+  'investigate', 'assess', 'identify', 'choose', 'select',
+]);
+
+/**
+ * Split the LLM's out_of_scope[] into actual scope decisions and
+ * open questions. Items ending in '?', or starting with one of the
+ * meta-decision verbs above, route to questions. Everything else
+ * stays in decisions.
+ */
+function classifyOutOfScopeEntries(
+  entries: string[],
+): { decisions: string[]; questions: string[] } {
+  const decisions: string[] = [];
+  const questions: string[] = [];
+  for (const entry of entries) {
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    if (trimmed.endsWith('?')) { questions.push(trimmed); continue; }
+    const firstWord = trimmed.split(/\s+/, 1)[0]?.toLowerCase() ?? '';
+    if (OPEN_QUESTION_LEADERS.has(firstWord)) { questions.push(trimmed); continue; }
+    decisions.push(trimmed);
+  }
+  return { decisions, questions };
+}
+
+/**
+ * Pre-populate `external_systems[]` with anything Phase 1 already
+ * named deterministically — technical_constraints_discovery.
+ * technicalConstraints[] (TECH-* ids) and integrations_qa_bloom.
+ * integrations[] (INT-* ids). Phase 3.1 used to hope qwen would
+ * faithfully reproduce these from a free-form context; cal-21
+ * showed it picks a few high-salience ones and silently drops the
+ * rest. The bookkeeping/judgment split: orchestrator does the
+ * exhaustive list, LLM does the descriptions.
+ *
+ * Returns a list of seed externals the LLM should treat as
+ * pre-confirmed. Caller merges with the LLM's own external_systems
+ * list, deduping by id (LLM-provided wins for description if it
+ * elaborated). When merged this way, the LLM is free to add
+ * externals it derived from FRs (e.g. a third-party email service
+ * mentioned only in a journey) without re-emitting the known set.
+ */
+function gatherDeterministicExternals(
+  artifacts: GovernedStreamRecord[],
+): ExternalSystem[] {
+  const out: ExternalSystem[] = [];
+  const seen = new Set<string>();
+  const push = (e: ExternalSystem | null): void => {
+    if (!e?.id || seen.has(e.id)) return;
+    seen.add(e.id);
+    out.push(e);
+  };
+  for (const a of artifacts) {
+    const c = (a.content ?? {}) as Record<string, unknown>;
+    const list = pickExternalsList(c);
+    if (!list) continue;
+    for (const item of list.items) push(list.toExternal(item));
+  }
+  return out;
+}
+
+/** Per-kind extractor: returns the items[] and a shaper for that artifact kind. */
+function pickExternalsList(
+  c: Record<string, unknown>,
+): { items: Array<Record<string, unknown>>; toExternal: (i: Record<string, unknown>) => ExternalSystem | null } | null {
+  if (c.kind === 'technical_constraints_discovery') {
+    const items = arr(c.technicalConstraints ?? c.technical_constraints);
+    return items ? { items, toExternal: techConstraintToExternal } : null;
+  }
+  if (c.kind === 'integrations_qa_bloom') {
+    const items = arr(c.integrations ?? c.integrationCatalog);
+    return items ? { items, toExternal: integrationToExternal } : null;
+  }
+  return null;
+}
+
+function arr(v: unknown): Array<Record<string, unknown>> | null {
+  return Array.isArray(v) ? (v as Array<Record<string, unknown>>) : null;
+}
+
+function techConstraintToExternal(t: Record<string, unknown>): ExternalSystem | null {
+  const id = typeof t.id === 'string' ? t.id : '';
+  if (!id) return null;
+  return {
+    id,
+    name: (t.technology as string) ?? (t.name as string) ?? id,
+    purpose: (t.text as string) ?? (t.rationale as string) ?? '',
+    interface_type: (t.category as string) ?? 'technical',
+  };
+}
+
+function integrationToExternal(i: Record<string, unknown>): ExternalSystem | null {
+  let id = '';
+  if (typeof i.id === 'string') id = i.id;
+  else if (typeof i.name === 'string') id = i.name;
+  if (!id) return null;
+  return {
+    id,
+    name: (i.name as string) ?? id,
+    purpose: (i.description as string) ?? (i.purpose as string) ?? '',
+    interface_type: (i.protocol as string) ?? (i.type as string) ?? 'integration',
+  };
+}
+
+/**
+ * Merge LLM-emitted external_systems with the deterministic seed
+ * list. LLM-provided entries win for `name`/`purpose`/`interface_type`
+ * (the LLM may have added context the constraint discovery row
+ * lacked), but every deterministic id is guaranteed to appear in
+ * the result. Comparison is case-insensitive on id.
+ */
+function mergeExternals(
+  llmEmitted: ExternalSystem[],
+  deterministic: ExternalSystem[],
+): ExternalSystem[] {
+  const byId = new Map<string, ExternalSystem>();
+  for (const e of deterministic) byId.set(e.id.toLowerCase(), e);
+  for (const e of llmEmitted) {
+    const key = e.id.toLowerCase();
+    const existing = byId.get(key);
+    if (existing) {
+      // Prefer LLM-elaborated text when non-empty, else keep the
+      // deterministic baseline.
+      byId.set(key, {
+        id: existing.id,  // canonical casing from constraints
+        name: e.name?.trim() || existing.name,
+        purpose: e.purpose?.trim() || existing.purpose,
+        interface_type: e.interface_type?.trim() || existing.interface_type,
+      });
+    } else {
+      byId.set(key, e);
+    }
+  }
+  return Array.from(byId.values());
+}
+

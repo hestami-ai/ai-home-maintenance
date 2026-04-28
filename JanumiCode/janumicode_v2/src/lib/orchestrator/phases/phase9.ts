@@ -16,13 +16,14 @@
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
 import type { PhaseId } from '../../types/records';
 import { getLogger } from '../../logging';
-import { ExecutorAgent, type ExecutionTask, type ExecutionResult } from '../../agents/executorAgent';
+import { ExecutorAgent, type ExecutionTask, type ExecutionResult, type ExecutorBackingTool } from '../../agents/executorAgent';
 import { ExecutionContextBuilder, type ImplementationTask as CtxTask } from '../executionContextBuilder';
 import { TestRunner, type TestSuite } from '../testRunner';
 import { EvalRunner, type EvaluationCriterion } from '../evalRunner';
 import { FailureHandler, type FailureContext } from '../failureHandler';
 import { ReasoningReview, type ReasoningReviewInput } from '../../review/reasoningReview';
 import { ContextBuilder } from '../contextBuilder';
+import { loadExecutorTrace } from './phase9TraceLoader';
 import { LoopDetectionMonitor, type FlawRecord } from '../loopDetectionMonitor';
 import { randomUUID } from 'node:crypto';
 
@@ -52,12 +53,37 @@ export class Phase9Handler implements PhaseHandler {
     );
 
     // ── Initialize Executor Agent ──────────────────────────────────
+    // Resolve the executor backing tool from config:
+    //   llm_routing.executor.primary.backing_tool — when set, picks
+    //   which CLI runs Phase 9 tasks (claude_code_cli / goose_cli /
+    //   gemini_cli / codex_cli). Default executor falls back to
+    //   claude_code_cli when the config key is absent. cal-22+ uses
+    //   goose_cli + ollama qwen-3.5:9b for cost containment.
+    //
+    // Env override: JANUMICODE_EXECUTOR_BACKING_TOOL takes precedence
+    // over config so operators can flip executors per-run without
+    // editing janumicode.json.
+    const cfg = engine.configManager.get();
+    const cfgExecutor = cfg.llm_routing.executor?.primary;
+    const envExecutor = process.env.JANUMICODE_EXECUTOR_BACKING_TOOL;
+    const executorBackingTool = (envExecutor ?? cfgExecutor?.backing_tool) as
+      ExecutorBackingTool | undefined;
+    // Calibration runs flip this on so the executor can run Bash to
+    // self-verify (e.g. `node --test` to confirm the tests it just
+    // wrote actually pass). Production CLI / VS Code use cases keep
+    // it off so permission prompts surface to the human as designed.
+    // Resolution: per-workflow config beats env var; default false.
+    const cfgExecution = (cfg as unknown as { execution?: { unattended_skip_permissions?: boolean } }).execution;
+    const unattendedSkipPermissions =
+      cfgExecution?.unattended_skip_permissions === true
+      || process.env.JANUMICODE_EXECUTOR_UNATTENDED === '1';
     const executorAgent = new ExecutorAgent(
       engine.db,
       engine.agentInvoker,
       engine.writer,
       engine.eventBus,
       generateId,
+      { executorBackingTool, unattendedSkipPermissions },
     );
 
     // ── Extract artifacts from prior phases ────────────────────────
@@ -77,13 +103,18 @@ export class Phase9Handler implements PhaseHandler {
     let tasksQuarantined = 0;
 
     for (const task of orderedTasks) {
-      const invocationId = generateId();
+      // ID used to name the per-task detail file (`.janumicode/context/9.1_<id>.md`).
+      // Distinct from the executor's `invocation_id` (returned in
+      // ExecutionResult) which is what stamps every trace record's
+      // `produced_by_record_id` and is the key reasoning_review must
+      // filter on.
+      const contextFileId = generateId();
 
       // Build context payload for this task
       const contextPayload = execContextBuilder.buildTaskContext(
         task as unknown as CtxTask,
         workflowRun.id,
-        invocationId,
+        contextFileId,
         artifacts,
       );
 
@@ -133,32 +164,47 @@ export class Phase9Handler implements PhaseHandler {
         {
           provider: rrConfig.primary.provider,
           model: rrConfig.primary.model,
-          traceMaxTokens: rrConfig.trace_max_tokens,
           temperature: rrConfig.temperature,
           janumiCodeVersionSha: engine.janumiCodeVersionSha,
         },
       );
 
-      // Load trace records from DB for this task
-      const traceRecords = engine.db.prepare(`
-        SELECT * FROM governed_stream
-        WHERE workflow_run_id = ? AND phase_id = '9' AND sub_phase_id = '9.1'
-        AND json_extract(content, '$.task_id') = ?
-        ORDER BY produced_at ASC
-      `).all(workflowRun.id, task.id) as Array<{ id: string; content: string; produced_at: string }>;
+      // Load executor trace (SQL + typeMap) via the extracted loader so
+      // the correlation key + record-type mapping are regression-tested
+      // in isolation. See phase9TraceLoader.ts for the rationale.
+      const trace = loadExecutorTrace(engine.db, workflowRun.id, result.invocationId);
+
+      // Diagnostic — surface what the trace-selection query actually
+      // returned. Empty results here usually mean the executor's writes
+      // haven't been flushed yet, or the `produced_by_record_id`
+      // linkage convention has drifted again.
+      getLogger().info('workflow', 'Reasoning review — trace records loaded', {
+        task_id: task.id,
+        invocation_id: result.invocationId,
+        trace_record_count: trace.rows.length,
+        trace_type_counts: trace.typeCounts,
+      });
 
       const reviewInput: ReasoningReviewInput = {
-        traceRecords: traceRecords.map((r, i) => ({
-          id: r.id,
-          type: 'agent_reasoning_step' as const,
-          content: r.content,
-          sequencePosition: i,
-          tokenCount: Math.ceil(r.content.length / 4), // Rough token estimate
-        })),
+        traceRecords: trace.traceRecords,
         isExecutorAgent: true,
         requiredOutputSpec: task.description,
         phaseGateCriteria: task.completion_criteria.map(c => c.description).join('\n'),
-        finalOutput: result.success ? 'Task completed successfully' : (result.error ?? 'Task failed'),
+        // Pass concrete evidence to the reviewer rather than a vague
+        // success string. Earlier iterations sent literally "Task
+        // completed successfully" with an empty trace, and the reviewer
+        // (correctly) flagged a `completeness_shortcut`. Surface the
+        // files written, their operation, and any verification status
+        // so the reviewer has something to cross-check the trace against.
+        finalOutput: result.success
+          ? [
+              `Task ${task.id} reported success.`,
+              result.skippedIdempotent ? 'Task was idempotent and skipped (no changes needed).' : null,
+              result.filesWritten.length > 0
+                ? `Files written (${result.filesWritten.length}):\n${result.filesWritten.map(f => `  - ${f.operation} ${f.filePath}${f.driftDetected ? ' [drift_detected]' : ''}`).join('\n')}`
+                : 'Files written: none',
+            ].filter(Boolean).join('\n')
+          : (result.error ?? 'Task failed'),
         completionCriteria: task.completion_criteria.map(c => c.description).join('\n'),
         subPhaseId: '9.1',
         workflowRunId: workflowRun.id,
@@ -204,7 +250,7 @@ export class Phase9Handler implements PhaseHandler {
         // Run loop detection if we have history
         if (flawHistory.length >= 2) {
           // Extract tool calls from trace records
-          const toolCallHistory = traceRecords
+          const toolCallHistory = trace.rows
             .filter(r => r.content.includes('"type":"tool_call"') || r.content.includes('"tool_call"'))
             .map(r => {
               try {
@@ -651,6 +697,29 @@ export class Phase9Handler implements PhaseHandler {
   /**
    * Extract test suites from test_plan artifact content.
    */
+  /**
+   * Convert a Phase 7 test plan into TestRunner suites.
+   *
+   * Phase 7's prompt template emits test_plan as:
+   *   { kind: 'test_plan', test_suites: [
+   *       { suite_id, component_id, test_type, test_cases: [
+   *           { test_case_id, type, acceptance_criterion_ids[],
+   *             preconditions[], expected_outcome }
+   *       ] }
+   *   ] }
+   *
+   * The earlier extractor read `plan.test_cases` — a flat path that
+   * doesn't exist in that shape, so cal-22b found zero test cases,
+   * built zero suites, and Phase 9.2 reported `suite_results: []`.
+   *
+   * This walker handles both shapes (the nested production shape and
+   * a legacy flat shape some fixtures may still use). Note the
+   * deeper architectural limitation: Phase 7's test cases are prose
+   * specifications, not test-file references. Without `testFilePaths`
+   * the runner has nothing to execute. Wave R replaces this with
+   * per-leaf test execution inside the executor loop where the
+   * executor authors AND runs the tests against its own writes.
+   */
   private extractTestSuites(
     testPlanContent: string,
     generateId: () => string,
@@ -663,17 +732,36 @@ export class Phase9Handler implements PhaseHandler {
       return [];
     }
 
+    const flatCases: Array<Record<string, unknown>> = [];
+    const nestedSuites = (plan.test_suites ?? []) as Array<Record<string, unknown>>;
+    if (Array.isArray(nestedSuites) && nestedSuites.length > 0) {
+      // Production shape: walk each suite's test_cases.
+      for (const ns of nestedSuites) {
+        const cases = (ns.test_cases ?? []) as Array<Record<string, unknown>>;
+        // Inherit the suite's test_type onto each case if the case
+        // didn't set its own — Phase 7 puts the type on the suite.
+        const suiteType = ns.test_type as string | undefined;
+        for (const c of cases) {
+          flatCases.push({ ...c, _inherited_type: suiteType, _suite_id: ns.suite_id });
+        }
+      }
+    } else {
+      // Legacy flat shape.
+      const top = (plan.test_cases ?? []) as Array<Record<string, unknown>>;
+      flatCases.push(...top);
+    }
+
     const suites: TestSuite[] = [];
-    const testCases = (plan.test_cases ?? []) as Array<Record<string, unknown>>;
 
     // Group test cases by suite type
     const byType = new Map<string, Array<Record<string, unknown>>>();
-    for (const tc of testCases) {
-      const type = (tc.suite_type ?? tc.type ?? 'unit') as string;
-      if (!byType.has(type)) {
-        byType.set(type, []);
-      }
-      byType.get(type)!.push(tc);
+    for (const tc of flatCases) {
+      const type = (tc.suite_type ?? tc._inherited_type ?? tc.type ?? 'unit') as string;
+      // Normalize Phase 7's `e2e` / `end_to_end` / `endToEnd` variants
+      // onto the runner's internal label.
+      const normalized = type === 'e2e' || type === 'endToEnd' ? 'end_to_end' : type;
+      if (!byType.has(normalized)) byType.set(normalized, []);
+      byType.get(normalized)!.push(tc);
     }
 
     // Build TestSuite objects
@@ -688,8 +776,14 @@ export class Phase9Handler implements PhaseHandler {
         validatesTaskIds: cases
           .flatMap(c => (c.validates_task_ids ?? []) as string[]),
         coversCriteriaIds: cases
-          .map(c => (c.acceptance_criterion_id ?? c.criterion_id ?? '') as string)
-          .filter(id => id),
+          .flatMap(c => {
+            // Phase 7 emits acceptance_criterion_ids as an array;
+            // legacy fixtures used singular acceptance_criterion_id.
+            const arr = c.acceptance_criterion_ids;
+            if (Array.isArray(arr)) return arr.filter(id => typeof id === 'string') as string[];
+            const single = (c.acceptance_criterion_id ?? c.criterion_id ?? '') as string;
+            return single ? [single] : [];
+          }),
       });
     }
 
@@ -698,6 +792,29 @@ export class Phase9Handler implements PhaseHandler {
 
   /**
    * Extract evaluation criteria from evaluation plan artifact content.
+   */
+  /**
+   * Convert a Phase 8 evaluation plan into the unified
+   * EvaluationCriterion shape Phase 9.3's EvalRunner consumes.
+   *
+   * Phase 8 emits THREE distinct artifact kinds, each with its own
+   * domain-specific field names:
+   *   - `functional_evaluation_plan.criteria[]` — items shaped as
+   *     `{ functional_requirement_id, evaluation_method, success_condition }`
+   *   - `quality_evaluation_plan.criteria[]` — items shaped as
+   *     `{ nfr_id, category, evaluation_tool, threshold, measurement_method }`
+   *   - `reasoning_evaluation_plan.scenarios[]` — items shaped as
+   *     `{ scenario_id, scenario_name, expected_reasoning, ... }`
+   *
+   * The earlier extractor expected a flat `c.name / c.description /
+   * c.evaluation_tool` shape that Phase 8 never produces. Result:
+   * cal-22b surfaced 22 "Unnamed criterion" entries with empty
+   * descriptions, all marked failed regardless of actual evidence.
+   *
+   * This dispatcher reads the plan's `kind` to pick the right
+   * field-mapping, normalizes each kind into EvaluationCriterion, and
+   * fills `name` / `description` from whichever fields the LLM
+   * actually populated.
    */
   private extractEvalCriteria(
     evalPlanContent: string,
@@ -711,12 +828,102 @@ export class Phase9Handler implements PhaseHandler {
       return [];
     }
 
-    const criteria: EvaluationCriterion[] = [];
-    const planCriteria = (plan.criteria ?? plan.evaluation_criteria ?? []) as Array<Record<string, unknown>>;
+    const kind = plan.kind as string | undefined;
 
-    for (const c of planCriteria) {
+    if (kind === 'functional_evaluation_plan') {
+      return this.extractFunctionalCriteria(plan, generateId);
+    }
+    if (kind === 'quality_evaluation_plan') {
+      return this.extractQualityCriteria(plan, generateId);
+    }
+    if (kind === 'reasoning_evaluation_plan') {
+      return this.extractReasoningCriteria(plan, generateId);
+    }
+    // Unknown kind — fall back to legacy behaviour for any
+    // already-shaped evaluation plans the LLM might emit. Keeps
+    // backward compat for fixtures that match the old contract.
+    return this.extractLegacyCriteria(plan, generateId);
+  }
+
+  private extractFunctionalCriteria(
+    plan: Record<string, unknown>,
+    generateId: () => string,
+  ): EvaluationCriterion[] {
+    const items = (plan.criteria ?? []) as Array<Record<string, unknown>>;
+    return items.map(c => {
+      const frId = (c.functional_requirement_id as string) ?? '';
+      const method = (c.evaluation_method as string) ?? '';
+      const condition = (c.success_condition as string) ?? '';
+      const name = frId
+        ? `Functional ${frId}${method ? ` (${method})` : ''}`
+        : (method || 'Functional criterion');
+      return {
+        id: (c.id as string) ?? generateId(),
+        name,
+        type: 'functional' as const,
+        description: condition,
+        evaluationTool: method || 'llm_judge',
+        acceptanceCriterionId: frId || undefined,
+      };
+    });
+  }
+
+  private extractQualityCriteria(
+    plan: Record<string, unknown>,
+    generateId: () => string,
+  ): EvaluationCriterion[] {
+    const items = (plan.criteria ?? []) as Array<Record<string, unknown>>;
+    return items.map(c => {
+      const nfrId = (c.nfr_id as string) ?? '';
+      const category = (c.category as string) ?? '';
+      const tool = (c.evaluation_tool as string) ?? '';
+      const threshold = (c.threshold as string) ?? '';
+      const measurement = (c.measurement_method as string) ?? '';
+      const name = nfrId
+        ? `Quality ${nfrId}${category ? ` — ${category}` : ''}`
+        : (category || 'Quality criterion');
+      const description = [threshold, measurement].filter(Boolean).join(' — ');
+      return {
+        id: (c.id as string) ?? generateId(),
+        name,
+        type: 'quality' as const,
+        description,
+        evaluationTool: tool || 'llm_judge',
+        acceptanceCriterionId: nfrId || undefined,
+      };
+    });
+  }
+
+  private extractReasoningCriteria(
+    plan: Record<string, unknown>,
+    generateId: () => string,
+  ): EvaluationCriterion[] {
+    // Phase 8.3 emits scenarios, not criteria — each scenario tests a
+    // different reasoning capability. Treat each scenario as one
+    // criterion at this layer.
+    const items = (plan.scenarios ?? plan.criteria ?? []) as Array<Record<string, unknown>>;
+    return items.map(c => {
+      const id = (c.scenario_id as string) ?? (c.id as string) ?? generateId();
+      const name = (c.scenario_name as string) ?? (c.name as string) ?? `Reasoning scenario ${id}`;
+      const description = (c.expected_reasoning as string) ?? (c.description as string) ?? '';
+      return {
+        id,
+        name,
+        type: 'reasoning' as const,
+        description,
+        evaluationTool: (c.evaluation_tool as string) ?? 'llm_judge',
+      };
+    });
+  }
+
+  private extractLegacyCriteria(
+    plan: Record<string, unknown>,
+    generateId: () => string,
+  ): EvaluationCriterion[] {
+    const planCriteria = (plan.criteria ?? plan.evaluation_criteria ?? []) as Array<Record<string, unknown>>;
+    return planCriteria.map(c => {
       const type = (c.type ?? 'functional') as 'functional' | 'quality' | 'reasoning';
-      criteria.push({
+      return {
         id: (c.id as string) ?? generateId(),
         name: (c.name as string) ?? 'Unnamed criterion',
         type,
@@ -724,9 +931,7 @@ export class Phase9Handler implements PhaseHandler {
         evaluationTool: (c.evaluation_tool as string) ?? 'llm_judge',
         passingThreshold: c.passing_threshold as number | undefined,
         acceptanceCriterionId: c.acceptance_criterion_id as string | undefined,
-      });
-    }
-
-    return criteria;
+      };
+    });
   }
 }

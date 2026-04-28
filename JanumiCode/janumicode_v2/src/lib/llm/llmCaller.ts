@@ -63,6 +63,20 @@ export interface LLMCallOptions {
   provider: string;
   /** Model name */
   model: string;
+  /**
+   * Optional per-call provider base URL. When set, providers that
+   * support per-call URL routing (currently `llamacpp`) target this
+   * endpoint instead of the constructor-time default. Lets the
+   * calibration harness point different roles at different
+   * llama-server instances on different ports without registering
+   * multiple provider adapters.
+   *
+   * Other providers (`ollama`, `openai`, `google`, `anthropic`) ignore
+   * this field — they're constructor-configured. Adding it on the
+   * call options surface keeps the route-resolver in phase handlers
+   * one place to thread URL through.
+   */
+  baseUrl?: string;
   /** System prompt */
   system?: string;
   /** User prompt */
@@ -277,8 +291,26 @@ export class LLMCaller {
     // immediately, then appends chunks as they stream, and a trailer on
     // completion. Lets `tail -f .janumicode/live/<id>.log` show live
     // model progress independent of DB commits.
+    // Filename prefix encodes phase / sub-phase so operators scanning
+    // .janumicode/live/ can find every call for a given sub-phase via
+    // glob (e.g. `phase06_1__*.log`). Falls back to no prefix when
+    // traceContext is absent (rare — typically only test fixtures).
+    //
+    // Raw-token-stream writing is opt-in via JANUMICODE_LLM_LIVE_RAW_STREAM=1.
+    // Default off because cal-21 produced ~700 MB of live logs largely
+    // from per-chunk lines; the trailer's full text + thinking chain
+    // is what operators actually consume. Loop detection is unaffected
+    // (bytesWritten is incremented in JS regardless of disk write).
+    const filenamePrefix = buildLogFilenamePrefix(
+      options.traceContext?.phaseId ?? null,
+      options.traceContext?.subPhaseId ?? null,
+    );
+    const writeRawTokenStream = process.env.JANUMICODE_LLM_LIVE_RAW_STREAM === '1';
     const logFile = invocationId && this.liveLogDir
-      ? new InvocationLogFile(this.liveLogDir, invocationId)
+      ? new InvocationLogFile(this.liveLogDir, invocationId, {
+          filenamePrefix,
+          writeRawTokenStream,
+        })
       : null;
     if (logFile) {
       logFile.writeHeader({
@@ -676,4 +708,36 @@ export class LLMCaller {
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+}
+
+/**
+ * Build a filename prefix encoding phase/sub-phase for live log files.
+ *
+ *   phaseId='6', subPhaseId='6.1'  → 'phase06_1'
+ *   phaseId='10', subPhaseId='10.2' → 'phase10_2'
+ *   phaseId='3', subPhaseId='3.2a' → 'phase03_2a'
+ *   phaseId='2', subPhaseId=null   → 'phase02'
+ *   both null                       → null  (legacy unprefixed shape)
+ *
+ * The prefix is deterministic and glob-friendly so operators can find
+ * all calls for a phase via `ls phase06_*` or for a specific sub-phase
+ * via `ls phase06_1__*`. Padding phaseId to 2 digits keeps lexical sort
+ * order matching numerical phase order through Phase 10.
+ */
+export function buildLogFilenamePrefix(
+  phaseId: string | null,
+  subPhaseId: string | null,
+): string | null {
+  if (!phaseId && !subPhaseId) return null;
+  // Prefer subPhaseId because it carries the full path. When only
+  // phaseId is present, we still emit `phaseNN` for grouping.
+  const source = subPhaseId ?? phaseId ?? '';
+  // Split on the first '.' — major phase is everything before it.
+  const dotIdx = source.indexOf('.');
+  const major = dotIdx >= 0 ? source.slice(0, dotIdx) : source;
+  const minor = dotIdx >= 0 ? source.slice(dotIdx + 1) : '';
+  // Strip non-id characters defensively (shouldn't be any in practice).
+  const safeMinor = minor.replaceAll(/[^a-zA-Z0-9]/g, '_');
+  const padded = major.padStart(2, '0');
+  return safeMinor ? `phase${padded}_${safeMinor}` : `phase${padded}`;
 }

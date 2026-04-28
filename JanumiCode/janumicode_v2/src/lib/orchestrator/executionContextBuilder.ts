@@ -14,6 +14,7 @@
 import { ContextBuilder, type StdinContent, type DetailFileContent, type ContextPayload } from './contextBuilder';
 import type { GovernedStreamWriter } from './governedStreamWriter';
 import type { Database } from '../database/init';
+import { normalizeWorkspacePath } from './phases/phase6';
 
 // Re-export types from contextBuilder for convenience
 export type { StdinContent, DetailFileContent, ContextPayload };
@@ -286,12 +287,18 @@ export class ExecutionContextBuilder {
       formatCompletionCriteria(task.completion_criteria)
     );
 
-    // Write scope constraints
+    // Write scope constraints. Defensive normalize: legacy DBs (cal-21
+    // and earlier) persist absolute paths like `/opt/hestami/PROP/...`
+    // because the Phase 6 normalization wasn't in place at the time.
+    // Strip system-root prefixes so Phase 9 resolves them against
+    // workspacePath consistently regardless of when the task was
+    // emitted.
     if (task.write_directory_paths?.length) {
+      const normalized = task.write_directory_paths.map(p => normalizeWorkspacePath(p));
       sections.push(
         `## Write Scope Constraint\n` +
         `Files may ONLY be created/modified in:\n` +
-        task.write_directory_paths.map(p => `- ${p}`).join('\n')
+        normalized.map(p => `- ${p}`).join('\n')
       );
     }
 

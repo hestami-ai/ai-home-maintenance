@@ -193,9 +193,14 @@ export async function createTestEngine(
   engine.registerPhase(new Phase10Handler());
 
   // 5. Embedding (created but NOT started — tests don't need background embedding)
+  // Mirrors extension.ts env-var plumbing so calibration runs that go
+  // through the test harness can route the embedding role at llama-swap.
+  const embedProvider = (process.env.JANUMICODE_EMBED_PROVIDER as 'ollama' | 'llamacpp') ?? 'ollama';
+  const embedDefaultModel = embedProvider === 'llamacpp' ? 'qwen3-embedding-8b' : 'qwen3-embedding:8b';
   const embedding = new EmbeddingService(db, {
-    provider: 'ollama',
-    model: 'qwen3-embedding:8b',
+    provider: embedProvider,
+    model: process.env.JANUMICODE_EMBED_MODEL ?? embedDefaultModel,
+    baseUrl: process.env.JANUMICODE_EMBED_BASE_URL,
     maxParallel: 1,
   });
 
@@ -240,9 +245,13 @@ export async function createTestEngine(
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { GoogleProvider } = require('../../lib/llm/providers/google');
 
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { LlamaCppProvider } = require('../../lib/llm/providers/llamacpp');
+
     const ollama = new OllamaProvider();
     const anthropic = new AnthropicProvider();
     const google = new GoogleProvider();
+    const llamacpp = new LlamaCppProvider();
 
     if (effectiveMode === 'capture') {
       // Capture mode: wrap each real provider so every call is intercepted
@@ -252,11 +261,13 @@ export async function createTestEngine(
       engine.llmCaller.registerProvider(mockLLM.wrapForCapture(ollama));
       engine.llmCaller.registerProvider(mockLLM.wrapForCapture(anthropic));
       engine.llmCaller.registerProvider(mockLLM.wrapForCapture(google));
+      engine.llmCaller.registerProvider(mockLLM.wrapForCapture(llamacpp));
     } else {
       // Pure real mode: register providers directly.
       engine.llmCaller.registerProvider(ollama);
       engine.llmCaller.registerProvider(anthropic);
       engine.llmCaller.registerProvider(google);
+      engine.llmCaller.registerProvider(llamacpp);
     }
     // Keep mock available as a fallback provider name
     engine.llmCaller.registerProvider(mockLLM);

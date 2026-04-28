@@ -15,8 +15,6 @@ function mockResult(overrides: Partial<ReasoningReviewResult> = {}): ReasoningRe
     overallPass: true,
     flaws: [],
     traceSelectionRecordIds: ['r1'],
-    traceSamplingApplied: false,
-    traceStrideN: null,
     subPhaseId: '1.2',
     ...overrides,
   };

@@ -242,9 +242,11 @@ export class OrchestratorEngine {
     this.agentInvoker.setEventBus(this.eventBus);
 
     this.decisionTraceGenerator = new DecisionTraceGenerator(db);
+    const nmRouting = this.configManager.getLLMRouting().requirements_agent?.primary;
     this.narrativeMemoryGenerator = new NarrativeMemoryGenerator(this.llmCaller, this.templateLoader, {
-      provider: 'ollama',
-      model: 'qwen3.5:9b',
+      provider: nmRouting?.provider ?? 'ollama',
+      model: nmRouting?.model ?? 'qwen3.5:9b',
+      baseUrl: nmRouting?.base_url,
       temperature: 0.3,
       janumiCodeVersionSha: this.versionSha,
     });
@@ -263,9 +265,21 @@ export class OrchestratorEngine {
       causal_relevance: 0.10,
       contradiction_signal: 0.10,
     };
+    // DMR Stage 1 + Stage 7 LLM calls used to hardcode ollama/qwen3.5:9b,
+    // bypassing llm_routing entirely. cal-22b surfaced this — every
+    // phase's context-packet build was hitting ollama on CPU even
+    // though llm_routing.domain_interpreter was pointing at llamacpp.
+    // Borrow domain_interpreter routing for DMR since it's the closest
+    // semantic role match (knowledge synthesis from prior decisions).
+    const diRouting = this.configManager.getLLMRouting().domain_interpreter?.primary;
     this.deepMemoryResearch = new DeepMemoryResearchAgent(
       db, this.llmCaller, weights,
-      { janumiCodeVersionSha: this.versionSha },
+      {
+        janumiCodeVersionSha: this.versionSha,
+        provider: diRouting?.provider,
+        model: diRouting?.model,
+        baseUrl: diRouting?.base_url,
+      },
       this.templateLoader,
       undefined, // embedding service — attached later
       this.writer,
@@ -283,10 +297,19 @@ export class OrchestratorEngine {
     const weights = (this.configManager.get() as unknown as Record<string, unknown>).deep_memory_research as
       { materiality_weights: MaterialityWeights };
     // Rebuild DMR with the embedding wired. This is idempotent.
+    // Same routing pull as the constructor — DMR's provider/model/baseUrl
+    // come from llm_routing.domain_interpreter, not the hardcoded
+    // ollama/qwen3.5:9b default.
+    const diRouting = this.configManager.getLLMRouting().domain_interpreter?.primary;
     (this as unknown as { deepMemoryResearch: DeepMemoryResearchAgent }).deepMemoryResearch =
       new DeepMemoryResearchAgent(
         this.db, this.llmCaller, weights.materiality_weights,
-        { janumiCodeVersionSha: this.versionSha },
+        {
+          janumiCodeVersionSha: this.versionSha,
+          provider: diRouting?.provider,
+          model: diRouting?.model,
+          baseUrl: diRouting?.base_url,
+        },
         this.templateLoader,
         embedding,
         this.writer,
@@ -917,7 +940,7 @@ export class OrchestratorEngine {
         `.janumicode/config.json or DEFAULT_CONFIG.`,
       );
     }
-    const { backing_tool, provider, model } = roleRouting.primary;
+    const { backing_tool, provider, model, base_url } = roleRouting.primary;
     const temperature = options.temperature ?? roleRouting.temperature ?? 0.3;
 
     if (backing_tool === 'direct_llm_api') {
@@ -927,6 +950,7 @@ export class OrchestratorEngine {
       return this.llmCaller.call({
         provider,
         model: model ?? '',
+        baseUrl: base_url,
         prompt: options.prompt,
         responseFormat: options.responseFormat,
         temperature,

@@ -7,6 +7,7 @@ required_variables:
   - active_constraints
   - component_model_summary
   - interface_contracts_summary
+  - system_requirements_summary
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -32,5 +33,6 @@ Rules:
 - Include error codes for all failure scenarios
 
 CONTEXT:
+System Requirements (Phase 3.2 — what each endpoint must support): {{system_requirements_summary}}
 Component Model: {{component_model_summary}}
 Interface Contracts: {{interface_contracts_summary}}

@@ -27,6 +27,7 @@ import type {
   ViewerRootSummary,
   ViewerSnapshot,
   ViewerStatus,
+  ViewerSystemRequirement,
   ViewerTier,
 } from './types';
 
@@ -60,6 +61,7 @@ export class DecompViewerDataProvider {
     const phase1Anchors = this.loadPhase1Anchors(workflowRunId);
     const nfrApplications = this.loadNfrApplications(workflowRunId);
     const intentSummary = this.loadIntentSummary(workflowRunId);
+    const systemRequirements = this.loadSystemRequirements(workflowRunId);
 
     const duplicateAssumptions = assumptions.filter(a => !!a.duplicate_of).length;
     const byStatus: Record<ViewerStatus, number> = {};
@@ -84,6 +86,7 @@ export class DecompViewerDataProvider {
       phase1_anchors: phase1Anchors,
       nfr_applications: nfrApplications,
       intent_summary: intentSummary,
+      system_requirements: systemRequirements,
       totals: {
         nodes: nodes.length,
         atomic: byStatus['atomic'] ?? 0,
@@ -133,6 +136,10 @@ export class DecompViewerDataProvider {
     h.update(`nfr_apps:${s.nfr_applications.length}|`);
     for (const a of s.nfr_applications) {
       h.update(`${a.nfr_id}:${a.applies_to_requirements.join(',')}|`);
+    }
+    h.update(`sysreqs:${s.system_requirements.length}|`);
+    for (const sr of s.system_requirements) {
+      h.update(`${sr.id}:${sr.source_requirement_ids.length}|`);
     }
     return h.digest('hex').slice(0, 16);
   }
@@ -528,6 +535,36 @@ export class DecompViewerDataProvider {
       }
     }
     return out;
+  }
+
+  /**
+   * Phase 3.2 System Requirements. Reads the latest non-superseded
+   * `system_requirements` artifact and surfaces the items[]. Empty
+   * when Phase 3.2 hasn't run, or the artifact is the placeholder.
+   * Each item carries source_requirement_ids for FR/NFR traceability.
+   */
+  private loadSystemRequirements(workflowRunId: string): ViewerSystemRequirement[] {
+    const row = this.db
+      .prepare(
+        `SELECT content FROM governed_stream
+         WHERE record_type = 'artifact_produced'
+           AND is_current_version = 1
+           AND workflow_run_id = ?
+           AND json_extract(content, '$.kind') = 'system_requirements'
+         ORDER BY produced_at DESC LIMIT 1`,
+      )
+      .get(workflowRunId) as { content: string } | undefined;
+    if (!row) return [];
+    const c = JSON.parse(row.content) as Record<string, unknown>;
+    const items = Array.isArray(c.items) ? (c.items as Array<Record<string, unknown>>) : [];
+    return items.map(it => ({
+      id: (it.id as string) ?? '',
+      statement: (it.statement as string) ?? '',
+      source_requirement_ids: Array.isArray(it.source_requirement_ids)
+        ? (it.source_requirement_ids as unknown[]).filter((x): x is string => typeof x === 'string')
+        : [],
+      priority: (it.priority as string) ?? undefined,
+    }));
   }
 
   /**

@@ -164,6 +164,16 @@ export interface DMRConfig {
   model?: string;
   /** Provider name for LLM calls. */
   provider?: string;
+  /**
+   * Optional provider base URL — only honored by providers that
+   * support per-call URL routing (currently `llamacpp`). Lets the
+   * orchestrator point DMR at a specific llama-server instance.
+   * Without this, llama.cpp users discovered DMR was silently
+   * falling back to the LlamaCppProvider's constructor default
+   * (LLAMACPP_URL or 127.0.0.1:11435), which is fine when there's
+   * one server but breaks multi-server harness setups.
+   */
+  baseUrl?: string;
   /** JanumiCode version SHA — stamped on records we write. */
   janumiCodeVersionSha: string;
   /** Materiality scoring threshold — findings below are dropped in Stage 7. */
@@ -188,6 +198,7 @@ export class DeepMemoryResearchAgent {
   private readonly maxCausalDepth: number;
   private readonly model: string;
   private readonly provider: string;
+  private readonly baseUrl: string | undefined;
 
   constructor(
     private readonly db: Database,
@@ -205,6 +216,7 @@ export class DeepMemoryResearchAgent {
     this.maxCausalDepth = config.maxCausalDepth ?? 3;
     this.model = config.model ?? process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b';
     this.provider = config.provider ?? 'ollama';
+    this.baseUrl = config.baseUrl;
   }
 
   /**
@@ -341,6 +353,7 @@ export class DeepMemoryResearchAgent {
     const result = await this.llmCaller.call({
       provider: this.provider,
       model: this.model,
+      baseUrl: this.baseUrl,
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.3,
@@ -824,6 +837,7 @@ export class DeepMemoryResearchAgent {
       const result = await this.llmCaller.call({
         provider: this.provider,
         model: this.model,
+        baseUrl: this.baseUrl,
         prompt: rendered.rendered,
         responseFormat: 'json',
         temperature: 0.3,

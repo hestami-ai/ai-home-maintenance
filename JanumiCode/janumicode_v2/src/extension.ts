@@ -40,6 +40,7 @@ import { Phase10Handler } from './lib/orchestrator/phases/phase10';
 import { OllamaProvider } from './lib/llm/providers/ollama';
 import { AnthropicProvider } from './lib/llm/providers/anthropic';
 import { GoogleProvider } from './lib/llm/providers/google';
+import { LlamaCppProvider } from './lib/llm/providers/llamacpp';
 import { ClientLiaisonAgent } from './lib/agents/clientLiaisonAgent';
 import { DecisionRouter } from './lib/orchestrator/decisionRouter';
 import {
@@ -134,9 +135,20 @@ async function bootstrap(
   //
   //    Override with JANUMICODE_EMBED_MODEL in the environment if you want
   //    to experiment or if the default isn't pulled locally.
+  // Embedding backend is env-overridable so the calibration harness
+  // can route through llama-swap (single proxy serving both chat and
+  // embedding models) instead of running Ollama in parallel.
+  //   JANUMICODE_EMBED_PROVIDER  → 'ollama' | 'llamacpp'      (default 'ollama')
+  //   JANUMICODE_EMBED_MODEL     → tag/key for the embed model
+  //   JANUMICODE_EMBED_BASE_URL  → backend URL (default http://127.0.0.1:11434)
+  const embedProvider = (process.env.JANUMICODE_EMBED_PROVIDER as 'ollama' | 'llamacpp') ?? 'ollama';
+  const embedDefaultModel = embedProvider === 'llamacpp'
+    ? 'qwen3-embedding-8b'  // llama-swap key (no colon)
+    : 'qwen3-embedding:8b'; // Ollama tag
   const embedding = new EmbeddingService(db, {
-    provider: 'ollama',
-    model: process.env.JANUMICODE_EMBED_MODEL ?? 'qwen3-embedding:8b',
+    provider: embedProvider,
+    model: process.env.JANUMICODE_EMBED_MODEL ?? embedDefaultModel,
+    baseUrl: process.env.JANUMICODE_EMBED_BASE_URL,
     maxParallel: 1,
   });
   embedding.start();
@@ -163,6 +175,7 @@ async function bootstrap(
   engine.llmCaller.registerProvider(new OllamaProvider());
   engine.llmCaller.registerProvider(new AnthropicProvider());
   engine.llmCaller.registerProvider(new GoogleProvider());
+  engine.llmCaller.registerProvider(new LlamaCppProvider());
   log.info('activation', 'Bootstrap step 8/14: LLM provider adapters registered');
 
   // Register builtin CLI output parsers BEFORE validateLLMRouting so

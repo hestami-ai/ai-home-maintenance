@@ -52,6 +52,30 @@ export interface InvocationLogFinal {
 }
 
 /**
+ * Per-call options for shaping live-log output. Defined here so
+ * LLMCaller can override based on env vars / settings.
+ */
+export interface InvocationLogOptions {
+  /**
+   * When true, every streaming chunk is appended to the .log file.
+   * When false (the new default), the per-chunk lines are skipped on
+   * disk but `bytesWritten` is still incremented. The bytesWritten
+   * counter is what feeds runaway-thinking detection in LLMCaller —
+   * it's a JS-memory counter, not a stat() of the file on disk —
+   * so disabling the per-chunk write does NOT weaken loop detection.
+   *
+   * Why default off: the chunk lines balloon the file size dramatically
+   * during long thinking-mode streams (cal-21 produced 700 MB of live
+   * logs) without adding much value once the trailer is written. The
+   * trailer includes the full final text and full thinking chain.
+   * Operators who want the live tail-f view can opt back in via env.
+   */
+  writeRawTokenStream?: boolean;
+  /** Optional phase/sub-phase prefix for the filename (e.g. 'phase06_1'). */
+  filenamePrefix?: string | null;
+}
+
+/**
  * Append-only writer for a single invocation log file. Thread-safe as
  * long as only one call runs at a time for a given invocationId —
  * which is the LLMCaller's own invariant.
@@ -60,9 +84,23 @@ export class InvocationLogFile {
   private readonly filePath: string;
   private opened = false;
   private _bytesWritten = 0;
+  private readonly writeRawTokenStream: boolean;
 
-  constructor(private readonly logDir: string, invocationId: string) {
-    this.filePath = path.join(logDir, `${invocationId}.log`);
+  constructor(
+    private readonly logDir: string,
+    invocationId: string,
+    options: InvocationLogOptions = {},
+  ) {
+    // Filename shape:
+    //   - With prefix: `<prefix>__<invocationId>.log`
+    //     (e.g. `phase06_1__abc-123.log`) — operators scanning the
+    //     live dir can find all calls for a given sub-phase by glob.
+    //   - Without prefix: `<invocationId>.log` (legacy shape).
+    const base = options.filenamePrefix
+      ? `${options.filenamePrefix}__${invocationId}.log`
+      : `${invocationId}.log`;
+    this.filePath = path.join(logDir, base);
+    this.writeRawTokenStream = options.writeRawTokenStream ?? false;
   }
 
   get path(): string { return this.filePath; }
@@ -93,7 +131,9 @@ export class InvocationLogFile {
         'PROMPT:',
         header.prompt,
         '═'.repeat(72),
-        'STREAM (channel | ms-since-start | cumulative-chars | text):',
+        this.writeRawTokenStream
+          ? 'STREAM (channel | ms-since-start | cumulative-chars | text):'
+          : 'STREAM: omitted (writeRawTokenStream=false). Final text is in trailer below.',
         '',
       ].filter((s) => s !== '').join('\n');
       const payload = lines + '\n';
@@ -105,7 +145,14 @@ export class InvocationLogFile {
     }
   }
 
-  /** Append one streaming chunk. Called once per provider frame. */
+  /**
+   * Append one streaming chunk. Called once per provider frame.
+   *
+   * `_bytesWritten` is bumped on every call regardless of disk write —
+   * it's the runaway-thinking detection signal LLMCaller checks in
+   * `onChunk`. Disabling the disk write (default) preserves loop
+   * detection while keeping the live-log file compact.
+   */
   writeChunk(params: {
     channel: string;
     msSinceStart: number;
@@ -113,19 +160,20 @@ export class InvocationLogFile {
     text: string;
   }): void {
     if (!this.opened) return;
+    // Always count bytes so runaway-thinking detection remains
+    // accurate. The "would-have-written" line length is computed
+    // once and used both for the counter bump and (optionally) for
+    // the actual append.
+    const preview = params.text.replaceAll('\n', '\\n').slice(0, 120);
+    const line = `[${params.channel.padEnd(9)}] +${params.msSinceStart
+      .toString()
+      .padStart(6)}ms  chars=${params.cumulativeChars
+      .toString()
+      .padStart(6)}  ${preview}\n`;
+    this._bytesWritten += Buffer.byteLength(line);
+    if (!this.writeRawTokenStream) return;
     try {
-      // Clip individual chunk text so thinking-mode token streams
-      // don't render as multi-hundred-char log lines. Intermediate
-      // context stays readable via `tail -f`; the full chain is
-      // preserved in the trailer at the end.
-      const preview = params.text.replace(/\n/g, '\\n').slice(0, 120);
-      const line = `[${params.channel.padEnd(9)}] +${params.msSinceStart
-        .toString()
-        .padStart(6)}ms  chars=${params.cumulativeChars
-        .toString()
-        .padStart(6)}  ${preview}\n`;
       fs.appendFileSync(this.filePath, line);
-      this._bytesWritten += Buffer.byteLength(line);
     } catch {
       // Best-effort.
     }

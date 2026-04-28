@@ -1,0 +1,84 @@
+# llama-swap configuration for JanumiCode calibration runs.
+#
+# llama-swap is an OpenAI-compatible proxy that lazy-loads a llama-server
+# child process per model definition below. JanumiCode hits ONE port
+# (the `listen` line set on the llama-swap CLI — we set 11435) and
+# passes `model: "<key>"` in every chat-completions request. llama-swap
+# inspects that field and ensures the matching child server is up,
+# evicting whichever model was previously loaded if it differs.
+#
+# Why we use this: cal-22b needs cross-model routing (qwen for
+# decomposer, gemma for orchestrator + reasoning_review) but the 4090
+# can only fit one of these at a time. Concurrent loads share SMs
+# anyway, so swap-on-demand wins on both VRAM and throughput.
+#
+# Cold-start cost: each model swap takes ~8-15s on this hardware. cal-21
+# fired ~10-15 reasoning_review audits during Phase 2.1a; with this
+# proxy that's ~20-30 swaps (qwen→gemma, gemma→qwen) totaling ~5-8min
+# extra wall-clock. Acceptable for the architectural cleanup.
+#
+# Path conventions: huggingface-cli puts GGUFs under the user's HF
+# cache. The paths below match the smoke-tested files. If the cache
+# location changes, update both this file and wave6-calibration-run.js's
+# LLAMA_MODELS registry.
+
+# Health-check policy: llama-swap polls each child's /health before
+# routing requests through. Default is 60s timeout — bump it because
+# qwen3.5-35B at IQ4_XS takes ~12s cold-start.
+healthCheckTimeout: 180
+
+models:
+  qwen3.5-35b-a3b:
+    # Decomposer + domain interpreter + (when DMR is routed here)
+    # context-packet builder. Context cut from native 262144 → 131072
+    # → 98304 (96K) after observing shared-memory spillover at 131K
+    # too. qwen35moe's KV cache scales linearly with context; even
+    # with --parallel 1 the model + KV at 131K was crowding the 24 GB
+    # 4090. 96K leaves comfortable headroom for ggml's compute
+    # buffers on top of the loaded model.
+    #
+    # Phase 3.2 prompts in cal-21 hit ~35K tokens; 96K still gives
+    # ~3× headroom for that, plus reasonable thinking-mode budget.
+    cmd: |
+      "C:/Program Files/llama-b8951-bin-win-cuda-13.1-x64/llama-server.exe"
+      -m "C:/Users/mchen/.cache/huggingface/hub/models--byteshape--Qwen3.5-35B-A3B-GGUF/snapshots/07a18b090d818887a2b5ac6f248c7b538648f416/Qwen3.5-35B-A3B-IQ4_XS-4.06bpw.gguf"
+      --port ${PORT}
+      -c 98304
+      --parallel 1
+      --temp 1
+      --top-k 20
+      --top-p 0.95
+      --min-p 0
+      --presence-penalty 1.5
+      --repeat-penalty 1
+    # ttl: 0 = unload-on-eviction. Default behavior; explicit for clarity.
+    ttl: 0
+
+  gemma-4-e4b-it:
+    # Orchestrator (Phase 1.0 intent quality check) + reasoning_review
+    # (Phase 2.1a step 4c AC-shape audits). Same parallel-1 logic as
+    # qwen — single-call workload, no need for extra slots.
+    cmd: |
+      "C:/Program Files/llama-b8951-bin-win-cuda-13.1-x64/llama-server.exe"
+      -m "C:/Users/mchen/.cache/huggingface/hub/models--unsloth--gemma-4-E4B-it-GGUF/snapshots/ce152932ac27bc40bc9c727386760424d50bb456/gemma-4-E4B-it-BF16.gguf"
+      --port ${PORT}
+      -c 131072
+      --parallel 1
+      --temp 1
+      --top-k 64
+      --top-p 0.95
+    ttl: 0
+
+  qwen3-embedding-8b:
+    # Embedding role — Phase 2.1a dedup-on-supersession + DMR vector
+    # harvest. Distinct from the chat models because llama-server's
+    # `--embedding` flag flips the API surface to /v1/embeddings only.
+    # `--parallel 1` here too; embeddings are issued sequentially.
+    cmd: |
+      "C:/Program Files/llama-b8951-bin-win-cuda-13.1-x64/llama-server.exe"
+      -m "C:/Users/mchen/.cache/huggingface/hub/models--Qwen--Qwen3-Embedding-8B-GGUF/snapshots/69d0e58a13e463cd99a9b83e3f5fee7c10265fab/Qwen3-Embedding-8B-Q4_K_M.gguf"
+      --port ${PORT}
+      -c 32768
+      --parallel 1
+      --embedding
+    ttl: 0

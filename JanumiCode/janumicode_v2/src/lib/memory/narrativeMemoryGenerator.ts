@@ -52,6 +52,8 @@ export interface NarrativeMemoryConfig {
   model: string;
   temperature: number;
   janumiCodeVersionSha: string;
+  /** Optional per-call provider base URL (e.g. llama-swap proxy). */
+  baseUrl?: string;
 }
 
 const TEMPLATE_KEY = 'cross_cutting/narrative_memory.system';
@@ -101,6 +103,7 @@ export class NarrativeMemoryGenerator {
     const result = await this.llmCaller.call({
       provider: this.config.provider,
       model: this.config.model,
+      baseUrl: this.config.baseUrl,
       prompt: renderResult.rendered,
       responseFormat: 'json',
       temperature: this.config.temperature,

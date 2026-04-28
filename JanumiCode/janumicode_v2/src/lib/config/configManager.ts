@@ -156,6 +156,14 @@ export interface JanumiCodeConfig {
         provider?: string;
         /** Model override. CLIs have their own defaults; omit to use them. */
         model?: string;
+        /**
+         * Optional per-role provider base URL. Currently only honored
+         * by the `llamacpp` provider. Lets the calibration harness
+         * point this role at a specific llama-server instance (e.g.
+         * `http://127.0.0.1:11435`) without registering multiple
+         * provider adapters. Other providers ignore this field.
+         */
+        base_url?: string;
       };
       temperature?: number;
     };
@@ -172,6 +180,7 @@ export interface JanumiCodeConfig {
         backing_tool: string;
         provider?: string;
         model?: string;
+        base_url?: string;
       };
       temperature?: number;
     };
@@ -186,16 +195,15 @@ export interface JanumiCodeConfig {
         backing_tool: string;
         provider?: string;
         model?: string;
+        base_url?: string;
       };
       temperature?: number;
     };
     reasoning_review: {
       /** Primary provider + model used for ReasoningReview LLM calls. */
-      primary: { provider: string; model: string };
+      primary: { provider: string; model: string; base_url?: string };
       /** Temperature for reasoning review; should be low for deterministic output. */
       temperature: number;
-      /** Max tokens of trace to include in the review prompt. */
-      trace_max_tokens: number;
       /** Optional fallback if primary fails. */
       fallback?: { provider: string; model: string };
       /** Ensemble config (future — not yet used). */
@@ -203,6 +211,24 @@ export interface JanumiCodeConfig {
         enabled: boolean;
         secondary: { provider: string; model: string };
       };
+    };
+    /**
+     * Phase 9 implementation-task executor. Distinct from the planning
+     * roles because Phase 9 spawns a coding agent (file-system tools,
+     * shell access, multi-turn). `backing_tool` MUST be one of the CLI
+     * variants the ExecutorAgent supports — direct_llm_api is rejected
+     * here because executors need tool use. Optional so legacy configs
+     * keep working; ExecutorAgent falls back to its built-in default
+     * when omitted.
+     */
+    executor?: {
+      primary: {
+        /** 'claude_code_cli' | 'gemini_cli' | 'goose_cli' | 'codex_cli' */
+        backing_tool: string;
+        /** Model passed via `--model <name>` to the chosen CLI. */
+        model?: string;
+      };
+      temperature?: number;
     };
   };
 }
@@ -309,7 +335,6 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     reasoning_review: {
       primary: { provider: 'google', model: 'gemini-2.5-flash' },
       temperature: 0.2,
-      trace_max_tokens: 8000,
     },
   },
 };

@@ -717,7 +717,6 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     cfg.llm_routing.reasoning_review = {
       primary: { provider: 'ollama', model: 'qwen3.5:9b' },
       temperature: 0.2,
-      trace_max_tokens: 4000,
     };
     cfg.decomposition.reasoning_review_on_tier_c = true;
 

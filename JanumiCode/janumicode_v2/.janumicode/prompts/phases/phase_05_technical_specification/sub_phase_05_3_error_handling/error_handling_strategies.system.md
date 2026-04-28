@@ -7,6 +7,7 @@ required_variables:
   - active_constraints
   - component_model_summary
   - api_definitions_summary
+  - system_requirements_summary
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -35,5 +36,6 @@ Rules:
 - Detection and response strategies must be concrete and implementable
 
 CONTEXT:
+System Requirements (Phase 3.2 — error-handling expectations from each SR): {{system_requirements_summary}}
 Component Model: {{component_model_summary}}
 API Definitions: {{api_definitions_summary}}

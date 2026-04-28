@@ -120,10 +120,12 @@ describe('ContextBuilder', () => {
         { id: 'r2', type: 'agent_reasoning_step', sequencePosition: 4, content: 'more thinking...', tokenCount: 10 },
       ];
 
-      const selection = builder.buildTraceSelection(traces, false, 16000);
+      const selection = builder.buildTraceSelection(traces, false);
 
       expect(selection.selectedRecordIds).toContain('sc1'); // self-correction
       expect(selection.selectedRecordIds).toContain('tc1'); // tool call
+      expect(selection.selectedRecordIds).toContain('r1'); // reasoning step
+      expect(selection.selectedRecordIds).toContain('r2'); // reasoning step
       expect(selection.selectedRecordIds).not.toContain('tr1'); // tool result EXCLUDED
     });
 
@@ -134,40 +136,20 @@ describe('ContextBuilder', () => {
         { id: 'tr1', type: 'tool_result', sequencePosition: 1, content: 'result', tokenCount: 100 },
       ];
 
-      const executorSelection = builder.buildTraceSelection(traces, true, 16000);
+      const executorSelection = builder.buildTraceSelection(traces, true);
       expect(executorSelection.selectedRecordIds).not.toContain('tr1');
 
-      const planningSelection = builder.buildTraceSelection(traces, false, 16000);
+      const planningSelection = builder.buildTraceSelection(traces, false);
       expect(planningSelection.selectedRecordIds).not.toContain('tr1');
     });
 
-    it('includes first and last reasoning steps', () => {
-      const builder = new ContextBuilder(testOptions);
-      const traces: TraceRecord[] = [
-        { id: 'r1', type: 'agent_reasoning_step', sequencePosition: 0, content: 'first', tokenCount: 10 },
-        { id: 'r2', type: 'agent_reasoning_step', sequencePosition: 1, content: 'middle', tokenCount: 10 },
-        { id: 'r3', type: 'agent_reasoning_step', sequencePosition: 2, content: 'last', tokenCount: 10 },
-      ];
-
-      const selection = builder.buildTraceSelection(traces, false, 16000);
-      expect(selection.selectedRecordIds).toContain('r1'); // first
-      expect(selection.selectedRecordIds).toContain('r3'); // last
-    });
-
-    it('includes reasoning steps preceding tool calls', () => {
-      const builder = new ContextBuilder(testOptions);
-      const traces: TraceRecord[] = [
-        { id: 'r1', type: 'agent_reasoning_step', sequencePosition: 0, content: 'first', tokenCount: 10 },
-        { id: 'r2', type: 'agent_reasoning_step', sequencePosition: 1, content: 'about to call tool', tokenCount: 10 },
-        { id: 'tc1', type: 'tool_call', sequencePosition: 2, content: 'Read', tokenCount: 5 },
-        { id: 'r3', type: 'agent_reasoning_step', sequencePosition: 3, content: 'last', tokenCount: 10 },
-      ];
-
-      const selection = builder.buildTraceSelection(traces, false, 16000);
-      expect(selection.selectedRecordIds).toContain('r2'); // pre-tool-call
-    });
-
-    it('applies uniform stride sampling for executor agent when over budget', () => {
+    it('includes all reasoning steps regardless of count', () => {
+      // Earlier behavior selected first/last/pre-tool-call only and stride-sampled
+      // the rest under an 8000-token budget. That budget caused false-positive
+      // `completeness_shortcut` flags from reasoning_review on long executor
+      // traces; the calibration loop has no monetary cost and the architectural
+      // escape hatch for large content is the stdin + detail-file two-channel
+      // pattern, not ad-hoc token accounting at every call site.
       const builder = new ContextBuilder(testOptions);
       const traces: TraceRecord[] = [];
       for (let i = 0; i < 100; i++) {
@@ -176,15 +158,12 @@ describe('ContextBuilder', () => {
           type: 'agent_reasoning_step',
           sequencePosition: i,
           content: `step ${i}`,
-          tokenCount: 200, // 100 steps * 200 tokens = 20000 tokens
+          tokenCount: 200,
         });
       }
 
-      const selection = builder.buildTraceSelection(traces, true, 5000);
-      expect(selection.samplingApplied).toBe(true);
-      expect(selection.strideN).not.toBeNull();
-      expect(selection.selectedRecordIds.length).toBeLessThan(100);
-      // First and last always included
+      const selection = builder.buildTraceSelection(traces, true);
+      expect(selection.selectedRecordIds.length).toBe(100);
       expect(selection.selectedRecordIds).toContain('r0');
       expect(selection.selectedRecordIds).toContain('r99');
     });

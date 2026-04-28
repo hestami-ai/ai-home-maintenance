@@ -219,6 +219,20 @@ export interface ViewerNfrApplication {
   applies_to_requirements: string[];
 }
 
+/**
+ * One Phase 3 System Requirement (Phase 3.2 sub-phase output). The
+ * DAG tree uses these to render an "→ satisfied by:" footnote on
+ * each FR/NFR row, threading the Phase 1 → Phase 2 → Phase 3
+ * traceability chain end-to-end.
+ */
+export interface ViewerSystemRequirement {
+  id: string;
+  statement: string;
+  /** FR/NFR ids this SR was derived from. */
+  source_requirement_ids: string[];
+  priority?: string;
+}
+
 /** Top-level intent summary used to render the Raw Intent / Intent Statement header. */
 export interface ViewerIntentSummary {
   /** Original user prompt (raw_intent_received). */
@@ -277,6 +291,13 @@ export interface ViewerSnapshot {
    * product concept from the Phase 1 intent_statement.
    */
   intent_summary: ViewerIntentSummary;
+  /**
+   * Phase 3.2 System Requirements. The DAG tree uses these to render
+   * an "→ satisfied by:" footnote on each FR/NFR row, threading
+   * Phase 1 → Phase 2 → Phase 3 traceability end-to-end. Empty when
+   * Phase 3.2 hasn't run.
+   */
+  system_requirements: ViewerSystemRequirement[];
   /** Top-line counts for the summary strip. */
   totals: {
     nodes: number;

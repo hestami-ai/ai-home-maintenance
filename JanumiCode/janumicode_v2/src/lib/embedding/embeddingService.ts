@@ -15,25 +15,43 @@ import type { GovernedStreamRecord } from '../types/records';
 import { getLogger } from '../logging';
 
 export interface EmbeddingServiceConfig {
-  /** LLM provider — currently only `ollama` is supported. */
-  provider: 'ollama';
   /**
-   * Embedding model name. Recommended options (all Ollama-hosted):
-   *   - `qwen3-embedding:8b` — default, Qwen-family, aligns with the
-   *     primary `qwen3.5:9b` LLM. 4096-dim embeddings.
-   *   - `embeddinggemma:300m` — smaller, faster alternative. 768-dim.
+   * Embedding backend.
+   *   - `ollama`   — POSTs `/api/embeddings` with `{model, prompt}`
+   *                  and parses Ollama's `{embedding: [...]}` shape.
+   *   - `llamacpp` — POSTs `/v1/embeddings` with `{model, input}` and
+   *                  parses OpenAI's `{data: [{embedding}]}` shape.
+   *                  Used when llama-swap is the unified backend so
+   *                  the embedding model lives on the same proxy as
+   *                  the chat models — no Ollama process needed.
+   */
+  provider: 'ollama' | 'llamacpp';
+  /**
+   * Embedding model name. Recommended options:
+   *   - `qwen3-embedding:8b` — default Ollama tag.
+   *   - `qwen3-embedding-8b` — llama-swap key (no colon).
+   *   - `embeddinggemma:300m` — smaller, faster alternative (Ollama).
    */
   model: string;
   /** Maximum concurrent embedding requests. Default: 1. */
   maxParallel: number;
-  /** Ollama base URL. Default: `http://localhost:11434`. */
+  /**
+   * Ollama base URL — kept for backward compat. When provider is
+   * `llamacpp`, prefer `baseUrl` (which falls back to this if unset).
+   */
   ollamaBaseUrl?: string;
+  /**
+   * Generic backend base URL. Used by both providers when set; takes
+   * precedence over `ollamaBaseUrl`. For llamacpp, this is the
+   * llama-swap proxy port (typically `http://127.0.0.1:11435`).
+   */
+  baseUrl?: string;
   /**
    * Per-request timeout in milliseconds. Default: 30000 (30s). The embedding
    * endpoint can legitimately take 10+ seconds on first-call model load or
-   * when Ollama is busy serving a concurrent LLM request. Keeping the timeout
-   * permissive avoids the "This operation was aborted" failure cascade seen
-   * when a tighter ceiling collides with a shared Ollama instance.
+   * when the backend is busy serving a concurrent LLM request. Keeping the
+   * timeout permissive avoids the "This operation was aborted" failure
+   * cascade seen when a tighter ceiling collides with a shared backend.
    */
   timeoutMs?: number;
 }
@@ -65,7 +83,9 @@ export class EmbeddingService {
     private readonly db: Database,
     private readonly config: EmbeddingServiceConfig,
   ) {
-    this.baseUrl = config.ollamaBaseUrl ?? 'http://localhost:11434';
+    // Generic baseUrl wins over ollama-specific config; legacy field
+    // kept so existing callers don't break.
+    this.baseUrl = config.baseUrl ?? config.ollamaBaseUrl ?? 'http://localhost:11434';
   }
 
   start(): void {
@@ -227,23 +247,62 @@ export class EmbeddingService {
       this.config.timeoutMs ?? 30_000,
     );
     try {
-      const res = await fetch(`${this.baseUrl}/api/embeddings`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model: this.config.model, prompt: text }),
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        throw new Error(`Ollama embedding HTTP ${res.status}: ${await res.text()}`);
-      }
-      const json = (await res.json()) as { embedding?: number[] };
-      if (!json.embedding || !Array.isArray(json.embedding)) {
-        throw new Error('Ollama embedding response missing `embedding` array');
-      }
-      return new Float32Array(json.embedding);
+      // Branch on provider — llamacpp uses OpenAI's /v1/embeddings
+      // shape, ollama uses /api/embeddings. Each shapes its request +
+      // parses the response slightly differently.
+      const vec = this.config.provider === 'llamacpp'
+        ? await this.embedViaLlamacpp(text, controller.signal)
+        : await this.embedViaOllama(text, controller.signal);
+      return vec;
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  /** Ollama: POST /api/embeddings → `{embedding: [...]}` */
+  private async embedViaOllama(text: string, signal: AbortSignal): Promise<Float32Array> {
+    const res = await fetch(`${this.baseUrl}/api/embeddings`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: this.config.model, prompt: text }),
+      signal,
+    });
+    if (!res.ok) {
+      throw new Error(`Ollama embedding HTTP ${res.status}: ${await res.text()}`);
+    }
+    const json = (await res.json()) as { embedding?: number[] };
+    if (!json.embedding || !Array.isArray(json.embedding)) {
+      throw new Error('Ollama embedding response missing `embedding` array');
+    }
+    return new Float32Array(json.embedding);
+  }
+
+  /**
+   * llama.cpp: POST /v1/embeddings → OpenAI standard
+   *   `{data: [{embedding: [...], index: 0}], usage: {...}}`.
+   *
+   * Single-input form: pass `input: text` (string). llama-server
+   * tolerates string-or-array; using string keeps the existing
+   * single-text-per-call shape this service was designed around.
+   */
+  private async embedViaLlamacpp(text: string, signal: AbortSignal): Promise<Float32Array> {
+    const res = await fetch(`${this.baseUrl}/v1/embeddings`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: this.config.model, input: text }),
+      signal,
+    });
+    if (!res.ok) {
+      throw new Error(`llamacpp embedding HTTP ${res.status}: ${await res.text()}`);
+    }
+    const json = (await res.json()) as {
+      data?: Array<{ embedding?: number[] }>;
+    };
+    const emb = json.data?.[0]?.embedding;
+    if (!emb || !Array.isArray(emb)) {
+      throw new Error('llamacpp embedding response missing `data[0].embedding`');
+    }
+    return new Float32Array(emb);
   }
 
   /**

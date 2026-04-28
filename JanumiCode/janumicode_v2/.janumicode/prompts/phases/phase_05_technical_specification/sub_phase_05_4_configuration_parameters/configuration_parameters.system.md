@@ -7,6 +7,7 @@ required_variables:
   - active_constraints
   - component_model_summary
   - data_models_summary
+  - system_requirements_summary
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -36,5 +37,6 @@ Rules:
 - Use concrete types, not "any" or "object"
 
 CONTEXT:
+System Requirements (Phase 3.2 — config-affecting SRs like retention, audit, SLO): {{system_requirements_summary}}
 Component Model: {{component_model_summary}}
 Data Models: {{data_models_summary}}

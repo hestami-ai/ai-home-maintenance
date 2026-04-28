@@ -13,6 +13,7 @@
 import { LLMCaller } from '../llm/llmCaller';
 import { ContextBuilder, type TraceRecord } from '../orchestrator/contextBuilder';
 import { TemplateLoader } from '../orchestrator/templateLoader';
+import { getLogger } from '../logging';
 import type { ReasoningFlawType } from '../types/records';
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -47,8 +48,6 @@ export interface ReasoningReviewResult {
   overallPass: boolean;
   flaws: ReasoningFlaw[];
   traceSelectionRecordIds: string[];
-  traceSamplingApplied: boolean;
-  traceStrideN: number | null;
   reviewedOutputRecordId?: string;
   subPhaseId: string;
 }
@@ -73,7 +72,6 @@ export type ReasoningFlawAction =
 export interface ReasoningReviewConfig {
   provider: string;
   model: string;
-  traceMaxTokens: number;
   temperature: number;
   janumiCodeVersionSha: string;
 }
@@ -98,11 +96,26 @@ export class ReasoningReview {
     const traceSelection = this.contextBuilder.buildTraceSelection(
       input.traceRecords,
       input.isExecutorAgent,
-      this.config.traceMaxTokens,
     );
 
     // Build the trace text for the LLM
     const traceText = this.buildTraceText(input.traceRecords, traceSelection.selectedRecordIds);
+
+    // Diagnostic logging — empty trace text was the dominant root cause
+    // of false-positive `completeness_shortcut` flags. Surface counts at
+    // each transformation step so a regression is immediately visible
+    // in the workflow log instead of requiring DB forensics.
+    const inputTypeCounts: Record<string, number> = {};
+    for (const r of input.traceRecords) {
+      inputTypeCounts[r.type] = (inputTypeCounts[r.type] ?? 0) + 1;
+    }
+    getLogger().info('workflow', 'Reasoning review — trace built', {
+      sub_phase_id: input.subPhaseId,
+      input_records: input.traceRecords.length,
+      input_type_counts: inputTypeCounts,
+      selected_records: traceSelection.selectedRecordIds.length,
+      trace_text_chars: traceText.length,
+    });
 
     // Render the prompt from the template file
     const prompt = this.renderPrompt(input, traceText);
@@ -190,7 +203,7 @@ export class ReasoningReview {
    */
   private parseResult(
     parsed: Record<string, unknown> | null,
-    traceSelection: { selectedRecordIds: string[]; samplingApplied: boolean; strideN: number | null },
+    traceSelection: { selectedRecordIds: string[] },
     subPhaseId: string,
   ): ReasoningReviewResult {
     if (!parsed) {
@@ -204,8 +217,6 @@ export class ReasoningReview {
           recommendedAction: 'retry',
         }],
         traceSelectionRecordIds: traceSelection.selectedRecordIds,
-        traceSamplingApplied: traceSelection.samplingApplied,
-        traceStrideN: traceSelection.strideN,
         subPhaseId,
       };
     }
@@ -231,8 +242,6 @@ export class ReasoningReview {
       overallPass: (parsed.overall_pass as boolean) ?? flaws.length === 0,
       flaws,
       traceSelectionRecordIds: traceSelection.selectedRecordIds,
-      traceSamplingApplied: traceSelection.samplingApplied,
-      traceStrideN: traceSelection.strideN,
       subPhaseId,
     };
   }

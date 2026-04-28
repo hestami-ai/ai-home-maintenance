@@ -7,6 +7,7 @@ required_variables:
   - active_constraints
   - component_model_summary
   - software_domains_summary
+  - system_requirements_summary
   - detail_file_path
   - janumicode_version_sha
 reasoning_review_triggers:
@@ -33,6 +34,7 @@ Rules:
 - Use concrete types (string, integer, boolean, timestamp, uuid) not vague types
 
 CONTEXT:
+System Requirements (Phase 3.2 — what each entity must support): {{system_requirements_summary}}
 Component Model: {{component_model_summary}}
 Software Domains: {{software_domains_summary}}
 

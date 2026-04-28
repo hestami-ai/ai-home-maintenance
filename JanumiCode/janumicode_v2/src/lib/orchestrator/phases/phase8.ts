@@ -231,8 +231,7 @@ export class Phase8Handler implements PhaseHandler {
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
       traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '8', subPhaseId: '8.1', agentRole: 'eval_design_agent', label: 'Phase 8.1-8.3 — Evaluation Design' },
     });

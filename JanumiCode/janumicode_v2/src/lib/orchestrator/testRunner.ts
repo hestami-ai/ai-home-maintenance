@@ -7,6 +7,8 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { Database } from '../database/init';
 import { GovernedStreamWriter } from './governedStreamWriter';
 import { EventBus } from '../events/eventBus';
@@ -214,7 +216,27 @@ export class TestRunner {
   }
 
   /**
-   * Invoke Vitest for a suite.
+   * Invoke a test framework for a suite.
+   *
+   * Resolution order for the test command:
+   *   1. `package.json scripts.test` — whatever the workspace declared.
+   *      Run via `npm test` so the script's own assumptions hold.
+   *   2. Vitest (legacy default for JanumiCode's own internal suites).
+   *
+   * Earlier code hardcoded `npx vitest run` regardless of the
+   * workspace contents. cal-22b's Phase 9 executor wrote a Node.js
+   * project with `node:test`, the runner tried to invoke vitest
+   * against the test files, vitest wasn't installed in that
+   * workspace, the spawn failed, and the suite was reported as
+   * failed-with-error rather than running the actual tests. Detecting
+   * the workspace's declared test command makes the runner agnostic
+   * to whether Phase 9 generated a vitest / node:test / pytest /
+   * jest project.
+   *
+   * Returning the parsed shape uniformly is left to the framework
+   * detector — the parser walks well-known JSON shapes (vitest /
+   * jest) when present, and falls back to a coarse regex over plain
+   * text output otherwise.
    */
   private invokeVitest(suite: TestSuite, cwd: string): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -223,17 +245,12 @@ export class TestRunner {
       let stderr = '';
       let timedOut = false;
 
-      const args = [
-        'run',
-        '--reporter=json',
-        '--reporter=default',
-        ...suite.testFilePaths,
-      ];
-
-      const child: ChildProcess = spawn('npx', ['vitest', ...args], {
+      const cmd = this.resolveTestCommand(cwd, suite);
+      const child: ChildProcess = spawn(cmd.command, cmd.args, {
         cwd,
         shell: true,
         stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, ...cmd.env },
       });
 
       const timer = setTimeout(() => {
@@ -266,6 +283,43 @@ export class TestRunner {
         reject(err);
       });
     });
+  }
+
+  /**
+   * Pick the test command based on what the workspace actually
+   * declares. Falls back to vitest for backward compat when no
+   * package.json or no `scripts.test` is present.
+   *
+   * Wave R will replace this whole layer with per-leaf test execution
+   * inside the executor loop. This method is the minimal interim fix
+   * to stop hardcoding `vitest` against workspaces that use
+   * `node:test`, jest, mocha, pytest, etc.
+   */
+  private resolveTestCommand(cwd: string, suite: TestSuite): {
+    command: string; args: string[]; env: Record<string, string>;
+  } {
+    const pkgPath = path.join(cwd, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { scripts?: Record<string, string> };
+        if (pkg.scripts?.test) {
+          // Use the workspace's declared `test` script. We don't pass
+          // testFilePaths here — `npm test` runs whatever the script
+          // says to run, which is what calibration wants when the
+          // executor authored both the tests and the script.
+          return { command: 'npm', args: ['test', '--silent'], env: {} };
+        }
+      } catch {
+        // Malformed package.json — fall through to vitest default.
+      }
+    }
+    // Backward-compat default: vitest with the suite's declared file
+    // paths. Used by JanumiCode's own internal test infrastructure.
+    return {
+      command: 'npx',
+      args: ['vitest', 'run', '--reporter=json', '--reporter=default', ...suite.testFilePaths],
+      env: {},
+    };
   }
 
   /**
@@ -313,11 +367,14 @@ export class TestRunner {
       }
     }
 
-    // Fallback: parse text output
+    // Fallback: parse text output. Handles three common shapes —
+    // vitest's "N passed / N failed / N skipped", node:test's
+    // "ℹ pass N / ℹ fail N / ℹ skipped N", and pytest's
+    // "N passed, M failed in...". Whichever matches first wins.
     if (testCases.length === 0) {
-      const passMatch = output.match(/(\d+) passed/);
-      const failMatch = output.match(/(\d+) failed/);
-      const skipMatch = output.match(/(\d+) skipped/);
+      const passMatch = /(\d+) passed/.exec(output) ?? /[ℹi]\s*pass(?:ed)?\s+(\d+)/i.exec(output);
+      const failMatch = /(\d+) failed/.exec(output) ?? /[ℹi]\s*fail(?:ed)?\s+(\d+)/i.exec(output);
+      const skipMatch = /(\d+) skipped/.exec(output) ?? /[ℹi]\s*skipped\s+(\d+)/i.exec(output);
 
       passed = passMatch ? parseInt(passMatch[1], 10) : 0;
       failed = failMatch ? parseInt(failMatch[1], 10) : 0;

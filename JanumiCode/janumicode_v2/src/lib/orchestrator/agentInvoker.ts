@@ -54,6 +54,21 @@ export interface AgentInvocationOptions {
   /** Temperature */
   temperature?: number;
   /**
+   * When true, invoke the CLI in fully-unattended mode (e.g.
+   * Claude Code's `--dangerously-skip-permissions`). For roles like
+   * Phase 9's executor in calibration runs, where the agent must
+   * be able to run Bash to verify its own work and there is no human
+   * in the loop to approve permission requests. Production CLI / VS
+   * Code use cases leave this false so permission prompts surface to
+   * the human as designed.
+   *
+   * Calibration runners flip this on per-invocation rather than
+   * relying on the existing process-wide JANUMICODE_CLAUDE_SKIP_PERMISSIONS
+   * env var so the policy is explicit at each call site rather than
+   * a hidden global.
+   */
+  unattendedSkipPermissions?: boolean;
+  /**
    * Optional trace context. When provided together with an attached
    * writer (see setWriter), invokeCLI() writes a full agent_invocation
    * record on entry (capturing the exact command + args + stdin + cwd),
@@ -395,7 +410,17 @@ export class AgentInvoker {
           '--verbose',
           '--add-dir', options.cwd,
         ];
-        if (process.env.JANUMICODE_CLAUDE_SKIP_PERMISSIONS === '1') {
+        // Permission mode resolution, in priority order:
+        //   1. options.unattendedSkipPermissions — per-invocation
+        //      override set by callers that know the call is
+        //      definitionally headless (e.g. Phase 9 executor in
+        //      calibration mode).
+        //   2. JANUMICODE_CLAUDE_SKIP_PERMISSIONS=1 — process-wide
+        //      env override, kept for backward compat.
+        //   3. Default — `acceptEdits`. Auto-approves Edit/Write/
+        //      Patch but Bash and other tool calls still surface
+        //      permission requests to the human / IDE.
+        if (options.unattendedSkipPermissions || process.env.JANUMICODE_CLAUDE_SKIP_PERMISSIONS === '1') {
           args.push('--dangerously-skip-permissions');
         } else {
           args.push('--permission-mode', 'acceptEdits');

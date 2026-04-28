@@ -89,7 +89,20 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     reasoning_review: {
       primary: { provider: 'google', model: 'gemini-2.5-flash' },
       temperature: 0.2,
-      trace_max_tokens: 8000,
+    },
+    /**
+     * Phase 9 implementation-task executor. Distinct from the planner
+     * roles above because Phase 9 spawns a coding agent (file-system
+     * tools, shell access, multi-turn) rather than a single LLM
+     * round-trip. cal-21 used `claude_code_cli`; cal-22 calibration
+     * switches to `goose_cli` backed by ollama qwen-3.5:9b for cost
+     * containment during the per-phase audit cycle. Override via
+     * env: JANUMICODE_EXECUTOR_BACKING_TOOL, JANUMICODE_GOOSE_PROVIDER,
+     * JANUMICODE_GOOSE_MODEL.
+     */
+    executor: {
+      primary: { backing_tool: 'goose_cli', model: 'qwen3.5:9b' },
+      temperature: 0.4,
     },
   },
 };

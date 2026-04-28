@@ -48,6 +48,7 @@ import type {
 import { verifyCoverage } from './phase1/verifyCoverage';
 import { verifyReleaseManifest } from './phase1/verifyReleaseManifest';
 import { buildReleaseManifest, type LlmReleaseSkeleton } from './phase1/buildReleaseManifest';
+import { normalizeTechnicalConstraints } from './phase1Normalizers';
 import { randomUUID } from 'node:crypto';
 import type {
   DecisionBundleContent,
@@ -2014,18 +2015,10 @@ export class Phase1Handler implements PhaseHandler {
   // ── Extraction normalizers (id reassignment + provenance preservation) ──
 
   private normalizeTechnicalConstraints(raw: unknown[]): TechnicalConstraint[] {
-    return raw.map((r, i) => {
-      const o = (r ?? {}) as Record<string, unknown>;
-      return {
-        id: typeof o.id === 'string' && o.id.length > 0 ? o.id : `TECH-${i + 1}`,
-        category: typeof o.category === 'string' ? o.category : 'uncategorized',
-        text: typeof o.text === 'string' ? o.text : '',
-        technology: typeof o.technology === 'string' ? o.technology : undefined,
-        version: typeof o.version === 'string' ? o.version : undefined,
-        rationale: typeof o.rationale === 'string' ? o.rationale : undefined,
-        source_ref: this.normalizeSourceRef(o.source_ref),
-      };
-    }).filter(t => t.text.length > 0);
+    // Delegated to the extracted pure-function module so the
+    // LLM-shape-tolerance behavior is regression-tested in isolation.
+    // See phase1Normalizers.ts for the fallback order rationale.
+    return normalizeTechnicalConstraints(raw);
   }
 
   private normalizeVVRequirements(raw: unknown[]): VVRequirement[] {
@@ -2589,6 +2582,13 @@ export class Phase1Handler implements PhaseHandler {
         filterArr('vv_requirements', acceptedVV);
         filterArr('integrations', acceptedIntegrations);
       }
+      // Normalize acceptanceCriteria to string[] before persistence.
+      // cal-22 hit qwen-3.5:9b emitting a bare string here, which crashed
+      // Phase 2's formatter. Coercing on the write side keeps the
+      // persisted artifact matching its declared type so downstream
+      // readers can trust the shape.
+      const ac = (j as Record<string, unknown>).acceptanceCriteria;
+      (j as Record<string, unknown>).acceptanceCriteria = normalizeAcceptanceCriteria(ac);
       return j as unknown as UserJourney;
     });
     const totalDropped = Object.values(droppedBySurfaceType).reduce((a, b) => a + b.length, 0);
@@ -3056,5 +3056,30 @@ interface IntentDiscoveryBundle {
   complianceExtractedItems: ExtractedItem[];
   vvRequirements: VVRequirement[];
   canonicalVocabulary: VocabularyTerm[];
+}
+
+/**
+ * Normalize an LLM-emitted `acceptanceCriteria` value to string[].
+ * The journey-bloom prompt asks for `string[]` but qwen-3.5:9b
+ * (cal-22) returned a bare string for some journeys. Earlier runs
+ * may also produce arrays of objects when the model embeds
+ * measurable conditions. Coerce all shapes to a plain string[] so
+ * the persisted UserJourney shape matches its TypeScript contract.
+ */
+function normalizeAcceptanceCriteria(v: unknown): string[] {
+  if (v == null) return [];
+  if (typeof v === 'string') return v.length > 0 ? [v] : [];
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const item of v) {
+    if (typeof item === 'string') {
+      if (item.length > 0) out.push(item);
+    } else if (item && typeof item === 'object') {
+      const o = item as Record<string, unknown>;
+      const text = (o.description ?? o.text ?? o.title ?? o.criterion) as string | undefined;
+      if (typeof text === 'string' && text.length > 0) out.push(text);
+    }
+  }
+  return out;
 }
 

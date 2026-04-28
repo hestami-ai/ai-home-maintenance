@@ -16,6 +16,7 @@ import type { GovernedStreamRecord, PhaseId } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
+import { pickItemsArray } from '../parsedResponseHelpers';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -81,6 +82,16 @@ export class Phase5Handler implements PhaseHandler {
     const componentSummary = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${prior.componentModel?.summary ?? 'No component model available'}`;
     const domainsSummary = prior.softwareDomains?.summary ?? 'No domains available';
     const contractsSummary = prior.interfaceContracts?.summary ?? 'No interface contracts available';
+    // Phase 3.2 SR layer threaded into every Phase 5 sub-phase:
+    //   5.1 entities — what each model must support per SR
+    //   5.2 endpoints — what each API call satisfies per SR
+    //   5.3 error strategies — error-handling expectations per SR
+    //   5.4 config params — retention, audit, SLO knobs per SR
+    // Pre-cal-22 the SR layer was a placeholder so threading it
+    // would have hurt; post-replay (or post-fix on next run) the
+    // 16-SR list adds real signal without prompt-template changes
+    // beyond `system_requirements_summary` (already wired here).
+    const sysReqSummary = prior.systemRequirements?.summary ?? 'No system requirements available';
     const derivedFromIds = prior.allRecordIds;
 
     // ── 5.1 — Data Model Specification ────────────────────────
@@ -95,7 +106,7 @@ export class Phase5Handler implements PhaseHandler {
     });
 
     const dataModelsContent = await this.runDataModelSpecification(
-      ctx, componentSummary, domainsSummary, dmr51,
+      ctx, componentSummary, domainsSummary, sysReqSummary, dmr51,
     );
 
     const dataModelsRecord = engine.writer.writeRecord({
@@ -124,7 +135,7 @@ export class Phase5Handler implements PhaseHandler {
     });
 
     const apiContent = await this.runApiDefinition(
-      ctx, componentSummary, contractsSummary, dmr52,
+      ctx, componentSummary, contractsSummary, sysReqSummary, dmr52,
     );
 
     const apiRecord = engine.writer.writeRecord({
@@ -158,7 +169,7 @@ export class Phase5Handler implements PhaseHandler {
     });
 
     const errorContent = await this.runErrorHandlingStrategy(
-      ctx, componentSummary, apiSummary, dmr53,
+      ctx, componentSummary, apiSummary, sysReqSummary, dmr53,
     );
 
     const errorRecord = engine.writer.writeRecord({
@@ -192,7 +203,7 @@ export class Phase5Handler implements PhaseHandler {
     });
 
     const configContent = await this.runConfigurationParameters(
-      ctx, componentSummary, dataModelsSummary, dmr54,
+      ctx, componentSummary, dataModelsSummary, sysReqSummary, dmr54,
     );
 
     const configRecord = engine.writer.writeRecord({
@@ -313,7 +324,7 @@ export class Phase5Handler implements PhaseHandler {
 
   private async runDataModelSpecification(
     ctx: PhaseContext, componentSummary: string, domainsSummary: string,
-    dmr: PhaseContextPacketResult,
+    sysReqSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<DataModels> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', '05_1_data_models');
@@ -322,27 +333,32 @@ export class Phase5Handler implements PhaseHandler {
 
     const rendered = engine.templateLoader.render(template, {
       active_constraints: dmr.activeConstraintsText, component_model_summary: componentSummary,
-      software_domains_summary: domainsSummary, detail_file_path: dmr.detailFilePath,
+      software_domains_summary: domainsSummary,
+      system_requirements_summary: sysReqSummary,
+      detail_file_path: dmr.detailFilePath,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    // Route through requirements_agent routing for llamacpp via
+    // llama-swap. See phase3.ts for the rationale.
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
       traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.1', agentRole: 'technical_spec_agent', label: 'Phase 5.1 — Data Model Specification' },
     });
+    // Defensive parse — cal-21 lost 6 of 7 data models to the
+    // SR-loss bug pattern (kind-name envelope vs schema property
+    // name). See parsedResponseHelpers.ts.
     const parsed = result.parsed as Record<string, unknown> | null;
-    const dm = parsed?.data_models ?? parsed;
-    const data = (Array.isArray(dm) ? dm[0] : dm) as Partial<DataModels> | null;
-    if (data?.models && Array.isArray(data.models) && data.models.length > 0) return { models: data.models as DataModels['models'] };
+    const models = pickItemsArray<DataModels['models'][number]>(parsed, ['data_models', 'models']);
+    if (models && models.length > 0) return { models };
     return fallback;
   }
 
   private async runApiDefinition(
     ctx: PhaseContext, componentSummary: string, contractsSummary: string,
-    dmr: PhaseContextPacketResult,
+    sysReqSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<ApiDefinitions> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', '05_2_api_definitions');
@@ -352,26 +368,27 @@ export class Phase5Handler implements PhaseHandler {
     const rendered = engine.templateLoader.render(template, {
       active_constraints: dmr.activeConstraintsText, component_model_summary: componentSummary,
       interface_contracts_summary: contractsSummary,
+      system_requirements_summary: sysReqSummary,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    // Route through requirements_agent routing for llamacpp via
+    // llama-swap. See phase3.ts for the rationale.
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
       traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.2', agentRole: 'technical_spec_agent', label: 'Phase 5.2 — API Definition' },
     });
     const parsed = result.parsed as Record<string, unknown> | null;
-    const ad = parsed?.api_definitions ?? parsed;
-    const data = (Array.isArray(ad) ? ad[0] : ad) as Partial<ApiDefinitions> | null;
-    if (data?.definitions && Array.isArray(data.definitions) && data.definitions.length > 0) return { definitions: data.definitions as ApiDefinitions['definitions'] };
+    const definitions = pickItemsArray<ApiDefinitions['definitions'][number]>(parsed, ['api_definitions', 'definitions']);
+    if (definitions && definitions.length > 0) return { definitions };
     return fallback;
   }
 
   private async runErrorHandlingStrategy(
     ctx: PhaseContext, componentSummary: string, apiSummary: string,
-    dmr: PhaseContextPacketResult,
+    sysReqSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<ErrorHandlingStrategies> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', '05_3_error_handling');
@@ -381,26 +398,27 @@ export class Phase5Handler implements PhaseHandler {
     const rendered = engine.templateLoader.render(template, {
       active_constraints: dmr.activeConstraintsText, component_model_summary: componentSummary,
       api_definitions_summary: apiSummary,
+      system_requirements_summary: sysReqSummary,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    // Route through requirements_agent routing for llamacpp via
+    // llama-swap. See phase3.ts for the rationale.
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
       traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.3', agentRole: 'technical_spec_agent', label: 'Phase 5.3 — Error Handling Strategy' },
     });
     const parsed = result.parsed as Record<string, unknown> | null;
-    const eh = parsed?.error_handling_strategies ?? parsed;
-    const data = (Array.isArray(eh) ? eh[0] : eh) as Partial<ErrorHandlingStrategies> | null;
-    if (data?.strategies && Array.isArray(data.strategies) && data.strategies.length > 0) return { strategies: data.strategies as ErrorHandlingStrategies['strategies'] };
+    const strategies = pickItemsArray<ErrorHandlingStrategies['strategies'][number]>(parsed, ['error_handling_strategies', 'strategies']);
+    if (strategies && strategies.length > 0) return { strategies };
     return fallback;
   }
 
   private async runConfigurationParameters(
     ctx: PhaseContext, componentSummary: string, dataModelsSummary: string,
-    dmr: PhaseContextPacketResult,
+    sysReqSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<ConfigurationParameters> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', '05_4_configuration_parameters');
@@ -410,20 +428,22 @@ export class Phase5Handler implements PhaseHandler {
     const rendered = engine.templateLoader.render(template, {
       active_constraints: dmr.activeConstraintsText, component_model_summary: componentSummary,
       data_models_summary: dataModelsSummary,
+      system_requirements_summary: sysReqSummary,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    // Route through requirements_agent routing for llamacpp via
+    // llama-swap. See phase3.ts for the rationale.
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
       traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.4', agentRole: 'technical_spec_agent', label: 'Phase 5.4 — Configuration Parameters' },
     });
+    // cal-21 lost 23 of 24 configuration parameters here. Same bug.
     const parsed = result.parsed as Record<string, unknown> | null;
-    const cp = parsed?.configuration_parameters ?? parsed;
-    const data = (Array.isArray(cp) ? cp[0] : cp) as Partial<ConfigurationParameters> | null;
-    if (data?.params && Array.isArray(data.params) && data.params.length > 0) return { params: data.params as ConfigurationParameters['params'] };
+    const params = pickItemsArray<ConfigurationParameters['params'][number]>(parsed, ['configuration_parameters', 'params']);
+    if (params && params.length > 0) return { params };
     return fallback;
   }
 

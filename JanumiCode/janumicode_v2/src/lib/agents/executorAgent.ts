@@ -37,6 +37,15 @@ export interface ExecutionTask {
 export interface ExecutionResult {
   taskId: string;
   success: boolean;
+  /**
+   * The `invocation_id` written into the executor's `agent_invocation`
+   * row and stamped onto every child trace record (tool_call,
+   * tool_result, agent_reasoning_step, agent_self_correction,
+   * file_system_write_record) as `produced_by_record_id`. Callers need
+   * this to query the executor's full trace — phase9's reasoning_review
+   * filter previously regenerated its own ID and got zero matches.
+   */
+  invocationId: string;
   /** Files written during execution */
   filesWritten: FileWriteRecord[];
   /** Whether a refactoring task was skipped (already applied) */
@@ -103,12 +112,27 @@ export interface ExecutorAgentOptions {
    * parser" confusion it produced before.
    */
   executorBackingTool?: ExecutorBackingTool;
+  /**
+   * Calibration / unattended runs. When true, the executor invokes the
+   * CLI in fully-skip-permissions mode so the agent can run Bash to
+   * verify its own work without a human approving each Bash call.
+   * Default false — production CLI / VS Code use cases keep the
+   * `acceptEdits` permission mode so Bash requests surface to the
+   * human as designed.
+   *
+   * cal-22b symptom this addresses: the executor wrote source + tests,
+   * then tried `node --test` to verify, and the sandbox blocked it.
+   * The agent then claimed success without proof, triggering a
+   * (correct) `completeness_shortcut` flag from reasoning_review.
+   */
+  unattendedSkipPermissions?: boolean;
 }
 
 // ── ExecutorAgent ───────────────────────────────────────────────────
 
 export class ExecutorAgent {
   private readonly executorBackingTool: ExecutorBackingTool;
+  private readonly unattendedSkipPermissions: boolean;
 
   constructor(
     private readonly db: Database,
@@ -119,6 +143,7 @@ export class ExecutorAgent {
     options?: ExecutorAgentOptions,
   ) {
     this.executorBackingTool = options?.executorBackingTool ?? 'claude_code_cli';
+    this.unattendedSkipPermissions = options?.unattendedSkipPermissions ?? false;
   }
 
   /**
@@ -131,6 +156,10 @@ export class ExecutorAgent {
     cwd: string,
     janumiCodeVersionSha: string,
   ): Promise<ExecutionResult> {
+    // Generate invocationId up-front so every return path carries the
+    // ID callers need to correlate downstream trace records.
+    const invocationId = this.generateId();
+
     // Refactoring task idempotency check
     if (task.taskType === 'refactoring' && task.expectedPreStateHash) {
       const idempotencyResult = await this.checkRefactoringIdempotency(task, cwd);
@@ -139,6 +168,7 @@ export class ExecutorAgent {
         return {
           taskId: task.id,
           success: true,
+          invocationId,
           filesWritten: [],
           skippedIdempotent: true,
         };
@@ -147,6 +177,7 @@ export class ExecutorAgent {
         return {
           taskId: task.id,
           success: false,
+          invocationId,
           filesWritten: [],
           skippedIdempotent: false,
           error: 'Refactoring target file in indeterminate state — hash mismatch and verification failed. Escalating to human.',
@@ -155,7 +186,6 @@ export class ExecutorAgent {
     }
 
     // Record invocation start
-    const invocationId = this.generateId();
     this.writer.writeRecord({
       record_type: 'agent_invocation',
       schema_version: '1.0',
@@ -200,6 +230,7 @@ export class ExecutorAgent {
       invocationId,
       prompt: stdinContent,
       cwd,
+      unattendedSkipPermissions: this.unattendedSkipPermissions,
     });
 
     // Record execution trace events
@@ -270,6 +301,7 @@ export class ExecutorAgent {
     return {
       taskId: task.id,
       success: result.success,
+      invocationId,
       filesWritten,
       skippedIdempotent: false,
       error: result.error,
@@ -505,6 +537,12 @@ export class ExecutorAgent {
       phase_id: '9',
       sub_phase_id: '9.1',
       produced_by_agent_role: 'executor_agent',
+      // Stamp produced_by_record_id with the executor's invocationId so
+      // file_system_write_record correlates with every other executor
+      // child record. Earlier code only embedded the id inside
+      // content.agent_invocation_id, which forced offline forensics to
+      // know about a second linkage convention.
+      produced_by_record_id: invocationId,
       janumicode_version_sha: janumiCodeVersionSha,
       content: {
         agent_invocation_id: invocationId,

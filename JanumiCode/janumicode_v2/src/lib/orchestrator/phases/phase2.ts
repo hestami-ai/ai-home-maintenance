@@ -1963,6 +1963,7 @@ export class Phase2Handler implements PhaseHandler {
       const result = await engine.llmCaller.call({
         provider: routing.primary.provider,
         model: routing.primary.model,
+        baseUrl: routing.primary.base_url,
         prompt: rendered.rendered,
         responseFormat: 'json',
         temperature: routing.temperature,
@@ -2168,10 +2169,44 @@ export class Phase2Handler implements PhaseHandler {
 function formatJourneys(js: UserJourney[]): string {
   if (!js.length) return '(none)';
   return js.map(j => {
-    const acs = (j.acceptanceCriteria ?? []).slice(0, 3).join(' | ');
+    // cal-22 surfaced an LLM shape divergence: `acceptanceCriteria`
+    // arrives as a bare string ("Property record exists…") rather
+    // than a string[]. Normalize so .slice/.join doesn't crash.
+    const acs = coerceAcceptanceCriteria(j.acceptanceCriteria).slice(0, 3).join(' | ');
     return `- ${j.id} [${j.implementationPhase ?? '?'}] (persona ${j.personaId}) ${j.title}: ${j.scenario}` +
            (acs ? `\n  Acceptance: ${acs}` : '');
   }).join('\n');
+}
+
+/**
+ * Coerce a journey's `acceptanceCriteria` field to string[] no matter
+ * which shape the LLM emitted:
+ *   - undefined/null         → []
+ *   - "single string"        → ["single string"]
+ *   - ["a", "b"]             → ["a", "b"]
+ *   - [{description: "a"}…]  → ["a", …]  (extracts description/text/title)
+ *   - mixed array            → string entries kept, objects extracted, others dropped
+ *
+ * Defensive because the LLM doesn't reliably honor the typed
+ * UserJourney.acceptanceCriteria: string[] contract. cal-22 had it
+ * as a string; future runs may emit objects when the model
+ * "improves" with measurable conditions.
+ */
+function coerceAcceptanceCriteria(v: unknown): string[] {
+  if (v == null) return [];
+  if (typeof v === 'string') return v.length > 0 ? [v] : [];
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const item of v) {
+    if (typeof item === 'string') {
+      if (item.length > 0) out.push(item);
+    } else if (item && typeof item === 'object') {
+      const o = item as Record<string, unknown>;
+      const text = (o.description ?? o.text ?? o.title ?? o.criterion) as string | undefined;
+      if (typeof text === 'string' && text.length > 0) out.push(text);
+    }
+  }
+  return out;
 }
 
 function formatEntities(es: Entity[]): string {

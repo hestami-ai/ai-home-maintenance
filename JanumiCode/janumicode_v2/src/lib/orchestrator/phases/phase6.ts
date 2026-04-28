@@ -13,6 +13,7 @@ import type { PhaseId } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
+import { pickItemsArray } from '../parsedResponseHelpers';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -79,9 +80,24 @@ export class Phase6Handler implements PhaseHandler {
       requiredOutputSpec: 'implementation_plan JSON — tasks with component_id, dependencies, completion_criteria',
     });
 
-    const planContent = await this.runTaskDecomposition(
+    const rawPlan = await this.runTaskDecomposition(
       ctx, componentSummary, techSpecsSummary, dmr61,
     );
+
+    // Normalize write/read paths to workspace-relative form. cal-21
+    // failed Phase 9 with "Write scope is unreachable: /opt/hestami/
+    // PROP/LIFECYCLE — Linux path that doesn't exist on this Windows
+    // system." The LLM emits absolute Linux paths because the Hestami
+    // spec uses them; the executor needs paths it can resolve under
+    // workspacePath on any OS.
+    const planContent: ImplementationPlan = {
+      ...rawPlan,
+      tasks: rawPlan.tasks.map(t => ({
+        ...t,
+        write_directory_paths: t.write_directory_paths?.map(normalizeWorkspacePath),
+        read_directory_paths: t.read_directory_paths?.map(normalizeWorkspacePath),
+      })),
+    };
 
     const planRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -235,9 +251,9 @@ export class Phase6Handler implements PhaseHandler {
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama',
-      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    // Route through requirements_agent routing for llamacpp via
+    // llama-swap. See phase3.ts for the rationale.
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.4,
@@ -250,12 +266,13 @@ export class Phase6Handler implements PhaseHandler {
       },
     });
 
+    // Defensive parse — see parsedResponseHelpers.ts. cal-21 happened
+    // to use the schema-key envelope here so didn't lose data, but
+    // the model is free to switch to `{ implementation_plan: [...] }`
+    // on retry. Same migration as Phase 3-5.
     const parsed = result.parsed as Record<string, unknown> | null;
-    const ip = parsed?.implementation_plan ?? parsed;
-    const data = (Array.isArray(ip) ? ip[0] : ip) as Partial<ImplementationPlan> | null;
-    if (data?.tasks && Array.isArray(data.tasks) && data.tasks.length > 0) {
-      return { tasks: data.tasks as ImplementationTask[] };
-    }
+    const tasks = pickItemsArray<ImplementationTask>(parsed, ['implementation_plan', 'tasks']);
+    if (tasks && tasks.length > 0) return { tasks };
     return fallback;
   }
 
@@ -347,4 +364,48 @@ export class Phase6Handler implements PhaseHandler {
     for (const node of graph.keys()) dfs(node, []);
     return cycles;
   }
+}
+
+/**
+ * Coerce an LLM-emitted directory path into a workspace-relative
+ * form that the Phase 9 executor can resolve regardless of host OS.
+ *
+ * The Hestami product spec uses absolute Linux paths
+ * (`/opt/hestami/PROP/LIFECYCLE`, `/var/hestami/COMM/SCHEDULER`),
+ * and qwen-3.5:9b faithfully reproduces them in task specs. Phase 9
+ * then tried to write to `/opt/hestami/...` on Windows and got blocked
+ * by the executor's write-scope guard, which is why cal-21 produced
+ * 21 "Write scope is unreachable" results instead of code.
+ *
+ * Normalization rules:
+ *   1. Backslashes → forward slashes.
+ *   2. Strip leading `/opt/`, `/var/`, `/usr/`, `/srv/` system roots
+ *      so the remainder reads as a workspace-relative subtree.
+ *   3. Strip leading `/` and `./`.
+ *   4. Collapse double slashes.
+ *   5. Reject empty or `.` (shouldn't be a write scope).
+ *
+ * Input:   `/opt/hestami/PROP/LIFECYCLE`
+ * Output:  `hestami/PROP/LIFECYCLE`
+ *
+ * The Phase 9 executor resolves the result against `workspacePath`,
+ * so this gives a fully portable spec.
+ */
+export function normalizeWorkspacePath(p: string): string {
+  if (!p) return p;
+  let out = p.replaceAll('\\', '/');
+  // Strip absolute system-root prefixes that won't exist under
+  // workspacePath. Order matters — match longest first.
+  for (const root of ['/opt/', '/var/', '/usr/', '/srv/']) {
+    if (out.startsWith(root)) { out = out.slice(root.length); break; }
+  }
+  // Strip leading `/` or `./`.
+  while (out.startsWith('/') || out.startsWith('./')) {
+    out = out.startsWith('./') ? out.slice(2) : out.slice(1);
+  }
+  // Collapse runs of slashes.
+  out = out.replaceAll(/\/+/g, '/');
+  // Trim trailing slash for stability.
+  if (out.endsWith('/') && out.length > 1) out = out.slice(0, -1);
+  return out;
 }

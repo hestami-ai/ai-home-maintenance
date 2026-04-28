@@ -125,6 +125,19 @@
     return `qualified by: ${nfrs.join(', ')}`;
   }
 
+  /**
+   * "→ satisfied by: SR-001, SR-014" footnote for a given FR/NFR id.
+   * Phase 3 system_requirements.source_requirement_ids[] inverted in
+   * the dagModel. Prefer the root-level id (display_key on the
+   * depth=0 node); the SR list is not deduped — if a root and its
+   * leaves both appear in some SR's sources, both contribute.
+   */
+  function satisfiedByFootnote(usId: string): string | null {
+    const srs = $dagModel.satisfiedByMap.get(usId);
+    if (!srs || srs.length === 0) return null;
+    return `satisfied by: ${srs.join(', ')}`;
+  }
+
   /** Render a single FR/NFR root under its primary anchor (decomposition tree expanded). */
   function primaryRowsFor(rootFrId: string): SubRow[] {
     return $expandedIndentedNodes.has(rootSeed(rootFrId)?.node_id ?? '')
@@ -137,11 +150,12 @@
 
 <section class="dag-tree">
   <header class="toolbar">
-    <span class="legend" title="Decomposition: parent → child via parent_node_id (Wave 6 records). Traceability: anchor → root via traces_to. Qualification: NFR.applies_to_requirements → FR.">
+    <span class="legend" title="Decomposition: parent → child via parent_node_id (Wave 6 records). Traceability: anchor → root via traces_to. Qualification: NFR.applies_to_requirements → FR. Satisfaction: Phase 3.2 SR.source_requirement_ids → FR/NFR.">
       Edges:
       <span class="edge-pill edge-decomp">decomposition ▾</span>
       <span class="edge-pill edge-trace">traceability →</span>
       <span class="edge-pill edge-qual">qualification ⓠ</span>
+      <span class="edge-pill edge-satisfy">satisfaction →</span>
     </span>
     <button class="toolbar-btn" onclick={() => expandAllDagAnchors(allAnchorIds)}>Expand all</button>
     <button class="toolbar-btn" onclick={collapseAllDagAnchors}>Collapse all</button>
@@ -203,8 +217,10 @@
                               >{row.hasChildren ? ($expandedIndentedNodes.has(row.node.node_id) ? '▾' : '▸') : '·'}</button>
                               <NodeRow node={row.node} />
                               {#if row.depth === 0}
-                                {@const fn = qualifiedByFootnote(row.node.display_key)}
-                                {#if fn}<div class="footnote qualified-by">ⓠ {fn}</div>{/if}
+                                {@const qfn = qualifiedByFootnote(row.node.display_key)}
+                                {@const sfn = satisfiedByFootnote(row.node.display_key)}
+                                {#if qfn}<div class="footnote qualified-by">ⓠ {qfn}</div>{/if}
+                                {#if sfn}<div class="footnote satisfied-by" title="Phase 3.2 system requirements that source this FR/NFR via source_requirement_ids[]">→ {sfn}</div>{/if}
                               {/if}
                             </li>
                           {/each}
@@ -267,6 +283,10 @@
                                 onclick={(e) => { e.stopPropagation(); if (row.hasChildren) toggleIndentedNode(row.node.node_id); }}
                               >{row.hasChildren ? ($expandedIndentedNodes.has(row.node.node_id) ? '▾' : '▸') : '·'}</button>
                               <NodeRow node={row.node} />
+                              {#if row.depth === 0}
+                                {@const sfn = satisfiedByFootnote(row.node.display_key)}
+                                {#if sfn}<div class="footnote satisfied-by" title="Phase 3.2 system requirements that source this NFR via source_requirement_ids[]">→ {sfn}</div>{/if}
+                              {/if}
                             </li>
                           {/each}
                         {/each}
@@ -467,5 +487,16 @@
     font-size: 11px;
     color: var(--jc-warning-container, #FFE08A);
     font-family: var(--jc-font-mono);
+  }
+  .footnote.satisfied-by {
+    grid-column: 2 / -1;
+    margin-left: var(--jc-space-md);
+    font-size: 11px;
+    color: var(--jc-on-tertiary-container, #C8E6C9);
+    font-family: var(--jc-font-mono);
+  }
+  .edge-satisfy {
+    background: var(--jc-tertiary-container, #2A4A45);
+    color: var(--jc-on-tertiary-container, #C8E6C9);
   }
 </style>

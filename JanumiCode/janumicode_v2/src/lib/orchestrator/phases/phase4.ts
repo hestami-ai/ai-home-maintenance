@@ -15,6 +15,7 @@ import type { GovernedStreamRecord, PhaseId } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
+import { pickItemsArray } from '../parsedResponseHelpers';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -322,9 +323,9 @@ export class Phase4Handler implements PhaseHandler {
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama',
-      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    // Route through requirements_agent routing for llamacpp via
+    // llama-swap. See phase3.ts for the rationale.
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.4,
@@ -337,12 +338,13 @@ export class Phase4Handler implements PhaseHandler {
       },
     });
 
+    // Defensive parse — see parsedResponseHelpers.ts for the cal-21
+    // SR-loss bug pattern this guards against. Phase 4.1 happens to
+    // currently emit `{ domains: [...] }` (schema key) but the model
+    // is free to switch to the kind-name envelope on retry.
     const parsed = result.parsed as Record<string, unknown> | null;
-    const sd = parsed?.software_domains ?? parsed;
-    const data = (Array.isArray(sd) ? sd[0] : sd) as Partial<SoftwareDomains> | null;
-    if (data?.domains && Array.isArray(data.domains) && data.domains.length > 0) {
-      return { domains: data.domains as SoftwareDomain[] };
-    }
+    const domains = pickItemsArray<SoftwareDomain>(parsed, ['software_domains', 'domains']);
+    if (domains && domains.length > 0) return { domains };
     return fallback;
   }
 
@@ -376,9 +378,9 @@ export class Phase4Handler implements PhaseHandler {
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama',
-      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    // Route through requirements_agent routing for llamacpp via
+    // llama-swap. See phase3.ts for the rationale.
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.4,
@@ -392,11 +394,8 @@ export class Phase4Handler implements PhaseHandler {
     });
 
     const parsed = result.parsed as Record<string, unknown> | null;
-    const cm = parsed?.component_model ?? parsed;
-    const data = (Array.isArray(cm) ? cm[0] : cm) as Partial<ComponentModel> | null;
-    if (data?.components && Array.isArray(data.components) && data.components.length > 0) {
-      return { components: data.components as Component[] };
-    }
+    const components = pickItemsArray<Component>(parsed, ['component_model', 'components']);
+    if (components && components.length > 0) return { components };
     return fallback;
   }
 
@@ -433,9 +432,9 @@ export class Phase4Handler implements PhaseHandler {
     if (rendered.missing_variables.length > 0) return fallback;
 
     // LLM throws propagate to engine catch (halts workflow).
-    const result = await engine.llmCaller.call({
-      provider: 'ollama',
-      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+    // Route through requirements_agent routing for llamacpp via
+    // llama-swap. See phase3.ts for the rationale.
+    const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.4,
@@ -448,12 +447,14 @@ export class Phase4Handler implements PhaseHandler {
       },
     });
 
+    // cal-21 lost 6 of 7 ADRs to this exact spot before the migration:
+    // model emitted `{ architectural_decisions: [adr1..adr7] }`, the
+    // old parser took adr1 as a single ADR, looked for `.adrs` inside
+    // it (doesn't exist), fell back to the placeholder. Same pattern
+    // as the SR-loss bug — see parsedResponseHelpers.ts.
     const parsed = result.parsed as Record<string, unknown> | null;
-    const ad = parsed?.architectural_decisions ?? parsed;
-    const data = (Array.isArray(ad) ? ad[0] : ad) as Partial<ArchitecturalDecisions> | null;
-    if (data?.adrs && Array.isArray(data.adrs) && data.adrs.length > 0) {
-      return { adrs: data.adrs as ADR[] };
-    }
+    const adrs = pickItemsArray<ADR>(parsed, ['architectural_decisions', 'adrs']);
+    if (adrs && adrs.length > 0) return { adrs };
     return fallback;
   }
 

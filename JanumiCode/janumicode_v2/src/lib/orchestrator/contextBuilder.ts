@@ -94,10 +94,6 @@ export interface TraceRecord {
 export interface TraceSelection {
   /** Record IDs included in the selection */
   selectedRecordIds: string[];
-  /** Whether stride sampling was applied */
-  samplingApplied: boolean;
-  /** Stride N if sampling was applied */
-  strideN: number | null;
   /** Total tokens in the selection */
   totalTokens: number;
 }
@@ -298,123 +294,41 @@ export class ContextBuilder {
   /**
    * Construct a Trace Selection from execution trace records.
    * Deterministic — no LLM call required.
+   *
+   * Includes ALL self-corrections, tool-call invocations, and reasoning
+   * steps. Tool results are excluded by design — they live in the
+   * Governed Stream for the Unsticking Agent to consult, but the reviewer
+   * is meant to inspect what the agent *concluded* from results, not the
+   * results themselves.
+   *
+   * No token budget. Earlier iterations clamped this to 8000 tokens and
+   * applied stride sampling, which silently truncated executor traces
+   * and led to false-positive `completeness_shortcut` flags from the
+   * reviewer (it was seeing two reasoning steps and concluding "no
+   * evidence of work"). The two-channel stdin + detail-file architecture
+   * is the intended escape hatch for large content; ad-hoc token
+   * accounting at every call site duplicates and undermines that design.
    */
   buildTraceSelection(
     traceRecords: TraceRecord[],
-    isExecutorAgent: boolean,
-    traceMaxTokens: number,
+    _isExecutorAgent: boolean,
   ): TraceSelection {
     const selected = new Set<string>();
     let totalTokens = 0;
 
-    // Always include: all self-corrections
     for (const r of traceRecords) {
-      if (r.type === 'agent_self_correction') {
+      if (
+        r.type === 'agent_self_correction'
+        || r.type === 'tool_call'
+        || r.type === 'agent_reasoning_step'
+      ) {
         selected.add(r.id);
         totalTokens += r.tokenCount;
-      }
-    }
-
-    // Always include: all tool calls (invocation only, not results)
-    for (const r of traceRecords) {
-      if (r.type === 'tool_call') {
-        selected.add(r.id);
-        totalTokens += r.tokenCount;
-      }
-    }
-
-    // Always EXCLUDE: tool results
-    // (available in Governed Stream for Unsticking Agent)
-
-    // Reasoning steps: first, last, pre-tool-call, pre-self-correction
-    const reasoningSteps = traceRecords.filter(r => r.type === 'agent_reasoning_step');
-
-    if (reasoningSteps.length > 0) {
-      // First step
-      selected.add(reasoningSteps[0].id);
-      totalTokens += reasoningSteps[0].tokenCount;
-
-      // Last step
-      if (reasoningSteps.length > 1) {
-        const last = reasoningSteps[reasoningSteps.length - 1];
-        selected.add(last.id);
-        totalTokens += last.tokenCount;
-      }
-
-      // Steps preceding tool calls and self-corrections
-      for (let i = 1; i < traceRecords.length; i++) {
-        const curr = traceRecords[i];
-        if (curr.type === 'tool_call' || curr.type === 'agent_self_correction') {
-          const prev = traceRecords[i - 1];
-          if (prev.type === 'agent_reasoning_step' && !selected.has(prev.id)) {
-            selected.add(prev.id);
-            totalTokens += prev.tokenCount;
-          }
-        }
-      }
-    }
-
-    // Executor Agent only: uniform stride sampling for remaining steps
-    let samplingApplied = false;
-    let strideN: number | null = null;
-
-    if (isExecutorAgent) {
-      const unselectedSteps = reasoningSteps.filter(r => !selected.has(r.id));
-
-      if (unselectedSteps.length > 0) {
-        const remainingBudget = traceMaxTokens - totalTokens;
-
-        if (remainingBudget > 0) {
-          const totalUnselectedTokens = unselectedSteps.reduce((sum, r) => sum + r.tokenCount, 0);
-
-          if (totalUnselectedTokens <= remainingBudget) {
-            // All fit
-            for (const r of unselectedSteps) {
-              selected.add(r.id);
-              totalTokens += r.tokenCount;
-            }
-          } else {
-            // Uniform stride sampling
-            samplingApplied = true;
-            const avgTokens = totalUnselectedTokens / unselectedSteps.length;
-            const availableSlots = Math.floor(remainingBudget / avgTokens);
-            strideN = Math.ceil(unselectedSteps.length / Math.max(availableSlots, 1));
-
-            for (let i = 0; i < unselectedSteps.length; i += strideN) {
-              const r = unselectedSteps[i];
-              selected.add(r.id);
-              totalTokens += r.tokenCount;
-            }
-
-            // Always include steps adjacent to self-corrections
-            for (const r of traceRecords) {
-              if (r.type === 'agent_self_correction') {
-                const idx = traceRecords.indexOf(r);
-                if (idx > 0) {
-                  const before = traceRecords[idx - 1];
-                  if (before.type === 'agent_reasoning_step' && !selected.has(before.id)) {
-                    selected.add(before.id);
-                    totalTokens += before.tokenCount;
-                  }
-                }
-                if (idx < traceRecords.length - 1) {
-                  const after = traceRecords[idx + 1];
-                  if (after.type === 'agent_reasoning_step' && !selected.has(after.id)) {
-                    selected.add(after.id);
-                    totalTokens += after.tokenCount;
-                  }
-                }
-              }
-            }
-          }
-        }
       }
     }
 
     return {
       selectedRecordIds: Array.from(selected),
-      samplingApplied,
-      strideN,
       totalTokens,
     };
   }

@@ -134,6 +134,13 @@ export interface ViewerIntentSummary {
   product_description: string | null;
 }
 
+export interface ViewerSystemRequirement {
+  id: string;
+  statement: string;
+  source_requirement_ids: string[];
+  priority?: string;
+}
+
 export interface ViewerRootSummary {
   root_fr_id: string;
   root_kind: ViewerRootKind;
@@ -163,6 +170,7 @@ export interface ViewerSnapshot {
   phase1_anchors: ViewerPhase1Anchor[];
   nfr_applications: ViewerNfrApplication[];
   intent_summary: ViewerIntentSummary;
+  system_requirements: ViewerSystemRequirement[];
   totals: {
     nodes: number;
     atomic: number;
@@ -434,6 +442,14 @@ export interface DagModel {
   placementByRoot: Map<string, DagRootPlacement>;
   /** us_id → list of NFR ids that qualify it (inverse of NFR.applies_to_requirements). */
   qualifiedByMap: Map<string, string[]>;
+  /**
+   * us_id (or NFR id) → list of SR ids that satisfy it (inverse of
+   * Phase 3.2 SR.source_requirement_ids[]). Renders an
+   * "→ satisfied by:" footnote on each FR/NFR row.
+   */
+  satisfiedByMap: Map<string, string[]>;
+  /** SR id → SR record, for footnote tooltips. */
+  systemRequirementsById: Map<string, ViewerSystemRequirement>;
 }
 
 /**
@@ -563,6 +579,71 @@ function buildQualifiedByMap(apps: ViewerNfrApplication[]): Map<string, string[]
 }
 
 /**
+ * Inverse-map Phase 3.2 SR.source_requirement_ids[] → root_id →
+ * [sr_ids]. Used to render the "→ satisfied by:" footnote on each
+ * FR/NFR root row in the DAG tree.
+ *
+ * "Declare at root, derive at leaf" — see the cal-22+ calibration
+ * decision. NFRs declare applies_to_requirements at root level
+ * (US-001, NFR-001) and downstream consumers walk decomposition
+ * trees to project leaf coverage. SR.source_requirement_ids[] from
+ * the Phase 3.2 LLM is intentionally permitted to mix roots and
+ * leaves (judgment work — "this SR was inspired by these specific
+ * drivers"); we normalize on read so the footnote stays root-level.
+ *
+ * Normalize-on-read algorithm: for each source id, look up its
+ * decomposition node by display_key; if found and not depth=0,
+ * walk parent_node_id (via display_key chain) up to the root.
+ * Index the SR under the resolved root's display_key. Source ids
+ * that don't map to any known node (e.g. stale references after
+ * supersession) get indexed under themselves so they're still
+ * visible somewhere — surfaces drift rather than hiding it.
+ */
+function buildSatisfiedByMap(
+  srs: ViewerSystemRequirement[],
+  nodes: ViewerDecompositionNode[],
+): Map<string, string[]> {
+  // Index nodes by display_key (LLM-facing id, e.g. "US-001",
+  // "FR-ACCT-1.1-1") and by node_id (internal UUID — what
+  // parent_node_id chains through). Both built once.
+  const byDisplayKey = new Map<string, ViewerDecompositionNode>();
+  const byNodeId = new Map<string, ViewerDecompositionNode>();
+  for (const n of nodes) {
+    byDisplayKey.set(n.display_key, n);
+    byNodeId.set(n.node_id, n);
+  }
+
+  const resolveRoot = (sourceId: string): string => {
+    const node = byDisplayKey.get(sourceId);
+    if (!node) return sourceId;  // unknown id — return as-is so drift is visible
+    if (node.depth === 0) return node.display_key;
+    let cur: ViewerDecompositionNode | undefined = node;
+    while (cur && cur.parent_node_id) {
+      const next: ViewerDecompositionNode | undefined = byNodeId.get(cur.parent_node_id);
+      if (!next) break;
+      cur = next;
+      if (cur.depth === 0) return cur.display_key;
+    }
+    return cur?.display_key ?? sourceId;
+  };
+
+  const out = new Map<string, string[]>();
+  for (const sr of srs) {
+    // Dedupe SRs per root — a single SR might reference both a root
+    // and several of its leaves; we only want it listed once.
+    const seenForThisSr = new Set<string>();
+    for (const sourceId of sr.source_requirement_ids) {
+      const rootId = resolveRoot(sourceId);
+      const key = `${sr.id}@${rootId}`;
+      if (seenForThisSr.has(key)) continue;
+      seenForThisSr.add(key);
+      pushToMapList(out, rootId, sr.id);
+    }
+  }
+  return out;
+}
+
+/**
  * Build the DAG model from the current snapshot. Re-derived whenever
  * the snapshot revision changes.
  */
@@ -574,7 +655,10 @@ export const dagModel = derived(snapshot, ($s): DagModel => {
   if (!$s) {
     return {
       anchorsById, primaryRootsByAnchor, secondaryRootsByAnchor,
-      orphanAnchorIds: new Set(), placementByRoot, qualifiedByMap: new Map(),
+      orphanAnchorIds: new Set(), placementByRoot,
+      qualifiedByMap: new Map(),
+      satisfiedByMap: new Map(),
+      systemRequirementsById: new Map(),
     };
   }
   for (const a of $s.phase1_anchors) anchorsById.set(a.id, a);
@@ -590,10 +674,14 @@ export const dagModel = derived(snapshot, ($s): DagModel => {
       orphanAnchorIds.add(id);
     }
   }
+  const systemRequirementsById = new Map<string, ViewerSystemRequirement>();
+  for (const sr of $s.system_requirements) systemRequirementsById.set(sr.id, sr);
   return {
     anchorsById, primaryRootsByAnchor, secondaryRootsByAnchor,
     orphanAnchorIds, placementByRoot,
     qualifiedByMap: buildQualifiedByMap($s.nfr_applications),
+    satisfiedByMap: buildSatisfiedByMap($s.system_requirements, $s.nodes),
+    systemRequirementsById,
   };
 });
 
