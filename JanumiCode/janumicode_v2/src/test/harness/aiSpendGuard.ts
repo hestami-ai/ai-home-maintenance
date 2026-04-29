@@ -41,6 +41,8 @@ export const DEFAULT_PRICING: PricingTier[] = [
 
   // Ollama (local, free)
   { provider: 'ollama', model: '*', inputCostPer1k: 0, outputCostPer1k: 0 },
+  // llama.cpp (local, free)
+  { provider: 'llamacpp', model: '*', inputCostPer1k: 0, outputCostPer1k: 0 },
 
   // Mock (testing, free)
   { provider: 'mock', model: '*', inputCostPer1k: 0, outputCostPer1k: 0 },

@@ -38,7 +38,7 @@ describe('Retriever — @bundle token resolution', () => {
       VALUES ('run-1', 'ws-1', 'abc', '2026-01-01T00:00:00Z', 'in_progress')
     `).run();
     writer = new GovernedStreamWriter(db, testId);
-    embedding = new EmbeddingService(db, { provider: 'ollama', model: 'x', maxParallel: 1 });
+    embedding = new EmbeddingService(db, { provider: 'llamacpp', model: 'x', maxParallel: 1 });
     cdb = new ClientLiaisonDBImpl(db, embedding);
     retriever = new Retriever(cdb); // no engine → forces legacy path
   });

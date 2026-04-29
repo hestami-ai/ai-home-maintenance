@@ -1,0 +1,79 @@
+{
+  "$id": "janumicode:data_model_decomposition_node:1.0",
+  "title": "Data Model Decomposition Node",
+  "description": "Single node in a recursive data-model decomposition tree (Wave 9 — Phase 5.1a). Append-only — frozen on creation. status indicates whether this node was further decomposed, met atomic-value criteria, was pruned at the Tier-B mirror gate, deferred when a safety cap tripped, or downgraded after a tier mislabel was detected post-gate.",
+  "type": "object",
+  "required": ["kind", "node_id", "parent_node_id", "display_key", "root_entity_id", "depth", "pass_number", "status", "entity", "surfaced_assumption_ids"],
+  "properties": {
+    "kind": { "const": "data_model_decomposition_node" },
+    "node_id": { "type": "string" },
+    "parent_node_id": { "type": ["string", "null"] },
+    "display_key": { "type": "string" },
+    "root_entity_id": { "type": "string" },
+    "depth": { "type": "integer", "minimum": 0, "maximum": 5 },
+    "pass_number": { "type": "integer", "minimum": 0 },
+    "status": { "type": "string", "enum": ["pending", "decomposed", "atomic", "pruned", "deferred", "downgraded"] },
+    "tier": {
+      "type": "string",
+      "enum": ["A", "B", "C", "D"],
+      "description": "Wave 9 data-model tier rubric. A=Aggregate Root (owns a consistency boundary), B=Entity (identity within aggregate; mirror-gated), C=Sub-entity / value-type cluster, D=Atomic value type / relation (terminal)."
+    },
+    "entity": {
+      "type": "object",
+      "required": ["id", "name", "fields"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "kind": { "type": "string", "enum": ["aggregate", "entity", "value_type", "relation"], "description": "Local kind annotation. Distinct from tier — a tier-B can be an entity OR an aggregate root depending on scope." },
+        "component_id": { "type": ["string", "null"] },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type"],
+            "properties": {
+              "name": { "type": "string" },
+              "type": { "type": "string" },
+              "constraints": { "type": "string" },
+              "nullable": { "type": "boolean" },
+              "is_identity": { "type": "boolean" }
+            }
+          }
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["target_entity_id", "kind"],
+            "properties": {
+              "target_entity_id": { "type": "string" },
+              "kind": { "type": "string", "enum": ["one_to_one", "one_to_many", "many_to_one", "many_to_many", "owns", "references"] },
+              "ownership": { "type": "string", "enum": ["owns", "references"] }
+            }
+          }
+        },
+        "active_constraints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Inherited TECH-* IDs (Phase 1.0c) that anchor storage/library choices."
+        },
+        "traces_to": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "decomposition_rationale": { "type": "string" },
+    "surfaced_assumption_ids": { "type": "array", "items": { "type": "string" } },
+    "release_id": { "type": ["string", "null"] },
+    "release_ordinal": { "type": ["integer", "null"] },
+    "atomic_criteria_satisfied": {
+      "type": "object",
+      "required": ["fields_typed", "no_implicit_subentity", "relationships_externalized", "constraints_enumerated"],
+      "properties": {
+        "fields_typed": { "type": "boolean" },
+        "no_implicit_subentity": { "type": "boolean" },
+        "relationships_externalized": { "type": "boolean" },
+        "constraints_enumerated": { "type": "boolean" }
+      }
+    },
+    "pruning_reason": { "type": "string" }
+  }
+}

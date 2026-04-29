@@ -36,7 +36,7 @@ describe('EmbeddingService — abort handling', () => {
 
   function makeService(timeoutMs?: number): EmbeddingService {
     return new EmbeddingService(db, {
-      provider: 'ollama',
+      provider: 'llamacpp',
       model: 'test-model',
       maxParallel: 1,
       timeoutMs,
@@ -56,10 +56,11 @@ describe('EmbeddingService — abort handling', () => {
     // First call aborts — should throw but NOT trip the breaker.
     await expect(svc.embedQuery('hello')).rejects.toThrow(/aborted/i);
 
-    // Simulate Ollama recovering: next call returns a valid embedding.
+    // Simulate llamacpp recovering: next call returns a valid OpenAI-
+    // shaped embedding response (`data[0].embedding`).
     globalThis.fetch = vi.fn().mockImplementation(async () => ({
       ok: true,
-      json: async () => ({ embedding: [0.1, 0.2, 0.3] }),
+      json: async () => ({ data: [{ embedding: [0.1, 0.2, 0.3] }] }),
     })) as unknown as typeof fetch;
 
     // Breaker must NOT have fired — this call should succeed.

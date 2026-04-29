@@ -1,0 +1,49 @@
+{
+  "$id": "janumicode:task_quarantine:1.0",
+  "title": "Task Quarantine",
+  "description": "Wave R — one record per quarantined leaf. Carries full retry trace + last failure reason. Used by the deferred-batch wave to retry with augmented context, and surfaced in workflow run summary as known gaps for human attention.",
+  "type": "object",
+  "required": ["kind", "leaf_task_id", "wave_number", "attempts", "quarantine_reason", "quarantined_at"],
+  "properties": {
+    "kind": { "const": "task_quarantine" },
+    "leaf_task_id": { "type": "string" },
+    "leaf_node_id": { "type": ["string", "null"], "description": "The Wave 8 task_decomposition_node UUID (when leaf came from a recursive tree)." },
+    "wave_number": { "type": "integer", "minimum": 1 },
+    "release_id": { "type": ["string", "null"] },
+    "release_ordinal": { "type": ["integer", "null"] },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["attempt_number", "invocation_id", "outcome"],
+        "properties": {
+          "attempt_number": { "type": "integer", "minimum": 1 },
+          "invocation_id": { "type": "string" },
+          "outcome": { "type": "string", "enum": ["execution_failed", "reasoning_review_failed", "tests_failed", "passed"] },
+          "reasoning_review_flaws": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "flaw_type": { "type": "string" },
+                "severity": { "type": "string" },
+                "description": { "type": "string" }
+              }
+            }
+          },
+          "test_failures": { "type": "array", "items": { "type": "string" } },
+          "files_written_count": { "type": "integer", "minimum": 0 },
+          "error_message": { "type": "string" }
+        }
+      }
+    },
+    "quarantine_reason": { "type": "string" },
+    "rescue_status": {
+      "type": "string",
+      "enum": ["pending", "rescued", "terminally_deferred"],
+      "default": "pending",
+      "description": "Updated when the deferred-batch wave attempts the leaf. 'rescued' = passed; 'terminally_deferred' = failed again; 'pending' = not yet retried."
+    },
+    "quarantined_at": { "type": "string" }
+  }
+}

@@ -591,7 +591,7 @@ describe('DeepMemoryResearchAgent', () => {
       });
       const caller = new LLMCaller({ maxRetries: 0 });
       caller.registerProvider(mockLLM);
-      caller.registerProvider(mockLLM.bindAsProvider('ollama'));
+      caller.registerProvider(mockLLM.bindAsProvider('llamacpp'));
 
       const agentWithLLM = new DeepMemoryResearchAgent(
         db, caller, defaultWeights,
@@ -629,7 +629,7 @@ describe('DeepMemoryResearchAgent', () => {
       });
       const caller = new LLMCaller({ maxRetries: 0 });
       caller.registerProvider(mockLLM);
-      caller.registerProvider(mockLLM.bindAsProvider('ollama'));
+      caller.registerProvider(mockLLM.bindAsProvider('llamacpp'));
 
       const agentWithLLM = new DeepMemoryResearchAgent(
         db, caller, defaultWeights,
@@ -650,7 +650,7 @@ describe('DeepMemoryResearchAgent', () => {
       // No fixtures — mock returns empty JSON for every call.
       const caller = new LLMCaller({ maxRetries: 0 });
       caller.registerProvider(mockLLM);
-      caller.registerProvider(mockLLM.bindAsProvider('ollama'));
+      caller.registerProvider(mockLLM.bindAsProvider('llamacpp'));
 
       const agentWithLLM = new DeepMemoryResearchAgent(
         db, caller, defaultWeights,

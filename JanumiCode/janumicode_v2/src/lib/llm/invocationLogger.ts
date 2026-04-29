@@ -82,9 +82,25 @@ export interface InvocationLogOptions {
  */
 export class InvocationLogFile {
   private readonly filePath: string;
+  /**
+   * Parallel raw-stream file. Sibling to `filePath` with `.stream.log`
+   * suffix. Receives every chunk's text content in append-only fashion
+   * (no per-chunk header, no prefix) so operators can `tail -f` it to
+   * watch live model output. Exists regardless of writeRawTokenStream —
+   * this is the loop-detection diagnostic the structured log
+   * deliberately omits to stay compact. cal-24 lesson: when the model
+   * silently spins (empty `response` / `thinking` frames keeping the
+   * stall timer reset, structured log frozen), the stream file lets a
+   * human operator see whether ANY tokens are flowing.
+   */
+  private readonly streamFilePath: string;
   private opened = false;
   private _bytesWritten = 0;
   private readonly writeRawTokenStream: boolean;
+  /** Tracks the last channel written to the stream file so we only
+   *  emit a transition marker when channel changes (avoids spamming
+   *  every chunk). */
+  private lastStreamChannel: string | null = null;
 
   constructor(
     private readonly logDir: string,
@@ -100,10 +116,12 @@ export class InvocationLogFile {
       ? `${options.filenamePrefix}__${invocationId}.log`
       : `${invocationId}.log`;
     this.filePath = path.join(logDir, base);
+    this.streamFilePath = this.filePath.replace(/\.log$/, '.stream.log');
     this.writeRawTokenStream = options.writeRawTokenStream ?? false;
   }
 
   get path(): string { return this.filePath; }
+  get streamPath(): string { return this.streamFilePath; }
 
   /**
    * Running total of bytes appended to the log file across header +
@@ -140,6 +158,22 @@ export class InvocationLogFile {
       fs.writeFileSync(this.filePath, payload, { flag: 'w' });
       this._bytesWritten = Buffer.byteLength(payload);
       this.opened = true;
+      // Create the parallel raw-stream file with a tiny banner so
+      // `tail -f` works from the start. The banner mirrors the header's
+      // identifying fields so an operator looking at the .stream.log
+      // alone can tell which invocation it belongs to.
+      try {
+        const streamBanner = [
+          `# ${header.invocationId} | ${header.provider}/${header.model}`,
+          `# role=${header.agentRole ?? '(none)'} phase=${header.phaseId ?? '-'}/${header.subPhaseId ?? '-'}`,
+          `# label=${header.label ?? '(none)'}`,
+          `# started=${header.startedAt}`,
+          '',
+        ].join('\n');
+        fs.writeFileSync(this.streamFilePath, streamBanner, { flag: 'w' });
+      } catch {
+        /* best-effort */
+      }
     } catch {
       // Best-effort — logging must never break the call path.
     }
@@ -171,6 +205,23 @@ export class InvocationLogFile {
       .toString()
       .padStart(6)}  ${preview}\n`;
     this._bytesWritten += Buffer.byteLength(line);
+    // Always append the raw text to the parallel .stream.log — that's
+    // the diagnostic surface for "is the model still producing tokens
+    // or has it silently hung?". Raw text only (no prefix) so `tail -f`
+    // shows exactly what the model is producing. Channel transitions
+    // get a single visible marker so thinking/response interleave is
+    // legible without breaking up the token flow.
+    if (params.text.length > 0) {
+      try {
+        const channelMarker = this.lastStreamChannel === params.channel
+          ? ''
+          : `\n\n──[${params.channel}]──\n`;
+        this.lastStreamChannel = params.channel;
+        fs.appendFileSync(this.streamFilePath, channelMarker + params.text);
+      } catch {
+        /* best-effort */
+      }
+    }
     if (!this.writeRawTokenStream) return;
     try {
       fs.appendFileSync(this.filePath, line);

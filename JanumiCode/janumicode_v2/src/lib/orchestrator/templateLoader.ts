@@ -67,8 +67,17 @@ export class TemplateLoader {
   private templates = new Map<string, PromptTemplate>();
   private promptsRoot: string;
 
-  constructor(workspacePath: string) {
-    this.promptsRoot = join(workspacePath, '.janumicode', 'prompts');
+  /**
+   * @param sourceRoot Repo / extension root (NOT a per-workspace dir).
+   *   Templates are source-of-truth versioned with code; they live under
+   *   `<sourceRoot>/prompts/` alongside `src/`. Earlier this directory
+   *   was `<sourceRoot>/.janumicode/prompts/` which collided with the
+   *   workspace-runtime convention `<workspacePath>/.janumicode/...`
+   *   used for ephemeral state (config.json, test-harness DB, live logs).
+   *   The dot-name is now reserved for runtime state only.
+   */
+  constructor(sourceRoot: string) {
+    this.promptsRoot = join(sourceRoot, 'prompts');
     this.loadAll();
   }
 

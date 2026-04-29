@@ -176,6 +176,20 @@ export interface LLMCallerConfig {
   fallback?: { provider: string; model: string };
 }
 
+/**
+ * Hook signature for reasoning-review post-processing. Invoked once per
+ * successful agent_output, with the freshly-written record's id and the
+ * full LLM result. Synchronous: the LLMCaller awaits it before returning
+ * to the phase handler. The hook itself decides whether to actually
+ * review (see reasoningReviewer.shouldSkipReview for the guard chain).
+ */
+export type ReviewerHook = (params: {
+  agentOutputId: string;
+  traceContext: LLMTraceContext;
+  prompt: string;
+  result: LLMCallResult;
+}) => Promise<void>;
+
 // ── Error Types ─────────────────────────────────────────────────────
 
 export type LLMErrorType =
@@ -210,8 +224,21 @@ export class LLMCaller {
   private _inFlightCount = 0;
   private eventBus: import('../events/eventBus').EventBus | null = null;
   private liveLogDir: string | null = null;
+  private reviewerHook: ReviewerHook | null = null;
 
   constructor(private readonly config: LLMCallerConfig) {}
+
+  /**
+   * Attach a hook that runs after every successful agent_output is
+   * written. Used to wire up reasoning-review on every LLM call. The
+   * hook is invoked synchronously (awaited) so review findings land in
+   * governed_stream BEFORE the next phase runs and pushes them out of
+   * the user's attention. The hook itself is responsible for guarding
+   * against self-recursion (see reasoningReviewer.shouldSkipReview).
+   */
+  setReviewerHook(hook: ReviewerHook | null): void {
+    this.reviewerHook = hook;
+  }
 
   /**
    * Configure a directory where per-invocation live log files are
@@ -411,7 +438,7 @@ export class LLMCaller {
         try {
           const result = await adapter.call(streamingOptions);
           result.retryAttempts = retryAttempts;
-          this.writeOutputRecords(invocationId, options, result, Date.now() - startedAt, null);
+          const { agentOutputId } = this.writeOutputRecords(invocationId, options, result, Date.now() - startedAt, null);
           logFile?.writeFinal({
             status: 'success',
             text: result.text,
@@ -421,6 +448,7 @@ export class LLMCaller {
             durationMs: Date.now() - startedAt,
             retryAttempts,
           });
+          await this.runReviewerHook(agentOutputId, options, result);
           return result;
         } catch (err) {
           retryAttempts++;
@@ -480,7 +508,8 @@ export class LLMCaller {
             const result = await fallbackAdapter.call(fallbackOptions);
             result.usedFallback = true;
             result.retryAttempts = retryAttempts;
-            this.writeOutputRecords(invocationId, fallbackOptions, result, Date.now() - startedAt, null);
+            const { agentOutputId } = this.writeOutputRecords(invocationId, fallbackOptions, result, Date.now() - startedAt, null);
+            await this.runReviewerHook(agentOutputId, fallbackOptions, result);
             return result;
           } catch {
             // Fallback also failed — throw original error
@@ -594,12 +623,13 @@ export class LLMCaller {
     result: LLMCallResult | null,
     durationMs: number,
     error: LLMError | null,
-  ): void {
-    if (!this.writer || !invocationId || !options.traceContext) return;
+  ): { agentOutputId: string | null } {
+    if (!this.writer || !invocationId || !options.traceContext) return { agentOutputId: null };
     const ctx = options.traceContext;
 
+    let agentOutputId: string | null = null;
     try {
-      this.writer.writeRecord({
+      const outputRec = this.writer.writeRecord({
         record_type: 'agent_output',
         schema_version: '1.0',
         workflow_run_id: ctx.workflowRunId,
@@ -633,6 +663,7 @@ export class LLMCaller {
           retry_attempts: error ? this.config.maxRetries : 0,
         },
       });
+      agentOutputId = outputRec.id;
     } catch {
       /* instrumentation must never break the call path */
     }
@@ -660,6 +691,43 @@ export class LLMCaller {
           /* instrumentation must never break the call path */
         }
       }
+    }
+
+    return { agentOutputId };
+  }
+
+  /**
+   * Invoke the reasoning-review hook on a successful agent_output.
+   * Synchronous (awaited) so review findings land in governed_stream
+   * before the next phase begins. Soft-fails: any error from the hook
+   * is logged via console.warn and swallowed — the review feature must
+   * never fail the underlying LLM call. The hook itself decides whether
+   * to actually review (self-review guard, empty-output skip, etc.).
+   *
+   * Public so the AgentInvoker (CLI dispatch path) can fire it after
+   * its own writeCLIOutputRecord — direct LLM calls and CLI dispatches
+   * both produce reviewable agent_output records, and we want both
+   * paths to flow through the same review pipeline.
+   */
+  async runReviewerHook(
+    agentOutputId: string | null,
+    options: { traceContext?: LLMTraceContext; prompt: string },
+    result: LLMCallResult,
+  ): Promise<void> {
+    if (!this.reviewerHook || !agentOutputId || !options.traceContext) return;
+    try {
+      await this.reviewerHook({
+        agentOutputId,
+        traceContext: options.traceContext,
+        prompt: options.prompt,
+        result,
+      });
+    } catch (err) {
+      // The hook is responsible for writing its own soft-fail records;
+      // a thrown error here means the hook itself crashed before it
+      // could record anything. Swallow so we don't poison the LLM call.
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`reasoning-review hook crashed: ${msg}`);
     }
   }
 

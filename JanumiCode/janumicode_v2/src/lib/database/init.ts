@@ -134,6 +134,29 @@ function ensureSchemaColumns(db: { exec: (sql: string) => void }): void {
     // Phase 1.7 release plan — pointer to the approved ReleasePlan
     // governed_stream row. Null until 1.7 completes.
     { table: 'workflow_runs', column: 'active_release_plan_record_id',   ddl: 'TEXT' },
+    // Wave 7 — recursive component decomposition telemetry (Phase 4.2a).
+    // Mirrors the FR/NFR pair above so workflow_run_summary can report
+    // saturation health for both requirement and component trees.
+    { table: 'workflow_runs', column: 'component_decomposition_budget_calls_used', ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'component_decomposition_max_depth_reached', ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'active_component_pipeline_id',                ddl: 'TEXT' },
+    // Wave 8 — recursive task decomposition telemetry (Phase 6.1a).
+    { table: 'workflow_runs', column: 'task_decomposition_budget_calls_used', ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'task_decomposition_max_depth_reached', ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'active_task_pipeline_id',              ddl: 'TEXT' },
+    // Wave 9 — Phase 5.1a recursive data-model decomposition telemetry.
+    { table: 'workflow_runs', column: 'data_model_decomposition_budget_calls_used', ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'data_model_decomposition_max_depth_reached', ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'active_data_model_pipeline_id',                 ddl: 'TEXT' },
+    // Wave 10 — Phase 7.1a recursive test decomposition telemetry.
+    { table: 'workflow_runs', column: 'test_decomposition_budget_calls_used',  ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'test_decomposition_max_depth_reached',  ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'active_test_pipeline_id',               ddl: 'TEXT' },
+    // Wave R — Phase 9 execution scheduler telemetry.
+    { table: 'workflow_runs', column: 'current_execution_wave',          ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'total_execution_waves',           ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'quarantined_leaf_count',          ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'terminally_deferred_leaf_count',  ddl: 'INTEGER DEFAULT 0' },
   ];
   for (const { table, column, ddl } of additive) {
     try {

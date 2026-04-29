@@ -40,10 +40,10 @@ const HELPER_NAMES = [
 ] as const;
 
 const TEMPLATE_PATHS = [
-  '.janumicode/prompts/phases/phase_05_technical_specification/sub_phase_05_1_data_models/data_models.system.md',
-  '.janumicode/prompts/phases/phase_05_technical_specification/sub_phase_05_2_api_definitions/api_definitions.system.md',
-  '.janumicode/prompts/phases/phase_05_technical_specification/sub_phase_05_3_error_handling/error_handling_strategies.system.md',
-  '.janumicode/prompts/phases/phase_05_technical_specification/sub_phase_05_4_configuration_parameters/configuration_parameters.system.md',
+  'prompts/phases/phase_05_technical_specification/sub_phase_05_1_data_models/data_models.system.md',
+  'prompts/phases/phase_05_technical_specification/sub_phase_05_2_api_definitions/api_definitions.system.md',
+  'prompts/phases/phase_05_technical_specification/sub_phase_05_3_error_handling/error_handling_strategies.system.md',
+  'prompts/phases/phase_05_technical_specification/sub_phase_05_4_configuration_parameters/configuration_parameters.system.md',
 ];
 
 describe('phase5 — sysReqSummary parameter threading', () => {

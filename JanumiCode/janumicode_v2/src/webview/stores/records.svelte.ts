@@ -81,10 +81,39 @@ class RecordsStore {
    */
   isChildOfInvocation(record: SerializedRecord): boolean {
     if (record.derived_from_record_ids.length === 0) return false;
-    return this.records.some(
+    if (this.records.some(
       r => r.record_type === 'agent_invocation' &&
            record.derived_from_record_ids.includes(r.id),
-    );
+    )) return true;
+    // reasoning_review_record points at agent_output, not at agent_invocation
+    // directly — walk one hop up the derivation chain so it nests inside
+    // the AgentInvocationCard alongside its reviewed agent_output.
+    if (record.record_type === 'reasoning_review_record') {
+      for (const parentId of record.derived_from_record_ids) {
+        const parent = this.records.find(r => r.id === parentId);
+        if (parent && parent.record_type === 'agent_output') {
+          // Recurse: is the agent_output a child of an invocation?
+          if (this.isChildOfInvocation(parent)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Find the reasoning_review_record (if any) for a given agent_output id.
+   * Used by AgentInvocationCard to render the review inline next to its
+   * reviewed output. Returns the most recent review when multiple exist
+   * (shouldn't happen in practice — one review per output — but defensive).
+   */
+  getReviewForOutput(agentOutputId: string): SerializedRecord | undefined {
+    let latest: SerializedRecord | undefined;
+    for (const r of this.records) {
+      if (r.record_type !== 'reasoning_review_record') continue;
+      if (!r.derived_from_record_ids.includes(agentOutputId)) continue;
+      if (!latest || r.produced_at > latest.produced_at) latest = r;
+    }
+    return latest;
   }
 
   /**
@@ -207,6 +236,82 @@ class RecordsStore {
     let latest: SerializedRecord | undefined;
     for (const r of this.records) {
       if (r.record_type !== 'requirement_decomposition_node') continue;
+      const c = r.content as { node_id?: string };
+      if (c.node_id !== nodeId) continue;
+      if (!latest || r.produced_at > latest.produced_at) latest = r;
+    }
+    return latest;
+  }
+
+  // ── Wave 7 — component decomposition helpers ─────────────────────
+
+  isSupersededComponentDecompositionPipeline(record: SerializedRecord): boolean {
+    if (record.record_type !== 'component_decomposition_pipeline') return false;
+    const c = record.content as { pipeline_id?: string };
+    if (!c.pipeline_id) return false;
+    for (const r of this.records) {
+      if (r.record_type !== 'component_decomposition_pipeline') continue;
+      const rc = r.content as { pipeline_id?: string };
+      if (rc.pipeline_id !== c.pipeline_id) continue;
+      if (r.produced_at > record.produced_at) return true;
+    }
+    return false;
+  }
+
+  isOwnedByComponentPipeline(record: SerializedRecord): boolean {
+    if (record.record_type !== 'component_decomposition_node'
+      && record.record_type !== 'component_assumption_set_snapshot') return false;
+    return this.records.some(r => r.record_type === 'component_decomposition_pipeline');
+  }
+
+  getComponentDecompositionChildren(parentNodeId: string): SerializedRecord[] {
+    return this.records
+      .filter(r => r.record_type === 'component_decomposition_node'
+        && (r.content as { parent_node_id?: string }).parent_node_id === parentNodeId);
+  }
+
+  getLatestComponentDecompositionNode(nodeId: string): SerializedRecord | undefined {
+    let latest: SerializedRecord | undefined;
+    for (const r of this.records) {
+      if (r.record_type !== 'component_decomposition_node') continue;
+      const c = r.content as { node_id?: string };
+      if (c.node_id !== nodeId) continue;
+      if (!latest || r.produced_at > latest.produced_at) latest = r;
+    }
+    return latest;
+  }
+
+  // ── Wave 8 — task decomposition helpers ──────────────────────────
+
+  isSupersededTaskDecompositionPipeline(record: SerializedRecord): boolean {
+    if (record.record_type !== 'task_decomposition_pipeline') return false;
+    const c = record.content as { pipeline_id?: string };
+    if (!c.pipeline_id) return false;
+    for (const r of this.records) {
+      if (r.record_type !== 'task_decomposition_pipeline') continue;
+      const rc = r.content as { pipeline_id?: string };
+      if (rc.pipeline_id !== c.pipeline_id) continue;
+      if (r.produced_at > record.produced_at) return true;
+    }
+    return false;
+  }
+
+  isOwnedByTaskPipeline(record: SerializedRecord): boolean {
+    if (record.record_type !== 'task_decomposition_node'
+      && record.record_type !== 'task_assumption_set_snapshot') return false;
+    return this.records.some(r => r.record_type === 'task_decomposition_pipeline');
+  }
+
+  getTaskDecompositionChildren(parentNodeId: string): SerializedRecord[] {
+    return this.records
+      .filter(r => r.record_type === 'task_decomposition_node'
+        && (r.content as { parent_node_id?: string }).parent_node_id === parentNodeId);
+  }
+
+  getLatestTaskDecompositionNode(nodeId: string): SerializedRecord | undefined {
+    let latest: SerializedRecord | undefined;
+    for (const r of this.records) {
+      if (r.record_type !== 'task_decomposition_node') continue;
       const c = r.content as { node_id?: string };
       if (c.node_id !== nodeId) continue;
       if (!latest || r.produced_at > latest.produced_at) latest = r;

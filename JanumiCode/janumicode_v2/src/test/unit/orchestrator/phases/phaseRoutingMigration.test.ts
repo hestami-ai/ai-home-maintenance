@@ -1,6 +1,6 @@
 /**
  * Regression tests pinning the migration of Phase 3-9 LLM call sites
- * away from hardcoded `provider: 'ollama'` / `model: 'qwen3.5:9b'`
+ * away from hardcoded `provider: 'llamacpp'` / `model: 'qwen3.5:9b'`
  * toward `engine.callForRole(...)`.
  *
  * Background:
@@ -9,7 +9,7 @@
  *   `llm_routing.<role>.primary` so the same code can be retargeted
  *   without edits. We discovered Phase 3, 4, 5, 6, 7, and 8 each had
  *   call sites that bypassed routing with a hardcoded
- *   `provider: 'ollama', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b'`
+ *   `provider: 'llamacpp', model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b'`
  *   payload — every one of which silently spun up an ollama process
  *   on the user's machine even when the rest of the workflow had
  *   moved off Ollama. The fix routes them all through
@@ -39,9 +39,9 @@ describe('phase 3-8 LLM call sites — no hardcoded provider fallbacks', () => {
   for (const phaseFile of ROUTED_PHASES) {
     const filePath = path.resolve(PHASES_DIR, phaseFile);
 
-    it(`${phaseFile} contains no hardcoded provider: 'ollama' fallback`, () => {
+    it(`${phaseFile} contains no hardcoded provider: 'llamacpp' fallback`, () => {
       const src = fs.readFileSync(filePath, 'utf8');
-      // Match `provider: 'ollama'` and `provider: "ollama"` (any
+      // Match `provider: 'llamacpp'` and `provider: "ollama"` (any
       // whitespace). This is the exact pattern the bug took before
       // migration; flagging any reintroduction is intentional.
       expect(src, `${phaseFile} reintroduced hardcoded ollama provider`).not.toMatch(

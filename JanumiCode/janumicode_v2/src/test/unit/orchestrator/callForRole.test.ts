@@ -16,6 +16,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { createTestDatabase, type Database } from '../../../lib/database/init';
 import { ConfigManager } from '../../../lib/config/configManager';
@@ -25,12 +27,13 @@ import { MockLLMProvider } from '../../helpers/mockLLMProvider';
 describe('OrchestratorEngine.callForRole — orchestrator dispatcher', () => {
   let db: Database;
   let engine: OrchestratorEngine;
-  const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
+  const extensionPath = path.resolve(__dirname, '..', '..', '..', '..');
+  const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
 
   beforeEach(() => {
     db = createTestDatabase();
     const configManager = new ConfigManager();
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
+    engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
   });
 
   afterEach(() => { db.close(); });
@@ -43,10 +46,10 @@ describe('OrchestratorEngine.callForRole — orchestrator dispatcher', () => {
       text: '{"overall_status":"pass"}',
       parsedJson: { overall_status: 'pass' },
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
 
     engine.configManager.setOrchestratorRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.3,
     });
 
@@ -57,7 +60,7 @@ describe('OrchestratorEngine.callForRole — orchestrator dispatcher', () => {
 
     expect(result.text).toContain('overall_status');
     expect(result.parsed).toEqual({ overall_status: 'pass' });
-    expect(result.provider).toBe('ollama');
+    expect(result.provider).toBe('llamacpp');
   });
 
   it('routes CLI backing through AgentInvoker and coerces events into LLMCallResult shape', async () => {
@@ -216,12 +219,13 @@ describe('OrchestratorEngine.callForRole — orchestrator dispatcher', () => {
 describe('ConfigManager.validateLLMRouting — orchestrator', () => {
   let db: Database;
   let engine: OrchestratorEngine;
-  const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
+  const extensionPath2 = path.resolve(__dirname, '..', '..', '..', '..');
+  const workspacePath2 = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
 
   beforeEach(() => {
     db = createTestDatabase();
     const configManager = new ConfigManager();
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
+    engine = new OrchestratorEngine(db, configManager, workspacePath2, extensionPath2);
   });
 
   afterEach(() => { db.close(); });
@@ -241,9 +245,9 @@ describe('ConfigManager.validateLLMRouting — orchestrator', () => {
       primary: { backing_tool: 'claude_code_cli', model: 'qwen3.5:9b' },
     });
     engine.llmCaller.registerProvider({ name: 'google', call: () => Promise.reject(new Error('stub')) });
-    // Register ollama too so the iter-3 default domain_interpreter
-    // routing (direct_llm_api + ollama) also validates.
-    engine.llmCaller.registerProvider({ name: 'ollama', call: () => Promise.reject(new Error('stub')) });
+    // Register llamacpp too so the default domain_interpreter routing
+    // (direct_llm_api + llamacpp) also validates.
+    engine.llmCaller.registerProvider({ name: 'llamacpp', call: () => Promise.reject(new Error('stub')) });
     engine.registerBuiltinCLIParsers();
     expect(() => engine.validateLLMRouting()).not.toThrow();
   });

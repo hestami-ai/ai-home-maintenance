@@ -69,7 +69,7 @@ describe('LLMCaller — invocation persistence', () => {
 
   function stubProvider(): LLMProviderAdapter {
     return {
-      name: 'ollama',
+      name: 'llamacpp',
       async call(options: LLMCallOptions): Promise<LLMCallResult> {
         return {
           text: 'ok', parsed: null, toolCalls: [], provider: options.provider,
@@ -82,14 +82,14 @@ describe('LLMCaller — invocation persistence', () => {
 
   function streamingProvider(chunks: string[]): LLMProviderAdapter {
     return {
-      name: 'ollama',
+      name: 'llamacpp',
       async call(options: LLMCallOptions): Promise<LLMCallResult> {
         const opts = options as LLMStreamingCallOptions;
         for (const c of chunks) {
           opts.onChunk?.({ text: c, channel: 'response' });
         }
         return {
-          text: chunks.join(''), parsed: null, toolCalls: [], provider: 'ollama',
+          text: chunks.join(''), parsed: null, toolCalls: [], provider: 'llamacpp',
           model: options.model, inputTokens: null, outputTokens: null,
           usedFallback: false, retryAttempts: 0,
         };
@@ -100,7 +100,7 @@ describe('LLMCaller — invocation persistence', () => {
   it('persists prompt, system, temperature, and tools on agent_invocation', async () => {
     caller.registerProvider(stubProvider());
     await caller.call({
-      provider: 'ollama',
+      provider: 'llamacpp',
       model: 'qwen3.5:9b',
       prompt: 'Classify this intent: "build a todo app"',
       system: 'You are a requirements analyst.',
@@ -122,7 +122,7 @@ describe('LLMCaller — invocation persistence', () => {
   it('writes system as null when absent, not undefined', async () => {
     caller.registerProvider(stubProvider());
     await caller.call({
-      provider: 'ollama',
+      provider: 'llamacpp',
       model: 'x',
       prompt: 'p',
       traceContext: trace,
@@ -140,7 +140,7 @@ describe('LLMCaller — invocation persistence', () => {
     caller.setEventBus(bus);
     caller.registerProvider(streamingProvider(['Hello', ', ', 'world']));
     await caller.call({
-      provider: 'ollama',
+      provider: 'llamacpp',
       model: 'x',
       prompt: 'greet',
       traceContext: trace,
@@ -166,7 +166,7 @@ describe('LLMCaller — invocation persistence', () => {
     caller.setEventBus(new EventBus());
     caller.registerProvider(streamingProvider(['a', 'b', 'c']));
     await caller.call({
-      provider: 'ollama',
+      provider: 'llamacpp',
       model: 'x',
       prompt: 'p',
       traceContext: trace,

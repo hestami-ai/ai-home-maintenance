@@ -7,13 +7,20 @@
  * No LLM call required — purely deterministic.
  */
 
-import type { LoopStatus, ReasoningFlawType } from '../types/records';
+import type { LoopStatus, ReasoningReviewSeverity } from '../types/records';
 
 // ── Types ───────────────────────────────────────────────────────────
 
 export interface FlawRecord {
   attemptNumber: number;
-  flaws: { type: ReasoningFlawType; severity: 'high' | 'low' }[];
+  /**
+   * Per-attempt review concerns. `type` is a freeform short-form summary
+   * (e.g. the reviewer concern's `summary` field); the v1-style closed
+   * `ReasoningFlawType` taxonomy was retired with the reasoning-review
+   * unification — concerns now have severity HIGH/MEDIUM/LOW and a
+   * caller-defined summary string.
+   */
+  flaws: { type: string; severity: ReasoningReviewSeverity }[];
 }
 
 export interface ToolCallRecord {
@@ -62,11 +69,11 @@ export class LoopDetectionMonitor {
     const previousFlaws = flawHistory.find(f => f.attemptNumber === retryCount - 1);
 
     const currentHighCount = currentFlaws
-      ? currentFlaws.flaws.filter(f => f.severity === 'high').length
+      ? currentFlaws.flaws.filter(f => f.severity === 'HIGH').length
       : 0;
 
     const previousHighCount = previousFlaws
-      ? previousFlaws.flaws.filter(f => f.severity === 'high').length
+      ? previousFlaws.flaws.filter(f => f.severity === 'HIGH').length
       : 0;
 
     // Tool call sequence analysis

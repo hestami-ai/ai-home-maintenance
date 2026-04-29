@@ -49,7 +49,7 @@ describe('ClientLiaisonDB.getActiveWorkflowRun — DB-as-truth resolver', () => 
     db = createTestDatabase();
     liaisonDb = new ClientLiaisonDBImpl(
       db,
-      new EmbeddingService(db, { provider: 'ollama', model: 'qwen3-embedding:8b', maxParallel: 1 }),
+      new EmbeddingService(db, { provider: 'llamacpp', model: 'qwen3-embedding:8b', maxParallel: 1 }),
     );
   });
 

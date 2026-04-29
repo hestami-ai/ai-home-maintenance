@@ -3,7 +3,7 @@
  * Based on JanumiCode Spec v2.3, §7.8 and §12.
  *
  * Uses ajv (v8) with JSON Schema 2020-12 support.
- * Schemas are loaded from .janumicode/schemas/artifacts/*.schema.json.
+ * Schemas are loaded from <sourceRoot>/schemas/artifacts/*.schema.json.
  */
 
 import Ajv, { type ValidateFunction, type ErrorObject } from 'ajv';
@@ -31,8 +31,13 @@ export class SchemaValidator {
   private validators = new Map<string, ValidateFunction>();
   private readonly schemaDirs: string[];
 
-  constructor(workspacePath: string) {
-    const baseDir = join(workspacePath, '.janumicode', 'schemas');
+  /**
+   * @param sourceRoot Repo / extension root. Schemas are source-of-truth
+   *   (versioned with code) at `<sourceRoot>/schemas/`. See TemplateLoader
+   *   for the rationale on splitting source from workspace-runtime state.
+   */
+  constructor(sourceRoot: string) {
+    const baseDir = join(sourceRoot, 'schemas');
     // Load from both artifacts/ (phase outputs) and memory/ (DMR records)
     this.schemaDirs = [
       join(baseDir, 'artifacts'),

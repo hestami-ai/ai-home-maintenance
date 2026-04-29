@@ -117,6 +117,99 @@ export interface JanumiCodeConfig {
      * pass. Enable for runs where latent-commitment detection matters.
      */
     reasoning_review_on_tier_c: boolean;
+    /**
+     * Wave 7 — recursive component decomposition (Phase 4.2a) safety
+     * rails. Tier rubric is component-scaled (A=Macro Subsystem, B=
+     * Bounded Domain, C=Module, D=Atomic Component). Defaults are
+     * lower than the requirements caps because component trees are
+     * typically shallower (depth_cap=6 vs 10) and per-call context is
+     * heavier (carries domain + sibling-component state).
+     */
+    component_depth_cap: number;
+    component_budget_cap: number;
+    component_fanout_cap: number;
+    component_mirror_gate_depth: number;
+    /**
+     * Wave 7 Step 4c analog — when true, audit Tier-C component
+     * children for "responsibility shape" (verb-led / mutually
+     * exclusive / collectively exhausting / no implied subcomponents).
+     * Off by default until Wave 7 calibration evidence supports
+     * flipping it.
+     */
+    component_reasoning_review_on_tier_c: boolean;
+    /**
+     * Wave 8 — recursive task decomposition (Phase 6.1a) safety rails.
+     * Tier rubric is task-scaled (A=Epic, B=Story, C=Task, D=Atomic-Unit).
+     * Defaults: depth_cap=5 (tasks are shallower than components),
+     * budget_cap=250 (whole-run budget across all roots), fanout_cap=10
+     * (most components yield 2–6 stories with headroom).
+     */
+    task_depth_cap: number;
+    task_budget_cap: number;
+    task_fanout_cap: number;
+    task_mirror_gate_depth: number;
+    /**
+     * Wave 8 Step 4c analog — when true, audit Tier-C tasks for
+     * "atomic-unit shape" (single-session sized / completion criteria
+     * verifiable / no implied subtask / scope within one component).
+     * Off by default until Wave 8 calibration evidence supports it.
+     */
+    task_reasoning_review_on_tier_c: boolean;
+    /**
+     * Wave 9 — recursive data-model decomposition (Phase 5.1a) safety
+     * rails. Tier rubric is data-model-scoped (A=Aggregate Root,
+     * B=Entity, C=Sub-entity / value-type cluster, D=Atomic value type).
+     * Defaults: depth_cap=4 (data trees are typically shallow), fanout
+     * cap=10 (an aggregate can host many entities), budget_cap=150
+     * (heavier per-call context than tasks; smaller tree size).
+     */
+    data_model_depth_cap: number;
+    data_model_budget_cap: number;
+    data_model_fanout_cap: number;
+    data_model_mirror_gate_depth: number;
+    data_model_reasoning_review_on_tier_c: boolean;
+    /**
+     * Wave 10 — recursive test decomposition (Phase 7.1a) safety rails.
+     * Tier rubric is test-scoped (A=Test Suite, B=Test Scenario,
+     * C=Test Case, D=Atomic Test Step). Mirror Wave 7/8/9 caps; the
+     * test tree is typically the deepest because end-to-end scenarios
+     * naturally decompose into many atomic steps (arrange/act/assert).
+     */
+    test_depth_cap: number;
+    test_budget_cap: number;
+    test_fanout_cap: number;
+    test_mirror_gate_depth: number;
+    test_reasoning_review_on_tier_c: boolean;
+  };
+
+  /**
+   * Wave R — Phase 9 release-plan execution scheduler config. Replaces
+   * the prior failureHandler abort/skip binary with retry budgets,
+   * quarantine semantics, per-leaf test execution, and per-wave gates.
+   * See docs/waveR_phase9_release_execution.md.
+   */
+  execution: {
+    /** Per-leaf retries before quarantine in a release wave. */
+    leaf_retry_budget: number;
+    /** Per-leaf retries in the deferred-batch wave. */
+    deferred_retry_budget: number;
+    /** in_place = strict write_directory_paths; feature_branch deferred to Wave R+1. */
+    workspace_mode: 'in_place' | 'feature_branch';
+    /** Calibration runs auto-approve; interactive runs default false. */
+    auto_approve_wave_gates: boolean;
+    /** Fallback when two leaves declare overlapping write_directory_paths. */
+    merge_conflict_default_strategy: 'manual' | 'extend' | 'replace';
+    /** Calibration / unattended bypass for executor permission prompts. */
+    unattended_skip_permissions: boolean;
+    /** Per-leaf test execution policy. */
+    tests_per_leaf: {
+      enabled: boolean;
+      test_command_resolution: 'package_json_scripts' | 'explicit_per_leaf' | 'framework_autodetect';
+      /** Per-leaf wall-clock for the test invocation (ms). */
+      timeout_ms: number;
+    };
+    /** Optional wave-level reasoning review at the gate. */
+    wave_reasoning_review_on_gate: boolean;
   };
 
   /**
@@ -172,7 +265,7 @@ export interface JanumiCodeConfig {
      * discovery, 1.2 domains, 1.3 journeys, 1.4 entities, 1.5 integrations,
      * 1.6 narrative refinement) and Phase 1 default-lens bloom/synthesis.
      * Optional so legacy configs keep working; falls back to
-     * `{ backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' }`
+     * `{ backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' }`
      * when absent.
      */
     domain_interpreter?: {
@@ -249,7 +342,7 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
   context_assembly: {
     cli_agents: {
       stdin_max_tokens: 8000,
-      detail_file_path_template: '.janumicode/context/{sub_phase_id}_{invocation_id}.md',
+      detail_file_path_template: '.janumicode/runs/{workflow_run_id}/context/{sub_phase_id}_{invocation_id}.md',
       detail_file_cleanup: 'archive_after_phase_gate',
       detail_file_max_bytes: 10485760, // 10MB
       governing_constraints_always_in_stdin: true,
@@ -258,7 +351,7 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
   },
 
   invariant_library: {
-    path: '.janumicode/schemas/invariants',
+    path: 'schemas/invariants',
     run_before_reasoning_review: true,
     blocking_violation_action: 'quarantine_and_retry_with_violation',
   },
@@ -299,6 +392,59 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     fanout_cap: 8,
     mirror_gate_depth: 2,
     reasoning_review_on_tier_c: false,
+    // Wave 7 component-tree caps. Component trees are typically
+    // shallower than requirement trees (depth_cap=6), with higher
+    // permissible fanout per node (12) because software domains can
+    // legitimately host many components. Per-run budget of 200 calls
+    // — heavier per-call context than requirements (carries domain +
+    // sibling-component state) but still substantially less surface
+    // than a 500-call FR run.
+    component_depth_cap: 6,
+    component_budget_cap: 200,
+    component_fanout_cap: 12,
+    component_mirror_gate_depth: 2,
+    component_reasoning_review_on_tier_c: false,
+    // Wave 8 task-tree caps. Tasks fan out per component leaf and are
+    // already finer-grained than components, so depth_cap=5 (vs
+    // component depth_cap=6), fanout_cap=10 (typical 2–6 stories per
+    // component), budget_cap=250 across the whole run.
+    task_depth_cap: 5,
+    task_budget_cap: 250,
+    task_fanout_cap: 10,
+    task_mirror_gate_depth: 2,
+    task_reasoning_review_on_tier_c: false,
+    // Wave 9 data-model caps. Data trees are shallow (depth_cap=4),
+    // moderate fanout (10 entities per aggregate), moderate per-run
+    // budget (150 calls).
+    data_model_depth_cap: 4,
+    data_model_budget_cap: 150,
+    data_model_fanout_cap: 10,
+    data_model_mirror_gate_depth: 2,
+    data_model_reasoning_review_on_tier_c: false,
+    // Wave 10 recursive test caps. Tests can run deeper than tasks
+    // (depth_cap=6) because end-to-end scenarios naturally have
+    // arrange/act/assert/teardown layers; fanout is moderate (10
+    // sub-scenarios per scenario typical); whole-run budget 250.
+    test_depth_cap: 6,
+    test_budget_cap: 250,
+    test_fanout_cap: 10,
+    test_mirror_gate_depth: 2,
+    test_reasoning_review_on_tier_c: false,
+  },
+
+  execution: {
+    leaf_retry_budget: 3,
+    deferred_retry_budget: 2,
+    workspace_mode: 'in_place',
+    auto_approve_wave_gates: false,
+    merge_conflict_default_strategy: 'manual',
+    unattended_skip_permissions: false,
+    tests_per_leaf: {
+      enabled: true,
+      test_command_resolution: 'package_json_scripts',
+      timeout_ms: 120_000,
+    },
+    wave_reasoning_review_on_gate: false,
   },
 
   // Spec §10 canonical:
@@ -323,13 +469,13 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     // backing for gold-capture / real-mode harness runs (see the CLI
     // runner env-var wiring).
     domain_interpreter: {
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     },
     // Requirements Agent default — matches domain_interpreter. Override
     // via JANUMICODE_REQUIREMENTS_AGENT_BACKING for CLI-backed runs.
     requirements_agent: {
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     },
     reasoning_review: {

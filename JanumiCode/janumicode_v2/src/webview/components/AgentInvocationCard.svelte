@@ -15,6 +15,7 @@
   import type { SerializedRecord } from '../stores/records.svelte';
   import { recordsStore } from '../stores/records.svelte';
   import { streamingStore } from '../stores/streaming.svelte';
+  import ReasoningReviewCard from './ReasoningReviewCard.svelte';
 
   interface Props {
     record: SerializedRecord;
@@ -43,6 +44,11 @@
   // ── Child records ─────────────────────────────────────────────
   const children = $derived(recordsStore.getChildren(record.id));
   const agentOutput = $derived(children.find(c => c.record_type === 'agent_output'));
+  // Reasoning review attaches to the agent_output (not the invocation), so
+  // we walk one hop down to find it. Renders inline below RESPONSE.
+  const reviewRecord = $derived(
+    agentOutput ? recordsStore.getReviewForOutput(agentOutput.id) : undefined,
+  );
   const toolCalls = $derived(children.filter(c => c.record_type === 'tool_call'));
   const reasoningSteps = $derived(children.filter(c => c.record_type === 'agent_reasoning_step'));
   // Streaming chunks come from the transient store (no longer persisted as
@@ -311,6 +317,15 @@
             </button>
           {/if}
         </details>
+      {/if}
+
+      <!-- Reasoning review (advisory) — surfaces concerns the reviewer LLM
+           found in the agent's thinking + final response. Inline form
+           keeps the review attached to the call it critiqued so findings
+           don't scroll out of view. Only renders when the agent_output
+           record exists AND a review record references it. -->
+      {#if agentOutput && reviewRecord}
+        <ReasoningReviewCard record={reviewRecord} inline={true} />
       {/if}
 
       <!-- Error message -->

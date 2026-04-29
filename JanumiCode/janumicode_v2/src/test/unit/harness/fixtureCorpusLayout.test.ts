@@ -117,7 +117,7 @@ describe('MockLLMProvider — phase-organized fixture corpus', () => {
       match = 'Test Template',
     ): void {
       const options: LLMCallOptions = {
-        provider: 'ollama',
+        provider: 'llamacpp',
         model: 'qwen3.5:9b',
         prompt: 'test prompt',
         traceContext: {
@@ -132,7 +132,7 @@ describe('MockLLMProvider — phase-organized fixture corpus', () => {
         text: 'captured output',
         parsed: null,
         toolCalls: [],
-        provider: 'ollama',
+        provider: 'llamacpp',
         model: 'qwen3.5:9b',
         inputTokens: 1,
         outputTokens: 2,

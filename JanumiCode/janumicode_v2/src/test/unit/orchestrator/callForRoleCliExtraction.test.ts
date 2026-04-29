@@ -16,6 +16,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { createTestDatabase, type Database } from '../../../lib/database/init';
 import { ConfigManager } from '../../../lib/config/configManager';
@@ -24,12 +26,13 @@ import { OrchestratorEngine } from '../../../lib/orchestrator/orchestratorEngine
 describe('callForRole — CLI text extraction via stdoutText', () => {
   let db: Database;
   let engine: OrchestratorEngine;
-  const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
+  const extensionPath = path.resolve(__dirname, '..', '..', '..', '..');
+  const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
 
   beforeEach(() => {
     db = createTestDatabase();
     const configManager = new ConfigManager();
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
+    engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
     engine.registerBuiltinCLIParsers();
     engine.configManager.setOrchestratorRouting({
       primary: { backing_tool: 'gemini_cli', model: 'gemini-2.5-flash' },

@@ -43,7 +43,7 @@ import { runFrBloomThreePass } from './phase2/frBloomThreePass';
 import { runNfrBloomThreePass } from './phase2/nfrBloomThreePass';
 import type { NfrSkeleton } from './phase2/verifyNfrCoverage';
 import type { DecisionBundleContent, MirrorItem, MirrorItemDecision } from '../../types/decisionBundle';
-import { OllamaEmbeddingClient, findNearestAbove, type EmbeddingClient } from '../../llm/embeddings';
+import { createEmbeddingClient, findNearestAbove, type EmbeddingClient } from '../../llm/embeddings';
 import { randomUUID } from 'node:crypto';
 
 // ── Logical-identity helpers ───────────────────────────────────────
@@ -1045,7 +1045,7 @@ export class Phase2Handler implements PhaseHandler {
     // we log and continue with no dedup (raw delta is the fallback
     // termination signal). Threshold intentionally conservative (0.92)
     // to minimize false-merge risk; tunable via env.
-    const embeddingClient: EmbeddingClient = engine.getEmbeddingClientOverride() ?? new OllamaEmbeddingClient();
+    const embeddingClient: EmbeddingClient = engine.getEmbeddingClientOverride() ?? createEmbeddingClient();
     const embeddingCache = new Map<string, number[]>();
     const dedupThreshold = Number.parseFloat(
       process.env.JANUMICODE_ASSUMPTION_DEDUP_THRESHOLD ?? '0.92');
@@ -1353,6 +1353,7 @@ export class Phase2Handler implements PhaseHandler {
           //      parent that produces further Tier-B children is effectively
           //      still a functional sub-area whose commitments are one level
           //      deeper than the human saw at the original gate.
+          let parentDowngraded = false;
           if (entry.tierHint === 'B') {
             const explicitDisagreement = tierAssessment
               && tierAssessment.agrees_with_hint === false
@@ -1360,6 +1361,7 @@ export class Phase2Handler implements PhaseHandler {
               && (tierAssessment.tier === 'A' || tierAssessment.tier === 'B');
             const producedTierBChildren = (pendingGateByParent.get(entry.nodeId)?.length ?? 0) > 0;
             if (explicitDisagreement || producedTierBChildren) {
+              parentDowngraded = true;
               const reason = explicitDisagreement
                 ? `tier_downgrade: decomposer_assessed_${tierAssessment?.tier}_not_B`
                 : 'tier_downgrade: post_gate_children_still_tier_B';
@@ -1419,6 +1421,51 @@ export class Phase2Handler implements PhaseHandler {
                 children: emittedChildrenWithTier.map(x => x.story),
               });
             }
+          }
+
+          // Status transition for successful decomposition. A parent
+          // that produced children must be marked `decomposed` so the
+          // governed_stream tells the truth about its lifecycle. Only
+          // transition when not already terminal-superseded by Step 4b.
+          if (emittedChildren.length > 0 && !parentDowngraded) {
+            // Preserve creation provenance: the canonical (current) row
+            // for a node should keep the sub_phase_id where it was first
+            // emitted, not the sub_phase that updated its status. Without
+            // this, depth-0 roots created in 2.1 / 2.2 would have their
+            // canonical row stamped 2.1a / 2.2a after the saturation loop
+            // marks them decomposed — breaking provenance queries like
+            // "list FR roots emitted in 2.1".
+            const originalRec = engine.writer.getRecord(entry.parentRecordId);
+            const originalSubPhase = originalRec?.sub_phase_id ?? config.recordSubPhaseId;
+            const decomposedRec = engine.writer.writeRecord({
+              record_type: 'requirement_decomposition_node',
+              schema_version: '1.0',
+              workflow_run_id: workflowRun.id,
+              phase_id: '2',
+              sub_phase_id: originalSubPhase,
+              produced_by_agent_role: 'orchestrator',
+              janumicode_version_sha: engine.janumiCodeVersionSha,
+              derived_from_record_ids: [entry.parentRecordId],
+              content: {
+                kind: 'requirement_decomposition_node',
+                node_id: entry.nodeId,
+                parent_node_id: entry.parentNodeId,
+                display_key: entry.displayKey,
+                root_fr_id: entry.rootFrId,
+                depth: entry.depth,
+                pass_number: passNumber,
+                status: 'decomposed',
+                tier: entry.tierHint === 'root' ? undefined : (entry.tierHint as DecompositionTier),
+                root_kind: config.rootKind,
+                user_story: entry.userStory,
+                surfaced_assumption_ids: [],
+                release_id: entry.releaseId,
+                release_ordinal: entry.releaseOrdinal,
+              } satisfies RequirementDecompositionNodeContent,
+            });
+            engine.writer.supersedeDecompositionNodeByLogicalId(
+              workflowRun.id, entry.nodeId, decomposedRec.id,
+            );
           }
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);

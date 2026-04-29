@@ -20,7 +20,7 @@ import { LLMCaller } from '../../../lib/llm/llmCaller';
 import { EventBus } from '../../../lib/events/eventBus';
 import type { LLMCallOptions, LLMCallResult, LLMProviderAdapter } from '../../../lib/llm/llmCaller';
 
-function stubProvider(name = 'ollama'): LLMProviderAdapter {
+function stubProvider(name = 'llamacpp'): LLMProviderAdapter {
   return {
     name,
     async call(options: LLMCallOptions): Promise<LLMCallResult> {
@@ -51,7 +51,7 @@ describe('LLMCaller — activity event emission', () => {
 
   beforeEach(() => {
     caller = new LLMCaller({ maxRetries: 0 });
-    caller.registerProvider(stubProvider('ollama'));
+    caller.registerProvider(stubProvider('llamacpp'));
     bus = new EventBus();
     caller.setEventBus(bus);
     events = [];
@@ -62,7 +62,7 @@ describe('LLMCaller — activity event emission', () => {
 
   it('emits llm:started and llm:finished in order for a successful call', async () => {
     await caller.call({
-      provider: 'ollama',
+      provider: 'llamacpp',
       model: 'qwen3.5:9b',
       prompt: 'hello',
       traceContext: {
@@ -80,7 +80,7 @@ describe('LLMCaller — activity event emission', () => {
 
   it('carries traceContext label / agentRole / subPhaseId into both events', async () => {
     await caller.call({
-      provider: 'ollama',
+      provider: 'llamacpp',
       model: 'qwen3.5:9b',
       prompt: 'hello',
       traceContext: {
@@ -98,7 +98,7 @@ describe('LLMCaller — activity event emission', () => {
     expect(started?.label).toBe('DMR Stage 1 — Query Decomposition');
     expect(started?.agentRole).toBe('requirements_agent');
     expect(started?.subPhaseId).toBe('1.2');
-    expect(started?.provider).toBe('ollama');
+    expect(started?.provider).toBe('llamacpp');
     expect(started?.lane).toBe('phase');
 
     expect(finished?.label).toBe('DMR Stage 1 — Query Decomposition');
@@ -108,7 +108,7 @@ describe('LLMCaller — activity event emission', () => {
   });
 
   it('emits null label (not undefined) when traceContext is absent', async () => {
-    await caller.call({ provider: 'ollama', model: 'q', prompt: 'p' });
+    await caller.call({ provider: 'llamacpp', model: 'q', prompt: 'p' });
 
     const started = events.find(e => e.type === 'llm:started')?.payload;
     expect(started).toHaveProperty('label', null);

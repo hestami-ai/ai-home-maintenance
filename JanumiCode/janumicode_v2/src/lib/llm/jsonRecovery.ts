@@ -73,7 +73,14 @@ export function parseJsonWithRecovery(text: string): {
 }
 
 function repairJsonCommonModelPathologies(input: string): string {
-  const normalizedLines = input
+  // Strip orphan `"` immediately following a numeric value BEFORE the
+  // unescaped-quote walker runs — otherwise the stray quote flips
+  // in-double state and the rest of the document looks like one giant
+  // string value to the walker.
+  const dequoted = stripStraySlashOutsideStrings(
+    stripStrayColonAfterObjectOpen(stripStrayQuoteAfterNumber(input)),
+  );
+  const normalizedLines = dequoted
     .split('\n')
     .map((line) => repairSingleQuotedLineValue(line))
     .join('\n');
@@ -134,7 +141,364 @@ function repairJsonCommonModelPathologies(input: string): string {
     i++;
   }
 
-  return stripTrailingCommas(out);
+  return stripOrphanQuoteColonProperty(stripTrailingCommas(out));
+}
+
+/**
+ * Strip a stray `"` immediately following a numeric value. qwen3.5-MoE
+ * occasionally emits `"stepNumber": 3"` instead of `"stepNumber": 3` —
+ * the model started thinking the field was a string mid-token, dropped
+ * a closing quote, but kept the bare digits before it. JSON.parse then
+ * fails at the orphan quote with "Expected ',' or '}' after property
+ * value".
+ *
+ * Pattern: `:` followed by optional whitespace, an integer or decimal
+ * literal, optional whitespace, then `"`, then optional whitespace,
+ * then a structural terminator (`,` `}` `]` end-of-input). When all
+ * conditions match, the orphan `"` is dropped. State machine walks
+ * in/out of double-quoted strings so legitimate `:"value"` patterns
+ * are untouched.
+ */
+function stripStrayQuoteAfterNumber(input: string): string {
+  let out = '';
+  let inDouble = false;
+  let escaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+
+    if (inDouble) {
+      out += ch;
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inDouble = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      // Look back over `out` for `: <number>` (with intervening
+      // whitespace allowed). If we see digits/decimal preceded by a
+      // colon (after whitespace), and look ahead is a JSON terminator,
+      // drop this quote as orphan.
+      let k = out.length - 1;
+      while (k >= 0 && /\s/.test(out[k])) k--;
+      // Must end with at least one digit.
+      if (k >= 0 && /[0-9]/.test(out[k])) {
+        // Walk back through digits + optional decimal point + optional sign.
+        while (k >= 0 && /[0-9]/.test(out[k])) k--;
+        if (k >= 0 && out[k] === '.') {
+          k--;
+          while (k >= 0 && /[0-9]/.test(out[k])) k--;
+        }
+        if (k >= 0 && out[k] === '-') k--;
+        // Now expect optional whitespace, then `:` for a property
+        // value, OR `,`/`[` for an array element. Either way the
+        // preceding number is a value, not a property name.
+        while (k >= 0 && /\s/.test(out[k])) k--;
+        const prevTok = k >= 0 ? out[k] : '';
+        const numericValueContext = prevTok === ':' || prevTok === ',' || prevTok === '[';
+        if (numericValueContext) {
+          // Look ahead past the candidate orphan quote for the next
+          // non-whitespace character.
+          let j = i + 1;
+          while (j < input.length && /\s/.test(input[j])) j++;
+          const nextCh = j < input.length ? input[j] : '';
+          if (nextCh === ',' || nextCh === '}' || nextCh === ']' || nextCh === '') {
+            // Drop the orphan quote (do NOT enter string mode).
+            continue;
+          }
+        }
+      }
+      out += ch;
+      inDouble = true;
+      continue;
+    }
+
+    out += ch;
+  }
+
+  return out;
+}
+
+/**
+ * Drop stray `/` characters that appear outside string values. JSON has
+ * no syntax that uses `/` outside strings — it's never a comment, never
+ * a separator, never part of a literal. gemma4:26b-a4b-it occasionally
+ * emits a lone `/` on its own line between array elements, e.g.:
+ *
+ *   "goals": [
+ *     "a",
+ *     "b"
+ *   /
+ *   ],
+ *
+ * Likely a truncated comment marker (`//...`) the model started and
+ * abandoned. The state machine walks in/out of double-quoted strings
+ * so legitimate `/` characters in URLs, paths, dates, etc. inside
+ * string values are preserved. Block-comment starts (`/*`) and line-
+ * comment starts (`//`) are also stripped along with their bodies.
+ */
+function stripStraySlashOutsideStrings(input: string): string {
+  let out = '';
+  let inDouble = false;
+  let escaped = false;
+  let i = 0;
+
+  while (i < input.length) {
+    const ch = input[i];
+
+    if (inDouble) {
+      out += ch;
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inDouble = false;
+      }
+      i++;
+      continue;
+    }
+
+    if (ch === '"') {
+      out += ch;
+      inDouble = true;
+      i++;
+      continue;
+    }
+
+    if (ch === '/') {
+      const next = input[i + 1];
+      if (next === '/') {
+        // Line comment — skip to next newline (keep the newline so
+        // line numbers in error messages stay sane).
+        i += 2;
+        while (i < input.length && input[i] !== '\n') i++;
+        continue;
+      }
+      if (next === '*') {
+        // Block comment — skip to closing `*/`.
+        i += 2;
+        while (i < input.length && !(input[i] === '*' && input[i + 1] === '/')) i++;
+        if (i < input.length) i += 2;
+        continue;
+      }
+      // Lone `/` — drop it.
+      i++;
+      continue;
+    }
+
+    out += ch;
+    i++;
+  }
+
+  return out;
+}
+
+/**
+ * Drop a stray `:` that appears immediately after an object-open `{`
+ * (with only whitespace between). gemma4:26b-a4b-it occasionally emits
+ *   {
+ *     : "stepNumber": 2,
+ *     ...
+ *   }
+ * — likely the model dropped the property name before the colon. The
+ * standalone `:` is never legal JSON inside an object before the first
+ * key, so removing it is unambiguous. State machine walks in/out of
+ * double-quoted strings so a literal `{:"...` inside a string value is
+ * left untouched.
+ */
+function stripStrayColonAfterObjectOpen(input: string): string {
+  let out = '';
+  let inDouble = false;
+  let escaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+
+    if (inDouble) {
+      out += ch;
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inDouble = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      out += ch;
+      inDouble = true;
+      continue;
+    }
+
+    if (ch === '{') {
+      out += ch;
+      // Peek ahead for whitespace + `:` + whitespace + `"`. If matched,
+      // skip the stray colon (emit the whitespace, drop just the `:`).
+      let j = i + 1;
+      while (j < input.length && /\s/.test(input[j])) j++;
+      if (j < input.length && input[j] === ':') {
+        let k = j + 1;
+        while (k < input.length && /\s/.test(input[k])) k++;
+        if (k < input.length && input[k] === '"') {
+          out += input.slice(i + 1, j);
+          i = j;
+          continue;
+        }
+      }
+      continue;
+    }
+
+    out += ch;
+  }
+
+  return out;
+}
+
+/**
+ * Drop a malformed property where the property-name token was lost but
+ * the closing quote and colon survived. gemma4:26b-a4b-it has been
+ * observed emitting:
+ *
+ *   {
+ *     "stepNumber": 1,
+ *     "actor": "Manager"
+ *   },
+ *   {
+ *     ": 2,
+ *     "actor": "System"
+ *   }
+ *
+ * — the second object's first property should be `"stepNumber": 2,`
+ * but the model dropped the name token, leaving just `":` (one orphan
+ * quote, one colon, no key). Strict JSON parses this as the start of a
+ * string literal whose value contains a literal newline → fails.
+ *
+ * Detection: outside-string, `"` immediately followed by `:` (with at
+ * most whitespace between, no second `"`). In valid JSON the empty-key
+ * idiom `"":` always has TWO adjacent quotes, so `":` (single quote +
+ * colon) is unambiguously malformed.
+ *
+ * Repair: skip the orphan `"`, the `:`, the value that follows, and a
+ * single trailing `,` if present. The value-skipper handles strings,
+ * numbers, booleans, null, arrays, and objects (balanced).
+ */
+function stripOrphanQuoteColonProperty(input: string): string {
+  let out = '';
+  let inDouble = false;
+  let escaped = false;
+  let i = 0;
+
+  while (i < input.length) {
+    const ch = input[i];
+
+    if (inDouble) {
+      out += ch;
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inDouble = false;
+      }
+      i++;
+      continue;
+    }
+
+    if (ch === '"') {
+      // Look ahead past optional whitespace for `:` (NOT preceded by
+      // another `"` — the empty-key `"":` idiom is legal).
+      let j = i + 1;
+      while (j < input.length && /\s/.test(input[j])) j++;
+      if (j < input.length && input[j] === ':') {
+        // Orphan `":` confirmed. Skip past `:` then skip the value
+        // and a single trailing `,` if present.
+        const afterValue = skipValueAndComma(input, j + 1);
+        i = afterValue;
+        continue;
+      }
+      // Real string opener — fall through to normal handling below.
+      out += ch;
+      inDouble = true;
+      i++;
+      continue;
+    }
+
+    out += ch;
+    i++;
+  }
+
+  return out;
+}
+
+/**
+ * Starting at index `start`, skip a JSON value (string / number / bool /
+ * null / array / object) plus any leading whitespace, then a single
+ * trailing `,` if present (also with leading whitespace). Returns the
+ * index of the next character to process. Used by
+ * stripOrphanQuoteColonProperty to drop the value attached to an
+ * orphan `":` construct.
+ */
+function skipValueAndComma(input: string, start: number): number {
+  let i = start;
+  while (i < input.length && /\s/.test(input[i])) i++;
+  if (i >= input.length) return i;
+
+  const ch = input[i];
+  if (ch === '"') {
+    // String value — walk to closing quote with escape handling.
+    i++;
+    let escaped = false;
+    while (i < input.length) {
+      const c = input[i];
+      if (escaped) { escaped = false; i++; continue; }
+      if (c === '\\') { escaped = true; i++; continue; }
+      if (c === '"') { i++; break; }
+      i++;
+    }
+  } else if (ch === '{' || ch === '[') {
+    // Object or array — balance brackets while tracking strings.
+    const openCh = ch;
+    const closeCh = openCh === '{' ? '}' : ']';
+    let depth = 0;
+    let inStr = false;
+    let escaped = false;
+    while (i < input.length) {
+      const c = input[i];
+      if (inStr) {
+        if (escaped) { escaped = false; }
+        else if (c === '\\') { escaped = true; }
+        else if (c === '"') { inStr = false; }
+        i++;
+        continue;
+      }
+      if (c === '"') { inStr = true; i++; continue; }
+      if (c === openCh) { depth++; i++; continue; }
+      if (c === closeCh) {
+        depth--;
+        i++;
+        if (depth === 0) break;
+        continue;
+      }
+      i++;
+    }
+  } else {
+    // Bare literal: number, true, false, null. Scan until next
+    // structural terminator.
+    while (i < input.length && !/[,}\]]/.test(input[i])) i++;
+  }
+
+  // Skip optional trailing whitespace + one `,`.
+  while (i < input.length && /\s/.test(input[i])) i++;
+  if (i < input.length && input[i] === ',') i++;
+  return i;
 }
 
 /**

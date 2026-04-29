@@ -45,7 +45,7 @@ export class OllamaProvider implements LLMProviderAdapter {
     // Non-family callers keep their own temperature.
     let temperature: number;
     if (isQwen) temperature = 1;
-    else if (isGemma) temperature = 1;
+    else if (isGemma) temperature = 0;
     else temperature = options.temperature ?? 0.7;
 
     // Token cap (`num_predict`) — off by default to match the
@@ -76,10 +76,13 @@ export class OllamaProvider implements LLMProviderAdapter {
       think: true,
       options: {
         temperature,
-        // Gemma maxes out at 128K context; qwen + others get the large
-        // 256K allocation the rest of the pipeline expects.
-        num_ctx: isGemma ? 131072 : 262144,
-        ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95 } : {}),
+        // Per cal-24 calibration spec: gemma → 156000 ctx (gemma4:26b-a4b-it
+        // decomposer); qwen → 262141 ctx (qwen3.5:9b reviewer). Sampling
+        // profiles match the same spec — kept hardcoded by family rather
+        // than threaded through config so any caller pointing at one of
+        // these families gets the calibrated defaults automatically.
+        num_ctx: isGemma ? 128000 : 262141,
+        ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95, min_p: 0, repeat_penalty: 1 } : {}),
         ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
         ...(numPredict > 0 ? { num_predict: numPredict } : {}),
       },
@@ -330,7 +333,7 @@ export class OllamaProvider implements LLMProviderAdapter {
 
     let temperature: number;
     if (isQwen) temperature = 1;
-    else if (isGemma) temperature = 1;
+    else if (isGemma) temperature = 0;
     else temperature = options.temperature ?? 0.7;
 
     const body: Record<string, unknown> = {
@@ -348,8 +351,8 @@ export class OllamaProvider implements LLMProviderAdapter {
       })),
       options: {
         temperature,
-        num_ctx: isGemma ? 131072 : 262144,
-        ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95 } : {}),
+        num_ctx: isGemma ? 128000 : 262141,
+        ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95, min_p: 0, repeat_penalty: 1 } : {}),
         ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
         ...(options.maxTokens ? { num_predict: options.maxTokens } : {}),
       },

@@ -1,0 +1,76 @@
+{
+  "$id": "janumicode:component_decomposition_node:1.0",
+  "title": "Component Decomposition Node",
+  "description": "Single node in a recursive component decomposition tree (Wave 7 — Phase 4.2a). Append-only — frozen on creation. status indicates whether this node was further decomposed, met atomic-component criteria, was pruned by the human at the Tier-B mirror gate, was deferred when a safety cap tripped, or was downgraded after a tier mislabel was detected post-gate.",
+  "type": "object",
+  "required": ["kind", "node_id", "parent_node_id", "display_key", "root_component_id", "depth", "pass_number", "status", "component", "surfaced_assumption_ids"],
+  "properties": {
+    "kind": { "const": "component_decomposition_node" },
+    "node_id": { "type": "string", "description": "Canonical logical UUID. Stable across revisions of the same logical node." },
+    "parent_node_id": { "type": ["string", "null"], "description": "Parent node's canonical logical UUID, or null at depth 0." },
+    "display_key": { "type": "string", "description": "Short human-readable label (LLM's component.id, with a collision suffix if a sibling already uses the same bare label). Presentation-only." },
+    "root_component_id": { "type": "string", "description": "The depth-0 root component this node descends from." },
+    "depth": { "type": "integer", "minimum": 0, "maximum": 6 },
+    "pass_number": { "type": "integer", "minimum": 0 },
+    "status": { "type": "string", "enum": ["pending", "decomposed", "atomic", "pruned", "deferred", "downgraded"] },
+    "tier": {
+      "type": "string",
+      "enum": ["A", "B", "C", "D"],
+      "description": "Wave 7 component tier rubric. A=Macro Subsystem (recurse), B=Bounded Domain (mirror-gate then recurse), C=Module (one more pass), D=Atomic Component (terminal)."
+    },
+    "component": {
+      "type": "object",
+      "required": ["id", "name", "responsibilities", "dependencies"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "responsibilities": {
+          "type": "array",
+          "description": "Verb-led action statements describing what the component is responsible for.",
+          "items": {
+            "type": "object",
+            "required": ["id", "description"],
+            "properties": {
+              "id": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "description": "Other components this one depends on. Each entry references a `component_id` and a `kind` (sync_call / async_event / data_read / data_write).",
+          "items": {
+            "type": "object",
+            "required": ["component_id", "kind"],
+            "properties": {
+              "component_id": { "type": "string" },
+              "kind": { "type": "string", "enum": ["sync_call", "async_event", "data_read", "data_write"] }
+            }
+          }
+        },
+        "domain_id": { "type": ["string", "null"] },
+        "active_constraints": {
+          "type": "array",
+          "description": "Technical constraint IDs (TECH-*) from Phase 1.0c that anchor this component's implementation choices. Inherited from parent and refined as the tree narrows.",
+          "items": { "type": "string" }
+        },
+        "traces_to": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "decomposition_rationale": { "type": "string" },
+    "surfaced_assumption_ids": { "type": "array", "items": { "type": "string" } },
+    "release_id": { "type": ["string", "null"], "description": "Release assignment (inherited from parent; null = backlog)." },
+    "release_ordinal": { "type": ["integer", "null"], "minimum": 1, "description": "Cached ordinal of the assigned release for sort convenience." },
+    "atomic_criteria_satisfied": {
+      "type": "object",
+      "required": ["responsibilities_verb_led", "responsibilities_mutually_exclusive", "responsibilities_collectively_exhaust", "no_subcomponent_implied"],
+      "properties": {
+        "responsibilities_verb_led": { "type": "boolean" },
+        "responsibilities_mutually_exclusive": { "type": "boolean" },
+        "responsibilities_collectively_exhaust": { "type": "boolean" },
+        "no_subcomponent_implied": { "type": "boolean" }
+      }
+    },
+    "pruning_reason": { "type": "string" }
+  }
+}

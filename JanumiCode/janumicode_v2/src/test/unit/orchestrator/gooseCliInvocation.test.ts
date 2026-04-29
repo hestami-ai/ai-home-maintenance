@@ -18,6 +18,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { createTestDatabase, type Database } from '../../../lib/database/init';
 import { ConfigManager } from '../../../lib/config/configManager';
@@ -38,8 +40,9 @@ describe('Goose CLI invocation wiring', () => {
     delete process.env.JANUMICODE_GOOSE_EXTRA_ARGS;
     db = createTestDatabase();
     const configManager = new ConfigManager();
-    const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
+    const extensionPath = path.resolve(__dirname, '..', '..', '..', '..');
+    const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
+    engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
     engine.registerBuiltinCLIParsers();
   });
 

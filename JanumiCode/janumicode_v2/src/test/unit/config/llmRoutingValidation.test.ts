@@ -43,7 +43,7 @@ describe('validateLLMRouting', () => {
       engine.llmCaller.registerProvider(mock.bindAsProvider('google'));
       // domain_interpreter routing defaults to ollama (iter-3 default);
       // register it so the validator's referenced-provider check passes.
-      engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+      engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
       // Should not throw.
       expect(() => engine.validateLLMRouting()).not.toThrow();
     } finally {
@@ -73,7 +73,7 @@ describe('validateLLMRouting', () => {
 
   it('ConfigManager.validateLLMRouting returns specific error strings per missing provider', () => {
     const configManager = new ConfigManager();
-    const errors = configManager.validateLLMRouting(new Set(['ollama']));
+    const errors = configManager.validateLLMRouting(new Set(['llamacpp']));
     expect(errors.length).toBe(1);
     expect(errors[0]).toMatch(/reasoning_review/);
     expect(errors[0]).toMatch(/google/);
@@ -84,7 +84,7 @@ describe('validateLLMRouting', () => {
 
   it('ConfigManager.validateLLMRouting returns empty when all providers are registered', () => {
     const configManager = new ConfigManager();
-    const errors = configManager.validateLLMRouting(new Set(['google', 'anthropic', 'ollama']));
+    const errors = configManager.validateLLMRouting(new Set(['google', 'anthropic', 'llamacpp']));
     expect(errors).toEqual([]);
   });
 });

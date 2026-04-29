@@ -369,6 +369,23 @@ export type RecordType =
   | 'requirement_decomposition_node'
   | 'assumption_set_snapshot'
   | 'requirement_decomposition_pipeline'
+  | 'component_decomposition_node'
+  | 'component_assumption_set_snapshot'
+  | 'component_decomposition_pipeline'
+  | 'task_decomposition_node'
+  | 'task_assumption_set_snapshot'
+  | 'task_decomposition_pipeline'
+  | 'data_model_decomposition_node'
+  | 'data_model_assumption_set_snapshot'
+  | 'data_model_decomposition_pipeline'
+  | 'test_decomposition_node'
+  | 'test_assumption_set_snapshot'
+  | 'test_decomposition_pipeline'
+  | 'execution_wave_started'
+  | 'execution_wave_completed'
+  | 'task_quarantine'
+  | 'task_test_result'
+  | 'wave_gate_decision'
   | 'memory_edge_proposed'
   | 'memory_edge_confirmed'
   | 'intent_quality_report'
@@ -507,23 +524,6 @@ export type WorkflowRunStatus =
   | 'failed'
   | 'rolled_back';
 
-// ── Reasoning Flaw Types (§8.1) ─────────────────────────────────────
-
-export type ReasoningFlawType =
-  | 'unsupported_assumption'
-  | 'invalid_inference'
-  | 'circular_logic'
-  | 'scope_violation'
-  | 'premature_convergence'
-  | 'false_equivalence'
-  | 'authority_confusion'
-  | 'completeness_shortcut'
-  | 'contradiction_with_prior_approved'
-  | 'unacknowledged_uncertainty'
-  | 'implementability_violation'
-  | 'implementation_divergence'
-  | 'tool_result_misinterpretation_suspected';
-
 // ── Loop Status (§7.10) ─────────────────────────────────────────────
 
 export type LoopStatus =
@@ -586,6 +586,49 @@ export type IntentLens =
   | 'infra'
   | 'legal'
   | 'unclassified';
+
+export type ReasoningReviewSeverity = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface ReasoningReviewConcern {
+  severity: ReasoningReviewSeverity;
+  summary: string;
+  detail: string;
+  location: string;
+  recommendation: string;
+}
+
+/**
+ * Output of an automated reasoning review on a single agent_output.
+ * Linked to the reviewed call via `derived_from_record_ids = [agent_output_id]`.
+ *
+ * Status semantics:
+ *   - `success`     — review LLM call returned and parsed cleanly
+ *   - `parse_error` — review LLM returned text but JSON couldn't be recovered
+ *   - `failed`      — review LLM call failed after retries (soft-fail)
+ *   - `skipped`     — preconditions not met (e.g. empty thinking + empty text)
+ *
+ * Advisory only: never blocks workflow progression. UI surfaces `concerns`
+ * in a card alongside the originating agent_output.
+ */
+export interface ReasoningReviewRecordContent {
+  kind: 'reasoning_review';
+  status: 'success' | 'parse_error' | 'failed' | 'skipped';
+  reviewed_agent_output_id: string;
+  reviewed_agent_role: string | null;
+  reviewed_phase_id: string | null;
+  reviewed_sub_phase_id: string | null;
+  reviewer_provider: string | null;
+  reviewer_model: string | null;
+  has_concerns: boolean;
+  concerns: ReasoningReviewConcern[];
+  overall_assessment: string;
+  duration_ms: number;
+  retry_attempts: number;
+  /** Populated on parse_error / failed; null on success / skipped. */
+  error_message: string | null;
+  /** When status='skipped', why we skipped (e.g. 'no_thinking_or_text', 'self_review'). */
+  skip_reason?: string;
+}
 
 export interface IntentLensClassificationContent {
   kind: 'intent_lens_classification';
@@ -858,6 +901,584 @@ export interface RequirementDecompositionPipelineContent {
   final_leaf_count?: number;
   final_max_depth?: number;
   total_llm_calls?: number;
+}
+
+// ── Wave 7 — Recursive component decomposition (Phase 4.2a) ─────────
+//
+// Mirrors Wave 6's tier-based saturation loop, adapted for components.
+// Tier rubric: A=Macro Subsystem (recurse), B=Bounded Domain (mirror-
+// gated), C=Module (one more pass), D=Atomic Component (terminal).
+// See docs/wave7_phase4_recursive_decomposition.md for the design.
+
+export interface ComponentResponsibility {
+  id: string;
+  description: string;
+}
+
+export type ComponentDependencyKind = 'sync_call' | 'async_event' | 'data_read' | 'data_write';
+
+export interface ComponentDependency {
+  component_id: string;
+  kind: ComponentDependencyKind;
+}
+
+export interface DecompositionComponent {
+  id: string;
+  name: string;
+  responsibilities: ComponentResponsibility[];
+  dependencies: ComponentDependency[];
+  /** Software domain id this component belongs to (Phase 4.1 output). */
+  domain_id?: string | null;
+  /**
+   * Technical-constraint IDs (TECH-*) from Phase 1.0c that anchor this
+   * component's implementation choices. Inherited from parent at write
+   * time; refined as the tree narrows (e.g. a frontend leaf carries
+   * only TECH-SVELTEKIT-1, not the whole stack).
+   */
+  active_constraints?: string[];
+  traces_to?: string[];
+}
+
+export interface ComponentDecompositionAtomicCriteria {
+  responsibilities_verb_led: boolean;
+  responsibilities_mutually_exclusive: boolean;
+  responsibilities_collectively_exhaust: boolean;
+  no_subcomponent_implied: boolean;
+}
+
+export interface ComponentDecompositionNodeContent {
+  kind: 'component_decomposition_node';
+  /**
+   * Canonical logical identity for this decomposition node. Stable
+   * across revisions (downgrade / pruned / deferred / atomic
+   * supersessions all share this id). Distinct from the LLM's
+   * `component.id` which can collide across siblings under different
+   * parents.
+   */
+  node_id: string;
+  /** Parent node's canonical logical UUID, or null at depth 0. */
+  parent_node_id: string | null;
+  /**
+   * Short human-readable label — the LLM's emitted `component.id` with a
+   * collision suffix when a sibling under the same parent already uses
+   * the same bare label. Presentation-only.
+   */
+  display_key: string;
+  /** The depth-0 root component this node descends from. */
+  root_component_id: string;
+  depth: number;
+  pass_number: number;
+  status: DecompositionNodeStatus;
+  tier?: DecompositionTier;
+  component: DecompositionComponent;
+  decomposition_rationale?: string;
+  surfaced_assumption_ids: string[];
+  atomic_criteria_satisfied?: ComponentDecompositionAtomicCriteria;
+  pruning_reason?: string;
+  /** Inherited release assignment, mirrors Wave 6 release propagation. */
+  release_id: string | null;
+  release_ordinal: number | null;
+}
+
+export type ComponentAssumptionCategory =
+  | 'boundary'
+  | 'cross_cutting'
+  | 'integration_pattern'
+  | 'data_ownership'
+  | 'scaling_assumption'
+  | 'tech_choice'
+  | 'open_question';
+
+export type ComponentAssumptionSource = 'handoff' | 'domain' | 'decomposition' | 'human';
+
+export interface ComponentAssumptionEntry {
+  id: string;
+  text: string;
+  source: ComponentAssumptionSource;
+  surfaced_at_node?: string;
+  surfaced_at_pass: number;
+  category: ComponentAssumptionCategory;
+  citations?: string[];
+  duplicate_of?: string;
+  duplicate_similarity?: number;
+}
+
+export interface ComponentAssumptionSetSnapshotContent {
+  kind: 'component_assumption_set_snapshot';
+  pass_number: number;
+  root_component_id: string;
+  assumptions: ComponentAssumptionEntry[];
+  delta_from_previous_pass: number;
+  semantic_delta?: number;
+}
+
+export interface ComponentDecompositionPipelineContent {
+  kind: 'component_decomposition_pipeline';
+  pipeline_id: string;
+  root_component_id: string;
+  passes: DecompositionPassEntry[];
+  final_leaf_count?: number;
+  final_max_depth?: number;
+  total_llm_calls?: number;
+  tier_distribution?: { A?: number; B?: number; C?: number; D?: number };
+}
+
+// ── Wave 8 — Recursive task decomposition (Phase 6.1a) ──────────────
+//
+// Mirrors Wave 6 / Wave 7 tier-based saturation loop, adapted for
+// implementation tasks. Tier rubric: A=Epic (multi-cluster body of work,
+// recurse), B=Story (scope commitment, mirror-gate), C=Task (coherent
+// unit, one more pass), D=Atomic-Unit (single executor session, terminal).
+// See docs/wave8_phase6_recursive_task_decomposition.md for the design
+// (and project_wave6_recursive_decomposition memory for the saturation
+// machinery these all share).
+
+export interface TaskCompletionCriterion {
+  criterion_id: string;
+  description: string;
+  verification_method?: 'schema_check' | 'invariant' | 'output_comparison' | 'test_execution';
+  artifact_ref?: string;
+}
+
+export interface DecompositionTask {
+  id: string;
+  name: string;
+  description: string;
+  task_type?: 'standard' | 'refactoring';
+  /** Component (logical id or display key) this task belongs to. */
+  component_id: string;
+  component_responsibility: string;
+  backing_tool?: string;
+  estimated_complexity?: 'low' | 'medium' | 'high';
+  complexity_flag?: string;
+  completion_criteria: TaskCompletionCriterion[];
+  write_directory_paths?: string[];
+  read_directory_paths?: string[];
+  dependency_task_ids?: string[];
+  /**
+   * Technical-constraint IDs (TECH-*) inherited from the parent task /
+   * parent component. Anchors backing-tool + tech choices for the
+   * executor. A single-component leaf carries only the constraints that
+   * apply to that component (e.g. SvelteKit-only for a frontend leaf).
+   */
+  active_constraints?: string[];
+  /** References to upstream artifacts this task realises (component ids, responsibility ids, AC ids). */
+  traces_to?: string[];
+}
+
+export interface TaskDecompositionAtomicCriteria {
+  single_executor_session: boolean;
+  completion_criteria_verifiable: boolean;
+  no_subtask_implied: boolean;
+  scope_within_one_component: boolean;
+}
+
+export interface TaskDecompositionNodeContent {
+  kind: 'task_decomposition_node';
+  /** Canonical logical UUID. Stable across revisions. */
+  node_id: string;
+  /** Parent node's logical UUID (or null at depth 0). */
+  parent_node_id: string | null;
+  /**
+   * Sibling-unique human label — LLM's task.id with `#nnnn` collision
+   * suffix when needed. Presentation-only.
+   */
+  display_key: string;
+  /** Depth-0 root task this node descends from (root's logical UUID). */
+  root_task_id: string;
+  depth: number;
+  pass_number: number;
+  status: DecompositionNodeStatus;
+  tier?: DecompositionTier;
+  task: DecompositionTask;
+  decomposition_rationale?: string;
+  surfaced_assumption_ids: string[];
+  atomic_criteria_satisfied?: TaskDecompositionAtomicCriteria;
+  pruning_reason?: string;
+  release_id: string | null;
+  release_ordinal: number | null;
+}
+
+export type TaskAssumptionCategory =
+  | 'implementation_choice'
+  | 'sequencing'
+  | 'dependency'
+  | 'tooling'
+  | 'scope_boundary'
+  | 'integration_seam'
+  | 'open_question';
+
+export type TaskAssumptionSource = 'component' | 'plan' | 'decomposition' | 'human';
+
+export interface TaskAssumptionEntry {
+  id: string;
+  text: string;
+  source: TaskAssumptionSource;
+  surfaced_at_node?: string;
+  surfaced_at_pass: number;
+  category: TaskAssumptionCategory;
+  citations?: string[];
+  duplicate_of?: string;
+  duplicate_similarity?: number;
+}
+
+export interface TaskAssumptionSetSnapshotContent {
+  kind: 'task_assumption_set_snapshot';
+  pass_number: number;
+  root_task_id: string;
+  assumptions: TaskAssumptionEntry[];
+  delta_from_previous_pass: number;
+  semantic_delta?: number;
+}
+
+export interface TaskDecompositionPipelineContent {
+  kind: 'task_decomposition_pipeline';
+  pipeline_id: string;
+  root_task_id: string;
+  passes: DecompositionPassEntry[];
+  final_leaf_count?: number;
+  final_max_depth?: number;
+  total_llm_calls?: number;
+  tier_distribution?: { A?: number; B?: number; C?: number; D?: number };
+}
+
+// ── Wave 9 — Recursive data-model decomposition (Phase 5.1a) ──────
+//
+// Tier rubric is data-model-scoped:
+//   A — Aggregate Root (owns its consistency boundary; recurse)
+//   B — Entity (identity within an aggregate; mirror-gated)
+//   C — Sub-entity / Value-type cluster (one more pass)
+//   D — Atomic value type / relation (terminal)
+
+export type DataModelEntityKind = 'aggregate' | 'entity' | 'value_type' | 'relation';
+
+export interface DataModelField {
+  name: string;
+  type: string;
+  constraints?: string;
+  nullable?: boolean;
+  is_identity?: boolean;
+}
+
+export type DataModelRelationshipKind =
+  | 'one_to_one'
+  | 'one_to_many'
+  | 'many_to_one'
+  | 'many_to_many'
+  | 'owns'
+  | 'references';
+
+export interface DataModelRelationship {
+  target_entity_id: string;
+  kind: DataModelRelationshipKind;
+  ownership?: 'owns' | 'references';
+}
+
+export interface DecompositionEntity {
+  id: string;
+  name: string;
+  kind?: DataModelEntityKind;
+  component_id?: string | null;
+  fields: DataModelField[];
+  relationships?: DataModelRelationship[];
+  active_constraints?: string[];
+  traces_to?: string[];
+}
+
+export interface DataModelAtomicCriteria {
+  fields_typed: boolean;
+  no_implicit_subentity: boolean;
+  relationships_externalized: boolean;
+  constraints_enumerated: boolean;
+}
+
+export interface DataModelDecompositionNodeContent {
+  kind: 'data_model_decomposition_node';
+  node_id: string;
+  parent_node_id: string | null;
+  display_key: string;
+  root_entity_id: string;
+  depth: number;
+  pass_number: number;
+  status: DecompositionNodeStatus;
+  tier?: DecompositionTier;
+  entity: DecompositionEntity;
+  decomposition_rationale?: string;
+  surfaced_assumption_ids: string[];
+  atomic_criteria_satisfied?: DataModelAtomicCriteria;
+  pruning_reason?: string;
+  release_id: string | null;
+  release_ordinal: number | null;
+}
+
+export type DataModelAssumptionCategory =
+  | 'identity'
+  | 'ownership'
+  | 'cardinality'
+  | 'lifecycle'
+  | 'consistency'
+  | 'storage_choice'
+  | 'open_question';
+
+export type DataModelAssumptionSource = 'component' | 'domain' | 'decomposition' | 'human';
+
+export interface DataModelAssumptionEntry {
+  id: string;
+  text: string;
+  source: DataModelAssumptionSource;
+  surfaced_at_node?: string;
+  surfaced_at_pass: number;
+  category: DataModelAssumptionCategory;
+  citations?: string[];
+  duplicate_of?: string;
+  duplicate_similarity?: number;
+}
+
+export interface DataModelAssumptionSetSnapshotContent {
+  kind: 'data_model_assumption_set_snapshot';
+  pass_number: number;
+  root_entity_id: string;
+  assumptions: DataModelAssumptionEntry[];
+  delta_from_previous_pass: number;
+  semantic_delta?: number;
+}
+
+export interface DataModelDecompositionPipelineContent {
+  kind: 'data_model_decomposition_pipeline';
+  pipeline_id: string;
+  root_entity_id: string;
+  passes: DecompositionPassEntry[];
+  final_leaf_count?: number;
+  final_max_depth?: number;
+  total_llm_calls?: number;
+  tier_distribution?: { A?: number; B?: number; C?: number; D?: number };
+}
+
+// ── Wave 10 — Recursive test decomposition (Phase 7.1a) ───────────
+//
+// Full peer to Waves 6/7/8/9. Tier rubric is test-scoped:
+//   A — Test Suite (a coherent body of test work; recurse)
+//   B — Test Scenario (scope commitment about a behaviour; mirror-gated)
+//   C — Test Case (one verifiable instance; one more pass)
+//   D — Atomic Test Step (single executable assertion; terminal)
+
+export type TestDecompositionTestType =
+  | 'unit'
+  | 'integration'
+  | 'end_to_end'
+  | 'performance'
+  | 'contract';
+
+export interface DecompositionTestStep {
+  id: string;
+  description: string;
+  /** Phase of an executable test: arrange (setup), act (action), assert. */
+  phase?: 'arrange' | 'act' | 'assert' | 'teardown';
+  expected_outcome?: string;
+}
+
+export interface DecompositionTestCase {
+  id: string;
+  name: string;
+  test_type: TestDecompositionTestType;
+  /** Component(s) under test (logical IDs). */
+  component_ids?: string[];
+  /** Acceptance-criterion IDs this test validates. */
+  acceptance_criterion_ids?: string[];
+  preconditions?: string[];
+  steps: DecompositionTestStep[];
+  expected_outcome?: string;
+  edge_cases?: string[];
+  test_file_path?: string;
+  active_constraints?: string[];
+  traces_to?: string[];
+}
+
+export interface TestDecompositionAtomicCriteria {
+  steps_executable: boolean;
+  assertions_verifiable: boolean;
+  no_implicit_subscenario: boolean;
+  scope_within_one_component: boolean;
+}
+
+export interface TestDecompositionNodeContent {
+  kind: 'test_decomposition_node';
+  node_id: string;
+  parent_node_id: string | null;
+  display_key: string;
+  root_test_id: string;
+  depth: number;
+  pass_number: number;
+  status: DecompositionNodeStatus;
+  tier?: DecompositionTier;
+  test_case: DecompositionTestCase;
+  decomposition_rationale?: string;
+  surfaced_assumption_ids: string[];
+  atomic_criteria_satisfied?: TestDecompositionAtomicCriteria;
+  pruning_reason?: string;
+  release_id: string | null;
+  release_ordinal: number | null;
+}
+
+export type TestAssumptionCategory =
+  | 'preconditions'
+  | 'fixture_setup'
+  | 'oracle_choice'
+  | 'tooling'
+  | 'scope_boundary'
+  | 'flake_risk'
+  | 'open_question';
+
+export type TestAssumptionSource = 'fr' | 'component' | 'decomposition' | 'human';
+
+export interface TestAssumptionEntry {
+  id: string;
+  text: string;
+  source: TestAssumptionSource;
+  surfaced_at_node?: string;
+  surfaced_at_pass: number;
+  category: TestAssumptionCategory;
+  citations?: string[];
+  duplicate_of?: string;
+  duplicate_similarity?: number;
+}
+
+export interface TestAssumptionSetSnapshotContent {
+  kind: 'test_assumption_set_snapshot';
+  pass_number: number;
+  root_test_id: string;
+  assumptions: TestAssumptionEntry[];
+  delta_from_previous_pass: number;
+  semantic_delta?: number;
+}
+
+export interface TestDecompositionPipelineContent {
+  kind: 'test_decomposition_pipeline';
+  pipeline_id: string;
+  root_test_id: string;
+  passes: DecompositionPassEntry[];
+  final_leaf_count?: number;
+  final_max_depth?: number;
+  total_llm_calls?: number;
+  tier_distribution?: { A?: number; B?: number; C?: number; D?: number };
+}
+
+// ── Wave R — Phase 9 release-plan execution ───────────────────────
+//
+// Replaces Phase 9's flat for-loop with a wave-based execution
+// scheduler. One wave per release ordinal (with an optional final
+// deferred-batch wave for quarantined leaves). See
+// docs/waveR_phase9_release_execution.md.
+
+export type ExecutionWaveKind = 'release' | 'deferred_batch' | 'single';
+
+export interface ExecutionWaveStartedContent {
+  kind: 'execution_wave_started';
+  wave_number: number;
+  release_id: string | null;
+  release_ordinal: number | null;
+  release_name?: string;
+  wave_kind: ExecutionWaveKind;
+  leaf_count: number;
+  started_at: string;
+  leaf_distribution_by_component?: Record<string, number>;
+  leaf_ids?: string[];
+}
+
+export interface ExecutionWaveCompletedContent {
+  kind: 'execution_wave_completed';
+  wave_number: number;
+  release_id: string | null;
+  release_ordinal: number | null;
+  release_name?: string;
+  wave_kind: ExecutionWaveKind;
+  leaf_count: number;
+  successful_count: number;
+  quarantined_count: number;
+  rescued_count?: number;
+  skipped_count?: number;
+  started_at?: string;
+  completed_at: string;
+  duration_ms?: number;
+  files_written_count?: number;
+  files_modified_count?: number;
+  files_deleted_count?: number;
+  test_summary?: {
+    total_passed: number;
+    total_failed: number;
+    total_skipped: number;
+    leaves_with_failing_tests: number;
+  };
+  reasoning_review_summary?: Record<string, number>;
+  successful_leaf_ids?: string[];
+  quarantined_leaf_ids?: string[];
+}
+
+export type QuarantineAttemptOutcome =
+  | 'execution_failed'
+  | 'reasoning_review_failed'
+  | 'tests_failed'
+  | 'passed';
+
+export interface QuarantineAttemptEntry {
+  attempt_number: number;
+  invocation_id: string;
+  outcome: QuarantineAttemptOutcome;
+  reasoning_review_flaws?: Array<{ flaw_type: string; severity: string; description?: string }>;
+  test_failures?: string[];
+  files_written_count?: number;
+  error_message?: string;
+}
+
+export type QuarantineRescueStatus = 'pending' | 'rescued' | 'terminally_deferred';
+
+export interface TaskQuarantineContent {
+  kind: 'task_quarantine';
+  leaf_task_id: string;
+  leaf_node_id?: string | null;
+  wave_number: number;
+  release_id: string | null;
+  release_ordinal: number | null;
+  attempts: QuarantineAttemptEntry[];
+  quarantine_reason: string;
+  rescue_status: QuarantineRescueStatus;
+  quarantined_at: string;
+}
+
+export interface TaskTestResultContent {
+  kind: 'task_test_result';
+  leaf_task_id: string;
+  attempt_number: number;
+  wave_number: number;
+  test_command?: string;
+  passed_count: number;
+  failed_count: number;
+  skipped_count: number;
+  exit_code: number | null;
+  duration_ms: number;
+  stdout_excerpt?: string;
+  stderr_excerpt?: string;
+  executed_at: string;
+  skipped_reason?: string;
+}
+
+export type WaveGateDecisionKind =
+  | 'approved'
+  | 'rejected'
+  | 'investigated_then_approved'
+  | 'auto_approved';
+
+export interface WaveGateDecisionContent {
+  kind: 'wave_gate_decision';
+  wave_number: number;
+  release_id: string | null;
+  release_ordinal: number | null;
+  wave_kind: ExecutionWaveKind;
+  decision: WaveGateDecisionKind;
+  reason?: string;
+  rolled_back?: boolean;
+  decided_at: string;
+  decided_by: 'human' | 'auto';
 }
 
 // ── Product Description Handoff (Phase 1 product lens) ──────────────

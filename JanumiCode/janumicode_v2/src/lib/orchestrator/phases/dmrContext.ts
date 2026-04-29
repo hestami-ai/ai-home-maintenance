@@ -114,6 +114,7 @@ export async function buildPhaseContextPacket(
         complianceContext: '',
         unstickingResolutions: '',
       },
+      workflowRun.id,
     );
     detailFilePath = payload.detailFile?.path ?? '(not available)';
   } catch (err) {

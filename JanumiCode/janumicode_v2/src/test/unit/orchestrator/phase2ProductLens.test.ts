@@ -12,6 +12,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { createTestDatabase, type Database } from '../../../lib/database/init';
 import { ConfigManager } from '../../../lib/config/configManager';
@@ -23,12 +25,13 @@ import type { ProductDescriptionHandoffContent } from '../../../lib/types/record
 describe('Phase 2 — product-lens handoff consumption', () => {
   let db: Database;
   let engine: OrchestratorEngine;
-  const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
+  const extensionPath = path.resolve(__dirname, '..', '..', '..', '..');
+  const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
 
   beforeEach(() => {
     db = createTestDatabase();
     const configManager = new ConfigManager();
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
+    engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
     engine.llmCaller.registerProvider({
       name: 'google',
       call: () => Promise.reject(new Error('stub')),
@@ -152,9 +155,9 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       },
     });
     // Also need to satisfy the default-path LLM call just in case.
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
 
@@ -233,9 +236,9 @@ describe('Phase 2 — product-lens handoff consumption', () => {
         }],
       },
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
 
@@ -322,9 +325,9 @@ describe('Phase 2 — product-lens handoff consumption', () => {
         }],
       },
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
 
@@ -392,9 +395,9 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       match: 'product-lens Non-Functional Requirements Bloom',
       parsedJson: { requirements: [{ id: 'NFR-1', category: 'security', description: 'd', threshold: 't', measurement_method: 'm', traces_to: ['VV-1'] }] },
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
 
@@ -494,9 +497,9 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       match: 'product-lens Non-Functional Requirements Bloom',
       parsedJson: { requirements: [{ id: 'NFR-1', category: 'security', description: 'd', threshold: 't', measurement_method: 'm', traces_to: ['VV-1'] }] },
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
 
@@ -602,9 +605,9 @@ describe('Phase 2 — product-lens handoff consumption', () => {
         ],
       },
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
 
@@ -706,16 +709,16 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       match: 'product-lens Non-Functional Requirements Bloom',
       parsedJson: { requirements: [{ id: 'NFR-1', category: 'security', description: 'd', threshold: 't', measurement_method: 'm', traces_to: ['VV-1'] }] },
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     // Wire both routing roles to ollama so the audit call also routes
     // through the mock provider.
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
     const cfg = engine.configManager.get();
     cfg.llm_routing.reasoning_review = {
-      primary: { provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.2,
     };
     cfg.decomposition.reasoning_review_on_tier_c = true;
@@ -795,9 +798,9 @@ describe('Phase 2 — product-lens handoff consumption', () => {
         surfaced_assumptions: [],
       },
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
 
@@ -870,9 +873,9 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       match: 'product-lens Non-Functional Requirements Bloom',
       parsedJson: { requirements: [{ id: 'NFR-1', category: 'security', description: 'd', threshold: 't', measurement_method: 'm', traces_to: ['VV-1'] }] },
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
 
@@ -944,10 +947,21 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     async () => {
     // Integration test against a running ollama instance with the
     // qwen3-embedding:8b model. Skipped gracefully when ollama isn't
-    // reachable — the saturation loop's own error handling flows
-    // through and the assertion pivots on whether embeddings were
-    // actually produced. Requires `ollama serve` + `qwen3-embedding:8b`
-    // pulled locally.
+    // reachable. Requires `ollama serve` + `qwen3-embedding:8b` pulled
+    // locally. Vitest auto-installs a NoopEmbeddingClient (returns
+    // empty vectors) so we explicitly inject a real OllamaEmbeddingClient
+    // here — the live-ollama tag is the contract that this test bypasses
+    // the test-mode default.
+    const ollamaUrl = process.env.OLLAMA_URL ?? 'http://127.0.0.1:11434';
+    const reachable = await fetch(`${ollamaUrl}/api/tags`)
+      .then(r => r.ok)
+      .catch(() => false);
+    if (!reachable) {
+      console.warn(`[live-ollama] skipping — ${ollamaUrl} not reachable`);
+      return;
+    }
+    const { OllamaEmbeddingClient } = await import('../../../lib/llm/embeddings');
+    engine.setEmbeddingClientOverride(new OllamaEmbeddingClient({ baseUrl: ollamaUrl }));
     const mock = new MockLLMProvider();
     mock.setFixture('fr-product', {
       match: 'product-lens Functional Requirements Bloom',
@@ -985,9 +999,9 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       parsedJson: { requirements: [{ id: 'NFR-1', category: 'security', description: 'd', threshold: 't', measurement_method: 'm', traces_to: ['VV-1'] }] },
     });
 
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
 
@@ -1052,9 +1066,9 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       match: 'product-lens Non-Functional Requirements Bloom',
       parsedJson: { requirements: [{ id: 'NFR-001', category: 'security', description: 'd', threshold: 't', measurement_method: 'm', traces_to: ['VV-1'] }] },
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
 

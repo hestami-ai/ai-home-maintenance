@@ -1,0 +1,43 @@
+{
+  "$id": "janumicode:test_assumption_set_snapshot:1.0",
+  "title": "Test Assumption Set Snapshot",
+  "description": "Wave 10 — one record per test-decomposition pass capturing the cumulative testing-assumption set. Termination criterion: pass with delta_from_previous_pass === 0 means fixed-point reached.",
+  "type": "object",
+  "required": ["kind", "pass_number", "root_test_id", "assumptions", "delta_from_previous_pass"],
+  "properties": {
+    "kind": { "const": "test_assumption_set_snapshot" },
+    "pass_number": { "type": "integer", "minimum": 0 },
+    "root_test_id": { "type": "string" },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "source", "surfaced_at_pass", "category"],
+        "properties": {
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "source": { "type": "string", "enum": ["fr", "component", "decomposition", "human"] },
+          "surfaced_at_node": { "type": "string" },
+          "surfaced_at_pass": { "type": "integer", "minimum": 0 },
+          "category": {
+            "type": "string",
+            "enum": [
+              "preconditions",
+              "fixture_setup",
+              "oracle_choice",
+              "tooling",
+              "scope_boundary",
+              "flake_risk",
+              "open_question"
+            ]
+          },
+          "citations": { "type": "array", "items": { "type": "string" } },
+          "duplicate_of": { "type": "string" },
+          "duplicate_similarity": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "delta_from_previous_pass": { "type": "integer", "minimum": 0 },
+    "semantic_delta": { "type": "integer", "minimum": 0 }
+  }
+}

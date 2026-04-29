@@ -1,0 +1,43 @@
+{
+  "$id": "janumicode:task_assumption_set_snapshot:1.0",
+  "title": "Task Assumption Set Snapshot",
+  "description": "Wave 8 — one record per task-decomposition pass capturing the cumulative implementation-assumption set A_n. Termination criterion: pass N writes delta_from_previous_pass === 0 means the decomposition reached fixed-point. Distinct from Phase 2 / Phase 4.2a snapshots — these track implementation-level assumptions (sequencing, tooling, dependency direction, scope edges).",
+  "type": "object",
+  "required": ["kind", "pass_number", "root_task_id", "assumptions", "delta_from_previous_pass"],
+  "properties": {
+    "kind": { "const": "task_assumption_set_snapshot" },
+    "pass_number": { "type": "integer", "minimum": 0 },
+    "root_task_id": { "type": "string" },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "source", "surfaced_at_pass", "category"],
+        "properties": {
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "source": { "type": "string", "enum": ["component", "plan", "decomposition", "human"] },
+          "surfaced_at_node": { "type": "string" },
+          "surfaced_at_pass": { "type": "integer", "minimum": 0 },
+          "category": {
+            "type": "string",
+            "enum": [
+              "implementation_choice",
+              "sequencing",
+              "dependency",
+              "tooling",
+              "scope_boundary",
+              "integration_seam",
+              "open_question"
+            ]
+          },
+          "citations": { "type": "array", "items": { "type": "string" } },
+          "duplicate_of": { "type": "string" },
+          "duplicate_similarity": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "delta_from_previous_pass": { "type": "integer", "minimum": 0 },
+    "semantic_delta": { "type": "integer", "minimum": 0 }
+  }
+}

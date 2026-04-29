@@ -34,11 +34,11 @@ describe('AgentInvocationCard', () => {
   });
 
   it('shows model info in the body', () => {
-    const record = makeAgentInvocation({ model: 'qwen3.5:9b', provider: 'ollama' });
+    const record = makeAgentInvocation({ model: 'qwen3.5:9b', provider: 'llamacpp' });
     const { container, cleanup } = mountComponent(AgentInvocationCard, { record });
     try {
       expect($(container, '.inv-model')?.textContent).toContain('qwen3.5:9b');
-      expect($(container, '.inv-provider')?.textContent).toContain('ollama');
+      expect($(container, '.inv-provider')?.textContent).toContain('llamacpp');
     } finally {
       cleanup();
     }

@@ -33,7 +33,40 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
   decomposition_fr_calls_used     INTEGER DEFAULT 0,
   decomposition_nfr_calls_used    INTEGER DEFAULT 0,
   decomposition_max_depth_reached INTEGER DEFAULT 0,
-  active_release_plan_record_id   TEXT
+  active_release_plan_record_id   TEXT,
+  -- Wave 7 — Phase 4.2a recursive component decomposition telemetry.
+  -- Tracks per-run budget consumption + max depth reached across all
+  -- root components. Mirrors the FR/NFR pair above so a single
+  -- workflow_run_summary query can report saturation health for both
+  -- requirement and component trees side-by-side.
+  component_decomposition_budget_calls_used INTEGER DEFAULT 0,
+  component_decomposition_max_depth_reached INTEGER DEFAULT 0,
+  -- Pipeline id of the most recent Phase 4.2a saturation run. Webview
+  -- ComponentDecompositionPipelineCard uses this to surface the
+  -- canonical pipeline card without scanning the full governed_stream.
+  active_component_pipeline_id    TEXT,
+  -- Wave 8 — Phase 6.1a recursive task decomposition telemetry.
+  -- Mirrors the FR/NFR + component pairs above so workflow_run_summary
+  -- can report saturation health for all three tree types side-by-side.
+  task_decomposition_budget_calls_used INTEGER DEFAULT 0,
+  task_decomposition_max_depth_reached INTEGER DEFAULT 0,
+  active_task_pipeline_id         TEXT,
+  -- Wave 9 — Phase 5.1a recursive data-model decomposition telemetry.
+  data_model_decomposition_budget_calls_used INTEGER DEFAULT 0,
+  data_model_decomposition_max_depth_reached INTEGER DEFAULT 0,
+  active_data_model_pipeline_id   TEXT,
+  -- Wave 10 — Phase 7.1a recursive test decomposition telemetry.
+  test_decomposition_budget_calls_used INTEGER DEFAULT 0,
+  test_decomposition_max_depth_reached INTEGER DEFAULT 0,
+  active_test_pipeline_id         TEXT,
+  -- Wave R — Phase 9 release-plan execution scheduler telemetry.
+  -- Tracks current wave progress so resume from mid-wave knows
+  -- exactly where to pick up; quarantine counters surface known
+  -- gaps in the workflow_run summary.
+  current_execution_wave          INTEGER DEFAULT 0,
+  total_execution_waves           INTEGER DEFAULT 0,
+  quarantined_leaf_count          INTEGER DEFAULT 0,
+  terminally_deferred_leaf_count  INTEGER DEFAULT 0
 );
 
 -- ── Universal record store — the Governed Stream (lossless) ─────────

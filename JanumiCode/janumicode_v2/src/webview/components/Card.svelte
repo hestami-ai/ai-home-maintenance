@@ -18,6 +18,13 @@
   import DecompositionNodeCard from './DecompositionNodeCard.svelte';
   import AssumptionSnapshotCard from './AssumptionSnapshotCard.svelte';
   import DecompositionPipelineCard from './DecompositionPipelineCard.svelte';
+  import ComponentDecompositionNodeCard from './ComponentDecompositionNodeCard.svelte';
+  import ComponentDecompositionPipelineCard from './ComponentDecompositionPipelineCard.svelte';
+  import TaskDecompositionNodeCard from './TaskDecompositionNodeCard.svelte';
+  import TaskDecompositionPipelineCard from './TaskDecompositionPipelineCard.svelte';
+  import ExecutionWaveCard from './ExecutionWaveCard.svelte';
+  import QuarantineLedgerCard from './QuarantineLedgerCard.svelte';
+  import ReasoningReviewCard from './ReasoningReviewCard.svelte';
 
   interface Props {
     record: SerializedRecord;
@@ -146,6 +153,28 @@
   // hidden so only the latest pipeline card appears.
   const isSupersededPipeline = $derived(recordsStore.isSupersededDecompositionPipeline(record));
   const isOwnedByPipeline = $derived(recordsStore.isOwnedByDecompositionPipeline(record));
+
+  // Wave 7 — same pattern for the component-decomposition pipeline.
+  const isSupersededComponentPipeline = $derived(
+    recordsStore.isSupersededComponentDecompositionPipeline(record),
+  );
+  const isOwnedByComponentPipeline = $derived(recordsStore.isOwnedByComponentPipeline(record));
+  // Non-root component decomposition nodes render nested inside the
+  // pipeline card / root card; suppress them at top level.
+  const isNonRootComponentDecomp = $derived(
+    record.record_type === 'component_decomposition_node'
+    && (record.content as { depth?: number }).depth !== 0,
+  );
+
+  // Wave 8 — same pattern for the task-decomposition pipeline.
+  const isSupersededTaskPipeline = $derived(
+    recordsStore.isSupersededTaskDecompositionPipeline(record),
+  );
+  const isOwnedByTaskPipeline = $derived(recordsStore.isOwnedByTaskPipeline(record));
+  const isNonRootTaskDecomp = $derived(
+    record.record_type === 'task_decomposition_node'
+    && (record.content as { depth?: number }).depth !== 0,
+  );
 </script>
 
 <!-- Agent child records: skip at top level (rendered nested by AgentInvocationCard) -->
@@ -182,6 +211,77 @@
 {:else if record.record_type === 'assumption_set_snapshot'}
   <div data-record-id={record.id} data-phase-id={record.phase_id}>
     <AssumptionSnapshotCard {record} />
+  </div>
+<!-- Wave 7: superseded component pipeline + owned children render nested -->
+{:else if isSupersededComponentPipeline}
+  <!-- deliberately empty — only the latest component pipeline record renders -->
+{:else if isOwnedByComponentPipeline}
+  <!-- deliberately empty — rendered inside ComponentDecompositionPipelineCard -->
+{:else if isNonRootComponentDecomp}
+  <!-- deliberately empty — non-root component nodes render nested inside the root card -->
+<!-- Wave 7: component decomposition pipeline composite (latest per pipeline_id) -->
+{:else if record.record_type === 'component_decomposition_pipeline'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <ComponentDecompositionPipelineCard {record} />
+  </div>
+<!-- Wave 7: component decomposition root (depth-0) when no pipeline card exists -->
+{:else if record.record_type === 'component_decomposition_node'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <ComponentDecompositionNodeCard {record} />
+  </div>
+<!-- Wave 7: component assumption snapshot per saturation pass -->
+{:else if record.record_type === 'component_assumption_set_snapshot'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <AssumptionSnapshotCard {record} />
+  </div>
+<!-- Wave 8: superseded task pipeline + owned children render nested -->
+{:else if isSupersededTaskPipeline}
+  <!-- deliberately empty — only the latest task pipeline record renders -->
+{:else if isOwnedByTaskPipeline}
+  <!-- deliberately empty — rendered inside TaskDecompositionPipelineCard -->
+{:else if isNonRootTaskDecomp}
+  <!-- deliberately empty — non-root task nodes render nested inside the root card -->
+<!-- Wave 8: task decomposition pipeline composite (latest per pipeline_id) -->
+{:else if record.record_type === 'task_decomposition_pipeline'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <TaskDecompositionPipelineCard {record} />
+  </div>
+<!-- Wave 8: task decomposition root (depth-0) when no pipeline card exists -->
+{:else if record.record_type === 'task_decomposition_node'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <TaskDecompositionNodeCard {record} />
+  </div>
+<!-- Wave 8: task assumption snapshot per saturation pass -->
+{:else if record.record_type === 'task_assumption_set_snapshot'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <AssumptionSnapshotCard {record} />
+  </div>
+<!-- Wave R: execution-wave start/complete cards -->
+{:else if record.record_type === 'execution_wave_started' || record.record_type === 'execution_wave_completed'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <ExecutionWaveCard {record} />
+  </div>
+<!-- Wave R: per-leaf quarantine ledger entry -->
+{:else if record.record_type === 'task_quarantine'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <QuarantineLedgerCard {record} />
+  </div>
+<!-- Wave 9: data-model decomposition records fall through to the
+     generic card renderer. A dedicated tree card can be added later
+     once Wave 9 calibration evidence shows what visual treatment helps. -->
+<!-- Wave 10: test decomposition records also fall through to generic. -->
+{:else if record.record_type === 'test_assumption_set_snapshot'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <AssumptionSnapshotCard {record} />
+  </div>
+<!-- Reasoning review card. When the parent agent_invocation is in view,
+     isChildOfInvocation suppresses this at top-level (it renders nested
+     inside AgentInvocationCard next to its reviewed agent_output). When
+     the invocation isn't in view (e.g. older agent fell out of pagination
+     window), the review still appears as a standalone card. -->
+{:else if record.record_type === 'reasoning_review_record'}
+  <div data-record-id={record.id} data-phase-id={record.phase_id}>
+    <ReasoningReviewCard {record} />
   </div>
 <!-- Agent invocation card (always expanded, owns its children) -->
 {:else if record.record_type === 'agent_invocation'}

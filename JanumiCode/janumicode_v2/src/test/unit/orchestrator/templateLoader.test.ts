@@ -20,7 +20,10 @@ describe('TemplateLoader', () => {
       const template = loader.getTemplate('cross_cutting/reasoning_review.system');
       expect(template).not.toBeNull();
       expect(template!.metadata.agent_role).toBe('reasoning_review');
-      expect(template!.metadata.required_variables).toContain('trace_selection');
+      // Unified template has no required variables — system prompt is
+      // static and the user message is built programmatically by the
+      // reviewer module from (prompt, thinking, response).
+      expect(template!.metadata.required_variables).toEqual([]);
     });
 
     it('loads intent quality check template', () => {

@@ -40,7 +40,11 @@ export class OllamaEmbeddingClient implements EmbeddingClient {
 
   async embed(inputs: string[], options?: { signal?: AbortSignal }): Promise<number[][]> {
     if (inputs.length === 0) return [];
-    const body = JSON.stringify({ model: this.model, input: inputs });
+    // Pass num_ctx explicitly. qwen3-embedding:8b is calibrated for
+    // 40960-token context per the cal-24 spec; relying on the model's
+    // template default risks silently truncating long assumption-set
+    // texts during dedup.
+    const body = JSON.stringify({ model: this.model, input: inputs, options: { num_ctx: 40960 } });
     const url = new URL('/api/embed', this.baseUrl);
     const client = url.protocol === 'https:' ? https : http;
     // Connection + idle timeouts. The request fails fast when ollama
@@ -121,6 +125,117 @@ export class OllamaEmbeddingClient implements EmbeddingClient {
       req.end();
     });
   }
+}
+
+/**
+ * llama-server / llama-swap embedding client. Posts to the OpenAI-
+ * compatible `/v1/embeddings` endpoint (`{model, input}` body, returns
+ * `{data: [{embedding: number[]}]}`). Used when calibration / production
+ * routes embeddings through llama-swap to keep ONE backend serving
+ * chat + embeddings (avoids fighting Ollama for VRAM mid-run).
+ */
+export class LlamacppEmbeddingClient implements EmbeddingClient {
+  private readonly baseUrl: string;
+  private readonly model: string;
+
+  constructor(opts?: { baseUrl?: string; model?: string }) {
+    this.baseUrl = opts?.baseUrl
+      ?? process.env.JANUMICODE_EMBED_BASE_URL
+      ?? process.env.JANUMICODE_EMBEDDING_URL
+      ?? process.env.LLAMACPP_URL
+      ?? 'http://127.0.0.1:11435';
+    this.model = opts?.model
+      ?? process.env.JANUMICODE_EMBED_MODEL
+      ?? process.env.JANUMICODE_EMBEDDING_MODEL
+      ?? 'qwen3-embedding-8b';
+  }
+
+  async embed(inputs: string[], options?: { signal?: AbortSignal }): Promise<number[][]> {
+    if (inputs.length === 0) return [];
+    const url = `${this.baseUrl.replace(/\/+$/, '')}/v1/embeddings`;
+    const idleTimeoutMs = Number.parseInt(
+      process.env.JANUMICODE_EMBEDDING_IDLE_TIMEOUT_MS ?? '180000', 10);
+    // Some llama-server builds reject array `input` with model-load
+    // races; iterate one at a time, which also matches how
+    // EmbeddingService is wired and keeps signal aborts crisp.
+    const out: number[][] = [];
+    for (const text of inputs) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), idleTimeoutMs);
+      const onAbort = () => ctrl.abort();
+      options?.signal?.addEventListener('abort', onAbort, { once: true });
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: this.model, input: text }),
+          signal: ctrl.signal,
+        });
+        if (!res.ok) {
+          throw new Error(`llamacpp embedding HTTP ${res.status}: ${await res.text()}`);
+        }
+        const json = await res.json() as { data?: Array<{ embedding?: number[] }> };
+        const emb = json.data?.[0]?.embedding;
+        if (!Array.isArray(emb)) {
+          throw new Error('llamacpp embedding response missing data[0].embedding');
+        }
+        out.push(emb);
+      } finally {
+        clearTimeout(timer);
+        options?.signal?.removeEventListener('abort', onAbort);
+      }
+    }
+    return out;
+  }
+}
+
+/**
+ * No-op embedding client. Returns empty vectors so cosineSimilarity
+ * yields NaN and findNearestAbove flags zero duplicates — the
+ * saturation loop's dedup pass becomes a deterministic no-op without
+ * any network call. Used by vitest and any environment where
+ * embedding-backed dedup isn't appropriate (no Ollama / no llama-swap
+ * reachable). Distinct from "dedup disabled" via env: this still
+ * exercises the dedup code path so tests cover that branch, just
+ * without blocking on a network round-trip.
+ */
+export class NoopEmbeddingClient implements EmbeddingClient {
+  async embed(inputs: string[]): Promise<number[][]> {
+    return inputs.map(() => []);
+  }
+}
+
+/**
+ * Resolve the embedding client to use for saturation-loop dedup. Reads
+ * env vars set by the calibration harness (or production config) so a
+ * single switch flips every saturation loop's embedding backend in one
+ * place. Resolution order (first match wins):
+ *
+ *   1. Vitest sets `VITEST=true` automatically; never make network
+ *      calls during the test suite. Returns NoopEmbeddingClient.
+ *      Tests that need real embedding semantics inject a mock via
+ *      `engine.setEmbeddingClientOverride()` instead.
+ *   2. `JANUMICODE_EMBED_PROVIDER=noop` → NoopEmbeddingClient (explicit
+ *      escape hatch for environments without a reachable embedder).
+ *   3. `JANUMICODE_EMBED_PROVIDER=llamacpp` → LlamacppEmbeddingClient
+ *      (calibration / production with llama-swap serving everything).
+ *   4. `JANUMICODE_EMBED_PROVIDER=ollama` → OllamaEmbeddingClient.
+ *   5. Fallback → OllamaEmbeddingClient (preserves prior default).
+ *
+ * Tests that supply a mock via `engine.setEmbeddingClientOverride()`
+ * bypass this factory entirely.
+ */
+export function createEmbeddingClient(): EmbeddingClient {
+  if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') {
+    return new NoopEmbeddingClient();
+  }
+  const provider = (process.env.JANUMICODE_EMBED_PROVIDER
+    ?? process.env.JANUMICODE_EMBEDDING_PROVIDER
+    ?? '').toLowerCase().trim();
+  if (provider === 'noop') return new NoopEmbeddingClient();
+  if (provider === 'llamacpp') return new LlamacppEmbeddingClient();
+  if (provider === 'ollama') return new OllamaEmbeddingClient();
+  return new OllamaEmbeddingClient();
 }
 
 // ── Similarity math ────────────────────────────────────────────────

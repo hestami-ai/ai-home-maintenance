@@ -21,7 +21,7 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
   context_assembly: {
     cli_agents: {
       stdin_max_tokens: 8000,
-      detail_file_path_template: '.janumicode/context/{sub_phase_id}_{invocation_id}.md',
+      detail_file_path_template: '.janumicode/runs/{workflow_run_id}/context/{sub_phase_id}_{invocation_id}.md',
       detail_file_cleanup: 'archive_after_phase_gate',
       detail_file_max_bytes: 10_485_760,
       governing_constraints_always_in_stdin: true,
@@ -30,7 +30,7 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
   },
 
   invariant_library: {
-    path: '.janumicode/schemas/invariants',
+    path: 'schemas/invariants',
     run_before_reasoning_review: true,
     blocking_violation_action: 'quarantine_and_retry_with_violation',
   },
@@ -71,6 +71,48 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     fanout_cap: 8,
     mirror_gate_depth: 2,
     reasoning_review_on_tier_c: false,
+    // Wave 7 component-tree caps — see configManager.ts for rationale.
+    component_depth_cap: 6,
+    component_budget_cap: 200,
+    component_fanout_cap: 12,
+    component_mirror_gate_depth: 2,
+    component_reasoning_review_on_tier_c: false,
+    // Wave 8 task-tree caps — tasks fan out per component-leaf, so the
+    // budget covers the whole run, depth is shallow because tasks are
+    // already finer-grained than components, and fanout is moderate
+    // (most components yield 2–6 stories).
+    task_depth_cap: 5,
+    task_budget_cap: 250,
+    task_fanout_cap: 10,
+    task_mirror_gate_depth: 2,
+    task_reasoning_review_on_tier_c: false,
+    // Wave 9 data-model caps.
+    data_model_depth_cap: 4,
+    data_model_budget_cap: 150,
+    data_model_fanout_cap: 10,
+    data_model_mirror_gate_depth: 2,
+    data_model_reasoning_review_on_tier_c: false,
+    // Wave 10 recursive test caps.
+    test_depth_cap: 6,
+    test_budget_cap: 250,
+    test_fanout_cap: 10,
+    test_mirror_gate_depth: 2,
+    test_reasoning_review_on_tier_c: false,
+  },
+
+  execution: {
+    leaf_retry_budget: 3,
+    deferred_retry_budget: 2,
+    workspace_mode: 'in_place' as const,
+    auto_approve_wave_gates: false,
+    merge_conflict_default_strategy: 'manual' as const,
+    unattended_skip_permissions: false,
+    tests_per_leaf: {
+      enabled: true,
+      test_command_resolution: 'package_json_scripts' as const,
+      timeout_ms: 120_000,
+    },
+    wave_reasoning_review_on_gate: false,
   },
 
   llm_routing: {
@@ -79,11 +121,11 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
       temperature: 0.3,
     },
     domain_interpreter: {
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     },
     requirements_agent: {
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     },
     reasoning_review: {

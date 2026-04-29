@@ -162,7 +162,7 @@ export class ConsistencyChecker {
 
   /**
    * Semantic consistency — LLM-powered reasoning.
-   * Prompt loaded from .janumicode/prompts/cross_cutting/consistency_checker_semantic.system.md
+   * Prompt loaded from prompts/cross_cutting/consistency_checker_semantic.system.md
    */
   private async checkSemanticConsistency(
     input: ConsistencyCheckInput,

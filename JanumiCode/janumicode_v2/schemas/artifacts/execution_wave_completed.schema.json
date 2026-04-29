@@ -1,0 +1,41 @@
+{
+  "$id": "janumicode:execution_wave_completed:1.0",
+  "title": "Execution Wave Completed",
+  "description": "Wave R — emitted when an execution wave finishes (independent of gate decision). Carries success / quarantine / rejected counts, file-write summary, test summary, reasoning_review-flaw summary.",
+  "type": "object",
+  "required": ["kind", "wave_number", "release_id", "wave_kind", "leaf_count", "successful_count", "quarantined_count", "completed_at"],
+  "properties": {
+    "kind": { "const": "execution_wave_completed" },
+    "wave_number": { "type": "integer", "minimum": 1 },
+    "release_id": { "type": ["string", "null"] },
+    "release_ordinal": { "type": ["integer", "null"], "minimum": 1 },
+    "release_name": { "type": "string" },
+    "wave_kind": { "type": "string", "enum": ["release", "deferred_batch", "single"] },
+    "leaf_count": { "type": "integer", "minimum": 0 },
+    "successful_count": { "type": "integer", "minimum": 0 },
+    "quarantined_count": { "type": "integer", "minimum": 0 },
+    "rescued_count": { "type": "integer", "minimum": 0 },
+    "skipped_count": { "type": "integer", "minimum": 0 },
+    "started_at": { "type": "string" },
+    "completed_at": { "type": "string" },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "files_written_count": { "type": "integer", "minimum": 0 },
+    "files_modified_count": { "type": "integer", "minimum": 0 },
+    "files_deleted_count": { "type": "integer", "minimum": 0 },
+    "test_summary": {
+      "type": "object",
+      "properties": {
+        "total_passed": { "type": "integer", "minimum": 0 },
+        "total_failed": { "type": "integer", "minimum": 0 },
+        "total_skipped": { "type": "integer", "minimum": 0 },
+        "leaves_with_failing_tests": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "reasoning_review_summary": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "successful_leaf_ids": { "type": "array", "items": { "type": "string" } },
+    "quarantined_leaf_ids": { "type": "array", "items": { "type": "string" } }
+  }
+}

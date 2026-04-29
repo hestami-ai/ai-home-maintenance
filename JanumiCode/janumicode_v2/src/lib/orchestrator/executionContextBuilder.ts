@@ -234,7 +234,7 @@ export class ExecutionContextBuilder {
       governingConstraints: this.buildGoverningConstraints(task, artifacts.adrs),
       requiredOutputSpec: this.buildRequiredOutputSpec(task),
       summaryContext: this.buildSummaryContext(task, artifacts),
-      detailFileReference: `Full context available in detail file at .janumicode/context/9.1_${invocationId}.md`,
+      detailFileReference: `Full context available in detail file at .janumicode/runs/${workflowRunId}/context/9.1_${task.id}_${invocationId}.md`,
       invariantViolations: retryContext?.invariantViolations,
       reasoningReviewFindings: retryContext?.reasoningReviewFindings,
     };
@@ -260,6 +260,7 @@ export class ExecutionContextBuilder {
       invocationId,
       stdinContent,
       detailContent,
+      workflowRunId,
     );
   }
 

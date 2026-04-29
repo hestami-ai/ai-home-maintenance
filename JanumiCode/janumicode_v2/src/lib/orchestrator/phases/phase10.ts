@@ -75,13 +75,16 @@ export class Phase10Handler implements PhaseHandler {
     // ── 10.3 — Workflow Run Closure ───────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '10.3');
 
-    const allArtifacts = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
-    const decisionTraces = engine.writer.getRecordsByType(workflowRun.id, 'decision_trace');
+    // Use narrow queries here — a long calibration run produces thousands
+    // of artifact_produced rows totalling tens of MB. Pulling the full
+    // bodies through the sidecar RPC SAB (32MB cap) overflows it and
+    // surfaces as "RPC error: offset is out of bounds" right at workflow
+    // closure (observed end of cal-23). We only need cardinalities + the
+    // single intent_statement record here.
+    const artifactsCount = engine.writer.countRecordsByType(workflowRun.id, 'artifact_produced');
+    const decisionTracesCount = engine.writer.countRecordsByType(workflowRun.id, 'decision_trace');
 
-    // Get intent statement summary
-    const intentRecord = allArtifacts.find(
-      r => (r.content as Record<string, unknown>).kind === 'intent_statement',
-    );
+    const intentRecord = engine.writer.getArtifactByKind(workflowRun.id, 'intent_statement');
     const intentContent = intentRecord?.content as Record<string, unknown> | undefined;
     const intentSummary = intentContent
       ? `${(intentContent.product_concept as Record<string, unknown>)?.name ?? 'Unknown'}: ${(intentContent.product_concept as Record<string, unknown>)?.description ?? ''}`.slice(0, 300)
@@ -100,8 +103,8 @@ export class Phase10Handler implements PhaseHandler {
         kind: 'workflow_run_summary',
         run_id: workflowRun.id,
         intent_statement_summary: intentSummary,
-        key_decisions: decisionTraces.length,
-        artifacts_produced: allArtifacts.length,
+        key_decisions: decisionTracesCount,
+        artifacts_produced: artifactsCount,
         janumicode_version_sha: engine.janumiCodeVersionSha,
         completion_timestamp: new Date().toISOString(),
       },
@@ -113,7 +116,7 @@ export class Phase10Handler implements PhaseHandler {
     const closureMirror = engine.mirrorGenerator.generate({
       artifactId: summaryRecord.id,
       artifactType: 'workflow_run_summary',
-      content: { artifacts_produced: allArtifacts.length, key_decisions: decisionTraces.length },
+      content: { artifacts_produced: artifactsCount, key_decisions: decisionTracesCount },
     });
 
     const mirrorRecord = engine.writer.writeRecord({

@@ -20,7 +20,7 @@ describe('activityStore — summary transitions', () => {
 
   it('reports the current call label while running', () => {
     activityStore.handleStarted({
-      provider: 'ollama',
+      provider: 'llamacpp',
       lane: 'phase',
       label: 'DMR Stage 1 — Query Decomposition',
       agentRole: 'deep_memory_research',
@@ -32,13 +32,13 @@ describe('activityStore — summary transitions', () => {
 
   it('falls back to "<provider> (<lane>)" when label is null', () => {
     activityStore.handleStarted({
-      provider: 'ollama',
+      provider: 'llamacpp',
       lane: 'user_query',
       label: null,
       agentRole: null,
       subPhaseId: null,
     });
-    expect(activityStore.summary).toBe('ollama (user_query)');
+    expect(activityStore.summary).toBe('llamacpp (user_query)');
   });
 
   it('reports queue depth when idle but work is pending', () => {
@@ -48,7 +48,7 @@ describe('activityStore — summary transitions', () => {
 
   it('shows "Done — <label>" briefly after finish, then decays', () => {
     activityStore.handleStarted({
-      provider: 'ollama',
+      provider: 'llamacpp',
       lane: 'phase',
       label: 'Phase 1.2 — Bloom',
       agentRole: null,
@@ -69,7 +69,7 @@ describe('activityStore — summary transitions', () => {
   it('handleFinished decrements the queue depth', () => {
     activityStore.handleQueued(2);
     activityStore.handleStarted({
-      provider: 'ollama', lane: 'phase', label: 'A', agentRole: null, subPhaseId: null,
+      provider: 'llamacpp', lane: 'phase', label: 'A', agentRole: null, subPhaseId: null,
     });
     activityStore.handleFinished({ label: 'A', agentRole: null });
     expect(activityStore.queueDepth).toBe(1);
@@ -77,7 +77,7 @@ describe('activityStore — summary transitions', () => {
 
   it('handleFinished floors the queue depth at 0 (defensive against drift)', () => {
     activityStore.handleStarted({
-      provider: 'ollama', lane: 'phase', label: 'solo', agentRole: null, subPhaseId: null,
+      provider: 'llamacpp', lane: 'phase', label: 'solo', agentRole: null, subPhaseId: null,
     });
     activityStore.handleFinished({ label: 'solo', agentRole: null });
     expect(activityStore.queueDepth).toBe(0);

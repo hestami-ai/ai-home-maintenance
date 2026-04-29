@@ -53,7 +53,7 @@ describe('AgentInvocationCard — prompt + CLI visibility', () => {
   it('renders the prompt in a PROMPT section for LLM invocations', () => {
     resetStore();
     const record = makeInvocation({
-      provider: 'ollama',
+      provider: 'llamacpp',
       model: 'qwen3.5:9b',
       prompt: 'Classify this intent.',
       system: null,
@@ -196,7 +196,7 @@ describe('AgentInvocationCard — collapsibility defaults', () => {
   it('renders PROMPT, SYSTEM, and THINKING as collapsed <details> with a +/- toggle', () => {
     resetStore();
     const record = makeInvocation({
-      provider: 'ollama',
+      provider: 'llamacpp',
       model: 'qwen3.5:9b',
       prompt: 'Classify this intent.',
       system: 'You are an analyst.',

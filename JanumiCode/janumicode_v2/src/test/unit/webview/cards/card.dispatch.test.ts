@@ -13,7 +13,7 @@ describe('Card.svelte dispatch', () => {
   it('routes agent_invocation to AgentInvocationCard', () => {
     const record = makeFakeRecord({
       record_type: 'agent_invocation',
-      content: { provider: 'ollama', model: 'qwen3.5:9b', status: 'running', label: 'Test Call' },
+      content: { provider: 'llamacpp', model: 'qwen3.5:9b', status: 'running', label: 'Test Call' },
     });
     const { container, cleanup } = mountComponent(Card, { record });
     try {

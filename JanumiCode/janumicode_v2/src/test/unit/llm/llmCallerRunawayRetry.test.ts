@@ -25,7 +25,7 @@ function providerThatFailsThenSucceeds(
 ): { provider: LLMProviderAdapter; getCount: () => number } {
   let callCount = 0;
   const provider: LLMProviderAdapter = {
-    name: 'ollama',
+    name: 'llamacpp',
     async call(options: LLMCallOptions): Promise<LLMCallResult> {
       callCount++;
       if (callCount <= failCount) throw failures;
@@ -50,7 +50,7 @@ describe('LLMCaller — runaway-thinking retry semantics', () => {
     const { provider, getCount } = providerThatFailsThenSucceeds(err, 2);
     caller.registerProvider(provider);
 
-    const result = await caller.call({ provider: 'ollama', model: 'test', prompt: 'test' });
+    const result = await caller.call({ provider: 'llamacpp', model: 'test', prompt: 'test' });
     expect(result.text).toBe('recovered');
     expect(getCount()).toBe(3); // 2 failures + 1 success
     expect(result.retryAttempts).toBe(2);
@@ -60,7 +60,7 @@ describe('LLMCaller — runaway-thinking retry semantics', () => {
     const caller = new LLMCaller({ maxRetries: 2 });
     let callCount = 0;
     const provider: LLMProviderAdapter = {
-      name: 'ollama',
+      name: 'llamacpp',
       async call() {
         callCount++;
         throw new LLMError(
@@ -70,7 +70,7 @@ describe('LLMCaller — runaway-thinking retry semantics', () => {
     };
     caller.registerProvider(provider);
 
-    await expect(caller.call({ provider: 'ollama', model: 'test', prompt: 'test' })).rejects.toMatchObject({
+    await expect(caller.call({ provider: 'llamacpp', model: 'test', prompt: 'test' })).rejects.toMatchObject({
       name: 'LLMError',
       errorType: 'runaway_thinking',
     });
@@ -81,7 +81,7 @@ describe('LLMCaller — runaway-thinking retry semantics', () => {
     const caller = new LLMCaller({ maxRetries: 3 });
     let callCount = 0;
     const provider: LLMProviderAdapter = {
-      name: 'ollama',
+      name: 'llamacpp',
       async call() {
         callCount++;
         throw new LLMError('context length exceeded', 'context_exceeded', 400, false);
@@ -89,7 +89,7 @@ describe('LLMCaller — runaway-thinking retry semantics', () => {
     };
     caller.registerProvider(provider);
 
-    await expect(caller.call({ provider: 'ollama', model: 'test', prompt: 'test' })).rejects.toMatchObject({
+    await expect(caller.call({ provider: 'llamacpp', model: 'test', prompt: 'test' })).rejects.toMatchObject({
       errorType: 'context_exceeded',
     });
     expect(callCount).toBe(1); // no retry

@@ -230,6 +230,102 @@ export class GovernedStreamWriter {
   }
 
   /**
+   * Wave 7 — supersede a component decomposition node by its logical
+   * UUID. Mirrors the FR variant above. Separate method (rather than
+   * generalized record_type parameter) keeps the existing FR behavior
+   * untouched while Wave 7 calibrates; a future consolidation can fold
+   * them together.
+   */
+  supersedeComponentDecompositionNodeByLogicalId(
+    workflowRunId: string,
+    logicalNodeId: string,
+    supersedingRecordId: string,
+  ): void {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      UPDATE governed_stream
+         SET is_current_version = 0,
+             superseded_by_id = ?,
+             superseded_at = ?
+       WHERE workflow_run_id = ?
+         AND record_type = 'component_decomposition_node'
+         AND is_current_version = 1
+         AND id != ?
+         AND json_extract(content, '$.node_id') = ?
+    `).run(supersedingRecordId, now, workflowRunId, supersedingRecordId, logicalNodeId);
+  }
+
+  /**
+   * Wave 8 — supersede a task decomposition node by its logical UUID.
+   * Mirrors the FR / component variants. Separate method (rather than
+   * generalized record_type parameter) keeps the existing FR / component
+   * behavior untouched while Wave 8 calibrates.
+   */
+  supersedeTaskDecompositionNodeByLogicalId(
+    workflowRunId: string,
+    logicalNodeId: string,
+    supersedingRecordId: string,
+  ): void {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      UPDATE governed_stream
+         SET is_current_version = 0,
+             superseded_by_id = ?,
+             superseded_at = ?
+       WHERE workflow_run_id = ?
+         AND record_type = 'task_decomposition_node'
+         AND is_current_version = 1
+         AND id != ?
+         AND json_extract(content, '$.node_id') = ?
+    `).run(supersedingRecordId, now, workflowRunId, supersedingRecordId, logicalNodeId);
+  }
+
+  /**
+   * Wave 9 — supersede a data-model decomposition node by its logical
+   * UUID. Mirrors the FR / component / task variants.
+   */
+  supersedeDataModelDecompositionNodeByLogicalId(
+    workflowRunId: string,
+    logicalNodeId: string,
+    supersedingRecordId: string,
+  ): void {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      UPDATE governed_stream
+         SET is_current_version = 0,
+             superseded_by_id = ?,
+             superseded_at = ?
+       WHERE workflow_run_id = ?
+         AND record_type = 'data_model_decomposition_node'
+         AND is_current_version = 1
+         AND id != ?
+         AND json_extract(content, '$.node_id') = ?
+    `).run(supersedingRecordId, now, workflowRunId, supersedingRecordId, logicalNodeId);
+  }
+
+  /**
+   * Wave 10 — supersede a test decomposition node by its logical UUID.
+   */
+  supersedeTestDecompositionNodeByLogicalId(
+    workflowRunId: string,
+    logicalNodeId: string,
+    supersedingRecordId: string,
+  ): void {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      UPDATE governed_stream
+         SET is_current_version = 0,
+             superseded_by_id = ?,
+             superseded_at = ?
+       WHERE workflow_run_id = ?
+         AND record_type = 'test_decomposition_node'
+         AND is_current_version = 1
+         AND id != ?
+         AND json_extract(content, '$.node_id') = ?
+    `).run(supersedingRecordId, now, workflowRunId, supersedingRecordId, logicalNodeId);
+  }
+
+  /**
    * Mark a record as semantically superseded (across workflow runs).
    */
   semanticSupersession(recordId: string, supersededByRecordId: string): void {
@@ -270,6 +366,49 @@ export class GovernedStreamWriter {
     ).all(workflowRunId, recordType) as Record<string, unknown>[];
 
     return rows.map(row => this.rowToRecord(row));
+  }
+
+  /**
+   * Count records of a given type for a workflow run. Use this when only
+   * the cardinality is needed (e.g. Phase 10 closure summary). Loading
+   * full bodies via getRecordsByType for thousands of rows can overflow
+   * the sidecar SAB bridge (32MB) and surface as
+   * "RPC error: offset is out of bounds".
+   */
+  countRecordsByType(
+    workflowRunId: string,
+    recordType: RecordType,
+    currentVersionOnly = true,
+  ): number {
+    const whereClause = currentVersionOnly
+      ? 'WHERE workflow_run_id = ? AND record_type = ? AND is_current_version = 1'
+      : 'WHERE workflow_run_id = ? AND record_type = ?';
+    const row = this.db.prepare(
+      `SELECT COUNT(*) AS n FROM governed_stream ${whereClause}`
+    ).get(workflowRunId, recordType) as { n: number } | undefined;
+    return row?.n ?? 0;
+  }
+
+  /**
+   * Fetch a single artifact_produced record by its content.kind. Returns
+   * the most recent matching row (current version). Narrower than
+   * getRecordsByType for callers that only need one specific artifact
+   * (e.g. intent_statement) without paying the bulk-load cost.
+   */
+  getArtifactByKind(
+    workflowRunId: string,
+    kind: string,
+  ): GovernedStreamRecord | null {
+    const row = this.db.prepare(
+      `SELECT * FROM governed_stream
+       WHERE workflow_run_id = ?
+         AND record_type = 'artifact_produced'
+         AND is_current_version = 1
+         AND json_extract(content, '$.kind') = ?
+       ORDER BY produced_at DESC
+       LIMIT 1`
+    ).get(workflowRunId, kind) as Record<string, unknown> | undefined;
+    return row ? this.rowToRecord(row) : null;
   }
 
   // ── Authority Level Assignment (§3.1) ──────────────────────────

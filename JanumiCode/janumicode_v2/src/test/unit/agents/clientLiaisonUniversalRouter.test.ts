@@ -110,7 +110,7 @@ describe('Retriever — DMR delegation (Phase 1)', () => {
       INSERT INTO workflow_runs (id, workspace_id, janumicode_version_sha, initiated_at, status)
       VALUES ('run-1', 'ws-1', 'abc', '2026-01-01T00:00:00Z', 'in_progress')
     `).run();
-    embedding = new EmbeddingService(db, { provider: 'ollama', model: 'x', maxParallel: 1 });
+    embedding = new EmbeddingService(db, { provider: 'llamacpp', model: 'x', maxParallel: 1 });
     cdb = new ClientLiaisonDBImpl(db, embedding);
   });
 
@@ -285,7 +285,7 @@ describe('getRecentConversationTurns (Phase 2b)', () => {
       VALUES ('run-1', 'ws-1', 'abc', '2026-01-01T00:00:00Z', 'in_progress')
     `).run();
     writer = new GovernedStreamWriter(db, testId);
-    embedding = new EmbeddingService(db, { provider: 'ollama', model: 'x', maxParallel: 1 });
+    embedding = new EmbeddingService(db, { provider: 'llamacpp', model: 'x', maxParallel: 1 });
     cdb = new ClientLiaisonDBImpl(db, embedding);
   });
 

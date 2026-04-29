@@ -12,6 +12,7 @@ import type { Database } from '../database/init';
 import { getLogger, createTraceContext, type TraceContext } from '../logging';
 import { StateMachine } from './stateMachine';
 import { GovernedStreamWriter } from './governedStreamWriter';
+import { runReasoningReview, shouldSkipReview, writeSkipRecord } from '../review/reasoningReviewer';
 import { SchemaValidator } from './schemaValidator';
 import { InvariantChecker } from './invariantChecker';
 import { TemplateLoader } from './templateLoader';
@@ -193,7 +194,7 @@ export class OrchestratorEngine {
     this.writer = new GovernedStreamWriter(db, () => randomUUID());
     this.schemaValidator = new SchemaValidator(extensionPath);
     this.invariantChecker = new InvariantChecker(
-      `${extensionPath}/.janumicode/schemas/invariants`,
+      `${extensionPath}/schemas/invariants`,
     );
     this.templateLoader = new TemplateLoader(extensionPath);
     this.contextBuilder = new ContextBuilder({
@@ -216,6 +217,65 @@ export class OrchestratorEngine {
     // to render. The writer's eventBus auto-emit forwards each record to
     // the webview as it lands, so the user sees agent activity live.
     this.llmCaller.setWriter(this.writer, this.versionSha);
+
+    // Wire reasoning-review on every successful agent_output. The hook
+    // runs synchronously after each LLM call so findings land in the
+    // governed_stream BEFORE the next phase scrolls them out of the
+    // user's attention. Self-review is short-circuited by the agentRole
+    // guard inside `shouldSkipReview` so we don't recurse forever.
+    //
+    // Auto-disabled in vitest: review issues a real LLM call which
+    // would either hit Ollama (network) or fail expectations counting
+    // governed_stream records. Same pattern as createEmbeddingClient.
+    // Explicit override: JANUMICODE_REVIEW_ENABLED=false disables in
+    // production runs (e.g. operator triage); =true forces it on in
+    // tests if a future test needs it.
+    const reviewEnabledFlag = process.env.JANUMICODE_REVIEW_ENABLED;
+    const reviewEnabled = reviewEnabledFlag === 'true'
+      ? true
+      : reviewEnabledFlag === 'false'
+        ? false
+        : process.env.VITEST !== 'true' && process.env.NODE_ENV !== 'test';
+    if (reviewEnabled) this.llmCaller.setReviewerHook(async (params) => {
+      const skip = shouldSkipReview(params.traceContext, params.result);
+      if (skip.skip) {
+        writeSkipRecord(
+          params.agentOutputId,
+          params.traceContext,
+          skip.reason,
+          this.writer,
+          this.versionSha,
+        );
+        return;
+      }
+      const routing = this.configManager.getLLMRouting().reasoning_review?.primary;
+      if (!routing?.provider || !routing?.model) {
+        // Reviewer not configured — write a skip record so coverage gaps
+        // are visible. Distinct from `self_review` so the operator can
+        // tell config issue from architectural skip.
+        writeSkipRecord(
+          params.agentOutputId,
+          params.traceContext,
+          'reasoning_review_routing_missing',
+          this.writer,
+          this.versionSha,
+        );
+        return;
+      }
+      await runReasoningReview(
+        params,
+        {
+          provider: routing.provider,
+          model: routing.model,
+          baseUrl: routing.base_url,
+          temperature: this.configManager.getLLMRouting().reasoning_review?.temperature,
+        },
+        this.llmCaller,
+        this.writer,
+        this.versionSha,
+        this.templateLoader,
+      );
+    });
 
     this.agentInvoker = new AgentInvoker(this.llmCaller, {
       timeoutSeconds: config.cli_invocation.timeout_seconds,
@@ -1064,7 +1124,7 @@ export class OrchestratorEngine {
  * Thinking-only events are excluded — they describe reasoning, not
  * the model's final answer, and would pollute a JSON parse attempt.
  */
-function extractFinalText(
+export function extractFinalText(
   events: ReadonlyArray<import('../cli/outputParser').ParsedEvent>,
 ): string {
   // Prefer the terminal result envelope (Claude Code).
@@ -1103,4 +1163,57 @@ function extractFinalText(
     }
   }
   return parts.join('');
+}
+
+/**
+ * Extract the agent's reasoning/thinking content from a CLI invocation's
+ * events. Concatenates any intermediate thinking, assistant-style
+ * messages, and reasoning steps — explicitly skips `tool_use` and
+ * `tool_result` events per the cal-24 design (tool-call output bloats
+ * the review prompt without surfacing reasoning flaws the reviewer can
+ * act on).
+ *
+ * Used by the reasoning-review hook in agentInvoker to populate the
+ * `thinking` channel for CLI-dispatched agents (Goose, Claude Code,
+ * Gemini, Codex). When the CLI emits no separable reasoning channel
+ * (e.g. Gemini plain text), the result is empty and the reviewer just
+ * sees prompt + final response.
+ */
+export function extractReasoningText(
+  events: ReadonlyArray<import('../cli/outputParser').ParsedEvent>,
+): string {
+  const parts: string[] = [];
+  // Track which events to exclude as the "final answer" so they're not
+  // double-counted (final answer goes in the `text` channel separately).
+  let lastResultIndex = -1;
+  let lastAgentMessageIndex = -1;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (lastResultIndex === -1 && e.data.type === 'result') {
+      lastResultIndex = i;
+    }
+    const item = (e.data as { item?: { type?: string } }).item;
+    if (lastAgentMessageIndex === -1 && e.data.type === 'item.completed' && item?.type === 'agent_message') {
+      lastAgentMessageIndex = i;
+    }
+  }
+  for (let i = 0; i < events.length; i++) {
+    if (i === lastResultIndex || i === lastAgentMessageIndex) continue;
+    const e = events[i];
+    const t = e.data.type;
+    // Tool-call activity — excluded per design.
+    if (t === 'tool_use' || t === 'tool_result' || t === 'tool_call') continue;
+    // Type-only event envelopes that carry no readable text.
+    if (t === 'result') continue;
+    // Reasoning / message text. The CLI parser normalizes thinking
+    // payloads into `text` / `content` so we read either.
+    const data = e.data as { text?: unknown; content?: unknown; thinking?: unknown };
+    const text = typeof data.text === 'string'
+      ? data.text
+      : (typeof data.content === 'string'
+        ? data.content
+        : (typeof data.thinking === 'string' ? data.thinking : ''));
+    if (text.trim().length > 0) parts.push(text);
+  }
+  return parts.join('\n');
 }

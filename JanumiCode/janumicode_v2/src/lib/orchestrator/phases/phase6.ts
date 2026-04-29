@@ -8,12 +8,19 @@
  *   6.3 — Approval (phase gate)
  */
 
+import { randomUUID } from 'node:crypto';
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
-import type { PhaseId } from '../../types/records';
+import type {
+  PhaseId,
+  TechnicalConstraint,
+  DecompositionTask,
+  TaskDecompositionNodeContent,
+} from '../../types/records';
 import { getLogger } from '../../logging';
-import { extractPriorPhaseContext } from './phaseContext';
+import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
+import { runTaskSaturationLoop } from './phase6_1a';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -60,7 +67,20 @@ export class Phase6Handler implements PhaseHandler {
     const allArtifacts = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
     const prior = extractPriorPhaseContext(allArtifacts);
 
-    const componentSummary = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${prior.componentModel?.summary ?? 'No component model available'}`;
+    // Wave 7 — prefer Phase 4.2a leaf components when available so the
+    // implementation planner sees the decomposed leaf set (one task per
+    // leaf+responsibility), not the coarse root component_model.
+    const componentDecompositionNodes = engine.writer.getRecordsByType(
+      workflowRun.id, 'component_decomposition_node',
+    );
+    const effectiveComponents = buildEffectiveComponentView(componentDecompositionNodes, prior);
+    if (effectiveComponents.source === 'leaves') {
+      getLogger().info('workflow', 'Phase 6: consuming Wave 7 component leaves', {
+        leafCount: effectiveComponents.leafCount,
+        rootCount: effectiveComponents.rootCount,
+      });
+    }
+    const componentSummary = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${effectiveComponents.summary || (prior.componentModel?.summary ?? 'No component model available')}`;
     const techSpecsSummary = [
       prior.dataModels?.summary ?? 'No data models',
       prior.apiDefinitions?.summary ?? 'No API definitions',
@@ -118,6 +138,96 @@ export class Phase6Handler implements PhaseHandler {
     });
     artifactIds.push(planRecord.id);
     engine.ingestionPipeline.ingest(planRecord);
+
+    // ── 6.1a — Recursive Task Decomposition (Wave 8) ──────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '6.1a');
+
+    const techConstraintsRecord = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced')
+      .find(r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery');
+    const technicalConstraints: TechnicalConstraint[] = techConstraintsRecord
+      ? (((techConstraintsRecord.content as Record<string, unknown>).technicalConstraints) as TechnicalConstraint[] ?? [])
+      : [];
+
+    // Resume guard — skip seeding when depth-0 nodes already exist.
+    const existingTaskRoots = engine.writer.getRecordsByType(workflowRun.id, 'task_decomposition_node')
+      .filter(r => (r.content as unknown as TaskDecompositionNodeContent).depth === 0);
+    let rootTasks: DecompositionTask[];
+    let rootNodeRecordIds: string[];
+    let rootLogicalIds: string[];
+    if (existingTaskRoots.length > 0) {
+      getLogger().info('workflow', 'Phase 6.1a RESUME: depth-0 task nodes already present', {
+        existingRoots: existingTaskRoots.length,
+      });
+      rootTasks = existingTaskRoots.map(r => (r.content as unknown as TaskDecompositionNodeContent).task);
+      rootNodeRecordIds = existingTaskRoots.map(r => r.id);
+      rootLogicalIds = existingTaskRoots.map(r => (r.content as unknown as TaskDecompositionNodeContent).node_id);
+    } else {
+      const constraintIds = technicalConstraints.map(t => t.id);
+      rootTasks = planContent.tasks.map(t => ({
+        id: t.id,
+        name: t.id,
+        description: t.description,
+        task_type: t.task_type,
+        component_id: t.component_id,
+        component_responsibility: t.component_responsibility,
+        backing_tool: t.backing_tool,
+        estimated_complexity: t.estimated_complexity,
+        complexity_flag: t.complexity_flag,
+        completion_criteria: t.completion_criteria.map(c => ({
+          criterion_id: c.criterion_id,
+          description: c.description,
+          verification_method: c.verification_method,
+          artifact_ref: c.artifact_ref,
+        })),
+        write_directory_paths: t.write_directory_paths,
+        read_directory_paths: t.read_directory_paths,
+        dependency_task_ids: t.dependency_task_ids,
+        active_constraints: constraintIds,
+        traces_to: t.technical_spec_ids,
+      }));
+      rootNodeRecordIds = [];
+      rootLogicalIds = [];
+      for (const rt of rootTasks) {
+        const logicalNodeId = randomUUID();
+        const rec = engine.writer.writeRecord({
+          record_type: 'task_decomposition_node',
+          schema_version: '1.0',
+          workflow_run_id: workflowRun.id,
+          phase_id: '6',
+          sub_phase_id: '6.1a',
+          produced_by_agent_role: 'implementation_planner',
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+          derived_from_record_ids: [planRecord.id],
+          content: {
+            kind: 'task_decomposition_node',
+            node_id: logicalNodeId,
+            parent_node_id: null,
+            display_key: rt.id,
+            root_task_id: logicalNodeId,
+            depth: 0,
+            pass_number: 0,
+            status: 'pending',
+            task: rt,
+            surfaced_assumption_ids: [],
+            release_id: null,
+            release_ordinal: null,
+          } satisfies TaskDecompositionNodeContent,
+        });
+        rootNodeRecordIds.push(rec.id);
+        rootLogicalIds.push(logicalNodeId);
+        artifactIds.push(rec.id);
+      }
+    }
+
+    if (rootTasks.length > 0) {
+      await runTaskSaturationLoop(ctx, {
+        technicalConstraints,
+        componentSummary,
+        rootTasks,
+        rootNodeRecordIds,
+        rootLogicalIds,
+      });
+    }
 
     // ── 6.2 — Mirror and Menu ─────────────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '6.2');
@@ -271,7 +381,16 @@ export class Phase6Handler implements PhaseHandler {
     // the model is free to switch to `{ implementation_plan: [...] }`
     // on retry. Same migration as Phase 3-5.
     const parsed = result.parsed as Record<string, unknown> | null;
-    const tasks = pickItemsArray<ImplementationTask>(parsed, ['implementation_plan', 'tasks']);
+    // qwen3.5-35b-a3b often nests as { implementation_plan: { tasks: [...] } }
+    // rather than the flatter { implementation_plan: [...] } / { tasks: [...] }
+    // shapes pickItemsArray expects. Unwrap one level when we see the nested
+    // object envelope so the 25-task plan isn't silently dropped to fallback.
+    const ip = parsed && typeof parsed.implementation_plan === 'object' && !Array.isArray(parsed.implementation_plan)
+      ? parsed.implementation_plan as Record<string, unknown>
+      : null;
+    const tasks =
+      pickItemsArray<ImplementationTask>(parsed, ['implementation_plan', 'tasks']) ??
+      (ip ? pickItemsArray<ImplementationTask>(ip, ['tasks', 'implementation_plan']) : null);
     if (tasks && tasks.length > 0) return { tasks };
     return fallback;
   }

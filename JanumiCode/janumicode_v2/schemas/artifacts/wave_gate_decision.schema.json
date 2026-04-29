@@ -1,0 +1,19 @@
+{
+  "$id": "janumicode:wave_gate_decision:1.0",
+  "title": "Wave Gate Decision",
+  "description": "Wave R — wave-completion gate decision. One per wave. Replaces the single Phase 9.5 mirror with per-wave gating; the final phase gate aggregates across all wave decisions.",
+  "type": "object",
+  "required": ["kind", "wave_number", "decision", "decided_at"],
+  "properties": {
+    "kind": { "const": "wave_gate_decision" },
+    "wave_number": { "type": "integer", "minimum": 1 },
+    "release_id": { "type": ["string", "null"] },
+    "release_ordinal": { "type": ["integer", "null"] },
+    "wave_kind": { "type": "string", "enum": ["release", "deferred_batch", "single"] },
+    "decision": { "type": "string", "enum": ["approved", "rejected", "investigated_then_approved", "auto_approved"] },
+    "reason": { "type": "string", "description": "Human-supplied rationale for reject / investigate; auto-approve reason for unattended runs." },
+    "rolled_back": { "type": "boolean", "description": "True when reject triggered workspace snapshot reverse-apply." },
+    "decided_at": { "type": "string" },
+    "decided_by": { "type": "string", "enum": ["human", "auto"], "default": "human" }
+  }
+}

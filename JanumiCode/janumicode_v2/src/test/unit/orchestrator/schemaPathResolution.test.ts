@@ -111,7 +111,7 @@ describe('OrchestratorEngine schema path resolution', () => {
       EXTENSION_ROOT,
     );
 
-    const schemasDir = path.join(EXTENSION_ROOT, '.janumicode', 'schemas', 'artifacts');
+    const schemasDir = path.join(EXTENSION_ROOT, 'schemas', 'artifacts');
     const files = fs.readdirSync(schemasDir).filter((f) => f.endsWith('.schema.json'));
     const expectedTypes = files.map((f) => f.replace(/\.schema\.json$/, ''));
 

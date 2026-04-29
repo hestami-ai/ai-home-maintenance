@@ -11,12 +11,20 @@
  *   5.6 — Consistency Check and Approval (phase gate)
  */
 
+import { randomUUID } from 'node:crypto';
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
-import type { GovernedStreamRecord, PhaseId } from '../../types/records';
+import type {
+  GovernedStreamRecord,
+  PhaseId,
+  TechnicalConstraint,
+  DecompositionEntity,
+  DataModelDecompositionNodeContent,
+} from '../../types/records';
 import { getLogger } from '../../logging';
-import { extractPriorPhaseContext } from './phaseContext';
+import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
+import { runDataModelSaturationLoop } from './phase5_1a';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -79,7 +87,20 @@ export class Phase5Handler implements PhaseHandler {
     const allArtifacts = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
     const prior = extractPriorPhaseContext(allArtifacts);
 
-    const componentSummary = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${prior.componentModel?.summary ?? 'No component model available'}`;
+    // Wave 7 — prefer the leaf-level component view when a Phase 4.2a
+    // tree exists. Falls back to the flat component_model summary when
+    // the tree is absent (default-lens runs / older fixtures).
+    const componentDecompositionNodes = engine.writer.getRecordsByType(
+      workflowRun.id, 'component_decomposition_node',
+    );
+    const effectiveComponents = buildEffectiveComponentView(componentDecompositionNodes, prior);
+    if (effectiveComponents.source === 'leaves') {
+      getLogger().info('workflow', 'Phase 5: consuming Wave 7 component leaves', {
+        leafCount: effectiveComponents.leafCount,
+        rootCount: effectiveComponents.rootCount,
+      });
+    }
+    const componentSummary = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${effectiveComponents.summary || (prior.componentModel?.summary ?? 'No component model available')}`;
     const domainsSummary = prior.softwareDomains?.summary ?? 'No domains available';
     const contractsSummary = prior.interfaceContracts?.summary ?? 'No interface contracts available';
     // Phase 3.2 SR layer threaded into every Phase 5 sub-phase:
@@ -122,6 +143,95 @@ export class Phase5Handler implements PhaseHandler {
     });
     artifactIds.push(dataModelsRecord.id);
     engine.ingestionPipeline.ingest(dataModelsRecord);
+
+    // ── 5.1a — Recursive Data Model Decomposition (Wave 9) ────
+    engine.stateMachine.setSubPhase(workflowRun.id, '5.1a');
+
+    const techConstraintsRecord = allArtifacts.find(
+      r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery',
+    );
+    const technicalConstraints: TechnicalConstraint[] = techConstraintsRecord
+      ? (((techConstraintsRecord.content as Record<string, unknown>).technicalConstraints) as TechnicalConstraint[] ?? [])
+      : [];
+
+    // Resume guard — skip seeding when depth-0 nodes already exist.
+    const existingDataModelRoots = engine.writer.getRecordsByType(workflowRun.id, 'data_model_decomposition_node')
+      .filter(r => (r.content as unknown as DataModelDecompositionNodeContent).depth === 0);
+    let rootEntities: DecompositionEntity[];
+    let rootDataModelRecordIds: string[];
+    let rootDataModelLogicalIds: string[];
+    if (existingDataModelRoots.length > 0) {
+      getLogger().info('workflow', 'Phase 5.1a RESUME: depth-0 entity nodes already present', {
+        existingRoots: existingDataModelRoots.length,
+      });
+      rootEntities = existingDataModelRoots.map(r => (r.content as unknown as DataModelDecompositionNodeContent).entity);
+      rootDataModelRecordIds = existingDataModelRoots.map(r => r.id);
+      rootDataModelLogicalIds = existingDataModelRoots.map(r => (r.content as unknown as DataModelDecompositionNodeContent).node_id);
+    } else {
+      // Convert Phase 5.1's data_models entries into per-entity roots.
+      // Each `models[].entities[]` element becomes one depth-0 root.
+      const constraintIds = technicalConstraints.map(t => t.id);
+      rootEntities = dataModelsContent.models.flatMap(m =>
+        m.entities.map(e => ({
+          id: e.name,
+          name: e.name,
+          kind: 'aggregate' as const,
+          component_id: m.component_id,
+          fields: e.fields.map(f => ({
+            name: f.name,
+            type: f.type,
+            constraints: f.constraints,
+          })),
+          relationships: (e.relationships ?? []).map(rel => ({
+            target_entity_id: rel,
+            kind: 'references' as const,
+          })),
+          active_constraints: constraintIds,
+        })),
+      );
+      rootDataModelRecordIds = [];
+      rootDataModelLogicalIds = [];
+      for (const entity of rootEntities) {
+        const logicalNodeId = randomUUID();
+        const rec = engine.writer.writeRecord({
+          record_type: 'data_model_decomposition_node',
+          schema_version: '1.0',
+          workflow_run_id: workflowRun.id,
+          phase_id: '5',
+          sub_phase_id: '5.1a',
+          produced_by_agent_role: 'technical_spec_agent',
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+          derived_from_record_ids: [dataModelsRecord.id],
+          content: {
+            kind: 'data_model_decomposition_node',
+            node_id: logicalNodeId,
+            parent_node_id: null,
+            display_key: entity.id,
+            root_entity_id: logicalNodeId,
+            depth: 0,
+            pass_number: 0,
+            status: 'pending',
+            entity,
+            surfaced_assumption_ids: [],
+            release_id: null,
+            release_ordinal: null,
+          } satisfies DataModelDecompositionNodeContent,
+        });
+        rootDataModelRecordIds.push(rec.id);
+        rootDataModelLogicalIds.push(logicalNodeId);
+        artifactIds.push(rec.id);
+      }
+    }
+
+    if (rootEntities.length > 0) {
+      await runDataModelSaturationLoop(ctx, {
+        technicalConstraints,
+        componentSummary,
+        rootEntities,
+        rootNodeRecordIds: rootDataModelRecordIds,
+        rootLogicalIds: rootDataModelLogicalIds,
+      });
+    }
 
     // ── 5.2 — API Definition ──────────────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '5.2');

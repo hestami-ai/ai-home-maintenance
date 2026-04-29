@@ -1,0 +1,22 @@
+{
+  "$id": "janumicode:execution_wave_started:1.0",
+  "title": "Execution Wave Started",
+  "description": "Wave R — emitted when an execution wave begins. One per release (plus a final deferred-batch wave). Carries release identity, leaf count, and per-component distribution.",
+  "type": "object",
+  "required": ["kind", "wave_number", "release_id", "release_ordinal", "wave_kind", "leaf_count", "started_at"],
+  "properties": {
+    "kind": { "const": "execution_wave_started" },
+    "wave_number": { "type": "integer", "minimum": 1 },
+    "release_id": { "type": ["string", "null"] },
+    "release_ordinal": { "type": ["integer", "null"], "minimum": 1 },
+    "release_name": { "type": "string" },
+    "wave_kind": { "type": "string", "enum": ["release", "deferred_batch", "single"] },
+    "leaf_count": { "type": "integer", "minimum": 0 },
+    "started_at": { "type": "string" },
+    "leaf_distribution_by_component": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "leaf_ids": { "type": "array", "items": { "type": "string" } }
+  }
+}

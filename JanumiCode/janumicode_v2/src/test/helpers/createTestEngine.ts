@@ -40,8 +40,8 @@ export interface TestEngineOptions {
    */
   dbPath?: string;
   /**
-   * Extension root — where `.janumicode/schemas/`, `.janumicode/prompts/`,
-   * and `.janumicode/schemas/invariants/` live. Defaults to the repo root.
+   * Extension root — where `schemas/`, `prompts/`, and
+   * `schemas/invariants/` live. Defaults to the repo root.
    */
   extensionPath?: string;
   /**
@@ -84,7 +84,7 @@ export interface TestEngineOptions {
    * Quality Check (and any future orchestrator-role LLM work) to a
    * specific backing. Defaults vary by mode:
    *
-   *   - mock   → `{ backing_tool: 'direct_llm_api', provider: 'ollama',
+   *   - mock   → `{ backing_tool: 'direct_llm_api', provider: 'llamacpp',
    *                 model: 'qwen3.5:9b' }` so the call routes through
    *                 MockLLMProvider like every other role.
    *   - real   → production default (gemini_cli).
@@ -149,7 +149,7 @@ export async function createTestEngine(
     ?? (opts.useRealProviders ? 'real' : 'mock');
   const orchestratorRouting = opts.orchestratorRouting ?? (
     effectiveModeForRouting === 'mock'
-      ? { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' }
+      ? { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' }
       : undefined
   );
 
@@ -233,6 +233,7 @@ export async function createTestEngine(
   if (effectiveMode === 'mock') {
     // Mock mode: every provider name routes to the fixture store.
     engine.llmCaller.registerProvider(mockLLM);
+    engine.llmCaller.registerProvider(mockLLM.bindAsProvider('llamacpp'));
     engine.llmCaller.registerProvider(mockLLM.bindAsProvider('ollama'));
     engine.llmCaller.registerProvider(mockLLM.bindAsProvider('anthropic'));
     engine.llmCaller.registerProvider(mockLLM.bindAsProvider('google'));
@@ -292,7 +293,7 @@ export async function createTestEngine(
   // Register providers on the Liaison's internal PriorityLLMCaller too.
   if (effectiveMode === 'mock') {
     liaison.registerProviders(mockLLM as unknown as LLMProviderAdapter);
-    liaison.registerProviders(mockLLM.bindAsProvider('ollama') as unknown as LLMProviderAdapter);
+    liaison.registerProviders(mockLLM.bindAsProvider('llamacpp') as unknown as LLMProviderAdapter);
   } else {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { OllamaProvider: OllamaP } = require('../../lib/llm/providers/ollama');

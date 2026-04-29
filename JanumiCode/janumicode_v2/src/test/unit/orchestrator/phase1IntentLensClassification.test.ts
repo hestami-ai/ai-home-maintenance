@@ -18,6 +18,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { createTestDatabase, type Database } from '../../../lib/database/init';
 import { ConfigManager } from '../../../lib/config/configManager';
@@ -28,12 +30,13 @@ import { MockLLMProvider } from '../../helpers/mockLLMProvider';
 describe('Phase 1.0a — Intent Lens Classification', () => {
   let db: Database;
   let engine: OrchestratorEngine;
-  const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
+  const extensionPath = path.resolve(__dirname, '..', '..', '..', '..');
+  const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
 
   beforeEach(() => {
     db = createTestDatabase();
     const configManager = new ConfigManager();
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
+    engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
     engine.llmCaller.registerProvider({
       name: 'google',
       call: () => Promise.reject(new Error('stub')),
@@ -71,9 +74,9 @@ describe('Phase 1.0a — Intent Lens Classification', () => {
       confidence: 0.92,
       rationale: 'Raw intent says "build" plus persona language.',
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setOrchestratorRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
     });
 
     const { run } = engine.startWorkflowRun('ws-1', 'test');
@@ -108,9 +111,9 @@ describe('Phase 1.0a — Intent Lens Classification', () => {
       confidence: 0.88,
       rationale: 'Deploy / k8s language throughout.',
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setOrchestratorRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
     });
 
     const { run } = engine.startWorkflowRun('ws-1', 'test');
@@ -154,9 +157,9 @@ describe('Phase 1.0a — Intent Lens Classification', () => {
       match: 'Intent Lens Classification',
       parsedJson: {},
     });
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setOrchestratorRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
     });
 
     const { run } = engine.startWorkflowRun('ws-1', 'test');

@@ -14,17 +14,19 @@
  */
 
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
-import type { PhaseId } from '../../types/records';
+import type {
+  PhaseId,
+  ReleasePlanContentV2,
+  WaveGateDecisionContent,
+  TaskQuarantineContent,
+} from '../../types/records';
 import { getLogger } from '../../logging';
-import { ExecutorAgent, type ExecutionTask, type ExecutionResult, type ExecutorBackingTool } from '../../agents/executorAgent';
+import { ExecutorAgent, type ExecutorBackingTool } from '../../agents/executorAgent';
 import { ExecutionContextBuilder, type ImplementationTask as CtxTask } from '../executionContextBuilder';
 import { TestRunner, type TestSuite } from '../testRunner';
 import { EvalRunner, type EvaluationCriterion } from '../evalRunner';
-import { FailureHandler, type FailureContext } from '../failureHandler';
-import { ReasoningReview, type ReasoningReviewInput } from '../../review/reasoningReview';
-import { ContextBuilder } from '../contextBuilder';
-import { loadExecutorTrace } from './phase9TraceLoader';
-import { LoopDetectionMonitor, type FlawRecord } from '../loopDetectionMonitor';
+import { ExecutionScheduler, type SchedulerLeaf, type SchedulerReleaseEntry } from '../executionScheduler';
+import { extractPriorPhaseContext, buildEffectiveTaskView, buildEffectiveTestPlanView } from './phaseContext';
 import { randomUUID } from 'node:crypto';
 
 export class Phase9Handler implements PhaseHandler {
@@ -35,10 +37,6 @@ export class Phase9Handler implements PhaseHandler {
     const artifactIds: string[] = [];
     const generateId = () => randomUUID();
 
-    // Track flaw history for loop detection
-    const flawHistory: FlawRecord[] = [];
-    const loopMonitor = new LoopDetectionMonitor();
-
     // ── Initialize Execution Context Builder ───────────────────────
     const execContextBuilder = new ExecutionContextBuilder(
       engine.db,
@@ -46,7 +44,7 @@ export class Phase9Handler implements PhaseHandler {
       {
         stdinMaxTokens: 8000,
         detailFileMaxBytes: 100000,
-        detailFilePathTemplate: `${engine.workspacePath}/.janumicode/context/{sub_phase_id}_{invocation_id}.md`,
+        detailFilePathTemplate: `${engine.workspacePath}/.janumicode/runs/{workflow_run_id}/context/{sub_phase_id}_{invocation_id}.md`,
         workspacePath: engine.workspacePath,
         janumiCodeVersionSha: engine.janumiCodeVersionSha,
       },
@@ -94,221 +92,97 @@ export class Phase9Handler implements PhaseHandler {
     // ── 9.1 — Implementation Task Execution ───────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '9.1');
 
-    const tasks = artifacts.implementationPlan ?? [];
-    const orderedTasks = execContextBuilder.getTasksInDependencyOrder(tasks);
-
-    const executionResults: ExecutionResult[] = [];
-    let tasksCompleted = 0;
-    let tasksFailed = 0;
-    let tasksQuarantined = 0;
-
-    for (const task of orderedTasks) {
-      // ID used to name the per-task detail file (`.janumicode/context/9.1_<id>.md`).
-      // Distinct from the executor's `invocation_id` (returned in
-      // ExecutionResult) which is what stamps every trace record's
-      // `produced_by_record_id` and is the key reasoning_review must
-      // filter on.
-      const contextFileId = generateId();
-
-      // Build context payload for this task
-      const contextPayload = execContextBuilder.buildTaskContext(
-        task as unknown as CtxTask,
-        workflowRun.id,
-        contextFileId,
-        artifacts,
-      );
-
-      // Convert to ExecutionTask format
-      const execTask: ExecutionTask = {
-        id: task.id,
-        taskType: task.task_type,
-        componentId: task.component_id,
-        componentResponsibility: task.component_responsibility,
-        description: task.description,
-        backingTool: task.backing_tool,
-        completionCriteria: task.completion_criteria.map(c => ({
-          criterionId: c.criterion_id,
-          description: c.description,
-        })),
-        writeDirectoryPaths: task.write_directory_paths ?? [],
-        expectedPreStateHash: task.expected_pre_state_hash,
-        verificationStep: task.verification_step,
-      };
-
-      // Execute the task
-      const result = await executorAgent.execute(
-        execTask,
-        workflowRun.id,
-        contextPayload.stdin.text,
-        engine.workspacePath,
-        engine.janumiCodeVersionSha,
-      );
-
-      executionResults.push(result);
-
-      // Run Reasoning Review after each task. The provider/model come from
-      // `llm_routing.reasoning_review.primary` in config — NOT hardcoded
-      // here. If the provider isn't registered at engine startup,
-      // validateLLMRouting() surfaces that as a fatal misconfiguration so
-      // we never get to this point with a broken config.
-      const rrConfig = engine.llmRouting.reasoning_review;
-      const reasoningReview = new ReasoningReview(
-        engine.llmCaller,
-        new ContextBuilder({
-          stdinMaxTokens: 32000,
-          detailFileMaxBytes: 50000,
-          detailFilePathTemplate: '',
-          workspacePath: engine.workspacePath,
-        }),
-        engine.templateLoader,
-        {
-          provider: rrConfig.primary.provider,
-          model: rrConfig.primary.model,
-          temperature: rrConfig.temperature,
-          janumiCodeVersionSha: engine.janumiCodeVersionSha,
-        },
-      );
-
-      // Load executor trace (SQL + typeMap) via the extracted loader so
-      // the correlation key + record-type mapping are regression-tested
-      // in isolation. See phase9TraceLoader.ts for the rationale.
-      const trace = loadExecutorTrace(engine.db, workflowRun.id, result.invocationId);
-
-      // Diagnostic — surface what the trace-selection query actually
-      // returned. Empty results here usually mean the executor's writes
-      // haven't been flushed yet, or the `produced_by_record_id`
-      // linkage convention has drifted again.
-      getLogger().info('workflow', 'Reasoning review — trace records loaded', {
-        task_id: task.id,
-        invocation_id: result.invocationId,
-        trace_record_count: trace.rows.length,
-        trace_type_counts: trace.typeCounts,
+    // Wave 8 — prefer Phase 6.1a leaf tasks when available so the
+    // executor sees the decomposed atomic-unit set rather than the
+    // coarse Phase 6.1 root plan. Falls back to the flat plan when no
+    // tree exists.
+    const allArtifactRecords = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
+    const priorForTasks = extractPriorPhaseContext(allArtifactRecords);
+    const taskNodes = engine.writer.getRecordsByType(workflowRun.id, 'task_decomposition_node');
+    const effectiveTasks = buildEffectiveTaskView(taskNodes, priorForTasks);
+    if (effectiveTasks.source === 'leaves') {
+      getLogger().info('workflow', 'Phase 9: consuming Wave 8 task leaves', {
+        leafCount: effectiveTasks.leafCount,
+        rootCount: effectiveTasks.rootCount,
       });
-
-      const reviewInput: ReasoningReviewInput = {
-        traceRecords: trace.traceRecords,
-        isExecutorAgent: true,
-        requiredOutputSpec: task.description,
-        phaseGateCriteria: task.completion_criteria.map(c => c.description).join('\n'),
-        // Pass concrete evidence to the reviewer rather than a vague
-        // success string. Earlier iterations sent literally "Task
-        // completed successfully" with an empty trace, and the reviewer
-        // (correctly) flagged a `completeness_shortcut`. Surface the
-        // files written, their operation, and any verification status
-        // so the reviewer has something to cross-check the trace against.
-        finalOutput: result.success
-          ? [
-              `Task ${task.id} reported success.`,
-              result.skippedIdempotent ? 'Task was idempotent and skipped (no changes needed).' : null,
-              result.filesWritten.length > 0
-                ? `Files written (${result.filesWritten.length}):\n${result.filesWritten.map(f => `  - ${f.operation} ${f.filePath}${f.driftDetected ? ' [drift_detected]' : ''}`).join('\n')}`
-                : 'Files written: none',
-            ].filter(Boolean).join('\n')
-          : (result.error ?? 'Task failed'),
-        completionCriteria: task.completion_criteria.map(c => c.description).join('\n'),
-        subPhaseId: '9.1',
-        workflowRunId: workflowRun.id,
-      };
-
-      // ReasoningReview is a correctness-validation step. If it fails, the
-      // task's outputs cannot be trusted and the phase must surface the
-      // failure — not silently pass. The LLM provider must be configured
-      // and reachable; misconfigurations should be caught at engine startup
-      // (see ConfigManager.validateLLMRouting).
-      const reviewResult = await reasoningReview.review(reviewInput);
-
-      // Record reasoning review result
-      engine.writer.writeRecord({
-        record_type: 'artifact_produced',
-        schema_version: '1.0',
-        workflow_run_id: workflowRun.id,
-        phase_id: '9',
-        sub_phase_id: '9.1',
-        produced_by_agent_role: 'reasoning_review',
-        janumicode_version_sha: engine.janumiCodeVersionSha,
-        content: {
-          kind: 'reasoning_review_result',
-          task_id: task.id,
-          overall_pass: reviewResult.overallPass,
-          flaw_count: reviewResult.flaws.length,
-          high_severity_flaws: reviewResult.flaws.filter(f => f.severity === 'high').length,
-        },
-      });
-
-      if (!reviewResult.overallPass) {
-        getLogger().warn('workflow', 'Reasoning review found flaws', {
-          task_id: task.id,
-          flaw_count: reviewResult.flaws.length,
-        });
-
-        // Track flaws for loop detection
-        flawHistory.push({
-          attemptNumber: flawHistory.length + 1,
-          flaws: reviewResult.flaws.map(f => ({ type: f.flawType, severity: f.severity })),
-        });
-
-        // Run loop detection if we have history
-        if (flawHistory.length >= 2) {
-          // Extract tool calls from trace records
-          const toolCallHistory = trace.rows
-            .filter(r => r.content.includes('"type":"tool_call"') || r.content.includes('"tool_call"'))
-            .map(r => {
-              try {
-                const content = JSON.parse(r.content);
-                return {
-                  attemptNumber: flawHistory.length,
-                  toolCalls: content.toolCalls || content.tool_calls || [{ name: content.name || 'unknown', params: JSON.stringify(content.params || content.input || {}) }],
-                };
-              } catch {
-                return { attemptNumber: flawHistory.length, toolCalls: [] };
-              }
-            });
-
-          const loopResult = loopMonitor.assess({
-            retryCount: flawHistory.length,
-            flawHistory,
-            toolCallHistory,
-            availableTools: ['read_file', 'write_file', 'execute_command', 'search'],
-          });
-
-          // Record loop status
-          engine.writer.writeRecord({
-            record_type: 'artifact_produced',
-            schema_version: '1.0',
-            workflow_run_id: workflowRun.id,
-            phase_id: '9',
-            sub_phase_id: '9.1',
-            produced_by_agent_role: 'loop_detection_monitor',
-            janumicode_version_sha: engine.janumiCodeVersionSha,
-            content: {
-              kind: 'loop_detection_result',
-              task_id: task.id,
-              loop_status: loopResult.loopStatus,
-              high_severity_flaw_count: loopResult.highSeverityFlawCount,
-              tools_not_called: loopResult.toolsNotCalled,
-            },
-          });
-
-          // If DIVERGING or STALLED, trigger UnstickingAgent via FailureHandler
-          if (loopResult.loopStatus === 'DIVERGING' || loopResult.loopStatus === 'STALLED') {
-            getLogger().warn('workflow', 'Loop detected, may need intervention', {
-              task_id: task.id,
-              loop_status: loopResult.loopStatus,
-            });
-          }
-        }
-      }
-
-      if (result.success) {
-        tasksCompleted++;
-      } else {
-        tasksFailed++;
-        getLogger().warn('workflow', 'Task execution failed', {
-          task_id: task.id,
-          error: result.error,
-        });
-      }
     }
+    const tasks: CtxTask[] = (effectiveTasks.source === 'leaves'
+      ? (effectiveTasks.tasks as unknown as CtxTask[])
+      : (artifacts.implementationPlan ?? []));
+
+    // ── Wave R — release-plan-driven execution scheduler ──────────
+    // Replaces the prior flat for-loop with wave-based scheduling.
+    // Reads the Phase 1.8 release_plan, slices leaves by release ordinal,
+    // runs each wave with per-leaf retries + reasoning_review +
+    // per-leaf tests + quarantine + wave gate, then a deferred-batch
+    // wave for any quarantined leaves.
+    const releasePlanRecord = allArtifactRecords.find(
+      r => (r.content as Record<string, unknown>).kind === 'release_plan',
+    );
+    const releasePlan = releasePlanRecord
+      ? (releasePlanRecord.content as unknown as ReleasePlanContentV2)
+      : null;
+    const releases: SchedulerReleaseEntry[] = releasePlan?.releases?.map(r => ({
+      release_id: r.release_id,
+      release_ordinal: r.ordinal,
+      release_name: r.name,
+    })) ?? [];
+
+    // Cast leaves to SchedulerLeaf (enriches with release_id /
+    // release_ordinal / _leaf_node_id from buildEffectiveTaskView).
+    const schedulerLeaves: SchedulerLeaf[] = tasks.map(t => {
+      const meta = t as unknown as Record<string, unknown>;
+      return {
+        ...t,
+        release_id: (meta._leaf_release_id as string | undefined)
+          ?? (meta.release_id as string | null | undefined)
+          ?? null,
+        release_ordinal: (meta._leaf_release_ordinal as number | null | undefined)
+          ?? (meta.release_ordinal as number | null | undefined)
+          ?? null,
+        _leaf_node_id: meta._leaf_node_id as string | undefined,
+      };
+    });
+
+    const scheduler = new ExecutionScheduler(
+      engine,
+      engine.writer,
+      execContextBuilder,
+      executorAgent,
+      artifacts,
+      {
+        leafRetryBudget: cfg.execution?.leaf_retry_budget ?? 3,
+        deferredRetryBudget: cfg.execution?.deferred_retry_budget ?? 2,
+        autoApproveWaveGates: cfg.execution?.auto_approve_wave_gates ?? false,
+        testsPerLeaf: {
+          enabled: cfg.execution?.tests_per_leaf?.enabled ?? true,
+          resolution: cfg.execution?.tests_per_leaf?.test_command_resolution ?? 'package_json_scripts',
+          timeoutMs: cfg.execution?.tests_per_leaf?.timeout_ms ?? 120_000,
+        },
+      },
+      generateId,
+    );
+
+    const scheduleResult = await scheduler.run({
+      workflowRunId: workflowRun.id,
+      workspacePath: engine.workspacePath,
+      janumiCodeVersionSha: engine.janumiCodeVersionSha,
+      leaves: schedulerLeaves,
+      releases,
+    });
+
+    getLogger().info('workflow', 'Wave R: scheduler completed', {
+      total_waves: scheduleResult.totalWaves,
+      successful: scheduleResult.successfulLeafCount,
+      quarantined: scheduleResult.quarantinedLeafCount,
+      rescued: scheduleResult.rescuedLeafCount,
+      terminally_deferred: scheduleResult.terminallyDeferredLeafCount,
+      rejected_waves: scheduleResult.rejectedWaveCount,
+    });
+
+    const tasksCompleted = scheduleResult.successfulLeafCount;
+    const tasksFailed = scheduleResult.terminallyDeferredLeafCount;
+    const tasksQuarantined = scheduleResult.quarantinedLeafCount;
 
     const executionRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -322,12 +196,16 @@ export class Phase9Handler implements PhaseHandler {
       content: {
         kind: 'execution_summary',
         sub_phase: '9.1_implementation',
-        tasks_attempted: orderedTasks.length,
+        tasks_attempted: schedulerLeaves.length,
         tasks_completed: tasksCompleted,
         tasks_failed: tasksFailed,
         tasks_quarantined: tasksQuarantined,
-        execution_trace_count: orderedTasks.length,
-        files_written: executionResults.flatMap(r => r.filesWritten).map(f => f.filePath),
+        rescued: scheduleResult.rescuedLeafCount,
+        terminally_deferred: scheduleResult.terminallyDeferredLeafCount,
+        wave_count: scheduleResult.totalWaves,
+        rejected_waves: scheduleResult.rejectedWaveCount,
+        execution_trace_count: scheduleResult.invocationIds.length,
+        wave_outcomes: scheduleResult.waveOutcomes,
       },
     });
     artifactIds.push(executionRecord.id);
@@ -336,17 +214,42 @@ export class Phase9Handler implements PhaseHandler {
     // ── 9.2 — Test Execution ──────────────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '9.2');
 
-    // Load test plan to get test suites
-    const testPlanRecord = engine.db.prepare(`
-      SELECT content FROM governed_stream
-      WHERE workflow_run_id = ? AND record_type = 'artifact_produced'
-      AND json_extract(content, '$.kind') = 'test_plan'
-      ORDER BY produced_at DESC LIMIT 1
-    `).get(workflowRun.id) as { content: string } | undefined;
-
-    const testSuites: TestSuite[] = testPlanRecord
-      ? this.extractTestSuites(testPlanRecord.content, generateId)
-      : [];
+    // Wave 10 — prefer Phase 7.1a test leaves when available so the
+    // wave-aggregate test runner sees decomposed atomic-step cases
+    // rather than coarse Phase 7.1 root cases. Falls back to the flat
+    // plan when no tree exists.
+    const testNodes = engine.writer.getRecordsByType(workflowRun.id, 'test_decomposition_node');
+    const effectiveTests = buildEffectiveTestPlanView(testNodes, priorForTasks);
+    let testSuites: TestSuite[] = [];
+    if (effectiveTests.source === 'leaves') {
+      getLogger().info('workflow', 'Phase 9.2: consuming Wave 10 test leaves', {
+        leafCount: effectiveTests.leafCount,
+        rootCount: effectiveTests.rootCount,
+      });
+      // Adapt buildEffectiveTestPlanView shape into TestRunner suites.
+      for (const s of effectiveTests.test_suites) {
+        testSuites.push({
+          id: s.suite_id,
+          name: `${s.test_type.charAt(0).toUpperCase() + s.test_type.slice(1)} Tests (${s.component_id})`,
+          type: s.test_type,
+          testFilePaths: s.test_cases
+            .map(tc => tc.test_file_path ?? '')
+            .filter(p => p.length > 0),
+          validatesTaskIds: [],
+          coversCriteriaIds: s.test_cases.flatMap(tc => tc.acceptance_criterion_ids),
+        });
+      }
+    } else {
+      const testPlanRecord = engine.db.prepare(`
+        SELECT content FROM governed_stream
+        WHERE workflow_run_id = ? AND record_type = 'artifact_produced'
+        AND json_extract(content, '$.kind') = 'test_plan'
+        ORDER BY produced_at DESC LIMIT 1
+      `).get(workflowRun.id) as { content: string } | undefined;
+      testSuites = testPlanRecord
+        ? this.extractTestSuites(testPlanRecord.content, generateId)
+        : [];
+    }
 
     const testRunner = new TestRunner(
       engine.db,
@@ -457,190 +360,76 @@ export class Phase9Handler implements PhaseHandler {
     artifactIds.push(evalResultsRecord.id);
     engine.ingestionPipeline.ingest(evalResultsRecord);
 
-    // ── 9.4 — Failure Handling ─────────────────────
-    // Handle failures if tests or evaluations failed
-    if (testResults.totalFailed > 0 || !evalResults.overallPass) {
+    // ── 9.4 — Quarantine summary ───────────────────────────────
+    // Wave R replaces the prior abort/skip failure handler with the
+    // scheduler's per-leaf retry budget + quarantine ledger. Each
+    // quarantined leaf already has a task_quarantine record. Roll up a
+    // summary so downstream consumers (workflow run summary, future
+    // brownfield retries) see the gap surface.
+    if (tasksQuarantined > 0 || tasksFailed > 0) {
       engine.stateMachine.setSubPhase(workflowRun.id, '9.4');
 
-      const failureHandler = new FailureHandler(
-        engine.db,
-        engine.writer,
-        engine.eventBus,
-        engine.llmCaller,
-        engine.templateLoader,
-        generateId,
-        engine.janumiCodeVersionSha,
-      );
-
-      // Build failure context for each failed task
-      for (const taskResult of executionResults.filter(r => !r.success)) {
-        const failureContext: FailureContext = {
-          workflowRunId: workflowRun.id,
-          subPhaseId: '9.1',
-          taskId: taskResult.taskId,
-          taskName: tasks.find(t => t.id === taskResult.taskId)?.description ?? 'Unknown task',
-          failureType: 'execution_error',
-          errorMessage: taskResult.error ?? 'Unknown error',
-          executionTrace: JSON.stringify(taskResult),
-          attemptNumber: 1,
-          maxAttempts: 3,
-          previousAttempts: [],
-        };
-
-        const resolution = await failureHandler.handleFailure(failureContext);
-
-        if (resolution.strategy === 'retry' && failureContext.attemptNumber < failureContext.maxAttempts) {
-          // Retry: Re-invoke executor for the failed task
-          getLogger().info('workflow', 'Retrying failed task', {
-            taskId: taskResult.taskId,
-            attempt: failureContext.attemptNumber + 1,
-            maxAttempts: failureContext.maxAttempts,
-          });
-
-          const task = tasks.find(t => t.id === taskResult.taskId);
-          if (task) {
-            const retryInvocationId = generateId();
-            const retryContext = execContextBuilder.buildTaskContext(
-              task as unknown as CtxTask,
-              workflowRun.id,
-              retryInvocationId,
-              artifacts,
-            );
-
-            const retryTask: ExecutionTask = {
-              id: task.id,
-              taskType: task.task_type,
-              componentId: task.component_id,
-              componentResponsibility: task.component_responsibility,
-              description: task.description,
-              backingTool: task.backing_tool,
-              completionCriteria: task.completion_criteria.map(c => ({
-                criterionId: c.criterion_id,
-                description: c.description,
-              })),
-              writeDirectoryPaths: task.write_directory_paths ?? [],
-              expectedPreStateHash: task.expected_pre_state_hash,
-              verificationStep: task.verification_step,
-            };
-
-            const retryResult = await executorAgent.execute(
-              retryTask,
-              workflowRun.id,
-              retryContext.stdin.text,
-              engine.workspacePath,
-              engine.janumiCodeVersionSha,
-            );
-
-            if (retryResult.success) {
-              getLogger().info('workflow', 'Retry succeeded', { taskId: taskResult.taskId });
-            } else {
-              getLogger().warn('workflow', 'Retry failed', { taskId: taskResult.taskId, error: retryResult.error });
-            }
-          }
-        } else if (resolution.strategy === 'rollback') {
-          // Rollback: Restore files from previous state
-          getLogger().warn('workflow', 'Rolling back changes', { taskId: taskResult.taskId });
-
-          // Load file write records for this task
-          const writeRecords = engine.db.prepare(`
-            SELECT content FROM governed_stream
-            WHERE workflow_run_id = ? AND phase_id = '9' AND sub_phase_id = '9.1'
-            AND record_type = 'artifact_produced'
-            AND json_extract(content, '$.kind') = 'file_written'
-            AND json_extract(content, '$.task_id') = ?
-          `).all(workflowRun.id, taskResult.taskId) as Array<{ content: string }>;
-
-          for (const record of writeRecords) {
-            try {
-              const fileRecord = JSON.parse(record.content);
-              if (fileRecord.sha256Before && fileRecord.filePath) {
-                // Record rollback intent (actual file restoration would require backup storage)
-                engine.writer.writeRecord({
-                  record_type: 'artifact_produced',
-                  schema_version: '1.0',
-                  workflow_run_id: workflowRun.id,
-                  phase_id: '9',
-                  sub_phase_id: '9.4',
-                  produced_by_agent_role: 'orchestrator',
-                  janumicode_version_sha: engine.janumiCodeVersionSha,
-                  content: {
-                    kind: 'rollback_record',
-                    task_id: taskResult.taskId,
-                    file_path: fileRecord.filePath,
-                    previous_hash: fileRecord.sha256Before,
-                    status: 'recorded',
-                    note: 'Actual file restoration requires backup storage implementation',
-                  },
-                });
-              }
-            } catch (parseErr) {
-              getLogger().warn('workflow', 'Failed to parse file write record for rollback', { error: String(parseErr) });
-            }
-          }
-        } else if (resolution.strategy === 'escalate') {
-          getLogger().warn('workflow', 'Failure requires escalation', {
-            taskId: taskResult.taskId,
-            reason: resolution.escalationReason,
-          });
-          // Create human gate for escalation
-          const escalationRecord = engine.writer.writeRecord({
-            record_type: 'phase_gate_evaluation',
-            schema_version: '1.0',
-            workflow_run_id: workflowRun.id,
-            phase_id: '9',
-            sub_phase_id: '9.4',
-            produced_by_agent_role: 'orchestrator',
-            janumicode_version_sha: engine.janumiCodeVersionSha,
-            content: {
-              kind: 'failure_escalation',
-              task_id: taskResult.taskId,
-              reason: resolution.escalationReason,
-              resolution: 'pending',
-            },
-          });
-          artifactIds.push(escalationRecord.id);
-
-          try {
-            const decision = await engine.pauseForDecision(workflowRun.id, escalationRecord.id, 'phase_gate');
-            if (decision.type === 'phase_gate_rejection') {
-              return { success: false, error: 'User rejected failure resolution', artifactIds };
-            }
-          } catch (err) {
-            getLogger().warn('workflow', 'Failure escalation decision failed', { error: String(err) });
-          }
-        } else if (resolution.strategy === 'accept_with_caveat') {
-          // Accept with caveat: Document the exception and proceed
-          getLogger().info('workflow', 'Accepting failure with caveat', {
-            taskId: taskResult.taskId,
-            caveat: resolution.caveat,
-          });
-
-          engine.writer.writeRecord({
-            record_type: 'artifact_produced',
-            schema_version: '1.0',
-            workflow_run_id: workflowRun.id,
-            phase_id: '9',
-            sub_phase_id: '9.4',
-            produced_by_agent_role: 'orchestrator',
-            janumicode_version_sha: engine.janumiCodeVersionSha,
-            content: {
-              kind: 'acceptance_with_caveat',
-              task_id: taskResult.taskId,
-              caveat: resolution.caveat,
-              accepted_at: new Date().toISOString(),
-            },
-          });
-        }
+      const quarantineRecords = engine.writer.getRecordsByType(workflowRun.id, 'task_quarantine');
+      const latestByLeaf = new Map<string, TaskQuarantineContent>();
+      for (const r of quarantineRecords) {
+        const c = r.content as unknown as TaskQuarantineContent;
+        if (!latestByLeaf.has(c.leaf_task_id)) latestByLeaf.set(c.leaf_task_id, c);
       }
+      const summary = engine.writer.writeRecord({
+        record_type: 'artifact_produced',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '9',
+        sub_phase_id: '9.4',
+        produced_by_agent_role: 'orchestrator',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [executionRecord.id],
+        content: {
+          kind: 'quarantine_summary',
+          quarantined_count: tasksQuarantined,
+          rescued_count: scheduleResult.rescuedLeafCount,
+          terminally_deferred_count: tasksFailed,
+          quarantined_leaves: [...latestByLeaf.values()].map(q => ({
+            leaf_task_id: q.leaf_task_id,
+            wave_number: q.wave_number,
+            release_id: q.release_id,
+            release_ordinal: q.release_ordinal,
+            attempt_count: q.attempts.length,
+            quarantine_reason: q.quarantine_reason,
+            rescue_status: q.rescue_status,
+          })),
+        },
+      });
+      artifactIds.push(summary.id);
+      engine.ingestionPipeline.ingest(summary);
     }
 
-    // ── 9.5 — Completion Approval ─────────────────────────────
+    // ── 9.5 — Final phase summary ──────────────────────────────
+    // Wave R: per-wave gates already gated each release as it
+    // finished. This sub-phase is now a thin terminal mirror that
+    // aggregates across wave_gate_decision records and presents the
+    // overall workflow execution outcome (test totals + eval pass +
+    // wave decisions) for the final phase gate.
     engine.stateMachine.setSubPhase(workflowRun.id, '9.5');
+
+    const waveGateRecords = engine.writer.getRecordsByType(workflowRun.id, 'wave_gate_decision');
+    const waveDecisions = waveGateRecords.map(r => r.content as unknown as WaveGateDecisionContent);
+    const anyRejected = waveDecisions.some(d => d.decision === 'rejected');
 
     const execMirror = engine.mirrorGenerator.generate({
       artifactId: executionRecord.id,
       artifactType: 'execution_summary',
-      content: { tasks_completed: tasksCompleted, tasks_failed: tasksFailed, tests_passed: 0, eval_pass: tasksFailed === 0 },
+      content: {
+        total_waves: scheduleResult.totalWaves,
+        leaves_successful: tasksCompleted,
+        leaves_quarantined: tasksQuarantined,
+        leaves_rescued: scheduleResult.rescuedLeafCount,
+        leaves_terminally_deferred: tasksFailed,
+        rejected_waves: scheduleResult.rejectedWaveCount,
+        tests_passed: testResults.totalPassed,
+        tests_failed: testResults.totalFailed,
+        eval_pass: evalResults.overallPass,
+      },
     });
 
     const mirrorRecord = engine.writer.writeRecord({
@@ -656,20 +445,35 @@ export class Phase9Handler implements PhaseHandler {
         kind: 'execution_completion_mirror',
         mirror_id: execMirror.mirrorId,
         fields: execMirror.fields,
+        wave_decisions: waveDecisions.map(d => ({
+          wave_number: d.wave_number,
+          wave_kind: d.wave_kind,
+          decision: d.decision,
+          rolled_back: d.rolled_back ?? false,
+        })),
       },
     });
     artifactIds.push(mirrorRecord.id);
     engine.eventBus.emit('mirror:presented', { mirrorId: execMirror.mirrorId, artifactType: 'execution_summary' });
 
-    try {
-      const resolution = await engine.pauseForDecision(workflowRun.id, mirrorRecord.id, 'mirror');
-      if (resolution.type === 'mirror_rejection') {
-        return { success: false, error: 'User rejected execution results', artifactIds };
+    // Auto-approve the terminal mirror under unattended/calibration
+    // mode (the per-wave gates already had their own auto-approve
+    // applied; surfacing this one too keeps the pause-free run path
+    // coherent). Otherwise pause for the human.
+    if (cfg.execution?.auto_approve_wave_gates !== true) {
+      try {
+        const resolution = await engine.pauseForDecision(workflowRun.id, mirrorRecord.id, 'mirror');
+        if (resolution.type === 'mirror_rejection') {
+          return { success: false, error: 'User rejected execution results', artifactIds };
+        }
+      } catch (err) {
+        getLogger().warn('workflow', 'Phase 9 approval failed', { error: String(err) });
+        return { success: false, error: 'Execution approval failed', artifactIds };
       }
-    } catch (err) {
-      getLogger().warn('workflow', 'Phase 9 approval failed', { error: String(err) });
-      return { success: false, error: 'Execution approval failed', artifactIds };
+    } else {
+      getLogger().info('workflow', 'Wave R: terminal mirror auto-approved (auto_approve_wave_gates=true)');
     }
+    void anyRejected;
 
     // Phase Gate
     const gateRecord = engine.writer.writeRecord({

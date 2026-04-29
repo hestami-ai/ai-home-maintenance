@@ -9,11 +9,18 @@
  *   7.4 — Approval (phase gate)
  */
 
+import { randomUUID } from 'node:crypto';
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
-import type { PhaseId } from '../../types/records';
+import type {
+  PhaseId,
+  TechnicalConstraint,
+  DecompositionTestCase,
+  TestDecompositionNodeContent,
+} from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveFrView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
+import { runTestSaturationLoop } from './phase7_1a';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -120,6 +127,97 @@ export class Phase7Handler implements PhaseHandler {
     });
     artifactIds.push(testPlanRecord.id);
     engine.ingestionPipeline.ingest(testPlanRecord);
+
+    // ── 7.1a — Recursive Test Decomposition (Wave 10) ─────────
+    engine.stateMachine.setSubPhase(workflowRun.id, '7.1a');
+
+    const techConstraintsRecord = allArtifacts.find(
+      r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery',
+    );
+    const technicalConstraints: TechnicalConstraint[] = techConstraintsRecord
+      ? (((techConstraintsRecord.content as Record<string, unknown>).technicalConstraints) as TechnicalConstraint[] ?? [])
+      : [];
+
+    // Resume guard — skip seeding when depth-0 nodes already exist.
+    const existingTestRoots = engine.writer.getRecordsByType(workflowRun.id, 'test_decomposition_node')
+      .filter(r => (r.content as unknown as TestDecompositionNodeContent).depth === 0);
+    let rootTestCases: DecompositionTestCase[];
+    let rootTestRecordIds: string[];
+    let rootTestLogicalIds: string[];
+    if (existingTestRoots.length > 0) {
+      getLogger().info('workflow', 'Phase 7.1a RESUME: depth-0 test nodes already present', {
+        existingRoots: existingTestRoots.length,
+      });
+      rootTestCases = existingTestRoots.map(r => (r.content as unknown as TestDecompositionNodeContent).test_case);
+      rootTestRecordIds = existingTestRoots.map(r => r.id);
+      rootTestLogicalIds = existingTestRoots.map(r => (r.content as unknown as TestDecompositionNodeContent).node_id);
+    } else {
+      // Convert Phase 7.1's flat test plan into per-case roots. Each
+      // test_suites[].test_cases[] entry becomes one depth-0 root.
+      const constraintIds = technicalConstraints.map(t => t.id);
+      rootTestCases = testPlanContent.test_suites.flatMap(s =>
+        s.test_cases.map(tc => ({
+          id: tc.test_case_id,
+          name: tc.expected_outcome ?? tc.test_case_id,
+          test_type: tc.type,
+          component_ids: tc.component_ids ?? [],
+          acceptance_criterion_ids: tc.acceptance_criterion_ids,
+          preconditions: tc.preconditions,
+          steps: (tc.execution_steps && tc.execution_steps.length > 0)
+            ? tc.execution_steps.map((stp, idx) => ({
+                id: `step-${String(idx + 1).padStart(2, '0')}`,
+                description: stp,
+              }))
+            : [{ id: 'step-01', description: tc.expected_outcome ?? tc.test_case_id }],
+          expected_outcome: tc.expected_outcome,
+          edge_cases: tc.edge_cases,
+          active_constraints: constraintIds,
+        })),
+      );
+      rootTestRecordIds = [];
+      rootTestLogicalIds = [];
+      for (const tc of rootTestCases) {
+        const logicalNodeId = randomUUID();
+        const rec = engine.writer.writeRecord({
+          record_type: 'test_decomposition_node',
+          schema_version: '1.0',
+          workflow_run_id: workflowRun.id,
+          phase_id: '7',
+          sub_phase_id: '7.1a',
+          produced_by_agent_role: 'test_design_agent',
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+          derived_from_record_ids: [testPlanRecord.id],
+          content: {
+            kind: 'test_decomposition_node',
+            node_id: logicalNodeId,
+            parent_node_id: null,
+            display_key: tc.id,
+            root_test_id: logicalNodeId,
+            depth: 0,
+            pass_number: 0,
+            status: 'pending',
+            test_case: tc,
+            surfaced_assumption_ids: [],
+            release_id: null,
+            release_ordinal: null,
+          } satisfies TestDecompositionNodeContent,
+        });
+        rootTestRecordIds.push(rec.id);
+        rootTestLogicalIds.push(logicalNodeId);
+        artifactIds.push(rec.id);
+      }
+    }
+
+    if (rootTestCases.length > 0) {
+      await runTestSaturationLoop(ctx, {
+        technicalConstraints,
+        componentSummary: prior.componentModel?.summary ?? 'No component model available',
+        acceptanceCriteriaSummary: prior.functionalRequirements?.summary ?? 'No FR/AC summary available',
+        rootTestCases,
+        rootNodeRecordIds: rootTestRecordIds,
+        rootLogicalIds: rootTestLogicalIds,
+      });
+    }
 
     // ── 7.2 — Test Coverage Analysis ──────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '7.2');

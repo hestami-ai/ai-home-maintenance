@@ -25,6 +25,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { createTestDatabase, type Database } from '../../../lib/database/init';
 import { ConfigManager } from '../../../lib/config/configManager';
@@ -58,12 +60,13 @@ class RecordingHandler implements PhaseHandler {
 describe('OrchestratorEngine — halt on unrecoverable LLM/CLI failure', () => {
   let db: Database;
   let engine: OrchestratorEngine;
-  const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
+  const extensionPath = path.resolve(__dirname, '..', '..', '..', '..');
+  const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
 
   beforeEach(() => {
     db = createTestDatabase();
     const configManager = new ConfigManager();
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
+    engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
   });
 
   afterEach(() => { db.close(); });

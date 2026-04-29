@@ -3,6 +3,8 @@ import { createTestDatabase, type Database } from '../../../lib/database/init';
 import { OrchestratorEngine } from '../../../lib/orchestrator/orchestratorEngine';
 import { Phase0Handler } from '../../../lib/orchestrator/phases/phase0';
 import { ConfigManager } from '../../../lib/config/configManager';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import path from 'path';
 
 describe('OrchestratorEngine', () => {
@@ -12,8 +14,9 @@ describe('OrchestratorEngine', () => {
   beforeEach(() => {
     db = createTestDatabase();
     const configManager = new ConfigManager();
-    const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
+    const extensionPath = path.resolve(__dirname, '..', '..', '..', '..');
+    const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
+    engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
   });
 
   afterEach(() => {

@@ -5,7 +5,7 @@
  * Single LLM API call. Synchronous — blocks Phase transition.
  * Produced at every Phase Gate acceptance before next Phase begins.
  *
- * Prompt is loaded from .janumicode/prompts/cross_cutting/narrative_memory.system.md
+ * Prompt is loaded from prompts/cross_cutting/narrative_memory.system.md
  */
 
 import { LLMCaller } from '../llm/llmCaller';

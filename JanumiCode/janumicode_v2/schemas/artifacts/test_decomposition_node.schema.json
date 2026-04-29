@@ -1,0 +1,68 @@
+{
+  "$id": "janumicode:test_decomposition_node:1.0",
+  "title": "Test Decomposition Node",
+  "description": "Single node in a recursive test-decomposition tree (Wave 10 — Phase 7.1a). Append-only — frozen on creation. status indicates whether this node was further decomposed, met atomic-test-step criteria, was pruned at the Tier-B mirror gate, deferred when a safety cap tripped, or downgraded after a tier mislabel was detected post-gate.",
+  "type": "object",
+  "required": ["kind", "node_id", "parent_node_id", "display_key", "root_test_id", "depth", "pass_number", "status", "test_case", "surfaced_assumption_ids"],
+  "properties": {
+    "kind": { "const": "test_decomposition_node" },
+    "node_id": { "type": "string" },
+    "parent_node_id": { "type": ["string", "null"] },
+    "display_key": { "type": "string" },
+    "root_test_id": { "type": "string" },
+    "depth": { "type": "integer", "minimum": 0, "maximum": 6 },
+    "pass_number": { "type": "integer", "minimum": 0 },
+    "status": { "type": "string", "enum": ["pending", "decomposed", "atomic", "pruned", "deferred", "downgraded"] },
+    "tier": {
+      "type": "string",
+      "enum": ["A", "B", "C", "D"],
+      "description": "Wave 10 test tier rubric. A=Test Suite (recurse), B=Test Scenario (mirror-gated), C=Test Case (one more pass), D=Atomic Test Step (terminal)."
+    },
+    "test_case": {
+      "type": "object",
+      "required": ["id", "name", "test_type", "steps"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "test_type": { "type": "string", "enum": ["unit", "integration", "end_to_end", "performance", "contract"] },
+        "component_ids": { "type": "array", "items": { "type": "string" } },
+        "acceptance_criterion_ids": { "type": "array", "items": { "type": "string" } },
+        "preconditions": { "type": "array", "items": { "type": "string" } },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "description"],
+            "properties": {
+              "id": { "type": "string" },
+              "description": { "type": "string" },
+              "phase": { "type": "string", "enum": ["arrange", "act", "assert", "teardown"] },
+              "expected_outcome": { "type": "string" }
+            }
+          }
+        },
+        "expected_outcome": { "type": "string" },
+        "edge_cases": { "type": "array", "items": { "type": "string" } },
+        "test_file_path": { "type": "string" },
+        "active_constraints": { "type": "array", "items": { "type": "string" } },
+        "traces_to": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "decomposition_rationale": { "type": "string" },
+    "surfaced_assumption_ids": { "type": "array", "items": { "type": "string" } },
+    "release_id": { "type": ["string", "null"] },
+    "release_ordinal": { "type": ["integer", "null"] },
+    "atomic_criteria_satisfied": {
+      "type": "object",
+      "required": ["steps_executable", "assertions_verifiable", "no_implicit_subscenario", "scope_within_one_component"],
+      "properties": {
+        "steps_executable": { "type": "boolean" },
+        "assertions_verifiable": { "type": "boolean" },
+        "no_implicit_subscenario": { "type": "boolean" },
+        "scope_within_one_component": { "type": "boolean" }
+      }
+    },
+    "pruning_reason": { "type": "string" }
+  }
+}

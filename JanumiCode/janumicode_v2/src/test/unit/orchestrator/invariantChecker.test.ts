@@ -8,7 +8,7 @@ describe('InvariantChecker', () => {
 
     beforeEach(() => {
       const invariantsPath = path.resolve(
-        __dirname, '..', '..', '..', '..', '.janumicode', 'schemas', 'invariants'
+        __dirname, '..', '..', '..', '..', 'schemas', 'invariants'
       );
       checker = new InvariantChecker(invariantsPath);
     });

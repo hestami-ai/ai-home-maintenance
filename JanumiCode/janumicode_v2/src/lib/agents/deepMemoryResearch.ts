@@ -215,7 +215,7 @@ export class DeepMemoryResearchAgent {
     this.maxVectorCandidates = config.maxVectorCandidates ?? 50;
     this.maxCausalDepth = config.maxCausalDepth ?? 3;
     this.model = config.model ?? process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b';
-    this.provider = config.provider ?? 'ollama';
+    this.provider = config.provider ?? 'llamacpp';
     this.baseUrl = config.baseUrl;
   }
 

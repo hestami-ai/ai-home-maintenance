@@ -72,7 +72,7 @@ describe('cosineSimilarity', () => {
 describe('EmbeddingService.enqueue text extraction', () => {
   it('skips records without text-bearing content', () => {
     const db = createTestDatabase();
-    const svc = new EmbeddingService(db, { provider: 'ollama', model: 'm', maxParallel: 1 });
+    const svc = new EmbeddingService(db, { provider: 'llamacpp', model: 'm', maxParallel: 1 });
     // No fields the extractor recognizes — enqueue is a no-op.
     svc.enqueue(makeRecord({ random: 1 }));
     db.close();
@@ -82,7 +82,7 @@ describe('EmbeddingService.enqueue text extraction', () => {
 
   it('extracts the text field for embedding', () => {
     const db = createTestDatabase();
-    const svc = new EmbeddingService(db, { provider: 'ollama', model: 'm', maxParallel: 1 });
+    const svc = new EmbeddingService(db, { provider: 'llamacpp', model: 'm', maxParallel: 1 });
     // Don't start the worker — we just verify enqueue accepts the record without error.
     svc.enqueue(makeRecord({ text: 'hello world' }));
     svc.enqueue(makeRecord({ description: 'a description' }));

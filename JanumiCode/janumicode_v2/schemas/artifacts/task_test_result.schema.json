@@ -1,0 +1,23 @@
+{
+  "$id": "janumicode:task_test_result:1.0",
+  "title": "Task Test Result",
+  "description": "Wave R — per-leaf test execution result. Carries pass/fail counts, output summary, duration. Distinct from the wave-level test_results aggregate.",
+  "type": "object",
+  "required": ["kind", "leaf_task_id", "attempt_number", "passed_count", "failed_count", "duration_ms", "executed_at"],
+  "properties": {
+    "kind": { "const": "task_test_result" },
+    "leaf_task_id": { "type": "string" },
+    "attempt_number": { "type": "integer", "minimum": 1 },
+    "wave_number": { "type": "integer", "minimum": 1 },
+    "test_command": { "type": "string", "description": "Resolved test command (e.g. 'npm test', 'vitest run path', 'node --test test/leaf-001/')" },
+    "passed_count": { "type": "integer", "minimum": 0 },
+    "failed_count": { "type": "integer", "minimum": 0 },
+    "skipped_count": { "type": "integer", "minimum": 0 },
+    "exit_code": { "type": ["integer", "null"] },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "stdout_excerpt": { "type": "string" },
+    "stderr_excerpt": { "type": "string" },
+    "executed_at": { "type": "string" },
+    "skipped_reason": { "type": "string", "description": "Populated when the runner skipped tests (e.g. no test command resolved, tests-per-leaf disabled)." }
+  }
+}

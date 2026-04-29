@@ -18,6 +18,8 @@
  * → Phase 2 chain runs hermetically.
  */
 
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import path from 'path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDatabase, type Database } from '../../../lib/database/init';
@@ -30,12 +32,13 @@ import { MockLLMProvider } from '../../helpers/mockLLMProvider';
 describe('Release prioritization — Phase 1.8 → Phase 2 propagation', () => {
   let db: Database;
   let engine: OrchestratorEngine;
-  const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
+  const extensionPath = path.resolve(__dirname, '..', '..', '..', '..');
+  const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
 
   beforeEach(() => {
     db = createTestDatabase();
     const configManager = new ConfigManager();
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
+    engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
     engine.llmCaller.registerProvider({
       name: 'google',
       call: () => Promise.reject(new Error('stub — not routed')),
@@ -297,12 +300,12 @@ describe('Release prioritization — Phase 1.8 → Phase 2 propagation', () => {
     const mock = new MockLLMProvider();
     seedProductLensChain(mock);
     seedPhase2Fixtures(mock);
-    engine.llmCaller.registerProvider(mock.bindAsProvider('ollama'));
+    engine.llmCaller.registerProvider(mock.bindAsProvider('llamacpp'));
     engine.configManager.setOrchestratorRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
     });
     engine.configManager.setRequirementsAgentRouting({
-      primary: { backing_tool: 'direct_llm_api', provider: 'ollama', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
       temperature: 0.5,
     });
 

@@ -200,13 +200,46 @@ export class AgentInvoker {
       const errorMessage = this.resolveCLIError(result);
       const success = result.exitCode === 0 && !result.timedOut && !result.idledOut;
 
-      this.writeCLIOutputRecord(
+      const { agentOutputId } = this.writeCLIOutputRecord(
         invocationRecordId,
         options,
         result,
         Date.now() - startedAt,
         success ? null : errorMessage ?? 'CLI invocation failed',
       );
+
+      // Fire the reasoning-review hook on successful CLI completions so
+      // Phase 9 executor calls (Goose, Claude Code) get the same advisory
+      // review coverage as direct LLM calls. We construct a minimal
+      // LLMCallResult-shaped envelope from the CLI invocation; tool-call
+      // events and stderr are intentionally omitted from the prompt the
+      // reviewer sees — per cal-24 design, tool-call output bloats the
+      // review prompt without surfacing reasoning flaws the reviewer can
+      // act on. `text` is the synthesized final response (best-effort
+      // extraction); `thinking` is left empty until per-CLI-tool reasoning
+      // extractors are wired (a separate task).
+      if (success && agentOutputId && options.traceContext) {
+        const { extractFinalText, extractReasoningText } = await import('./orchestratorEngine.js');
+        const finalText = extractFinalText(result.events) || (result.stdoutText ?? '');
+        const reasoningText = extractReasoningText(result.events);
+        const reviewResult = {
+          text: finalText,
+          parsed: null,
+          thinking: reasoningText || undefined,
+          toolCalls: [],
+          provider: options.backingTool,
+          model: options.model ?? options.backingTool,
+          inputTokens: null,
+          outputTokens: null,
+          usedFallback: false,
+          retryAttempts: 0,
+        };
+        await this.llmCaller.runReviewerHook(
+          agentOutputId,
+          { traceContext: options.traceContext, prompt: options.prompt },
+          reviewResult,
+        );
+      }
 
       return {
         success,
@@ -284,12 +317,12 @@ export class AgentInvoker {
     result: CLIInvocationResult | null,
     durationMs: number,
     errorMessage: string | null,
-  ): void {
-    if (!this.writer || !invocationId || !options.traceContext) return;
+  ): { agentOutputId: string | null } {
+    if (!this.writer || !invocationId || !options.traceContext) return { agentOutputId: null };
     const ctx = options.traceContext;
     const status = errorMessage === null ? 'success' : 'error';
     try {
-      this.writer.writeRecord({
+      const rec = this.writer.writeRecord({
         record_type: 'agent_output',
         schema_version: '1.0',
         workflow_run_id: ctx.workflowRunId,
@@ -309,8 +342,10 @@ export class AgentInvoker {
           error_message: errorMessage,
         },
       });
+      return { agentOutputId: rec.id };
     } catch {
       /* best-effort */
+      return { agentOutputId: null };
     }
   }
 

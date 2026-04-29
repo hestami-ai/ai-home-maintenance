@@ -19,6 +19,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { createTestDatabase, type Database } from '../../../lib/database/init';
 import { ConfigManager } from '../../../lib/config/configManager';
@@ -46,8 +48,9 @@ describe('OrchestratorEngine — phase limit enforcement', () => {
     log.length = 0;
     db = createTestDatabase();
     const configManager = new ConfigManager();
-    const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
+    const extensionPath = path.resolve(__dirname, '..', '..', '..', '..');
+    const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
+    engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
     engine.setAutoApproveDecisions(true);
 
     for (const p of ['0', '1', '2', '3', '4'] as PhaseId[]) {

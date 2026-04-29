@@ -19,8 +19,8 @@ describe('LoopDetectionMonitor', () => {
       const result = monitor.assess({
         retryCount: 2,
         flawHistory: [
-          { attemptNumber: 1, flaws: [{ type: 'circular_logic', severity: 'high' }, { type: 'invalid_inference', severity: 'high' }] },
-          { attemptNumber: 2, flaws: [{ type: 'circular_logic', severity: 'high' }] },
+          { attemptNumber: 1, flaws: [{ type: 'circular_logic', severity: 'HIGH' }, { type: 'invalid_inference', severity: 'HIGH' }] },
+          { attemptNumber: 2, flaws: [{ type: 'circular_logic', severity: 'HIGH' }] },
         ],
         toolCallHistory: [
           { attemptNumber: 1, toolCalls: [{ name: 'Read', params: 'a' }] },
@@ -35,8 +35,8 @@ describe('LoopDetectionMonitor', () => {
       const result = monitor.assess({
         retryCount: 2,
         flawHistory: [
-          { attemptNumber: 1, flaws: [{ type: 'circular_logic', severity: 'high' }] },
-          { attemptNumber: 2, flaws: [{ type: 'circular_logic', severity: 'high' }, { type: 'scope_violation', severity: 'high' }] },
+          { attemptNumber: 1, flaws: [{ type: 'circular_logic', severity: 'HIGH' }] },
+          { attemptNumber: 2, flaws: [{ type: 'circular_logic', severity: 'HIGH' }, { type: 'scope_violation', severity: 'HIGH' }] },
         ],
         toolCallHistory: [
           { attemptNumber: 1, toolCalls: [{ name: 'Read', params: 'a' }] },
@@ -51,8 +51,8 @@ describe('LoopDetectionMonitor', () => {
       const result = monitor.assess({
         retryCount: 2,
         flawHistory: [
-          { attemptNumber: 1, flaws: [{ type: 'unsupported_assumption', severity: 'high' }] },
-          { attemptNumber: 2, flaws: [{ type: 'invalid_inference', severity: 'high' }] },
+          { attemptNumber: 1, flaws: [{ type: 'unsupported_assumption', severity: 'HIGH' }] },
+          { attemptNumber: 2, flaws: [{ type: 'invalid_inference', severity: 'HIGH' }] },
         ],
         toolCallHistory: [
           { attemptNumber: 1, toolCalls: [{ name: 'Read', params: 'a' }] },
@@ -69,8 +69,8 @@ describe('LoopDetectionMonitor', () => {
       const result = monitor.assess({
         retryCount: 2,
         flawHistory: [
-          { attemptNumber: 1, flaws: [{ type: 'unsupported_assumption', severity: 'high' }] },
-          { attemptNumber: 2, flaws: [{ type: 'unsupported_assumption', severity: 'high' }] },
+          { attemptNumber: 1, flaws: [{ type: 'unsupported_assumption', severity: 'HIGH' }] },
+          { attemptNumber: 2, flaws: [{ type: 'unsupported_assumption', severity: 'HIGH' }] },
         ],
         toolCallHistory: [
           { attemptNumber: 1, toolCalls: [] },
@@ -87,8 +87,8 @@ describe('LoopDetectionMonitor', () => {
       const result = monitor.assess({
         retryCount: 2,
         flawHistory: [
-          { attemptNumber: 1, flaws: [{ type: 'circular_logic', severity: 'high' }] },
-          { attemptNumber: 2, flaws: [{ type: 'circular_logic', severity: 'high' }] },
+          { attemptNumber: 1, flaws: [{ type: 'circular_logic', severity: 'HIGH' }] },
+          { attemptNumber: 2, flaws: [{ type: 'circular_logic', severity: 'HIGH' }] },
         ],
         toolCallHistory: [
           { attemptNumber: 1, toolCalls: [] },
@@ -106,11 +106,11 @@ describe('LoopDetectionMonitor', () => {
       const result = monitor.assess({
         retryCount: 2,
         flawHistory: [
-          { attemptNumber: 1, flaws: [{ type: 'unsupported_assumption', severity: 'high' }] },
+          { attemptNumber: 1, flaws: [{ type: 'unsupported_assumption', severity: 'HIGH' }] },
           { attemptNumber: 2, flaws: [
-            { type: 'unsupported_assumption', severity: 'high' },
-            { type: 'unacknowledged_uncertainty', severity: 'low' },
-            { type: 'unacknowledged_uncertainty', severity: 'low' },
+            { type: 'unsupported_assumption', severity: 'HIGH' },
+            { type: 'unacknowledged_uncertainty', severity: 'LOW' },
+            { type: 'unacknowledged_uncertainty', severity: 'LOW' },
           ] },
         ],
         toolCallHistory: [
@@ -130,8 +130,8 @@ describe('LoopDetectionMonitor', () => {
       const result = monitor.assess({
         retryCount: 2,
         flawHistory: [
-          { attemptNumber: 1, flaws: [{ type: 'scope_violation', severity: 'high' }] },
-          { attemptNumber: 2, flaws: [{ type: 'scope_violation', severity: 'high' }] },
+          { attemptNumber: 1, flaws: [{ type: 'scope_violation', severity: 'HIGH' }] },
+          { attemptNumber: 2, flaws: [{ type: 'scope_violation', severity: 'HIGH' }] },
         ],
         toolCallHistory: [
           { attemptNumber: 1, toolCalls: [] },

@@ -172,15 +172,36 @@ export class Phase1Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(qualityRecord);
 
     if (qualityReport.overall_status === 'blocking') {
-      engine.eventBus.emit('error:occurred', {
-        message: 'Intent Quality Check found blocking issues',
-        context: JSON.stringify(qualityReport),
-      });
-      return {
-        success: false,
-        error: 'Intent Quality Check found blocking contradictions — must be resolved before bloom',
-        artifactIds,
-      };
+      // Only true contradictions (consistency_findings) hard-fail the
+      // phase. Coherence-finding blockers are scope/complexity concerns
+      // — judgement calls the calibrating LLM may flag inconsistently
+      // across runs (cal-23 case: gemma flagged "massive scope" as
+      // blocking on the Hestami spec; the same spec passed in cal-22b).
+      // We log them as advisories instead of halting bloom; the human
+      // approval gates downstream can still pause the run on substance.
+      const consistency = (qualityReport.consistency_findings ?? []) as Array<{ severity?: string; concern?: string }>;
+      const coherence = (qualityReport.coherence_findings ?? []) as Array<{ severity?: string; concern?: string }>;
+      const blockingConsistency = consistency.filter(f => f.severity === 'blocking');
+      const blockingCoherence = coherence.filter(f => f.severity === 'blocking');
+      if (blockingConsistency.length > 0) {
+        engine.eventBus.emit('error:occurred', {
+          message: 'Intent Quality Check found blocking contradictions',
+          context: JSON.stringify(qualityReport),
+        });
+        return {
+          success: false,
+          error: 'Intent Quality Check found blocking contradictions — must be resolved before bloom',
+          artifactIds,
+        };
+      }
+      if (blockingCoherence.length > 0) {
+        getLogger().warn('workflow',
+          `Phase 1.0: Intent Quality Check flagged ${blockingCoherence.length} blocking coherence concern(s) — proceeding with bloom; surfaced as advisory`,
+          {
+            workflow_run_id: workflowRun.id,
+            concerns: blockingCoherence.map(f => f.concern ?? '<unnamed>').slice(0, 10),
+          });
+      }
     }
 
     // ── Sub-Phase 1.0a — Intent Lens Classification ──────────
@@ -764,7 +785,7 @@ export class Phase1Handler implements PhaseHandler {
   }
 
   /**
-   * Write a Context Payload detail file under .janumicode/context/ so the
+   * Write a Context Payload detail file under .janumicode/runs/<run_id>/context/ so the
    * full assembled context is auditable (and, in future, readable by CLI
    * agents directly from disk without re-inlining). Returns the path or
    * null on failure.
@@ -800,6 +821,7 @@ export class Phase1Handler implements PhaseHandler {
           complianceContext: '',
           unstickingResolutions: '',
         },
+        workflowRun.id,
       );
       // Augment the detail file on disk with the enriched intent so a
       // human auditor (or future CLI agent) can see exactly what the
@@ -1522,7 +1544,7 @@ export class Phase1Handler implements PhaseHandler {
       cross_cutting: lastCrossCutting,
       approved: false,
     };
-    const manifestGaps = verifyReleaseManifest({
+    let manifestGaps = verifyReleaseManifest({
       plan: draftPlan,
       journeys: safeJourneys,
       workflows: acceptedWorkflowsForPlan,
@@ -1531,6 +1553,32 @@ export class Phase1Handler implements PhaseHandler {
       integrations: acceptedIntegrationsForPlan,
       vocabulary: acceptedVocabularyForPlan,
     });
+
+    // Auto-fix pass — when the verifier flags release_backward_dependency
+    // for one or more workflows, the LLM placed the workflow earlier than
+    // its trigger targets. Deterministic remedy: move each offending
+    // workflow forward to the latest release that contains any of its
+    // trigger targets. Re-verify; only fall through to the hard-fail
+    // path if violations remain.
+    const backwardGap = manifestGaps.find(g => g.check === 'release_backward_dependency' && g.severity === 'blocking');
+    if (backwardGap) {
+      const fixesApplied = autoFixBackwardDependencies(draftPlan, acceptedWorkflowsForPlan, safeJourneys);
+      if (fixesApplied.length > 0) {
+        getLogger().warn('workflow', `Phase 1.8: auto-fixed ${fixesApplied.length} backward-dependency violation(s) — promoted workflow(s) to a later release`, {
+          workflow_run_id: workflowRun.id,
+          fixes: fixesApplied.slice(0, 20),
+        });
+        manifestGaps = verifyReleaseManifest({
+          plan: draftPlan,
+          journeys: safeJourneys,
+          workflows: acceptedWorkflowsForPlan,
+          entityIds: acceptedEntitiesForPlan.map(e => e.id),
+          complianceIds: acceptedComplianceForPlan.map(c => c.id),
+          integrations: acceptedIntegrationsForPlan,
+          vocabulary: acceptedVocabularyForPlan,
+        });
+      }
+    }
     const blockingManifestGaps = manifestGaps.filter(g => g.severity === 'blocking');
     if (blockingManifestGaps.length > 0) {
       const gapRecIds = this.persistCoverageGaps(ctx, manifestGaps, [round18.record.id]);
@@ -2557,40 +2605,201 @@ export class Phase1Handler implements PhaseHandler {
     const acceptedRetention = new Set(inputs.retentionRules.map(r => r.id));
     const acceptedVV = new Set(inputs.vvRequirements.map(v => v.id));
     const acceptedIntegrations = new Set(inputs.integrations.map(i => i.id));
+    const acceptedPersonaIds = new Set(inputs.acceptedPersonas.map(p => p.id));
     const rawJourneys = (parsed.userJourneys as Array<Record<string, unknown>> | undefined) ?? [];
     const droppedBySurfaceType: Record<string, string[]> = {
       compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [],
     };
-    const userJourneys: UserJourney[] = rawJourneys.map(j => {
-      const s = (j as { surfaces?: Record<string, unknown> }).surfaces;
-      if (s && typeof s === 'object') {
-        const filterArr = (key: string, accepted: Set<string>, mergeAccepted?: Set<string>) => {
-          const xs = Array.isArray((s as Record<string, unknown>)[key])
-            ? (s as Record<string, string[]>)[key].filter(x => typeof x === 'string')
-            : [];
-          const kept: string[] = [];
-          for (const x of xs) {
-            if (accepted.has(x) || (mergeAccepted && mergeAccepted.has(x))) kept.push(x);
-            else droppedBySurfaceType[key].push(x);
-          }
-          (s as Record<string, string[]>)[key] = kept;
-        };
-        // Retention-rule ids may also resolve against the compliance set
-        // (retention is a subset of compliance in our extraction model).
-        filterArr('compliance_regimes', acceptedCompliance);
-        filterArr('retention_rules', acceptedRetention, acceptedCompliance);
-        filterArr('vv_requirements', acceptedVV);
-        filterArr('integrations', acceptedIntegrations);
+    // Persona-ID self-heal. Mirrors the surfaces[*] drop pattern but
+    // applied to journey.personaId, journey.additionalPersonas[], and
+    // journey.steps[].actor (where actor MAY be a persona id, "System",
+    // or an integration id). Resolution order:
+    //   1. Per-journey LLM retry — re-emit the offending journey with
+    //      explicit "use ONLY these accepted persona IDs" feedback.
+    //      Most correct: lets the model pick the right initiator from
+    //      context rather than us guessing by string distance.
+    //   2. Fuzzy-remap fallback — when the retry budget is exhausted or
+    //      the retry also produced an invalid id, remap to the closest
+    //      accepted persona by token-overlap or Levenshtein distance.
+    //   3. Drop — when no reasonable fuzzy match exists either.
+    const personaRemapLog: Array<{ from: string; to: string; where: string }> = [];
+    const personaDropLog: Array<{ id: string; where: string }> = [];
+    const personaRetryLog: Array<{ journey_id: string; from: string; to: string; outcome: string }> = [];
+    const remapPersona = (raw: string, where: string): string | null => {
+      if (acceptedPersonaIds.has(raw)) return raw;
+      const best = nearestAcceptedPersona(raw, [...acceptedPersonaIds]);
+      if (best) {
+        personaRemapLog.push({ from: raw, to: best, where });
+        return best;
       }
-      // Normalize acceptanceCriteria to string[] before persistence.
-      // cal-22 hit qwen-3.5:9b emitting a bare string here, which crashed
-      // Phase 2's formatter. Coercing on the write side keeps the
-      // persisted artifact matching its declared type so downstream
-      // readers can trust the shape.
+      personaDropLog.push({ id: raw, where });
+      return null;
+    };
+    const filterSurfaces = (j: Record<string, unknown>) => {
+      const s = (j as { surfaces?: Record<string, unknown> }).surfaces;
+      if (!s || typeof s !== 'object') return;
+      const filterArr = (key: string, accepted: Set<string>, mergeAccepted?: Set<string>) => {
+        const xs = Array.isArray((s as Record<string, unknown>)[key])
+          ? (s as Record<string, string[]>)[key].filter(x => typeof x === 'string')
+          : [];
+        const kept: string[] = [];
+        for (const x of xs) {
+          if (accepted.has(x) || (mergeAccepted && mergeAccepted.has(x))) kept.push(x);
+          else droppedBySurfaceType[key].push(x);
+        }
+        (s as Record<string, string[]>)[key] = kept;
+      };
+      filterArr('compliance_regimes', acceptedCompliance);
+      filterArr('retention_rules', acceptedRetention, acceptedCompliance);
+      filterArr('vv_requirements', acceptedVV);
+      filterArr('integrations', acceptedIntegrations);
+    };
+    // Identify hallucinated persona references on a journey BEFORE
+    // mutating it. Used to gate the per-journey LLM retry: only
+    // journeys with at least one offending id pay the retry cost.
+    const collectInvalidPersonaRefs = (j: Record<string, unknown>): Array<{ id: string; where: string }> => {
+      const refs: Array<{ id: string; where: string }> = [];
+      const journeyId = typeof j.id === 'string' ? j.id : '<unknown>';
+      if (typeof j.personaId === 'string' && !acceptedPersonaIds.has(j.personaId)) {
+        refs.push({ id: j.personaId, where: `${journeyId}.personaId` });
+      }
+      if (Array.isArray(j.additionalPersonas)) {
+        for (const p of j.additionalPersonas) {
+          if (typeof p === 'string' && !acceptedPersonaIds.has(p)) {
+            refs.push({ id: p, where: `${journeyId}.additionalPersonas` });
+          }
+        }
+      }
+      if (Array.isArray(j.steps)) {
+        for (const stepRaw of j.steps) {
+          if (!stepRaw || typeof stepRaw !== 'object') continue;
+          const step = stepRaw as Record<string, unknown>;
+          const actor = step.actor;
+          if (typeof actor !== 'string') continue;
+          if (actor === 'System' || acceptedIntegrations.has(actor)) continue;
+          if (!actor.startsWith('P-')) continue;
+          if (!acceptedPersonaIds.has(actor)) {
+            refs.push({ id: actor, where: `${journeyId}.step#${step.stepNumber}.actor` });
+          }
+        }
+      }
+      return refs;
+    };
+    // Apply remapPersona to a journey in place. Returns true on
+    // success; false when the initiator persona is unrecoverable.
+    const applyRemap = (j: Record<string, unknown>): boolean => {
+      const journeyId = typeof j.id === 'string' ? j.id : '<unknown>';
+      if (typeof j.personaId === 'string') {
+        const remapped = remapPersona(j.personaId, `${journeyId}.personaId`);
+        if (!remapped) return false;
+        j.personaId = remapped;
+      }
+      if (Array.isArray(j.additionalPersonas)) {
+        const kept: string[] = [];
+        for (const p of j.additionalPersonas) {
+          if (typeof p !== 'string') continue;
+          const remapped = remapPersona(p, `${journeyId}.additionalPersonas`);
+          if (remapped) kept.push(remapped);
+        }
+        j.additionalPersonas = kept;
+      }
+      if (Array.isArray(j.steps)) {
+        for (const stepRaw of j.steps) {
+          if (!stepRaw || typeof stepRaw !== 'object') continue;
+          const step = stepRaw as Record<string, unknown>;
+          const actor = step.actor;
+          if (typeof actor !== 'string') continue;
+          if (actor === 'System' || acceptedIntegrations.has(actor) || !actor.startsWith('P-')) continue;
+          const remapped = remapPersona(actor, `${journeyId}.step#${step.stepNumber}.actor`);
+          step.actor = remapped ?? 'System';
+        }
+      }
+      return true;
+    };
+    const PER_JOURNEY_RETRY_BUDGET = 2;
+    const TOTAL_RETRY_BUDGET = 10;
+    let totalRetriesUsed = 0;
+    const journeysAfterDrop: Array<Record<string, unknown>> = [];
+    for (let j of rawJourneys) {
+      filterSurfaces(j);
       const ac = (j as Record<string, unknown>).acceptanceCriteria;
       (j as Record<string, unknown>).acceptanceCriteria = normalizeAcceptanceCriteria(ac);
-      return j as unknown as UserJourney;
-    });
+      const journeyId = typeof (j as { id?: string }).id === 'string' ? (j as { id: string }).id : '<unknown>';
+
+      // Step 1 — LLM retry per offending journey (most correct path).
+      let invalidRefs = collectInvalidPersonaRefs(j);
+      let retriesForThisJourney = 0;
+      while (invalidRefs.length > 0
+        && retriesForThisJourney < PER_JOURNEY_RETRY_BUDGET
+        && totalRetriesUsed < TOTAL_RETRY_BUDGET) {
+        retriesForThisJourney++;
+        totalRetriesUsed++;
+        const fixed = await this.retryJourneyForPersonaFix(
+          ctx, j, invalidRefs, inputs.acceptedPersonas, retriesForThisJourney,
+        );
+        if (fixed) {
+          filterSurfaces(fixed);
+          const fac = (fixed as Record<string, unknown>).acceptanceCriteria;
+          (fixed as Record<string, unknown>).acceptanceCriteria = normalizeAcceptanceCriteria(fac);
+          j = fixed;
+          const stillInvalid = collectInvalidPersonaRefs(j);
+          personaRetryLog.push({
+            journey_id: journeyId,
+            from: invalidRefs.map(r => r.id).join(','),
+            to: typeof j.personaId === 'string' ? j.personaId : '?',
+            outcome: stillInvalid.length === 0 ? 'fixed' : 'still_invalid',
+          });
+          invalidRefs = stillInvalid;
+        } else {
+          personaRetryLog.push({
+            journey_id: journeyId,
+            from: invalidRefs.map(r => r.id).join(','),
+            to: '',
+            outcome: 'retry_call_failed',
+          });
+          break;
+        }
+      }
+      if (invalidRefs.length > 0 && totalRetriesUsed >= TOTAL_RETRY_BUDGET) {
+        personaRetryLog.push({
+          journey_id: journeyId,
+          from: invalidRefs.map(r => r.id).join(','),
+          to: '',
+          outcome: 'retry_budget_exhausted',
+        });
+      }
+
+      // Step 2 — fuzzy-remap fallback for any residual invalid refs.
+      if (!applyRemap(j as Record<string, unknown>)) {
+        getLogger().warn('workflow', 'Phase 1.3a: dropping journey — personaId unrecoverable after retry + fuzzy-remap', {
+          journey_id: journeyId,
+          persona_id: (j as { personaId?: unknown }).personaId,
+        });
+        continue;
+      }
+      journeysAfterDrop.push(j as Record<string, unknown>);
+    }
+    const userJourneys: UserJourney[] = journeysAfterDrop as unknown as UserJourney[];
+    if (personaRetryLog.length > 0) {
+      const fixed = personaRetryLog.filter(r => r.outcome === 'fixed').length;
+      getLogger().warn('workflow', `Phase 1.3a: ran ${personaRetryLog.length} per-journey LLM retry/retries (${fixed} fixed by retry, rest fell through to remap/drop)`, {
+        workflow_run_id: ctx.workflowRun.id,
+        retries: personaRetryLog.slice(0, 20),
+        total_retries_used: totalRetriesUsed,
+      });
+    }
+    if (personaRemapLog.length > 0) {
+      getLogger().warn('workflow', `Phase 1.3a: remapped ${personaRemapLog.length} hallucinated persona id(s) to nearest accepted match`, {
+        workflow_run_id: ctx.workflowRun.id,
+        remaps: personaRemapLog.slice(0, 20),
+      });
+    }
+    if (personaDropLog.length > 0) {
+      getLogger().warn('workflow', `Phase 1.3a: dropped ${personaDropLog.length} unresolvable persona id reference(s)`, {
+        workflow_run_id: ctx.workflowRun.id,
+        drops: personaDropLog.slice(0, 20),
+      });
+    }
     const totalDropped = Object.values(droppedBySurfaceType).reduce((a, b) => a + b.length, 0);
     if (totalDropped > 0) {
       getLogger().warn('workflow', `Phase 1.3a: dropped ${totalDropped} non-accepted id(s) from journey surfaces`, {
@@ -2606,6 +2815,89 @@ export class Phase1Handler implements PhaseHandler {
       unreachedPersonas,
       unreachedDomains,
     };
+  }
+
+  /**
+   * 1.3a per-journey persona-fix retry. Fires one focused LLM call to
+   * re-emit a single offending journey with strict instruction to use
+   * only accepted persona ids. Returns the corrected journey object, or
+   * null when the call fails or the LLM emits unparseable JSON.
+   *
+   * Invoked from runJourneyBloom13a's sanitizer when a journey carries
+   * a personaId / additionalPersonas[] / step.actor that's not in the
+   * accepted persona set. More correct than mechanical fuzzy-remapping
+   * — the model picks the right initiator from context. Falls through
+   * to fuzzy-remap when the retry budget is exhausted or also fails.
+   */
+  private async retryJourneyForPersonaFix(
+    ctx: PhaseContext,
+    journey: Record<string, unknown>,
+    invalidRefs: ReadonlyArray<{ id: string; where: string }>,
+    acceptedPersonas: Persona[],
+    attempt: number,
+  ): Promise<Record<string, unknown> | null> {
+    const { engine } = ctx;
+    const journeyId = typeof journey.id === 'string' ? journey.id : '<unknown>';
+    const acceptedList = acceptedPersonas
+      .map(p => `- ${p.id}: ${p.name}`)
+      .join('\n');
+    const offending = invalidRefs.map(r => `  - "${r.id}" at ${r.where}`).join('\n');
+    const journeyJson = JSON.stringify(journey, null, 2);
+    const prompt = `You are correcting a single user journey whose persona references include id(s) that aren't in the accepted set.
+
+# Accepted personas (these are the ONLY valid persona ids; copy them verbatim — do not invent variants)
+
+${acceptedList}
+
+# Offending references in the journey
+
+${offending}
+
+# The journey to correct
+
+${journeyJson}
+
+# Your task
+
+Re-emit this single journey as a JSON object that matches the original schema (id, personaId, additionalPersonas[], steps[], etc.) but with EVERY persona reference replaced by an id from the accepted set above. If a step's actor was a hallucinated persona id and no accepted persona fits the role, set the actor to "System" instead. Preserve every other field unchanged.
+
+# JSON Output Contract (strict)
+
+- Response is ONE JSON object — the corrected journey.
+- No markdown fences, no prose before or after the JSON.
+- Straight ASCII double quotes only.
+- Every personaId / additionalPersonas[] entry / step.actor (when persona-shaped) MUST be one of: ${acceptedPersonas.map(p => p.id).join(', ')}, "System", or an integration id.`;
+    try {
+      const result = await engine.callForRole('domain_interpreter', {
+        prompt,
+        responseFormat: 'json',
+        temperature: 0.3,
+        traceContext: {
+          workflowRunId: ctx.workflowRun.id,
+          phaseId: '1',
+          subPhaseId: '1.3a',
+          agentRole: 'domain_interpreter',
+          label: `Phase 1.3a — persona-fix retry attempt ${attempt} for ${journeyId}`,
+        },
+      });
+      const parsed = this.safeParseJson(result);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+      // Preserve the original journey id when the model drops or
+      // reshapes it — we are correcting THIS journey, not generating
+      // a new one. Surfaces / acceptanceCriteria normalization is
+      // re-applied by the caller after this returns.
+      if (typeof parsed.id !== 'string' && typeof journey.id === 'string') {
+        parsed.id = journey.id;
+      }
+      return parsed;
+    } catch (err) {
+      getLogger().warn('workflow', 'Phase 1.3a: persona-fix retry call failed', {
+        journey_id: journeyId,
+        attempt,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
   }
 
   /**
@@ -3066,6 +3358,164 @@ interface IntentDiscoveryBundle {
  * measurable conditions. Coerce all shapes to a plain string[] so
  * the persisted UserJourney shape matches its TypeScript contract.
  */
+/**
+ * Find the closest accepted persona id when the LLM emitted a near-name
+ * variant (e.g. "P-HOA-BOARD-MANAGER" instead of accepted
+ * "P-HOA-BOARD-MEMBER"). Strategy:
+ *   1. Token-overlap match — if the candidate shares all tokens except
+ *      one, it's almost certainly the same persona under a different
+ *      name. This catches the cal-23 manager/member case.
+ *   2. Levenshtein-bounded match — fall back to edit-distance ≤ 4 when
+ *      tokens don't align cleanly (e.g. typos, suffix variants).
+ * Returns null when no accepted persona is within either threshold.
+ */
+function nearestAcceptedPersona(raw: string, accepted: readonly string[]): string | null {
+  if (accepted.length === 0) return null;
+  const rawTokens = new Set(raw.toUpperCase().split(/[-_\s]+/).filter(Boolean));
+  // Token-overlap pass: best match shares all-but-one token.
+  let bestByTokens: { id: string; overlap: number; missing: number } | null = null;
+  for (const a of accepted) {
+    const aTokens = new Set(a.toUpperCase().split(/[-_\s]+/).filter(Boolean));
+    let overlap = 0;
+    for (const t of rawTokens) if (aTokens.has(t)) overlap++;
+    const missing = Math.abs(rawTokens.size - aTokens.size) + (rawTokens.size - overlap);
+    if (overlap >= Math.max(1, rawTokens.size - 1)
+      && (!bestByTokens || overlap > bestByTokens.overlap || missing < bestByTokens.missing)) {
+      bestByTokens = { id: a, overlap, missing };
+    }
+  }
+  if (bestByTokens) return bestByTokens.id;
+  // Levenshtein fallback.
+  let bestById: { id: string; distance: number } | null = null;
+  for (const a of accepted) {
+    const d = levenshtein(raw.toUpperCase(), a.toUpperCase());
+    if (d <= 4 && (!bestById || d < bestById.distance)) bestById = { id: a, distance: d };
+  }
+  return bestById?.id ?? null;
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  let prev = new Array<number>(b.length + 1);
+  let curr = new Array<number>(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[b.length];
+}
+
+/**
+ * Phase 1.8 deterministic auto-fix for `release_backward_dependency`
+ * verifier failures. When the LLM places a workflow in an earlier
+ * release than one of its trigger targets, move the workflow forward
+ * to the latest release that contains any of its trigger targets.
+ *
+ * Mutates `plan` in place: removes each offending workflow from its
+ * source release's `contains.workflows`, removes it from
+ * `cross_cutting.workflows` if present, and pushes it onto the target
+ * release's `contains.workflows`. Idempotent — running on a clean plan
+ * is a no-op. Safe under shared-array invariants because both source
+ * and target are arrays we own (release contents).
+ *
+ * Cross-cutting workflows whose triggers include release-specific
+ * targets are also auto-fixed: the workflow is demoted from
+ * `cross_cutting` to the latest target release, since a workflow
+ * whose triggers fire only in some releases doesn't truly span all.
+ *
+ * Returns a per-workflow log of what was moved (for the WARN line).
+ */
+function autoFixBackwardDependencies(
+  plan: ReleasePlanContentV2,
+  workflows: WorkflowV2[],
+  journeys: UserJourney[],
+): Array<{ workflow_id: string; from: string; to: string; reason: string }> {
+  const fixes: Array<{ workflow_id: string; from: string; to: string; reason: string }> = [];
+
+  // Build id → ordinal lookup. cross_cutting → -Infinity (never blocks
+  // anything) and matches verifyReleaseManifest's mapping exactly.
+  const ordinalOf = new Map<string, number>();
+  for (const r of plan.releases) {
+    for (const id of r.contains.journeys) ordinalOf.set(id, r.ordinal);
+    for (const id of r.contains.workflows) ordinalOf.set(id, r.ordinal);
+    for (const id of r.contains.compliance) ordinalOf.set(id, r.ordinal);
+    for (const id of r.contains.integrations) ordinalOf.set(id, r.ordinal);
+  }
+  for (const id of plan.cross_cutting.workflows) ordinalOf.set(id, -Infinity);
+  for (const id of plan.cross_cutting.compliance) ordinalOf.set(id, -Infinity);
+  for (const id of plan.cross_cutting.integrations) ordinalOf.set(id, -Infinity);
+
+  const journeyIdSet = new Set(journeys.map(j => j.id));
+
+  // Workflow id → its current placement (release ordinal or
+  // 'cross_cutting'). Lets us find the source release fast.
+  const workflowPlacementSource = new Map<string, ReleaseV2 | 'cross_cutting'>();
+  for (const r of plan.releases) {
+    for (const wid of r.contains.workflows) workflowPlacementSource.set(wid, r);
+  }
+  for (const wid of plan.cross_cutting.workflows) workflowPlacementSource.set(wid, 'cross_cutting');
+
+  for (const w of workflows) {
+    const wfPlacement = workflowPlacementSource.get(w.id);
+    if (wfPlacement === undefined) continue; // not placed; coverage check reports it
+    const wfOrd = wfPlacement === 'cross_cutting' ? -Infinity : wfPlacement.ordinal;
+
+    // Compute the maximum trigger-target ordinal. Targets that are
+    // cross_cutting (-Infinity) don't constrain placement; targets
+    // not present in ordinalOf are coverage failures (ignored here).
+    let maxTargetOrd = -Infinity;
+    for (const t of w.triggers) {
+      let target: string | undefined;
+      if (t.kind === 'journey_step') target = t.journey_id;
+      else if (t.kind === 'compliance') target = t.regime_id;
+      else if (t.kind === 'integration') target = t.integration_id;
+      if (target === undefined) continue;
+      const o = ordinalOf.get(target);
+      if (o === undefined) continue; // unknown target — coverage check reports
+      if (o === -Infinity) continue; // cross_cutting target; doesn't constrain
+      // For journey_step triggers, double-check the journey is
+      // actually a known accepted journey — guards against stale
+      // references that survived earlier filtering.
+      if (t.kind === 'journey_step' && !journeyIdSet.has(t.journey_id)) continue;
+      if (o > maxTargetOrd) maxTargetOrd = o;
+    }
+
+    if (maxTargetOrd === -Infinity) continue; // no constraining targets
+    if (typeof wfOrd === 'number' && wfOrd >= maxTargetOrd && wfOrd !== -Infinity) continue; // already satisfies
+
+    const targetRelease = plan.releases.find(r => r.ordinal === maxTargetOrd);
+    if (!targetRelease) continue; // shouldn't happen; bail safely
+
+    // Remove from current placement.
+    if (wfPlacement === 'cross_cutting') {
+      plan.cross_cutting.workflows = plan.cross_cutting.workflows.filter(id => id !== w.id);
+    } else {
+      wfPlacement.contains.workflows = wfPlacement.contains.workflows.filter(id => id !== w.id);
+    }
+    // Add to target release (dedupe just in case).
+    if (!targetRelease.contains.workflows.includes(w.id)) {
+      targetRelease.contains.workflows.push(w.id);
+    }
+    // Update ordinalOf so subsequent iterations see the new placement.
+    ordinalOf.set(w.id, targetRelease.ordinal);
+
+    fixes.push({
+      workflow_id: w.id,
+      from: wfPlacement === 'cross_cutting' ? 'cross_cutting' : `REL-ord=${wfPlacement.ordinal}`,
+      to: `REL-ord=${targetRelease.ordinal}`,
+      reason: `triggers reference targets up to REL-ord=${maxTargetOrd}`,
+    });
+  }
+  return fixes;
+}
+
 function normalizeAcceptanceCriteria(v: unknown): string[] {
   if (v == null) return [];
   if (typeof v === 'string') return v.length > 0 ? [v] : [];

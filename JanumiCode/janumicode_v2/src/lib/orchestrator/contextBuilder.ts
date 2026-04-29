@@ -111,11 +111,12 @@ export class ContextBuilder {
     invocationId: string,
     stdinContent: StdinContent,
     detailFileContent?: DetailFileContent,
+    workflowRunId?: string,
   ): ContextPayload {
     // Build detail file first (so we have the path for stdin reference)
     let detailFile: DetailFile | null = null;
     if (detailFileContent) {
-      const detailPath = this.resolveDetailFilePath(subPhaseId, invocationId);
+      const detailPath = this.resolveDetailFilePath(subPhaseId, invocationId, workflowRunId);
       detailFile = this.writeDetailFile(detailPath, detailFileContent);
     }
 
@@ -354,11 +355,21 @@ export class ContextBuilder {
   }
 
   /**
-   * Resolve the detail file path from template.
+   * Resolve the detail file path from template. Substitutes
+   * `{sub_phase_id}`, `{invocation_id}`, and `{workflow_run_id}`.
+   * `{workflow_run_id}` is the per-run isolation token introduced
+   * with the `.janumicode/runs/<run_id>/context/...` layout — when
+   * absent (older callers), it falls back to a literal "unknown-run"
+   * sentinel so the path still resolves but per-run grouping breaks.
    */
-  private resolveDetailFilePath(subPhaseId: string, invocationId: string): string {
+  private resolveDetailFilePath(
+    subPhaseId: string,
+    invocationId: string,
+    workflowRunId?: string,
+  ): string {
     return this.options.detailFilePathTemplate
       .replace('{sub_phase_id}', subPhaseId)
-      .replace('{invocation_id}', invocationId);
+      .replace('{invocation_id}', invocationId)
+      .replace('{workflow_run_id}', workflowRunId ?? 'unknown-run');
   }
 }

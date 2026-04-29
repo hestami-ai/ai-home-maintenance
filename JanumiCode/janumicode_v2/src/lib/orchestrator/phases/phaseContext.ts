@@ -604,3 +604,679 @@ export function getFrozenFrLeaves(
   }
   return leaves;
 }
+
+// ── Wave 7 — frozen component leaves ─────────────────────────────
+
+export interface FrozenComponentLeaf {
+  node_id: string;
+  root_component_id: string;
+  display_key: string;
+  root_display_key: string;
+  depth: number;
+  tier: 'A' | 'B' | 'C' | 'D' | null;
+  release_id: string | null;
+  release_ordinal: number | null;
+  component: {
+    id: string;
+    name: string;
+    domain_id?: string | null;
+    responsibilities: Array<{ id: string; description: string }>;
+    dependencies: Array<{ component_id: string; kind: string }>;
+    active_constraints?: string[];
+    traces_to?: string[];
+  };
+}
+
+/**
+ * Wave 7 — walk all component_decomposition_node records and return the
+ * frozen leaves: nodes whose current-version status is `atomic`. Mirrors
+ * getFrozenFrLeaves. Used by Phase 5/6/4.3/4.5 to consume leaf-level
+ * component definitions rather than the coarse root component_model.
+ *
+ * Returns an empty array when no Phase 4.2a tree exists (default-lens
+ * runs, fixtures that skipped Wave 7). Callers fall back to the flat
+ * `component_model.components[]` artifact in that case.
+ */
+export function getFrozenComponentLeaves(
+  allArtifacts: GovernedStreamRecord[],
+): FrozenComponentLeaf[] {
+  const latestByNodeId = new Map<string, GovernedStreamRecord>();
+  for (const r of allArtifacts) {
+    if (r.record_type !== 'component_decomposition_node') continue;
+    const c = r.content as Record<string, unknown>;
+    const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
+    if (!nodeId) continue;
+    const existing = latestByNodeId.get(nodeId);
+    if (!existing || r.produced_at > existing.produced_at) {
+      latestByNodeId.set(nodeId, r);
+    }
+  }
+
+  const rootDisplayKeyByUuid = new Map<string, string>();
+  for (const r of latestByNodeId.values()) {
+    const c = r.content as Record<string, unknown>;
+    if (c.depth !== 0) continue;
+    const rootUuid = typeof c.node_id === 'string' ? c.node_id : null;
+    const display = typeof c.display_key === 'string' ? c.display_key : null;
+    if (rootUuid && display) rootDisplayKeyByUuid.set(rootUuid, display);
+  }
+
+  const leaves: FrozenComponentLeaf[] = [];
+  for (const r of latestByNodeId.values()) {
+    const c = r.content as Record<string, unknown>;
+    if (c.status !== 'atomic') continue;
+    const component = c.component as FrozenComponentLeaf['component'] | undefined;
+    if (!component) continue;
+    const rootId = typeof c.root_component_id === 'string' ? c.root_component_id : '';
+    leaves.push({
+      node_id: typeof c.node_id === 'string' ? c.node_id : '',
+      root_component_id: rootId,
+      display_key: typeof c.display_key === 'string' ? c.display_key : (component.id ?? ''),
+      root_display_key: rootDisplayKeyByUuid.get(rootId) ?? rootId,
+      depth: typeof c.depth === 'number' ? c.depth : 0,
+      tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
+        ? c.tier as FrozenComponentLeaf['tier']
+        : null,
+      release_id: typeof c.release_id === 'string' ? c.release_id : null,
+      release_ordinal: typeof c.release_ordinal === 'number' ? c.release_ordinal : null,
+      component,
+    });
+  }
+  return leaves;
+}
+
+export interface EffectiveComponentView {
+  components: Array<Record<string, unknown>>;
+  summary: string;
+  source: 'leaves' | 'roots' | 'none';
+  leafCount: number;
+  rootCount: number;
+}
+
+/**
+ * Wave 7 — pick the effective component set for a downstream consumer.
+ * Returns the leaf set when a Phase 4.2a tree exists, otherwise the flat
+ * `component_model.components[]` from Phase 4.2. Mirrors
+ * buildEffectiveFrView's contract so Phase 5/6/4.3/4.5 can switch their
+ * iteration source with minimal call-site churn.
+ */
+export function buildEffectiveComponentView(
+  decompositionNodes: GovernedStreamRecord[],
+  prior: PriorPhaseContext,
+): EffectiveComponentView {
+  const leaves = getFrozenComponentLeaves(decompositionNodes);
+  const rootComponents = (prior.componentModel?.content.components as Array<Record<string, unknown>>) ?? [];
+  if (leaves.length > 0) {
+    const sorted = [...leaves].sort((a, b) => {
+      const ao = a.release_ordinal ?? Number.MAX_SAFE_INTEGER;
+      const bo = b.release_ordinal ?? Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      const rd = a.root_display_key.localeCompare(b.root_display_key);
+      return rd !== 0 ? rd : a.display_key.localeCompare(b.display_key);
+    });
+    const componentRecords = sorted.map(l => ({
+      id: l.component.id,
+      name: l.component.name,
+      domain_id: l.component.domain_id,
+      // Surface the same shape Phase 5/6 already understand: `responsibilities[].statement`
+      // for backward compat, plus `description` for new consumers.
+      responsibilities: l.component.responsibilities.map(r => ({
+        id: r.id,
+        statement: r.description,
+        description: r.description,
+      })),
+      dependencies: l.component.dependencies.map(d => ({
+        target_component_id: d.component_id,
+        component_id: d.component_id,
+        dependency_type: d.kind,
+        kind: d.kind,
+      })),
+      active_constraints: l.component.active_constraints ?? [],
+      satisfies_requirement_ids: l.component.traces_to,
+      // Preserve leaf-derived metadata for downstream phases that want it.
+      _leaf_node_id: l.node_id,
+      _leaf_display_key: l.display_key,
+      _leaf_root_display_key: l.root_display_key,
+      _leaf_release_ordinal: l.release_ordinal,
+      _leaf_tier: l.tier,
+    }));
+    const summaryLines = sorted.map(l => {
+      const release = l.release_ordinal != null ? `Release ${l.release_ordinal}` : 'Backlog';
+      const resps = l.component.responsibilities.map(r => `  - ${r.description}`).join('\n');
+      return `[${release}] ${l.display_key} (Tier ${l.tier ?? '?'} leaf under ${l.root_display_key}): ${l.component.name}\n${resps}`;
+    });
+    return {
+      components: componentRecords,
+      summary: summaryLines.join('\n\n'),
+      source: 'leaves',
+      leafCount: leaves.length,
+      rootCount: rootComponents.length,
+    };
+  }
+  if (rootComponents.length > 0) {
+    return {
+      components: rootComponents,
+      summary: prior.componentModel?.summary ?? '',
+      source: 'roots',
+      leafCount: 0,
+      rootCount: rootComponents.length,
+    };
+  }
+  return {
+    components: [],
+    summary: 'No component model available',
+    source: 'none',
+    leafCount: 0,
+    rootCount: 0,
+  };
+}
+
+// ── Wave 8 — frozen task leaves ───────────────────────────────────
+
+export interface FrozenTaskLeaf {
+  node_id: string;
+  root_task_id: string;
+  display_key: string;
+  root_display_key: string;
+  depth: number;
+  tier: 'A' | 'B' | 'C' | 'D' | null;
+  release_id: string | null;
+  release_ordinal: number | null;
+  task: {
+    id: string;
+    name: string;
+    description: string;
+    task_type?: 'standard' | 'refactoring';
+    component_id: string;
+    component_responsibility: string;
+    backing_tool?: string;
+    estimated_complexity?: 'low' | 'medium' | 'high';
+    complexity_flag?: string;
+    completion_criteria: Array<{
+      criterion_id: string;
+      description: string;
+      verification_method?: 'schema_check' | 'invariant' | 'output_comparison' | 'test_execution';
+      artifact_ref?: string;
+    }>;
+    write_directory_paths?: string[];
+    read_directory_paths?: string[];
+    dependency_task_ids?: string[];
+    active_constraints?: string[];
+    traces_to?: string[];
+  };
+}
+
+/**
+ * Wave 8 — walk all task_decomposition_node records and return the
+ * frozen leaves: nodes whose current-version status is `atomic`. Mirrors
+ * getFrozenComponentLeaves. Used by Phase 9 to consume leaf-level
+ * implementation tasks rather than the coarse Phase 6.1 root plan.
+ *
+ * Returns an empty array when no Phase 6.1a tree exists. Callers fall
+ * back to the flat `implementation_plan.tasks[]` artifact.
+ */
+export function getFrozenTaskLeaves(
+  allArtifacts: GovernedStreamRecord[],
+): FrozenTaskLeaf[] {
+  const latestByNodeId = new Map<string, GovernedStreamRecord>();
+  for (const r of allArtifacts) {
+    if (r.record_type !== 'task_decomposition_node') continue;
+    const c = r.content as Record<string, unknown>;
+    const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
+    if (!nodeId) continue;
+    const existing = latestByNodeId.get(nodeId);
+    if (!existing || r.produced_at > existing.produced_at) {
+      latestByNodeId.set(nodeId, r);
+    }
+  }
+
+  const rootDisplayKeyByUuid = new Map<string, string>();
+  for (const r of latestByNodeId.values()) {
+    const c = r.content as Record<string, unknown>;
+    if (c.depth !== 0) continue;
+    const rootUuid = typeof c.node_id === 'string' ? c.node_id : null;
+    const display = typeof c.display_key === 'string' ? c.display_key : null;
+    if (rootUuid && display) rootDisplayKeyByUuid.set(rootUuid, display);
+  }
+
+  const leaves: FrozenTaskLeaf[] = [];
+  for (const r of latestByNodeId.values()) {
+    const c = r.content as Record<string, unknown>;
+    if (c.status !== 'atomic') continue;
+    const task = c.task as FrozenTaskLeaf['task'] | undefined;
+    if (!task) continue;
+    const rootId = typeof c.root_task_id === 'string' ? c.root_task_id : '';
+    leaves.push({
+      node_id: typeof c.node_id === 'string' ? c.node_id : '',
+      root_task_id: rootId,
+      display_key: typeof c.display_key === 'string' ? c.display_key : (task.id ?? ''),
+      root_display_key: rootDisplayKeyByUuid.get(rootId) ?? rootId,
+      depth: typeof c.depth === 'number' ? c.depth : 0,
+      tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
+        ? c.tier as FrozenTaskLeaf['tier']
+        : null,
+      release_id: typeof c.release_id === 'string' ? c.release_id : null,
+      release_ordinal: typeof c.release_ordinal === 'number' ? c.release_ordinal : null,
+      task,
+    });
+  }
+  return leaves;
+}
+
+export interface EffectiveTaskView {
+  /**
+   * Records shaped to match the legacy `implementation_plan.tasks[]`
+   * shape Phase 9 already understands (id, task_type, component_id,
+   * component_responsibility, description, backing_tool,
+   * dependency_task_ids, estimated_complexity, completion_criteria,
+   * write_directory_paths, read_directory_paths). Leaf-derived metadata
+   * is surfaced via `_leaf_*` fields for callers that want it.
+   */
+  tasks: Array<Record<string, unknown>>;
+  summary: string;
+  source: 'leaves' | 'roots' | 'none';
+  leafCount: number;
+  rootCount: number;
+}
+
+export function buildEffectiveTaskView(
+  decompositionNodes: GovernedStreamRecord[],
+  prior: PriorPhaseContext,
+): EffectiveTaskView {
+  const leaves = getFrozenTaskLeaves(decompositionNodes);
+  const rootTasks = (prior.implementationPlan?.content.tasks as Array<Record<string, unknown>>) ?? [];
+  if (leaves.length > 0) {
+    const sorted = [...leaves].sort((a, b) => {
+      const ao = a.release_ordinal ?? Number.MAX_SAFE_INTEGER;
+      const bo = b.release_ordinal ?? Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      const rd = a.root_display_key.localeCompare(b.root_display_key);
+      return rd !== 0 ? rd : a.display_key.localeCompare(b.display_key);
+    });
+    const taskRecords = sorted.map(l => ({
+      id: l.task.id,
+      task_type: l.task.task_type ?? 'standard',
+      component_id: l.task.component_id,
+      component_responsibility: l.task.component_responsibility,
+      description: l.task.description,
+      backing_tool: l.task.backing_tool ?? 'claude_code_cli',
+      dependency_task_ids: l.task.dependency_task_ids ?? [],
+      estimated_complexity: l.task.estimated_complexity ?? 'medium',
+      complexity_flag: l.task.complexity_flag,
+      completion_criteria: l.task.completion_criteria.map(c => ({
+        criterion_id: c.criterion_id,
+        description: c.description,
+        verification_method: c.verification_method,
+        artifact_ref: c.artifact_ref,
+      })),
+      write_directory_paths: l.task.write_directory_paths ?? [],
+      read_directory_paths: l.task.read_directory_paths ?? [],
+      active_constraints: l.task.active_constraints ?? [],
+      _leaf_node_id: l.node_id,
+      _leaf_display_key: l.display_key,
+      _leaf_root_display_key: l.root_display_key,
+      _leaf_release_ordinal: l.release_ordinal,
+      _leaf_tier: l.tier,
+    }));
+    const summaryLines = sorted.map(l => {
+      const release = l.release_ordinal != null ? `Release ${l.release_ordinal}` : 'Backlog';
+      const ccs = l.task.completion_criteria.map(c => `  - ${c.description}`).join('\n');
+      return `[${release}] ${l.display_key} (Tier ${l.tier ?? '?'} leaf under ${l.root_display_key}): ${l.task.name}\n  Component: ${l.task.component_id}\n${ccs}`;
+    });
+    return {
+      tasks: taskRecords,
+      summary: summaryLines.join('\n\n'),
+      source: 'leaves',
+      leafCount: leaves.length,
+      rootCount: rootTasks.length,
+    };
+  }
+  if (rootTasks.length > 0) {
+    return {
+      tasks: rootTasks,
+      summary: prior.implementationPlan?.summary ?? '',
+      source: 'roots',
+      leafCount: 0,
+      rootCount: rootTasks.length,
+    };
+  }
+  return {
+    tasks: [],
+    summary: 'No implementation plan available',
+    source: 'none',
+    leafCount: 0,
+    rootCount: 0,
+  };
+}
+
+// ── Wave 9 — frozen data-model leaves ────────────────────────────
+
+export interface FrozenDataModelLeaf {
+  node_id: string;
+  root_entity_id: string;
+  display_key: string;
+  root_display_key: string;
+  depth: number;
+  tier: 'A' | 'B' | 'C' | 'D' | null;
+  release_id: string | null;
+  release_ordinal: number | null;
+  entity: {
+    id: string;
+    name: string;
+    kind?: string;
+    component_id?: string | null;
+    fields: Array<{
+      name: string;
+      type: string;
+      constraints?: string;
+      nullable?: boolean;
+      is_identity?: boolean;
+    }>;
+    relationships?: Array<{
+      target_entity_id: string;
+      kind: string;
+      ownership?: string;
+    }>;
+    active_constraints?: string[];
+    traces_to?: string[];
+  };
+}
+
+export function getFrozenDataModelLeaves(
+  allArtifacts: GovernedStreamRecord[],
+): FrozenDataModelLeaf[] {
+  const latestByNodeId = new Map<string, GovernedStreamRecord>();
+  for (const r of allArtifacts) {
+    if (r.record_type !== 'data_model_decomposition_node') continue;
+    const c = r.content as Record<string, unknown>;
+    const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
+    if (!nodeId) continue;
+    const existing = latestByNodeId.get(nodeId);
+    if (!existing || r.produced_at > existing.produced_at) {
+      latestByNodeId.set(nodeId, r);
+    }
+  }
+  const rootDisplayKeyByUuid = new Map<string, string>();
+  for (const r of latestByNodeId.values()) {
+    const c = r.content as Record<string, unknown>;
+    if (c.depth !== 0) continue;
+    const rootUuid = typeof c.node_id === 'string' ? c.node_id : null;
+    const display = typeof c.display_key === 'string' ? c.display_key : null;
+    if (rootUuid && display) rootDisplayKeyByUuid.set(rootUuid, display);
+  }
+  const leaves: FrozenDataModelLeaf[] = [];
+  for (const r of latestByNodeId.values()) {
+    const c = r.content as Record<string, unknown>;
+    if (c.status !== 'atomic') continue;
+    const entity = c.entity as FrozenDataModelLeaf['entity'] | undefined;
+    if (!entity) continue;
+    const rootId = typeof c.root_entity_id === 'string' ? c.root_entity_id : '';
+    leaves.push({
+      node_id: typeof c.node_id === 'string' ? c.node_id : '',
+      root_entity_id: rootId,
+      display_key: typeof c.display_key === 'string' ? c.display_key : (entity.id ?? ''),
+      root_display_key: rootDisplayKeyByUuid.get(rootId) ?? rootId,
+      depth: typeof c.depth === 'number' ? c.depth : 0,
+      tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
+        ? c.tier as FrozenDataModelLeaf['tier'] : null,
+      release_id: typeof c.release_id === 'string' ? c.release_id : null,
+      release_ordinal: typeof c.release_ordinal === 'number' ? c.release_ordinal : null,
+      entity,
+    });
+  }
+  return leaves;
+}
+
+export interface EffectiveDataModelView {
+  /** `data_models.models[]` shape that downstream phases (5.2 API
+   *  definitions, Phase 6, Phase 9) already understand. Each leaf
+   *  becomes one entity under an artificial component_id grouping. */
+  models: Array<{
+    component_id: string;
+    entities: Array<{
+      name: string;
+      fields: Array<{ name: string; type: string; constraints?: string }>;
+      relationships?: string[];
+    }>;
+  }>;
+  summary: string;
+  source: 'leaves' | 'roots' | 'none';
+  leafCount: number;
+  rootCount: number;
+}
+
+export function buildEffectiveDataModelView(
+  decompositionNodes: GovernedStreamRecord[],
+  prior: PriorPhaseContext,
+): EffectiveDataModelView {
+  const leaves = getFrozenDataModelLeaves(decompositionNodes);
+  const rootModels = (prior.dataModels?.content.models as Array<Record<string, unknown>>) ?? [];
+  if (leaves.length > 0) {
+    const sorted = [...leaves].sort((a, b) => {
+      const ao = a.release_ordinal ?? Number.MAX_SAFE_INTEGER;
+      const bo = b.release_ordinal ?? Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      const rd = a.root_display_key.localeCompare(b.root_display_key);
+      return rd !== 0 ? rd : a.display_key.localeCompare(b.display_key);
+    });
+    const modelsByComponent = new Map<string, EffectiveDataModelView['models'][number]>();
+    for (const l of sorted) {
+      const compId = l.entity.component_id ?? 'unassigned';
+      let bucket = modelsByComponent.get(compId);
+      if (!bucket) {
+        bucket = { component_id: compId, entities: [] };
+        modelsByComponent.set(compId, bucket);
+      }
+      bucket.entities.push({
+        name: l.entity.name,
+        fields: l.entity.fields.map(f => ({
+          name: f.name,
+          type: f.type,
+          constraints: f.constraints,
+        })),
+        relationships: (l.entity.relationships ?? []).map(r => `${r.target_entity_id} (${r.kind})`),
+      });
+    }
+    const summaryLines = sorted.map(l => {
+      const release = l.release_ordinal != null ? `Release ${l.release_ordinal}` : 'Backlog';
+      const fieldStr = l.entity.fields.map(f => `${f.name}:${f.type}`).join(', ');
+      return `[${release}] ${l.display_key} (Tier ${l.tier ?? '?'} leaf under ${l.root_display_key}): ${l.entity.name}\n  Fields: ${fieldStr}`;
+    });
+    return {
+      models: [...modelsByComponent.values()],
+      summary: summaryLines.join('\n\n'),
+      source: 'leaves',
+      leafCount: leaves.length,
+      rootCount: rootModels.length,
+    };
+  }
+  if (rootModels.length > 0) {
+    return {
+      models: rootModels as EffectiveDataModelView['models'],
+      summary: prior.dataModels?.summary ?? '',
+      source: 'roots',
+      leafCount: 0,
+      rootCount: rootModels.length,
+    };
+  }
+  return {
+    models: [],
+    summary: 'No data models available',
+    source: 'none',
+    leafCount: 0,
+    rootCount: 0,
+  };
+}
+
+// ── Wave 10 — frozen test leaves ─────────────────────────────────
+
+export interface FrozenTestLeaf {
+  node_id: string;
+  root_test_id: string;
+  display_key: string;
+  root_display_key: string;
+  depth: number;
+  tier: 'A' | 'B' | 'C' | 'D' | null;
+  release_id: string | null;
+  release_ordinal: number | null;
+  test_case: {
+    id: string;
+    name: string;
+    test_type: string;
+    component_ids?: string[];
+    acceptance_criterion_ids?: string[];
+    preconditions?: string[];
+    steps: Array<{
+      id: string;
+      description: string;
+      phase?: string;
+      expected_outcome?: string;
+    }>;
+    expected_outcome?: string;
+    edge_cases?: string[];
+    test_file_path?: string;
+    active_constraints?: string[];
+    traces_to?: string[];
+  };
+}
+
+export function getFrozenTestLeaves(
+  allArtifacts: GovernedStreamRecord[],
+): FrozenTestLeaf[] {
+  const latestByNodeId = new Map<string, GovernedStreamRecord>();
+  for (const r of allArtifacts) {
+    if (r.record_type !== 'test_decomposition_node') continue;
+    const c = r.content as Record<string, unknown>;
+    const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
+    if (!nodeId) continue;
+    const existing = latestByNodeId.get(nodeId);
+    if (!existing || r.produced_at > existing.produced_at) {
+      latestByNodeId.set(nodeId, r);
+    }
+  }
+  const rootDisplayKeyByUuid = new Map<string, string>();
+  for (const r of latestByNodeId.values()) {
+    const c = r.content as Record<string, unknown>;
+    if (c.depth !== 0) continue;
+    const rootUuid = typeof c.node_id === 'string' ? c.node_id : null;
+    const display = typeof c.display_key === 'string' ? c.display_key : null;
+    if (rootUuid && display) rootDisplayKeyByUuid.set(rootUuid, display);
+  }
+  const leaves: FrozenTestLeaf[] = [];
+  for (const r of latestByNodeId.values()) {
+    const c = r.content as Record<string, unknown>;
+    if (c.status !== 'atomic') continue;
+    const tc = c.test_case as FrozenTestLeaf['test_case'] | undefined;
+    if (!tc) continue;
+    const rootId = typeof c.root_test_id === 'string' ? c.root_test_id : '';
+    leaves.push({
+      node_id: typeof c.node_id === 'string' ? c.node_id : '',
+      root_test_id: rootId,
+      display_key: typeof c.display_key === 'string' ? c.display_key : (tc.id ?? ''),
+      root_display_key: rootDisplayKeyByUuid.get(rootId) ?? rootId,
+      depth: typeof c.depth === 'number' ? c.depth : 0,
+      tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
+        ? c.tier as FrozenTestLeaf['tier'] : null,
+      release_id: typeof c.release_id === 'string' ? c.release_id : null,
+      release_ordinal: typeof c.release_ordinal === 'number' ? c.release_ordinal : null,
+      test_case: tc,
+    });
+  }
+  return leaves;
+}
+
+export interface EffectiveTestPlanView {
+  /** Phase 9-compatible `test_suites[]` shape. Each leaf becomes one
+   *  test_case under a suite keyed by test_type. */
+  test_suites: Array<{
+    suite_id: string;
+    component_id: string;
+    test_type: 'unit' | 'integration' | 'end_to_end';
+    test_cases: Array<{
+      test_case_id: string;
+      type: 'unit' | 'integration' | 'end_to_end';
+      acceptance_criterion_ids: string[];
+      component_ids?: string[];
+      preconditions: string[];
+      execution_steps?: string[];
+      expected_outcome: string;
+      edge_cases?: string[];
+      test_file_path?: string;
+    }>;
+  }>;
+  summary: string;
+  source: 'leaves' | 'roots' | 'none';
+  leafCount: number;
+  rootCount: number;
+}
+
+export function buildEffectiveTestPlanView(
+  decompositionNodes: GovernedStreamRecord[],
+  prior: PriorPhaseContext,
+): EffectiveTestPlanView {
+  const leaves = getFrozenTestLeaves(decompositionNodes);
+  const rootSuites = (prior.testPlan?.content.test_suites as Array<Record<string, unknown>>) ?? [];
+  if (leaves.length > 0) {
+    const sorted = [...leaves].sort((a, b) => {
+      const ao = a.release_ordinal ?? Number.MAX_SAFE_INTEGER;
+      const bo = b.release_ordinal ?? Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      const rd = a.root_display_key.localeCompare(b.root_display_key);
+      return rd !== 0 ? rd : a.display_key.localeCompare(b.display_key);
+    });
+    const suitesByType = new Map<string, EffectiveTestPlanView['test_suites'][number]>();
+    for (const l of sorted) {
+      const tt = l.test_case.test_type as 'unit' | 'integration' | 'end_to_end';
+      const compId = (l.test_case.component_ids ?? [])[0] ?? 'unassigned';
+      const suiteKey = `${tt}::${compId}`;
+      let bucket = suitesByType.get(suiteKey);
+      if (!bucket) {
+        bucket = {
+          suite_id: `suite-leaves-${tt}-${compId}`,
+          component_id: compId,
+          test_type: tt,
+          test_cases: [],
+        };
+        suitesByType.set(suiteKey, bucket);
+      }
+      bucket.test_cases.push({
+        test_case_id: l.test_case.id,
+        type: tt,
+        acceptance_criterion_ids: l.test_case.acceptance_criterion_ids ?? [],
+        component_ids: l.test_case.component_ids,
+        preconditions: l.test_case.preconditions ?? [],
+        execution_steps: l.test_case.steps.map(s => s.description),
+        expected_outcome: l.test_case.expected_outcome ?? l.test_case.name,
+        edge_cases: l.test_case.edge_cases,
+        test_file_path: l.test_case.test_file_path,
+      });
+    }
+    const summaryLines = sorted.map(l => {
+      const release = l.release_ordinal != null ? `Release ${l.release_ordinal}` : 'Backlog';
+      return `[${release}] ${l.display_key} (Tier ${l.tier ?? '?'} ${l.test_case.test_type} leaf under ${l.root_display_key}): ${l.test_case.name}`;
+    });
+    return {
+      test_suites: [...suitesByType.values()],
+      summary: summaryLines.join('\n'),
+      source: 'leaves',
+      leafCount: leaves.length,
+      rootCount: rootSuites.length,
+    };
+  }
+  if (rootSuites.length > 0) {
+    return {
+      test_suites: rootSuites as EffectiveTestPlanView['test_suites'],
+      summary: prior.testPlan?.summary ?? '',
+      source: 'roots',
+      leafCount: 0,
+      rootCount: rootSuites.length,
+    };
+  }
+  return {
+    test_suites: [],
+    summary: 'No test plan available',
+    source: 'none',
+    leafCount: 0,
+    rootCount: 0,
+  };
+}

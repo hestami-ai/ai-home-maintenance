@@ -10,12 +10,21 @@
  *   4.5 — Consistency Check and Approval (phase gate)
  */
 
+import { randomUUID } from 'node:crypto';
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
-import type { GovernedStreamRecord, PhaseId } from '../../types/records';
+import type {
+  GovernedStreamRecord,
+  PhaseId,
+  ProductDescriptionHandoffContent,
+  TechnicalConstraint,
+  DecompositionComponent,
+  ComponentDecompositionNodeContent,
+} from '../../types/records';
 import { getLogger } from '../../logging';
-import { extractPriorPhaseContext } from './phaseContext';
+import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
+import { runComponentSaturationLoop } from './phase4_2a';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -157,10 +166,131 @@ export class Phase4Handler implements PhaseHandler {
     artifactIds.push(componentRecord.id);
     engine.ingestionPipeline.ingest(componentRecord);
 
+    // ── 4.2a — Recursive Component Decomposition (Wave 7) ─────
+    engine.stateMachine.setSubPhase(workflowRun.id, '4.2a');
+
+    // Read prerequisites: product handoff + Phase 1.0c technical
+    // constraints. The constraints anchor each leaf component to the
+    // user's stated stack (SvelteKit / Bun / PostgreSQL / etc.) so
+    // downstream phases don't reinvent defaults from training data.
+    const handoffRecord = engine.writer.getRecordsByType(workflowRun.id, 'product_description_handoff')[0];
+    const handoff = (handoffRecord?.content ?? {}) as unknown as ProductDescriptionHandoffContent;
+    const techConstraintsRecord = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced')
+      .find(r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery');
+    const technicalConstraints: TechnicalConstraint[] = techConstraintsRecord
+      ? (((techConstraintsRecord.content as Record<string, unknown>).technicalConstraints) as TechnicalConstraint[] ?? [])
+      : [];
+
+    // Convert Phase 4.2's flat ComponentModel shape into the
+    // DecompositionComponent shape Wave 7 uses, and emit depth-0
+    // component_decomposition_node records as seeds for the saturation
+    // loop. Resume guard — skip if depth-0 nodes already exist (the
+    // loop's resume helper will pick up from the prior state).
+    const existingRoots = engine.writer.getRecordsByType(workflowRun.id, 'component_decomposition_node')
+      .filter(r => (r.content as unknown as ComponentDecompositionNodeContent).depth === 0);
+    let rootComponents: DecompositionComponent[];
+    let rootNodeRecordIds: string[];
+    let rootLogicalIds: string[];
+    if (existingRoots.length > 0) {
+      getLogger().info('workflow', 'Phase 4.2a RESUME: depth-0 nodes already present', {
+        existingRoots: existingRoots.length,
+      });
+      rootComponents = existingRoots.map(r => (r.content as unknown as ComponentDecompositionNodeContent).component);
+      rootNodeRecordIds = existingRoots.map(r => r.id);
+      rootLogicalIds = existingRoots.map(r => (r.content as unknown as ComponentDecompositionNodeContent).node_id);
+    } else {
+      rootComponents = componentContent.components.map(c => ({
+        id: c.id,
+        name: c.name,
+        domain_id: c.domain_id ?? null,
+        responsibilities: c.responsibilities.map(r => ({ id: r.id, description: r.statement })),
+        dependencies: (c.dependencies ?? []).map(d => ({
+          component_id: d.target_component_id,
+          // Phase 4.2's `dependency_type` is free-form string; coerce to the
+          // four kinds Wave 7 supports — fall back to sync_call for unknowns.
+          kind: ((['sync_call', 'async_event', 'data_read', 'data_write'] as const) as readonly string[])
+            .includes(d.dependency_type)
+            ? (d.dependency_type as 'sync_call' | 'async_event' | 'data_read' | 'data_write')
+            : 'sync_call',
+        })),
+        active_constraints: technicalConstraints.map(t => t.id),
+        traces_to: c.satisfies_requirement_ids,
+      }));
+      rootNodeRecordIds = [];
+      rootLogicalIds = [];
+      for (const rc of rootComponents) {
+        const logicalNodeId = randomUUID();
+        const rec = engine.writer.writeRecord({
+          record_type: 'component_decomposition_node',
+          schema_version: '1.0',
+          workflow_run_id: workflowRun.id,
+          phase_id: '4',
+          sub_phase_id: '4.2a',
+          produced_by_agent_role: 'architecture_agent',
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+          derived_from_record_ids: [componentRecord.id],
+          content: {
+            kind: 'component_decomposition_node',
+            node_id: logicalNodeId,
+            parent_node_id: null,
+            display_key: rc.id,
+            root_component_id: logicalNodeId,
+            depth: 0,
+            pass_number: 0,
+            status: 'pending',
+            component: rc,
+            surfaced_assumption_ids: [],
+            release_id: null,
+            release_ordinal: null,
+          } satisfies ComponentDecompositionNodeContent,
+        });
+        rootNodeRecordIds.push(rec.id);
+        rootLogicalIds.push(logicalNodeId);
+        artifactIds.push(rec.id);
+      }
+    }
+
+    // Run the saturation loop. Throws on configuration errors
+    // (missing template etc.); per-node decomposition failures are
+    // captured as `status='deferred'` rows inside the loop and never
+    // halt the phase.
+    if (rootComponents.length > 0) {
+      await runComponentSaturationLoop(ctx, {
+        handoff,
+        technicalConstraints,
+        domainsSummary,
+        rootComponents,
+        rootNodeRecordIds,
+        rootLogicalIds,
+      });
+    }
+
     // ── 4.3 — Architectural Decision Capture ──────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '4.3');
 
-    const componentSummary = componentContent.components.map(c => {
+    // Wave 7 — prefer leaf components for ADR capture so decisions
+    // attach to the actual modules that will be implemented, not the
+    // coarse Phase 4.2 roots. Falls back to the flat list when no
+    // tree exists.
+    const decompNodesForAdr = engine.writer.getRecordsByType(
+      workflowRun.id, 'component_decomposition_node',
+    );
+    const effectiveForAdr = buildEffectiveComponentView(decompNodesForAdr, prior);
+    const adrComponentsSource = effectiveForAdr.source === 'leaves'
+      ? effectiveForAdr.components.map(c => ({
+          id: c.id as string,
+          name: c.name as string,
+          domain_id: c.domain_id as string | undefined,
+          responsibilities: (c.responsibilities as Array<{ id: string; statement?: string; description?: string }>)
+            .map(r => ({ id: r.id, statement: r.statement ?? r.description ?? '' })),
+          dependencies: (c.dependencies as Array<{ target_component_id?: string; component_id?: string; dependency_type?: string; kind?: string }>)
+            .map(d => ({
+              target_component_id: d.target_component_id ?? d.component_id ?? '',
+              dependency_type: d.dependency_type ?? d.kind ?? 'sync_call',
+            })),
+        }))
+      : componentContent.components;
+    const componentSummary = adrComponentsSource.map(c => {
       const resps = c.responsibilities.map(r => `  ${r.id}: ${r.statement}`).join('\n');
       const deps = (c.dependencies ?? []).map(d => `${d.target_component_id} (${d.dependency_type})`).join(', ');
       return `${c.id}: ${c.name} (domain: ${c.domain_id ?? 'unassigned'})\n  Responsibilities:\n${resps}\n  Dependencies: ${deps || 'none'}`;
@@ -195,12 +325,27 @@ export class Phase4Handler implements PhaseHandler {
     // ── 4.4 — Architecture Mirror and Menu ────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, '4.4');
 
+    // Surface Wave 7 leaf-count + tier distribution in the architecture
+    // mirror so the human sees how recursive decomposition expanded the
+    // root components. Falls back to root count when no tree exists.
+    const decompNodesForMirror = engine.writer.getRecordsByType(
+      workflowRun.id, 'component_decomposition_node',
+    );
+    const effectiveForMirror = buildEffectiveComponentView(decompNodesForMirror, prior);
+    const tierDistribution = decompNodesForMirror.reduce<Record<string, number>>((acc, r) => {
+      const c = r.content as unknown as ComponentDecompositionNodeContent;
+      if (c.tier) acc[c.tier] = (acc[c.tier] ?? 0) + 1;
+      return acc;
+    }, {});
+
     const archMirror = engine.mirrorGenerator.generate({
       artifactId: componentRecord.id,
       artifactType: 'architecture_definition',
       content: {
         domains: domainsContent,
         components_count: componentContent.components.length,
+        leaf_components_count: effectiveForMirror.leafCount,
+        component_tier_distribution: tierDistribution,
         adrs_count: adrsContent.adrs.length,
       },
     });
@@ -222,6 +367,8 @@ export class Phase4Handler implements PhaseHandler {
         fields: archMirror.fields,
         domains_count: domainsContent.domains.length,
         components_count: componentContent.components.length,
+        leaf_components_count: effectiveForMirror.leafCount,
+        component_tier_distribution: tierDistribution,
         adrs_count: adrsContent.adrs.length,
       },
     });

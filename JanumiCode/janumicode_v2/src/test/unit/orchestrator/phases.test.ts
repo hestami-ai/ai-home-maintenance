@@ -8,6 +8,8 @@ import { Phase3Handler } from '../../../lib/orchestrator/phases/phase3';
 import { Phase4Handler } from '../../../lib/orchestrator/phases/phase4';
 import { Phase5Handler } from '../../../lib/orchestrator/phases/phase5';
 import { ConfigManager } from '../../../lib/config/configManager';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import path from 'path';
 
 describe('Phase Handlers 2-5', () => {
@@ -17,8 +19,9 @@ describe('Phase Handlers 2-5', () => {
   beforeEach(() => {
     db = createTestDatabase();
     const configManager = new ConfigManager();
-    const workspacePath = path.resolve(__dirname, '..', '..', '..', '..');
-    engine = new OrchestratorEngine(db, configManager, workspacePath);
+    const extensionPath = path.resolve(__dirname, '..', '..', '..', '..');
+    const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
+    engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
     engine.setAutoApproveDecisions(true);
 
     // Stub the Orchestrator backing — see fullPipeline.test.ts for
@@ -35,12 +38,13 @@ describe('Phase Handlers 2-5', () => {
       }),
     };
     engine.llmCaller.registerProvider({ name: 'stub', ...stubProvider });
-    // Phase 2-8 helpers hardcode `provider: 'ollama'`. After removing
+    // Phase 2-8 helpers hardcode `provider: 'llamacpp'`. After removing
     // the silent fallback catches (correctness invariant: unrecoverable
     // LLM failures halt the workflow), an unregistered ollama provider
     // throws and propagates. Register a no-op stub under 'ollama' so
     // those helpers hit their inner empty-response fallback path and
     // the phase flow runs end-to-end.
+    engine.llmCaller.registerProvider({ name: 'llamacpp', ...stubProvider });
     engine.llmCaller.registerProvider({ name: 'ollama', ...stubProvider });
 
     // Register all phases
