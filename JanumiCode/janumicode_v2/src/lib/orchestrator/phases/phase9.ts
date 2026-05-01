@@ -90,7 +90,7 @@ export class Phase9Handler implements PhaseHandler {
       .find(r => (r.content as Record<string, unknown>).kind === 'implementation_plan');
 
     // ── 9.1 — Implementation Task Execution ───────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '9.1');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'implementation_task_execution');
 
     // Wave 8 — prefer Phase 6.1a leaf tasks when available so the
     // executor sees the decomposed atomic-unit set rather than the
@@ -189,7 +189,7 @@ export class Phase9Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '9',
-      sub_phase_id: '9.1',
+      sub_phase_id: 'implementation_task_execution',
       produced_by_agent_role: 'executor_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: planRecord ? [planRecord.id] : [],
@@ -212,7 +212,7 @@ export class Phase9Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(executionRecord);
 
     // ── 9.2 — Test Execution ──────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '9.2');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'test_execution');
 
     // Wave 10 — prefer Phase 7.1a test leaves when available so the
     // wave-aggregate test runner sees decomposed atomic-step cases
@@ -270,7 +270,7 @@ export class Phase9Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '9',
-      sub_phase_id: '9.2',
+      sub_phase_id: 'test_execution',
       produced_by_agent_role: 'executor_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [executionRecord.id],
@@ -294,7 +294,7 @@ export class Phase9Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(testResultsRecord);
 
     // ── 9.3 — Evaluation Execution ────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '9.3');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'evaluation_execution');
 
     // Load evaluation plan to get criteria
     const evalPlanRecord = engine.db.prepare(`
@@ -331,7 +331,7 @@ export class Phase9Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '9',
-      sub_phase_id: '9.3',
+      sub_phase_id: 'evaluation_execution',
       produced_by_agent_role: 'eval_execution_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [executionRecord.id, testResultsRecord.id],
@@ -367,7 +367,7 @@ export class Phase9Handler implements PhaseHandler {
     // summary so downstream consumers (workflow run summary, future
     // brownfield retries) see the gap surface.
     if (tasksQuarantined > 0 || tasksFailed > 0) {
-      engine.stateMachine.setSubPhase(workflowRun.id, '9.4');
+      engine.stateMachine.setSubPhase(workflowRun.id, 'execution_synthesis');
 
       const quarantineRecords = engine.writer.getRecordsByType(workflowRun.id, 'task_quarantine');
       const latestByLeaf = new Map<string, TaskQuarantineContent>();
@@ -380,7 +380,7 @@ export class Phase9Handler implements PhaseHandler {
         schema_version: '1.0',
         workflow_run_id: workflowRun.id,
         phase_id: '9',
-        sub_phase_id: '9.4',
+        sub_phase_id: 'execution_synthesis',
         produced_by_agent_role: 'orchestrator',
         janumicode_version_sha: engine.janumiCodeVersionSha,
         derived_from_record_ids: [executionRecord.id],
@@ -410,7 +410,7 @@ export class Phase9Handler implements PhaseHandler {
     // aggregates across wave_gate_decision records and presents the
     // overall workflow execution outcome (test totals + eval pass +
     // wave decisions) for the final phase gate.
-    engine.stateMachine.setSubPhase(workflowRun.id, '9.5');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'execution_gate');
 
     const waveGateRecords = engine.writer.getRecordsByType(workflowRun.id, 'wave_gate_decision');
     const waveDecisions = waveGateRecords.map(r => r.content as unknown as WaveGateDecisionContent);
@@ -437,7 +437,7 @@ export class Phase9Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '9',
-      sub_phase_id: '9.5',
+      sub_phase_id: 'execution_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [executionRecord.id, testResultsRecord.id, evalResultsRecord.id],
@@ -481,7 +481,7 @@ export class Phase9Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '9',
-      sub_phase_id: '9.5',
+      sub_phase_id: 'execution_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [executionRecord.id, testResultsRecord.id, evalResultsRecord.id],

@@ -45,14 +45,15 @@ describe('phaseManifest', () => {
 
     it('phase 0 — workspace_init', () => {
       expect(displayCodeFor('workspace_classification')).toBe('0.1.1');
-      expect(displayCodeFor('workspace_ingestion')).toBe('0.1.2');
-      expect(displayCodeFor('active_constraint_extraction')).toBe('0.2.1');
-      expect(displayCodeFor('active_constraint_enrichment')).toBe('0.2.2');
+      expect(displayCodeFor('external_reference_resolution')).toBe('0.1.2');
+      expect(displayCodeFor('artifact_ingestion')).toBe('0.2.1');
+      expect(displayCodeFor('brownfield_continuity_check')).toBe('0.2.2');
       expect(displayCodeFor('vocabulary_collision_check')).toBe('0.3');
     });
 
-    it('phase 0.5 — cross_cutting_bootstrap', () => {
-      expect(displayCodeFor('cross_cutting_bootstrap_init')).toBe('0.5.1');
+    it('phase 0.5 — cross_run_impact_analysis', () => {
+      expect(displayCodeFor('impact_enumeration')).toBe('0.5.1');
+      expect(displayCodeFor('refactoring_decision')).toBe('0.5.2');
     });
 
     it('phase 1 — intent_capture', () => {
@@ -65,19 +66,15 @@ describe('phaseManifest', () => {
       expect(displayCodeFor('canonical_vocabulary_discovery')).toBe('1.3.5');
       expect(displayCodeFor('discovery_bundle_compose')).toBe('1.3.6');
       expect(displayCodeFor('scope_bounding')).toBe('1.4');
-      expect(displayCodeFor('business_domains_bloom')).toBe('1.5.1');
-      expect(displayCodeFor('intent_domain_bloom')).toBe('1.5.2');
-      expect(displayCodeFor('user_journey_bloom')).toBe('1.6.1');
-      expect(displayCodeFor('user_journey_decomposition')).toBe('1.6.2');
-      expect(displayCodeFor('system_workflow_bloom')).toBe('1.7.1');
-      expect(displayCodeFor('system_workflow_decomposition')).toBe('1.7.2');
+      expect(displayCodeFor('business_domains_bloom')).toBe('1.5');
+      expect(displayCodeFor('user_journey_bloom')).toBe('1.6');
+      expect(displayCodeFor('system_workflow_bloom')).toBe('1.7');
       expect(displayCodeFor('coverage_verifier')).toBe('1.8');
       expect(displayCodeFor('entities_bloom')).toBe('1.9');
-      expect(displayCodeFor('intent_statement_synthesis')).toBe('1.10');
-      expect(displayCodeFor('integrations_qa_bloom')).toBe('1.11');
-      expect(displayCodeFor('product_description_synthesis')).toBe('1.12');
-      expect(displayCodeFor('product_handoff_gate')).toBe('1.13');
-      expect(displayCodeFor('release_plan')).toBe('1.14');
+      expect(displayCodeFor('integrations_qa_bloom')).toBe('1.10');
+      expect(displayCodeFor('product_description_synthesis')).toBe('1.11');
+      expect(displayCodeFor('product_handoff_gate')).toBe('1.12');
+      expect(displayCodeFor('release_plan')).toBe('1.13');
     });
 
     it('phase 2 — requirements (FR + NFR three-pass + saturation)', () => {
@@ -132,7 +129,7 @@ describe('phaseManifest', () => {
       expect(displayCodeFor('test_case_skeleton')).toBe('7.1.1');
       expect(displayCodeFor('test_case_saturation')).toBe('7.1.2');
       expect(displayCodeFor('test_plan_synthesis')).toBe('7.2');
-      expect(displayCodeFor('test_fixtures')).toBe('7.3');
+      expect(displayCodeFor('test_plan_review_prep')).toBe('7.3');
       expect(displayCodeFor('test_plan_gate')).toBe('7.4');
     });
 
@@ -149,9 +146,9 @@ describe('phaseManifest', () => {
       expect(displayCodeFor('execution_synthesis')).toBe('9.4');
       expect(displayCodeFor('execution_gate')).toBe('9.5');
 
-      expect(displayCodeFor('commit_prep')).toBe('10.1');
-      expect(displayCodeFor('commit_execute')).toBe('10.2');
-      expect(displayCodeFor('commit_finalize')).toBe('10.3');
+      expect(displayCodeFor('pre_commit_consistency_check')).toBe('10.1');
+      expect(displayCodeFor('commit_preparation')).toBe('10.2');
+      expect(displayCodeFor('workflow_run_closure')).toBe('10.3');
     });
   });
 

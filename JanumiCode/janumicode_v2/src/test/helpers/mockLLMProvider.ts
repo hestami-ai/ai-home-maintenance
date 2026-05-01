@@ -33,6 +33,7 @@ import type {
   ToolCall,
 } from '../../lib/llm/llmCaller';
 import type { FixtureFile, FixtureManifest } from '../harness/types';
+import { parentPhaseOf } from '../../lib/orchestrator/phaseManifest';
 
 export interface MockFixture {
   /** Substring matched against the rendered prompt. First match wins. */
@@ -671,13 +672,22 @@ export class MockLLMProvider implements LLMProviderAdapter {
 // ── Corpus layout helpers ──────────────────────────────────────────
 
 /**
- * Map a sub-phase id (e.g. '1.2', '10.3', '0.5.1') to its phase-level
- * directory name (`phase_01`, `phase_10`, `phase_00`). Returns null
- * when the sub-phase id is missing — those captures land at the
- * corpus root instead.
+ * Map a sub-phase id to its phase-level directory name
+ * (`phase_01`, `phase_10`, `phase_00`). Accepts both legacy numeric ids
+ * (e.g. '1.2', '10.3', '0.5.1') and slug-based ids (e.g. 'fr_saturation',
+ * 'commit_finalize') by resolving slugs through the phase manifest.
+ * Returns null when the sub-phase id is missing or unknown.
  */
 function subPhaseToPhaseDir(subPhaseId: string | null | undefined): string | null {
   if (!subPhaseId) return null;
+  // Try slug resolution via manifest first.
+  const parent = parentPhaseOf(subPhaseId);
+  if (parent) {
+    const code = parent.displayCode.split('.')[0];
+    const num = Number.parseInt(code, 10);
+    if (!Number.isNaN(num)) return `phase_${String(num).padStart(2, '0')}`;
+  }
+  // Fallback for legacy numeric ids.
   const head = subPhaseId.split('.')[0];
   const num = Number.parseInt(head, 10);
   if (Number.isNaN(num)) return null;

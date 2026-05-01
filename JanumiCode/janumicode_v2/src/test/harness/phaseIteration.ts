@@ -9,6 +9,7 @@
  */
 
 import type { Database } from '../../lib/database/init';
+import { collectGovernedStream } from '../../lib/database/iterateGovernedStream';
 import type { PhaseId } from '../../lib/types/records';
 import { PHASE_ORDER } from '../../lib/types/records';
 import type { MockFixture } from '../helpers/mockLLMProvider';
@@ -222,14 +223,18 @@ export function collectPhaseRecords(
   workflowRunId: string,
   phase: PhaseId,
 ): Array<{ record_type: string; produced_at: string }> {
-  const records = db.prepare(`
+  // Paginate via the shared helper to stay under the 32MB SAB
+  // ceiling on long calibration runs (per-phase record counts can
+  // reach the low thousands).
+  const stmt = db.prepare(`
     SELECT record_type, produced_at
     FROM governed_stream
     WHERE workflow_run_id = ? AND phase_id = ?
     ORDER BY produced_at
-  `).all(workflowRunId, phase) as Array<{ record_type: string; produced_at: string }>;
-
-  return records;
+    LIMIT ? OFFSET ?
+  `);
+  return collectGovernedStream<{ record_type: string; produced_at: string }>(
+    stmt, [workflowRunId, phase], { pageSize: 500 });
 }
 
 /**

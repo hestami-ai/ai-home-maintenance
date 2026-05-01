@@ -91,10 +91,10 @@ export class Phase7Handler implements PhaseHandler {
     const derivedFromIds = prior.allRecordIds;
 
     // ── 7.1 — Test Case Generation ────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '7.1');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'test_case_skeleton');
 
     const dmr71 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '7.1',
+      subPhaseId: 'test_case_skeleton',
       requestingAgentRole: 'test_design_agent',
       query: `Test case generation for requirements: ${frSummary.slice(0, 400)}`,
       detailFileLabel: 'p7_1_tests',
@@ -110,7 +110,7 @@ export class Phase7Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '7',
-      sub_phase_id: '7.1',
+      sub_phase_id: 'test_case_skeleton',
       produced_by_agent_role: 'test_design_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: derivedFromIds,
@@ -129,7 +129,7 @@ export class Phase7Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(testPlanRecord);
 
     // ── 7.1a — Recursive Test Decomposition (Wave 10) ─────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '7.1a');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'test_case_saturation');
 
     const techConstraintsRecord = allArtifacts.find(
       r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery',
@@ -183,7 +183,7 @@ export class Phase7Handler implements PhaseHandler {
           schema_version: '1.0',
           workflow_run_id: workflowRun.id,
           phase_id: '7',
-          sub_phase_id: '7.1a',
+          sub_phase_id: 'test_case_saturation',
           produced_by_agent_role: 'test_design_agent',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: [testPlanRecord.id],
@@ -220,7 +220,7 @@ export class Phase7Handler implements PhaseHandler {
     }
 
     // ── 7.2 — Test Coverage Analysis ──────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '7.2');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'test_plan_synthesis');
 
     const coverageReport = this.runCoverageAnalysis(testPlanContent, allAcIds);
 
@@ -229,7 +229,7 @@ export class Phase7Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '7',
-      sub_phase_id: '7.2',
+      sub_phase_id: 'test_plan_synthesis',
       produced_by_agent_role: 'consistency_checker',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [testPlanRecord.id],
@@ -239,7 +239,7 @@ export class Phase7Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(coverageRecord);
 
     // ── 7.3 — Mirror and Menu ─────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '7.3');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'test_plan_review_prep');
 
     const totalCases = testPlanContent.test_suites.reduce((n, s) => n + s.test_cases.length, 0);
     const testMirror = engine.mirrorGenerator.generate({
@@ -253,7 +253,7 @@ export class Phase7Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '7',
-      sub_phase_id: '7.3',
+      sub_phase_id: 'test_plan_review_prep',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [testPlanRecord.id, coverageRecord.id],
@@ -282,14 +282,14 @@ export class Phase7Handler implements PhaseHandler {
     }
 
     // ── 7.4 — Approval ────────────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '7.4');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'test_plan_gate');
 
     const gateRecord = engine.writer.writeRecord({
       record_type: 'phase_gate_evaluation',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '7',
-      sub_phase_id: '7.4',
+      sub_phase_id: 'test_plan_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [testPlanRecord.id, coverageRecord.id],
@@ -317,7 +317,7 @@ export class Phase7Handler implements PhaseHandler {
     dmr: PhaseContextPacketResult,
   ): Promise<TestPlan> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('test_design_agent', '07_1_test_case_generation');
+    const template = engine.templateLoader.findTemplate('test_design_agent', 'test_case_skeleton');
 
     const fallback: TestPlan = {
       test_suites: [{
@@ -344,7 +344,7 @@ export class Phase7Handler implements PhaseHandler {
     // LLM throws propagate to engine catch (halts workflow).
     const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '7', subPhaseId: '7.1', agentRole: 'test_design_agent', label: 'Phase 7.1 — Test Case Generation' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '7', subPhaseId: 'test_case_skeleton', agentRole: 'test_design_agent', label: 'Phase 7.1 — Test Case Generation' },
     });
 
     const parsed = result.parsed as Record<string, unknown> | null;

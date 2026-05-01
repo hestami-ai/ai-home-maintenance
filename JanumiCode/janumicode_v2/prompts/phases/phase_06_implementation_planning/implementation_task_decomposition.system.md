@@ -1,6 +1,6 @@
 ---
 agent_role: implementation_planner
-sub_phase: 06_1_implementation_task_decomposition
+sub_phase: task_skeleton
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

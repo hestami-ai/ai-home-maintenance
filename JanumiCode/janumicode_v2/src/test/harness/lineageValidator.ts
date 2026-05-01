@@ -14,6 +14,7 @@
  */
 
 import type { Database } from '../../lib/database/init';
+import { collectGovernedStream } from '../../lib/database/iterateGovernedStream';
 import type { IntentLens, PhaseId } from '../../lib/types/records';
 import { getPhaseContract } from './phaseContracts';
 import type {
@@ -788,7 +789,7 @@ function buildShapeCoverageGap(
     expected: { field: finding.field, description: finding.expected },
     observed: { field: finding.field, value: finding.actual },
     likely_source: {
-      templates: ['prompts/phases/phase_01_intent_capture/sub_phase_01_6_product_description_synthesis/product_description_synthesis.product.system.md'],
+      templates: ['prompts/phases/phase_01_intent_capture/product_description_synthesis/product_description_synthesis.product.system.md'],
       handlers: ['src/lib/orchestrator/phases/phase1.ts:runProductDescriptionSynthesis'],
       schemas: ['schemas/artifacts/product_description_handoff.schema.json'],
     },
@@ -850,19 +851,19 @@ function guessLikelySourceForArtifact(
 
   const kind = req.content_kind;
   const map: Record<string, { template?: string; schema?: string }> = {
-    intent_discovery: { template: 'prompts/phases/phase_01_intent_capture/sub_phase_01_0b_intent_discovery/intent_discovery.product.system.md' },
-    business_domains_bloom: { template: 'prompts/phases/phase_01_intent_capture/sub_phase_01_2_business_domains_bloom/business_domains_bloom.product.system.md' },
-    user_journey_bloom:     { template: 'prompts/phases/phase_01_intent_capture/sub_phase_01_3a_user_journey_bloom/user_journey_bloom.product.system.md' },
-    system_workflow_bloom:  { template: 'prompts/phases/phase_01_intent_capture/sub_phase_01_3b_system_workflow_bloom/system_workflow_bloom.product.system.md' },
-    entities_bloom: { template: 'prompts/phases/phase_01_intent_capture/sub_phase_01_4_entities_bloom/entities_bloom.product.system.md' },
-    integrations_qa_bloom: { template: 'prompts/phases/phase_01_intent_capture/sub_phase_01_5_integrations_qa_bloom/integrations_qa_bloom.product.system.md' },
+    intent_discovery: { template: 'prompts/phases/phase_01_intent_capture/product_intent_discovery/intent_discovery.product.system.md' },
+    business_domains_bloom: { template: 'prompts/phases/phase_01_intent_capture/business_domains_bloom/business_domains_bloom.product.system.md' },
+    user_journey_bloom:     { template: 'prompts/phases/phase_01_intent_capture/user_journey_bloom/user_journey_bloom.product.system.md' },
+    system_workflow_bloom:  { template: 'prompts/phases/phase_01_intent_capture/system_workflow_bloom/system_workflow_bloom.product.system.md' },
+    entities_bloom: { template: 'prompts/phases/phase_01_intent_capture/entities_bloom/entities_bloom.product.system.md' },
+    integrations_qa_bloom: { template: 'prompts/phases/phase_01_intent_capture/integrations_qa_bloom/integrations_qa_bloom.product.system.md' },
     intent_statement: { schema: '(derived at 1.6 from product_description_handoff)' },
-    intent_lens_classification: { template: 'prompts/phases/phase_01_intent_capture/sub_phase_01_0a_intent_lens_classification/intent_lens_classification.system.md', schema: 'schemas/artifacts/intent_lens_classification.schema.json' },
+    intent_lens_classification: { template: 'prompts/phases/phase_01_intent_capture/intent_lens_classification/intent_lens_classification.system.md', schema: 'schemas/artifacts/intent_lens_classification.schema.json' },
   };
   const hint = kind ? map[kind] : undefined;
   if (req.record_type === 'product_description_handoff') {
     return {
-      templates: ['prompts/phases/phase_01_intent_capture/sub_phase_01_6_product_description_synthesis/product_description_synthesis.product.system.md'],
+      templates: ['prompts/phases/phase_01_intent_capture/product_description_synthesis/product_description_synthesis.product.system.md'],
       handlers: ['src/lib/orchestrator/phases/phase1.ts:runProductDescriptionSynthesis'],
       schemas: ['schemas/artifacts/product_description_handoff.schema.json'],
     };
@@ -932,15 +933,20 @@ function getSpecReferences(result: LineageValidationResult): string[] {
 // ── DB + parsing helpers ───────────────────────────────────────────
 
 function getRecordsForRun(db: Database, workflowRunId: string): StreamRecord[] {
-  return db
-    .prepare(
-      `SELECT id, record_type, phase_id, sub_phase_id, produced_by_agent_role,
-              authority_level, content, produced_at
-         FROM governed_stream
-         WHERE workflow_run_id = ?
-         ORDER BY produced_at ASC`,
-    )
-    .all(workflowRunId) as StreamRecord[];
+  // Paginate via the shared `iterateGovernedStream` helper to stay
+  // under the 32MB SharedArrayBuffer ceiling enforced by the sidecar
+  // RPC bridge — same root cause that previously made
+  // collectHarnessResult fail with "RPC error: offset is out of bounds"
+  // on cal-25's ~6800-record DB.
+  const stmt = db.prepare(
+    `SELECT id, record_type, phase_id, sub_phase_id, produced_by_agent_role,
+            authority_level, content, produced_at
+       FROM governed_stream
+       WHERE workflow_run_id = ?
+       ORDER BY produced_at ASC, id ASC
+       LIMIT ? OFFSET ?`,
+  );
+  return collectGovernedStream<StreamRecord>(stmt, [workflowRunId], { pageSize: 500 });
 }
 
 function findArtifactByKind(records: StreamRecord[], kind: string): StreamRecord | null {

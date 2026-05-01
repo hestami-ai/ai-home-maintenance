@@ -97,10 +97,10 @@ export class Phase3Handler implements PhaseHandler {
     const derivedFromIds = prior.allRecordIds;
 
     // ── 3.1 — System Boundary Definition ──────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '3.1');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'system_boundary');
 
     const dmr31 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '3.1',
+      subPhaseId: 'system_boundary',
       requestingAgentRole: 'systems_agent',
       query: `System boundary for: ${intentSummary.slice(0, 400)}`,
       detailFileLabel: 'p3_1_boundary',
@@ -129,7 +129,7 @@ export class Phase3Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '3',
-      sub_phase_id: '3.1',
+      sub_phase_id: 'system_boundary',
       produced_by_agent_role: 'systems_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: derivedFromIds,
@@ -139,7 +139,7 @@ export class Phase3Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(boundaryRecord);
 
     // ── 3.2 — System Requirements Derivation ──────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '3.2');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'system_requirements');
 
     const boundarySummary = [
       `PROJECT TYPE: ${prior.projectTypeDescription}`,
@@ -154,7 +154,7 @@ export class Phase3Handler implements PhaseHandler {
     ].filter(Boolean).join('\n');
 
     const dmr32 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '3.2',
+      subPhaseId: 'system_requirements',
       requestingAgentRole: 'systems_agent',
       query: `System requirements derived from boundary: ${boundarySummary.slice(0, 400)}`,
       detailFileLabel: 'p3_2_sysreq',
@@ -170,7 +170,7 @@ export class Phase3Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '3',
-      sub_phase_id: '3.2',
+      sub_phase_id: 'system_requirements',
       produced_by_agent_role: 'systems_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [boundaryRecord.id, ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : [])],
@@ -180,14 +180,14 @@ export class Phase3Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(sysReqRecord);
 
     // ── 3.3 — Interface Contract Specification ────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '3.3');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'interface_contracts');
 
     const externalSystemsList = boundaryContent.external_systems
       .map(e => `${e.id}: ${e.name} (${e.interface_type})`)
       .join('\n') || 'No external systems identified';
 
     const dmr33 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '3.3',
+      subPhaseId: 'interface_contracts',
       requestingAgentRole: 'systems_agent',
       query: `Interface contracts for external systems: ${externalSystemsList.slice(0, 400)}`,
       detailFileLabel: 'p3_3_contracts',
@@ -203,7 +203,7 @@ export class Phase3Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '3',
-      sub_phase_id: '3.3',
+      sub_phase_id: 'interface_contracts',
       produced_by_agent_role: 'systems_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [boundaryRecord.id, sysReqRecord.id],
@@ -213,7 +213,7 @@ export class Phase3Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(contractsRecord);
 
     // ── 3.4 — Mirror and Menu ─────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '3.4');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'system_spec_finalize');
 
     const specMirror = engine.mirrorGenerator.generate({
       artifactId: boundaryRecord.id,
@@ -230,7 +230,7 @@ export class Phase3Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '3',
-      sub_phase_id: '3.4',
+      sub_phase_id: 'system_spec_finalize',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [boundaryRecord.id, sysReqRecord.id, contractsRecord.id],
@@ -265,7 +265,7 @@ export class Phase3Handler implements PhaseHandler {
     }
 
     // ── 3.5 — Consistency Check and Approval ──────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '3.5');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'system_spec_gate');
 
     const consistencyReport = this.runConsistencyCheck(
       boundaryContent, sysReqContent, contractsContent, frStories,
@@ -276,7 +276,7 @@ export class Phase3Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '3',
-      sub_phase_id: '3.5',
+      sub_phase_id: 'system_spec_gate',
       produced_by_agent_role: 'consistency_checker',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [boundaryRecord.id, sysReqRecord.id, contractsRecord.id],
@@ -291,7 +291,7 @@ export class Phase3Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '3',
-      sub_phase_id: '3.5',
+      sub_phase_id: 'system_spec_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [boundaryRecord.id, sysReqRecord.id, contractsRecord.id, consistencyRecord.id],
@@ -322,7 +322,7 @@ export class Phase3Handler implements PhaseHandler {
     dmr: PhaseContextPacketResult,
   ): Promise<SystemBoundary> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('systems_agent', '03_1_system_boundary');
+    const template = engine.templateLoader.findTemplate('systems_agent', 'system_boundary');
 
     const fallback: SystemBoundary = {
       in_scope: ['Core application functionality as described in requirements'],
@@ -355,7 +355,7 @@ export class Phase3Handler implements PhaseHandler {
       traceContext: {
         workflowRunId: ctx.workflowRun.id,
         phaseId: '3',
-        subPhaseId: '3.1',
+        subPhaseId: 'system_boundary',
         agentRole: 'systems_agent',
         label: 'Phase 3.1 — System Boundary Definition',
       },
@@ -392,7 +392,7 @@ export class Phase3Handler implements PhaseHandler {
     dmr: PhaseContextPacketResult,
   ): Promise<SystemRequirements> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('systems_agent', '03_2_system_requirements');
+    const template = engine.templateLoader.findTemplate('systems_agent', 'system_requirements');
 
     const fallback: SystemRequirements = {
       items: [{
@@ -425,7 +425,7 @@ export class Phase3Handler implements PhaseHandler {
       traceContext: {
         workflowRunId: ctx.workflowRun.id,
         phaseId: '3',
-        subPhaseId: '3.2',
+        subPhaseId: 'system_requirements',
         agentRole: 'systems_agent',
         label: 'Phase 3.2 — System Requirements Derivation',
       },
@@ -452,7 +452,7 @@ export class Phase3Handler implements PhaseHandler {
     dmr: PhaseContextPacketResult,
   ): Promise<InterfaceContracts> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('systems_agent', '03_3_interface_contracts');
+    const template = engine.templateLoader.findTemplate('systems_agent', 'interface_contracts');
 
     const fallback: InterfaceContracts = {
       contracts: [{
@@ -486,7 +486,7 @@ export class Phase3Handler implements PhaseHandler {
       traceContext: {
         workflowRunId: ctx.workflowRun.id,
         phaseId: '3',
-        subPhaseId: '3.3',
+        subPhaseId: 'interface_contracts',
         agentRole: 'systems_agent',
         label: 'Phase 3.3 — Interface Contract Specification',
       },

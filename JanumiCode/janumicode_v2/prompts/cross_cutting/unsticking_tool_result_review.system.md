@@ -1,6 +1,6 @@
 ---
 agent_role: unsticking_agent
-sub_phase: cross_cutting_unsticking_tool_review
+sub_phase: unsticking_tool_result_review
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

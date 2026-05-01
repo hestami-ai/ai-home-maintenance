@@ -32,9 +32,21 @@ const data = new Uint8Array(sab, DATA_OFFSET);
 
 // ── Spawn Sidecar Process ───────────────────────────────────────────
 
+interface SidecarReply {
+  ok: boolean;
+  /**
+   * On success: JSON-serialized `result` (string, possibly the literal
+   * `"null"`). On error: JSON-serialized `error` payload — either a
+   * plain string for legacy/throw paths, or an object for structured
+   * errors like RpcResultTooLarge. The client at rpcClient.ts re-parses
+   * this string and throws the typed error.
+   */
+  payload: string;
+}
+
 let sidecar: ChildProcess;
 let requestId = 0;
-const pendingRequests = new Map<string, (response: string) => void>();
+const pendingRequests = new Map<string, (response: SidecarReply) => void>();
 
 function spawnSidecar(): void {
   sidecar = spawn(nodePath, [sidecarPath, dbPath], {
@@ -49,7 +61,15 @@ function spawnSidecar(): void {
       const resolver = pendingRequests.get(response.id);
       if (resolver) {
         pendingRequests.delete(response.id);
-        resolver(JSON.stringify(response.result ?? response.error ?? null));
+        // Distinguish success from error explicitly so structured sidecar
+        // errors (e.g. RpcResultTooLarge) flow through CTRL_ERROR with
+        // their JSON shape intact, instead of being silently treated as
+        // a `result` and parsed as a stray string by the caller.
+        if (response.error !== undefined && response.error !== null) {
+          resolver({ ok: false, payload: JSON.stringify(response.error) });
+        } else {
+          resolver({ ok: true, payload: JSON.stringify(response.result ?? null) });
+        }
       }
     } catch {
       // Ignore malformed lines
@@ -69,7 +89,7 @@ spawnSidecar();
 
 // ── Request/Response Loop ───────────────────────────────────────────
 
-function sendToSidecar(method: string, params: Record<string, unknown>): Promise<string> {
+function sendToSidecar(method: string, params: Record<string, unknown>): Promise<SidecarReply> {
   return new Promise((resolve) => {
     const id = `req-${++requestId}`;
     pendingRequests.set(id, resolve);
@@ -96,13 +116,16 @@ async function processLoop(): Promise<void> {
 
     try {
       const { method, params } = JSON.parse(requestJson);
-      const response = await sendToSidecar(method, params);
-      const encoded = new TextEncoder().encode(response);
+      const reply = await sendToSidecar(method, params);
+      const encoded = new TextEncoder().encode(reply.payload);
 
-      // Write response to shared buffer
+      // Write response to shared buffer; route sidecar-side errors to
+      // CTRL_ERROR so the client can distinguish them from a real result
+      // and (for structured payloads like RpcResultTooLarge) re-parse
+      // the JSON shape into a typed Error subclass.
       data.set(encoded);
       Atomics.store(ctrl, LEN_OFFSET, encoded.byteLength);
-      Atomics.store(ctrl, CTRL_OFFSET, CTRL_RESPONSE);
+      Atomics.store(ctrl, CTRL_OFFSET, reply.ok ? CTRL_RESPONSE : CTRL_ERROR);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       const encoded = new TextEncoder().encode(errMsg);

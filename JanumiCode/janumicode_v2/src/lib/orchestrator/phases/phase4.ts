@@ -104,10 +104,10 @@ export class Phase4Handler implements PhaseHandler {
     const derivedFromIds = prior.allRecordIds;
 
     // ── 4.1 — Software Domain Identification ──────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '4.1');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'software_domains');
 
     const dmr41 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '4.1',
+      subPhaseId: 'software_domains',
       requestingAgentRole: 'architecture_agent',
       query: `Software domain identification for project: ${prior.projectTypeDescription.slice(0, 400)}`,
       detailFileLabel: 'p4_1_domains',
@@ -123,7 +123,7 @@ export class Phase4Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '4',
-      sub_phase_id: '4.1',
+      sub_phase_id: 'software_domains',
       produced_by_agent_role: 'architecture_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: derivedFromIds,
@@ -133,7 +133,7 @@ export class Phase4Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(domainsRecord);
 
     // ── 4.2 — Component Decomposition ─────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '4.2');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'component_skeleton');
 
     const domainsSummary = domainsContent.domains.map(d => {
       const terms = d.ubiquitous_language.map(t => `${t.term}: ${t.definition}`).join('; ');
@@ -141,7 +141,7 @@ export class Phase4Handler implements PhaseHandler {
     }).join('\n');
 
     const dmr42 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '4.2',
+      subPhaseId: 'component_skeleton',
       requestingAgentRole: 'architecture_agent',
       query: `Component decomposition for domains: ${domainsSummary.slice(0, 400)}`,
       detailFileLabel: 'p4_2_components',
@@ -157,7 +157,7 @@ export class Phase4Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '4',
-      sub_phase_id: '4.2',
+      sub_phase_id: 'component_skeleton',
       produced_by_agent_role: 'architecture_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [domainsRecord.id],
@@ -167,7 +167,7 @@ export class Phase4Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(componentRecord);
 
     // ── 4.2a — Recursive Component Decomposition (Wave 7) ─────
-    engine.stateMachine.setSubPhase(workflowRun.id, '4.2a');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'component_saturation');
 
     // Read prerequisites: product handoff + Phase 1.0c technical
     // constraints. The constraints anchor each leaf component to the
@@ -225,7 +225,7 @@ export class Phase4Handler implements PhaseHandler {
           schema_version: '1.0',
           workflow_run_id: workflowRun.id,
           phase_id: '4',
-          sub_phase_id: '4.2a',
+          sub_phase_id: 'component_saturation',
           produced_by_agent_role: 'architecture_agent',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: [componentRecord.id],
@@ -266,7 +266,7 @@ export class Phase4Handler implements PhaseHandler {
     }
 
     // ── 4.3 — Architectural Decision Capture ──────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '4.3');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'adr_capture');
 
     // Wave 7 — prefer leaf components for ADR capture so decisions
     // attach to the actual modules that will be implemented, not the
@@ -297,7 +297,7 @@ export class Phase4Handler implements PhaseHandler {
     }).join('\n');
 
     const dmr43 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '4.3',
+      subPhaseId: 'adr_capture',
       requestingAgentRole: 'architecture_agent',
       query: `Architectural decisions for components: ${componentSummary.slice(0, 400)}`,
       detailFileLabel: 'p4_3_adrs',
@@ -313,7 +313,7 @@ export class Phase4Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '4',
-      sub_phase_id: '4.3',
+      sub_phase_id: 'adr_capture',
       produced_by_agent_role: 'architecture_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [domainsRecord.id, componentRecord.id],
@@ -323,7 +323,7 @@ export class Phase4Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(adrsRecord);
 
     // ── 4.4 — Architecture Mirror and Menu ────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '4.4');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'architecture_synthesis');
 
     // Surface Wave 7 leaf-count + tier distribution in the architecture
     // mirror so the human sees how recursive decomposition expanded the
@@ -355,7 +355,7 @@ export class Phase4Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '4',
-      sub_phase_id: '4.4',
+      sub_phase_id: 'architecture_synthesis',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [domainsRecord.id, componentRecord.id, adrsRecord.id],
@@ -391,7 +391,7 @@ export class Phase4Handler implements PhaseHandler {
     }
 
     // ── 4.5 — Consistency Check and Approval ──────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '4.5');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'architecture_gate');
 
     const consistencyReport = this.runConsistencyCheck(
       componentContent, adrsContent, sysReqItems,
@@ -402,7 +402,7 @@ export class Phase4Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '4',
-      sub_phase_id: '4.5',
+      sub_phase_id: 'architecture_gate',
       produced_by_agent_role: 'consistency_checker',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [domainsRecord.id, componentRecord.id, adrsRecord.id],
@@ -417,7 +417,7 @@ export class Phase4Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '4',
-      sub_phase_id: '4.5',
+      sub_phase_id: 'architecture_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [domainsRecord.id, componentRecord.id, adrsRecord.id, consistencyRecord.id],
@@ -447,7 +447,7 @@ export class Phase4Handler implements PhaseHandler {
     dmr: PhaseContextPacketResult,
   ): Promise<SoftwareDomains> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('architecture_agent', '04_1_software_domains');
+    const template = engine.templateLoader.findTemplate('architecture_agent', 'software_domains');
 
     const fallback: SoftwareDomains = {
       domains: [{
@@ -479,7 +479,7 @@ export class Phase4Handler implements PhaseHandler {
       traceContext: {
         workflowRunId: ctx.workflowRun.id,
         phaseId: '4',
-        subPhaseId: '4.1',
+        subPhaseId: 'software_domains',
         agentRole: 'architecture_agent',
         label: 'Phase 4.1 — Software Domain Identification',
       },
@@ -502,7 +502,7 @@ export class Phase4Handler implements PhaseHandler {
     dmr: PhaseContextPacketResult,
   ): Promise<ComponentModel> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('architecture_agent', '04_2_component_decomposition');
+    const template = engine.templateLoader.findTemplate('architecture_agent', 'component_skeleton');
 
     const fallback: ComponentModel = {
       components: [{
@@ -534,7 +534,7 @@ export class Phase4Handler implements PhaseHandler {
       traceContext: {
         workflowRunId: ctx.workflowRun.id,
         phaseId: '4',
-        subPhaseId: '4.2',
+        subPhaseId: 'component_skeleton',
         agentRole: 'architecture_agent',
         label: 'Phase 4.2 — Component Decomposition',
       },
@@ -553,7 +553,7 @@ export class Phase4Handler implements PhaseHandler {
     dmr: PhaseContextPacketResult,
   ): Promise<ArchitecturalDecisions> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('architecture_agent', '04_3_adr_capture');
+    const template = engine.templateLoader.findTemplate('architecture_agent', 'adr_capture');
 
     const fallback: ArchitecturalDecisions = {
       adrs: [{
@@ -588,7 +588,7 @@ export class Phase4Handler implements PhaseHandler {
       traceContext: {
         workflowRunId: ctx.workflowRun.id,
         phaseId: '4',
-        subPhaseId: '4.3',
+        subPhaseId: 'adr_capture',
         agentRole: 'architecture_agent',
         label: 'Phase 4.3 — Architectural Decision Capture',
       },

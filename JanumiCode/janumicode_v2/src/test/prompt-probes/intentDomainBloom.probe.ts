@@ -14,7 +14,7 @@ describe('Probe: Intent Domain Bloom', () => {
     const result = await runProbe({
       name: 'intent_domain_bloom',
       agentRole: 'domain_interpreter',
-      subPhase: '01_2_intent_domain_bloom',
+      subPhase: 'intent_domain_bloom',
       variables: {
         active_constraints: 'No constraints at this stage.',
         scope_classification_summary: 'breadth: single_product, depth: production_grade',

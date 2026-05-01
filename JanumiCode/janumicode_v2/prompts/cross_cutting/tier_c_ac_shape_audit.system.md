@@ -1,6 +1,6 @@
 ---
 agent_role: reasoning_review
-sub_phase: cross_cutting_tier_c_ac_shape_audit
+sub_phase: tier_c_ac_shape_audit
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

@@ -14,7 +14,7 @@ describe('Probe: Intent Statement Synthesis', () => {
     const result = await runProbe({
       name: 'intent_statement_synthesis',
       agentRole: 'domain_interpreter',
-      subPhase: '01_4_intent_statement_synthesis',
+      subPhase: 'intent_statement_synthesis',
       variables: {
         active_constraints: 'No prior constraints',
         prune_decisions_summary: 'Human selected concept c2 (TaskFlow). Confirmed assumptions: web-based, multi-tenant. Rejected mobile-first interpretation.',

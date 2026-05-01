@@ -19,7 +19,7 @@
  *     the forward-only constraint is respected, this is often a
  *     planning smell worth surfacing for human review).
  *
- * Emits `CoverageGapContent` records with `sub_phase_id: '1.8'`.
+ * Emits `CoverageGapContent` records with `sub_phase_id: 'release_plan'`.
  * `blocking` severity pauses the MMP approval gate; `advisory` severity
  * surfaces warnings for the human to consider without blocking.
  *
@@ -54,7 +54,7 @@ export interface ReleaseManifestVerifierInputs {
 
 export type ReleaseManifestVerifierResult = CoverageGapContent[];
 
-const SUB_PHASE: '1.8' = '1.8';
+const SUB_PHASE = 'release_plan';
 
 // ── Helpers ────────────────────────────────────────────────────────
 

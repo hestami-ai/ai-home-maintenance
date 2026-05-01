@@ -1,6 +1,6 @@
 ---
 agent_role: reasoning_review
-sub_phase: cross_cutting_verification_ensemble
+sub_phase: verification_ensemble_secondary
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

@@ -96,7 +96,7 @@ describe('validateLineage — missing artifacts', () => {
 
   it('reports Phase 0 missing collision_risk_report as a MissingRecord gap', () => {
     // Only write workspace_classification, skip collision_risk_report.
-    writeArtifact('workspace_classification', '0.1', '0');
+    writeArtifact('workspace_classification', 'workspace_classification', '0');
     const result = validateLineage(db, runId, ['0']);
     expect(result.valid).toBe(false);
     const missingKinds = result.missingRecords.map((m) => m.record_type);
@@ -105,8 +105,8 @@ describe('validateLineage — missing artifacts', () => {
   });
 
   it('does NOT report greenfield-only runs missing brownfield-only artifacts', () => {
-    writeArtifact('workspace_classification', '0.1', '0');
-    writeArtifact('collision_risk_report', '0.4', '0');
+    writeArtifact('workspace_classification', 'workspace_classification', '0');
+    writeArtifact('collision_risk_report', 'vocabulary_collision_check', '0');
     // external_file_ingested / ingested_artifact_index / prior_decision_summary
     // are all brownfield-only and marked optional in the contract.
     const result = validateLineage(db, runId, ['0']);
@@ -119,7 +119,7 @@ describe('validateLineage — missing artifacts', () => {
   it('sub_phase_id is part of the match — same kind in a different sub-phase does not count', () => {
     // Write workspace_classification but at the wrong sub-phase.
     writeArtifact('workspace_classification', '0.3', '0'); // wrong sub-phase
-    writeArtifact('collision_risk_report', '0.4', '0');
+    writeArtifact('collision_risk_report', 'vocabulary_collision_check', '0');
     const result = validateLineage(db, runId, ['0']);
     const missing = result.missingRecords
       .map((m) => `${m.record_type}@${m.sub_phase ?? ''}`)
@@ -155,10 +155,10 @@ describe('validateLineage — invariants', () => {
       consistency_report: 'consistency_checker',
     };
     const phase4Art: Array<[string, string]> = [
-      ['software_domains', '4.1'],
-      ['component_model', '4.2'],
-      ['architectural_decisions', '4.3'],
-      ['consistency_report', '4.5'],
+      ['software_domains', 'software_domains'],
+      ['component_model', 'component_skeleton'],
+      ['architectural_decisions', 'adr_capture'],
+      ['consistency_report', 'architecture_gate'],
     ];
     for (const [kind, sub] of phase4Art) {
       if (kind === 'component_model') {
@@ -190,7 +190,7 @@ describe('validateLineage — invariants', () => {
       schema_version: '1.0',
       workflow_run_id: runId,
       phase_id: '4',
-      sub_phase_id: '4.4',
+      sub_phase_id: 'architecture_synthesis',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: 'dev',
       content: { kind: 'architecture_mirror' },
@@ -200,7 +200,7 @@ describe('validateLineage — invariants', () => {
       schema_version: '1.0',
       workflow_run_id: runId,
       phase_id: '4',
-      sub_phase_id: '4.5',
+      sub_phase_id: 'architecture_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: 'dev',
       content: { kind: 'phase_gate' },
@@ -239,7 +239,7 @@ describe('buildGapReport — failed_at_phase derivation', () => {
           {
             record_type: 'artifact_produced[kind=functional_requirements]',
             phase: '2',
-            sub_phase: '2.1',
+            sub_phase: 'fr_bloom_skeleton',
             reason: 'Phase 2.1 must produce functional_requirements.',
           },
         ],
@@ -249,7 +249,7 @@ describe('buildGapReport — failed_at_phase derivation', () => {
       '2',
     );
     expect(report.failed_at_phase).toBe('2');
-    expect(report.failed_at_sub_phase).toBe('2.1');
+    expect(report.failed_at_sub_phase).toBe('fr_bloom_skeleton');
   });
 
   it('derives sub_phase from first assertion failure when no missing records', () => {

@@ -35,7 +35,7 @@ export class Phase0Handler implements PhaseHandler {
     const workspacePath = engine.workspacePath;
 
     // ── Sub-Phase 0.1 — Workspace Classification ────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '0.1');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'workspace_classification');
 
     // Brownfield = any existing workspace content outside the .janumicode/
     // directory. This is filesystem-aware, not just DB-aware — the v1
@@ -68,7 +68,7 @@ export class Phase0Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '0',
-      sub_phase_id: '0.1',
+      sub_phase_id: 'workspace_classification',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       content: classificationContent,
@@ -81,7 +81,7 @@ export class Phase0Handler implements PhaseHandler {
     // bloom from actual content, not a filename. Runs in both greenfield
     // and brownfield — if the human says "Review specs/foo.md", we read
     // specs/foo.md regardless of whether the rest of the workspace is empty.
-    engine.stateMachine.setSubPhase(workflowRun.id, '0.1b');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'external_reference_resolution');
 
     const resolvedRefs = await this.runReferenceResolution(ctx, workspacePath);
     for (const id of resolvedRefs.ingestedRecordIds) artifactIds.push(id);
@@ -89,18 +89,18 @@ export class Phase0Handler implements PhaseHandler {
     // ── Sub-Phase 0.2 — Artifact Ingestion (brownfield only) ────
     let ingestedIndex: { recordIds: string[]; totalFiles: number } = { recordIds: [], totalFiles: 0 };
     if (workspaceType === 'brownfield') {
-      engine.stateMachine.setSubPhase(workflowRun.id, '0.2');
+      engine.stateMachine.setSubPhase(workflowRun.id, 'artifact_ingestion');
       ingestedIndex = await this.runArtifactIngestion(ctx, workspacePath, resolvedRefs.resolvedPaths);
       for (const id of ingestedIndex.recordIds) artifactIds.push(id);
 
       // ── Sub-Phase 0.2b — Brownfield Continuity Check ──────────
-      engine.stateMachine.setSubPhase(workflowRun.id, '0.2b');
+      engine.stateMachine.setSubPhase(workflowRun.id, 'brownfield_continuity_check');
       const continuityId = await this.runBrownfieldContinuityCheck(ctx);
       if (continuityId) artifactIds.push(continuityId);
     }
 
     // ── Sub-Phase 0.4 — Vocabulary Collision Check ──────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '0.4');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'vocabulary_collision_check');
 
     const collisionContent = {
       kind: 'collision_risk_report' as const,
@@ -121,7 +121,7 @@ export class Phase0Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '0',
-      sub_phase_id: '0.4',
+      sub_phase_id: 'vocabulary_collision_check',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       content: collisionContent,
@@ -225,7 +225,7 @@ export class Phase0Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '0',
-      sub_phase_id: '0.1b',
+      sub_phase_id: 'external_reference_resolution',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       content,
@@ -293,7 +293,7 @@ export class Phase0Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '0',
-      sub_phase_id: '0.2',
+      sub_phase_id: 'artifact_ingestion',
       produced_by_agent_role: 'deep_memory_research',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: ingestedRecordIds,
@@ -335,7 +335,7 @@ export class Phase0Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '0',
-      sub_phase_id: '0.2',
+      sub_phase_id: 'artifact_ingestion',
       produced_by_agent_role: 'deep_memory_research',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       content,
@@ -373,7 +373,7 @@ export class Phase0Handler implements PhaseHandler {
         schema_version: '1.0',
         workflow_run_id: workflowRun.id,
         phase_id: '0',
-        sub_phase_id: '0.2b',
+        sub_phase_id: 'brownfield_continuity_check',
         produced_by_agent_role: 'deep_memory_research',
         janumicode_version_sha: engine.janumiCodeVersionSha,
         content,
@@ -391,7 +391,7 @@ export class Phase0Handler implements PhaseHandler {
         knownRelevantRecordIds: [],
         workflowRunId: workflowRun.id,
         phaseId: '0',
-        subPhaseId: '0.2b',
+        subPhaseId: 'brownfield_continuity_check',
       });
 
       const content = {
@@ -420,7 +420,7 @@ export class Phase0Handler implements PhaseHandler {
         schema_version: '1.0',
         workflow_run_id: workflowRun.id,
         phase_id: '0',
-        sub_phase_id: '0.2b',
+        sub_phase_id: 'brownfield_continuity_check',
         produced_by_agent_role: 'deep_memory_research',
         janumicode_version_sha: engine.janumiCodeVersionSha,
         content,

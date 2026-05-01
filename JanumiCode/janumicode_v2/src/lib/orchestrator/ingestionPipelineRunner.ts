@@ -446,7 +446,12 @@ export class IngestionPipelineRunner {
    */
   private runStageV(record: GovernedStreamRecord): void {
     // Check if this record's content might answer open questions
-    // by looking for 'raises' edges pointing to unresolved questions
+    // by looking for 'raises' edges pointing to unresolved questions.
+    // SAB-WARNING: caller of .all() — review for pagination if results grow unbounded.
+    // This query has no workflow_run_id filter; it scans every 'raises' edge across the
+    // workspace's entire history. On long-lived workspaces with many runs this could
+    // exceed the 32MB SharedArrayBuffer ceiling enforced by the sidecar RPC bridge.
+    // Consider scoping to the active run or adding LIMIT/OFFSET pagination if it fires.
     const openQuestions = this.db.prepare(`
       SELECT me.target_record_id, gs.content
       FROM memory_edge me

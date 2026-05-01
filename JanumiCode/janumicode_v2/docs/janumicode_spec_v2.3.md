@@ -15,7 +15,7 @@
 - *__Classify-first decomposition (Wave 8)__ — Phase 2.1a / 2.2a decomposer prompts (`schema_version: 2.0`) elevate the atomic-leaf decision to a first-class top-level branch. Output begins with `parent_branch_classification: "atomic_leaf" | "decomposable" | "invalid_parent"`; only the rules of the chosen branch then apply. Reduces small-model attention overload and surfaces the leaf escape hatch consistently. Output schema is backward-compatible — adds one top-level field; `parent_tier_assessment`, `children[]`, and `surfaced_assumptions[]` unchanged (§4).*
 - *__Hard-fail on non-product lens (Wave 8)__ — Phase 1 hard-fails with a structured error when `intent_lens_classification.lens !== 'product'`. The legacy lens-neutral fallback flow (`Sub-Phase 1.2 Intent Domain Bloom` via the `intent_domain_bloom.system.md` template, `Sub-Phase 1.4 Intent Statement Synthesis` via `intent_statement_synthesis.system.md`) is retired — only the product-lens pipeline (`executeProductLens`) is reachable. Phase 2 hard-fails when `product_description_handoff` is missing; the legacy `runFunctionalRequirementsBloom` / `runNonFunctionalRequirementsBloom` methods and their non-product templates (`functional_requirements_bloom.system.md`, `nonfunctional_requirements_bloom.system.md`) are removed. Operators with a non-product intent receive a clear "lens not yet supported" error rather than silently degraded output (§4, §10).*
 - *__Runaway-thinking retry classification (Wave 8)__ — In-stream invocation-log-size aborts (the cap that fires when a single attempt's log file exceeds 1.5 MB — typically a thinking spiral) are now classified as a new retryable `LLMErrorType: 'runaway_thinking'` rather than the non-retryable `'context_exceeded'`. Each retry starts with a fresh per-attempt log baseline so sampling variance can rescue the spiral. `getBackoffDelay('runaway_thinking') = 2000` ms. True HTTP-400 `context_exceeded` from a server rejection remains non-retryable (§7, §8.5).*
-- *__Coverage gap record family expansion__ — `coverage_gap.sub_phase_id` widens to `'1.3c' | '1.8' | '2.1c' | '2.2c'` (§6, §15).*
+- *__Coverage gap record family expansion__ — `coverage_gap.sub_phase_id` widens to `'coverage_verifier' | 'release_plan' | 'fr_bloom_verifier' | 'nfr_bloom_verifier'` (slug IDs after Wave 11 sub-phase rename — see §4) (§6, §15).*
 - *__Decomposition Viewer (VS Code custom editor)__ — readonly custom editor (`janumicode.decompViewer`, viewType `*.janumicode-decomp`) renders the Multi-Level Accordion visualization (per `docs/requirements viewer/decomp-viewer-visualization.md`). Polls the governed-stream DB at `pollIntervalMs` (default 3000) and pushes a snapshot to a Svelte 5 webview when the SHA-256 revision hash over load-bearing fields changes. Surfaces FR/NFR roots, decomposition trees with status/tier badges, surfaced assumptions, release rail, summary strip, and detail drawer. Status-bar button + command palette entry for discoverability (`janumicode.openDecompViewer`). Read-only access uses `better-sqlite3` `{ readonly: true, fileMustExist: true }` so it can attach to a calibration DB while the writer is live (§17).*
 - *__Visual design system migration__ — UI tokens migrated to the `--jc-*` design-token system per `docs/visual design/DESIGN.md` (Logical Architect): surface hierarchy via tonal background steps, "No-Line" rule (no internal borders — separation through tonal step), 3 px primary-tinted left-edge status bar for selection, Editorial Contrast typography (Space Grotesk display, Inter body, Source Code Pro mono), max 6 px radius (§17).*
 - *__Phase 1 lens dispatch records__ — `intent_lens_classification.fallback_lens` is still emitted by the classifier for audit, but the orchestrator no longer consults it; classification is the single dispatch signal (§4 Phase 1.0a, §15).*
@@ -122,7 +122,7 @@ All [JC:Prompt Templates], schema fields, agent instructions, and UI labels must
 | **janumicode_version_sha** | The git commit SHA of the JanumiCode repository pinned at Workflow Run initiation; recorded on every Governed Stream Record | "version", "build number" |
 | **Context Payload — Stdin** | The directive channel of an Agent Invocation — governing constraints, required output specification, and summary context injected via stdin to a CLI-backed agent | "context", "prompt" (unqualified) |
 | **Context Payload — Detail File** | The reference channel of an Agent Invocation — a generated filesystem file containing full evidentiary detail the CLI-backed agent may consult during its work | "context file", "detail document" |
-| **Detail File Path** | The deterministic filesystem path at which the Context Payload Detail File is placed: `.janumicode/context/{sub_phase_id}_{invocation_id}.md` | "context path", "file location" |
+| **Detail File Path** | The deterministic filesystem path at which the Context Payload Detail File is placed: `.janumicode/runs/{workflow_run_id}/context/{sub_phase_id}_{invocation_id}.md` | "context path", "file location" |
 | **Execution Trace** | The complete ordered set of Governed Stream Records produced during a single Agent Invocation — including reasoning steps, self-corrections, tool call invocations, and the final output. Tool results are captured in the Governed Stream but excluded from the Reasoning Review context by design. | "agent log", "run trace", "agent history" |
 | **Trace Selection** | The structured subset of the Execution Trace provided to the Reasoning Review — always includes all self-corrections and tool call invocations; selects reasoning steps by rule; excludes tool results | "trace subset", "context selection" |
 
@@ -345,6 +345,7 @@ All [JC:Prompt Templates], schema fields, agent instructions, and UI labels must
 | Loop Detection Monitor | Deterministic — no LLM | N/A — TypeScript process | Retry counting; flaw trend analysis; tool call sequence analysis; Loop Status assessment |
 | Reasoning Review | LLM API call | Google Gemini thinking model | Inspection of Execution Trace (reasoning steps, self-corrections, tool call invocations, final output) against complete flaw taxonomy. Tool results excluded by design. |
 | Narrative Memory Generator | LLM API call | Anthropic Claude Sonnet | Phase summary with inline citations; anti-failure-mode discipline |
+| JSON Repair | LLM API call (meta-role) | Configurable (primary + fallback models, typically different families) | Repairs malformed JSON output for any agent that requested `responseFormat: 'json'` and whose response could not be parsed. Invoked automatically by `LLMCaller` after retries are exhausted — never invoked by phase code directly. Receives the original prompt, system prompt, thinking chain, and an optional schema hint (JSON Schema, TypeScript interface, or example object) so output remains semantically faithful, not just syntactically valid. Two attempts (primary then fallback model); both failures halt the workflow. Skipped when the calling `agentRole` is itself `json_repair` or `reasoning_review` (no recursion; reasoning_review has separate failure semantics). Local regex-based recovery has been removed — LLM repair is the only remediation. |
 
 ### 3.1 Authority Level Taxonomy
 
@@ -396,6 +397,8 @@ Semantic Supersession is not a rollback. It is the formal mechanism by which a h
 
 ## 4. Phase and Sub-Phase Contracts
 
+> *Sub-phase identity is **slug-based** (e.g. `fr_saturation`, `intent_quality_check`). Display codes like `2.1.4` and `1.1` are **derived at render time** from the manifest at `src/lib/orchestrator/phaseManifest.ts` — they reflect execution order within a parent phase plus optional `group` clustering, and may shift when a new sub-phase is inserted between existing ones. The DB stores slugs only; display codes are not persisted. Sub-phase headers below show the canonical display code followed by the slug. After Wave 11 the slug is the stable identifier — numeric strings are presentation-only.*
+
 All phases are mandatory. Execution is strictly sequential. The Orchestrator cannot skip phases. Phases may only be revisited through an explicit rollback authorized by the human.
 
 At every Phase boundary the Orchestrator: runs a Vocabulary Collision Check; pre-populates Context Packets for agents requiring historical context; and generates Narrative Memory and Decision Trace synchronously at Phase Gate acceptance before the next Phase begins.
@@ -425,30 +428,32 @@ At every Phase boundary the Orchestrator: runs a Vocabulary Collision Check; pre
 
 **Entry Criterion:** A new Workflow Run is initiated by the human.
 
-#### Sub-Phase 0.1 — Workspace Classification
+#### Sub-Phase 0.1.1 — Workspace Classification (`workspace_classification`)
 
 - **[JC:Agent Role]:** Orchestrator
 - **Action:** Determines whether Workspace is greenfield or brownfield. Pins `janumicode_version_sha`.
 - **Output Artifact:** `workspace_classification`
 
-#### Sub-Phase 0.2 — Artifact Ingestion *(brownfield only)*
+#### Sub-Phase 0.2.1 — Artifact Ingestion (`artifact_ingestion`) *(brownfield only)*
 
 - **[JC:Agent Role]:** Deep Memory Research Agent
 - **Action:** Normalizes Existing Artifacts. Identifies Ingestion Gaps and Conflicts.
 - **Output Artifact:** `ingested_artifact_index`, `ingestion_gap_list`, `ingestion_conflict_list`
 
-#### Sub-Phase 0.2b — Brownfield Continuity Check *(brownfield only)*
+#### Sub-Phase 0.2.2 — Brownfield Continuity Check (`brownfield_continuity_check`) *(brownfield only)*
 
 - **[JC:Agent Role]:** Deep Memory Research Agent
 - **Action:** Retrieves complete Decision History. Produces Prior Decision Summary.
 - **Output Artifact:** `prior_decision_summary`
 
-#### Sub-Phase 0.3 — Ingestion Review *(brownfield only)*
+#### Sub-Phase 0.3 — Ingestion Review *(brownfield only)* **[RETIRED]**
+
+**This sub-phase was retired.** No live manifest slug; ingestion gap/conflict review is now folded into the brownfield continuity check (`brownfield_continuity_check`) and the Phase 0 gate criteria below. Preserved here as historical record.
 
 - **Interaction:** Mirror presenting gap and conflict lists. Menu for human to prioritize and resolve.
 - **Output:** Approved `baseline_artifact_set`
 
-#### Sub-Phase 0.4 — Vocabulary Collision Check
+#### Sub-Phase 0.3 — Vocabulary Collision Check (`vocabulary_collision_check`)
 
 - **[JC:Agent Role]:** Orchestrator (LLM API call)
 - **Output Artifact:** `collision_risk_report`
@@ -479,7 +484,7 @@ At every Phase boundary the Orchestrator: runs a Vocabulary Collision Check; pre
 
 The UI displays Phase 0.5 as "Cross-Run Impact Analysis" without a number prefix.
 
-#### Sub-Phase 0.5.1 — Impact Enumeration
+#### Sub-Phase 0.5.1 — Impact Enumeration (`impact_enumeration`)
 
 - **[JC:Agent Role]:** Consistency Checker Agent
 - **Context Payload includes:** Prior Workflow Run's Implementation Artifacts; the changed interface definition; the `prior_decision_summary`
@@ -500,7 +505,7 @@ When the diff is ambiguous (a field is both added and a structurally similar fie
 
 > "The proposed interface change would require modifying [N] tasks across [M] files — exceeding the cascade threshold. Options: (A) Proceed — accept the full refactoring scope, (B) Redesign the interface change to reduce cascade impact — return to Phase 0.5.1 with constraint to reduce scope, (C) Abandon this interface change and pursue an additive approach that does not break existing contracts."
 
-#### Sub-Phase 0.5.2 — Refactoring Decision
+#### Sub-Phase 0.5.2 — Refactoring Decision (`refactoring_decision`)
 
 - **Interaction:** Mirror presents `cross_run_impact_report`. Human selects:
   - **(A) Proceed:** A Refactoring Task will be added to Phase 6 to update affected prior-run artifacts. Refactoring Tasks carry idempotency fields — see Section 8.7.
@@ -531,7 +536,7 @@ When the diff is ambiguous (a field is both added and a structurally similar fie
 
 Every lens-conditional variant carries the same Phase 1 semantics — a locked intent usable by Phase 2 — but the topology is tuned to the shape of the intent. Non-product lenses may receive dedicated bespoke flows in future revisions; until then they follow the default collapsed flow.
 
-#### Sub-Phase 1.0 — Intent Quality Check
+#### Sub-Phase 1.1 — Intent Quality Check (`intent_quality_check`)
 
 - **[JC:Agent Role]:** Orchestrator (LLM API call)
 - **Action:** Assesses the Raw Intent across three dimensions before bloom begins:
@@ -546,7 +551,7 @@ Every lens-conditional variant carries the same Phase 1 semantics — a locked i
 
 **If contradictory intent detected:** The contradiction must be resolved before bloom proceeds. Mirror presents the contradiction with the specific conflicting elements identified. Menu presents resolution options. Proceeding with unresolved contradictions is blocked.
 
-#### Sub-Phase 1.0a — Intent Lens Classification
+#### Sub-Phase 1.2 — Intent Lens Classification (`intent_lens_classification`)
 
 - **[JC:Agent Role]:** Orchestrator (LLM API call)
 - **Action:** Classifies the Raw Intent into one of six lenses — `product`, `feature`, `bug`, `infra`, `legal`, `unclassified` — to resolve which downstream Phase 1 topology applies. The classifier reads the Raw Intent plus any files ingested in Phase 0 (inlined inline), emits a lens + confidence score + rationale grounded in quoted evidence, and persists the chosen lens on the Workflow Run.
@@ -554,7 +559,9 @@ Every lens-conditional variant carries the same Phase 1 semantics — a locked i
 - **Output Artifact:** `intent_lens_classification: {lens, confidence, rationale, fallback_lens}`
 - **State Effect:** Writes `workflow_runs.intent_lens` so every downstream sub-phase resolves lens-aware templates and contracts without re-reading the raw intent.
 
-#### Sub-Phase 1.1 — Raw Intent Reception
+#### Sub-Phase 1.1 — Raw Intent Reception **[RETIRED]**
+
+**This sub-phase was retired in Wave 8** as part of the default-flow retirement (see "Default-Flow Sub-Phases — RETIRED (Wave 8)" below). Raw intent is now captured directly by Sub-Phase 1.1 (`intent_quality_check`) under the product-lens flow. Preserved here as historical record.
 
 - **[JC:Agent Role]:** Orchestrator
 - **Action:** Logs Raw Intent as Governed Stream Record. Triggers Sub-Phase 1.1b.
@@ -579,7 +586,9 @@ The default-flow sub-phases (`Sub-Phase 1.2 Intent Domain Bloom`, `Sub-Phase 1.4
 **Compliance Menu:**
 > "The following compliance regimes appear applicable. Confirm, add, or remove: [list with checkboxes]."
 
-#### Sub-Phase 1.2 — Intent Domain Bloom
+#### Sub-Phase 1.2 — Intent Domain Bloom **[RETIRED]**
+
+**This sub-phase was retired in Wave 8.** The `intent_domain_bloom` slug and its lens-neutral template are no longer invoked; the product-lens equivalent is Sub-Phase 1.5 — Business Domains and Personas Bloom (`business_domains_bloom`). Preserved here as historical record.
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Context Payload stdin:** Active constraints (Authority Level 6+), `scope_classification`, `compliance_context` summary, `collision_risk_report` aliases, `prior_decision_summary` summary (brownfield)
@@ -591,23 +600,31 @@ The default-flow sub-phases (`Sub-Phase 1.2 Intent Domain Bloom`, `Sub-Phase 1.4
 
 When a System-Proposed Content item is approved, `GovernedStreamWriter` elevates its `authority_level` from 1 to 5 and traverses `record_references` forward from the item to clear `derived_from_system_proposal: true` from all downstream artifacts that inherited it due to this item.
 
-#### Sub-Phase 1.3 — Intent Candidate Review and Menu
+#### Sub-Phase 1.3 — Intent Candidate Review and Menu **[RETIRED]**
+
+**This sub-phase was retired in Wave 8.** The default-flow candidate review is replaced by per-round Mirror/Menu prune gates inside the product-lens proposer rounds (1.5–1.11). Preserved here as historical record.
 
 - **Interaction:** Annotated Mirror of `intent_bloom` centered on candidate interpretations first. The human reviews, keeps, rejects, edits, or defers candidate directions before downstream synthesis. Assumptions, constraints, and open questions inside a candidate are supporting rationale at this stage unless explicitly elevated into a later assumption-focused surface. Mixed-format Menus follow the Decision Sequencing Protocol (Section 7.5) to prune candidate space. System-Proposed Content items require individual explicit approval before they can be used as governing content. Prior decision conflicts are highlighted. All Decision Traces are recorded.
 
-#### Sub-Phase 1.4 — Assumption Surfacing and Adjudication
+#### Sub-Phase 1.4 — Assumption Surfacing and Adjudication **[RETIRED]**
+
+**This sub-phase was retired in Wave 8.** Assumption surfacing now occurs inline within each product-lens proposer round and during product description synthesis. Preserved here as historical record.
 
 - **[JC:Agent Role]:** Orchestrator + Domain Interpreter Agent
 - **Action:** Extracts the assumption set implied by the kept candidate interpretations, normalizes and deduplicates those assumptions into first-class review objects, and presents them for explicit human adjudication. Only accepted or edited assumptions may become governing inputs to downstream synthesis. Rejected assumptions are excluded. Deferred assumptions remain unresolved and block progression unless explicitly handled by policy.
 - **Output Artifact:** `surfaced_assumptions`, `adjudicated_assumptions`
 
-#### Sub-Phase 1.5 — Intent Statement Synthesis
+#### Sub-Phase 1.5 — Intent Statement Synthesis **[RETIRED]**
+
+**This sub-phase was retired in Wave 8.** The `intent_statement_synthesis` slug and its template are no longer invoked; the product-lens flow synthesizes a `product_description_handoff` instead (Sub-Phase 1.11 — `product_description_synthesis`). Preserved here as historical record.
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Action:** Synthesizes all prune decisions into complete Intent Statement using only the kept candidate interpretations and the adjudicated assumption set. Reasoning Review applied. Domain Compliance Reasoning Review applied if `compliance_context` is populated.
 - **Output Artifact:** `intent_statement: {product_concept, confirmed_assumptions: [{assumption_id, assumption, confirmed_by_record_id}], confirmed_constraints, out_of_scope, scope_classification_ref, compliance_context_ref, prior_decision_overrides, system_proposed_content_items: [{field, content, approved: bool}]}`
 
-#### Sub-Phase 1.6 — Intent Statement Approval
+#### Sub-Phase 1.6 — Intent Statement Approval **[RETIRED]**
+
+**This sub-phase was retired in Wave 8.** The product-lens flow uses the Sub-Phase 1.12 Handoff Approval gate (`product_handoff_gate`) instead. Preserved here as historical record.
 
 - **Interaction:** Full Mirror of `intent_statement`. Human approves, rejects, or edits. If rejected: return to 1.2 with rejection context injected.
 
@@ -631,66 +648,66 @@ The system invariant holds: **only Phase 0 (ingestion) and Phase 1.0* extraction
 
 Each extraction pass captures items with a **`source_ref`** containing `document_path`, optional `section_heading`, and a verbatim `excerpt`. This traceability spine lets Phase 8 Evaluation walk `source_ref → extracted_item → requirement → component → test_result` chains mechanically and detect drift per segment.
 
-#### Sub-Phase 1.0b — Product Intent Discovery *(product lens)*
+#### Sub-Phase 1.3.1 — Product Intent Discovery (`product_intent_discovery`) *(product lens)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Action:** Silent homework pass. Extracts the **product slice**: vision, description, seed personas, seed user journeys, phasing strategy, success metrics, UX requirements, and product-level requirements / decisions / constraints / open questions. **Does not capture** technical stack, compliance regimes, V&V targets, or vocabulary — those are sibling passes' responsibility.
 - **Output Artifact:** `artifact_produced[kind=intent_discovery]`
 
-#### Sub-Phase 1.0c — Technical Constraints Discovery *(product lens)*
+#### Sub-Phase 1.3.2 — Technical Constraints Discovery (`technical_constraints_discovery`) *(product lens)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Action:** Transcribes stated-not-invented technical decisions from the source documents — chosen stack, mandatory infrastructure, security models, deployment constraints, integration protocols. Explicitly transcription, not design; Phase 4 (Architecture) and Phase 5 (Technical Specification) consume these as pre-approved authoritative constraints.
 - **Output Artifact:** `artifact_produced[kind=technical_constraints_discovery]` carrying `technicalConstraints[]`.
 
-#### Sub-Phase 1.0d — Compliance & Retention Discovery *(product lens)*
+#### Sub-Phase 1.3.3 — Compliance & Retention Discovery (`compliance_retention_discovery`) *(product lens)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Action:** Captures regulatory regimes (HIPAA, SOC2, GDPR, WCAG, etc.), legal retention obligations, audit requirements, and jurisdictional constraints stated in source documents. Downstream consumers: Phase 1.1b (scope/compliance context augmentation), Phase 5 (data model retention wiring), Phase 7 (test planning), Phase 8 (evaluation design).
 - **Output Artifact:** `artifact_produced[kind=compliance_retention_discovery]` carrying `complianceExtractedItems[]`.
 
-#### Sub-Phase 1.0e — V&V Requirements Discovery *(product lens)*
+#### Sub-Phase 1.3.4 — V&V Requirements Discovery (`vv_requirements_discovery`) *(product lens)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Action:** Captures Verification & Validation requirements with measurable threshold + measurement method — distinct from free-prose `qualityAttributes[]` in that each V&V item is structured `{ target, measurement, threshold }` for direct consumption by Phase 7 Test Planning and Phase 8 Evaluation Design.
 - **Output Artifact:** `artifact_produced[kind=vv_requirements_discovery]` carrying `vvRequirements[]`.
 
-#### Sub-Phase 1.0f — Canonical Vocabulary Discovery *(product lens)*
+#### Sub-Phase 1.3.5 — Canonical Vocabulary Discovery (`canonical_vocabulary_discovery`) *(product lens)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Action:** Captures domain-specific terms + definitions from source documents. Consumed by Phase 0.4 Vocabulary Collision Check and by Phase 4 Architecture naming to keep component names aligned with stakeholder mental model.
 - **Output Artifact:** `artifact_produced[kind=canonical_vocabulary_discovery]` carrying `canonicalVocabulary[]`.
 
-#### Sub-Phase 1.0g — Intent Discovery Synthesis *(product lens)*
+#### Sub-Phase 1.3.6 — Intent Discovery Synthesis (`discovery_bundle_compose`) *(product lens)*
 
 - **[JC:Agent Role]:** Orchestrator (deterministic)
 - **Action:** No LLM call — merges the five extraction outputs into a single `IntentDiscoveryBundle` that the remaining Phase 1 sub-phases (1.1b scope + 1.2–1.5 blooms + 1.6 handoff synthesis) consume. Writes an `intent_discovery_bundle` record that points at each extraction artifact via `derived_from_record_ids` and captures per-category counts as a summary.
 - **Output Artifact:** `artifact_produced[kind=intent_discovery_bundle]`
 
-#### Sub-Phase 1.1b — Scope Bounding and Compliance Context *(reused from default flow)*
+#### Sub-Phase 1.4 — Scope Bounding and Compliance Context (`scope_bounding`) *(reused from default flow)*
 
 Identical to Sub-Phase 1.1b above. Emitted under both lens topologies.
 
-#### Sub-Phase 1.2 — Business Domains and Personas Bloom *(product lens, Round 1)*
+#### Sub-Phase 1.5 — Business Domains and Personas Bloom (`business_domains_bloom`) *(product lens, Round 1)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Action:** Proposer Round 1. Expands the validated product intent into the complete set of business domains and personas the product could encompass. Intentionally over-proposes — the human prunes. Each domain carries a short `entityPreview` and `workflowPreview` to surface what downstream rounds will expand on.
 - **Output Artifact:** `artifact_produced[kind=business_domains_bloom]` followed by `decision_bundle_presented` prune gate.
 
-#### Sub-Phase 1.3a — User Journey Bloom *(product lens, Wave 7)*
+#### Sub-Phase 1.6 — User Journey Bloom (`user_journey_bloom`) *(product lens, Wave 7)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Action:** Proposer Round 2a. Takes the accepted domains + personas from Round 1 and proposes user journeys with steps, actors, acceptance criteria, `implementationPhase` tag, and `automatable: boolean` per step (Wave 7 — flags the steps Sub-Phase 1.3b will be expected to back). Coverage targets are: every accepted persona initiates ≥1 journey, every accepted domain hosts ≥1 journey. Journeys that legitimately don't apply MUST be declared in `unreachedPersonas[]` / `unreachedDomains[]` with a reason — silent omission is caught by the 1.3c verifier as `persona_coverage` / `domain_journey_coverage` advisory gaps.
 - **Output Artifact:** `artifact_produced[kind=user_journey_bloom]` followed by `decision_bundle_presented` prune gate.
 
-#### Sub-Phase 1.3b — System Workflow Bloom *(product lens, Wave 7)*
+#### Sub-Phase 1.7 — System Workflow Bloom (`system_workflow_bloom`) *(product lens, Wave 7)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Entry Criterion:** 1.3a accepted (`accepted_journeys` + accepted personas + accepted domains available).
 - **Action:** Proposer Round 2b. Proposes system workflows that **back** automatable journey steps (one workflow per step flagged `automatable: true` in 1.3a, with a `triggers[]` entry of kind `journey_step` pointing at `(journey_id, step_number)`), plus own-triggered workflows seeded by `compliance_extracted_items` (kind `compliance` triggers), `integrations` (kind `integration` triggers), `schedule` triggers (cadence-based: nightly retention sweeps, weekly billing batches), or `event` triggers. Each workflow declares `surfaces: { compliance_regimes[], retention_rules[], vv_requirements[], integrations[] }` so 1.3c can deterministically verify coverage.
 - **Output Artifact:** `artifact_produced[kind=system_workflow_bloom]` followed by `decision_bundle_presented` prune gate.
 
-#### Sub-Phase 1.3c — Coverage Verifier *(product lens, Wave 7, deterministic)*
+#### Sub-Phase 1.8 — Coverage Verifier (`coverage_verifier`) *(product lens, Wave 7, deterministic)*
 
 - **[JC:Agent Role]:** Orchestrator (deterministic — pure function, no LLM call).
 - **Entry Criterion:** Both 1.3a and 1.3b accepted.
@@ -701,25 +718,25 @@ Identical to Sub-Phase 1.1b above. Emitted under both lens topologies.
   - **`automatable_step_backing`** (advisory) — every journey step explicitly flagged `automatable: true` is claimed by ≥1 workflow with a `journey_step` trigger pointing at it. Workflow-backed-but-not-flagged is treated as implicit promotion (not a gap).
   - **`compliance_coverage`** / **`retention_coverage`** / **`integration_coverage`** / **`vv_coverage`** (advisory) — every accepted compliance item, retention rule, integration, V&V requirement is surfaced by ≥1 journey or workflow via `surfaces.*[]` arrays or workflow `triggers`.
   - **`referential_integrity_*`** (blocking) — `journey.personaId`, `journey.businessDomainIds[]`, journey-step `actor`, workflow `businessDomainId`, workflow `triggers[]`, workflow-step `actor`, `workflow.backs_journeys[]`, and every id in `surfaces.*[]` arrays must resolve to accepted upstream items. A single gap record per category aggregates all offenders to keep blast radius small.
-- **Output Artifacts:** `coverage_gap` records (zero or more) with `sub_phase_id: '1.3c'`. Empty array means all checks passed.
+- **Output Artifacts:** `coverage_gap` records (zero or more) with `sub_phase_id: 'coverage_verifier'`. Empty array means all checks passed.
 
 #### Combined Sub-Phase 1.3 (legacy reference) — RETIRED
 
 The combined `Sub-Phase 1.3 — User Journeys and System Workflows Bloom` from the v2.4 spec is replaced by the three-step 1.3a/1.3b/1.3c sequence above. The combined `journeys_workflows_bloom` artifact kind is no longer produced.
 
-#### Sub-Phase 1.4 — Business Entities Bloom *(product lens, Round 3)*
+#### Sub-Phase 1.9 — Business Entities Bloom (`entities_bloom`) *(product lens, Round 3)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Action:** Proposer Round 3. Takes the accepted domains and workflows from prior rounds and proposes the full entity catalog needed to implement them — core entities, junction entities, audit/history entities, configuration entities — each linked to its owning business domain.
 - **Output Artifact:** `artifact_produced[kind=entities_bloom]` followed by `decision_bundle_presented` prune gate.
 
-#### Sub-Phase 1.5 — Integrations and Quality Attributes Bloom *(product lens, Round 4)*
+#### Sub-Phase 1.10 — Integrations and Quality Attributes Bloom (`integrations_qa_bloom`) *(product lens, Round 4)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Action:** Proposer Round 4. Takes everything accepted from prior rounds and proposes external-system integrations (with category, suggested providers, ownership model) plus cross-cutting quality attributes (NFRs — multi-tenancy, RBAC, encryption, accessibility, performance SLOs, compliance, observability).
 - **Output Artifact:** `artifact_produced[kind=integrations_qa_bloom]` followed by `decision_bundle_presented` prune gate.
 
-#### Sub-Phase 1.6 — Product Description Synthesis *(product lens)*
+#### Sub-Phase 1.11 — Product Description Synthesis (`product_description_synthesis`) *(product lens)*
 
 - **[JC:Agent Role]:** Domain Interpreter Agent
 - **Action:** Silent consolidation. Carries forward every accepted item from Rounds 1–4 verbatim (no summarization, no MVP pruning — the human prunes during review, not during synthesis) and refines the narrative fields (vision, description, summary) against the settled product shape. Resolves open questions that were answered during the bloom rounds and flags the remainder as open loops. Also derives a compatibility `intent_statement` projection so Phases 2–9 can continue reading their existing interface unchanged.
@@ -727,11 +744,11 @@ The combined `Sub-Phase 1.3 — User Journeys and System Workflows Bloom` from t
   - `product_description_handoff`: full v1-shaped finalized plan — productVision, productDescription, summary, personas, userJourneys, phasingStrategy, successMetrics, businessDomainProposals, entityProposals, workflowProposals, integrationProposals, qualityAttributes, uxRequirements, requirements, decisions, constraints, openQuestions, humanDecisions, openLoops.
   - `artifact_produced[kind=intent_statement]`: derived compatibility record with `product_concept` (name, description, who_it_serves, problem_it_solves) + `confirmed_assumptions` + `confirmed_constraints` + `out_of_scope`.
 
-#### Sub-Phase 1.7 — Handoff Approval *(product lens)*
+#### Sub-Phase 1.12 — Handoff Approval (`product_handoff_gate`) *(product lens)*
 
 - **Interaction:** Full Mirror of the `product_description_handoff` with section-level summaries (personas count, journeys count, domains count, entities count, etc.). Human approves, rejects, or edits sections. On approval → Sub-Phase 1.8. On rejection → `requires_input`; the re-bloom loop does not apply at approval.
 
-#### Sub-Phase 1.8 — Release Plan Approval *(product lens)*
+#### Sub-Phase 1.13 — Release Plan Approval (`release_plan`) *(product lens)*
 
 - **[JC:Agent Role]:** Orchestrator (LLM proposer + human gate).
 - **Entry Criterion:** 1.7 Handoff Approval passed — approved `product_description_handoff` available.
@@ -780,7 +797,7 @@ Lens-conditional:
 
 This completes the traceability chain `source_ref (1.0*) → handoff_item (1.6) → requirement (2.1/2.2) → [future: component (4) → test_result (9)]` that Phase 8 Evaluation walks for drift detection. The harness invariant `validateRequirementsProductTraceability` rejects FRs/NFRs with empty or unknown `traces_to`; `validateJourneyCoverageByFRs` warns when an accepted journey has no FR tracing to it.
 
-#### Sub-Phase 2.1 — Functional Requirements Bloom *(Wave 8 — three-pass)*
+#### Sub-Phase 2.1 — Functional Requirements Bloom (`fr_bloom_skeleton` 2.1.1 + `fr_bloom_enrichment` 2.1.2 + `fr_bloom_verifier` 2.1.3) *(Wave 8 — three-pass)*
 
 Phase 2.1 under Wave 8 is split into three internal passes (skeleton → enrichment → verifier) to fit small-model attention budgets while preserving correctness. The driver lives at [src/lib/orchestrator/phases/phase2/frBloomThreePass.ts](src/lib/orchestrator/phases/phase2/frBloomThreePass.ts).
 
@@ -801,7 +818,7 @@ Phase 2.1 under Wave 8 is split into three internal passes (skeleton → enrichm
 
 **Sub-Phase 2.1c — Pass 3 (Coverage Verifier, deterministic)**
 - **[JC:Agent Role]:** Orchestrator (deterministic — pure function, no LLM call).
-- **Action:** Runs `verifyFrCoverage` in [src/lib/orchestrator/phases/phase2/verifyFrCoverage.ts](src/lib/orchestrator/phases/phase2/verifyFrCoverage.ts). Emits `coverage_gap` records with `sub_phase_id: '2.1c'`. Blocking severity halts Phase 2 with a structured error citing the gap-record ids; advisory severity logs and proceeds.
+- **Action:** Runs `verifyFrCoverage` in [src/lib/orchestrator/phases/phase2/verifyFrCoverage.ts](src/lib/orchestrator/phases/phase2/verifyFrCoverage.ts). Emits `coverage_gap` records with `sub_phase_id: 'fr_bloom_verifier'`. Blocking severity halts Phase 2 with a structured error citing the gap-record ids; advisory severity logs and proceeds.
 - **Predicates checked:**
   - **`fr_id_uniqueness`** (blocking) — FR ids unique within `user_stories[]`.
   - **`ac_presence`** (blocking) — every FR carries ≥1 AC with non-empty `measurable_condition`.
@@ -812,7 +829,7 @@ Phase 2.1 under Wave 8 is split into three internal passes (skeleton → enrichm
 
 **Output Artifact (after Pass 3 passes):** `artifact_produced[kind=functional_requirements]` — `user_stories[]` with `traces_to[]` and full `acceptance_criteria[]`. Depth-0 `requirement_decomposition_node` records are then written for each root FR, seeding Sub-Phase 2.1a.
 
-#### Sub-Phase 2.1a — Recursive Functional Requirements Decomposition *(product lens, Wave 6)*
+#### Sub-Phase 2.1.4 — Recursive Functional Requirements Decomposition (`fr_saturation`) *(product lens, Wave 6)*
 
 - **[JC:Agent Role]:** Requirements Agent
 - **Entry Criterion:** `functional_requirements` bloom output available; depth-0 `requirement_decomposition_node` records written for each root FR User Story (each carries the root's `release_id` + `release_ordinal` resolved via `traces_to` → journey → Release; unmatched roots land in Backlog).
@@ -854,7 +871,7 @@ Phase 2.1 under Wave 8 is split into three internal passes (skeleton → enrichm
 - `reasoning_review_record[kind=tier_c_ac_shape_audit]` — optional, when Step 4c fires.
 - Per-kind telemetry on `workflow_runs`: `decomposition_fr_calls_used`, `decomposition_nfr_calls_used` (aggregate of per-root counters at loop end), `decomposition_budget_calls_used` (sum), `decomposition_max_depth_reached` (max across both kinds).
 
-#### Sub-Phase 2.2 — Non-Functional Requirements Bloom *(Wave 8 — three-pass)*
+#### Sub-Phase 2.2 — Non-Functional Requirements Bloom (`nfr_bloom_skeleton` 2.2.1 + `nfr_bloom_enrichment` 2.2.2 + `nfr_bloom_verifier` 2.2.3) *(Wave 8 — three-pass)*
 
 Phase 2.2 mirrors the Wave 8 three-pass restructure of Phase 2.1: skeleton → threshold/measurement enrichment → verifier. The driver lives at [src/lib/orchestrator/phases/phase2/nfrBloomThreePass.ts](src/lib/orchestrator/phases/phase2/nfrBloomThreePass.ts).
 
@@ -875,7 +892,7 @@ Phase 2.2 mirrors the Wave 8 three-pass restructure of Phase 2.1: skeleton → t
 
 **Sub-Phase 2.2c — Pass 3 (Coverage Verifier, deterministic)**
 - **[JC:Agent Role]:** Orchestrator (deterministic — pure function, no LLM call).
-- **Action:** Runs `verifyNfrCoverage` in [src/lib/orchestrator/phases/phase2/verifyNfrCoverage.ts](src/lib/orchestrator/phases/phase2/verifyNfrCoverage.ts). Emits `coverage_gap` records with `sub_phase_id: '2.2c'`. Blocking severity halts Phase 2; advisory logs and proceeds.
+- **Action:** Runs `verifyNfrCoverage` in [src/lib/orchestrator/phases/phase2/verifyNfrCoverage.ts](src/lib/orchestrator/phases/phase2/verifyNfrCoverage.ts). Emits `coverage_gap` records with `sub_phase_id: 'nfr_bloom_verifier'`. Blocking severity halts Phase 2; advisory logs and proceeds.
 - **Predicates checked:**
   - **`nfr_id_uniqueness`** (blocking) — NFR ids unique.
   - **`nfr_threshold_presence`** (blocking) — every NFR has non-empty `threshold` AND `measurement_method`.
@@ -888,21 +905,21 @@ Phase 2.2 mirrors the Wave 8 three-pass restructure of Phase 2.1: skeleton → t
 
 **Output Artifact (after Pass 3 passes):** `artifact_produced[kind=non_functional_requirements]` — `requirements[]` with full `threshold`, `measurement_method`, `traces_to[]`, `applies_to_requirements[]`. Depth-0 NFR `requirement_decomposition_node` records are then written, seeding Sub-Phase 2.2a.
 
-#### Sub-Phase 2.2a — Recursive Non-Functional Requirements Decomposition *(product lens, Wave 6)*
+#### Sub-Phase 2.2.4 — Recursive Non-Functional Requirements Decomposition (`nfr_saturation`) *(product lens, Wave 6)*
 
-Structurally identical to Sub-Phase 2.1a: the same saturation loop, tier model, safety rails, assumption dedup, Step 4b / 4c, and release propagation — parameterized with `config.rootKind = 'nfr'`, `sub_phase_id = '2.2a'`, `templateSubPhase = '02_2a_non_functional_requirements_decomposition'`, and `gateSurfacePrefix = 'nfr-decomp-gate-'`. NFR decomposition nodes carry `root_kind: 'nfr'` for downstream projection (`getFrozenFrLeaves` vs. future `getFrozenNfrLeaves`).
+Structurally identical to `fr_saturation` (Sub-Phase 2.1.4): the same saturation loop, tier model, safety rails, assumption dedup, Step 4b / 4c, and release propagation — parameterized with `config.rootKind = 'nfr'`, `sub_phase_id = 'nfr_saturation'`, `templateSubPhase = '02_2a_non_functional_requirements_decomposition'`, and `gateSurfacePrefix = 'nfr-decomp-gate-'`. NFR decomposition nodes carry `root_kind: 'nfr'` for downstream projection (`getFrozenFrLeaves` vs. future `getFrozenNfrLeaves`).
 
-#### Sub-Phase 2.3 — Requirements Mirror and Menu
+#### Sub-Phase 2.3 — Requirements Mirror and Menu (`requirement_set_finalize`)
 
 - **Interaction:** Annotated Mirror. Menus follow Decision Sequencing Protocol. Reasoning Review applied. Domain Compliance Reasoning Review applied for compliance-relevant requirements.
 
-#### Sub-Phase 2.4 — Requirements Consistency Check
+#### Sub-Phase 2.4 — Requirements Consistency Check (`requirement_set_review_prep`)
 
 - **[JC:Agent Role]:** Consistency Checker Agent
 - **Context Payload includes:** Context Packet (pre-populated, `all_runs` scope); `compliance_context`
 - **Output Artifact:** `consistency_report`
 
-#### Sub-Phase 2.5 — Requirements Approval with Domain Attestation
+#### Sub-Phase 2.5 — Requirements Approval with Domain Attestation (`requirements_gate`)
 
 - **Interaction:** Mirror of consistency report followed by mandatory attestation step.
 
@@ -927,28 +944,28 @@ The human's approval is recorded as a `decision_trace` of type `phase_gate_appro
 
 **Entry Criterion:** Phase 2 Phase Gate passed. Vocabulary Collision Check re-run. Orchestrator pre-populates Context Packet for Systems Agent (`all_runs` scope).
 
-#### Sub-Phase 3.1 — System Boundary Definition
+#### Sub-Phase 3.1 — System Boundary Definition (`system_boundary`)
 
 - **[JC:Agent Role]:** Systems Agent
 - **Context Payload stdin:** Active constraints; `intent_statement` summary; `functional_requirements` summary; `non_functional_requirements` summary
 - **Context Payload detail file:** Full Context Packet; full `functional_requirements`; full `non_functional_requirements`
 - **Output Artifact:** `system_boundary: {in_scope, out_of_scope, external_systems: [{id, name, purpose, interface_type}]}`
 
-#### Sub-Phase 3.2 — System Requirements Derivation
+#### Sub-Phase 3.2 — System Requirements Derivation (`system_requirements`)
 
 - **[JC:Agent Role]:** Systems Agent
 - **Output Artifact:** `system_requirements: {items: [{id, statement, source_requirement_ids, allocation, priority}]}`
 
-#### Sub-Phase 3.3 — Interface Contract Specification
+#### Sub-Phase 3.3 — Interface Contract Specification (`interface_contracts`)
 
 - **[JC:Agent Role]:** Systems Agent
 - **Output Artifact:** `interface_contracts: {contracts: [{id, systems_involved, protocol, data_format, auth_mechanism, error_handling_strategy}]}`
 
-#### Sub-Phase 3.4 — System Specification Mirror and Menu
+#### Sub-Phase 3.4 — System Specification Mirror and Menu (`system_spec_finalize`)
 
 - **Interaction:** Annotated Mirror. Menus resolve boundary decisions and External System choices. Reasoning Review applied. Domain Compliance Reasoning Review applied.
 
-#### Sub-Phase 3.5 — Consistency Check and Approval
+#### Sub-Phase 3.5 — Consistency Check and Approval (`system_spec_gate`)
 
 - **[JC:Agent Role]:** Consistency Checker Agent (Context Packet pre-populated)
 - **Interaction:** Human approves or triggers re-bloom of flagged items.
@@ -969,30 +986,37 @@ The human's approval is recorded as a `decision_trace` of type `phase_gate_appro
 
 **Entry Criterion:** Phase 3 Phase Gate passed. Vocabulary Collision Check re-run. Orchestrator pre-populates Context Packet for Architecture Agent (`all_runs` scope).
 
-#### Sub-Phase 4.1 — Software Domain Identification
+#### Sub-Phase 4.1 — Software Domain Identification (`software_domains`)
 
 - **[JC:Agent Role]:** Architecture Agent
 - **Context Payload stdin:** Active constraints; `system_boundary` summary; `system_requirements` summary
 - **Context Payload detail file:** Full Context Packet; full `system_requirements`; full `interface_contracts`
 - **Output Artifact:** `software_domains: {domains: [{id, name, ubiquitous_language: [{term, definition}], system_requirement_ids}]}`
 
-#### Sub-Phase 4.2 — Component Decomposition
+#### Sub-Phase 4.2.1 — Component Skeleton (`component_skeleton`)
 
 - **[JC:Agent Role]:** Architecture Agent
+- **Action:** Pass 1 — produces top-level component skeletons (id, name, domain assignment, top-level responsibilities, top-level dependencies). Output is the seed for the saturation pass.
+- **Output Artifact:** `component_model` (skeleton form)
+
+#### Sub-Phase 4.2.2 — Component Saturation (`component_saturation`)
+
+- **[JC:Agent Role]:** Architecture Agent
+- **Action:** Pass 2 — recursive decomposition of each component subtree to atomic leaves; enriches responsibilities and dependencies until termination criteria are satisfied.
 - **Output Artifact:** `component_model: {components: [{id, name, domain_id, responsibilities: [{id, statement}], dependencies: [{target_component_id, dependency_type}]}]}`
 
-#### Sub-Phase 4.3 — Architectural Decision Capture
+#### Sub-Phase 4.3 — Architectural Decision Capture (`adr_capture`)
 
 - **[JC:Agent Role]:** Architecture Agent
 - **Output Artifact:** `architectural_decisions: {adrs: [{id, title, status, context, decision, alternatives, rationale, consequences}]}`
 
-#### Sub-Phase 4.4 — Architecture Mirror and Menu
+#### Sub-Phase 4.4 — Architecture Mirror and Menu (`architecture_synthesis`)
 
 - **Interaction:** Annotated Mirror with ADRs inline. Menus resolve key architectural choices. Reasoning Review applied — especially for Dependency cycles and responsibility overlaps. `component_model` Invariant Check includes: no Component Responsibility statement contains conjunctions connecting distinct concerns.
 
 **Implementability Review:** The Reasoning Review of the `component_model` artifact includes a specific check for `implementability_violation` — any Component Responsibility that is scoped too broadly to be implemented in a single Executor Agent session. If flagged, the Mirror presents the flagged responsibilities with a Menu: "(A) Return to Phase 4.2 to decompose this Component further, (B) Accept as-is and rely on the Implementation Planner to manage complexity."
 
-#### Sub-Phase 4.5 — Consistency Check and Approval
+#### Sub-Phase 4.5 — Consistency Check and Approval (`architecture_gate`)
 
 - **[JC:Agent Role]:** Consistency Checker Agent (Context Packet pre-populated)
 
@@ -1013,33 +1037,40 @@ The human's approval is recorded as a `decision_trace` of type `phase_gate_appro
 
 **Entry Criterion:** Phase 4 Phase Gate passed. Vocabulary Collision Check re-run. Orchestrator pre-populates Context Packet for Technical Spec Agent (`all_runs` scope).
 
-#### Sub-Phase 5.1 — Data Model Specification
+#### Sub-Phase 5.1.1 — Data Model Skeleton (`data_model_skeleton`)
 
 - **[JC:Agent Role]:** Technical Spec Agent
 - **Context Payload stdin:** Active constraints; `component_model` summary; relevant `software_domains` summary
 - **Context Payload detail file:** Full Context Packet; full `component_model`; full `architectural_decisions`
+- **Action:** Pass 1 — top-level data model skeletons per component (entities, top-level fields, top-level relationships). Output seeds the saturation pass.
+- **Output Artifact:** `data_models` (skeleton form)
+
+#### Sub-Phase 5.1.2 — Data Model Saturation (`data_model_saturation`)
+
+- **[JC:Agent Role]:** Technical Spec Agent
+- **Action:** Pass 2 — recursive data model decomposition; enriches fields with types and constraints and expands relationships until termination criteria are satisfied.
 - **Output Artifact:** `data_models: {models: [{component_id, entities: [{name, fields: [{name, type, constraints}], relationships}]}]}`
 
-#### Sub-Phase 5.2 — API Definition
+#### Sub-Phase 5.2 — API Definition (`api_definitions`)
 
 - **[JC:Agent Role]:** Technical Spec Agent
 - **Output Artifact:** `api_definitions: {definitions: [{component_id, endpoints: [{path, method, inputs, outputs, error_codes}]}]}`
 
-#### Sub-Phase 5.3 — Error Handling Strategy Specification
+#### Sub-Phase 5.3 — Error Handling Strategy Specification (`error_handling`)
 
 - **[JC:Agent Role]:** Technical Spec Agent
 - **Output Artifact:** `error_handling_strategies: {strategies: [{component_id, error_types, detection, response, surfacing}]}`
 
-#### Sub-Phase 5.4 — Configuration Parameter Specification
+#### Sub-Phase 5.4 — Configuration Parameter Specification (`configuration_parameters`)
 
 - **[JC:Agent Role]:** Technical Spec Agent
 - **Output Artifact:** `configuration_parameters: {params: [{component_id, name, type, default, required, description}]}`
 
-#### Sub-Phase 5.5 — Technical Specification Mirror and Menu
+#### Sub-Phase 5.5 — Technical Specification Mirror and Menu (`technical_spec_synthesis`)
 
 - **Interaction:** Annotated Mirror. Menus resolve technology choices, library selections, patterns. Reasoning Review applied. Domain Compliance Reasoning Review applied where `compliance_context` is relevant.
 
-#### Sub-Phase 5.6 — Consistency Check and Approval
+#### Sub-Phase 5.6 — Consistency Check and Approval (`technical_spec_gate`)
 
 - **[JC:Agent Role]:** Consistency Checker Agent (Context Packet pre-populated)
 
@@ -1061,19 +1092,26 @@ The human's approval is recorded as a `decision_trace` of type `phase_gate_appro
 
 **Entry Criterion:** Phase 5 Phase Gate passed. `refactoring_scope` artifact available if Phase 0.5 was triggered.
 
-#### Sub-Phase 6.1 — Implementation Task Decomposition
+#### Sub-Phase 6.1.1 — Task Skeleton (`task_skeleton`)
 
 - **[JC:Agent Role]:** Implementation Planner Agent
-- **Decomposition Rule:** One Implementation Task = one Component + one Component Responsibility. If a Component Responsibility requires multiple distinct implementation steps, each step is its own task with explicit `dependency_task_ids` linking them.
+- **Action:** Pass 1 — produces top-level implementation task skeletons (one task per Component Responsibility, with id, component_id, responsibility_id, top-level dependency_task_ids, and an initial complexity estimate). Output seeds the saturation pass.
+- **Decomposition Rule:** One Implementation Task = one Component + one Component Responsibility.
+- **Output Artifact:** `implementation_plan` (skeleton form)
+
+#### Sub-Phase 6.1.2 — Task Saturation (`task_saturation`)
+
+- **[JC:Agent Role]:** Implementation Planner Agent
+- **Action:** Pass 2 — recursive decomposition of each task subtree until tasks are atomic leaves; enriches `completion_criteria`, refines dependencies, and flags complexity.
 - **Complexity Flagging:** Any task rated `estimated_complexity: high` must include a `complexity_flag` field with explanation. The Orchestrator surfaces all complexity-flagged tasks in the Phase 6 Mirror with a Menu per flagged task: "(A) Return to Phase 4 to refine this Component's decomposition via Dependency Closure Rollback, (B) Accept as-is — Executor Agent will handle complexity, (C) Manually split this task here."
 - **Refactoring Tasks:** If `refactoring_scope` artifact exists, Refactoring Tasks from Phase 0.5 are added to the Implementation Plan. See Section 8.7 for Refactoring Task schema including idempotency fields.
 - **Output Artifact:** `implementation_plan`
 
-#### Sub-Phase 6.2 — Implementation Plan Mirror and Menu
+#### Sub-Phase 6.2 — Implementation Plan Mirror and Menu (`implementation_plan_synthesis`)
 
 - **Interaction:** Mirror of sequenced task graph. Menus resolve sequencing conflicts and complexity concerns. Reasoning Review applied.
 
-#### Sub-Phase 6.3 — Approval
+#### Sub-Phase 6.3 — Approval (`implementation_plan_gate`)
 
 - **Interaction:** Human approves `implementation_plan`.
 
@@ -1095,25 +1133,31 @@ The human's approval is recorded as a `decision_trace` of type `phase_gate_appro
 
 **Entry Criterion:** Phase 6 Phase Gate passed.
 
-#### Sub-Phase 7.1 — Test Case Generation
+#### Sub-Phase 7.1.1 — Test Case Skeleton (`test_case_skeleton`)
 
 - **[JC:Agent Role]:** Test Design Agent
 - **Context Payload stdin:** Active constraints; `functional_requirements` summary; `implementation_plan` summary
 - **Context Payload detail file:** Full Context Packet; full `functional_requirements`; full `non_functional_requirements`; full `component_model`
-- **Action:** Generates structured Test Case specifications for every Acceptance Criterion. Categorizes as Unit, Integration, or End-to-End. Assigns to Test Suites per Component. Covers functional behavior only — NFR coverage is Phase 8's responsibility.
+- **Action:** Pass 1 — generates top-level test case skeletons per Acceptance Criterion (id, ac_id, suite assignment, category Unit/Integration/E2E). Output seeds the saturation pass.
+- **Output Artifact:** `test_plan` (skeleton form)
+
+#### Sub-Phase 7.1.2 — Test Case Saturation (`test_case_saturation`)
+
+- **[JC:Agent Role]:** Test Design Agent
+- **Action:** Pass 2 — recursive decomposition of each test case subtree to atomic test specifications; enriches preconditions, steps, expected results, and trace-to-AC links. Covers functional behavior only — NFR coverage is Phase 8's responsibility.
 - **Output Artifact:** `test_plan` — see Section 8.7 for full Test Case schema
 
-#### Sub-Phase 7.2 — Test Coverage Analysis
+#### Sub-Phase 7.2 — Test Coverage Analysis (`test_plan_synthesis`)
 
 - **[JC:Agent Role]:** Consistency Checker Agent
 - **Action:** Verifies every Acceptance Criterion has at least one Test Case. Identifies coverage gaps.
 - **Output Artifact:** `test_coverage_report: {gaps: [{acceptance_criterion_id, reason}], coverage_percentage}`
 
-#### Sub-Phase 7.3 — Test Plan Mirror and Menu
+#### Sub-Phase 7.3 — Test Plan Mirror and Menu (`test_plan_review_prep`)
 
 - **Interaction:** Annotated Mirror. Reasoning Review applied.
 
-#### Sub-Phase 7.4 — Approval
+#### Sub-Phase 7.4 — Approval (`test_plan_gate`)
 
 - **Interaction:** Human approves `test_plan`.
 
@@ -1132,29 +1176,29 @@ The human's approval is recorded as a `decision_trace` of type `phase_gate_appro
 
 **Entry Criterion:** Phase 7 Phase Gate passed. Eval Design Agent receives `test_plan` as read-only input to ensure no duplication. `compliance_context` injected into Eval Design Agent's context to ensure compliance-related NFRs have evaluation criteria.
 
-#### Sub-Phase 8.1 — Functional Evaluation Design
+#### Sub-Phase 8.1 — Functional Evaluation Design (`evaluation_design`)
 
 - **[JC:Agent Role]:** Eval Design Agent
 - **Action:** Designs Functional Evaluation criteria for Functional Requirements not already covered by the Test Plan.
 - **Output Artifact:** `functional_evaluation_plan: {criteria: [{functional_requirement_id, evaluation_method, success_condition}]}`
 
-#### Sub-Phase 8.2 — Quality Evaluation Design
+#### Sub-Phase 8.2 — Quality Evaluation Design (`evaluation_metrics`)
 
 - **[JC:Agent Role]:** Eval Design Agent
 - **Action:** Designs Quality Evaluation criteria mapped to Non-Functional Requirements. Specifies tooling per criterion using tool inventory from `janumicode.config.json` supplemented by reasoning from Technical Specification stack. Includes `fallback_if_tool_unavailable` per criterion.
 - **Output Artifact:** `quality_evaluation_plan: {criteria: [{nfr_id, category, evaluation_tool, threshold, measurement_method, fallback_if_tool_unavailable}]}`
 
-#### Sub-Phase 8.3 — Reasoning Evaluation Design *(AI subsystems only)*
+#### Sub-Phase 8.3 — Reasoning Evaluation Design (`evaluation_thresholds`) *(AI subsystems only)*
 
 - **[JC:Agent Role]:** Eval Design Agent
 - **Action:** Designs red-team scenarios and meta-eval checks for any AI components in the product being built.
 - **Output Artifact:** `reasoning_evaluation_plan: {scenarios: [{id, description, pass_criteria}]}`
 
-#### Sub-Phase 8.4 — Evaluation Plan Mirror and Menu
+#### Sub-Phase 8.4 — Evaluation Plan Mirror and Menu (`evaluation_synthesis`)
 
 - **Interaction:** Annotated Mirror. Reasoning Review applied. Domain Compliance Reasoning Review applied. Meta-eval check that evaluation criteria map to stated requirements.
 
-#### Sub-Phase 8.5 — Approval
+#### Sub-Phase 8.5 — Approval (`evaluation_gate`)
 
 - **Interaction:** Human approves evaluation plans.
 
@@ -1175,7 +1219,7 @@ The human's approval is recorded as a `decision_trace` of type `phase_gate_appro
 
 **Entry Criterion:** Phases 6, 7, and 8 all Phase Gate passed.
 
-#### Sub-Phase 9.1 — Implementation Task Execution
+#### Sub-Phase 9.1 — Implementation Task Execution (`implementation_task_execution`)
 
 - **[JC:Agent Role]:** Executor Agent (per task, per assigned Backing Tool)
 - **Execution Trace capture:** The Governed Stream captures the complete Execution Trace for each Executor Agent invocation — all reasoning steps, all self-corrections, all tool call invocations (tool name + parameters), all tool results (stored in Governed Stream; excluded from Reasoning Review trace selection), and the final output.
@@ -1188,7 +1232,7 @@ The human's approval is recorded as a `decision_trace` of type `phase_gate_appro
 - **Refactoring Task execution:** Checks `expected_pre_state_hash` before modifying. Idempotency protocol per Section 8.7.
 - **Output:** Implementation Artifacts; full Execution Traces in Governed Stream
 
-#### Sub-Phase 9.2 — Test Execution
+#### Sub-Phase 9.2 — Test Execution (`test_execution`)
 
 - **[JC:Agent Role]:** Executor Agent (test runner configuration)
 - **Action:** Executes all Test Suites. Captures Test Results.
@@ -1217,18 +1261,18 @@ The human's approval is recorded as a `decision_trace` of type `phase_gate_appro
 }
 ```
 
-#### Sub-Phase 9.3 — Evaluation Execution
+#### Sub-Phase 9.3 — Evaluation Execution (`evaluation_execution`)
 
 - **[JC:Agent Role]:** Eval Execution Agent
 - **Action:** Runs all tooling specified in Evaluation Plans. Maps outputs to criteria. Captures results. See Section 18 for Eval Execution Agent cross-cutting specification.
 - **Output Artifact:** `evaluation_results: {functional: [...], quality: [...], reasoning: [...]}`
 
-#### Sub-Phase 9.4 — Failure Handling
+#### Sub-Phase 9.4 — Failure Handling (`execution_synthesis`)
 
 - **Interaction:** On any Test Result failure or Evaluation failure: escalate to human with specific failure context, evidence, and options — retry targeted re-execution, rollback to prior Phase, or accept with documented exception.
 - **Tool Result Misinterpretation suspected:** If a test failure cannot be attributed to a Reasoning Flaw in the Execution Trace, escalate to Unsticking Agent with full Governed Stream access including tool results. The Unsticking Agent may diagnose Tool Result Misinterpretation and recommend targeted re-execution with explicit correction context.
 
-#### Sub-Phase 9.5 — Completion Approval
+#### Sub-Phase 9.5 — Completion Approval (`execution_gate`)
 
 - **Interaction:** Full Mirror of `test_results` and `evaluation_results`. Human approves Workflow Run as complete.
 
@@ -1249,20 +1293,20 @@ The human's approval is recorded as a `decision_trace` of type `phase_gate_appro
 
 **Entry Criterion:** Phase 9 Phase Gate passed. Orchestrator pre-populates Context Packet for Consistency Checker (`all_runs` scope).
 
-#### Sub-Phase 10.1 — Pre-Commit Consistency Check
+#### Sub-Phase 10.1 — Pre-Commit Consistency Check (`pre_commit_consistency_check`)
 
 - **[JC:Agent Role]:** Consistency Checker Agent (Context Packet pre-populated)
 - **Action:** Final cross-artifact consistency check across all Phase artifacts in the current Workflow Run. Verifies Implementation Artifacts are traceable to every Acceptance Criterion and that no Architectural Decision has been violated. Verifies consistency with `prior_decision_summary` from Phase 0 (excluding items explicitly superseded by `prior_decision_override` Decision Traces).
 - **Output Artifact:** `pre_commit_consistency_report`
 - **Scope note:** Cross-run consistency is current-run-only at this stage because it was continuously enforced throughout upstream phases via Context Packets. The `prior_decision_summary` is the contract representing everything from prior runs that this run agreed to respect.
 
-#### Sub-Phase 10.2 — Commit Preparation
+#### Sub-Phase 10.2 — Commit Preparation (`commit_preparation`)
 
 - **[JC:Agent Role]:** Executor Agent (git tooling)
 - **Action:** Stages all Implementation Artifacts. Generates commit message from Intent Statement and Decision Trace summary. Commits to configured branch.
 - **Output Artifact:** `commit_record: {commit_sha, branch, commit_message, artifact_ids_committed}`
 
-#### Sub-Phase 10.3 — Workflow Run Closure
+#### Sub-Phase 10.3 — Workflow Run Closure (`workflow_run_closure`)
 
 - **[JC:Agent Role]:** Orchestrator
 - **Action:** Marks Workflow Run as complete. Generates final Workflow Run Summary. Updates Decision History. Makes all artifacts available for future brownfield Workflow Runs.
@@ -1435,6 +1479,7 @@ Every entry has a canonical `record_type`. Maximum granularity — one record pe
 | `reasoning_review_ensemble_record` | Verification Ensemble result — primary and secondary findings, agreement/disagreement, action taken |
 | `domain_compliance_review_record` | Domain Compliance Reasoning Review — compliance regime checked, findings |
 | `detail_file_generated` | Record that a Context Payload Detail File was generated — includes path, contents description, invocation_id |
+| `json_repair_record` | Diagnostic record summarizing a `json_repair` sequence. Written whenever the JSON repair fallback fires for an agent call. Carries `status ∈ {recovered, exhausted}`, `original_agent_role`, and `attempts[]` (each attempt: `provider`, `model`, `duration_ms`, `success`, `error`). `derived_from_record_ids` points back to the original `agent_invocation` that produced the malformed output. Each repair attempt is also captured as its own `agent_invocation` + `agent_output` pair with `agentRole: 'json_repair'` and `label: 'json_repair_attempt_1'` or `'json_repair_attempt_2'`. |
 
 ### 6.2 Human Interaction Records
 
@@ -1523,7 +1568,7 @@ Every entry has a canonical `record_type`. Maximum granularity — one record pe
 | `requirement_decomposition_pipeline` | Per-kind saturation-loop container (one per root_kind per run). Updated incrementally via `supersedByRollback` as passes complete; the latest version reflects current pipeline state. Content includes `passes[]` (per-pass delta + semantic_delta + node count), `termination_reason` (`fixed_point` \| `budget_cap` \| `depth_cap`), `final_leaf_count`, `final_max_depth`, `total_llm_calls`. |
 | `assumption_set_snapshot` | Per-pass record of the cumulative assumption set for a root_kind. Fields: `pass_number`, `root_fr_id` (kind marker — `*` for FR, `*nfr*` for NFR), full `assumptions[]` list, `delta_from_previous_pass` (raw count), `semantic_delta` (count excluding duplicate_of-flagged rows). The saturation-loop termination gate reads `semantic_delta`; `delta_from_previous_pass` is retained for audit. |
 | `release_plan` | Phase 1.8 Release Plan artifact. `releases[]` is an ordered list of Release entries. **schemaVersion `2.0` (Wave 7)** widens the per-Release content from `traces_to_journeys[]` to `contains: { journeys[], workflows[], entities[], compliance[], integrations[], vocabulary[] }` plus a top-level `cross_cutting: { workflows[], compliance[], integrations[], vocabulary[] }` block. Only records with `approved: true` drive Phase 2 assignment. The active plan is pinned on the Workflow Run via `workflow_runs.active_release_plan_record_id`. Iterations during the Phase 1.8 feedback loop write additional `approved: false` records for audit. |
-| `coverage_gap` | Output of a deterministic coverage verifier. `sub_phase_id ∈ {'1.3c', '1.8', '2.1c', '2.2c'}` identifies which verifier emitted the gap. Carries `check` (machine tag — e.g. `journey_fr_coverage`, `nfr_threshold_presence`, `referential_integrity_*`), `severity ∈ {blocking, advisory}`, `expected[]` / `actual[]` / `missing[]` arrays of artifact ids, optional `extra[]` for double-count checks, optional `details{}`. Blocking gaps halt the parent phase with `success: false`; advisory gaps log and proceed. The orchestrator routes blocking gaps to MMP for human resolution (`accepted_as_scope_cut` / `rebloom_requested`) when an interactive UI is attached. |
+| `coverage_gap` | Output of a deterministic coverage verifier. `sub_phase_id ∈ {'coverage_verifier', 'release_plan', 'fr_bloom_verifier', 'nfr_bloom_verifier'}` (slug IDs after Wave 11 sub-phase rename — see §4) identifies which verifier emitted the gap. Carries `check` (machine tag — e.g. `journey_fr_coverage`, `nfr_threshold_presence`, `referential_integrity_*`), `severity ∈ {blocking, advisory}`, `expected[]` / `actual[]` / `missing[]` arrays of artifact ids, optional `extra[]` for double-count checks, optional `details{}`. Blocking gaps halt the parent phase with `success: false`; advisory gaps log and proceed. The orchestrator routes blocking gaps to MMP for human resolution (`accepted_as_scope_cut` / `rebloom_requested`) when an interactive UI is attached. |
 
 ### 6.8 Wave 6 Reasoning-Review Sub-Types *(product lens)*
 
@@ -1578,7 +1623,7 @@ The stdin directive is designed to remain within the configured `stdin_max_token
 
 **Channel 2 — Context Payload Detail File (reference channel):**
 
-A generated markdown file placed at `.janumicode/context/{sub_phase_id}_{invocation_id}.md` before agent invocation. Contains:
+A generated markdown file placed at `.janumicode/runs/{workflow_run_id}/context/{sub_phase_id}_{invocation_id}.md` before agent invocation. Contains:
 
 - Full Context Packet from Deep Memory Research Agent
 - Full Narrative Memories from all prior phases
@@ -1588,7 +1633,7 @@ A generated markdown file placed at `.janumicode/context/{sub_phase_id}_{invocat
 - Full Unsticking resolution records relevant to this problem class
 - Full prior Phase Gate-approved artifacts relevant to this Sub-Phase
 
-The detail file is written by `ContextBuilder` and its generation is recorded as a `detail_file_generated` Governed Stream Record. After Phase Gate acceptance, detail files are moved to `.janumicode/context/archive/` — available for audit and for the Unsticking Agent if needed.
+The detail file is written by `ContextBuilder` and its generation is recorded as a `detail_file_generated` Governed Stream Record. Detail files persist in their per-run directory for the lifetime of the run — available for audit and for the Unsticking Agent if needed.
 
 **The stdin directive instructs the agent:**
 
@@ -2291,7 +2336,7 @@ When `tool_result_misinterpretation_suspected` is flagged by the Reasoning Revie
 
 **Streaming Stall Detection Protocol:** A thinking-mode LLM can keep emitting tokens without making semantic progress — the stream itself isn't hung, so idle-socket timers don't trip, but the output never converges. Two independent signals catch these in-stream, with Loop Detection Monitor as the cross-invocation signal:
 
-1. **Invocation log size cap (per LLM call, retryable).** The orchestrator's `LLMCaller.call` watches the bytes written to the per-invocation `.log` file (prompt + chunk metadata + streamed text). When `bytesWritten > maxLogFileBytes` for this attempt exceeds the threshold (`JANUMICODE_LLM_MAX_LOG_FILE_BYTES`, default **1,572,864 bytes ≈ 1.5 MB**), the in-flight HTTP stream is aborted. **Wave 8 classification:** the abort is classified as `LLMErrorType: 'runaway_thinking'` (a new retryable type) — distinct from a true HTTP-400 `'context_exceeded'` (server-side rejection, non-retryable). `LLMCaller.isRetryable('runaway_thinking') === true`; `getBackoffDelay('runaway_thinking') === 2000` ms; `LLMCaller` retries up to `maxRetries` (default 3), each retry starting from a fresh `bytesBaseline` so a failed attempt-1 doesn't immediately re-trip attempt-2. Rationale: healthy qwen3.5:9b invocations top out at ~100–200 KB log file; anything past 1.5 MB is practically certain to be runaway thinking. Variance between attempts often allows the next retry to converge — calibration runs commonly observe 1-retry rescues with 0 final failures.
+1. **Invocation log size cap (per LLM call, retryable).** The orchestrator's `LLMCaller.call` watches the bytes written to the per-invocation `.log` file (prompt + chunk metadata + streamed text). Live-log filenames use the convention `phase{NN}_{sub_phase_slug}__{uuid}.log` — phase number padded to 2 digits, separated by `_` from the slug (e.g. `phase02_fr_saturation__<uuid>.log`). Lexical sort matches phase-number execution order. When `bytesWritten > maxLogFileBytes` for this attempt exceeds the threshold (`JANUMICODE_LLM_MAX_LOG_FILE_BYTES`, default **1,572,864 bytes ≈ 1.5 MB**), the in-flight HTTP stream is aborted. **Wave 8 classification:** the abort is classified as `LLMErrorType: 'runaway_thinking'` (a new retryable type) — distinct from a true HTTP-400 `'context_exceeded'` (server-side rejection, non-retryable). `LLMCaller.isRetryable('runaway_thinking') === true`; `getBackoffDelay('runaway_thinking') === 2000` ms; `LLMCaller` retries up to `maxRetries` (default 3), each retry starting from a fresh `bytesBaseline` so a failed attempt-1 doesn't immediately re-trip attempt-2. Rationale: healthy qwen3.5:9b invocations top out at ~100–200 KB log file; anything past 1.5 MB is practically certain to be runaway thinking. Variance between attempts often allows the next retry to converge — calibration runs commonly observe 1-retry rescues with 0 final failures.
 
 2. **Records-idle session abort (per Workflow Run, non-retryable).** The CLI runner's `waitForQuiescence` watches the `governed_stream` table for new rows. When no new record has landed for `records_idle_stall_ms` (default **900,000 ms = 15 min**), the session AbortController is tripped — propagates into any in-flight LLMCaller, tears down the HTTP stream, and the phase returns `requires_input`. Unlike the log-size cap this is a SESSION-level signal; no retry. Progress is measured by records landing in the stream, so long-running legitimate LLM calls (thinking-mode prose) that ARE making progress but haven't yet finished don't trigger records-idle as long as their emitted decomposition-node / assumption-set records are landing.
 
@@ -2474,7 +2519,7 @@ Domain Compliance Reasoning Review is applied to evaluation plans.
 
 **Nature:** Deterministic, non-LLM validation. Runs via `InvariantChecker` before Reasoning Review for every artifact. No LLM call required. Fast and cheap — invariant failures cause immediate retry with the violation injected into stdin, bypassing the Reasoning Review entirely.
 
-**Storage:** `.janumicode/schemas/invariants/{artifact_type}.invariants.json` — versioned with the JSON Schema library.
+**Storage:** `schemas/invariants/{artifact_type}.invariants.json` (top-level, extension-resident) — versioned with the JSON Schema library.
 
 **Invariant record format:**
 
@@ -2539,7 +2584,7 @@ Domain Compliance Reasoning Review is applied to evaluation plans.
 
 **On violation:** `InvariantChecker` returns the violation to the Orchestrator. The Orchestrator records an `invariant_violation_record`, marks the agent output as `quarantined: true`, injects the violation message into the retrying agent's stdin directive under `[JC:INVARIANT VIOLATION]`, and triggers retry without an LLM Reasoning Review call. The retry receives the specific violated invariant and its location — not a vague "try again" signal.
 
-**Invariant Library extension:** New invariants are added by creating new `.invariants.json` files in `.janumicode/schemas/invariants/`. The `InvariantChecker` discovers all files in that directory at startup. Adding a new invariant does not require code changes — only a new JSON file versioned with the JanumiCode repository.
+**Invariant Library extension:** New invariants are added by creating new `.invariants.json` files in `schemas/invariants/` (top-level, extension-resident). The `InvariantChecker` discovers all files in that directory at startup. Adding a new invariant does not require code changes — only a new JSON file versioned with the JanumiCode repository.
 
 ---
 
@@ -2743,7 +2788,7 @@ The `[JC:SYSTEM SCOPE]` section contains JanumiCode framework instructions — g
 ### 9.4 Directory Structure
 
 ```
-/.janumicode/prompts
+/prompts
   /phases
     /phase_00_workspace_init/
     /phase_00_5_cross_run_impact/
@@ -2887,8 +2932,16 @@ The `[JC:SYSTEM SCOPE]` section contains JanumiCode framework instructions — g
     "intent_quality_check":        { "provider": "anthropic", "model": "claude-sonnet-4-20250514" },
     "scope_classification":        { "provider": "anthropic", "model": "claude-sonnet-4-20250514" },
     "ingestion_pipeline_stage3":   { "provider": "anthropic", "model": "claude-sonnet-4-20250514" },
-    "loop_detection_monitor":      { "implementation": "deterministic" }
+    "loop_detection_monitor":      { "implementation": "deterministic" },
+    "json_repair": {
+      "primary":               { "provider": "ollama", "model": "qwen3.5:9b", "base_url": "..." },
+      "fallback":              { "provider": "ollama", "model": "gemma4:e4b", "base_url": "..." },
+      "temperature":           0,
+      "fallback_temperature":  0
+    }
   },
+
+  "_json_repair_note": "The `json_repair` slot under `llm_routing` configures the meta-role invoked automatically by LLMCaller when an agent's `responseFormat: 'json'` response cannot be parsed after retries. Two attempts: primary model, then fallback model (typically a different family for decorrelated bias). Both attempts receive the original prompt, system prompt, thinking chain, and an optional schema hint. If both fail, the workflow halts. Omit the slot to disable JSON repair entirely (caller halts on parse failure). Defaults to disabled.",
 
   "governed_stream": {
     "sqlite_path":        ".janumicode/governed_stream.db",
@@ -2901,8 +2954,7 @@ The `[JC:SYSTEM SCOPE]` section contains JanumiCode framework instructions — g
   "context_assembly": {
     "cli_agents": {
       "stdin_max_tokens":                       8000,
-      "detail_file_path_template":              ".janumicode/context/{sub_phase_id}_{invocation_id}.md",
-      "detail_file_cleanup":                    "archive_after_phase_gate",
+      "detail_file_path_template":              ".janumicode/runs/{workflow_run_id}/context/{sub_phase_id}_{invocation_id}.md",
       "detail_file_max_bytes":                  10485760,
       "governing_constraints_always_in_stdin":  true,
       "hard_stop_on_governing_constraint_overflow": true
@@ -2910,7 +2962,7 @@ The `[JC:SYSTEM SCOPE]` section contains JanumiCode framework instructions — g
   },
 
   "invariant_library": {
-    "path":                       ".janumicode/schemas/invariants",
+    "path":                       "schemas/invariants",
     "run_before_reasoning_review": true,
     "blocking_violation_action":  "quarantine_and_retry_with_violation"
   },
@@ -3318,7 +3370,7 @@ CREATE INDEX lac_status ON llm_api_calls(status);
 ## 12. JSON Schema Library Structure
 
 ```
-/.janumicode/schemas
+/schemas
   /artifacts
     workspace_classification.schema.json
     ingested_artifact_index.schema.json
@@ -3415,7 +3467,7 @@ CREATE INDEX lac_status ON llm_api_calls(status);
     schema_registry.json
 ```
 
-**Invariant Library extension:** New invariants are added by creating or modifying `.invariants.json` files. The `InvariantChecker` discovers all files in `.janumicode/schemas/invariants/` at startup. No code changes required — only JSON files versioned with the JanumiCode repository.
+**Invariant Library extension:** New invariants are added by creating or modifying `.invariants.json` files. The `InvariantChecker` discovers all files in `schemas/invariants/` (top-level, extension-resident) at startup. No code changes required — only JSON files versioned with the JanumiCode repository.
 
 ---
 
@@ -3814,7 +3866,7 @@ If JanumiCode is upgraded between the start and completion of a Phase 0.5 refact
 }
 ```
 
-Written as `artifact_produced` with `sub_phase_id: '1.0a'`. Persisted on the Workflow Run via `workflow_runs.intent_lens = lens`.
+Written as `artifact_produced` with `sub_phase_id: 'intent_lens_classification'`. Persisted on the Workflow Run via `workflow_runs.intent_lens = lens`.
 
 ### 15.14 Requirement Decomposition Node *(Wave 6)*
 

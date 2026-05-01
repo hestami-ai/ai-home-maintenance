@@ -8,6 +8,7 @@
  */
 
 import type { Database } from '../database/init';
+import { collectGovernedStream } from '../database/iterateGovernedStream';
 import { getLogger } from '../logging';
 import type { PhaseId } from '../types/records';
 import type {
@@ -55,16 +56,19 @@ export class CanvasDataProvider {
       // task-execution records persist the raw Claude Code CLI
       // result envelope which has no `kind` discriminator. Without
       // sub_phase_id we'd lose 20+ execution records to phase 0.
-      const rows = this.db
-        .prepare(
-          `SELECT id, record_type, content, produced_at, sub_phase_id
-           FROM governed_stream
-           WHERE workflow_run_id = ?
-             AND record_type = 'artifact_produced'
-             AND is_current_version = 1`,
-        )
-        .all(workflowRunId) as typeof records | null | undefined;
-      records = Array.isArray(rows) ? rows : [];
+      // Paginate via the shared helper — per-run artifact_produced
+      // rows can reach 1k–6k+ on long calibration runs and `content`
+      // often carries multi-KB JSON, so unpaginated `.all()` here is
+      // the highest-volume canvas query.
+      const stmt = this.db.prepare(
+        `SELECT id, record_type, content, produced_at, sub_phase_id
+         FROM governed_stream
+         WHERE workflow_run_id = ?
+           AND record_type = 'artifact_produced'
+           AND is_current_version = 1
+         LIMIT ? OFFSET ?`,
+      );
+      records = collectGovernedStream<typeof records[number]>(stmt, [workflowRunId], { pageSize: 200 });
     } catch (err) {
       log.error('ui', 'canvas: loadNodes governed_stream query failed', {
         workflowRunId,
@@ -148,14 +152,14 @@ export class CanvasDataProvider {
     // Load sub-artifact edges
     let subArtifactEdges: Array<{ id: string; source_id: string; target_id: string; edge_type: string }> = [];
     try {
-      const rows = this.db
-        .prepare(
-          `SELECT id, source_id, target_id, edge_type
-           FROM sub_artifact_edge
-           WHERE workflow_run_id = ?`,
-        )
-        .all(workflowRunId) as typeof subArtifactEdges | null | undefined;
-      subArtifactEdges = Array.isArray(rows) ? rows : [];
+      const stmt = this.db.prepare(
+        `SELECT id, source_id, target_id, edge_type
+         FROM sub_artifact_edge
+         WHERE workflow_run_id = ?
+         LIMIT ? OFFSET ?`,
+      );
+      subArtifactEdges = collectGovernedStream<typeof subArtifactEdges[number]>(
+        stmt, [workflowRunId], { pageSize: 1000 });
     } catch (err) {
       log.error('ui', 'canvas: loadEdges sub_artifact_edge query failed', {
         workflowRunId, error: err instanceof Error ? err.message : String(err),
@@ -175,14 +179,14 @@ export class CanvasDataProvider {
     // Schema columns are source_record_id / target_record_id.
     let memoryEdges: Array<{ id: string; source_record_id: string; target_record_id: string; edge_type: string }> = [];
     try {
-      const rows = this.db
-        .prepare(
-          `SELECT id, source_record_id, target_record_id, edge_type
-           FROM memory_edge
-           WHERE workflow_run_id = ?`,
-        )
-        .all(workflowRunId) as typeof memoryEdges | null | undefined;
-      memoryEdges = Array.isArray(rows) ? rows : [];
+      const stmt = this.db.prepare(
+        `SELECT id, source_record_id, target_record_id, edge_type
+         FROM memory_edge
+         WHERE workflow_run_id = ?
+         LIMIT ? OFFSET ?`,
+      );
+      memoryEdges = collectGovernedStream<typeof memoryEdges[number]>(
+        stmt, [workflowRunId], { pageSize: 1000 });
     } catch (err) {
       log.error('ui', 'canvas: loadEdges memory_edge query failed', {
         workflowRunId, error: err instanceof Error ? err.message : String(err),

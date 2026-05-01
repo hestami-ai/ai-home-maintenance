@@ -32,7 +32,7 @@ function rec(content: ComponentDecompositionNodeContent, secondsOffset = 0): Gov
     schema_version: '1.0',
     workflow_run_id: 'run-1',
     phase_id: '4',
-    sub_phase_id: '4.2a',
+    sub_phase_id: 'component_saturation',
     produced_by_agent_role: 'domain_interpreter',
     produced_by_record_id: null,
     produced_at: ts,

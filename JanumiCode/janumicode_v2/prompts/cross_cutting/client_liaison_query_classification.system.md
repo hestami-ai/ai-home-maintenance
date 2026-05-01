@@ -1,6 +1,6 @@
 ---
 agent_role: client_liaison
-sub_phase: cross_cutting_client_liaison_classify
+sub_phase: client_liaison_query_classification
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

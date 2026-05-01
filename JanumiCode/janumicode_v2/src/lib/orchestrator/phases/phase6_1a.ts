@@ -65,14 +65,14 @@ function normalizeTier(raw: unknown): DecompositionTier {
 // ── Loop config ────────────────────────────────────────────────────
 
 export interface TaskSaturationConfig {
-  recordSubPhaseId: '6.1a';
+  recordSubPhaseId: 'task_saturation';
   templateSubPhase: string;
   gateSurfacePrefix: string;
 }
 
 const DEFAULT_CONFIG: TaskSaturationConfig = {
-  recordSubPhaseId: '6.1a',
-  templateSubPhase: '06_1a_task_decomposition',
+  recordSubPhaseId: 'task_saturation',
+  templateSubPhase: 'task_saturation',
   gateSurfacePrefix: 'task-decomp-gate-',
 };
 
@@ -1238,7 +1238,7 @@ async function runAtomicShapeAudit(
   parentTask: DecompositionTask,
   children: DecompositionTask[],
   passNumber: number,
-  recordSubPhaseId: '6.1a',
+  recordSubPhaseId: 'task_saturation',
 ): Promise<void> {
   const { engine, workflowRun } = ctx;
 

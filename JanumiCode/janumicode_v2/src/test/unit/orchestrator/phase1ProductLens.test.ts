@@ -309,23 +309,23 @@ describe('Phase 1 — product-lens end-to-end flow', () => {
     const findByKind = (kind: string) => artifacts.find(a => (a.content as { kind?: string }).kind === kind);
 
     // Every product-lens sub-phase writes its expected artifact kind.
-    expect(findByKind('intent_lens_classification')?.sub_phase_id).toBe('1.0a');
-    expect(findByKind('intent_discovery')?.sub_phase_id).toBe('1.0b');
+    expect(findByKind('intent_lens_classification')?.sub_phase_id).toBe('intent_lens_classification');
+    expect(findByKind('intent_discovery')?.sub_phase_id).toBe('product_intent_discovery');
     // iter-4 decomposed extraction sub-phases each emit a record.
-    expect(findByKind('technical_constraints_discovery')?.sub_phase_id).toBe('1.0c');
-    expect(findByKind('compliance_retention_discovery')?.sub_phase_id).toBe('1.0d');
-    expect(findByKind('vv_requirements_discovery')?.sub_phase_id).toBe('1.0e');
-    expect(findByKind('canonical_vocabulary_discovery')?.sub_phase_id).toBe('1.0f');
-    expect(findByKind('intent_discovery_bundle')?.sub_phase_id).toBe('1.0g');
-    expect(findByKind('scope_classification')?.sub_phase_id).toBe('1.1b');
-    expect(findByKind('compliance_context')?.sub_phase_id).toBe('1.1b');
-    expect(findByKind('business_domains_bloom')?.sub_phase_id).toBe('1.2');
+    expect(findByKind('technical_constraints_discovery')?.sub_phase_id).toBe('technical_constraints_discovery');
+    expect(findByKind('compliance_retention_discovery')?.sub_phase_id).toBe('compliance_retention_discovery');
+    expect(findByKind('vv_requirements_discovery')?.sub_phase_id).toBe('vv_requirements_discovery');
+    expect(findByKind('canonical_vocabulary_discovery')?.sub_phase_id).toBe('canonical_vocabulary_discovery');
+    expect(findByKind('intent_discovery_bundle')?.sub_phase_id).toBe('discovery_bundle_compose');
+    expect(findByKind('scope_classification')?.sub_phase_id).toBe('scope_bounding');
+    expect(findByKind('compliance_context')?.sub_phase_id).toBe('scope_bounding');
+    expect(findByKind('business_domains_bloom')?.sub_phase_id).toBe('business_domains_bloom');
     // Wave 7 — 1.3 is split into 1.3a (journeys) + 1.3b (workflows).
-    expect(findByKind('user_journey_bloom')?.sub_phase_id).toBe('1.3a');
-    expect(findByKind('system_workflow_bloom')?.sub_phase_id).toBe('1.3b');
-    expect(findByKind('entities_bloom')?.sub_phase_id).toBe('1.4');
-    expect(findByKind('integrations_qa_bloom')?.sub_phase_id).toBe('1.5');
-    expect(findByKind('intent_statement')?.sub_phase_id).toBe('1.6');
+    expect(findByKind('user_journey_bloom')?.sub_phase_id).toBe('user_journey_bloom');
+    expect(findByKind('system_workflow_bloom')?.sub_phase_id).toBe('system_workflow_bloom');
+    expect(findByKind('entities_bloom')?.sub_phase_id).toBe('entities_bloom');
+    expect(findByKind('integrations_qa_bloom')?.sub_phase_id).toBe('integrations_qa_bloom');
+    expect(findByKind('intent_statement')?.sub_phase_id).toBe('product_description_synthesis');
 
     // The quality report lives on its own record_type.
     const qualityReports = engine.writer.getRecordsByType(run.id, 'intent_quality_report');
@@ -334,7 +334,7 @@ describe('Phase 1 — product-lens end-to-end flow', () => {
     // The product description handoff lives on its own record_type.
     const handoffs = engine.writer.getRecordsByType(run.id, 'product_description_handoff');
     expect(handoffs.length).toBe(1);
-    expect(handoffs[0].sub_phase_id).toBe('1.6');
+    expect(handoffs[0].sub_phase_id).toBe('product_description_synthesis');
     const handoff = handoffs[0].content as Record<string, unknown>;
     expect(handoff.kind).toBe('product_description_handoff');
     // Carry-forward sanity: the accepted bloom outputs flow through
@@ -349,14 +349,14 @@ describe('Phase 1 — product-lens end-to-end flow', () => {
     // Decision bundles: 1.2 + 1.3a + 1.3b + 1.4 + 1.5 + 1.8 (Wave 7 split).
     const bundles = engine.writer.getRecordsByType(run.id, 'decision_bundle_presented');
     const bundleSubPhases = bundles.map(b => b.sub_phase_id).sort();
-    expect(bundleSubPhases).toEqual(['1.2', '1.3a', '1.3b', '1.4', '1.5', '1.8']);
+    expect(bundleSubPhases).toEqual(['business_domains_bloom', 'entities_bloom', 'integrations_qa_bloom', 'release_plan', 'system_workflow_bloom', 'user_journey_bloom']);
 
     // 1.7 handoff approval emitted its mirror; phase gate now fires at 1.8.
     const mirrors = engine.writer.getRecordsByType(run.id, 'mirror_presented');
-    const mirrorAt17 = mirrors.find(m => m.sub_phase_id === '1.7');
+    const mirrorAt17 = mirrors.find(m => m.sub_phase_id === 'product_handoff_gate');
     expect(mirrorAt17).toBeDefined();
     const gates = engine.writer.getRecordsByType(run.id, 'phase_gate_evaluation');
-    expect(gates.some(g => g.sub_phase_id === '1.8')).toBe(true);
+    expect(gates.some(g => g.sub_phase_id === 'release_plan')).toBe(true);
 
     // 1.8 release plan: at least two artifact_produced records of
     // kind=release_plan (the proposer output + the final approved

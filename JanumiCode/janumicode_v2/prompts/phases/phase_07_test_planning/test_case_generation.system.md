@@ -1,6 +1,6 @@
 ---
 agent_role: test_design_agent
-sub_phase: 07_1_test_case_generation
+sub_phase: test_case_skeleton
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

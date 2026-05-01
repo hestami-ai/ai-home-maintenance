@@ -155,7 +155,7 @@ async function runSkeletonPass(deps: NfrBloomDeps): Promise<{
   const { ctx, handoff, dmr, intentSummary, frSummary } = deps;
   const template = ctx.engine.templateLoader.findTemplate(
     'requirements_agent',
-    '02_2_nonfunctional_requirements',
+    'nfr_bloom_skeleton',
     'product',
   );
   if (!template) {
@@ -188,7 +188,7 @@ async function runSkeletonPass(deps: NfrBloomDeps): Promise<{
     traceContext: {
       workflowRunId: ctx.workflowRun.id,
       phaseId: '2',
-      subPhaseId: '2.2',
+      subPhaseId: 'nfr_bloom_skeleton',
       agentRole: 'requirements_agent',
       label: 'Phase 2.2 — NFR Skeleton Bloom (Pass 1 of 3)',
     },
@@ -203,7 +203,7 @@ async function runEnrichmentPass(
   const { ctx } = deps;
   const template = ctx.engine.templateLoader.findTemplate(
     'requirements_agent',
-    '02_2b_nonfunctional_requirements_threshold_enrichment',
+    'nfr_bloom_enrichment',
     'product',
   );
   if (!template) {
@@ -240,7 +240,7 @@ async function runEnrichmentPass(
           traceContext: {
             workflowRunId: ctx.workflowRun.id,
             phaseId: '2',
-            subPhaseId: '2.2b',
+            subPhaseId: 'nfr_bloom_enrichment',
             agentRole: 'requirements_agent',
             label: `Phase 2.2b — NFR Threshold Enrichment (${s.id}) attempt ${attempt}/${MAX_ATTEMPTS}`,
           },

@@ -6,7 +6,8 @@
  *
  * Protocol:
  *   Request:  {"id":"req-1","method":"exec|run|get|all|pragma","params":{"sql":"...","params":[...]}}
- *   Response: {"id":"req-1","result":...} or {"id":"req-1","error":"..."}
+ *   Response: {"id":"req-1","result":...} or {"id":"req-1","error":"..."} or
+ *             {"id":"req-1","error":{ code: ..., ... }}    ← structured error
  *
  * Ported from v1 pattern at JanumiCode/janumicode/src/sidecar/dbServer.ts
  */
@@ -14,6 +15,11 @@
 import { createInterface } from 'readline';
 import { SCHEMA_DDL, VECTOR_SEARCH_DDL } from '../lib/database/schema';
 import { closeWithCheckpoint } from '../lib/database/init';
+import {
+  DEFAULT_MAX_ROWS_PER_RPC,
+  DEFAULT_MAX_BYTES_PER_RPC,
+  enforceRpcResultLimits,
+} from './dbServerLimits';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -24,14 +30,42 @@ interface RpcRequest {
     sql?: string;
     params?: unknown[];
     pragma?: string;
+    /**
+     * Optional per-call override for the row ceiling. Callers acknowledge
+     * the SAB-bridge risk explicitly when supplying this. Default comes
+     * from JANUMICODE_RPC_MAX_ROWS env or the constant at top.
+     */
+    maxRows?: number;
+    /**
+     * Optional per-call override for the byte ceiling.
+     * Default comes from JANUMICODE_RPC_MAX_BYTES env.
+     */
+    maxBytes?: number;
   };
 }
 
 interface RpcResponse {
   id: string;
   result?: unknown;
-  error?: string;
+  /** Either a plain message string, or a structured error object (e.g. RpcResultTooLarge). */
+  error?: string | Record<string, unknown>;
 }
+
+// ── Result-size ceilings ────────────────────────────────────────────
+//
+// Last line of defense against client-side `.all()` queries that would
+// blow the 32MB SharedArrayBuffer that bridges the sidecar to the
+// extension host. Configurable via env so cal-runs can probe behavior
+// without rebuilding. Per-call overrides are accepted in the RPC params
+// and take precedence over these defaults.
+
+const MAX_ROWS_PER_RPC = process.env.JANUMICODE_RPC_MAX_ROWS
+  ? Number.parseInt(process.env.JANUMICODE_RPC_MAX_ROWS, 10) || DEFAULT_MAX_ROWS_PER_RPC
+  : DEFAULT_MAX_ROWS_PER_RPC;
+
+const MAX_BYTES_PER_RPC = process.env.JANUMICODE_RPC_MAX_BYTES
+  ? Number.parseInt(process.env.JANUMICODE_RPC_MAX_BYTES, 10) || DEFAULT_MAX_BYTES_PER_RPC
+  : DEFAULT_MAX_BYTES_PER_RPC;
 
 // ── Startup ─────────────────────────────────────────────────────────
 
@@ -104,7 +138,17 @@ function handleRequest(req: RpcRequest): RpcResponse {
 
       case 'all': {
         const stmt = getCachedStatement(req.params?.sql ?? '');
-        const rows = stmt.all(...(req.params?.params ?? []));
+        const rows = stmt.all(...(req.params?.params ?? [])) as unknown[];
+        // Enforce server-side row/byte ceilings BEFORE handing rows to
+        // the SAB bridge. A structured RpcResultTooLarge error here is
+        // far more actionable than the cryptic "offset is out of bounds"
+        // RangeError the SAB write would otherwise raise.
+        const maxRows = req.params?.maxRows ?? MAX_ROWS_PER_RPC;
+        const maxBytes = req.params?.maxBytes ?? MAX_BYTES_PER_RPC;
+        const limitError = enforceRpcResultLimits(rows, { maxRows, maxBytes });
+        if (limitError) {
+          return { id: req.id, error: limitError };
+        }
         return { id: req.id, result: rows };
       }
 

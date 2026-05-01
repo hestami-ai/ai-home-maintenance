@@ -1,6 +1,6 @@
 ---
 agent_role: orchestrator
-sub_phase: 00_4_vocabulary_collision_check
+sub_phase: vocabulary_collision_check
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

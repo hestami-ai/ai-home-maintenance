@@ -146,6 +146,10 @@ export async function runPipeline(
 
   try {
     let workflowRunId: string | null = null;
+    // Captured by the waitForQuiescence().then handlers below so the
+    // post-loop result-shaping code can distinguish operator pause
+    // from a stall or clean completion.
+    let quiescenceReason: QuiescenceExitReason = 'completed';
 
     if (config.resumeFromDb && config.resumeAtPhase) {
       // ── Resume mode: skip bootstrapIntent, advance to target phase ──
@@ -191,12 +195,14 @@ export async function runPipeline(
           console.warn(`[resume] Phase execution ended: ${msg}`);
         });
       const quiescencePromise = waitForQuiescence(engine, db, workflowRunId, {
-        mockCapMs, stableThreshold, recordsIdleStallMs,
-      }).then(() => {
-        // Stall detected or workflow completed — abort any in-flight
-        // LLM call so the phase promise unwinds. The abortSession call
-        // is a no-op if nothing is in flight, so this is safe in the
-        // clean-completion case too.
+        mockCapMs, stableThreshold, recordsIdleStallMs, workspacePath,
+      }).then((reason) => {
+        quiescenceReason = reason;
+        // Stall detected, paused, or workflow completed — abort any
+        // in-flight LLM call so the phase promise unwinds. The
+        // abortSession call is a no-op if nothing is in flight (and
+        // also a no-op on a second call when the pause path already
+        // aborted), so this is safe in every case.
         engine.abortSession('waitForQuiescence exited (stall or completion)');
       });
       await Promise.race([phasePromise, quiescencePromise]);
@@ -236,10 +242,11 @@ export async function runPipeline(
       const stableThreshold = llmMode === 'mock' ? 3 : 100;
       const recordsIdleStallMs = engine.configManager.get().workflow.records_idle_stall_ms;
       if (workflowRunId) {
-        await waitForQuiescence(engine, db, workflowRunId, {
+        quiescenceReason = await waitForQuiescence(engine, db, workflowRunId, {
           mockCapMs: llmMode === 'mock' ? mockCapMs : null,
           stableThreshold,
           recordsIdleStallMs,
+          workspacePath,
         });
         engine.abortSession('waitForQuiescence exited (stall or completion)');
       }
@@ -264,6 +271,25 @@ export async function runPipeline(
       dbPath: resolvedDbPath,
       startTimeMs: startTime,
     });
+
+    // Attach the pause marker when the loop exited via the operator
+    // pause-flag path so the CLI / virtuous-cycle consumer can tell
+    // the difference between "run finished" and "run was paused mid-flow,
+    // resume with --resume-from-db". Stall and clean-completion exits
+    // leave `paused` undefined.
+    if (quiescenceReason === 'paused') {
+      result.paused = {
+        paused_at: new Date().toISOString(),
+        workflow_run_id: workflowRunId,
+      };
+      // Suppress the gap report on pause — the workflow isn't broken,
+      // it's intentionally suspended. Surfacing a "Phase X failed"
+      // gap report would mislead the operator and the virtuous-cycle
+      // consumer into thinking they need to fix something before
+      // resuming. The DB still has every record produced up to the
+      // pause; resuming via --resume-from-db continues from there.
+      result.gapReport = undefined;
+    }
 
     // Optional LLM-grounded suggested_fix. Runs after the rule-based
     // enhancement so the prompt can reference the already-populated
@@ -460,7 +486,64 @@ interface QuiescenceOptions {
    * suspend the check (waiting for a gate submit is not a stall).
    */
   recordsIdleStallMs: number;
+  /**
+   * Workspace root. When set, the loop watches for the operator
+   * pause-flag file at `<workspace>/.janumicode/PAUSE_REQUESTED` and
+   * triggers a clean abort if it appears mid-run. Optional — when
+   * unset (e.g. some unit tests), pause detection is skipped.
+   */
+  workspacePath?: string;
 }
+
+/** Outcome of a single waitForQuiescence call. Surfaces back through
+ *  runPipeline so the caller can distinguish the records-idle stall
+ *  exit (operational issue) from the operator-initiated pause exit
+ *  (intentional, resumable). 'completed' covers both true completion
+ *  and graceful quiescence. */
+export type QuiescenceExitReason = 'completed' | 'stalled' | 'paused';
+
+/**
+ * Pause-flag detector — extracted so the unit test can mock the fs
+ * calls without spinning up the whole runner. Returns true iff the
+ * `<workspace>/.janumicode/PAUSE_REQUESTED` flag exists; on detection,
+ * deletes the flag and writes a `PAUSED_AT` marker so a subsequent
+ * `--resume-from-db` doesn't re-trigger the pause and the operator has
+ * a record of when the pause landed.
+ */
+export function detectAndConsumePauseFlag(
+  workspacePath: string,
+  workflowRunId: string | null,
+  fsImpl: { existsSync: typeof fs.existsSync; unlinkSync: typeof fs.unlinkSync; writeFileSync: typeof fs.writeFileSync; mkdirSync: typeof fs.mkdirSync } = fs,
+): boolean {
+  const flagDir = path.join(workspacePath, '.janumicode');
+  const flagPath = path.join(flagDir, 'PAUSE_REQUESTED');
+  if (!fsImpl.existsSync(flagPath)) return false;
+  try {
+    fsImpl.unlinkSync(flagPath);
+  } catch {
+    // Best-effort — if the unlink fails, the next tick will re-detect
+    // the flag and try again. Either way the abort path still runs.
+  }
+  try {
+    fsImpl.mkdirSync(flagDir, { recursive: true });
+    fsImpl.writeFileSync(
+      path.join(flagDir, 'PAUSED_AT'),
+      JSON.stringify(
+        { workflow_run_id: workflowRunId, paused_at: new Date().toISOString() },
+        null,
+        2,
+      ),
+    );
+  } catch {
+    // Marker write is informational; failure shouldn't block the pause.
+  }
+  return true;
+}
+
+/** Reason string passed to abortSession when the operator pause-flag
+ *  fires. Exported so tests can assert on the exact reason and the
+ *  result-printer can recognise the pause case versus a stall abort. */
+export const PAUSE_ABORT_REASON = 'operator paused via PAUSE_REQUESTED flag';
 
 interface QuiescenceLoopState {
   lastSubPhase: string | null | undefined;
@@ -522,7 +605,7 @@ async function waitForQuiescence(
   db: Database,
   runId: string,
   opts: QuiescenceOptions,
-): Promise<void> {
+): Promise<QuiescenceExitReason> {
   const mockDeadline = opts.mockCapMs ? Date.now() + opts.mockCapMs : null;
   const state: QuiescenceLoopState = {
     lastSubPhase: undefined,
@@ -535,11 +618,22 @@ async function waitForQuiescence(
   while (true) {
     if (mockDeadline !== null && Date.now() > mockDeadline) {
       console.warn(`[waitForQuiescence] Mock-mode cap ${(opts.mockCapMs! / 1000).toFixed(0)}s reached — exiting`);
-      return;
+      return 'completed';
+    }
+
+    // Operator pause-flag check. Cheap fs.existsSync per tick; a no-op
+    // when the flag is absent. When present we abort the session so any
+    // in-flight ollama call unwinds, then exit with 'paused' so the
+    // CLI prints a marker and exit cleanly. The existing
+    // --resume-from-db path picks the run up where it left off.
+    if (opts.workspacePath && detectAndConsumePauseFlag(opts.workspacePath, runId)) {
+      console.warn('[waitForQuiescence] PAUSE_REQUESTED flag detected — aborting session');
+      engine.abortSession(PAUSE_ABORT_REASON);
+      return 'paused';
     }
 
     const run = engine.stateMachine.getWorkflowRun(runId);
-    if (!run) return;
+    if (!run) return 'completed';
 
     const currentRecordCount = getRecordCount(db, runId);
     if (currentRecordCount > state.lastRecordCount) {
@@ -549,7 +643,16 @@ async function waitForQuiescence(
     const pendingCount = (engine as unknown as { pendingDecisions: Map<string, unknown> }).pendingDecisions?.size ?? 0;
 
     const decision = evaluateQuiescenceTick(engine, run, state, currentRecordCount, pendingCount, opts);
-    if (decision === 'done') return;
+    if (decision === 'done') {
+      // The records-idle stall path inside evaluateQuiescenceTick logs
+      // its own warning and returns 'done'; surface that here as
+      // 'stalled' vs the clean-completion 'completed' so callers can
+      // colour the result accordingly.
+      const timeSinceProgress = Date.now() - state.lastProgressAt;
+      const stalled = timeSinceProgress > opts.recordsIdleStallMs && pendingCount === 0
+        && run.status !== 'completed' && run.status !== 'failed' && run.status !== 'rolled_back';
+      return stalled ? 'stalled' : 'completed';
+    }
     if (decision === 'continue') {
       await new Promise((r) => setTimeout(r, 50));
       continue;
@@ -558,7 +661,7 @@ async function waitForQuiescence(
     // 'tick' — graceful quiescence check: same sub-phase N times + no pending decisions.
     if (run.current_sub_phase_id === state.lastSubPhase && pendingCount === 0) {
       state.stableCount++;
-      if (state.stableCount >= opts.stableThreshold) return;
+      if (state.stableCount >= opts.stableThreshold) return 'completed';
     } else {
       state.stableCount = 0;
       state.lastSubPhase = run.current_sub_phase_id;

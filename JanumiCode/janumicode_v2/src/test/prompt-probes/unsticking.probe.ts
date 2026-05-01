@@ -16,7 +16,7 @@ describe('Probe: Unsticking Socratic Turn', () => {
       templateKey: 'cross_cutting/unsticking_socratic_turn.system',
       variables: {
         loop_status: 'SCOPE_BLIND',
-        sub_phase_id: '04_2_component_decomposition',
+        sub_phase_id: 'component_skeleton',
         reasoning_review_findings: 'unsupported_assumption: Agent assumed web-only architecture without checking Intent Statement which mentions mobile clients',
         stuck_agent_trace_summary: 'Agent generated 3 components but did not call Read tool to inspect intent_statement.json',
         turn_number: '1',

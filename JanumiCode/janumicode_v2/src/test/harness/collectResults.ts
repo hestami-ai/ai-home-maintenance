@@ -11,6 +11,7 @@
  */
 
 import type { Database } from '../../lib/database/init';
+import { iterateGovernedStream } from '../../lib/database/iterateGovernedStream';
 import type { PhaseId } from '../../lib/types/records';
 import { validateLineage, buildGapReport } from './lineageValidator';
 import { FULL_WORKFLOW_EXPECTATIONS, validateExpectations } from './hestamiExpectations';
@@ -53,14 +54,22 @@ export function collectHarnessResult(
 ): HarnessResult {
   const durationMs = Date.now() - opts.startTimeMs;
 
-  const records: StreamRecord[] = workflowRunId
-    ? db.prepare(
-        `SELECT record_type, phase_id, sub_phase_id, content
+  // Paginate via the shared `iterateGovernedStream` helper to stay
+  // under the 32MB SharedArrayBuffer ceiling enforced by the sidecar
+  // RPC bridge (cal-25 had ~6800 records).
+  const records: StreamRecord[] = [];
+  if (workflowRunId) {
+    const stmt = db.prepare(
+      `SELECT record_type, phase_id, sub_phase_id, content
          FROM governed_stream
          WHERE workflow_run_id = ?
-         ORDER BY produced_at`,
-      ).all(workflowRunId) as StreamRecord[]
-    : [];
+         ORDER BY produced_at, id
+         LIMIT ? OFFSET ?`,
+    );
+    for (const batch of iterateGovernedStream<StreamRecord>(stmt, [workflowRunId], { pageSize: 500 })) {
+      for (const r of batch) records.push(r);
+    }
+  }
 
   // Inventory what's present, keyed by phase.
   const phasesWithRecords = new Set<string>();

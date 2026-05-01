@@ -22,7 +22,7 @@ export class Phase05Handler implements PhaseHandler {
     const artifactIds: string[] = [];
 
     // ── 0.5.1 — Impact Enumeration ────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '0.5.1');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'impact_enumeration');
 
     // Build the cross-run impact report
     const impactContent = {
@@ -39,7 +39,7 @@ export class Phase05Handler implements PhaseHandler {
       artifactType: 'cross_run_impact_report',
       workflowRunId: workflowRun.id,
       phaseId: '0.5',
-      subPhaseId: '0.5.1',
+      subPhaseId: 'impact_enumeration',
       agentRole: 'consistency_checker',
       content: impactContent,
     });
@@ -64,7 +64,7 @@ export class Phase05Handler implements PhaseHandler {
     }
 
     // ── 0.5.2 — Refactoring Decision ─────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '0.5.2');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'refactoring_decision');
 
     // Present impact report as Mirror for human decision
     engine.eventBus.emit('phase_gate:pending', { phaseId: '0.5' });

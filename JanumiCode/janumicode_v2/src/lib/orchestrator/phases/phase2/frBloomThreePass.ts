@@ -191,7 +191,7 @@ async function runSkeletonPass(deps: FrBloomDeps): Promise<{
   const { ctx, handoff, dmr, intentSummary } = deps;
   const template = ctx.engine.templateLoader.findTemplate(
     'requirements_agent',
-    '02_1_functional_requirements',
+    'fr_bloom_skeleton',
     'product',
   );
   if (!template) {
@@ -225,7 +225,7 @@ async function runSkeletonPass(deps: FrBloomDeps): Promise<{
     traceContext: {
       workflowRunId: ctx.workflowRun.id,
       phaseId: '2',
-      subPhaseId: '2.1',
+      subPhaseId: 'fr_bloom_skeleton',
       agentRole: 'requirements_agent',
       label: 'Phase 2.1 — FR Skeleton Bloom (Pass 1 of 3)',
     },
@@ -241,7 +241,7 @@ async function runEnrichmentPass(
   const { ctx } = deps;
   const template = ctx.engine.templateLoader.findTemplate(
     'requirements_agent',
-    '02_1b_functional_requirements_ac_enrichment',
+    'fr_bloom_enrichment',
     'product',
   );
   if (!template) {
@@ -279,7 +279,7 @@ async function runEnrichmentPass(
           traceContext: {
             workflowRunId: ctx.workflowRun.id,
             phaseId: '2',
-            subPhaseId: '2.1b',
+            subPhaseId: 'fr_bloom_enrichment',
             agentRole: 'requirements_agent',
             label: `Phase 2.1b — FR AC Enrichment (${s.id}) attempt ${attempt}/${MAX_ATTEMPTS}`,
           },

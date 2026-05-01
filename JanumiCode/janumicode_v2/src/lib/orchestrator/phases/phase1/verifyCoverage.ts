@@ -73,7 +73,7 @@ export interface CoverageVerifierInputs {
 /** Output of the verifier — empty array means "all checks passed". */
 export type CoverageVerifierResult = CoverageGapContent[];
 
-const SUB_PHASE: '1.3c' = '1.3c';
+const SUB_PHASE = 'coverage_verifier';
 
 // ── Predicate helpers ──────────────────────────────────────────────
 

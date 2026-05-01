@@ -18,7 +18,7 @@ describe('Probe: Implementation Task Execution (9.1)', () => {
     const result = await runProbe({
       name: 'phase_9_1_implementation_task_execution',
       agentRole: 'executor_agent',
-      subPhase: '09_1_implementation_task_execution',
+      subPhase: 'implementation_task_execution',
       variables: {
         active_constraints: 'Use TypeScript strict mode',
         implementation_task: '{"id": "task-001", "component_id": "auth_service", "description": "Implement JWT token generation"}',

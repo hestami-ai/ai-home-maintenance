@@ -14,7 +14,7 @@ describe('Probe: Test Case Generation (7.1)', () => {
     const result = await runProbe({
       name: 'phase_7_1_test_case_generation',
       agentRole: 'test_design_agent',
-      subPhase: '07_1_test_case_generation',
+      subPhase: 'test_case_skeleton',
       variables: {
         active_constraints: 'Use Vitest framework',
         functional_requirements_summary: `US-001: Create task (AC-001: task appears in list within 1s)

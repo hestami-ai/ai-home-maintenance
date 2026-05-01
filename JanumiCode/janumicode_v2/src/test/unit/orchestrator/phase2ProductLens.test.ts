@@ -260,11 +260,11 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     const rootContent = roots[0].content as { node_id: string; display_key: string };
     expect(rootContent.display_key).toBe('FR-ACCT-0');
     expect(rootContent.node_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/i);
-    expect(roots[0].sub_phase_id).toBe('2.1');
+    expect(roots[0].sub_phase_id).toBe('fr_bloom_skeleton');
 
     const children = nodes.filter(n => (n.content as { depth?: number }).depth === 1);
     expect(children).toHaveLength(2);
-    expect(children.every(c => c.sub_phase_id === '2.1a')).toBe(true);
+    expect(children.every(c => c.sub_phase_id === 'fr_saturation')).toBe(true);
     expect(children.every(c => (c.content as { parent_node_id?: string }).parent_node_id === rootContent.node_id)).toBe(true);
     // Tier-D children are written with status='atomic' (terminal).
     expect(children.every(c => (c.content as { tier: string }).tier === 'D')).toBe(true);
@@ -624,7 +624,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       (n.content as { depth?: number }).depth === 0
       && (n.content as { root_kind?: string }).root_kind === 'nfr');
     expect(nfrRoot, 'expected a depth-0 NFR root node').toBeDefined();
-    expect(nfrRoot!.sub_phase_id).toBe('2.2');
+    expect(nfrRoot!.sub_phase_id).toBe('nfr_bloom_skeleton');
     expect((nfrRoot!.content as { display_key: string }).display_key).toBe('NFR-AUDIT');
     expect((nfrRoot!.content as { node_id: string }).node_id).toMatch(/^[0-9a-f]{8}-/i);
 
@@ -633,7 +633,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       (n.content as { depth?: number }).depth === 1
       && (n.content as { root_kind?: string }).root_kind === 'nfr');
     expect(nfrLeaves).toHaveLength(1);
-    expect(nfrLeaves[0].sub_phase_id).toBe('2.2a');
+    expect(nfrLeaves[0].sub_phase_id).toBe('nfr_saturation');
     expect((nfrLeaves[0].content as { tier?: string }).tier).toBe('D');
     expect((nfrLeaves[0].content as { status: string }).status).toBe('atomic');
 

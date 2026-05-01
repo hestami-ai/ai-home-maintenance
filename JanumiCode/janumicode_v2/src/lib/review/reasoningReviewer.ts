@@ -67,7 +67,7 @@ const FALLBACK_SYSTEM_PROMPT =
 function resolveReviewerSystemPrompt(templateLoader: TemplateLoader | null): string {
   if (cachedSystemPrompt) return cachedSystemPrompt;
   if (!templateLoader) return FALLBACK_SYSTEM_PROMPT;
-  const tmpl = templateLoader.findTemplate('reasoning_review', 'cross_cutting');
+  const tmpl = templateLoader.findTemplate('reasoning_review', 'reasoning_review');
   if (!tmpl) return FALLBACK_SYSTEM_PROMPT;
   // The template body has no {{variables}} — render with empty context to
   // get the body verbatim and strip any trailing whitespace.

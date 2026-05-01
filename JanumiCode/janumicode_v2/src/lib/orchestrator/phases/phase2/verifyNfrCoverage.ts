@@ -57,7 +57,7 @@ export interface NfrCoverageVerifierInputs {
 
 export type NfrCoverageVerifierResult = CoverageGapContent[];
 
-const SUB_PHASE: '2.2c' = '2.2c';
+const SUB_PHASE: 'nfr_bloom_verifier' = 'nfr_bloom_verifier';
 
 function uniqSorted(xs: string[]): string[] {
   return Array.from(new Set(xs)).sort();

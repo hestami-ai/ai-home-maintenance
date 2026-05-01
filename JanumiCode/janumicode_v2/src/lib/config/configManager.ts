@@ -306,6 +306,23 @@ export interface JanumiCodeConfig {
       };
     };
     /**
+     * Dedicated LLM-based JSON repair fallback. Fires when an agent
+     * call requested `responseFormat: 'json'` and the response can't
+     * be parsed. Two attempts run sequentially:
+     *   1. PRIMARY repair model
+     *   2. FALLBACK repair model (different family, different bias)
+     * Both receive the original prompt + system + thinking chain (and
+     * optional schema hint) as grounding. If both fail, the workflow
+     * halts with a json_repair_record diagnostic. Omit this slot to
+     * disable repair (caller halts immediately on parse failure).
+     */
+    json_repair?: {
+      primary: { provider: string; model: string; base_url?: string };
+      fallback?: { provider: string; model: string; base_url?: string };
+      temperature?: number;
+      fallback_temperature?: number;
+    };
+    /**
      * Phase 9 implementation-task executor. Distinct from the planning
      * roles because Phase 9 spawns a coding agent (file-system tools,
      * shell access, multi-turn). `backing_tool` MUST be one of the CLI

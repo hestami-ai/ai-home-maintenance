@@ -1,6 +1,6 @@
 ---
 agent_role: orchestrator
-sub_phase: cross_cutting_ingestion_stage3
+sub_phase: ingestion_pipeline_stage3
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

@@ -253,7 +253,7 @@ interface ConsistencyReport {
  * gate surface prefix, and root_kind tag on written nodes.
  */
 interface SaturationLoopConfig {
-  recordSubPhaseId: '2.1a' | '2.2a';
+  recordSubPhaseId: 'fr_saturation' | 'nfr_saturation';
   templateSubPhase: string;
   rootKind: 'fr' | 'nfr';
   gateSurfacePrefix: string;
@@ -290,7 +290,7 @@ export class Phase2Handler implements PhaseHandler {
     const handoffRecordId = handoffHit.recordId;
 
     // ── 2.1 — Functional Requirements Bloom ───────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '2.1');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'fr_bloom_skeleton');
 
     // Wave 6 resume — if depth-0 FR decomposition nodes already exist
     // for this run, we're resuming a partial/stalled prior run. Skip
@@ -320,7 +320,7 @@ export class Phase2Handler implements PhaseHandler {
       // Invoke DMR to assemble cross-cutting context (active constraints,
       // material findings, ingested external files) before the bloom.
       const dmr21 = await buildPhaseContextPacket(ctx, {
-        subPhaseId: '2.1',
+        subPhaseId: 'fr_bloom_skeleton',
         requestingAgentRole: 'requirements_agent',
         query: `Functional requirements bloom for: ${intentSummary.slice(0, 400)}`,
         detailFileLabel: 'p2_1_func_req',
@@ -350,7 +350,7 @@ export class Phase2Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '2',
-      sub_phase_id: '2.1',
+      sub_phase_id: 'fr_bloom_skeleton',
       produced_by_agent_role: 'requirements_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: frDerivedFrom,
@@ -416,7 +416,7 @@ export class Phase2Handler implements PhaseHandler {
           schema_version: '1.0',
           workflow_run_id: workflowRun.id,
           phase_id: '2',
-          sub_phase_id: '2.1',
+          sub_phase_id: 'fr_bloom_skeleton',
           produced_by_agent_role: 'requirements_agent',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: [frRecord.id],
@@ -442,7 +442,7 @@ export class Phase2Handler implements PhaseHandler {
 
     // ── 2.1a — Functional Requirements Decomposition ──
     // Wave 6 Pass-1 Level-1 decomposition. Handoff always present post-Wave 8.
-    engine.stateMachine.setSubPhase(workflowRun.id, '2.1a');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'fr_saturation');
     await this.runSaturationLoop(
       ctx,
       handoff,
@@ -452,7 +452,7 @@ export class Phase2Handler implements PhaseHandler {
     );
 
     // ── 2.2 — Non-Functional Requirements Bloom ───────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '2.2');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'nfr_bloom_skeleton');
 
     // Wave 6 resume — same idempotency as FR: if depth-0 NFR nodes
     // already exist, recover from stream rather than re-bloom.
@@ -494,7 +494,7 @@ export class Phase2Handler implements PhaseHandler {
       };
     } else {
       const dmr22 = await buildPhaseContextPacket(ctx, {
-        subPhaseId: '2.2',
+        subPhaseId: 'nfr_bloom_skeleton',
         requestingAgentRole: 'requirements_agent',
         query: `Non-functional requirements for: ${intentSummary.slice(0, 200)}; FRs: ${frSummary.slice(0, 200)}`,
         detailFileLabel: 'p2_2_nfr',
@@ -526,7 +526,7 @@ export class Phase2Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '2',
-      sub_phase_id: '2.2',
+      sub_phase_id: 'nfr_bloom_skeleton',
       produced_by_agent_role: 'requirements_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: nfrDerivedFrom,
@@ -591,7 +591,7 @@ export class Phase2Handler implements PhaseHandler {
             schema_version: '1.0',
             workflow_run_id: workflowRun.id,
             phase_id: '2',
-            sub_phase_id: '2.2',
+            sub_phase_id: 'nfr_bloom_skeleton',
             produced_by_agent_role: 'requirements_agent',
             janumicode_version_sha: engine.janumiCodeVersionSha,
             derived_from_record_ids: [nfrRecord.id],
@@ -616,7 +616,7 @@ export class Phase2Handler implements PhaseHandler {
         }
       }
 
-      engine.stateMachine.setSubPhase(workflowRun.id, '2.2a');
+      engine.stateMachine.setSubPhase(workflowRun.id, 'nfr_saturation');
       await this.runSaturationLoop(
         ctx,
         handoff,
@@ -624,8 +624,8 @@ export class Phase2Handler implements PhaseHandler {
         nfrRootNodeIds,
         nfrRootLogicalIds,
         {
-          recordSubPhaseId: '2.2a',
-          templateSubPhase: '02_2a_non_functional_requirements_decomposition',
+          recordSubPhaseId: 'nfr_saturation',
+          templateSubPhase: 'nfr_saturation',
           rootKind: 'nfr',
           gateSurfacePrefix: 'nfr-decomp-gate-',
         },
@@ -633,7 +633,7 @@ export class Phase2Handler implements PhaseHandler {
     }
 
     // ── 2.3 — Requirements Mirror and Menu ────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '2.3');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'requirement_set_finalize');
 
     const frMirror = engine.mirrorGenerator.generate({
       artifactId: frRecord.id,
@@ -646,7 +646,7 @@ export class Phase2Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '2',
-      sub_phase_id: '2.3',
+      sub_phase_id: 'requirement_set_finalize',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [frRecord.id, nfrRecord.id],
@@ -682,7 +682,7 @@ export class Phase2Handler implements PhaseHandler {
     }
 
     // ── 2.4 — Requirements Consistency Check ──────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '2.4');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'requirement_set_review_prep');
 
     const consistencyReport = this.runConsistencyCheck(frContent, nfrContent);
 
@@ -691,7 +691,7 @@ export class Phase2Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '2',
-      sub_phase_id: '2.4',
+      sub_phase_id: 'requirement_set_review_prep',
       produced_by_agent_role: 'consistency_checker',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [frRecord.id, nfrRecord.id],
@@ -712,7 +712,7 @@ export class Phase2Handler implements PhaseHandler {
     }
 
     // ── 2.5 — Approval with Domain Attestation ────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '2.5');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'requirements_gate');
 
     const attestationMirror = engine.mirrorGenerator.generate({
       artifactId: consistencyRecord.id,
@@ -725,7 +725,7 @@ export class Phase2Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '2',
-      sub_phase_id: '2.5',
+      sub_phase_id: 'requirements_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [consistencyRecord.id],
@@ -767,7 +767,7 @@ export class Phase2Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '2',
-      sub_phase_id: '2.5',
+      sub_phase_id: 'requirements_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [frRecord.id, nfrRecord.id, consistencyRecord.id, attestationRecord.id],
@@ -888,8 +888,8 @@ export class Phase2Handler implements PhaseHandler {
     rootNodeRecordIds: string[],
     rootLogicalIds: string[],
     config: SaturationLoopConfig = {
-      recordSubPhaseId: '2.1a',
-      templateSubPhase: '02_1a_functional_requirements_decomposition',
+      recordSubPhaseId: 'fr_saturation',
+      templateSubPhase: 'fr_saturation',
       rootKind: 'fr',
       gateSurfacePrefix: 'decomp-gate-',
     },
@@ -1787,8 +1787,8 @@ export class Phase2Handler implements PhaseHandler {
     passAssumptions: AssumptionEntry[],
     downgradeNotesByParent: Map<string, string> = new Map(),
     config: SaturationLoopConfig = {
-      recordSubPhaseId: '2.1a',
-      templateSubPhase: '02_1a_functional_requirements_decomposition',
+      recordSubPhaseId: 'fr_saturation',
+      templateSubPhase: 'fr_saturation',
       rootKind: 'fr',
       gateSurfacePrefix: 'decomp-gate-',
     },
@@ -1980,12 +1980,12 @@ export class Phase2Handler implements PhaseHandler {
     parentStory: DecompositionUserStory,
     children: DecompositionUserStory[],
     passNumber: number,
-    subPhaseId: '2.1a' | '2.2a' = '2.1a',
+    subPhaseId: 'fr_saturation' | 'nfr_saturation' = 'fr_saturation',
   ): Promise<void> {
     const { engine, workflowRun } = ctx;
     const template = engine.templateLoader.findTemplate(
       'reasoning_review',
-      'cross_cutting_tier_c_ac_shape_audit',
+      'tier_c_ac_shape_audit',
     );
     if (!template) {
       getLogger().warn('workflow', 'Phase 2.1a/2.2a Step 4c: AC-shape audit template missing — skipping', {

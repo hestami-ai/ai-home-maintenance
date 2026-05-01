@@ -26,22 +26,22 @@ describe('TemplateLoader — product-lens Phase 1 templates', () => {
   });
 
   const productLensTemplates: Array<{ subPhase: string; requires: string[] }> = [
-    { subPhase: '01_0b_intent_discovery',                requires: ['raw_intent_text'] },
-    { subPhase: '01_2_business_domains_bloom',           requires: ['product_vision', 'discovered_personas'] },
-    { subPhase: '01_3a_user_journey_bloom',              requires: ['accepted_domains', 'accepted_personas'] },
-    { subPhase: '01_3b_system_workflow_bloom',           requires: ['accepted_domains', 'accepted_journeys'] },
-    { subPhase: '01_4_entities_bloom',                   requires: ['accepted_domains', 'accepted_workflows'] },
-    { subPhase: '01_5_integrations_qa_bloom',            requires: ['accepted_entities', 'accepted_workflows'] },
+    { subPhase: 'product_intent_discovery',                requires: ['raw_intent_text'] },
+    { subPhase: 'business_domains_bloom',           requires: ['product_vision', 'discovered_personas'] },
+    { subPhase: 'user_journey_bloom',              requires: ['accepted_domains', 'accepted_personas'] },
+    { subPhase: 'system_workflow_bloom',           requires: ['accepted_domains', 'accepted_journeys'] },
+    { subPhase: 'entities_bloom',                   requires: ['accepted_domains', 'accepted_workflows'] },
+    { subPhase: 'integrations_qa_bloom',            requires: ['accepted_entities', 'accepted_workflows'] },
     // iter-4 decomposed extraction passes (1.0c/1.0d/1.0e/1.0f) — each
     // takes the same raw_intent_text input, narrow-scoped prompts.
-    { subPhase: '01_0c_technical_constraints_discovery', requires: ['raw_intent_text'] },
-    { subPhase: '01_0d_compliance_retention_discovery',  requires: ['raw_intent_text'] },
-    { subPhase: '01_0e_vv_requirements_discovery',       requires: ['raw_intent_text'] },
-    { subPhase: '01_0f_canonical_vocabulary_discovery',  requires: ['raw_intent_text'] },
+    { subPhase: 'technical_constraints_discovery', requires: ['raw_intent_text'] },
+    { subPhase: 'compliance_retention_discovery',  requires: ['raw_intent_text'] },
+    { subPhase: 'vv_requirements_discovery',       requires: ['raw_intent_text'] },
+    { subPhase: 'canonical_vocabulary_discovery',  requires: ['raw_intent_text'] },
     // 1.6 refactored in iter-3 to narrative-only — arrays are assembled
     // deterministically in the handler, LLM only refines
     // vision/description/summary/openLoops from a compact bloom summary.
-    { subPhase: '01_6_product_description_synthesis',    requires: ['seed_vision', 'bloom_summary'] },
+    { subPhase: 'product_description_synthesis',    requires: ['seed_vision', 'bloom_summary'] },
   ];
 
   for (const { subPhase, requires } of productLensTemplates) {
@@ -62,8 +62,8 @@ describe('TemplateLoader — product-lens Phase 1 templates', () => {
     // and they also shouldn't accidentally resolve to the product templates
     // at the renamed sub-phases. They should fall back to the collapsed-flow
     // neutral template at sub_phase = 01_2_intent_domain_bloom.
-    const t = loader.findTemplate('domain_interpreter', '01_2_intent_domain_bloom', 'bug');
+    const t = loader.findTemplate('domain_interpreter', 'intent_domain_bloom', 'bug');
     expect(t).not.toBeNull();
-    expect(t!.metadata.sub_phase).toBe('01_2_intent_domain_bloom');
+    expect(t!.metadata.sub_phase).toBe('intent_domain_bloom');
   });
 });

@@ -57,14 +57,14 @@ const STEP_PHASES: readonly NonNullable<DecompositionTestStep['phase']>[] = [
 ];
 
 export interface TestSaturationConfig {
-  recordSubPhaseId: '7.1a';
+  recordSubPhaseId: 'test_case_saturation';
   templateSubPhase: string;
   gateSurfacePrefix: string;
 }
 
 const DEFAULT_CONFIG: TestSaturationConfig = {
-  recordSubPhaseId: '7.1a',
-  templateSubPhase: '07_1a_test_decomposition',
+  recordSubPhaseId: 'test_case_saturation',
+  templateSubPhase: 'test_case_saturation',
   gateSurfacePrefix: 'test-decomp-gate-',
 };
 

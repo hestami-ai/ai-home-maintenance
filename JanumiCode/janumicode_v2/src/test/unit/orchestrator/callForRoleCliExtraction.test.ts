@@ -95,13 +95,15 @@ describe('callForRole — CLI text extraction via stdoutText', () => {
     expect(result.parsed?.overall_status).toBe('pass');
   });
 
-  it('recovers JSON with trailing commas from CLI stdout (qwen/gemini pathology)', async () => {
+  it('does NOT locally recover trailing-comma pathologies (handed to LLM repair)', async () => {
+    // Local regex recovery passes were removed — JSON malformations are
+    // now handled by the json_repair LLM fallback (separate test path).
+    // Confirm that a clearly-broken JSON returns parsed=null here so
+    // the upstream caller knows to dispatch repair (or halt).
     const stdout = `{
   "completeness_findings": [
     {"field": "x", "status": "present", "severity": "low", "explanation": "ok",},
   ],
-  "consistency_findings": [],
-  "coherence_findings": [],
   "overall_status": "pass",
 }`;
     stubCli(stdout);
@@ -110,9 +112,7 @@ describe('callForRole — CLI text extraction via stdoutText', () => {
       prompt: 'IQC prompt',
       responseFormat: 'json',
     });
-    expect(result.parsed?.overall_status).toBe('pass');
-    const findings = result.parsed?.completeness_findings as Array<{ field: string }>;
-    expect(findings).toHaveLength(1);
+    expect(result.parsed).toBeNull();
   });
 
   it('falls back to extractFinalText when stdoutText is absent (older CLI invoker mocks)', async () => {

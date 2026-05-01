@@ -127,11 +127,11 @@ program
       }
 
       // Exit code mapping for the virtuous cycle:
-      //   0 = success
+      //   0 = success OR paused (paused is operator-initiated, not a failure)
       //   1 = partial OR failed (the normal "gap found, fix, rerun" signal)
       //   2 = runtime exception thrown by the pipeline (bug or infra)
       //   4 = bootstrap/config error caught above (never reaches here)
-      if (result.status === 'success') process.exit(0);
+      if (result.status === 'success' || result.paused) process.exit(0);
       process.exit(1);
     } catch (err) {
       emitError(options.json, (err as Error).message ?? String(err), 'workflow_exception', err);
@@ -166,6 +166,15 @@ function printHumanResult(
   result: import('../test/harness/types').HarnessResult,
   gapReportPath: string | undefined,
 ): void {
+  if (result.paused) {
+    console.log('\n=== Workflow Paused ===');
+    console.log(`Workflow run id: ${result.paused.workflow_run_id}`);
+    console.log(`Paused at:       ${result.paused.paused_at}`);
+    console.log(`Phases completed so far: ${result.phasesCompleted.join(', ')}`);
+    console.log(`Resume with: janumicode run --resume-from-db <db> --resume-at-phase <phase>`);
+    console.log(`DB path: ${result.governedStreamPath}`);
+    return;
+  }
   if (result.status === 'success') {
     console.log('\n=== Workflow Completed Successfully ===');
     console.log(`Phases completed: ${result.phasesCompleted.join(', ')}`);
@@ -196,6 +205,29 @@ function printHumanResult(
     console.log(`\nGap report written to: ${gapReportPath}`);
   }
 }
+
+program
+  .command('pause')
+  .description(
+    'Request the running `janumicode run` process to pause at the next quiescence tick. ' +
+    'Creates `<workspace>/.janumicode/PAUSE_REQUESTED`. ' +
+    'Cancel a pending pause by deleting that file before the runner observes it.',
+  )
+  .argument('<workspace>', 'Workspace root path (same one passed to `run --workspace`)')
+  .action((workspace: string) => {
+    const workspacePath = path.resolve(workspace);
+    if (!fs.existsSync(workspacePath)) {
+      console.error(`Workspace path does not exist: ${workspacePath}`);
+      process.exit(4);
+    }
+    const flagDir = path.join(workspacePath, '.janumicode');
+    fs.mkdirSync(flagDir, { recursive: true });
+    const flagPath = path.join(flagDir, 'PAUSE_REQUESTED');
+    fs.writeFileSync(flagPath, new Date().toISOString() + '\n');
+    console.log(`Pause requested. The runner will stop at its next quiescence tick.`);
+    console.log(`Flag: ${flagPath}`);
+    console.log(`Cancel before observation by deleting that file.`);
+  });
 
 program
   .command('verify')

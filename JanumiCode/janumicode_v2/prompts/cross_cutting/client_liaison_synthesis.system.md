@@ -1,6 +1,6 @@
 ---
 agent_role: client_liaison
-sub_phase: cross_cutting_client_liaison_synthesis
+sub_phase: client_liaison_synthesis
 schema_version: 1.1
 co_invocation_exception: false
 required_variables:

@@ -20,6 +20,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { Database } from '../database/init';
+import { iterateGovernedStream } from '../database/iterateGovernedStream';
 import type { OrchestratorEngine } from '../orchestrator/orchestratorEngine';
 import type { DecisionRouter, InboundDecision } from '../orchestrator/decisionRouter';
 import type { ClientLiaisonAgent } from '../agents/clientLiaisonAgent';
@@ -556,22 +557,16 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
    * RPC ceiling.
    */
   private streamSnapshot(runId: string): void {
-    const PAGE_SIZE = 500;
     this.post({ type: 'snapshotStart' });
-    let offset = 0;
     const stmt = this.db.prepare(
       `SELECT * FROM governed_stream
         WHERE workflow_run_id = ? AND is_current_version = 1
         ORDER BY produced_at ASC
         LIMIT ? OFFSET ?`,
     );
-    while (true) {
-      const rows = stmt.all(runId, PAGE_SIZE, offset) as Record<string, unknown>[];
-      if (rows.length === 0) break;
+    for (const rows of iterateGovernedStream<Record<string, unknown>>(stmt, [runId], { pageSize: 500 })) {
       const records = rows.map((r) => this.serialize(this.rowToRecord(r)));
       this.post({ type: 'snapshotChunk', records });
-      if (rows.length < PAGE_SIZE) break;
-      offset += rows.length;
     }
     this.post({ type: 'snapshotComplete' });
   }
@@ -643,7 +638,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
         const content = JSON.parse(classificationRow.content) as { workspace_type?: string };
         if (content.workspace_type === 'greenfield') {
           // Brownfield-only sub-phases to skip
-          skipped.push('0.2', '0.2b', '0.3');
+          skipped.push('artifact_ingestion', 'brownfield_continuity_check');
         }
       } catch {
         // Ignore parse errors
@@ -663,7 +658,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
     if (!phase05Triggered) {
       // Phase 0.5 sub-phases to skip
-      skipped.push('0.5.1', '0.5.2');
+      skipped.push('impact_enumeration', 'refactoring_decision');
     }
 
     return skipped;

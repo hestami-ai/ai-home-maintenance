@@ -90,10 +90,10 @@ export class Phase6Handler implements PhaseHandler {
     const derivedFromIds = prior.allRecordIds;
 
     // ── 6.1 — Implementation Task Decomposition ──────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '6.1');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'task_skeleton');
 
     const dmr61 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '6.1',
+      subPhaseId: 'task_skeleton',
       requestingAgentRole: 'implementation_planner',
       query: `Implementation task decomposition for: ${componentSummary.slice(0, 400)}`,
       detailFileLabel: 'p6_1_tasks',
@@ -124,7 +124,7 @@ export class Phase6Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '6',
-      sub_phase_id: '6.1',
+      sub_phase_id: 'task_skeleton',
       produced_by_agent_role: 'implementation_planner',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: derivedFromIds,
@@ -140,7 +140,7 @@ export class Phase6Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(planRecord);
 
     // ── 6.1a — Recursive Task Decomposition (Wave 8) ──────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '6.1a');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'task_saturation');
 
     const techConstraintsRecord = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced')
       .find(r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery');
@@ -194,7 +194,7 @@ export class Phase6Handler implements PhaseHandler {
           schema_version: '1.0',
           workflow_run_id: workflowRun.id,
           phase_id: '6',
-          sub_phase_id: '6.1a',
+          sub_phase_id: 'task_saturation',
           produced_by_agent_role: 'implementation_planner',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: [planRecord.id],
@@ -230,7 +230,7 @@ export class Phase6Handler implements PhaseHandler {
     }
 
     // ── 6.2 — Mirror and Menu ─────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '6.2');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'implementation_plan_synthesis');
 
     const planMirror = engine.mirrorGenerator.generate({
       artifactId: planRecord.id,
@@ -246,7 +246,7 @@ export class Phase6Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '6',
-      sub_phase_id: '6.2',
+      sub_phase_id: 'implementation_plan_synthesis',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [planRecord.id],
@@ -279,7 +279,7 @@ export class Phase6Handler implements PhaseHandler {
     }
 
     // ── 6.3 — Approval ────────────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '6.3');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'implementation_plan_gate');
 
     // Consistency check
     const consistencyReport = this.runConsistencyCheck(planContent);
@@ -289,7 +289,7 @@ export class Phase6Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '6',
-      sub_phase_id: '6.3',
+      sub_phase_id: 'implementation_plan_gate',
       produced_by_agent_role: 'consistency_checker',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [planRecord.id],
@@ -304,7 +304,7 @@ export class Phase6Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '6',
-      sub_phase_id: '6.3',
+      sub_phase_id: 'implementation_plan_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [planRecord.id, consistencyRecord.id],
@@ -330,7 +330,7 @@ export class Phase6Handler implements PhaseHandler {
     dmr: PhaseContextPacketResult,
   ): Promise<ImplementationPlan> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('implementation_planner', '06_1_implementation_task_decomposition');
+    const template = engine.templateLoader.findTemplate('implementation_planner', 'task_skeleton');
 
     const fallback: ImplementationPlan = {
       tasks: [{
@@ -370,7 +370,7 @@ export class Phase6Handler implements PhaseHandler {
       traceContext: {
         workflowRunId: ctx.workflowRun.id,
         phaseId: '6',
-        subPhaseId: '6.1',
+        subPhaseId: 'task_skeleton',
         agentRole: 'implementation_planner',
         label: 'Phase 6.1 — Implementation Task Decomposition',
       },

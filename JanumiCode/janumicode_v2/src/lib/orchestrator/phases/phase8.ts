@@ -68,10 +68,10 @@ export class Phase8Handler implements PhaseHandler {
     const derivedFromIds = prior.allRecordIds;
 
     // ── 8.1–8.3 — Evaluation Design (single LLM call) ────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '8.1');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'evaluation_design');
 
     const dmr81 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '8.1',
+      subPhaseId: 'evaluation_design',
       requestingAgentRole: 'eval_design_agent',
       query: `Evaluation design for test plan and NFRs: ${nfrSummary.slice(0, 400)}`,
       detailFileLabel: 'p8_1_evals',
@@ -86,7 +86,7 @@ export class Phase8Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '8',
-      sub_phase_id: '8.1',
+      sub_phase_id: 'evaluation_design',
       produced_by_agent_role: 'eval_design_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: derivedFromIds,
@@ -96,14 +96,14 @@ export class Phase8Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(funcEvalRecord);
 
     // Write quality evaluation plan
-    engine.stateMachine.setSubPhase(workflowRun.id, '8.2');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'evaluation_metrics');
 
     const qualityEvalRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '8',
-      sub_phase_id: '8.2',
+      sub_phase_id: 'evaluation_metrics',
       produced_by_agent_role: 'eval_design_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [funcEvalRecord.id],
@@ -113,14 +113,14 @@ export class Phase8Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(qualityEvalRecord);
 
     // Write reasoning evaluation plan
-    engine.stateMachine.setSubPhase(workflowRun.id, '8.3');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'evaluation_thresholds');
 
     const reasoningEvalRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '8',
-      sub_phase_id: '8.3',
+      sub_phase_id: 'evaluation_thresholds',
       produced_by_agent_role: 'eval_design_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [funcEvalRecord.id],
@@ -130,7 +130,7 @@ export class Phase8Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(reasoningEvalRecord);
 
     // ── 8.4 — Mirror and Menu ─────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '8.4');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'evaluation_synthesis');
 
     const evalMirror = engine.mirrorGenerator.generate({
       artifactId: funcEvalRecord.id,
@@ -148,7 +148,7 @@ export class Phase8Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '8',
-      sub_phase_id: '8.4',
+      sub_phase_id: 'evaluation_synthesis',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [funcEvalRecord.id, qualityEvalRecord.id, reasoningEvalRecord.id],
@@ -177,14 +177,14 @@ export class Phase8Handler implements PhaseHandler {
     }
 
     // ── 8.5 — Approval ────────────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '8.5');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'evaluation_gate');
 
     const gateRecord = engine.writer.writeRecord({
       record_type: 'phase_gate_evaluation',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '8',
-      sub_phase_id: '8.5',
+      sub_phase_id: 'evaluation_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [funcEvalRecord.id, qualityEvalRecord.id, reasoningEvalRecord.id],
@@ -211,7 +211,7 @@ export class Phase8Handler implements PhaseHandler {
     dmr: PhaseContextPacketResult,
   ): Promise<EvalDesignResult> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('eval_design_agent', '08_1_evaluation_design');
+    const template = engine.templateLoader.findTemplate('eval_design_agent', 'evaluation_design');
 
     const fallback: EvalDesignResult = {
       functional_evaluation_plan: { criteria: [{ functional_requirement_id: 'US-001', evaluation_method: 'Manual inspection', success_condition: 'Core functionality works as specified' }] },
@@ -233,7 +233,7 @@ export class Phase8Handler implements PhaseHandler {
     // LLM throws propagate to engine catch (halts workflow).
     const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '8', subPhaseId: '8.1', agentRole: 'eval_design_agent', label: 'Phase 8.1-8.3 — Evaluation Design' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '8', subPhaseId: 'evaluation_design', agentRole: 'eval_design_agent', label: 'Phase 8.1-8.3 — Evaluation Design' },
     });
 
     const parsed = result.parsed as Record<string, unknown> | null;

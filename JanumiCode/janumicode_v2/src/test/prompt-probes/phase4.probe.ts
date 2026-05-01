@@ -17,7 +17,7 @@ describe('Probe: Software Domains (4.1)', () => {
     const result = await runProbe({
       name: 'phase_4_1_software_domains',
       agentRole: 'architecture_agent',
-      subPhase: '04_1_software_domains',
+      subPhase: 'software_domains',
       variables: {
         active_constraints: 'No constraints',
         system_boundary_summary: 'In scope: task management, user accounts, notifications',
@@ -71,7 +71,7 @@ describe('Probe: Component Decomposition (4.2)', () => {
     const result = await runProbe({
       name: 'phase_4_2_component_decomposition',
       agentRole: 'architecture_agent',
-      subPhase: '04_2_component_decomposition',
+      subPhase: 'component_skeleton',
       variables: {
         active_constraints: 'No constraints',
         software_domains_summary: 'Domains: auth, tasks, notifications',
@@ -136,7 +136,7 @@ describe('Probe: ADR Capture (4.3)', () => {
     const result = await runProbe({
       name: 'phase_4_3_adr_capture',
       agentRole: 'architecture_agent',
-      subPhase: '04_3_adr_capture',
+      subPhase: 'adr_capture',
       variables: {
         active_constraints: 'No constraints',
         component_model_summary: 'Components: AuthService, TaskService, NotificationService',

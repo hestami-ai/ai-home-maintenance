@@ -334,7 +334,7 @@ export class DeepMemoryResearchAgent {
     if (!this.templateLoader) return deterministicFallback;
 
     const template = this.templateLoader.findTemplate(
-      'deep_memory_research', 'cross_cutting_deep_memory_decomposition',
+      'deep_memory_research', 'deep_memory_query_decomposition',
     );
     if (!template) return deterministicFallback;
 
@@ -809,7 +809,7 @@ export class DeepMemoryResearchAgent {
     if (!this.templateLoader) return basePacket;
 
     const template = this.templateLoader.findTemplate(
-      'deep_memory_research', 'cross_cutting_deep_memory_synthesis',
+      'deep_memory_research', 'deep_memory_context_packet_synthesis',
     );
     if (!template) return basePacket;
 

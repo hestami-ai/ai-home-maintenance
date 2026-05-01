@@ -10,6 +10,7 @@
  */
 
 import type { Database } from '../../lib/database/init';
+import { collectGovernedStream } from '../../lib/database/iterateGovernedStream';
 import type { LLMCaller } from '../../lib/llm/llmCaller';
 import type { GapReport, MissingRecord, SchemaViolation, AssertionFailure } from './types';
 
@@ -219,9 +220,11 @@ function analyzeAISpend(
   db: Database,
   workflowRunId: string,
 ): EnhancedGapReport['ai_spend_analysis'] | undefined {
-  // Query LLM call records
-  const llmCalls = db.prepare(`
-    SELECT 
+  // Paginate via the shared helper. Row-count guard keeps the
+  // 32MB SAB ceiling honest if a pathological run fans out
+  // agent_invocation counts beyond the usual hundreds.
+  const llmStmt = db.prepare(`
+    SELECT
       phase_id,
       content->>'$.provider' as provider,
       content->>'$.inputTokens' as input_tokens,
@@ -229,12 +232,14 @@ function analyzeAISpend(
     FROM governed_stream
     WHERE workflow_run_id = ?
       AND record_type = 'agent_invocation'
-  `).all(workflowRunId) as Array<{
+    LIMIT ? OFFSET ?
+  `);
+  const llmCalls = collectGovernedStream<{
     phase_id: string | null;
     provider: string | null;
     input_tokens: string | null;
     output_tokens: string | null;
-  }>;
+  }>(llmStmt, [workflowRunId], { pageSize: 1000 });
 
   if (llmCalls.length === 0) {
     return undefined;

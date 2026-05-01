@@ -71,8 +71,8 @@ function normalizeTier(raw: unknown): DecompositionTier {
 // ── Loop config ────────────────────────────────────────────────────
 
 export interface ComponentSaturationConfig {
-  /** Sub-phase id stamped on every record (always '4.2a' for Wave 7). */
-  recordSubPhaseId: '4.2a';
+  /** Sub-phase id stamped on every record (always 'component_saturation' for Wave 7). */
+  recordSubPhaseId: 'component_saturation';
   /** Template subdir (inside prompts/phases/phase_04_architecture). */
   templateSubPhase: string;
   /** Mirror-gate surface id prefix (e.g. 'comp-decomp-gate-'). */
@@ -80,8 +80,8 @@ export interface ComponentSaturationConfig {
 }
 
 const DEFAULT_CONFIG: ComponentSaturationConfig = {
-  recordSubPhaseId: '4.2a',
-  templateSubPhase: '04_2a_component_decomposition',
+  recordSubPhaseId: 'component_saturation',
+  templateSubPhase: 'component_saturation',
   gateSurfacePrefix: 'comp-decomp-gate-',
 };
 
@@ -1321,7 +1321,7 @@ async function runResponsibilityShapeAudit(
   parentComponent: DecompositionComponent,
   children: DecompositionComponent[],
   passNumber: number,
-  recordSubPhaseId: '4.2a',
+  recordSubPhaseId: 'component_saturation',
 ): Promise<void> {
   const { engine, workflowRun } = ctx;
 

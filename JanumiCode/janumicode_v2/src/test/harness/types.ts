@@ -189,6 +189,17 @@ export interface HarnessResult {
   durationMs: number;
   /** Path to the governed stream database */
   governedStreamPath: string;
+  /**
+   * Set when the runner exited because the operator created a
+   * `<workspace>/.janumicode/PAUSE_REQUESTED` flag. The workflow is
+   * resumable via `--resume-from-db`. Absent on stalls / clean
+   * completion / failures so existing consumers don't have to widen
+   * their `status` checks.
+   */
+  paused?: {
+    paused_at: string;
+    workflow_run_id: string | null;
+  };
 }
 
 // Fixture Types

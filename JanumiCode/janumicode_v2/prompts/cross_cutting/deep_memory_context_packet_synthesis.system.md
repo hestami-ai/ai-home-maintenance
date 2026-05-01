@@ -1,6 +1,6 @@
 ---
 agent_role: deep_memory_research
-sub_phase: cross_cutting_deep_memory_synthesis
+sub_phase: deep_memory_context_packet_synthesis
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

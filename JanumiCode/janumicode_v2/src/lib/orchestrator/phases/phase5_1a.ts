@@ -51,14 +51,14 @@ const RELATIONSHIP_KINDS: readonly DataModelRelationshipKind[] = [
 ];
 
 export interface DataModelSaturationConfig {
-  recordSubPhaseId: '5.1a';
+  recordSubPhaseId: 'data_model_saturation';
   templateSubPhase: string;
   gateSurfacePrefix: string;
 }
 
 const DEFAULT_CONFIG: DataModelSaturationConfig = {
-  recordSubPhaseId: '5.1a',
-  templateSubPhase: '05_1a_data_model_decomposition',
+  recordSubPhaseId: 'data_model_saturation',
+  templateSubPhase: 'data_model_saturation',
   gateSurfacePrefix: 'data-model-gate-',
 };
 

@@ -75,7 +75,7 @@ describe('Wave 5 — traceability + journey coverage invariants', () => {
       schema_version: '1.0',
       workflow_run_id: runId,
       phase_id: '2',
-      sub_phase_id: '2.1',
+      sub_phase_id: 'fr_bloom_skeleton',
       produced_by_agent_role: 'requirements_agent',
       janumicode_version_sha: 'sha',
       content: { kind: 'functional_requirements', user_stories: userStories.map(s => ({
@@ -92,7 +92,7 @@ describe('Wave 5 — traceability + journey coverage invariants', () => {
       schema_version: '1.0',
       workflow_run_id: runId,
       phase_id: '2',
-      sub_phase_id: '2.2',
+      sub_phase_id: 'nfr_bloom_skeleton',
       produced_by_agent_role: 'requirements_agent',
       janumicode_version_sha: 'sha',
       content: { kind: 'non_functional_requirements', requirements: reqs.map(r => ({
@@ -108,22 +108,22 @@ describe('Wave 5 — traceability + journey coverage invariants', () => {
   function seedTailRecords(): void {
     writer.writeRecord({
       record_type: 'mirror_presented', schema_version: '1.0', workflow_run_id: runId,
-      phase_id: '2', sub_phase_id: '2.3', produced_by_agent_role: 'orchestrator',
+      phase_id: '2', sub_phase_id: 'requirement_set_finalize', produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: 'sha', content: { kind: 'requirements_mirror' },
     });
     writer.writeRecord({
       record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: runId,
-      phase_id: '2', sub_phase_id: '2.4', produced_by_agent_role: 'consistency_checker',
+      phase_id: '2', sub_phase_id: 'requirement_set_review_prep', produced_by_agent_role: 'consistency_checker',
       janumicode_version_sha: 'sha', content: { kind: 'consistency_report', overall_pass: true },
     });
     writer.writeRecord({
       record_type: 'mirror_presented', schema_version: '1.0', workflow_run_id: runId,
-      phase_id: '2', sub_phase_id: '2.5', produced_by_agent_role: 'orchestrator',
+      phase_id: '2', sub_phase_id: 'requirements_gate', produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: 'sha', content: { kind: 'attestation' },
     });
     writer.writeRecord({
       record_type: 'phase_gate_evaluation', schema_version: '1.0', workflow_run_id: runId,
-      phase_id: '2', sub_phase_id: '2.5', produced_by_agent_role: 'orchestrator',
+      phase_id: '2', sub_phase_id: 'requirements_gate', produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: 'sha', content: { kind: 'phase_gate', phase_id: '2' },
     });
   }

@@ -84,22 +84,6 @@ interface BloomContent {
   candidate_product_concepts: BloomCandidate[];
 }
 
-interface IntentStatementContent {
-  product_concept: {
-    name: string;
-    description: string;
-    who_it_serves: string;
-    problem_it_solves: string;
-  };
-  confirmed_assumptions: Array<{
-    assumption_id: string;
-    assumption: string;
-    confirmed_by_record_id: string;
-  }>;
-  confirmed_constraints: string[];
-  out_of_scope: string[];
-}
-
 interface SurfacedAssumption {
   id: string;
   text: string;
@@ -122,7 +106,7 @@ export class Phase1Handler implements PhaseHandler {
     const artifactIds: string[] = [];
 
     // ── Sub-Phase 1.0 — Intent Quality Check ──────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.0');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'intent_quality_check');
 
     const rawIntentRecords = engine.writer.getRecordsByType(workflowRun.id, 'raw_intent_received');
     if (rawIntentRecords.length === 0) {
@@ -162,7 +146,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.0',
+      sub_phase_id: 'intent_quality_check',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [rawIntent.id],
@@ -205,7 +189,7 @@ export class Phase1Handler implements PhaseHandler {
     }
 
     // ── Sub-Phase 1.0a — Intent Lens Classification ──────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.0a');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'intent_lens_classification');
 
     const lensClassification = await this.runIntentLensClassification(ctx, rawIntentText);
     const lensRecord = engine.writer.writeRecord({
@@ -213,7 +197,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.0a',
+      sub_phase_id: 'intent_lens_classification',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [rawIntent.id, qualityRecord.id],
@@ -264,7 +248,7 @@ export class Phase1Handler implements PhaseHandler {
     rawIntentText: string,
   ): Promise<Record<string, unknown>> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('orchestrator', '01_0_intent_quality_check');
+    const template = engine.templateLoader.findTemplate('orchestrator', 'intent_quality_check');
     const defaultReport = {
       completeness_findings: [],
       consistency_findings: [],
@@ -313,7 +297,7 @@ export class Phase1Handler implements PhaseHandler {
       traceContext: {
         workflowRunId: ctx.workflowRun.id,
         phaseId: '1',
-        subPhaseId: '1.0',
+        subPhaseId: 'intent_quality_check',
         agentRole: 'orchestrator',
         label: 'Phase 1.0 — Intent Quality Check',
       },
@@ -338,7 +322,7 @@ export class Phase1Handler implements PhaseHandler {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate(
       'orchestrator',
-      '01_0a_intent_lens_classification',
+      'intent_lens_classification',
     );
 
     const supportedLenses = new Set<IntentLens>(['product', 'feature']);
@@ -355,7 +339,7 @@ export class Phase1Handler implements PhaseHandler {
     if (!template) {
       getLogger().warn('workflow', 'Intent lens classification template not found; using unclassified + product fallback', {
         workflow_run_id: ctx.workflowRun.id,
-        sub_phase_id: '1.0a',
+        sub_phase_id: 'intent_lens_classification',
       });
       return defaultResult;
     }
@@ -378,7 +362,7 @@ export class Phase1Handler implements PhaseHandler {
         traceContext: {
           workflowRunId: ctx.workflowRun.id,
           phaseId: '1',
-          subPhaseId: '1.0a',
+          subPhaseId: 'intent_lens_classification',
           agentRole: 'orchestrator',
           label: 'Phase 1.0a — Intent Lens Classification',
         },
@@ -409,7 +393,7 @@ export class Phase1Handler implements PhaseHandler {
     if (lens !== fallback) {
       getLogger().warn('workflow', `Lens '${lens}' not yet supported — using product fallback for Phase 1.2 / 1.5`, {
         workflow_run_id: ctx.workflowRun.id,
-        sub_phase_id: '1.0a',
+        sub_phase_id: 'intent_lens_classification',
         classified_lens: lens,
       });
     }
@@ -438,7 +422,7 @@ export class Phase1Handler implements PhaseHandler {
       knownRelevantRecordIds: [],
       workflowRunId: workflowRun.id,
       phaseId: '1',
-      subPhaseId: '1.2',
+      subPhaseId: 'business_domains_bloom',
     });
   }
 
@@ -481,13 +465,13 @@ export class Phase1Handler implements PhaseHandler {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate(
       'domain_interpreter',
-      '01_2_intent_domain_bloom',
+      'intent_domain_bloom',
       lens,
     );
     if (template && template.metadata.lens !== lens) {
       getLogger().warn('workflow', `Lens ${lens} not yet supported — using lens-neutral fallback template`, {
         workflow_run_id: ctx.workflowRun.id,
-        sub_phase_id: '1.2',
+        sub_phase_id: 'business_domains_bloom',
         requested_lens: lens,
       });
     }
@@ -510,7 +494,7 @@ export class Phase1Handler implements PhaseHandler {
     if (!template) {
       getLogger().warn('workflow', 'Intent bloom template not found; using fallback', {
         workflow_run_id: ctx.workflowRun.id,
-        sub_phase_id: '1.2',
+        sub_phase_id: 'business_domains_bloom',
       });
       return fallback;
     }
@@ -542,7 +526,7 @@ export class Phase1Handler implements PhaseHandler {
     if (rendered.missing_variables.length > 0) {
       getLogger().warn('workflow', 'Intent bloom template render missing variables; using fallback', {
         workflow_run_id: ctx.workflowRun.id,
-        sub_phase_id: '1.2',
+        sub_phase_id: 'business_domains_bloom',
         missing_variables: rendered.missing_variables,
       });
       return fallback;
@@ -561,7 +545,7 @@ export class Phase1Handler implements PhaseHandler {
       traceContext: {
         workflowRunId: ctx.workflowRun.id,
         phaseId: '1',
-        subPhaseId: '1.2',
+        subPhaseId: 'business_domains_bloom',
         agentRole: 'domain_interpreter',
         label: 'Phase 1.2 — Intent Domain Bloom',
       },
@@ -573,14 +557,14 @@ export class Phase1Handler implements PhaseHandler {
       if (recovered.recovered) {
         getLogger().warn('workflow', 'Recovered malformed bloom JSON from raw model text', {
           workflow_run_id: ctx.workflowRun.id,
-          sub_phase_id: '1.2',
+          sub_phase_id: 'business_domains_bloom',
           provider: result.provider,
           model: result.model,
         });
       } else if (!recovered.parsed) {
         getLogger().warn('workflow', 'Bloom raw model text could not be parsed as JSON', {
           workflow_run_id: ctx.workflowRun.id,
-          sub_phase_id: '1.2',
+          sub_phase_id: 'business_domains_bloom',
           provider: result.provider,
           model: result.model,
           error: recovered.error ?? 'unknown',
@@ -594,96 +578,11 @@ export class Phase1Handler implements PhaseHandler {
     }
     getLogger().warn('workflow', 'Bloom parsed JSON did not contain candidate_product_concepts; using fallback', {
       workflow_run_id: ctx.workflowRun.id,
-      sub_phase_id: '1.2',
+      sub_phase_id: 'business_domains_bloom',
       provider: result.provider,
       model: result.model,
       parsed_top_level_keys: parsed ? Object.keys(parsed).slice(0, 20) : [],
     });
-    return fallback;
-  }
-
-  private async runIntentStatementSynthesis(
-    ctx: PhaseContext,
-    keptCandidates: BloomCandidate[],
-    confirmedAssumptions: Array<{ id: string; text: string; rationale?: string; source_candidate_ids: string[] }>,
-    confirmedAssumptionsRecordId: string,
-    rawIntentText: string,
-    lens: IntentLens = 'product',
-  ): Promise<IntentStatementContent> {
-    const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate(
-      'domain_interpreter',
-      '01_4_intent_statement_synthesis',
-      lens,
-    );
-    if (template && template.metadata.lens !== lens) {
-      getLogger().warn('workflow', `Lens ${lens} not yet supported — using lens-neutral fallback template`, {
-        workflow_run_id: ctx.workflowRun.id,
-        sub_phase_id: '1.5',
-        requested_lens: lens,
-      });
-    }
-    const confirmedAssumptionEntries = confirmedAssumptions.map((assumption) => ({
-      assumption_id: assumption.id,
-      assumption: assumption.text,
-      confirmed_by_record_id: confirmedAssumptionsRecordId,
-    }));
-
-    const primary = keptCandidates[0];
-    const fallback: IntentStatementContent = {
-      product_concept: {
-        name: primary?.name ?? 'Untitled product',
-        description: primary?.description ?? rawIntentText,
-        who_it_serves: primary?.who_it_serves ?? 'unspecified',
-        problem_it_solves: primary?.problem_it_solves ?? 'unspecified',
-      },
-      confirmed_assumptions: confirmedAssumptionEntries,
-      confirmed_constraints: keptCandidates.flatMap(c => c.constraints),
-      out_of_scope: [],
-    };
-
-    if (!template) return fallback;
-
-    const rendered = engine.templateLoader.render(template, {
-      active_constraints: '(none)',
-      prune_decisions_summary: keptCandidates.map(c => `Kept: ${c.name}`).join('\n'),
-      selected_product_concept: JSON.stringify(primary, null, 2),
-      confirmed_assumptions: JSON.stringify(confirmedAssumptionEntries, null, 2),
-      confirmed_constraints: keptCandidates.flatMap(c => c.constraints).join('; '),
-      out_of_scope_items: '',
-      scope_classification_ref: '',
-      compliance_context_ref: '',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-    });
-    if (rendered.missing_variables.length > 0) return fallback;
-
-    // LLM call throws propagate to the engine's phase catch. Parse /
-    // shape fallbacks below handle the success-but-empty-JSON case.
-    const result = await engine.llmCaller.call({
-      provider: 'ollama',
-      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
-      prompt: rendered.rendered,
-      responseFormat: 'json',
-      temperature: 0.4,
-      traceContext: {
-        workflowRunId: ctx.workflowRun.id,
-        phaseId: '1',
-        subPhaseId: '1.5',
-        agentRole: 'domain_interpreter',
-        label: 'Phase 1.5 — Intent Statement Synthesis',
-      },
-    });
-    const parsed = result.parsed as Record<string, unknown> | null;
-    // LLM may wrap response in a top-level key like "intent_statement"
-    const unwrapped = (parsed?.intent_statement ?? parsed?.statement ?? parsed) as Partial<IntentStatementContent> | null;
-    if (unwrapped?.product_concept) {
-      return {
-        product_concept: unwrapped.product_concept,
-        confirmed_assumptions: fallback.confirmed_assumptions,
-        confirmed_constraints: unwrapped.confirmed_constraints ?? fallback.confirmed_constraints,
-        out_of_scope: unwrapped.out_of_scope ?? [],
-      };
-    }
     return fallback;
   }
 
@@ -803,7 +702,7 @@ export class Phase1Handler implements PhaseHandler {
         .join('\n') ?? '';
 
       const payload = engine.contextBuilder.buildContextPayload(
-        '1.2',
+        'business_domains_bloom',
         invocationId,
         {
           governingConstraints: constraintsText,
@@ -877,7 +776,7 @@ export class Phase1Handler implements PhaseHandler {
     const humanDecisions: HumanDecisionSummary[] = [];
 
     // ── 1.0b Product Intent Discovery (silent) ──────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.0b');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'product_intent_discovery');
     let discovery: IntentDiscoveryResult;
     try {
       discovery = await this.runIntentDiscovery(ctx, rawIntentText);
@@ -889,7 +788,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.0b',
+      sub_phase_id: 'product_intent_discovery',
       produced_by_agent_role: 'domain_interpreter',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [rawIntent.id, lensRecord.id],
@@ -899,7 +798,7 @@ export class Phase1Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(discoveryRecord);
 
     // ── 1.0c Technical Constraints Discovery (silent) ───────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.0c');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'technical_constraints_discovery');
     let technicalConstraints: TechnicalConstraint[] = [];
     try {
       technicalConstraints = await this.runTechnicalConstraintsDiscovery(ctx, rawIntentText);
@@ -918,7 +817,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.0c',
+      sub_phase_id: 'technical_constraints_discovery',
       produced_by_agent_role: 'domain_interpreter',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [rawIntent.id, lensRecord.id],
@@ -928,7 +827,7 @@ export class Phase1Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(techRecord);
 
     // ── 1.0d Compliance & Retention Discovery (silent) ──────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.0d');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'compliance_retention_discovery');
     let complianceExtractedItems: ExtractedItem[] = [];
     try {
       complianceExtractedItems = await this.runComplianceRetentionDiscovery(ctx, rawIntentText);
@@ -943,7 +842,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.0d',
+      sub_phase_id: 'compliance_retention_discovery',
       produced_by_agent_role: 'domain_interpreter',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [rawIntent.id, lensRecord.id],
@@ -953,7 +852,7 @@ export class Phase1Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(complianceRecord_extraction);
 
     // ── 1.0e V&V Requirements Discovery (silent) ────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.0e');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'vv_requirements_discovery');
     let vvRequirements: VVRequirement[] = [];
     try {
       vvRequirements = await this.runVVRequirementsDiscovery(ctx, rawIntentText);
@@ -968,7 +867,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.0e',
+      sub_phase_id: 'vv_requirements_discovery',
       produced_by_agent_role: 'domain_interpreter',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [rawIntent.id, lensRecord.id],
@@ -978,7 +877,7 @@ export class Phase1Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(vvRecord);
 
     // ── 1.0f Canonical Vocabulary Discovery (silent) ────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.0f');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'canonical_vocabulary_discovery');
     let canonicalVocabulary: VocabularyTerm[] = [];
     try {
       canonicalVocabulary = await this.runCanonicalVocabularyDiscovery(ctx, rawIntentText);
@@ -993,7 +892,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.0f',
+      sub_phase_id: 'canonical_vocabulary_discovery',
       produced_by_agent_role: 'domain_interpreter',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [rawIntent.id, lensRecord.id],
@@ -1003,7 +902,7 @@ export class Phase1Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(vocabRecord);
 
     // ── 1.0g Intent Discovery Synthesis (deterministic compose) ──
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.0g');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'discovery_bundle_compose');
     const discoveryBundle: IntentDiscoveryBundle = this.composeDiscoveryBundle(
       discovery,
       technicalConstraints,
@@ -1016,7 +915,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.0g',
+      sub_phase_id: 'discovery_bundle_compose',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [discoveryRecord.id, techRecord.id, complianceRecord_extraction.id, vvRecord.id, vocabRecord.id],
@@ -1042,13 +941,13 @@ export class Phase1Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(bundleRecord);
 
     // ── 1.1b Scope Bounding + Compliance (deterministic) ────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.1b');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'scope_bounding');
     const scopeRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.1b',
+      sub_phase_id: 'scope_bounding',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       content: { kind: 'scope_classification', breadth: 'single_product', depth: 'production_grade' },
@@ -1060,7 +959,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.1b',
+      sub_phase_id: 'scope_bounding',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       content: { kind: 'compliance_context', regimes: [] },
@@ -1069,9 +968,9 @@ export class Phase1Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(complianceRecord);
 
     // ── 1.2 Business Domains & Personas Bloom (Round 1) ─────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.2');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'business_domains_bloom');
     const round12 = await this.runBloomRoundWithFeedbackLoop<{ domains: BusinessDomain[]; personas: Persona[] }>(ctx, {
-      subPhaseId: '1.2',
+      subPhaseId: 'business_domains_bloom',
       roundLabel: 'Business Domains',
       lensRationale: state.lensClassification.rationale,
       humanDecisions,
@@ -1084,7 +983,7 @@ export class Phase1Handler implements PhaseHandler {
           schema_version: '1.0',
           workflow_run_id: workflowRun.id,
           phase_id: '1',
-          sub_phase_id: '1.2',
+          sub_phase_id: 'business_domains_bloom',
           produced_by_agent_role: 'domain_interpreter',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: derivedFrom,
@@ -1120,10 +1019,10 @@ export class Phase1Handler implements PhaseHandler {
     const integrationInputs: Integration[] = [];
 
     // ── 1.3a — User Journey Bloom ─────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.3a');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'user_journey_bloom');
     let bloom13aMeta: { unreachedPersonas: string[]; unreachedDomains: string[] } = { unreachedPersonas: [], unreachedDomains: [] };
     const round13a = await this.runBloomRoundWithFeedbackLoop<{ userJourneys: UserJourney[]; unreachedPersonas: string[]; unreachedDomains: string[] }>(ctx, {
-      subPhaseId: '1.3a',
+      subPhaseId: 'user_journey_bloom',
       roundLabel: 'User Journeys',
       lensRationale: state.lensClassification.rationale,
       humanDecisions,
@@ -1148,7 +1047,7 @@ export class Phase1Handler implements PhaseHandler {
           schema_version: '1.0',
           workflow_run_id: workflowRun.id,
           phase_id: '1',
-          sub_phase_id: '1.3a',
+          sub_phase_id: 'user_journey_bloom',
           produced_by_agent_role: 'domain_interpreter',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: derivedFrom,
@@ -1177,9 +1076,9 @@ export class Phase1Handler implements PhaseHandler {
     const safeJourneys = acceptedJourneys.length > 0 ? acceptedJourneys : journeyBloom.userJourneys;
 
     // ── 1.3b — System Workflow Bloom ──────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.3b');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'system_workflow_bloom');
     const round13b = await this.runBloomRoundWithFeedbackLoop<{ workflows: WorkflowV2[] }>(ctx, {
-      subPhaseId: '1.3b',
+      subPhaseId: 'system_workflow_bloom',
       roundLabel: 'System Workflows',
       lensRationale: state.lensClassification.rationale,
       humanDecisions,
@@ -1200,7 +1099,7 @@ export class Phase1Handler implements PhaseHandler {
           schema_version: '1.0',
           workflow_run_id: workflowRun.id,
           phase_id: '1',
-          sub_phase_id: '1.3b',
+          sub_phase_id: 'system_workflow_bloom',
           produced_by_agent_role: 'domain_interpreter',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: derivedFrom,
@@ -1227,7 +1126,7 @@ export class Phase1Handler implements PhaseHandler {
     const safeWorkflowsV2 = acceptedWorkflowsV2.length > 0 ? acceptedWorkflowsV2 : workflowBloom.workflows;
 
     // ── 1.3c — Coverage Verifier (deterministic) ─────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.3c');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'coverage_verifier');
     const coverageGaps = verifyCoverage({
       personas: safePersonas,
       domainIds: safeDomains.map(d => d.id),
@@ -1266,9 +1165,9 @@ export class Phase1Handler implements PhaseHandler {
     }
 
     // ── 1.4 Business Entities Bloom (Round 3) ───────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.4');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'entities_bloom');
     const round14 = await this.runBloomRoundWithFeedbackLoop<{ entities: Entity[] }>(ctx, {
-      subPhaseId: '1.4',
+      subPhaseId: 'entities_bloom',
       roundLabel: 'Entities',
       lensRationale: state.lensClassification.rationale,
       humanDecisions,
@@ -1281,7 +1180,7 @@ export class Phase1Handler implements PhaseHandler {
           schema_version: '1.0',
           workflow_run_id: workflowRun.id,
           phase_id: '1',
-          sub_phase_id: '1.4',
+          sub_phase_id: 'entities_bloom',
           produced_by_agent_role: 'domain_interpreter',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: derivedFrom,
@@ -1302,7 +1201,7 @@ export class Phase1Handler implements PhaseHandler {
     const safeEntities = acceptedEntities.length > 0 ? acceptedEntities : entitiesBloom.entities;
 
     // ── 1.5 Integrations + Quality Attributes Bloom (Round 4) ──
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.5');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'integrations_qa_bloom');
     // Hoist the id-generator so the QA synthetic ids are stable across
     // feedback iterations — a re-bloom produces a new array, but the
     // same id scheme resolves accept/reject consistently.
@@ -1313,7 +1212,7 @@ export class Phase1Handler implements PhaseHandler {
     }));
     let lastQaItems: Array<{ id: string; label: string; description: string }> = [];
     const round15 = await this.runBloomRoundWithFeedbackLoop<{ integrations: Integration[]; qualityAttributes: string[] }>(ctx, {
-      subPhaseId: '1.5',
+      subPhaseId: 'integrations_qa_bloom',
       roundLabel: 'Integrations/QA',
       lensRationale: state.lensClassification.rationale,
       humanDecisions,
@@ -1326,7 +1225,7 @@ export class Phase1Handler implements PhaseHandler {
           schema_version: '1.0',
           workflow_run_id: workflowRun.id,
           phase_id: '1',
-          sub_phase_id: '1.5',
+          sub_phase_id: 'integrations_qa_bloom',
           produced_by_agent_role: 'domain_interpreter',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: derivedFrom,
@@ -1354,7 +1253,7 @@ export class Phase1Handler implements PhaseHandler {
     const safeQAs = acceptedQAs.length > 0 ? acceptedQAs : integrationsBloom.qualityAttributes;
 
     // ── 1.6 Product Description Synthesis (silent) ──────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.6');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'product_description_synthesis');
     let handoff: ProductDescriptionHandoffContent;
     try {
       handoff = await this.runProductDescriptionSynthesis(ctx, {
@@ -1381,7 +1280,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.6',
+      sub_phase_id: 'product_description_synthesis',
       produced_by_agent_role: 'domain_interpreter',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [discoveryRecord.id, domainsRecord.id, journeysRecord.id, entitiesRecord.id, round15.record.id],
@@ -1398,7 +1297,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.6',
+      sub_phase_id: 'product_description_synthesis',
       produced_by_agent_role: 'domain_interpreter',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [handoffRecord.id],
@@ -1408,7 +1307,7 @@ export class Phase1Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(statementRecord);
 
     // ── 1.7 Handoff Approval ────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.7');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'product_handoff_gate');
     const approvalMirror = engine.mirrorGenerator.generate({
       artifactId: handoffRecord.id,
       artifactType: 'product_description_handoff',
@@ -1419,7 +1318,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.7',
+      sub_phase_id: 'product_handoff_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [handoffRecord.id],
@@ -1458,7 +1357,7 @@ export class Phase1Handler implements PhaseHandler {
     }
 
     // ── 1.8 Release Plan v2 — widened manifest proposal + deterministic verifier + approval ──
-    engine.stateMachine.setSubPhase(workflowRun.id, '1.8');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'release_plan');
     // Derive full input surface from handoff + discovery.
     const acceptedWorkflowsForPlan = safeWorkflowsV2;
     const acceptedEntitiesForPlan = safeEntities;
@@ -1467,7 +1366,7 @@ export class Phase1Handler implements PhaseHandler {
     const acceptedVocabularyForPlan = discoveryBundle.canonicalVocabulary;
     let lastCrossCutting: CrossCuttingContents = { workflows: [], compliance: [], integrations: [], vocabulary: [] };
     const round18 = await this.runBloomRoundWithFeedbackLoop<{ releases: ReleaseV2[]; crossCutting: CrossCuttingContents }>(ctx, {
-      subPhaseId: '1.8',
+      subPhaseId: 'release_plan',
       roundLabel: 'Release Plan (v2)',
       lensRationale: state.lensClassification.rationale,
       humanDecisions,
@@ -1495,7 +1394,7 @@ export class Phase1Handler implements PhaseHandler {
           schema_version: '2.0',
           workflow_run_id: workflowRun.id,
           phase_id: '1',
-          sub_phase_id: '1.8',
+          sub_phase_id: 'release_plan',
           produced_by_agent_role: 'orchestrator',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: derivedFrom,
@@ -1609,7 +1508,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '2.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.8',
+      sub_phase_id: 'release_plan',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [round18.record.id],
@@ -1631,7 +1530,7 @@ export class Phase1Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '1',
-      sub_phase_id: '1.8',
+      sub_phase_id: 'release_plan',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [
@@ -1871,7 +1770,7 @@ export class Phase1Handler implements PhaseHandler {
    */
   private async runIntentDiscovery(ctx: PhaseContext, rawIntentText: string): Promise<IntentDiscoveryResult> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_0b_intent_discovery', 'product');
+    const template = engine.templateLoader.findTemplate('domain_interpreter', 'product_intent_discovery', 'product');
     if (!template) throw new Error('1.0b intent_discovery product-lens template not found');
     const ingestedFiles = await this.collectIngestedFileContent(ctx);
     const enrichedIntent = this.buildEnrichedIntentText(rawIntentText, ingestedFiles);
@@ -1884,7 +1783,7 @@ export class Phase1Handler implements PhaseHandler {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.4,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.0b', agentRole: 'domain_interpreter', label: 'Phase 1.0b — Intent Discovery' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'product_intent_discovery', agentRole: 'domain_interpreter', label: 'Phase 1.0b — Intent Discovery' },
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('Intent Discovery returned unparseable JSON');
@@ -1916,7 +1815,7 @@ export class Phase1Handler implements PhaseHandler {
   ): Promise<TechnicalConstraint[]> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate(
-      'domain_interpreter', '01_0c_technical_constraints_discovery', 'product',
+      'domain_interpreter', 'technical_constraints_discovery', 'product',
     );
     if (!template) throw new Error('1.0c technical_constraints_discovery product-lens template not found');
     const ingestedFiles = await this.collectIngestedFileContent(ctx);
@@ -1932,7 +1831,7 @@ export class Phase1Handler implements PhaseHandler {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.2,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.0c', agentRole: 'domain_interpreter', label: 'Phase 1.0c — Technical Constraints Discovery' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'technical_constraints_discovery', agentRole: 'domain_interpreter', label: 'Phase 1.0c — Technical Constraints Discovery' },
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('Technical Constraints Discovery returned unparseable JSON');
@@ -1951,7 +1850,7 @@ export class Phase1Handler implements PhaseHandler {
   ): Promise<ExtractedItem[]> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate(
-      'domain_interpreter', '01_0d_compliance_retention_discovery', 'product',
+      'domain_interpreter', 'compliance_retention_discovery', 'product',
     );
     if (!template) throw new Error('1.0d compliance_retention_discovery product-lens template not found');
     const ingestedFiles = await this.collectIngestedFileContent(ctx);
@@ -1967,7 +1866,7 @@ export class Phase1Handler implements PhaseHandler {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.2,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.0d', agentRole: 'domain_interpreter', label: 'Phase 1.0d — Compliance & Retention Discovery' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'compliance_retention_discovery', agentRole: 'domain_interpreter', label: 'Phase 1.0d — Compliance & Retention Discovery' },
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('Compliance & Retention Discovery returned unparseable JSON');
@@ -1987,7 +1886,7 @@ export class Phase1Handler implements PhaseHandler {
   ): Promise<VVRequirement[]> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate(
-      'domain_interpreter', '01_0e_vv_requirements_discovery', 'product',
+      'domain_interpreter', 'vv_requirements_discovery', 'product',
     );
     if (!template) throw new Error('1.0e vv_requirements_discovery product-lens template not found');
     const ingestedFiles = await this.collectIngestedFileContent(ctx);
@@ -2003,7 +1902,7 @@ export class Phase1Handler implements PhaseHandler {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.2,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.0e', agentRole: 'domain_interpreter', label: 'Phase 1.0e — V&V Requirements Discovery' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'vv_requirements_discovery', agentRole: 'domain_interpreter', label: 'Phase 1.0e — V&V Requirements Discovery' },
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('V&V Requirements Discovery returned unparseable JSON');
@@ -2021,7 +1920,7 @@ export class Phase1Handler implements PhaseHandler {
   ): Promise<VocabularyTerm[]> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate(
-      'domain_interpreter', '01_0f_canonical_vocabulary_discovery', 'product',
+      'domain_interpreter', 'canonical_vocabulary_discovery', 'product',
     );
     if (!template) throw new Error('1.0f canonical_vocabulary_discovery product-lens template not found');
     const ingestedFiles = await this.collectIngestedFileContent(ctx);
@@ -2037,7 +1936,7 @@ export class Phase1Handler implements PhaseHandler {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.2,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.0f', agentRole: 'domain_interpreter', label: 'Phase 1.0f — Canonical Vocabulary Discovery' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'canonical_vocabulary_discovery', agentRole: 'domain_interpreter', label: 'Phase 1.0f — Canonical Vocabulary Discovery' },
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('Canonical Vocabulary Discovery returned unparseable JSON');
@@ -2145,7 +2044,7 @@ export class Phase1Handler implements PhaseHandler {
     humanFeedback: string = '',
   ): Promise<{ domains: BusinessDomain[]; personas: Persona[] }> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_2_business_domains_bloom', 'product');
+    const template = engine.templateLoader.findTemplate('domain_interpreter', 'business_domains_bloom', 'product');
     if (!template) throw new Error('1.2 business_domains_bloom product-lens template not found');
     const rendered = engine.templateLoader.render(template, {
       product_vision: discovery.productVision,
@@ -2162,7 +2061,7 @@ export class Phase1Handler implements PhaseHandler {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.5,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.2', agentRole: 'domain_interpreter', label: 'Phase 1.2 — Business Domains & Personas Bloom' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'business_domains_bloom', agentRole: 'domain_interpreter', label: 'Phase 1.2 — Business Domains & Personas Bloom' },
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('Business Domains bloom returned unparseable JSON');
@@ -2181,7 +2080,7 @@ export class Phase1Handler implements PhaseHandler {
     humanFeedback: string = '',
   ): Promise<{ entities: Entity[] }> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_4_entities_bloom', 'product');
+    const template = engine.templateLoader.findTemplate('domain_interpreter', 'entities_bloom', 'product');
     if (!template) throw new Error('1.4 entities_bloom product-lens template not found');
     const rendered = engine.templateLoader.render(template, {
       accepted_domains: this.formatDomains(acceptedDomains),
@@ -2196,7 +2095,7 @@ export class Phase1Handler implements PhaseHandler {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.5,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.4', agentRole: 'domain_interpreter', label: 'Phase 1.4 — Entities Bloom' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'entities_bloom', agentRole: 'domain_interpreter', label: 'Phase 1.4 — Entities Bloom' },
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('Entities bloom returned unparseable JSON');
@@ -2213,7 +2112,7 @@ export class Phase1Handler implements PhaseHandler {
     humanFeedback: string = '',
   ): Promise<{ integrations: Integration[]; qualityAttributes: string[] }> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_5_integrations_qa_bloom', 'product');
+    const template = engine.templateLoader.findTemplate('domain_interpreter', 'integrations_qa_bloom', 'product');
     if (!template) throw new Error('1.5 integrations_qa_bloom product-lens template not found');
     const rendered = engine.templateLoader.render(template, {
       accepted_domains: this.formatDomains(acceptedDomains),
@@ -2229,7 +2128,7 @@ export class Phase1Handler implements PhaseHandler {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.5,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.5', agentRole: 'domain_interpreter', label: 'Phase 1.5 — Integrations & QA Bloom' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'integrations_qa_bloom', agentRole: 'domain_interpreter', label: 'Phase 1.5 — Integrations & QA Bloom' },
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('Integrations/QA bloom returned unparseable JSON');
@@ -2314,7 +2213,7 @@ export class Phase1Handler implements PhaseHandler {
     base: ProductDescriptionHandoffContent,
   ): Promise<Partial<ProductDescriptionHandoffContent>> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_6_product_description_synthesis', 'product');
+    const template = engine.templateLoader.findTemplate('domain_interpreter', 'product_description_synthesis', 'product');
     if (!template) {
       throw new Error('1.6 product_description_synthesis product-lens template not found');
     }
@@ -2347,7 +2246,7 @@ export class Phase1Handler implements PhaseHandler {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.3,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.6', agentRole: 'domain_interpreter', label: 'Phase 1.6 — Product Description Narrative Refinement' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'product_description_synthesis', agentRole: 'domain_interpreter', label: 'Phase 1.6 — Product Description Narrative Refinement' },
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('1.6 narrative LLM returned unparseable JSON');
@@ -2434,9 +2333,9 @@ export class Phase1Handler implements PhaseHandler {
   }
 
   /**
-   * Project a product_description_handoff into the IntentStatementContent
-   * shape that Phase 2+ reads today. A follow-up can upgrade specific
-   * downstream phases to read the richer handoff directly.
+   * Project a product_description_handoff into the intent_statement shape
+   * Phase 2+ reads today. A follow-up can upgrade specific downstream
+   * phases to read the richer handoff directly.
    */
   private deriveIntentStatementFromHandoff(handoff: ProductDescriptionHandoffContent): Record<string, unknown> {
     const primaryPersona = handoff.personas[0];
@@ -2567,7 +2466,7 @@ export class Phase1Handler implements PhaseHandler {
     humanFeedback: string = '',
   ): Promise<{ userJourneys: UserJourney[]; unreachedPersonas: string[]; unreachedDomains: string[] }> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_3a_user_journey_bloom', 'product');
+    const template = engine.templateLoader.findTemplate('domain_interpreter', 'user_journey_bloom', 'product');
     if (!template) throw new Error('1.3a user_journey_bloom product-lens template not found');
     const rendered = engine.templateLoader.render(template, {
       accepted_personas: this.formatPersonas(inputs.acceptedPersonas),
@@ -2585,7 +2484,7 @@ export class Phase1Handler implements PhaseHandler {
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.5,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.3a', agentRole: 'domain_interpreter', label: 'Phase 1.3a — User Journey Bloom' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'user_journey_bloom', agentRole: 'domain_interpreter', label: 'Phase 1.3a — User Journey Bloom' },
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('1.3a bloom returned unparseable JSON');
@@ -2875,7 +2774,7 @@ Re-emit this single journey as a JSON object that matches the original schema (i
         traceContext: {
           workflowRunId: ctx.workflowRun.id,
           phaseId: '1',
-          subPhaseId: '1.3a',
+          subPhaseId: 'user_journey_bloom',
           agentRole: 'domain_interpreter',
           label: `Phase 1.3a — persona-fix retry attempt ${attempt} for ${journeyId}`,
         },
@@ -2920,7 +2819,7 @@ Re-emit this single journey as a JSON object that matches the original schema (i
     humanFeedback: string = '',
   ): Promise<{ workflows: WorkflowV2[] }> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('domain_interpreter', '01_3b_system_workflow_bloom', 'product');
+    const template = engine.templateLoader.findTemplate('domain_interpreter', 'system_workflow_bloom', 'product');
     if (!template) throw new Error('1.3b system_workflow_bloom product-lens template not found');
     const rendered = engine.templateLoader.render(template, {
       accepted_journeys: this.formatJourneysWithSteps(inputs.acceptedJourneys),
@@ -2938,7 +2837,7 @@ Re-emit this single journey as a JSON object that matches the original schema (i
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.5,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: '1.3b', agentRole: 'domain_interpreter', label: 'Phase 1.3b — System Workflow Bloom' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'system_workflow_bloom', agentRole: 'domain_interpreter', label: 'Phase 1.3b — System Workflow Bloom' },
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('1.3b bloom returned unparseable JSON');
@@ -3083,7 +2982,7 @@ Re-emit this single journey as a JSON object that matches the original schema (i
     feedback: string,
   ): Promise<{ releases: ReleaseV2[]; crossCutting: CrossCuttingContents }> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('orchestrator', '01_8_release_plan', 'product');
+    const template = engine.templateLoader.findTemplate('orchestrator', 'release_plan', 'product');
     if (!template) throw new Error('1.8 v2 release_plan product-lens template not found');
     const rendered = engine.templateLoader.render(template, {
       product_vision: inputs.productVision || '(none)',
@@ -3104,7 +3003,7 @@ Re-emit this single journey as a JSON object that matches the original schema (i
       traceContext: {
         workflowRunId: ctx.workflowRun.id,
         phaseId: '1',
-        subPhaseId: '1.8',
+        subPhaseId: 'release_plan',
         agentRole: 'orchestrator',
         label: 'Phase 1.8 — Release Plan v2 proposer (narrow scope)',
       },

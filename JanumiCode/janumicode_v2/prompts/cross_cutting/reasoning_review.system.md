@@ -1,6 +1,6 @@
 ---
 agent_role: reasoning_review
-sub_phase: cross_cutting
+sub_phase: reasoning_review
 schema_version: 2.0
 co_invocation_exception: false
 required_variables:

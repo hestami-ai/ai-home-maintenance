@@ -17,7 +17,7 @@ describe('Probe: System Boundary (3.1)', () => {
     const result = await runProbe({
       name: 'phase_3_1_system_boundary',
       agentRole: 'systems_agent',
-      subPhase: '03_1_system_boundary',
+      subPhase: 'system_boundary',
       variables: {
         active_constraints: 'No constraints',
         intent_statement_summary: 'TaskFlow — task management with email notifications and GitHub integration',
@@ -64,7 +64,7 @@ describe('Probe: System Requirements (3.2)', () => {
     const result = await runProbe({
       name: 'phase_3_2_system_requirements',
       agentRole: 'systems_agent',
-      subPhase: '03_2_system_requirements',
+      subPhase: 'system_requirements',
       variables: {
         active_constraints: 'No constraints',
         system_boundary_summary: 'In scope: task management. Out of scope: mobile. External: GitHub, SMTP',
@@ -117,7 +117,7 @@ describe('Probe: Interface Contracts (3.3)', () => {
     const result = await runProbe({
       name: 'phase_3_3_interface_contracts',
       agentRole: 'systems_agent',
-      subPhase: '03_3_interface_contracts',
+      subPhase: 'interface_contracts',
       variables: {
         active_constraints: 'No constraints',
         system_boundary_summary: 'External systems: GitHub API, SMTP server',

@@ -1,6 +1,6 @@
 ---
 agent_role: reasoning_review
-sub_phase: cross_cutting_domain_compliance
+sub_phase: domain_compliance_review
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

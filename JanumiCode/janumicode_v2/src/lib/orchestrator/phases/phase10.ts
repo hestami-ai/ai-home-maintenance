@@ -23,14 +23,14 @@ export class Phase10Handler implements PhaseHandler {
     const artifactIds: string[] = [];
 
     // ── 10.1 — Pre-Commit Consistency Check ───────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '10.1');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'pre_commit_consistency_check');
 
     const consistencyRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '10',
-      sub_phase_id: '10.1',
+      sub_phase_id: 'pre_commit_consistency_check',
       produced_by_agent_role: 'consistency_checker',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       content: {
@@ -48,14 +48,14 @@ export class Phase10Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(consistencyRecord);
 
     // ── 10.2 — Commit Preparation ─────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '10.2');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'commit_preparation');
 
     const commitRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '10',
-      sub_phase_id: '10.2',
+      sub_phase_id: 'commit_preparation',
       produced_by_agent_role: 'executor_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [consistencyRecord.id],
@@ -73,7 +73,7 @@ export class Phase10Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(commitRecord);
 
     // ── 10.3 — Workflow Run Closure ───────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '10.3');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'workflow_run_closure');
 
     // Use narrow queries here — a long calibration run produces thousands
     // of artifact_produced rows totalling tens of MB. Pulling the full
@@ -95,7 +95,7 @@ export class Phase10Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '10',
-      sub_phase_id: '10.3',
+      sub_phase_id: 'workflow_run_closure',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [commitRecord.id],
@@ -124,7 +124,7 @@ export class Phase10Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '10',
-      sub_phase_id: '10.3',
+      sub_phase_id: 'workflow_run_closure',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [summaryRecord.id],
@@ -157,7 +157,7 @@ export class Phase10Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '10',
-      sub_phase_id: '10.3',
+      sub_phase_id: 'workflow_run_closure',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [consistencyRecord.id, commitRecord.id, summaryRecord.id],

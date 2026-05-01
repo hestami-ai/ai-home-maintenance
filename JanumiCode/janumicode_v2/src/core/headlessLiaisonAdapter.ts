@@ -86,13 +86,22 @@ export class HeadlessLiaisonAdapter {
         throw new Error(`File not found: ${resolvedPath}`);
       }
 
-      // Verify file exists and is readable (content will be read by phase handlers from URI)
+      // Inline file content so Phase 1's lens classifier (which sees only
+      // the raw intent text, not workspace artifacts) has the actual spec
+      // to classify. Files up to 256KB are inlined verbatim; larger files
+      // are truncated with a marker.
       fs.accessSync(resolvedPath, fs.constants.R_OK);
-      userPromptText = `Execute the intent described in the attached document.`;
-      
+      const MAX_INLINE = 256 * 1024;
+      const fullText = fs.readFileSync(resolvedPath, 'utf-8');
+      const inlineText = fullText.length > MAX_INLINE
+        ? fullText.slice(0, MAX_INLINE) + '\n\n[TRUNCATED — original is ' + fullText.length + ' bytes]'
+        : fullText;
+      const fileName = path.basename(resolvedPath);
+      userPromptText = `Execute the intent described in the attached document.\n\n=== ATTACHED DOCUMENT: ${fileName} ===\n${inlineText}\n=== END ATTACHED DOCUMENT ===`;
+
       attachments = [{
         uri: `file://${resolvedPath}`,
-        name: path.basename(resolvedPath),
+        name: fileName,
         type: 'file',
       }];
     } else {

@@ -1,6 +1,6 @@
 ---
 agent_role: eval_design_agent
-sub_phase: 08_1_evaluation_design
+sub_phase: evaluation_design
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

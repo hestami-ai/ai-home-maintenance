@@ -1,6 +1,6 @@
 ---
 agent_role: consistency_checker
-sub_phase: cross_cutting_semantic_consistency
+sub_phase: consistency_checker_semantic
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

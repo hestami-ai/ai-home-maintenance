@@ -11,6 +11,7 @@
  */
 
 import type { Database } from '../database/init';
+import { collectGovernedStream } from '../database/iterateGovernedStream';
 import * as crypto from 'node:crypto';
 import type {
   Phase1AnchorKind,
@@ -147,16 +148,17 @@ export class DecompViewerDataProvider {
   // ── Decomposition nodes ──────────────────────────────────────────
 
   private loadNodes(workflowRunId: string): ViewerDecompositionNode[] {
-    const rows = this.db
-      .prepare(
-        `SELECT id, content, produced_at
-         FROM governed_stream
-         WHERE record_type = 'requirement_decomposition_node'
-           AND is_current_version = 1
-           AND workflow_run_id = ?
-         ORDER BY produced_at ASC`,
-      )
-      .all(workflowRunId) as Array<{ id: string; content: string; produced_at: string }>;
+    const stmt = this.db.prepare(
+      `SELECT id, content, produced_at
+       FROM governed_stream
+       WHERE record_type = 'requirement_decomposition_node'
+         AND is_current_version = 1
+         AND workflow_run_id = ?
+       ORDER BY produced_at ASC
+       LIMIT ? OFFSET ?`,
+    );
+    const rows = collectGovernedStream<{ id: string; content: string; produced_at: string }>(
+      stmt, [workflowRunId], { pageSize: 500 });
 
     const parsed = rows.map(r => {
       const c = JSON.parse(r.content) as Record<string, unknown>;
@@ -281,16 +283,17 @@ export class DecompViewerDataProvider {
     // Take the latest snapshot per root_kind. Wave 6 writes a fresh
     // assumption_set_snapshot each pass; we want the most-recent for fr
     // and nfr so the viewer reflects the current de-duplicated state.
-    const rows = this.db
-      .prepare(
-        `SELECT content, produced_at
-         FROM governed_stream
-         WHERE record_type = 'assumption_set_snapshot'
-           AND is_current_version = 1
-           AND workflow_run_id = ?
-         ORDER BY produced_at DESC`,
-      )
-      .all(workflowRunId) as Array<{ content: string; produced_at: string }>;
+    const stmt = this.db.prepare(
+      `SELECT content, produced_at
+       FROM governed_stream
+       WHERE record_type = 'assumption_set_snapshot'
+         AND is_current_version = 1
+         AND workflow_run_id = ?
+       ORDER BY produced_at DESC
+       LIMIT ? OFFSET ?`,
+    );
+    const rows = collectGovernedStream<{ content: string; produced_at: string }>(
+      stmt, [workflowRunId], { pageSize: 500 });
 
     const byKind = new Map<string, Array<Record<string, unknown>>>();
     for (const r of rows) {
@@ -332,15 +335,16 @@ export class DecompViewerDataProvider {
     // doesn't (yet) emit `root_kind` on this record. The pipeline
     // belongs to FR when sub_phase_id='2.1a' or pipeline_id starts
     // with 'decomp-pipe-fr-', and NFR for '2.2a' / 'decomp-pipe-nfr-'.
-    const rows = this.db
-      .prepare(
-        `SELECT content, sub_phase_id
-         FROM governed_stream
-         WHERE record_type = 'requirement_decomposition_pipeline'
-           AND is_current_version = 1
-           AND workflow_run_id = ?`,
-      )
-      .all(workflowRunId) as Array<{ content: string; sub_phase_id: string | null }>;
+    const stmt = this.db.prepare(
+      `SELECT content, sub_phase_id
+       FROM governed_stream
+       WHERE record_type = 'requirement_decomposition_pipeline'
+         AND is_current_version = 1
+         AND workflow_run_id = ?
+       LIMIT ? OFFSET ?`,
+    );
+    const rows = collectGovernedStream<{ content: string; sub_phase_id: string | null }>(
+      stmt, [workflowRunId], { pageSize: 500 });
 
     const out: ViewerPipelineSummary[] = [];
     for (const r of rows) {
@@ -465,24 +469,25 @@ export class DecompViewerDataProvider {
    * is a smaller anchor set, not a broken viewer.
    */
   private loadPhase1Anchors(workflowRunId: string): ViewerPhase1Anchor[] {
-    const rows = this.db
-      .prepare(
-        `SELECT content, sub_phase_id
-         FROM governed_stream
-         WHERE record_type = 'artifact_produced'
-           AND is_current_version = 1
-           AND workflow_run_id = ?
-           AND json_extract(content, '$.kind') IN (
-             'user_journey_bloom',
-             'system_workflow_bloom',
-             'entities_bloom',
-             'business_domains_bloom',
-             'compliance_retention_discovery',
-             'vv_requirements_discovery',
-             'technical_constraints_discovery'
-           )`,
-      )
-      .all(workflowRunId) as Array<{ content: string; sub_phase_id: string | null }>;
+    const stmt = this.db.prepare(
+      `SELECT content, sub_phase_id
+       FROM governed_stream
+       WHERE record_type = 'artifact_produced'
+         AND is_current_version = 1
+         AND workflow_run_id = ?
+         AND json_extract(content, '$.kind') IN (
+           'user_journey_bloom',
+           'system_workflow_bloom',
+           'entities_bloom',
+           'business_domains_bloom',
+           'compliance_retention_discovery',
+           'vv_requirements_discovery',
+           'technical_constraints_discovery'
+         )
+       LIMIT ? OFFSET ?`,
+    );
+    const rows = collectGovernedStream<{ content: string; sub_phase_id: string | null }>(
+      stmt, [workflowRunId], { pageSize: 500 });
 
     const out: ViewerPhase1Anchor[] = [];
     const seen = new Set<string>();
@@ -710,8 +715,8 @@ function derivePipelineRootKind(
   subPhaseId: string | null,
   pipelineId: string | undefined,
 ): ViewerRootKind {
-  if (subPhaseId === '2.2a') return 'nfr';
-  if (subPhaseId === '2.1a') return 'fr';
+  if (subPhaseId === 'nfr_saturation') return 'nfr';
+  if (subPhaseId === 'fr_saturation') return 'fr';
   if (typeof pipelineId === 'string' && pipelineId.includes('-nfr-')) return 'nfr';
   if (typeof pipelineId === 'string' && pipelineId.includes('-fr-')) return 'fr';
   return 'fr';

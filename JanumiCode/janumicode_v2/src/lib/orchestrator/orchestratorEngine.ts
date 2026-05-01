@@ -277,6 +277,34 @@ export class OrchestratorEngine {
       );
     });
 
+    // LLM-based JSON repair fallback (json_repair agent role): when a
+    // call requests `responseFormat: 'json'` and the response doesn't
+    // parse, the LLMCaller hands the broken text to a dedicated repair
+    // sequence — primary model first, fallback model if primary fails.
+    // Both attempts include the original prompt + system + thinking
+    // chain (and optional schema hint) as grounding context. Read from
+    // `config.llm_routing.json_repair`. Skipped silently if not
+    // configured (caller halts on parse failure).
+    const jsonRepairConfig = this.configManager.getLLMRouting().json_repair;
+    if (jsonRepairConfig?.primary?.provider && jsonRepairConfig?.primary?.model) {
+      this.llmCaller.setJsonRepairRouting({
+        primary: {
+          provider: jsonRepairConfig.primary.provider,
+          model: jsonRepairConfig.primary.model,
+          baseUrl: jsonRepairConfig.primary.base_url,
+          temperature: jsonRepairConfig.temperature ?? 0,
+        },
+        fallback: jsonRepairConfig.fallback?.provider && jsonRepairConfig.fallback?.model
+          ? {
+              provider: jsonRepairConfig.fallback.provider,
+              model: jsonRepairConfig.fallback.model,
+              baseUrl: jsonRepairConfig.fallback.base_url,
+              temperature: jsonRepairConfig.fallback_temperature ?? 0,
+            }
+          : undefined,
+      });
+    }
+
     this.agentInvoker = new AgentInvoker(this.llmCaller, {
       timeoutSeconds: config.cli_invocation.timeout_seconds,
       idleTimeoutSeconds: config.cli_invocation.idle_timeout_seconds,

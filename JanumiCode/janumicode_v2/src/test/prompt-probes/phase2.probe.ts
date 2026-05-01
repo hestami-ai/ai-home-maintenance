@@ -16,7 +16,7 @@ describe('Probe: Functional Requirements Bloom (2.1)', () => {
     const result = await runProbe({
       name: 'phase_2_1_functional_requirements',
       agentRole: 'requirements_agent',
-      subPhase: '02_1_functional_requirements',
+      subPhase: 'fr_bloom_skeleton',
       variables: {
         active_constraints: 'Must work in modern browsers',
         intent_statement_summary: 'TaskFlow — task management platform for small software teams. Features: task creation with priorities, kanban boards, team assignment, email notifications for overdue tasks',
@@ -77,7 +77,7 @@ describe('Probe: Non-Functional Requirements Bloom (2.2)', () => {
     const result = await runProbe({
       name: 'phase_2_2_nonfunctional_requirements',
       agentRole: 'requirements_agent',
-      subPhase: '02_2_nonfunctional_requirements',
+      subPhase: 'nfr_bloom_skeleton',
       variables: {
         active_constraints: 'Must support 100 concurrent users',
         intent_statement_summary: 'TaskFlow — production-grade task management',

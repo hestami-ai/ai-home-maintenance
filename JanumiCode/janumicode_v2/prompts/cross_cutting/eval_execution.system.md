@@ -1,6 +1,6 @@
 ---
 agent_role: eval_execution_agent
-sub_phase: cross_cutting_eval_execution
+sub_phase: eval_execution
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

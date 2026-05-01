@@ -10,6 +10,7 @@
  */
 
 import type { Database } from '../../lib/database/init';
+import { collectGovernedStream } from '../../lib/database/iterateGovernedStream';
 import type { PhaseId } from '../../lib/types/records';
 
 export interface FailsafeConfig {
@@ -216,20 +217,24 @@ export class CIFailsafe {
     currentErrorRate: number;
     totalTokens: number;
   } {
-    // Get LLM call records
-    const llmCalls = db.prepare(`
-      SELECT 
+    // Paginate via the shared helper — same agent_invocation pattern
+    // as aiSpendGuard / gapReportEnhancer; row-count guard keeps the
+    // 32MB SAB ceiling honest even when a run fans out unexpectedly.
+    const llmStmt = db.prepare(`
+      SELECT
         content->>'$.provider' as provider,
         content->>'$.inputTokens' as input_tokens,
         content->>'$.outputTokens' as output_tokens
       FROM governed_stream
       WHERE workflow_run_id = ?
         AND record_type = 'agent_invocation'
-    `).all(workflowRunId) as Array<{
+      LIMIT ? OFFSET ?
+    `);
+    const llmCalls = collectGovernedStream<{
       provider: string | null;
       input_tokens: string | null;
       output_tokens: string | null;
-    }>;
+    }>(llmStmt, [workflowRunId], { pageSize: 1000 });
 
     // Get error count
     const counts = db.prepare(`

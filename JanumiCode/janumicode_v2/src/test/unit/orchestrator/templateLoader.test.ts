@@ -32,14 +32,14 @@ describe('TemplateLoader', () => {
       // removed because two templates with the same agent_role + sub_phase
       // metadata made `findTemplate` behaviour depend on directory scan
       // order.
-      const template = loader.findTemplate('orchestrator', '01_0_intent_quality_check');
+      const template = loader.findTemplate('orchestrator', 'intent_quality_check');
       expect(template).not.toBeNull();
       expect(template!.metadata.agent_role).toBe('orchestrator');
       expect(template!.metadata.required_variables).toContain('raw_intent_text');
     });
 
     it('loads intent domain bloom template', () => {
-      const template = loader.findTemplate('domain_interpreter', '01_2_intent_domain_bloom');
+      const template = loader.findTemplate('domain_interpreter', 'intent_domain_bloom');
       expect(template).not.toBeNull();
       expect(template!.metadata.required_variables).toContain('active_constraints');
       expect(template!.metadata.required_variables).toContain('raw_intent_text');
@@ -184,7 +184,7 @@ describe('TemplateLoader', () => {
         path: 'test.md',
         metadata: {
           agent_role: 'domain_interpreter',
-          sub_phase: '01_2_intent_domain_bloom',
+          sub_phase: 'intent_domain_bloom',
           schema_version: '1.0',
           co_invocation_exception: false,
           required_variables: [],
@@ -195,9 +195,9 @@ describe('TemplateLoader', () => {
       };
 
       loader.addTemplate('test', template);
-      expect(loader.findTemplate('domain_interpreter', '01_2_intent_domain_bloom')).not.toBeNull();
+      expect(loader.findTemplate('domain_interpreter', 'intent_domain_bloom')).not.toBeNull();
       expect(loader.findTemplate('domain_interpreter', 'wrong_phase')).toBeNull();
-      expect(loader.findTemplate('wrong_role', '01_2_intent_domain_bloom')).toBeNull();
+      expect(loader.findTemplate('wrong_role', 'intent_domain_bloom')).toBeNull();
     });
   });
 });

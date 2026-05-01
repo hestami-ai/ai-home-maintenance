@@ -72,7 +72,7 @@ describe('Phase 1 — product-lens free-text feedback re-bloom loop', () => {
     // saw — MockLLMProvider doesn't expose prompts, so shim on top.
     const realCall = engine.llmCaller.call.bind(engine.llmCaller);
     (engine.llmCaller as unknown as { call: typeof engine.llmCaller.call }).call = async (opts) => {
-      if (opts.traceContext?.subPhaseId === '1.2') {
+      if (opts.traceContext?.subPhaseId === 'business_domains_bloom') {
         domainsPromptsSeen.push(opts.prompt);
       }
       return realCall(opts);
@@ -218,7 +218,7 @@ describe('Phase 1 — product-lens free-text feedback re-bloom loop', () => {
         `SELECT sub_phase_id FROM governed_stream WHERE id = ?`,
       ).get(decisionId) as { sub_phase_id: string | null } | undefined;
 
-      if (surfaceType === 'decision_bundle' && row?.sub_phase_id === '1.2' && !firstDomainsGateSeen) {
+      if (surfaceType === 'decision_bundle' && row?.sub_phase_id === 'business_domains_bloom' && !firstDomainsGateSeen) {
         firstDomainsGateSeen = true;
         engine.resolveDecision(decisionId, {
           type: 'decision_bundle_resolution',
@@ -264,13 +264,13 @@ describe('Phase 1 — product-lens free-text feedback re-bloom loop', () => {
     // proposer iteration.
     const artifacts = engine.writer.getRecordsByType(run.id, 'artifact_produced');
     const domainsBlooms = artifacts.filter(
-      a => a.sub_phase_id === '1.2' && (a.content as { kind?: string }).kind === 'business_domains_bloom',
+      a => a.sub_phase_id === 'business_domains_bloom' && (a.content as { kind?: string }).kind === 'business_domains_bloom',
     );
     expect(domainsBlooms.length).toBe(2);
 
     // Two 1.2 decision_bundle_presented surfaces — one per iteration.
     const bundles = engine.writer.getRecordsByType(run.id, 'decision_bundle_presented');
-    const bundlesAt12 = bundles.filter(b => b.sub_phase_id === '1.2');
+    const bundlesAt12 = bundles.filter(b => b.sub_phase_id === 'business_domains_bloom');
     expect(bundlesAt12.length).toBe(2);
 
     // Final handoff still landed at 1.6.

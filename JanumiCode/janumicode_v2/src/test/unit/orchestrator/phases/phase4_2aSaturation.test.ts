@@ -77,7 +77,7 @@ function seedRootNode(
     schema_version: '1.0',
     workflow_run_id: runId,
     phase_id: '4',
-    sub_phase_id: '4.2a',
+    sub_phase_id: 'component_saturation',
     produced_by_agent_role: 'architecture_agent',
     janumicode_version_sha: 'dev',
     derived_from_record_ids: [],

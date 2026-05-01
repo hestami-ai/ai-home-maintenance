@@ -9,6 +9,7 @@
  */
 
 import type { Database } from '../../lib/database/init';
+import { collectGovernedStream } from '../../lib/database/iterateGovernedStream';
 
 export interface PricingTier {
   provider: string;
@@ -221,8 +222,11 @@ export class AISpendGuard {
    * Load spend records from database.
    */
   loadFromDatabase(db: Database, workflowRunId: string): void {
-    const llmCalls = db.prepare(`
-      SELECT 
+    // Paginate via the shared helper. Pathological runs can push
+    // agent_invocation counts into the thousands; projected fields are
+    // small (<1KB/row) but the row-count guard alone makes this safe.
+    const stmt = db.prepare(`
+      SELECT
         phase_id,
         sub_phase_id,
         content->>'$.provider' as provider,
@@ -234,7 +238,9 @@ export class AISpendGuard {
       FROM governed_stream
       WHERE workflow_run_id = ?
         AND record_type = 'agent_invocation'
-    `).all(workflowRunId) as Array<{
+      LIMIT ? OFFSET ?
+    `);
+    const llmCalls = collectGovernedStream<{
       phase_id: string | null;
       sub_phase_id: string | null;
       provider: string | null;
@@ -243,7 +249,7 @@ export class AISpendGuard {
       input_tokens: string | null;
       output_tokens: string | null;
       produced_at: string;
-    }>;
+    }>(stmt, [workflowRunId], { pageSize: 1000 });
 
     for (const call of llmCalls) {
       const input = Number.parseInt(call.input_tokens ?? '0', 10) || 0;

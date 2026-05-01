@@ -1,6 +1,6 @@
 ---
 agent_role: narrative_memory_generator
-sub_phase: cross_cutting_narrative_memory
+sub_phase: narrative_memory
 schema_version: 1.0
 co_invocation_exception: false
 required_variables:

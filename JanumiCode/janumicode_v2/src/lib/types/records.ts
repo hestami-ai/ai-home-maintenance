@@ -93,6 +93,7 @@ export type AgentRole =
   | 'orchestrator'
   | 'loop_detection_monitor'
   | 'reasoning_review'
+  | 'json_repair'
   | 'narrative_memory_generator';
 
 // ── Phase IDs (§4) ──────────────────────────────────────────────────
@@ -130,195 +131,89 @@ export const PHASE_NAMES: Record<PhaseId, string> = {
   '10': 'Commit and Deployment Initiation',
 };
 
-/**
- * Sub-phase names per phase.
- * Key: phaseId, Value: Record<subPhaseId, subPhaseName>
- */
-export const SUB_PHASE_NAMES: Record<PhaseId, Record<string, string>> = {
-  '0': {
-    '0.1': 'Workspace Classification',
-    '0.2': 'Artifact Ingestion',
-    '0.2b': 'Brownfield Continuity Check',
-    '0.4': 'Vocabulary Collision Check',
-  },
-  '0.5': {
-    '0.5.1': 'Impact Enumeration',
-    '0.5.2': 'Refactoring Decision',
-  },
-  '1': {
-    '1.0': 'Intent Quality Check',
-    '1.0a': 'Intent Lens Classification',
-    '1.0b': 'Intent Discovery',
-    '1.0c': 'Technical Constraints Discovery',
-    '1.0d': 'Compliance & Retention Discovery',
-    '1.0e': 'V&V Requirements Discovery',
-    '1.0f': 'Canonical Vocabulary Discovery',
-    '1.0g': 'Intent Discovery Synthesis',
-    '1.1b': 'Scope Bounding',
-    '1.2': 'Intent Domain Bloom',
-    '1.3': 'Intent Candidate Review & Menu',
-    '1.4': 'Assumption Surfacing & Adjudication',
-    '1.5': 'Intent Statement Synthesis',
-    '1.6': 'Intent Statement Approval',
-    '1.7': 'Handoff Approval',
-  },
-  '2': {
-    '2.1': 'Functional Requirements Bloom',
-    '2.1a': 'Functional Requirements Decomposition',
-    '2.2': 'Non-Functional Requirements Bloom',
-    '2.2a': 'Non-Functional Requirements Decomposition',
-    '2.3': 'Requirements Mirror and Menu',
-  },
-  '3': {
-    '3.1': 'System Boundary Definition',
-    '3.2': 'System Requirements Derivation',
-    '3.3': 'Interface Contract Specification',
-  },
-  '4': {
-    '4.1': 'Software Domain Identification',
-    '4.2': 'Component Decomposition',
-    '4.3': 'Architectural Decision Capture',
-  },
-  '5': {
-    '5.1': 'Data Model Specification',
-    '5.2': 'API Definition',
-    '5.3': 'Error Handling Strategy Specification',
-  },
-  '6': {
-    '6.1': 'Implementation Task Decomposition',
-    '6.2': 'Implementation Plan Mirror and Menu',
-    '6.3': 'Approval',
-  },
-  '7': {
-    '7.1': 'Test Case Generation',
-    '7.2': 'Test Coverage Analysis',
-    '7.3': 'Test Plan Mirror and Menu',
-  },
-  '8': {
-    '8.1': 'Functional Evaluation Design',
-    '8.2': 'Quality Evaluation Design',
-    '8.3': 'Reasoning Evaluation Design',
-  },
-  '9': {
-    '9.1': 'Implementation Task Execution',
-    '9.2': 'Test Execution',
-    '9.3': 'Evaluation Execution',
-  },
-  '10': {
-    '10.1': 'Pre-Commit Consistency Check',
-    '10.2': 'Commit Preparation',
-    '10.3': 'Workflow Run Closure',
-  },
-};
-
-/**
- * Sub-phase order per phase for timeline rendering.
- */
-export const SUB_PHASE_ORDER: Record<PhaseId, string[]> = {
-  '0': ['0.1', '0.2', '0.2b', '0.4'],
-  '0.5': ['0.5.1', '0.5.2'],
-  '1': ['1.0', '1.0a', '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6'],
-  '2': ['2.1', '2.2', '2.3'],
-  '3': ['3.1', '3.2', '3.3'],
-  '4': ['4.1', '4.2', '4.3'],
-  '5': ['5.1', '5.2', '5.3'],
-  '6': ['6.1', '6.2', '6.3'],
-  '7': ['7.1', '7.2', '7.3'],
-  '8': ['8.1', '8.2', '8.3'],
-  '9': ['9.1', '9.2', '9.3'],
-  '10': ['10.1', '10.2', '10.3'],
-};
-
-// ── Lens-conditional sub-phase topology (Phase 1 product lens) ───────
+// ── Sub-phase identity is now manifest-backed (slug IDs) ────────────
 //
-// Phase 1's sub-phase list and the human-facing names of 1.2–1.6 depend
-// on the classified intent lens. The product lens runs a v1-style bloom/
-// prune proposer loop: silent intent discovery (1.0b) + four bloom rounds
-// (1.2 domains, 1.3 journeys, 1.4 entities, 1.5 integrations) + silent
-// synthesis (1.6) + handoff approval (1.7). Non-product lenses keep the
-// default collapsed flow.
+// SUB_PHASE_NAMES + SUB_PHASE_ORDER below are derived from the canonical
+// phase manifest (`src/lib/orchestrator/phaseManifest.ts`). The keys of
+// SUB_PHASE_NAMES[phaseId] are slug-based sub-phase IDs (e.g.
+// `'workspace_classification'`, `'fr_saturation'`) — NOT the legacy
+// numeric IDs (`'0.1'`, `'2.1a'`). Callers that previously hardcoded
+// numeric IDs must migrate to slugs.
 //
-// The defaults above (SUB_PHASE_NAMES + SUB_PHASE_ORDER) are the fallback;
-// callers resolve lens-aware values via getSubPhaseName / getSubPhaseOrder.
+// Lens-conditional sub-phase topology is no longer encoded here. With
+// slug IDs, each step has a unique slug and a single canonical name —
+// the prior lens-keyed overrides existed to disambiguate distinct steps
+// that shared a numeric prefix, which slugs eliminate by construction.
+
+import {
+  PHASES as MANIFEST_PHASES,
+  subPhasesOf,
+} from '../orchestrator/phaseManifest';
 
 /**
- * Per-phase, per-lens overrides for sub-phase human-facing names. If a
- * lens isn't listed here for a given phase, fall back to SUB_PHASE_NAMES.
+ * Sub-phase names per phase. Key: phase displayCode (numeric string).
+ * Value: Record<subPhaseSlug, displayName>.
  */
-export const SUB_PHASE_NAMES_BY_LENS: Partial<Record<PhaseId, Partial<Record<IntentLens, Record<string, string>>>>> = {
-  '1': {
-    product: {
-      '1.0': 'Intent Quality Check',
-      '1.0a': 'Intent Lens Classification',
-      '1.0b': 'Product Intent Discovery',
-      '1.0c': 'Technical Constraints Discovery',
-      '1.0d': 'Compliance & Retention Discovery',
-      '1.0e': 'V&V Requirements Discovery',
-      '1.0f': 'Canonical Vocabulary Discovery',
-      '1.0g': 'Intent Discovery Synthesis',
-      '1.1b': 'Scope Bounding',
-      '1.2': 'Business Domains & Personas Bloom',
-      '1.3': 'User Journeys & Workflows Bloom',
-      '1.4': 'Business Entities Bloom',
-      '1.5': 'Integrations & Quality Attributes Bloom',
-      '1.6': 'Product Description Synthesis',
-      '1.7': 'Handoff Approval',
-      '1.8': 'Release Plan Approval',
-    },
-  },
-};
+export const SUB_PHASE_NAMES: Record<PhaseId, Record<string, string>> = (() => {
+  const result = {} as Record<PhaseId, Record<string, string>>;
+  for (const phase of MANIFEST_PHASES) {
+    const code = phase.displayCode as PhaseId;
+    const names: Record<string, string> = {};
+    for (const sp of subPhasesOf(phase.id)) {
+      names[sp.id] = sp.displayName;
+    }
+    result[code] = names;
+  }
+  return result;
+})();
 
 /**
- * Per-phase, per-lens overrides for the ordered sub-phase list.
+ * Sub-phase order per phase for timeline rendering. Slug IDs in
+ * execution order.
  */
-export const SUB_PHASE_ORDER_BY_LENS: Partial<Record<PhaseId, Partial<Record<IntentLens, string[]>>>> = {
-  '1': {
-    product: [
-      '1.0', '1.0a',
-      // Decomposed intent-discovery extraction passes (iter-4).
-      '1.0b', '1.0c', '1.0d', '1.0e', '1.0f',
-      // Deterministic composer merges 1.0b–1.0f into the discovery bundle.
-      '1.0g',
-      '1.1b', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8',
-    ],
-  },
-  // Wave 6 — product-lens Phase 2 inserts 2.1a (recursive FR
-  // decomposition) between root FR bloom and NFR bloom. Default lens
-  // skips 2.1a since there's no handoff to drive the decomposition.
-  '2': {
-    product: ['2.1', '2.1a', '2.2', '2.2a', '2.3'],
-  },
-};
+export const SUB_PHASE_ORDER: Record<PhaseId, string[]> = (() => {
+  const result = {} as Record<PhaseId, string[]>;
+  for (const phase of MANIFEST_PHASES) {
+    const code = phase.displayCode as PhaseId;
+    result[code] = subPhasesOf(phase.id).map((sp) => sp.id);
+  }
+  return result;
+})();
 
 /**
- * Resolve the human-facing name for a sub-phase. Prefers the lens-specific
- * override when `lens` is given and an override exists; otherwise falls
- * back to the default SUB_PHASE_NAMES entry; otherwise returns the raw id.
+ * @deprecated Lens-conditional name overrides are no longer used —
+ * slugs disambiguate every step by construction. Kept as an empty
+ * object for callers that still reference it; will be removed once
+ * those callers migrate.
+ */
+export const SUB_PHASE_NAMES_BY_LENS: Partial<Record<PhaseId, Partial<Record<IntentLens, Record<string, string>>>>> = {};
+
+/**
+ * @deprecated Lens-conditional order overrides are no longer used.
+ * Kept as an empty object for callers that still reference it.
+ */
+export const SUB_PHASE_ORDER_BY_LENS: Partial<Record<PhaseId, Partial<Record<IntentLens, string[]>>>> = {};
+
+/**
+ * Resolve the human-facing name for a sub-phase. The `lens` parameter
+ * is ignored — kept for signature compatibility while callers migrate.
  */
 export function getSubPhaseName(
   phaseId: PhaseId,
   subPhaseId: string,
-  lens?: IntentLens | null,
+  _lens?: IntentLens | null,
 ): string {
-  if (lens) {
-    const lensOverride = SUB_PHASE_NAMES_BY_LENS[phaseId]?.[lens]?.[subPhaseId];
-    if (lensOverride) return lensOverride;
-  }
   return SUB_PHASE_NAMES[phaseId]?.[subPhaseId] ?? subPhaseId;
 }
 
 /**
- * Resolve the ordered sub-phase list for a phase. Prefers the lens-specific
- * override when one exists; otherwise falls back to the default ordering.
+ * Resolve the ordered sub-phase list for a phase. The `lens` parameter
+ * is ignored — kept for signature compatibility.
  */
 export function getSubPhaseOrder(
   phaseId: PhaseId,
-  lens?: IntentLens | null,
+  _lens?: IntentLens | null,
 ): string[] {
-  if (lens) {
-    const lensOverride = SUB_PHASE_ORDER_BY_LENS[phaseId]?.[lens];
-    if (lensOverride) return lensOverride;
-  }
   return SUB_PHASE_ORDER[phaseId] ?? [];
 }
 
@@ -339,6 +234,7 @@ export type RecordType =
   | 'invariant_violation_record'
   | 'reasoning_review_record'
   | 'reasoning_review_ensemble_record'
+  | 'json_repair_record'
   | 'domain_compliance_review_record'
   | 'detail_file_generated'
   // Human Interaction Records (§6.2)
@@ -1648,7 +1544,7 @@ export interface CoverageGapContent {
   kind: 'coverage_gap';
   schemaVersion: '1.0';
   /** Which sub-phase emitted the gap. */
-  sub_phase_id: '1.3c' | '1.8' | '2.1c' | '2.2c';
+  sub_phase_id: 'coverage_verifier' | 'release_plan' | 'fr_bloom_verifier' | 'nfr_bloom_verifier';
   /** One-line description of the structural rule that tripped. */
   assertion: string;
   severity: 'blocking' | 'advisory';

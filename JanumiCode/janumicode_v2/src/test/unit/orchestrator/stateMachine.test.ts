@@ -155,10 +155,10 @@ describe('StateMachine', () => {
   describe('setSubPhase', () => {
     it('sets the current sub-phase', () => {
       sm.createWorkflowRun({ id: 'run-1', workspace_id: 'ws-1', janumicode_version_sha: 'abc' });
-      sm.setSubPhase('run-1', '0.1');
+      sm.setSubPhase('run-1', 'workspace_classification');
 
       const run = sm.getWorkflowRun('run-1');
-      expect(run!.current_sub_phase_id).toBe('0.1');
+      expect(run!.current_sub_phase_id).toBe('workspace_classification');
     });
   });
 
@@ -224,21 +224,21 @@ describe('StateMachine', () => {
         id: 'attempt-1',
         workflow_run_id: 'run-1',
         phase_id: '1',
-        sub_phase_id: '1.2',
+        sub_phase_id: 'business_domains_bloom',
         attempt_number: 1,
       });
 
-      expect(sm.getRetryCount('run-1', '1.2')).toBe(1);
+      expect(sm.getRetryCount('run-1', 'business_domains_bloom')).toBe(1);
 
       sm.logSubPhaseAttempt({
         id: 'attempt-2',
         workflow_run_id: 'run-1',
         phase_id: '1',
-        sub_phase_id: '1.2',
+        sub_phase_id: 'business_domains_bloom',
         attempt_number: 2,
       });
 
-      expect(sm.getRetryCount('run-1', '1.2')).toBe(2);
+      expect(sm.getRetryCount('run-1', 'business_domains_bloom')).toBe(2);
     });
 
     it('completes a sub-phase attempt', () => {
@@ -248,7 +248,7 @@ describe('StateMachine', () => {
         id: 'attempt-1',
         workflow_run_id: 'run-1',
         phase_id: '1',
-        sub_phase_id: '1.2',
+        sub_phase_id: 'business_domains_bloom',
         attempt_number: 1,
       });
 

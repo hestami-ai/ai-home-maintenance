@@ -14,7 +14,7 @@ describe('Probe: Evaluation Design (8.1)', () => {
     const result = await runProbe({
       name: 'phase_8_1_evaluation_design',
       agentRole: 'eval_design_agent',
-      subPhase: '08_1_evaluation_design',
+      subPhase: 'evaluation_design',
       variables: {
         active_constraints: 'No constraints',
         test_plan_summary: '20 test cases covering FRs across unit, integration, e2e',

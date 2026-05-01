@@ -53,7 +53,7 @@ describe('Wave 4 — lens-aware Phase 1 contract resolution', () => {
         .filter((s): s is string => typeof s === 'string')),
     );
     // Wave 7 — 1.3 is split into 1.3a (journeys) + 1.3b (workflows) + 1.3c (verifier).
-    for (const sp of ['1.0', '1.0a', '1.0b', '1.1b', '1.2', '1.3a', '1.3b', '1.4', '1.5', '1.6', '1.7']) {
+    for (const sp of ['intent_quality_check', 'intent_lens_classification', 'product_intent_discovery', 'scope_bounding', 'business_domains_bloom', 'user_journey_bloom', 'system_workflow_bloom', 'entities_bloom', 'integrations_qa_bloom', 'product_description_synthesis', 'product_handoff_gate']) {
       expect(subPhases.has(sp), `product contract missing sub-phase ${sp}`).toBe(true);
     }
   });
@@ -184,7 +184,7 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
       schema_version: '1.0',
       workflow_run_id: runId,
       phase_id: '1',
-      sub_phase_id: '1.0',
+      sub_phase_id: 'intent_quality_check',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: 'test-sha',
       content: { overall_status: 'pass' },
@@ -201,23 +201,23 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
         content: { kind },
       });
     };
-    stub('1.0a', 'intent_lens_classification', 'orchestrator');
-    stub('1.0b', 'intent_discovery');
-    stub('1.0c', 'technical_constraints_discovery');
-    stub('1.0d', 'compliance_retention_discovery');
-    stub('1.0e', 'vv_requirements_discovery');
-    stub('1.0f', 'canonical_vocabulary_discovery');
-    stub('1.0g', 'intent_discovery_bundle', 'orchestrator');
-    stub('1.1b', 'scope_classification', 'orchestrator');
-    stub('1.1b', 'compliance_context', 'orchestrator');
-    stub('1.2', 'business_domains_bloom');
+    stub('intent_lens_classification', 'intent_lens_classification', 'orchestrator');
+    stub('product_intent_discovery', 'intent_discovery');
+    stub('technical_constraints_discovery', 'technical_constraints_discovery');
+    stub('compliance_retention_discovery', 'compliance_retention_discovery');
+    stub('vv_requirements_discovery', 'vv_requirements_discovery');
+    stub('canonical_vocabulary_discovery', 'canonical_vocabulary_discovery');
+    stub('discovery_bundle_compose', 'intent_discovery_bundle', 'orchestrator');
+    stub('scope_bounding', 'scope_classification', 'orchestrator');
+    stub('scope_bounding', 'compliance_context', 'orchestrator');
+    stub('business_domains_bloom', 'business_domains_bloom');
     // Wave 7 — 1.3 split into 1.3a (journeys) + 1.3b (workflows) + 1.3c (deterministic verifier).
-    stub('1.3a', 'user_journey_bloom');
-    stub('1.3b', 'system_workflow_bloom');
-    stub('1.4', 'entities_bloom');
-    stub('1.5', 'integrations_qa_bloom');
+    stub('user_journey_bloom', 'user_journey_bloom');
+    stub('system_workflow_bloom', 'system_workflow_bloom');
+    stub('entities_bloom', 'entities_bloom');
+    stub('integrations_qa_bloom', 'integrations_qa_bloom');
     // 1.2/1.3a/1.3b/1.4/1.5 decision bundles
-    for (const sp of ['1.2', '1.3a', '1.3b', '1.4', '1.5']) {
+    for (const sp of ['business_domains_bloom', 'user_journey_bloom', 'system_workflow_bloom', 'entities_bloom', 'integrations_qa_bloom']) {
       writer.writeRecord({
         record_type: 'decision_bundle_presented',
         schema_version: '1.0',
@@ -235,7 +235,7 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
       schema_version: '1.0',
       workflow_run_id: runId,
       phase_id: '1',
-      sub_phase_id: '1.6',
+      sub_phase_id: 'product_description_synthesis',
       produced_by_agent_role: 'domain_interpreter',
       janumicode_version_sha: 'test-sha',
       content: handoff as unknown as Record<string, unknown>,
@@ -245,7 +245,7 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
       schema_version: '1.0',
       workflow_run_id: runId,
       phase_id: '1',
-      sub_phase_id: '1.6',
+      sub_phase_id: 'product_description_synthesis',
       produced_by_agent_role: 'domain_interpreter',
       janumicode_version_sha: 'test-sha',
       content: {
@@ -259,7 +259,7 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
       schema_version: '1.0',
       workflow_run_id: runId,
       phase_id: '1',
-      sub_phase_id: '1.7',
+      sub_phase_id: 'product_handoff_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: 'test-sha',
       content: { kind: 'product_description_handoff_mirror' },
@@ -269,7 +269,7 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
       schema_version: '1.0',
       workflow_run_id: runId,
       phase_id: '1',
-      sub_phase_id: '1.7',
+      sub_phase_id: 'product_handoff_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: 'test-sha',
       content: { kind: 'phase_gate', phase_id: '1' },
@@ -295,7 +295,7 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
     const personaGap = result.gaps.find(g => g.expected && (g.expected.field === 'personas'));
     expect(personaGap, 'expected a gap for personas coverage').toBeDefined();
     expect(personaGap!.category).toBe('coverage_violation');
-    expect(personaGap!.sub_phase_id).toBe('1.6');
+    expect(personaGap!.sub_phase_id).toBe('product_description_synthesis');
     expect(personaGap!.likely_source.templates[0]).toContain('product_description_synthesis.product.system.md');
 
     const entityGap = result.gaps.find(g => g.expected && (g.expected.field === 'entityProposals'));
@@ -334,7 +334,7 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
     expect(result.valid).toBe(false);
     const missingHandoff = result.gaps.find(g => g.category === 'missing_artifact' && typeof g.expected.record_type === 'string' && g.expected.record_type === 'product_description_handoff');
     expect(missingHandoff, 'expected a missing_artifact gap for product_description_handoff').toBeDefined();
-    expect(missingHandoff!.sub_phase_id).toBe('1.6');
+    expect(missingHandoff!.sub_phase_id).toBe('product_description_synthesis');
     expect(missingHandoff!.likely_source.templates[0]).toContain('product_description_synthesis.product.system.md');
     expect(missingHandoff!.likely_source.handlers[0]).toContain('runProductDescriptionSynthesis');
     expect(missingHandoff!.reproduce.command).toContain('vitest');

@@ -14,7 +14,7 @@ describe('Probe: Scope Bounding', () => {
     const result = await runProbe({
       name: 'scope_bounding_single_product',
       agentRole: 'orchestrator',
-      subPhase: '01_1b_scope_bounding',
+      subPhase: 'scope_bounding',
       variables: {
         raw_intent_text: 'Build a project management tool for small teams with task boards, time tracking, and team chat integration.',
         intent_quality_report_summary: 'All required fields present. No contradictions. Coherent product concept.',

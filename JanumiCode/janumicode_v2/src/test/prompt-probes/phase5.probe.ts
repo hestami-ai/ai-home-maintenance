@@ -16,7 +16,7 @@ describe('Probe: Data Models (5.1)', () => {
     const result = await runProbe({
       name: 'phase_5_1_data_models',
       agentRole: 'technical_spec_agent',
-      subPhase: '05_1_data_models',
+      subPhase: 'data_model_skeleton',
       variables: {
         active_constraints: 'No constraints',
         component_model_summary: 'Components: AuthService (handles users), TaskService (handles tasks)',
@@ -78,7 +78,7 @@ describe('Probe: API Definitions (5.2)', () => {
     const result = await runProbe({
       name: 'phase_5_2_api_definitions',
       agentRole: 'technical_spec_agent',
-      subPhase: '05_2_api_definitions',
+      subPhase: 'api_definitions',
       variables: {
         active_constraints: 'No constraints',
         component_model_summary: 'Components: AuthService, TaskService',

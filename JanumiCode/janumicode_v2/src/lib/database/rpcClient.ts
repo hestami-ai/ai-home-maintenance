@@ -20,6 +20,10 @@ import { Worker } from 'worker_threads';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import type { Database, Statement, RunResult } from './init';
+import { parseRpcError } from './rpcErrors';
+
+export { RpcResultTooLargeError } from './rpcErrors';
+export type { RpcResultTooLargePayload } from '../../sidecar/dbServerLimits';
 
 // ── SharedArrayBuffer Layout ────────────────────────────────────────
 //
@@ -154,7 +158,7 @@ export class DatabaseRPCClient implements Database {
     Atomics.store(this.ctrl, CTRL_OFFSET, CTRL_IDLE);
 
     if (ctrlValue === CTRL_ERROR) {
-      throw new Error(`RPC error: ${responseJson}`);
+      throw parseRpcError(responseJson);
     }
 
     try {

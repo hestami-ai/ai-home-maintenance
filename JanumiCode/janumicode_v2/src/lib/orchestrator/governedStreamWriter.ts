@@ -11,6 +11,7 @@
  */
 
 import type { Database } from '../database/init';
+import { collectGovernedStream } from '../database/iterateGovernedStream';
 import type {
   GovernedStreamRecord,
   RecordType,
@@ -361,9 +362,15 @@ export class GovernedStreamWriter {
       ? 'WHERE workflow_run_id = ? AND record_type = ? AND is_current_version = 1'
       : 'WHERE workflow_run_id = ? AND record_type = ?';
 
-    const rows = this.db.prepare(
-      `SELECT * FROM governed_stream ${whereClause} ORDER BY produced_at ASC`
-    ).all(workflowRunId, recordType) as Record<string, unknown>[];
+    // Paginate via the shared `iterateGovernedStream` helper. High-fanout
+    // record types (e.g. agent_reasoning_step) on long calibration runs
+    // can approach the 32MB SAB ceiling enforced by the sidecar RPC
+    // bridge; PAGE_SIZE 500 keeps each batch comfortably below it.
+    const stmt = this.db.prepare(
+      `SELECT * FROM governed_stream ${whereClause} ORDER BY produced_at ASC LIMIT ? OFFSET ?`,
+    );
+    const rows = collectGovernedStream<Record<string, unknown>>(
+      stmt, [workflowRunId, recordType], { pageSize: 500 });
 
     return rows.map(row => this.rowToRecord(row));
   }

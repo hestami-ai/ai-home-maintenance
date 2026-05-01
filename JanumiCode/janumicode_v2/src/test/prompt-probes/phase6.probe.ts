@@ -14,7 +14,7 @@ describe('Probe: Implementation Task Decomposition (6.1)', () => {
     const result = await runProbe({
       name: 'phase_6_1_implementation_task_decomposition',
       agentRole: 'implementation_planner',
-      subPhase: '06_1_implementation_task_decomposition',
+      subPhase: 'task_skeleton',
       variables: {
         active_constraints: 'Use TypeScript and Node.js',
         component_model_summary: 'Components: AuthService (responsibility: handle authentication), TaskService (responsibility: manage tasks)',

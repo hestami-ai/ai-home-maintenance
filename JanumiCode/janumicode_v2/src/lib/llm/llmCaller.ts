@@ -83,6 +83,14 @@ export interface LLMCallOptions {
   prompt: string;
   /** Response format */
   responseFormat?: 'json' | 'text';
+  /**
+   * Optional schema hint — passed to the json_repair fallback when the
+   * primary call's response can't be parsed. Free-form: a JSON Schema,
+   * a TypeScript interface, or an example object literal. The repair
+   * model uses it to constrain its repaired output to the expected
+   * shape. Has no effect on the primary call itself.
+   */
+  expectedJsonSchema?: string;
   /** Temperature (0-2) */
   temperature?: number;
   /** Max output tokens */
@@ -225,8 +233,24 @@ export class LLMCaller {
   private eventBus: import('../events/eventBus').EventBus | null = null;
   private liveLogDir: string | null = null;
   private reviewerHook: ReviewerHook | null = null;
+  private jsonRepairRouting: import('./jsonRepairLLM').JsonRepairRouting | null = null;
 
   constructor(private readonly config: LLMCallerConfig) {}
+
+  /**
+   * Configure the LLM-based JSON repair fallback (`json_repair` agent
+   * role). When a call requests `responseFormat: 'json'` and the
+   * provider's parsed output is null, the broken text is handed to a
+   * dedicated repair sequence: primary model first, fallback model if
+   * primary fails. Both attempts include the original prompt + system +
+   * thinking chain as grounding context. Set to null to disable
+   * (default — caller halts on parse failure).
+   *
+   * Single-GPU constraint: repair attempts run strictly sequentially.
+   */
+  setJsonRepairRouting(routing: import('./jsonRepairLLM').JsonRepairRouting | null): void {
+    this.jsonRepairRouting = routing;
+  }
 
   /**
    * Attach a hook that runs after every successful agent_output is
@@ -438,6 +462,53 @@ export class LLMCaller {
         try {
           const result = await adapter.call(streamingOptions);
           result.retryAttempts = retryAttempts;
+          // LLM-based JSON repair fallback (json_repair agent role): if
+          // the call requested json and the response didn't parse, hand
+          // the broken text to a dedicated repair sequence (primary →
+          // fallback). Both attempts receive the original prompt +
+          // system + thinking chain as grounding so the repair model
+          // can produce a semantically faithful fix. Sequential by
+          // design (single-GPU host). Skip the loop guard cases:
+          //   - this call IS a repair call (agentRole === 'json_repair')
+          //   - this call IS reasoning-review (separate domain)
+          // Repair runs BEFORE persistence so result.parsed reflects
+          // the repaired value when downstream consumers read it.
+          if (
+            options.responseFormat === 'json' &&
+            !result.parsed &&
+            typeof result.text === 'string' &&
+            result.text.trim().length > 0 &&
+            this.jsonRepairRouting &&
+            options.traceContext?.agentRole !== 'json_repair' &&
+            options.traceContext?.agentRole !== 'reasoning_review'
+          ) {
+            const { repairJsonViaLLM } = await import('./jsonRepairLLM');
+            const repair = await repairJsonViaLLM(
+              result.text,
+              this.jsonRepairRouting,
+              {
+                originalPrompt: options.prompt,
+                originalSystem: options.system ?? null,
+                originalThinking: result.thinking ?? null,
+                originalAgentRole: options.traceContext?.agentRole ?? null,
+                expectedJsonSchema: options.expectedJsonSchema ?? null,
+              },
+              {
+                workflowRunId: options.traceContext?.workflowRunId ?? '',
+                phaseId: options.traceContext?.phaseId ?? null,
+                subPhaseId: options.traceContext?.subPhaseId ?? null,
+              },
+              this,
+            );
+            if (repair.parsed) {
+              result.parsed = repair.parsed;
+            }
+            // Always write a json_repair_record so the operator can see
+            // exactly what was attempted (and what each attempt
+            // returned). Useful even on success — confirms which model
+            // ultimately produced the parsed output.
+            this.writeJsonRepairRecord(invocationId, options, repair);
+          }
           const { agentOutputId } = this.writeOutputRecords(invocationId, options, result, Date.now() - startedAt, null);
           logFile?.writeFinal({
             status: 'success',
@@ -697,6 +768,46 @@ export class LLMCaller {
   }
 
   /**
+   * Persist a `json_repair_record` summarising a json_repair sequence.
+   * Always written when repair fires (success or failure) so operators
+   * can see what was tried and what each attempt returned. The record
+   * is keyed off the original invocation via derived_from_record_ids.
+   */
+  private writeJsonRepairRecord(
+    originalInvocationId: string | null,
+    options: LLMCallOptions,
+    repair: import('./jsonRepairLLM').JsonRepairResult,
+  ): void {
+    if (!this.writer || !originalInvocationId || !options.traceContext) return;
+    const ctx = options.traceContext;
+    try {
+      this.writer.writeRecord({
+        record_type: 'json_repair_record',
+        schema_version: '1.0',
+        workflow_run_id: ctx.workflowRunId,
+        phase_id: ctx.phaseId ?? null,
+        sub_phase_id: ctx.subPhaseId ?? null,
+        produced_by_agent_role: 'json_repair',
+        janumicode_version_sha: this.versionSha,
+        derived_from_record_ids: [originalInvocationId],
+        content: {
+          status: repair.parsed ? 'recovered' : 'exhausted',
+          original_agent_role: ctx.agentRole ?? null,
+          attempts: repair.attempts.map((a) => ({
+            provider: a.routing.provider,
+            model: a.routing.model,
+            duration_ms: a.durationMs,
+            success: !!a.parsed,
+            error: a.error ?? null,
+          })),
+        },
+      });
+    } catch {
+      // Best-effort diagnostic — don't fail the LLM call over it.
+    }
+  }
+
+  /**
    * Invoke the reasoning-review hook on a successful agent_output.
    * Synchronous (awaited) so review findings land in governed_stream
    * before the next phase begins. Soft-fails: any error from the hook
@@ -781,31 +892,27 @@ export class LLMCaller {
 /**
  * Build a filename prefix encoding phase/sub-phase for live log files.
  *
- *   phaseId='6', subPhaseId='6.1'  → 'phase06_1'
- *   phaseId='10', subPhaseId='10.2' → 'phase10_2'
- *   phaseId='3', subPhaseId='3.2a' → 'phase03_2a'
- *   phaseId='2', subPhaseId=null   → 'phase02'
- *   both null                       → null  (legacy unprefixed shape)
+ *   phaseId='2', subPhaseId='fr_saturation' → 'phase02_fr_saturation'
+ *   phaseId='10', subPhaseId='commit_finalize' → 'phase10_commit_finalize'
+ *   phaseId='0.5', subPhaseId='impact_enumeration' → 'phase00_5_impact_enumeration'
+ *   phaseId='2', subPhaseId=null → 'phase02'
+ *   both null → null
  *
- * The prefix is deterministic and glob-friendly so operators can find
- * all calls for a phase via `ls phase06_*` or for a specific sub-phase
- * via `ls phase06_1__*`. Padding phaseId to 2 digits keeps lexical sort
- * order matching numerical phase order through Phase 10.
+ * Padding the phase number to 2 digits keeps lexical sort order matching
+ * numerical phase order through Phase 10. The slug carries the
+ * sub-phase identity verbatim — glob-friendly via `ls phase02_*` or
+ * `ls phase02_fr_*` for a specific cluster.
  */
 export function buildLogFilenamePrefix(
   phaseId: string | null,
   subPhaseId: string | null,
 ): string | null {
   if (!phaseId && !subPhaseId) return null;
-  // Prefer subPhaseId because it carries the full path. When only
-  // phaseId is present, we still emit `phaseNN` for grouping.
-  const source = subPhaseId ?? phaseId ?? '';
-  // Split on the first '.' — major phase is everything before it.
-  const dotIdx = source.indexOf('.');
-  const major = dotIdx >= 0 ? source.slice(0, dotIdx) : source;
-  const minor = dotIdx >= 0 ? source.slice(dotIdx + 1) : '';
-  // Strip non-id characters defensively (shouldn't be any in practice).
-  const safeMinor = minor.replaceAll(/[^a-zA-Z0-9]/g, '_');
-  const padded = major.padStart(2, '0');
-  return safeMinor ? `phase${padded}_${safeMinor}` : `phase${padded}`;
+  const phasePart = phaseId
+    ? phaseId.split('.').map((p) => p.padStart(2, '0')).join('_')
+    : '';
+  const subSafe = subPhaseId ? subPhaseId.replaceAll(/[^a-zA-Z0-9_]/g, '_') : '';
+  if (!phasePart) return `phase_${subSafe}`;
+  if (!subSafe) return `phase${phasePart}`;
+  return `phase${phasePart}_${subSafe}`;
 }

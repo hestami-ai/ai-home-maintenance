@@ -116,10 +116,10 @@ export class Phase5Handler implements PhaseHandler {
     const derivedFromIds = prior.allRecordIds;
 
     // ── 5.1 — Data Model Specification ────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '5.1');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'data_model_skeleton');
 
     const dmr51 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '5.1',
+      subPhaseId: 'data_model_skeleton',
       requestingAgentRole: 'technical_spec_agent',
       query: `Data model specification for components: ${componentSummary.slice(0, 400)}`,
       detailFileLabel: 'p5_1_data_models',
@@ -135,7 +135,7 @@ export class Phase5Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '5',
-      sub_phase_id: '5.1',
+      sub_phase_id: 'data_model_skeleton',
       produced_by_agent_role: 'technical_spec_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: derivedFromIds,
@@ -145,7 +145,7 @@ export class Phase5Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(dataModelsRecord);
 
     // ── 5.1a — Recursive Data Model Decomposition (Wave 9) ────
-    engine.stateMachine.setSubPhase(workflowRun.id, '5.1a');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'data_model_saturation');
 
     const techConstraintsRecord = allArtifacts.find(
       r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery',
@@ -198,7 +198,7 @@ export class Phase5Handler implements PhaseHandler {
           schema_version: '1.0',
           workflow_run_id: workflowRun.id,
           phase_id: '5',
-          sub_phase_id: '5.1a',
+          sub_phase_id: 'data_model_saturation',
           produced_by_agent_role: 'technical_spec_agent',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: [dataModelsRecord.id],
@@ -234,10 +234,10 @@ export class Phase5Handler implements PhaseHandler {
     }
 
     // ── 5.2 — API Definition ──────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '5.2');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'api_definitions');
 
     const dmr52 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '5.2',
+      subPhaseId: 'api_definitions',
       requestingAgentRole: 'technical_spec_agent',
       query: `API definitions for components with contracts: ${contractsSummary.slice(0, 400)}`,
       detailFileLabel: 'p5_2_apis',
@@ -253,7 +253,7 @@ export class Phase5Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '5',
-      sub_phase_id: '5.2',
+      sub_phase_id: 'api_definitions',
       produced_by_agent_role: 'technical_spec_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [dataModelsRecord.id, ...(prior.interfaceContracts ? [prior.interfaceContracts.recordId] : [])],
@@ -263,7 +263,7 @@ export class Phase5Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(apiRecord);
 
     // ── 5.3 — Error Handling Strategy ─────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '5.3');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'error_handling');
 
     const apiSummary = apiContent.definitions.map(d => {
       const eps = d.endpoints.map(e => `  ${e.method} ${e.path} (auth: ${e.auth_requirement ?? 'none'})`).join('\n');
@@ -271,7 +271,7 @@ export class Phase5Handler implements PhaseHandler {
     }).join('\n');
 
     const dmr53 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '5.3',
+      subPhaseId: 'error_handling',
       requestingAgentRole: 'technical_spec_agent',
       query: `Error handling strategy for APIs: ${apiSummary.slice(0, 400)}`,
       detailFileLabel: 'p5_3_errors',
@@ -287,7 +287,7 @@ export class Phase5Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '5',
-      sub_phase_id: '5.3',
+      sub_phase_id: 'error_handling',
       produced_by_agent_role: 'technical_spec_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [apiRecord.id],
@@ -297,7 +297,7 @@ export class Phase5Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(errorRecord);
 
     // ── 5.4 — Configuration Parameters ────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '5.4');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'configuration_parameters');
 
     const dataModelsSummary = dataModelsContent.models.map(m => {
       const ents = m.entities.map(e => `  ${e.name}: ${e.fields.map(f => `${f.name}:${f.type}`).join(', ')}`).join('\n');
@@ -305,7 +305,7 @@ export class Phase5Handler implements PhaseHandler {
     }).join('\n');
 
     const dmr54 = await buildPhaseContextPacket(ctx, {
-      subPhaseId: '5.4',
+      subPhaseId: 'configuration_parameters',
       requestingAgentRole: 'technical_spec_agent',
       query: `Configuration parameters for data models: ${dataModelsSummary.slice(0, 400)}`,
       detailFileLabel: 'p5_4_config',
@@ -321,7 +321,7 @@ export class Phase5Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '5',
-      sub_phase_id: '5.4',
+      sub_phase_id: 'configuration_parameters',
       produced_by_agent_role: 'technical_spec_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [dataModelsRecord.id],
@@ -331,7 +331,7 @@ export class Phase5Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(configRecord);
 
     // ── 5.5 — Mirror and Menu ─────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '5.5');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'technical_spec_synthesis');
 
     const specMirror = engine.mirrorGenerator.generate({
       artifactId: dataModelsRecord.id,
@@ -349,7 +349,7 @@ export class Phase5Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '5',
-      sub_phase_id: '5.5',
+      sub_phase_id: 'technical_spec_synthesis',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [dataModelsRecord.id, apiRecord.id, errorRecord.id, configRecord.id],
@@ -384,7 +384,7 @@ export class Phase5Handler implements PhaseHandler {
     }
 
     // ── 5.6 — Consistency Check and Approval ──────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, '5.6');
+    engine.stateMachine.setSubPhase(workflowRun.id, 'technical_spec_gate');
 
     const consistencyReport = this.runConsistencyCheck(dataModelsContent, apiContent);
 
@@ -393,7 +393,7 @@ export class Phase5Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '5',
-      sub_phase_id: '5.6',
+      sub_phase_id: 'technical_spec_gate',
       produced_by_agent_role: 'consistency_checker',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [dataModelsRecord.id, apiRecord.id, errorRecord.id, configRecord.id],
@@ -408,7 +408,7 @@ export class Phase5Handler implements PhaseHandler {
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '5',
-      sub_phase_id: '5.6',
+      sub_phase_id: 'technical_spec_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [dataModelsRecord.id, apiRecord.id, errorRecord.id, configRecord.id, consistencyRecord.id],
@@ -437,7 +437,7 @@ export class Phase5Handler implements PhaseHandler {
     sysReqSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<DataModels> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('technical_spec_agent', '05_1_data_models');
+    const template = engine.templateLoader.findTemplate('technical_spec_agent', 'data_model_skeleton');
     const fallback: DataModels = { models: [{ component_id: 'COMP-001', entities: [{ name: 'Record', fields: [{ name: 'id', type: 'uuid' }, { name: 'created_at', type: 'timestamp' }] }] }] };
     if (!template) return fallback;
 
@@ -455,7 +455,7 @@ export class Phase5Handler implements PhaseHandler {
     // llama-swap. See phase3.ts for the rationale.
     const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.1', agentRole: 'technical_spec_agent', label: 'Phase 5.1 — Data Model Specification' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: 'data_model_skeleton', agentRole: 'technical_spec_agent', label: 'Phase 5.1 — Data Model Specification' },
     });
     // Defensive parse — cal-21 lost 6 of 7 data models to the
     // SR-loss bug pattern (kind-name envelope vs schema property
@@ -471,7 +471,7 @@ export class Phase5Handler implements PhaseHandler {
     sysReqSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<ApiDefinitions> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('technical_spec_agent', '05_2_api_definitions');
+    const template = engine.templateLoader.findTemplate('technical_spec_agent', 'api_definitions');
     const fallback: ApiDefinitions = { definitions: [{ component_id: 'COMP-001', endpoints: [{ path: '/api/v1/resource', method: 'GET', auth_requirement: 'bearer_token' }] }] };
     if (!template) return fallback;
 
@@ -488,7 +488,7 @@ export class Phase5Handler implements PhaseHandler {
     // llama-swap. See phase3.ts for the rationale.
     const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.2', agentRole: 'technical_spec_agent', label: 'Phase 5.2 — API Definition' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: 'api_definitions', agentRole: 'technical_spec_agent', label: 'Phase 5.2 — API Definition' },
     });
     const parsed = result.parsed as Record<string, unknown> | null;
     const definitions = pickItemsArray<ApiDefinitions['definitions'][number]>(parsed, ['api_definitions', 'definitions']);
@@ -501,7 +501,7 @@ export class Phase5Handler implements PhaseHandler {
     sysReqSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<ErrorHandlingStrategies> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('technical_spec_agent', '05_3_error_handling');
+    const template = engine.templateLoader.findTemplate('technical_spec_agent', 'error_handling');
     const fallback: ErrorHandlingStrategies = { strategies: [{ component_id: 'COMP-001', error_types: ['validation_error', 'not_found'], detection: 'try/catch with typed errors', response: 'return error response with appropriate status code', surfacing: 'HTTP status codes and JSON error body' }] };
     if (!template) return fallback;
 
@@ -518,7 +518,7 @@ export class Phase5Handler implements PhaseHandler {
     // llama-swap. See phase3.ts for the rationale.
     const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.3', agentRole: 'technical_spec_agent', label: 'Phase 5.3 — Error Handling Strategy' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: 'error_handling', agentRole: 'technical_spec_agent', label: 'Phase 5.3 — Error Handling Strategy' },
     });
     const parsed = result.parsed as Record<string, unknown> | null;
     const strategies = pickItemsArray<ErrorHandlingStrategies['strategies'][number]>(parsed, ['error_handling_strategies', 'strategies']);
@@ -531,7 +531,7 @@ export class Phase5Handler implements PhaseHandler {
     sysReqSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<ConfigurationParameters> {
     const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('technical_spec_agent', '05_4_configuration_parameters');
+    const template = engine.templateLoader.findTemplate('technical_spec_agent', 'configuration_parameters');
     const fallback: ConfigurationParameters = { params: [{ component_id: 'COMP-001', name: 'port', type: 'integer', default: 3000, required: false, description: 'HTTP server listen port' }] };
     if (!template) return fallback;
 
@@ -548,7 +548,7 @@ export class Phase5Handler implements PhaseHandler {
     // llama-swap. See phase3.ts for the rationale.
     const result = await engine.callForRole('requirements_agent', {
       prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: '5.4', agentRole: 'technical_spec_agent', label: 'Phase 5.4 — Configuration Parameters' },
+      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: 'configuration_parameters', agentRole: 'technical_spec_agent', label: 'Phase 5.4 — Configuration Parameters' },
     });
     // cal-21 lost 23 of 24 configuration parameters here. Same bug.
     const parsed = result.parsed as Record<string, unknown> | null;
