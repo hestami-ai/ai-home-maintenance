@@ -235,6 +235,7 @@ export class AgentInvoker {
           retryAttempts: 0,
         };
         await this.llmCaller.runReviewerHook(
+          invocationRecordId,
           agentOutputId,
           { traceContext: options.traceContext, prompt: options.prompt },
           reviewResult,

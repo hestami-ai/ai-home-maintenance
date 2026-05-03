@@ -138,6 +138,8 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are rejecte
 
 # JSON Output Contract (strict — non-negotiable)
 
+**Field naming convention:** Use snake_case for all JSON property names (e.g., `user_stories`, `acceptance_criteria`, not `userStories`).
+
 - **No markdown fences.** Response starts with `{` and ends with `}`.
 - **No prose before or after the JSON.**
 - **No trailing commas.**

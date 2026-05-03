@@ -1,0 +1,444 @@
+/**
+ * Reasoning-Review Harness — dispatch infrastructure (Track D Commit 2).
+ *
+ * Foundation only: validator bodies are still stubs (Commits 3–7 land
+ * deterministic functions and LLM prompt templates). This module owns
+ * the dispatch loop, record-writing skeleton, and loop-guard.
+ *
+ * Behavior summary:
+ *   1. Loop-guard: skip entirely for harness-internal agentRoles.
+ *   2. Write the parent `reasoning_review_harness_record` with
+ *      status='running' so the webview sees the parent card immediately.
+ *   3. Sequentially invoke each dispatched validator (single-GPU host —
+ *      no parallelism per locked harness_design §3).
+ *   4. For each validator, write one `reasoning_review_finding_record`
+ *      per finding. When the validator can't run (deterministic stub
+ *      with no body, LLM with missing template, or thrown exception),
+ *      record a `validator_unavailable` failure entry on the outcome —
+ *      do not throw.
+ *   5. Write a NEW `reasoning_review_harness_record` with the final
+ *      counts and call `supersedByRollback` so the running record is
+ *      marked as no-longer-current. Decision recommendation is left
+ *      undefined here — Commit 8's `final_synthesis` validator fills it.
+ *
+ * Wired into LLMCaller via setReviewHarnessHook (Track D Commit 10).
+ * The prior single-pass `runReasoningReview` reviewer has been retired.
+ */
+
+import { randomUUID } from 'node:crypto';
+
+import type { GovernedStreamWriter } from '../../orchestrator/governedStreamWriter';
+import type { LLMCaller, LLMCallResult, LLMTraceContext } from '../../llm/llmCaller';
+import type { TemplateLoader } from '../../orchestrator/templateLoader';
+import type {
+  ReasoningReviewFindingRecordContent,
+  ReasoningReviewHarnessRecordContent,
+  ReviewHarnessFindingsCountBySeverity,
+} from '../../types/records';
+
+import { computeFinalSynthesisDecision } from './finalSynthesisDecision';
+import { normalizeAgentOutputCasing } from './normalizeAgentOutputCasing';
+import {
+  selectValidators,
+  type ValidatorEntry,
+  type ValidatorFinding,
+  type ValidatorRuntimeParams,
+} from './validatorRegistry';
+
+/**
+ * Agent roles that must NEVER trigger a harness run, to prevent the
+ * harness from reviewing its own validator calls (or json_repair's
+ * recovery calls). Match the synonym list maintained alongside the
+ * existing `runReasoningReview` self-review guard.
+ */
+const HARNESS_INTERNAL_ROLES: ReadonlySet<string> = new Set([
+  'harness',
+  'json_repair',
+  'reasoning_review',
+]);
+
+export interface ReviewHarnessParams {
+  agentInvocationId: string;
+  agentOutputId: string;
+  traceContext: LLMTraceContext;
+  prompt: string;
+  result: LLMCallResult;
+}
+
+/**
+ * Provider/model routing for harness LLM validator calls (Track D Commit 10).
+ * Sourced from `llm_routing.reasoning_review` by the orchestrator hook and
+ * threaded into every LLM validator's `LLMInvokeContext`. When omitted,
+ * validators fall back to stub strings that surface as
+ * `validator_unavailable` (legacy behavior preserved for existing tests).
+ */
+export interface HarnessLLMRouting {
+  provider: string;
+  model: string;
+  temperature?: number;
+}
+
+export interface ReviewHarnessOutcome {
+  /** Id of the FINAL harness record (status='completed' or 'failed'). */
+  harnessRecordId: string | null;
+  /** All findings collated across every dispatched validator. */
+  findings: ValidatorFinding[];
+  /** Validator ids selected by `selectValidators` for this output. */
+  validatorsDispatched: string[];
+  /** Per-validator failures (no exception escapes runReviewHarness). */
+  validatorFailures: { validatorId: string; error: string }[];
+  /** True when the loop-guard skipped the run entirely. */
+  skipped: boolean;
+  /** Reason for skip; null when not skipped. */
+  skipReason: string | null;
+}
+
+/**
+ * Run the harness for one reviewed agent_output. Always returns; never
+ * throws. Validator failures are captured in `validatorFailures` so the
+ * caller can inspect coverage gaps.
+ */
+export async function runReviewHarness(
+  params: ReviewHarnessParams,
+  llmCaller: LLMCaller,
+  writer: GovernedStreamWriter,
+  versionSha: string,
+  templateLoader: TemplateLoader,
+  harnessRouting?: HarnessLLMRouting,
+): Promise<ReviewHarnessOutcome> {
+  const { agentInvocationId, agentOutputId, traceContext, prompt, result } = params;
+
+  // ── 1. Loop-guard ──────────────────────────────────────────────
+  const role = traceContext.agentRole ?? null;
+  if (role && HARNESS_INTERNAL_ROLES.has(role)) {
+    return {
+      harnessRecordId: null,
+      findings: [],
+      validatorsDispatched: [],
+      validatorFailures: [],
+      skipped: true,
+      skipReason: `loop_guard:${role}`,
+    };
+  }
+
+  // ── 2. Compute output payload + dispatch list ──────────────────
+  // Defense-in-depth: tolerate camelCase agent emissions for known snake_case fields.
+  const rawContent = extractOutputContent(result);
+  const outputContent = rawContent === null
+    ? null
+    : normalizeAgentOutputCasing(rawContent) as Record<string, unknown>;
+  const outputThinking = result.thinking ?? null;
+  const harnessId = randomUUID();
+
+  // Effective role for dispatch resolution. Unsampled roles fall
+  // through to the placeholder bundle in selectValidators.
+  const effectiveRole = role ?? 'unknown';
+  const subPhaseId = traceContext.subPhaseId ?? '';
+
+  const dispatched = selectValidators({
+    agentRole: effectiveRole,
+    subPhaseId,
+    outputContent,
+    outputThinking,
+  });
+  const dispatchedIds = dispatched.map((v) => v.id);
+
+  const startedAt = Date.now();
+
+  // ── 3. Write the parent harness record (status='running') ──────
+  const baseRecordOptions = {
+    schema_version: '1.0',
+    workflow_run_id: traceContext.workflowRunId,
+    phase_id: traceContext.phaseId ?? null,
+    sub_phase_id: traceContext.subPhaseId ?? null,
+    produced_by_agent_role: 'harness' as const,
+    janumicode_version_sha: versionSha,
+  };
+
+  const initialContent: ReasoningReviewHarnessRecordContent = {
+    kind: 'reasoning_review_harness',
+    harness_id: harnessId,
+    status: 'running',
+    reviewed_agent_invocation_id: agentInvocationId,
+    reviewed_agent_output_id: agentOutputId,
+    reviewed_agent_role: role,
+    reviewed_phase_id: traceContext.phaseId ?? null,
+    reviewed_sub_phase_id: traceContext.subPhaseId ?? null,
+    dispatched_validator_ids: dispatchedIds,
+    findings_count_by_severity: { HIGH: 0, MEDIUM: 0, LOW: 0 },
+    validator_failure_count: 0,
+    decision_recommendation: null,
+    duration_ms: 0,
+  };
+
+  const initialHarnessRecord = writer.writeRecord({
+    ...baseRecordOptions,
+    record_type: 'reasoning_review_harness_record',
+    derived_from_record_ids: [agentInvocationId, agentOutputId],
+    content: initialContent as unknown as Record<string, unknown>,
+  });
+
+  // ── 4. Sequentially dispatch each validator ────────────────────
+  const allFindings: ValidatorFinding[] = [];
+  const failures: { validatorId: string; error: string }[] = [];
+  // Per-validator token capture (Commit 9). Keyed by validatorId; the
+  // last-recorded usage wins (validators currently issue exactly one
+  // LLM call). Deterministic validators never appear in this map.
+  const tokensByValidator = new Map<
+    string,
+    { inputTokens: number | null; outputTokens: number | null }
+  >();
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  const recordLLMUsage = (validatorId: string, usage: {
+    inputTokens: number | null; outputTokens: number | null;
+  }): void => {
+    tokensByValidator.set(validatorId, usage);
+    if (typeof usage.inputTokens === 'number') totalInputTokens += usage.inputTokens;
+    if (typeof usage.outputTokens === 'number') totalOutputTokens += usage.outputTokens;
+  };
+
+  for (const entry of dispatched) {
+    const runtimeParams: ValidatorRuntimeParams = {
+      agentRole: effectiveRole,
+      subPhaseId,
+      agentOutputId,
+      outputText: result.text ?? '',
+      outputContent,
+      outputThinking,
+      originalPrompt: prompt,
+      originalSystem: null,
+      upstreamFindings: [...allFindings],
+    };
+
+    const validatorStart = Date.now();
+    const findings = await runOneValidator(
+      entry,
+      runtimeParams,
+      llmCaller,
+      templateLoader,
+      {
+        upstreamTrace: traceContext,
+        failures,
+        recordLLMUsage,
+        harnessRouting,
+      },
+    );
+    const validatorDuration = Date.now() - validatorStart;
+
+    const tokens = tokensByValidator.get(entry.id) ?? null;
+    for (const finding of findings) {
+      allFindings.push(finding);
+      writeFindingRecord({
+        writer,
+        baseRecordOptions,
+        harnessId,
+        harnessRecordId: initialHarnessRecord.id,
+        finding,
+        durationMs: validatorDuration,
+        inputTokens: tokens?.inputTokens ?? null,
+        outputTokens: tokens?.outputTokens ?? null,
+      });
+    }
+  }
+
+  // ── 5. Write the final harness record + supersede the running one ──
+  // Strip the final_synthesis decision finding from the corpus the
+  // policy computes over — its severity is itself derived from the
+  // policy and would double-count. Contract-design findings are
+  // collated by the policy itself (informational-only).
+  const policyInputs = allFindings.filter(
+    (f) => f.validatorId !== 'final_synthesis',
+  );
+  const decisionResult = computeFinalSynthesisDecision(policyInputs, failures);
+
+  const counts = countBySeverity(allFindings);
+  // Pull out the LLM narrative from the final_synthesis finding (when
+  // produced). The decision text in the harness record is the
+  // deterministic rationale; the narrative is supplemental.
+  const synthesisFinding = allFindings.find(
+    (f) => f.validatorId === 'final_synthesis',
+  );
+  const narrative = synthesisFinding?.detail
+    ? extractNarrativeFromDetail(synthesisFinding.detail, decisionResult.rationale)
+    : null;
+
+  const finalContent: ReasoningReviewHarnessRecordContent = {
+    ...initialContent,
+    status: 'completed',
+    findings_count_by_severity: counts,
+    validator_failure_count: failures.length,
+    decision_recommendation: decisionResult.decision,
+    decision_rationale: decisionResult.rationale,
+    contractDesignFindings: decisionResult.contractDesignFindings,
+    narrative_summary: narrative,
+    total_input_tokens: totalInputTokens,
+    total_output_tokens: totalOutputTokens,
+    duration_ms: Date.now() - startedAt,
+  };
+
+  const finalHarnessRecord = writer.writeRecord({
+    ...baseRecordOptions,
+    record_type: 'reasoning_review_harness_record',
+    derived_from_record_ids: [agentInvocationId, agentOutputId, initialHarnessRecord.id],
+    content: finalContent as unknown as Record<string, unknown>,
+  });
+
+  // Mark the 'running' parent as superseded by the final record so
+  // queries for current-version harness records get the completed one.
+  writer.supersedByRollback(initialHarnessRecord.id, finalHarnessRecord.id);
+
+  return {
+    harnessRecordId: finalHarnessRecord.id,
+    findings: allFindings,
+    validatorsDispatched: dispatchedIds,
+    validatorFailures: failures,
+    skipped: false,
+    skipReason: null,
+  };
+}
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+/**
+ * Run a single validator. Captures every failure mode and returns
+ * findings (or [] when unavailable). Pushes a `validator_unavailable`
+ * failure into `failures` when applicable. Never throws.
+ */
+interface RunOneValidatorContext {
+  upstreamTrace: LLMTraceContext;
+  failures: { validatorId: string; error: string }[];
+  recordLLMUsage: (
+    validatorId: string,
+    usage: { inputTokens: number | null; outputTokens: number | null },
+  ) => void;
+  harnessRouting: HarnessLLMRouting | undefined;
+}
+
+async function runOneValidator(
+  entry: ValidatorEntry,
+  runtime: ValidatorRuntimeParams,
+  llmCaller: LLMCaller,
+  templateLoader: TemplateLoader,
+  ctx: RunOneValidatorContext,
+): Promise<ValidatorFinding[]> {
+  const { upstreamTrace, failures, recordLLMUsage, harnessRouting } = ctx;
+  if (entry.kind === 'deterministic') {
+    if (typeof entry.validate !== 'function') {
+      // Foundation stub — Commit 3 lands the body. Mark unavailable so
+      // coverage gaps are auditable.
+      failures.push({
+        validatorId: entry.id,
+        error: 'validator_unavailable: deterministic body not yet implemented (Commit 3+ pending)',
+      });
+      return [];
+    }
+    try {
+      return entry.validate(runtime);
+    } catch (err) {
+      failures.push({
+        validatorId: entry.id,
+        error: `deterministic_threw: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      return [];
+    }
+  }
+
+  // LLM validator. Commits 3+ wire `invoke` per-validator. When
+  // missing (defensive: family-class / role-specific bodies still
+  // pending in Commits 5–7), record validator_unavailable.
+  if (typeof entry.invoke !== 'function') {
+    failures.push({
+      validatorId: entry.id,
+      error: `validator_unavailable: LLM invoke not yet implemented (${entry.promptTemplatePath})`,
+    });
+    return [];
+  }
+
+  try {
+    return await entry.invoke(runtime, llmCaller, templateLoader, {
+      workflowRunId: upstreamTrace.workflowRunId,
+      phaseId: upstreamTrace.phaseId ?? null,
+      subPhaseId: upstreamTrace.subPhaseId ?? null,
+      pushFailure: (validatorId, error) => {
+        failures.push({ validatorId, error });
+      },
+      recordLLMUsage,
+      harnessProvider: harnessRouting?.provider,
+      harnessModel: harnessRouting?.model,
+      harnessTemperature: harnessRouting?.temperature,
+    });
+  } catch (err) {
+    failures.push({
+      validatorId: entry.id,
+      error: `validator_threw: ${err instanceof Error ? err.message : String(err)}`,
+    });
+    return [];
+  }
+}
+
+/**
+ * The final_synthesis validator stamps `<deterministic rationale>\n\n<narrative>`
+ * into the finding's `detail` field (when an LLM narrative was obtained).
+ * Strip the deterministic rationale prefix to recover the narrative alone.
+ */
+function extractNarrativeFromDetail(detail: string, rationale: string): string | null {
+  if (!detail) return null;
+  if (detail.startsWith(rationale)) {
+    const rest = detail.slice(rationale.length).replace(/^\s*\n+/, '');
+    return rest.length > 0 ? rest : null;
+  }
+  return detail;
+}
+
+function countBySeverity(findings: ValidatorFinding[]): ReviewHarnessFindingsCountBySeverity {
+  const counts: ReviewHarnessFindingsCountBySeverity = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+  for (const f of findings) counts[f.severity] += 1;
+  return counts;
+}
+
+function extractOutputContent(
+  result: LLMCallResult,
+): Record<string, unknown> | null {
+  if (result.parsed && typeof result.parsed === 'object') return result.parsed;
+  return null;
+}
+
+function writeFindingRecord(args: {
+  writer: GovernedStreamWriter;
+  baseRecordOptions: {
+    schema_version: string;
+    workflow_run_id: string;
+    phase_id: string | null;
+    sub_phase_id: string | null;
+    produced_by_agent_role: 'harness';
+    janumicode_version_sha: string;
+  };
+  harnessId: string;
+  harnessRecordId: string;
+  finding: ValidatorFinding;
+  durationMs: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+}): void {
+  const content: ReasoningReviewFindingRecordContent = {
+    kind: 'reasoning_review_finding',
+    harness_id: args.harnessId,
+    validator_id: args.finding.validatorId,
+    severity: args.finding.severity,
+    finding_type: args.finding.type,
+    summary: args.finding.summary,
+    location: args.finding.location,
+    detail: args.finding.detail,
+    recommendation: args.finding.recommendation,
+    duration_ms: args.durationMs,
+    input_tokens: args.inputTokens,
+    output_tokens: args.outputTokens,
+  };
+  args.writer.writeRecord({
+    ...args.baseRecordOptions,
+    record_type: 'reasoning_review_finding_record',
+    derived_from_record_ids: [args.harnessRecordId],
+    content: content as unknown as Record<string, unknown>,
+  });
+}

@@ -12,7 +12,7 @@ import type { Database } from '../database/init';
 import { getLogger, createTraceContext, type TraceContext } from '../logging';
 import { StateMachine } from './stateMachine';
 import { GovernedStreamWriter } from './governedStreamWriter';
-import { runReasoningReview, shouldSkipReview, writeSkipRecord } from '../review/reasoningReviewer';
+import { runReviewHarness } from '../review/harness/reviewHarness';
 import { SchemaValidator } from './schemaValidator';
 import { InvariantChecker } from './invariantChecker';
 import { TemplateLoader } from './templateLoader';
@@ -218,11 +218,12 @@ export class OrchestratorEngine {
     // the webview as it lands, so the user sees agent activity live.
     this.llmCaller.setWriter(this.writer, this.versionSha);
 
-    // Wire reasoning-review on every successful agent_output. The hook
-    // runs synchronously after each LLM call so findings land in the
-    // governed_stream BEFORE the next phase scrolls them out of the
-    // user's attention. Self-review is short-circuited by the agentRole
-    // guard inside `shouldSkipReview` so we don't recurse forever.
+    // Wire the reasoning-review HARNESS (Track D Commit 10) on every
+    // successful agent_output. The hook runs synchronously after each
+    // LLM call so harness findings land in the governed_stream BEFORE
+    // the next phase scrolls them out of the user's attention. The
+    // harness owns its own loop-guard (skips agentRole ∈ {harness,
+    // json_repair, reasoning_review}) so it never reviews itself.
     //
     // Auto-disabled in vitest: review issues a real LLM call which
     // would either hit Ollama (network) or fail expectations counting
@@ -236,46 +237,32 @@ export class OrchestratorEngine {
       : reviewEnabledFlag === 'false'
         ? false
         : process.env.VITEST !== 'true' && process.env.NODE_ENV !== 'test';
-    if (reviewEnabled) this.llmCaller.setReviewerHook(async (params) => {
-      const skip = shouldSkipReview(params.traceContext, params.result);
-      if (skip.skip) {
-        writeSkipRecord(
-          params.agentOutputId,
-          params.traceContext,
-          skip.reason,
+    if (reviewEnabled) {
+      // Harness LLM validators route through the same provider/model the
+      // legacy reasoning_review step used (Track D Commit 10). Falling
+      // back to undefined when unconfigured leaves validators stub-routed
+      // → validator_unavailable, which is what tests expect.
+      const reasoningReviewCfg = this.configManager.getLLMRouting().reasoning_review;
+      const harnessRouting = reasoningReviewCfg?.primary?.provider && reasoningReviewCfg?.primary?.model
+        ? {
+            provider: reasoningReviewCfg.primary.provider,
+            model: reasoningReviewCfg.primary.model,
+            temperature: reasoningReviewCfg.temperature ?? 0,
+          }
+        : undefined;
+      this.llmCaller.setReviewHarnessHook(async (params) => {
+        // Harness owns its own loop-guard, empty-output handling, and
+        // failure recording. The orchestrator wiring stays thin.
+        await runReviewHarness(
+          params,
+          this.llmCaller,
           this.writer,
           this.versionSha,
+          this.templateLoader,
+          harnessRouting,
         );
-        return;
-      }
-      const routing = this.configManager.getLLMRouting().reasoning_review?.primary;
-      if (!routing?.provider || !routing?.model) {
-        // Reviewer not configured — write a skip record so coverage gaps
-        // are visible. Distinct from `self_review` so the operator can
-        // tell config issue from architectural skip.
-        writeSkipRecord(
-          params.agentOutputId,
-          params.traceContext,
-          'reasoning_review_routing_missing',
-          this.writer,
-          this.versionSha,
-        );
-        return;
-      }
-      await runReasoningReview(
-        params,
-        {
-          provider: routing.provider,
-          model: routing.model,
-          baseUrl: routing.base_url,
-          temperature: this.configManager.getLLMRouting().reasoning_review?.temperature,
-        },
-        this.llmCaller,
-        this.writer,
-        this.versionSha,
-        this.templateLoader,
-      );
-    });
+      });
+    }
 
     // LLM-based JSON repair fallback (json_repair agent role): when a
     // call requests `responseFormat: 'json'` and the response doesn't

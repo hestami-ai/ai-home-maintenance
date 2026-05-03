@@ -94,7 +94,11 @@ export type AgentRole =
   | 'loop_detection_monitor'
   | 'reasoning_review'
   | 'json_repair'
-  | 'narrative_memory_generator';
+  | 'narrative_memory_generator'
+  // Reasoning-review harness (Track D — replaces the single-pass
+  // reasoning_review hook once Commit 10 lands the cutover; for now
+  // both roles co-exist).
+  | 'harness';
 
 // ── Phase IDs (§4) ──────────────────────────────────────────────────
 
@@ -234,6 +238,13 @@ export type RecordType =
   | 'invariant_violation_record'
   | 'reasoning_review_record'
   | 'reasoning_review_ensemble_record'
+  // Reasoning-review harness (Track D, Commit 1 foundation):
+  //   - `reasoning_review_harness_record`: parent per harness invocation
+  //   - `reasoning_review_finding_record`: one per validator finding
+  // See src/lib/review/harness/validatorRegistry.ts and the harness
+  // design doc under docs/reasoning review prompt template redesign.
+  | 'reasoning_review_harness_record'
+  | 'reasoning_review_finding_record'
   | 'json_repair_record'
   | 'domain_compliance_review_record'
   | 'detail_file_generated'
@@ -524,6 +535,95 @@ export interface ReasoningReviewRecordContent {
   error_message: string | null;
   /** When status='skipped', why we skipped (e.g. 'no_thinking_or_text', 'self_review'). */
   skip_reason?: string;
+}
+
+// ── Reasoning-review harness (Track D) ──────────────────────────────
+//
+// Parallel to ReasoningReviewRecordContent above, but aggregates
+// per-validator findings under a single harness invocation. Replaces
+// the single-pass reviewer once Commit 10 lands the cutover; both
+// shapes co-exist during the migration.
+
+export type ReviewHarnessDecision =
+  | 'ACCEPT'
+  | 'ACCEPT_WITH_NOTES'
+  | 'REVISE'
+  | 'QUARANTINE'
+  | 'ESCALATE';
+
+export type ReviewHarnessStatus = 'running' | 'completed' | 'failed';
+
+export interface ReviewHarnessFindingsCountBySeverity {
+  HIGH: number;
+  MEDIUM: number;
+  LOW: number;
+}
+
+export interface ReasoningReviewHarnessRecordContent {
+  kind: 'reasoning_review_harness';
+  /** UUID — primary linkage key shared with all child finding records. */
+  harness_id: string;
+  /** Status — running while validators dispatch, completed/failed at end. */
+  status: ReviewHarnessStatus;
+  reviewed_agent_invocation_id: string;
+  reviewed_agent_output_id: string;
+  reviewed_agent_role: string | null;
+  reviewed_phase_id: string | null;
+  reviewed_sub_phase_id: string | null;
+  /** Canonical validator ids dispatched for this output. */
+  dispatched_validator_ids: string[];
+  /** Per-severity finding counts (filled at end of run). */
+  findings_count_by_severity: ReviewHarnessFindingsCountBySeverity;
+  /** Number of validators that errored / had no body / hit retries-exhausted. */
+  validator_failure_count: number;
+  /**
+   * Filled by Commit 8's `final_synthesis` validator. Until then,
+   * remains undefined / null.
+   */
+  decision_recommendation?: ReviewHarnessDecision | null;
+  /** Short rationale string explaining why the decision was selected. */
+  decision_rationale?: string | null;
+  /**
+   * Pass-through findings (synthesis-time collation) flagged as
+   * upstream-prompt / contract-design defects. INFORMATIONAL ONLY —
+   * locked decision §6.5: do NOT influence decision_recommendation.
+   */
+  contractDesignFindings?: ReviewHarnessContractDesignFinding[];
+  /** LLM-narrative summary produced by the final_synthesis prompt (when LLM ran). */
+  narrative_summary?: string | null;
+  /** Aggregate token usage across all LLM validator calls (Commit 9). */
+  total_input_tokens?: number;
+  total_output_tokens?: number;
+  /** Wall-clock duration in ms across all validators. */
+  duration_ms: number;
+}
+
+export interface ReviewHarnessContractDesignFinding {
+  validator_id: string;
+  severity: ReasoningReviewSeverity;
+  summary: string;
+  location: string;
+  detail: string;
+  recommendation: string;
+}
+
+export interface ReasoningReviewFindingRecordContent {
+  kind: 'reasoning_review_finding';
+  harness_id: string;
+  validator_id: string;
+  severity: ReasoningReviewSeverity;
+  /** Validator-specific finding type (see catalog §9). */
+  finding_type: string;
+  summary: string;
+  /** Field path / quoted span / child id / acceptance-criterion id. */
+  location: string;
+  detail: string;
+  recommendation: string;
+  /** Per-validator wall-clock in ms. */
+  duration_ms: number;
+  /** Token tracking — populated by Commit 9. Null for deterministic. */
+  input_tokens?: number | null;
+  output_tokens?: number | null;
 }
 
 export interface IntentLensClassificationContent {

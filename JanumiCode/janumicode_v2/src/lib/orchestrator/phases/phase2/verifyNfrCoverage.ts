@@ -135,8 +135,13 @@ function checkComplianceCoverage(i: NfrCoverageVerifierInputs): CoverageGapConte
   })];
 }
 
-/** `unreached_seeds[]` must name real seeds and real absorbing NFRs. */
+/** `unreached_seeds[]` must name real seeds and real absorbing NFRs.
+ *  Exception: the SYSTEM_INFERRED__AGENT_OMISSION sentinel is allowed
+ *  in `absorbed_into` — that's the auto-flagger marking a seed the
+ *  agent dropped entirely (see autoFlagDroppedSeeds.ts). It surfaces
+ *  the gap for human review without blocking the run. */
 function checkUnreachedSeedIntegrity(i: NfrCoverageVerifierInputs): CoverageGapContent[] {
+  const SYSTEM_INFERRED_SENTINEL = 'SYSTEM_INFERRED__AGENT_OMISSION';
   const vvIds = new Set(i.vvRequirements.map(v => v.id));
   const compIds = new Set(i.complianceItems.map(c => c.id));
   const nfrIds = new Set(i.nfrs.map(n => n.id));
@@ -146,7 +151,8 @@ function checkUnreachedSeedIntegrity(i: NfrCoverageVerifierInputs): CoverageGapC
       vvIds.has(u.seed_id) || compIds.has(u.seed_id) ||
       u.seed_id.startsWith('QA-') || u.seed_id.startsWith('TECH-') || u.seed_id.startsWith('UJ-');
     if (!isValidSeed) offenders.push(`${u.seed_id}:seed-not-accepted`);
-    if (!nfrIds.has(u.absorbed_into)) offenders.push(`${u.seed_id}:absorbed_into-${u.absorbed_into}-not-accepted`);
+    const isValidAbsorber = u.absorbed_into === SYSTEM_INFERRED_SENTINEL || nfrIds.has(u.absorbed_into);
+    if (!isValidAbsorber) offenders.push(`${u.seed_id}:absorbed_into-${u.absorbed_into}-not-accepted`);
   }
   if (offenders.length === 0) return [];
   return [mkGap({

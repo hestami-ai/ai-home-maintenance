@@ -16,15 +16,10 @@ describe('TemplateLoader', () => {
       expect(loaded.length).toBeGreaterThan(0);
     });
 
-    it('loads cross-cutting reasoning review template', () => {
-      const template = loader.getTemplate('cross_cutting/reasoning_review.system');
-      expect(template).not.toBeNull();
-      expect(template!.metadata.agent_role).toBe('reasoning_review');
-      // Unified template has no required variables — system prompt is
-      // static and the user message is built programmatically by the
-      // reviewer module from (prompt, thinking, response).
-      expect(template!.metadata.required_variables).toEqual([]);
-    });
+    // Note: the prior `cross_cutting/reasoning_review.system.md` template
+    // was deleted in Track D Commit 10 alongside the single-pass
+    // `runReasoningReview` reviewer. The harness now uses per-validator
+    // templates under `prompts/review/<family>/<id>.system.md`.
 
     it('loads intent quality check template', () => {
       // IQC lives under phases/phase_01_intent_capture/, not cross_cutting/

@@ -48,7 +48,14 @@ import type {
 import { verifyCoverage } from './phase1/verifyCoverage';
 import { verifyReleaseManifest } from './phase1/verifyReleaseManifest';
 import { buildReleaseManifest, type LlmReleaseSkeleton } from './phase1/buildReleaseManifest';
-import { normalizeTechnicalConstraints } from './phase1Normalizers';
+import {
+  normalizeTechnicalConstraints,
+  normalizeJourneyFromWire,
+  normalizeIntentDiscoveryFromWire,
+  normalizeSynthesisFromWire,
+  normalizeDomainFromWire,
+  normalizePersonaFromWire,
+} from './phase1Normalizers';
 import { randomUUID } from 'node:crypto';
 import type {
   DecisionBundleContent,
@@ -1785,21 +1792,23 @@ export class Phase1Handler implements PhaseHandler {
       temperature: 0.4,
       traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'product_intent_discovery', agentRole: 'domain_interpreter', label: 'Phase 1.0b — Intent Discovery' },
     });
-    const parsed = this.safeParseJson(result);
-    if (!parsed) throw new Error('Intent Discovery returned unparseable JSON');
+    const rawParsed = this.safeParseJson(result);
+    if (!rawParsed) throw new Error('Intent Discovery returned unparseable JSON');
+    // Wire-format → record-type adapter: agents now emit snake_case; map to camelCase TS fields.
+    const parsed = normalizeIntentDiscoveryFromWire(rawParsed);
     return {
       analysisSummary: (parsed.analysisSummary as string) ?? '',
       productVision: (parsed.productVision as string) ?? '',
       productDescription: (parsed.productDescription as string) ?? '',
-      personas: (parsed.personas as Persona[] | undefined) ?? [],
-      userJourneys: (parsed.userJourneys as UserJourney[] | undefined) ?? [],
+      personas: ((parsed.personas as Array<Record<string, unknown>> | undefined) ?? []).map(normalizePersonaFromWire) as Persona[],
+      userJourneys: ((parsed.userJourneys as Array<Record<string, unknown>> | undefined) ?? []).map(normalizeJourneyFromWire) as UserJourney[],
       phasingStrategy: (parsed.phasingStrategy as PhasingPhase[] | undefined) ?? [],
       successMetrics: (parsed.successMetrics as string[] | undefined) ?? [],
       uxRequirements: (parsed.uxRequirements as string[] | undefined) ?? [],
       requirements: this.normalizeExtractedItems(parsed.requirements, 'REQUIREMENT', 'REQ'),
       decisions: this.normalizeExtractedItems(parsed.decisions, 'DECISION', 'DEC'),
       constraints: this.normalizeExtractedItems(parsed.constraints, 'CONSTRAINT', 'CON'),
-      openQuestions: this.normalizeExtractedItems(parsed.openQuestions, 'OPEN_QUESTION', 'Q'),
+      openQuestions: this.normalizeExtractedItems(parsed.openQuestions ?? parsed.open_questions, 'OPEN_QUESTION', 'Q'),
     };
   }
 
@@ -1870,7 +1879,10 @@ export class Phase1Handler implements PhaseHandler {
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('Compliance & Retention Discovery returned unparseable JSON');
-    const raw = Array.isArray(parsed.complianceExtractedItems) ? parsed.complianceExtractedItems : [];
+    // Accept snake_case (canonical) with camelCase fallback for backward compat.
+    const raw = Array.isArray(parsed.compliance_extracted_items)
+      ? parsed.compliance_extracted_items
+      : Array.isArray(parsed.complianceExtractedItems) ? parsed.complianceExtractedItems : [];
     // Preserve any source_ref on each item during normalization.
     return this.normalizeExtractedItemsWithProvenance(raw, 'COMP');
   }
@@ -2065,9 +2077,12 @@ export class Phase1Handler implements PhaseHandler {
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('Business Domains bloom returned unparseable JSON');
+    // Wire-format → record-type adapter: normalize snake_case domain/persona fields.
+    const rawDomains = (parsed.domains as Array<Record<string, unknown>> | undefined) ?? [];
+    const rawPersonas = (parsed.personas as Array<Record<string, unknown>> | undefined) ?? [];
     return {
-      domains: (parsed.domains as BusinessDomain[] | undefined) ?? [],
-      personas: (parsed.personas as Persona[] | undefined) ?? [],
+      domains: rawDomains.map(normalizeDomainFromWire) as BusinessDomain[],
+      personas: rawPersonas.map(normalizePersonaFromWire) as Persona[],
     };
   }
 
@@ -2248,8 +2263,10 @@ export class Phase1Handler implements PhaseHandler {
       temperature: 0.3,
       traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '1', subPhaseId: 'product_description_synthesis', agentRole: 'domain_interpreter', label: 'Phase 1.6 — Product Description Narrative Refinement' },
     });
-    const parsed = this.safeParseJson(result);
-    if (!parsed) throw new Error('1.6 narrative LLM returned unparseable JSON');
+    const rawParsed = this.safeParseJson(result);
+    if (!rawParsed) throw new Error('1.6 narrative LLM returned unparseable JSON');
+    // Wire-format → record-type adapter: agents now emit snake_case; map to camelCase TS fields.
+    const parsed = normalizeSynthesisFromWire(rawParsed);
 
     const refined: Partial<ProductDescriptionHandoffContent> = {};
     if (typeof parsed.productVision === 'string' && parsed.productVision.trim().length > 0) {
@@ -2505,7 +2522,11 @@ export class Phase1Handler implements PhaseHandler {
     const acceptedVV = new Set(inputs.vvRequirements.map(v => v.id));
     const acceptedIntegrations = new Set(inputs.integrations.map(i => i.id));
     const acceptedPersonaIds = new Set(inputs.acceptedPersonas.map(p => p.id));
-    const rawJourneys = (parsed.userJourneys as Array<Record<string, unknown>> | undefined) ?? [];
+    // Accept snake_case (canonical) with camelCase fallback; normalize each journey object.
+    const rawJourneysRaw = (
+      (parsed.user_journeys ?? parsed.userJourneys) as Array<Record<string, unknown>> | undefined
+    ) ?? [];
+    const rawJourneys = rawJourneysRaw.map(normalizeJourneyFromWire);
     const droppedBySurfaceType: Record<string, string[]> = {
       compliance_regimes: [], retention_rules: [], vv_requirements: [], integrations: [],
     };

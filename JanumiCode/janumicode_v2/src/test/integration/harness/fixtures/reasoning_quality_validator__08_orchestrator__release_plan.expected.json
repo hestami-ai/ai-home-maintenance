@@ -1,0 +1,7 @@
+{
+  "validator": "reasoning_quality_validator",
+  "sample": "08_orchestrator__release_plan",
+  "passed": false,
+  "expectedFindingCount": 1,
+  "overallAssessment": "The agent successfully structured the release plan into logical, dependency-aware phases. However, it failed to assign a significant number of accepted journeys to any release, violating the critical constraint that every accepted journey must appear in exactly one release. This makes the plan materially incorrect and unusable until the missing journeys are placed."
+}

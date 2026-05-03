@@ -44,7 +44,7 @@ Each child is a complete workflow with its own triggers, steps, and outcome — 
 
 # Step structure (same as 1.3b bloom)
 
-Every step is `{ stepNumber, actor, action, expectedOutcome }` — workflow steps do NOT carry `automatable` (a workflow is system-side by definition).
+Every step is `{ step_number, actor, action, expected_outcome }` — workflow steps do NOT carry `automatable` (a workflow is system-side by definition).
 
 # Trigger structure (same as 1.3b bloom)
 
@@ -65,15 +65,15 @@ Response is a single valid JSON object. No markdown fences, no prose outside the
   "children": [
     {
       "id": "WF-PARENT-SLUG-SUB1",
-      "businessDomainId": "DOM-X",
+      "business_domain_id": "DOM-X",
       "name": "Sub-workflow name",
       "description": "...",
       "steps": [
         {
-          "stepNumber": 1,
+          "step_number": 1,
           "actor": "System",
           "action": "...",
-          "expectedOutcome": "..."
+          "expected_outcome": "..."
         }
       ],
       "triggers": [

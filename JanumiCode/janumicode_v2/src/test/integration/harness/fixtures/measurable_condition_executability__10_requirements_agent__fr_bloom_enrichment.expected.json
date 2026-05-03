@@ -1,0 +1,7 @@
+{
+  "validator": "measurable_condition_executability",
+  "sample": "10_requirements_agent__fr_bloom_enrichment",
+  "passed": true,
+  "expectedFindingCount": 0,
+  "overallAssessment": "All measurable_condition fields are concrete, deterministic, and executable. They utilize standard API/DB assertion shapes (HTTP codes, status checks, log queries) and correctly incorporate the grounded time threshold from the original acceptance criterion. The structure adheres strictly to the required JSON format."
+}

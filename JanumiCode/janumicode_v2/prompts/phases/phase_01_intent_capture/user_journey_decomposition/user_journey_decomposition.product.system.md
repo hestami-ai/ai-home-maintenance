@@ -40,7 +40,7 @@ Each child is a complete journey with its own scenario, steps, and ACs — not a
 
 # Step structure (same as 1.3a bloom)
 
-Every step is `{ stepNumber, actor, action, expectedOutcome, automatable }`.
+Every step is `{ step_number, actor, action, expected_outcome, automatable }`.
 - `actor` must be a persona id (P-*), `"System"`, or an integration id (INT-*).
 - `automatable: true` when the step is performed by the system OR when the step implies significant system-side work that 1.3b's workflow bloom must handle.
 
@@ -49,6 +49,8 @@ Every step is `{ stepNumber, actor, action, expectedOutcome, automatable }`.
 Children that share steps (e.g. "validate session" appears in both Password Reset and Account Deletion) should name the shared step identically across children. This is how 1.3b detects shared workflows vs. per-child workflows.
 
 # JSON Output Contract (strict)
+
+**Field naming convention:** Use snake_case for all JSON property names (e.g., `persona_id`, `acceptance_criteria`, not `personaId`).
 
 Response must be a single valid JSON object:
 - No markdown fences; no prose before or after the JSON.
@@ -66,22 +68,22 @@ Response must be a single valid JSON object:
   "children": [
     {
       "id": "UJ-PARENT-SLUG-SUB1",
-      "personaId": "P-HOMEOWNER",
-      "additionalPersonas": [],
+      "persona_id": "P-HOMEOWNER",
+      "additional_personas": [],
       "title": "Verb-phrase journey title",
       "scenario": "When/where/why this journey happens",
-      "businessDomainIds": ["DOM-X"],
+      "business_domain_ids": ["DOM-X"],
       "steps": [
         {
-          "stepNumber": 1,
+          "step_number": 1,
           "actor": "P-HOMEOWNER",
           "action": "...",
-          "expectedOutcome": "...",
+          "expected_outcome": "...",
           "automatable": false
         }
       ],
-      "acceptanceCriteria": ["..."],
-      "implementationPhase": "Phase 1",
+      "acceptance_criteria": ["..."],
+      "implementation_phase": "Phase 1",
       "priority": "critical|high|medium|low",
       "umbrella": false,
       "source": "document-specified|domain-standard|ai-proposed",

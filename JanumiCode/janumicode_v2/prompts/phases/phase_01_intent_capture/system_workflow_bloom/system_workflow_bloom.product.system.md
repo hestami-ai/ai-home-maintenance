@@ -83,9 +83,9 @@ Your own workflow ids follow the same semantic-slug convention:
   - `{ "kind": "event", "event_type": "..." }` — domain-event name. Use snake_case with a noun.verb shape: `"invoice.posted"`, `"claim.submitted"`, `"account.deleted"`. Event types referenced here become contracts that downstream phases implement.
   - `{ "kind": "compliance", "regime_id": "COMP-*", "rule": "..." }` — `regime_id` MUST be the EXACT `COMP-*` slug from the `compliance_regimes` list below (e.g. `"COMP-GDPR-RTBF"`). DO NOT put free text (`"Malware scanning rules"`) or a concept name (`"State licensing"`) in `regime_id` — the verifier rejects those as referential-integrity violations. Put the descriptive text in the `rule` field instead (e.g. `{ "kind": "compliance", "regime_id": "COMP-MALWARE-SCAN", "rule": "All uploaded files scanned before storage" }`).
   - `{ "kind": "integration", "integration_id": "INT-*", "event": "..." }` — `integration_id` MUST reference an accepted integration; `event` names the integration-side event (e.g. `"subscription.payment_failed"`).
-- **Every step in `steps[]` is a structured object:** `{ stepNumber, actor, action, expectedOutcome }`. `actor` is `"System"`, a persona id, or an integration id — same rules as journey steps (but workflow steps do NOT carry `automatable`, since a workflow is already system-side by definition).
+- **Every step in `steps[]` is a structured object:** `{ step_number, actor, action, expected_outcome }`. `actor` is `"System"`, a persona id, or an integration id — same rules as journey steps (but workflow steps do NOT carry `automatable`, since a workflow is already system-side by definition).
 - **`actors[]`** is the distinct set of non-System actors that appear in any step, plus any persona/integration involved in the workflow's lifecycle (not just steps). Empty array is valid for purely internal workflows.
-- **`businessDomainId` MUST reference a real domain** from the accepted list.
+- **`business_domain_id` MUST reference a real domain** from the accepted list.
 - **`backs_journeys[]`** is the distinct set of `journey_id` values across all `kind: "journey_step"` entries in `triggers[]`. Emit it even when empty (`[]` for workflows that are schedule/event/compliance/integration-only).
 
 # Umbrella workflows
@@ -104,15 +104,15 @@ Response is a single valid JSON object. No markdown fences, no prose outside the
   "workflows": [
     {
       "id": "WF-PROVISION-IDENTITY",
-      "businessDomainId": "DOM-X",
+      "business_domain_id": "DOM-X",
       "name": "Workflow name",
       "description": "What this workflow accomplishes in one paragraph.",
       "steps": [
         {
-          "stepNumber": 1,
+          "step_number": 1,
           "actor": "System",
           "action": "What the system does at this step",
-          "expectedOutcome": "Observable result"
+          "expected_outcome": "Observable result"
         }
       ],
       "triggers": [

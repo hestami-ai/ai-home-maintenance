@@ -45,6 +45,8 @@ If the context below contains a `# Human Feedback` section, that feedback is the
 
 # JSON Output Contract (strict — non-negotiable)
 
+**Field naming convention:** Use snake_case for all JSON property names (e.g., `entity_preview`, `workflow_preview`, not `entityPreview`).
+
 Your response MUST be a single valid JSON object. Strict rules:
 - **No markdown fences** — no triple-backticks, no language-tagged code fences.
 - **No prose before or after the JSON.** The response starts with `{` and ends with `}`.
@@ -64,8 +66,8 @@ Your ENTIRE response must be a single JSON object. No prose, no markdown fences.
       "name": "Domain Name",
       "description": "What this domain covers",
       "rationale": "Why this domain is relevant, and how it maps to the validated personas/journeys",
-      "entityPreview": ["Entity1", "Entity2", "Entity3"],
-      "workflowPreview": ["Workflow1", "Workflow2"],
+      "entity_preview": ["Entity1", "Entity2", "Entity3"],
+      "workflow_preview": ["Workflow1", "Workflow2"],
       "source": "user-specified|ai-proposed|domain-standard"
     }
   ],
@@ -75,7 +77,7 @@ Your ENTIRE response must be a single JSON object. No prose, no markdown fences.
       "name": "Persona Name",
       "description": "Who they are and their context",
       "goals": ["What they want to achieve"],
-      "painPoints": ["What frustrates them today"],
+      "pain_points": ["What frustrates them today"],
       "source": "document-specified|ai-proposed|domain-standard"
     }
   ]

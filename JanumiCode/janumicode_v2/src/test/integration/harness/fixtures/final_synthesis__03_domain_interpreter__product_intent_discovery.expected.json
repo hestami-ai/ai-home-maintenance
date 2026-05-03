@@ -1,0 +1,11 @@
+{
+  "validator": "final_synthesis",
+  "sample": "03_domain_interpreter__product_intent_discovery",
+  "kind": "final_synthesis",
+  "upstreamFindingsFile": "final_synthesis__03_domain_interpreter__product_intent_discovery.upstream-findings.json",
+  "deterministicDecision": "REVISE",
+  "deterministicRationale": "1 HIGH (grounding) + 1 MEDIUM (reasoning_quality) → REVISE per harness decision policy",
+  "expectedDecisionRecommendation": "REVISE",
+  "expectedFindingCount": 0,
+  "overallAssessment": "The presence of a HIGH grounding finding regarding unsupported persona attributes mandates a REVISE decision. The MEDIUM reasoning-quality finding about unjustified inference leaps further supports revision, since the agent made claims about persona attributes and pain points that are not directly supported by the source material. A rerun with explicit instruction to restrict outputs to source-verifiable content is recommended."
+}

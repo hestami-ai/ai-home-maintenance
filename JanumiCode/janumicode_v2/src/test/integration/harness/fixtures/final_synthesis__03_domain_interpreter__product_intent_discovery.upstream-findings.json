@@ -1,0 +1,20 @@
+[
+  {
+    "validatorId": "grounding_validator",
+    "severity": "HIGH",
+    "type": "unsupported_claim",
+    "summary": "Persona attributes labeled ai-proposed are not grounded in source",
+    "location": "personas[].attributes",
+    "detail": "Multiple persona attributes carry ai-proposed annotations without backing source citations.",
+    "recommendation": "Either remove the ai-proposed attributes or cite the inferring evidence."
+  },
+  {
+    "validatorId": "reasoning_quality_validator",
+    "severity": "MEDIUM",
+    "type": "unjustified_leap",
+    "summary": "Inferred persona role beyond what source explicitly states",
+    "location": "personas section",
+    "detail": "The agent extrapolated persona structure from generic real-estate domain knowledge rather than the spec's explicit persona descriptions.",
+    "recommendation": "Mark inferred personas with provenance and downgrade confidence."
+  }
+]

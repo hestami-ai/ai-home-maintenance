@@ -17,6 +17,119 @@
 
 import type { TechnicalConstraint, SourceRef } from '../../types/records';
 
+/**
+ * Wire-format → record-type adapter: maps snake_case agent JSON keys to the
+ * camelCase field names used in TS record types (UserJourney, Persona, etc.).
+ * Called at the parse seam after JSON.parse so downstream code always sees
+ * the camelCase shape the TS types expect. Keeps camelCase originals if the
+ * agent happened to emit them (backward-compat during transition).
+ *
+ * Only remaps the specific keys that changed in the snake_case flip for
+ * phase_01. DO NOT propagate into TS-internal code beyond this file.
+ */
+function snakeToCamel(raw: Record<string, unknown>, mapping: Record<string, string>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...raw };
+  for (const [snake, camel] of Object.entries(mapping)) {
+    if (snake in raw && !(camel in raw)) {
+      out[camel] = raw[snake];
+    }
+  }
+  return out;
+}
+
+const JOURNEY_WIRE_MAP: Record<string, string> = {
+  persona_id: 'personaId',
+  additional_personas: 'additionalPersonas',
+  business_domain_ids: 'businessDomainIds',
+  acceptance_criteria: 'acceptanceCriteria',
+  implementation_phase: 'implementationPhase',
+};
+
+const STEP_WIRE_MAP: Record<string, string> = {
+  step_number: 'stepNumber',
+  expected_outcome: 'expectedOutcome',
+};
+
+/**
+ * Normalize a single raw journey object from wire-format (snake_case) to the
+ * camelCase shape expected by UserJourney TS record consumers.
+ */
+export function normalizeJourneyFromWire(raw: Record<string, unknown>): Record<string, unknown> {
+  const j = snakeToCamel(raw, JOURNEY_WIRE_MAP);
+  if (Array.isArray(j.steps)) {
+    j.steps = (j.steps as unknown[]).map((s) => {
+      if (s && typeof s === 'object' && !Array.isArray(s)) {
+        return snakeToCamel(s as Record<string, unknown>, STEP_WIRE_MAP);
+      }
+      return s;
+    });
+  }
+  return j;
+}
+
+const INTENT_DISCOVERY_WIRE_MAP: Record<string, string> = {
+  analysis_summary: 'analysisSummary',
+  product_vision: 'productVision',
+  product_description: 'productDescription',
+  user_journeys: 'userJourneys',
+  phasing_strategy: 'phasingStrategy',
+  success_metrics: 'successMetrics',
+  ux_requirements: 'uxRequirements',
+  open_questions: 'openQuestions',
+};
+
+/**
+ * Normalize the top-level parsed intent_discovery JSON from snake_case wire
+ * format to the camelCase fields used internally.
+ */
+export function normalizeIntentDiscoveryFromWire(
+  parsed: Record<string, unknown>,
+): Record<string, unknown> {
+  return snakeToCamel(parsed, INTENT_DISCOVERY_WIRE_MAP);
+}
+
+const SYNTHESIS_WIRE_MAP: Record<string, string> = {
+  product_vision: 'productVision',
+  product_description: 'productDescription',
+  open_loops: 'openLoops',
+};
+
+/**
+ * Normalize the top-level parsed product_description_synthesis JSON from
+ * snake_case wire format to the camelCase fields used internally.
+ */
+export function normalizeSynthesisFromWire(
+  parsed: Record<string, unknown>,
+): Record<string, unknown> {
+  return snakeToCamel(parsed, SYNTHESIS_WIRE_MAP);
+}
+
+const DOMAIN_WIRE_MAP: Record<string, string> = {
+  entity_preview: 'entityPreview',
+  workflow_preview: 'workflowPreview',
+  pain_points: 'painPoints',
+};
+
+/**
+ * Normalize a single domain object from wire-format to the camelCase shape
+ * expected by BusinessDomain TS record consumers.
+ */
+export function normalizeDomainFromWire(raw: Record<string, unknown>): Record<string, unknown> {
+  return snakeToCamel(raw, DOMAIN_WIRE_MAP);
+}
+
+const PERSONA_WIRE_MAP: Record<string, string> = {
+  pain_points: 'painPoints',
+};
+
+/**
+ * Normalize a single persona object from wire-format to the camelCase shape
+ * expected by Persona TS record consumers.
+ */
+export function normalizePersonaFromWire(raw: Record<string, unknown>): Record<string, unknown> {
+  return snakeToCamel(raw, PERSONA_WIRE_MAP);
+}
+
 export function normalizeSourceRef(raw: unknown): SourceRef | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const o = raw as Record<string, unknown>;

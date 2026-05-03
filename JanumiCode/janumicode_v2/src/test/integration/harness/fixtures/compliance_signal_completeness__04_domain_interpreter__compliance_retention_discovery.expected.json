@@ -1,0 +1,7 @@
+{
+  "validator": "compliance_signal_completeness",
+  "sample": "04_domain_interpreter__compliance_retention_discovery",
+  "passed": false,
+  "expectedFindingCount": 2,
+  "overallAssessment": "The agent captured several high-salience compliance requirements from the source spec but failed to surface a critical persistence/retention constraint mandated by the source's eternal-perspective architecture, and missed the broader jurisdictional constraint inherent in a Real Property OS product (state condo acts, local HOA laws). These omissions are significant compliance gaps that should be flagged as additional CONSTRAINT or OPEN_QUESTION records."
+}

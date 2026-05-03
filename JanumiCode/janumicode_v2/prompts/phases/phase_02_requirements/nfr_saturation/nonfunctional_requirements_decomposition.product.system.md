@@ -147,6 +147,8 @@ For each child, list assumptions / constraints / compliance citations / open que
 
 # JSON Output Contract (strict — non-negotiable)
 
+**Field naming convention:** Use snake_case for all JSON property names (e.g., `requirements`, `seed_threshold`, not `nfrs`).
+
 - **No markdown fences.** Response starts with `{` and ends with `}`.
 - **No prose before or after the JSON.**
 - **No trailing commas.**

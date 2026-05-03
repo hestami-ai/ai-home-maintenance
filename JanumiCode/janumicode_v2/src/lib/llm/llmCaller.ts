@@ -185,13 +185,18 @@ export interface LLMCallerConfig {
 }
 
 /**
- * Hook signature for reasoning-review post-processing. Invoked once per
- * successful agent_output, with the freshly-written record's id and the
- * full LLM result. Synchronous: the LLMCaller awaits it before returning
- * to the phase handler. The hook itself decides whether to actually
- * review (see reasoningReviewer.shouldSkipReview for the guard chain).
+ * Hook signature for the reasoning-review HARNESS dispatch (Track D
+ * Commit 10 cutover). Invoked once per successful agent_output, with
+ * the freshly-written records' ids and the full LLM result. Synchronous:
+ * the LLMCaller awaits it before returning to the phase handler. The
+ * hook itself decides whether to actually run the harness (the harness
+ * loop-guard short-circuits for harness/json_repair internal calls).
+ *
+ * Replaces the prior single-pass `ReviewerHook` whose behaviour now
+ * lives entirely inside `runReviewHarness`.
  */
-export type ReviewerHook = (params: {
+export type ReviewHarnessHook = (params: {
+  agentInvocationId: string;
   agentOutputId: string;
   traceContext: LLMTraceContext;
   prompt: string;
@@ -232,7 +237,7 @@ export class LLMCaller {
   private _inFlightCount = 0;
   private eventBus: import('../events/eventBus').EventBus | null = null;
   private liveLogDir: string | null = null;
-  private reviewerHook: ReviewerHook | null = null;
+  private reviewHarnessHook: ReviewHarnessHook | null = null;
   private jsonRepairRouting: import('./jsonRepairLLM').JsonRepairRouting | null = null;
 
   constructor(private readonly config: LLMCallerConfig) {}
@@ -253,15 +258,16 @@ export class LLMCaller {
   }
 
   /**
-   * Attach a hook that runs after every successful agent_output is
-   * written. Used to wire up reasoning-review on every LLM call. The
-   * hook is invoked synchronously (awaited) so review findings land in
-   * governed_stream BEFORE the next phase runs and pushes them out of
-   * the user's attention. The hook itself is responsible for guarding
-   * against self-recursion (see reasoningReviewer.shouldSkipReview).
+   * Attach the reasoning-review HARNESS hook (Track D Commit 10).
+   * Runs after every successful agent_output is written. Invoked
+   * synchronously (awaited) so harness findings land in governed_stream
+   * BEFORE the next phase runs. The harness's own loop-guard
+   * short-circuits when the originating call's `agentRole` is
+   * `harness` / `json_repair` / `reasoning_review` so this is safe to
+   * unconditionally fire on every reviewable call.
    */
-  setReviewerHook(hook: ReviewerHook | null): void {
-    this.reviewerHook = hook;
+  setReviewHarnessHook(hook: ReviewHarnessHook | null): void {
+    this.reviewHarnessHook = hook;
   }
 
   /**
@@ -406,6 +412,13 @@ export class LLMCaller {
       // log monotonically even when individual tokens are tiny. 1.5 MB
       // of log file = practically certain to be stuck. Retryable up to
       // maxRetries so sampling variance can rescue the next attempt.
+      // Tuning history (cal-26 cycle): tried 100 KB and 256 KB to catch
+      // loops earlier; both falsely tripped on qwen3.5:9b's normal
+      // verbose-but-converging thinking on bloom/discovery sub-phases
+      // (user_journey_bloom hit 92 KB of legit deliberation before the
+      // model started emitting JSON). Reverted to 1.5 MB — the real
+      // loop pathology in cal-25 was at NFR saturation and is rare
+      // enough that letting it run longer is acceptable.
       const maxLogFileBytes = Number.parseInt(
         process.env.JANUMICODE_LLM_MAX_LOG_FILE_BYTES ?? '1572864', 10);
 
@@ -519,7 +532,7 @@ export class LLMCaller {
             durationMs: Date.now() - startedAt,
             retryAttempts,
           });
-          await this.runReviewerHook(agentOutputId, options, result);
+          await this.runReviewerHook(invocationId, agentOutputId, options, result);
           return result;
         } catch (err) {
           retryAttempts++;
@@ -580,7 +593,7 @@ export class LLMCaller {
             result.usedFallback = true;
             result.retryAttempts = retryAttempts;
             const { agentOutputId } = this.writeOutputRecords(invocationId, fallbackOptions, result, Date.now() - startedAt, null);
-            await this.runReviewerHook(agentOutputId, fallbackOptions, result);
+            await this.runReviewerHook(invocationId, agentOutputId, fallbackOptions, result);
             return result;
           } catch {
             // Fallback also failed — throw original error
@@ -821,13 +834,20 @@ export class LLMCaller {
    * paths to flow through the same review pipeline.
    */
   async runReviewerHook(
+    agentInvocationId: string | null,
     agentOutputId: string | null,
     options: { traceContext?: LLMTraceContext; prompt: string },
     result: LLMCallResult,
   ): Promise<void> {
-    if (!this.reviewerHook || !agentOutputId || !options.traceContext) return;
+    if (!this.reviewHarnessHook || !agentOutputId || !agentInvocationId || !options.traceContext) return;
+    // Loop-guard: skip review for harness-internal / json_repair calls.
+    // The harness's own loop-guard would also skip these, but checking
+    // here avoids the call entirely.
+    const role = options.traceContext.agentRole;
+    if (role === 'json_repair' || role === 'harness' || role === 'reasoning_review') return;
     try {
-      await this.reviewerHook({
+      await this.reviewHarnessHook({
+        agentInvocationId,
         agentOutputId,
         traceContext: options.traceContext,
         prompt: options.prompt,

@@ -1,0 +1,7 @@
+{
+  "validator": "source_grouping_coverage",
+  "sample": "05_domain_interpreter__business_domains_bloom",
+  "passed": true,
+  "expectedFindingCount": 0,
+  "overallAssessment": "All source-stated top-level groupings (the three product subsystems named in the source spec) are structurally represented by the proposed business domains. The output is comprehensive and structurally sound; no missing groupings, fabricated groupings, or coverage gaps were detected."
+}

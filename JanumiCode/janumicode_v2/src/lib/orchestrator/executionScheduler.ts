@@ -32,7 +32,7 @@ import type {
 } from '../types/records';
 import type { ExecutionContextBuilder, ImplementationTask as CtxTask } from './executionContextBuilder';
 import type { ExecutorAgent, ExecutionTask, ExecutionResult } from '../agents/executorAgent';
-import type { ReasoningReviewRecordContent } from '../types/records';
+import type { ReasoningReviewFindingRecordContent } from '../types/records';
 import {
   captureWaveSnapshot,
   diffWaveSnapshots,
@@ -556,13 +556,12 @@ export class ExecutionScheduler {
     // disabled, skipped, or not yet flushed), Phase 9 treats the task as
     // tentatively passing — gating absence is not a failure mode by
     // design (advisory, never blocking unless we explicitly opt in).
-    const reviewRecord = findReasoningReviewForInvocation(
+    const highSeverityFindings = findHighSeverityHarnessFindingsForInvocation(
       this.engine.db,
       workflowRunId,
       executionResult.invocationId,
     );
-    const highSeverityConcerns = reviewRecord?.concerns.filter(c => c.severity === 'HIGH') ?? [];
-    if (highSeverityConcerns.length > 0) {
+    if (highSeverityFindings.length > 0) {
       return {
         invocationId: executionResult.invocationId,
         testResult: null,
@@ -570,10 +569,10 @@ export class ExecutionScheduler {
           attempt_number: attemptNumber,
           invocation_id: executionResult.invocationId,
           outcome: 'reasoning_review_failed',
-          reasoning_review_flaws: highSeverityConcerns.map(c => ({
-            flaw_type: c.summary.slice(0, 80),
-            severity: c.severity.toLowerCase(),
-            description: c.detail,
+          reasoning_review_flaws: highSeverityFindings.map(f => ({
+            flaw_type: f.summary.slice(0, 80),
+            severity: f.severity.toLowerCase(),
+            description: f.detail,
           })),
           files_written_count: executionResult.filesWritten.length,
         },
@@ -798,19 +797,25 @@ function buildRetryContext(
 }
 
 /**
- * Look up the reasoning_review_record produced by the LLMCaller hook
- * for a given executor invocation. Walks `agent_invocation → agent_output
- * → reasoning_review_record` via derived_from_record_ids. Returns the
- * latest matching content (one review per output in practice, but
- * defensive on duplicates). Phase 9 uses this to decide whether the
- * executor's per-call review surfaced any HIGH-severity concerns that
- * should quarantine the leaf for retry.
+ * Look up HIGH-severity reasoning_review_finding_record entries the
+ * harness produced for a given executor invocation (Track D Commit 10).
+ *
+ * Replaces the prior single-pass `reasoning_review_record` lookup. The
+ * harness writes one parent `reasoning_review_harness_record` per
+ * agent_output, then one `reasoning_review_finding_record` per finding
+ * (per validator). Phase 9's quarantine policy continues to fire on
+ * any HIGH severity finding from any validator — exactly matching the
+ * old "any HIGH concern" semantics, just plumbed across multiple
+ * records instead of one.
+ *
+ * Walks `agent_invocation → agent_output → reasoning_review_harness_record
+ * → reasoning_review_finding_record` via derived_from_record_ids.
  */
-function findReasoningReviewForInvocation(
+function findHighSeverityHarnessFindingsForInvocation(
   db: import('../database/init').Database,
   workflowRunId: string,
   invocationId: string,
-): ReasoningReviewRecordContent | null {
+): Array<{ summary: string; detail: string; severity: string }> {
   // Find the agent_output(s) derived from the invocation.
   const outputRows = db.prepare(`
     SELECT id FROM governed_stream
@@ -819,27 +824,43 @@ function findReasoningReviewForInvocation(
       AND is_current_version = 1
       AND json_extract(derived_from_record_ids, '$') LIKE ?
   `).all(workflowRunId, `%${invocationId}%`) as Array<{ id: string }>;
-  if (outputRows.length === 0) return null;
-  // Find the latest reasoning_review_record derived from any of those outputs.
+  if (outputRows.length === 0) return [];
+
+  // Find the harness record(s) derived from any of those outputs.
+  const harnessIds: string[] = [];
   for (const out of outputRows) {
-    const reviewRow = db.prepare(`
-      SELECT content FROM governed_stream
+    const harnessRows = db.prepare(`
+      SELECT id FROM governed_stream
       WHERE workflow_run_id = ?
-        AND record_type = 'reasoning_review_record'
+        AND record_type = 'reasoning_review_harness_record'
         AND is_current_version = 1
         AND json_extract(derived_from_record_ids, '$') LIKE ?
-      ORDER BY produced_at DESC
-      LIMIT 1
-    `).get(workflowRunId, `%${out.id}%`) as { content: string } | undefined;
-    if (reviewRow) {
+    `).all(workflowRunId, `%${out.id}%`) as Array<{ id: string }>;
+    for (const r of harnessRows) harnessIds.push(r.id);
+  }
+  if (harnessIds.length === 0) return [];
+
+  const high: Array<{ summary: string; detail: string; severity: string }> = [];
+  for (const hid of harnessIds) {
+    const findingRows = db.prepare(`
+      SELECT content FROM governed_stream
+      WHERE workflow_run_id = ?
+        AND record_type = 'reasoning_review_finding_record'
+        AND is_current_version = 1
+        AND json_extract(derived_from_record_ids, '$') LIKE ?
+    `).all(workflowRunId, `%${hid}%`) as Array<{ content: string }>;
+    for (const row of findingRows) {
       try {
-        return JSON.parse(reviewRow.content) as ReasoningReviewRecordContent;
+        const c = JSON.parse(row.content) as ReasoningReviewFindingRecordContent;
+        if (c.severity === 'HIGH') {
+          high.push({ summary: c.summary, detail: c.detail, severity: c.severity });
+        }
       } catch {
-        return null;
+        /* tolerate partially-written rows */
       }
     }
   }
-  return null;
+  return high;
 }
 
 function emptyScheduleResult(): ExecutionScheduleResult {

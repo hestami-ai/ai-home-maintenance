@@ -18,12 +18,20 @@ import {
   type NfrSkeleton,
   type UnreachedSeedDeclaration,
 } from './verifyNfrCoverage';
+import {
+  autoFlagDroppedSeeds,
+  type SystemInferredUnreachedSeed,
+} from './autoFlagDroppedSeeds';
 
 export interface NfrBloomThreePassResult {
   nfrs: NfrSkeleton[];
   unreachedSeeds: UnreachedSeedDeclaration[];
   coverageGaps: NfrCoverageVerifierResult;
   selfHealDrops: string[];
+  /** Seeds the deterministic post-processor flagged because the agent
+   *  dropped them from both traces_to and unreached_seeds. Empty when
+   *  the agent's output already covered every input seed. */
+  autoFlaggedSeeds: SystemInferredUnreachedSeed[];
 }
 
 interface FormatHelpers {
@@ -291,6 +299,26 @@ export async function runNfrBloomThreePass(
     });
   }
   const enriched = await runEnrichmentPass(deps, skeletons);
+
+  // Deterministic post-processor: auto-flag any input seed (VV / COMP)
+  // the agent dropped from BOTH traces_to and unreached_seeds. The
+  // architectural rationale lives in autoFlagDroppedSeeds.ts; in short,
+  // enumeration discipline is a code concern, not an LLM concern. Without
+  // this, a sampling miss like cal-26's VV-LICENSE-MONITORING propagates
+  // to the verifier as a blocking gap and halts the run.
+  const { unreached: finalUnreached, autoFlagged } = autoFlagDroppedSeeds({
+    vvRequirements: deps.handoff.vvRequirements ?? [],
+    complianceItems: deps.handoff.complianceExtractedItems ?? [],
+    nfrs: enriched,
+    unreached,
+  });
+  if (autoFlagged.length > 0) {
+    getLogger().warn('workflow', 'Phase 2.2 auto-flagged dropped seeds (agent omitted from both traces and unreached_seeds)', {
+      count: autoFlagged.length,
+      seeds: autoFlagged.map(s => `${s.source_kind}:${s.seed_id}`),
+    });
+  }
+
   const coverageGaps = verifyNfrCoverage({
     vvRequirements: deps.handoff.vvRequirements ?? [],
     qualityAttributesCount: (deps.handoff.qualityAttributes ?? []).length,
@@ -299,12 +327,13 @@ export async function runNfrBloomThreePass(
     journeys: deps.handoff.userJourneys ?? [],
     acceptedFrIds: deps.acceptedFrIds,
     nfrs: enriched,
-    unreachedSeeds: unreached,
+    unreachedSeeds: finalUnreached,
   });
   return {
     nfrs: enriched,
-    unreachedSeeds: unreached,
+    unreachedSeeds: finalUnreached,
     coverageGaps,
     selfHealDrops: drops,
+    autoFlaggedSeeds: autoFlagged,
   };
 }
