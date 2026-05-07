@@ -609,12 +609,30 @@ const OPEN_QUESTION_LEADERS = new Set([
  * stays in decisions.
  */
 function classifyOutOfScopeEntries(
-  entries: string[],
+  entries: unknown[],
 ): { decisions: string[]; questions: string[] } {
   const decisions: string[] = [];
   const questions: string[] = [];
   for (const entry of entries) {
-    const trimmed = entry.trim();
+    // The LLM occasionally emits structured entries — `{ item, rationale }`
+    // or similar — instead of plain strings. Coerce to a usable string
+    // (preferring known fields) and skip anything we can't reduce to text.
+    let asString: string;
+    if (typeof entry === 'string') {
+      asString = entry;
+    } else if (entry && typeof entry === 'object') {
+      const obj = entry as Record<string, unknown>;
+      const candidate =
+        (typeof obj.item === 'string' && obj.item) ||
+        (typeof obj.text === 'string' && obj.text) ||
+        (typeof obj.description === 'string' && obj.description) ||
+        '';
+      if (!candidate) continue;
+      asString = candidate;
+    } else {
+      continue;
+    }
+    const trimmed = asString.trim();
     if (!trimmed) continue;
     if (trimmed.endsWith('?')) { questions.push(trimmed); continue; }
     const firstWord = trimmed.split(/\s+/, 1)[0]?.toLowerCase() ?? '';

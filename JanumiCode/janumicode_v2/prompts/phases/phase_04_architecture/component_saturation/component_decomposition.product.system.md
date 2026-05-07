@@ -164,6 +164,30 @@ For each child you produce, list any **architectural assumption, integration pat
 - If you cannot produce a child without first surfacing an architectural assumption, surface it — never invent silently.
 - `parent_branch_classification` is **required** and must be exactly one of the three enum values.
 
+# Hard rules — child shape (apply to every emitted child)
+
+**Dependency reference integrity** (prevents fabricated-namespace defect):
+- Every id in a child's `dependencies[].component_id` MUST resolve to: a sibling or parent component in the current saturation invocation, a depth-0 component id known from the input, or a component id explicitly listed under `sibling_context`. Do NOT mint dependency `component_id` values from the agent's own decomposition path namespace (e.g., a `comp-*` id you coined during this invocation that has not been declared upstream or as a sibling). Unknown forward references MUST be surfaced as `open_question` assumptions rather than silently committed as dependency ids.
+
+**Surfaced-assumption novelty + category discipline** (prevents re-surfacing and category drift):
+- Every entry in `surfaced_assumptions[]` MUST be genuinely novel — not already present in `existing_assumptions[]` by identity or paraphrase. Do not re-surface assumptions already on the existing list.
+- The `category` value MUST match content semantics using the definitions in the "Surfacing assumptions" section above:
+  - `boundary` — where one component ends and another begins
+  - `cross_cutting` — a horizontal concern the parent assumes is provided elsewhere
+  - `integration_pattern` — a communication or sync/async pattern
+  - `data_ownership` — which component owns canonical state
+  - `scaling_assumption` — load/throughput/horizontal-scale posture
+  - `tech_choice` — a technology commitment beyond active_constraints
+  - `open_question` — an unresolved architectural decision the human must make
+- An ungrounded technology name, algorithm, or vendor-specific product that is absent from `active_constraints` MUST be `open_question`, NOT `tech_choice`. Promoting a guess to `tech_choice` passes false assurance to downstream phases.
+
+**Parent-branch classification + fanout discipline** (prevents tier-assignment and fanout defects):
+- The `parent_branch_classification` value MUST be consistent with the structural test defined in Step 1:
+  - `atomic_component` — emit EXACTLY one Tier-D mirror child whose `name`, `responsibilities`, `dependencies`, and `domain_id` mirror the parent.
+  - `decomposable` — emit 1 to 12 children (no fewer, no more per the fanout rule above). 0 children means you should have picked `atomic_component`; >12 means the parent needs an intermediate Tier-A bloom rather than a flat list.
+  - `invalid_parent` — emit zero children with a structured `rationale`.
+- Each child's `tier` (A/B/C/D) MUST be consistent with its responsibilities' shape per the tier rubric. Do NOT assign Tier-D to a child whose responsibilities name a quality area, a workflow, or a coordination scope that implies further decomposition.
+
 # JSON Output Contract (strict — non-negotiable)
 
 - **No markdown fences.** Response starts with `{` and ends with `}`.

@@ -14,6 +14,7 @@ import type {
   PhaseId,
   TechnicalConstraint,
   DecompositionTask,
+  TaskCompletionCriterion,
   TaskDecompositionNodeContent,
 } from '../../types/records';
 import { getLogger } from '../../logging';
@@ -163,28 +164,14 @@ export class Phase6Handler implements PhaseHandler {
       rootLogicalIds = existingTaskRoots.map(r => (r.content as unknown as TaskDecompositionNodeContent).node_id);
     } else {
       const constraintIds = technicalConstraints.map(t => t.id);
-      rootTasks = planContent.tasks.map(t => ({
-        id: t.id,
-        name: t.id,
-        description: t.description,
-        task_type: t.task_type,
-        component_id: t.component_id,
-        component_responsibility: t.component_responsibility,
-        backing_tool: t.backing_tool,
-        estimated_complexity: t.estimated_complexity,
-        complexity_flag: t.complexity_flag,
-        completion_criteria: t.completion_criteria.map(c => ({
-          criterion_id: c.criterion_id,
-          description: c.description,
-          verification_method: c.verification_method,
-          artifact_ref: c.artifact_ref,
-        })),
-        write_directory_paths: t.write_directory_paths,
-        read_directory_paths: t.read_directory_paths,
-        dependency_task_ids: t.dependency_task_ids,
-        active_constraints: constraintIds,
-        traces_to: t.technical_spec_ids,
-      }));
+      rootTasks = planContent.tasks.map((t, taskIdx) => {
+        // cal-26 surfaced three LLM-output shape defects the prompt didn't
+        // explicitly forbid; coerce them defensively here so downstream
+        // saturation/render code sees a clean shape regardless of whether
+        // the (rewritten) prompt also enforces them. Logged via the
+        // post-coercion warning in normalizeRootTaskShape() below.
+        return normalizeRootTaskShape(t, taskIdx, constraintIds);
+      });
       rootNodeRecordIds = [];
       rootLogicalIds = [];
       for (const rt of rootTasks) {
@@ -513,11 +500,36 @@ export class Phase6Handler implements PhaseHandler {
 export function normalizeWorkspacePath(p: string): string {
   if (!p) return p;
   let out = p.replaceAll('\\', '/');
-  // Strip absolute system-root prefixes that won't exist under
+
+  // Strip Windows drive letters (e.g. `E:/Projects/.../src/foo` → after this
+  // step the leading `/` strip below gets us to the relative path). cal-26
+  // surfaced LLM-emitted absolute Windows paths into the project's actual
+  // source tree (E:/Projects/hestami-ai/janumicode_v2/src/components/...),
+  // which the prior normalizer left intact. The executor would then write
+  // into the live extension code rather than the workspace sandbox.
+  const driveMatch = /^([A-Za-z]):\//.exec(out);
+  if (driveMatch) {
+    out = out.slice(driveMatch[0].length);
+  }
+
+  // Strip absolute Linux system-root prefixes that won't exist under
   // workspacePath. Order matters — match longest first.
   for (const root of ['/opt/', '/var/', '/usr/', '/srv/']) {
     if (out.startsWith(root)) { out = out.slice(root.length); break; }
   }
+
+  // If the post-strip path still references the JanumiCode project root
+  // (Projects/hestami-ai/JanumiCode/janumicode_v2/), strip everything up
+  // through the trailing `/janumicode_v2/` so we end up with a path
+  // that's relative to the calibration workspace, not the project source.
+  // This prevents a Phase 9 executor from writing into the live extension
+  // code when the LLM emits absolute paths from training data.
+  const projectRootRe = /(?:^|\/)janumicode_v2\//;
+  const projectMatch = projectRootRe.exec(out);
+  if (projectMatch) {
+    out = out.slice(projectMatch.index + projectMatch[0].length);
+  }
+
   // Strip leading `/` or `./`.
   while (out.startsWith('/') || out.startsWith('./')) {
     out = out.startsWith('./') ? out.slice(2) : out.slice(1);
@@ -527,4 +539,135 @@ export function normalizeWorkspacePath(p: string): string {
   // Trim trailing slash for stability.
   if (out.endsWith('/') && out.length > 1) out = out.slice(0, -1);
   return out;
+}
+
+/**
+ * Coerce a Phase 6.1 LLM-emitted task into the canonical DecompositionTask
+ * shape that Phase 6.1a saturation + downstream consumers expect.
+ *
+ * cal-26 surfaced three classes of LLM-output drift the prompt didn't
+ * forbid:
+ *   - missing `name` field (LLM omitted it; we fell back to t.id, which
+ *     made sibling context render as `task-N: task-N`)
+ *   - `completion_criteria` emitted as array of strings, not objects
+ *     (renderer printed `[undefined] undefined` per item)
+ *   - `backing_tool` set to a language name like "Python" outside the
+ *     active_constraints stack (hallucinated from training data)
+ *
+ * The Phase 6 prompt rewrite (Track B) tightens the contract; this helper
+ * (Track A) catches whatever the LLM still drifts on. Logs a single
+ * structured warning per task that needed coercion so calibration can
+ * surface the rate.
+ */
+export function normalizeRootTaskShape(
+  raw: Record<string, unknown>,
+  taskIdx: number,
+  constraintIds: string[],
+): DecompositionTask {
+  const t = raw as Partial<DecompositionTask> & Record<string, unknown>;
+  const drifts: string[] = [];
+
+  // 1. `name` fallback: prompt should require it; if missing, derive from
+  // description (truncated) before falling back to id.
+  let name = typeof t.name === 'string' && t.name.trim().length > 0 ? t.name : null;
+  if (!name) {
+    const desc = typeof t.description === 'string' ? t.description.trim() : '';
+    if (desc.length > 0) {
+      name = desc.length > 80 ? `${desc.slice(0, 77)}...` : desc;
+      drifts.push('name_missing_derived_from_description');
+    } else {
+      name = String(t.id ?? `task-${taskIdx + 1}`);
+      drifts.push('name_missing_fell_back_to_id');
+    }
+  }
+
+  // 2. `completion_criteria` shape coercion: accept array of strings
+  // (cal-26 LLM behavior) by lifting each into an object with a synthetic
+  // criterion_id and verification_method=test_execution. Empty / missing
+  // arrays surface as a single placeholder so downstream invariants
+  // (Invariant IP-001 — at least one CC per task) can flag rather than
+  // crash on undefined access.
+  const rawCC = Array.isArray(t.completion_criteria) ? t.completion_criteria : [];
+  const completion_criteria: TaskCompletionCriterion[] = rawCC.map((c, idx) => {
+    if (typeof c === 'string') {
+      drifts.push('completion_criteria_string_coerced');
+      return {
+        criterion_id: `CC-${String(idx + 1).padStart(3, '0')}`,
+        description: c,
+        verification_method: 'test_execution',
+      };
+    }
+    if (c && typeof c === 'object') {
+      const cobj = c as Record<string, unknown>;
+      const criterion_id = typeof cobj.criterion_id === 'string'
+        ? cobj.criterion_id
+        : `CC-${String(idx + 1).padStart(3, '0')}`;
+      const description = typeof cobj.description === 'string'
+        ? cobj.description
+        : (typeof cobj.text === 'string' ? cobj.text : '(missing description)');
+      if (typeof cobj.criterion_id !== 'string') drifts.push('completion_criteria_missing_id');
+      if (typeof cobj.description !== 'string') drifts.push('completion_criteria_missing_description');
+      const verification_method = typeof cobj.verification_method === 'string'
+        ? cobj.verification_method as TaskCompletionCriterion['verification_method']
+        : 'test_execution';
+      const artifact_ref = typeof cobj.artifact_ref === 'string' ? cobj.artifact_ref : undefined;
+      return { criterion_id, description, verification_method, artifact_ref };
+    }
+    drifts.push('completion_criteria_unparseable');
+    return {
+      criterion_id: `CC-${String(idx + 1).padStart(3, '0')}`,
+      description: '(unparseable completion criterion)',
+      verification_method: 'test_execution',
+    };
+  });
+  if (completion_criteria.length === 0) {
+    drifts.push('completion_criteria_empty');
+  }
+
+  // 3. `backing_tool` constraint check: warn (do not auto-correct) when
+  // the LLM picks a language name outside the active_constraints stack.
+  // Auto-correcting is risky — the safer behavior is to flag, let the
+  // saturation pass's stricter prompt re-emit a sensible value, and surface
+  // the rate via warning logs.
+  const KNOWN_BACKING_TOOLS = new Set([
+    'claude_code_cli', 'codex_cli', 'gemini_cli', 'goose_cli', 'code_editor', 'direct_llm_api',
+  ]);
+  const backing_tool = typeof t.backing_tool === 'string' ? t.backing_tool : undefined;
+  if (backing_tool && !KNOWN_BACKING_TOOLS.has(backing_tool)) {
+    drifts.push(`backing_tool_outside_known_set:${backing_tool}`);
+  }
+
+  if (drifts.length > 0) {
+    getLogger().warn('workflow', 'Phase 6.1 task shape drift coerced', {
+      task_id: t.id,
+      task_idx: taskIdx,
+      drifts,
+    });
+  }
+
+  return {
+    id: String(t.id ?? `task-${taskIdx + 1}`),
+    name,
+    description: typeof t.description === 'string' ? t.description : '',
+    task_type: t.task_type as DecompositionTask['task_type'],
+    component_id: typeof t.component_id === 'string' ? t.component_id : '',
+    component_responsibility: typeof t.component_responsibility === 'string' ? t.component_responsibility : '',
+    backing_tool,
+    estimated_complexity: t.estimated_complexity as DecompositionTask['estimated_complexity'],
+    complexity_flag: typeof t.complexity_flag === 'string' ? t.complexity_flag : undefined,
+    completion_criteria,
+    write_directory_paths: Array.isArray(t.write_directory_paths)
+      ? t.write_directory_paths.filter((p): p is string => typeof p === 'string').map(normalizeWorkspacePath)
+      : [],
+    read_directory_paths: Array.isArray(t.read_directory_paths)
+      ? t.read_directory_paths.filter((p): p is string => typeof p === 'string').map(normalizeWorkspacePath)
+      : [],
+    dependency_task_ids: Array.isArray(t.dependency_task_ids)
+      ? t.dependency_task_ids.filter((p): p is string => typeof p === 'string')
+      : [],
+    active_constraints: constraintIds,
+    traces_to: Array.isArray((t as Record<string, unknown>).technical_spec_ids)
+      ? ((t as Record<string, unknown>).technical_spec_ids as unknown[]).filter((p): p is string => typeof p === 'string')
+      : (Array.isArray(t.traces_to) ? t.traces_to.filter((p): p is string => typeof p === 'string') : []),
+  };
 }

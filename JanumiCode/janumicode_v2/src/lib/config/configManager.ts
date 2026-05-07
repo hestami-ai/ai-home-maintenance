@@ -105,6 +105,15 @@ export interface JanumiCodeConfig {
     fanout_cap: number;
     mirror_gate_depth: number;
     /**
+     * Thin-slice support: cap how many depth-0 root FRs/NFRs from
+     * Phase 2.1/2.2 bloom feed into the saturation loop. Default 0 =
+     * no cap (every bloom root is saturated). `--thin-slice` mode sets
+     * these to a small N (e.g. 2) so total saturation cost is bounded
+     * while every Phase 2 prompt template still fires end-to-end.
+     */
+    max_root_count_fr: number;
+    max_root_count_nfr: number;
+    /**
      * Wave 6 Step 4c — when true, after each post-gate decomposition
      * pass produces Tier-C/D children under a previously-accepted
      * Tier-B parent, run a Reasoning Review pass to audit whether the
@@ -408,6 +417,8 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     budget_cap: 500,
     fanout_cap: 8,
     mirror_gate_depth: 2,
+    max_root_count_fr: 0,
+    max_root_count_nfr: 0,
     reasoning_review_on_tier_c: false,
     // Wave 7 component-tree caps. Component trees are typically
     // shallower than requirement trees (depth_cap=6), with higher
@@ -621,6 +632,28 @@ export class ConfigManager {
    */
   setRequirementsAgentRouting(override: NonNullable<JanumiCodeConfig['llm_routing']['requirements_agent']>): void {
     this.config.llm_routing.requirements_agent = override;
+  }
+
+  /**
+   * Override fields on the `decomposition` block at runtime. Used by
+   * `--thin-slice` mode to tighten depth/fanout/budget caps and limit
+   * root counts so a calibration run exercises every prompt template
+   * end-to-end without saturating fully. Only the fields present in
+   * `override` are touched; other fields keep their existing values.
+   */
+  setDecompositionOverrides(override: Partial<JanumiCodeConfig['decomposition']>): void {
+    this.config.decomposition = { ...this.config.decomposition, ...override };
+  }
+
+  /**
+   * Override fields on the `workflow` block at runtime. Used by
+   * `--thin-slice` mode to extend the records-idle stall window so a
+   * single legitimate slow LLM call (Phase 1 bloom prompts can take
+   * several minutes of verbose-but-converging output on qwen3.5:9b)
+   * doesn't trip the stall detector. Mirrors `setDecompositionOverrides`.
+   */
+  setWorkflowOverrides(override: Partial<JanumiCodeConfig['workflow']>): void {
+    this.config.workflow = { ...this.config.workflow, ...override };
   }
 
   /**

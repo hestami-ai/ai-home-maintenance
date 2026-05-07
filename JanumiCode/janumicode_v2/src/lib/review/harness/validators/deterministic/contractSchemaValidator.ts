@@ -133,6 +133,141 @@ const CONTRACT_SCHEMAS: Record<string, ContractSchema> = {
   'requirements_agent:nfr_bloom_enrichment': {
     required: { nfrs: { type: 'array' } },
   },
+
+  // ── Phase 3: systems_agent sub-phases ──────────────────────────────────
+
+  // S15 — systems_agent / system_boundary (3.1)
+  // Evidence: sample 15. Top-level: in_scope[], out_of_scope[], external_systems[].
+  'systems_agent:system_boundary': {
+    required: {
+      in_scope: { type: 'array' },
+      out_of_scope: { type: 'array' },
+      external_systems: { type: 'array' },
+    },
+  },
+
+  // S16 — systems_agent / system_requirements (3.2)
+  // Evidence: sample 16. Top-level: system_requirements[].
+  // Each item has: id, statement, source_requirement_ids[], priority.
+  'systems_agent:system_requirements': {
+    required: {
+      system_requirements: { type: 'array' },
+    },
+  },
+
+  // S17 — systems_agent / interface_contracts (3.3)
+  // Evidence: sample 17. Top-level: contracts[].
+  // Each item has: id, systems_involved[], protocol, data_format, auth_mechanism.
+  'systems_agent:interface_contracts': {
+    required: {
+      contracts: { type: 'array' },
+    },
+  },
+
+  // ── Phase 4: architecture_agent sub-phases ─────────────────────────────
+
+  // S18 — architecture_agent / software_domains (4.1)
+  // Evidence: sample 18. Top-level: software_domains[].
+  // Each item has: id, name, ubiquitous_language[], system_requirement_ids[].
+  'architecture_agent:software_domains': {
+    required: {
+      software_domains: { type: 'array' },
+    },
+  },
+
+  // S19 — architecture_agent / component_skeleton (4.2)
+  // Evidence: sample 19. Top-level: components[].
+  // Each item has: id, name, domain_id, responsibilities[], dependencies[].
+  'architecture_agent:component_skeleton': {
+    required: {
+      components: { type: 'array' },
+    },
+  },
+
+  // S20 — architecture_agent / adr_capture (4.3)
+  // Evidence: sample 20. Top-level: architectural_decisions[] (array of ADR objects directly).
+  // NOTE: accepted_rationale[] does NOT exist in the agent's schema — the prompt notes this gap
+  // and falls back to rationale. adr_status_discipline_validator enforces the status rules.
+  // Each ADR has: id, title, status (proposed|accepted), context, decision, alternatives[], rationale, consequences.
+  'architecture_agent:adr_capture': {
+    required: {
+      architectural_decisions: { type: 'array' },
+    },
+  },
+
+  // S21 — domain_interpreter / component_saturation (4.2a)
+  // Evidence: sample 21a/21b. Top-level: parent_branch_classification, parent_tier_assessment{}, children[].
+  'domain_interpreter:component_saturation': {
+    required: {
+      parent_branch_classification: {
+        type: 'string',
+        enum: ['decomposable', 'atomic_leaf', 'invalid_parent'],
+      },
+      parent_tier_assessment: { type: 'object' },
+      children: { type: 'array' },
+    },
+  },
+
+  // ── Phase 5: technical_spec_agent sub-phases ───────────────────────────
+
+  // S22 — technical_spec_agent / data_model_skeleton (5.1)
+  // Evidence: sample 22. Top-level: data_models[].
+  // Each item has: component_id, entities[].
+  'technical_spec_agent:data_model_skeleton': {
+    required: {
+      data_models: { type: 'array' },
+    },
+  },
+
+  // S23 — technical_spec_agent / api_definitions (5.2)
+  // Evidence: sample 23. Top-level: api_definitions[].
+  // Each item has: component_id, endpoints[].
+  'technical_spec_agent:api_definitions': {
+    required: {
+      api_definitions: { type: 'array' },
+    },
+  },
+
+  // S24 — technical_spec_agent / error_handling (5.3)
+  // Evidence: sample 24. Top-level: strategies[] (note: prompt schema name is
+  // error_handling_strategies but agent emits root key 'strategies'; prompt text at sample 24
+  // shows the agent's self-correction "root key is likely 'strategies'"). Contract registers
+  // 'strategies' since that is what the agent emits per sample evidence.
+  // Each item has: component_id, error_types[], detection, response, surfacing, error_payload.
+  'technical_spec_agent:error_handling': {
+    required: {
+      strategies: { type: 'array' },
+    },
+    optional: {
+      error_handling_strategies: { type: 'array' },
+    },
+  },
+
+  // S25 — technical_spec_agent / configuration_parameters (5.4)
+  // Evidence: sample 25. Top-level: params[].
+  // Each item has: component_id, name, type, default (nullable), required (bool), description.
+  'technical_spec_agent:configuration_parameters': {
+    required: {
+      params: { type: 'array' },
+    },
+    optional: {
+      configuration_parameters: { type: 'array' },
+    },
+  },
+
+  // S26 — technical_spec_agent / data_model_saturation (5.x)
+  // Evidence: samples 26a/26b. Top-level: parent_branch_classification, parent_tier_assessment{}, children[].
+  // Same shape as component_saturation (S21) but entity-surface rubric (decomposable/atomic_value/invalid_parent).
+  'technical_spec_agent:data_model_saturation': {
+    required: {
+      parent_branch_classification: {
+        type: 'string',
+        enum: ['decomposable', 'atomic_value', 'invalid_parent'],
+      },
+      parent_tier_assessment: { type: 'object' },
+      children: { type: 'array' },
+    },
+  },
 };
 
 function getJsonType(value: unknown): string {

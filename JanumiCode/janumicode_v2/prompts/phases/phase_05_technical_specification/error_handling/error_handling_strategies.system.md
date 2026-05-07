@@ -22,7 +22,8 @@ GOVERNING CONSTRAINTS (apply without exception):
 
 Produce [JC:Error Handling Strategies] for each Component — how errors are detected, classified, responded to, and surfaced.
 
-REQUIRED OUTPUT: A JSON object matching the `error_handling_strategies` schema:
+REQUIRED OUTPUT: A JSON object whose top-level key is `strategies` (an array). The contract schema is named `error_handling_strategies`, but the emitted JSON root key MUST be `strategies` — do NOT wrap the array under an `error_handling_strategies` key.
+
 - strategies: array, each with:
   - component_id
   - error_types: array of classified error categories (e.g., validation, authorization, timeout, internal)
@@ -34,6 +35,27 @@ Rules:
 - Every Component must have at least one error handling strategy
 - Error types must be specific, not generic ("validation_error", not "error")
 - Detection and response strategies must be concrete and implementable
+
+# Hard rules — JSON output discipline
+
+- Response MUST start with `{` and end with `}`. NO markdown fence wrappers (```json, ```), NO leading commentary, NO trailing prose.
+- Enforced by `json_output_discipline_check` (catalog §1).
+
+# Hard rules — error-type source attestation
+
+- Each entry in `error_types[]` MUST be one of:
+  - (a) a concrete error name documented in upstream source / `api_definitions_summary` / `system_requirements_summary` (e.g., a 4xx/5xx error category named in an existing API definition);
+  - (b) a generic platform-level error type (HTTP 4xx/5xx codes, OS-level signal classes, transport-layer canonical names like `EHOSTUNREACH`);
+  - (c) an `open_question` placeholder when source is silent on the specific error class (e.g., `error_types: ["__OPEN_QUESTION__: which validation errors does the asset-upload pipeline surface?"]`).
+- Do NOT invent domain-specific error names (e.g., `EVENT_LEDGER_OVERFLOW`, `CAM_GOVERNANCE_VIOLATION`) that are absent from upstream source. Cal-26 sample 24 emitted 18 such inventions across components — this rule directly catches that pattern.
+- The "specific, not generic" rule above does NOT license invention; specificity must come from upstream documentation, not the model's domain priors.
+- Enforced by `error_type_source_attestation_validator` (catalog §6, role-specific outlier).
+
+# Hard rules — operational-specifics grounding
+
+- The `detection`, `response`, and `surfacing` fields MUST describe upstream-grounded mechanisms, not invented detection regex patterns or fabricated tooling specifics.
+- Generic descriptions ("middleware-based exception capture", "exponential backoff with jitter") are acceptable when upstream is silent on the specific mechanism. Concrete tooling names (specific middleware library names, specific retry-strategy library names) MUST be grounded in `active_constraints` / upstream tech.
+- Enforced by `ungrounded_operational_specifics` parameterization C (catalog §2).
 
 CONTEXT:
 System Requirements (Phase 3.2 — error-handling expectations from each SR): {{system_requirements_summary}}

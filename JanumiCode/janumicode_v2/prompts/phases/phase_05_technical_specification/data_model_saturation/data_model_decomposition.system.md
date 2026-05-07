@@ -130,6 +130,38 @@ For each child you produce, list any **identity choice, ownership decision, card
 - `parent_branch_classification` is required and exactly one of the three values.
 - Use `decomposition_rationale` to explain *why this child, not another*.
 
+# Hard rules — child shape (apply to every emitted child)
+
+**Trace-id integrity:**
+- Every id in a child's `relationships[].target_entity_id` MUST resolve to a sibling/parent/ancestor entity in the saturation tree, OR a depth-0 entity, OR a known reference from the input. Do NOT mint entity ids from the agent's own decomposition path namespace. Enforced by `traces_to_id_validity` (catalog §5.4.1, parameterized for `relationships[].target_entity_id`).
+
+**Surfaced-assumption novelty + category discipline:**
+- Every `surfaced_assumptions[]` entry MUST be NOT already present (by id or paraphrase) in `existing_assumptions`. Do not re-surface assumptions already on the list.
+- The `category` value MUST match content semantics:
+  - `lifecycle` — append-only / mutability / state-transition discipline grounded in upstream
+  - `constraint` — system-internal/architectural restriction grounded in source or upstream tier
+  - `scope` — bounding the deliverable
+  - `open_question` — UNGROUNDED numeric / temporal / regulatory claim that the human must resolve
+- An ungrounded numeric or temporal commitment MUST be `open_question`, NOT `lifecycle` or `constraint`. Enforced by `surfaced_assumption_novelty` (catalog §5.4).
+
+**Parent-branch classification + fanout discipline:**
+- `parent_branch_classification` MUST be consistent with the structural test:
+  - `atomic_leaf` — emit EXACTLY one Tier-D mirror child whose name/fields/relationships mirror the parent.
+  - `decomposable` — emit 1 to 8 children. 0 children means you should have picked atomic_leaf; >8 children means the parent is a quality area that needs an intermediate Tier-A bloom rather than a flat list.
+  - `invalid_parent` — emit zero children with structured `rationale`.
+- Each child's `tier` MUST be consistent with its `kind` and field count per the catalog tier rubric. Enforced by `decomposition_fanout_discipline` and `tier_assignment_audit` (catalog §5.4).
+
+# Hard rules — entity-kind consistency
+
+- Each child entity's `kind` field (`entity`, `value_object`, `aggregate`, `enum`, etc.) MUST be consistent with the parent's structural pattern: a child of an `entity` parent is typically `value_object` or another `entity`; a child of an `aggregate` parent is an `entity` or `value_object`.
+- Do NOT silently change `kind` across parent-child boundaries without explicit `decomposition_rationale` justifying the kind change. Cal-26 sample 26a surfaced silent entity-kind drift on a depth-0 saturation; this rule prevents that.
+- Enforced by `entity_kind_consistency_validator` (catalog §5.4 saturation family).
+
+# Hard rules — tier-override discipline
+
+- When a child's assessed `tier` differs from the parent tier hint passed by the orchestrator (e.g., parent hint is B but child is assessed as D), the override MUST include explanatory rationale in the `decomposition_rationale` field. Silent tier override loses the audit trail of why the agent disagreed with the upstream tier signal.
+- Enforced by `tier_override_assumption_validator` (catalog §5.4 saturation family).
+
 # JSON Output Contract (strict — non-negotiable)
 
 - **No markdown fences.** Response starts with `{` and ends with `}`.

@@ -70,6 +70,8 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     budget_cap: 500,
     fanout_cap: 8,
     mirror_gate_depth: 2,
+    max_root_count_fr: 0,
+    max_root_count_nfr: 0,
     reasoning_review_on_tier_c: false,
     // Wave 7 component-tree caps — see configManager.ts for rationale.
     component_depth_cap: 6,

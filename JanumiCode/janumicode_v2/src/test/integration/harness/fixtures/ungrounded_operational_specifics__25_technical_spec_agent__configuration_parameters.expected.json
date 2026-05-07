@@ -1,0 +1,7 @@
+{
+  "validator": "ungrounded_operational_specifics",
+  "sample": "25_technical_spec_agent__configuration_parameters",
+  "passed": false,
+  "expectedFindingCount": 10,
+  "overallAssessment": "The agent systematically fabricated concrete deployment-specific defaults across configuration parameters: explicit endpoint URLs (https://api.internal/hestami/...), bucket names, webhook URLs, and specific format strings (uuid-4) that are not present in the upstream system requirements or component model. Parameterization-C applies to this Phase 5.4 surface. Multiple HIGH-severity findings for endpoint URL defaults; MEDIUM for numeric defaults not in upstream. The sample 25 harness record shows 13 HIGH unsupported_endpoint findings from grounding_validator confirming the pattern — this validator adds specificity by focusing on the configuration_parameters field path set."
+}

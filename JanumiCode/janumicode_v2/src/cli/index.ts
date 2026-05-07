@@ -52,11 +52,12 @@ program
   .option('--capture-output-dir <path>', 'Directory to save captured fixtures')
   .option('--resume-from-db <path>', 'Resume from a prior run DB (skip bootstrapIntent)')
   .option('--resume-at-phase <phase>', 'Phase to resume at (requires --resume-from-db)')
+  .option('--thin-slice', 'Constrain decomposition (depth=2, fanout=1, ~2 roots per kind, all reasoning_review on) so every prompt template fires end-to-end in hours, not days. Used for prompt-template validation.', false)
   .option('--json', 'Emit the full HarnessResult as JSON on stdout instead of the human banner. Intended for virtuous-cycle coding agents that parse the result programmatically.', false)
   .option('--llm-gap-enhance', 'Call an LLM to produce a grounded suggested_fix on the gap report. Opt-in: adds one LLM call per failed run.', false)
   .option('--llm-gap-provider <provider>', 'Provider for --llm-gap-enhance (default: ollama).', 'ollama')
   .option('--llm-gap-model <model>', 'Model for --llm-gap-enhance (default: qwen3.5:9b).', 'qwen3.5:9b')
-  .action(async (options: { intent: string; workspace: string; llmMode: string; autoApprove: boolean; phaseLimit?: string; fixtureDir?: string; gapReport?: string; decisionOverrides?: string; captureFixtures?: boolean; captureOutputDir?: string; resumeFromDb?: string; resumeAtPhase?: string; json?: boolean; llmGapEnhance?: boolean; llmGapProvider?: string; llmGapModel?: string }) => {
+  .action(async (options: { intent: string; workspace: string; llmMode: string; autoApprove: boolean; phaseLimit?: string; fixtureDir?: string; gapReport?: string; decisionOverrides?: string; captureFixtures?: boolean; captureOutputDir?: string; resumeFromDb?: string; resumeAtPhase?: string; thinSlice?: boolean; json?: boolean; llmGapEnhance?: boolean; llmGapProvider?: string; llmGapModel?: string }) => {
     // When JSON output is requested, redirect INFO/DEBUG logs to stderr
     // via the logging handler's env-controlled switch. Otherwise stdout
     // would carry both JSON and logger lines, and nothing downstream
@@ -103,6 +104,7 @@ program
       captureOutputDir: options.captureOutputDir ? path.resolve(options.captureOutputDir) : undefined,
       resumeFromDb: options.resumeFromDb ? path.resolve(options.resumeFromDb) : undefined,
       resumeAtPhase: options.resumeAtPhase,
+      thinSlice: options.thinSlice,
       llmGapEnhance: options.llmGapEnhance
         ? {
             provider: options.llmGapProvider ?? 'ollama',

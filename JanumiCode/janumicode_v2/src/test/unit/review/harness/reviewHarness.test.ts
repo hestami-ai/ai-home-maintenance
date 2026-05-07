@@ -93,7 +93,7 @@ describe('runReviewHarness — dispatch infrastructure', () => {
         agentOutputId: 'out-1',
         traceContext: makeTraceContext(),
         prompt: 'p',
-        result: emptyResult({ text: 'response', parsed: { ok: true } }),
+        result: emptyResult({ text: '{}', parsed: { ok: true } }),
       },
       caller,
       writerCtx.writer,
@@ -122,7 +122,7 @@ describe('runReviewHarness — dispatch infrastructure', () => {
         agentOutputId: 'out-1',
         traceContext: makeTraceContext(),
         prompt: 'p',
-        result: emptyResult({ text: 'r', parsed: { ok: true } }),
+        result: emptyResult({ text: '{}', parsed: { ok: true } }),
       },
       caller,
       writerCtx.writer,
@@ -204,7 +204,7 @@ describe('runReviewHarness — dispatch infrastructure', () => {
         agentOutputId: 'out-1',
         traceContext: makeTraceContext(),
         prompt: 'p',
-        result: emptyResult({ text: 'r', parsed: { ok: true } }),
+        result: emptyResult({ text: '{}', parsed: { ok: true } }),
       },
       caller,
       writerCtx.writer,
@@ -254,7 +254,7 @@ describe('runReviewHarness — dispatch infrastructure', () => {
         agentOutputId: 'out-1',
         traceContext: makeTraceContext(),
         prompt: 'p',
-        result: emptyResult({ text: 'r', parsed: { ok: true } }),
+        result: emptyResult({ text: '{}', parsed: { ok: true } }),
       },
       caller,
       writerCtx.writer,
@@ -295,7 +295,7 @@ describe('runReviewHarness — dispatch infrastructure', () => {
           label: 'test',
         },
         prompt: 'p',
-        result: emptyResult({ text: 'r', parsed: { ok: true } }),
+        result: emptyResult({ text: '{}', parsed: { ok: true } }),
       },
       caller,
       writerCtx.writer,
@@ -320,7 +320,7 @@ describe('runReviewHarness — dispatch infrastructure', () => {
         agentOutputId: 'out-1',
         traceContext: makeTraceContext(),
         prompt: 'p',
-        result: emptyResult({ text: 'r', parsed: { ok: true } }),
+        result: emptyResult({ text: '{}', parsed: { ok: true } }),
       },
       caller,
       writerCtx.writer,
@@ -343,7 +343,7 @@ describe('runReviewHarness — dispatch infrastructure', () => {
         agentOutputId: 'out-1',
         traceContext: makeTraceContext(),
         prompt: 'p',
-        result: emptyResult({ text: 'r', parsed: { ok: true } }),
+        result: emptyResult({ text: '{}', parsed: { ok: true } }),
       },
       caller,
       writerCtx.writer,
@@ -380,7 +380,7 @@ describe('runReviewHarness — dispatch infrastructure', () => {
         agentOutputId: 'out-1',
         traceContext: makeTraceContext(),
         prompt: 'p',
-        result: emptyResult({ text: 'r', parsed: { ok: true } }),
+        result: emptyResult({ text: '{}', parsed: { ok: true } }),
       },
       caller,
       writerCtx.writer,
@@ -423,7 +423,7 @@ describe('runReviewHarness — dispatch infrastructure', () => {
         agentOutputId: 'out-1',
         traceContext: makeTraceContext(),
         prompt: 'p',
-        result: emptyResult({ text: 'r', parsed: { ok: true } }),
+        result: emptyResult({ text: '{}', parsed: { ok: true } }),
       },
       caller,
       writerCtx.writer,
@@ -436,5 +436,73 @@ describe('runReviewHarness — dispatch infrastructure', () => {
       .find((c) => c.status === 'completed');
     expect(completed!.total_input_tokens).toBe(0);
     expect(completed!.total_output_tokens).toBe(0);
+  });
+
+  // ── json_output_discipline_check short-circuit (catalog §1 option a) ──
+
+  it('short-circuits LLM validator chain when json_output_discipline_check fires HIGH, writes REVISE with fixed rationale', async () => {
+    // Use technical_spec_agent/data_model_skeleton — one of the bundles
+    // that includes json_output_discipline_check as the pre-validator.
+    // Pass markdown-fenced JSON as the raw outputText to trigger the
+    // json_output_discipline_check HIGH finding.
+    const { caller, callMock } = makeLLMCaller(async () =>
+      emptyResult({ text: '{"findings":[]}', parsed: { findings: [] } }),
+    );
+
+    await runReviewHarness(
+      {
+        agentInvocationId: 'inv-1',
+        agentOutputId: 'out-1',
+        traceContext: {
+          workflowRunId: 'wf-1',
+          phaseId: '5',
+          subPhaseId: 'data_model_skeleton',
+          agentRole: 'technical_spec_agent' as LLMTraceContext['agentRole'],
+          label: 'test',
+        },
+        prompt: 'p',
+        // Markdown-fenced JSON triggers json_output_discipline_check HIGH.
+        result: emptyResult({
+          text: '```json\n{"data_models":[]}\n```',
+          parsed: { data_models: [] },
+        }),
+      },
+      caller,
+      writerCtx.writer,
+      'sha',
+      // Templates present so LLM validators would run IF not short-circuited.
+      makeTemplateLoader(true),
+    );
+
+    // Assert: final_synthesis LLM invoke was NOT called (all LLM validators
+    // short-circuited). LLM caller may have been called for pre-validator
+    // (json_output_discipline_check is deterministic — no LLM call) but
+    // must not have been called for final_synthesis or other LLM validators.
+    // Since json_output_discipline_check is deterministic, callMock should
+    // not have been called at all.
+    expect(callMock).not.toHaveBeenCalled();
+
+    // Assert: harness record has REVISE decision with the fixed short-circuit rationale.
+    const completed = writerCtx.written
+      .filter((r) => r.options.record_type === 'reasoning_review_harness_record')
+      .map((r) => r.options.content as Record<string, unknown>)
+      .find((c) => c.status === 'completed');
+    expect(completed).toBeDefined();
+    expect(completed!.decision_recommendation).toBe('REVISE');
+    expect(typeof completed!.decision_rationale).toBe('string');
+    expect((completed!.decision_rationale as string)).toContain('json_output_discipline_check');
+    expect((completed!.decision_rationale as string)).toContain('short-circuited');
+
+    // Assert: the json_output_discipline_check finding is present in allFindings.
+    const findingRecords = writerCtx.written.filter(
+      (r) => r.options.record_type === 'reasoning_review_finding_record',
+    );
+    const preValidatorFinding = findingRecords.find(
+      (r) =>
+        (r.options.content as Record<string, unknown>).validator_id ===
+        'json_output_discipline_check',
+    );
+    expect(preValidatorFinding).toBeDefined();
+    expect((preValidatorFinding!.options.content as Record<string, unknown>).severity).toBe('HIGH');
   });
 });

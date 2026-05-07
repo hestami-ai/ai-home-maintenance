@@ -179,6 +179,20 @@ export async function runReviewHarness(
   });
 
   // ── 4. Sequentially dispatch each validator ────────────────────
+  //
+  // PRE-VALIDATOR HOOK: json_output_discipline_check
+  // ─────────────────────────────────────────────────────────────
+  // This validator runs BEFORE the LLM validator chain (catalog §1).
+  // If it fires HIGH findings (markdown fence / leading prose), the harness
+  // sets shortCircuitLLM=true and skips all subsequent LLM validators.
+  // Deterministic validators still run — they are cheap and may surface
+  // additional structural issues even on broken JSON.
+  //
+  // Wiring: json_output_discipline_check must be the first entry in any
+  // dispatch bundle where it appears. The pre-check extracts it from the
+  // dispatched list, runs it, and re-integrates findings into allFindings.
+  // The main dispatch loop then skips LLM validators when shortCircuitLLM=true.
+
   const allFindings: ValidatorFinding[] = [];
   const failures: { validatorId: string; error: string }[] = [];
   // Per-validator token capture (Commit 9). Keyed by validatorId; the
@@ -198,7 +212,52 @@ export async function runReviewHarness(
     if (typeof usage.outputTokens === 'number') totalOutputTokens += usage.outputTokens;
   };
 
+  // Pre-validator: run json_output_discipline_check if dispatched.
+  // Short-circuit LLM validators on HIGH findings.
+  let shortCircuitLLM = false;
+  const preValidatorEntry = dispatched.find((v) => v.id === 'json_output_discipline_check');
+  if (preValidatorEntry) {
+    const preParams: ValidatorRuntimeParams = {
+      agentRole: effectiveRole,
+      subPhaseId,
+      agentOutputId,
+      outputText: result.text ?? '',
+      outputContent,
+      outputThinking,
+      originalPrompt: prompt,
+      originalSystem: null,
+      upstreamFindings: [],
+    };
+    const preFindings = await runOneValidator(
+      preValidatorEntry,
+      preParams,
+      llmCaller,
+      templateLoader,
+      { upstreamTrace: traceContext, failures, recordLLMUsage, harnessRouting },
+    );
+    for (const finding of preFindings) {
+      allFindings.push(finding);
+      writeFindingRecord({
+        writer,
+        baseRecordOptions,
+        harnessId,
+        harnessRecordId: initialHarnessRecord.id,
+        finding,
+        durationMs: 0,
+        inputTokens: null,
+        outputTokens: null,
+      });
+    }
+    if (preFindings.some((f) => f.severity === 'HIGH')) {
+      shortCircuitLLM = true;
+    }
+  }
+
   for (const entry of dispatched) {
+    // Skip the pre-validator in the main loop (already ran above).
+    if (entry.id === 'json_output_discipline_check') continue;
+    // Short-circuit: skip LLM validators when pre-validator fired HIGH.
+    if (shortCircuitLLM && entry.kind === 'llm') continue;
     const runtimeParams: ValidatorRuntimeParams = {
       agentRole: effectiveRole,
       subPhaseId,
@@ -250,7 +309,28 @@ export async function runReviewHarness(
   const policyInputs = allFindings.filter(
     (f) => f.validatorId !== 'final_synthesis',
   );
-  const decisionResult = computeFinalSynthesisDecision(policyInputs, failures);
+
+  // Short-circuit decision: when json_output_discipline_check fired HIGH,
+  // all LLM validators were skipped (shortCircuitLLM=true). In that case
+  // we emit a fixed REVISE decision with a clear rationale instead of
+  // running the normal policy computation, so the caller knows exactly
+  // why the chain was aborted. (Catalog spec: option (a) from §1.)
+  //
+  // The normal policy would compute REVISE anyway for a single HIGH
+  // finding, but the rationale would be generic ("1 HIGH finding; ->
+  // REVISE"). The fixed rationale is more actionable.
+  let decisionResult = computeFinalSynthesisDecision(policyInputs, failures);
+  if (shortCircuitLLM) {
+    decisionResult = {
+      ...decisionResult,
+      decision: 'REVISE',
+      rationale:
+        'Pre-validator json_output_discipline_check fired HIGH severity; ' +
+        'LLM validator chain short-circuited. ' +
+        'JSON output discipline must be addressed before semantic review can run.',
+      contractDesignFindings: [],
+    };
+  }
 
   const counts = countBySeverity(allFindings);
   // Pull out the LLM narrative from the final_synthesis finding (when

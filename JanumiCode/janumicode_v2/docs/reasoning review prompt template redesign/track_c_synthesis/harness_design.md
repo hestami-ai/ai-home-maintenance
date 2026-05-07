@@ -26,7 +26,9 @@ For each `(agent_role, sub_phase)` pair drawn from the 12 sampled assessments + 
 
 ### 2.1 Sampled (agent_role, sub_phase) pairs
 
-Listed in display-code order (cross-reference `phaseManifest.ts`):
+Listed in display-code order (cross-reference `phaseManifest.ts`).
+
+**Family-sharing note (cal-26 Phase 4):** `domain_interpreter / component_saturation` (entry 4.2a below) shares the §5.4 saturation-class family with `requirements_agent / fr_saturation` (entry 2.1.4) and `requirements_agent / nfr_saturation` (entry 2.2.4) — same family, different role and surface. The decomposition rubric is isomorphic; `traces_to_id_validity` is parameterized to `dependencies[].component_id` for the component surface. See `validator_catalog.md` §5.4.1 parameterization note and §7.7.
 
 #### orchestrator / intent_quality_check (1.1) — sample 01
 
@@ -267,12 +269,347 @@ Excluded:                  ac_count_discipline (no AC array),
                            tier_decomposition_validator
 ```
 
-### 2.2 Saturation passes (deferred to original ChatGPT-5.5 reference)
+#### requirements_agent / fr_saturation (2.1.4) — sample 13
 
-Sub-phases 2.1.4 (FR saturation) and 2.2.4 (NFR saturation) — when sampled, will use the original ChatGPT-5.5 templates verbatim:
+Family-level validators defined in `validator_catalog.md` §5.4.1. Narrowing note for `reasoning_quality_validator` in §5.4.3.
 
 ```
-fr_saturation / nfr_saturation
+Always-on (deterministic): contract_schema_validator (full saturation schema —
+                             tier, parent_branch_classification, decomposition_rationale),
+                           parent_branch_classification_check,
+                           decomposition_fanout_discipline,
+                           surfaced_assumption_novelty (deterministic side),
+                           traces_to_id_validity
+Always-on (LLM):           grounding_validator (parameterized for saturation context —
+                             handoff + sibling chain as claim surface),
+                           tier_assignment_audit,
+                           surfaced_assumption_novelty (LLM side),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator (NARROWED — reasoning-vs-output
+                             divergence only; see validator_catalog.md §5.4.3),
+                           assumption_citation_validator (FULL form —
+                             surfaced_assumptions[] active at saturation)
+Synthesis:                 final_synthesis
+Excluded:                  measurement_adequacy_validator (saturation children receive
+                             their own AC sets; measurement adequacy of those ACs is
+                             the responsibility of subsequent per-child saturation
+                             harness invocations, not the parent-level review),
+                           any nfr-specific outliers (separate dispatch row 2.2.4)
+```
+
+#### requirements_agent / nfr_saturation (2.2.4) — sample 14
+
+Same family-level set as fr_saturation (2.1.4) above, plus NFR-specific role outliers defined in `validator_catalog.md` §5.4.2.
+
+```
+Always-on (deterministic): contract_schema_validator (full saturation schema),
+                           parent_branch_classification_check,
+                           decomposition_fanout_discipline,
+                           surfaced_assumption_novelty (deterministic side),
+                           traces_to_id_validity
+Always-on (LLM):           grounding_validator (parameterized for saturation context —
+                             handoff + sibling chain),
+                           tier_assignment_audit,
+                           surfaced_assumption_novelty (LLM side),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator (NARROWED — see §5.4.3),
+                           assumption_citation_validator (FULL form)
+Role-specific (LLM):       nfr_threshold_grounding,
+                           measurement_method_executability (parameterized for
+                             per-child measurable_condition surface, not per-method-string)
+Synthesis:                 final_synthesis
+Excluded:                  measurement_adequacy_validator (same rationale as fr_saturation)
+```
+
+#### systems_agent / system_boundary (3.1) — sample 15
+
+Discovery-class family dispatch. See `validator_catalog.md` §2 for `source_item_enumeration_completeness` definition. `ungrounded_operational_specifics` is **not** dispatched at this sub-phase (no structured schema fields with operational commitment semantics; Phase 3.1 output is freeform in_scope / out_of_scope / external_systems arrays).
+
+```
+Always-on (deterministic): contract_schema_validator,
+                           source_item_enumeration_completeness (semantic mode —
+                             input is prose FR responsibilities, not explicit IDs;
+                             LLM verifies each FR domain is semantically covered
+                             by at least one in_scope entry)
+Always-on (LLM):           grounding_validator (parameterized for system-spec context),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator
+Synthesis:                 final_synthesis
+Excluded:                  measurement_adequacy_validator (no AC at this surface),
+                           tier_decomposition_validator (no decomposition),
+                           assumption_citation_validator (no surfaced_assumptions field),
+                           saturation-class validators (not a saturation pass)
+```
+
+#### systems_agent / system_requirements (3.2) — sample 16
+
+Discovery-class family dispatch. `source_item_enumeration_completeness` in id-match mode: extract all FR/NFR IDs from prompt context, assert each appears in at least one item's `source_requirement_ids[]` — pure TypeScript set-difference, no LLM call. `ungrounded_operational_specifics` is **not** dispatched (no structured operational-commitment schema fields at this sub-phase).
+
+```
+Always-on (deterministic): contract_schema_validator,
+                           source_item_enumeration_completeness (id-match mode —
+                             FR/NFR ids from prompt context → source_requirement_ids[]
+                             arrays; compute set difference; pure code check)
+Always-on (LLM):           grounding_validator,
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator
+Synthesis:                 final_synthesis
+Excluded:                  measurement_adequacy_validator (no AC at this surface),
+                           tier_decomposition_validator (no decomposition),
+                           assumption_citation_validator (no surfaced_assumptions field),
+                           saturation-class validators (not a saturation pass)
+```
+
+#### systems_agent / interface_contracts (3.3) — sample 17
+
+Discovery-class family dispatch plus `ungrounded_operational_specifics (parameterization A)`. See `validator_catalog.md` §2 for the consolidated `ungrounded_operational_specifics` entry (formerly the `implementation_commitment_grounding` role-specific outlier — absorbed into §2 at Stage 1D.3). `source_item_enumeration_completeness` in id-match mode: extract the system IDs from the prompt's External Systems section, assert each appears in at least one contract's `systems_involved[]` array.
+
+```
+Always-on (deterministic): contract_schema_validator,
+                           source_item_enumeration_completeness (id-match mode —
+                             system ids from prompt's External Systems section →
+                             systems_involved[] arrays across all contracts;
+                             pure set-difference; exact 3-ID miss precision vs
+                             LLM-estimated 6-item overinclusive list at sample 17)
+Always-on (LLM):           grounding_validator,
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator,
+                           ungrounded_operational_specifics (parameterization A —
+                             targets auth_mechanism, error_handling_strategy, protocol,
+                             data_format fields; cross-checks technology-name and
+                             strategy-name patterns against source context;
+                             formerly implementation_commitment_grounding — absorbed into
+                             consolidated family entry; see validator_catalog.md §2)
+Synthesis:                 final_synthesis
+Excluded:                  measurement_adequacy_validator (no AC at this surface),
+                           tier_decomposition_validator (no decomposition),
+                           assumption_citation_validator (no surfaced_assumptions field),
+                           saturation-class validators (not a saturation pass)
+```
+
+#### architecture_agent / software_domains (4.1) — sample 18
+
+Discovery-class family dispatch. Phase 4.1 is a vocabulary-term enumeration and grounding pass: the dominant defect is over-specification in vocabulary definitions (mechanism-level specificity not mandated by source SRs). See per-role assessment 18.
+
+```
+Always-on (deterministic): contract_schema_validator,
+                           source_item_enumeration_completeness (vocabulary_grounding mode —
+                             input is SR behavioral inventory per domain; output is
+                             ubiquitous_language terms array; bidirectional: each term
+                             definition must trace to at least one SR-mandated behavior,
+                             and each mandated behavior cluster should have at least one
+                             term; see validator_catalog.md §2 Phase 4 extension)
+Always-on (LLM):           grounding_validator (parameterized for vocabulary-definition
+                             context — detects over-specification of mechanism-level
+                             specificity against SR source; e.g. naming algorithm or state
+                             transitions not mandated by the SR),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator
+Synthesis:                 final_synthesis
+Excluded:                  saturation-class validators (not a saturation pass),
+                           bloom-class structural validators (different contract surface —
+                             ubiquitous_language terms, not responsibility/journey arrays),
+                           ungrounded_operational_specifics (no ADR threshold or
+                             operational-commitment schema fields at this sub-phase —
+                             that validator's parameterization B is Phase 4.3 specific)
+```
+
+#### architecture_agent / component_skeleton (4.2) — sample 19
+
+Bloom-class family dispatch. Phase 4.2 is a coverage bloom: generate a component set covering all SRs with each responsibility expressing a single cohesive concern (CM-001 invariant). Confirms the bloom-class prediction from `deferred_to_track_d.md` §1. See per-role assessment 19.
+
+```
+Always-on (deterministic): contract_schema_validator,
+                           sr_allocation_completeness_validator (HIGH on uncovered SR;
+                             MEDIUM on undeclared cross-allocation — checks that every
+                             input SR id appears in at least one component allocation
+                             and that split-SR allocations are declared in cross_cuts[];
+                             see validator_catalog.md §3),
+                           responsibility_atomicity_validator (MEDIUM on CM-001
+                             conjunction violations — scans responsibility statements
+                             for 'X AND Y' / 'X, Y, and Z' patterns implying hidden
+                             sub-component scope; see validator_catalog.md §3)
+Always-on (LLM):           grounding_validator (parameterized for responsibility-statement
+                             context — checks unsupported claims in responsibility
+                             statements against upstream SR text and component vocabulary),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator
+Synthesis:                 final_synthesis
+Excluded:                  saturation-class validators (not a saturation pass),
+                           source_item_enumeration_completeness (SR coverage handled
+                             by sr_allocation_completeness_validator at this surface),
+                           domain/bloom-class validators from Phase 1 (different
+                             contract shape — component_model vs. journey/domain arrays),
+                           ungrounded_operational_specifics (no ADR or operational-commitment
+                             schema fields at this sub-phase — component responsibility
+                             statements are in scope for grounding_validator)
+```
+
+#### architecture_agent / adr_capture (4.3) — sample 20
+
+Hybrid bundle: discovery-class grounding + thin decision-class layer. Phase 4.3 tasks the agent with capturing ADRs for every significant architectural choice; the dominant defect is introduction of unsupported technical thresholds. **Note**: adr_capture is an emergent sub-phase not in the original Phase 4 list; verify prompt and schema registration before Track D dispatch wiring (see `deferred_to_track_d.md` §7.1 and per-role assessment 20).
+
+```
+Always-on (deterministic): contract_schema_validator,
+                           adr_status_discipline_validator (enforces 'proposed' default
+                             unless explicit acceptance rationale present — see
+                             validator_catalog.md §6; LOW-MEDIUM severity)
+Always-on (LLM):           grounding_validator (parameterized for ADR context — HIGH on
+                             unsupported technical thresholds; MEDIUM on partially-supported
+                             entity generalizations; e.g. "SHA-256" when source says
+                             "cryptographic checksum"),
+                           ungrounded_operational_specifics (parameterization B —
+                             bidirectional threshold check: each introduced threshold
+                             must trace to upstream source → unsupported HIGH; each
+                             upstream-mandated threshold must appear in at least one ADR →
+                             dropped HIGH; partially supported → MEDIUM;
+                             formerly mandated_threshold_inheritance — absorbed into
+                             consolidated family entry; see validator_catalog.md §2),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator
+Synthesis:                 final_synthesis
+Excluded:                  source_item_enumeration_completeness (threshold coverage handled
+                             by ungrounded_operational_specifics parameterization B
+                             at this surface),
+                           bloom-class validators, saturation-class validators,
+                           sr_allocation_completeness_validator (no SR allocation at this
+                             surface — ADR enumeration, not component coverage)
+```
+
+#### domain_interpreter / component_saturation (4.2a) — sample 21
+
+Saturation-class family dispatch. `domain_interpreter` is the confirmed recursive saturation executor for Phase 4 component decomposition across all 34 cal-26 invocations on this surface. Same §5.4 saturation-class family as fr_saturation (2.1.4) and nfr_saturation (2.2.4) — same family, different role and surface. Decomposition rubric: (atomic_component / decomposable / invalid_parent); tier model: A/B/C/D. cal-26 reached depth 1 only; clean ACCEPTs at both depths 0 and 1. See per-role assessment 21.
+
+```
+Always-on (deterministic): contract_schema_validator (component saturation schema —
+                             atomic_component / decomposable / invalid_parent,
+                             tier A/B/C/D, agrees_with_hint, decomposition_rationale),
+                           parent_branch_classification_check,
+                           decomposition_fanout_discipline,
+                           surfaced_assumption_novelty (deterministic side),
+                           traces_to_id_validity (parameterized: dependencies[].component_id
+                             — checks against sibling_context + emitted children;
+                             see validator_catalog.md §5.4.1 parameterization note;
+                             LOW at shallow depths, MEDIUM at depth ≥2)
+Always-on (LLM):           grounding_validator (parameterized for component-context —
+                             responsibility statements, tier rationale, active_constraints
+                             narrowing),
+                           tier_assignment_audit,
+                           surfaced_assumption_novelty (LLM side),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator (NARROWED — reasoning-vs-output
+                             divergence only; see validator_catalog.md §5.4.3 narrowing
+                             note; must NOT fire on tier label quality or classification
+                             rubric content)
+Synthesis:                 final_synthesis
+Excluded:                  measurement_adequacy_validator (no AC surface at this pass),
+                           nfr-specific outliers (nfr_threshold_grounding,
+                             measurement_method_executability — different role),
+                           bloom-class validators, discovery-class validators
+```
+
+**Phase 5 dispatch note (cal-26 samples 22–26b):** All five Phase 5 samples fell through to the PLACEHOLDER bundle at cal-26 time (Phase 5 not in DISPATCH_BUNDLES). Dispatch rows below are promoted as of Stage 1D.3. cal-26 evidence shows `technical_spec_agent` runs its own data_model_saturation pass with no role decoupling (unlike Phase 4 component_saturation which uses `domain_interpreter`). Per-(role, sub_phase) dispatch is the right granularity, not per-role. Note: `json_output_discipline_check` appears in EVERY Phase 5 dispatch row — this is intentional given its family-level cross-role status; sample 23 (markdown fence wrapping with 134695ms repair latency) confirms the need.
+
+#### technical_spec_agent / data_model_skeleton (5.1) — sample 22
+
+```
+Always-on (deterministic): contract_schema_validator,
+                           json_output_discipline_check,
+                           source_item_enumeration_completeness (id-match mode —
+                             component ids → data-model entries; pure set-difference
+                             over the 28-item backlog component list),
+                           traces_to_id_validity (parameterized: references[] field
+                             path — checks FK targets against known entity-id set;
+                             see validator_catalog.md §5.4.1 parameterization note),
+                           relationship_directionality_validator
+Always-on (LLM):           grounding_validator,
+                           ungrounded_operational_specifics (parameterization C),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator
+Synthesis:                 final_synthesis
+```
+
+#### technical_spec_agent / api_definitions (5.2) — sample 23
+
+```
+Always-on (deterministic): contract_schema_validator,
+                           json_output_discipline_check
+Always-on (LLM):           grounding_validator,
+                           interface_contract_alignment_validator,
+                           ungrounded_operational_specifics (parameterization C),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator
+Synthesis:                 final_synthesis
+```
+
+#### technical_spec_agent / error_handling (5.3) — sample 24
+
+Schema naming note: `sub_phase_id` is `error_handling` but artifact root key is `error_handling_strategies`. Dispatch key must map correctly before production wiring. See `deferred_to_track_d.md` §7.3.
+
+```
+Always-on (deterministic): contract_schema_validator,
+                           json_output_discipline_check
+Always-on (LLM):           grounding_validator,
+                           error_type_source_attestation_validator,
+                           ungrounded_operational_specifics (parameterization C),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator
+Synthesis:                 final_synthesis
+```
+
+#### technical_spec_agent / configuration_parameters (5.4) — sample 25
+
+```
+Always-on (deterministic): contract_schema_validator,
+                           json_output_discipline_check
+Always-on (LLM):           grounding_validator,
+                           ungrounded_operational_specifics (parameterization C —
+                             primary surface for this validator; QUARANTINE evidence:
+                             15 HIGH findings on fabricated endpoint URLs, bucket names,
+                             and algorithmic defaults; see per-role assessment 25),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator
+Synthesis:                 final_synthesis
+```
+
+#### technical_spec_agent / data_model_saturation (5.x) — sample 26
+
+Saturation-class family dispatch. `technical_spec_agent` is the confirmed saturation executor for Phase 5.x — same role as flat sub-phases 5.1–5.4, no domain_interpreter decoupling (contrast with Phase 4.2a). Decomposition rubric: decomposable / atomic_value / invalid_parent; tier A/B/C/D. cal-26 reached depth 1 only (26a REVISE, 26b ACCEPT). See per-role assessment 26 and `validator_catalog.md` §7.8.
+
+```
+Always-on (deterministic): contract_schema_validator (data model saturation schema —
+                             decomposable / atomic_value / invalid_parent,
+                             tier A/B/C/D, agrees_with_hint, decomposition_rationale),
+                           json_output_discipline_check,
+                           parent_branch_classification_check,
+                           decomposition_fanout_discipline,
+                           surfaced_assumption_novelty (deterministic side),
+                           traces_to_id_validity (parameterized: references[] /
+                             entity-id field path — checks against known entity-id set;
+                             see validator_catalog.md §5.4.1; LOW at shallow depths),
+                           entity_kind_consistency_validator,
+                           tier_override_assumption_validator
+Always-on (LLM):           grounding_validator (parameterized for data-model context),
+                           tier_assignment_audit,
+                           surfaced_assumption_novelty (LLM side),
+                           reasoning_to_response_faithfulness,
+                           reasoning_quality_validator (NARROWED — reasoning-vs-output
+                             divergence only; see validator_catalog.md §5.4.3)
+Synthesis:                 final_synthesis
+Excluded:                  measurement_adequacy_validator (no AC surface at data model
+                             saturation), nfr-specific outliers (different role),
+                           ungrounded_operational_specifics (not applicable at saturation
+                             passes — operational specifics are a flat-sub-phase concern)
+```
+
+### 2.2 Saturation passes (deferred to original ChatGPT-5.5 reference)
+
+**Status update (cal-26, samples 13 and 14):** Sub-phases 2.1.4 (fr_saturation) and 2.2.4 (nfr_saturation) have been sampled. Their dispatch rows have been promoted to §2.1 above (entries 2.1.4 and 2.2.4). The original placeholder below is preserved for historical reference and to document the ChatGPT-5.5 baseline bundle that the promoted rows augment.
+
+Sub-phases 2.1.4 (FR saturation) and 2.2.4 (NFR saturation) — original ChatGPT-5.5 baseline templates (now augmented by the §2.1.4 / §2.2.4 dispatch rows):
+
+```
+fr_saturation / nfr_saturation (ChatGPT-5.5 baseline — augmented in §2.1 above)
 Always-on (deterministic): contract_schema_validator (full saturation schema)
 Always-on (LLM):           grounding_validator (full original §2),
                            measurement_adequacy_validator (full original §3),

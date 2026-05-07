@@ -1,0 +1,7 @@
+{
+  "validator": "nfr_threshold_grounding",
+  "sample": "14b_requirements_agent__nfr_saturation_depth4",
+  "passed": false,
+  "expectedFindingCount": 2,
+  "overallAssessment": "The agent emitted numeric thresholds in child NFR measurable_condition fields that are not grounded in the parent NFR or any handoff item. Specifically: temporal bookending not present in any handoff item, and a per-ballot locking commitment that goes beyond A-0068's scope. Per catalog §5.4.2: every numeric threshold in a child NFR must trace to the parent NFR or handoff or be surfaced as an open_question. This is the threshold-fabrication pattern that drove the QUARANTINE decision on sample 14b (the original harness found HIGH findings from grounding_validator). This validator adds precision over grounding_validator by specifically targeting the measurable_condition and seed_threshold fields."
+}

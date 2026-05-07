@@ -152,6 +152,27 @@ For each child you produce, list any **assumption, constraint, compliance citati
 - If you cannot produce a child without first surfacing an assumption, surface it — never invent silently.
 - `parent_branch_classification` is **required** and must be exactly one of the three enum values.
 
+# Hard rules — child shape (apply to every emitted child)
+
+**Trace-id integrity** (prevents fabricated-namespace defect):
+- Every id in a child's `traces_to[]` MUST resolve to: a handoff entry id (UJ-* / VV-* / TECH-* / COMP-* / QA-#), a sibling id from `sibling_context`, or a parent / ancestor id from the upstream decomposition chain. Do NOT mint trace ids from the agent's own decomposition path namespace.
+
+**Surfaced-assumption novelty + category discipline** (prevents assumption re-surfacing and category drift):
+- Every entry in `surfaced_assumptions[]` MUST be genuinely novel — not already present in `existing_assumptions[]` by identity or paraphrase. Do not re-surface assumptions already on the list.
+- The `category` value MUST match content semantics:
+  - `constraint` — system-internal/architectural restriction grounded in source or upstream tier
+  - `scope` — bounding the deliverable
+  - `implementation_choice` — concrete how-to decision
+  - `open_question` — UNGROUNDED numeric / temporal / regulatory claim that the human must resolve
+- An ungrounded numeric threshold or temporal commitment MUST be `open_question`, NOT `constraint` or `scope`. Promoting a guess to `constraint` passes false assurance to downstream phases.
+
+**Parent-branch classification + fanout discipline** (prevents tier-assignment and fanout defects):
+- The `parent_branch_classification` value MUST be consistent with the structural test:
+  - `atomic_leaf` — emit EXACTLY one Tier-D mirror child whose name/description/AC mirror the parent.
+  - `decomposable` — emit 1 to 8 children (no fewer, no more). 0 children means you should have picked atomic_leaf; >8 means the parent is a quality area that needs an intermediate Tier-A bloom rather than a flat list.
+  - `invalid_parent` — emit zero children with a structured `rationale`.
+- Each child's `tier` (A/B/C/D) MUST be consistent with its description and AC count per the tier rubric. Do NOT assign Tier-D to a child whose description names a quality area or workflow.
+
 # JSON Output Contract (strict — non-negotiable)
 
 **Field naming convention:** Use snake_case for all JSON property names (e.g., `user_stories`, `acceptance_criteria`, not `userStories`).

@@ -31,6 +31,13 @@ Rules:
 - Ubiquitous language terms must be unambiguous within the domain
 - Do NOT use terms from the JanumiCode Canonical Vocabulary as domain terms
 
+# Hard rules — vocabulary-grounding discipline
+
+- Every input system_requirement id received via `system_requirements_summary` MUST appear in at least one domain's `system_requirement_ids[]`. Silent omission of a system_requirement id is a defect that downstream phases cannot detect by reading the artifact alone. Even when a requirement is only partially relevant to a domain, allocate it to the best-fit domain's `system_requirement_ids[]` and note any shared coverage in the domain's `ubiquitous_language` definitions.
+- Every `ubiquitous_language` term emitted in the output MUST be grounded in a behavior, entity, or constraint that appears in `system_requirements_summary` or an explicit upstream phase artifact. Do NOT introduce vocabulary terms whose definitions commit to mechanisms, state-transition names, algorithm names, or ordering semantics that are absent from the source requirements. Free invention of vocabulary terms creates downstream traceability gaps.
+- Every mandated behavioral cluster in `system_requirements_summary` SHOULD have at least one term in the relevant domain's `ubiquitous_language[]`. If a requirement's behavioral cluster is intentionally omitted from vocabulary (e.g., covered by JanumiCode Canonical Vocabulary or fully captured by an existing term in a sibling domain), note the rationale explicitly rather than omitting silently.
+- This is enforced by `source_item_enumeration_completeness` (vocabulary_grounding mode) — see validator catalog §2. The validator checks bidirectionally: each term must trace to at least one mandated behavior, and each mandated behavior cluster should have at least one term.
+
 CONTEXT:
 System Boundary: {{system_boundary_summary}}
 System Requirements: {{system_requirements_summary}}

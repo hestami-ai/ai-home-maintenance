@@ -443,12 +443,21 @@ export class Phase2Handler implements PhaseHandler {
     // ── 2.1a — Functional Requirements Decomposition ──
     // Wave 6 Pass-1 Level-1 decomposition. Handoff always present post-Wave 8.
     engine.stateMachine.setSubPhase(workflowRun.id, 'fr_saturation');
+    const frRootCap = engine.configManager.get().decomposition.max_root_count_fr;
+    const frRoots = frRootCap > 0 ? frContent.user_stories.slice(0, frRootCap) : frContent.user_stories;
+    const frRootNodeIds = frRootCap > 0 ? rootNodeIds.slice(0, frRootCap) : rootNodeIds;
+    const frRootLogicalIds = frRootCap > 0 ? rootLogicalIds.slice(0, frRootCap) : rootLogicalIds;
+    if (frRootCap > 0 && frContent.user_stories.length > frRootCap) {
+      getLogger().info('workflow', 'Phase 2.1a: max_root_count_fr cap applied', {
+        cap: frRootCap, totalRoots: frContent.user_stories.length, saturatedRoots: frRoots.length,
+      });
+    }
     await this.runSaturationLoop(
       ctx,
       handoff,
-      frContent.user_stories,
-      rootNodeIds,
-      rootLogicalIds,
+      frRoots,
+      frRootNodeIds,
+      frRootLogicalIds,
     );
 
     // ── 2.2 — Non-Functional Requirements Bloom ───────────────
@@ -617,12 +626,21 @@ export class Phase2Handler implements PhaseHandler {
       }
 
       engine.stateMachine.setSubPhase(workflowRun.id, 'nfr_saturation');
+      const nfrRootCap = engine.configManager.get().decomposition.max_root_count_nfr;
+      const nfrRoots = nfrRootCap > 0 ? nfrAsStories.slice(0, nfrRootCap) : nfrAsStories;
+      const nfrRootNodeIdsCapped = nfrRootCap > 0 ? nfrRootNodeIds.slice(0, nfrRootCap) : nfrRootNodeIds;
+      const nfrRootLogicalIdsCapped = nfrRootCap > 0 ? nfrRootLogicalIds.slice(0, nfrRootCap) : nfrRootLogicalIds;
+      if (nfrRootCap > 0 && nfrAsStories.length > nfrRootCap) {
+        getLogger().info('workflow', 'Phase 2.2a: max_root_count_nfr cap applied', {
+          cap: nfrRootCap, totalRoots: nfrAsStories.length, saturatedRoots: nfrRoots.length,
+        });
+      }
       await this.runSaturationLoop(
         ctx,
         handoff,
-        nfrAsStories,
-        nfrRootNodeIds,
-        nfrRootLogicalIds,
+        nfrRoots,
+        nfrRootNodeIdsCapped,
+        nfrRootLogicalIdsCapped,
         {
           recordSubPhaseId: 'nfr_saturation',
           templateSubPhase: 'nfr_saturation',

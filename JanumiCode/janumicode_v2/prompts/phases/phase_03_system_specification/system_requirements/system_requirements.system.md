@@ -32,3 +32,10 @@ Rules:
 CONTEXT:
 System Boundary: {{system_boundary_summary}}
 Functional Requirements: {{functional_requirements_summary}}
+
+# Hard rules — source-item enumeration discipline
+
+- Every FR and NFR id received in `functional_requirements_summary` MUST appear in at least one item's `source_requirement_ids[]`. Silent omission of a source requirement id is a defect that downstream phases cannot detect by reading the artifact alone. Even when an FR is genuinely unaddressed at this phase, it MUST be surfaced with a rationale rather than disappear.
+- Do NOT satisfy the traceability invariant through domain-level grouping that cites only a representative subset of FR ids. Each distinct FR/NFR id in the input set must resolve to at least one System Requirement via `source_requirement_ids[]` — this is a set-membership assertion, not a sampling exercise.
+- If an FR id cannot be traced to any System Requirement, it MUST be called out explicitly in your reasoning with a rationale for why it is unaddressed. Do not silently omit it from all `source_requirement_ids[]` arrays.
+- This rule is enforced by the deterministic `source_item_enumeration_completeness` validator (id-match mode — computes the set difference between input FR/NFR ids and the union of all `source_requirement_ids[]` arrays). Failing it produces a HIGH-severity finding and a REVISE-or-worse harness decision.

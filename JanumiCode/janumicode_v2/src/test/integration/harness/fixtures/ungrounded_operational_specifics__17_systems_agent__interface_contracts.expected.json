@@ -1,0 +1,7 @@
+{
+  "validator": "ungrounded_operational_specifics",
+  "sample": "17_systems_agent__interface_contracts",
+  "passed": false,
+  "expectedFindingCount": 4,
+  "overallAssessment": "The agent emitted multiple concrete operational values in structured schema fields that are not grounded in the upstream source context. Specific auth mechanisms (Bearer Token), protocol details (HTTPS/TLS), and data formats (JSON/Metadata) were committed to without upstream mandates. These constitute parameterization-A fabrications: concrete implementation commitments in fields whose structural position implies binding downstream contracts. The source context provides only category-level guidance on integration patterns, not specific protocol or auth selections."
+}

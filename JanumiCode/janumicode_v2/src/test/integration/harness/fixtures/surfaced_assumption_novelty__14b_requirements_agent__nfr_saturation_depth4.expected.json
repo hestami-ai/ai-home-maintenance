@@ -1,0 +1,7 @@
+{
+  "validator": "surfaced_assumption_novelty",
+  "sample": "14b_requirements_agent__nfr_saturation_depth4",
+  "passed": false,
+  "expectedFindingCount": 2,
+  "overallAssessment": "Sample 14b contained 7 assumption findings in the original harness record. The agent surfaced near-duplicate assumptions that closely paraphrase existing entries (A-0068 and its derivatives). The LLM semantic novelty check identifies at least one assumption whose text is a paraphrase rather than a genuinely new claim, and one assumption whose category (implementation_choice) does not match its content (which reads as a scope constraint). Per catalog §5.4.1: MEDIUM on duplicate/near-duplicate; LOW on category drift."
+}

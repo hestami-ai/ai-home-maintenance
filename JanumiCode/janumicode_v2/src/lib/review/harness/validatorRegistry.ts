@@ -34,6 +34,18 @@ import { validateNfrStructuralCompleteness } from './validators/deterministic/nf
 import { validateAcCountDiscipline } from './validators/deterministic/acCountDiscipline';
 import { validateExemplarLeakageDetector } from './validators/deterministic/exemplarLeakageDetector';
 import { validateEntityWorkflowShape } from './validators/deterministic/entityWorkflowShape';
+// Stage B — new deterministic validators (Stages 1A–1D)
+import { validateJsonOutputDiscipline } from './validators/deterministic/jsonOutputDisciplineCheck';
+import { invokeSourceItemEnumerationCompleteness } from './validators/deterministic/sourceItemEnumerationCompleteness';
+import { validateRelationshipDirectionality } from './validators/deterministic/relationshipDirectionalityValidator';
+import { validateResponsibilityAtomicity } from './validators/deterministic/responsibilityAtomicityValidator';
+import { validateSrAllocationCompleteness } from './validators/deterministic/srAllocationCompletenessValidator';
+import { validateParentBranchClassification } from './validators/deterministic/parentBranchClassificationCheck';
+import { validateDecompositionFanoutDiscipline } from './validators/deterministic/decompositionFanoutDiscipline';
+import { validateTracesToIdValidity } from './validators/deterministic/tracesToIdValidity';
+import { validateEntityKindConsistency } from './validators/deterministic/entityKindConsistencyValidator';
+import { validateTierOverrideAssumption } from './validators/deterministic/tierOverrideAssumptionValidator';
+import { validateAdrStatusDiscipline } from './validators/deterministic/adrStatusDisciplineValidator';
 // Wire-in: LLM validator invoke functions (Commits 4–7, factory pattern).
 import { invokeGroundingValidator } from './validators/llm/groundingValidator';
 import { invokeReasoningToResponseFaithfulness } from './validators/llm/reasoningToResponseFaithfulness';
@@ -86,6 +98,13 @@ import { invokeCompletenessEvidenceAdequacy } from './validators/llm/completenes
 import { invokeCoherenceEvidenceAudit } from './validators/llm/coherenceEvidenceAudit';
 import { invokeConfidenceCalibrationLens } from './validators/llm/confidenceCalibrationLens';
 import { invokeIntentVsArtifactScopeAudit } from './validators/llm/intentVsArtifactScopeAudit';
+// Stage B — new LLM validators (Stages 1A–1D)
+import { invokeUngroundedOperationalSpecifics } from './validators/llm/ungroundedOperationalSpecifics';
+import { invokeInterfaceContractAlignmentValidator } from './validators/llm/interfaceContractAlignmentValidator';
+import { invokeTierAssignmentAudit } from './validators/llm/tierAssignmentAudit';
+import { invokeSurfacedAssumptionNovelty } from './validators/llm/surfacedAssumptionNovelty';
+import { invokeNfrThresholdGrounding } from './validators/llm/nfrThresholdGrounding';
+import { invokeErrorTypeSourceAttestationValidator } from './validators/llm/errorTypeSourceAttestationValidator';
 import type { LLMInvokeContext } from './validators/llm/llmValidatorRunner';
 import type { LLMCaller } from '../../llm/llmCaller';
 import type { TemplateLoader } from '../../orchestrator/templateLoader';
@@ -100,6 +119,7 @@ export type ValidatorFamily =
   | 'requirements_skeleton'
   | 'requirements_enrichment'
   | 'requirements_saturation'
+  | 'saturation'
   | 'role_specific';
 
 export type ValidatorKind = 'deterministic' | 'llm';
@@ -199,6 +219,7 @@ const bundleKey = (role: string, sub: string): string =>
 
 /** Universal minimum dispatched at any sub_phase (used as fallback). */
 const PLACEHOLDER_BUNDLE: readonly string[] = [
+  'json_output_discipline_check',
   'contract_schema_validator',
   'grounding_validator',
   'reasoning_quality_validator',
@@ -208,6 +229,7 @@ const PLACEHOLDER_BUNDLE: readonly string[] = [
 
 /** Saturation universal bundle (saturation-specific validators deferred). */
 const SATURATION_UNIVERSAL_BUNDLE: readonly string[] = [
+  'json_output_discipline_check',
   'contract_schema_validator',
   'grounding_validator',
   'reasoning_to_response_faithfulness',
@@ -221,6 +243,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('orchestrator', 'intent_quality_check'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'status_consistency_iqc',
       'grounding_validator',
@@ -234,6 +257,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('orchestrator', 'intent_lens_classification'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'calibration_rule_consistency_lens',
       'grounding_validator',
@@ -247,6 +271,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('domain_interpreter', 'product_intent_discovery'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'extraction_id_traceability',
       'grounding_validator',
@@ -262,6 +287,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('domain_interpreter', 'compliance_retention_discovery'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'extraction_id_traceability',
       'grounding_validator',
@@ -280,6 +306,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('domain_interpreter', 'business_domains_bloom'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'persona_id_continuity',
       'entity_workflow_shape',
@@ -297,6 +324,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('domain_interpreter', 'user_journey_bloom'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'persona_id_continuity',
       'journey_id_continuity',
@@ -319,6 +347,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('domain_interpreter', 'product_description_synthesis'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'handoff_field_completeness',
       'synthesis_coverage_audit',
@@ -336,6 +365,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('orchestrator', 'release_plan'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'handoff_field_completeness',
       'synthesis_coverage_audit',
@@ -355,6 +385,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('requirements_agent', 'fr_bloom_skeleton'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'story_structural_completeness',
       'handoff_coverage_audit',
@@ -374,6 +405,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('requirements_agent', 'fr_bloom_enrichment'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'enrichment_echo_invariance',
       'ac_count_discipline',
@@ -396,6 +428,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('requirements_agent', 'nfr_bloom_skeleton'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'nfr_structural_completeness',
       'handoff_coverage_audit',
@@ -418,6 +451,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
   [
     bundleKey('requirements_agent', 'nfr_bloom_enrichment'),
     [
+      'json_output_discipline_check',
       'contract_schema_validator',
       'enrichment_echo_invariance',
       'output_substantiveness_check',
@@ -436,15 +470,229 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
       'final_synthesis',
     ],
   ],
-  // Saturation passes (DEFERRED per §6.8 — only universal validators
-  // dispatch until saturation samples land)
+  // ── Stage 1A additions: fr_saturation (2.1.4) and nfr_saturation (2.2.4) ──
+  // Promoted from SATURATION_UNIVERSAL_BUNDLE per cal-26 samples 13 and 14.
+  // Stage B: replaces the placeholder stubs with the full §5.4 family bundle.
   [
     bundleKey('requirements_agent', 'fr_saturation'),
-    [...SATURATION_UNIVERSAL_BUNDLE],
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'parent_branch_classification_check',
+      'decomposition_fanout_discipline',
+      'traces_to_id_validity',
+      'grounding_validator',
+      'tier_assignment_audit',
+      'surfaced_assumption_novelty',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'assumption_citation_validator',
+      'final_synthesis',
+    ],
   ],
   [
     bundleKey('requirements_agent', 'nfr_saturation'),
-    [...SATURATION_UNIVERSAL_BUNDLE],
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'parent_branch_classification_check',
+      'decomposition_fanout_discipline',
+      'traces_to_id_validity',
+      'grounding_validator',
+      'tier_assignment_audit',
+      'surfaced_assumption_novelty',
+      'nfr_threshold_grounding',
+      'measurement_method_executability',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'assumption_citation_validator',
+      'final_synthesis',
+    ],
+  ],
+
+  // ── Stage 1B additions: systems_agent Phase 3 sub-phases ──────────
+  // S15 — systems_agent / system_boundary (3.1)
+  [
+    bundleKey('systems_agent', 'system_boundary'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'source_item_enumeration_completeness',
+      'grounding_validator',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S16 — systems_agent / system_requirements (3.2)
+  [
+    bundleKey('systems_agent', 'system_requirements'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'source_item_enumeration_completeness',
+      'grounding_validator',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S17 — systems_agent / interface_contracts (3.3)
+  [
+    bundleKey('systems_agent', 'interface_contracts'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'source_item_enumeration_completeness',
+      'grounding_validator',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'ungrounded_operational_specifics',
+      'final_synthesis',
+    ],
+  ],
+
+  // ── Stage 1C additions: architecture_agent Phase 4 sub-phases ─────
+  // S18 — architecture_agent / software_domains (4.1)
+  [
+    bundleKey('architecture_agent', 'software_domains'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'source_item_enumeration_completeness',
+      'grounding_validator',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S19 — architecture_agent / component_skeleton (4.2)
+  [
+    bundleKey('architecture_agent', 'component_skeleton'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'sr_allocation_completeness_validator',
+      'responsibility_atomicity_validator',
+      'grounding_validator',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S20 — architecture_agent / adr_capture (4.3)
+  [
+    bundleKey('architecture_agent', 'adr_capture'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'adr_status_discipline_validator',
+      'grounding_validator',
+      'ungrounded_operational_specifics',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S21 — domain_interpreter / component_saturation (4.2a)
+  [
+    bundleKey('domain_interpreter', 'component_saturation'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'parent_branch_classification_check',
+      'decomposition_fanout_discipline',
+      'traces_to_id_validity',
+      'grounding_validator',
+      'tier_assignment_audit',
+      'surfaced_assumption_novelty',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'assumption_citation_validator',
+      'final_synthesis',
+    ],
+  ],
+
+  // ── Stage 1D additions: technical_spec_agent Phase 5 sub-phases ───
+  // S22 — technical_spec_agent / data_model_skeleton (5.1)
+  [
+    bundleKey('technical_spec_agent', 'data_model_skeleton'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'source_item_enumeration_completeness',
+      'traces_to_id_validity',
+      'relationship_directionality_validator',
+      'grounding_validator',
+      'ungrounded_operational_specifics',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S23 — technical_spec_agent / api_definitions (5.2)
+  [
+    bundleKey('technical_spec_agent', 'api_definitions'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'source_item_enumeration_completeness',
+      'grounding_validator',
+      'interface_contract_alignment_validator',
+      'ungrounded_operational_specifics',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S24 — technical_spec_agent / error_handling (5.3)
+  [
+    bundleKey('technical_spec_agent', 'error_handling'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'source_item_enumeration_completeness',
+      'grounding_validator',
+      'error_type_source_attestation_validator',
+      'ungrounded_operational_specifics',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S25 — technical_spec_agent / configuration_parameters (5.4)
+  [
+    bundleKey('technical_spec_agent', 'configuration_parameters'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'source_item_enumeration_completeness',
+      'grounding_validator',
+      'ungrounded_operational_specifics',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S26 — technical_spec_agent / data_model_saturation (5.x)
+  [
+    bundleKey('technical_spec_agent', 'data_model_saturation'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'parent_branch_classification_check',
+      'decomposition_fanout_discipline',
+      'traces_to_id_validity',
+      'entity_kind_consistency_validator',
+      'tier_override_assumption_validator',
+      'grounding_validator',
+      'tier_assignment_audit',
+      'surfaced_assumption_novelty',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'assumption_citation_validator',
+      'final_synthesis',
+    ],
   ],
 ]);
 
@@ -1041,6 +1289,171 @@ const ENTRIES: ValidatorEntry[] = [
     appliesTo: NEVER,
     promptTemplatePath:
       'prompts/review/requirements_saturation/tier_decomposition_validator.system.md',
+  },
+
+  // ── Family: saturation (cross-surface, §5.4) ──────────────────────
+  // Applies to fr_saturation, nfr_saturation, component_saturation,
+  // and data_model_saturation (different roles, same family rubric).
+  {
+    id: 'json_output_discipline_check',
+    family: 'cross_role',
+    kind: 'deterministic',
+    description:
+      'PRE-VALIDATOR: verify agent raw response is bare JSON (starts { or [, ends } or ], no markdown fences). Runs BEFORE LLM validator chain; HIGH on fence-wrapped JSON triggers short-circuit.',
+    appliesTo: dispatchedIn('json_output_discipline_check'),
+    validate: validateJsonOutputDiscipline,
+  },
+  {
+    id: 'source_item_enumeration_completeness',
+    family: 'discovery',
+    kind: 'llm',
+    description:
+      'Verify every source item id (FR/NFR/system/component) the agent received appears in its output. Three modes: id_match (set-difference, deterministic), vocabulary_grounding (bidirectional, deterministic), semantic (LLM — Phase 3.1 system_boundary). HIGH on silent drop.',
+    appliesTo: dispatchedIn('source_item_enumeration_completeness'),
+    promptTemplatePath:
+      'prompts/review/discovery/source_item_enumeration_completeness_semantic.system.md',
+    invoke: invokeSourceItemEnumerationCompleteness,
+  },
+  {
+    id: 'relationship_directionality_validator',
+    family: 'discovery',
+    kind: 'deterministic',
+    description:
+      'Phase 5.1: verify FK directions in data_models relationships are consistent with source cardinality descriptions. MEDIUM per reversed FK.',
+    appliesTo: dispatchedIn('relationship_directionality_validator'),
+    validate: validateRelationshipDirectionality,
+  },
+  {
+    id: 'responsibility_atomicity_validator',
+    family: 'bloom',
+    kind: 'deterministic',
+    description:
+      'Phase 4.2: detect compound responsibility statements (CM-001 conjunction violations) in component descriptions. MEDIUM per offending statement.',
+    appliesTo: dispatchedIn('responsibility_atomicity_validator'),
+    validate: validateResponsibilityAtomicity,
+  },
+  {
+    id: 'sr_allocation_completeness_validator',
+    family: 'bloom',
+    kind: 'deterministic',
+    description:
+      'Phase 4.2: verify all input SR ids are covered by at least one component; undeclared cross-allocations. HIGH on uncovered SR; MEDIUM on undeclared cross-cut.',
+    appliesTo: dispatchedIn('sr_allocation_completeness_validator'),
+    validate: validateSrAllocationCompleteness,
+  },
+  {
+    id: 'parent_branch_classification_check',
+    family: 'saturation',
+    kind: 'deterministic',
+    description:
+      'Saturation-class: verify parent_branch_classification (atomic_leaf/decomposable/invalid_parent) is consistent with child count and tier rules. HIGH on contract violation.',
+    appliesTo: dispatchedIn('parent_branch_classification_check'),
+    validate: validateParentBranchClassification,
+  },
+  {
+    id: 'decomposition_fanout_discipline',
+    family: 'saturation',
+    kind: 'deterministic',
+    description:
+      'Saturation-class: enforce 1 child for atomic, 1–8 for decomposable, and no flat-mapping anti-pattern. HIGH on rule violation.',
+    appliesTo: dispatchedIn('decomposition_fanout_discipline'),
+    validate: validateDecompositionFanoutDiscipline,
+  },
+  {
+    id: 'traces_to_id_validity',
+    family: 'saturation',
+    kind: 'deterministic',
+    description:
+      'Cross-role saturation: verify every reference id in the parameterized field (traces_to[], dependencies[].component_id, references[]) resolves to a known id. Field path varies by (agentRole, subPhaseId). HIGH at depth≥2; LOW at depth 0–1.',
+    appliesTo: dispatchedIn('traces_to_id_validity'),
+    validate: validateTracesToIdValidity,
+  },
+  {
+    id: 'entity_kind_consistency_validator',
+    family: 'saturation',
+    kind: 'deterministic',
+    description:
+      'Phase 5.1a data_model_saturation: verify the PK-holding entity is not classified as kind="value_type". LOW-MEDIUM on misclassification.',
+    appliesTo: dispatchedIn('entity_kind_consistency_validator'),
+    validate: validateEntityKindConsistency,
+  },
+  {
+    id: 'tier_override_assumption_validator',
+    family: 'saturation',
+    kind: 'deterministic',
+    description:
+      'Phase 5.1a data_model_saturation: verify that agrees_with_hint=false is accompanied by a surfaced assumption documenting the override rationale. LOW on missing override rationale.',
+    appliesTo: dispatchedIn('tier_override_assumption_validator'),
+    validate: validateTierOverrideAssumption,
+  },
+  {
+    id: 'ungrounded_operational_specifics',
+    family: 'discovery',
+    kind: 'llm',
+    description:
+      'Discovery-class: verify concrete operational/technical details in schema fields are grounded in source. Three parameterizations: A (interface commitments), B (ADR thresholds — bidirectional), C (runtime specifics: URLs, buckets, defaults). HIGH on binding ungrounded values.',
+    appliesTo: dispatchedIn('ungrounded_operational_specifics'),
+    promptTemplatePath: 'prompts/review/discovery/ungrounded_operational_specifics.system.md',
+    invoke: invokeUngroundedOperationalSpecifics,
+  },
+  {
+    id: 'interface_contract_alignment_validator',
+    family: 'discovery',
+    kind: 'llm',
+    description:
+      'Phase 5.2: verify each api_definitions component uses the protocol declared in its matching Phase 3.3 interface contract. HIGH on protocol mismatch.',
+    appliesTo: dispatchedIn('interface_contract_alignment_validator'),
+    promptTemplatePath: 'prompts/review/discovery/interface_contract_alignment_validator.system.md',
+    invoke: invokeInterfaceContractAlignmentValidator,
+  },
+  {
+    id: 'tier_assignment_audit',
+    family: 'saturation',
+    kind: 'llm',
+    description:
+      'Saturation-class: verify each child tier (A/B/C/D) is consistent with description, AC count, and decomposition_rationale. MEDIUM for off-by-one; HIGH for cross-tier.',
+    appliesTo: dispatchedIn('tier_assignment_audit'),
+    promptTemplatePath: 'prompts/review/saturation/tier_assignment_audit.system.md',
+    invoke: invokeTierAssignmentAudit,
+  },
+  {
+    id: 'surfaced_assumption_novelty',
+    family: 'saturation',
+    kind: 'llm',
+    description:
+      'Saturation-class hybrid (deterministic id-dedup + LLM semantic novelty): verify each surfaced_assumption is not a duplicate/paraphrase of existing assumptions; verify category matches content. MEDIUM on duplicate; LOW on category drift.',
+    appliesTo: dispatchedIn('surfaced_assumption_novelty'),
+    promptTemplatePath: 'prompts/review/saturation/surfaced_assumption_novelty.system.md',
+    invoke: invokeSurfacedAssumptionNovelty,
+  },
+  {
+    id: 'nfr_threshold_grounding',
+    family: 'saturation',
+    kind: 'llm',
+    description:
+      'NFR saturation outlier: every numeric threshold in child NFR measurable_condition / seed_threshold must be grounded in parent NFR / handoff. HIGH on fabricated threshold.',
+    appliesTo: dispatchedIn('nfr_threshold_grounding'),
+    promptTemplatePath: 'prompts/review/saturation/nfr_threshold_grounding.system.md',
+    invoke: invokeNfrThresholdGrounding,
+  },
+  {
+    id: 'adr_status_discipline_validator',
+    family: 'role_specific',
+    kind: 'deterministic',
+    description:
+      'Phase 4.3 adr_capture: enforce ADR status default of proposed unless explicit acceptance rationale is present. LOW when all ADRs accepted without rationale; MEDIUM per individual.',
+    appliesTo: dispatchedIn('adr_status_discipline_validator'),
+    validate: validateAdrStatusDiscipline,
+  },
+  {
+    id: 'error_type_source_attestation_validator',
+    family: 'role_specific',
+    kind: 'llm',
+    description:
+      'Phase 5.3 error_handling: for each error_types value, classify attestation as directly named / source-derivable / plausible-unattested / fabricated-generic. HIGH on group D; MEDIUM on group C; LOW on group B.',
+    appliesTo: dispatchedIn('error_type_source_attestation_validator'),
+    promptTemplatePath: 'prompts/review/role_specific/error_type_source_attestation_validator.system.md',
+    invoke: invokeErrorTypeSourceAttestationValidator,
   },
 
   // ── Family: role_specific (one-of validators) ─────────────────────

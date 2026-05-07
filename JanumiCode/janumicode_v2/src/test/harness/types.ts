@@ -372,6 +372,13 @@ export interface PipelineRunnerConfig {
   /** Phase to resume at (required when resumeFromDb is set). */
   resumeAtPhase?: string;
   /**
+   * Thin-slice mode: constrain the decomposition tree (depth=2,
+   * fanout=1, ~2 root FRs/NFRs, all reasoning_review on) so every
+   * sub-phase prompt template fires at least once end-to-end. Used
+   * for prompt-template validation between full calibration runs.
+   */
+  thinSlice?: boolean;
+  /**
    * When set, the runner calls an LLM to produce a rich suggested_fix
    * for the gap report by grounding its suggestion in the governed
    * stream tail. Requires an available provider (same routing as normal

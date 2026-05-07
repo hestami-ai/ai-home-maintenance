@@ -422,6 +422,50 @@ export class LLMCaller {
       const maxLogFileBytes = Number.parseInt(
         process.env.JANUMICODE_LLM_MAX_LOG_FILE_BYTES ?? '1572864', 10);
 
+      // Per-call wall-clock timeout — companion to the byte-cap retry.
+      // The byte cap catches token-producing loops (log grows fast). It
+      // does NOT catch silent hangs where the call produces no tokens
+      // for a long time (cal-26 cycle: ollama call wedged for 15+ min,
+      // records-idle stall fired session abort, deferred 9 nodes).
+      // This timeout fires the same per-attempt abort path so the call
+      // is retryable (sampling variance can rescue the next attempt).
+      // Default 180 s — long enough that a legit verbose-but-
+      // converging saturation call (~2 min for qwen3.5:9b) finishes
+      // cleanly, short enough that 3 retries (540s) stay well under
+      // the orchestrator's records-idle stall (default 900s). Cal-27
+      // ran with 300s × 3 = 900s exactly, so a single hung node tied
+      // up the whole stall budget and aborted the session.
+      // Set to 0 to disable.
+      const maxCallSeconds = Number.parseInt(
+        process.env.JANUMICODE_LLM_MAX_CALL_SECONDS ?? '180', 10);
+
+      // Line-repetition cap — fast-fail for degenerate-loop pathologies
+      // (cal-27 NFR saturation: qwen3.5:9b emitted "* `1`: Count/status
+      // check." 1000+ times before the wall-clock fired). When the same
+      // non-trivial line appears N times CONSECUTIVELY, the model is
+      // stuck in a low-entropy attractor and a fresh sampling pass is
+      // the only way out — so we abort and let retry sample from a
+      // different state. Threshold of 30 is well above any legitimate
+      // enumeration. Consecutive-only avoids false positives on
+      // legitimate JSON whose common fields (e.g. "actor": "System")
+      // repeat many times across a list interspersed with other lines.
+      // Set to 0 to disable.
+      const maxRepeatedLine = Number.parseInt(
+        process.env.JANUMICODE_LLM_MAX_REPEATED_LINE ?? '30', 10);
+
+      // No-progress timer — primary silent-hang safety net. Resets on
+      // every streaming chunk; aborts when no chunk has arrived for N
+      // seconds. Replaces total-wall-clock as the precise "is the model
+      // making progress?" signal — a slow-but-streaming valid output
+      // (Phase 1 bloom prompts can stream 200+ KB over 5+ minutes)
+      // never trips, while a wedged socket or paused generation does.
+      // The total-wall-clock below is kept as an outer last-resort cap.
+      // Default 90 s is generous enough for a model that pauses briefly
+      // while emitting big tool-call payloads or thinking blocks. Set
+      // to 0 to disable.
+      const maxNoProgressSeconds = Number.parseInt(
+        process.env.JANUMICODE_LLM_NO_PROGRESS_SECONDS ?? '90', 10);
+
       for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
         // Per-attempt abort + stream state so a retry starts with a
         // fresh budget. bytesBaseline captures the log-file size at
@@ -432,6 +476,43 @@ export class LLMCaller {
         const bytesBaseline = logFile?.bytesWritten ?? 0;
         const abortController = new AbortController();
         let abortReason: string | null = null;
+        // Per-attempt line-repetition tracking (consecutive). Reset
+        // every retry so sampling variance gets a clean slate.
+        let lineBuffer = '';
+        let lastLine: string | null = null;
+        let consecutiveLineCount = 0;
+        // No-progress timer — re-armed on every streaming chunk. Cleared
+        // in every exit path (success, error, retry) below alongside
+        // the wall-clock handle.
+        let noProgressHandle: NodeJS.Timeout | null = null;
+        const armNoProgressTimer = () => {
+          if (noProgressHandle) clearTimeout(noProgressHandle);
+          if (maxNoProgressSeconds <= 0) return;
+          noProgressHandle = setTimeout(() => {
+            if (abortReason) return;
+            abortReason = `no-progress timeout (${maxNoProgressSeconds}s without a streaming chunk) — likely silent hang`;
+            if (!abortController.signal.aborted) abortController.abort();
+          }, maxNoProgressSeconds * 1000);
+          noProgressHandle.unref?.();
+        };
+        // Arm initially so a provider that never emits a single chunk
+        // (e.g. wedged socket before TTFB) still aborts.
+        armNoProgressTimer();
+
+        // Wall-clock timer — outer safety cap for adversarial cases
+        // where a model pauses, emits a chunk every N-1 seconds (just
+        // resetting no-progress), and never converges. Cleared in every
+        // exit path (success, error, retry) below.
+        let callTimeoutHandle: NodeJS.Timeout | null = null;
+        if (maxCallSeconds > 0) {
+          callTimeoutHandle = setTimeout(() => {
+            if (abortReason) return;
+            abortReason = `invocation wall-clock exceeded (${maxCallSeconds}s this attempt) — likely silent hang`;
+            if (!abortController.signal.aborted) abortController.abort();
+          }, maxCallSeconds * 1000);
+          // Don't keep the process alive on this timer if the run otherwise finishes.
+          callTimeoutHandle.unref?.();
+        }
         // Union the caller-provided abort signal (session abort from
         // waitForQuiescence) with our internal one. Session abort is
         // non-retryable: the outer orchestrator is shutting down.
@@ -454,6 +535,10 @@ export class LLMCaller {
           ...options,
           abortSignal: abortController.signal,
           onChunk: (chunk) => {
+            // Re-arm the no-progress timer on every chunk — any chunk
+            // (response text, thinking, even empty whitespace) counts
+            // as forward progress from the streaming socket.
+            armNoProgressTimer();
             cumulativeChars += chunk.text.length;
             logFile?.writeChunk({
               channel: chunk.channel,
@@ -467,6 +552,42 @@ export class LLMCaller {
               if (attemptBytes > maxLogFileBytes) {
                 abortReason = `invocation log size exceeded (${attemptBytes} > ${maxLogFileBytes} bytes this attempt) — likely runaway thinking`;
                 abortController.abort();
+              }
+            }
+            // Consecutive-line-repetition detector: count identical
+            // non-trivial lines that appear back-to-back with no other
+            // line types between them. Cal-27 pathology: qwen3.5:9b
+            // emitted "* `1`: Count/status check." 1000+ times with NO
+            // other lines between — a true degenerate loop. Thin-slice
+            // false-positive (initial design): `"actor": "System",`
+            // repeats 100+ times across a list of workflows but is
+            // INTERSPERSED with `"action"`, `"step_number"`, etc., so
+            // the consecutive count resets every few lines and never
+            // hits the threshold. The total-count variant flagged this
+            // legitimate JSON output as a loop; consecutive-count does
+            // not. Catches degenerate loops at ~10s while leaving valid
+            // verbose JSON alone.
+            if (!abortReason && maxRepeatedLine > 0) {
+              lineBuffer += chunk.text;
+              let nl = lineBuffer.indexOf('\n');
+              while (nl !== -1) {
+                const line = lineBuffer.slice(0, nl).trim();
+                lineBuffer = lineBuffer.slice(nl + 1);
+                if (line.length >= 8) {
+                  if (line === lastLine) {
+                    consecutiveLineCount++;
+                  } else {
+                    lastLine = line;
+                    consecutiveLineCount = 1;
+                  }
+                  if (consecutiveLineCount >= maxRepeatedLine) {
+                    const preview = line.length > 60 ? line.slice(0, 60) + '…' : line;
+                    abortReason = `degenerate loop detected (line repeated ${consecutiveLineCount}× consecutively this attempt): "${preview}"`;
+                    abortController.abort();
+                    break;
+                  }
+                }
+                nl = lineBuffer.indexOf('\n');
               }
             }
           },
@@ -547,7 +668,18 @@ export class LLMCaller {
             //     variance can rescue it. This is distinct from a true
             //     HTTP 400 context_exceeded where the server itself
             //     rejects the request.
-            const isRunawayThinking = (abortReason as string).includes('invocation log size exceeded');
+            // Both byte-cap ("invocation log size exceeded") and wall-clock
+            // ("invocation wall-clock exceeded") in-stream aborts are
+            // treated as `runaway_thinking` — same retry semantics: a
+            // fresh attempt gets fresh budget and sampling variance can
+            // rescue it. Distinguish from true HTTP 400 context_exceeded
+            // where the server rejects the request.
+            const reason = abortReason as string;
+            const isRunawayThinking =
+              reason.includes('invocation log size exceeded') ||
+              reason.includes('invocation wall-clock exceeded') ||
+              reason.includes('degenerate loop detected') ||
+              reason.includes('no-progress timeout');
             const errorType: LLMErrorType = sessionAborted
               ? 'unknown'
               : (isRunawayThinking ? 'runaway_thinking' : 'context_exceeded');
@@ -573,6 +705,8 @@ export class LLMCaller {
           }
         } finally {
           externalCleanup?.();
+          if (callTimeoutHandle) clearTimeout(callTimeoutHandle);
+          if (noProgressHandle) clearTimeout(noProgressHandle);
         }
       }
 

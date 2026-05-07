@@ -78,6 +78,63 @@ export async function runPipeline(
     engine.setPhaseLimit(config.phaseLimit as PhaseId);
   }
 
+  // --thin-slice mode: tighten every decomposition cap and limit root
+  // counts so the workflow exercises every sub-phase prompt template
+  // end-to-end without saturating fully. Goal: validate prompt
+  // templates between full calibration runs in hours, not days.
+  // Reasoning-review-on-tier-c flips to true across all four trees so
+  // the audit prompt templates are also exercised. Override is applied
+  // after createTestEngine so it takes precedence over any inherited
+  // workspace config.
+  if (config.thinSlice) {
+    // Workflow overrides: extend the records-idle stall window. Phase 1
+    // bloom prompts on qwen3.5:9b legitimately stream 200+ KB of valid
+    // JSON over 4-7 minutes. The no-progress timer now catches genuine
+    // hangs precisely (90s without a chunk), so the orchestrator stall
+    // window only needs to exceed the worst-case retry burst on a
+    // legitimately slow call. 60 min covers 3 retries at ~15 min each
+    // with healthy headroom.
+    engine.configManager.setWorkflowOverrides({
+      records_idle_stall_ms: 3600000,
+    });
+
+    // The no-progress timer (default 90s, env JANUMICODE_LLM_NO_PROGRESS_SECONDS)
+    // is now the primary silent-hang safety net — re-armed on every
+    // streaming chunk, so legitimate slow generations never trip it.
+    // The wall-clock is just an outer adversarial cap. Bump it generously
+    // for thin-slice (1800s = 30 min) so it never fires for valid output.
+    // Operator can override by setting JANUMICODE_LLM_MAX_CALL_SECONDS
+    // explicitly.
+    if (!process.env.JANUMICODE_LLM_MAX_CALL_SECONDS) {
+      process.env.JANUMICODE_LLM_MAX_CALL_SECONDS = '1800';
+    }
+
+    engine.configManager.setDecompositionOverrides({
+      depth_cap: 2,
+      budget_cap: 30,
+      fanout_cap: 1,
+      max_root_count_fr: 2,
+      max_root_count_nfr: 2,
+      reasoning_review_on_tier_c: true,
+      component_depth_cap: 2,
+      component_budget_cap: 15,
+      component_fanout_cap: 2,
+      component_reasoning_review_on_tier_c: true,
+      task_depth_cap: 2,
+      task_budget_cap: 20,
+      task_fanout_cap: 2,
+      task_reasoning_review_on_tier_c: true,
+      data_model_depth_cap: 2,
+      data_model_budget_cap: 15,
+      data_model_fanout_cap: 2,
+      data_model_reasoning_review_on_tier_c: true,
+      test_depth_cap: 2,
+      test_budget_cap: 20,
+      test_fanout_cap: 2,
+      test_reasoning_review_on_tier_c: true,
+    });
+  }
+
   // Live observability for live (non-mock) runs. Writes per-call .log
   // files under <workspace>/.janumicode/live/ (C8) and prints a
   // heartbeat + live tail to stdout (A1 + A3) so you can tell a
