@@ -1,0 +1,9 @@
+{
+  "overall_authority_status": "machine_assessed_support",
+  "attorney_confirmation_required": true,
+  "items": [
+    { "authority_id": "MD-FAM-ACCESS-ENFORCEMENT-001", "status": "machine_assessed_support" },
+    { "authority_id": "MD-FAM-CUSTODY-CASE-001", "status": "machine_assessed_support" },
+    { "authority_id": "COURT-ORDER-001", "status": "source_located" }
+  ]
+}

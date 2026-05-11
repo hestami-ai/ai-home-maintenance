@@ -1,0 +1,19 @@
+{
+  "primary_lens": "Family Law Production Lens",
+  "secondary_lenses": [
+    "Client Advice Draft Lens",
+    "Court Filing Draft Lens",
+    "Legal Research Memo Lens",
+    "Authority Verification Lens"
+  ],
+  "matter_type": "custody_visitation_enforcement",
+  "jurisdiction": "Maryland",
+  "confidence": "high",
+  "safe_next_state": "MatterContextNormalize",
+  "prohibited_actions": [
+    "send legal advice directly to client without attorney approval",
+    "file court document without attorney approval",
+    "treat authority verification as attorney-confirmed",
+    "give final legal conclusion without attorney review"
+  ]
+}

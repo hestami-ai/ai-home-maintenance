@@ -3,5 +3,5 @@
   "sample": "05_domain_interpreter__business_domains_bloom",
   "passed": true,
   "expectedFindingCount": 0,
-  "overallAssessment": "The agent successfully adhered to the structural requirements of the output contract. The primary focus of the audit (noun-vs-verb misclassification) was handled correctly: all entries in both entity_preview and workflow_preview arrays within the domains are correctly shaped (nouns for entities, verb-leading/process-oriented for workflows). No misclassifications were detected."
+  "overallAssessment": "The agent successfully maintained the separation of concerns across all proposed domains. All entries listed in 'entityPreview' are noun phrases (concepts/assets), and all entries in 'workflowPreview' are verb-leading phrases (actions/transitions). No noun-vs-verb misclassifications were detected."
 }

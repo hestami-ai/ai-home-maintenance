@@ -1,0 +1,45 @@
+/**
+ * CLV v1 — aggregated entries.
+ *
+ * Source of truth for the runtime CLV. The Markdown form lives at
+ * docs/clv/canonical_vocabulary_v1.md and is the human canonical form.
+ */
+
+import type { CanonicalVocabularyEntry } from '../types.js';
+import {
+  SECTION_01_ISSUES_CLAIMS_ASSERTIONS,
+  SECTION_02_FACTS_FINDINGS_CONCLUSIONS,
+  SECTION_03_REASONING_PRIMITIVES,
+  SECTION_04_AUTHORITY,
+} from './sections01to04_reasoning.js';
+import {
+  SECTION_05_RELEASES,
+  SECTION_06_REVIEWS_APPROVALS_SIGNATURES,
+  SECTION_07_PARTIES,
+  SECTION_08_ARTIFACTS,
+  SECTION_09_GATES,
+} from './sections05to09_workflow.js';
+import {
+  SECTION_10_TENANCY,
+  SECTION_11_VERIFICATION_STATUS,
+  SECTION_12_RELEASE_STATUS,
+  SECTION_13_PRIVILEGE_CLASSIFICATION,
+} from './sections10to13_tenancy_status.js';
+
+export const CLV_V1_ENTRIES: readonly CanonicalVocabularyEntry[] = [
+  ...SECTION_01_ISSUES_CLAIMS_ASSERTIONS,
+  ...SECTION_02_FACTS_FINDINGS_CONCLUSIONS,
+  ...SECTION_03_REASONING_PRIMITIVES,
+  ...SECTION_04_AUTHORITY,
+  ...SECTION_05_RELEASES,
+  ...SECTION_06_REVIEWS_APPROVALS_SIGNATURES,
+  ...SECTION_07_PARTIES,
+  ...SECTION_08_ARTIFACTS,
+  ...SECTION_09_GATES,
+  ...SECTION_10_TENANCY,
+  ...SECTION_11_VERIFICATION_STATUS,
+  ...SECTION_12_RELEASE_STATUS,
+  ...SECTION_13_PRIVILEGE_CLASSIFICATION,
+];
+
+export const CLV_V1_VERSION = 'v1';

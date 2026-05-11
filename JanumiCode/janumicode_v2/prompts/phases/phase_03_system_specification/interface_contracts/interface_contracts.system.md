@@ -7,6 +7,7 @@ required_variables:
   - active_constraints
   - system_boundary_summary
   - external_systems_list
+  - technical_constraints_summary
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -33,6 +34,7 @@ Rules:
 CONTEXT:
 System Boundary: {{system_boundary_summary}}
 External Systems: {{external_systems_list}}
+Technical Constraints (TECH-* ids the model may cite when grounding protocol / auth / vendor / format choices): {{technical_constraints_summary}}
 
 # Hard rules — source-item enumeration discipline
 

@@ -6,6 +6,7 @@ co_invocation_exception: false
 required_variables:
   - active_constraints
   - test_plan_summary
+  - functional_requirements_summary
   - non_functional_requirements_summary
   - compliance_context_summary
   - janumicode_version_sha
@@ -32,7 +33,17 @@ Rules:
 - No evaluation criterion should duplicate a Test Case from Phase 7
 - Compliance-related NFRs from compliance_context must have evaluation criteria
 
+# Hard rules — id grounding (PRIMARY surface for this phase)
+
+Thin-slice-1 evidence: when this prompt was given only NFRs and the test plan, the model fabricated `functional_requirement_id` values like `FR-SEC-001`, `FR-COMPL-001`, `FR-MNT-001` that did not exist in the upstream requirement set. The fix is grounding via the new `functional_requirements_summary` block; the rules below close the loop.
+
+- Every `functional_evaluation_plan.criteria[].functional_requirement_id` MUST appear verbatim in `functional_requirements_summary` (the FR / user-story IDs from Phase 2.1 / 2.1a). Do NOT invent FR IDs that match a plausible naming pattern but aren't in the input.
+- Every `quality_evaluation_plan.criteria[].nfr_id` MUST appear verbatim in `non_functional_requirements_summary` (NFR / NFR-saturation IDs from Phase 2.2 / 2.2a). Same rule: no inventing IDs.
+- If `functional_requirements_summary` is `'No FRs available'`, emit `functional_evaluation_plan.criteria: []` rather than fabricating; same for NFRs.
+- The `category` field on quality criteria MUST be derived from the actual NFR's category (e.g., the spec text), not assigned by guessing from a familiar-sounding ID.
+
 CONTEXT:
+Functional Requirements (FR / user-story IDs you may cite): {{functional_requirements_summary}}
+Non-Functional Requirements (NFR IDs you may cite): {{non_functional_requirements_summary}}
 Test Plan (read-only — do not duplicate): {{test_plan_summary}}
-Non-Functional Requirements: {{non_functional_requirements_summary}}
 Compliance: {{compliance_context_summary}}

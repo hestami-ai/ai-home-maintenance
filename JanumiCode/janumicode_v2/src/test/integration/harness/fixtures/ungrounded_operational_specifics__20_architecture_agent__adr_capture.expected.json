@@ -2,6 +2,6 @@
   "validator": "ungrounded_operational_specifics",
   "sample": "20_architecture_agent__adr_capture",
   "passed": false,
-  "expectedFindingCount": 3,
-  "overallAssessment": "The agent introduced multiple specific algorithm names and technology commitments (SHA-256 for cryptographic hashing, Haversine/Vincenty formulas for geodesic distance, last-modified timestamp with server priority for conflict resolution) that are not mandated by the upstream active_constraints or component_model_summary. The source context uses generic terms (IntegrityHash, GeodesicRadius, ConflictResolutionStrategy) without specifying algorithms. Parameterization-B bidirectional check: each threshold introduced must trace to upstream source. These HIGH-severity findings represent ungrounded algorithm selections that downstream phases will inherit as hard constraints."
+  "expectedFindingCount": 5,
+  "overallAssessment": "The agent successfully identified several key architectural patterns (RLS, Auth, Storage) but failed to capture critical, mandated algorithmic or threshold decisions (Quorum, Error Thresholds, Heartbeat Intervals). Furthermore, the agent introduced specific technical details (SHA-256, Haversine/Vincenty) that were not mandated by the source context, requiring clarification."
 }

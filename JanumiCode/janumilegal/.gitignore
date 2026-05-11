@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.log
+.env
+.env.*
+!.env.example
+.vscode-test/
+*.vsix
+.DS_Store
+coverage/
+test-and-evaluation/thin-slice-workspaces/
+calibration/regression_report.json

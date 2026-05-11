@@ -212,6 +212,25 @@ export async function runReviewHarness(
     if (typeof usage.outputTokens === 'number') totalOutputTokens += usage.outputTokens;
   };
 
+  // Pre-load prior artifacts for cross-record validators (e.g.
+  // spec_boundary_respect_bloom needs product_intent_discovery decisions
+  // and technical_constraints_discovery constraints). Single DB read per
+  // harness invocation; validators that don't need it ignore the field.
+  const priorArtifactsByKind: Map<string, Record<string, unknown>[]> = new Map();
+  try {
+    const artifactRecords = writer.getRecordsByType(traceContext.workflowRunId, 'artifact_produced');
+    for (const rec of artifactRecords) {
+      const content = rec.content as Record<string, unknown> | null;
+      const kind = typeof content?.kind === 'string' ? content.kind : null;
+      if (!kind) continue;
+      const bucket = priorArtifactsByKind.get(kind) ?? [];
+      bucket.push(content);
+      priorArtifactsByKind.set(kind, bucket);
+    }
+  } catch {
+    // Non-fatal: validators tolerate empty/undefined priorArtifactsByKind.
+  }
+
   // Pre-validator: run json_output_discipline_check if dispatched.
   // Short-circuit LLM validators on HIGH findings.
   let shortCircuitLLM = false;
@@ -227,6 +246,7 @@ export async function runReviewHarness(
       originalPrompt: prompt,
       originalSystem: null,
       upstreamFindings: [],
+      priorArtifactsByKind,
     };
     const preFindings = await runOneValidator(
       preValidatorEntry,
@@ -268,6 +288,7 @@ export async function runReviewHarness(
       originalPrompt: prompt,
       originalSystem: null,
       upstreamFindings: [...allFindings],
+      priorArtifactsByKind,
     };
 
     const validatorStart = Date.now();

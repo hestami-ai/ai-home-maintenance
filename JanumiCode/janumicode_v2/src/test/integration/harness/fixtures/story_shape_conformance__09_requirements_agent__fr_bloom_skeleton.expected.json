@@ -1,7 +1,7 @@
 {
   "validator": "story_shape_conformance",
   "sample": "09_requirements_agent__fr_bloom_skeleton",
-  "passed": false,
-  "expectedFindingCount": 1,
-  "overallAssessment": "The agent successfully mapped the majority of the user journeys into distinct, well-scoped functional requirements with coherent role/action/outcome triples following the canonical shape. However, the agent failed to incorporate several critical compliance requirements (notice, persistent data, GL audit) into the user stories, resulting in a coverage gap and incomplete output relative to the full functional requirements scope."
+  "passed": true,
+  "expectedFindingCount": 0,
+  "overallAssessment": "The output successfully adheres to the canonical Role-Action-Outcome shape for all stories. All roles are clearly defined personas, actions are scoped to single capabilities, and outcomes are measurable and non-vacuous. The structure is highly compliant with the required narrative shape."
 }

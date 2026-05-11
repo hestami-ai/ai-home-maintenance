@@ -230,6 +230,7 @@ export class Phase5Handler implements PhaseHandler {
         rootEntities,
         rootNodeRecordIds: rootDataModelRecordIds,
         rootLogicalIds: rootDataModelLogicalIds,
+        systemRequirementsSummary: sysReqSummary,
       });
     }
 

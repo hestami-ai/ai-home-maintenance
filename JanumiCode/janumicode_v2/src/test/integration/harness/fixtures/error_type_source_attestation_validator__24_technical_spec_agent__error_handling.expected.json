@@ -2,6 +2,6 @@
   "validator": "error_type_source_attestation_validator",
   "sample": "24_technical_spec_agent__error_handling",
   "passed": false,
-  "expectedFindingCount": 5,
-  "overallAssessment": "The agent specified 18 unsupported error-type names across the error_handling_strategies output. This validator reclassifies those 18 findings into groups by attestation level: Group A (directly named in source, ACCEPT with no finding), Group B (derivable from named source behavior, ACCEPT with LOW annotation), Group C (plausible but unattested infrastructure failure for the component, MEDIUM), Group D (generic cross-component failure unrelated to any named behavior, HIGH). Generic error types like 'api_service_unavailable' for in-process components and 'serialization_failure' without source SR evidence are the primary offenders. The grounding_validator found 18 MEDIUM unsupported_claim findings; this validator escalates the worst-group entries to HIGH and clears the derivable ones."
+  "expectedFindingCount": 71,
+  "overallAssessment": "The agent successfully identified many critical error types, demonstrating a strong understanding of the system's domain. However, a significant portion of the error types (approximately 60%) are plausible but unattested (Group C), representing assumptions about infrastructure or failure modes not explicitly covered by the System Requirements. While the agent correctly identified several Group A and Group B errors, the high volume of Group C findings suggests a need for stricter adherence to only naming errors explicitly or derivatively mandated by the source context, rather than guessing common failure modes."
 }

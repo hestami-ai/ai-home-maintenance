@@ -212,7 +212,16 @@ export class Phase7Handler implements PhaseHandler {
       await runTestSaturationLoop(ctx, {
         technicalConstraints,
         componentSummary: prior.componentModel?.summary ?? 'No component model available',
-        acceptanceCriteriaSummary: prior.functionalRequirements?.summary ?? 'No FR/AC summary available',
+        // Use the leaf-aware FR view so AC ids minted from Phase 2.1a
+        // leaves are visible to the saturation prompt. Previously this
+        // fell back to `prior.functionalRequirements?.summary` (root
+        // FRs only), so the parent test case's `acceptance_criterion_ids`
+        // referenced AC ids the model never saw — encouraging it to
+        // rephrase or fabricate them in children.
+        acceptanceCriteriaSummary: frSummary,
+        interfaceContractsSummary: prior.interfaceContracts?.summary
+          ?? prior.apiDefinitions?.summary
+          ?? 'No interface-contracts / api-definitions artifact available',
         rootTestCases,
         rootNodeRecordIds: rootTestRecordIds,
         rootLogicalIds: rootTestLogicalIds,

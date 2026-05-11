@@ -1,0 +1,9 @@
+{
+  "primary_lens": "Synthetic Isolation Lens",
+  "secondary_lenses": [],
+  "matter_type": "isolation_validation",
+  "jurisdiction": "Maryland",
+  "confidence": "high",
+  "safe_next_state": "MatterContextNormalize",
+  "prohibited_actions": []
+}

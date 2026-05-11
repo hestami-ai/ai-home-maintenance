@@ -257,6 +257,15 @@ interface SaturationLoopConfig {
   templateSubPhase: string;
   rootKind: 'fr' | 'nfr';
   gateSurfacePrefix: string;
+  /**
+   * For NFR saturation, the FR/user-story summary so children can
+   * ground `applies_to_requirements: [US-*]` references. The NFR
+   * saturation prompt's hard rules permit this, but without the
+   * roster the model fabricates US-* ids that pass the
+   * `sanitizeChildStory` filter unchallenged. FR runs leave this
+   * null — FR children don't reference FRs by id.
+   */
+  applicableFrSummary?: string | null;
 }
 
 export class Phase2Handler implements PhaseHandler {
@@ -513,7 +522,7 @@ export class Phase2Handler implements PhaseHandler {
       const three = await runNfrBloomThreePass({
         ctx, handoff, dmr: dmr22, intentSummary, frSummary,
         acceptedFrIds: frContent.user_stories.map(s => s.id),
-        format: { formatExtractedItems, formatVVRequirements, formatTechnicalConstraints },
+        format: { formatExtractedItems, formatVVRequirements, formatTechnicalConstraints, formatJourneys },
       });
       nfrContent = {
         requirements: three.nfrs.map((n: NfrSkeleton) => ({
@@ -646,6 +655,10 @@ export class Phase2Handler implements PhaseHandler {
           templateSubPhase: 'nfr_saturation',
           rootKind: 'nfr',
           gateSurfacePrefix: 'nfr-decomp-gate-',
+          // Pass the FR roster so NFR saturation children can ground
+          // `applies_to_requirements: [US-*]` references. Identical
+          // pattern to the Phase 8 grounding fix.
+          applicableFrSummary: frSummary,
         },
       );
     }
@@ -1198,6 +1211,12 @@ export class Phase2Handler implements PhaseHandler {
               : siblings.filter(s => s.id !== entry.userStory.id)
                   .map(s => `- ${s.id}: ${s.action} -> ${s.outcome}`).join('\n'),
             handoff_context: handoffSummary,
+            // Only the NFR saturation template uses this; FR runs ignore.
+            // Set to '(not applicable — FR saturation)' for FR runs so the
+            // template render's required_variables check still passes if
+            // the FR template ever opts into the same variable.
+            functional_requirements_summary: config.applicableFrSummary
+              ?? '(not applicable — FR saturation does not cite FR ids)',
             existing_assumptions: scopedAssumptions.length === 0
               ? '(none yet)'
               : scopedAssumptions
@@ -2562,6 +2581,15 @@ function formatHandoffForDecomposition(h: ProductDescriptionHandoffContent): str
   if (h.userJourneys?.length) lines.push('User journeys:', formatJourneys(h.userJourneys));
   if (h.entityProposals?.length) lines.push('Entities:', formatEntities(h.entityProposals));
   if (h.workflowProposals?.length) lines.push('Workflows:', formatWorkflows(h.workflowProposals));
+  // QA-# quality attributes — both saturation templates list QA-# as a
+  // valid `traces_to` prefix. Without this roster the model fabricates
+  // QA-# ids and `sanitizeChildStory` passes them through unvalidated.
+  if (h.qualityAttributes?.length) {
+    lines.push(
+      'Quality attributes:',
+      h.qualityAttributes.map((q, i) => `- [QA-${i + 1}] ${q}`).join('\n'),
+    );
+  }
   if (h.technicalConstraints?.length) lines.push('Technical constraints:', formatTechnicalConstraints(h.technicalConstraints));
   if (h.vvRequirements?.length) lines.push('V&V requirements:', formatVVRequirements(h.vvRequirements));
   if (h.complianceExtractedItems?.length) lines.push('Compliance items:', formatExtractedItems(h.complianceExtractedItems));

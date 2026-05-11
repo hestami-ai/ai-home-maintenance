@@ -197,9 +197,14 @@ describe('Phase 2 — product-lens handoff consumption', () => {
         }],
       },
     });
-    // Match on parent ID (present in the rendered parent_story block).
+    // Match on the parent_story header, which uses an actual newline
+    // between the bracketed priority and "As a ...". This anchor only
+    // appears in the FR-saturation parent_story block — it does NOT
+    // appear in the FR roster ({{functional_requirements_summary}})
+    // that NFR saturation now receives, where the same id is followed
+    // by ": " instead of a newline.
     mock.setFixture('decompose-root', {
-      match: 'FR-ACCT-0',
+      match: 'FR-ACCT-0 [critical]\nAs a CAM',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root is a functional sub-area' },
         children: [
@@ -298,7 +303,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     });
     // Pass-1 decomposing the root produces two Tier-B scope commitments.
     mock.setFixture('decompose-root', {
-      match: 'FR-ACCT-0',
+      match: 'FR-ACCT-0 [critical]\nAs a CAM',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
         children: [
@@ -377,7 +382,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     // decomposition call has no fixture match so returns empty children
     // and the loop terminates cleanly.
     mock.setFixture('decompose-root', {
-      match: 'FR-ROOT',
+      match: '# Parent being decomposed\nFR-ROOT',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
         children: [
@@ -467,7 +472,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     });
     // Pass 1 on the root: produces one Tier-B child FR-B1.
     mock.setFixture('decompose-root', {
-      match: 'FR-MISLABEL',
+      match: '# Parent being decomposed\nFR-MISLABEL',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
         children: [{
@@ -482,7 +487,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     // Tier-B child FR-B2. That's the mislabel signal — accepted-B parent
     // still has commitment layers. FR-B1 should be downgraded.
     mock.setFixture('decompose-B1', {
-      match: 'FR-B1',
+      match: '# Parent being decomposed\nFR-B1',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: false, rationale: 'still has commitments underneath' },
         children: [{
@@ -564,7 +569,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     });
     // FR decomposer returns atomic Tier-D children (terminate fast).
     mock.setFixture('decompose-fr', {
-      match: 'FR-ROOT',
+      match: '# Parent being decomposed\nFR-ROOT',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
         children: [{
@@ -589,7 +594,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     });
     // NFR decomposer returns atomic Tier-D children so 2.2a terminates.
     mock.setFixture('decompose-nfr', {
-      match: 'NFR-AUDIT',
+      match: '# Parent NFR being decomposed\nNFR-AUDIT',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root nfr' },
         children: [{
@@ -660,7 +665,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     });
     // Pass 1: root decomposes to a single Tier-B commitment.
     mock.setFixture('decompose-root', {
-      match: 'FR-AUDIT-ROOT',
+      match: '# Parent being decomposed\nFR-AUDIT-ROOT',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
         children: [{
@@ -676,7 +681,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     // implementation children — a clean post-gate decomposition. This is
     // where the 4c audit should fire.
     mock.setFixture('decompose-commitment', {
-      match: 'FR-COMMITMENT',
+      match: '# Parent being decomposed\nFR-COMMITMENT',
       parsedJson: {
         parent_tier_assessment: { tier: 'B', agrees_with_hint: true, rationale: 'real commitment' },
         children: [
@@ -766,7 +771,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       },
     });
     mock.setFixture('decompose-fr', {
-      match: 'FR-ROOT',
+      match: '# Parent being decomposed\nFR-ROOT',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
         children: [{
@@ -787,7 +792,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       },
     });
     mock.setFixture('decompose-nfr', {
-      match: 'NFR-1',
+      match: '# Parent NFR being decomposed\nNFR-1',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root nfr' },
         children: [{
@@ -853,7 +858,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       },
     });
     mock.setFixture('decompose-root', {
-      match: 'FR-ROOT',
+      match: '# Parent being decomposed\nFR-ROOT',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
         children: [{
@@ -979,7 +984,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
     // matter). qwen3-embedding:8b should place 1+2 well above the
     // 0.92 threshold and 3 well below.
     mock.setFixture('decompose-root', {
-      match: 'FR-ROOT',
+      match: '# Parent being decomposed\nFR-ROOT',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
         children: [{
@@ -1048,7 +1053,7 @@ describe('Phase 2 — product-lens handoff consumption', () => {
       },
     });
     mock.setFixture('decompose-root-malformed', {
-      match: 'FR-ROOT',
+      match: '# Parent being decomposed\nFR-ROOT',
       parsedJson: {
         parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
         children: [

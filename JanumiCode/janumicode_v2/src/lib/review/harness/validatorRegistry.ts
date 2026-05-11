@@ -62,6 +62,7 @@ import { invokeComplianceSignalCompleteness } from './validators/llm/complianceS
 // Commit 5b — bloom
 import { invokeSourceAttributionGrounding } from './validators/llm/sourceAttributionGrounding';
 import { invokeBloomCompletenessVsThinking } from './validators/llm/bloomCompletenessVsThinking';
+import { invokeSpecBoundaryRespectBloom } from './validators/llm/specBoundaryRespectBloom';
 import { invokeSourceGroupingCoverage } from './validators/llm/sourceGroupingCoverage';
 import { invokeDomainPersonaCoherence } from './validators/llm/domainPersonaCoherence';
 import { invokeSurfaceAttributionCompleteness } from './validators/llm/surfaceAttributionCompleteness';
@@ -185,6 +186,15 @@ export interface ValidatorRuntimeParams {
    * collation). Empty for now; final_synthesis (Commit 8) reads it.
    */
   upstreamFindings?: ValidatorFinding[];
+  /**
+   * Prior governed-stream artifacts for this workflow run, grouped by
+   * `content.kind`. Lets cross-record validators (e.g.
+   * `spec_boundary_respect_bloom`) consult discovery / extraction outputs
+   * without re-extracting from raw spec text. The harness pre-loads this
+   * once per agent_output review; validators that don't need it ignore.
+   * Undefined when the harness was invoked without writer access (tests).
+   */
+  priorArtifactsByKind?: ReadonlyMap<string, ReadonlyArray<Record<string, unknown>>>;
 }
 
 export interface ValidatorFinding {
@@ -315,6 +325,7 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
       'open_question_vs_decided',
       'source_grouping_coverage',
       'bloom_completeness_vs_thinking',
+      'spec_boundary_respect_bloom',
       'reasoning_to_response_faithfulness',
       'reasoning_quality_validator',
       'final_synthesis',
@@ -338,8 +349,106 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
       'open_question_vs_decided',
       'phase_journey_alignment',
       'bloom_completeness_vs_thinking',
+      'spec_boundary_respect_bloom',
       'reasoning_to_response_faithfulness',
       'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S06b — domain_interpreter / system_workflow_bloom (1.3b) — added Wave 8 thin-slice fixes
+  [
+    bundleKey('domain_interpreter', 'system_workflow_bloom'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'source_attribution_grounding',
+      'workflow_journey_separation',
+      'open_question_vs_decided',
+      'bloom_completeness_vs_thinking',
+      'spec_boundary_respect_bloom',
+      'grounding_validator',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S06c — domain_interpreter / entities_bloom (1.4) — added Wave 8 thin-slice fixes
+  [
+    bundleKey('domain_interpreter', 'entities_bloom'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'source_attribution_grounding',
+      'open_question_vs_decided',
+      'bloom_completeness_vs_thinking',
+      'spec_boundary_respect_bloom',
+      'grounding_validator',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S06d — domain_interpreter / integrations_qa_bloom (1.5) — added Wave 8 thin-slice fixes
+  [
+    bundleKey('domain_interpreter', 'integrations_qa_bloom'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'source_attribution_grounding',
+      'open_question_vs_decided',
+      'bloom_completeness_vs_thinking',
+      'spec_boundary_respect_bloom',
+      'grounding_validator',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+  // S03b — domain_interpreter / technical_constraints_discovery (1.0c) — added Wave 8 thin-slice fixes
+  [
+    bundleKey('domain_interpreter', 'technical_constraints_discovery'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'extraction_id_traceability',
+      'grounding_validator',
+      'scope_boundary_adherence_discovery',
+      'open_question_vs_decided',
+      'external_reference_handling',
+      'assumption_citation_validator',
+      'reasoning_to_response_faithfulness',
+      'final_synthesis',
+    ],
+  ],
+  // S03c — domain_interpreter / vv_requirements_discovery (1.0e) — added Wave 8 thin-slice fixes
+  [
+    bundleKey('domain_interpreter', 'vv_requirements_discovery'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'extraction_id_traceability',
+      'grounding_validator',
+      'scope_boundary_adherence_discovery',
+      'open_question_vs_decided',
+      'external_reference_handling',
+      'assumption_citation_validator',
+      'reasoning_to_response_faithfulness',
+      'final_synthesis',
+    ],
+  ],
+  // S03d — domain_interpreter / canonical_vocabulary_discovery (1.0f) — added Wave 8 thin-slice fixes
+  [
+    bundleKey('domain_interpreter', 'canonical_vocabulary_discovery'),
+    [
+      'json_output_discipline_check',
+      'contract_schema_validator',
+      'extraction_id_traceability',
+      'grounding_validator',
+      'scope_boundary_adherence_discovery',
+      'open_question_vs_decided',
+      'external_reference_handling',
+      'assumption_citation_validator',
+      'reasoning_to_response_faithfulness',
       'final_synthesis',
     ],
   ],
@@ -898,6 +1007,16 @@ const ENTRIES: ValidatorEntry[] = [
     appliesTo: dispatchedIn('bloom_completeness_vs_thinking'),
     promptTemplatePath: 'prompts/review/bloom/bloom_completeness_vs_thinking.system.md',
     invoke: invokeBloomCompletenessVsThinking,
+  },
+  {
+    id: 'spec_boundary_respect_bloom',
+    family: 'bloom',
+    kind: 'llm',
+    description:
+      'Detect bloom items that contradict a stated technical constraint or cover a concept the intent-discovery decisions list as excluded. Reads product_intent_discovery.decisions and technical_constraints_discovery.technicalConstraints from prior artifacts. Advisory.',
+    appliesTo: dispatchedIn('spec_boundary_respect_bloom'),
+    promptTemplatePath: 'prompts/review/bloom/spec_boundary_respect_bloom.system.md',
+    invoke: invokeSpecBoundaryRespectBloom,
   },
   {
     id: 'entity_workflow_shape',

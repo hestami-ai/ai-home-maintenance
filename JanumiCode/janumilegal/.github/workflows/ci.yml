@@ -1,0 +1,35 @@
+name: JanumiLegal CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'JanumiCode/janumilegal/**'
+  pull_request:
+    paths:
+      - 'JanumiCode/janumilegal/**'
+
+defaults:
+  run:
+    working-directory: JanumiCode/janumilegal
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: JanumiCode/janumilegal/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm lint:layers
+      - run: pnpm test
+      - run: pnpm calibration
+      - run: pnpm build

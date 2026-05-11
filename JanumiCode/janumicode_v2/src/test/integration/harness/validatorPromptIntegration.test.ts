@@ -23,6 +23,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, it, expect, beforeAll } from 'vitest';
+import { getParameterizationLabel } from '../../../lib/review/harness/validators/llm/ungroundedOperationalSpecifics';
+import { OllamaProvider } from '../../../lib/llm/providers/ollama';
 
 const SKIP = process.env.SKIP_OLLAMA_INTEGRATION === 'true';
 const OLLAMA = process.env.OLLAMA_URL ?? 'http://127.0.0.1:11434';
@@ -39,6 +41,27 @@ const SIMILARITY_THRESHOLD = Number.parseFloat(process.env.HARNESS_SIMILARITY_TH
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 const FIXTURE_DIR = path.join(__dirname, 'fixtures');
 const SAMPLE_DIR = path.join(REPO, 'docs', 'reasoning review prompt template redesign', 'track_c_samples');
+const DEBUG_DIR = path.join(__dirname, '_debug');
+fs.mkdirSync(DEBUG_DIR, { recursive: true });
+
+function writeDebugArtifacts(
+  validator: string,
+  sample: string,
+  systemPrompt: string,
+  userPrompt: string,
+  rawResponse: string,
+  thinking: string,
+  error: string | null,
+): void {
+  const slug = `${validator}__${sample}`;
+  fs.writeFileSync(path.join(DEBUG_DIR, `${slug}.system.txt`), systemPrompt, 'utf8');
+  fs.writeFileSync(path.join(DEBUG_DIR, `${slug}.user.txt`), userPrompt, 'utf8');
+  fs.writeFileSync(path.join(DEBUG_DIR, `${slug}.response.txt`), rawResponse, 'utf8');
+  fs.writeFileSync(path.join(DEBUG_DIR, `${slug}.thinking.txt`), thinking, 'utf8');
+  if (error) {
+    fs.writeFileSync(path.join(DEBUG_DIR, `${slug}.error.txt`), error, 'utf8');
+  }
+}
 
 interface Fixture {
   validator: string;
@@ -80,12 +103,28 @@ describe.skipIf(SKIP)('harness validator prompt integration', () => {
   for (const fixture of fixtures) {
     it(`${fixture.validator} on ${fixture.sample}`, async () => {
       const { systemPrompt, userPrompt } = buildPrompts(fixture);
-      const raw = await callOllamaChat(systemPrompt, userPrompt);
+      let out: OllamaCallOutput;
+      try {
+        out = await callOllamaChat(systemPrompt, userPrompt);
+      } catch (callErr) {
+        writeDebugArtifacts(fixture.validator, fixture.sample, systemPrompt, userPrompt, '', '', `chat call failed: ${(callErr as Error).message}`);
+        throw callErr;
+      }
+      const raw = out.text;
+      writeDebugArtifacts(fixture.validator, fixture.sample, systemPrompt, userPrompt, raw, out.thinking, null);
 
-      // Assertion 1: JSON parses
+      // Assertion 1: JSON parses. The provider already ran
+      // parseJsonWithRecovery on `result.text` (handles markdown fences
+      // and minor structural drift) and surfaced the parsed object on
+      // `out.parsed`. Fall back to a fresh JSON.parse only if recovery
+      // returned null — that path produces an actionable parse error.
       let parsed: Record<string, unknown>;
-      try { parsed = JSON.parse(raw); } catch (e) {
-        throw new Error(`validator output is not valid JSON: ${(e as Error).message}\n${raw.slice(0, 500)}`);
+      if (out.parsed) {
+        parsed = out.parsed;
+      } else {
+        try { parsed = JSON.parse(raw); } catch (e) {
+          throw new Error(`validator output is not valid JSON: ${(e as Error).message}\n${raw.slice(0, 500)}`);
+        }
       }
 
       // Assertion 2: schema (validator id + findings[])
@@ -120,7 +159,7 @@ describe.skipIf(SKIP)('harness validator prompt integration', () => {
       ]);
       const sim = cosine(embedActual, embedExpected);
       expect(sim, `semantic similarity ${sim.toFixed(3)} below threshold ${SIMILARITY_THRESHOLD}`).toBeGreaterThanOrEqual(SIMILARITY_THRESHOLD);
-    }, 120_000);
+    }, 300_000);
   }
 });
 
@@ -134,6 +173,13 @@ function buildPrompts(fixture: Fixture): { systemPrompt: string; userPrompt: str
   const samplePath = path.join(SAMPLE_DIR, `${fixture.sample}.md`);
   const runtime = parseSample(samplePath);
 
+  // Sample naming convention: `<num>_<agent_role>__<sub_phase>` (e.g.
+  // `17_systems_agent__interface_contracts`). Strip the leading numeric
+  // prefix to recover the canonical agent_role used by the validator
+  // dispatch + per-validator preprocessGrounding hooks.
+  const subPhaseId = fixture.sample.split('__')[1] ?? '';
+  const agentRole = (fixture.sample.split('__')[0] ?? '').replace(/^\d+_/, '');
+
   const systemPrompt = render(templateBody, {
     ORIGINAL_PROMPT: runtime.originalPrompt,
     ORIGINAL_SYSTEM: runtime.originalSystem,
@@ -142,8 +188,13 @@ function buildPrompts(fixture: Fixture): { systemPrompt: string; userPrompt: str
     AGENT_REASONING: runtime.outputThinking,
     AGENT_RESPONSE: runtime.outputText,
     AGENT_FINAL_RESPONSE: runtime.outputText,
-    AGENT_ROLE: 'requirements_agent',
-    SUB_PHASE: fixture.sample.split('__')[1] ?? '',
+    AGENT_ROLE: agentRole || 'requirements_agent',
+    SUB_PHASE: subPhaseId,
+    // Per-validator preprocessGrounding values that the production runner
+    // injects via factory hooks. Mirror that wiring here so the test
+    // exercises the same prompt the harness produces. Add new entries
+    // when a validator's prompt template gains a new {{VAR}} slot.
+    PARAMETERIZATION: getParameterizationLabel(agentRole || 'requirements_agent', subPhaseId),
   });
 
   // final_synthesis takes upstream findings + a deterministic decision rather
@@ -242,24 +293,38 @@ Your role is the validator described in your system prompt.`,
   ].join('\n\n---\n\n');
 }
 
-async function callOllamaChat(system: string, user: string): Promise<string> {
-  const res = await fetch(`${OLLAMA}/api/chat`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model: REVIEWER_MODEL,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      stream: false,
-      format: 'json',
-      options: { temperature: 0 },
-    }),
+// Single shared provider instance — same path the orchestrator uses in
+// production. Routes through `/api/generate` (not `/api/chat`), applies
+// the family-tuned num_ctx (128000 for gemma / 262141 for qwen),
+// `think: true`, and the production parseJsonWithRecovery strategy. Using
+// the provider directly avoids drift between the integration test and
+// the harness's actual behavior — the test catches prompt-template
+// regressions only when it exercises the same call path the real
+// validator dispatch uses.
+const ollamaProvider = new OllamaProvider(OLLAMA);
+
+interface OllamaCallOutput {
+  text: string;
+  parsed: Record<string, unknown> | null;
+  thinking: string;
+}
+
+async function callOllamaChat(system: string, user: string): Promise<OllamaCallOutput> {
+  const result = await ollamaProvider.call({
+    provider: 'ollama',
+    model: REVIEWER_MODEL,
+    system,
+    prompt: user,
+    // For thinking-mode models (qwen, gemma) the provider intentionally does
+    // NOT set the wire-level `format: 'json'` ollama option — instead it
+    // relies on the prompt to request JSON and runs parseJsonWithRecovery
+    // on result.text. We still pass responseFormat: 'json' here because
+    // that's what triggers the recovery path; the provider gates the
+    // wire-level format flag separately via its model-family check.
+    responseFormat: 'json',
+    temperature: 0,
   });
-  if (!res.ok) throw new Error(`ollama chat HTTP ${res.status}: ${await res.text()}`);
-  const json = await res.json() as { message?: { content?: string } };
-  return json.message?.content ?? '';
+  return { text: result.text, parsed: result.parsed, thinking: result.thinking ?? '' };
 }
 
 async function callOllamaEmbed(text: string): Promise<number[]> {

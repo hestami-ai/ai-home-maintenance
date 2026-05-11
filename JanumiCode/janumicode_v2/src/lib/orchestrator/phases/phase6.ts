@@ -82,7 +82,16 @@ export class Phase6Handler implements PhaseHandler {
       });
     }
     const componentSummary = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${effectiveComponents.summary || (prior.componentModel?.summary ?? 'No component model available')}`;
+    // Hard rule #7 of the task_skeleton template: every Technical
+    // Specification id must appear in at least one task's traces_to[].
+    // The audit's older roll-up dropped system_requirements (SR-*) and
+    // interface_contracts (IC-*); when the model spontaneously cited
+    // them (Hestami-shaped specs), the ids were fabricated. Include
+    // both so the model can ground citations and so the validator can
+    // verify coverage.
     const techSpecsSummary = [
+      prior.systemRequirements?.summary ?? '',
+      prior.interfaceContracts?.summary ?? '',
       prior.dataModels?.summary ?? 'No data models',
       prior.apiDefinitions?.summary ?? 'No API definitions',
       prior.errorHandlingStrategies?.summary ?? '',

@@ -8,6 +8,7 @@ required_variables:
   - active_constraints
   - intent_statement_summary
   - functional_requirements_summary
+  - accepted_journeys
   - quality_attributes
   - vv_requirements
   - technical_constraints
@@ -132,6 +133,10 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are dropped
 
 # Functional Requirements (from Sub-Phase 2.1 — do not duplicate; may appear in applies_to_requirements)
 {{functional_requirements_summary}}
+
+# Accepted User Journeys (the only legitimate source for `UJ-*` ids in `traces_to[]` — when a journey directly demands a specific NFR)
+# Do NOT mint UJ-* ids that are not in this list; the self-heal filter silently drops fabricated refs.
+{{accepted_journeys}}
 
 # Quality Attributes (free-prose NFR seeds)
 {{quality_attributes}}

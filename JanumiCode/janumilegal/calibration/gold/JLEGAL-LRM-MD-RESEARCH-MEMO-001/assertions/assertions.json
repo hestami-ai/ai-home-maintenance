@@ -1,0 +1,18 @@
+{
+  "assertions": [
+    {
+      "id": "lens_primary_is_legal_research_memo",
+      "target": "lens.primary_lens",
+      "comparator": "equals",
+      "expected": "Legal Research Memo Lens",
+      "hardGate": true
+    },
+    {
+      "id": "research_memo_internal_only",
+      "target": "release_status.research_memo_draft",
+      "comparator": "matches",
+      "expected": "^approved_for_internal_use$",
+      "hardGate": true
+    }
+  ]
+}

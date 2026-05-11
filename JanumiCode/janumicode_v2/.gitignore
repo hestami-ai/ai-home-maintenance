@@ -17,3 +17,6 @@ test-output/
 # gap reports, prompt-probe output). Fixtures that need to be tracked
 # live under src/test/fixtures/ instead.
 test-and-evaluation/
+
+# integration test debug captures
+src/test/integration/harness/_debug/

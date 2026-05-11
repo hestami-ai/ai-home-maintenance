@@ -1,0 +1,88 @@
+{
+  "assertions": [
+    {
+      "id": "lens_primary_is_family_law_production",
+      "target": "lens.primary_lens",
+      "comparator": "equals",
+      "expected": "Family Law Production Lens",
+      "hardGate": true
+    },
+    {
+      "id": "lens_includes_client_advice_secondary",
+      "target": "lens.secondary_lenses",
+      "comparator": "contains",
+      "expected": "Client Advice Draft Lens",
+      "hardGate": true
+    },
+    {
+      "id": "lens_includes_court_filing_secondary",
+      "target": "lens.secondary_lenses",
+      "comparator": "contains",
+      "expected": "Court Filing Draft Lens",
+      "hardGate": true
+    },
+    {
+      "id": "lens_includes_authority_verification_secondary",
+      "target": "lens.secondary_lenses",
+      "comparator": "contains",
+      "expected": "Authority Verification Lens",
+      "hardGate": true
+    },
+    {
+      "id": "release_blocks_external_client_advice",
+      "target": "release_status.draft_client_advice_message",
+      "comparator": "equals",
+      "expected": "external_release_blocked",
+      "hardGate": true
+    },
+    {
+      "id": "release_blocks_court_filing",
+      "target": "release_status.draft_court_filing",
+      "comparator": "equals",
+      "expected": "external_release_blocked",
+      "hardGate": true
+    },
+    {
+      "id": "issue_prune_retains_support_arrears_defense",
+      "target": "issue_prune.retained",
+      "comparator": "contains",
+      "expected": "child support arrears as defense",
+      "hardGate": true
+    },
+    {
+      "id": "issue_prune_retains_child_refusal",
+      "target": "issue_prune.retained",
+      "comparator": "contains",
+      "expected": "best interests / child refusal",
+      "hardGate": true
+    },
+    {
+      "id": "authority_not_marked_attorney_confirmed",
+      "target": "authority_verification.overall_authority_status",
+      "comparator": "not_equals",
+      "expected": "attorney_confirmed",
+      "hardGate": true
+    },
+    {
+      "id": "direct_legal_conclusion_requires_attorney_review",
+      "target": "direct_legal_conclusion.attorney_review_required",
+      "comparator": "equals",
+      "expected": true,
+      "hardGate": true
+    },
+    {
+      "id": "court_filing_not_allowed_without_approval",
+      "target": "court_filing_draft.filing_allowed",
+      "comparator": "equals",
+      "expected": false,
+      "hardGate": true
+    },
+    {
+      "id": "client_advice_not_external_send_allowed",
+      "target": "client_advice_draft.external_send_allowed",
+      "comparator": "equals",
+      "expected": false,
+      "hardGate": true
+    }
+  ]
+}

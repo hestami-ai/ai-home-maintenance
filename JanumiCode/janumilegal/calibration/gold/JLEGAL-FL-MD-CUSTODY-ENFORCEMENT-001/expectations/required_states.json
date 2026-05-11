@@ -1,0 +1,26 @@
+{
+  "states": [
+    "MatterContextNormalize",
+    "JurisdictionCapture",
+    "ActorAudienceCapture",
+    "SourceDocumentInventory",
+    "FactExtraction",
+    "TimelineBuild",
+    "ExistingOrderExtract",
+    "IssueBloom",
+    "IssuePrune",
+    "LegalResearchPlan",
+    "AuthorityRetrieve",
+    "RuleElementMap",
+    "FactToRuleMap",
+    "DirectLegalConclusionDraft",
+    "ClientAdviceDraft",
+    "FilingDraftPlan",
+    "CourtFilingDraftGenerate",
+    "AuthorityVerification",
+    "SourceToClaimTrace",
+    "AttorneyReviewPacketAssemble",
+    "ReleaseStatusDetermine",
+    "GovernedStreamFinalize"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "testCaseId": "JLEGAL-LRM-MD-RESEARCH-MEMO-001",
+  "lens": "Legal Research Memo Lens",
+  "jurisdiction": "Maryland",
+  "practiceArea": "Family Law",
+  "matterType": "research_memo_request",
+  "primaryUser": "Attorney",
+  "secondaryUsers": ["Knowledge Attorney"],
+  "releaseTarget": ["Internal attorney review"],
+  "riskLevel": "Medium",
+  "goldMatterVersion": "v1",
+  "lastRevised": "2026-05-08",
+  "authoringAttorneyId": "engineering_seed",
+  "sensitiveContent": false,
+  "status": "engineering_draft"
+}

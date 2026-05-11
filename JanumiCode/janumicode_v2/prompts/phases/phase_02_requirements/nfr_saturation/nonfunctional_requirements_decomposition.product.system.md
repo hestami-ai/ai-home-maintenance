@@ -10,6 +10,7 @@ required_variables:
   - parent_tier_hint
   - sibling_context
   - handoff_context
+  - functional_requirements_summary
   - existing_assumptions
   - current_depth
   - janumicode_version_sha
@@ -201,6 +202,10 @@ For each child, list assumptions / constraints / compliance citations / open que
 
 # Handoff context — ground your commitments in these named items
 {{handoff_context}}
+
+# Functional requirements (the only legitimate source for `applies_to_requirements: [US-*]` references)
+# Children of this NFR may reference an FR id ONLY if it appears verbatim below. Do not mint new US-* ids.
+{{functional_requirements_summary}}
 
 # Existing assumption set (do NOT re-surface items already here)
 {{existing_assumptions}}

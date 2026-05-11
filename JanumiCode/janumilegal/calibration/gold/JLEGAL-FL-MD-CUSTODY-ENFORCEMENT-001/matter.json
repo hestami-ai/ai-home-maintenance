@@ -1,0 +1,16 @@
+{
+  "testCaseId": "JLEGAL-FL-MD-CUSTODY-ENFORCEMENT-001",
+  "lens": "Family Law Production Lens",
+  "jurisdiction": "Maryland",
+  "practiceArea": "Family Law",
+  "matterType": "Custody / Visitation Enforcement",
+  "primaryUser": "Attorney",
+  "secondaryUsers": ["Paralegal", "Client Communication Reviewer", "Supervising Attorney"],
+  "releaseTarget": ["Internal attorney review", "Client advice draft", "Court filing draft"],
+  "riskLevel": "High",
+  "goldMatterVersion": "v1",
+  "lastRevised": "2026-05-08",
+  "authoringAttorneyId": "engineering_seed",
+  "sensitiveContent": false,
+  "status": "engineering_draft"
+}

@@ -3,5 +3,5 @@
   "sample": "23_technical_spec_agent__api_definitions",
   "passed": false,
   "expectedFindingCount": 3,
-  "overallAssessment": "The agent flattened all component endpoint definitions to REST/HTTPS, ignoring explicit protocol specifications in the Phase 3.3 interface contracts. CONTRACT-BACKEND-003 specifies gRPC/Protobuf for internal backend communication; CONTRACT-SYNC-011 specifies TUS resumable upload protocol; CONTRACT-SECURITY-012 specifies KMS API integration. Each of these components received REST endpoint definitions instead. Per catalog §2: protocol mismatch contradicting an explicit contract is HIGH severity. This is the canonical defect pattern identified in per-role assessment 23."
+  "overallAssessment": "The agent successfully modeled the general REST/HTTPS structure for most components, which is acceptable where no specific protocol contract exists. However, three critical areas—AI Processing, Offline Synchronization, and Security/Identity Management—show HIGH severity protocol mismatches. In these cases, the agent defaulted to generic REST/HTTPS when the governing Interface Contracts explicitly mandate specialized protocols (gRPC, TUS, KMS API), leading to a failure to align the API definitions with the required technical implementation layer."
 }

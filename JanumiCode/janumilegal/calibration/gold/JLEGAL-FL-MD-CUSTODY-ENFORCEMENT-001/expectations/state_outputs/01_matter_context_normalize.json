@@ -1,0 +1,10 @@
+{
+  "matter_type": "custody_visitation_enforcement",
+  "client_role": "father",
+  "opposing_party_role": "mother",
+  "child_involved": true,
+  "requested_action": "evaluate possible enforcement filing and client advice",
+  "known_urgency": "moderate",
+  "external_release_requested": true,
+  "external_release_allowed_without_attorney": false
+}

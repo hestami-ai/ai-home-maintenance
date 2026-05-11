@@ -135,6 +135,7 @@ describe('runTestSaturationLoop — Wave 10 saturation', () => {
         technicalConstraints: [],
         componentSummary: 'comp-x: Component X',
         acceptanceCriteriaSummary: 'AC-001, AC-002',
+        interfaceContractsSummary: 'IC-001, API-foo',
         rootTestCases: [root],
         rootNodeRecordIds: [seeded.recordId],
         rootLogicalIds: [seeded.logicalNodeId],

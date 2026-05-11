@@ -1,7 +1,7 @@
 {
   "validator": "tier_assignment_audit",
   "sample": "14b_requirements_agent__nfr_saturation_depth4",
-  "passed": false,
-  "expectedFindingCount": 2,
-  "overallAssessment": "The agent assigned Tier-A to a child NFR that structurally belongs at Tier-C or Tier-D based on its description and AC count. The child names a specific quality sub-area (temporal bookending of audit windows) that is atomic and decomposable only along single measurable dimension — not a macro quality area warranting Tier-A classification. Additionally, a hint-override to Tier-A was made without adequate decomposition rationale. Per catalog §5.4.1: MEDIUM for within-one-tier misclassification, HIGH for cross-tier errors where the description clearly places the child in the atomic range."
+  "passed": true,
+  "expectedFindingCount": 0,
+  "overallAssessment": "The agent successfully decomposed the complex Non-Functional Requirement into distinct, logically separated commitments. The tier assignments (B, B, C) are consistent with the nature of the sub-commitments (Policy Thresholds and Measurement Verification). The agent correctly identified that the parent NFR represents a broad quality sub-area (Tier A), overriding the provided hint (Tier C) with a strong, justifiable rationale."
 }

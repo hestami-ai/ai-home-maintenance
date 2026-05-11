@@ -95,6 +95,14 @@ export class Phase3Handler implements PhaseHandler {
     const nfrSummary = prior.nonFunctionalRequirements?.summary ?? 'No NFRs available';
     const frStories = frView.stories;
     const derivedFromIds = prior.allRecordIds;
+    // Roll up the Phase 1.0c technical_constraints_discovery artifact
+    // into a TECH-id roster the 3.3 prompt can cite directly. Without
+    // this the interface-contracts prompt's grounding rule (protocols /
+    // auth choices grounded in upstream technical_constraints[]) had no
+    // input to point at — qwen3.5:9b would either hallucinate a
+    // protocol or attribute it to active_constraints which is the
+    // DMR-derived narrative, not the canonical TECH-* list.
+    const technicalConstraintsSummary = formatTechnicalConstraintsSummary(allArtifacts);
 
     // ── 3.1 — System Boundary Definition ──────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'system_boundary');
@@ -162,7 +170,7 @@ export class Phase3Handler implements PhaseHandler {
     });
 
     const sysReqContent = await this.runSystemRequirementsDerivation(
-      ctx, boundarySummary, frSummary, dmr32,
+      ctx, boundarySummary, frSummary, nfrSummary, dmr32,
     );
 
     const sysReqRecord = engine.writer.writeRecord({
@@ -195,7 +203,7 @@ export class Phase3Handler implements PhaseHandler {
     });
 
     const contractsContent = await this.runInterfaceContractSpecification(
-      ctx, boundarySummary, externalSystemsList, dmr33,
+      ctx, boundarySummary, externalSystemsList, technicalConstraintsSummary, dmr33,
     );
 
     const contractsRecord = engine.writer.writeRecord({
@@ -389,6 +397,7 @@ export class Phase3Handler implements PhaseHandler {
     ctx: PhaseContext,
     boundarySummary: string,
     frSummary: string,
+    nfrSummary: string,
     dmr: PhaseContextPacketResult,
   ): Promise<SystemRequirements> {
     const { engine } = ctx;
@@ -409,6 +418,7 @@ export class Phase3Handler implements PhaseHandler {
       active_constraints: dmr.activeConstraintsText,
       system_boundary_summary: boundarySummary,
       functional_requirements_summary: frSummary,
+      non_functional_requirements_summary: nfrSummary,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;
@@ -449,6 +459,7 @@ export class Phase3Handler implements PhaseHandler {
     ctx: PhaseContext,
     boundarySummary: string,
     externalSystemsList: string,
+    technicalConstraintsSummary: string,
     dmr: PhaseContextPacketResult,
   ): Promise<InterfaceContracts> {
     const { engine } = ctx;
@@ -470,6 +481,7 @@ export class Phase3Handler implements PhaseHandler {
       active_constraints: dmr.activeConstraintsText,
       system_boundary_summary: boundarySummary,
       external_systems_list: externalSystemsList,
+      technical_constraints_summary: technicalConstraintsSummary,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;
@@ -728,6 +740,40 @@ function integrationToExternal(i: Record<string, unknown>): ExternalSystem | nul
  * lacked), but every deterministic id is guaranteed to appear in
  * the result. Comparison is case-insensitive on id.
  */
+/**
+ * Build the TECH-* constraint roster the 3.3 prompt cites for grounding
+ * protocol / auth / vendor choices. Pulls the
+ * `technical_constraints_discovery` artifact from Phase 1.0c, formats
+ * each item as `TECH-ID — technology — category — text`. Returns a
+ * placeholder string when no such artifact exists so the template
+ * render doesn't fail required_variables validation.
+ */
+function formatTechnicalConstraintsSummary(
+  allArtifacts: ReadonlyArray<{ content: unknown }>,
+): string {
+  for (const r of allArtifacts) {
+    const c = r.content as Record<string, unknown>;
+    if (c?.kind !== 'technical_constraints_discovery') continue;
+    const items = arr(c.technicalConstraints ?? c.technical_constraints);
+    if (!items?.length) continue;
+    const lines = items.map(formatTechnicalConstraintLine).filter(Boolean);
+    if (lines.length > 0) return lines.join('\n');
+  }
+  return 'No technical_constraints_discovery artifact available';
+}
+
+function formatTechnicalConstraintLine(t: Record<string, unknown>): string {
+  const id = typeof t.id === 'string' ? t.id : '';
+  if (!id) return '';
+  const tech = (t.technology as string) ?? (t.name as string) ?? '';
+  const category = (t.category as string) ?? '';
+  const text = (t.text as string) ?? (t.rationale as string) ?? '';
+  const parts = [id, tech];
+  if (category) parts.push(category);
+  if (text) parts.push(text);
+  return parts.join(' — ');
+}
+
 function mergeExternals(
   llmEmitted: ExternalSystem[],
   deterministic: ExternalSystem[],

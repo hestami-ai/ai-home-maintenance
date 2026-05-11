@@ -1,0 +1,14 @@
+{
+  "pruning_decisions": [
+    { "issue": "visitation/access enforcement", "decision": "retain", "reason": "Directly matches client objective and existing order terms." },
+    { "issue": "contempt", "decision": "retain", "reason": "Potential remedy for alleged violation of court order; attorney must assess procedural viability." },
+    { "issue": "make-up visitation", "decision": "retain", "reason": "Potential client-requested relief related to missed access." },
+    { "issue": "child support arrears as defense", "decision": "retain", "reason": "Opposing party cited support arrears; order expressly addresses withholding access based on support disputes." },
+    { "issue": "best interests / child refusal", "decision": "retain", "reason": "Opposing party claims child does not want to attend; may affect attorney strategy." },
+    { "issue": "modification of custody", "decision": "defer", "reason": "Client asks about enforcement; modification may be considered later if denial pattern continues." },
+    { "issue": "emergency relief", "decision": "remove", "reason": "No current emergency safety concern reported." },
+    { "issue": "protective order or safety issue", "decision": "remove", "reason": "No protective order or safety concern reported in intake notes." },
+    { "issue": "evidence sufficiency", "decision": "retain", "reason": "Filing viability depends on evidence and document support." },
+    { "issue": "separate support proceeding coordination", "decision": "defer", "reason": "Related but not necessary to draft initial enforcement packet." }
+  ]
+}

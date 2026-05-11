@@ -52,10 +52,10 @@ The user-prompt message provides:
 - The agent's reasoning / thinking
 - The agent's final response
 
-The runtime context also supplies:
-- PARAMETERIZATION: the active parameterization label (A, B, or C with description)
+[ACTIVE PARAMETERIZATION FOR THIS CALL]
+{{PARAMETERIZATION}}
 
-Use the PARAMETERIZATION value to select the correct checking logic above.
+Use the active parameterization above to select the correct checking logic from the three options described in [MISSION]. Do NOT apply rules from a parameterization that is not active.
 
 [OUT OF SCOPE]
 - Grounding of claims already covered by grounding_validator (general claim grounding).

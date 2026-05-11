@@ -9,6 +9,7 @@ required_variables:
   - parent_tier_hint
   - sibling_context
   - component_context
+  - depth_zero_tasks
   - existing_assumptions
   - current_depth
   - janumicode_version_sha
@@ -228,6 +229,10 @@ You are the Implementation Planner performing tier-based task decomposition. The
 
 # Component context — the component this task belongs to (Phase 4 / 4.2a output)
 {{component_context}}
+
+# Depth-0 tasks — root-level Phase 6.1 tasks across the whole plan (legitimate `dependency_task_ids[]` targets when a child needs a cross-branch dependency)
+# Children MUST NOT mint task ids that are not present in `sibling_context`, in this list, or in any earlier level visible above. If you cannot find a matching id, omit the dependency rather than fabricate.
+{{depth_zero_tasks}}
 
 # Existing assumption set (do NOT re-surface items already here)
 {{existing_assumptions}}

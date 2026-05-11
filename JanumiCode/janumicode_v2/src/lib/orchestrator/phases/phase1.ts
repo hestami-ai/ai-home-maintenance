@@ -1383,7 +1383,10 @@ export class Phase1Handler implements PhaseHandler {
         const r = await this.runReleasePlanProposalV2_18(ctx, {
           productVision: handoff.productVision,
           productDescription: handoff.productDescription,
-          phasingStrategy: discovery.phasingStrategy ?? [],
+          // Use the handoff's filtered phasingStrategy (UJ-* ids surviving
+          // the 1.3a MMP gate), not raw discovery output that may still
+          // reference rejected journeys.
+          phasingStrategy: handoff.phasingStrategy ?? [],
           journeys: safeJourneys,
           workflows: acceptedWorkflowsForPlan,
           entities: acceptedEntitiesForPlan,
@@ -2406,6 +2409,22 @@ export class Phase1Handler implements PhaseHandler {
     return items.slice(0, 25).map(i => `- ${i.text}`).join('\n');
   }
 
+  /**
+   * Like formatExtractedItems but preserves the item id (COMP-*, INT-*,
+   * VV-*, etc.) so prompts that ask the model to cite the id verbatim
+   * actually see it. Thin-slice-1 evidence: user_journey_bloom (1.3a)
+   * and system_workflow_bloom (1.3b) instructed the model to use exact
+   * COMP-* slugs in `surfaces.compliance_regimes[]` and
+   * `triggers[].regime_id`, but `formatExtractedItems` rendered each
+   * item without its id, forcing the model to fabricate. The self-heal
+   * filters then dropped every fabricated id, leaving compliance
+   * surfaces silently empty across all journeys and workflows.
+   */
+  private formatExtractedItemsWithIds(items: ExtractedItem[]): string {
+    if (!items.length) return '(none)';
+    return items.slice(0, 25).map(i => `- **${i.id}**: ${i.text}`).join('\n');
+  }
+
   private formatDomains(ds: BusinessDomain[]): string {
     if (!ds.length) return '(none)';
     return ds.map(d => `- **${d.id}**: ${d.name} — ${d.description}`).join('\n');
@@ -2489,8 +2508,8 @@ export class Phase1Handler implements PhaseHandler {
       accepted_personas: this.formatPersonas(inputs.acceptedPersonas),
       accepted_domains: this.formatDomains(inputs.acceptedDomains),
       phasing_strategy: this.formatPhasing(inputs.phasingStrategy),
-      compliance_regimes: this.formatExtractedItems(inputs.complianceItems),
-      retention_rules: this.formatExtractedItems(inputs.retentionRules),
+      compliance_regimes: this.formatExtractedItemsWithIds(inputs.complianceItems),
+      retention_rules: this.formatExtractedItemsWithIds(inputs.retentionRules),
       vv_requirements: this.formatVVRequirements(inputs.vvRequirements),
       integrations: this.formatIntegrations(inputs.integrations),
       human_feedback: humanFeedback.trim().length > 0 ? humanFeedback : '(none)',
@@ -2846,8 +2865,8 @@ Re-emit this single journey as a JSON object that matches the original schema (i
       accepted_journeys: this.formatJourneysWithSteps(inputs.acceptedJourneys),
       accepted_personas: this.formatPersonas(inputs.acceptedPersonas),
       accepted_domains: this.formatDomains(inputs.acceptedDomains),
-      compliance_regimes: this.formatExtractedItems(inputs.complianceItems),
-      retention_rules: this.formatExtractedItems(inputs.retentionRules),
+      compliance_regimes: this.formatExtractedItemsWithIds(inputs.complianceItems),
+      retention_rules: this.formatExtractedItemsWithIds(inputs.retentionRules),
       vv_requirements: this.formatVVRequirements(inputs.vvRequirements),
       integrations: this.formatIntegrations(inputs.integrations),
       human_feedback: humanFeedback.trim().length > 0 ? humanFeedback : '(none)',

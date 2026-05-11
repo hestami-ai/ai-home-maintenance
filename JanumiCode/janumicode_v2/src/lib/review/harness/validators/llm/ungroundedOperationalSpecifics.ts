@@ -17,7 +17,7 @@
 import { makeLLMValidator } from './llmValidatorRunner';
 import type { ValidatorRuntimeParams } from '../../validatorRegistry';
 
-function getParameterizationLabel(agentRole: string, subPhaseId: string): string {
+export function getParameterizationLabel(agentRole: string, subPhaseId: string): string {
   if (agentRole === 'systems_agent' && subPhaseId === 'interface_contracts') {
     return 'A — interface commitment fields (auth_mechanism, protocol, data_format)';
   }

@@ -1,0 +1,14 @@
+{
+  "issue_candidates": [
+    { "issue": "visitation/access enforcement", "why_it_might_matter": "Client alleges two denials of access under existing order." },
+    { "issue": "contempt", "why_it_might_matter": "Intentional violation of court order may support enforcement/contempt analysis." },
+    { "issue": "make-up visitation", "why_it_might_matter": "Client may seek compensatory access." },
+    { "issue": "child support arrears as defense", "why_it_might_matter": "Opposing party cited support arrears as reason for denial." },
+    { "issue": "best interests / child refusal", "why_it_might_matter": "Mother claims child does not want to go." },
+    { "issue": "modification of custody", "why_it_might_matter": "Repeated denial may implicate custody modification, but client currently asks enforcement." },
+    { "issue": "emergency relief", "why_it_might_matter": "Urgent relief may be considered if safety or immediate harm exists." },
+    { "issue": "protective order or safety issue", "why_it_might_matter": "Family cases may involve safety concerns, but none are reported." },
+    { "issue": "evidence sufficiency", "why_it_might_matter": "Texts and order may support filing, but authentication and full context matter." },
+    { "issue": "separate support proceeding coordination", "why_it_might_matter": "Support matter may affect strategy but not access obligation." }
+  ]
+}

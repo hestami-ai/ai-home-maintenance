@@ -10,6 +10,7 @@ required_variables:
   - sibling_context
   - component_context
   - acceptance_criteria_summary
+  - interface_contracts_summary
   - existing_assumptions
   - current_depth
   - janumicode_version_sha
@@ -162,8 +163,13 @@ For each child you produce, list any **precondition, fixture-setup choice, oracl
 # Component context — the component(s) under test
 {{component_context}}
 
-# Acceptance criteria summary the parent validates
+# Acceptance criteria summary the parent validates (the only legitimate source for `acceptance_criterion_ids[]` references)
 {{acceptance_criteria_summary}}
+
+# Interface contracts / API definitions (the only legitimate source for `traces_to[]` `resp-*` / contract-style ids)
+# IMPORTANT: every id you emit in a child's `traces_to[]` MUST appear verbatim in this block OR in `acceptance_criteria_summary`.
+# If no contract / AC id matches, OMIT `traces_to` for that child rather than fabricate one.
+{{interface_contracts_summary}}
 
 # Existing assumption set (do NOT re-surface items already here)
 {{existing_assumptions}}

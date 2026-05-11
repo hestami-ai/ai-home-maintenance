@@ -71,7 +71,22 @@ const DEFAULT_CONFIG: TestSaturationConfig = {
 export interface TestSaturationInput {
   technicalConstraints: TechnicalConstraint[];
   componentSummary: string;
+  /**
+   * Leaf-aware FR/AC summary (from `buildEffectiveFrView`). The
+   * saturation prompt asks each child to attach `acceptance_criterion_ids`,
+   * and the parent test case's existing AC ids were minted from Phase
+   * 2.1a leaf decomposition. This summary MUST carry those leaf-level
+   * AC ids — using the root-FR summary as a fallback caused thin-slice-1
+   * to surface fabricated/rephrased AC refs.
+   */
   acceptanceCriteriaSummary: string;
+  /**
+   * Phase 3.3 / 5.2 interface-contracts / api-definitions summary.
+   * Surfaces the legitimate id roster for `traces_to[]` when the
+   * saturation prompt's worked example shows `resp-*`-style
+   * contract references — without this, qwen3.5:9b fabricates them.
+   */
+  interfaceContractsSummary: string;
   rootTestCases: DecompositionTestCase[];
   rootNodeRecordIds: string[];
   rootLogicalIds: string[];
@@ -431,6 +446,7 @@ export async function runTestSaturationLoop(
             : siblings.filter(s => s.id !== entry.testCase.id).map(s => `- ${s.id}: ${s.name}`).join('\n'),
           component_context: input.componentSummary,
           acceptance_criteria_summary: input.acceptanceCriteriaSummary,
+          interface_contracts_summary: input.interfaceContractsSummary,
           existing_assumptions: scopedAssumptions.length === 0
             ? '(none yet)'
             : scopedAssumptions.map(a => `- [${a.id}] (${a.category}) ${a.text}`).join('\n'),

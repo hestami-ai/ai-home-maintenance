@@ -1,0 +1,16 @@
+{
+  "testCaseId": "JLEGAL-ISO-MULTI-MATTER-001",
+  "lens": "Synthetic Isolation Lens",
+  "jurisdiction": "Maryland",
+  "practiceArea": "Family Law",
+  "matterType": "isolation_validation",
+  "primaryUser": "Engineering",
+  "secondaryUsers": [],
+  "releaseTarget": ["Internal validation only"],
+  "riskLevel": "Low",
+  "goldMatterVersion": "v1",
+  "lastRevised": "2026-05-08",
+  "authoringAttorneyId": "engineering_seed",
+  "sensitiveContent": false,
+  "status": "engineering_draft"
+}

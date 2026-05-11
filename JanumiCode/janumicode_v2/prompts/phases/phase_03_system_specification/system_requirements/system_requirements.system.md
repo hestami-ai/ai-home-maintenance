@@ -7,6 +7,7 @@ required_variables:
   - active_constraints
   - system_boundary_summary
   - functional_requirements_summary
+  - non_functional_requirements_summary
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -32,6 +33,7 @@ Rules:
 CONTEXT:
 System Boundary: {{system_boundary_summary}}
 Functional Requirements: {{functional_requirements_summary}}
+Non-Functional Requirements: {{non_functional_requirements_summary}}
 
 # Hard rules — source-item enumeration discipline
 

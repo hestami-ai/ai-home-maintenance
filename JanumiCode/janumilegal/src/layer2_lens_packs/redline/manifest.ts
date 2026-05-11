@@ -1,0 +1,72 @@
+import type { LensPhaseManifest } from '../../lib/orchestrator/types.js';
+import { SHARED_AGENTS } from '../sharedAgents.js';
+
+export const REDLINE_LENS_ID = 'redline_lens';
+
+export const redlineManifest: LensPhaseManifest = {
+  lensId: REDLINE_LENS_ID,
+  lensVersion: 'v1',
+  practiceArea: 'transactional',
+  applicableJurisdictions: ['MD', 'VA', 'PA', 'DC'],
+  states: [
+    {
+      stateId: 'DocumentTypeIdentify',
+      required: true,
+      predecessors: [],
+      permittedAgents: [SHARED_AGENTS.intakeNormalize],
+      inputSchema: 'DocumentTypeInput.v1',
+      outputSchema: 'DocumentTypeOutput.v1',
+      validators: [],
+      escalationConditions: [],
+      clvScope: ['clv.core.source.v1'],
+      artifactsProduced: [],
+    },
+    {
+      stateId: 'ClauseMapExtract',
+      required: true,
+      predecessors: ['DocumentTypeIdentify'],
+      permittedAgents: [SHARED_AGENTS.clauseMap],
+      inputSchema: 'ClauseMapInput.v1',
+      outputSchema: 'ClauseMapOutput.v1',
+      validators: [],
+      escalationConditions: [],
+      clvScope: ['clv.core.source.v1'],
+      artifactsProduced: [],
+    },
+    {
+      stateId: 'RedlineCandidateGenerate',
+      required: true,
+      predecessors: ['ClauseMapExtract'],
+      permittedAgents: [SHARED_AGENTS.redlineCandidate],
+      inputSchema: 'RedlineCandidateInput.v1',
+      outputSchema: 'RedlineCandidateOutput.v1',
+      validators: [],
+      escalationConditions: [],
+      clvScope: ['clv.core.work_product.v1'],
+      artifactsProduced: ['redline_candidate'],
+    },
+    {
+      stateId: 'ReleaseStatusDetermine',
+      required: true,
+      predecessors: ['RedlineCandidateGenerate'],
+      permittedAgents: [SHARED_AGENTS.releaseStatusDetermine],
+      inputSchema: 'ReleaseStatusInput.v1',
+      outputSchema: 'ReleaseStatusOutput.v1',
+      validators: [],
+      escalationConditions: [],
+      clvScope: ['clv.core.release.v1', 'clv.core.gate.v1'],
+      artifactsProduced: [],
+    },
+  ],
+  requiredArtifacts: [{ artifactType: 'redline_candidate', schema: 'RedlineCandidateOutput.v1' }],
+  validators: [],
+  escalationTriggers: [],
+  releasePolicies: [],
+  clvBindings: [
+    'clv.core.source.v1',
+    'clv.core.work_product.v1',
+    'clv.core.release.v1',
+    'clv.core.gate.v1',
+  ],
+  dependencies: [],
+};

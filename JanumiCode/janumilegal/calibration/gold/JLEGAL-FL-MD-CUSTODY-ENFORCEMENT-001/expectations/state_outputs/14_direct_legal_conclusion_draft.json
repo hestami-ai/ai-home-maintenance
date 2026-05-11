@@ -1,0 +1,11 @@
+{
+  "conclusion_text": "Mother's stated reason for withholding access (support arrears) is expressly prohibited by the operative order. Father appears to have a viable enforcement claim, but contempt requires elements not yet established by available evidence.",
+  "facts_relied_upon": ["custody_order_terms", "denied_exchange_dates", "mother_text_messages_citing_support_arrears"],
+  "authorities_relied_upon": ["MD-FAM-ACCESS-ENFORCEMENT-001", "COURT-ORDER-001"],
+  "assumptions": ["no protective order in force", "no later make-up access agreed"],
+  "missing_facts": ["confirmed support payment history", "any prior enforcement filings", "father's documented appearance at exchange"],
+  "adverse_considerations": ["child refusal claim by mother", "potential best-interests counter-argument"],
+  "could_change_if": ["mother provides verified safety concern", "documented mutual rescheduling"],
+  "verification_status": "machine_assessed",
+  "attorney_review_required": true
+}

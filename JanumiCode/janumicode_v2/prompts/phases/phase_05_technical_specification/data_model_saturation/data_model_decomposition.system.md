@@ -9,6 +9,9 @@ required_variables:
   - parent_tier_hint
   - sibling_context
   - component_context
+  - system_requirements_summary
+  - ancestor_chain
+  - depth_zero_entities
   - existing_assumptions
   - current_depth
   - janumicode_version_sha
@@ -185,6 +188,17 @@ For each child you produce, list any **identity choice, ownership decision, card
 
 # Component context — the component(s) this entity belongs to
 {{component_context}}
+
+# System requirements (the only legitimate source for `traces_to[]` `resp-*` / `SR-*` ids)
+# IMPORTANT: every id you emit in a child's `traces_to[]` MUST appear verbatim in this block.
+# If no SR id matches, OMIT `traces_to` for that child rather than fabricate one.
+{{system_requirements_summary}}
+
+# Ancestor chain — entity ids above the parent (legitimate `relationships[].target_entity_id` targets per traces_to_id_validity rule)
+{{ancestor_chain}}
+
+# Depth-0 entities — other root aggregates in this run (also legitimate cross-aggregate `target_entity_id` targets)
+{{depth_zero_entities}}
 
 # Existing assumption set (do NOT re-surface items already here)
 {{existing_assumptions}}

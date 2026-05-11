@@ -317,6 +317,10 @@ function formatRootTaskForPrompt(t: DecompositionTask): string {
   const writes = (t.write_directory_paths ?? []).join(', ') || '(none)';
   const reads = (t.read_directory_paths ?? []).join(', ') || '(none)';
   const deps = (t.dependency_task_ids ?? []).join(', ') || '(none)';
+  // Surface parent traces_to so saturation children can re-cite parent
+  // responsibility / Tech-Spec ids in their own traces_to[]. Without
+  // this the model has no anchor and either omits or fabricates.
+  const traces = ((t as Record<string, unknown>).traces_to as string[] | undefined)?.join(', ') || '(none)';
   return [
     `Task id: ${t.id}`,
     `Name: ${t.name}`,
@@ -330,6 +334,7 @@ function formatRootTaskForPrompt(t: DecompositionTask): string {
     `Write paths: ${writes}`,
     `Read paths: ${reads}`,
     `Dependencies: ${deps}`,
+    `Traces to: ${traces}`,
   ].filter(Boolean).join('\n');
 }
 
@@ -526,6 +531,15 @@ export async function runTaskSaturationLoop(
           : input.technicalConstraints;
         const activeConstraintsForPrompt = formatTechnicalConstraints(inherited);
 
+        // Cross-branch `dependency_task_ids[]` need to point at root
+        // tasks from other branches. `sibling_context` only carries
+        // same-parent siblings, so without this roster the model
+        // either omits valid cross-branch deps or fabricates ids.
+        // Mirrors the `depth_zero_entities` pattern used in Phase 5.1a.
+        const depthZeroTasksText = input.rootTasks.length === 0
+          ? '(none)'
+          : input.rootTasks.map(t => `- ${t.id}: ${t.name}`).join('\n');
+
         const variables: Record<string, string> = {
           active_constraints: activeConstraintsForPrompt,
           parent_task: formatRootTaskForPrompt(entry.task),
@@ -536,6 +550,7 @@ export async function runTaskSaturationLoop(
                 .filter(s => s.id !== entry.task.id)
                 .map(s => `- ${s.id}: ${s.name}`).join('\n'),
           component_context: input.componentSummary,
+          depth_zero_tasks: depthZeroTasksText,
           existing_assumptions: scopedAssumptions.length === 0
             ? '(none yet)'
             : scopedAssumptions.map(a => `- [${a.id}] (${a.category}) ${a.text}`).join('\n'),

@@ -8,6 +8,7 @@ import type {
   ExtractedItem,
   ProductDescriptionHandoffContent,
   TechnicalConstraint,
+  UserJourney,
   VVRequirement,
 } from '../../../types/records';
 import type { PhaseContext } from '../../orchestratorEngine';
@@ -38,6 +39,14 @@ interface FormatHelpers {
   formatExtractedItems: (items: ExtractedItem[]) => string;
   formatVVRequirements: (vvs: VVRequirement[]) => string;
   formatTechnicalConstraints: (tcs: TechnicalConstraint[]) => string;
+  /**
+   * Render user journeys as `- **UJ-XXX**: <title>`. The NFR bloom
+   * skeleton template lists `UJ-*` as a valid `traces_to` prefix
+   * ("when a journey directly demands a specific NFR") but, before this
+   * fix, no journey roster was passed in — so the model fabricated
+   * UJ-* refs that the self-heal filter then silently dropped.
+   */
+  formatJourneys: (js: UserJourney[]) => string;
 }
 
 export interface NfrBloomDeps {
@@ -174,6 +183,7 @@ async function runSkeletonPass(deps: NfrBloomDeps): Promise<{
     active_constraints: dmr.activeConstraintsText,
     intent_statement_summary: intentSummary,
     functional_requirements_summary: frSummary,
+    accepted_journeys: deps.format.formatJourneys(handoff.userJourneys ?? []),
     quality_attributes: (handoff.qualityAttributes ?? [])
       .map((q, i) => `- [QA-${i + 1}] ${q}`).join('\n') || '(none)',
     vv_requirements: deps.format.formatVVRequirements(handoff.vvRequirements ?? []),

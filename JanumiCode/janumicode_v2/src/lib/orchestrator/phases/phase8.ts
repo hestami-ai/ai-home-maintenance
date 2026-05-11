@@ -61,6 +61,7 @@ export class Phase8Handler implements PhaseHandler {
     const allArtifacts = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
     const prior = extractPriorPhaseContext(allArtifacts);
 
+    const frSummary = prior.functionalRequirements?.summary ?? 'No FRs available';
     const nfrSummary = prior.nonFunctionalRequirements?.summary ?? 'No NFRs available';
     const testPlanSummary = prior.testPlan
       ? `(read-only — do not duplicate test cases)\n${prior.testPlan.summary}`
@@ -78,7 +79,7 @@ export class Phase8Handler implements PhaseHandler {
       requiredOutputSpec: 'functional_evaluation_plan, quality_evaluation_plan, reasoning_evaluation_plan',
     });
 
-    const evalResult = await this.runEvaluationDesign(ctx, testPlanSummary, nfrSummary, dmr81);
+    const evalResult = await this.runEvaluationDesign(ctx, testPlanSummary, frSummary, nfrSummary, dmr81);
 
     // Write functional evaluation plan
     const funcEvalRecord = engine.writer.writeRecord({
@@ -207,7 +208,7 @@ export class Phase8Handler implements PhaseHandler {
   // ── LLM call helper ───────────────────────────────────────────
 
   private async runEvaluationDesign(
-    ctx: PhaseContext, testPlanSummary: string, nfrSummary: string,
+    ctx: PhaseContext, testPlanSummary: string, frSummary: string, nfrSummary: string,
     dmr: PhaseContextPacketResult,
   ): Promise<EvalDesignResult> {
     const { engine } = ctx;
@@ -224,6 +225,7 @@ export class Phase8Handler implements PhaseHandler {
     const rendered = engine.templateLoader.render(template, {
       active_constraints: dmr.activeConstraintsText,
       test_plan_summary: testPlanSummary,
+      functional_requirements_summary: frSummary,
       non_functional_requirements_summary: nfrSummary,
       compliance_context_summary: 'No compliance regimes',
       janumicode_version_sha: engine.janumiCodeVersionSha,

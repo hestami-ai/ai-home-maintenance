@@ -1,0 +1,10 @@
+{
+  "states": [
+    "ResearchQuestionNormalize",
+    "JurisdictionCapture",
+    "AuthorityRetrieve",
+    "DraftMemoGenerate",
+    "AuthorityVerification",
+    "ReleaseStatusDetermine"
+  ]
+}

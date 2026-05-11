@@ -1,0 +1,1 @@
+My ex has refused to let me see my son for the last two weekends, even though our custody order says I get him every other weekend from Friday at 6 PM until Sunday at 6 PM. She says he does not want to come and that I am behind on child support, so she does not have to follow the order. I want to know what I can do. Can we file something?

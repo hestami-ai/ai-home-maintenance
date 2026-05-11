@@ -68,6 +68,14 @@ export interface DataModelSaturationInput {
   rootEntities: DecompositionEntity[];
   rootNodeRecordIds: string[];
   rootLogicalIds: string[];
+  /**
+   * Phase 3.2 system_requirements summary, threaded so the data-model
+   * saturation prompt can ground `traces_to[]` (which the prompt's
+   * worked example shows referencing responsibility / SR-* ids). Without
+   * this, qwen3.5:9b fabricates `resp-*` ids the validator subsequently
+   * fails. See thin-slice-1 audit findings.
+   */
+  systemRequirementsSummary: string;
 }
 
 interface QueueEntry {
@@ -411,6 +419,26 @@ export async function runDataModelSaturationLoop(
           : input.technicalConstraints;
         const activeConstraintsForPrompt = formatTechnicalConstraints(inherited);
 
+        // Build the ancestor chain (parent's ancestors + the parent
+        // itself) for `relationships[].target_entity_id` grounding. The
+        // saturation prompt's traces_to_id_validity rule explicitly
+        // permits target ids that resolve to ancestors above the parent;
+        // without surfacing them here the model can only see direct
+        // siblings + parent and would fabricate cross-aggregate refs.
+        const ancestorIdsForPrompt: string[] = [];
+        let cursorAnc: string | null = entry.parentNodeId;
+        while (cursorAnc) {
+          ancestorIdsForPrompt.push(cursorAnc);
+          cursorAnc = parentChain.get(cursorAnc) ?? null;
+        }
+        const ancestorChainText = ancestorIdsForPrompt.length === 0
+          ? '(none — parent is depth-0 root)'
+          : ancestorIdsForPrompt.map(id => `- ${id}`).join('\n');
+
+        const depthZeroText = input.rootEntities.length === 0
+          ? '(none)'
+          : input.rootEntities.map(e => `- ${e.id}: ${e.name}`).join('\n');
+
         const variables: Record<string, string> = {
           active_constraints: activeConstraintsForPrompt,
           parent_entity: formatEntityForPrompt(entry.entity),
@@ -419,6 +447,9 @@ export async function runDataModelSaturationLoop(
             ? '(none — sole child under this parent)'
             : siblings.filter(s => s.id !== entry.entity.id).map(s => `- ${s.id}: ${s.name}`).join('\n'),
           component_context: input.componentSummary,
+          system_requirements_summary: input.systemRequirementsSummary,
+          ancestor_chain: ancestorChainText,
+          depth_zero_entities: depthZeroText,
           existing_assumptions: scopedAssumptions.length === 0
             ? '(none yet)'
             : scopedAssumptions.map(a => `- [${a.id}] (${a.category}) ${a.text}`).join('\n'),

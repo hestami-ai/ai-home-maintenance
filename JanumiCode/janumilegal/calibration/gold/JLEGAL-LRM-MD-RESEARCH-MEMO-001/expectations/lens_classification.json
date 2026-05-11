@@ -1,0 +1,12 @@
+{
+  "primary_lens": "Legal Research Memo Lens",
+  "secondary_lenses": ["Authority Verification Lens"],
+  "matter_type": "research_memo_request",
+  "jurisdiction": "Maryland",
+  "confidence": "high",
+  "safe_next_state": "ResearchQuestionNormalize",
+  "prohibited_actions": [
+    "treat authority verification as attorney-confirmed",
+    "release memo externally without attorney review"
+  ]
+}

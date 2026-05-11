@@ -1,0 +1,11 @@
+{
+  "assertions": [
+    {
+      "id": "isolation_marker_distinct_per_matter",
+      "target": "lens.confidence",
+      "comparator": "in",
+      "expected": ["high", "medium", "low"],
+      "hardGate": true
+    }
+  ]
+}
