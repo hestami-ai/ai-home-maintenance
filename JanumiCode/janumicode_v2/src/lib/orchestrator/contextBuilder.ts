@@ -33,6 +33,10 @@ export interface DetailFile {
   sizeBytes: number;
   /** Whether content was truncated due to size limit */
   truncated: boolean;
+  /** Full markdown content (after any truncation). Allows callers to
+   *  inline the detail content into prompts for LLM agents that can't
+   *  read the file from disk (phases 0-8 use direct LLM API calls). */
+  content: string;
 }
 
 export interface ContextPayload {
@@ -287,6 +291,7 @@ export class ContextBuilder {
       path: filePath,
       sizeBytes: Buffer.byteLength(markdown, 'utf-8'),
       truncated,
+      content: markdown,
     };
   }
 

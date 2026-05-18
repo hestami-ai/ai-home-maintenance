@@ -71,10 +71,22 @@ export class Phase8Handler implements PhaseHandler {
     // ── 8.1–8.3 — Evaluation Design (single LLM call) ────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'evaluation_design');
 
+    const frIds = ((prior.functionalRequirements?.content.user_stories as Array<Record<string, unknown>>) ?? [])
+      .map(s => (typeof s.id === 'string' ? s.id : ''))
+      .filter(Boolean);
+    const nfrIds = ((prior.nonFunctionalRequirements?.content.requirements as Array<Record<string, unknown>>) ?? [])
+      .map(n => (typeof n.id === 'string' ? n.id : ''))
+      .filter(Boolean);
+    const dmr81Seeds = [
+      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
+      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
+      ...(prior.testPlan ? [prior.testPlan.recordId] : []),
+    ];
     const dmr81 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'evaluation_design',
       requestingAgentRole: 'eval_design_agent',
-      query: `Evaluation design for test plan and NFRs: ${nfrSummary.slice(0, 400)}`,
+      query: `Evaluation plans for FRs ${frIds.join(', ')} and NFRs ${nfrIds.join(', ')} against test_plan ${prior.testPlan?.recordId ?? 'unknown'}.`,
+      knownRelevantRecordIds: dmr81Seeds,
       detailFileLabel: 'p8_1_evals',
       requiredOutputSpec: 'functional_evaluation_plan, quality_evaluation_plan, reasoning_evaluation_plan',
     });

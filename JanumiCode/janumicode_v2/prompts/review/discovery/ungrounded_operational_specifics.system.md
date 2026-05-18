@@ -82,6 +82,8 @@ the OUTPUT CONTRACT JSON below.
              | "partially_supported_specificity",
       "summary": "one-line description",
       "location": "field path",
+      "target_field": "the exact top-level array field name in the audited artifact (e.g. the array name shown in the reviewed agent's JSON output). When the artifact has multiple candidate arrays, use the array containing the offending element.",
+      "target_identifier": "id OR unambiguous name of the offending item (matched against the array element's `id` or `name` field)",
       "claim": "the exact fabricated value or silent-drop description",
       "sourceEvidence": "what the source says (or 'source is silent')",
       "detail": "explanation of grounding gap",
@@ -90,6 +92,25 @@ the OUTPUT CONTRACT JSON below.
   ],
   "overallAssessment": "..."
 }
+
+[TARGET FIELDS — IMPORTANT, READ CAREFULLY]
+The `target_field` and `target_identifier` fields are REQUIRED for HIGH
+findings. They make the finding machine-actionable: a downstream auto-
+mitigation step will use them to locate and drop the offending item from
+the reviewed artifact.
+
+- `target_field` MUST be the exact top-level array field name in the
+  artifact whose element is being flagged. For this validator the valid
+  values are: the exact top-level array field name in the audited artifact (e.g. the array name shown in the reviewed agent's JSON output). When the artifact has multiple candidate arrays, use the array containing the offending element. Do NOT include a JSONPath
+  prefix like `$.` — bare field name only.
+- `target_identifier` MUST be either (a) the element's `id` field value
+  if present, or (b) the element's `name` field value otherwise. It MUST
+  uniquely identify the element within the named array. If no
+  unambiguous identifier exists, lower the severity to MEDIUM and omit
+  these fields — the human will adjudicate.
+- For MEDIUM and LOW findings: emit `target_field` and `target_identifier`
+  when you can determine them confidently; otherwise omit. They are not
+  required at these severities.
 
 The response begins with "{" and ends with "}". No fences, headings, or
 trailing prose.

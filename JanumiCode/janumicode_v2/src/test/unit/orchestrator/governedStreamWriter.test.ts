@@ -154,6 +154,84 @@ describe('GovernedStreamWriter', () => {
 
       expect(record.authority_level).toBe(AuthorityLevel.PhaseGateCertified);
     });
+
+    // ── New cases from Layer B ──
+    it('assigns Constitutional (7) for constitutional_invariant', () => {
+      const record = writer.writeRecord({
+        record_type: 'constitutional_invariant',
+        schema_version: '1.0',
+        workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc123',
+        content: {},
+      });
+      expect(record.authority_level).toBe(AuthorityLevel.Constitutional);
+    });
+
+    it('assigns Human-Acknowledged (3) for mirror_acknowledged', () => {
+      const record = writer.writeRecord({
+        record_type: 'mirror_acknowledged',
+        schema_version: '1.0',
+        workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc123',
+        content: {},
+      });
+      expect(record.authority_level).toBe(AuthorityLevel.HumanAcknowledged);
+    });
+
+    it.each([
+      'business_domains_bloom',
+      'user_journey_bloom',
+      'system_workflow_bloom',
+      'entities_bloom',
+      'integrations_qa_bloom',
+      'fr_bloom_enrichment',
+      'nfr_bloom_enrichment',
+      'fr_saturation',
+      'nfr_saturation',
+      'component_saturation',
+      'data_model_saturation',
+      'task_saturation',
+      'test_case_saturation',
+    ])('assigns Exploratory (1) for artifact_produced in sub_phase=%s', (subPhase) => {
+      const record = writer.writeRecord({
+        record_type: 'artifact_produced',
+        schema_version: '1.0',
+        workflow_run_id: 'run-1',
+        sub_phase_id: subPhase,
+        janumicode_version_sha: 'abc123',
+        content: {},
+      });
+      expect(record.authority_level).toBe(AuthorityLevel.Exploratory);
+    });
+
+    it('assigns Agent-Asserted (2) for artifact_produced in non-bloom sub_phase', () => {
+      const record = writer.writeRecord({
+        record_type: 'artifact_produced',
+        schema_version: '1.0',
+        workflow_run_id: 'run-1',
+        sub_phase_id: 'system_requirements',
+        janumicode_version_sha: 'abc123',
+        content: {},
+      });
+      expect(record.authority_level).toBe(AuthorityLevel.AgentAsserted);
+    });
+
+    it.each([
+      'requirement_decomposition_node',
+      'component_decomposition_node',
+      'task_decomposition_node',
+      'data_model_decomposition_node',
+      'test_decomposition_node',
+    ] as const)('assigns Exploratory (1) for %s', (recordType) => {
+      const record = writer.writeRecord({
+        record_type: recordType,
+        schema_version: '1.0',
+        workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc123',
+        content: {},
+      });
+      expect(record.authority_level).toBe(AuthorityLevel.Exploratory);
+    });
   });
 
   describe('derived_from_system_proposal propagation', () => {

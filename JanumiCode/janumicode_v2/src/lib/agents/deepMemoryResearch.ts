@@ -28,6 +28,11 @@ import type { EmbeddingService } from '../embedding/embeddingService';
 import { cosineSimilarity } from '../embedding/embeddingService';
 import { getLogger } from '../logging';
 import type { DmrPipelineContent, DmrStageEntry } from '../types/records';
+import {
+  buildAuthorityElevationIndex,
+  effectiveAuthorityLevel,
+  type AuthorityElevationIndex,
+} from '../orchestrator/effectiveAuthority';
 
 const DMR_STAGE_NAMES: Record<number, string> = {
   1: 'Query Decomposition',
@@ -48,6 +53,47 @@ const DMR_STAGE_KINDS: Record<number, DmrStageEntry['kind']> = {
   6: 'deterministic',
   7: 'llm',
 };
+
+/**
+ * Pure-plumbing record types excluded entirely from FTS/vector harvest.
+ * These carry no semantic content worth retrieving on — they're error
+ * envelopes, timing markers, and presentation echoes.
+ *
+ * `agent_invocation`, `agent_output`, `agent_reasoning_step`, and the
+ * reasoning_review_* types are NOT in this list — they carry the agent
+ * reasoning trail that the system uses for intent-fidelity / drift
+ * detection (spec §1.5 invariant CI-10: "the Governed Stream is
+ * lossless"). They're harvested into the candidate pool but
+ * down-weighted in materiality scoring via REASONING_TRAIL_MULTIPLIER
+ * so the default Context Packet surfaces governing artifacts first
+ * while audit-style consumers can still reach them.
+ */
+const HARVEST_PLUMBING_EXCLUDE = [
+  'json_repair_record',
+  'file_system_write_record',
+  'mirror_presented',
+  'decision_bundle_presented',
+  'execution_wave_started',
+  'execution_wave_completed',
+  'workflow_run_closure',
+];
+
+/**
+ * Reasoning-trail records — included in harvest but materiality is
+ * multiplied by REASONING_TRAIL_MULTIPLIER before threshold check.
+ * Effect: in the default Context Packet, governing artifacts crowd out
+ * raw transcripts; an audit consumer lowering materialityThreshold or
+ * supplying known_relevant_record_ids surfaces them.
+ */
+const REASONING_TRAIL_RECORD_TYPES = new Set<string>([
+  'agent_invocation',
+  'agent_output',
+  'agent_reasoning_step',
+  'reasoning_review_finding_record',
+  'reasoning_review_harness_record',
+]);
+
+const REASONING_TRAIL_MULTIPLIER = 0.4;
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -71,8 +117,21 @@ export interface ContextPacket {
     temporalScope: { from: string; to: string };
     authorityLevelsIncluded: number[];
     sourcesInScope: string[];
+    /** Spec §8.4 Stage 1 field. Populated by deterministic decomposition;
+     *  currently always empty — conflict-zone detection requires
+     *  governed-stream inspection that the current direct-LLM-API DMR
+     *  architecture cannot perform. Surfaced empty for spec conformance
+     *  and audit-shape stability. */
+    knownConflictZones: string[];
   };
   completenessStatus: CompletenessStatus;
+  /** Spec §8.4 Stage 7 output: narrative summary of governing decisions,
+   *  with every claim citing a source record ID. Produced by Stage 7's
+   *  LLM synthesis when available; falls back to a deterministic summary
+   *  derived from active_constraints when synthesis is unavailable or
+   *  the LLM omits the field. Distinct from `completenessNarrative`
+   *  (which describes what was found / what is missing). */
+  decisionContextSummary: string;
   completenessNarrative: string;
   unavailableSources: UnavailableSource[];
   materialFindings: MaterialFinding[];
@@ -196,7 +255,11 @@ export class DeepMemoryResearchAgent {
   private readonly maxFtsCandidates: number;
   private readonly maxVectorCandidates: number;
   private readonly maxCausalDepth: number;
-  private readonly model: string;
+  /** Model is optional at construction (lets tests instantiate without
+   * touching LLM-call paths); validated lazily at the first LLM call so
+   * production callers must resolve it via ConfigManager.getRoutingModel
+   * rather than relying on a hardcoded literal here. */
+  private readonly model: string | undefined;
   private readonly provider: string;
   private readonly baseUrl: string | undefined;
 
@@ -214,7 +277,7 @@ export class DeepMemoryResearchAgent {
     this.maxFtsCandidates = config.maxFtsCandidates ?? 100;
     this.maxVectorCandidates = config.maxVectorCandidates ?? 50;
     this.maxCausalDepth = config.maxCausalDepth ?? 3;
-    this.model = config.model ?? process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b';
+    this.model = config.model;
     this.provider = config.provider ?? 'llamacpp';
     this.baseUrl = config.baseUrl;
   }
@@ -267,9 +330,24 @@ export class DeepMemoryResearchAgent {
       output_record_id: decompRecordId ?? undefined,
     });
 
+    // Build the authority elevation index once per research() call. The
+    // governed stream stores authority_level at write time; phase-gate
+    // certification and constitutional status elevate it without rewriting
+    // the record (spec §3.1 + §8.12 Stage II `validates` edges). All
+    // downstream reads of MaterialFinding.authorityLevel reflect the
+    // elevated value so scoring, constraint extraction, and `active_constraints`
+    // filtering see the effective authority, not the stored one.
+    const elevationIndex = buildAuthorityElevationIndex(this.db);
+
     // Stage 2 — Broad Candidate Harvest
     markStart(2);
     const candidates = await this.harvestCandidates(brief, decomposition);
+    for (const c of candidates) {
+      c.authorityLevel = effectiveAuthorityLevel(
+        { id: c.id, record_type: c.recordType, authority_level: c.authorityLevel },
+        elevationIndex,
+      );
+    }
     markDone(2, { output_summary: `${candidates.length} candidate finding(s) harvested (FTS5 + vector + graph)` });
 
     // Stage 3 — Materiality Scoring
@@ -279,7 +357,7 @@ export class DeepMemoryResearchAgent {
 
     // Stage 4 — Relationship Expansion
     markStart(4);
-    const expanded = this.expandRelationships(scored);
+    const expanded = this.expandRelationships(scored, elevationIndex);
     markDone(4, { output_summary: `${expanded.length} finding(s) after memory_edge expansion` });
 
     // Stage 5 — Supersession and Contradiction Analysis
@@ -317,11 +395,26 @@ export class DeepMemoryResearchAgent {
   }
 
   // ── Stage 1: Query Decomposition ────────────────────────────────
+  //
+  // Deterministic by design — the prior LLM call produced fields that
+  // were either rule-derived (authority levels, sources, temporal scope)
+  // or unused downstream (decision_types_sought, temporal_scope are
+  // never consumed by Stages 2-7). The only meaningful LLM-side
+  // contribution was topic-entity tokenization, and qwen3.5:9b
+  // consistently produced marketing-prose tokens rather than the
+  // upstream record identifiers Stage 2's topic FTS sweep can match
+  // against. `extractTopicEntities` now preserves ID-shaped tokens
+  // (e.g. `COMP-1`, `FR-3`, `NFR-2`) so the deterministic path provides
+  // strictly better signal than the LLM did, in a fraction of the time.
+  //
+  // Spec §8.4's full Stage 1 design (including `known_conflict_zones`
+  // derived from governed-stream inspection) requires a CLI-backed DMR
+  // with tool access. Tracked as SPEC GAP — see study notes.
 
   private async decomposeQuery(
     brief: RetrievalBrief,
   ): Promise<ContextPacket['queryDecomposition']> {
-    const deterministicFallback: ContextPacket['queryDecomposition'] = {
+    return {
       topicEntities: this.extractTopicEntities(brief.query),
       decisionTypesSought: ['menu_selection', 'mirror_approval', 'phase_gate_approval'],
       temporalScope: { from: '1970-01-01T00:00:00Z', to: new Date().toISOString() },
@@ -329,61 +422,7 @@ export class DeepMemoryResearchAgent {
       sourcesInScope: brief.scopeTier === 'current_run'
         ? ['governed_stream_current_run']
         : ['governed_stream_all_runs'],
-    };
-
-    if (!this.templateLoader) return deterministicFallback;
-
-    const template = this.templateLoader.findTemplate(
-      'deep_memory_research', 'deep_memory_query_decomposition',
-    );
-    if (!template) return deterministicFallback;
-
-    const rendered = this.templateLoader.render(template, {
-      retrieval_brief_query: brief.query,
-      scope_tier: brief.scopeTier,
-      requesting_agent_role: brief.requestingAgentRole,
-      janumicode_version_sha: this.config.janumiCodeVersionSha,
-    });
-    if (rendered.missing_variables.length > 0) return deterministicFallback;
-
-    // LLM throws propagate to the engine's phase catch (halts the
-    // workflow). Empty/unparseable parsed JSON still falls back to
-    // the deterministic decomposition — that's a successful call with
-    // garbage output, not an unrecoverable failure.
-    const result = await this.llmCaller.call({
-      provider: this.provider,
-      model: this.model,
-      baseUrl: this.baseUrl,
-      prompt: rendered.rendered,
-      responseFormat: 'json',
-      temperature: 0.3,
-      traceContext: {
-        workflowRunId: brief.workflowRunId,
-        phaseId: brief.phaseId,
-        subPhaseId: brief.subPhaseId,
-        agentRole: 'deep_memory_research',
-        label: 'DMR Stage 1 — Query Decomposition',
-      },
-    });
-
-    const parsed = result.parsed as Record<string, unknown> | null;
-    if (!parsed) return deterministicFallback;
-
-    return {
-      topicEntities: Array.isArray(parsed.topic_entities)
-        ? (parsed.topic_entities as unknown[]).map(String)
-        : deterministicFallback.topicEntities,
-      decisionTypesSought: Array.isArray(parsed.decision_types_sought)
-        ? (parsed.decision_types_sought as unknown[]).map(String)
-        : deterministicFallback.decisionTypesSought,
-      temporalScope: (parsed.temporal_scope as { from: string; to: string } | undefined)
-        ?? deterministicFallback.temporalScope,
-      authorityLevelsIncluded: Array.isArray(parsed.authority_levels_included)
-        ? (parsed.authority_levels_included as unknown[]).map(n => Number(n)).filter(n => !isNaN(n))
-        : deterministicFallback.authorityLevelsIncluded,
-      sourcesInScope: Array.isArray(parsed.sources_in_scope)
-        ? (parsed.sources_in_scope as unknown[]).map(String)
-        : deterministicFallback.sourcesInScope,
+      knownConflictZones: [],
     };
   }
 
@@ -490,7 +529,7 @@ export class DeepMemoryResearchAgent {
     const causalRelevance = this.computeCausalRelevance(finding.id);
     const contradictionSignal = finding.governingStatus === 'contradicted' ? 1.0 : 0.0;
 
-    return (
+    const raw = (
       w.semantic_similarity * semanticSimilarity +
       w.constraint_relevance * constraintRelevance +
       w.authority_level * authorityScore +
@@ -498,6 +537,10 @@ export class DeepMemoryResearchAgent {
       w.causal_relevance * causalRelevance +
       w.contradiction_signal * contradictionSignal
     );
+
+    return REASONING_TRAIL_RECORD_TYPES.has(finding.recordType)
+      ? raw * REASONING_TRAIL_MULTIPLIER
+      : raw;
   }
 
   /**
@@ -519,7 +562,7 @@ export class DeepMemoryResearchAgent {
     const causalRelevance = this.computeCausalRelevance(finding.id);
     const contradictionSignal = finding.governingStatus === 'contradicted' ? 1.0 : 0.0;
 
-    const score = (
+    const raw = (
       w.semantic_similarity * semanticSimilarity +
       w.constraint_relevance * constraintRelevance +
       w.authority_level * authorityScore +
@@ -527,6 +570,10 @@ export class DeepMemoryResearchAgent {
       w.causal_relevance * causalRelevance +
       w.contradiction_signal * contradictionSignal
     );
+
+    const score = REASONING_TRAIL_RECORD_TYPES.has(finding.recordType)
+      ? raw * REASONING_TRAIL_MULTIPLIER
+      : raw;
 
     finding.materialityBreakdown = {
       semanticSimilarity,
@@ -610,7 +657,10 @@ export class DeepMemoryResearchAgent {
 
   // ── Stage 4: Relationship Expansion ─────────────────────────────
 
-  private expandRelationships(findings: MaterialFinding[]): MaterialFinding[] {
+  private expandRelationships(
+    findings: MaterialFinding[],
+    elevationIndex: AuthorityElevationIndex,
+  ): MaterialFinding[] {
     const expanded = [...findings];
     const seen = new Set(findings.map(f => f.id));
 
@@ -630,16 +680,22 @@ export class DeepMemoryResearchAgent {
         ).get(edge.target_record_id) as Record<string, unknown> | undefined;
 
         if (record) {
+          const recId = record.id as string;
+          const recType = record.record_type as string;
+          const storedAuth = record.authority_level as number;
           expanded.push({
-            id: record.id as string,
-            recordType: record.record_type as string,
-            authorityLevel: record.authority_level as number,
+            id: recId,
+            recordType: recType,
+            authorityLevel: effectiveAuthorityLevel(
+              { id: recId, record_type: recType, authority_level: storedAuth },
+              elevationIndex,
+            ),
             governingStatus: 'active',
             summary: this.extractSummary(record) || `Expanded via ${edge.edge_type} from ${finding.id}`,
-            sourceRecordIds: [record.id as string],
+            sourceRecordIds: [recId],
             materialityScore: finding.materialityScore * 0.7,
           });
-          seen.add(record.id as string);
+          seen.add(recId);
         }
       }
     }
@@ -783,6 +839,7 @@ export class DeepMemoryResearchAgent {
     const basePacket: ContextPacket = {
       queryDecomposition: decomposition,
       completenessStatus,
+      decisionContextSummary: this.buildDeterministicDecisionSummary(activeConstraints, supersessionChains, contradictions),
       completenessNarrative: `Research produced ${filteredFindings.length} material finding(s) over ${findings.length} candidate(s).`,
       unavailableSources,
       materialFindings: filteredFindings,
@@ -833,6 +890,13 @@ export class DeepMemoryResearchAgent {
     });
     if (rendered.missing_variables.length > 0) return basePacket;
 
+    if (!this.model) {
+      throw new Error(
+        'DeepMemoryResearchAgent.model is not set. ' +
+        'Production callers must supply config.model via ConfigManager.getRoutingModel(role). ' +
+        'Never fall back to a hardcoded literal.',
+      );
+    }
     try {
       const result = await this.llmCaller.call({
         provider: this.provider,
@@ -872,12 +936,14 @@ export class DeepMemoryResearchAgent {
         : basePacket.completenessNarrative;
 
       const decisionSummary = typeof unwrapped.decision_context_summary === 'string'
-        ? `${unwrapped.decision_context_summary}\n\n${llmNarrative}`
-        : llmNarrative;
+        && unwrapped.decision_context_summary.trim().length > 0
+          ? unwrapped.decision_context_summary
+          : basePacket.decisionContextSummary;
 
       return {
         ...basePacket,
-        completenessNarrative: decisionSummary,
+        decisionContextSummary: decisionSummary,
+        completenessNarrative: llmNarrative,
         openQuestions,
       };
     } catch (err) {
@@ -890,10 +956,49 @@ export class DeepMemoryResearchAgent {
 
   // ── Helpers ─────────────────────────────────────────────────────
 
+  /**
+   * Deterministic decision_context_summary used when the Stage 7 LLM
+   * synthesis is unavailable or omits the field. Composes a one-line
+   * narrative naming the active constraints and contradiction state so
+   * the spec's "every claim cites a source_record_id" rule is honored
+   * even in the fallback path.
+   */
+  private buildDeterministicDecisionSummary(
+    activeConstraints: ActiveConstraint[],
+    supersessionChains: SupersessionChain[],
+    contradictions: Contradiction[],
+  ): string {
+    if (activeConstraints.length === 0) {
+      return 'No active constraints identified in scope.';
+    }
+    const constraintLine = activeConstraints
+      .slice(0, 5)
+      .map(c => `${c.statement} (auth=${c.authorityLevel}; source=${c.sourceRecordIds[0] ?? 'unknown'})`)
+      .join('; ');
+    const moreCount = Math.max(0, activeConstraints.length - 5);
+    const constraintSuffix = moreCount > 0 ? ` (+${moreCount} more)` : '';
+    const supersessionSuffix = supersessionChains.length > 0
+      ? ` Supersession chains: ${supersessionChains.length}.`
+      : '';
+    const contradictionSuffix = contradictions.length > 0
+      ? ` Unresolved contradictions: ${contradictions.filter(c => c.resolutionStatus === 'unresolved').length}.`
+      : '';
+    return `Governing decisions: ${constraintLine}${constraintSuffix}.${supersessionSuffix}${contradictionSuffix}`;
+  }
+
   private extractTopicEntities(query: string): string[] {
-    // Keep quoted phrases intact. Then strip stopwords and short tokens.
+    // Preserve domain-shaped identifiers (FR-1, COMP-API-GATEWAY, NFR-2,
+    // UJ-SHARE, etc.) verbatim — these are the highest-value retrieval
+    // tokens because they match indexed record fields directly. Phase
+    // callers pass these in the query when they have upstream artifacts
+    // to anchor against.
+    const idTokens = [...query.matchAll(/\b[A-Z][A-Z0-9]+-[A-Z0-9-]+\b/g)].map(m => m[0]);
+
+    // Keep quoted phrases intact.
     const quoted = [...query.matchAll(/"([^"]+)"/g)].map(m => m[1]);
-    const stripped = query.replace(/"[^"]+"/g, ' ');
+    const stripped = query
+      .replace(/"[^"]+"/g, ' ')
+      .replace(/\b[A-Z][A-Z0-9]+-[A-Z0-9-]+\b/g, ' '); // remove already-captured IDs
     const stopwords = new Set([
       'the', 'and', 'for', 'with', 'from', 'that', 'this', 'these',
       'those', 'into', 'onto', 'over', 'then', 'than', 'when', 'where',
@@ -903,7 +1008,7 @@ export class DeepMemoryResearchAgent {
       .filter(w => w.length > 3)
       .map(w => w.toLowerCase().replace(/[^a-z0-9_\-./]/g, ''))
       .filter(w => w.length > 0 && !stopwords.has(w));
-    return [...quoted, ...words].slice(0, 12);
+    return [...idTokens, ...quoted, ...words].slice(0, 12);
   }
 
   private searchFTS(
@@ -922,12 +1027,19 @@ export class DeepMemoryResearchAgent {
         ? [ftsQuery, workflowRunId]
         : [ftsQuery];
 
+      // Exclude conversation/process noise: agent_invocation prompts repeat
+      // the query verbatim and dominate FTS rankings, drowning out actual
+      // memory-bearing records. See SKIPPED_RECORD_TYPES in the embedding
+      // service for the matching write-side exclusion list.
+      const noiseTypes = HARVEST_PLUMBING_EXCLUDE.map(t => `'${t}'`).join(',');
+
       const results = this.db.prepare(`
         SELECT gs.id, gs.record_type, gs.authority_level, gs.content
         FROM governed_stream_fts fts
         JOIN governed_stream gs ON gs.id = fts.id
         WHERE governed_stream_fts MATCH ? ${whereClause}
           AND gs.is_current_version = 1
+          AND gs.record_type NOT IN (${noiseTypes})
         LIMIT ${this.maxFtsCandidates}
       `).all(...params) as Array<{ id: string; record_type: string; authority_level: number; content: string }>;
 
@@ -963,11 +1075,13 @@ export class DeepMemoryResearchAgent {
         content: string;
         embedding: Buffer;
       }
+      const noiseTypes = HARVEST_PLUMBING_EXCLUDE.map(t => `'${t}'`).join(',');
       const rows = this.db.prepare(`
         SELECT gs.id, gs.record_type, gs.authority_level, gs.content, v.embedding
         FROM governed_stream gs
         JOIN governed_stream_vec v ON v.record_id = gs.id
         WHERE gs.is_current_version = 1 ${whereClause}
+          AND gs.record_type NOT IN (${noiseTypes})
       `).all(...params) as VecRow[];
 
       // Score each by cosine similarity; keep top N.
@@ -1003,19 +1117,26 @@ export class DeepMemoryResearchAgent {
     authorityLevels: number[],
   ): MaterialFinding[] {
     if (authorityLevels.length === 0) return [];
-    const minLevel = Math.min(...authorityLevels);
-    if (minLevel < 5) return []; // Only auto-include governing records
+
+    // Harvest at the *highest* requested level downward to 5. Previously this
+    // used Math.min and short-circuited when the lowest requested level was
+    // below 5 — meaning a brief asking for [3,4,5,6,7] (broad sweep) got
+    // nothing instead of the governing records the agent asked for.
+    const governingLevels = authorityLevels.filter(l => l >= 5);
+    if (governingLevels.length === 0) return []; // Only auto-include governing records
+    const floor = Math.min(...governingLevels);
 
     const whereClause = brief.scopeTier === 'current_run'
       ? 'AND workflow_run_id = ?'
       : '';
-    const params = brief.scopeTier === 'current_run' ? [minLevel, brief.workflowRunId] : [minLevel];
+    const params = brief.scopeTier === 'current_run' ? [floor, brief.workflowRunId] : [floor];
 
     try {
       const rows = this.db.prepare(`
         SELECT id, record_type, authority_level, content
         FROM governed_stream
         WHERE authority_level >= ? AND is_current_version = 1 ${whereClause}
+          AND record_type NOT IN (${HARVEST_PLUMBING_EXCLUDE.map(t => `'${t}'`).join(',')})
         ORDER BY authority_level DESC
         LIMIT 50
       `).all(...params) as Array<{ id: string; record_type: string; authority_level: number; content: string }>;
@@ -1124,6 +1245,7 @@ export class DeepMemoryResearchAgent {
           temporal_scope: decomposition.temporalScope,
           authority_levels_included: decomposition.authorityLevelsIncluded,
           sources_in_scope: decomposition.sourcesInScope,
+          known_conflict_zones: decomposition.knownConflictZones,
         },
       });
       return rec.id;
@@ -1240,8 +1362,10 @@ export function contextPacketToJson(packet: ContextPacket): Record<string, unkno
       temporal_scope: packet.queryDecomposition.temporalScope,
       authority_levels_included: packet.queryDecomposition.authorityLevelsIncluded,
       sources_in_scope: packet.queryDecomposition.sourcesInScope,
+      known_conflict_zones: packet.queryDecomposition.knownConflictZones,
     },
     completeness_status: packet.completenessStatus,
+    decision_context_summary: packet.decisionContextSummary,
     completeness_narrative: packet.completenessNarrative,
     unavailable_sources: packet.unavailableSources.map(s => ({
       source: s.source,

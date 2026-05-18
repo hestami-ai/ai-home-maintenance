@@ -59,6 +59,7 @@ describe('ExecutorAgent — dual-detection file writes', () => {
     agentInvoker = new AgentInvoker(llm, {
       timeoutSeconds: 1,
       idleTimeoutSeconds: 1,
+      noContentTimeoutSeconds: 1,
       bufferMaxEvents: 100,
     });
     executor = new ExecutorAgent(db, agentInvoker, writer, eventBus, testId);
@@ -278,23 +279,22 @@ describe('ExecutorAgent — dual-detection file writes', () => {
 
   it('links every file_system_write row to the agent_invocation via agent_invocation_id', async () => {
     // Audit invariant: the file-write rows must be attributable to the
-    // specific agent invocation that produced them.
+    // specific agent invocation that produced them. With CLI persistence
+    // parity, AgentInvoker.invokeCLI owns the agent_invocation record
+    // write — so this test verifies the link via ExecutorAgent's
+    // returned invocationId (which is what gets passed to AgentInvoker
+    // and stamped on the record's content.invocation_id).
     stubInvocation({
       writeFilesDuringInvoke: [{ path: 'out.txt', content: 'x' }],
     });
 
-    await executor.execute(makeTask(), runId, 'stdin', tmpDir, 'dev');
+    const out = await executor.execute(makeTask(), runId, 'stdin', tmpDir, 'dev');
 
     const row = db.prepare(`
       SELECT agent_invocation_id FROM file_system_writes WHERE workflow_run_id = ?
     `).get(runId) as { agent_invocation_id: string };
     expect(row.agent_invocation_id).toBeTruthy();
-
-    // And the linked id matches the agent_invocation record the
-    // executor wrote at the start of execute().
-    const invocation = writer.getRecordsByType(runId, 'agent_invocation')[0];
-    expect(invocation).toBeDefined();
-    const invocationId = (invocation.content as { invocation_id: string }).invocation_id;
-    expect(row.agent_invocation_id).toBe(invocationId);
+    expect(out.invocationId).toBeTruthy();
+    expect(row.agent_invocation_id).toBe(out.invocationId);
   });
 });

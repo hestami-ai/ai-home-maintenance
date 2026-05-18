@@ -11,6 +11,12 @@
  *   - missing required field, parse failure, branch-rule violation -> HIGH
  *   - type/enum mismatch -> MEDIUM
  *   - extra unexpected fields / cosmetic issues -> LOW
+ *
+ * This validator emits ADVISORY findings only; targetField/targetIdentifier
+ * are not populated because findings do not correspond to mutable array
+ * elements — they describe whole-output JSON-shape issues (parse failures,
+ * missing top-level required fields, wrong field types). Auto-mitigation by
+ * dropping an array element is not applicable.
  */
 
 import type { ValidatorRuntimeParams, ValidatorFinding } from '../../validatorRegistry';

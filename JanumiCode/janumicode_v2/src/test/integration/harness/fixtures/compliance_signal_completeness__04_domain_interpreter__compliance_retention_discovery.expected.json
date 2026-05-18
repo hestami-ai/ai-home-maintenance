@@ -1,7 +1,0 @@
-{
-  "validator": "compliance_signal_completeness",
-  "sample": "04_domain_interpreter__compliance_retention_discovery",
-  "passed": false,
-  "expectedFindingCount": 1,
-  "overallAssessment": "The agent successfully captured the core HOA/POA statutes and general audit/retention requirements. However, the source material explicitly references 'Tax compliance' in the Vantaca appendix, which is a high-salience tax-form handling hook that was missed in the extraction."
-}

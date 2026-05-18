@@ -260,4 +260,37 @@ describe('Phase 0 — Workspace Initialization', () => {
       expect(rec).toBeDefined();
     });
   });
+
+  describe('Constitutional invariants seeding (B.1 integration)', () => {
+    it('seeds 10 constitutional_invariant records on first Phase 0 run', async () => {
+      const runId = await runPhase0(te, 'Build something');
+      const seeded = te.engine.writer.getRecordsByType(runId, 'constitutional_invariant');
+      expect(seeded).toHaveLength(10);
+      // All at authority level 7
+      for (const rec of seeded) {
+        expect(rec.authority_level).toBe(7);
+      }
+      // Each has invariant_id + statement
+      const contents = seeded.map(r => r.content as Record<string, unknown>);
+      const ids = contents.map(c => c.invariant_id as string).sort();
+      expect(ids).toContain('CI-1');
+      expect(ids).toContain('CI-10');
+      for (const c of contents) {
+        expect(typeof c.statement).toBe('string');
+        expect((c.statement as string).length).toBeGreaterThan(20);
+        expect(c.source_section).toBe('1.5');
+      }
+    });
+
+    it('does not re-seed on second Phase 0 run in same workspace', async () => {
+      await runPhase0(te, 'First run');
+      await runPhase0(te, 'Second run');
+
+      // Total invariants across both runs should still be 10
+      const all = te.db.prepare(
+        `SELECT COUNT(*) AS c FROM governed_stream WHERE record_type = 'constitutional_invariant'`,
+      ).get() as { c: number };
+      expect(all.c).toBe(10);
+    });
+  });
 });

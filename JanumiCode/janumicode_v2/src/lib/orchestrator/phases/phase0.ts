@@ -25,6 +25,7 @@ import {
   type ScannedFile,
 } from '../../workspace/workspaceScanner';
 import { resolveAllReferences, type ResolvedReference } from '../../workspace/referenceResolver';
+import { seedConstitutionalInvariants } from '../constitutionalInvariants';
 
 export class Phase0Handler implements PhaseHandler {
   readonly phaseId: PhaseId = '0';
@@ -75,6 +76,17 @@ export class Phase0Handler implements PhaseHandler {
     });
     artifactIds.push(classificationRecord.id);
     engine.ingestionPipeline.ingest(classificationRecord);
+
+    // ── Seed Constitutional Invariants (spec §1.5, Authority Level 7) ─
+    // Idempotent: only writes on the first run that finds none in the
+    // workspace. Subsequent runs inherit via DMR all-runs scope.
+    const seededInvariantIds = seedConstitutionalInvariants({
+      db: engine.db,
+      writer: engine.writer,
+      workflowRunId: workflowRun.id,
+      janumiCodeVersionSha: engine.janumiCodeVersionSha,
+    });
+    for (const id of seededInvariantIds) artifactIds.push(id);
 
     // ── Sub-Phase 0.1b — External Reference Resolution ──────────
     // Resolve explicit file references from the raw intent so Phase 1 can

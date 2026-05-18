@@ -26,6 +26,18 @@ export interface CLIInvocationOptions {
   timeoutSeconds?: number;
   /** Idle timeout in seconds — no stdout for this long (default: 120) */
   idleTimeoutSeconds?: number;
+  /**
+   * No-content-progress timeout in seconds. Fires when no parsed event
+   * with `recordType === 'agent_reasoning_step'` (assistant text or
+   * thinking) has arrived in N seconds — even if the stdout pipe is
+   * still emitting tool_use / tool_result / heartbeat envelopes. This
+   * catches the "Goose stuck in a tool-call loop" pathology that the
+   * byte-level idle timer misses because periodic envelopes reset it.
+   * Default: 600 s. Set to 0 to disable. All four CLI providers
+   * (Claude Code, Gemini, Goose, Codex) map text/thinking to
+   * `agent_reasoning_step`, so the detector is provider-agnostic.
+   */
+  noContentTimeoutSeconds?: number;
   /** Maximum buffered events before backpressure (default: 1000) */
   bufferMaxEvents?: number;
   /** Output parser for this backing tool */
@@ -48,6 +60,12 @@ export interface CLIInvocationResult {
   timedOut: boolean;
   /** Whether the process was killed by idle timeout */
   idledOut: boolean;
+  /**
+   * Whether the process was killed by the no-content-progress timer
+   * (stdout was still emitting envelopes but no assistant text or
+   * thinking arrived within the configured window).
+   */
+  noContentTimedOut: boolean;
   /** All parsed events from stdout */
   events: ParsedEvent[];
   /**
@@ -74,6 +92,7 @@ export class CLIInvoker {
   async invoke(options: CLIInvocationOptions): Promise<CLIInvocationResult> {
     const timeoutMs = (options.timeoutSeconds ?? 600) * 1000;
     const idleTimeoutMs = (options.idleTimeoutSeconds ?? 120) * 1000;
+    const noContentTimeoutMs = (options.noContentTimeoutSeconds ?? 600) * 1000;
     const startTime = Date.now();
 
     return new Promise<CLIInvocationResult>((resolve) => {
@@ -81,7 +100,9 @@ export class CLIInvoker {
       let stderr = '';
       let timedOut = false;
       let idledOut = false;
+      let noContentTimedOut = false;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
+      let noContentTimer: ReturnType<typeof setTimeout> | null = null;
       let processTimer: ReturnType<typeof setTimeout> | null = null;
 
       // Merge environment
@@ -127,7 +148,17 @@ export class CLIInvoker {
           // parseLine now returns an array — a single Claude Code
           // envelope can carry multiple logical events (a text block
           // plus N tool_use blocks). Treat each one independently.
-          for (const event of parsed) events.push(event);
+          for (const event of parsed) {
+            events.push(event);
+            // Reset the no-content timer only on assistant text or
+            // thinking. tool_use / tool_result envelopes keep the byte-
+            // level idle timer happy but DON'T reset this — that's the
+            // whole point: catch a CLI that's spinning on tool calls
+            // without producing any assistant reasoning.
+            if (event.recordType === 'agent_reasoning_step') {
+              resetNoContentTimer();
+            }
+          }
         }
       });
 
@@ -154,6 +185,7 @@ export class CLIInvoker {
           exitCode: code,
           timedOut,
           idledOut,
+          noContentTimedOut,
           events,
           stdoutText,
           stderr,
@@ -168,6 +200,7 @@ export class CLIInvoker {
           exitCode: null,
           timedOut,
           idledOut,
+          noContentTimedOut,
           events,
           stdoutText,
           stderr,
@@ -190,7 +223,7 @@ export class CLIInvoker {
         killProcess(child);
       }, timeoutMs);
 
-      // Idle timeout
+      // Idle timeout — fires when no stdout byte arrives at all.
       function resetIdleTimer() {
         if (idleTimer) clearTimeout(idleTimer);
         idleTimer = setTimeout(() => {
@@ -199,11 +232,25 @@ export class CLIInvoker {
         }, idleTimeoutMs);
       }
 
+      // No-content-progress timeout — fires when no assistant text or
+      // thinking event arrives, even if heartbeat / tool envelopes are
+      // still streaming. Disabled when noContentTimeoutSeconds === 0.
+      function resetNoContentTimer() {
+        if (noContentTimer) clearTimeout(noContentTimer);
+        if (noContentTimeoutMs <= 0) return;
+        noContentTimer = setTimeout(() => {
+          noContentTimedOut = true;
+          killProcess(child);
+        }, noContentTimeoutMs);
+      }
+
       resetIdleTimer();
+      resetNoContentTimer();
 
       function clearTimers() {
         if (processTimer) clearTimeout(processTimer);
         if (idleTimer) clearTimeout(idleTimer);
+        if (noContentTimer) clearTimeout(noContentTimer);
       }
 
       function killProcess(proc: ChildProcess) {

@@ -42,6 +42,8 @@ import {
 import { LeafTestRunner, type LeafTestRunnerConfig, type LeafTestRunResult } from './leafTestRunner';
 import { QuarantineLedger } from './quarantineLedger';
 import { WaveGate, type WaveGateOutcome } from './waveGate';
+import { buildPhaseContextPacket } from './phases/dmrContext';
+import type { PhaseContext } from './orchestratorEngine';
 
 // ── Public types ───────────────────────────────────────────────────
 
@@ -474,11 +476,22 @@ export class ExecutionScheduler {
     const logger = getLogger();
     const contextFileId = this.generateId();
 
+    // Per-task DMR call — pulls active_constraints + material findings
+    // scoped to this specific task. Phases 5-8 call DMR for their own
+    // work; Phase 9 follows the same pattern so the executor sees
+    // task-relevant constraints rather than only the constitutional
+    // invariants the builder would surface by default. DMR failure is
+    // non-fatal: buildTaskContext falls back to its builder-time
+    // active_constraints option.
+    const dmrPacket = await this.fetchDmrPacketForTask(leaf, workflowRunId);
+
     let stdinText = this.executionContextBuilder.buildTaskContext(
       leaf as unknown as CtxTask,
       workflowRunId,
       contextFileId,
       this.artifacts,
+      undefined,
+      dmrPacket,
     ).stdin.text;
 
     if (augmentedContext) {
@@ -620,6 +633,68 @@ export class ExecutionScheduler {
   }
 
   // ── helpers ────────────────────────────────────────────────────
+
+  /**
+   * Per-task DMR call. Constructs a structured query that names the
+   * task's component_id, FRs/NFRs (derived from completion_criteria
+   * artifact_refs + technical_spec_ids), and seeds
+   * `knownRelevantRecordIds` from `task.derived_from_record_ids` so the
+   * Stage 2 harvest hits the motivating artifacts at materiality=1.0.
+   *
+   * Failures are non-fatal — `buildPhaseContextPacket` already returns
+   * a sentinel empty packet on error. The executor still gets a usable
+   * prompt; only the active_constraints + per-task DMR detail are
+   * missing.
+   */
+  private async fetchDmrPacketForTask(
+    leaf: SchedulerLeaf,
+    workflowRunId: string,
+  ): Promise<{ activeConstraintsText: string; detailFileContent: string } | null> {
+    try {
+      const componentId = leaf.component_id ?? 'unknown';
+      const specIds = leaf.technical_spec_ids ?? [];
+      const criterionRefs = (leaf.completion_criteria ?? [])
+        .map(c => c.artifact_ref).filter(Boolean) as string[];
+      const idTokens = [...new Set([componentId, ...specIds, ...criterionRefs])]
+        .filter(s => s && s !== 'unknown').slice(0, 20);
+      const query = idTokens.length > 0
+        ? `Implementation of task ${leaf.id} on component ${componentId} referencing ${idTokens.join(', ')}. Retrieve governing constraints, technical specs, and known conflicts.`
+        : `Implementation of task ${leaf.id} on component ${componentId}. Retrieve governing constraints and technical specs.`;
+
+      const known: string[] = [];
+      if (leaf.derived_from_record_ids) for (const id of leaf.derived_from_record_ids) known.push(id);
+
+      const ctxShim: PhaseContext = {
+        workflowRun: {
+          id: workflowRunId,
+          current_phase_id: '9',
+        } as PhaseContext['workflowRun'],
+        engine: this.engine,
+      } as unknown as PhaseContext;
+
+      const packet = await buildPhaseContextPacket(ctxShim, {
+        subPhaseId: `9.1_${leaf.id}`,
+        requestingAgentRole: 'executor_agent',
+        query,
+        scopeTier: 'all_runs',
+        knownRelevantRecordIds: known,
+        detailFileLabel: `9_1_task_${leaf.id}`,
+        requiredOutputSpec: 'Implementation artifacts + tests per completion criteria',
+      });
+
+      if (!packet.packet) return null;
+      return {
+        activeConstraintsText: packet.activeConstraintsText,
+        detailFileContent: packet.detailFileContent,
+      };
+    } catch (err) {
+      getLogger().warn('workflow', 'per-task DMR call failed; proceeding without DMR context', {
+        leaf: leaf.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
 
   private updateRunTotals(
     workflowRunId: string,

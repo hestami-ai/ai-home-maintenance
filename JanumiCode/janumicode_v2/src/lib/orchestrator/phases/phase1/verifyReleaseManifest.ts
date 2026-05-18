@@ -50,6 +50,12 @@ export interface ReleaseManifestVerifierInputs {
   integrations: Integration[];
   /** All accepted vocabulary — exactly one release OR cross_cutting. */
   vocabulary: VocabularyTerm[];
+  /** All accepted V&V requirement ids — exactly one release OR cross_cutting. */
+  vvRequirementIds?: string[];
+  /** All accepted quality attribute ids (synthetic QA-N) — exactly one release OR cross_cutting. */
+  qualityAttributeIds?: string[];
+  /** All accepted technical constraint ids — exactly one release OR cross_cutting. */
+  technicalConstraintIds?: string[];
 }
 
 export type ReleaseManifestVerifierResult = CoverageGapContent[];
@@ -289,9 +295,12 @@ export function verifyReleaseManifest(i: ReleaseManifestVerifierInputs): Release
   gaps.push(...checkOrdinalIntegrity(plan));
 
   // Exact-coverage per artifact type.
-  const byTypeForRelease = (type: 'journeys' | 'workflows' | 'entities' | 'compliance' | 'integrations' | 'vocabulary'): Map<string, string[]> => {
+  const byTypeForRelease = (
+    type: 'journeys' | 'workflows' | 'entities' | 'compliance' | 'integrations' | 'vocabulary'
+        | 'vv_requirements' | 'quality_attributes' | 'technical_constraints',
+  ): Map<string, string[]> => {
     const m = new Map<string, string[]>();
-    for (const r of plan.releases) m.set(r.release_id, r.contains[type]);
+    for (const r of plan.releases) m.set(r.release_id, (r.contains[type] ?? []));
     return m;
   };
 
@@ -337,6 +346,33 @@ export function verifyReleaseManifest(i: ReleaseManifestVerifierInputs): Release
     perRelease: byTypeForRelease('vocabulary'),
     crossCutting: plan.cross_cutting.vocabulary,
   }));
+  if (i.vvRequirementIds) {
+    gaps.push(...checkExactCoverage({
+      check: 'release_exact_coverage_vv_requirements',
+      assertion: 'Every accepted V&V requirement id must appear in exactly one release OR in cross_cutting.vv_requirements.',
+      expected: i.vvRequirementIds,
+      perRelease: byTypeForRelease('vv_requirements'),
+      crossCutting: plan.cross_cutting.vv_requirements ?? [],
+    }));
+  }
+  if (i.qualityAttributeIds) {
+    gaps.push(...checkExactCoverage({
+      check: 'release_exact_coverage_quality_attributes',
+      assertion: 'Every accepted quality attribute id must appear in exactly one release OR in cross_cutting.quality_attributes.',
+      expected: i.qualityAttributeIds,
+      perRelease: byTypeForRelease('quality_attributes'),
+      crossCutting: plan.cross_cutting.quality_attributes ?? [],
+    }));
+  }
+  if (i.technicalConstraintIds) {
+    gaps.push(...checkExactCoverage({
+      check: 'release_exact_coverage_technical_constraints',
+      assertion: 'Every accepted technical constraint id must appear in exactly one release OR in cross_cutting.technical_constraints.',
+      expected: i.technicalConstraintIds,
+      perRelease: byTypeForRelease('technical_constraints'),
+      crossCutting: plan.cross_cutting.technical_constraints ?? [],
+    }));
+  }
 
   gaps.push(...checkBackwardDependencies(plan, i.workflows));
   gaps.push(...checkTraceCoherence(plan, i.workflows));

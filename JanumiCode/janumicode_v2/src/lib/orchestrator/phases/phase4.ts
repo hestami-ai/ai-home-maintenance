@@ -106,10 +106,18 @@ export class Phase4Handler implements PhaseHandler {
     // ── 4.1 — Software Domain Identification ──────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'software_domains');
 
+    const srIds = sysReqItems.map(i => i.id as string).filter(Boolean);
+    const dmr41Seeds = [
+      ...(prior.systemBoundary ? [prior.systemBoundary.recordId] : []),
+      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
+      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
+      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
+    ];
     const dmr41 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'software_domains',
       requestingAgentRole: 'architecture_agent',
-      query: `Software domain identification for project: ${prior.projectTypeDescription.slice(0, 400)}`,
+      query: `Software domains for system_boundary ${prior.systemBoundary?.recordId ?? 'unknown'} covering system_requirements ${srIds.join(', ')}.`,
+      knownRelevantRecordIds: dmr41Seeds,
       detailFileLabel: 'p4_1_domains',
       requiredOutputSpec: 'software_domains JSON — domains array with ubiquitous_language',
     });
@@ -140,10 +148,18 @@ export class Phase4Handler implements PhaseHandler {
       return `${d.id}: ${d.name} (reqs: ${(d.system_requirement_ids ?? []).join(', ')})\n  Terms: ${terms}`;
     }).join('\n');
 
+    const domainIds = domainsContent.domains.map(d => d.id).filter(Boolean);
+    const dmr42Seeds = [
+      domainsRecord.id,
+      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
+      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
+      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
+    ];
     const dmr42 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'component_skeleton',
       requestingAgentRole: 'architecture_agent',
-      query: `Component decomposition for domains: ${domainsSummary.slice(0, 400)}`,
+      query: `Component decomposition for domains ${domainIds.join(', ')} (software_domains ${domainsRecord.id}) implementing system_requirements ${srIds.join(', ')}.`,
+      knownRelevantRecordIds: dmr42Seeds,
       detailFileLabel: 'p4_2_components',
       requiredOutputSpec: 'component_model JSON — components with responsibilities and dependencies',
     });
@@ -296,10 +312,17 @@ export class Phase4Handler implements PhaseHandler {
       return `${c.id}: ${c.name} (domain: ${c.domain_id ?? 'unassigned'})\n  Responsibilities:\n${resps}\n  Dependencies: ${deps || 'none'}`;
     }).join('\n');
 
+    const adrComponentIds = adrComponentsSource.map(c => c.id).filter(Boolean);
+    const dmr43Seeds = [
+      componentRecord.id,
+      domainsRecord.id,
+      ...(techConstraintsRecord ? [techConstraintsRecord.id] : []),
+    ];
     const dmr43 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'adr_capture',
       requestingAgentRole: 'architecture_agent',
-      query: `Architectural decisions for components: ${componentSummary.slice(0, 400)}`,
+      query: `Architectural decisions governing components ${adrComponentIds.join(', ')} across domains ${domainIds.join(', ')} (component_model ${componentRecord.id}).`,
+      knownRelevantRecordIds: dmr43Seeds,
       detailFileLabel: 'p4_3_adrs',
       requiredOutputSpec: 'architectural_decisions JSON — adrs with context, decision, alternatives, consequences',
     });
@@ -465,6 +488,7 @@ export class Phase4Handler implements PhaseHandler {
       system_boundary_summary: boundarySummary,
       system_requirements_summary: sysReqSummary,
       detail_file_path: dmr.detailFilePath,
+      detail_file_content: dmr.detailFileContent,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;

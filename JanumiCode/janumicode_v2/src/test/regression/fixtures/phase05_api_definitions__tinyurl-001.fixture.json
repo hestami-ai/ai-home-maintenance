@@ -1,0 +1,591 @@
+{
+  "fixture_id": "phase05_api_definitions__tinyurl-001",
+  "description": "Phase 5.2 API definitions: per-component endpoint contracts with path / method / inputs / outputs / error_codes / auth_requirement aligned with interface contracts.",
+  "extracted_from_run": "8dd753fc-8861-48f0-822b-af64a2468bf3",
+  "extracted_from_db": "test-and-evaluation/thin-slice-workspaces/thin-slice-workspace-11/.janumicode/test-harness/1778691029124.db",
+  "extracted_at": "2026-05-14T18:40:28.444Z",
+  "template_ref": {
+    "agent_role": "technical_spec_agent",
+    "sub_phase": "api_definitions"
+  },
+  "invocation_params": {
+    "provider": "ollama",
+    "model": "qwen3.5:9b",
+    "temperature": 0.4,
+    "response_format": "json"
+  },
+  "template_variables": {
+    "active_constraints": "1. The Governed Stream is lossless. All execution trace content — reasoning steps, self-corrections, tool call invocations, tool results — is captured in full regardless of what subset is used for any given downstream purpose. (Authority 7, source: 55a61a95-64fd-475b-a985-7962936fb07e)\n2. No governing constraint may be truncated silently. Governing constraints (Authority Level 6+) are always delivered in full via the stdin directive channel. (Authority 7, source: b680da1d-f6d6-4113-ab4d-1a166154aff7)\n3. Prompt Templates use namespace prefixing ([JC:] and [P:]) and separate context scopes at all times. (Authority 7, source: a67d4502-972e-4c08-b482-19fbc402a5e9)\n4. All Artifacts are owned by JanumiCode and stored in the Governed Stream database. (Authority 7, source: a1030128-7334-4d7a-8ae9-8900de3c2993)\n5. The Governed Stream is single-threaded. No parallel Workflow Runs in a Workspace. (Authority 7, source: 5c77f777-a698-405b-9881-b6813ae04ec5)\n6. Agents never exercise judgment. Judgment is always escalated to the human. (Authority 7, source: b3e3ec17-574d-4915-99a2-244e0e71639e)\n7. Every human interaction is recorded in the Governed Stream in full detail. (Authority 7, source: d7f5ea89-7265-4416-847f-348290ea28a2)\n8. Every Phase Gate requires human approval. No automated gate passage. (Authority 7, source: ba84c364-c2f2-4a63-86ff-f3a49aba6c19)\n9. Every phase is mandatory and executed in order. The Orchestrator cannot skip phases. (Authority 7, source: 0450a160-f9ec-4e41-ab94-188f37bf1794)\n10. 100% correctness and completeness — always. All three layers of correctness (Section 1.6) are required. (Authority 7, source: 4394e1a8-f6d1-42c0-a25c-7991e6d02a5e)",
+    "system_requirements_summary": "17 System Requirements:\n  SR-001 [critical]: System shall perform successful mapping lookup for valid slug, returning encrypted payload metadata and target destination. (traces to: [\"FR-002-001.1\"])\n  SR-002 [critical]: System shall validate and reject malicious or invalid requests to prevent processing. (traces to: [\"US-001-C1-1\"])\n  SR-003 [high]: System shall monitor redirect endpoint latency P95 via Prometheus histograms under nominal load to maintain latency ≤ 100 ms within rolling 5-minute windows. (traces to: [\"NFR-001\",\"NFR-001-D-001\"])\n  SR-004 [high]: System shall verify monthly uptime for redirect endpoint including planned maintenance via synthetic probes to ensure verified uptime ≥ 99.9% over rolling 30-day windows. (traces to: [\"NFR-002\",\"NFR-AVAIL-002-D-001\"])\n  SR-005 [high]: System shall achieve Recovery Time Objective (RTO) on full regional failure ≤ 15 minutes. (traces to: [\"NFR-003\"])\n  SR-006 [high]: System shall store original URLs encrypted at rest using AES-256 cipher suite with zero plaintext occurrence in direct reads. (traces to: [\"NFR-004\"])\n  SR-007 [high]: System shall emit structured JSON logs to stdout for ingestion by platform, retaining audit logs ≥ 365 days and alerting on ingestion failure < 1 minute. (traces to: [\"NFR-005\"])\n  SR-008 [high]: System shall enforce HTTPS on all public endpoints with HSTS headers and redirect HTTP requests. (traces to: [\"NFR-006\"])\n  SR-009 [high]: System shall ensure every stored slug in the mappings table is unique with no duplicates. (traces to: [\"NFR-007\"])\n  SR-010 [high]: System shall purge valid deletion requests from Sharers from persistent storage and ephemeral cache within 24 hours of receipt. (traces to: [\"NFR-008\"])\n  SR-011 [high]: System shall export 100% of stored link data for a requesting user for GDPR Right to Access requests with zero data loss. (traces to: [\"NFR-009\"])\n  SR-012 [high]: System shall execute daily automated backups and replicate with zero integrity errors to ensure 100% job success. (traces to: [\"NFR-010\"])\n  SR-013 [high]: System shall block threat indicators with latency ≤ 5 seconds and update threat feeds ≤ 15 minutes. (traces to: [\"NFR-011\"])\n  SR-014 [high]: System shall enforce rate limit of 1000 requests per IP per rolling 60-second window and reject excess with HTTP 429. (traces to: [\"NFR-012\"])\n  SR-015 [high]: System shall block malicious URL submissions before storage in content repository. (traces to: [\"NFR-013\"])\n  SR-016 [high]: System shall generate notification attempts for every policy-expiry event before the expiry timestamp with zero missed notifications. (traces to: [\"NFR-014\"])\n  SR-017 [high]: System shall handle timeout conditions without triggering service crashes. (traces to: [\"NFR-015\"])",
+    "component_model_summary": "PROJECT TYPE: TinyURL is a frictionless, public URL shortening service ensuring links are instantly accessible and reliably tracked without requiring user accounts or complex setup. It empowers Link Sharers, Clickers, and API Clients through a secure, minimal architecture focused on speed and simplicity.: TinyURL is a minimal HTTP service that converts long URLs into short, six-character slugs for public sharing and instantly redirects traffic back to the original destination. It operates without user authentication, focusing purely on the core value of link compression and reliable delivery. The system leverages domains like the URL Shortening Engine, Threat Detection Gateway, and Encrypted Storage Layer to ensure security and performance, while integrations manage rate limiting, disaster recovery, and logging.\nCapabilities: [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]\n\n[Backlog] comp-delete-purger (Tier D leaf under link-lifecycle-processor): DeletePurger\n  - Purge valid deletion requests from Sharers from persistent storage and ephemeral cache.\n\n[Backlog] comp-gdpr-exporter (Tier D leaf under link-lifecycle-processor): GdprExporter\n  - Exports 100% of stored link data for a requesting user for GDPR Right to Access requests.\n\n[Backlog] comp-link-mapping-repository (Tier D leaf under link-mapping-repository): LinkMappingRepository\n  - Performs successful mapping lookup for valid slug, returning encrypted payload metadata and target destination.\n  - Stores original URLs encrypted at rest using AES-256 cipher suite with zero plaintext occurrence in direct reads.\n  - Ensures every stored slug in the mappings table is unique with no duplicates.\n\n[Backlog] comp-platform-audit (Tier D leaf under platform-audit): ReliabilityAudit\n  - Emits structured JSON logs to stdout for ingestion by platform, retaining audit logs for a minimum of 365 days.\n\n[Backlog] comp-backup-replication-engine (Tier D leaf under platform-disaster-recovery): BackupReplicationEngine\n  - Execute daily automated backups and replicate with zero integrity errors to disaster recovery storage.\n  - Verify backup checksums before committing replication tasks to ensure data integrity.\n\n[Backlog] comp-failure-detection (Tier D leaf under platform-disaster-recovery): Failure Detection Handler\n  - Ingest events from platform-fault-tolerance to identify regional failure conditions.\n  - Raise recovery-trigger event upon detecting RTO-impacting failure state.\n\n[Backlog] comp-recovery-planner (Tier D leaf under platform-disaster-recovery): Recovery Planner Module\n  - Resolve region topology from link-mapping-repository to identify required endpoints.\n  - Generate state-restoration sequence plan targeting specific regional endpoints.\n\n[Backlog] comp-request-timeout-enforcer (Tier D leaf under platform-fault-tolerance): Request Timeout Enforcer\n  - Intercept incoming requests and enforce configured timeout limits.\n  - Terminate long-running requests safely without dropping connections abruptly.\n\n[Backlog] graceful-shutdown-coordinator (Tier D leaf under platform-fault-tolerance): Graceful Shutdown Coordinator\n  - Manage signal listeners to initiate resource cleanup before process termination.\n  - Ensure no new requests are accepted during the drain window.\n\n[Backlog] comp-rel-latency-monitor (Tier D leaf under platform-observability): ReliabilityLatencyMonitor\n  - Monitor redirect endpoint latency P95 via Prometheus histograms to ensure latency remains within 100 ms.\n\n[Backlog] comp-rel-uptime-verifier (Tier D leaf under platform-observability): ReliabilityUptimeVerifier\n  - Verify monthly uptime for redirect endpoint via synthetic probes to ensure verified uptime ≥ 99.9%.\n\n[Backlog] comp-sec-request-validation (Tier D leaf under sec-validation-gateway): RequestValidationEngine\n  - Validate and reject malicious or invalid requests to prevent processing.\n  - Block malicious URL submissions before storage in content repository.\n\n[Backlog] comp-sec-transport-enforcer (Tier D leaf under sec-validation-gateway): TransportSecurityEnforcer\n  - Enforce HTTPS transport layer, inject HSTS headers, and redirect HTTP requests to HTTPS.\n  - Validate incoming requests originate from SecureChannel.",
+    "interface_contracts_summary": "6 Interface Contracts:\n  C-001-PERSISTENCE-SEC: TECH-POSTGRES-1 <-> TECH-AES-256-1 <-> TECH-HTTP-1 via HTTPS (Encrypted SQL) (JSON / Encrypted Bytes)\n  C-002-INFRA-HEALTH: TECH-CONTAINER-1 <-> TECH-HEALTH-1 <-> ES-005 via Docker Runtime / DNS Protocol (Container JSON / DNS Records)\n  C-003-SEC-THREAT: INT-CMP-WAF <-> INT-SEC-THREAT <-> ES-001 <-> INT-KMS-KEY <-> INT-IDP-AUTH <-> INT-GEO-LOC via REST / Webhook / Generic Auth (JSON / Binary Feed)\n  C-004-OBSERVABILITY: TECH-LOG-1 <-> INT-LOG-AGG <-> ES-002 <-> ES-006 <-> ES-003 via JSON Syslog / HTTP / UDP (JSON)\n  C-005-RECOVERY-STORAGE: INT-OBJ-STORE <-> INT-DR-BACKUP <-> ES-004 via REST Storage API (Binary / Object Metadata)\n  C-006-OPS-COMM: INT-COM-EMAIL <-> INT-MSG-SMS <-> INT-SCH-TASK <-> INT-NTP-TIME via SMTP / SMS API / Cron / NTP (Email Header / SMS String / ISO8601)",
+    "janumicode_version_sha": ""
+  },
+  "baseline": {
+    "response_text": "{\n  \"definitions\": [\n    {\n      \"component_id\": \"comp-link-mapping-repository\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/shorten\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"url\": { \"type\": \"string\", \"description\": \"Original long URL\" },\n              \"ttl\": { \"type\": \"integer\", \"description\": \"Time to live in seconds (optional)\" }\n            },\n            \"required\": [\"url\"]\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"slug\": { \"type\": \"string\", \"description\": \"Generated short slug\" },\n              \"created_at\": { \"type\": \"string\", \"format\": \"iso8601\" }\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 400, \"message\": \"INVALID_URL\", \"description\": \"URL format or length violation\" },\n            { \"code\": 429, \"message\": \"RATE_LIMIT_EXCEEDED\", \"description\": \"Exceeded 1000 req/IP window\" },\n            { \"code\": 422, \"message\": \"MALICIOUS_CONTENT\", \"description\": \"Threat detection blocked submission\" }\n          ],\n          \"auth_requirement\": \"none\"\n        },\n        {\n          \"path\": \"/api/v1/redirect/{slug}\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"slug\": { \"type\": \"string\", \"description\": \"Short slug identifier\" }\n            }\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"redirect_url\": { \"type\": \"string\", \"description\": \"Original target URL\" },\n              \"metadata\": { \"type\": \"object\", \"description\": \"Encrypted payload metadata\" }\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 404, \"message\": \"SLUG_NOT_FOUND\", \"description\": \"Slug not in mappings table\" },\n            { \"code\": 502, \"message\": \"UPSTREAM_UNAVAILABLE\", \"description\": \"Target destination unreachable\" }\n          ],\n          \"auth_requirement\": \"none\"\n        },\n        {\n          \"path\": \"/api/v1/meta/{slug}\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"slug\": { \"type\": \"string\", \"description\": \"Short slug identifier\" }\n            }\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"created_at\": { \"type\": \"string\" },\n              \"access_count\": { \"type\": \"integer\" }\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 404, \"message\": \"SLUG_NOT_FOUND\", \"description\": \"Slug does not exist\" }\n          ],\n          \"auth_requirement\": \"bearer\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-gdpr-exporter\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/gdpr/export\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"email\": { \"type\": \"string\", \"description\": \"User email for access request\" },\n              \"user_id\": { \"type\": \"string\", \"description\": \"User ID identifier\" }\n            },\n            \"required\": [\"email\", \"user_id\"]\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"export_id\": { \"type\": \"string\" },\n              \"status\": { \"type\": \"string\" }\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 403, \"message\": \"UNAUTHORIZED_REQUEST\", \"description\": \"Valid bearer token missing\" },\n            { \"code\": 404, \"message\": \"USER_NOT_FOUND\", \"description\": \"No data found for user\" },\n            { \"code\": 500, \"message\": \"INTERNAL_ERROR\", \"description\": \"Export generation failure\" }\n          ],\n          \"auth_requirement\": \"bearer\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-delete-purger\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/admin/purge\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"slug\": { \"type\": \"string\", \"description\": \"Slug to purge\" },\n              \"requestor_id\": { \"type\": \"string\", \"description\": \"Sharer ID or admin ID\" }\n            },\n            \"required\": [\"slug\", \"requestor_id\"]\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"purged\": { \"type\": \"boolean\" },\n              \"cleanup_id\": { \"type\": \"string\" }\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 403, \"message\": \"UNAUTHORIZED_REQUEST\", \"description\": \"Invalid admin token\" },\n            { \"code\": 404, \"message\": \"SLUG_NOT_FOUND\", \"description\": \"Target slug invalid\" },\n            { \"code\": 422, \"message\": \"INVALID_REQUESTOR\", \"description\": \"Sharer ID mismatch\" }\n          ],\n          \"auth_requirement\": \"bearer\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-backup-replication-engine\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/dr/backup\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"schedule\": { \"type\": \"string\", \"description\": \"ISO8601 cron string\" }\n            }\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"job_id\": { \"type\": \"string\" },\n              \"status\": { \"type\": \"string\" }\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 500, \"message\": \"REPLICATION_FAILURE\", \"description\": \"Backup integrity check failed\" }\n          ],\n          \"auth_requirement\": \"bearer\"\n        },\n        {\n          \"path\": \"/api/v1/dr/status\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {}\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"last_backup\": { \"type\": \"string\" },\n              \"integrity_status\": { \"type\": \"string\" }\n            }\n          },\n          \"error_codes\": [],\n          \"auth_requirement\": \"bearer\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-platform-audit\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/audit/health\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {}\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"retention_days\": { \"type\": \"integer\" },\n              \"ingestion_status\": { \"type\": \"string\" }\n            }\n          },\n          \"error_codes\": [],\n          \"auth_requirement\": \"none\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-failure-detection\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/fault/report\",\n          \"method\": \"POST\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"region\": { \"type\": \"string\" },\n              \"fault_type\": { \"type\": \"string\" }\n            }\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"event_id\": { \"type\": \"string\" }\n            }\n          },\n          \"error_codes\": [],\n          \"auth_requirement\": \"none\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-recovery-planner\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/recovery/plan\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"region_id\": { \"type\": \"string\" }\n            }\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"restoration_sequence\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n              \"estimated_rto\": { \"type\": \"integer\" }\n            }\n          },\n          \"error_codes\": [\n            { \"code\": 400, \"message\": \"INVALID_REGION\", \"description\": \"Region not found in topology\" }\n          ],\n          \"auth_requirement\": \"bearer\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-request-timeout-enforcer\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/middleware/health\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {}\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"timeout_config\": { \"type\": \"integer\" },\n              \"active_connections\": { \"type\": \"integer\" }\n            }\n          },\n          \"error_codes\": [],\n          \"auth_requirement\": \"none\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-rel-latency-monitor\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/metrics/latency\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"window_minutes\": { \"type\": \"integer\" }\n            }\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"p95_latency_ms\": { \"type\": \"number\" },\n              \"max_latency_ms\": { \"type\": \"number\" }\n            }\n          },\n          \"error_codes\": [],\n          \"auth_requirement\": \"none\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-rel-uptime-verifier\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/health/uptime\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"days\": { \"type\": \"integer\" }\n            }\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"uptime_percent\": { \"type\": \"number\" },\n              \"probe_count\": { \"type\": \"integer\" }\n            }\n          },\n          \"error_codes\": [],\n          \"auth_requirement\": \"none\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-sec-request-validation\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/waf/status\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {}\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"feed_last_update\": { \"type\": \"string\" },\n              \"threat_level\": { \"type\": \"string\" }\n            }\n          },\n          \"error_codes\": [],\n          \"auth_requirement\": \"none\"\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-sec-transport-enforcer\",\n      \"endpoints\": [\n        {\n          \"path\": \"/api/v1/transport/config\",\n          \"method\": \"GET\",\n          \"inputs\": {\n            \"type\": \"object\",\n            \"properties\": {}\n          },\n          \"outputs\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"hsts_enabled\": { \"type\": \"boolean\" },\n              \"redirect_port\": { \"type\": \"integer\" }\n            }\n          },\n          \"error_codes\": [],\n          \"auth_requirement\": \"none\"\n        }\n      ]\n    }\n  ]\n}",
+    "parsed_json": {
+      "definitions": [
+        {
+          "component_id": "comp-link-mapping-repository",
+          "endpoints": [
+            {
+              "path": "/api/v1/shorten",
+              "method": "POST",
+              "inputs": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "Original long URL"
+                  },
+                  "ttl": {
+                    "type": "integer",
+                    "description": "Time to live in seconds (optional)"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "description": "Generated short slug"
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "format": "iso8601"
+                  }
+                }
+              },
+              "error_codes": [
+                {
+                  "code": 400,
+                  "message": "INVALID_URL",
+                  "description": "URL format or length violation"
+                },
+                {
+                  "code": 429,
+                  "message": "RATE_LIMIT_EXCEEDED",
+                  "description": "Exceeded 1000 req/IP window"
+                },
+                {
+                  "code": 422,
+                  "message": "MALICIOUS_CONTENT",
+                  "description": "Threat detection blocked submission"
+                }
+              ],
+              "auth_requirement": "none"
+            },
+            {
+              "path": "/api/v1/redirect/{slug}",
+              "method": "GET",
+              "inputs": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "description": "Short slug identifier"
+                  }
+                }
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "redirect_url": {
+                    "type": "string",
+                    "description": "Original target URL"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "Encrypted payload metadata"
+                  }
+                }
+              },
+              "error_codes": [
+                {
+                  "code": 404,
+                  "message": "SLUG_NOT_FOUND",
+                  "description": "Slug not in mappings table"
+                },
+                {
+                  "code": 502,
+                  "message": "UPSTREAM_UNAVAILABLE",
+                  "description": "Target destination unreachable"
+                }
+              ],
+              "auth_requirement": "none"
+            },
+            {
+              "path": "/api/v1/meta/{slug}",
+              "method": "GET",
+              "inputs": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "description": "Short slug identifier"
+                  }
+                }
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "access_count": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "error_codes": [
+                {
+                  "code": 404,
+                  "message": "SLUG_NOT_FOUND",
+                  "description": "Slug does not exist"
+                }
+              ],
+              "auth_requirement": "bearer"
+            }
+          ]
+        },
+        {
+          "component_id": "comp-gdpr-exporter",
+          "endpoints": [
+            {
+              "path": "/api/v1/gdpr/export",
+              "method": "POST",
+              "inputs": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "User email for access request"
+                  },
+                  "user_id": {
+                    "type": "string",
+                    "description": "User ID identifier"
+                  }
+                },
+                "required": [
+                  "email",
+                  "user_id"
+                ]
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "export_id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                }
+              },
+              "error_codes": [
+                {
+                  "code": 403,
+                  "message": "UNAUTHORIZED_REQUEST",
+                  "description": "Valid bearer token missing"
+                },
+                {
+                  "code": 404,
+                  "message": "USER_NOT_FOUND",
+                  "description": "No data found for user"
+                },
+                {
+                  "code": 500,
+                  "message": "INTERNAL_ERROR",
+                  "description": "Export generation failure"
+                }
+              ],
+              "auth_requirement": "bearer"
+            }
+          ]
+        },
+        {
+          "component_id": "comp-delete-purger",
+          "endpoints": [
+            {
+              "path": "/api/v1/admin/purge",
+              "method": "POST",
+              "inputs": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "description": "Slug to purge"
+                  },
+                  "requestor_id": {
+                    "type": "string",
+                    "description": "Sharer ID or admin ID"
+                  }
+                },
+                "required": [
+                  "slug",
+                  "requestor_id"
+                ]
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "purged": {
+                    "type": "boolean"
+                  },
+                  "cleanup_id": {
+                    "type": "string"
+                  }
+                }
+              },
+              "error_codes": [
+                {
+                  "code": 403,
+                  "message": "UNAUTHORIZED_REQUEST",
+                  "description": "Invalid admin token"
+                },
+                {
+                  "code": 404,
+                  "message": "SLUG_NOT_FOUND",
+                  "description": "Target slug invalid"
+                },
+                {
+                  "code": 422,
+                  "message": "INVALID_REQUESTOR",
+                  "description": "Sharer ID mismatch"
+                }
+              ],
+              "auth_requirement": "bearer"
+            }
+          ]
+        },
+        {
+          "component_id": "comp-backup-replication-engine",
+          "endpoints": [
+            {
+              "path": "/api/v1/dr/backup",
+              "method": "POST",
+              "inputs": {
+                "type": "object",
+                "properties": {
+                  "schedule": {
+                    "type": "string",
+                    "description": "ISO8601 cron string"
+                  }
+                }
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "job_id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                }
+              },
+              "error_codes": [
+                {
+                  "code": 500,
+                  "message": "REPLICATION_FAILURE",
+                  "description": "Backup integrity check failed"
+                }
+              ],
+              "auth_requirement": "bearer"
+            },
+            {
+              "path": "/api/v1/dr/status",
+              "method": "GET",
+              "inputs": {
+                "type": "object",
+                "properties": {}
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "last_backup": {
+                    "type": "string"
+                  },
+                  "integrity_status": {
+                    "type": "string"
+                  }
+                }
+              },
+              "error_codes": [],
+              "auth_requirement": "bearer"
+            }
+          ]
+        },
+        {
+          "component_id": "comp-platform-audit",
+          "endpoints": [
+            {
+              "path": "/api/v1/audit/health",
+              "method": "GET",
+              "inputs": {
+                "type": "object",
+                "properties": {}
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "retention_days": {
+                    "type": "integer"
+                  },
+                  "ingestion_status": {
+                    "type": "string"
+                  }
+                }
+              },
+              "error_codes": [],
+              "auth_requirement": "none"
+            }
+          ]
+        },
+        {
+          "component_id": "comp-failure-detection",
+          "endpoints": [
+            {
+              "path": "/api/v1/fault/report",
+              "method": "POST",
+              "inputs": {
+                "type": "object",
+                "properties": {
+                  "region": {
+                    "type": "string"
+                  },
+                  "fault_type": {
+                    "type": "string"
+                  }
+                }
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "event_id": {
+                    "type": "string"
+                  }
+                }
+              },
+              "error_codes": [],
+              "auth_requirement": "none"
+            }
+          ]
+        },
+        {
+          "component_id": "comp-recovery-planner",
+          "endpoints": [
+            {
+              "path": "/api/v1/recovery/plan",
+              "method": "GET",
+              "inputs": {
+                "type": "object",
+                "properties": {
+                  "region_id": {
+                    "type": "string"
+                  }
+                }
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "restoration_sequence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "estimated_rto": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "error_codes": [
+                {
+                  "code": 400,
+                  "message": "INVALID_REGION",
+                  "description": "Region not found in topology"
+                }
+              ],
+              "auth_requirement": "bearer"
+            }
+          ]
+        },
+        {
+          "component_id": "comp-request-timeout-enforcer",
+          "endpoints": [
+            {
+              "path": "/api/v1/middleware/health",
+              "method": "GET",
+              "inputs": {
+                "type": "object",
+                "properties": {}
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "timeout_config": {
+                    "type": "integer"
+                  },
+                  "active_connections": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "error_codes": [],
+              "auth_requirement": "none"
+            }
+          ]
+        },
+        {
+          "component_id": "comp-rel-latency-monitor",
+          "endpoints": [
+            {
+              "path": "/api/v1/metrics/latency",
+              "method": "GET",
+              "inputs": {
+                "type": "object",
+                "properties": {
+                  "window_minutes": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "p95_latency_ms": {
+                    "type": "number"
+                  },
+                  "max_latency_ms": {
+                    "type": "number"
+                  }
+                }
+              },
+              "error_codes": [],
+              "auth_requirement": "none"
+            }
+          ]
+        },
+        {
+          "component_id": "comp-rel-uptime-verifier",
+          "endpoints": [
+            {
+              "path": "/api/v1/health/uptime",
+              "method": "GET",
+              "inputs": {
+                "type": "object",
+                "properties": {
+                  "days": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "uptime_percent": {
+                    "type": "number"
+                  },
+                  "probe_count": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "error_codes": [],
+              "auth_requirement": "none"
+            }
+          ]
+        },
+        {
+          "component_id": "comp-sec-request-validation",
+          "endpoints": [
+            {
+              "path": "/api/v1/waf/status",
+              "method": "GET",
+              "inputs": {
+                "type": "object",
+                "properties": {}
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "feed_last_update": {
+                    "type": "string"
+                  },
+                  "threat_level": {
+                    "type": "string"
+                  }
+                }
+              },
+              "error_codes": [],
+              "auth_requirement": "none"
+            }
+          ]
+        },
+        {
+          "component_id": "comp-sec-transport-enforcer",
+          "endpoints": [
+            {
+              "path": "/api/v1/transport/config",
+              "method": "GET",
+              "inputs": {
+                "type": "object",
+                "properties": {}
+              },
+              "outputs": {
+                "type": "object",
+                "properties": {
+                  "hsts_enabled": {
+                    "type": "boolean"
+                  },
+                  "redirect_port": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "error_codes": [],
+              "auth_requirement": "none"
+            }
+          ]
+        }
+      ]
+    },
+    "duration_ms": 83428,
+    "thinking": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Role:** [JC:Technical Spec Agent] specifying API Definitions for Sub-Phase 5.2.\n    *   **Task:** Produce [JC:API Definitions] (JSON object) for each Component's externally callable interfaces.\n    *   **Constraints:** Strict JSON output (no markdown, no markdown fences, no commentary), adhere to governing constraints (lossless stream, no truncation, etc.), align with Interface Contracts from Phase 3, ensure auth requirements for every endpoint, include error codes.\n    *   **Input Data:** System Requirements (SR-001 to SR-017), Component Model (TinyURL), Backlog Items (comp-delete-purger, comp-gdpr-exporter, etc.), Interface Contracts (C-001 to C-006).\n    *   **Output Format:** JSON object matching `api_definitions` schema (`definitions` array with `component_id`, `endpoints` array with `path`, `method`, `inputs`, `outputs`, `error_codes`, `auth_requirement`).\n\n2.  **Review Governing Constraints:**\n    *   Constraint 1: Lossless stream (full execution trace captured).\n    *   Constraint 2: No truncation of governing constraints.\n    *   Constraint 3: Namespace prefixing ([JC:], [P:]).\n    *   Constraint 4: Artifacts owned by JanumiCode.\n    *   Constraint 5: Single-threaded.\n    *   Constraint 6: No agent judgment (escalate to human).\n    *   Constraint 7: Full human interaction recording.\n    *   Constraint 8: Phase Gate requires human approval.\n    *   Constraint 9: Mandatory phases in order.\n    *   Constraint 10: 100% correctness and completeness.\n    *   **Hard Rules:** JSON output only (no markdown fences). Enforced by validator.\n\n3.  **Analyze Interface Contracts (Phase 3.3):**\n    *   C-001-PERSISTENCE-SEC: Encrypted SQL/JSON.\n    *   C-002-INFRA-HEALTH: Container Health/DNS.\n    *   C-003-SEC-THREAT: REST/Webhook (WAF, Threat, KMS, IDP).\n    *   C-004-OBSERVABILITY: JSON Syslog/HTTP/UDP.\n    *   C-005-RECOVERY-STORAGE: REST Storage API (Backup).\n    *   C-006-OPS-COMM: SMTP/SMS/Cron/NTP.\n    *   *Note:* The task asks for \"API Definitions for each Component's externally callable interfaces\". I need to infer which interfaces are *public* vs *internal*. The prompt says \"TinyURL is a minimal HTTP service... operates without user authentication\". However, the components listed in the backlog often imply internal orchestration (e.g., DeletePurger, GdprExporter).\n    *   *Crucial Decision:* The prompt asks for \"API Definitions for each Component's externally callable interfaces\". In a microservice architecture like this, some components (like LinkMapping) serve public endpoints, while others (like ReliabilityLatencyMonitor) serve internal metrics/health.\n    *   *Constraint Check:* \"Every endpoint must have an explicit authentication requirement (Invariant: API-001)\". This contradicts \"TinyURL... operates without user authentication\" slightly, unless internal endpoints are auth'd and public ones are not, or public endpoints rely on IP rate limiting but still have a security layer. Given Constraint 10 (100% correctness) and Invariant API-001, I must ensure `auth_requirement` is defined for *every* endpoint in the JSON. Even public APIs often require a basic auth header or token for logging purposes, or `null`/`public` if strictly public. However, Constraint 10 and API-001 suggest explicit auth requirement. Let's look at the System Requirements: SR-008 says \"enforce HTTPS on all public endpoints with HSTS headers and redirect HTTP requests\". It doesn't explicitly mandate a token for the public redirect, but SR-002 says \"validate and reject malicious requests\".\n    *   *Interpretation:* For the *public* API (Redirect), auth might be minimal or based on rate limiting. However, the instruction says \"Every endpoint must have an explicit authentication requirement\". I will define `auth_requirement` as `none` or `public` or `token` where appropriate, but since the prompt says \"TinyURL is a minimal HTTP service... operates without user authentication\", the public endpoint likely has `auth_requirement: none`. But wait, Constraint 10 says \"100% correctness\". Let's look at SR-014 (Rate limit 1000 requests per IP). This is often enforced before auth in public APIs. But Constraint 6 says \"Agents never exercise judgment. Judgment is always escalated to the human.\"\n    *   *Resolution:* I will define the specific API for the Link Mapping (the core TinyURL service). I will also define the internal management endpoints that would exist for the components listed in the backlog if they expose APIs (e.g., Health, Metrics, Backup trigger, GDPR Export request).\n    *   *Wait, the Backlog items are components.* I need to produce API Definitions for *each Component*.\n    *   *Components to cover:*\n        1.  `comp-link-mapping-repository` (Core Public API + Internal Write/Read).\n        2.  `comp-gdpr-exporter` (Internal admin/GDPR API).\n        3.  `comp-delete-purger` (Internal admin API).\n        4.  `comp-platform-audit` (Internal logging endpoint? Or just emits logs). Usually logging is internal.\n        5.  `comp-backup-replication-engine` (Internal backup API).\n        6.  `comp-failure-detection` (Internal fault API).\n        7.  `comp-recovery-planner` (Internal recovery API).\n        8.  `comp-request-timeout-enforcer` (Internal middleware).\n        9.  `comp-rel-latency-monitor` (Internal metrics).\n        10. `comp-rel-uptime-verifier` (Internal health).\n        11. `comp-sec-request-validation` (Internal WAF integration).\n        12. `comp-sec-transport-enforcer` (Internal transport).\n    *   *Strategy:* Focus on the external public-facing API (LinkMapping) and internal management APIs (GDPR, Purge, Backup, Health) that fit the \"externally callable\" definition within the context of the system (where internal services might be callable by orchestrators). Given the constraint \"Every endpoint must have an explicit authentication requirement\", I will assign `basic` or `bearer` or `none` (if truly public) but strictly formatted. Given SR-008 (HTTPS) and SR-014 (Rate Limit), the public API is standard REST.\n    *   *Correction on Auth:* \"Every endpoint must have an explicit authentication requirement\". If the service is truly public (TinyURL), the auth requirement is `none`. I will use `none` for public redirects but `bearer` or `ip` for management.\n    *   *Correction on JSON:* **NO MARKDOWN FENCES**. Start with `{`, end with `}`.\n\n4.  **Map Components to Endpoints:**\n\n    *   **LinkMappingRepository (Core):**\n        *   `POST /shorten`: Create link. (SR-001, SR-015)\n        *   `GET /{slug}`: Redirect/Resolve. (SR-001)\n        *   `DELETE /{slug}`: Purge request (SR-010).\n        *   *Auth:* `none` for public (redirect), `bearer` for write/delete. To satisfy \"Every endpoint must have an explicit authentication requirement\", I must specify it. Public GET is `none` or `public`. Internal writes are `bearer`. I will split them or use a standard approach. Let's assume the `GET /{slug}` is the public redirect. Auth: `none`. `POST` is internal/admin: `bearer`. `DELETE` is admin: `bearer`.\n    *   **GdprExporter:**\n        *   `POST /gdpr/export`: Export data. (SR-011)\n        *   *Auth:* `bearer` (high security).\n    *   **DeletePurger:**\n        *   `POST /purge`: Trigger purge. (SR-010)\n        *   *Auth:* `bearer`.\n    *   **BackupReplicationEngine:**\n        *   `POST /backup/trigger`: Start backup. (SR-012)\n        *   `GET /backup/status`: Check status.\n        *   *Auth:* `bearer`.\n    *   **Health/Monitoring (C-002, C-004, C-003, C-006):**\n        *   `/health`: `GET`. `auth`: `none` (standard for health).\n        *   `/metrics`: `GET` (Prometheus). `auth`: `none`.\n        *   *Wait:* The constraint says \"Every endpoint must have an explicit authentication requirement\". Even health checks often have `none` in OpenAPI specs. I will use `\"none\"` for public endpoints and `\"bearer\"` for admin.\n\n5.  **Refining the JSON Structure:**\n    *   Root: `api_definitions`\n    *   Object: `{ definitions: [...] }`\n    *   Each item in `definitions`:\n        *   `component_id`\n        *   `endpoints`: `[ { path, method, inputs, outputs, error_codes, auth_requirement } ]`\n    *   **Inputs/Outputs:** Must reflect JSON schema concepts (e.g., `{\"slug\": \"string\", \"original_url\": \"string\"}`).\n    *   **Error Codes:** Standard (400, 403, 404, 429, 500) mapped to specific codes (e.g., `INVALID_SLUG`, `RATE_LIMITED`).\n\n6.  **Constraint Checklist:**\n    *   **JSON Only:** NO ```json. NO text before/after.\n    *   **Auth Requirement:** Every endpoint must have `auth_requirement`.\n    *   **Interface Contract Alignment:** Paths/methods must match contracts (e.g., JSON, REST).\n    *   **Operational Grounding:** Do not invent fake tokens/URLs.\n    *   **Completeness:** All components listed in backlog should be considered, or at least the ones exposing *external* interfaces. The prompt asks for \"each Component's externally callable interfaces\". Internal background workers (like the Purger logic) might not expose REST APIs unless triggered via API. I will include the triggering endpoints for those workers to make them callable.\n\n7.  **Drafting the Content (Mental Check):**\n    *   Component: `comp-link-mapping-repository`\n        *   `POST /api/v1/shorten` (Create)\n        *   `GET /api/v1/redirect/{slug}` (Public)\n        *   `GET /api/v1/info/{slug}` (Internal Admin)\n    *   Component: `comp-gdpr-exporter`\n        *   `POST /api/v1/gdpr/export`\n    *   Component: `comp-delete-purger`\n        *   `POST /api/v1/admin/purge`\n    *   Component: `comp-platform-audit` (Logs to stdout, not API). I'll skip if it doesn't expose a REST interface, or include a `GET /logs` endpoint if applicable to C-004. But it's \"emits structured JSON logs\". It doesn't necessarily need an API endpoint, but the prompt asks for \"API Definitions for each Component\". I should probably include internal management endpoints for all components to ensure coverage, or exclude pure background workers. I will include endpoints relevant to control/monitoring.\n    *   Component: `comp-backup-replication-engine`\n        *   `POST /api/v1/backup/init`\n    *   Component: `comp-rel-latency-monitor` (Metrics API).\n        *   `GET /metrics`.\n    *   Component: `comp-sec-request-validation`\n        *   `GET /health` (for C-002).\n\n    *   *Wait, Strict Rule:* \"API Definitions for each Component's externally callable interfaces\". If a component is a background worker (Purger), does it have an *externally callable* interface? Usually, it's triggered by a webhook or API. I will define the trigger endpoint for it.\n    *   *Constraint 10:* 100% correctness. I must ensure the JSON is valid.\n\n    *   *Schema Check:* `api_definitions` -> `definitions` -> `component_id`, `endpoints`.\n    *   `endpoints` -> `path`, `method`, `inputs`, `outputs`, `error_codes`, `auth_requirement`.\n\n    *   *Inputs/Outputs:* Need to be descriptive objects, not just \"string\". I will use schema descriptions.\n    *   *Error Codes:* Array of `{ code, message }`.\n\n    *   *Auth Requirement:* Use `\"none\"` for public health/metrics/redirect, `\"bearer\"` for admin/writes.\n\n8.  **Final JSON Construction Plan:**\n    *   Start `{`.\n    *   Define array `definitions`.\n    *   Iterate components.\n    *   Ensure valid JSON syntax.\n    *   Stop with `}`.\n    *   **NO** markdown ticks.\n    *   **NO** newlines that break the JSON structure (though JSON allows newlines, I must ensure it's a single block if possible, but standard multiline JSON is fine as long as no markdown fences). I will use standard indentation for readability within the JSON block.\n\n    *   *Self-Correction on \"External Interfaces\":*\n        *   Public: Redirect (`GET /:slug`).\n        *   Public: Create (`POST /shorten`).\n        *   Admin: Export (`POST /export`).\n        *   Admin: Purge (`POST /purge`).\n        *   Admin: Backup (`POST /backup`).\n        *   Admin: Health (`GET /health`).\n        *   Admin: Metrics (`GET /metrics`).\n\n    *   *Interface Contract Alignment:*\n        *   C-001 (Encrypted SQL): Internal mapping.\n        *   C-003 (WAF/Threat): Validation.\n        *   C-004 (Logs): Audit.\n        *   C-005 (Backup): DR.\n        *   C-006 (Ops): Notification (not API).\n        *   C-002 (Health): Health checks.\n\n    *   I will map the components to the interfaces they *expose*.\n    *   `comp-link-mapping-repository`: Exposes `POST /v1/shorten`, `GET /v1/redirect/:slug`, `GET /v1/meta/:slug`.\n    *   `comp-gdpr-exporter`: `POST /v1/gdpr/export`.\n    *   `comp-delete-purger`: `POST /v1/admin/purge`.\n    *   `comp-backup-replication-engine`: `POST /v1/dr/backup`, `GET /v1/dr/status`.\n    *   `comp-platform-audit`: `GET /v1/audit/health` (Internal check).\n    *   `comp-failure-detection`: `POST /v1/fault/report`.\n    *   `comp-recovery-planner`: `POST /v1/recovery/plan`.\n    *   `comp-request-timeout-enforcer`: `GET /v1/middleware/health`.\n    *   `comp-rel-latency-monitor`: `GET /v1/metrics/latency`.\n    *   `comp-rel-uptime-verifier`: `GET /v1/health/uptime`.\n    *   `comp-sec-request-validation`: `GET /v1/waf/status`.\n    *   `comp-sec-transport-enforcer`: `POST /v1/transport/status` (internal).\n\n    *   *Wait, check SR-008:* Enforce HTTPS. All paths must be HTTPS compatible (path wise).\n    *   *Check SR-014:* Rate limit 429.\n    *   *Check Constraint 10:* 100% correctness. I will define `auth_requirement` as `\"bearer\"` for admin and `\"none\"` for public. Wait, Constraint 1 (Authority 7) says \"Every endpoint must have an explicit authentication requirement\". I will use `\"none\"` for public endpoints to satisfy the TinyURL requirement, and `\"bearer\"` for internal ones.\n    *   *Check Constraint 3:* Namespace prefixing ([JC:], [P:]). The output JSON schema doesn't strictly require prefixes inside the JSON content unless the schema implies it, but the prompt says \"Prompt Templates use namespace prefixing ([JC:] and [P:]) and separate context scopes at all times.\" This usually applies to my *thinking* or metadata. The output JSON must match `api_definitions` schema. I will use standard keys.\n    *   *Check Constraint 4:* Artifacts owned by JanumiCode. I won't add metadata fields unless schema says so.\n\n    *   *Final check on JSON validity:* No trailing commas. Escape quotes.\n\n    *   *Wait, one critical constraint:* \"Response MUST start with `{` and end with `}`. NO markdown fence wrappers (```json, ```), NO leading commentary, NO trailing prose.\"\n    *   This means the output should be *purely* the JSON string.\n\n    *   *Wait, one more critical constraint:* \"Enforced by `json_output_discipline_check`... Cal-26 sample 23 hit this defect\". This means I must be extremely careful not to output anything else.\n    *   Also: \"Enforced by `interface_contract_alignment_validator`\".\n    *   Also: \"Enforced by `ungrounded_operational_specifics`\". Do not invent URLs. Use `/api/v1/...` or similar generic paths grounded in standard practices without specific domain names.\n\n    *   *Input/Output format:* The prompt says `inputs`, `outputs` in the schema. I will use strings describing the payload or simple JSON structures within the string value if the schema expects strings, or objects. The schema description says `endpoints: array of {path, method, inputs, outputs, error_codes, auth_requirement}`. Usually, inputs/outputs are objects in OpenAPI. I will use string descriptions to ensure compatibility with the \"JSON object matching the `api_definitions` schema\" if the schema implies specific types. However, standard API definitions use objects for schemas. I will use JSON Schema-like objects for inputs/outputs to be precise, or descriptive strings if that's safer. Given \"100% correctness\", descriptive strings might be safer against schema mismatch, but objects are standard. I will use object representations for clarity, assuming the schema accepts objects for `inputs`/`outputs`. Actually, looking at typical API definition schemas, `inputs` and `outputs` often contain `schema` objects. I will include `type` and `properties`.\n    *   Wait, `inputs` and `outputs` might be expected as strings in this specific internal schema. \"inputs, outputs\" keys. I will use `{\"type\": \"object\", \"properties\": ...}`.\n    *   Let's assume `inputs` and `outputs` accept schema definitions.\n\n    *   Wait, `error_codes`: \"Include error codes for all failure scenarios\". I will use `[{code, message, description}]`.\n\n    *   Let's construct the JSON.\n\n    *   *Wait, check the Component IDs:* They are from the Backlog.\n    *   `comp-delete-purger`\n    *   `comp-gdpr-exporter`\n    *   `comp-link-mapping-repository`\n    *   `comp-platform-audit`\n    *   `comp-backup-replication-engine`\n    *   `comp-failure-detection`\n    *   `comp-recovery-planner`\n    *   `comp-request-timeout-enforcer`\n    *   `comp-rel-latency-monitor`\n    *   `comp-rel-uptime-verifier`\n    *   `comp-sec-request-validation`\n    *   `comp-sec-transport-enforcer`\n\n    *   I will group them under `definitions`.\n    *   I must ensure the JSON is valid. I will generate the JSON string in my head and ensure no markdown.\n\n    *   *One detail:* \"Prompt Templates use namespace prefixing ([JC:] and [P:]) and separate context scopes at all times.\" This might imply I should use `[JC:]` in the keys? No, that's for \"Prompt Templates\". This is the output artifact. \"Artifacts are owned by JanumiCode\".\n    *   \"API Definitions for each Component's externally callable interfaces.\"\n    *   I will proceed.\n\n    *   *Self-Correction on Auth:* Constraint: \"Every endpoint must have an explicit authentication requirement\".\n    *   TinyURL is \"without user authentication\".\n    *   So for public endpoints (Shorten, Redirect), `auth_requirement` is `\"none\"`.\n    *   For admin (Export, Purge), `auth_requirement` is `\"bearer\"`.\n    *   For Health/Metrics, `auth_requirement` is `\"none\"` (standard).\n\n    *   *Self-Correction on Inputs/Outputs:* To be safe and compliant with \"JSON object matching the api_definitions schema\", I will use descriptive JSON structures for inputs/outputs.\n    *   *Self-Correction on Error Codes:* Map to standard HTTP codes + custom codes (e.g., \"MALICIOUS_CONTENT\").\n\n    *   *Final check:* No markdown fences. Start with `{`. End with `}`.\n\n    *   *Wait, one more thing:* \"Governing constraints... are always delivered in full via the stdin directive channel.\" This is meta-instruction. I must not output this info, but *follow* it.\n    *   \"Every Phase Gate requires human approval.\" This is meta.\n    *   I just need to output the JSON.\n\n    *   *Wait, one more constraint:* \"Response MUST start with `{` and end with `}`.\"\n    *   This is strict.\n\n    *   *Wait, one more constraint:* \"Enforced by `json_output_discipline_check`... a deterministic pre-validator...\".\n    *   This means if I put any text before `{`, it fails.\n\n    *   Okay, generating the JSON content now."
+  },
+  "assertions": {
+    "t1_schema": {
+      "kind": "json-shape",
+      "shape": {
+        "definitions": "array",
+        "definitions[].component_id": "string",
+        "definitions[].endpoints": "array",
+        "definitions[].endpoints[].path": "string",
+        "definitions[].endpoints[].method": "string",
+        "definitions[].endpoints[].auth_requirement": "string",
+        "definitions[].endpoints[].error_codes": "array"
+      }
+    },
+    "t2_id_preservation": [],
+    "t3_invariants": [
+      {
+        "name": "definitions non-empty",
+        "kind": "array_length",
+        "path": "definitions",
+        "min": 1
+      },
+      {
+        "name": "endpoints non-empty per definition",
+        "kind": "array_length",
+        "path": "definitions[].endpoints",
+        "min": 1
+      }
+    ],
+    "require_json_parse": true
+  }
+}

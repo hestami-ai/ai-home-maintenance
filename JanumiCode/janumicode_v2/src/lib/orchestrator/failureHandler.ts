@@ -18,6 +18,7 @@ import { UnstickingAgent, type UnstickingInput, type UnstickingResult } from '..
 import { LLMCaller } from '../llm/llmCaller';
 import { TemplateLoader } from './templateLoader';
 import type { LoopStatus } from '../types/records';
+import type { ConfigManager } from '../config/configManager';
 
 // Types
 
@@ -58,32 +59,34 @@ export interface FailureHandlerConfig {
   maxRetryAttempts: number;
   rollbackEnabled: boolean;
   unstickingEnabled: boolean;
-  unstickingConfig: {
+  /**
+   * Optional override for the unsticking agent's LLM routing. When
+   * absent, FailureHandler reads from `llm_routing.unsticking` on the
+   * supplied ConfigManager. Provided as an explicit override path for
+   * tests; production callers should configure via ConfigManager.
+   */
+  unstickingConfig?: {
     provider: string;
     model: string;
     maxSocraticTurns: number;
   };
 }
 
-// Default provider names must match an LLMProviderAdapter.name. GoogleProvider
-// registers as 'google' (see src/lib/llm/providers/google.ts). Earlier versions
-// used 'gemini' here, which did not match any registered adapter and caused
-// silent failures under test harnesses that happened to bind 'gemini' too.
 const DEFAULT_CONFIG: FailureHandlerConfig = {
   maxRetryAttempts: 3,
   rollbackEnabled: true,
   unstickingEnabled: true,
-  unstickingConfig: {
-    provider: 'google',
-    model: 'gemini-2.5-flash',
-    maxSocraticTurns: 3,
-  },
+  // unstickingConfig intentionally omitted — resolved from ConfigManager
+  // at constructor time so the literal model name lives in one place
+  // (DEFAULT_CONFIG.llm_routing.unsticking in configManager.ts).
 };
 
 // FailureHandler class
 
 export class FailureHandler {
   private readonly unstickingAgent: UnstickingAgent | null;
+  /** Resolved unsticking LLM config — populated when enabled. */
+  private readonly resolvedUnstickingConfig: { provider: string; model: string; maxSocraticTurns: number } | null;
 
   constructor(
     private readonly db: Database,
@@ -93,12 +96,43 @@ export class FailureHandler {
     private readonly templateLoader: TemplateLoader,
     private readonly generateId: () => string,
     private readonly janumiCodeVersionSha: string,
+    private readonly configManager: ConfigManager,
     private readonly config: FailureHandlerConfig = DEFAULT_CONFIG,
   ) {
-    // Initialize UnstickingAgent if enabled
-    this.unstickingAgent = config.unstickingEnabled
-      ? new UnstickingAgent(db, llmCaller, templateLoader, config.unstickingConfig)
-      : null;
+    // Initialize UnstickingAgent if enabled. Resolve unsticking routing
+    // from ConfigManager unless the caller passed an explicit override.
+    if (config.unstickingEnabled) {
+      this.resolvedUnstickingConfig = config.unstickingConfig ?? this.resolveUnstickingConfig();
+      this.unstickingAgent = new UnstickingAgent(db, llmCaller, templateLoader, this.resolvedUnstickingConfig);
+    } else {
+      this.resolvedUnstickingConfig = null;
+      this.unstickingAgent = null;
+    }
+  }
+
+  /**
+   * Resolve the unsticking LLM config from `llm_routing.unsticking`.
+   * Throws if the routing slot is missing — never falls back to a
+   * hardcoded literal.
+   */
+  private resolveUnstickingConfig(): { provider: string; model: string; maxSocraticTurns: number } {
+    const routing = this.configManager.getLLMRouting() as { unsticking?: {
+      primary: { provider: string; model: string; base_url?: string };
+      temperature?: number;
+      max_socratic_turns?: number;
+    } };
+    const u = routing.unsticking;
+    if (!u?.primary?.provider || !u.primary.model) {
+      throw new Error(
+        'FailureHandler requires llm_routing.unsticking.primary with provider+model set. ' +
+        'Configure in .janumicode/config.json or rely on DEFAULT_CONFIG.',
+      );
+    }
+    return {
+      provider: u.primary.provider,
+      model: u.primary.model,
+      maxSocraticTurns: u.max_socratic_turns ?? 3,
+    };
   }
 
   /**
@@ -379,10 +413,13 @@ Attempts: ${context.attemptNumber}
 
 Write a 1-2 sentence caveat that documents this limitation.`;
 
+    if (!this.resolvedUnstickingConfig) {
+      return `Task "${context.taskName}" has known limitation: ${context.errorMessage}`;
+    }
     try {
       const result = await this.llmCaller.call({
-        provider: this.config.unstickingConfig.provider,
-        model: this.config.unstickingConfig.model,
+        provider: this.resolvedUnstickingConfig.provider,
+        model: this.resolvedUnstickingConfig.model,
         prompt,
         temperature: 0.3,
       });

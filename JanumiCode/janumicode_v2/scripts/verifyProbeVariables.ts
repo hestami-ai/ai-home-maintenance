@@ -12,7 +12,11 @@ import { join } from 'path';
 import { TemplateLoader } from '../src/lib/orchestrator/templateLoader';
 
 const WORKSPACE = join(__dirname, '..');
-const PROBES_DIR = join(WORKSPACE, 'src', 'test', 'prompt-probes');
+// Archived 2026-05-14 — probes moved to src/test/_archive/. Kept this
+// script wired to the archive path so `pnpm verify:probes` doesn't
+// silently no-op if invoked. New prompt validation goes through the
+// regression suite — see src/test/regression/README.md.
+const PROBES_DIR = join(WORKSPACE, 'src', 'test', '_archive', 'prompt-probes-pre-regression');
 
 interface ProbeReference {
   probeFile: string;

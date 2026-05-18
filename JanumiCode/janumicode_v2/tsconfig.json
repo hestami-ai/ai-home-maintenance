@@ -29,6 +29,7 @@
     "out",
     "src/**/*.test.ts",
     "src/webview/**/*.svelte",
-    "src/test/e2e/**"
+    "src/test/e2e/**",
+    "src/test/_archive/**"
   ]
 }

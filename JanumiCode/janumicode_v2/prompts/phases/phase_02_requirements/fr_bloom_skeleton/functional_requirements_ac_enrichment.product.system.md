@@ -13,6 +13,7 @@ required_variables:
   - traced_compliance_items
   - canonical_vocabulary
   - detail_file_path
+  - detail_file_content
   - janumicode_version_sha
 reasoning_review_triggers: []
 verification_ensemble_triggers: []
@@ -144,4 +145,8 @@ Return ONLY the enriched FR as a JSON object — SAME shape as the skeleton, but
 {{canonical_vocabulary}}
 
 # Detail File
-Complete supporting context at: {{detail_file_path}}
+DETAIL FILE PATH (reference only): {{detail_file_path}}
+
+DEEP MEMORY RESEARCH CONTEXT (full detail file content — read this carefully; it contains prior-phase findings, supersession chains, contradictions, and completeness assessment that govern this sub-phase):
+
+{{detail_file_content}}

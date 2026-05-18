@@ -14,6 +14,7 @@ required_variables:
   - technical_constraints
   - compliance_extracted_items
   - detail_file_path
+  - detail_file_content
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -98,7 +99,7 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are dropped
 
 ## Pass-1 per-NFR contract
 
-- EXACTLY ONE `seed_threshold` per NFR in Pass 1 — a single short line stating the essential measurable commitment. Pass 2 will expand into the full `threshold` + `measurement_method`.
+- EXACTLY ONE `seed_threshold` per NFR in Pass 1 — a single short line stating the essential measurable commitment. Pass 2 will expand into the full `threshold` + `measurement_method`. The `seed_threshold` field is REQUIRED on every requirement object — never omit it, never emit `null`, never use an empty string. If you cannot state a measurable commitment in one line, the NFR is malformed and should not be emitted.
 - `priority` is one of `critical | high | medium | low`.
 - `id` follows the `NFR-NNN` format, contiguous from `NFR-001`.
 - `applies_to_requirements` is optional; empty array is fine when the NFR is cross-cutting.
@@ -151,4 +152,8 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are dropped
 {{compliance_extracted_items}}
 
 # Detail File
-Complete supporting context at: {{detail_file_path}}
+DETAIL FILE PATH (reference only): {{detail_file_path}}
+
+DEEP MEMORY RESEARCH CONTEXT (full detail file content — read this carefully; it contains prior-phase findings, supersession chains, contradictions, and completeness assessment that govern this sub-phase):
+
+{{detail_file_content}}

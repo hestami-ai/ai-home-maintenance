@@ -576,34 +576,34 @@ describe('DeepMemoryResearchAgent', () => {
 
   // ── LLM-backed Stage 1 / Stage 7 integration ─────────────────────
   describe('LLM-backed stages with real templates', () => {
-    it('Stage 1 uses deep_memory_query_decomposition template when loader + mock LLM are provided', async () => {
+    it('Stage 1 produces deterministic decomposition from the brief query (LLM no longer invoked)', async () => {
+      // Stage 1 was demoted to a pure deterministic path: the LLM
+      // response is no longer consulted, so this test verifies the
+      // deterministic shape rather than asserting mocked LLM output
+      // flows through.
       const templateLoader = new TemplateLoader(REPO_ROOT);
       const mockLLM = new MockLLMProvider();
-      // Match on the DMR Stage 1 prompt's signature substring
-      mockLLM.setFixture('Query Decomposition', {
-        parsedJson: {
-          topic_entities: ['authentication', 'jwt'],
-          decision_types_sought: ['mirror_approval'],
-          temporal_scope: { from: '2025-01-01', to: '2026-01-01' },
-          authority_levels_included: [6, 7],
-          sources_in_scope: ['governed_stream_current_run'],
-        },
-      });
       const caller = new LLMCaller({ maxRetries: 0 });
       caller.registerProvider(mockLLM);
       caller.registerProvider(mockLLM.bindAsProvider('llamacpp'));
 
       const agentWithLLM = new DeepMemoryResearchAgent(
         db, caller, defaultWeights,
-        { janumiCodeVersionSha: 'abc' },
+        { janumiCodeVersionSha: 'abc', model: 'test-model' },
         templateLoader,
       );
 
-      const packet = await agentWithLLM.research(baseBrief({ query: 'jwt authentication' }));
+      const packet = await agentWithLLM.research(baseBrief({ query: 'jwt authentication for FR-1 and NFR-2' }));
 
-      // Stage 1's LLM response should flow into queryDecomposition
+      // Deterministic extractor: prose tokens stay lowercase, ID-shaped
+      // tokens (FR-1, NFR-2) are preserved verbatim.
+      expect(packet.queryDecomposition.topicEntities).toContain('FR-1');
+      expect(packet.queryDecomposition.topicEntities).toContain('NFR-2');
       expect(packet.queryDecomposition.topicEntities).toContain('authentication');
-      expect(packet.queryDecomposition.authorityLevelsIncluded).toEqual([6, 7]);
+      // Authority levels are rule-fixed.
+      expect(packet.queryDecomposition.authorityLevelsIncluded).toEqual([5, 6, 7]);
+      // New spec-conformance field.
+      expect(packet.queryDecomposition.knownConflictZones).toEqual([]);
     });
 
     it('Stage 7 enriches narrative with open_questions from LLM synthesis', async () => {
@@ -633,7 +633,7 @@ describe('DeepMemoryResearchAgent', () => {
 
       const agentWithLLM = new DeepMemoryResearchAgent(
         db, caller, defaultWeights,
-        { janumiCodeVersionSha: 'abc' },
+        { janumiCodeVersionSha: 'abc', model: 'test-model' },
         templateLoader,
       );
 
@@ -641,7 +641,10 @@ describe('DeepMemoryResearchAgent', () => {
 
       expect(packet.openQuestions.length).toBe(1);
       expect(packet.openQuestions[0].question).toBe('What is the target runtime?');
-      expect(packet.completenessNarrative).toContain('Agents synthesized');
+      // After the Stage 7 split fix: decision_context_summary stays in its
+      // own field rather than being concatenated into completenessNarrative.
+      expect(packet.decisionContextSummary).toContain('Agents synthesized');
+      expect(packet.completenessNarrative).toContain('Full coverage achieved');
     });
 
     it('degrades to deterministic decomposition when LLM returns nothing parseable', async () => {
@@ -654,7 +657,7 @@ describe('DeepMemoryResearchAgent', () => {
 
       const agentWithLLM = new DeepMemoryResearchAgent(
         db, caller, defaultWeights,
-        { janumiCodeVersionSha: 'abc' },
+        { janumiCodeVersionSha: 'abc', model: 'test-model' },
         templateLoader,
       );
 
@@ -663,6 +666,165 @@ describe('DeepMemoryResearchAgent', () => {
       // Should still produce sensible topic entities from deterministic fallback
       expect(packet.queryDecomposition.topicEntities.length).toBeGreaterThan(0);
       expect(packet.queryDecomposition.sourcesInScope).toContain('governed_stream_current_run');
+    });
+  });
+
+  // ── A.3 fix — harvestByAuthority handles mixed-level requests ─────
+  describe('harvestByAuthority (mixed-level requests)', () => {
+    it('still harvests authority-5+ records when query decomposition includes levels < 5', async () => {
+      // Regression: the old Math.min short-circuit returned [] when the
+      // *lowest* requested level was below 5, even if 5+ levels were also
+      // requested. Now we filter to the requested levels >= 5 first.
+      writer.writeRecord({
+        record_type: 'decision_trace',
+        schema_version: '1.0',
+        workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc',
+        content: {
+          decision_type: 'something',
+          payload: { description: 'a governing decision about authentication' },
+        },
+      });
+
+      // The deterministic decomposer asks for [5,6,7] — that should still
+      // surface governance records regardless of broader requests. But the
+      // bug previously fired when an *LLM-driven* decomposer returned a
+      // wider set including lows. Verify the harvest finds the record.
+      const packet = await agent.research(baseBrief({
+        query: 'governing authentication decision',
+      }));
+
+      expect(packet.materialFindings.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ── A.2-revised — reasoning-trail deprioritization ────────────────
+  describe('reasoning-trail deprioritization', () => {
+    it('reasoning record scores lower than equivalent governance record', () => {
+      // Same authority, same governing status, same id — only record_type differs.
+      // The 0.4x multiplier should make the reasoning record score lower.
+      const reasoningScore = agent.computeMateriality(
+        {
+          id: '1',
+          recordType: 'agent_reasoning_step',
+          authorityLevel: 2,
+          governingStatus: 'active',
+          summary: '',
+          sourceRecordIds: [],
+          materialityScore: 0,
+        },
+        baseBrief(),
+      );
+
+      const governanceScore = agent.computeMateriality(
+        {
+          id: '2',
+          recordType: 'artifact_produced',
+          authorityLevel: 2,
+          governingStatus: 'active',
+          summary: '',
+          sourceRecordIds: [],
+          materialityScore: 0,
+        },
+        baseBrief(),
+      );
+
+      expect(reasoningScore).toBeLessThan(governanceScore);
+      // 0.4x ratio (with floating-point slack)
+      expect(reasoningScore / governanceScore).toBeCloseTo(0.4, 1);
+    });
+
+    it.each([
+      'agent_invocation',
+      'agent_output',
+      'agent_reasoning_step',
+      'reasoning_review_finding_record',
+      'reasoning_review_harness_record',
+    ])('record_type=%s gets deprioritized', (recordType) => {
+      const reasoning = agent.computeMateriality(
+        { id: '1', recordType, authorityLevel: 5, governingStatus: 'active', summary: '', sourceRecordIds: [], materialityScore: 0 },
+        baseBrief(),
+      );
+      const governance = agent.computeMateriality(
+        { id: '2', recordType: 'artifact_produced', authorityLevel: 5, governingStatus: 'active', summary: '', sourceRecordIds: [], materialityScore: 0 },
+        baseBrief(),
+      );
+      expect(reasoning).toBeLessThan(governance);
+    });
+  });
+
+  // ── B.3/B.4 — effective authority surfaces phase-gate-certified records ──
+  describe('effective authority via phase-gate-approved', () => {
+    it('artifact referenced by phase_gate_approved appears as active_constraint', async () => {
+      // Write an artifact at stored authority=2
+      const artifact = writer.writeRecord({
+        record_type: 'artifact_produced',
+        schema_version: '1.0',
+        workflow_run_id: 'run-1',
+        sub_phase_id: 'system_requirements',
+        janumicode_version_sha: 'abc',
+        content: { description: 'authentication uses OAuth 2.0 with PKCE' },
+      });
+
+      // Write a phase_gate_approved record (authority=5 by writer rule)
+      const gate = writer.writeRecord({
+        record_type: 'phase_gate_approved',
+        schema_version: '1.0',
+        workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc',
+        content: { phase_id: '3', approved_artifact_ids: [artifact.id] },
+      });
+
+      // Insert a `validates` memory_edge from the gate to the artifact —
+      // this is what the spec says Stage II should produce, and it's what
+      // buildAuthorityElevationIndex queries.
+      db.prepare(`
+        INSERT INTO memory_edge (id, source_record_id, target_record_id, edge_type, asserted_by, asserted_at, authority_level, status)
+        VALUES ('e1', ?, ?, 'validates', 'test', ?, 5, 'system_asserted')
+      `).run(gate.id, artifact.id, new Date().toISOString());
+
+      const packet = await agent.research(baseBrief({
+        query: 'authentication OAuth PKCE',
+      }));
+
+      // The artifact's effective authority is now 6, so it should appear
+      // both in materialFindings (with authorityLevel=6) and as an
+      // active_constraint (filter requires authorityLevel >= 6).
+      const found = packet.materialFindings.find(f => f.id === artifact.id);
+      expect(found).toBeDefined();
+      expect(found!.authorityLevel).toBe(6);
+
+      const constraint = packet.activeConstraints.find(c => c.id === artifact.id);
+      expect(constraint).toBeDefined();
+      expect(constraint!.authorityLevel).toBe(6);
+    });
+
+    it('constitutional_invariant records appear with authority=7', async () => {
+      const inv = writer.writeRecord({
+        record_type: 'constitutional_invariant',
+        schema_version: '1.0',
+        workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc',
+        authority_level: 7,
+        content: {
+          kind: 'constitutional_invariant',
+          invariant_id: 'CI-X',
+          statement: 'The OAuth flow must use PKCE for all public clients',
+          source_section: '1.5',
+        },
+      });
+
+      const packet = await agent.research(baseBrief({
+        query: 'OAuth PKCE public clients',
+      }));
+
+      const found = packet.materialFindings.find(f => f.id === inv.id);
+      expect(found).toBeDefined();
+      expect(found!.authorityLevel).toBe(7);
+
+      const constraint = packet.activeConstraints.find(c => c.id === inv.id);
+      expect(constraint).toBeDefined();
+      expect(constraint!.authorityLevel).toBe(7);
     });
   });
 });

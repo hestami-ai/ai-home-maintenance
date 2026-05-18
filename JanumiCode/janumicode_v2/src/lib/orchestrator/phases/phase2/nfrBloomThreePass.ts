@@ -148,6 +148,7 @@ function buildEnrichmentVariables(
     traced_technical_constraints: deps.format.formatTechnicalConstraints(tracedTech),
     traced_compliance_items: deps.format.formatExtractedItems(tracedComp),
     detail_file_path: deps.dmr.detailFilePath,
+    detail_file_content: deps.dmr.detailFileContent,
     janumicode_version_sha: deps.ctx.engine.janumiCodeVersionSha,
   };
 }
@@ -190,6 +191,7 @@ async function runSkeletonPass(deps: NfrBloomDeps): Promise<{
     technical_constraints: deps.format.formatTechnicalConstraints(handoff.technicalConstraints ?? []),
     compliance_extracted_items: deps.format.formatExtractedItems(handoff.complianceExtractedItems ?? []),
     detail_file_path: dmr.detailFilePath,
+    detail_file_content: dmr.detailFileContent,
     janumicode_version_sha: ctx.engine.janumiCodeVersionSha,
   };
   const rendered = ctx.engine.templateLoader.render(template, variables);

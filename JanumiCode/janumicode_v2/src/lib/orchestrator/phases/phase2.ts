@@ -111,12 +111,20 @@ function assignReleaseToRoot(
   // test whether any of the root's trace ids appear in any of that
   // release's `contains[type]` arrays. First match wins.
   //
-  // `cross_cutting` intentionally does NOT anchor a root to a release:
-  // a workflow / compliance item / integration / vocab term marked
-  // cross-cutting is available in every release, so it gives no
-  // release-ordering signal. If a root's only trace is into
-  // cross_cutting, it remains backlog (release_id: null). Callers
-  // treat that as "spans all releases / not release-scheduled".
+  // Two-pass match:
+  //   Pass 1 — look for a release-specific match in `contains[type]`.
+  //            First (lowest-ordinal) hit wins.
+  //   Pass 2 — if no release matched but at least one trace id resolves
+  //            into `cross_cutting[type]`, anchor the root to the FIRST
+  //            release. Rationale: NFR roots typically trace exclusively
+  //            to product-wide VV-* / QA-N / TECH-* / vocab items that
+  //            live in cross_cutting by default (see buildReleaseManifest).
+  //            Without this fallback every such root falls to Backlog,
+  //            which is the ts-13 cascade. Release-1 is the right anchor
+  //            because cross-cutting items, by definition, ship in (and
+  //            apply to) every release — so the earliest one is the
+  //            ordering-correct choice for a cross-cutting-only root.
+  //   Otherwise — backlog (release_id: null).
   const sortedReleases = [...plan.releases].sort((a, b) => a.ordinal - b.ordinal);
   const traceSet = new Set(traces);
   for (const r of sortedReleases) {
@@ -127,8 +135,29 @@ function assignReleaseToRoot(
       c.entities.some((id: string) => traceSet.has(id)) ||
       c.compliance.some((id: string) => traceSet.has(id)) ||
       c.integrations.some((id: string) => traceSet.has(id)) ||
-      c.vocabulary.some((id: string) => traceSet.has(id));
+      c.vocabulary.some((id: string) => traceSet.has(id)) ||
+      // VV / QA / TECH slots added after the ts-13 backlog cascade — these
+      // are usually empty in `contains` (cross_cutting is the default)
+      // but a future trigger rule may promote specific ids into a
+      // release's contains, at which point this scan picks them up.
+      (c.vv_requirements ?? []).some((id: string) => traceSet.has(id)) ||
+      (c.quality_attributes ?? []).some((id: string) => traceSet.has(id)) ||
+      (c.technical_constraints ?? []).some((id: string) => traceSet.has(id));
     if (anyMatch) return { release_id: r.release_id, release_ordinal: r.ordinal };
+  }
+  // Pass 2 — cross-cutting fallback to Release 1.
+  const cc = plan.cross_cutting;
+  const ccHit =
+    cc.workflows.some((id: string) => traceSet.has(id)) ||
+    cc.compliance.some((id: string) => traceSet.has(id)) ||
+    cc.integrations.some((id: string) => traceSet.has(id)) ||
+    cc.vocabulary.some((id: string) => traceSet.has(id)) ||
+    (cc.vv_requirements ?? []).some((id: string) => traceSet.has(id)) ||
+    (cc.quality_attributes ?? []).some((id: string) => traceSet.has(id)) ||
+    (cc.technical_constraints ?? []).some((id: string) => traceSet.has(id));
+  if (ccHit && sortedReleases.length > 0) {
+    const first = sortedReleases[0];
+    return { release_id: first.release_id, release_ordinal: first.ordinal };
   }
   return { release_id: null, release_ordinal: null };
 }
@@ -203,6 +232,13 @@ interface NonFunctionalRequirement {
     | 'observability'
     | 'compliance';
   description: string;
+  /**
+   * NFR priority — emitted by the Pass-1 producer (NfrSkeleton.priority)
+   * and carried through the Pass-2 enrichment merge. Required in the
+   * final artifact so downstream consumers (NFR decomposition, eval
+   * threshold weighting) can rank NFRs.
+   */
+  priority: 'critical' | 'high' | 'medium' | 'low';
   threshold: string;
   measurement_method?: string;
   /**
@@ -328,10 +364,15 @@ export class Phase2Handler implements PhaseHandler {
     } else {
       // Invoke DMR to assemble cross-cutting context (active constraints,
       // material findings, ingested external files) before the bloom.
+      const dmr21Seeds = [
+        ...(prior.intentStatement ? [prior.intentStatement.recordId] : []),
+        ...(handoffRecordId ? [handoffRecordId] : []),
+      ];
       const dmr21 = await buildPhaseContextPacket(ctx, {
         subPhaseId: 'fr_bloom_skeleton',
         requestingAgentRole: 'requirements_agent',
-        query: `Functional requirements bloom for: ${intentSummary.slice(0, 400)}`,
+        query: `Functional requirements bloom grounded in product_description_handoff ${handoffRecordId ?? 'unknown'} and intent_statement ${prior.intentStatement?.recordId ?? 'unknown'}.`,
+        knownRelevantRecordIds: dmr21Seeds,
         detailFileLabel: 'p2_1_func_req',
         requiredOutputSpec: 'functional_requirements JSON — user_stories with acceptance_criteria',
       });
@@ -504,6 +545,11 @@ export class Phase2Handler implements PhaseHandler {
             id: s.id,
             category: 'security' as const,
             description: s.action,
+            // Resume path has no priority field on the stored user_story
+            // shape (the adapter dropped it pre-priority). Default to
+            // 'medium' rather than fail; saturation only uses id +
+            // user_story.
+            priority: (s as { priority?: 'critical' | 'high' | 'medium' | 'low' }).priority ?? 'medium',
             threshold: s.outcome,
             measurement_method: s.acceptance_criteria[0]?.measurable_condition,
             traces_to: s.traces_to ?? [],
@@ -511,10 +557,17 @@ export class Phase2Handler implements PhaseHandler {
         }),
       };
     } else {
+      const frIds = frContent.user_stories.map(s => s.id);
+      const dmr22Seeds = [
+        frRecord.id,
+        ...(handoffRecordId ? [handoffRecordId] : []),
+        ...(prior.intentStatement ? [prior.intentStatement.recordId] : []),
+      ];
       const dmr22 = await buildPhaseContextPacket(ctx, {
         subPhaseId: 'nfr_bloom_skeleton',
         requestingAgentRole: 'requirements_agent',
-        query: `Non-functional requirements for: ${intentSummary.slice(0, 200)}; FRs: ${frSummary.slice(0, 200)}`,
+        query: `Non-functional requirements covering FRs ${frIds.join(', ')} (artifact ${frRecord.id}) under product_description_handoff ${handoffRecordId ?? 'unknown'}.`,
+        knownRelevantRecordIds: dmr22Seeds,
         detailFileLabel: 'p2_2_nfr',
         requiredOutputSpec: 'non_functional_requirements JSON — performance, security, reliability, etc.',
       });
@@ -529,6 +582,11 @@ export class Phase2Handler implements PhaseHandler {
           id: n.id,
           category: n.category as NonFunctionalRequirement['category'],
           description: n.description,
+          // Preserve priority from Pass-1 through the Pass-2 enrichment.
+          // The earlier mapping omitted it, which caused the artifact to
+          // ship priority-less NFRs even though both passes populate it
+          // — surfaced in the ts-13 quality assessment.
+          priority: n.priority,
           threshold: n.threshold ?? '',
           measurement_method: n.measurement_method,
           traces_to: n.traces_to,

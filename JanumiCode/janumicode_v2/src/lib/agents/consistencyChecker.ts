@@ -12,6 +12,7 @@
 
 import { LLMCaller } from '../llm/llmCaller';
 import { TemplateLoader } from '../orchestrator/templateLoader';
+import type { ConfigManager } from '../config/configManager';
 
 const SEMANTIC_TEMPLATE_KEY = 'cross_cutting/consistency_checker_semantic.system';
 
@@ -70,6 +71,7 @@ export interface ConsistencyFinding {
 export class ConsistencyChecker {
   constructor(
     private readonly llmCaller: LLMCaller,
+    private readonly configManager: ConfigManager,
     private readonly templateLoader?: TemplateLoader,
   ) {}
 
@@ -186,9 +188,11 @@ export class ConsistencyChecker {
       janumicode_version_sha: 'dev',
     });
 
+    const route = this.configManager.getRoutingModel('requirements_agent');
     const result = await this.llmCaller.call({
-      provider: 'ollama',
-      model: 'qwen3.5:9b',
+      provider: route.provider,
+      model: route.model,
+      baseUrl: route.baseUrl,
       prompt: renderResult.rendered,
       responseFormat: 'json',
       temperature: 0.2,

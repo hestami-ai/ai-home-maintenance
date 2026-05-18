@@ -21,6 +21,25 @@ import type {
 import type { EventBus, SerializedRecord } from '../events/eventBus';
 import type { EmbeddingService } from '../embedding/embeddingService';
 
+/**
+ * Sub-phase IDs whose `artifact_produced` outputs are Bloom Sub-Phase
+ * candidate space (Authority Level 1 per spec §3.1). Matches anything
+ * containing `_bloom` or `_saturation` — covers terminal forms like
+ * `business_domains_bloom` AND mid-string forms like `fr_bloom_enrichment`,
+ * `nfr_bloom_skeleton`, `fr_bloom_skeleton`. Saturation passes use
+ * decomposition_node record types and are also handled via
+ * DECOMPOSITION_NODE_RECORD_TYPES.
+ */
+const BLOOM_SUB_PHASE_PATTERN = /(_bloom|_saturation)(_|$)/;
+
+const DECOMPOSITION_NODE_RECORD_TYPES = new Set<RecordType>([
+  'requirement_decomposition_node',
+  'component_decomposition_node',
+  'task_decomposition_node',
+  'data_model_decomposition_node',
+  'test_decomposition_node',
+]);
+
 export interface WriteRecordOptions {
   /** Record type */
   record_type: RecordType;
@@ -426,7 +445,7 @@ export class GovernedStreamWriter {
    */
   private resolveAuthorityLevel(
     recordType: RecordType,
-    _subPhaseId?: string | null,
+    subPhaseId?: string | null,
   ): AuthorityLevel {
     // Human interaction records
     switch (recordType) {
@@ -436,6 +455,8 @@ export class GovernedStreamWriter {
         return 5; // Human-Approved
       case 'mirror_edited':
         return 4; // Human-Edited
+      case 'mirror_acknowledged':
+        return 3; // Human-Acknowledged (continued past Mirror without editing/approving)
       case 'mirror_presented':
       case 'decision_bundle_presented':
         return 2; // Agent-Asserted (presented to human, not yet acted on)
@@ -453,9 +474,24 @@ export class GovernedStreamWriter {
         return 5; // Human-Approved (human provided the input)
       case 'narrative_memory':
         return 5; // Human-Approved (generated at Phase Gate approval)
-      default:
-        return 2; // Agent-Asserted (default for agent-produced records)
+      case 'constitutional_invariant':
+        return 7; // Constitutional — spec §1.5; seeded once per workspace
+      case 'auto_mitigation_action':
+        return 5; // Human-Approved equivalent — orchestrator policy=auto authorised the mutation
     }
+
+    // Level 1 (Exploratory) — spec §3.1: "Agent-generated candidate space
+    // before any human interaction." Bloom Sub-Phase outputs + decomposition
+    // nodes (saturation expansion) fall here. After Mirror interaction the
+    // lifecycle moves them up (4 on edit, 5 on approve, 6 on gate-certify).
+    if (DECOMPOSITION_NODE_RECORD_TYPES.has(recordType)) {
+      return 1;
+    }
+    if (recordType === 'artifact_produced' && subPhaseId && BLOOM_SUB_PHASE_PATTERN.test(subPhaseId)) {
+      return 1;
+    }
+
+    return 2; // Agent-Asserted (default for agent-produced records)
   }
 
   // ── effective_at Resolution (§13.3) ────────────────────────────

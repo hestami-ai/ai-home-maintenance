@@ -126,6 +126,15 @@ export interface ExecutorAgentOptions {
    * (correct) `completeness_shortcut` flag from reasoning_review.
    */
   unattendedSkipPermissions?: boolean;
+  /**
+   * Workflow-level forced executor backing tool. When set, every
+   * execute() call routes the subprocess invocation through this tool
+   * regardless of `executorBackingTool` or per-task descriptive
+   * backing_tool. Used by `--thin-slice` and calibration runs to pin
+   * Phase 9 to `goose_cli` for cost-bounded local execution. Log line
+   * fires per-task so the override is audit-visible.
+   */
+  forcedExecutorBackingTool?: ExecutorBackingTool;
 }
 
 // ── ExecutorAgent ───────────────────────────────────────────────────
@@ -133,6 +142,7 @@ export interface ExecutorAgentOptions {
 export class ExecutorAgent {
   private readonly executorBackingTool: ExecutorBackingTool;
   private readonly unattendedSkipPermissions: boolean;
+  private readonly forcedExecutorBackingTool: ExecutorBackingTool | null;
 
   constructor(
     private readonly db: Database,
@@ -144,6 +154,7 @@ export class ExecutorAgent {
   ) {
     this.executorBackingTool = options?.executorBackingTool ?? 'claude_code_cli';
     this.unattendedSkipPermissions = options?.unattendedSkipPermissions ?? false;
+    this.forcedExecutorBackingTool = options?.forcedExecutorBackingTool ?? null;
   }
 
   /**
@@ -185,22 +196,14 @@ export class ExecutorAgent {
       }
     }
 
-    // Record invocation start
-    this.writer.writeRecord({
-      record_type: 'agent_invocation',
-      schema_version: '1.0',
-      workflow_run_id: workflowRunId,
-      phase_id: '9',
-      sub_phase_id: '9.1',
-      produced_by_agent_role: 'executor_agent',
-      janumicode_version_sha: janumiCodeVersionSha,
-      content: {
-        invocation_id: invocationId,
-        task_id: task.id,
-        backing_tool: task.backingTool,
-        status: 'started',
-      },
-    });
+    // The agent_invocation record is written by AgentInvoker.invokeCLI
+    // (since the CLI persistence parity work) using the traceContext we
+    // pass below. This gives us the live log + llm:started/llm:finished
+    // events + stdin/stdout/thinking captured in the same shape as
+    // direct-LLM-API invocations. We surface task_id + task.backingTool
+    // (the infra descriptor) through traceContext so they land in
+    // agent_invocation content for trace correlation + audit, while
+    // AgentInvoker writes the executor tool itself into provider/model.
 
     this.eventBus.emit('agent:invocation_started', {
       invocationId,
@@ -224,14 +227,47 @@ export class ExecutorAgent {
     // stdinContent assembled upstream by ExecutionContextBuilder, so
     // the coding agent still knows what dependencies it's writing
     // against.
+    // Workflow-level force override (e.g. `--thin-slice` pins to
+    // goose_cli). Logged per-task so the audit trail shows exactly
+    // when and where the override fired.
+    let effectiveBackingTool = this.executorBackingTool;
+    if (this.forcedExecutorBackingTool && this.forcedExecutorBackingTool !== this.executorBackingTool) {
+      getLogger().info('workflow', 'force_executor_backing_tool override applied', {
+        from: task.backingTool,
+        to: this.forcedExecutorBackingTool,
+        task_id: task.id,
+      });
+      effectiveBackingTool = this.forcedExecutorBackingTool;
+    }
+
     const result = await this.agentInvoker.invoke({
       agentRole: 'executor_agent',
-      backingTool: this.executorBackingTool,
+      backingTool: effectiveBackingTool,
       invocationId,
       prompt: stdinContent,
       cwd,
       unattendedSkipPermissions: this.unattendedSkipPermissions,
+      traceContext: {
+        workflowRunId,
+        phaseId: '9',
+        subPhaseId: '9.1',
+        agentRole: 'executor_agent',
+        label: `Phase 9.1 — ${task.id}`,
+        taskId: task.id,
+        taskBackingTool: task.backingTool,
+      },
     });
+
+    // Windows CMD doesn't recognize `mkdir -p` as a flag. When Unix-trained
+    // coding agents run that command via shell tools, CMD interprets `-p`
+    // as an additional directory name and creates a literal `-p` directory
+    // alongside the intended target. Sweep any empty `-p` directories left
+    // in the workspace root and immediate subdirs so they don't pollute the
+    // workspace or get committed. Empty-only as a safety guard — if the
+    // agent actually wrote files there, the cleanup is a no-op.
+    if (process.platform === 'win32') {
+      cleanupStrayDashPDirs(cwd);
+    }
 
     // Record execution trace events
     if (result.cliResult) {
@@ -692,4 +728,55 @@ export class ExecutorAgent {
   static computeFileHash(content: string): string {
     return createHash('sha256').update(content).digest('hex');
   }
+}
+
+/**
+ * Windows-only cleanup for stray `-p` directories created when Unix-trained
+ * coding agents run `mkdir -p some/path` via Windows CMD. CMD doesn't
+ * recognize `-p` as a flag; it treats it as an additional directory name
+ * and creates a literal `-p` directory alongside the intended target.
+ *
+ * Removes empty `-p` directories at the workspace root and at one level of
+ * nesting (in case the agent's working-dir was a subdir). Non-empty `-p`
+ * directories are left alone — if the agent actually wrote files there,
+ * the run will surface them for human review rather than us silently
+ * destroying work.
+ */
+export function cleanupStrayDashPDirs(workspacePath: string): void {
+  try {
+    sweepDashP(workspacePath);
+    // One level of subdirs — the agent may have cd'd into a subpath before
+    // running the bad command. Don't recurse arbitrarily; one level is
+    // enough to catch the common case without scanning a large tree.
+    const entries = fs.readdirSync(workspacePath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name !== '.janumicode' && entry.name !== 'node_modules') {
+        sweepDashP(path.join(workspacePath, entry.name));
+      }
+    }
+  } catch (err) {
+    getLogger().debug('workflow', 'cleanupStrayDashPDirs failed (non-fatal)', {
+      workspacePath,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+function sweepDashP(dirPath: string): void {
+  const target = path.join(dirPath, '-p');
+  if (!fs.existsSync(target)) return;
+  const stat = fs.statSync(target);
+  if (!stat.isDirectory()) return;
+  const contents = fs.readdirSync(target);
+  if (contents.length > 0) {
+    getLogger().warn('workflow', 'Found non-empty `-p` directory — leaving in place for review', {
+      path: target,
+      entryCount: contents.length,
+    });
+    return;
+  }
+  fs.rmdirSync(target);
+  getLogger().info('workflow', 'Removed stray empty `-p` directory (CMD mkdir -p artifact)', {
+    path: target,
+  });
 }

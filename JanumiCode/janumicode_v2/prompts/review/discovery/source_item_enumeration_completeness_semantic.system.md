@@ -72,6 +72,14 @@ in the output.
   is absent with no out_of_scope mention.
 - LOW: a minor supporting detail or synonym is missing but the core concept is covered.
 
+[MACHINE-ACTIONABILITY]
+This validator emits ADVISORY findings only. Findings target reasoning,
+prose spans, holistic artifact properties, or coverage gaps where the
+offending element is MISSING from the artifact rather than present in
+it. The downstream auto-mitigation engine cannot act on these findings.
+Do NOT emit `target_field` or `target_identifier` fields — they do not
+apply at any severity. A human reviewer adjudicates these findings.
+
 [OUTPUT JSON CONTRACT]
 Return a single valid JSON object as the entire response.
 The response begins with "{" and ends with "}".

@@ -98,7 +98,11 @@ export type AgentRole =
   // Reasoning-review harness (Track D — replaces the single-pass
   // reasoning_review hook once Commit 10 lands the cutover; for now
   // both roles co-exist).
-  | 'harness';
+  | 'harness'
+  // Ingestion Pipeline Stage III — LLM relationship extraction
+  // (spec §8.12). Stamped on agent_invocation records emitted when
+  // Stage III fires per ingested governed-stream record.
+  | 'ingestion_pipeline_stage3';
 
 // ── Phase IDs (§4) ──────────────────────────────────────────────────
 
@@ -256,6 +260,7 @@ export type RecordType =
   | 'mirror_approved'
   | 'mirror_rejected'
   | 'mirror_edited'
+  | 'mirror_acknowledged'
   | 'phase_gate_evaluation'
   | 'phase_gate_approved'
   | 'phase_gate_rejected'
@@ -266,7 +271,9 @@ export type RecordType =
   | 'verification_ensemble_disagreement'
   | 'quarantine_override'
   // Memory Records (§6.3)
+  | 'constitutional_invariant'
   | 'narrative_memory'
+  | 'auto_mitigation_action'
   | 'decision_trace_summary'
   | 'retrieval_brief_record'
   | 'context_packet'
@@ -517,6 +524,59 @@ export interface ReasoningReviewConcern {
  * Advisory only: never blocks workflow progression. UI surfaces `concerns`
  * in a card alongside the originating agent_output.
  */
+/**
+ * Auto-mitigation action — audit record for a deterministic mutation
+ * applied to an artifact in response to a HIGH validator finding under
+ * `orchestrator.auto_mitigation_policy = 'auto'`.
+ *
+ * One record per mutation. Records the offending finding, the action
+ * taken, the JSONPath into the artifact that was mutated, and snapshots
+ * of the before/after values for audit + potential rollback.
+ *
+ * Authority Level 5 — the orchestrator's explicit policy commit is the
+ * human-equivalent action that authorises the deterministic mitigation.
+ */
+export interface AutoMitigationActionContent {
+  kind: 'auto_mitigation_action';
+  /** Record id of the artifact this mitigation mutates. */
+  source_artifact_id: string;
+  /** Record id of the reasoning_review_finding_record that prompted the action. */
+  finding_record_id: string;
+  /** Validator that caught the issue. */
+  validator_id: string;
+  /** Finding type (validator-specific). */
+  finding_type: string;
+  /** What the mitigation did. */
+  action_type: 'drop' | 'replace' | 'retry' | 'skip';
+  /** Top-level field within the artifact where the mutation landed (e.g. "domains"). */
+  target_field: string;
+  /** Identifier of the element acted on (id or name). */
+  target_identifier: string;
+  /** Human-readable rationale, typically the finding's summary. */
+  rationale: string;
+  /** Snapshot of the element before the mutation (for audit / rollback). */
+  before_value: unknown;
+  /** Snapshot of the element after the mutation (null for `drop`). */
+  after_value: unknown;
+}
+
+/**
+ * Constitutional Invariant — Authority Level 7 governing rule from spec §1.5.
+ * Seeded once per workspace at init. Carried into every Context Packet as
+ * `active_constraints` regardless of run-local state. No agent decision,
+ * Orchestrator decision, or human approval within a Workflow Run can
+ * supersede these.
+ */
+export interface ConstitutionalInvariantContent {
+  kind: 'constitutional_invariant';
+  /** Stable identifier — e.g. `CI-1`, `CI-2`. */
+  invariant_id: string;
+  /** Full statement of the invariant from spec §1.5. */
+  statement: string;
+  /** Spec section this invariant comes from (always `1.5` today). */
+  source_section: string;
+}
+
 export interface ReasoningReviewRecordContent {
   kind: 'reasoning_review';
   status: 'success' | 'parse_error' | 'failed' | 'skipped';
@@ -624,6 +684,14 @@ export interface ReasoningReviewFindingRecordContent {
   /** Token tracking — populated by Commit 9. Null for deterministic. */
   input_tokens?: number | null;
   output_tokens?: number | null;
+  /**
+   * Machine-resolvable target — populated when the validator's output
+   * contract requires it (currently spec_boundary_respect_bloom; expands
+   * to other validators as auto-mitigation coverage grows). Consumed by
+   * MitigationEngine handlers to locate the offending element.
+   */
+  target_field?: string;
+  target_identifier?: string;
 }
 
 export interface IntentLensClassificationContent {
@@ -1582,6 +1650,25 @@ export interface ReleaseContents {
   integrations: string[];
   /** References `VocabularyTerm.id` (VOC-*). */
   vocabulary: string[];
+  /**
+   * References V&V requirement ids (VV-*). Added so NFR roots that
+   * trace exclusively to V&V items (most performance / availability /
+   * reliability NFRs) can anchor to a release instead of unconditionally
+   * landing in Backlog. ts-13 surfaced this gap.
+   */
+  vv_requirements: string[];
+  /**
+   * References quality-attribute ids (QA-*). Added for the same
+   * NFR-anchoring reason as `vv_requirements` — many NFRs trace
+   * to a single quality attribute and would otherwise drop to Backlog.
+   */
+  quality_attributes: string[];
+  /**
+   * References technical-constraint ids (TECH-*). Added so NFRs that
+   * trace into hard constraints (encryption-at-rest, language choice,
+   * deployment topology) can anchor.
+   */
+  technical_constraints: string[];
 }
 
 /**
@@ -1603,6 +1690,15 @@ export interface CrossCuttingContents {
   compliance: string[];
   integrations: string[];
   vocabulary: string[];
+  /**
+   * V&V items, quality attributes, and technical constraints can legitimately
+   * span every release (e.g. "P95 latency ≤ 100 ms" applies to every release;
+   * "Postgres only" is enforced across the product). Cross-cutting variants
+   * pair with the per-release slots above.
+   */
+  vv_requirements: string[];
+  quality_attributes: string[];
+  technical_constraints: string[];
 }
 
 export interface ReleaseV2 {

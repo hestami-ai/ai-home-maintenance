@@ -8,6 +8,7 @@ required_variables:
   - system_boundary_summary
   - system_requirements_summary
   - detail_file_path
+  - detail_file_content
   - janumicode_version_sha
 reasoning_review_triggers:
   - premature_convergence
@@ -42,4 +43,8 @@ CONTEXT:
 System Boundary: {{system_boundary_summary}}
 System Requirements: {{system_requirements_summary}}
 
-DETAIL FILE: {{detail_file_path}}
+DETAIL FILE PATH (reference only): {{detail_file_path}}
+
+DEEP MEMORY RESEARCH CONTEXT (full detail file content — read this carefully; it contains prior-phase findings, supersession chains, contradictions, and completeness assessment that govern this sub-phase):
+
+{{detail_file_content}}

@@ -1,7 +1,0 @@
-{
-  "validator": "interface_contract_alignment_validator",
-  "sample": "23_technical_spec_agent__api_definitions",
-  "passed": false,
-  "expectedFindingCount": 3,
-  "overallAssessment": "The agent successfully modeled the general REST/HTTPS structure for most components, which is acceptable where no specific protocol contract exists. However, three critical areas—AI Processing, Offline Synchronization, and Security/Identity Management—show HIGH severity protocol mismatches. In these cases, the agent defaulted to generic REST/HTTPS when the governing Interface Contracts explicitly mandate specialized protocols (gRPC, TUS, KMS API), leading to a failure to align the API definitions with the required technical implementation layer."
-}

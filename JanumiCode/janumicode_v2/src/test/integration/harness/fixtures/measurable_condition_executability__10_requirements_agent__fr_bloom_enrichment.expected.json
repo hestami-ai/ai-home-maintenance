@@ -1,7 +1,0 @@
-{
-  "validator": "measurable_condition_executability",
-  "sample": "10_requirements_agent__fr_bloom_enrichment",
-  "passed": true,
-  "expectedFindingCount": 0,
-  "overallAssessment": "All measurable conditions provided are concrete, deterministic, and represent executable assertions (API contracts or log queries). A downstream test author could implement tests for all criteria without invention."
-}

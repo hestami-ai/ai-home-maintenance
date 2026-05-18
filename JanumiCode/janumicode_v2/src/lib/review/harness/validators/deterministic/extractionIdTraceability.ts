@@ -22,6 +22,16 @@ const PREFIX_RULES: Record<string, readonly string[]> = {
 
 const ID_FIELD_PATTERN = /^[A-Z][A-Z0-9_-]*-\d+$/;
 
+/**
+ * Extract the top-level array/field name from a JSON path like
+ * `$.user_stories[0].id` -> `user_stories`. Returns null if the path
+ * does not begin with `$.<field>`.
+ */
+function topLevelFieldFromPath(path: string): string | null {
+  const m = /^\$\.([A-Za-z_]\w*)/.exec(path);
+  return m ? m[1] : null;
+}
+
 function collectIds(node: unknown, ids: { id: string; path: string }[], path: string): void {
   if (Array.isArray(node)) {
     node.forEach((item, idx) => collectIds(item, ids, `${path}[${idx}]`));
@@ -52,14 +62,16 @@ export function validateExtractionIdTraceability(
   const seen = new Map<string, string>();
   for (const { id, path } of ids) {
     if (seen.has(id)) {
+      const targetField = topLevelFieldFromPath(path);
       findings.push({
         validatorId: 'extraction_id_traceability',
-        severity: 'HIGH',
+        severity: targetField ? 'HIGH' : 'MEDIUM',
         type: 'duplicate_id',
         summary: `Duplicate id '${id}'`,
         location: path,
         detail: `Id '${id}' already appears at ${seen.get(id)}.`,
         recommendation: 'Make every id unique within the output.',
+        ...(targetField ? { targetField, targetIdentifier: id } : {}),
       });
     } else {
       seen.set(id, path);
@@ -69,14 +81,16 @@ export function validateExtractionIdTraceability(
   // Format check.
   for (const { id, path } of ids) {
     if (!ID_FIELD_PATTERN.test(id)) {
+      const targetField = topLevelFieldFromPath(path);
       findings.push({
         validatorId: 'extraction_id_traceability',
-        severity: 'HIGH',
+        severity: targetField ? 'HIGH' : 'MEDIUM',
         type: 'malformed_id',
         summary: `Malformed id '${id}'`,
         location: path,
         detail: `Id '${id}' does not match PREFIX-NNN pattern.`,
         recommendation: 'Use the documented PREFIX-NNN convention.',
+        ...(targetField ? { targetField, targetIdentifier: id } : {}),
       });
     }
   }

@@ -8,6 +8,7 @@ required_variables:
   - component_model_summary
   - technical_specs_summary
   - detail_file_path
+  - detail_file_content
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -39,7 +40,7 @@ Every task in the output array MUST include ALL of the following fields with the
 | `name` | string | Short imperative phrase (5–10 words). MUST be a human-readable action. Example: `"Implement Better-Auth session verification middleware"`. Never leave blank; never use the id as the name. |
 | `description` | string | 1–3 sentences elaborating what the task builds, which files it touches, and what success looks like at a high level. |
 | `task_type` | `"standard"` \| `"refactoring"` | Use `refactoring` only when the task modifies existing production code without adding net-new behaviour. |
-| `component_id` | string | Verbatim component id from the Component Model. |
+| `component_id` | string | **VERBATIM** component id from the Component Model — copy it byte-for-byte. Do NOT prepend `comp-`. Do NOT modify case, prefix, or suffix. If the Component Model shows `link-mapping-repository`, emit `link-mapping-repository` — never `comp-link-mapping-repository`. Downstream phases match this against `component_model.components[].id` exactly. |
 | `component_responsibility` | string | **Verbatim** text of the responsibility from the Component Model. (Invariant: IP-002 — do not paraphrase.) |
 | `backing_tool` | string | See Backing-Tool Rule below. |
 | `estimated_complexity` | `"low"` \| `"medium"` \| `"high"` | |
@@ -133,7 +134,7 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
       "name": "Implement Better-Auth session verification middleware",
       "description": "Create an Express/Hono middleware that reads the Better-Auth session cookie, validates the JWT against the configured secret, and attaches the decoded session to the request context. Returns 401 on missing or expired tokens.",
       "task_type": "standard",
-      "component_id": "comp-auth-middleware",
+      "component_id": "auth-middleware",
       "component_responsibility": "Validate inbound requests against Better-Auth session tokens and expose the authenticated session to downstream handlers",
       "backing_tool": "claude_code_cli",
       "estimated_complexity": "medium",
@@ -161,7 +162,7 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
       "name": "Author vendor credential DB schema migration",
       "description": "Write and run the Drizzle/Postgres migration that creates the vendor_credentials table with columns for credential_type, status, issued_at, expires_at, and a partial unique index on active credentials. No application code in this task.",
       "task_type": "standard",
-      "component_id": "comp-vendor-data",
+      "component_id": "vendor-data",
       "component_responsibility": "Persist vendor credential records in the database with expiry and revocation tracking",
       "backing_tool": "claude_code_cli",
       "estimated_complexity": "low",
@@ -201,6 +202,7 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
 7. **Every Technical Specification must be covered** by at least one task's `traces_to`.
 8. **No circular task dependencies.**
 9. **Tasks with `estimated_complexity: "high"` MUST include `complexity_flag`.**
+10. **`component_id` MUST be byte-for-byte identical to a `components[].id` value in the Component Model.** Never prepend `comp-`. Never modify case, prefix, or suffix. Downstream Phase 9 looks up the component by exact id; a mismatch breaks the component-context, test-case filtering, and eval-criteria filtering for every task on that component. If the Component Model shows `link-mapping-repository`, the task's `component_id` MUST be `link-mapping-repository`.
 
 # JSON Output Contract (strict — non-negotiable)
 
@@ -232,4 +234,8 @@ You are the Implementation Planner. The `component_model_summary` and `technical
 {{technical_specs_summary}}
 
 # Detail file path (full context reference)
-{{detail_file_path}}
+DETAIL FILE PATH (reference only): {{detail_file_path}}
+
+DEEP MEMORY RESEARCH CONTEXT (full detail file content — read this carefully; it contains prior-phase findings, supersession chains, contradictions, and completeness assessment that govern this sub-phase):
+
+{{detail_file_content}}

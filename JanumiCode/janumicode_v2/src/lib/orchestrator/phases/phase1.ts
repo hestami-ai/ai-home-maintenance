@@ -67,6 +67,9 @@ import type {
 import { getLogger } from '../../logging';
 import { parseJsonWithRecovery } from '../../llm/jsonRecovery';
 import { buildInterpretationMirror } from './phase1/buildInterpretationMirror';
+import { normalizeIdsInTree, normalizeIdHyphens } from '../idNormalization';
+import { MitigationEngine } from '../../review/mitigation/mitigationEngine';
+import { loadMostRecentFindings } from '../../review/mitigation/findingsLookup';
 
 /** An assumption may be a plain string or a structured object from the LLM. */
 type AssumptionEntry = string | { statement?: string; inference?: string; assumption?: string; basis?: string };
@@ -543,9 +546,11 @@ export class Phase1Handler implements PhaseHandler {
     // executeCurrentPhase catch converts them to phase failure. The
     // inner "return fallback" paths below handle the softer case where
     // the call succeeded but returned empty / unparseable JSON.
+    const diRoute = engine.configManager.getRoutingModel('domain_interpreter');
     const result = await engine.llmCaller.call({
-      provider: 'ollama',
-      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      provider: diRoute.provider,
+      model: diRoute.model,
+      baseUrl: diRoute.baseUrl,
       prompt: rendered.rendered,
       responseFormat: 'json',
       temperature: 0.6,
@@ -561,7 +566,12 @@ export class Phase1Handler implements PhaseHandler {
     if (!parsed && typeof result.text === 'string' && result.text.trim().length > 0) {
       const recovered = parseJsonWithRecovery(result.text);
       parsed = recovered.parsed;
-      if (recovered.recovered) {
+      // `recovered.parsed` is non-null only when extraction + parse succeeded
+      // against the raw text (i.e. the LLM caller's normal parse path missed
+      // JSON that was salvageable). Treat that as "recovered" and emit the
+      // diagnostic warning. The previous `recovered.recovered` field never
+      // existed on this return type — that condition silently never fired.
+      if (recovered.parsed) {
         getLogger().warn('workflow', 'Recovered malformed bloom JSON from raw model text', {
           workflow_run_id: ctx.workflowRun.id,
           sub_phase_id: 'business_domains_bloom',
@@ -1182,6 +1192,12 @@ export class Phase1Handler implements PhaseHandler {
       priorRecordIds: [journeysRecord.id],
       runProposer: (feedback) => this.runEntitiesBloom(ctx, safeDomains, safeWorkflowsV2, safePersonas, safeJourneys, feedback),
       writeBloomRecord: (bloom, derivedFrom) => {
+        // Normalize ENT-* ids: replace any underscores in the body with
+        // hyphens. ts-13 surfaced ~5% drift (e.g. `ENT-LEGAL_DOCUMENT`
+        // instead of `ENT-LEGAL-DOCUMENT`); we sanitize at ingestion so
+        // downstream traces can match on the canonical hyphen-only form.
+        const content = { kind: 'entities_bloom', ...bloom } as unknown as Record<string, unknown>;
+        normalizeIdsInTree(content, new Set(['id']), normalizeIdHyphens);
         const rec = engine.writer.writeRecord({
           record_type: 'artifact_produced',
           schema_version: '1.0',
@@ -1191,7 +1207,7 @@ export class Phase1Handler implements PhaseHandler {
           produced_by_agent_role: 'domain_interpreter',
           janumicode_version_sha: engine.janumiCodeVersionSha,
           derived_from_record_ids: derivedFrom,
-          content: { kind: 'entities_bloom', ...bloom } as unknown as Record<string, unknown>,
+          content,
         });
         artifactIds.push(rec.id);
         return rec;
@@ -1371,7 +1387,10 @@ export class Phase1Handler implements PhaseHandler {
     const acceptedIntegrationsForPlan = safeIntegrations;
     const acceptedComplianceForPlan = discoveryBundle.complianceExtractedItems;
     const acceptedVocabularyForPlan = discoveryBundle.canonicalVocabulary;
-    let lastCrossCutting: CrossCuttingContents = { workflows: [], compliance: [], integrations: [], vocabulary: [] };
+    let lastCrossCutting: CrossCuttingContents = {
+      workflows: [], compliance: [], integrations: [], vocabulary: [],
+      vv_requirements: [], quality_attributes: [], technical_constraints: [],
+    };
     const round18 = await this.runBloomRoundWithFeedbackLoop<{ releases: ReleaseV2[]; crossCutting: CrossCuttingContents }>(ctx, {
       subPhaseId: 'release_plan',
       roundLabel: 'Release Plan (v2)',
@@ -1394,6 +1413,9 @@ export class Phase1Handler implements PhaseHandler {
           integrations: acceptedIntegrationsForPlan,
           vocabulary: acceptedVocabularyForPlan,
           domains: safeDomains,
+          vvRequirements: discoveryBundle.vvRequirements,
+          technicalConstraints: discoveryBundle.technicalConstraints,
+          qualityAttributes: safeQAs,
         }, feedback);
         lastCrossCutting = r.crossCutting;
         return r;
@@ -1453,6 +1475,9 @@ export class Phase1Handler implements PhaseHandler {
       cross_cutting: lastCrossCutting,
       approved: false,
     };
+    const acceptedVvIdsForPlan = discoveryBundle.vvRequirements.map(v => v.id);
+    const acceptedTechIdsForPlan = discoveryBundle.technicalConstraints.map(t => t.id);
+    const acceptedQaIdsForPlan = safeQAs.map((_q, i) => `QA-${i + 1}`);
     let manifestGaps = verifyReleaseManifest({
       plan: draftPlan,
       journeys: safeJourneys,
@@ -1461,6 +1486,9 @@ export class Phase1Handler implements PhaseHandler {
       complianceIds: acceptedComplianceForPlan.map(c => c.id),
       integrations: acceptedIntegrationsForPlan,
       vocabulary: acceptedVocabularyForPlan,
+      vvRequirementIds: acceptedVvIdsForPlan,
+      qualityAttributeIds: acceptedQaIdsForPlan,
+      technicalConstraintIds: acceptedTechIdsForPlan,
     });
 
     // Auto-fix pass — when the verifier flags release_backward_dependency
@@ -1485,6 +1513,9 @@ export class Phase1Handler implements PhaseHandler {
           complianceIds: acceptedComplianceForPlan.map(c => c.id),
           integrations: acceptedIntegrationsForPlan,
           vocabulary: acceptedVocabularyForPlan,
+          vvRequirementIds: acceptedVvIdsForPlan,
+          qualityAttributeIds: acceptedQaIdsForPlan,
+          technicalConstraintIds: acceptedTechIdsForPlan,
         });
       }
     }
@@ -1730,6 +1761,16 @@ export class Phase1Handler implements PhaseHandler {
       } catch (err) {
         return { success: false, error: `${spec.roundLabel} bloom failed: ${err instanceof Error ? err.message : String(err)}` };
       }
+
+      // Auto-mitigation step (spec §auto-mitigation-design.md).
+      // The reasoning-review harness has fired synchronously on the
+      // proposer's agent_output by the time we get here. If policy is
+      // 'auto' and a registered validator emitted HIGH findings with
+      // machine-resolvable targets, mutate `bloom` before writing it.
+      // Each mutation lands an `auto_mitigation_action` governed-stream
+      // record for audit.
+      this.runAutoMitigation(ctx, spec.subPhaseId, bloom as unknown as Record<string, unknown>);
+
       const derivedFrom = [
         ...spec.priorRecordIds,
         ...(lastRecord ? [lastRecord.id] : []),
@@ -1803,8 +1844,8 @@ export class Phase1Handler implements PhaseHandler {
       analysisSummary: (parsed.analysisSummary as string) ?? '',
       productVision: (parsed.productVision as string) ?? '',
       productDescription: (parsed.productDescription as string) ?? '',
-      personas: ((parsed.personas as Array<Record<string, unknown>> | undefined) ?? []).map(normalizePersonaFromWire) as Persona[],
-      userJourneys: ((parsed.userJourneys as Array<Record<string, unknown>> | undefined) ?? []).map(normalizeJourneyFromWire) as UserJourney[],
+      personas: ((parsed.personas as Array<Record<string, unknown>> | undefined) ?? []).map(normalizePersonaFromWire) as unknown as Persona[],
+      userJourneys: ((parsed.userJourneys as Array<Record<string, unknown>> | undefined) ?? []).map(normalizeJourneyFromWire) as unknown as UserJourney[],
       phasingStrategy: (parsed.phasingStrategy as PhasingPhase[] | undefined) ?? [],
       successMetrics: (parsed.successMetrics as string[] | undefined) ?? [],
       uxRequirements: (parsed.uxRequirements as string[] | undefined) ?? [],
@@ -2084,8 +2125,8 @@ export class Phase1Handler implements PhaseHandler {
     const rawDomains = (parsed.domains as Array<Record<string, unknown>> | undefined) ?? [];
     const rawPersonas = (parsed.personas as Array<Record<string, unknown>> | undefined) ?? [];
     return {
-      domains: rawDomains.map(normalizeDomainFromWire) as BusinessDomain[],
-      personas: rawPersonas.map(normalizePersonaFromWire) as Persona[],
+      domains: rawDomains.map(normalizeDomainFromWire) as unknown as BusinessDomain[],
+      personas: rawPersonas.map(normalizePersonaFromWire) as unknown as Persona[],
     };
   }
 
@@ -2996,6 +3037,26 @@ Re-emit this single journey as a JSON object that matches the original schema (i
         dropped_workflows: droppedWorkflows,
       });
     }
+    // Fail loud when the LLM hallucinated so heavily that fewer than half
+    // its proposed workflows survive the deterministic filter — the
+    // current artifact would be empty or sparse, and a silent prune
+    // hides that the producer needs to be re-run with corrected input
+    // (or, more often, that the LLM ignored the accepted-domains list).
+    // Threshold is conservative: only the >50%-drop case escalates.
+    // The historical ts-12 / ts-13 system_workflow_bloom drops were
+    // both 100% — those would have caught this loudly instead of
+    // silently producing `workflows: []`.
+    const totalProposed = workflows.length + droppedWorkflows.length;
+    if (totalProposed > 0 && droppedWorkflows.length / totalProposed > 0.5) {
+      const ratioPct = Math.round((droppedWorkflows.length / totalProposed) * 100);
+      throw new Error(
+        `Phase 1.3b system_workflow_bloom: ${droppedWorkflows.length}/${totalProposed} (${ratioPct}%) ` +
+        `proposed workflows dropped because their business_domain_id is not in the accepted_domains set ` +
+        `or all their triggers reference non-accepted ids. The LLM is hallucinating downstream references. ` +
+        `Check accepted_domains rendering in the prompt; verify the producer is seeing the right domain list. ` +
+        `Dropped workflow ids: ${droppedWorkflows.slice(0, 10).join(', ')}${droppedWorkflows.length > 10 ? '…' : ''}`,
+      );
+    }
     return { workflows };
   }
 
@@ -3018,6 +3079,9 @@ Re-emit this single journey as a JSON object that matches the original schema (i
       integrations: Integration[];
       vocabulary: VocabularyTerm[];
       domains: BusinessDomain[];
+      vvRequirements: VVRequirement[];
+      technicalConstraints: TechnicalConstraint[];
+      qualityAttributes: string[];
     },
     feedback: string,
   ): Promise<{ releases: ReleaseV2[]; crossCutting: CrossCuttingContents }> {
@@ -3085,6 +3149,13 @@ Re-emit this single journey as a JSON object that matches the original schema (i
       complianceIds: inputs.complianceItems.map(c => c.id),
       integrations: inputs.integrations,
       vocabulary: inputs.vocabulary,
+      vvRequirementIds: inputs.vvRequirements.map(v => v.id),
+      technicalConstraintIds: inputs.technicalConstraints.map(t => t.id),
+      // QA-N ids are the synthetic indices used at the 1.5 gate
+      // (`buildQaItems` in this file). Regenerated here so the ids
+      // match what the gate review presented and what NFR roots will
+      // cite in `traces_to`.
+      qualityAttributeIds: inputs.qualityAttributes.map((_q, i) => `QA-${i + 1}`),
     });
 
     if (built.unplacedJourneys.length > 0) {
@@ -3233,6 +3304,56 @@ Re-emit this single journey as a JSON object that matches the original schema (i
       ids.push(rec.id);
     }
     return ids;
+  }
+
+  /**
+   * Apply deterministic mitigations to a freshly-proposed bloom artifact
+   * based on the reasoning-review harness findings that fired against it.
+   * Mutates `bloom` in place. No-op when policy != 'auto' or no findings
+   * have machine-resolvable targets.
+   *
+   * See study/auto-mitigation-design.md for the v1 scope (drop only,
+   * gated to spec_boundary_respect_bloom).
+   */
+  private runAutoMitigation(
+    ctx: PhaseContext,
+    subPhaseId: string,
+    bloom: Record<string, unknown>,
+  ): void {
+    const cfg = ctx.engine.configManager.get();
+    const policy = cfg.workflow.auto_mitigation_policy ?? 'disabled';
+    if (policy !== 'auto') return;
+
+    const { findings, findingRecordIds, harnessRecordId } = loadMostRecentFindings(
+      ctx.engine.db,
+      ctx.workflowRun.id,
+      subPhaseId,
+    );
+    if (findings.length === 0 || !harnessRecordId) return;
+
+    const engine = new MitigationEngine();
+    const result = engine.apply(findings, bloom, {
+      writer: ctx.engine.writer,
+      workflowRunId: ctx.workflowRun.id,
+      phaseId: '1',
+      subPhaseId,
+      janumiCodeVersionSha: ctx.engine.janumiCodeVersionSha,
+      // We haven't written the bloom artifact yet — cite the harness
+      // record as the immediate parent. Once the bloom artifact lands
+      // its id flows downstream via derived_from_record_ids on later
+      // records, preserving the trace.
+      sourceArtifactRecordId: harnessRecordId,
+      findingRecordIds,
+    });
+
+    if (result.actionsApplied.length > 0) {
+      getLogger().info('workflow', 'Auto-mitigation applied to bloom', {
+        workflow_run_id: ctx.workflowRun.id,
+        sub_phase_id: subPhaseId,
+        actions_applied: result.actionsApplied.length,
+        findings_skipped: result.findingsSkipped,
+      });
+    }
   }
 }
 

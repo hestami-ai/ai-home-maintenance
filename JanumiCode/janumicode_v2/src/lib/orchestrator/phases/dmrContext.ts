@@ -44,6 +44,12 @@ export interface PhaseContextPacketResult {
   activeConstraintsText: string;
   /** Detail file path (or '(not available)' if write failed) */
   detailFilePath: string;
+  /** Full markdown content of the detail file, suitable for inlining into
+   *  LLM prompts. Phases 0-8 use direct LLM API calls and cannot read the
+   *  detail file from disk; this lets the prompt template inline the
+   *  substantive DMR context (material findings, completeness narrative,
+   *  supersession chains, contradictions). Empty when DMR fails. */
+  detailFileContent: string;
   /** Record IDs to include in derived_from */
   derivedFromRecordIds: string[];
 }
@@ -63,6 +69,7 @@ export async function buildPhaseContextPacket(
     packet: null,
     activeConstraintsText: '(none)',
     detailFilePath: '(not available)',
+    detailFileContent: '(no DMR detail content available)',
     derivedFromRecordIds: [],
   };
 
@@ -94,7 +101,10 @@ export async function buildPhaseContextPacket(
     : '(none)';
 
   // Write the detail file via ContextBuilder for audit + Phase 9 readiness.
-  let detailFilePath = '(not available)';
+  // Also capture the markdown content so phases 0-8 (direct LLM API calls,
+  // no filesystem access) can inline it into their prompts via the
+  // `detail_file_content` template variable.
+  let detailFile: { path: string; content: string } | null = null;
   try {
     const invocationId = `${options.detailFileLabel ?? options.subPhaseId.replace(/\./g, '_')}-${workflowRun.id.slice(0, 8)}`;
     const payload = engine.contextBuilder.buildContextPayload(
@@ -116,7 +126,9 @@ export async function buildPhaseContextPacket(
       },
       workflowRun.id,
     );
-    detailFilePath = payload.detailFile?.path ?? '(not available)';
+    if (payload.detailFile) {
+      detailFile = { path: payload.detailFile.path, content: payload.detailFile.content };
+    }
   } catch (err) {
     getLogger().debug('phase_dmr', 'Detail file write failed — using sentinel', {
       subPhaseId: options.subPhaseId,
@@ -134,7 +146,8 @@ export async function buildPhaseContextPacket(
   return {
     packet,
     activeConstraintsText,
-    detailFilePath,
+    detailFilePath: detailFile?.path ?? '(not available)',
+    detailFileContent: detailFile?.content ?? '(no DMR detail content available)',
     derivedFromRecordIds,
   };
 }

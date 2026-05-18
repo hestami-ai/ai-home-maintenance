@@ -91,7 +91,7 @@ If `human_feedback` is non-empty, the user is re-running this round with guidanc
 
 # JSON Output Contract (strict — non-negotiable)
 
-**Field naming convention:** Use snake_case for all JSON property names (e.g., `user_journeys`, `acceptance_criteria`, not `userJourneys`).
+**Field naming convention:** Use snake_case for **every** JSON property name in the response — including nested object keys. Never emit camelCase variants. Specifically: emit `user_journeys` (NOT `userJourneys`), `persona_id` (NOT `personaId`), `additional_personas` (NOT `additionalPersonas`), `business_domain_ids` (NOT `businessDomainIds`), `acceptance_criteria` (NOT `acceptanceCriteria`), `implementation_phase` (NOT `implementationPhase`), `domain_id` (NOT `domainId`). Never emit BOTH snake_case and camelCase forms of the same field — that is malformed output.
 
 Your response MUST be a single valid JSON object. Strict rules:
 - **No markdown fences** — no triple-backticks.
@@ -146,7 +146,7 @@ Your response MUST be a single valid JSON object. Strict rules:
     { "persona_id": "P-n", "reason": "Why no journey exists for this persona." }
   ],
   "unreached_domains": [
-    { "domainId": "DOM-n", "reason": "Why no journey exists in this domain." }
+    { "domain_id": "DOM-n", "reason": "Why no journey exists in this domain." }
   ]
 }
 ```
@@ -168,7 +168,7 @@ For a product of moderate ambition with 3–6 personas and 3–8 domains, expect
 # Accepted Domains (from Sub-Phase 1.2)
 {{accepted_domains}}
 
-# Validated Phasing Strategy (from Sub-Phase 1.0b — BINDING for implementationPhase tagging)
+# Validated Phasing Strategy (from Sub-Phase 1.0b — BINDING for `implementation_phase` tagging)
 {{phasing_strategy}}
 
 # Accepted Compliance Regimes (from Sub-Phase 1.0d)

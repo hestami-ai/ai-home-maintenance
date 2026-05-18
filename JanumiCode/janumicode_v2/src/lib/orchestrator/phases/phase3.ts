@@ -107,10 +107,19 @@ export class Phase3Handler implements PhaseHandler {
     // ── 3.1 — System Boundary Definition ──────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'system_boundary');
 
+    const frIds = frStories.map(s => s.id as string).filter(Boolean);
+    const nfrIdList = ((prior.nonFunctionalRequirements?.content.requirements as Array<Record<string, unknown>>) ?? [])
+      .map(n => n.id as string).filter(Boolean);
+    const dmr31Seeds = [
+      ...(prior.intentStatement ? [prior.intentStatement.recordId] : []),
+      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
+      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
+    ];
     const dmr31 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'system_boundary',
       requestingAgentRole: 'systems_agent',
-      query: `System boundary for: ${intentSummary.slice(0, 400)}`,
+      query: `System boundary for FRs ${frIds.join(', ')} and NFRs ${nfrIdList.join(', ')} (intent ${prior.intentStatement?.recordId ?? 'unknown'}).`,
+      knownRelevantRecordIds: dmr31Seeds,
       detailFileLabel: 'p3_1_boundary',
       requiredOutputSpec: 'system_boundary JSON — in_scope, out_of_scope, external_systems',
     });
@@ -161,10 +170,17 @@ export class Phase3Handler implements PhaseHandler {
       `External systems: ${boundaryContent.external_systems.map(e => `${e.id}: ${e.name} (${e.interface_type})`).join('; ') || 'none'}`,
     ].filter(Boolean).join('\n');
 
+    const externalSystemIds = boundaryContent.external_systems.map(e => e.id).filter(Boolean);
+    const dmr32Seeds = [
+      boundaryRecord.id,
+      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
+      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
+    ];
     const dmr32 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'system_requirements',
       requestingAgentRole: 'systems_agent',
-      query: `System requirements derived from boundary: ${boundarySummary.slice(0, 400)}`,
+      query: `System requirements deriving from system_boundary ${boundaryRecord.id} covering FRs ${frIds.join(', ')} and NFRs ${nfrIdList.join(', ')}; externals ${externalSystemIds.join(', ')}.`,
+      knownRelevantRecordIds: dmr32Seeds,
       detailFileLabel: 'p3_2_sysreq',
       requiredOutputSpec: 'system_requirements JSON — items array with id, statement, source_requirement_ids',
     });
@@ -194,10 +210,19 @@ export class Phase3Handler implements PhaseHandler {
       .map(e => `${e.id}: ${e.name} (${e.interface_type})`)
       .join('\n') || 'No external systems identified';
 
+    const techConstraintsRecordId = allArtifacts.find(
+      r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery',
+    )?.id;
+    const dmr33Seeds = [
+      boundaryRecord.id,
+      sysReqRecord.id,
+      ...(techConstraintsRecordId ? [techConstraintsRecordId] : []),
+    ];
     const dmr33 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'interface_contracts',
       requestingAgentRole: 'systems_agent',
-      query: `Interface contracts for external systems: ${externalSystemsList.slice(0, 400)}`,
+      query: `Interface contracts for external systems ${externalSystemIds.join(', ')} (boundary ${boundaryRecord.id}, system_requirements ${sysReqRecord.id}).`,
+      knownRelevantRecordIds: dmr33Seeds,
       detailFileLabel: 'p3_3_contracts',
       requiredOutputSpec: 'interface_contracts JSON — contracts array with protocol, data_format, error handling',
     });
@@ -347,6 +372,7 @@ export class Phase3Handler implements PhaseHandler {
       functional_requirements_summary: frSummary,
       non_functional_requirements_summary: nfrSummary,
       detail_file_path: dmr.detailFilePath,
+      detail_file_content: dmr.detailFileContent,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;

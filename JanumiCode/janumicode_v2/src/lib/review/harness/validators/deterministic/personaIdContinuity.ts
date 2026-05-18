@@ -6,6 +6,11 @@
  * Internal-consistency check (Commit 3 stub for the upstream-comparison
  * variant — full upstream comparison via params.upstreamFindings is a
  * later commit's job; for now we verify within-output integrity).
+ *
+ * This validator emits ADVISORY findings only; targetField/targetIdentifier
+ * are not populated because findings do not correspond to mutable array
+ * elements — they flag references to undefined persona ids that appear
+ * scattered throughout the artifact, not a single mutable array element.
  */
 
 import type { ValidatorRuntimeParams, ValidatorFinding } from '../../validatorRegistry';

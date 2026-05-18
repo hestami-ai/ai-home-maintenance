@@ -1,7 +1,0 @@
-{
-  "validator": "story_shape_conformance",
-  "sample": "09_requirements_agent__fr_bloom_skeleton",
-  "passed": true,
-  "expectedFindingCount": 0,
-  "overallAssessment": "The output successfully adheres to the canonical Role-Action-Outcome shape for all stories. All roles are clearly defined personas, actions are scoped to single capabilities, and outcomes are measurable and non-vacuous. The structure is highly compliant with the required narrative shape."
-}

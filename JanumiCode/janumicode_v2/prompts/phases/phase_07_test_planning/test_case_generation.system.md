@@ -9,6 +9,7 @@ required_variables:
   - implementation_plan_summary
   - component_model_summary
   - detail_file_path
+  - detail_file_content
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -39,4 +40,8 @@ Functional Requirements: {{functional_requirements_summary}}
 Implementation Plan: {{implementation_plan_summary}}
 Component Model: {{component_model_summary}}
 
-DETAIL FILE: {{detail_file_path}}
+DETAIL FILE PATH (reference only): {{detail_file_path}}
+
+DEEP MEMORY RESEARCH CONTEXT (full detail file content — read this carefully; it contains prior-phase findings, supersession chains, contradictions, and completeness assessment that govern this sub-phase):
+
+{{detail_file_content}}

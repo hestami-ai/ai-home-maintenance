@@ -295,6 +295,7 @@ export class OrchestratorEngine {
     this.agentInvoker = new AgentInvoker(this.llmCaller, {
       timeoutSeconds: config.cli_invocation.timeout_seconds,
       idleTimeoutSeconds: config.cli_invocation.idle_timeout_seconds,
+      noContentTimeoutSeconds: config.cli_invocation.no_content_timeout_seconds,
       bufferMaxEvents: config.cli_invocation.buffer_max_events,
     });
     this.agentInvoker.setWriter(this.writer, this.versionSha);
@@ -316,12 +317,30 @@ export class OrchestratorEngine {
     // eventBus → llm:stream_chunk channel as LLM calls.
     this.agentInvoker.setEventBus(this.eventBus);
 
+    // Wire the IngestionPipelineRunner with the dependencies its Stage III
+    // (LLM Relationship Extraction, spec §8.12) needs. Uses the same LLM
+    // routing as DMR (domain_interpreter primary). Without these deps,
+    // Stage III is a no-op — appropriate for fast unit tests that
+    // construct a minimal pipeline. Real runs pay the per-record cost.
+    const ipRouting = this.configManager.getLLMRouting().domain_interpreter?.primary;
+    if (ipRouting?.provider && ipRouting?.model) {
+      this.ingestionPipeline.setStage3LLMDependencies({
+        llmCaller: this.llmCaller,
+        templateLoader: this.templateLoader,
+        writer: this.writer,
+        provider: ipRouting.provider,
+        model: ipRouting.model,
+        baseUrl: ipRouting.base_url,
+        janumiCodeVersionSha: this.versionSha,
+      });
+    }
+
     this.decisionTraceGenerator = new DecisionTraceGenerator(db);
-    const nmRouting = this.configManager.getLLMRouting().requirements_agent?.primary;
+    const nmRoute = this.configManager.getRoutingModel('requirements_agent');
     this.narrativeMemoryGenerator = new NarrativeMemoryGenerator(this.llmCaller, this.templateLoader, {
-      provider: nmRouting?.provider ?? 'ollama',
-      model: nmRouting?.model ?? 'qwen3.5:9b',
-      baseUrl: nmRouting?.base_url,
+      provider: nmRoute.provider,
+      model: nmRoute.model,
+      baseUrl: nmRoute.baseUrl,
       temperature: 0.3,
       janumiCodeVersionSha: this.versionSha,
     });
@@ -346,14 +365,14 @@ export class OrchestratorEngine {
     // though llm_routing.domain_interpreter was pointing at llamacpp.
     // Borrow domain_interpreter routing for DMR since it's the closest
     // semantic role match (knowledge synthesis from prior decisions).
-    const diRouting = this.configManager.getLLMRouting().domain_interpreter?.primary;
+    const diRoute = this.configManager.getRoutingModel('domain_interpreter');
     this.deepMemoryResearch = new DeepMemoryResearchAgent(
       db, this.llmCaller, weights,
       {
         janumiCodeVersionSha: this.versionSha,
-        provider: diRouting?.provider,
-        model: diRouting?.model,
-        baseUrl: diRouting?.base_url,
+        provider: diRoute.provider,
+        model: diRoute.model,
+        baseUrl: diRoute.baseUrl,
       },
       this.templateLoader,
       undefined, // embedding service — attached later
@@ -375,15 +394,15 @@ export class OrchestratorEngine {
     // Same routing pull as the constructor — DMR's provider/model/baseUrl
     // come from llm_routing.domain_interpreter, not the hardcoded
     // ollama/qwen3.5:9b default.
-    const diRouting = this.configManager.getLLMRouting().domain_interpreter?.primary;
+    const diRoute = this.configManager.getRoutingModel('domain_interpreter');
     (this as unknown as { deepMemoryResearch: DeepMemoryResearchAgent }).deepMemoryResearch =
       new DeepMemoryResearchAgent(
         this.db, this.llmCaller, weights.materiality_weights,
         {
           janumiCodeVersionSha: this.versionSha,
-          provider: diRouting?.provider,
-          model: diRouting?.model,
-          baseUrl: diRouting?.base_url,
+          provider: diRoute.provider,
+          model: diRoute.model,
+          baseUrl: diRoute.baseUrl,
         },
         this.templateLoader,
         embedding,

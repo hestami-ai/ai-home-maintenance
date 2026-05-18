@@ -47,25 +47,59 @@ export interface EmbeddingServiceConfig {
    */
   baseUrl?: string;
   /**
-   * Per-request timeout in milliseconds. Default: 30000 (30s). The embedding
-   * endpoint can legitimately take 10+ seconds on first-call model load or
-   * when the backend is busy serving a concurrent LLM request. Keeping the
-   * timeout permissive avoids the "This operation was aborted" failure
-   * cascade seen when a tighter ceiling collides with a shared backend.
+   * Per-request timeout in milliseconds. Default 180_000 (180s) — aligned
+   * with LLMCaller's `JANUMICODE_LLM_MAX_CALL_SECONDS` (180s default).
+   *
+   * Background: 30s was the original default, predating the LLMCaller's
+   * timeout architecture. On single-GPU systems where Ollama swaps models
+   * between the workflow's primary model (e.g. qwen3.5:9b) and the
+   * embedding model (e.g. qwen3-embedding:8b), a model-swap + cold load
+   * can exceed 30s, aborting the embed call. Combined with no-retry,
+   * those records were silently dropped. Aligning with LLMCaller's
+   * tolerance gives model swaps room to complete.
+   *
+   * Override via `JANUMICODE_EMBED_TIMEOUT_SECONDS` env var.
    */
   timeoutMs?: number;
+  /**
+   * Maximum re-enqueue attempts on transient errors (abort / timeout).
+   * Default 3 — matches LLMCaller's `maxRetries`. Records the embedder
+   * fails to embed are re-enqueued with exponential backoff (1s, 4s, 16s).
+   * Aborts on the final attempt are logged at WARN.
+   *
+   * Override via `JANUMICODE_EMBED_MAX_RETRIES` env var.
+   */
+  maxRetries?: number;
 }
 
 interface QueuedJob {
   recordId: string;
   text: string;
+  /** 0-based attempt count. Each transient failure re-enqueues with attempt+1. */
+  attempt: number;
 }
+
+/**
+ * Timeout + retry defaults, aligned with LLMCaller's timeout architecture.
+ * Both env-overridable so operators can dial without code changes.
+ *
+ * `JANUMICODE_EMBED_TIMEOUT_SECONDS`  — per-call wall-clock budget
+ * `JANUMICODE_EMBED_MAX_RETRIES`      — re-enqueue attempts on transient abort
+ */
+const DEFAULT_TIMEOUT_MS = Number.parseInt(
+  process.env.JANUMICODE_EMBED_TIMEOUT_SECONDS ?? '180', 10) * 1000;
+const DEFAULT_MAX_RETRIES = Number.parseInt(
+  process.env.JANUMICODE_EMBED_MAX_RETRIES ?? '3', 10);
+
+/** Exponential backoff in ms between retry attempts. */
+const RETRY_BACKOFF_MS = [1_000, 4_000, 16_000];
 
 export class EmbeddingService {
   private readonly queue: QueuedJob[] = [];
   private inFlight = 0;
   private running = false;
   private readonly baseUrl: string;
+  private readonly maxRetries: number;
 
   /**
    * Circuit-breaker state. If the embedding backend returns a hard error
@@ -86,6 +120,7 @@ export class EmbeddingService {
     // Generic baseUrl wins over ollama-specific config; legacy field
     // kept so existing callers don't break.
     this.baseUrl = config.baseUrl ?? config.ollamaBaseUrl ?? 'http://localhost:11434';
+    this.maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
   }
 
   start(): void {
@@ -116,7 +151,7 @@ export class EmbeddingService {
     }
     const text = this.extractText(record);
     if (!text) return;
-    this.queue.push({ recordId: record.id, text });
+    this.queue.push({ recordId: record.id, text, attempt: 0 });
     this.tick();
   }
 
@@ -216,20 +251,37 @@ export class EmbeddingService {
       }
 
       if (!this.disabled) {
-        // Aborts (timeout, caller cancel) are benign and recoverable — the
-        // record will get re-embedded the next time the record is modified,
-        // or vector search will just skip it. Logging them at WARN spammed
-        // the output channel every time Ollama was busy. Log at DEBUG instead.
         const isAbort = err instanceof Error
           && (err.name === 'AbortError' || /aborted/i.test(message));
-        if (isAbort) {
-          getLogger().debug('embedding', 'Embed call aborted — record will be retried on next update', {
+
+        // Retry transient aborts (model-swap latency, brief Ollama
+        // contention) by re-enqueueing with exponential backoff. Records
+        // were previously dropped silently after a single 30s abort —
+        // see thin-slice-8 postmortem where ~80% of records went unembedded.
+        if (isAbort && job.attempt < this.maxRetries) {
+          const backoff = RETRY_BACKOFF_MS[Math.min(job.attempt, RETRY_BACKOFF_MS.length - 1)];
+          getLogger().warn('embedding', 'Embed call aborted — re-enqueueing with backoff', {
             recordId: job.recordId,
+            attempt: job.attempt + 1,
+            maxRetries: this.maxRetries,
+            backoffMs: backoff,
+          });
+          setTimeout(() => {
+            // Honor stop() / circuit breaker if either fired during backoff.
+            if (!this.running || this.disabled) return;
+            this.queue.push({ ...job, attempt: job.attempt + 1 });
+            this.tick();
+          }, backoff).unref?.();
+        } else if (isAbort) {
+          getLogger().warn('embedding', 'Embed call aborted on final attempt — record will not be embedded', {
+            recordId: job.recordId,
+            attempts: job.attempt + 1,
           });
         } else {
           getLogger().warn('embedding', 'Failed to embed record', {
             recordId: job.recordId,
             error: message,
+            attempt: job.attempt + 1,
           });
         }
       }
@@ -237,14 +289,14 @@ export class EmbeddingService {
   }
 
   private async callEmbed(text: string): Promise<Float32Array> {
-    // Hard timeout — Ollama's connect can hang indefinitely without one, which
-    // breaks both interactive flows and tests. Default 30s accommodates
-    // first-call model load and Ollama serving a concurrent LLM request;
-    // callers can tighten via config.timeoutMs for synthetic tests.
+    // Wall-clock timeout — mirrors LLMCaller's JANUMICODE_LLM_MAX_CALL_SECONDS
+    // architecture. Default 180s accommodates Ollama model-swap latency
+    // (qwen3.5:9b ↔ qwen3-embedding:8b can take 30-60s of cold-load when
+    // VRAM is tight). Tests can override via config.timeoutMs.
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
-      this.config.timeoutMs ?? 30_000,
+      this.config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     );
     try {
       // Branch on provider — llamacpp uses OpenAI's /v1/embeddings
@@ -305,19 +357,86 @@ export class EmbeddingService {
     return new Float32Array(emb);
   }
 
-  /**
-   * Extract a single text payload from a record's content. Returns null for
-   * structural records (no text to embed).
-   */
   private extractText(record: GovernedStreamRecord): string | null {
-    const c = record.content;
-    if (typeof c.text === 'string') return c.text;
-    if (typeof c.responseText === 'string') return c.responseText;
-    if (typeof c.summary === 'string') return c.summary;
-    if (typeof c.description === 'string') return c.description;
-    if (typeof c.statement === 'string') return c.statement;
-    if (typeof c.rationale === 'string') return c.rationale;
-    return null;
+    return extractEmbeddingText(record);
+  }
+}
+
+/**
+ * Extract a text payload from a record's content for embedding.
+ *
+ * Excludes pure-plumbing records (json_repair_record, file_system_write_record,
+ * mirror/decision-bundle presented, execution-wave timing markers,
+ * workflow_run_closure). Reasoning-trail records are NOT excluded — they
+ * carry the agent reasoning trail used for intent-fidelity / drift detection.
+ *
+ * For included records, walks content recursively and concatenates every
+ * scalar string field, stripping noisy metadata keys (IDs, timestamps,
+ * model/tool config). Truncates at MAX_TEXT_CHARS to bound embedding cost.
+ *
+ * Returns null when the record type is skipped or no extractable text remains.
+ *
+ * Exported for unit-testability; production callers use the EmbeddingService
+ * instance, which delegates here.
+ */
+export function extractEmbeddingText(record: GovernedStreamRecord): string | null {
+  if (SKIPPED_RECORD_TYPES.has(record.record_type)) return null;
+  const parts: string[] = [];
+  collectStrings(record.content, parts, 0);
+  if (parts.length === 0) return null;
+  const joined = parts.join('\n');
+  return joined.length > MAX_TEXT_CHARS ? joined.slice(0, MAX_TEXT_CHARS) : joined;
+}
+
+const MAX_TEXT_CHARS = 8000;
+const MAX_TEXT_DEPTH = 6;
+
+// Pure-plumbing record types skipped at embedding time — they carry no
+// semantic content (timing markers, error envelopes, presentation echoes).
+// Reasoning-trail records (agent_invocation, agent_output,
+// agent_reasoning_step, reasoning_review_*) ARE embedded; the Governed
+// Stream is lossless per spec §1.5 CI-10 and DMR's intent-fidelity /
+// drift-detection use cases need them searchable. DMR down-weights them
+// in materiality scoring rather than excluding them from retrieval.
+const SKIPPED_RECORD_TYPES = new Set<string>([
+  'json_repair_record',
+  'file_system_write_record',
+  'mirror_presented',
+  'decision_bundle_presented',
+  'execution_wave_started',
+  'execution_wave_completed',
+  'workflow_run_closure',
+]);
+
+// Content keys that are pure metadata; their string values pollute the
+// embedding text but carry no semantic signal worth retrieving on.
+const NOISY_KEYS = new Set<string>([
+  'id', 'record_id', 'node_id', 'invariant_id', 'harness_id',
+  'parent_node_id', 'target_record_id', 'source_record_id',
+  'workflow_run_id', 'phase_id', 'sub_phase_id', 'janumicode_version_sha',
+  'started_at', 'produced_at', 'effective_at', 'embedded_at', 'superseded_at',
+  'duration_ms', 'input_tokens', 'output_tokens', 'tool_call_count',
+  'retry_attempts', 'used_fallback', 'response_format', 'tool_count',
+  'provider', 'model', 'temperature', 'max_tokens', 'tools', 'system',
+  'auto_approved', 'auto_approved_by', 'attribution',
+]);
+
+function collectStrings(value: unknown, out: string[], depth: number): void {
+  if (depth > MAX_TEXT_DEPTH) return;
+  if (typeof value === 'string') {
+    const s = value.trim();
+    if (s.length >= 2 && s.length <= 4000) out.push(s);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectStrings(item, out, depth + 1);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) {
+      if (NOISY_KEYS.has(k)) continue;
+      collectStrings(v, out, depth + 1);
+    }
   }
 }
 

@@ -9,6 +9,7 @@ required_variables:
   - functional_requirements_summary
   - non_functional_requirements_summary
   - detail_file_path
+  - detail_file_content
   - janumicode_version_sha
 reasoning_review_triggers:
   - scope_violation
@@ -23,11 +24,30 @@ GOVERNING CONSTRAINTS (apply without exception):
 
 Define the [JC:System Boundary] — what will be built vs what will be integrated with.
 
-REQUIRED OUTPUT: A JSON object matching the `system_boundary` schema:
-- in_scope: array of capabilities/features that will be built
-- out_of_scope: array of capabilities explicitly excluded
-- external_systems: array of systems outside the boundary, each with:
-  - id, name, purpose, interface_type
+REQUIRED OUTPUT: A JSON object whose **top-level keys are exactly** `in_scope`, `out_of_scope`, and `external_systems` (do NOT wrap them under a `system_boundary` key — the top-level object IS the system boundary):
+- `in_scope`: array of **objects**, each with fields `capability` (string), `description` (string), `satisfies_fr` (array of FR ids). NOT an array of strings.
+- `out_of_scope`: array of **objects**, each with fields `capability` (string) and `rationale` (string). NOT an array of strings.
+- `external_systems`: array of objects, each with fields `id`, `name`, `purpose`, `interface_type`.
+
+Valid skeleton:
+```json
+{
+  "in_scope": [
+    { "capability": "...", "description": "...", "satisfies_fr": ["FR-001"] }
+  ],
+  "out_of_scope": [
+    { "capability": "...", "rationale": "..." }
+  ],
+  "external_systems": [
+    { "id": "EXT-001", "name": "...", "purpose": "...", "interface_type": "..." }
+  ]
+}
+```
+Invalid (do NOT do any of these):
+```json
+{ "system_boundary": { "in_scope": [...], ... } }
+{ "in_scope": ["a string instead of an object"] }
+```
 
 Rules:
 - in_scope must cover all Functional Requirements
@@ -39,7 +59,11 @@ Intent: {{intent_statement_summary}}
 Functional Requirements: {{functional_requirements_summary}}
 Non-Functional Requirements: {{non_functional_requirements_summary}}
 
-DETAIL FILE: {{detail_file_path}}
+DETAIL FILE PATH (reference only): {{detail_file_path}}
+
+DEEP MEMORY RESEARCH CONTEXT (full detail file content — read this carefully; it contains prior-phase findings, supersession chains, contradictions, and completeness assessment that govern this sub-phase):
+
+{{detail_file_content}}
 
 # Hard rules — source-item enumeration discipline
 

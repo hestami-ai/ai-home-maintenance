@@ -1,7 +1,0 @@
-{
-  "validator": "nfr_shape_conformance",
-  "sample": "11_requirements_agent__nfr_bloom_skeleton",
-  "passed": false,
-  "expectedFindingCount": 3,
-  "overallAssessment": "The majority of NFRs demonstrate excellent coherence between the observable quality (description) and the measurable target (seed_threshold). However, NFR-024 and NFR-026 suffer from high-severity dimension mismatches where the threshold is too vague or conceptual. NFR-030 requires a minor refinement to ensure the threshold captures the specific detail mandated by the description."
-}

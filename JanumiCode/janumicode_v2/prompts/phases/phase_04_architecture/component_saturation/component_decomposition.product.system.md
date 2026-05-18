@@ -78,6 +78,17 @@ Produce 1–12 tiered children using the tier model below. Do NOT go deeper than
 
 If a child's responsibilities express scope choices → Tier B. If implementation behavior → Tier C or D. Name does not determine tier; responsibility shape does.
 
+## Design principle by tier — applies a DIFFERENT rule at each level
+
+The cohesion rule changes as you go deeper. Applying the wrong principle at the wrong tier produces architecture smells in opposite directions (monolith at the bottom, microservice sprawl at the top).
+
+- **Tier A — Single-Service Principle.** One *business capability* per node. A Tier-A child SHOULD bundle several closely-related responsibilities that belong to the same capability or bounded context. Do NOT split a capability into multiple Tier-A siblings just because it contains more than one verb. Example: *"Work Order Lifecycle"* legitimately covers state transitions, assignment, completion, and audit — these stay together at Tier A. Splitting them into four Tier-A siblings ("State Transition Service", "Assignment Service", "Completion Service", "Audit Service") is over-decomposition at the architectural level and produces chatty cross-component dependencies downstream.
+- **Tier B — bounded scope.** One *scope commitment* per node (a capability slice, a cross-cutting concern, or an architectural choice). Several related responsibilities are still acceptable when they all serve the same scope commitment.
+- **Tier C — Single-Responsibility Principle (module).** One *reason to change* per node. A Tier-C child should be a cohesive module whose responsibilities all change together for the same reason. Multiple responsibilities are fine when they share a single change-axis.
+- **Tier D — Single-Responsibility Principle (atomic).** One coherent unit of work — one tech-spec block, one cluster of implementation tasks, one known file set. Terminal.
+
+**Failure mode to avoid:** applying SRP-style atomization at Tier A. Symptoms include: siblings with single-verb names ("Validate X", "Persist Y", "Emit Z") at Tier A; many Tier-A children with overlapping `dependencies[]` pointing at each other; component-id suffixes drifting toward `-A`, `-B`, `-C` variants of the same noun. If you see these, you are decomposing at the wrong tier — collapse the siblings back into one capability-shaped Tier-A node and let the responsibility-shaped split happen at Tier C.
+
 ## Parent tier hint — use as context, not gospel
 
 You have `parent_tier_hint`. Use it as the caller's expectation, but your `parent_tier_assessment` should reflect your honest read. If they disagree, set `agrees_with_hint: false` and explain.

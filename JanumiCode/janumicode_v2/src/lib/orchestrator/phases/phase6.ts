@@ -102,10 +102,26 @@ export class Phase6Handler implements PhaseHandler {
     // ── 6.1 — Implementation Task Decomposition ──────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'task_skeleton');
 
+    const componentIds = effectiveComponents.components
+      .map(c => (typeof c.id === 'string' ? c.id : ''))
+      .filter(Boolean);
+    const frUserStories = (prior.functionalRequirements?.content.user_stories as Array<Record<string, unknown>>) ?? [];
+    const frIds = frUserStories.map(s => (typeof s.id === 'string' ? s.id : '')).filter(Boolean);
+    const dmr61Seeds = [
+      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
+      ...(prior.dataModels ? [prior.dataModels.recordId] : []),
+      ...(prior.apiDefinitions ? [prior.apiDefinitions.recordId] : []),
+      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
+      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
+      ...(prior.interfaceContracts ? [prior.interfaceContracts.recordId] : []),
+      ...(prior.errorHandlingStrategies ? [prior.errorHandlingStrategies.recordId] : []),
+      ...(prior.configurationParameters ? [prior.configurationParameters.recordId] : []),
+    ];
     const dmr61 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'task_skeleton',
       requestingAgentRole: 'implementation_planner',
-      query: `Implementation task decomposition for: ${componentSummary.slice(0, 400)}`,
+      query: `Implementation task decomposition for components ${componentIds.join(', ')} per data_models ${prior.dataModels?.recordId ?? 'unknown'}, api_definitions ${prior.apiDefinitions?.recordId ?? 'unknown'}, FRs ${frIds.join(', ')}.`,
+      knownRelevantRecordIds: dmr61Seeds,
       detailFileLabel: 'p6_1_tasks',
       requiredOutputSpec: 'implementation_plan JSON — tasks with component_id, dependencies, completion_criteria',
     });
@@ -179,7 +195,7 @@ export class Phase6Handler implements PhaseHandler {
         // saturation/render code sees a clean shape regardless of whether
         // the (rewritten) prompt also enforces them. Logged via the
         // post-coercion warning in normalizeRootTaskShape() below.
-        return normalizeRootTaskShape(t, taskIdx, constraintIds);
+        return normalizeRootTaskShape(t as unknown as Record<string, unknown>, taskIdx, constraintIds);
       });
       rootNodeRecordIds = [];
       rootLogicalIds = [];
@@ -352,6 +368,7 @@ export class Phase6Handler implements PhaseHandler {
       component_model_summary: componentSummary,
       technical_specs_summary: techSpecsSummary,
       detail_file_path: dmr.detailFilePath,
+      detail_file_content: dmr.detailFileContent,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;
@@ -607,7 +624,7 @@ export function normalizeRootTaskShape(
       };
     }
     if (c && typeof c === 'object') {
-      const cobj = c as Record<string, unknown>;
+      const cobj = c as unknown as Record<string, unknown>;
       const criterion_id = typeof cobj.criterion_id === 'string'
         ? cobj.criterion_id
         : `CC-${String(idx + 1).padStart(3, '0')}`;

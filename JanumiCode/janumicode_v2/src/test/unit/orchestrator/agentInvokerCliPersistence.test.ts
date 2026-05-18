@@ -55,6 +55,7 @@ describe('AgentInvoker — CLI invocation persistence', () => {
     invoker = new AgentInvoker(llm, {
       timeoutSeconds: 1,
       idleTimeoutSeconds: 1,
+      noContentTimeoutSeconds: 1,
       bufferMaxEvents: 100,
     });
     invoker.setWriter(writer, 'dev');

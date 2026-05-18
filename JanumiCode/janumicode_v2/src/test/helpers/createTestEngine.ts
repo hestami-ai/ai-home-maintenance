@@ -215,7 +215,18 @@ export async function createTestEngine(
   // hangs on connect. DMR degrades gracefully without semantic similarity —
   // it still uses FTS5 and authority-weighted harvest.
   if (effectiveMode !== 'mock') {
+    // Three-part wiring (mirrors extension.ts):
+    //   1. setEmbeddingService on engine — DMR's vector-similarity path reads
+    //      from the embedding queue's results table at retrieval time.
+    //   2. setEmbeddingService on the WRITER — every successful writeRecord
+    //      call hands the record to embedding.enqueue(). Without this hook,
+    //      records are written but no enqueue ever fires.
+    //   3. start() the embedder so the worker loop drains the queue.
+    // Missing step (2) was the cause of `governed_stream_vec` staying empty
+    // across thin-slice-6 despite (1) and (3) being in place.
     engine.setEmbeddingService(embedding);
+    engine.writer.setEmbeddingService(embedding);
+    embedding.start();
   }
 
   // Register inline fixtures (useful in all modes for fallback)
@@ -321,6 +332,7 @@ export async function createTestEngine(
     mockLLM,
     embedding,
     cleanup() {
+      try { embedding.stop(); } catch { /* ignore */ }
       try { db.close(); } catch { /* ignore */ }
     },
   };

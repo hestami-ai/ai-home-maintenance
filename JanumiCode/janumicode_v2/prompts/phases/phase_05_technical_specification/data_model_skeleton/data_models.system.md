@@ -9,6 +9,7 @@ required_variables:
   - software_domains_summary
   - system_requirements_summary
   - detail_file_path
+  - detail_file_content
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -59,4 +60,8 @@ System Requirements (Phase 3.2 — what each entity must support): {{system_requ
 Component Model: {{component_model_summary}}
 Software Domains: {{software_domains_summary}}
 
-DETAIL FILE: {{detail_file_path}}
+DETAIL FILE PATH (reference only): {{detail_file_path}}
+
+DEEP MEMORY RESEARCH CONTEXT (full detail file content — read this carefully; it contains prior-phase findings, supersession chains, contradictions, and completeness assessment that govern this sub-phase):
+
+{{detail_file_content}}

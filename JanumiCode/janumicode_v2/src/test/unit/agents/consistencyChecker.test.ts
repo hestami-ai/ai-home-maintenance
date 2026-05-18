@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { ConsistencyChecker } from '../../../lib/agents/consistencyChecker';
 import { LLMCaller } from '../../../lib/llm/llmCaller';
+import { ConfigManager } from '../../../lib/config/configManager';
 
 describe('ConsistencyChecker', () => {
-  // Use LLMCaller with no providers — only test deterministic traceability
-  const checker = new ConsistencyChecker(new LLMCaller({ maxRetries: 0 }));
+  // Use LLMCaller with no providers — only test deterministic traceability.
+  // ConfigManager passed for constructor signature; semantic-LLM path not exercised here.
+  const checker = new ConsistencyChecker(
+    new LLMCaller({ maxRetries: 0 }),
+    new ConfigManager(),
+  );
 
   describe('checkTraceability', () => {
     it('passes when all source values have matching targets', () => {

@@ -46,6 +46,26 @@ export interface BuildManifestInputs {
   complianceIds: string[];
   integrations: Integration[];
   vocabulary: VocabularyTerm[];
+  /**
+   * Verification & validation requirement ids (VV-*) from Phase 1.0e
+   * discovery. Routed to `cross_cutting.vv_requirements` by default —
+   * V&V targets are typically product-wide thresholds, not release-
+   * scheduled artefacts. Present so NFR decomposition roots that trace
+   * exclusively to a VV-* id can anchor to a release (see
+   * `assignReleaseToRoot` cross-cutting fallback in phase2.ts).
+   */
+  vvRequirementIds?: string[];
+  /**
+   * Quality attribute ids (synthetic QA-N indices over the accepted
+   * `qualityAttributes[]` string list at the 1.5 gate). Routed to
+   * `cross_cutting.quality_attributes`.
+   */
+  qualityAttributeIds?: string[];
+  /**
+   * Technical constraint ids (TECH-*) from Phase 1.0c discovery. Routed
+   * to `cross_cutting.technical_constraints`.
+   */
+  technicalConstraintIds?: string[];
 }
 
 export interface BuildManifestResult {
@@ -60,7 +80,17 @@ export interface BuildManifestResult {
 // ── Helpers ────────────────────────────────────────────────────────
 
 function emptyContains(): ReleaseContents {
-  return { journeys: [], workflows: [], entities: [], compliance: [], integrations: [], vocabulary: [] };
+  return {
+    journeys: [], workflows: [], entities: [],
+    compliance: [], integrations: [], vocabulary: [],
+    // VV / QA / TECH default to cross_cutting (see buildReleaseManifest
+    // body). Per-release slots stay empty by default; a future trigger
+    // rule (e.g. workflow.triggers.kind === 'vv_check') could promote a
+    // specific id into a release's contains[type], at which point the
+    // builder's per-release VV/QA/TECH loops would mirror the
+    // compliance/integration override pattern.
+    vv_requirements: [], quality_attributes: [], technical_constraints: [],
+  };
 }
 
 function uniqSorted(xs: string[]): string[] {
@@ -254,6 +284,19 @@ export function buildReleaseManifest(input: BuildManifestInputs): BuildManifestR
   // Always cross_cutting. Canonical vocabulary is product-wide.
   const crossCuttingVocabulary: string[] = input.vocabulary.map(v => v.id);
 
+  // ── VV / QA / TECH ───────────────────────────────────────────────
+  // Default routing: all three default to cross_cutting. These are
+  // typically product-wide quality / verification / tech-stack
+  // constraints, not release-specific deliverables, and the 1.8 LLM
+  // does not currently produce a release placement for them. Anchoring
+  // them in cross_cutting keeps the manifest coverage-clean while
+  // letting `assignReleaseToRoot` resolve NFR roots whose only trace
+  // ids point at a VV-* / QA-N / TECH-* (cross-cutting-only roots
+  // anchor to Release 1 rather than Backlog — see phase2.ts).
+  const crossCuttingVv: string[] = input.vvRequirementIds ?? [];
+  const crossCuttingQa: string[] = input.qualityAttributeIds ?? [];
+  const crossCuttingTech: string[] = input.technicalConstraintIds ?? [];
+
   // ── Assemble ─────────────────────────────────────────────────────
   const releases: ReleaseV2[] = llmReleases.map(r => {
     const c = byRelease.get(r.release_id)!;
@@ -270,6 +313,11 @@ export function buildReleaseManifest(input: BuildManifestInputs): BuildManifestR
         compliance: uniqSorted(c.compliance),
         integrations: uniqSorted(c.integrations),
         vocabulary: uniqSorted(c.vocabulary),
+        // New slots — empty until the builder caller is wired to feed
+        // upstream VV / QA / TECH ids.
+        vv_requirements: uniqSorted(c.vv_requirements),
+        quality_attributes: uniqSorted(c.quality_attributes),
+        technical_constraints: uniqSorted(c.technical_constraints),
       },
     };
   });
@@ -281,6 +329,9 @@ export function buildReleaseManifest(input: BuildManifestInputs): BuildManifestR
       compliance:   uniqSorted(crossCuttingCompliance),
       integrations: uniqSorted(crossCuttingIntegrations),
       vocabulary:   uniqSorted(crossCuttingVocabulary),
+      vv_requirements:       uniqSorted(crossCuttingVv),
+      quality_attributes:    uniqSorted(crossCuttingQa),
+      technical_constraints: uniqSorted(crossCuttingTech),
     },
     unplacedJourneys: unplacedJourneys.sort(),
     orphanEntities: orphanEntities.sort(),

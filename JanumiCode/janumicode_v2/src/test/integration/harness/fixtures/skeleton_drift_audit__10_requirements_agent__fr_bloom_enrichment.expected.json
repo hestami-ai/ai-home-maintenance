@@ -1,7 +1,0 @@
-{
-  "validator": "skeleton_drift_audit",
-  "sample": "10_requirements_agent__fr_bloom_enrichment",
-  "passed": false,
-  "expectedFindingCount": 1,
-  "overallAssessment": "The agent successfully echoed all high-level story fields (id, role, action, outcome, traces_to) unchanged. However, the measurable condition for the seed acceptance criterion (AC-014) was changed from a vague statement to a highly specific technical assertion, constituting a HIGH severity drift from the skeleton commitment."
-}

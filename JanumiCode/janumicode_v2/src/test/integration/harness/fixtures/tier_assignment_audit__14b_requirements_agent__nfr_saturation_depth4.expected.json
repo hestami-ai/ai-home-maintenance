@@ -1,7 +1,0 @@
-{
-  "validator": "tier_assignment_audit",
-  "sample": "14b_requirements_agent__nfr_saturation_depth4",
-  "passed": true,
-  "expectedFindingCount": 0,
-  "overallAssessment": "The agent successfully decomposed the complex Non-Functional Requirement into distinct, logically separated commitments. The tier assignments (B, B, C) are consistent with the nature of the sub-commitments (Policy Thresholds and Measurement Verification). The agent correctly identified that the parent NFR represents a broad quality sub-area (Tier A), overriding the provided hint (Tier C) with a strong, justifiable rationale."
-}

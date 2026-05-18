@@ -64,6 +64,7 @@ describe('ExecutorAgent — backing tool routing', () => {
     agentInvoker = new AgentInvoker(llm, {
       timeoutSeconds: 1,
       idleTimeoutSeconds: 1,
+      noContentTimeoutSeconds: 1,
       bufferMaxEvents: 100,
     });
 
@@ -101,18 +102,20 @@ describe('ExecutorAgent — backing tool routing', () => {
     expect(invokeArgs.backingTool).toBe('direct_llm_api');
   });
 
-  it('still records the task infrastructure on the agent_invocation audit row', async () => {
+  it('forwards task infrastructure + task_id to AgentInvoker via traceContext for audit-row capture', async () => {
+    // The agent_invocation record is written by AgentInvoker.invokeCLI
+    // (CLI persistence parity work). ExecutorAgent's contract is to
+    // ensure the audit fields (task_id, taskBackingTool) reach the
+    // invoker via traceContext so they land in the record's content.
     const executor = new ExecutorAgent(db, agentInvoker, writer, eventBus, testId);
     await executor.execute(TASK, runId, 'prompt content', '/tmp', 'dev');
 
-    const row = db.prepare(
-      `SELECT content FROM governed_stream
-       WHERE workflow_run_id = ? AND record_type = 'agent_invocation'
-       ORDER BY produced_at DESC LIMIT 1`,
-    ).get(runId) as { content: string };
-    const content = JSON.parse(row.content) as { backing_tool: string; task_id: string };
-    // The task's infra description is still preserved for audit.
-    expect(content.backing_tool).toBe('DBOS Middleware / PostgreSQL RLS Policies');
-    expect(content.task_id).toBe('TASK-SEC-001');
+    const invokeArgs = invokeSpy.mock.calls[0][0] as {
+      traceContext?: { taskId?: string; taskBackingTool?: string; phaseId?: string };
+    };
+    expect(invokeArgs.traceContext).toBeDefined();
+    expect(invokeArgs.traceContext?.taskId).toBe('TASK-SEC-001');
+    expect(invokeArgs.traceContext?.taskBackingTool).toBe('DBOS Middleware / PostgreSQL RLS Policies');
+    expect(invokeArgs.traceContext?.phaseId).toBe('9');
   });
 });

@@ -24,9 +24,21 @@ export default defineConfig({
     include: [
       'src/test/unit/**/*.test.ts',
       'src/test/integration/**/*.test.ts',
+      // Deterministic regression layer — fast, no Ollama. Runs on every
+      // `pnpm test` and `pnpm test:unit` so a template change that breaks
+      // a fixture's required-variables contract fails the build instantly.
+      'src/test/regression/**/*.test.ts',
     ],
     exclude: [
-      'src/test/prompt-probes/**',
+      // Archive of pre-regression-suite probes / captures, kept for
+      // historical reference only. See src/test/_archive/README.md.
+      'src/test/_archive/**',
+      // Live-ollama tests have their own config (vitest.live.config.ts)
+      // with fileParallelism: false and longer timeouts. Excluded here so
+      // `pnpm test` runs only mock-LLM tests without depending on Ollama.
+      '**/*.live.test.ts',
+      // The live regression layer has its own config + Ollama precheck.
+      '**/*.regression.live.test.ts',
     ],
     // Default to node env. Card / DOM tests opt into happy-dom via the
     // `// @vitest-environment happy-dom` annotation at the top of the file.

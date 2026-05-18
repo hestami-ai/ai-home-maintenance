@@ -1,7 +1,0 @@
-{
-  "validator": "persona_journey_coupling",
-  "sample": "06_domain_interpreter__user_journey_bloom",
-  "passed": true,
-  "expectedFindingCount": 0,
-  "overallAssessment": "The output successfully covers all defined personas (P-HOMEOWNER, P-INVESTOR, P-PROVIDER, P-CAM-MANAGER, P-BOARD, P-ADMIN, P-TENANT, P-FINANCE-OFFICER, P-AUDITOR) as active actors in the proposed user journeys. All step actors resolve correctly to a known persona or 'System'. The 'unreached_personas' list is correctly empty, indicating full coverage of the persona set."
-}

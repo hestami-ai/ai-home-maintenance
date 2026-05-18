@@ -320,7 +320,7 @@ function formatRootTaskForPrompt(t: DecompositionTask): string {
   // Surface parent traces_to so saturation children can re-cite parent
   // responsibility / Tech-Spec ids in their own traces_to[]. Without
   // this the model has no anchor and either omits or fabricates.
-  const traces = ((t as Record<string, unknown>).traces_to as string[] | undefined)?.join(', ') || '(none)';
+  const traces = ((t as unknown as Record<string, unknown>).traces_to as string[] | undefined)?.join(', ') || '(none)';
   return [
     `Task id: ${t.id}`,
     `Name: ${t.name}`,

@@ -1,0 +1,798 @@
+{
+  "fixture_id": "phase01_entities_bloom__tinyurl-001",
+  "description": "Phase 1.4 entities bloom: enumerate data entities with id / businessDomainId / keyAttributes / relationships covering accepted domains / workflows / journeys.",
+  "extracted_from_run": "8dd753fc-8861-48f0-822b-af64a2468bf3",
+  "extracted_from_db": "test-and-evaluation/thin-slice-workspaces/thin-slice-workspace-11/.janumicode/test-harness/1778691029124.db",
+  "extracted_at": "2026-05-14T19:02:38.540Z",
+  "template_ref": {
+    "agent_role": "domain_interpreter",
+    "sub_phase": "entities_bloom",
+    "lens": "product"
+  },
+  "invocation_params": {
+    "provider": "ollama",
+    "model": "qwen3.5:9b",
+    "temperature": 0.5,
+    "response_format": "json"
+  },
+  "template_variables": {
+    "accepted_domains": "- **DOM-URL-SHORTENER**: URL Shortening Engine — Core logic accepting long URLs, validating length (2048 chars), and assigning unique short tokens.\n- **DOM-SLUG-GENERATOR**: Unique Slug Logic — Handles collision prevention ensuring global uniqueness for every 6-character token.\n- **DOM-REDIRECT-ENGINE**: Redirect Logic — Handles the HTTP 302 response generation and destination lookup.\n- **DOM-COUNTER-ANALYTICS**: Click Counter Service — Tracks and increments click counters for every successful redirect request.\n- **DOM-STORAGE-ENCRYPT**: Encrypted Storage Layer — Manages encrypted at-rest storage for submitted URLs to treat them as sensitive data.\n- **DOM-SECURITY-FILTER**: Threat Detection Gateway — Scans incoming/outgoing URLs for malicious redirects or sensitive content leakage.\n- **DOM-API-GATEWAY**: Public API Interface — Manages public access endpoints, authentication bypass, and input sanitization.\n- **DOM-RATE-LIMITER**: DoS Protection System — Implements rate limiting to prevent abuse and protect against brute-force attacks.\n- **DOM-CACHE-LAYER**: Performance Cache — Stores short-to-medium term redirects to reduce database load and speed up delivery.\n- **DOM-AUDIT-LOGGING**: System Audit Logging — Maintains immutable logs of all API calls for debugging and compliance.\n- **DOM-BACKUP-OPS**: Backup and Recovery — Handles data redundancy and disaster recovery for link data.\n- **DOM-RETENTION-POLICY**: Data Retention Manager — Manages lifecycle of links (deletion policies) to ensure compliance with data privacy.",
+    "accepted_workflows": "(none)",
+    "accepted_personas": "- **P-SHARER**: Link Sharer — Any user needing to share a long URL but wants to minimize space and clutter. Does not require login or persistence.\n  Goals: Obtain a short URL for a long target immediately; Ensure the short URL works reliably for others\n  Pain points: Long URLs break text layout or UI limits; Uncertainty if a shared link works for recipients\n- **P-CLICKER**: Link Clicker — Any user who receives or encounters a short URL. Interaction is passive (click -> redirect).\n  Goals: Reach the intended destination instantly; Not be exposed to malicious redirects or broken links\n  Pain points: Slow redirects or connection timeouts; Not knowing if the link was clicked or tracked\n- **P-API-CLIENT**: Programmatic Client — Automated systems or scripts that interact with the public API to fetch or create links without human intervention.\n  Goals: Integrate link shortening into their own workflows; Ensure API availability for their bots\n  Pain points: API rate limits blocking their automation; Error handling when links expire\n- **P-PLATFORM-OPS**: Platform Operations — Internal team managing the uptime and health of the public service infrastructure.\n  Goals: Maintain 99.9% uptime for public redirects; Monitor security logs for threats\n  Pain points: Database connection failures; High latency in redirect chains\n- **P-MARKETING-MGR**: Marketing Manager — Uses the public shortener for campaign tracking and analytics.\n  Goals: Track click volume on specific campaigns; Ensure links do not expire prematurely\n  Pain points: Difficulty distinguishing clicks from ads; Confusion over which links drove conversions",
+    "accepted_journeys": "- **UJ-SUBMIT-NEW-LINK** [Phase 1] User Submits New Short URL Request (P-SHARER): P-SHARER pastes a long URL into the input field and submits a request to create a short link.\n- **UJ-CLICK-SHORT-URL** [Phase 1] Clicker Navigates to Short Link (P-CLICKER): P-CLICKER receives a short URL and clicks it to reach the target destination.\n- **UJ-REQUEST-QUOTA** [Phase 1] Client Requests Batch Link Creation (P-API-CLIENT): P-API-CLIENT script sends multiple POST requests to the API endpoint.\n- **UJ-ENFORCE-RATE-LIMIT** [Phase 1] Client Encounters Rate Limit (P-API-CLIENT): P-API-CLIENT hits DoS protection threshold and receives a 429 response.\n- **UJ-REQUEST-GDPR-EXPORT** [Phase 1] Sharer Requests Data Export (P-SHARER): EU-based P-SHARER requests their data under GDPR Right to Access.\n- **UJ-REQUEST-PII-DELETION** [Phase 1] Sharer Requests Right to be Forgotten (P-SHARER): P-SHARER invokes deletion right for their specific slug.\n- **UJ-MARKET-TRACK-CLICKS** [Phase 1] Manager Views Campaign Analytics (P-MARKETING-MGR): P-MARKETING-MGR accesses analytics dashboard for a specific tracking link.\n- **UJ-MARKET-CREATE-CAMPAIGN** [Phase 1] Manager Creates Tracking Link (P-MARKETING-MGR): P-MARKETING-MGR uses the public shortener for campaign tracking.\n- **UJ-OPS-MONITOR-HEALTH** [Phase 1] Ops Team Monitors Service Uptime (P-PLATFORM-OPS): P-PLATFORM-OPS reviews system metrics to ensure availability targets.\n- **UJ-OPS-TRIGGER-RECOVERY** [Phase 1] Ops Team Initiates Disaster Recovery (P-PLATFORM-OPS): P-PLATFORM-OPS detects regional failure and triggers RTO plan.\n- **UJ-HOST-ENFORCE-HTTPS** [Phase 1] System Enforces HTTPS on HTTP Request (P-SHARER): P-SHARER attempts to use HTTP endpoint, system redirects to HTTPS.\n- **UJ-SEC-REJECT-MALICIOUS** [Phase 1] System Blocks Malicious URL Submission (P-SHARER): P-SHARER submits a link known or detected to be malicious by security filter.\n- **UJ-RETENTION-NOTIFY-EXPIRY** [Phase 1] System Notifies Manager of Retention Policy Expiry (P-MARKETING-MGR): P-MARKETING-MGR receives notice that their tracking link is subject to deletion per policy.\n- **UJ-OPS-AUDIT-LOG-REVIEW** [Phase 1] Ops Team Reviews System Audit Logs (P-PLATFORM-OPS): P-PLATFORM-OPS inspects logs for debugging or compliance verification.\n- **UJ-SECURITY-ENCRYPT-STORE** [Phase 1] System Encrypts Stored URL at Rest (P-PLATFORM-OPS): System step ensuring compliance with AES-256 storage requirement.\n- **UJ-CLICK-FAILURE-TIMEOUT** [Phase 1] Clicker Encounters Redirect Timeout (P-CLICKER): P-CLICKER attempts to access a link that times out during redirect logic.",
+    "human_feedback": "(none)",
+    "janumicode_version_sha": ""
+  },
+  "baseline": {
+    "response_text": "{\n  \"kind\": \"entities_bloom\",\n  \"entities\": [\n    {\n      \"id\": \"ENT-LINK\",\n      \"businessDomainId\": \"DOM-URL-SHORTENER\",\n      \"name\": \"Link Definition\",\n      \"description\": \"Core entity representing a submitted short link and its target destination.\",\n      \"keyAttributes\": [\n        \"link_id\",\n        \"slug_token\",\n        \"created_at\"\n      ],\n      \"relationships\": [\n        \"belongs_to CLIENT-IDENTITY\",\n        \"has_many CLICK-EVENT\",\n        \"links_to ENCRYPTED-PAYLOAD\"\n      ],\n      \"source\": \"document-specified\"\n    },\n    {\n      \"id\": \"ENT-SLUG-CONFIG\",\n      \"businessDomainId\": \"DOM-SLUG-GENERATOR\",\n      \"name\": \"Slug Generation Configuration\",\n      \"description\": \"Defines how unique slugs are generated, including prefix rules and character sets.\",\n      \"keyAttributes\": [\n        \"config_id\",\n        \"character_set\",\n        \"length_target\"\n      ],\n      \"relationships\": [\n        \"used_by ENT-SLUG-POOL\",\n        \"owned_by DOM-SLUG-GENERATOR\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-SLUG-POOL\",\n      \"businessDomainId\": \"DOM-SLUG-GENERATOR\",\n      \"name\": \"Slug Pool Registry\",\n      \"description\": \"Track active slug tokens to prevent collisions and manage expiration.\",\n      \"keyAttributes\": [\n        \"slug_value\",\n        \"pool_status\",\n        \"reserved_until\"\n      ],\n      \"relationships\": [\n        \"belongs_to ENT-SLUG-CONFIG\",\n        \"referenced_by ENT-LINK\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-REDIRECT-CONFIG\",\n      \"businessDomainId\": \"DOM-REDIRECT-ENGINE\",\n      \"name\": \"Redirect Configuration\",\n      \"description\": \"Settings controlling HTTP 302 responses and destination validation rules.\",\n      \"keyAttributes\": [\n        \"rule_id\",\n        \"response_code\",\n        \"target_validator\"\n      ],\n      \"relationships\": [\n        \"used_by ENT-REDIRECT-LOG\",\n        \"owned_by DOM-REDIRECT-ENGINE\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-REDIRECT-LOG\",\n      \"businessDomainId\": \"DOM-REDIRECT-ENGINE\",\n      \"name\": \"Redirect Execution Log\",\n      \"description\": \"Records every successful redirect execution including latency and status.\",\n      \"keyAttributes\": [\n        \"log_id\",\n        \"link_id\",\n        \"executed_at\"\n      ],\n      \"relationships\": [\n        \"references ENT-LINK\",\n        \"aggregated_by ENT-CAMPAIGN-STAT\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-CLICK-EVENT\",\n      \"businessDomainId\": \"DOM-COUNTER-ANALYTICS\",\n      \"name\": \"Click Event Record\",\n      \"description\": \"Individual click tracking for real-time analytics and attribution.\",\n      \"keyAttributes\": [\n        \"event_id\",\n        \"link_id\",\n        \"client_ip\"\n      ],\n      \"relationships\": [\n        \"belongs_to ENT-LINK\",\n        \"grouped_by ENT-CAMPAIGN\"\n      ],\n      \"source\": \"document-specified\"\n    },\n    {\n      \"id\": \"ENT-CAMPAIGN\",\n      \"businessDomainId\": \"DOM-COUNTER-ANALYTICS\",\n      \"name\": \"Marketing Campaign\",\n      \"description\": \"A group of links tracked together for marketing manager reporting.\",\n      \"keyAttributes\": [\n        \"campaign_id\",\n        \"name\",\n        \"owner_id\"\n      ],\n      \"relationships\": [\n        \"contains ENT-CLICK-EVENT\",\n        \"created_by P-MARKETING-MGR\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-CAMPAIGN-STAT\",\n      \"businessDomainId\": \"DOM-COUNTER-ANALYTICS\",\n      \"name\": \"Campaign Aggregate Statistics\",\n      \"description\": \"Pre-aggregated metrics for the marketing manager dashboard to improve performance.\",\n      \"keyAttributes\": [\n        \"stat_id\",\n        \"campaign_id\",\n        \"period_start\"\n      ],\n      \"relationships\": [\n        \"summarizes ENT-CLICK-EVENT\",\n        \"used_by P-MARKETING-MGR\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-IP-GEO-DATA\",\n      \"businessDomainId\": \"DOM-COUNTER-ANALYTICS\",\n      \"name\": \"IP Geolocation Data\",\n      \"description\": \"Map IP addresses to geographic regions for analytics visualization.\",\n      \"keyAttributes\": [\n        \"ip_range\",\n        \"country_code\",\n        \"updated_at\"\n      ],\n      \"relationships\": [\n        \"linked_to ENT-CLICK-EVENT\",\n        \"referenced_by ENT-CAMPAIGN\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-ENCRYPTED-PAYLOAD\",\n      \"businessDomainId\": \"DOM-STORAGE-ENCRYPT\",\n      \"name\": \"Encrypted Target Payload\",\n      \"description\": \"The encrypted version of the original long URL stored at rest.\",\n      \"keyAttributes\": [\n        \"encrypted_data\",\n        \"key_id\",\n        \"created_at\"\n      ],\n      \"relationships\": [\n        \"stores ENT-LINK\",\n        \"managed_by DOM-STORAGE-ENCRYPT\"\n      ],\n      \"source\": \"document-specified\"\n    },\n    {\n      \"id\": \"ENT-DECRYPTION-META\",\n      \"businessDomainId\": \"DOM-STORAGE-ENCRYPT\",\n      \"name\": \"Decryption Metadata\",\n      \"description\": \"Metadata required to safely decrypt the payload during redirect.\",\n      \"keyAttributes\": [\n        \"metadata_hash\",\n        \"encryption_version\",\n        \"status\"\n      ],\n      \"relationships\": [\n        \"references ENT-ENCRYPTED-PAYLOAD\",\n        \"linked_to ENT-LINK\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-THREAT-INDICATOR\",\n      \"businessDomainId\": \"DOM-SECURITY-FILTER\",\n      \"name\": \"Threat Indicator Registry\",\n      \"description\": \"Database of known malicious patterns and IPs to block redirects.\",\n      \"keyAttributes\": [\n        \"indicator_id\",\n        \"threat_type\",\n        \"severity\"\n      ],\n      \"relationships\": [\n        \"blocked_by ENT-BLOCKLIST-RULE\",\n        \"scanned_by ENT-SCAN-RESULT\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-SCAN-RESULT\",\n      \"businessDomainId\": \"DOM-SECURITY-FILTER\",\n      \"name\": \"Security Scan Result\",\n      \"description\": \"Result of a security scan for a specific incoming URL.\",\n      \"keyAttributes\": [\n        \"scan_id\",\n        \"url_hash\",\n        \"risk_score\"\n      ],\n      \"relationships\": [\n        \"generated_by ENT-THREAT-INDICATOR\",\n        \"used_by ENT-ABUSE-REPORT\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-BLOCKLIST-RULE\",\n      \"businessDomainId\": \"DOM-SECURITY-FILTER\",\n      \"name\": \"Blocklist Rule\",\n      \"description\": \"Configuration rules for IP ranges or domains to block.\",\n      \"keyAttributes\": [\n        \"rule_id\",\n        \"domain_pattern\",\n        \"action_type\"\n      ],\n      \"relationships\": [\n        \"managed_by DOM-SECURITY-FILTER\",\n        \"applied_to ENT-THREAT-INDICATOR\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-API-KEY\",\n      \"businessDomainId\": \"DOM-API-GATEWAY\",\n      \"name\": \"API Access Key\",\n      \"description\": \"Credentials for external clients to access the public API.\",\n      \"keyAttributes\": [\n        \"key_hash\",\n        \"permissions\",\n        \"expires_at\"\n      ],\n      \"relationships\": [\n        \"used_by ENT-API-CLIENT\",\n        \"restricted_by DOM-RATE-LIMITER\"\n      ],\n      \"source\": \"document-specified\"\n    },\n    {\n      \"id\": \"ENT-API-CLIENT\",\n      \"businessDomainId\": \"DOM-API-GATEWAY\",\n      \"name\": \"API Client Profile\",\n      \"description\": \"Profile of an automated system interacting with the service.\",\n      \"keyAttributes\": [\n        \"client_id\",\n        \"name\",\n        \"last_seen\"\n      ],\n      \"relationships\": [\n        \"uses ENT-API-KEY\",\n        \"audited_by DOM-AUDIT-LOGGING\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-AUTH-TOKEN\",\n      \"businessDomainId\": \"DOM-API-GATEWAY\",\n      \"name\": \"Authentication Token\",\n      \"description\": \"Transient token for session management and client validation.\",\n      \"keyAttributes\": [\n        \"token_hash\",\n        \"issued_at\",\n        \"ttl\"\n      ],\n      \"relationships\": [\n        \"issued_to ENT-API-CLIENT\",\n        \"revoked_by ENT-ABUSE-REPORT\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-RATE-LIMIT-BUCKET\",\n      \"businessDomainId\": \"DOM-RATE-LIMITER\",\n      \"name\": \"Rate Limit Bucket\",\n      \"description\": \"State container for rate limiting per client or IP address.\",\n      \"keyAttributes\": [\n        \"bucket_id\",\n        \"request_count\",\n        \"window_seconds\"\n      ],\n      \"relationships\": [\n        \"monitored_by ENT-RATE-LIMIT-CONFIG\",\n        \"protected_by DOM-RATE-LIMITER\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-RATE-LIMIT-CONFIG\",\n      \"businessDomainId\": \"DOM-RATE-LIMITER\",\n      \"name\": \"Rate Limit Configuration\",\n      \"description\": \"Thresholds and window sizes for preventing DoS and abuse.\",\n      \"keyAttributes\": [\n        \"config_id\",\n        \"threshold\",\n        \"reset_policy\"\n      ],\n      \"relationships\": [\n        \"applies_to ENT-RATE-LIMIT-BUCKET\",\n        \"managed_by DOM-RATE-LIMITER\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-IP-SCORE\",\n      \"businessDomainId\": \"DOM-RATE-LIMITER\",\n      \"name\": \"IP Reputation Score\",\n      \"description\": \"Dynamic score of an IP address based on request patterns.\",\n      \"keyAttributes\": [\n        \"ip_address\",\n        \"current_score\",\n        \"risk_level\"\n      ],\n      \"relationships\": [\n        \"updated_by ENT-ABUSE-REPORT\",\n        \"checked_by DOM-SECURITY-FILTER\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-ABUSE-REPORT\",\n      \"businessDomainId\": \"DOM-RATE-LIMITER\",\n      \"name\": \"Abuse Incident Report\",\n      \"description\": \"Log of abusive behaviors detected by the rate limiting system.\",\n      \"keyAttributes\": [\n        \"incident_id\",\n        \"source_ip\",\n        \"action_taken\"\n      ],\n      \"relationships\": [\n        \"blocks ENT-API-CLIENT\",\n        \"updates ENT-IP-SCORE\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-CACHE-ENTRY\",\n      \"businessDomainId\": \"DOM-CACHE-LAYER\",\n      \"name\": \"Cache Key Entry\",\n      \"description\": \"Stored short URL mapping in the performance cache layer.\",\n      \"keyAttributes\": [\n        \"cache_key\",\n        \"ttl\",\n        \"value_hash\"\n      ],\n      \"relationships\": [\n        \"serves ENT-LINK\",\n        \"managed_by DOM-CACHE-LAYER\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-CACHE-TASK\",\n      \"businessDomainId\": \"DOM-CACHE-LAYER\",\n      \"name\": \"Cache Management Task\",\n      \"description\": \"Scheduled job to populate cache or warm specific keys.\",\n      \"keyAttributes\": [\n        \"task_id\",\n        \"scheduled_for\",\n        \"priority\"\n      ],\n      \"relationships\": [\n        \"processes ENT-CACHE-ENTRY\",\n        \"scheduled_by DOM-CACHE-LAYER\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-CACHE-EVICT-LOG\",\n      \"businessDomainId\": \"DOM-CACHE-LAYER\",\n      \"name\": \"Cache Eviction Log\",\n      \"description\": \"Track when and why cache entries were removed for capacity.\",\n      \"keyAttributes\": [\n        \"eviction_id\",\n        \"key_removed\",\n        \"reason\"\n      ],\n      \"relationships\": [\n        \"references ENT-CACHE-ENTRY\",\n        \"logged_by DOM-AUDIT-LOGGING\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-AUDIT-RECORD\",\n      \"businessDomainId\": \"DOM-AUDIT-LOGGING\",\n      \"name\": \"Audit Log Record\",\n      \"description\": \"Immutable record of API calls, errors, and system events.\",\n      \"keyAttributes\": [\n        \"log_id\",\n        \"user_agent\",\n        \"timestamp\"\n      ],\n      \"relationships\": [\n        \"created_by DOM-AUDIT-LOGGING\",\n        \"reviewed_by P-PLATFORM-OPS\"\n      ],\n      \"source\": \"document-specified\"\n    },\n    {\n      \"id\": \"ENT-AUDIT-INDEX\",\n      \"businessDomainId\": \"DOM-AUDIT-LOGGING\",\n      \"name\": \"Audit Index Map\",\n      \"description\": \"Efficient index structure for querying audit logs by date or type.\",\n      \"keyAttributes\": [\n        \"index_id\",\n        \"date_range\",\n        \"record_hash\"\n      ],\n      \"relationships\": [\n        \"points_to ENT-AUDIT-RECORD\",\n        \"used_by DOM-AUDIT-LOGGING\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-GDPR-REQUEST\",\n      \"businessDomainId\": \"DOM-AUDIT-LOGGING\",\n      \"name\": \"GDPR Compliance Request\",\n      \"description\": \"Record of Data Subject Access Requests for export or deletion.\",\n      \"keyAttributes\": [\n        \"request_id\",\n        \"ip_fingerprint\",\n        \"status\"\n      ],\n      \"relationships\": [\n        \"triggers ENT-PII-DELETION-QUEUE\",\n        \"handled_by DOM-AUDIT-LOGGING\"\n      ],\n      \"source\": \"document-specified\"\n    },\n    {\n      \"id\": \"ENT-BACKUP-JOB\",\n      \"businessDomainId\": \"DOM-BACKUP-OPS\",\n      \"name\": \"Backup Execution Job\",\n      \"description\": \"Task representing a scheduled or manual backup run.\",\n      \"keyAttributes\": [\n        \"job_id\",\n        \"target_region\",\n        \"status\"\n      ],\n      \"relationships\": [\n        \"produces ENT-SNAPSHOT-FILE\",\n        \"tracked_by DOM-BACKUP-OPS\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-SNAPSHOT-FILE\",\n      \"businessDomainId\": \"DOM-BACKUP-OPS\",\n      \"name\": \"Backup Snapshot\",\n      \"description\": \"Physical or logical container holding the backup data.\",\n      \"keyAttributes\": [\n        \"file_id\",\n        \"region\",\n        \"size_bytes\"\n      ],\n      \"relationships\": [\n        \"created_by ENT-BACKUP-JOB\",\n        \"managed_by DOM-BACKUP-OPS\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-RECOVERY-PLAN\",\n      \"businessDomainId\": \"DOM-BACKUP-OPS\",\n      \"name\": \"Disaster Recovery Plan\",\n      \"description\": \"Procedure and resource map for restoring service after failure.\",\n      \"keyAttributes\": [\n        \"plan_id\",\n        \"rto_target\",\n        \"version\"\n      ],\n      \"relationships\": [\n        \"executes ENT-RECOVERY-STATE\",\n        \"monitored_by P-PLATFORM-OPS\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-POLICY-RULE\",\n      \"businessDomainId\": \"DOM-RETENTION-POLICY\",\n      \"name\": \"Data Retention Rule\",\n      \"description\": \"Configuration for how long link data must be kept.\",\n      \"keyAttributes\": [\n        \"rule_id\",\n        \"retention_days\",\n        \"applicable_domain\"\n      ],\n      \"relationships\": [\n        \"enforced_by ENT-RETENTION-TASK\",\n        \"defined_by DOM-RETENTION-POLICY\"\n      ],\n      \"source\": \"document-specified\"\n    },\n    {\n      \"id\": \"ENT-RETENTION-TASK\",\n      \"businessDomainId\": \"DOM-RETENTION-POLICY\",\n      \"name\": \"Retention Cleanup Task\",\n      \"description\": \"Automated job to delete expired data per policy rules.\",\n      \"keyAttributes\": [\n        \"task_id\",\n        \"cron_expression\",\n        \"next_run\"\n      ],\n      \"relationships\": [\n        \"executes ENT-POLICY-RULE\",\n        \"logs ENT-LIFECYCLE-LOG\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-LIFECYCLE-LOG\",\n      \"businessDomainId\": \"DOM-RETENTION-POLICY\",\n      \"name\": \"Link Lifecycle Event Log\",\n      \"description\": \"History of a link's life including creation and deletion events.\",\n      \"keyAttributes\": [\n        \"event_id\",\n        \"link_id\",\n        \"lifecycle_stage\"\n      ],\n      \"relationships\": [\n        \"tracks ENT-LINK\",\n        \"notifies P-MARKETING-MGR\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-COMPLIANCE-DATA\",\n      \"businessDomainId\": \"DOM-AUDIT-LOGGING\",\n      \"name\": \"Compliance Data Set\",\n      \"description\": \"Structured data specifically formatted for regulatory exports.\",\n      \"keyAttributes\": [\n        \"dataset_id\",\n        \"export_date\",\n        \"format_type\"\n      ],\n      \"relationships\": [\n        \"generated_from ENT-AUDIT-RECORD\",\n        \"serves P-SHARER GDPR request\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-SYSTEM-CLOCK\",\n      \"businessDomainId\": \"DOM-AUDIT-LOGGING\",\n      \"name\": \"System Clock Reference\",\n      \"description\": \"NTP synchronized time reference for log ordering.\",\n      \"keyAttributes\": [\n        \"clock_id\",\n        \"server_time\",\n        \"sync_status\"\n      ],\n      \"relationships\": [\n        \"validates ENT-AUDIT-RECORD\",\n        \"managed by P-PLATFORM-OPS\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-NOTIFICATION-TPL\",\n      \"businessDomainId\": \"DOM-RETENTION-POLICY\",\n      \"name\": \"Notification Template\",\n      \"description\": \"Text templates used for expiry notifications to managers.\",\n      \"keyAttributes\": [\n        \"template_id\",\n        \"subject\",\n        \"body_content\"\n      ],\n      \"relationships\": [\n        \"used_by ENT-RETENTION-TASK\",\n        \"targets P-MARKETING-MGR\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-COMMIT-LOG\",\n      \"businessDomainId\": \"DOM-STORAGE-ENCRYPT\",\n      \"name\": \"Storage Commit Log\",\n      \"description\": \"Audit of encryption key rotation and storage integrity checks.\",\n      \"keyAttributes\": [\n        \"commit_id\",\n        \"key_version\",\n        \"checksum\"\n      ],\n      \"relationships\": [\n        \"protects ENT-ENCRYPTED-PAYLOAD\",\n        \"managed_by DOM-STORAGE-ENCRYPT\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-REGION-MAPPING\",\n      \"businessDomainId\": \"DOM-CACHE-LAYER\",\n      \"name\": \"Region Endpoint Map\",\n      \"description\": \"Configuration for where cache nodes reside geographically.\",\n      \"keyAttributes\": [\n        \"region_code\",\n        \"latency_target\",\n        \"endpoint_url\"\n      ],\n      \"relationships\": [\n        \"hosts ENT-CACHE-ENTRY\",\n        \"managed by DOM-CACHE-LAYER\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-HEALTH-METRIC\",\n      \"businessDomainId\": \"DOM-AUDIT-LOGGING\",\n      \"name\": \"System Health Metric\",\n      \"description\": \"Current operational status of the infrastructure components.\",\n      \"keyAttributes\": [\n        \"metric_id\",\n        \"component_type\",\n        \"health_value\"\n      ],\n      \"relationships\": [\n        \"monitored by P-PLATFORM-OPS\",\n        \"aggregates by ENT-DISASTER-STATE\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-DISASTER-STATE\",\n      \"businessDomainId\": \"DOM-BACKUP-OPS\",\n      \"name\": \"Disaster Recovery State\",\n      \"description\": \"Current state of active disaster recovery or failover.\",\n      \"keyAttributes\": [\n        \"state_id\",\n        \"failover_active\",\n        \"region_fallback\"\n      ],\n      \"relationships\": [\n        \"uses ENT-RECOVERY-PLAN\",\n        \"triggers ENT-BACKUP-JOB\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-FEATURE-FLAG\",\n      \"businessDomainId\": \"DOM-RATE-LIMITER\",\n      \"name\": \"Feature Flag Record\",\n      \"description\": \"Toggle switches for enabling new features like advanced analytics.\",\n      \"keyAttributes\": [\n        \"flag_key\",\n        \"enabled\",\n        \"targeting_rule\"\n      ],\n      \"relationships\": [\n        \"controls ENT-ABUSE-REPORT visibility\",\n        \"managed by P-PLATFORM-OPS\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-CONFIG-VERSION\",\n      \"businessDomainId\": \"DOM-RETENTION-POLICY\",\n      \"name\": \"Configuration Version\",\n      \"description\": \"Snapshot of system configuration at a specific point in time.\",\n      \"keyAttributes\": [\n        \"version_id\",\n        \"config_hash\",\n        \"deployed_at\"\n      ],\n      \"relationships\": [\n        \"applies ENT-POLICY-RULE\",\n        \"tracked by DOM-BACKUP-OPS\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-METADATA-DEF\",\n      \"businessDomainId\": \"DOM-URL-SHORTENER\",\n      \"name\": \"Link Metadata Definition\",\n      \"description\": \"Schema definition for the data fields attached to a link.\",\n      \"keyAttributes\": [\n        \"schema_id\",\n        \"field_name\",\n        \"data_type\"\n      ],\n      \"relationships\": [\n        \"defines ENT-LINK\",\n        \"validated by DOM-URL-SHORTENER\"\n      ],\n      \"source\": \"domain-standard\"\n    },\n    {\n      \"id\": \"ENT-REDIRECT-TIMEOUT\",\n      \"businessDomainId\": \"DOM-REDIRECT-ENGINE\",\n      \"name\": \"Redirect Timeout Record\",\n      \"description\": \"Logs of redirects that failed due to network latency or timeout.\",\n      \"keyAttributes\": [\n        \"timeout_id\",\n        \"target_url\",\n        \"duration_ms\"\n      ],\n      \"relationships\": [\n        \"impacts P-CLICKER\",\n        \"logged by DOM-REDIRECT-ENGINE\"\n      ],\n      \"source\": \"ai-proposed\"\n    },\n    {\n      \"id\": \"ENT-PAYLOAD-SIZE\",\n      \"businessDomainId\": \"DOM-STORAGE-ENCRYPT\",\n      \"name\": \"Encrypted Payload Size Tracker\",\n      \"description\": \"Monitors the size of stored data to enforce storage limits.\",\n      \"keyAttributes\": [\n        \"size_id\",\n        \"link_id\",\n        \"bytes\"\n      ],\n      \"relationships\": [\n        \"tracks ENT-ENCRYPTED-PAYLOAD\",\n        \"alerts ENT-RETENTION-TASK\"\n      ],\n      \"source\": \"ai-proposed\"\n    }\n  ]\n}",
+    "parsed_json": {
+      "kind": "entities_bloom",
+      "entities": [
+        {
+          "id": "ENT-LINK",
+          "businessDomainId": "DOM-URL-SHORTENER",
+          "name": "Link Definition",
+          "description": "Core entity representing a submitted short link and its target destination.",
+          "keyAttributes": [
+            "link_id",
+            "slug_token",
+            "created_at"
+          ],
+          "relationships": [
+            "belongs_to CLIENT-IDENTITY",
+            "has_many CLICK-EVENT",
+            "links_to ENCRYPTED-PAYLOAD"
+          ],
+          "source": "document-specified"
+        },
+        {
+          "id": "ENT-SLUG-CONFIG",
+          "businessDomainId": "DOM-SLUG-GENERATOR",
+          "name": "Slug Generation Configuration",
+          "description": "Defines how unique slugs are generated, including prefix rules and character sets.",
+          "keyAttributes": [
+            "config_id",
+            "character_set",
+            "length_target"
+          ],
+          "relationships": [
+            "used_by ENT-SLUG-POOL",
+            "owned_by DOM-SLUG-GENERATOR"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-SLUG-POOL",
+          "businessDomainId": "DOM-SLUG-GENERATOR",
+          "name": "Slug Pool Registry",
+          "description": "Track active slug tokens to prevent collisions and manage expiration.",
+          "keyAttributes": [
+            "slug_value",
+            "pool_status",
+            "reserved_until"
+          ],
+          "relationships": [
+            "belongs_to ENT-SLUG-CONFIG",
+            "referenced_by ENT-LINK"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-REDIRECT-CONFIG",
+          "businessDomainId": "DOM-REDIRECT-ENGINE",
+          "name": "Redirect Configuration",
+          "description": "Settings controlling HTTP 302 responses and destination validation rules.",
+          "keyAttributes": [
+            "rule_id",
+            "response_code",
+            "target_validator"
+          ],
+          "relationships": [
+            "used_by ENT-REDIRECT-LOG",
+            "owned_by DOM-REDIRECT-ENGINE"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-REDIRECT-LOG",
+          "businessDomainId": "DOM-REDIRECT-ENGINE",
+          "name": "Redirect Execution Log",
+          "description": "Records every successful redirect execution including latency and status.",
+          "keyAttributes": [
+            "log_id",
+            "link_id",
+            "executed_at"
+          ],
+          "relationships": [
+            "references ENT-LINK",
+            "aggregated_by ENT-CAMPAIGN-STAT"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-CLICK-EVENT",
+          "businessDomainId": "DOM-COUNTER-ANALYTICS",
+          "name": "Click Event Record",
+          "description": "Individual click tracking for real-time analytics and attribution.",
+          "keyAttributes": [
+            "event_id",
+            "link_id",
+            "client_ip"
+          ],
+          "relationships": [
+            "belongs_to ENT-LINK",
+            "grouped_by ENT-CAMPAIGN"
+          ],
+          "source": "document-specified"
+        },
+        {
+          "id": "ENT-CAMPAIGN",
+          "businessDomainId": "DOM-COUNTER-ANALYTICS",
+          "name": "Marketing Campaign",
+          "description": "A group of links tracked together for marketing manager reporting.",
+          "keyAttributes": [
+            "campaign_id",
+            "name",
+            "owner_id"
+          ],
+          "relationships": [
+            "contains ENT-CLICK-EVENT",
+            "created_by P-MARKETING-MGR"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-CAMPAIGN-STAT",
+          "businessDomainId": "DOM-COUNTER-ANALYTICS",
+          "name": "Campaign Aggregate Statistics",
+          "description": "Pre-aggregated metrics for the marketing manager dashboard to improve performance.",
+          "keyAttributes": [
+            "stat_id",
+            "campaign_id",
+            "period_start"
+          ],
+          "relationships": [
+            "summarizes ENT-CLICK-EVENT",
+            "used_by P-MARKETING-MGR"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-IP-GEO-DATA",
+          "businessDomainId": "DOM-COUNTER-ANALYTICS",
+          "name": "IP Geolocation Data",
+          "description": "Map IP addresses to geographic regions for analytics visualization.",
+          "keyAttributes": [
+            "ip_range",
+            "country_code",
+            "updated_at"
+          ],
+          "relationships": [
+            "linked_to ENT-CLICK-EVENT",
+            "referenced_by ENT-CAMPAIGN"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-ENCRYPTED-PAYLOAD",
+          "businessDomainId": "DOM-STORAGE-ENCRYPT",
+          "name": "Encrypted Target Payload",
+          "description": "The encrypted version of the original long URL stored at rest.",
+          "keyAttributes": [
+            "encrypted_data",
+            "key_id",
+            "created_at"
+          ],
+          "relationships": [
+            "stores ENT-LINK",
+            "managed_by DOM-STORAGE-ENCRYPT"
+          ],
+          "source": "document-specified"
+        },
+        {
+          "id": "ENT-DECRYPTION-META",
+          "businessDomainId": "DOM-STORAGE-ENCRYPT",
+          "name": "Decryption Metadata",
+          "description": "Metadata required to safely decrypt the payload during redirect.",
+          "keyAttributes": [
+            "metadata_hash",
+            "encryption_version",
+            "status"
+          ],
+          "relationships": [
+            "references ENT-ENCRYPTED-PAYLOAD",
+            "linked_to ENT-LINK"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-THREAT-INDICATOR",
+          "businessDomainId": "DOM-SECURITY-FILTER",
+          "name": "Threat Indicator Registry",
+          "description": "Database of known malicious patterns and IPs to block redirects.",
+          "keyAttributes": [
+            "indicator_id",
+            "threat_type",
+            "severity"
+          ],
+          "relationships": [
+            "blocked_by ENT-BLOCKLIST-RULE",
+            "scanned_by ENT-SCAN-RESULT"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-SCAN-RESULT",
+          "businessDomainId": "DOM-SECURITY-FILTER",
+          "name": "Security Scan Result",
+          "description": "Result of a security scan for a specific incoming URL.",
+          "keyAttributes": [
+            "scan_id",
+            "url_hash",
+            "risk_score"
+          ],
+          "relationships": [
+            "generated_by ENT-THREAT-INDICATOR",
+            "used_by ENT-ABUSE-REPORT"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-BLOCKLIST-RULE",
+          "businessDomainId": "DOM-SECURITY-FILTER",
+          "name": "Blocklist Rule",
+          "description": "Configuration rules for IP ranges or domains to block.",
+          "keyAttributes": [
+            "rule_id",
+            "domain_pattern",
+            "action_type"
+          ],
+          "relationships": [
+            "managed_by DOM-SECURITY-FILTER",
+            "applied_to ENT-THREAT-INDICATOR"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-API-KEY",
+          "businessDomainId": "DOM-API-GATEWAY",
+          "name": "API Access Key",
+          "description": "Credentials for external clients to access the public API.",
+          "keyAttributes": [
+            "key_hash",
+            "permissions",
+            "expires_at"
+          ],
+          "relationships": [
+            "used_by ENT-API-CLIENT",
+            "restricted_by DOM-RATE-LIMITER"
+          ],
+          "source": "document-specified"
+        },
+        {
+          "id": "ENT-API-CLIENT",
+          "businessDomainId": "DOM-API-GATEWAY",
+          "name": "API Client Profile",
+          "description": "Profile of an automated system interacting with the service.",
+          "keyAttributes": [
+            "client_id",
+            "name",
+            "last_seen"
+          ],
+          "relationships": [
+            "uses ENT-API-KEY",
+            "audited_by DOM-AUDIT-LOGGING"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-AUTH-TOKEN",
+          "businessDomainId": "DOM-API-GATEWAY",
+          "name": "Authentication Token",
+          "description": "Transient token for session management and client validation.",
+          "keyAttributes": [
+            "token_hash",
+            "issued_at",
+            "ttl"
+          ],
+          "relationships": [
+            "issued_to ENT-API-CLIENT",
+            "revoked_by ENT-ABUSE-REPORT"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-RATE-LIMIT-BUCKET",
+          "businessDomainId": "DOM-RATE-LIMITER",
+          "name": "Rate Limit Bucket",
+          "description": "State container for rate limiting per client or IP address.",
+          "keyAttributes": [
+            "bucket_id",
+            "request_count",
+            "window_seconds"
+          ],
+          "relationships": [
+            "monitored_by ENT-RATE-LIMIT-CONFIG",
+            "protected_by DOM-RATE-LIMITER"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-RATE-LIMIT-CONFIG",
+          "businessDomainId": "DOM-RATE-LIMITER",
+          "name": "Rate Limit Configuration",
+          "description": "Thresholds and window sizes for preventing DoS and abuse.",
+          "keyAttributes": [
+            "config_id",
+            "threshold",
+            "reset_policy"
+          ],
+          "relationships": [
+            "applies_to ENT-RATE-LIMIT-BUCKET",
+            "managed_by DOM-RATE-LIMITER"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-IP-SCORE",
+          "businessDomainId": "DOM-RATE-LIMITER",
+          "name": "IP Reputation Score",
+          "description": "Dynamic score of an IP address based on request patterns.",
+          "keyAttributes": [
+            "ip_address",
+            "current_score",
+            "risk_level"
+          ],
+          "relationships": [
+            "updated_by ENT-ABUSE-REPORT",
+            "checked_by DOM-SECURITY-FILTER"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-ABUSE-REPORT",
+          "businessDomainId": "DOM-RATE-LIMITER",
+          "name": "Abuse Incident Report",
+          "description": "Log of abusive behaviors detected by the rate limiting system.",
+          "keyAttributes": [
+            "incident_id",
+            "source_ip",
+            "action_taken"
+          ],
+          "relationships": [
+            "blocks ENT-API-CLIENT",
+            "updates ENT-IP-SCORE"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-CACHE-ENTRY",
+          "businessDomainId": "DOM-CACHE-LAYER",
+          "name": "Cache Key Entry",
+          "description": "Stored short URL mapping in the performance cache layer.",
+          "keyAttributes": [
+            "cache_key",
+            "ttl",
+            "value_hash"
+          ],
+          "relationships": [
+            "serves ENT-LINK",
+            "managed_by DOM-CACHE-LAYER"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-CACHE-TASK",
+          "businessDomainId": "DOM-CACHE-LAYER",
+          "name": "Cache Management Task",
+          "description": "Scheduled job to populate cache or warm specific keys.",
+          "keyAttributes": [
+            "task_id",
+            "scheduled_for",
+            "priority"
+          ],
+          "relationships": [
+            "processes ENT-CACHE-ENTRY",
+            "scheduled_by DOM-CACHE-LAYER"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-CACHE-EVICT-LOG",
+          "businessDomainId": "DOM-CACHE-LAYER",
+          "name": "Cache Eviction Log",
+          "description": "Track when and why cache entries were removed for capacity.",
+          "keyAttributes": [
+            "eviction_id",
+            "key_removed",
+            "reason"
+          ],
+          "relationships": [
+            "references ENT-CACHE-ENTRY",
+            "logged_by DOM-AUDIT-LOGGING"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-AUDIT-RECORD",
+          "businessDomainId": "DOM-AUDIT-LOGGING",
+          "name": "Audit Log Record",
+          "description": "Immutable record of API calls, errors, and system events.",
+          "keyAttributes": [
+            "log_id",
+            "user_agent",
+            "timestamp"
+          ],
+          "relationships": [
+            "created_by DOM-AUDIT-LOGGING",
+            "reviewed_by P-PLATFORM-OPS"
+          ],
+          "source": "document-specified"
+        },
+        {
+          "id": "ENT-AUDIT-INDEX",
+          "businessDomainId": "DOM-AUDIT-LOGGING",
+          "name": "Audit Index Map",
+          "description": "Efficient index structure for querying audit logs by date or type.",
+          "keyAttributes": [
+            "index_id",
+            "date_range",
+            "record_hash"
+          ],
+          "relationships": [
+            "points_to ENT-AUDIT-RECORD",
+            "used_by DOM-AUDIT-LOGGING"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-GDPR-REQUEST",
+          "businessDomainId": "DOM-AUDIT-LOGGING",
+          "name": "GDPR Compliance Request",
+          "description": "Record of Data Subject Access Requests for export or deletion.",
+          "keyAttributes": [
+            "request_id",
+            "ip_fingerprint",
+            "status"
+          ],
+          "relationships": [
+            "triggers ENT-PII-DELETION-QUEUE",
+            "handled_by DOM-AUDIT-LOGGING"
+          ],
+          "source": "document-specified"
+        },
+        {
+          "id": "ENT-BACKUP-JOB",
+          "businessDomainId": "DOM-BACKUP-OPS",
+          "name": "Backup Execution Job",
+          "description": "Task representing a scheduled or manual backup run.",
+          "keyAttributes": [
+            "job_id",
+            "target_region",
+            "status"
+          ],
+          "relationships": [
+            "produces ENT-SNAPSHOT-FILE",
+            "tracked_by DOM-BACKUP-OPS"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-SNAPSHOT-FILE",
+          "businessDomainId": "DOM-BACKUP-OPS",
+          "name": "Backup Snapshot",
+          "description": "Physical or logical container holding the backup data.",
+          "keyAttributes": [
+            "file_id",
+            "region",
+            "size_bytes"
+          ],
+          "relationships": [
+            "created_by ENT-BACKUP-JOB",
+            "managed_by DOM-BACKUP-OPS"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-RECOVERY-PLAN",
+          "businessDomainId": "DOM-BACKUP-OPS",
+          "name": "Disaster Recovery Plan",
+          "description": "Procedure and resource map for restoring service after failure.",
+          "keyAttributes": [
+            "plan_id",
+            "rto_target",
+            "version"
+          ],
+          "relationships": [
+            "executes ENT-RECOVERY-STATE",
+            "monitored_by P-PLATFORM-OPS"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-POLICY-RULE",
+          "businessDomainId": "DOM-RETENTION-POLICY",
+          "name": "Data Retention Rule",
+          "description": "Configuration for how long link data must be kept.",
+          "keyAttributes": [
+            "rule_id",
+            "retention_days",
+            "applicable_domain"
+          ],
+          "relationships": [
+            "enforced_by ENT-RETENTION-TASK",
+            "defined_by DOM-RETENTION-POLICY"
+          ],
+          "source": "document-specified"
+        },
+        {
+          "id": "ENT-RETENTION-TASK",
+          "businessDomainId": "DOM-RETENTION-POLICY",
+          "name": "Retention Cleanup Task",
+          "description": "Automated job to delete expired data per policy rules.",
+          "keyAttributes": [
+            "task_id",
+            "cron_expression",
+            "next_run"
+          ],
+          "relationships": [
+            "executes ENT-POLICY-RULE",
+            "logs ENT-LIFECYCLE-LOG"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-LIFECYCLE-LOG",
+          "businessDomainId": "DOM-RETENTION-POLICY",
+          "name": "Link Lifecycle Event Log",
+          "description": "History of a link's life including creation and deletion events.",
+          "keyAttributes": [
+            "event_id",
+            "link_id",
+            "lifecycle_stage"
+          ],
+          "relationships": [
+            "tracks ENT-LINK",
+            "notifies P-MARKETING-MGR"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-COMPLIANCE-DATA",
+          "businessDomainId": "DOM-AUDIT-LOGGING",
+          "name": "Compliance Data Set",
+          "description": "Structured data specifically formatted for regulatory exports.",
+          "keyAttributes": [
+            "dataset_id",
+            "export_date",
+            "format_type"
+          ],
+          "relationships": [
+            "generated_from ENT-AUDIT-RECORD",
+            "serves P-SHARER GDPR request"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-SYSTEM-CLOCK",
+          "businessDomainId": "DOM-AUDIT-LOGGING",
+          "name": "System Clock Reference",
+          "description": "NTP synchronized time reference for log ordering.",
+          "keyAttributes": [
+            "clock_id",
+            "server_time",
+            "sync_status"
+          ],
+          "relationships": [
+            "validates ENT-AUDIT-RECORD",
+            "managed by P-PLATFORM-OPS"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-NOTIFICATION-TPL",
+          "businessDomainId": "DOM-RETENTION-POLICY",
+          "name": "Notification Template",
+          "description": "Text templates used for expiry notifications to managers.",
+          "keyAttributes": [
+            "template_id",
+            "subject",
+            "body_content"
+          ],
+          "relationships": [
+            "used_by ENT-RETENTION-TASK",
+            "targets P-MARKETING-MGR"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-COMMIT-LOG",
+          "businessDomainId": "DOM-STORAGE-ENCRYPT",
+          "name": "Storage Commit Log",
+          "description": "Audit of encryption key rotation and storage integrity checks.",
+          "keyAttributes": [
+            "commit_id",
+            "key_version",
+            "checksum"
+          ],
+          "relationships": [
+            "protects ENT-ENCRYPTED-PAYLOAD",
+            "managed_by DOM-STORAGE-ENCRYPT"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-REGION-MAPPING",
+          "businessDomainId": "DOM-CACHE-LAYER",
+          "name": "Region Endpoint Map",
+          "description": "Configuration for where cache nodes reside geographically.",
+          "keyAttributes": [
+            "region_code",
+            "latency_target",
+            "endpoint_url"
+          ],
+          "relationships": [
+            "hosts ENT-CACHE-ENTRY",
+            "managed by DOM-CACHE-LAYER"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-HEALTH-METRIC",
+          "businessDomainId": "DOM-AUDIT-LOGGING",
+          "name": "System Health Metric",
+          "description": "Current operational status of the infrastructure components.",
+          "keyAttributes": [
+            "metric_id",
+            "component_type",
+            "health_value"
+          ],
+          "relationships": [
+            "monitored by P-PLATFORM-OPS",
+            "aggregates by ENT-DISASTER-STATE"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-DISASTER-STATE",
+          "businessDomainId": "DOM-BACKUP-OPS",
+          "name": "Disaster Recovery State",
+          "description": "Current state of active disaster recovery or failover.",
+          "keyAttributes": [
+            "state_id",
+            "failover_active",
+            "region_fallback"
+          ],
+          "relationships": [
+            "uses ENT-RECOVERY-PLAN",
+            "triggers ENT-BACKUP-JOB"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-FEATURE-FLAG",
+          "businessDomainId": "DOM-RATE-LIMITER",
+          "name": "Feature Flag Record",
+          "description": "Toggle switches for enabling new features like advanced analytics.",
+          "keyAttributes": [
+            "flag_key",
+            "enabled",
+            "targeting_rule"
+          ],
+          "relationships": [
+            "controls ENT-ABUSE-REPORT visibility",
+            "managed by P-PLATFORM-OPS"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-CONFIG-VERSION",
+          "businessDomainId": "DOM-RETENTION-POLICY",
+          "name": "Configuration Version",
+          "description": "Snapshot of system configuration at a specific point in time.",
+          "keyAttributes": [
+            "version_id",
+            "config_hash",
+            "deployed_at"
+          ],
+          "relationships": [
+            "applies ENT-POLICY-RULE",
+            "tracked by DOM-BACKUP-OPS"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-METADATA-DEF",
+          "businessDomainId": "DOM-URL-SHORTENER",
+          "name": "Link Metadata Definition",
+          "description": "Schema definition for the data fields attached to a link.",
+          "keyAttributes": [
+            "schema_id",
+            "field_name",
+            "data_type"
+          ],
+          "relationships": [
+            "defines ENT-LINK",
+            "validated by DOM-URL-SHORTENER"
+          ],
+          "source": "domain-standard"
+        },
+        {
+          "id": "ENT-REDIRECT-TIMEOUT",
+          "businessDomainId": "DOM-REDIRECT-ENGINE",
+          "name": "Redirect Timeout Record",
+          "description": "Logs of redirects that failed due to network latency or timeout.",
+          "keyAttributes": [
+            "timeout_id",
+            "target_url",
+            "duration_ms"
+          ],
+          "relationships": [
+            "impacts P-CLICKER",
+            "logged by DOM-REDIRECT-ENGINE"
+          ],
+          "source": "ai-proposed"
+        },
+        {
+          "id": "ENT-PAYLOAD-SIZE",
+          "businessDomainId": "DOM-STORAGE-ENCRYPT",
+          "name": "Encrypted Payload Size Tracker",
+          "description": "Monitors the size of stored data to enforce storage limits.",
+          "keyAttributes": [
+            "size_id",
+            "link_id",
+            "bytes"
+          ],
+          "relationships": [
+            "tracks ENT-ENCRYPTED-PAYLOAD",
+            "alerts ENT-RETENTION-TASK"
+          ],
+          "source": "ai-proposed"
+        }
+      ]
+    },
+    "duration_ms": 475236,
+    "thinking": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Role:** PRODUCT DATA MODEL PROPOSER.\n    *   **Phase:** Phase 1 Sub-Phase 1.4 (Round 3 of four bloom rounds).\n    *   **Lens:** Product.\n    *   **Task:** Propose ALL data entities for the accepted domains and workflows.\n    *   **Input:** Accepted Domains (13 domains), Accepted User Journeys (16 journeys), Accepted Personas (5 personas).\n    *   **Constraints:**\n        *   JSON output only (no markdown fences, no prose).\n        *   Strict JSON schema (`kind`, `entities` array).\n        *   Entity ID format: `ENT-<SHORT-NAME>`.\n        *   `businessDomainId` must match accepted domains (DOM-XXX).\n        *   `keyAttributes` ≥ 2 entries.\n        *   `relationships` ≥ 1 entry.\n        *   `source`: `document-specified`, `domain-standard`, or `ai-proposed`.\n        *   No markdown, no trailing commas, no unescaped quotes inside strings.\n        *   Propose expansively (20-80 entities), covering all domains.\n        *   Incorporate Human Feedback (none).\n\n2.  **Review Accepted Domains & Workflows:**\n    *   **Domains:**\n        1.  DOM-URL-SHORTENER (Core logic)\n        2.  DOM-SLUG-GENERATOR (Uniqueness)\n        3.  DOM-REDIRECT-ENGINE (HTTP 302)\n        4.  DOM-COUNTER-ANALYTICS (Click tracking)\n        5.  DOM-STORAGE-ENCRYPT (Encrypted URL storage)\n        6.  DOM-SECURITY-FILTER (Threat detection)\n        7.  DOM-API-GATEWAY (Access control)\n        8.  DOM-RATE-LIMITER (DoS protection)\n        9.  DOM-CACHE-LAYER (Performance)\n        10. DOM-AUDIT-LOGGING (Logs)\n        11. DOM-BACKUP-OPS (Redundancy)\n        12. DOM-RETENTION-POLICY (Lifecycle)\n    *   **Workflows:** None explicitly listed in \"Accepted Workflows\" section, but implied by User Journeys.\n    *   **Personas:** Sharer, Clicker, API-Client, Platform-Ops, Marketing-Mgr.\n    *   **Journeys:** Submit, Click, Quota, Rate Limit, GDPR Export, PII Deletion, Market Track, Create Campaign, Ops Monitor, Trigger Recovery, HTTPS Enforce, Reject Malicious, Retention Notify, Audit Log Review, Encrypt Store, Click Failure.\n\n3.  **Identify Entities:**\n    I need to map these domains to database-like entities. Since this is a \"Product Data Model\", I'm modeling the state of the system.\n\n    *   **Core Business Entities:**\n        *   Link (The short URL itself). `ENT-LINK`\n        *   Slug (The unique token). `ENT-SLUG`\n        *   Target URL (Encrypted payload). `ENT-TARGET-URL` (Maybe part of Link, but domain says \"Encrypted Storage Layer\"). Let's make `ENT-LINK` contain the encrypted URL or point to `ENT-ENCRYPTED-PAYLOAD`. Let's stick to `ENT-LINK` for the record and `ENT-STORED-PAYLOAD` for the content. Actually, better to keep `ENT-LINK` as the main record and have a `ENT-ENCRYPTED-DATA` association if separation is strict. Let's keep it simple: `ENT-LINK` stores the target (encrypted or reference). Domain `DOM-STORAGE-ENCRYPT` suggests a specific handling. Let's create `ENT-ENCRYPTED-PAYLOAD`.\n        *   Campaign (For tracking). `ENT-CAMPAIGN` (From Marketing Manager persona).\n        *   User (For GDPR, Sharer identity if they log in). `ENT-USERS` (Even if anonymous, for GDPR export need to track *who* requested creation). Actually, `P-SHARER` doesn't require login. But `P-API-CLIENT` does. `DOM-AUDIT-LOGGING` tracks IP/User-Agent mostly. But for GDPR \"Right to Access\", we need to know who owns the link. Let's create `ENT-USER-SESSION` or `ENT-CLIENT-IDENTITY` for API clients. But for GDPR, we need to attribute ownership. If P-SHARER doesn't login, how do we handle GDPR? We track IP + Device Fingerprint as `ENT-CLIENT-IDENTITY`. Let's use `ENT-CLIENT-IDENTITY`.\n        *   IP Address/Threat Record. `ENT-IP-TIMESTAMP` or `ENT-THREAT-INDICATOR`.\n        *   Analytics/Click. `ENT-CLICK-EVENT`.\n        *   Log. `ENT-AUDIT-LOG`.\n        *   Policy. `ENT-RETENTION-POLICY`.\n        *   Cache. `ENT-CACHE-HIT-MISS`.\n        *   Backup. `ENT-BACKUP-SNAPSHOT`.\n\n    *   **Security/Compliance:**\n        *   Threat Feed. `ENT-THREAT-FEED`.\n        *   Policy Rule. `ENT-POLICY-RULE`.\n        *   Audit Log. `ENT-AUDIT-RECORD`.\n\n    *   **Infrastructure/Platform:**\n        *   Node/Region. `ENT-SERVICE-INSTANCE`.\n        *   Cache Key. `ENT-CACHE-KV`.\n        *   Backup Job. `ENT-BACKUP-JOB`.\n\n    *   **Analytics:**\n        *   Campaign Metric. `ENT-CAMPAIGN-METRIC`.\n        *   Geo Location (for analytics). `ENT-GEO-LOCATION`. (Standard domain knowledge).\n\n    *   **Configuration:**\n        *   Feature Flag. `ENT-CONFIG-FLAG`.\n        *   Rate Limit Config. `ENT-RATE-LIMIT-CONFIG`.\n\n    *   **API:**\n        *   API Key (for API-Client). `ENT-API-KEY`.\n        *   Rate Limit Queue (Transient, but maybe persist for abuse detection). `ENT-RATE-LIMIT-QUEUE-STATE`.\n\n    Let's count. I need 20-80. I should aim for ~40-50 high-quality entities to cover all bases without being too bloated, ensuring all domains are touched.\n\n    **Mapping Domains to Entities:**\n    1.  DOM-URL-SHORTENER -> `ENT-LINK-DEFINITION`, `ENT-LINK-SLUG`\n    2.  DOM-SLUG-GENERATOR -> `ENT-SLUG-CONFIG`, `ENT-SLUG-GENERATION-LIST`\n    3.  DOM-REDIRECT-ENGINE -> `ENT-REDIRECT-CONFIG`, `ENT-REDIRECT-LOG` (maybe merge with audit)\n    4.  DOM-COUNTER-ANALYTICS -> `ENT-CLICK-EVENT`, `ENT-COUNTER-AGGREGATE`\n    5.  DOM-STORAGE-ENCRYPT -> `ENT-ENCRYPTED-PAYLOAD`\n    6.  DOM-SECURITY-FILTER -> `ENT-THREAT-INDICATOR`, `ENT-SCAN-RESULT`\n    7.  DOM-API-GATEWAY -> `ENT-API-KEY`, `ENT-API-ACCESS-LOG` (Merge with Audit?)\n    8.  DOM-RATE-LIMITER -> `ENT-RATE-LIMIT-TOKEN`, `ENT-ABUSE-REPORT`\n    9.  DOM-CACHE-LAYER -> `ENT-CACHE-ENTRY`, `ENT-CACHE-WARMUP-TASK`\n    10. DOM-AUDIT-LOGGING -> `ENT-AUDIT-RECORD`, `ENT-LOG-INDEX`\n    11. DOM-BACKUP-OPS -> `ENT-BACKUP-SNAPSHOT`, `ENT-RECOVERY-PLAN`\n    12. DOM-RETENTION-POLICY -> `ENT-RETENTION-RULE`, `ENT-LINK-LIFECYCLE-STATUS`\n\n    **Personas/Journeys Entities:**\n    *   P-SHARER -> `ENT-CLIENT-IDENTITY`, `ENT-GDPR-REQUEST`\n    *   P-CLICKER -> `ENT-COMPATIBLE-BROWSER-REPORT` (Optional, maybe too detailed) -> `ENT-REDIRECT-FAILURE-LOG`\n    *   P-API-CLIENT -> `ENT-API-CLIENT`, `ENT-API-REQUEST-BATCH`\n    *   P-PLATFORM-OPS -> `ENT-HEALTH-METRIC`, `ENT-MONITOR-ALERT`, `ENT-DISASTER-RECOVERY-STATE`\n    *   P-MARKETING-MGR -> `ENT-CAMPAIGN`, `ENT-CAMPAIGN-ATTRIBUTION`, `ENT-COMP-DELETION-NOTIFICATION`\n\n    **Configuration:**\n    *   `ENT-SYSTEM-CONFIG`\n    *   `ENT-REGION-TOPOLOGY`\n\n    **Standard/Industry:**\n    *   `ENT-USER-AGENT` (for analytics)\n    *   `ENT-IP-RANGE` (for rate limiting)\n    *   `ENT-DATE-TIME-REFERENCE` (for audit)\n\n    Let's refine the list to ensure `businessDomainId` is valid (DOM-XXX).\n    I will group them logically but ensure they are distinct entities in the JSON.\n\n    **List:**\n    1.  ENT-LINK (Core)\n    2.  ENT-SLUG (Core)\n    3.  ENT-ENCRYPTED-PAYLOAD (Storage)\n    4.  ENT-CAMPAIGN (Marketing)\n    5.  ENT-CLICK-EVENT (Analytics)\n    6.  ENT-AGGREGATE-COUNTER (Analytics perf)\n    7.  ENT-AUDIT-LOG (Security/Compliance)\n    8.  ENT-API-CLIENT-ID (API Gateway/Client)\n    9.  ENT-API-KEY (API Auth)\n    10. ENT-RATE-LIMIT-STATE (Rate Limiter)\n    11. ENT-THREAT-INDICATOR (Security Filter)\n    12. ENT-SCAN-REPORT (Security Filter)\n    13. ENT-CACHE-KEY (Cache Layer)\n    14. ENT-CACHE-METRIC (Cache Layer Perf)\n    15. ENT-BACKUP-JOB (Backup Ops)\n    16. ENT-RECOVERY-SNAPSHOT (Backup Ops)\n    17. ENT-RETENTION-POLICY (Retention)\n    18. ENT-LINK-LIFECYCLE-STATE (Retention)\n    19. ENT-CLIENT-IDENTITY (GDPR Sharer)\n    20. ENT-GDPR-REQUEST (GDPR Workflow)\n    21. ENT-PII-DELETION-QUEUE (GDPR Workflow)\n    22. ENT-SLUG-GENERATOR-CONFIG (Slug Gen)\n    23. ENT-REDIRECT-CONFIG (Redirect Engine)\n    24. ENT-REDIRECT-LOG (Redirect Perf)\n    25. ENT-HEALTH-METRIC (Ops)\n    26. ENT-MONITOR-ALERT (Ops)\n    27. ENT-DISASTER-RECOVERY-PLAN (Ops)\n    28. ENT-HEALTH-CHECK-RESULT (Ops)\n    29. ENT-HTTPS-REDIRECT-LOG (Security/HTTP)\n    30. ENT-SESSION-TOKEN (Auth/Session)\n    31. ENT-USER-AGENT-TRACKING (Analytics)\n    32. ENT-IP-GEO-LOOKUP (Analytics)\n    33. ENT-SYSTEM-CONFIG (Platform Config)\n    34. ENT-FEATURE-FLAG (Config)\n    35. ENT-DATA-RETENTION-LOG (Compliance)\n    36. ENT-EXPIRY-NOTIFICATION-LOG (Marketing)\n    37. ENT-ABUSE-REPORT (Rate Limiter)\n    38. ENT-IP-BLOCKLIST (Rate Limiter/Security)\n    39. ENT-REGION-CONFIG (Infrastructure)\n    40. ENT-METADATA-TABLE (System)\n    41. ENT-METADATA-VERSION (System)\n\n    Need to ensure `keyAttributes` has at least 2, and `relationships` has at least 1.\n    Need to check `businessDomainId`.\n    Need to ensure no markdown.\n\n    **Drafting the JSON structure:**\n    Must be valid JSON. No comments.\n    Escape quotes if needed.\n\n    Let's check the domains again:\n    - DOM-URL-SHORTENER\n    - DOM-SLUG-GENERATOR\n    - DOM-REDIRECT-ENGINE\n    - DOM-COUNTER-ANALYTICS\n    - DOM-STORAGE-ENCRYPT\n    - DOM-SECURITY-FILTER\n    - DOM-API-GATEWAY\n    - DOM-RATE-LIMITER\n    - DOM-CACHE-LAYER\n    - DOM-AUDIT-LOGGING\n    - DOM-BACKUP-OPS\n    - DOM-RETENTION-POLICY\n\n    I will assign entities to these domains strictly.\n\n    **Entities construction:**\n    1.  ENT-LINK (DOM-URL-SHORTENER)\n    2.  ENT-SLUG-TOKEN (DOM-SLUG-GENERATOR)\n    3.  ENT-REDIRECT-RULE (DOM-REDIRECT-ENGINE)\n    4.  ENT-CLICK-RECORD (DOM-COUNTER-ANALYTICS)\n    5.  ENT-ENCRYPTED-PAYLOAD-BLOB (DOM-STORAGE-ENCRYPT)\n    6.  ENT-THREAT-SIGNATURE (DOM-SECURITY-FILTER)\n    7.  ENT-SYSTEM-USER (DOM-API-GATEWAY) - Actually use `ENT-API-CLIENT` for P-API-CLIENT.\n    8.  ENT-CLIENT-IDENTITY (DOM-API-GATEWAY)\n    9.  ENT-RATE-LIMIT-BUCKET (DOM-RATE-LIMITER)\n    10. ENT-CACHE-ENTRY (DOM-CACHE-LAYER)\n    11. ENT-AUDIT-RECORD (DOM-AUDIT-LOGGING)\n    12. ENT-BACKUP-SNAPSHOT (DOM-BACKUP-OPS)\n    13. ENT-POLICY-CONFIG (DOM-RETENTION-POLICY)\n    14. ENT-GDPR-REQUEST (DOM-SECURITY-FILTER/Retention/Storage)\n    15. ENT-MONITOR-METRIC (DOM-RETENTION-POLICY/Ops)\n    16. ENT-CAMPAIGN (DOM-COUNTER-ANALYTICS)\n    17. ENT-CAMPAIGN-STATS (DOM-COUNTER-ANALYTICS)\n    18. ENT-MALWARE-SCAN-RESULT (DOM-SECURITY-FILTER)\n    19. ENT-REGION-ENDPOINT (DOM-CACHE-LAYER)\n    20. ENT-FEATURE-FLAG (DOM-RATE-LIMITER)\n    21. ENT-IP-BLOCKLIST (DOM-RATE-LIMITER)\n    22. ENT-ABUSE-INCIDENT (DOM-RATE-LIMITER)\n    23. ENT-RECOVERY-PLAN (DOM-BACKUP-OPS)\n    24. ENT-HOST-SERVICE (DOM-CACHE-LAYER)\n    25. ENT-SESSION-TOKEN (DOM-API-GATEWAY)\n    26. ENT-REDIRECT-Failure-LOG (DOM-REDIRECT-ENGINE)\n    27. ENT-TOKEN-EXPIRY-SCHEDULE (DOM-RETENTION-POLICY)\n    28. ENT-DATA-WRAPPER (DOM-STORAGE-ENCRYPT)\n    29. ENT-PAYMENT-SUBSCRIPTION (DOM-BACKUP-OPS/Storage - Optional)\n    30. ENT-USER-AGENT-FINGERPRINT (DOM-COUNTER-ANALYTICS)\n    31. ENT-IP-RECORD (DOM-AUDIT-LOGGING)\n    32. ENT-LINK-STATUS-TRACKER (DOM-RETENTION-POLICY)\n    33. ENT-NOTIFICATION-TEMPLATE (DOM-RETENTION-POLICY)\n    34. ENT-ERROR-CODE-DEF (DOM-REDIRECT-ENGINE)\n    35. ENT-CACHE-WARM-JOB (DOM-CACHE-LAYER)\n    36. ENT-METADATA-INDEX (DOM-AUDIT-LOGGING)\n    37. ENT-CONFIG-RULE (DOM-RETENTION-POLICY)\n    38. ENT-SCAN-QUEUE (DOM-SECURITY-FILTER)\n    39. ENT-SLUG-PREFIX-MAP (DOM-SLUG-GENERATOR)\n    40. ENT-VERSIONING-LOG (DOM-RETENTION-POLICY)\n    41. ENT-TIMEZONE-CONFIG (DOM-COUNTER-ANALYTICS)\n    42. ENT-REPLICATION-TASK (DOM-BACKUP-OPS)\n    43. ENT-HEALTH-CHECK-SCHEDULE (DOM-RETENTION-POLICY)\n    44. ENT-LOG-ARCHIVE-BINDING (DOM-AUDIT-LOGGING)\n    45. ENT-COMPLIANCE-REPORT (DOM-AUDIT-LOGGING)\n\n    Okay, 45 seems good. I'll flesh out the attributes.\n    I must be careful with JSON escaping.\n    Double check: `businessDomainId` must be `DOM-XXX` (Accepted list).\n\n    **Refining Attributes & Relationships:**\n    For each entity, `keyAttributes` needs primary key, foreign key, etc.\n    For `relationships`, need text strings.\n\n    Example: `ENT-LINK`\n    keyAttributes: `[\"slug_token\", \"created_at\", \"encrypted_payload_hash\"]`\n    relationships: `[\"has many CLICK-RECORD\", \"belongs_to CLIENT-IDENTITY\"]`\n\n    Wait, `keyAttributes` is described as `[\"entityId\", \"foreignKey\", \"discriminator\"]`. It says `primary key`, `foreign keys`, `discriminators`, `key scalars`. I will put relevant column names there.\n    `id` is usually `slug_token` or a UUID. For shorteners, `slug` is often PK or part of it. Let's use `link_id` as PK.\n    I will use `[\"link_id\", \"slug_token\", \"user_id\"]` etc.\n\n    Wait, I need to ensure I don't use \"unescaped double quotes inside string values\".\n    I will write valid JSON.\n\n    Let's build the list systematically to ensure coverage.\n\n    Domains:\n    1.  DOM-URL-SHORTENER\n    2.  DOM-SLUG-GENERATOR\n    3.  DOM-REDIRECT-ENGINE\n    4.  DOM-COUNTER-ANALYTICS\n    5.  DOM-STORAGE-ENCRYPT\n    6.  DOM-SECURITY-FILTER\n    7.  DOM-API-GATEWAY\n    8.  DOM-RATE-LIMITER\n    9.  DOM-CACHE-LAYER\n    10. DOM-AUDIT-LOGGING\n    11. DOM-BACKUP-OPS\n    12. DOM-RETENTION-POLICY\n\n    Entities per domain:\n    1.  DOM-URL-SHORTENER: ENT-LINK, ENT-LINK-STATUS.\n    2.  DOM-SLUG-GENERATOR: ENT-SLUG-CONFIG, ENT-SLUG-POOL, ENT-SLUG-PREFIX.\n    3.  DOM-REDIRECT-ENGINE: ENT-REDIRECT-CONFIG, ENT-REDIRECT-LOG.\n    4.  DOM-COUNTER-ANALYTICS: ENT-CLICK-EVENT, ENT-CAMPAIGN, ENT-CAMPAIGN-STAT, ENT-IP-GEO-DATA.\n    5.  DOM-STORAGE-ENCRYPT: ENT-ENCRYPTED-CONTENT, ENT-DECRYPTION-TOKEN.\n    6.  DOM-SECURITY-FILTER: ENT-THREAT-INDICATOR, ENT-SCAN-RESULT, ENT-BLOCKLIST.\n    7.  DOM-API-GATEWAY: ENT-API-KEY, ENT-API-CLIENT, ENT-AUTH-SESSION.\n    8.  DOM-RATE-LIMITER: ENT-RATE-LIMIT-TOKEN, ENT-ABUSE-REPORT, ENT-IP-SCORE.\n    9.  DOM-CACHE-LAYER: ENT-CACHE-ENTRY, ENT-CACHE-WARM-QUEUE, ENT-CACHE-EVICT-LOG.\n    10. DOM-AUDIT-LOGGING: ENT-AUDIT-RECORD, ENT-LINKAGE-INDEX, ENT-GDPR-REQUEST.\n    11. DOM-BACKUP-OPS: ENT-BACKUP-JOB, ENT-SNAPSHOT-FILE, ENT-RECOVERY-STATE.\n    12. DOM-RETENTION-POLICY: ENT-POLICY-RULE, ENT-RETENTION-TASK, ENT-LIFECYCLE-LOG.\n\n    Total around 35-40. I'll add a few more for richness.\n    Check Human Feedback: None.\n\n    One thing: `businessDomainId` must reference a real domain id from the accepted list.\n    Accepted list: `DOM-URL-SHORTENER`, `DOM-SLUG-GENERATOR`, `DOM-REDIRECT-ENGINE`, `DOM-COUNTER-ANALYTICS`, `DOM-STORAGE-ENCRYPT`, `DOM-SECURITY-FILTER`, `DOM-API-GATEWAY`, `DOM-RATE-LIMITER`, `DOM-CACHE-LAYER`, `DOM-AUDIT-LOGGING`, `DOM-BACKUP-OPS`, `DOM-RETENTION-POLICY`.\n\n    I will ensure every `businessDomainId` is exactly one of these strings.\n\n    Let's write the JSON.\n\n    Careful with quotes inside strings. E.g. \"Central to the 'AI-native OS' vision.\" is valid.\n    I will avoid internal quotes where possible, or use single quotes inside strings.\n    Actually, the rule says: `No unescaped double quotes inside string values.`\n    So `value` is fine. `\"value with \"inner\" quote\"` is BAD. `\"value with 'inner' quote\"` is GOOD.\n    I will use single quotes for emphasis inside strings if needed.\n\n    Attributes: `[\"id\", \"slug\", \"type\"]`.\n    Relationships: `[\"has_many CLICK-EVENT\"]`.\n\n    Let's start generating the array content mentally to ensure JSON validity.\n\n    I will construct the JSON object directly in the output block.\n    I must NOT output ```json ... ```.\n    I must start with `{`.\n    I must end with `}`.\n\n    I will double check the count. 20-80 entities.\n    My plan is ~45 entities.\n\n    I'll ensure the `id` starts with `ENT-`.\n    `businessDomainId` starts with `DOM-`.\n\n    I'll review the `keyAttributes` requirement: `≥ 2 entries`.\n    `relationships`: `≥ 1 entry`.\n\n    Let's generate the content.\n    (Self-Correction: Make sure not to use markdown formatting for the JSON block).\n    Wait, the instruction says \"Your response MUST be a single valid JSON object... No markdown fences\".\n    This means the raw text must be JSON.\n    I will output the raw JSON string.\n\n    Wait, I need to be careful about the instruction \"No markdown fences — no triple-backticks\".\n    This means I should not write:\n    ```json\n    {\n    }\n    ```\n    I should write:\n    {\n    ...\n    }\n\n    Let's draft the content carefully.\n\n    Entity List:\n    1. ENT-LINK (DOM-URL-SHORTENER)\n    2. ENT-LINK-STATUS (DOM-RETENTION-POLICY)\n    3. ENT-SLUG-CONFIG (DOM-SLUG-GENERATOR)\n    4. ENT-SLUG-POOL (DOM-SLUG-GENERATOR)\n    5. ENT-REDIRECT-CONFIG (DOM-REDIRECT-ENGINE)\n    6. ENT-REDIRECT-LOG (DOM-REDIRECT-ENGINE)\n    7. ENT-CLICK-EVENT (DOM-COUNTER-ANALYTICS)\n    8. ENT-CAMPAIGN (DOM-COUNTER-ANALYTICS)\n    9. ENT-CLICK-DASHBOARD-DATA (DOM-COUNTER-ANALYTICS)\n    10. ENT-IP-GEO-LOOKUP (DOM-COUNTER-ANALYTICS)\n    11. ENT-ENCRYPTED-PAYLOAD (DOM-STORAGE-ENCRYPT)\n    12. ENT-DECRYPTION-META (DOM-STORAGE-ENCRYPT)\n    13. ENT-THREAT-INDICATOR (DOM-SECURITY-FILTER)\n    14. ENT-SCAN-RESULT (DOM-SECURITY-FILTER)\n    15. ENT-BLOCKLIST-RULE (DOM-SECURITY-FILTER)\n    16. ENT-API-KEY (DOM-API-GATEWAY)\n    17. ENT-API-CLIENT (DOM-API-GATEWAY)\n    18. ENT-AUTH-TOKEN (DOM-API-GATEWAY)\n    19. ENT-RATE-LIMIT-BUCKET (DOM-RATE-LIMITER)\n    20. ENT-RATE-LIMIT-CONFIG (DOM-RATE-LIMITER)\n    21. ENT-IP-SCORE (DOM-RATE-LIMITER)\n    22. ENT-ABUSE-REPORT (DOM-RATE-LIMITER)\n    23. ENT-CACHE-ENTRY (DOM-CACHE-LAYER)\n    24. ENT-CACHE-TASK (DOM-CACHE-LAYER)\n    25. ENT-CACHE-EVICT-LOG (DOM-CACHE-LAYER)\n    26. ENT-AUDIT-RECORD (DOM-AUDIT-LOGGING)\n    27. ENT-AUDIT-INDEX (DOM-AUDIT-LOGGING)\n    28. ENT-GDPR-REQUEST (DOM-AUDIT-LOGGING)\n    29. ENT-BACKUP-JOB (DOM-BACKUP-OPS)\n    30. ENT-SNAPSHOT-FILE (DOM-BACKUP-OPS)\n    31. ENT-RECOVERY-PLAN (DOM-BACKUP-OPS)\n    32. ENT-POLICY-RULE (DOM-RETENTION-POLICY)\n    33. ENT-RETENTION-TASK (DOM-RETENTION-POLICY)\n    34. ENT-LIFECYCLE-LOG (DOM-RETENTION-POLICY)\n    35. ENT-COMPLIANCE-DATA (DOM-AUDIT-LOGGING)\n    36. ENT-SYSTEM-CLOCK (DOM-AUDIT-LOGGING)\n    37. ENT-NOTIFICATION-TPL (DOM-RETENTION-POLICY)\n    38. ENT-COMMIT-LOG (DOM-STORAGE-ENCRYPT)\n    39. ENT-REGION-MAPPING (DOM-CACHE-LAYER)\n    40. ENT-HEALTH-METRIC (DOM-AUDIT-LOGGING)\n    41. ENT-DISASTER-STATE (DOM-BACKUP-OPS)\n    42. ENT-FEATURE-FLAG (DOM-RATE-LIMITER)\n    43. ENT-CONFIG-VERSION (DOM-RETENTION-POLICY)\n    44. ENT-METADATA-DEF (DOM-URL-SHORTENER)\n    45. ENT-REDIRECT-TIMEOUT (DOM-REDIRECT-ENGINE)\n    46. ENT-PAYLOAD-SIZE (DOM-STORAGE-ENCRYPT)\n\n    Total 46 entities. Good.\n\n    Now I will write the JSON. I will verify escaping.\n    I must use single quotes for any quotes inside strings.\n    I must not use markdown blocks.\n\n    Let's verify the `businessDomainId` field. It expects exact matches from the accepted list.\n    Accepted list:\n    - DOM-URL-SHORTENER\n    - DOM-SLUG-GENERATOR\n    - DOM-REDIRECT-ENGINE\n    - DOM-COUNTER-ANALYTICS\n    - DOM-STORAGE-ENCRYPT\n    - DOM-SECURITY-FILTER\n    - DOM-API-GATEWAY\n    - DOM-RATE-LIMITER\n    - DOM-CACHE-LAYER\n    - DOM-AUDIT-LOGGING\n    - DOM-BACKUP-OPS\n    - DOM-RETENTION-POLICY\n\n    I will ensure every entity uses one of these.\n\n    Let's write."
+  },
+  "assertions": {
+    "t1_schema": {
+      "kind": "json-shape",
+      "shape": {
+        "kind": "string",
+        "entities": "array",
+        "entities[].id": "string",
+        "entities[].businessDomainId": "string",
+        "entities[].name": "string",
+        "entities[].keyAttributes": "array",
+        "entities[].relationships": "array"
+      }
+    },
+    "t2_id_preservation": [],
+    "t3_invariants": [
+      {
+        "name": "entities non-empty",
+        "kind": "array_length",
+        "path": "entities",
+        "min": 1
+      },
+      {
+        "name": "entities[].id pattern ENT-*",
+        "kind": "required_value_pattern",
+        "path": "entities[].id",
+        "pattern": "^ENT-[A-Z0-9-]+$"
+      },
+      {
+        "name": "entities[].businessDomainId pattern DOM-*",
+        "kind": "required_value_pattern",
+        "path": "entities[].businessDomainId",
+        "pattern": "^DOM-[A-Z0-9-]+$"
+      },
+      {
+        "name": "entities[].id unique",
+        "kind": "unique_values",
+        "path": "entities[].id"
+      }
+    ],
+    "require_json_parse": true
+  }
+}

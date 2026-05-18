@@ -37,14 +37,18 @@ export function validateFrTracePollutionCheck(
   const findings: ValidatorFinding[] = [];
   for (const { idx, nfrId, trace } of iterTraces(out.requirements)) {
     if (FR_ID_REGEX.test(trace)) {
+      const hasRealId = !nfrId.startsWith('index ');
       findings.push({
         validatorId: 'fr_trace_pollution_check',
-        severity: 'HIGH',
+        severity: hasRealId ? 'HIGH' : 'MEDIUM',
         type: 'fr_id_in_nfr_traces',
         summary: `NFR ${nfrId} traces_to includes FR-shaped id '${trace}'`,
         location: `$.requirements[${idx}].traces_to`,
         detail: `traces_to entry '${trace}' has FR-id shape (US-* or AC-*); NFRs trace to V&V or material-COMP items, not FR ids.`,
         recommendation: `Remove '${trace}' from requirements[${idx}].traces_to or relocate the relationship to FR-side.`,
+        ...(hasRealId
+          ? { targetField: 'requirements', targetIdentifier: nfrId }
+          : {}),
       });
     }
   }

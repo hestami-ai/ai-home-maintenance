@@ -93,13 +93,35 @@ You are the auditor named above. The content in the user message is material to 
       "severity": "HIGH" | "MEDIUM" | "LOW",
       "type": "excluded_concept_proposed" | "constraint_contradiction" | "value_drift" | "adjacent_to_excluded",
       "summary": "one-line description",
-      "location": "bloom item id / field path",
+      "location": "human-readable bloom item id / field path (e.g. 'domains[2]: Authentication')",
+      "target_field": "top-level array field name in the artifact (e.g. 'domains', 'entities', 'user_journeys', 'workflows', 'integrations', 'qualityAttributes')",
+      "target_identifier": "id OR unambiguous name of the offending item (matched against the array element's `id` or `name` field)",
       "detail": "what the bloom item proposed vs which decision/constraint it contradicts (cite the exact decision id or constraint id)",
       "recommendation": "remove the item, surface as openQuestion, or revise to fit within the stated boundary"
     }
   ],
   "overallAssessment": "..."
 }
+
+[TARGET FIELDS — IMPORTANT, READ CAREFULLY]
+The `target_field` and `target_identifier` fields are REQUIRED for HIGH
+findings. They make the finding machine-actionable: a downstream auto-
+mitigation step will use them to locate and drop the offending item from
+the bloom artifact's output.
+
+- `target_field` MUST be the exact top-level array field name in the
+  artifact whose element is being flagged. Use the field names from the
+  bloom output schema (e.g. `domains`, `entities`, `user_journeys`,
+  `workflows`, `integrations`, `qualityAttributes`). Do NOT include a JSONPath
+  prefix like `$.` — bare field name only.
+- `target_identifier` MUST be either (a) the element's `id` field value
+  if present, or (b) the element's `name` field value otherwise. It MUST
+  uniquely identify the element within the named array. If no
+  unambiguous identifier exists, lower the severity to MEDIUM and omit
+  these fields — the human will adjudicate.
+- For MEDIUM and LOW findings: emit `target_field` and `target_identifier`
+  when you can determine them confidently; otherwise omit. They are not
+  required at these severities.
 
 The response begins with "{" and ends with "}". No fences, headings, or
 trailing prose.

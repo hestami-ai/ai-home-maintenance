@@ -1,7 +1,0 @@
-{
-  "validator": "nfr_threshold_grounding",
-  "sample": "14b_requirements_agent__nfr_saturation_depth4",
-  "passed": true,
-  "expectedFindingCount": 0,
-  "overallAssessment": "All measurable conditions contain concepts derived from the parent NFR and handoff context. No fabricated numeric thresholds (e.g., specific percentages, counts, or time windows) were detected that are not supported by the source material or the decomposition logic."
-}

@@ -1,7 +1,0 @@
-{
-  "validator": "ungrounded_operational_specifics",
-  "sample": "25_technical_spec_agent__configuration_parameters",
-  "passed": false,
-  "expectedFindingCount": 42,
-  "overallAssessment": "The agent has failed to ground the vast majority of concrete operational parameters. Nearly every default value, including URLs, specific numeric thresholds, and time durations, is fabricated. This indicates a critical failure to adhere to the grounding constraint, resulting in a high risk of deploying misconfigured system components."
-}

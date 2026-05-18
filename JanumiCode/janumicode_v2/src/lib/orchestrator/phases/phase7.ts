@@ -93,10 +93,21 @@ export class Phase7Handler implements PhaseHandler {
     // ── 7.1 — Test Case Generation ────────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'test_case_skeleton');
 
+    const frIds = frStories.map(s => (typeof s.id === 'string' ? s.id : '')).filter(Boolean);
+    const nfrIds = ((prior.nonFunctionalRequirements?.content.requirements as Array<Record<string, unknown>>) ?? [])
+      .map(n => (typeof n.id === 'string' ? n.id : ''))
+      .filter(Boolean);
+    const dmr71Seeds = [
+      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
+      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
+      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
+      ...(prior.implementationPlan ? [prior.implementationPlan.recordId] : []),
+    ];
     const dmr71 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'test_case_skeleton',
       requestingAgentRole: 'test_design_agent',
-      query: `Test case generation for requirements: ${frSummary.slice(0, 400)}`,
+      query: `Test cases covering ACs ${allAcIds.join(', ')} for FRs ${frIds.join(', ')} under NFRs ${nfrIds.join(', ')} (implementation_plan ${prior.implementationPlan?.recordId ?? 'unknown'}).`,
+      knownRelevantRecordIds: dmr71Seeds,
       detailFileLabel: 'p7_1_tests',
       requiredOutputSpec: 'test_plan JSON — test_suites with test_cases tracing to acceptance_criterion_ids',
     });
@@ -346,6 +357,7 @@ export class Phase7Handler implements PhaseHandler {
       implementation_plan_summary: planSummary,
       component_model_summary: componentSummary,
       detail_file_path: dmr.detailFilePath,
+      detail_file_content: dmr.detailFileContent,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;

@@ -24,6 +24,11 @@
  * for direct unit testing.
  *
  * Severity: HIGH on silent drop.
+ *
+ * This validator emits ADVISORY findings only; targetField/targetIdentifier
+ * are not populated because findings do not correspond to mutable array
+ * elements — they flag input items missing from the output (coverage gaps),
+ * which cannot be remediated by dropping an array element.
  */
 
 import type { ValidatorRuntimeParams, ValidatorFinding } from '../../validatorRegistry';

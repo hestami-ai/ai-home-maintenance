@@ -48,6 +48,7 @@ export class Phase9Handler implements PhaseHandler {
         workspacePath: engine.workspacePath,
         janumiCodeVersionSha: engine.janumiCodeVersionSha,
       },
+      engine.templateLoader,
     );
 
     // ── Initialize Executor Agent ──────────────────────────────────
@@ -75,13 +76,19 @@ export class Phase9Handler implements PhaseHandler {
     const unattendedSkipPermissions =
       cfgExecution?.unattended_skip_permissions === true
       || process.env.JANUMICODE_EXECUTOR_UNATTENDED === '1';
+    // Workflow-level override (e.g. `--thin-slice` pins to goose_cli).
+    // Read here so calibration runs route every Phase 9 task through a
+    // single executor regardless of what Phase 6 planner emitted.
+    const forcedExecutorBackingTool = (cfg as unknown as {
+      workflow?: { force_executor_backing_tool?: ExecutorBackingTool };
+    }).workflow?.force_executor_backing_tool ?? undefined;
     const executorAgent = new ExecutorAgent(
       engine.db,
       engine.agentInvoker,
       engine.writer,
       engine.eventBus,
       generateId,
-      { executorBackingTool, unattendedSkipPermissions },
+      { executorBackingTool, unattendedSkipPermissions, forcedExecutorBackingTool },
     );
 
     // ── Extract artifacts from prior phases ────────────────────────
@@ -151,7 +158,13 @@ export class Phase9Handler implements PhaseHandler {
       executorAgent,
       artifacts,
       {
-        leafRetryBudget: cfg.execution?.leaf_retry_budget ?? 3,
+        // Cap at 2 attempts (was 3). Calibrated from thin-slice-13
+        // where extra retries past 2 dominated the wall-clock budget
+        // without often yielding a successful task. The no-content
+        // detector in cliInvoker already short-circuits stuck tasks
+        // sooner than the per-call wall-clock used to, so each attempt
+        // is also less likely to drag.
+        leafRetryBudget: cfg.execution?.leaf_retry_budget ?? 2,
         deferredRetryBudget: cfg.execution?.deferred_retry_budget ?? 2,
         autoApproveWaveGates: cfg.execution?.auto_approve_wave_gates ?? false,
         testsPerLeaf: {

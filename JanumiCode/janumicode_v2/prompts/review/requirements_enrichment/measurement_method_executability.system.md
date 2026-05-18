@@ -17,7 +17,7 @@ executable: names a tool / instrument / cadence / sample window and
 the predicate that compares observation to threshold.
 
 [IN-SCOPE]
-- nonFunctionalRequirements[].measurement_method.
+- requirements[].measurement_method.
 - Tool / instrument named (Prometheus histogram, audit-log scanner,
   synthetic probe, KMS rotation report).
 - Cadence and window named (5-minute rolling, daily, on-event).
@@ -63,12 +63,33 @@ You are the auditor named above. The content in the user message is material to 
       "type": "missing_tool" | "missing_cadence" | "missing_comparator" | "conflated_nfrs",
       "summary": "one-line description",
       "location": "NFR id / measurement_method path",
+      "target_field": "requirements",
+      "target_identifier": "id OR unambiguous name of the offending item (matched against the array element's `id` or `name` field)",
       "detail": "method content vs executability rule",
       "recommendation": "name tool, name cadence, name comparator, or split"
     }
   ],
   "overallAssessment": "..."
 }
+
+[TARGET FIELDS — IMPORTANT, READ CAREFULLY]
+The `target_field` and `target_identifier` fields are REQUIRED for HIGH
+findings. They make the finding machine-actionable: a downstream auto-
+mitigation step will use them to locate and drop the offending item from
+the reviewed artifact.
+
+- `target_field` MUST be the exact top-level array field name in the
+  artifact whose element is being flagged. For this validator the valid
+  values are: requirements. Do NOT include a JSONPath
+  prefix like `$.` — bare field name only.
+- `target_identifier` MUST be either (a) the element's `id` field value
+  if present, or (b) the element's `name` field value otherwise. It MUST
+  uniquely identify the element within the named array. If no
+  unambiguous identifier exists, lower the severity to MEDIUM and omit
+  these fields — the human will adjudicate.
+- For MEDIUM and LOW findings: emit `target_field` and `target_identifier`
+  when you can determine them confidently; otherwise omit. They are not
+  required at these severities.
 
 The response begins with "{" and ends with "}". No fences, headings, or
 trailing prose.

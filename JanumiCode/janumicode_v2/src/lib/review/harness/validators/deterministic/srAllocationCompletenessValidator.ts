@@ -15,6 +15,11 @@
  *   - HIGH on uncovered SR (no component references it).
  *   - MEDIUM on undeclared cross-allocation (SR appears in multiple
  *     components but cross_cuts[] does not declare it).
+ *
+ * This validator emits ADVISORY findings only; targetField/targetIdentifier
+ * are not populated because findings do not correspond to mutable array
+ * elements — they flag coverage gaps (an input SR not referenced anywhere
+ * in components[]) which cannot be remediated by dropping an array element.
  */
 
 import type { ValidatorRuntimeParams, ValidatorFinding } from '../../validatorRegistry';

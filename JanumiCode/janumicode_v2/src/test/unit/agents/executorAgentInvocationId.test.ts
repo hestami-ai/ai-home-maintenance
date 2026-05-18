@@ -68,6 +68,7 @@ describe('ExecutorAgent — invocationId contract', () => {
     agentInvoker = new AgentInvoker(llm, {
       timeoutSeconds: 1,
       idleTimeoutSeconds: 1,
+      noContentTimeoutSeconds: 1,
       bufferMaxEvents: 100,
     });
     executor = new ExecutorAgent(db, agentInvoker, writer, eventBus, testId);
@@ -94,21 +95,23 @@ describe('ExecutorAgent — invocationId contract', () => {
     };
   }
 
-  it('returns the same invocationId stamped on agent_invocation.content.invocation_id', async () => {
-    (agentInvoker as unknown as { invoke: (opts: unknown) => Promise<unknown> }).invoke = vi.fn(async () => ({
+  it('returns the same invocationId it passes to AgentInvoker for the agent_invocation record', async () => {
+    // The agent_invocation record is now written by AgentInvoker.invokeCLI
+    // (CLI persistence parity). ExecutorAgent's contract is to mint the
+    // invocationId and forward it to AgentInvoker so the record's
+    // content.invocation_id matches what callers see. The mock captures
+    // the forwarded id; AgentInvoker is responsible for writing it.
+    const invokeSpy = vi.fn(async () => ({
       success: true,
       cliResult: { exitCode: 0, timedOut: false, idledOut: false, events: [], stderr: '', durationMs: 1 },
     }));
+    (agentInvoker as unknown as { invoke: (opts: unknown) => Promise<unknown> }).invoke = invokeSpy;
 
     const out = await executor.execute(makeTask(), runId, 'stdin', tmpDir, 'dev');
 
     expect(out.invocationId).toBeTruthy();
-    const invocationRow = db.prepare(`
-      SELECT json_extract(content, '$.invocation_id') AS iid
-      FROM governed_stream
-      WHERE workflow_run_id = ? AND record_type = 'agent_invocation'
-    `).get(runId) as { iid: string } | undefined;
-    expect(invocationRow?.iid).toBe(out.invocationId);
+    const invokeArgs = invokeSpy.mock.calls[0][0] as { invocationId: string };
+    expect(invokeArgs.invocationId).toBe(out.invocationId);
   });
 
   it('stamps every child trace record with produced_by_record_id === invocationId', async () => {

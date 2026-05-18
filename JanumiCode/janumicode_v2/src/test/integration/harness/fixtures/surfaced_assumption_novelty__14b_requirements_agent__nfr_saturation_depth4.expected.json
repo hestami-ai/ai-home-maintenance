@@ -1,7 +1,0 @@
-{
-  "validator": "surfaced_assumption_novelty",
-  "sample": "14b_requirements_agent__nfr_saturation_depth4",
-  "passed": true,
-  "expectedFindingCount": 0,
-  "overallAssessment": "All surfaced assumptions are semantically novel compared to existing assumptions and their assigned categories accurately reflect the underlying commitment type."
-}

@@ -18,6 +18,12 @@
  *   - HIGH:   markdown-fenced JSON (`\`\`\`json ... \`\`\``)
  *   - HIGH:   leading commentary before `{` or `[`
  *   - MEDIUM: trailing prose after closing `}` or `]`
+ *
+ * This validator emits ADVISORY findings only; targetField/targetIdentifier
+ * are not populated because findings do not correspond to mutable array
+ * elements — they describe whole-response shape violations (fences, prose
+ * wrappers) at location `$`. Auto-mitigation by dropping an array element
+ * is not applicable.
  */
 
 import type { ValidatorRuntimeParams, ValidatorFinding } from '../../validatorRegistry';

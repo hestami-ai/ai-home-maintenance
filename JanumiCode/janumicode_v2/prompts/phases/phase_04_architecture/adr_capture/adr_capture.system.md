@@ -20,9 +20,18 @@ GOVERNING CONSTRAINTS (apply without exception):
 
 Produce [JC:Architectural Decision Records] for every significant choice made during architecture definition.
 
-REQUIRED OUTPUT: A JSON object matching the `architectural_decisions` schema:
-- adrs: array, each with:
-  - id, title, status (proposed|accepted), context, decision, alternatives, rationale, consequences
+REQUIRED OUTPUT: A JSON object whose **single top-level key is `adrs`** (do NOT use `architectural_decisions` as the top-level key — use `adrs`):
+- `adrs`: array, each entry has fields:
+  - `id`, `title`, `status` (`proposed`|`accepted`), `context`, `decision`, `alternatives`, `rationale`, `consequences`
+
+Valid skeleton:
+```json
+{ "adrs": [ { "id": "ADR-001", ... } ] }
+```
+Invalid (do NOT do this):
+```json
+{ "architectural_decisions": [ ... ] }
+```
 
 Rules:
 - Every ADR must have status, decision, and rationale populated (Invariant: ADR-001, ADR-002)

@@ -155,7 +155,8 @@
       "Read(//tmp/**)",
       "Bash(pnpm vitest *)",
       "Bash(codex --help)",
-      "Bash(codex exec *)"
+      "Bash(codex exec *)",
+      "Bash(pnpm test:regression)"
     ]
   },
   "showThinkingSummaries": true

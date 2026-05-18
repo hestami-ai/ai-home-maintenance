@@ -85,7 +85,7 @@ Your own workflow ids follow the same semantic-slug convention:
   - `{ "kind": "integration", "integration_id": "INT-*", "event": "..." }` — `integration_id` MUST reference an accepted integration; `event` names the integration-side event (e.g. `"subscription.payment_failed"`).
 - **Every step in `steps[]` is a structured object:** `{ step_number, actor, action, expected_outcome }`. `actor` is `"System"`, a persona id, or an integration id — same rules as journey steps (but workflow steps do NOT carry `automatable`, since a workflow is already system-side by definition).
 - **`actors[]`** is the distinct set of non-System actors that appear in any step, plus any persona/integration involved in the workflow's lifecycle (not just steps). Empty array is valid for purely internal workflows.
-- **`business_domain_id` MUST reference a real domain** from the accepted list.
+- **`business_domain_id` MUST be one of the exact DOM-* identifiers from the `Accepted Business Domains` block at the bottom of this prompt.** Do not invent new DOM-* ids, do not abbreviate, do not change case. A workflow whose `business_domain_id` is not in that exact list will be dropped by the deterministic post-filter; if the LLM emits enough hallucinated domain ids that >50% of workflows are dropped, the whole sub-phase fails loud and re-runs.
 - **`backs_journeys[]`** is the distinct set of `journey_id` values across all `kind: "journey_step"` entries in `triggers[]`. Emit it even when empty (`[]` for workflows that are schedule/event/compliance/integration-only).
 
 # Umbrella workflows

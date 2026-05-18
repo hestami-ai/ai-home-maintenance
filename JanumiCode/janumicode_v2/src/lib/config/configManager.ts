@@ -60,6 +60,25 @@ export interface JanumiCodeConfig {
      * progress. Default here is 15 minutes of complete stream silence.
      */
     records_idle_stall_ms: number;
+    /**
+     * Auto-mitigation policy — see defaults.ts + study/auto-mitigation-design.md.
+     * Optional in config; defaults to `disabled` when omitted.
+     */
+    auto_mitigation_policy?: 'disabled' | 'auto' | 'present_to_human';
+    /**
+     * Thin-slice / calibration override — when set, Phase 9 task
+     * executor invocations use this backing tool regardless of what
+     * the Phase 6 implementation_planner chose per-task. Lets thin
+     * slice runs force `goose_cli` for cost-bounded local execution
+     * while leaving production runs free to honor the planner's choice.
+     * Logged per-task when the override fires.
+     */
+    force_executor_backing_tool?:
+      | 'claude_code_cli'
+      | 'gemini_cli'
+      | 'goose_cli'
+      | 'codex_cli'
+      | 'direct_llm_api';
   };
 
   deep_memory_research: {
@@ -81,6 +100,14 @@ export interface JanumiCodeConfig {
   cli_invocation: {
     timeout_seconds: number;
     idle_timeout_seconds: number;
+    /**
+     * Fires when no assistant text or thinking content has streamed from
+     * the CLI for N seconds, even if heartbeat / tool_use envelopes are
+     * still arriving. Catches the "spinning on tool calls without
+     * convergence" pathology that idle_timeout_seconds misses because
+     * envelope traffic keeps it alive. Set to 0 to disable.
+     */
+    no_content_timeout_seconds: number;
     buffer_max_events: number;
   };
 
@@ -349,6 +376,18 @@ export interface JanumiCodeConfig {
       };
       temperature?: number;
     };
+    /**
+     * UnstickingAgent routing — invoked by FailureHandler (Phase 9.4)
+     * when a loop is detected during task execution. Direct LLM call
+     * (no backing_tool wrapper); the agent runs N socratic turns to
+     * propose a correction. Shape mirrors `reasoning_review` — a
+     * provider+model pair plus optional knobs.
+     */
+    unsticking?: {
+      primary: { provider: string; model: string; base_url?: string };
+      temperature?: number;
+      max_socratic_turns?: number;
+    };
   };
 }
 
@@ -409,6 +448,11 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
   cli_invocation: {
     timeout_seconds: 600,
     idle_timeout_seconds: 120,
+    // Catches CLI sessions stuck in tool-call loops with no assistant
+    // text/thinking. Calibrated from thin-slice-13 where 600s was the
+    // upper bound for successful Phase 9.1 tasks; values higher than
+    // that were almost all goose tasks looping without convergence.
+    no_content_timeout_seconds: 600,
     buffer_max_events: 1000,
   },
 
@@ -492,23 +536,35 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
       primary: { backing_tool: 'gemini_cli', model: 'gemini-2.5-flash' },
       temperature: 0.3,
     },
-    // Default: local Ollama with qwen3.5:9b. Suitable for fixture-based
-    // mock tests and single-phase dev runs; override to a capable CLI
-    // backing for gold-capture / real-mode harness runs (see the CLI
-    // runner env-var wiring).
+    // Default: gpt-oss:20b. Switched from qwen3.5:9b after the
+    // thin-slice-12 bake-off — gpt-oss matched or beat qwen on every
+    // T1/T2/T3 dimension, was 3× faster, and avoided the runaway-
+    // thinking hang qwen reproducibly hit on entities_bloom and
+    // coverage_verifier. Provider kept as 'llamacpp' for the compiled
+    // default; live configs (cal-28 seed) route through 'ollama'.
     domain_interpreter: {
-      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'gpt-oss:20b' },
       temperature: 0.5,
     },
     // Requirements Agent default — matches domain_interpreter. Override
     // via JANUMICODE_REQUIREMENTS_AGENT_BACKING for CLI-backed runs.
     requirements_agent: {
-      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' },
+      primary: { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'gpt-oss:20b' },
       temperature: 0.5,
     },
     reasoning_review: {
       primary: { provider: 'google', model: 'gemini-2.5-flash' },
       temperature: 0.2,
+    },
+    // UnstickingAgent default — used by FailureHandler on loop detection.
+    // Google provider must register as 'google' to match (see
+    // src/lib/llm/providers/google.ts). Earlier versions used 'gemini'
+    // here, which didn't match any registered adapter — symptom was
+    // silent UnstickingAgent failures in tests.
+    unsticking: {
+      primary: { provider: 'google', model: 'gemini-2.5-flash' },
+      temperature: 0.3,
+      max_socratic_turns: 3,
     },
   },
 };
@@ -601,6 +657,33 @@ export class ConfigManager {
   getInvariantLibrary() { return this.config.invariant_library; }
   getCLIInvocation() { return this.config.cli_invocation; }
   getLLMRouting() { return this.config.llm_routing; }
+
+  /**
+   * Resolve the `{ provider, model, baseUrl? }` for a routing role with
+   * NO literal fallback — throws if the role lacks a `direct_llm_api`
+   * primary with a populated model. Use this anywhere production code
+   * needs a model name; never hardcode `'gpt-oss:20b'` (or any model
+   * literal) again. Roles that have a `direct_llm_api` primary today:
+   * `orchestrator`, `domain_interpreter`, `requirements_agent`. The
+   * `executor` role uses a CLI backing tool, not a direct API, so its
+   * `model` field is for the embedded CLI subprocess.
+   *
+   * Failure to set the role in config surfaces loudly at first call
+   * rather than silently routing through a stale literal default.
+   */
+  getRoutingModel(role: 'orchestrator' | 'domain_interpreter' | 'requirements_agent'): {
+    provider: string; model: string; baseUrl?: string;
+  } {
+    const routing = this.config.llm_routing[role];
+    const primary = (routing as { primary?: { backing_tool: string; provider?: string; model?: string; base_url?: string } } | undefined)?.primary;
+    if (!primary || primary.backing_tool !== 'direct_llm_api' || !primary.provider || !primary.model) {
+      throw new Error(
+        `llm_routing.${role}.primary must be a direct_llm_api routing with provider+model set. ` +
+        `Got: ${JSON.stringify(primary)}. Fix in .janumicode/config.json or DEFAULT_CONFIG.`,
+      );
+    }
+    return { provider: primary.provider, model: primary.model, baseUrl: primary.base_url };
+  }
 
   /**
    * Override `llm_routing.orchestrator` at runtime. Used by

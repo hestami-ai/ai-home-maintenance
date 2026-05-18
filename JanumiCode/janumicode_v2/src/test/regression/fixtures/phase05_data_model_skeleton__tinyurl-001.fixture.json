@@ -1,0 +1,713 @@
+{
+  "fixture_id": "phase05_data_model_skeleton__tinyurl-001",
+  "description": "Phase 5.1 data model specification: per-component entity definitions with typed fields and relationships.",
+  "extracted_from_run": "8dd753fc-8861-48f0-822b-af64a2468bf3",
+  "extracted_from_db": "test-and-evaluation/thin-slice-workspaces/thin-slice-workspace-11/.janumicode/test-harness/1778691029124.db",
+  "extracted_at": "2026-05-14T15:03:26.726Z",
+  "template_ref": {
+    "agent_role": "technical_spec_agent",
+    "sub_phase": "data_model_skeleton"
+  },
+  "invocation_params": {
+    "provider": "ollama",
+    "model": "qwen3.5:9b",
+    "temperature": 0.4,
+    "response_format": "json"
+  },
+  "template_variables": {
+    "active_constraints": "1. The Governed Stream is lossless. All execution trace content — reasoning steps, self-corrections, tool call invocations, tool results — is captured in full regardless of what subset is used for any given downstream purpose. (Authority 7, source: 55a61a95-64fd-475b-a985-7962936fb07e)\n2. No governing constraint may be truncated silently. Governing constraints (Authority Level 6+) are always delivered in full via the stdin directive channel. (Authority 7, source: b680da1d-f6d6-4113-ab4d-1a166154aff7)\n3. Prompt Templates use namespace prefixing ([JC:] and [P:]) and separate context scopes at all times. (Authority 7, source: a67d4502-972e-4c08-b482-19fbc402a5e9)\n4. All Artifacts are owned by JanumiCode and stored in the Governed Stream database. (Authority 7, source: a1030128-7334-4d7a-8ae9-8900de3c2993)\n5. The Governed Stream is single-threaded. No parallel Workflow Runs in a Workspace. (Authority 7, source: 5c77f777-a698-405b-9881-b6813ae04ec5)\n6. Agents never exercise judgment. Judgment is always escalated to the human. (Authority 7, source: b3e3ec17-574d-4915-99a2-244e0e71639e)\n7. Every human interaction is recorded in the Governed Stream in full detail. (Authority 7, source: d7f5ea89-7265-4416-847f-348290ea28a2)\n8. Every Phase Gate requires human approval. No automated gate passage. (Authority 7, source: ba84c364-c2f2-4a63-86ff-f3a49aba6c19)\n9. Every phase is mandatory and executed in order. The Orchestrator cannot skip phases. (Authority 7, source: 0450a160-f9ec-4e41-ab94-188f37bf1794)\n10. 100% correctness and completeness — always. All three layers of correctness (Section 1.6) are required. (Authority 7, source: 4394e1a8-f6d1-42c0-a25c-7991e6d02a5e)",
+    "system_requirements_summary": "17 System Requirements:\n  SR-001 [critical]: System shall perform successful mapping lookup for valid slug, returning encrypted payload metadata and target destination. (traces to: [\"FR-002-001.1\"])\n  SR-002 [critical]: System shall validate and reject malicious or invalid requests to prevent processing. (traces to: [\"US-001-C1-1\"])\n  SR-003 [high]: System shall monitor redirect endpoint latency P95 via Prometheus histograms under nominal load to maintain latency ≤ 100 ms within rolling 5-minute windows. (traces to: [\"NFR-001\",\"NFR-001-D-001\"])\n  SR-004 [high]: System shall verify monthly uptime for redirect endpoint including planned maintenance via synthetic probes to ensure verified uptime ≥ 99.9% over rolling 30-day windows. (traces to: [\"NFR-002\",\"NFR-AVAIL-002-D-001\"])\n  SR-005 [high]: System shall achieve Recovery Time Objective (RTO) on full regional failure ≤ 15 minutes. (traces to: [\"NFR-003\"])\n  SR-006 [high]: System shall store original URLs encrypted at rest using AES-256 cipher suite with zero plaintext occurrence in direct reads. (traces to: [\"NFR-004\"])\n  SR-007 [high]: System shall emit structured JSON logs to stdout for ingestion by platform, retaining audit logs ≥ 365 days and alerting on ingestion failure < 1 minute. (traces to: [\"NFR-005\"])\n  SR-008 [high]: System shall enforce HTTPS on all public endpoints with HSTS headers and redirect HTTP requests. (traces to: [\"NFR-006\"])\n  SR-009 [high]: System shall ensure every stored slug in the mappings table is unique with no duplicates. (traces to: [\"NFR-007\"])\n  SR-010 [high]: System shall purge valid deletion requests from Sharers from persistent storage and ephemeral cache within 24 hours of receipt. (traces to: [\"NFR-008\"])\n  SR-011 [high]: System shall export 100% of stored link data for a requesting user for GDPR Right to Access requests with zero data loss. (traces to: [\"NFR-009\"])\n  SR-012 [high]: System shall execute daily automated backups and replicate with zero integrity errors to ensure 100% job success. (traces to: [\"NFR-010\"])\n  SR-013 [high]: System shall block threat indicators with latency ≤ 5 seconds and update threat feeds ≤ 15 minutes. (traces to: [\"NFR-011\"])\n  SR-014 [high]: System shall enforce rate limit of 1000 requests per IP per rolling 60-second window and reject excess with HTTP 429. (traces to: [\"NFR-012\"])\n  SR-015 [high]: System shall block malicious URL submissions before storage in content repository. (traces to: [\"NFR-013\"])\n  SR-016 [high]: System shall generate notification attempts for every policy-expiry event before the expiry timestamp with zero missed notifications. (traces to: [\"NFR-014\"])\n  SR-017 [high]: System shall handle timeout conditions without triggering service crashes. (traces to: [\"NFR-015\"])",
+    "component_model_summary": "PROJECT TYPE: TinyURL is a frictionless, public URL shortening service ensuring links are instantly accessible and reliably tracked without requiring user accounts or complex setup. It empowers Link Sharers, Clickers, and API Clients through a secure, minimal architecture focused on speed and simplicity.: TinyURL is a minimal HTTP service that converts long URLs into short, six-character slugs for public sharing and instantly redirects traffic back to the original destination. It operates without user authentication, focusing purely on the core value of link compression and reliable delivery. The system leverages domains like the URL Shortening Engine, Threat Detection Gateway, and Encrypted Storage Layer to ensure security and performance, while integrations manage rate limiting, disaster recovery, and logging.\nCapabilities: [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]; [object Object]\n\n[Backlog] comp-delete-purger (Tier D leaf under link-lifecycle-processor): DeletePurger\n  - Purge valid deletion requests from Sharers from persistent storage and ephemeral cache.\n\n[Backlog] comp-gdpr-exporter (Tier D leaf under link-lifecycle-processor): GdprExporter\n  - Exports 100% of stored link data for a requesting user for GDPR Right to Access requests.\n\n[Backlog] comp-link-mapping-repository (Tier D leaf under link-mapping-repository): LinkMappingRepository\n  - Performs successful mapping lookup for valid slug, returning encrypted payload metadata and target destination.\n  - Stores original URLs encrypted at rest using AES-256 cipher suite with zero plaintext occurrence in direct reads.\n  - Ensures every stored slug in the mappings table is unique with no duplicates.\n\n[Backlog] comp-platform-audit (Tier D leaf under platform-audit): ReliabilityAudit\n  - Emits structured JSON logs to stdout for ingestion by platform, retaining audit logs for a minimum of 365 days.\n\n[Backlog] comp-backup-replication-engine (Tier D leaf under platform-disaster-recovery): BackupReplicationEngine\n  - Execute daily automated backups and replicate with zero integrity errors to disaster recovery storage.\n  - Verify backup checksums before committing replication tasks to ensure data integrity.\n\n[Backlog] comp-failure-detection (Tier D leaf under platform-disaster-recovery): Failure Detection Handler\n  - Ingest events from platform-fault-tolerance to identify regional failure conditions.\n  - Raise recovery-trigger event upon detecting RTO-impacting failure state.\n\n[Backlog] comp-recovery-planner (Tier D leaf under platform-disaster-recovery): Recovery Planner Module\n  - Resolve region topology from link-mapping-repository to identify required endpoints.\n  - Generate state-restoration sequence plan targeting specific regional endpoints.\n\n[Backlog] comp-request-timeout-enforcer (Tier D leaf under platform-fault-tolerance): Request Timeout Enforcer\n  - Intercept incoming requests and enforce configured timeout limits.\n  - Terminate long-running requests safely without dropping connections abruptly.\n\n[Backlog] graceful-shutdown-coordinator (Tier D leaf under platform-fault-tolerance): Graceful Shutdown Coordinator\n  - Manage signal listeners to initiate resource cleanup before process termination.\n  - Ensure no new requests are accepted during the drain window.\n\n[Backlog] comp-rel-latency-monitor (Tier D leaf under platform-observability): ReliabilityLatencyMonitor\n  - Monitor redirect endpoint latency P95 via Prometheus histograms to ensure latency remains within 100 ms.\n\n[Backlog] comp-rel-uptime-verifier (Tier D leaf under platform-observability): ReliabilityUptimeVerifier\n  - Verify monthly uptime for redirect endpoint via synthetic probes to ensure verified uptime ≥ 99.9%.\n\n[Backlog] comp-sec-request-validation (Tier D leaf under sec-validation-gateway): RequestValidationEngine\n  - Validate and reject malicious or invalid requests to prevent processing.\n  - Block malicious URL submissions before storage in content repository.\n\n[Backlog] comp-sec-transport-enforcer (Tier D leaf under sec-validation-gateway): TransportSecurityEnforcer\n  - Enforce HTTPS transport layer, inject HSTS headers, and redirect HTTP requests to HTTPS.\n  - Validate incoming requests originate from SecureChannel.",
+    "software_domains_summary": "3 Software Domains:\n  JC:Link-Lifecycle-Engine: Link Lifecycle Engine (reqs: SR-001, SR-006, SR-009, SR-010, SR-011, SR-016)\n    Terms: Slug: The six-character short identifier generated for original URLs to enable public sharing without authentication.; OriginalUrl: The target destination address stored and retrieved via the LinkMapping, encrypted at rest using AES-256.; LinkMapping: The unique, non-duplicated association record between a Slug and an OriginalUrl within the content repository.; DeletionRequest: A user-initiated request from a Sharer to remove a specific link from persistent storage and ephemeral cache within 24 hours.; DataExportJob: A system process that exports 100% of stored link data for a requesting user to satisfy GDPR Right to Access requests.; LinkExpiryEvent: A behavioral cluster triggered when a link policy reaches its expiry timestamp, initiating notification attempts for every policy-expiry event.\n  JC:Security-Validation-Gateway: Security Validation Gateway (reqs: SR-002, SR-008, SR-013, SR-014, SR-015)\n    Terms: MaliciousRequest: A request identified as malicious or invalid during validation that is rejected to prevent processing.; SecureChannel: The enforced HTTPS transport layer with HSTS headers and HTTP redirection used for all public endpoints.; RateLimitCounter: The enforcement mechanism limiting requests to 1000 per IP per rolling 60-second window, rejecting excess with HTTP 429.; ThreatIndicator: An indicator from the Threat Intelligence Feed used to block submissions and redirects within 5 seconds latency.; MaliciousSubmission: A URL content flagged as malicious before storage in the content repository to prevent persistence of harmful links.\n  JC:Platform-Reliability-Operations: Platform Reliability Operations (reqs: SR-003, SR-004, SR-005, SR-007, SR-012, SR-017)\n    Terms: RedirectLatency: The P95 latency metric monitored via Prometheus histograms to ensure redirect endpoint latency remains within 100 ms under nominal load.; UptimeMetric: The verified uptime metric calculated over rolling 30-day windows via synthetic probes, ensuring availability ≥ 99.9% including planned maintenance.; RecoveryObjective: The Recovery Time Objective (RTO) target defined for full regional failure recovery, requiring restoration within 15 minutes.; AuditLogRecord: The structured JSON log entry emitted to stdout for ingestion, retaining audit logs for a minimum of 365 days.; BackupReplicationJob: The automated task executed daily to backup data and replicate with zero integrity errors to disaster recovery storage.; SystemTimeout: A system state condition where timeout handling is applied to prevent service crashes during operational delays.",
+    "detail_file_path": "E:\\Projects\\hestami-ai\\JanumiCode\\janumicode_v2\\test-and-evaluation\\thin-slice-workspaces\\thin-slice-workspace-11/.janumicode/runs/8dd753fc-8861-48f0-822b-af64a2468bf3/context/data_model_skeleton_p5_1_data_models-8dd753fc.md",
+    "detail_file_content": "# JanumiCode Context Detail File\nGenerated: 2026-05-14T00:48:15.622Z\n\n\n## Deep Memory Research — Full Context Packet\n\n```json\n{\n  \"queryDecomposition\": {\n    \"topicEntities\": [\n      \"data\",\n      \"model\",\n      \"design\",\n      \"components\",\n      \"comp-delete-purger\",\n      \"comp-gdpr-exporter\",\n      \"comp-link-mapping-repository\",\n      \"comp-platform-audit\",\n      \"comp-backup-replication-engine\",\n      \"comp-failure-detection\",\n      \"comp-recovery-planner\",\n      \"comp-request-timeout-enforcer\"\n    ],\n    \"decisionTypesSought\": [\n      \"menu_selection\",\n      \"mirror_approval\",\n      \"phase_gate_approval\"\n    ],\n    \"temporalScope\": {\n      \"from\": \"1970-01-01T00:00:00Z\",\n      \"to\": \"2026-05-14T00:41:54.394Z\"\n    },\n    \"authorityLevelsIncluded\": [\n      5,\n      6,\n      7\n    ],\n    \"sourcesInScope\": [\n      \"governed_stream_all_runs\"\n    ],\n    \"knownConflictZones\": []\n  },\n  \"completenessStatus\": \"complete\",\n  \"decisionContextSummary\": \"The research context establishes the intent for TinyURL as a minimal URL shortening service defined by product description handoff (2cdb2df5-2f3d-4829-bd40-8e50669087f7) and intent discovery (9de70df6-5569-4c63-8695-e7a63302998c), with execution intent captured in the raw intent received (d0405a30-a2d1-45ef-bff1-a89f1a51954d). Execution is governed by Constitutional Invariants ensuring lossless stream capture (55a61a95-cd33-445a-87d4-f07df713ae78), prohibition of silent truncation for governing constraints (b680da1d-f6d6-4113-ab4d-1a166154aff7), namespace prefixing usage (a67d4502-972e-4c08-b482-19fbc402a5e9), JanumiCode artifact ownership (a1030128-7334-4d7a-8ae9-8900de3c2993), single-threaded operation (5c77f777-a698-405b-9881-b6813ae04ec5), prohibition of autonomous agent judgment (b3e3ec17-574d-4915-99a2-244e0e71639e), full recording of human interactions (d7f5ea89-7265-4416-847f-348290ea28a2), mandatory human approval for phase gates (ba84c364-c2f2-4a63-86ff-f3a49aba6c19), and 100% correctness requirements (4394e1a8-f6d1-42c0-a25c-7991e6d02a5e). The system design includes functional requirements (be0ecf7e-af44-443a-b845-53e96f6cd169), non-functional requirements (c6d2e917-86be-4a05-ad3c-0f169c793c36), system requirements (af71c59d-74e4-4b63-87b0-6aea5a9db752), technical constraints (1c0ee293-cd33-445a-87d4-f07df713ae78), and component models (f04da732-c561-4106-b525-f85599db0f77). Intent lens classification (f34162f5-52ab-40a7-97f3-782681e96e05) supports the discovery process.\",\n  \"completenessNarrative\": \"The packet is complete with no known gaps in the queried source stream. All queried sources were successfully processed with confidence 1.0. Found: TinyURL product definition, constitutional invariants, functional/system requirements, and component models. Missing: None identified per coverage assessment.\",\n  \"unavailableSources\": [],\n  \"materialFindings\": [\n    {\n      \"id\": \"1c0ee293-cd33-445a-87d4-f07df713ae78\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[technical_constraints_discovery]\",\n      \"sourceRecordIds\": [\n        \"1c0ee293-cd33-445a-87d4-f07df713ae78\"\n      ],\n      \"materialityScore\": 1\n    },\n    {\n      \"id\": \"f04da732-c561-4106-b525-f85599db0f77\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[component_model]\",\n      \"sourceRecordIds\": [\n        \"f04da732-c561-4106-b525-f85599db0f77\"\n      ],\n      \"materialityScore\": 1\n    },\n    {\n      \"id\": \"be0ecf7e-af44-443a-b845-53e96f6cd169\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[functional_requirements]\",\n      \"sourceRecordIds\": [\n        \"be0ecf7e-af44-443a-b845-53e96f6cd169\"\n      ],\n      \"materialityScore\": 1\n    },\n    {\n      \"id\": \"c6d2e917-86be-4a05-ad3c-0f169c793c36\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[non_functional_requirements]\",\n      \"sourceRecordIds\": [\n        \"c6d2e917-86be-4a05-ad3c-0f169c793c36\"\n      ],\n      \"materialityScore\": 1\n    },\n    {\n      \"id\": \"af71c59d-74e4-4b63-87b0-6aea5a9db752\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[system_requirements]\",\n      \"sourceRecordIds\": [\n        \"af71c59d-74e4-4b63-87b0-6aea5a9db752\"\n      ],\n      \"materialityScore\": 1\n    },\n    {\n      \"id\": \"55a61a95-64fd-475b-a985-7962936fb07e\",\n      \"recordType\": \"constitutional_invariant\",\n      \"authorityLevel\": 7,\n      \"governingStatus\": \"active\",\n      \"summary\": \"The Governed Stream is lossless. All execution trace content — reasoning steps, self-corrections, tool call invocations, tool results — is captured in full regardless of what subset is used for any given downstream purpose.\",\n      \"sourceRecordIds\": [\n        \"55a61a95-64fd-475b-a985-7962936fb07e\"\n      ],\n      \"materialityScore\": 0.6988694257661876,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 1,\n        \"authorityScore\": 1,\n        \"temporalRecency\": 0.9924628384412505,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"b680da1d-f6d6-4113-ab4d-1a166154aff7\",\n      \"recordType\": \"constitutional_invariant\",\n      \"authorityLevel\": 7,\n      \"governingStatus\": \"active\",\n      \"summary\": \"No governing constraint may be truncated silently. Governing constraints (Authority Level 6+) are always delivered in full via the stdin directive channel.\",\n      \"sourceRecordIds\": [\n        \"b680da1d-f6d6-4113-ab4d-1a166154aff7\"\n      ],\n      \"materialityScore\": 0.6988694167690492,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 1,\n        \"authorityScore\": 1,\n        \"temporalRecency\": 0.9924627784603276,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"a67d4502-972e-4c08-b482-19fbc402a5e9\",\n      \"recordType\": \"constitutional_invariant\",\n      \"authorityLevel\": 7,\n      \"governingStatus\": \"active\",\n      \"summary\": \"Prompt Templates use namespace prefixing ([JC:] and [P:]) and separate context scopes at all times.\",\n      \"sourceRecordIds\": [\n        \"a67d4502-972e-4c08-b482-19fbc402a5e9\"\n      ],\n      \"materialityScore\": 0.6988694166496181,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 1,\n        \"authorityScore\": 1,\n        \"temporalRecency\": 0.9924627776641207,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"a1030128-7334-4d7a-8ae9-8900de3c2993\",\n      \"recordType\": \"constitutional_invariant\",\n      \"authorityLevel\": 7,\n      \"governingStatus\": \"active\",\n      \"summary\": \"All Artifacts are owned by JanumiCode and stored in the Governed Stream database.\",\n      \"sourceRecordIds\": [\n        \"a1030128-7334-4d7a-8ae9-8900de3c2993\"\n      ],\n      \"materialityScore\": 0.6988694165699975,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 1,\n        \"authorityScore\": 1,\n        \"temporalRecency\": 0.9924627771333161,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"5c77f777-a698-405b-9881-b6813ae04ec5\",\n      \"recordType\": \"constitutional_invariant\",\n      \"authorityLevel\": 7,\n      \"governingStatus\": \"active\",\n      \"summary\": \"The Governed Stream is single-threaded. No parallel Workflow Runs in a Workspace.\",\n      \"sourceRecordIds\": [\n        \"5c77f777-a698-405b-9881-b6813ae04ec5\"\n      ],\n      \"materialityScore\": 0.6988694164903768,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 1,\n        \"authorityScore\": 1,\n        \"temporalRecency\": 0.9924627766025115,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"b3e3ec17-574d-4915-99a2-244e0e71639e\",\n      \"recordType\": \"constitutional_invariant\",\n      \"authorityLevel\": 7,\n      \"governingStatus\": \"active\",\n      \"summary\": \"Agents never exercise judgment. Judgment is always escalated to the human.\",\n      \"sourceRecordIds\": [\n        \"b3e3ec17-574d-4915-99a2-244e0e71639e\"\n      ],\n      \"materialityScore\": 0.6988694163311353,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 1,\n        \"authorityScore\": 1,\n        \"temporalRecency\": 0.9924627755409022,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"d7f5ea89-7265-4416-847f-348290ea28a2\",\n      \"recordType\": \"constitutional_invariant\",\n      \"authorityLevel\": 7,\n      \"governingStatus\": \"active\",\n      \"summary\": \"Every human interaction is recorded in the Governed Stream in full detail.\",\n      \"sourceRecordIds\": [\n        \"d7f5ea89-7265-4416-847f-348290ea28a2\"\n      ],\n      \"materialityScore\": 0.698869416171894,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 1,\n        \"authorityScore\": 1,\n        \"temporalRecency\": 0.992462774479293,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"ba84c364-c2f2-4a63-86ff-f3a49aba6c19\",\n      \"recordType\": \"constitutional_invariant\",\n      \"authorityLevel\": 7,\n      \"governingStatus\": \"active\",\n      \"summary\": \"Every Phase Gate requires human approval. No automated gate passage.\",\n      \"sourceRecordIds\": [\n        \"ba84c364-c2f2-4a63-86ff-f3a49aba6c19\"\n      ],\n      \"materialityScore\": 0.6988694160922733,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 1,\n        \"authorityScore\": 1,\n        \"temporalRecency\": 0.9924627739484885,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"0450a160-f9ec-4e41-ab94-188f37bf1794\",\n      \"recordType\": \"constitutional_invariant\",\n      \"authorityLevel\": 7,\n      \"governingStatus\": \"active\",\n      \"summary\": \"Every phase is mandatory and executed in order. The Orchestrator cannot skip phases.\",\n      \"sourceRecordIds\": [\n        \"0450a160-f9ec-4e41-ab94-188f37bf1794\"\n      ],\n      \"materialityScore\": 0.6988694159728422,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 1,\n        \"authorityScore\": 1,\n        \"temporalRecency\": 0.9924627731522815,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"4394e1a8-f6d1-42c0-a25c-7991e6d02a5e\",\n      \"recordType\": \"constitutional_invariant\",\n      \"authorityLevel\": 7,\n      \"governingStatus\": \"active\",\n      \"summary\": \"100% correctness and completeness — always. All three layers of correctness (Section 1.6) are required.\",\n      \"sourceRecordIds\": [\n        \"4394e1a8-f6d1-42c0-a25c-7991e6d02a5e\"\n      ],\n      \"materialityScore\": 0.6988694158932216,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 1,\n        \"authorityScore\": 1,\n        \"temporalRecency\": 0.9924627726214769,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"d0405a30-a2d1-45ef-bff1-a89f1a51954d\",\n      \"recordType\": \"raw_intent_received\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"Execute the intent described in the attached document.\\n\\n=== ATTACHED DOCUMENT: intent.md ===\\nExecute the intent described in the attached document.\\n\\n=== ATTACHED DOCUMENT: tinyurl-thin-slice.md ===\\n# TinyURL — A Minimal URL Shortener Service\\n\\n## Product Overview\\n\\nTinyURL is a public-facing service t\",\n      \"sourceRecordIds\": [\n        \"d0405a30-a2d1-45ef-bff1-a89f1a51954d\"\n      ],\n      \"materialityScore\": 0.5267265673493993,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.9924628299483763,\n        \"causalRelevance\": 0.6,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"646118b4-c645-42f9-b0bf-c74cbdd04e7e\",\n      \"recordType\": \"decision_trace\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"646118b4-c645-42f9-b0bf-c74cbdd04e7e\"\n      ],\n      \"materialityScore\": 0.4678568557709377,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.999998086091966,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"00674b12-751e-4e5d-9c5b-703690c0a681\",\n      \"recordType\": \"decision_trace\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"00674b12-751e-4e5d-9c5b-703690c0a681\"\n      ],\n      \"materialityScore\": 0.46768283374280534,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.99883793923775,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"b8fd2bf1-e075-4e3b-902b-fabad769b2b9\",\n      \"recordType\": \"decision_trace\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"b8fd2bf1-e075-4e3b-902b-fabad769b2b9\"\n      ],\n      \"materialityScore\": 0.46762202282685733,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.99843253313143,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"83c2f371-4f01-4c96-8064-5fb66ce0cdac\",\n      \"recordType\": \"decision_trace\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"83c2f371-4f01-4c96-8064-5fb66ce0cdac\"\n      ],\n      \"materialityScore\": 0.4676220220258612,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.9984325277914555,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"c4b082ef-1b09-460a-9343-68afafe3a20d\",\n      \"recordType\": \"decision_trace\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"c4b082ef-1b09-460a-9343-68afafe3a20d\"\n      ],\n      \"materialityScore\": 0.4670098305871482,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.9943512515333691,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"756f0a80-d21d-4935-9569-83b0732a8335\",\n      \"recordType\": \"decision_trace\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"756f0a80-d21d-4935-9569-83b0732a8335\"\n      ],\n      \"materialityScore\": 0.466987166794931,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.9942001595852543,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"3375c2fd-7a79-4585-bdad-587e67f38052\",\n      \"recordType\": \"decision_trace\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"3375c2fd-7a79-4585-bdad-587e67f38052\"\n      ],\n      \"materialityScore\": 0.4669725056599702,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.994102418685516,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"7c52c69f-3c67-4038-b3fb-8ee8ab24e48a\",\n      \"recordType\": \"decision_trace\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"7c52c69f-3c67-4038-b3fb-8ee8ab24e48a\"\n      ],\n      \"materialityScore\": 0.4669512015724423,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.9939603914353295,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"5414165f-657b-4879-9a06-315f5c125f99\",\n      \"recordType\": \"decision_trace\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"5414165f-657b-4879-9a06-315f5c125f99\"\n      ],\n      \"materialityScore\": 0.4669170913874378,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.9937329902019666,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"ef101798-cc6d-4b52-a9b2-b9fd46da9352\",\n      \"recordType\": \"decision_trace\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"ef101798-cc6d-4b52-a9b2-b9fd46da9352\"\n      ],\n      \"materialityScore\": 0.46689041504684625,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.9935551479313564,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"446e7a49-e74a-4a9c-b0a6-3cb1340f6abc\",\n      \"recordType\": \"decision_trace\",\n      \"authorityLevel\": 5,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"446e7a49-e74a-4a9c-b0a6-3cb1340f6abc\"\n      ],\n      \"materialityScore\": 0.4668493191946065,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.7142857142857143,\n        \"temporalRecency\": 0.9932811755830911,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"f34162f5-52ab-40a7-97f3-782681e96e05\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[intent_lens_classification]\",\n      \"sourceRecordIds\": [\n        \"f34162f5-52ab-40a7-97f3-782681e96e05\"\n      ],\n      \"materialityScore\": 0.4310288084648088,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9925730088130114,\n        \"causalRelevance\": 0.5,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"2cdb2df5-2f3d-4829-bd40-8e50669087f7\",\n      \"recordType\": \"product_description_handoff\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"This product discovery defines TinyURL as a minimal, public URL shortening service prioritizing speed and accessibility without user authentication. The core experience supports two primary personas, the Link Sharer seeking instant compression and the Link Clicker expecting reliable redirects, along\",\n      \"sourceRecordIds\": [\n        \"2cdb2df5-2f3d-4829-bd40-8e50669087f7\"\n      ],\n      \"materialityScore\": 0.4212728638125903,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9942000444648879,\n        \"causalRelevance\": 0.4,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"9de70df6-5569-4c63-8695-e7a63302998c\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[intent_discovery]\",\n      \"sourceRecordIds\": [\n        \"9de70df6-5569-4c63-8695-e7a63302998c\"\n      ],\n      \"materialityScore\": 0.4010469962049329,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9926942604138385,\n        \"causalRelevance\": 0.2,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"5213b036-fdbb-4f99-8df2-8607bac29cf7\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[architectural_decisions]\",\n      \"sourceRecordIds\": [\n        \"5213b036-fdbb-4f99-8df2-8607bac29cf7\"\n      ],\n      \"materialityScore\": 0.39214254474559895,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9999979173516124,\n        \"causalRelevance\": 0.1,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"077842c8-38ab-461e-9426-622281e28792\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[vv_requirements_discovery]\",\n      \"sourceRecordIds\": [\n        \"077842c8-38ab-461e-9426-622281e28792\"\n      ],\n      \"materialityScore\": 0.3910928056215277,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9929996565244708,\n        \"causalRelevance\": 0.1,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"0933bc25-b1ef-4b4d-bf18-9d1219dec10f\",\n      \"recordType\": \"intent_quality_report\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"0933bc25-b1ef-4b4d-bf18-9d1219dec10f\"\n      ],\n      \"materialityScore\": 0.3910187488869882,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9925059449608734,\n        \"causalRelevance\": 0.1,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"96432395-55ac-43bb-a275-9d9fb29ae162\",\n      \"recordType\": \"query_decomposition_record\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[query_decomposition]\",\n      \"sourceRecordIds\": [\n        \"96432395-55ac-43bb-a275-9d9fb29ae162\"\n      ],\n      \"materialityScore\": 0.3821425472726928,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9999979341989047,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"ac4f4a11-9ce7-4281-92a1-5ac764341acc\",\n      \"recordType\": \"retrieval_brief_record\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"ac4f4a11-9ce7-4281-92a1-5ac764341acc\"\n      ],\n      \"materialityScore\": 0.382142546751229,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9999979307224792,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"03d4d826-2f55-4097-9867-694ac9ee4491\",\n      \"recordType\": \"dmr_pipeline\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[dmr_pipeline]\",\n      \"sourceRecordIds\": [\n        \"03d4d826-2f55-4097-9867-694ac9ee4491\"\n      ],\n      \"materialityScore\": 0.38213271342929633,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9999323752429283,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"2fcdf28d-dc2a-448f-97e1-76bca7f10f3e\",\n      \"recordType\": \"context_packet\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"2fcdf28d-dc2a-448f-97e1-76bca7f10f3e\"\n      ],\n      \"materialityScore\": 0.3821327133089665,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9999323744407289,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"ebce2cc1-6bd7-40f9-b9f6-2d49ef6cf985\",\n      \"recordType\": \"retrieval_brief_record\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"\",\n      \"sourceRecordIds\": [\n        \"ebce2cc1-6bd7-40f9-b9f6-2d49ef6cf985\"\n      ],\n      \"materialityScore\": 0.3821289488348406,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9999072779465565,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"676a1664-552b-4b2a-a3b3-400108dce5ad\",\n      \"recordType\": \"query_decomposition_record\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[query_decomposition]\",\n      \"sourceRecordIds\": [\n        \"676a1664-552b-4b2a-a3b3-400108dce5ad\"\n      ],\n      \"materialityScore\": 0.3821289488348406,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.2857142857142857,\n        \"temporalRecency\": 0.9999072779465565,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"e4a7b362-074e-467f-94cd-66e4acf30d40\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[entities_bloom]\",\n      \"sourceRecordIds\": [\n        \"e4a7b362-074e-467f-94cd-66e4acf30d40\"\n      ],\n      \"materialityScore\": 0.3626654727340257,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.14285714285714285,\n        \"temporalRecency\": 0.9939602944173143,\n        \"causalRelevance\": 0.1,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"49f25d6c-a1d7-4250-9208-4f57a1cc8803\",\n      \"recordType\": \"component_decomposition_node\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[component_decomposition_node]\",\n      \"sourceRecordIds\": [\n        \"49f25d6c-a1d7-4250-9208-4f57a1cc8803\"\n      ],\n      \"materialityScore\": 0.353548664906624,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.14285714285714285,\n        \"temporalRecency\": 0.9998482422346363,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"bff4a734-3cd5-4a05-a525-ae326e3c58be\",\n      \"recordType\": \"component_decomposition_node\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[component_decomposition_node]\",\n      \"sourceRecordIds\": [\n        \"bff4a734-3cd5-4a05-a525-ae326e3c58be\"\n      ],\n      \"materialityScore\": 0.3535401828018315,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.14285714285714285,\n        \"temporalRecency\": 0.9997916948693532,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"3be08480-2028-4c22-8614-e62081b841c5\",\n      \"recordType\": \"component_decomposition_node\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[component_decomposition_node]\",\n      \"sourceRecordIds\": [\n        \"3be08480-2028-4c22-8614-e62081b841c5\"\n      ],\n      \"materialityScore\": 0.35354018248099695,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.14285714285714285,\n        \"temporalRecency\": 0.9997916927304557,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"a2e897c0-5c91-4d03-b790-267865bae17f\",\n      \"recordType\": \"component_decomposition_node\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[component_decomposition_node]\",\n      \"sourceRecordIds\": [\n        \"a2e897c0-5c91-4d03-b790-267865bae17f\"\n      ],\n      \"materialityScore\": 0.35353172804513533,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.14285714285714285,\n        \"temporalRecency\": 0.9997353298247117,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"e1d24cdf-d5d9-40ae-8c91-f2ccb1bbfef0\",\n      \"recordType\": \"component_decomposition_node\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[component_decomposition_node]\",\n      \"sourceRecordIds\": [\n        \"e1d24cdf-d5d9-40ae-8c91-f2ccb1bbfef0\"\n      ],\n      \"materialityScore\": 0.35352220627193925,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.14285714285714285,\n        \"temporalRecency\": 0.9996718513367379,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"3e1bb3e0-12d5-4ccd-826a-7b0184d5f247\",\n      \"recordType\": \"component_decomposition_node\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[component_decomposition_node]\",\n      \"sourceRecordIds\": [\n        \"3e1bb3e0-12d5-4ccd-826a-7b0184d5f247\"\n      ],\n      \"materialityScore\": 0.3535222061917402,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.14285714285714285,\n        \"temporalRecency\": 0.9996718508020775,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"d4330966-7fa1-435e-899f-b60e0b57ef78\",\n      \"recordType\": \"component_decomposition_node\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[component_decomposition_node]\",\n      \"sourceRecordIds\": [\n        \"d4330966-7fa1-435e-899f-b60e0b57ef78\"\n      ],\n      \"materialityScore\": 0.35351477360891614,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.14285714285714285,\n        \"temporalRecency\": 0.9996223002499174,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"5e231752-e794-460e-bb9d-e0322631ccaf\",\n      \"recordType\": \"component_decomposition_node\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[component_decomposition_node]\",\n      \"sourceRecordIds\": [\n        \"5e231752-e794-460e-bb9d-e0322631ccaf\"\n      ],\n      \"materialityScore\": 0.35351477352872107,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.14285714285714285,\n        \"temporalRecency\": 0.9996222997152836,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"03c5c9d1-1efe-433a-8366-1ef830f5f04a\",\n      \"recordType\": \"component_decomposition_node\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[component_decomposition_node]\",\n      \"sourceRecordIds\": [\n        \"03c5c9d1-1efe-433a-8366-1ef830f5f04a\"\n      ],\n      \"materialityScore\": 0.35348890603456423,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.14285714285714285,\n        \"temporalRecency\": 0.9994498497542378,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"19e5b61c-a651-4ead-9d9f-a85025398c19\",\n      \"recordType\": \"component_decomposition_node\",\n      \"authorityLevel\": 1,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[component_decomposition_node]\",\n      \"sourceRecordIds\": [\n        \"19e5b61c-a651-4ead-9d9f-a85025398c19\"\n      ],\n      \"materialityScore\": 0.3534590768935674,\n      \"materialityBreakdown\": {\n        \"semanticSimilarity\": 0.5,\n        \"constraintRelevance\": 0.3,\n        \"authorityScore\": 0.14285714285714285,\n        \"temporalRecency\": 0.999250988814259,\n        \"causalRelevance\": 0,\n        \"contradictionSignal\": 0\n      }\n    },\n    {\n      \"id\": \"6d8e1149-7b73-412e-a877-7bd4aced75d8\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[software_domains]\",\n      \"sourceRecordIds\": [\n        \"6d8e1149-7b73-412e-a877-7bd4aced75d8\"\n      ],\n      \"materialityScore\": 0.7\n    },\n    {\n      \"id\": \"3aa6fc1a-4026-45ae-9aff-bba04f374c05\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[intent_statement]\",\n      \"sourceRecordIds\": [\n        \"3aa6fc1a-4026-45ae-9aff-bba04f374c05\"\n      ],\n      \"materialityScore\": 0.7\n    },\n    {\n      \"id\": \"8ffa8d26-aed7-4e6a-869e-a5e26a00362d\",\n      \"recordType\": \"artifact_produced\",\n      \"authorityLevel\": 2,\n      \"governingStatus\": \"active\",\n      \"summary\": \"[system_boundary]\",\n      \"sourceRecordIds\": [\n        \"8ffa8d26-aed7-4e6a-869e-a5e26a00362d\"\n      ],\n      \"materialityScore\": 0.7\n    }\n  ],\n  \"activeConstraints\": [\n    {\n      \"id\": \"55a61a95-64fd-475b-a985-7962936fb07e\",\n      \"statement\": \"The Governed Stream is lossless. All execution trace content — reasoning steps, self-corrections, tool call invocations, tool results — is captured in full regardless of what subset is used for any given downstream purpose.\",\n      \"authorityLevel\": 7,\n      \"sourceRecordIds\": [\n        \"55a61a95-64fd-475b-a985-7962936fb07e\"\n      ]\n    },\n    {\n      \"id\": \"b680da1d-f6d6-4113-ab4d-1a166154aff7\",\n      \"statement\": \"No governing constraint may be truncated silently. Governing constraints (Authority Level 6+) are always delivered in full via the stdin directive channel.\",\n      \"authorityLevel\": 7,\n      \"sourceRecordIds\": [\n        \"b680da1d-f6d6-4113-ab4d-1a166154aff7\"\n      ]\n    },\n    {\n      \"id\": \"a67d4502-972e-4c08-b482-19fbc402a5e9\",\n      \"statement\": \"Prompt Templates use namespace prefixing ([JC:] and [P:]) and separate context scopes at all times.\",\n      \"authorityLevel\": 7,\n      \"sourceRecordIds\": [\n        \"a67d4502-972e-4c08-b482-19fbc402a5e9\"\n      ]\n    },\n    {\n      \"id\": \"a1030128-7334-4d7a-8ae9-8900de3c2993\",\n      \"statement\": \"All Artifacts are owned by JanumiCode and stored in the Governed Stream database.\",\n      \"authorityLevel\": 7,\n      \"sourceRecordIds\": [\n        \"a1030128-7334-4d7a-8ae9-8900de3c2993\"\n      ]\n    },\n    {\n      \"id\": \"5c77f777-a698-405b-9881-b6813ae04ec5\",\n      \"statement\": \"The Governed Stream is single-threaded. No parallel Workflow Runs in a Workspace.\",\n      \"authorityLevel\": 7,\n      \"sourceRecordIds\": [\n        \"5c77f777-a698-405b-9881-b6813ae04ec5\"\n      ]\n    },\n    {\n      \"id\": \"b3e3ec17-574d-4915-99a2-244e0e71639e\",\n      \"statement\": \"Agents never exercise judgment. Judgment is always escalated to the human.\",\n      \"authorityLevel\": 7,\n      \"sourceRecordIds\": [\n        \"b3e3ec17-574d-4915-99a2-244e0e71639e\"\n      ]\n    },\n    {\n      \"id\": \"d7f5ea89-7265-4416-847f-348290ea28a2\",\n      \"statement\": \"Every human interaction is recorded in the Governed Stream in full detail.\",\n      \"authorityLevel\": 7,\n      \"sourceRecordIds\": [\n        \"d7f5ea89-7265-4416-847f-348290ea28a2\"\n      ]\n    },\n    {\n      \"id\": \"ba84c364-c2f2-4a63-86ff-f3a49aba6c19\",\n      \"statement\": \"Every Phase Gate requires human approval. No automated gate passage.\",\n      \"authorityLevel\": 7,\n      \"sourceRecordIds\": [\n        \"ba84c364-c2f2-4a63-86ff-f3a49aba6c19\"\n      ]\n    },\n    {\n      \"id\": \"0450a160-f9ec-4e41-ab94-188f37bf1794\",\n      \"statement\": \"Every phase is mandatory and executed in order. The Orchestrator cannot skip phases.\",\n      \"authorityLevel\": 7,\n      \"sourceRecordIds\": [\n        \"0450a160-f9ec-4e41-ab94-188f37bf1794\"\n      ]\n    },\n    {\n      \"id\": \"4394e1a8-f6d1-42c0-a25c-7991e6d02a5e\",\n      \"statement\": \"100% correctness and completeness — always. All three layers of correctness (Section 1.6) are required.\",\n      \"authorityLevel\": 7,\n      \"sourceRecordIds\": [\n        \"4394e1a8-f6d1-42c0-a25c-7991e6d02a5e\"\n      ]\n    }\n  ],\n  \"supersessionChains\": [],\n  \"contradictions\": [],\n  \"openQuestions\": [],\n  \"implicitDecisions\": [],\n  \"recommendedDrilldowns\": [],\n  \"coverageAssessment\": {\n    \"sourcesQueried\": [\n      \"governed_stream_all_runs\"\n    ],\n    \"sourcesUnavailable\": [],\n    \"knownGaps\": [],\n    \"confidence\": 1\n  }\n}\n```",
+    "janumicode_version_sha": ""
+  },
+  "baseline": {
+    "response_text": "{\n  \"models\": [\n    {\n      \"component_id\": \"comp-link-mapping-repository\",\n      \"entities\": [\n        {\n          \"name\": \"LinkMapping\",\n          \"fields\": [\n            {\n              \"name\": \"slug\",\n              \"type\": \"string\",\n              \"constraints\": \"unique, length 6, lowercase alphanumeric\"\n            },\n            {\n              \"name\": \"original_url\",\n              \"type\": \"string\",\n              \"constraints\": \"encrypted_at_rest, aes-256\"\n            },\n            {\n              \"name\": \"created_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"utc_now\"\n            },\n            {\n              \"name\": \"expires_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"policy_expiry_event\"\n            },\n            {\n              \"name\": \"is_active\",\n              \"type\": \"boolean\",\n              \"constraints\": \"default true\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\",\n              \"foreign_key\": \"slug\"\n            }\n          ]\n        },\n        {\n          \"name\": \"PolicyExpiryEvent\",\n          \"fields\": [\n            {\n              \"name\": \"link_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"references LinkMapping slug\"\n            },\n            {\n              \"name\": \"expiry_timestamp\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"not_null\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": \"LinkMapping\",\n              \"type\": \"many_to_one\",\n              \"foreign_key\": \"link_id\",\n              \"direction\": \"child references parent\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-delete-purger\",\n      \"entities\": [\n        {\n          \"name\": \"DeletionRequest\",\n          \"fields\": [\n            {\n              \"name\": \"request_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"link_slug\",\n              \"type\": \"string\",\n              \"constraints\": \"references LinkMapping.slug, nullable if bulk\"\n            },\n            {\n              \"name\": \"requested_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"not_null\"\n            },\n            {\n              \"name\": \"purged_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"null if pending, max 24h gap to null\"\n            },\n            {\n              \"name\": \"status\",\n              \"type\": \"string\",\n              \"constraints\": \"enum: pending, purged, failed\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": \"LinkMapping\",\n              \"type\": \"many_to_one\",\n              \"foreign_key\": \"link_slug\",\n              \"direction\": \"child references parent\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-gdpr-exporter\",\n      \"entities\": [\n        {\n          \"name\": \"DataExportJob\",\n          \"fields\": [\n            {\n              \"name\": \"job_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"requested_user\",\n              \"type\": \"string\",\n              \"constraints\": \"nullable (system process)\"\n            },\n            {\n              \"name\": \"start_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"not_null\"\n            },\n            {\n              \"name\": \"complete_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"nullable\"\n            },\n            {\n              \"name\": \"export_hash\",\n              \"type\": \"string\",\n              \"constraints\": \"sha256 of exported data\"\n            },\n            {\n              \"name\": \"status\",\n              \"type\": \"string\",\n              \"constraints\": \"enum: queued, running, complete, failed\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-platform-audit\",\n      \"entities\": [\n        {\n          \"name\": \"AuditLogRecord\",\n          \"fields\": [\n            {\n              \"name\": \"log_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"event_type\",\n              \"type\": \"string\",\n              \"constraints\": \"operation_type\"\n            },\n            {\n              \"name\": \"payload\",\n              \"type\": \"string\",\n              \"constraints\": \"json_encoded\"\n            },\n            {\n              \"name\": \"ingested_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"not_null, retention >= 365 days\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-backup-replication-engine\",\n      \"entities\": [\n        {\n          \"name\": \"BackupReplicationJob\",\n          \"fields\": [\n            {\n              \"name\": \"job_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"source_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"references data_store_primary\"\n            },\n            {\n              \"name\": \"dest_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"references data_store_dr\"\n            },\n            {\n              \"name\": \"checksum\",\n              \"type\": \"string\",\n              \"constraints\": \"sha256, zero integrity errors\"\n            },\n            {\n              \"name\": \"status\",\n              \"type\": \"string\",\n              \"constraints\": \"enum: queued, in_progress, complete, failed\"\n            },\n            {\n              \"name\": \"executed_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"not_null if status complete\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-failure-detection\",\n      \"entities\": [\n        {\n          \"name\": \"FailureEvent\",\n          \"fields\": [\n            {\n              \"name\": \"event_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"region_id\",\n              \"type\": \"string\",\n              \"constraints\": \"geo_location_identifier\"\n            },\n            {\n              \"name\": \"detected_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"not_null\"\n            },\n            {\n              \"name\": \"severity\",\n              \"type\": \"string\",\n              \"constraints\": \"enum: warning, error, critical\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-recovery-planner\",\n      \"entities\": [\n        {\n          \"name\": \"RecoveryPlan\",\n          \"fields\": [\n            {\n              \"name\": \"plan_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"trigger_event_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"references FailureEvent.event_id\"\n            },\n            {\n              \"name\": \"rto_minutes\",\n              \"type\": \"integer\",\n              \"constraints\": \"<= 15 per SR-005\"\n            },\n            {\n              \"name\": \"execution_sequence\",\n              \"type\": \"array\",\n              \"constraints\": \"json array of step_ids\"\n            },\n            {\n              \"name\": \"completed_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"nullable\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": \"FailureEvent\",\n              \"type\": \"many_to_one\",\n              \"foreign_key\": \"trigger_event_id\",\n              \"direction\": \"child references parent\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-request-timeout-enforcer\",\n      \"entities\": [\n        {\n          \"name\": \"TimeoutConfig\",\n          \"fields\": [\n            {\n              \"name\": \"config_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"limit_ms\",\n              \"type\": \"integer\",\n              \"constraints\": \"max_duration_per_request\"\n            },\n            {\n              \"name\": \"action_on_exceed\",\n              \"type\": \"string\",\n              \"constraints\": \"enum: kill, graceful_shutdown\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-rel-latency-monitor\",\n      \"entities\": [\n        {\n          \"name\": \"LatencyMetric\",\n          \"fields\": [\n            {\n              \"name\": \"metric_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"endpoint\",\n              \"type\": \"string\",\n              \"constraints\": \"redirect_url\"\n            },\n            {\n              \"name\": \"p95_value\",\n              \"type\": \"integer\",\n              \"constraints\": \"milliseconds, <= 100 per SR-003\"\n            },\n            {\n              \"name\": \"window_start\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"prometheus_rollup\"\n            },\n            {\n              \"name\": \"status\",\n              \"type\": \"string\",\n              \"constraints\": \"enum: nominal, degraded\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-rel-uptime-verifier\",\n      \"entities\": [\n        {\n          \"name\": \"UptimeMetric\",\n          \"fields\": [\n            {\n              \"name\": \"metric_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"uptime_percentage\",\n              \"type\": \"decimal\",\n              \"constraints\": \"float, >= 99.9 per SR-004\"\n            },\n            {\n              \"name\": \"window_start\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"rolling_30_days\"\n            },\n            {\n              \"name\": \"verified\",\n              \"type\": \"boolean\",\n              \"constraints\": \"false until verification\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-sec-request-validation\",\n      \"entities\": [\n        {\n          \"name\": \"RateLimitEntry\",\n          \"fields\": [\n            {\n              \"name\": \"entry_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"ip_address\",\n              \"type\": \"string\",\n              \"constraints\": \"inet\"\n            },\n            {\n              \"name\": \"request_count\",\n              \"type\": \"integer\",\n              \"constraints\": \"max 1000 per window per SR-014\"\n            },\n            {\n              \"name\": \"window_start\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"rolling 60 seconds\"\n            },\n            {\n              \"name\": \"is_rejected\",\n              \"type\": \"boolean\",\n              \"constraints\": \"true if > 1000\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\"\n            }\n          ]\n        },\n        {\n          \"name\": \"MaliciousRequest\",\n          \"fields\": [\n            {\n              \"name\": \"request_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"payload\",\n              \"type\": \"string\",\n              \"constraints\": \"sanitized\"\n            },\n            {\n              \"name\": \"detection_time\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"not_null\"\n            },\n            {\n              \"name\": \"threat_indicator_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"references ThreatIndicator\"\n            },\n            {\n              \"name\": \"source_ip\",\n              \"type\": \"string\",\n              \"constraints\": \"inet\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": \"ThreatIndicator\",\n              \"type\": \"many_to_one\",\n              \"foreign_key\": \"threat_indicator_id\",\n              \"direction\": \"child references parent\"\n            }\n          ]\n        },\n        {\n          \"name\": \"ThreatIndicator\",\n          \"fields\": [\n            {\n              \"name\": \"indicator_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"indicator_type\",\n              \"type\": \"string\",\n              \"constraints\": \"url_hash, slug, ip\"\n            },\n            {\n              \"name\": \"source_feed\",\n              \"type\": \"string\",\n              \"constraints\": \"integrated_feed_name\"\n            },\n            {\n              \"name\": \"active\",\n              \"type\": \"boolean\",\n              \"constraints\": \"true if current\"\n            },\n            {\n              \"name\": \"updated_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"update <= 15 min per SR-013\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"comp-sec-transport-enforcer\",\n      \"entities\": [\n        {\n          \"name\": \"SecureChannelConfig\",\n          \"fields\": [\n            {\n              \"name\": \"config_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"protocol\",\n              \"type\": \"string\",\n              \"constraints\": \"enum: https, http\"\n            },\n            {\n              \"name\": \"hsts_enabled\",\n              \"type\": \"boolean\",\n              \"constraints\": \"true\"\n            },\n            {\n              \"name\": \"redirect_status_code\",\n              \"type\": \"integer\",\n              \"constraints\": \"301 or 302\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"component_id\": \"graceful-shutdown-coordinator\",\n      \"entities\": [\n        {\n          \"name\": \"ShutdownSignal\",\n          \"fields\": [\n            {\n              \"name\": \"signal_id\",\n              \"type\": \"uuid\",\n              \"constraints\": \"primary_key\"\n            },\n            {\n              \"name\": \"signal_type\",\n              \"type\": \"string\",\n              \"constraints\": \"SIGTERM, SIGINT\"\n            },\n            {\n              \"name\": \"process_id\",\n              \"type\": \"integer\",\n              \"constraints\": \"os_pid\"\n            },\n            {\n              \"name\": \"drain_window_ms\",\n              \"type\": \"integer\",\n              \"constraints\": \"configured_timeout\"\n            },\n            {\n              \"name\": \"received_at\",\n              \"type\": \"timestamp\",\n              \"constraints\": \"not_null\"\n            }\n          ],\n          \"relationships\": [\n            {\n              \"to\": null,\n              \"type\": \"one_to_one\"\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}",
+    "parsed_json": {
+      "models": [
+        {
+          "component_id": "comp-link-mapping-repository",
+          "entities": [
+            {
+              "name": "LinkMapping",
+              "fields": [
+                {
+                  "name": "slug",
+                  "type": "string",
+                  "constraints": "unique, length 6, lowercase alphanumeric"
+                },
+                {
+                  "name": "original_url",
+                  "type": "string",
+                  "constraints": "encrypted_at_rest, aes-256"
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp",
+                  "constraints": "utc_now"
+                },
+                {
+                  "name": "expires_at",
+                  "type": "timestamp",
+                  "constraints": "policy_expiry_event"
+                },
+                {
+                  "name": "is_active",
+                  "type": "boolean",
+                  "constraints": "default true"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one",
+                  "foreign_key": "slug"
+                }
+              ]
+            },
+            {
+              "name": "PolicyExpiryEvent",
+              "fields": [
+                {
+                  "name": "link_id",
+                  "type": "uuid",
+                  "constraints": "references LinkMapping slug"
+                },
+                {
+                  "name": "expiry_timestamp",
+                  "type": "timestamp",
+                  "constraints": "not_null"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": "LinkMapping",
+                  "type": "many_to_one",
+                  "foreign_key": "link_id",
+                  "direction": "child references parent"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "comp-delete-purger",
+          "entities": [
+            {
+              "name": "DeletionRequest",
+              "fields": [
+                {
+                  "name": "request_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "link_slug",
+                  "type": "string",
+                  "constraints": "references LinkMapping.slug, nullable if bulk"
+                },
+                {
+                  "name": "requested_at",
+                  "type": "timestamp",
+                  "constraints": "not_null"
+                },
+                {
+                  "name": "purged_at",
+                  "type": "timestamp",
+                  "constraints": "null if pending, max 24h gap to null"
+                },
+                {
+                  "name": "status",
+                  "type": "string",
+                  "constraints": "enum: pending, purged, failed"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": "LinkMapping",
+                  "type": "many_to_one",
+                  "foreign_key": "link_slug",
+                  "direction": "child references parent"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "comp-gdpr-exporter",
+          "entities": [
+            {
+              "name": "DataExportJob",
+              "fields": [
+                {
+                  "name": "job_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "requested_user",
+                  "type": "string",
+                  "constraints": "nullable (system process)"
+                },
+                {
+                  "name": "start_at",
+                  "type": "timestamp",
+                  "constraints": "not_null"
+                },
+                {
+                  "name": "complete_at",
+                  "type": "timestamp",
+                  "constraints": "nullable"
+                },
+                {
+                  "name": "export_hash",
+                  "type": "string",
+                  "constraints": "sha256 of exported data"
+                },
+                {
+                  "name": "status",
+                  "type": "string",
+                  "constraints": "enum: queued, running, complete, failed"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "comp-platform-audit",
+          "entities": [
+            {
+              "name": "AuditLogRecord",
+              "fields": [
+                {
+                  "name": "log_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "event_type",
+                  "type": "string",
+                  "constraints": "operation_type"
+                },
+                {
+                  "name": "payload",
+                  "type": "string",
+                  "constraints": "json_encoded"
+                },
+                {
+                  "name": "ingested_at",
+                  "type": "timestamp",
+                  "constraints": "not_null, retention >= 365 days"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "comp-backup-replication-engine",
+          "entities": [
+            {
+              "name": "BackupReplicationJob",
+              "fields": [
+                {
+                  "name": "job_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "source_id",
+                  "type": "uuid",
+                  "constraints": "references data_store_primary"
+                },
+                {
+                  "name": "dest_id",
+                  "type": "uuid",
+                  "constraints": "references data_store_dr"
+                },
+                {
+                  "name": "checksum",
+                  "type": "string",
+                  "constraints": "sha256, zero integrity errors"
+                },
+                {
+                  "name": "status",
+                  "type": "string",
+                  "constraints": "enum: queued, in_progress, complete, failed"
+                },
+                {
+                  "name": "executed_at",
+                  "type": "timestamp",
+                  "constraints": "not_null if status complete"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "comp-failure-detection",
+          "entities": [
+            {
+              "name": "FailureEvent",
+              "fields": [
+                {
+                  "name": "event_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "region_id",
+                  "type": "string",
+                  "constraints": "geo_location_identifier"
+                },
+                {
+                  "name": "detected_at",
+                  "type": "timestamp",
+                  "constraints": "not_null"
+                },
+                {
+                  "name": "severity",
+                  "type": "string",
+                  "constraints": "enum: warning, error, critical"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "comp-recovery-planner",
+          "entities": [
+            {
+              "name": "RecoveryPlan",
+              "fields": [
+                {
+                  "name": "plan_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "trigger_event_id",
+                  "type": "uuid",
+                  "constraints": "references FailureEvent.event_id"
+                },
+                {
+                  "name": "rto_minutes",
+                  "type": "integer",
+                  "constraints": "<= 15 per SR-005"
+                },
+                {
+                  "name": "execution_sequence",
+                  "type": "array",
+                  "constraints": "json array of step_ids"
+                },
+                {
+                  "name": "completed_at",
+                  "type": "timestamp",
+                  "constraints": "nullable"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": "FailureEvent",
+                  "type": "many_to_one",
+                  "foreign_key": "trigger_event_id",
+                  "direction": "child references parent"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "comp-request-timeout-enforcer",
+          "entities": [
+            {
+              "name": "TimeoutConfig",
+              "fields": [
+                {
+                  "name": "config_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "limit_ms",
+                  "type": "integer",
+                  "constraints": "max_duration_per_request"
+                },
+                {
+                  "name": "action_on_exceed",
+                  "type": "string",
+                  "constraints": "enum: kill, graceful_shutdown"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "comp-rel-latency-monitor",
+          "entities": [
+            {
+              "name": "LatencyMetric",
+              "fields": [
+                {
+                  "name": "metric_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "endpoint",
+                  "type": "string",
+                  "constraints": "redirect_url"
+                },
+                {
+                  "name": "p95_value",
+                  "type": "integer",
+                  "constraints": "milliseconds, <= 100 per SR-003"
+                },
+                {
+                  "name": "window_start",
+                  "type": "timestamp",
+                  "constraints": "prometheus_rollup"
+                },
+                {
+                  "name": "status",
+                  "type": "string",
+                  "constraints": "enum: nominal, degraded"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "comp-rel-uptime-verifier",
+          "entities": [
+            {
+              "name": "UptimeMetric",
+              "fields": [
+                {
+                  "name": "metric_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "uptime_percentage",
+                  "type": "decimal",
+                  "constraints": "float, >= 99.9 per SR-004"
+                },
+                {
+                  "name": "window_start",
+                  "type": "timestamp",
+                  "constraints": "rolling_30_days"
+                },
+                {
+                  "name": "verified",
+                  "type": "boolean",
+                  "constraints": "false until verification"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "comp-sec-request-validation",
+          "entities": [
+            {
+              "name": "RateLimitEntry",
+              "fields": [
+                {
+                  "name": "entry_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "ip_address",
+                  "type": "string",
+                  "constraints": "inet"
+                },
+                {
+                  "name": "request_count",
+                  "type": "integer",
+                  "constraints": "max 1000 per window per SR-014"
+                },
+                {
+                  "name": "window_start",
+                  "type": "timestamp",
+                  "constraints": "rolling 60 seconds"
+                },
+                {
+                  "name": "is_rejected",
+                  "type": "boolean",
+                  "constraints": "true if > 1000"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one"
+                }
+              ]
+            },
+            {
+              "name": "MaliciousRequest",
+              "fields": [
+                {
+                  "name": "request_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "payload",
+                  "type": "string",
+                  "constraints": "sanitized"
+                },
+                {
+                  "name": "detection_time",
+                  "type": "timestamp",
+                  "constraints": "not_null"
+                },
+                {
+                  "name": "threat_indicator_id",
+                  "type": "uuid",
+                  "constraints": "references ThreatIndicator"
+                },
+                {
+                  "name": "source_ip",
+                  "type": "string",
+                  "constraints": "inet"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": "ThreatIndicator",
+                  "type": "many_to_one",
+                  "foreign_key": "threat_indicator_id",
+                  "direction": "child references parent"
+                }
+              ]
+            },
+            {
+              "name": "ThreatIndicator",
+              "fields": [
+                {
+                  "name": "indicator_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "indicator_type",
+                  "type": "string",
+                  "constraints": "url_hash, slug, ip"
+                },
+                {
+                  "name": "source_feed",
+                  "type": "string",
+                  "constraints": "integrated_feed_name"
+                },
+                {
+                  "name": "active",
+                  "type": "boolean",
+                  "constraints": "true if current"
+                },
+                {
+                  "name": "updated_at",
+                  "type": "timestamp",
+                  "constraints": "update <= 15 min per SR-013"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "comp-sec-transport-enforcer",
+          "entities": [
+            {
+              "name": "SecureChannelConfig",
+              "fields": [
+                {
+                  "name": "config_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "protocol",
+                  "type": "string",
+                  "constraints": "enum: https, http"
+                },
+                {
+                  "name": "hsts_enabled",
+                  "type": "boolean",
+                  "constraints": "true"
+                },
+                {
+                  "name": "redirect_status_code",
+                  "type": "integer",
+                  "constraints": "301 or 302"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_id": "graceful-shutdown-coordinator",
+          "entities": [
+            {
+              "name": "ShutdownSignal",
+              "fields": [
+                {
+                  "name": "signal_id",
+                  "type": "uuid",
+                  "constraints": "primary_key"
+                },
+                {
+                  "name": "signal_type",
+                  "type": "string",
+                  "constraints": "SIGTERM, SIGINT"
+                },
+                {
+                  "name": "process_id",
+                  "type": "integer",
+                  "constraints": "os_pid"
+                },
+                {
+                  "name": "drain_window_ms",
+                  "type": "integer",
+                  "constraints": "configured_timeout"
+                },
+                {
+                  "name": "received_at",
+                  "type": "timestamp",
+                  "constraints": "not_null"
+                }
+              ],
+              "relationships": [
+                {
+                  "to": null,
+                  "type": "one_to_one"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "duration_ms": 120575,
+    "thinking": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Role:** [JC:Technical Spec Agent].\n    *   **Task:** Specify Data Models for Sub-Phase 5.1.\n    *   **Input:** System Requirements (SR-001 to SR-017), Component Models (comp-delete-purger, comp-gdpr-exporter, comp-link-mapping-repository, etc.), Software Domains (JC:Link-Lifecycle-Engine, JC:Security-Validation-Gateway, JC:Platform-Reliability-Operations), Deep Memory Research Context (Deep Memory File).\n    *   **Constraints:** Governing Constraints (1-10), Hard Rules (JSON output, no markdown fences, JSON discipline, full component coverage, relationship directionality, operational specifics grounding).\n    *   **Output Schema:** JSON object matching `data_models` schema (models array, component_id, entities array, fields array, relationships array).\n    *   **Specific Rules:**\n        *   Start with `{` and end with `}`.\n        *   NO markdown fences.\n        *   No leading/trailing prose.\n        *   Every input `component_id` must be covered.\n        *   Use concrete types.\n        *   No silent truncation of constraints.\n        *   Relationship directionality (child references parent).\n        *   Operational specifics must be grounded or open_question.\n\n2.  **Review Input Data:**\n    *   **System Requirements (SR):** 17 requirements covering mapping, validation, monitoring, uptime, RTO, encryption, logging, HTTPS, uniqueness, deletion, GDPR export, backups, threat blocking, rate limiting, URL blocking, notifications, timeout handling.\n    *   **Component Models:**\n        *   `comp-delete-purger` (DeletionRequest handling)\n        *   `comp-gdpr-exporter` (DataExportJob handling)\n        *   `comp-link-mapping-repository` (Slug, OriginalUrl, LinkMapping)\n        *   `comp-platform-audit` (AuditLogRecord)\n        *   `comp-backup-replication-engine` (BackupReplicationJob)\n        *   `comp-failure-detection` (RecoveryObjective/Regional Failure)\n        *   `comp-recovery-planner` (State Restoration)\n        *   `comp-request-timeout-enforcer` (SystemTimeout)\n        *   `comp-rel-latency-monitor` (RedirectLatency)\n        *   `comp-rel-uptime-verifier` (UptimeMetric)\n        *   `comp-sec-request-validation` (MaliciousRequest, RateLimitCounter, ThreatIndicator)\n        *   `comp-sec-transport-enforcer` (SecureChannel, Transport Security)\n        *   Note: Some components listed in `[Backlog]` but I need to check the `component_id` provided in the prompt's `[Backlog]` section vs the requirement to cover all components. The prompt lists components in `[Backlog]` section. I need to ensure all listed components are represented in the output `models` array.\n        *   Components listed in `[Backlog]`:\n            1.  `comp-delete-purger`\n            2.  `comp-gdpr-exporter`\n            3.  `comp-link-mapping-repository`\n            4.  `comp-platform-audit`\n            5.  `comp-backup-replication-engine`\n            6.  `comp-failure-detection`\n            7.  `comp-recovery-planner`\n            8.  `comp-request-timeout-enforcer`\n            9.  `comp-rel-latency-monitor`\n            10. `comp-rel-uptime-verifier`\n            11. `comp-sec-request-validation`\n            12. `comp-sec-transport-enforcer`\n            13. `graceful-shutdown-coordinator` (Listed in `[Backlog]` under `platform-fault-tolerance`)\n            14. `comp-recovery-planner` (Already listed)\n            15. Wait, looking closely at the `[Backlog]` section in the prompt:\n                *   `comp-delete-purger`\n                *   `comp-gdpr-exporter`\n                *   `comp-link-mapping-repository`\n                *   `comp-platform-audit`\n                *   `comp-backup-replication-engine`\n                *   `comp-failure-detection`\n                *   `comp-recovery-planner`\n                *   `comp-request-timeout-enforcer`\n                *   `graceful-shutdown-coordinator`\n                *   `comp-rel-latency-monitor`\n                *   `comp-rel-uptime-verifier`\n                *   `comp-sec-request-validation`\n                *   `comp-sec-transport-enforcer`\n        *   Total 13 components to cover.\n\n3.  **Construct Data Models:**\n    *   **Domain 1: JC:Link-Lifecycle-Engine**\n        *   Component: `comp-link-mapping-repository`\n        *   Entity: `LinkMapping` (Slug, OriginalUrl, CreatedAt, ExpiresAt, IsActive).\n        *   Component: `comp-delete-purger`\n        *   Entity: `DeletionRequest` (Linked Slug, Status, RequestedBy, RequestedAt, PurgedAt).\n        *   Component: `comp-gdpr-exporter`\n        *   Entity: `DataExportJob` (Linked User/Slug, Status, ExportedAt, DataHash).\n    *   **Domain 2: JC:Security-Validation-Gateway**\n        *   Component: `comp-sec-request-validation`\n        *   Entity: `MaliciousRequest` (SourceIP, Payload, DetectedAt, ThreatIndicator), `RateLimitEntry` (SourceIP, Count, WindowStart).\n        *   Component: `comp-sec-transport-enforcer`\n        *   Entity: `SecureChannelConfig` (HSTSSetting, Protocol).\n    *   **Domain 3: JC:Platform-Reliability-Operations**\n        *   Component: `comp-platform-audit`\n        *   Entity: `AuditLogRecord` (Timestamp, Level, Message, EventID).\n        *   Component: `comp-backup-replication-engine`\n        *   Entity: `BackupReplicationJob` (Source, Dest, Checksum, Status, JobID).\n        *   Component: `comp-rel-latency-monitor`\n        *   Entity: `LatencyMetric` (Timestamp, P95Value, Status).\n        *   Component: `comp-rel-uptime-verifier`\n        *   Entity: `UptimeMetric` (Timestamp, Percentage, Status).\n        *   Component: `comp-failure-detection` & `comp-recovery-planner`\n        *   Entity: `RecoveryObjective` (Region, RTO, Status), `RecoveryPlan` (Sequence, Region, Target).\n        *   Component: `comp-request-timeout-enforcer`\n        *   Entity: `SystemTimeoutConfig` (TimeoutLimit, Action).\n        *   Component: `graceful-shutdown-coordinator`\n        *   Entity: `ShutdownSignal` (SignalType, ProcessID, Status).\n        *   Component: `comp-request-timeout-enforcer` (re-using the timeout entity) - wait, `SystemTimeout` is the term. Let's create `TimeoutEvent`.\n\n4.  **Refine Entity Definitions:**\n    *   **LinkMapping:** `slug` (string, unique), `original_url_hash` (string), `created_at` (timestamp), `expires_at` (timestamp), `status` (boolean/string).\n    *   **DeletionRequest:** `mapping_id` (uuid), `status` (string), `requested_at` (timestamp).\n    *   **DataExportJob:** `export_job_id` (uuid), `mapping_ids` (array), `completed_at` (timestamp).\n    *   **AuditLogRecord:** `log_id` (uuid), `event_type` (string), `payload` (string/json), `ingested_at` (timestamp).\n    *   **BackupReplicationJob:** `job_id` (uuid), `backup_size` (integer), `checksum` (string), `status` (string).\n    *   **RecoveryObjective:** `region_id` (string), `rto_minutes` (integer).\n    *   **UptimeMetric:** `metric_id` (uuid), `uptime_percent` (decimal), `window_start` (timestamp).\n    *   **LatencyMetric:** `metric_id` (uuid), `p95_ms` (integer), `collected_at` (timestamp).\n    *   **SecureChannelConfig:** `enforce_https` (boolean), `hsts_enabled` (boolean).\n    *   **MaliciousRequest:** `request_id` (uuid), `ip_address` (string), `threat_indicator_id` (uuid).\n    *   **RateLimitEntry:** `ip_address` (string), `request_count` (integer).\n    *   **TimeoutConfig:** `timeout_limit_ms` (integer).\n    *   **ShutdownSignal:** `signal_type` (string).\n\n5.  **Address Hard Rules:**\n    *   **JSON Output:** Raw JSON only. No markdown.\n    *   **Component Coverage:** Ensure all 13 components listed in `[Backlog]` are mapped to at least one `models[]` entry with `component_id`.\n    *   **Types:** Use `string`, `integer`, `boolean`, `timestamp`, `uuid`, `array`.\n    *   **Relationships:** Child references parent (e.g., `DeletionRequest` references `LinkMapping` via FK).\n    *   **Operational Specifics:** Ensure values like \"365 days\", \"1000 requests\" are not invented defaults but grounded in requirements (SR-007, SR-014). If the requirement defines a default (e.g., \"rolling 60-second window\"), it should be reflected or as an open_question if not explicitly stored as a field constraint (usually stored as config). The prompt says \"Do NOT invent plausible-sounding defaults\". I will use the values defined in the System Requirements (e.g., 365 days, 1000 reqs, 60s) because they are grounded in SR text.\n    *   **Namespace Prefixing:** The output is JSON, but internal field names don't need [JC:] prefixing necessarily, just the logic. The output format is strict JSON.\n    *   **Constraint Delivery:** I must ensure the JSON output itself doesn't truncate governing constraints, but the prompt says \"Governing constraints... are always delivered in full via the stdin directive channel\". I am the agent *specifying* the model *under* these constraints. The output JSON is the artifact. I must not output the constraints text in the JSON body unless it's a field, but the rules say \"Response MUST start with `{`... NO markdown...\". I will follow the JSON structure.\n    *   **Validation:** Ensure every `component_id` from the backlog is in the `models` array `component_id` field.\n\n6.  **Drafting the JSON Structure:**\n    *   Root: `{ \"models\": [ ... ] }`\n    *   Models array item: `{ \"component_id\": \"...\", \"entities\": [ { \"name\": \"...\", \"fields\": [ ... ], \"relationships\": [ ... ] } ] }`\n\n7.  **Mapping Components to Entities:**\n    1.  `comp-link-mapping-repository`: `LinkMapping` Entity.\n    2.  `comp-delete-purger`: `DeletionRequest` Entity.\n    3.  `comp-gdpr-exporter`: `DataExportJob` Entity.\n    4.  `comp-platform-audit`: `AuditLogRecord` Entity.\n    5.  `comp-backup-replication-engine`: `BackupReplicationJob` Entity.\n    6.  `comp-failure-detection`: `FailureEvent` Entity (linked to `Region`).\n    7.  `comp-recovery-planner`: `RecoveryPlan` Entity.\n    8.  `comp-request-timeout-enforcer`: `TimeoutConfig` Entity.\n    9.  `comp-rel-latency-monitor`: `LatencyMetric` Entity.\n    10. `comp-rel-uptime-verifier`: `UptimeMetric` Entity.\n    11. `comp-sec-request-validation`: `MaliciousRequest` Entity, `RateLimitEntry` Entity.\n    12. `comp-sec-transport-enforcer`: `SecureChannelConfig` Entity.\n    13. `graceful-shutdown-coordinator`: `ShutdownSignal` Entity.\n\n    *Wait, SR-013 (Threat Intelligence) mentions `ThreatIndicator`.* `comp-sec-request-validation` handles blocking. I should add `ThreatIndicator` if it's an entity, or assume it's external. The Deep Memory says `ThreatIndicator` is a term. I will create an entity for it to ensure completeness if referenced in the component. However, the component is `comp-sec-request-validation`. I'll link `MaliciousRequest` to a `ThreatIndicator` or just `ThreatIndicator` entity if storage is needed. The component description says \"update threat feeds <= 15 minutes\". I'll add `ThreatIndicator` as a table entity for completeness.\n\n    *Wait, check component coverage again.*\n    The prompt lists:\n    - comp-delete-purger\n    - comp-gdpr-exporter\n    - comp-link-mapping-repository\n    - comp-platform-audit\n    - comp-backup-replication-engine\n    - comp-failure-detection\n    - comp-recovery-planner\n    - comp-request-timeout-enforcer\n    - graceful-shutdown-coordinator (This is a component_id in the backlog, no `comp-` prefix in the name but listed in `[Backlog]` as a component).\n    - comp-rel-latency-monitor\n    - comp-rel-uptime-verifier\n    - comp-sec-request-validation\n    - comp-sec-transport-enforcer\n\n    Total 13 components. I will ensure 13 entries in `models` array.\n\n    *Correction on Component IDs:* The prompt lists `graceful-shutdown-coordinator` without `comp-` prefix in the name in the `[Backlog]` list, but others have `comp-`. I should use the exact string provided in the `[Backlog]` list for `component_id`.\n    List:\n    1. `comp-delete-purger`\n    2. `comp-gdpr-exporter`\n    3. `comp-link-mapping-repository`\n    4. `comp-platform-audit`\n    5. `comp-backup-replication-engine`\n    6. `comp-failure-detection`\n    7. `comp-recovery-planner`\n    8. `comp-request-timeout-enforcer`\n    9. `graceful-shutdown-coordinator`\n    10. `comp-rel-latency-monitor`\n    11. `comp-rel-uptime-verifier`\n    12. `comp-sec-request-validation`\n    13. `comp-sec-transport-enforcer`\n\n    I will create 13 model entries.\n\n    *Relationship Directionality:* Child references parent. e.g. `DeletionRequest` has `link_mapping_id`. `AuditLogRecord` might reference `component_instance` or just standalone logs. I'll use `event_id` (uuid) for logs.\n\n    *Constraints:* Grounded in System Requirements.\n    - SR-007: AuditLogRecord retention >= 365 days.\n    - SR-014: RateLimitCounter 1000 req/IP/60s.\n    - SR-004: UptimeMetric >= 99.9%.\n    - SR-005: RTO 15 mins.\n    - SR-003: Latency P95 <= 100ms.\n    - SR-006: Encryption AES-256.\n\n    *Operational Specifics:* I need to be careful not to invent defaults. I will use the specific values from SR. If SR doesn't specify, I will mark as open_question or generic type.\n    Example: `original_url` is encrypted. Field type `encrypted_string` or `string` with constraint `encrypted: true`. I'll use `string` and constraint text.\n\n    *Output:* Strict JSON. No markdown.\n\n    *Let's assemble the JSON.*\n\n    *Self-Correction on JSON Structure:* The prompt asks for \"A JSON object matching the `data_models` schema\".\n    Schema provided in prompt:\n    - models: array, each with:\n      - component_id\n      - entities: array of {name, fields: [{name, type, constraints}], relationships}\n\n    I need to make sure the JSON is valid.\n\n    *Wait, one more check:* \"Every input `component_id` (from `component_model_summary`) MUST be covered\". The `component_model_summary` isn't explicitly named as a separate artifact, but the `[Backlog]` list serves that purpose. I must ensure all 13 are present.\n\n    *Wait, check constraint 2:* \"No governing constraint may be truncated silently.\" This applies to my internal reasoning trace (which I cannot see in the final output) and the output. The output must be JSON. I cannot output text saying \"Constraint X applies\". I just apply them.\n\n    *Wait, check constraint 4:* \"All Artifacts are owned by JanumiCode\". Not necessarily a field requirement, but I should acknowledge ownership if a field implies source. Usually not needed in data models.\n\n    *Relationships:* \"Reference fields in `entities[].relationships[]` MUST follow the directionality convention... typically: the child references the parent\". I will implement FKs in relationships.\n\n    *Wait, `graceful-shutdown-coordinator`*: I'll name the entity `ShutdownSignal`.\n\n    *Wait, `comp-sec-request-validation`*: I'll include `MaliciousRequest` and `RateLimitEntry`. Wait, `RateLimitEntry` isn't explicitly a component in the list, but it's part of SR-014/Security. I can merge into the component `comp-sec-request-validation`. Or create two entities under one component_id. The schema allows `entities: array`. So one component_id can have multiple entities.\n\n    *Wait, `comp-rel-latency-monitor`*: Entity `LatencyMetric`.\n    *Wait, `comp-rel-uptime-verifier`*: Entity `UptimeMetric`.\n\n    *Wait, `comp-failure-detection` & `comp-recovery-planner`*: Can share entities or have separate ones.\n    SR-005 (RTO) -> `RecoveryObjective`.\n    SR-003 (Latency) -> `LatencyMetric`.\n    SR-004 (Uptime) -> `UptimeMetric`.\n    SR-006 (Encryption) -> `LinkMapping` (OriginalUrl encrypted).\n    SR-010 (Deletion) -> `DeletionRequest`.\n    SR-011 (GDPR) -> `DataExportJob`.\n    SR-007 (Audit) -> `AuditLogRecord`.\n    SR-012 (Backup) -> `BackupReplicationJob`.\n    SR-013 (Threat) -> `ThreatIndicator` (maybe stored or external reference). I'll store `ThreatIndicator` as it's a feed to be managed (SR-013: update threat feeds).\n    SR-014 (Rate Limit) -> `RateLimitEntry` / `RateLimitConfig`.\n    SR-015 (Malicious) -> `MaliciousRequest` (blocking).\n    SR-016 (Notification) -> `Notification` (Policy Expiry).\n    SR-017 (Timeout) -> `TimeoutConfig` / `SystemTimeout`.\n\n    I need to ensure I don't exceed the component list. I will map these concepts to the component_id provided.\n    `comp-sec-request-validation` handles SR-002, SR-013, SR-014, SR-015.\n    `comp-sec-transport-enforcer` handles SR-008.\n    `comp-platform-audit` handles SR-007.\n    `comp-backup-replication-engine` handles SR-012.\n    `comp-failure-detection` & `comp-recovery-planner` handle SR-005, SR-017 (partially).\n    `comp-request-timeout-enforcer` handles SR-017.\n    `comp-rel-latency-monitor` handles SR-003.\n    `comp-rel-uptime-verifier` handles SR-004.\n    `comp-link-mapping-repository` handles SR-001, SR-006, SR-009.\n    `comp-delete-purger` handles SR-010.\n    `comp-gdpr-exporter` handles SR-011.\n    `graceful-shutdown-coordinator` handles SR-017 (partially).\n\n    I will distribute entities to cover the component_id requirement.\n\n    *Final check on \"No markdown fence wrappers\":*\n    Must be raw text starting with `{`.\n\n    *Final check on \"Response MUST start with `{` and end with `}`\":*\n    Yes.\n\n    *Final check on \"No leading commentary\":*\n    Yes.\n\n    *Final check on \"No trailing prose\":*\n    Yes.\n\n    *Let's write the JSON.*"
+  },
+  "assertions": {
+    "t1_schema": {
+      "kind": "json-shape",
+      "shape": {
+        "models": "array",
+        "models[].component_id": "string",
+        "models[].entities": "array",
+        "models[].entities[].name": "string",
+        "models[].entities[].fields": "array",
+        "models[].entities[].fields[].name": "string",
+        "models[].entities[].fields[].type": "string"
+      }
+    },
+    "t2_id_preservation": [
+      {
+        "name": "every input component_id appears as some model.component_id",
+        "input_source": {
+          "variable": "component_model_summary",
+          "id_pattern": "comp-[a-z0-9][a-z0-9-]*"
+        },
+        "output_assertion": {
+          "mode": "all_in_field",
+          "path": "models[].component_id",
+          "min_match_ratio": 1
+        }
+      }
+    ],
+    "t3_invariants": [
+      {
+        "name": "models array non-empty",
+        "kind": "array_length",
+        "path": "models",
+        "min": 1
+      },
+      {
+        "name": "field types use concrete primitives",
+        "kind": "enum_subset",
+        "path": "models[].entities[].fields[].type",
+        "allowed": [
+          "string",
+          "integer",
+          "boolean",
+          "timestamp",
+          "uuid",
+          "jsonb",
+          "text",
+          "decimal",
+          "numeric",
+          "float",
+          "datetime",
+          "date",
+          "bigint",
+          "smallint",
+          "json",
+          "bytes",
+          "blob",
+          "array",
+          "enum"
+        ]
+      }
+    ],
+    "require_json_parse": true
+  }
+}

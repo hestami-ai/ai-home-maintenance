@@ -58,6 +58,7 @@ For context only (you do not produce these fields):
 - **Compliance items** default to `cross_cutting` (regulations apply system-wide); a compliance item referenced by a workflow's `compliance` trigger is placed in that workflow's release.
 - **Integrations** follow the earliest workflow that uses them via an `integration` trigger; otherwise `cross_cutting`.
 - **Vocabulary** defaults to `cross_cutting` (canonical terms are product-wide).
+- **V&V requirements (VV-\*)**, **quality attributes (QA-N)**, and **technical constraints (TECH-\*)** default to `cross_cutting`. They are product-wide thresholds / tech-stack constraints; downstream NFR roots that trace exclusively to one of these anchor to the first release via the orchestrator's cross-cutting fallback.
 
 You do not need to reproduce these rules. Focus solely on releases + journey placement.
 

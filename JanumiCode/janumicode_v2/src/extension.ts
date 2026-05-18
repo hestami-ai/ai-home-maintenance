@@ -207,12 +207,13 @@ async function bootstrap(
 
   // 10. ClientLiaisonAgent (universal router)
   const extHost = buildExtensionHost();
+  const liaisonRoute = configManager.getRoutingModel('orchestrator');
   liaison = new ClientLiaisonAgent(
     db,
     engine,
     {
-      provider: 'ollama',
-      model: process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b',
+      provider: liaisonRoute.provider,
+      model: liaisonRoute.model,
       embeddingService: embedding,
     },
     extHost,

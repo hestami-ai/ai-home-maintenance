@@ -221,7 +221,8 @@ export async function runReviewHarness(
     const artifactRecords = writer.getRecordsByType(traceContext.workflowRunId, 'artifact_produced');
     for (const rec of artifactRecords) {
       const content = rec.content as Record<string, unknown> | null;
-      const kind = typeof content?.kind === 'string' ? content.kind : null;
+      if (!content) continue;
+      const kind = typeof content.kind === 'string' ? content.kind : null;
       if (!kind) continue;
       const bucket = priorArtifactsByKind.get(kind) ?? [];
       bucket.push(content);
@@ -535,6 +536,8 @@ function writeFindingRecord(args: {
     duration_ms: args.durationMs,
     input_tokens: args.inputTokens,
     output_tokens: args.outputTokens,
+    target_field: args.finding.targetField,
+    target_identifier: args.finding.targetIdentifier,
   };
   args.writer.writeRecord({
     ...args.baseRecordOptions,

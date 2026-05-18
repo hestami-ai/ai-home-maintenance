@@ -23,6 +23,53 @@ import { collectHarnessResult } from '../test/harness/collectResults';
 export type { HarnessResult, GapReport, SemanticWarning, DecisionOverride, PipelineRunnerConfig } from '../test/harness/types';
 
 /**
+ * Write a PID file containing this process's identifier + start
+ * metadata to `<workspace>/.janumicode/run.pid`. Operators can reliably
+ * locate and stop the workflow via:
+ *
+ *   kill $(jq -r .pid <workspace>/.janumicode/run.pid)
+ *
+ * Register handlers to remove the file on normal exit and on common
+ * termination signals so a clean shutdown doesn't leave a stale file.
+ * If the process is hard-killed (SIGKILL / OS reboot) the file stays;
+ * the next run overwrites it on launch, which is correct because at
+ * most one CLI runs per workspace by design.
+ */
+function writePidFile(workspacePath: string): void {
+  const pidPath = path.join(workspacePath, '.janumicode', 'run.pid');
+  const payload = {
+    pid: process.pid,
+    started_at: new Date().toISOString(),
+    workspace: workspacePath,
+    argv: process.argv.slice(1),
+  };
+  try {
+    fs.writeFileSync(pidPath, JSON.stringify(payload, null, 2));
+  } catch {
+    // Non-fatal: best-effort. The workflow proceeds; operators just
+    // fall back to the tasklist+grep heuristic if needed.
+    return;
+  }
+
+  const cleanup = (): void => {
+    try { fs.unlinkSync(pidPath); } catch { /* ignore */ }
+  };
+  // process.exit() — normal exits + explicit exits
+  process.once('exit', cleanup);
+  // Signal handlers must call exit() themselves; node's default is to
+  // exit without firing 'exit'. Re-emit by calling process.exit(0) after
+  // cleanup so the 'exit' handler also runs (idempotent unlink).
+  const signalHandler = (sig: NodeJS.Signals): void => {
+    cleanup();
+    // Re-raise the default behavior by calling exit with conventional 128+signo
+    const code = sig === 'SIGINT' ? 130 : sig === 'SIGTERM' ? 143 : 1;
+    process.exit(code);
+  };
+  process.once('SIGINT', signalHandler);
+  process.once('SIGTERM', signalHandler);
+}
+
+/**
  * Run a workflow pipeline in headless mode.
  *
  * @param intent - Intent string or @filepath reference
@@ -41,6 +88,13 @@ export async function runPipeline(
   // Database: either resume from an existing DB or create a fresh one.
   const dbDir = path.join(workspacePath, '.janumicode', 'test-harness');
   fs.mkdirSync(dbDir, { recursive: true });
+
+  // PID file: write our process id + metadata to `.janumicode/run.pid` so
+  // operators can reliably identify and stop the workflow without
+  // depending on `tasklist | grep node` heuristics. The file is removed
+  // on clean exit (including SIGINT/SIGTERM); a stale file on next run
+  // is overwritten — we don't assert orphan-process behavior here.
+  writePidFile(workspacePath);
 
   let resolvedDbPath: string;
   if (config.resumeFromDb) {
@@ -96,6 +150,12 @@ export async function runPipeline(
     // with healthy headroom.
     engine.configManager.setWorkflowOverrides({
       records_idle_stall_ms: 3600000,
+      auto_mitigation_policy: 'auto',
+      // Thin-slice runs always route Phase 9 executor invocations
+      // through goose_cli, overriding whatever the implementation_planner
+      // chose per task. Calibration cycles need cost-bounded local
+      // execution and a single executor surface to debug.
+      force_executor_backing_tool: 'goose_cli',
     });
 
     // The no-progress timer (default 90s, env JANUMICODE_LLM_NO_PROGRESS_SECONDS)
@@ -143,6 +203,10 @@ export async function runPipeline(
   if (llmMode !== 'mock') {
     fs.mkdirSync(liveLogDir, { recursive: true });
     engine.llmCaller.setLiveLogDir(liveLogDir);
+    // CLI parity: AgentInvoker also writes per-invocation live logs for
+    // Goose / Claude Code / Gemini / Codex calls so operators can tail
+    // them the same way as LLM calls.
+    engine.agentInvoker.setLiveLogDir(liveLogDir);
     // Real-mode runs spawn the Claude Code subprocess for Phase 9 task
     // execution. Mock mode deliberately skips this — Phase 9 should
     // fail fast with "No output parser registered for backing tool:
@@ -353,14 +417,17 @@ export async function runPipeline(
     // failed_at_phase. Any failure is swallowed inside
     // generateLLMGapSuggestion — the base report is still returned.
     if (config.llmGapEnhance && result.gapReport && workflowRunId) {
+      // Resolve "" sentinels from the CLI to workspace orchestrator
+      // routing — keeps the literal model name in one place (config).
+      const gapDefaults = engine.configManager.getRoutingModel('orchestrator');
       const suggestion = await generateLLMGapSuggestion(
         db,
         workflowRunId,
         result.gapReport,
         engine.llmCaller,
         {
-          provider: config.llmGapEnhance.provider,
-          model: config.llmGapEnhance.model,
+          provider: config.llmGapEnhance.provider || gapDefaults.provider,
+          model: config.llmGapEnhance.model || gapDefaults.model,
         },
       );
       if (suggestion) {

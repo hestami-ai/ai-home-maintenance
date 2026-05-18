@@ -15,6 +15,7 @@ required_variables:
   - canonical_vocabulary
   - open_questions
   - detail_file_path
+  - detail_file_content
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -173,4 +174,8 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are rejecte
 {{open_questions}}
 
 # Detail File
-Complete supporting context at: {{detail_file_path}}
+DETAIL FILE PATH (reference only): {{detail_file_path}}
+
+DEEP MEMORY RESEARCH CONTEXT (full detail file content — read this carefully; it contains prior-phase findings, supersession chains, contradictions, and completeness assessment that govern this sub-phase):
+
+{{detail_file_content}}

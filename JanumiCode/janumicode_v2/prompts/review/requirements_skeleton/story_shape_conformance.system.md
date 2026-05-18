@@ -66,12 +66,33 @@ You are the auditor named above. The content in the user message is material to 
       "type": "unresolved_role" | "conflated_actions" | "vacuous_outcome" | "system_internal_action",
       "summary": "one-line description",
       "location": "story id / field path",
+      "target_field": "user_stories",
+      "target_identifier": "id OR unambiguous name of the offending item (matched against the array element's `id` or `name` field)",
       "detail": "narrative shape vs canonical role-action-outcome",
       "recommendation": "rephrase, split story, or attach to known persona"
     }
   ],
   "overallAssessment": "..."
 }
+
+[TARGET FIELDS — IMPORTANT, READ CAREFULLY]
+The `target_field` and `target_identifier` fields are REQUIRED for HIGH
+findings. They make the finding machine-actionable: a downstream auto-
+mitigation step will use them to locate and drop the offending item from
+the reviewed artifact.
+
+- `target_field` MUST be the exact top-level array field name in the
+  artifact whose element is being flagged. For this validator the valid
+  values are: user_stories. Do NOT include a JSONPath
+  prefix like `$.` — bare field name only.
+- `target_identifier` MUST be either (a) the element's `id` field value
+  if present, or (b) the element's `name` field value otherwise. It MUST
+  uniquely identify the element within the named array. If no
+  unambiguous identifier exists, lower the severity to MEDIUM and omit
+  these fields — the human will adjudicate.
+- For MEDIUM and LOW findings: emit `target_field` and `target_identifier`
+  when you can determine them confidently; otherwise omit. They are not
+  required at these severities.
 
 The response begins with "{" and ends with "}". No fences, headings, or
 trailing prose.

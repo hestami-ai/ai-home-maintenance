@@ -53,6 +53,11 @@ const REASONING_MODEL_PATTERNS: RegExp[] = [
   // OpenAI o-series + GPT-5 are reasoning models.
   /^o[1-9]([-_.]|$)/i,
   /^gpt-5/i,
+  // OpenAI gpt-oss series (e.g. `gpt-oss:20b`, `gpt-oss:120b`) — open-
+  // weight reasoning models with thinking-mode enabled. Selected as the
+  // JanumiCode v2 default producer model after the thin-slice-12 bake-
+  // off (matched/beat qwen on T1/T2/T3, 3× faster, no runaway hangs).
+  /^gpt-oss/i,
   // DeepSeek R-series are reasoning models. V3 (non-R) is not.
   /^deepseek-r[1-9]/i,
 ];
@@ -156,7 +161,7 @@ describe('Model policy — every configured LLM must be a thinking/reasoning mod
     // Sanity check: these are the strings we EXPECT to see. If a production
     // model literal ever changes, this list should be updated so we don't
     // regress on coverage.
-    const expectedSeen = ['qwen3.5:9b', 'gemini-2.5-flash'];
+    const expectedSeen = ['gpt-oss:20b', 'gemini-2.5-flash'];
     const found = new Set(literals.map((l) => l.model));
     for (const name of expectedSeen) {
       expect(found.has(name), `Expected to see production model ${name}`).toBe(true);

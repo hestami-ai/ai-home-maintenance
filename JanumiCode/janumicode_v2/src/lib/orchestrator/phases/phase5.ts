@@ -22,6 +22,7 @@ import type {
 } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseContext';
+import { normalizeIdsInTree, normalizeComponentIdRef } from '../idNormalization';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
 import { runDataModelSaturationLoop } from './phase5_1a';
@@ -118,10 +119,24 @@ export class Phase5Handler implements PhaseHandler {
     // ── 5.1 — Data Model Specification ────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'data_model_skeleton');
 
+    const componentIds = effectiveComponents.components
+      .map(c => (typeof c.id === 'string' ? c.id : ''))
+      .filter(Boolean);
+    const techConstraintsRecId = allArtifacts.find(
+      r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery',
+    )?.id;
+    const dmr51Seeds = [
+      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
+      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
+      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
+      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
+      ...(techConstraintsRecId ? [techConstraintsRecId] : []),
+    ];
     const dmr51 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'data_model_skeleton',
       requestingAgentRole: 'technical_spec_agent',
-      query: `Data model specification for components: ${componentSummary.slice(0, 400)}`,
+      query: `Data model design for components ${componentIds.join(', ')} per component_model ${prior.componentModel?.recordId ?? 'unknown'}, system_requirements ${prior.systemRequirements?.recordId ?? 'unknown'}, technical_constraints ${techConstraintsRecId ?? 'unknown'}.`,
+      knownRelevantRecordIds: dmr51Seeds,
       detailFileLabel: 'p5_1_data_models',
       requiredOutputSpec: 'data_models JSON — entities with fields and relationships per component',
     });
@@ -130,6 +145,14 @@ export class Phase5Handler implements PhaseHandler {
       ctx, componentSummary, domainsSummary, sysReqSummary, dmr51,
     );
 
+    // Normalize component_id refs to the canonical lowercase `comp-`
+    // prefix that the Phase 4 component_skeleton + recursive component
+    // decomposition tree uses. ts-13 showed the Phase 5 LLM emitting
+    // `COMP-001` while Phase 4 used `comp-001`, silently breaking
+    // referential integrity for downstream data_model_saturation and
+    // Phase 6 task decomposition.
+    const dmContent = { kind: 'data_models', ...dataModelsContent } as unknown as Record<string, unknown>;
+    normalizeIdsInTree(dmContent, new Set(['component_id']), normalizeComponentIdRef);
     const dataModelsRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
@@ -139,7 +162,7 @@ export class Phase5Handler implements PhaseHandler {
       produced_by_agent_role: 'technical_spec_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: derivedFromIds,
-      content: { kind: 'data_models', ...dataModelsContent },
+      content: dmContent,
     });
     artifactIds.push(dataModelsRecord.id);
     engine.ingestionPipeline.ingest(dataModelsRecord);
@@ -237,10 +260,20 @@ export class Phase5Handler implements PhaseHandler {
     // ── 5.2 — API Definition ──────────────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'api_definitions');
 
+    const contractIds = ((prior.interfaceContracts?.content.contracts as Array<Record<string, unknown>>) ?? [])
+      .map(c => (typeof c.id === 'string' ? c.id : ''))
+      .filter(Boolean);
+    const dmr52Seeds = [
+      dataModelsRecord.id,
+      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
+      ...(prior.interfaceContracts ? [prior.interfaceContracts.recordId] : []),
+      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
+    ];
     const dmr52 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'api_definitions',
       requestingAgentRole: 'technical_spec_agent',
-      query: `API definitions for components with contracts: ${contractsSummary.slice(0, 400)}`,
+      query: `API definitions for components ${componentIds.join(', ')} fulfilling interface_contracts ${contractIds.join(', ')} on data_models ${dataModelsRecord.id}.`,
+      knownRelevantRecordIds: dmr52Seeds,
       detailFileLabel: 'p5_2_apis',
       requiredOutputSpec: 'api_definitions JSON — endpoints with inputs, outputs, error codes, auth',
     });
@@ -271,10 +304,17 @@ export class Phase5Handler implements PhaseHandler {
       return `Component ${d.component_id}:\n${eps}`;
     }).join('\n');
 
+    const dmr53Seeds = [
+      apiRecord.id,
+      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
+      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
+      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
+    ];
     const dmr53 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'error_handling',
       requestingAgentRole: 'technical_spec_agent',
-      query: `Error handling strategy for APIs: ${apiSummary.slice(0, 400)}`,
+      query: `Error handling strategies for components ${componentIds.join(', ')} against api_definitions ${apiRecord.id} per NFRs ${prior.nonFunctionalRequirements?.recordId ?? 'unknown'}.`,
+      knownRelevantRecordIds: dmr53Seeds,
       detailFileLabel: 'p5_3_errors',
       requiredOutputSpec: 'error_handling_strategies JSON — strategies with error types, detection, response',
     });
@@ -305,10 +345,17 @@ export class Phase5Handler implements PhaseHandler {
       return `Component ${m.component_id}:\n${ents}`;
     }).join('\n');
 
+    const dmr54Seeds = [
+      dataModelsRecord.id,
+      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
+      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
+      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
+    ];
     const dmr54 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'configuration_parameters',
       requestingAgentRole: 'technical_spec_agent',
-      query: `Configuration parameters for data models: ${dataModelsSummary.slice(0, 400)}`,
+      query: `Configuration parameters for components ${componentIds.join(', ')} against data_models ${dataModelsRecord.id} per NFRs ${prior.nonFunctionalRequirements?.recordId ?? 'unknown'}.`,
+      knownRelevantRecordIds: dmr54Seeds,
       detailFileLabel: 'p5_4_config',
       requiredOutputSpec: 'configuration_parameters JSON — params with name, type, default, description',
     });
@@ -447,6 +494,7 @@ export class Phase5Handler implements PhaseHandler {
       software_domains_summary: domainsSummary,
       system_requirements_summary: sysReqSummary,
       detail_file_path: dmr.detailFilePath,
+      detail_file_content: dmr.detailFileContent,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;

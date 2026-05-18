@@ -1,0 +1,406 @@
+{
+  "run_id": "c1b8e635-f7dc-425a-9fe0-74b1483beb84",
+  "generated_at": "2026-05-12T19:51:28.410Z",
+  "per_validator": 10,
+  "severities": [
+    "HIGH"
+  ],
+  "validators": [
+    {
+      "validator_id": "grounding_validator",
+      "total_findings": 180,
+      "sampled": 10,
+      "sample_ids": [
+        "dda56bff-5947-429b-a941-be9e154e51a3",
+        "cab2032b-a4b0-466b-96d9-d0b63323e79b",
+        "ebfc638c-5b1a-49ec-a915-d459f73eb2ed",
+        "8b426d3a-da7a-4144-84e8-6a4f75e873d8",
+        "5667f81f-8869-4afa-912d-23cf526f89fc",
+        "d7ce1348-eb10-4165-8c0c-f4d40ed4c05d",
+        "156d5d08-3f42-4e4d-8130-fdd3503faf58",
+        "7ea131b7-2a08-4cf0-872f-4fc6da845918",
+        "14a6a1de-5020-46d1-91ef-9f3920c69313",
+        "653ef717-58e9-4695-8765-ef95169c6770"
+      ]
+    },
+    {
+      "validator_id": "assumption_citation_validator",
+      "total_findings": 95,
+      "sampled": 10,
+      "sample_ids": [
+        "0a5e301a-607c-4a99-9565-d64a7cc50278",
+        "08804b5a-a1e0-4515-b544-3f084182f340",
+        "141b9e05-e2f9-4e38-8a9e-7a3e71ffcd15",
+        "902b2090-bc0c-415a-9364-d6c207b1fdaf",
+        "ef4df893-e19e-4449-b735-20a2629407d1",
+        "f7db25de-7d12-445b-becf-5e2e1e67f55b",
+        "44467aaf-2800-40fe-8886-f5f39430e01d",
+        "d759a1b4-8cef-4965-8c4f-13e36242abd2",
+        "571c10b2-3d8d-4ff4-8344-2d4898b77423",
+        "33c9e266-151d-4a3b-8f80-5eacf490fc8a"
+      ]
+    },
+    {
+      "validator_id": "final_synthesis",
+      "total_findings": 91,
+      "sampled": 10,
+      "sample_ids": [
+        "2dbebe92-5ad7-4d81-83eb-e75aab789980",
+        "62d3c29e-9dbb-4338-86ea-747ff8b7f4af",
+        "bcc209cd-bfa7-4767-952b-86981a8c2994",
+        "6b2b1a83-93bd-434f-94f0-51230b7cabfd",
+        "f7bed9a0-4a91-4885-9892-2d8240ad8ca2",
+        "f62e01de-4d83-44da-a407-a439ef56e1c5",
+        "54d0adf6-7412-406b-8a27-7d2c21946139",
+        "bfc94a3a-ad24-4663-addf-2f515acc5694",
+        "ff8978ce-e565-4e3e-9a4a-dc16f0f65c4a",
+        "2819292f-0263-4579-808b-9a0d57750ba9"
+      ]
+    },
+    {
+      "validator_id": "reasoning_quality_validator",
+      "total_findings": 67,
+      "sampled": 10,
+      "sample_ids": [
+        "a7c096ba-0d41-4ac5-ac1d-f0029a14eb9d",
+        "1ddbc074-bdc9-41e1-9541-da5082c7dadd",
+        "ff9e389a-6734-4401-b5b7-1694f7e69e1b",
+        "99892095-99ad-4353-a867-4a1a558f3532",
+        "a710f0b9-f5a1-493d-9f55-0ba8d68968cc",
+        "068680dd-f15d-4a0b-9d9d-b9a49adf7419",
+        "67b99f8c-b471-4854-8988-b8234268cdf6",
+        "9cbdec11-b7ed-4b1a-929c-c1d308c44ae9",
+        "750532a9-6aad-4e55-8e75-2dc77f28d4ea",
+        "ce4f8724-7c43-4691-a458-ed756c144d43"
+      ]
+    },
+    {
+      "validator_id": "source_item_enumeration_completeness",
+      "total_findings": 47,
+      "sampled": 10,
+      "sample_ids": [
+        "9fe64cfa-dfba-4532-a2a7-c1938ad42e63",
+        "f56b41b4-7804-4e91-afd2-d881da1a6962",
+        "fe8e2d05-d874-47fb-b689-855135089f3e",
+        "14bab025-bfef-4015-bd51-f5879b7bf237",
+        "998a481a-7eb1-496e-ab96-28f3a9b7df75",
+        "e393bea8-e9f3-47a8-9e93-34a1db954783",
+        "b7bed9e5-892b-4aa8-9172-ffe475718acd",
+        "c46267e0-40a9-4588-8957-4c565c5889eb",
+        "eba49f9c-7ea3-4717-ac4d-8d45f0c87802",
+        "15d23796-acc7-4d21-b91d-950db192022c"
+      ]
+    },
+    {
+      "validator_id": "contract_schema_validator",
+      "total_findings": 44,
+      "sampled": 10,
+      "sample_ids": [
+        "f1c74571-a064-4ffc-ada5-091aeb0dbcdc",
+        "c7b1cf54-d2ff-4615-96c0-a00877d092bc",
+        "f95b324a-df9f-4386-baef-a4917ba5128e",
+        "fe444e69-992a-45da-89eb-498202f55d0e",
+        "4baf87ff-e4b4-4b95-b101-af7858d07ceb",
+        "15f4676b-b753-40b3-8866-4653e517cde1",
+        "53d01410-b1cf-4492-b2d6-4e01e3bc14bb",
+        "f7935b0c-27ae-4e16-90e5-1e2701a586a6",
+        "dee7a024-e1fa-4e8a-acfa-7c9faba04d6e",
+        "f6407aef-c98f-4ea8-a1fb-968f0e0c1e19"
+      ]
+    },
+    {
+      "validator_id": "source_attribution_grounding",
+      "total_findings": 29,
+      "sampled": 10,
+      "sample_ids": [
+        "1a02ce50-1e22-452e-b3dd-18de70d4cbfd",
+        "b000b4c6-aee0-45ec-b38b-8806ff24f6e6",
+        "f4ea54ca-046e-40ea-8d93-99bda1d2bdc3",
+        "a13aeff7-c694-4aaa-90e8-a2a740e612ea",
+        "ab42f59a-cc90-4afa-b7e3-8960aefedbf4",
+        "d49ecf80-cb95-41e6-b9bb-3e30e5721481",
+        "8bd77242-0efd-4719-a398-e54ae8a2dc03",
+        "59b28d6b-0814-45e0-ab11-5451172ae906",
+        "67c169d3-6395-4749-85fc-a768fc3e52d2",
+        "e141c2f9-7fd8-4adf-8f0a-b8e90aa22288"
+      ]
+    },
+    {
+      "validator_id": "extraction_id_traceability",
+      "total_findings": 27,
+      "sampled": 10,
+      "sample_ids": [
+        "3dc35b7c-2538-44cc-a9c8-d82b11d3dccc",
+        "0fadf41c-1280-4b74-8a25-037feacf0f77",
+        "1d59d1b8-9b94-478c-8694-bce814767a25",
+        "a12c9ade-25d5-4930-9ee6-f4302c72805b",
+        "ba953508-2d3b-413e-b76d-de46dc67e55b",
+        "327e1ae0-ac60-44bd-94f7-4985d03eb167",
+        "fd0db514-cbe2-4a5c-87be-731aef06cb26",
+        "1ae1b3cb-3beb-4691-8b5c-1a97cca17ca9",
+        "2f2e16f0-c25e-4319-8c3a-0123681ae193",
+        "eaa8d01a-8bb8-4652-8998-a8b1fb7c5243"
+      ]
+    },
+    {
+      "validator_id": "reasoning_to_response_faithfulness",
+      "total_findings": 18,
+      "sampled": 10,
+      "sample_ids": [
+        "004d5f90-13c4-4691-b244-84eaf3b8ab28",
+        "289114a3-dbaa-4539-8019-2f8eb22111f9",
+        "c13ea3ff-bb83-41e4-a18b-6099a6890cc0",
+        "261cb332-e358-4cc6-872b-b8497514b890",
+        "d82916a2-b82b-4165-8d8b-5a8e2b6c893c",
+        "d8424570-02c3-48da-8925-897970fc7995",
+        "bbf2612b-e40e-47dc-9352-47b2c9861144",
+        "4df30444-32b3-4d48-b1ac-cfbddec229b9",
+        "a41bf4d5-ffda-411d-8318-0842b55fda62",
+        "1aae453c-8e24-4a94-8e1f-1902594a41e9"
+      ]
+    },
+    {
+      "validator_id": "open_question_vs_decided",
+      "total_findings": 12,
+      "sampled": 10,
+      "sample_ids": [
+        "79b9ae0c-0e13-4e6c-bbca-dd768f7955ac",
+        "dc8f65e5-bcc1-4c4d-9b54-1b18bf692bdc",
+        "da15e928-5875-4035-b609-0e082f6a0344",
+        "a88dcbac-6f8f-48df-bad2-dd5226c0c08b",
+        "7f0f3697-9495-4f59-9147-42e91bc3f8b7",
+        "87947996-ea1d-477a-9f07-98aa8912af20",
+        "6eb2adca-3bd2-4ac5-85bf-ff8efe6cca33",
+        "2eff92cc-1741-4d4a-a636-8f3b93ef1e5b",
+        "90b8c500-d4a3-4435-ab45-12e11e7ebf2e",
+        "ed9724a4-3ad3-4692-86b2-5dcc761ab277"
+      ]
+    },
+    {
+      "validator_id": "spec_boundary_respect_bloom",
+      "total_findings": 11,
+      "sampled": 10,
+      "sample_ids": [
+        "ade55c88-40d7-4fbe-bcdf-77e3be3fccab",
+        "cc1a29f5-04ca-42fb-8291-e66bc54aa229",
+        "c8f9d7af-2a9c-4685-aa77-d76f03053861",
+        "40877a31-55a7-4cbf-b523-908b1ccf6c4c",
+        "84bd4c4e-5f52-41d1-b7c1-0da7999a676b",
+        "3a3b2d3a-330e-4969-93c3-ffe348b2e222",
+        "55330779-5cd5-4a1d-a192-75588fea6f7d",
+        "19ffa2af-9aed-415d-bec5-dde580081293",
+        "754b0a7e-1b6c-42a3-a781-0356f3526857",
+        "807a17e9-50eb-4f2c-ba8a-2fe37bfb593c"
+      ]
+    },
+    {
+      "validator_id": "pass_scope_discipline",
+      "total_findings": 11,
+      "sampled": 10,
+      "sample_ids": [
+        "4e6df5b4-c583-4e4b-b206-5041b417a52b",
+        "ade55761-32dc-4a57-8ebe-6daff4e6bfb1",
+        "469cd0fa-2842-493b-8acf-24db48de3ab5",
+        "13c8dd89-f997-4e4b-9338-f3b26e635d41",
+        "25c6ee34-1764-4f95-915d-8189d5383d9c",
+        "e5ad9d80-3f40-4846-98ec-2aa1734b12fa",
+        "a4f5c5cb-69ee-4492-80c9-32865d01d17f",
+        "36f60674-9fb9-4fd6-a1e8-ac574dc2d769",
+        "b0881101-d6a3-4366-9e93-76ce6f147ee8",
+        "500a97a5-7db0-45a0-bc99-4d4c68bd6977"
+      ]
+    },
+    {
+      "validator_id": "measurement_adequacy_validator",
+      "total_findings": 10,
+      "sampled": 10,
+      "sample_ids": [
+        "3bc994bb-0fef-4a57-baf1-99d89d2b4d8f",
+        "3367c06f-2bfb-4c27-80a9-4c2fb5162ee6",
+        "d7ce49cd-c36f-44bd-b9d4-bf6a69672ae3",
+        "7821dee2-d4fe-499d-9fdb-50862970cbb1",
+        "0f15c167-2fd8-439f-9e76-b884ada2d0e9",
+        "3a253a2a-7c3a-4e9d-9b39-2cb66d22fb34",
+        "1010021b-a232-44fd-b92c-1584b536bcab",
+        "b65c0a5b-dc4b-41c4-9fb8-77972dcc860d",
+        "4cc314d7-6708-424d-a0e1-97b9713c089b",
+        "0410bddd-e580-41ff-94d9-0cc040be403c"
+      ]
+    },
+    {
+      "validator_id": "threshold_grounding_audit",
+      "total_findings": 9,
+      "sampled": 9,
+      "sample_ids": [
+        "9e887a68-5a08-42f8-9761-ebd706bf79dd",
+        "c94b59fb-544e-4d53-98aa-b76739daed9a",
+        "8b55c7b5-7c9a-40a6-8275-e6601531e5b9",
+        "600379be-c9fa-4851-b06b-44ea39c19e56",
+        "44f609fc-6ea2-4fd9-a774-4fa87003f059",
+        "6e879492-9a2a-481d-b686-3a1ae693fb50",
+        "03b66021-892c-469c-bc17-8adabf291b3d",
+        "8b947e44-aee8-4bca-9f73-a52ec8cf1774",
+        "4b453d9d-79d5-4c81-b6e1-311d32b09538"
+      ]
+    },
+    {
+      "validator_id": "sr_allocation_completeness_validator",
+      "total_findings": 9,
+      "sampled": 9,
+      "sample_ids": [
+        "3a3803d8-bd79-430f-b484-8b0e2dfed34b",
+        "99ff05e0-3c37-48e4-a41e-2e4759af28a9",
+        "b2774d1c-d57c-4591-8256-f46792dce22d",
+        "cfc1557a-aa52-46e8-b170-7c0d007acbef",
+        "9068d288-b123-4f34-95ff-fda6663d72dc",
+        "a8dd8ef4-a739-4567-b762-5d2d0d76842f",
+        "22f8fe36-74da-4244-8113-aad3c3c9c2e3",
+        "43b95b66-03d9-43ad-9173-4182416be647",
+        "7394b5e1-5719-40b4-bfd1-ed897fbd6365"
+      ]
+    },
+    {
+      "validator_id": "persona_id_continuity",
+      "total_findings": 8,
+      "sampled": 8,
+      "sample_ids": [
+        "1d54d256-c4cc-4956-bcf1-d79a404e862f",
+        "139298f8-0829-4d4e-8f88-1ccd8fbbd9cf",
+        "0ce2e6b3-b151-4b1d-be53-c3c34acc6ffe",
+        "b11677a5-78f4-4eb4-b85b-a68bffdd935d",
+        "dee50040-032b-479f-8e44-95023af5bee2",
+        "f5c210ef-4952-4467-ab08-d51447a30fed",
+        "df78bc2c-b7f6-42f9-8288-5199050a8d91",
+        "d68723b9-8232-4031-8c64-87f1c1a6c82f"
+      ]
+    },
+    {
+      "validator_id": "handoff_coverage_audit",
+      "total_findings": 8,
+      "sampled": 8,
+      "sample_ids": [
+        "da68201a-0988-4fa0-848a-44aaa5e99bd3",
+        "31af09b0-93f2-4142-8b1a-bc93e12ca9e3",
+        "0a9d93c1-8ee3-449f-92d0-ad1f7af6fb6e",
+        "cb3e3638-170e-4463-b2e9-08c5313f3b61",
+        "e51feb7c-d81c-4520-8ab2-e77577416f27",
+        "66ae42ac-a2ba-4711-8066-fd8c0501aac4",
+        "0ab8d037-e240-4a9b-86f9-edeb3b2f1f21",
+        "11800c7a-fc40-4e19-92d1-336c6462cad6"
+      ]
+    },
+    {
+      "validator_id": "json_output_discipline_check",
+      "total_findings": 6,
+      "sampled": 6,
+      "sample_ids": [
+        "739e0fa7-00a3-4e55-9c49-906f921f2c5a",
+        "ed4cfc8a-1adf-437a-a32f-16a60665b8ad",
+        "e941cf6a-f973-42f7-9062-74c0844c2846",
+        "9e5ff564-a0fc-4325-a3fb-a4fb333529a1",
+        "8909a03a-7a7a-433f-9bce-1fc2d28fda0c",
+        "ebaf1d78-6697-4b5d-bc70-8962efcabf34"
+      ]
+    },
+    {
+      "validator_id": "bloom_completeness_vs_thinking",
+      "total_findings": 5,
+      "sampled": 5,
+      "sample_ids": [
+        "dcf0ad62-e1c4-4ca6-b4c6-06a8cd6bd6c8",
+        "b80b37e5-2006-4699-910b-ac013c1713fb",
+        "0edc0019-f5d2-40ff-8b7e-8e1685a86906",
+        "4d40299b-3967-4809-a04b-e4e008a21953",
+        "27e9170a-1d76-4890-9a52-48c14b3542a0"
+      ]
+    },
+    {
+      "validator_id": "tier_assignment_audit",
+      "total_findings": 4,
+      "sampled": 4,
+      "sample_ids": [
+        "59d54c90-b42d-4eda-9c5c-70cefe4a9d22",
+        "f95be36f-44fe-4b6a-93ef-ab12ac49075e",
+        "581461aa-819d-4807-818c-246277eeacef",
+        "c3979c2e-db90-4f9b-8091-85ff21ccea57"
+      ]
+    },
+    {
+      "validator_id": "acceptance_criteria_measurability",
+      "total_findings": 3,
+      "sampled": 3,
+      "sample_ids": [
+        "5fb2b412-3ba7-43fd-a87b-c5494938e07c",
+        "f571ab4d-048c-45c1-9faf-7e211703ea96",
+        "0c4aa207-b174-4397-ad95-52b459210297"
+      ]
+    },
+    {
+      "validator_id": "synthesis_coverage_audit",
+      "total_findings": 3,
+      "sampled": 3,
+      "sample_ids": [
+        "38564aec-b55c-4219-b8c1-9477c388dce9",
+        "97ad5c8f-d683-4a7c-adac-97e0954f54a6",
+        "ee641097-3230-4928-a4b3-8e0b247db5cf"
+      ]
+    },
+    {
+      "validator_id": "measurement_method_executability",
+      "total_findings": 2,
+      "sampled": 2,
+      "sample_ids": [
+        "8f491ee3-14d9-45bb-9225-eb5bde15b133",
+        "046f12da-6cbe-4904-b770-f5a40b47e2d2"
+      ]
+    },
+    {
+      "validator_id": "compliance_signal_completeness",
+      "total_findings": 1,
+      "sampled": 1,
+      "sample_ids": [
+        "42b672de-23e9-46c5-9356-5ddbee123363"
+      ]
+    },
+    {
+      "validator_id": "external_reference_handling",
+      "total_findings": 1,
+      "sampled": 1,
+      "sample_ids": [
+        "5f214289-68cc-4f4f-81ff-ba9e64b7234b"
+      ]
+    },
+    {
+      "validator_id": "handoff_field_completeness",
+      "total_findings": 1,
+      "sampled": 1,
+      "sample_ids": [
+        "65d95636-6831-4279-8806-f6cb0a38419b"
+      ]
+    },
+    {
+      "validator_id": "measurable_condition_executability",
+      "total_findings": 1,
+      "sampled": 1,
+      "sample_ids": [
+        "4a26e7f4-a5c9-4624-9ca5-b47a96d1e9b1"
+      ]
+    },
+    {
+      "validator_id": "nfr_threshold_grounding",
+      "total_findings": 1,
+      "sampled": 1,
+      "sample_ids": [
+        "d254ec39-d701-4339-a0f5-33f3566ad48e"
+      ]
+    },
+    {
+      "validator_id": "ungrounded_operational_specifics",
+      "total_findings": 1,
+      "sampled": 1,
+      "sample_ids": [
+        "c92e9046-1f26-4784-b426-0f3d4601a273"
+      ]
+    }
+  ]
+}

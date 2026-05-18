@@ -151,6 +151,7 @@ function buildEnrichmentVariables(
     traced_compliance_items: deps.format.formatExtractedItems(tracedCompliance),
     canonical_vocabulary: deps.format.formatVocabulary(h.canonicalVocabulary ?? []),
     detail_file_path: deps.dmr.detailFilePath,
+    detail_file_content: deps.dmr.detailFileContent,
     janumicode_version_sha: deps.ctx.engine.janumiCodeVersionSha,
   };
 }
@@ -209,6 +210,7 @@ async function runSkeletonPass(deps: FrBloomDeps): Promise<{
     canonical_vocabulary: deps.format.formatVocabulary(handoff.canonicalVocabulary ?? []),
     open_questions: deps.format.formatExtractedItems(handoff.openQuestions ?? []),
     detail_file_path: dmr.detailFilePath,
+    detail_file_content: dmr.detailFileContent,
     janumicode_version_sha: ctx.engine.janumiCodeVersionSha,
   };
   const rendered = ctx.engine.templateLoader.render(template, variables);

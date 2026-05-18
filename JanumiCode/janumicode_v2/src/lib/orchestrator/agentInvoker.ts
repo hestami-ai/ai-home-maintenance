@@ -9,6 +9,8 @@
 import { CLIInvoker, type CLIInvocationResult } from '../cli/cliInvoker';
 import { type OutputParser } from '../cli/outputParser';
 import { LLMCaller, type LLMCallOptions, type LLMCallResult } from '../llm/llmCaller';
+import { InvocationLogFile } from '../llm/invocationLogger';
+import { buildLogFilenamePrefix } from '../llm/llmCaller';
 import type { GovernedStreamWriter } from './governedStreamWriter';
 import type { AgentRole, PhaseId } from '../types/records';
 
@@ -19,6 +21,16 @@ export interface CLITraceContext {
   agentRole?: AgentRole | null;
   /** Human-readable label for the invocation card header. */
   label?: string;
+  /** Phase 9 task identifier — surfaced into the agent_invocation
+   *  record's `task_id` field so trace consumers can correlate across
+   *  task boundaries. */
+  taskId?: string;
+  /** The task's declared infrastructure descriptor (e.g. "DBOS Middleware
+   *  / PostgreSQL RLS Policies"), distinct from the executor tool actually
+   *  invoked. Surfaced into the agent_invocation record's `backing_tool`
+   *  field for audit; the executor tool itself is recorded in `provider`/
+   *  `model`. */
+  taskBackingTool?: string;
 }
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -98,12 +110,14 @@ export class AgentInvoker {
   private writer: GovernedStreamWriter | null = null;
   private versionSha = 'dev';
   private eventBus: import('../events/eventBus').EventBus | null = null;
+  private liveLogDir: string | null = null;
 
   constructor(
     private readonly llmCaller: LLMCaller,
     private readonly cliConfig: {
       timeoutSeconds: number;
       idleTimeoutSeconds: number;
+      noContentTimeoutSeconds: number;
       bufferMaxEvents: number;
     },
   ) {}
@@ -128,6 +142,19 @@ export class AgentInvoker {
    */
   setEventBus(eventBus: import('../events/eventBus').EventBus): void {
     this.eventBus = eventBus;
+  }
+
+  /**
+   * Configure the per-invocation live log directory for CLI invocations.
+   * Mirrors LLMCaller.setLiveLogDir so CLI calls (Goose, Claude Code,
+   * Gemini, Codex) write a tailable `.log` file under
+   * `<dir>/<phase>_<sub>__<invocation>.log` containing the full stdin
+   * sent to the subprocess, streaming stdout/stderr, and a trailer
+   * with final text + reasoning chain. Optional — when unset, no
+   * live log file is written.
+   */
+  setLiveLogDir(dir: string | null): void {
+    this.liveLogDir = dir;
   }
 
   /**
@@ -177,6 +204,51 @@ export class AgentInvoker {
     const invocationRecordId = this.writeCLIInvocationRecord(options, command, args);
     const startedAt = Date.now();
     let chunkSequence = 0;
+    let cumulativeChars = 0;
+
+    // Open the per-invocation live log (parity with LLMCaller). Writes
+    // a header carrying the full stdin upfront, appends chunks as they
+    // stream, and writes a trailer on completion with final text +
+    // reasoning. Lets `tail -f .janumicode/live/<id>.log` show live CLI
+    // progress without waiting on DB commits.
+    const ctx = options.traceContext;
+    const filenamePrefix = buildLogFilenamePrefix(
+      ctx?.phaseId ?? null,
+      ctx?.subPhaseId ?? null,
+    );
+    const writeRawTokenStream = process.env.JANUMICODE_LLM_LIVE_RAW_STREAM === '1';
+    const logFile = invocationRecordId && this.liveLogDir
+      ? new InvocationLogFile(this.liveLogDir, invocationRecordId, {
+          filenamePrefix,
+          writeRawTokenStream,
+        })
+      : null;
+    if (logFile) {
+      logFile.writeHeader({
+        invocationId: invocationRecordId!,
+        provider: options.backingTool,
+        model: options.model ?? options.backingTool,
+        agentRole: ctx?.agentRole ?? null,
+        phaseId: ctx?.phaseId ?? null,
+        subPhaseId: ctx?.subPhaseId ?? null,
+        label: ctx?.label ?? this.backingToolDisplayName(options.backingTool),
+        prompt: options.prompt,
+        system: options.system ?? null,
+        startedAt: new Date().toISOString(),
+      });
+    }
+
+    // Emit llm:started so the ActivityStrip / live monitor sees the CLI
+    // invocation the same way it sees direct LLM calls. Mirrors
+    // LLMCaller.call(). `provider` carries the backing tool name so
+    // operators can tell the lane apart.
+    this.eventBus?.emit('llm:started', {
+      provider: options.backingTool,
+      lane: 'phase',
+      label: ctx?.label ?? null,
+      agentRole: ctx?.agentRole ?? null,
+      subPhaseId: ctx?.subPhaseId ?? null,
+    });
 
     try {
       const result = await this.cliInvoker.invoke({
@@ -187,12 +259,27 @@ export class AgentInvoker {
         env: options.env,
         timeoutSeconds: this.cliConfig.timeoutSeconds,
         idleTimeoutSeconds: this.cliConfig.idleTimeoutSeconds,
+        noContentTimeoutSeconds: this.cliConfig.noContentTimeoutSeconds,
         bufferMaxEvents: this.cliConfig.bufferMaxEvents,
         outputParser: parser,
         onStdoutChunk: (text) => {
+          cumulativeChars += text.length;
+          logFile?.writeChunk({
+            channel: 'stdout',
+            msSinceStart: Date.now() - startedAt,
+            cumulativeChars,
+            text,
+          });
           this.writeCLIOutputChunk(invocationRecordId, options, 'stdout', text, chunkSequence++);
         },
         onStderrChunk: (text) => {
+          cumulativeChars += text.length;
+          logFile?.writeChunk({
+            channel: 'stderr',
+            msSinceStart: Date.now() - startedAt,
+            cumulativeChars,
+            text,
+          });
           this.writeCLIOutputChunk(invocationRecordId, options, 'stderr', text, chunkSequence++);
         },
       });
@@ -200,13 +287,40 @@ export class AgentInvoker {
       const errorMessage = this.resolveCLIError(result);
       const success = result.exitCode === 0 && !result.timedOut && !result.idledOut;
 
+      // Best-effort extraction of final text + reasoning from the parsed
+      // event stream — parity with the LLM agent_output shape (text +
+      // thinking). Imported lazily to avoid a circular module reference
+      // (orchestratorEngine imports agentInvoker).
+      let finalText = result.stdoutText ?? '';
+      let reasoningText = '';
+      try {
+        const { extractFinalText, extractReasoningText } = await import('./orchestratorEngine.js');
+        finalText = extractFinalText(result.events) || (result.stdoutText ?? '');
+        reasoningText = extractReasoningText(result.events) ?? '';
+      } catch {
+        /* fall back to raw stdoutText */
+      }
+
       const { agentOutputId } = this.writeCLIOutputRecord(
         invocationRecordId,
         options,
         result,
         Date.now() - startedAt,
         success ? null : errorMessage ?? 'CLI invocation failed',
+        finalText,
+        reasoningText,
       );
+
+      logFile?.writeFinal({
+        status: success ? 'success' : 'error',
+        text: finalText,
+        thinking: reasoningText || null,
+        inputTokens: null,
+        outputTokens: null,
+        durationMs: Date.now() - startedAt,
+        retryAttempts: 0,
+        errorMessage: success ? undefined : errorMessage ?? 'CLI invocation failed',
+      });
 
       // Fire the reasoning-review hook on successful CLI completions so
       // Phase 9 executor calls (Goose, Claude Code) get the same advisory
@@ -219,9 +333,6 @@ export class AgentInvoker {
       // extraction); `thinking` is left empty until per-CLI-tool reasoning
       // extractors are wired (a separate task).
       if (success && agentOutputId && options.traceContext) {
-        const { extractFinalText, extractReasoningText } = await import('./orchestratorEngine.js');
-        const finalText = extractFinalText(result.events) || (result.stdoutText ?? '');
-        const reasoningText = extractReasoningText(result.events);
         const reviewResult = {
           text: finalText,
           parsed: null,
@@ -249,11 +360,30 @@ export class AgentInvoker {
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      this.writeCLIOutputRecord(invocationRecordId, options, null, Date.now() - startedAt, msg);
+      this.writeCLIOutputRecord(invocationRecordId, options, null, Date.now() - startedAt, msg, '', '');
+      logFile?.writeFinal({
+        status: 'error',
+        text: '',
+        thinking: null,
+        inputTokens: null,
+        outputTokens: null,
+        durationMs: Date.now() - startedAt,
+        retryAttempts: 0,
+        errorMessage: msg,
+      });
       return {
         success: false,
         error: msg,
       };
+    } finally {
+      this.eventBus?.emit('llm:finished', {
+        provider: options.backingTool,
+        lane: 'phase',
+        durationMs: Date.now() - startedAt,
+        label: ctx?.label ?? null,
+        agentRole: ctx?.agentRole ?? null,
+        subPhaseId: ctx?.subPhaseId ?? null,
+      });
     }
   }
 
@@ -288,6 +418,9 @@ export class AgentInvoker {
           command_line: [command, ...args.map(a => this.quoteArg(a))].join(' '),
           cwd: options.cwd,
           env: options.env ?? null,
+          invocation_id: options.invocationId,
+          ...(ctx.taskId ? { task_id: ctx.taskId } : {}),
+          ...(ctx.taskBackingTool ? { backing_tool: ctx.taskBackingTool } : {}),
         },
       });
       return record.id;
@@ -318,6 +451,8 @@ export class AgentInvoker {
     result: CLIInvocationResult | null,
     durationMs: number,
     errorMessage: string | null,
+    text: string = '',
+    thinking: string = '',
   ): { agentOutputId: string | null } {
     if (!this.writer || !invocationId || !options.traceContext) return { agentOutputId: null };
     const ctx = options.traceContext;
@@ -334,11 +469,26 @@ export class AgentInvoker {
         derived_from_record_ids: [invocationId],
         content: {
           status,
+          provider: options.backingTool,
+          model: options.model ?? options.backingTool,
+          // Parity with LLMCaller.agent_output: surface the final
+          // response text and the reasoning chain so the card and the
+          // reasoning-review hook see the same shape regardless of
+          // backing.
+          text,
+          thinking: thinking || null,
+          // Token usage stays null — CLI parsers don't extract it
+          // reliably (Codex reports it in turn.completed but Goose /
+          // Claude Code / Gemini do not).
+          input_tokens: null,
+          output_tokens: null,
           duration_ms: durationMs,
           exit_code: result?.exitCode ?? null,
           timed_out: result?.timedOut ?? false,
           idled_out: result?.idledOut ?? false,
           event_count: result?.events.length ?? 0,
+          bytes_stdout: result?.stdoutText ? Buffer.byteLength(result.stdoutText) : 0,
+          bytes_stderr: result?.stderr ? Buffer.byteLength(result.stderr) : 0,
           stderr: result?.stderr ?? '',
           error_message: errorMessage,
         },

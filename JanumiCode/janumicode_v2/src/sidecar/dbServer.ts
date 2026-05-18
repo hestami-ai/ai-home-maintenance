@@ -106,6 +106,36 @@ function getCachedStatement(sql: string) {
   return stmt;
 }
 
+/**
+ * Rehydrate JSON-round-tripped Buffer instances back into actual Buffers
+ * before binding to a prepared statement.
+ *
+ * The RPC bridge serializes the params array via JSON.stringify. Node's
+ * Buffer has a custom toJSON() that emits `{type:'Buffer', data:[...]}`
+ * — JSON.parse on the sidecar side reconstructs a plain object, which
+ * better-sqlite3 rejects when binding to a BLOB column (the error
+ * surfaces as "Too few parameter values were provided" because the
+ * binding rejection collapses the param count).
+ *
+ * This walk converts those plain objects back into Buffers. Other
+ * param types pass through unchanged.
+ *
+ * Mirror callsite in rpcClient.ts — the request serialization side is
+ * Node's built-in JSON encoder; no client-side change needed.
+ */
+function rehydrateParams(params: unknown[]): unknown[] {
+  return params.map(p => {
+    if (
+      p && typeof p === 'object' && !Array.isArray(p)
+      && (p as Record<string, unknown>).type === 'Buffer'
+      && Array.isArray((p as Record<string, unknown>).data)
+    ) {
+      return Buffer.from((p as { data: number[] }).data);
+    }
+    return p;
+  });
+}
+
 // ── Request Handler ─────────────────────────────────────────────────
 
 function handleRequest(req: RpcRequest): RpcResponse {
@@ -120,7 +150,7 @@ function handleRequest(req: RpcRequest): RpcResponse {
 
       case 'run': {
         const stmt = getCachedStatement(req.params?.sql ?? '');
-        const info = stmt.run(...(req.params?.params ?? []));
+        const info = stmt.run(...rehydrateParams(req.params?.params ?? []));
         return {
           id: req.id,
           result: {
@@ -132,13 +162,13 @@ function handleRequest(req: RpcRequest): RpcResponse {
 
       case 'get': {
         const stmt = getCachedStatement(req.params?.sql ?? '');
-        const row = stmt.get(...(req.params?.params ?? []));
+        const row = stmt.get(...rehydrateParams(req.params?.params ?? []));
         return { id: req.id, result: row ?? null };
       }
 
       case 'all': {
         const stmt = getCachedStatement(req.params?.sql ?? '');
-        const rows = stmt.all(...(req.params?.params ?? [])) as unknown[];
+        const rows = stmt.all(...rehydrateParams(req.params?.params ?? [])) as unknown[];
         // Enforce server-side row/byte ceilings BEFORE handing rows to
         // the SAB bridge. A structured RpcResultTooLarge error here is
         // far more actionable than the cryptic "offset is out of bounds"
@@ -147,7 +177,7 @@ function handleRequest(req: RpcRequest): RpcResponse {
         const maxBytes = req.params?.maxBytes ?? MAX_BYTES_PER_RPC;
         const limitError = enforceRpcResultLimits(rows, { maxRows, maxBytes });
         if (limitError) {
-          return { id: req.id, error: limitError };
+          return { id: req.id, error: limitError as unknown as Record<string, unknown> };
         }
         return { id: req.id, result: rows };
       }

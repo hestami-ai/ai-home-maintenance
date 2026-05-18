@@ -1,7 +1,0 @@
-{
-  "validator": "source_grouping_coverage",
-  "sample": "05_domain_interpreter__business_domains_bloom",
-  "passed": true,
-  "expectedFindingCount": 0,
-  "overallAssessment": "All three mandatory top-level organizing frames stated in the source material (Home Real Property Assistant, Service Provider Field Services Management, and Community Association Management) are comprehensively represented by dedicated domains in the Bloom output. The structural integrity of the grouping is maintained."
-}

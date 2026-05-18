@@ -207,6 +207,21 @@ export interface ValidatorFinding {
   location: string;
   detail: string;
   recommendation: string;
+  /**
+   * Machine-resolvable target — required for auto-mitigation. Validators
+   * whose findings can be acted on deterministically (drop, replace,
+   * surface as open question) emit these fields so the MitigationEngine
+   * can locate the offending element without re-parsing `location`.
+   *
+   *   targetField      — top-level array field name in the artifact
+   *                      (e.g. "domains", "entities", "userJourneys")
+   *   targetIdentifier — id or unambiguous name of the item to act on
+   *
+   * Optional: validators producing advisory-only findings can omit them.
+   * Auto-mitigation handlers MUST check presence before acting.
+   */
+  targetField?: string;
+  targetIdentifier?: string;
 }
 
 // ── Dispatch bundles per sampled (agent_role, sub_phase) ───────────
@@ -1701,7 +1716,12 @@ export function validateRegistryStructure(): string[] {
         );
       }
     } else if (entry.kind !== 'deterministic') {
-      errors.push(`Validator ${entry.id} has unknown kind: ${(entry as { kind: unknown }).kind}`);
+      // Defensive future-proof branch: if a new ValidatorEntry kind is added
+      // to the union, this catches it before silent dispatch failure. TS
+      // narrows `entry` to `never` here because the union is exhausted, so
+      // access via cast.
+      const stranded = entry as { id: string; kind: unknown };
+      errors.push(`Validator ${stranded.id} has unknown kind: ${stranded.kind}`);
     }
   }
 

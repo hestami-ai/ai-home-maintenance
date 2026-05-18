@@ -429,15 +429,19 @@ export class LLMCaller {
       // records-idle stall fired session abort, deferred 9 nodes).
       // This timeout fires the same per-attempt abort path so the call
       // is retryable (sampling variance can rescue the next attempt).
-      // Default 180 s — long enough that a legit verbose-but-
-      // converging saturation call (~2 min for qwen3.5:9b) finishes
-      // cleanly, short enough that 3 retries (540s) stay well under
-      // the orchestrator's records-idle stall (default 900s). Cal-27
-      // ran with 300s × 3 = 900s exactly, so a single hung node tied
-      // up the whole stall budget and aborted the session.
+      // Default 600 s — chosen after the Apriel-1.6:15b bake-off where a
+      // legit system_workflow_bloom run completed in 8:11 (491s) on a
+      // 22KB prompt. 240s and 180s defaults both timed out on Apriel
+      // for the larger Phase-1 producer prompts. Pair with maxRetries=1
+      // for a worst-case 1200s; pair with maxRetries=0 for a strict
+      // 600s budget that fits inside the orchestrator's records-idle
+      // stall (default 900s). Cal-27 ran with 300s × 3 = 900s exactly,
+      // so a single hung node tied up the whole stall budget and
+      // aborted the session — keep total maxCallSeconds × (1 + maxRetries)
+      // under the stall ceiling when adjusting either knob.
       // Set to 0 to disable.
       const maxCallSeconds = Number.parseInt(
-        process.env.JANUMICODE_LLM_MAX_CALL_SECONDS ?? '180', 10);
+        process.env.JANUMICODE_LLM_MAX_CALL_SECONDS ?? '600', 10);
 
       // Line-repetition cap — fast-fail for degenerate-loop pathologies
       // (cal-27 NFR saturation: qwen3.5:9b emitted "* `1`: Count/status
@@ -616,7 +620,7 @@ export class LLMCaller {
             options.traceContext?.agentRole !== 'json_repair' &&
             options.traceContext?.agentRole !== 'reasoning_review'
           ) {
-            const { repairJsonViaLLM } = await import('./jsonRepairLLM');
+            const { repairJsonViaLLM } = await import('./jsonRepairLLM.js');
             const repair = await repairJsonViaLLM(
               result.text,
               this.jsonRepairRouting,

@@ -42,7 +42,7 @@ describe('AgentInvoker — claude_code_cli permission mode', () => {
 
   beforeEach(() => {
     invoker = new AgentInvoker(new LLMCaller({ maxRetries: 0 }), {
-      timeoutSeconds: 1, idleTimeoutSeconds: 1, bufferMaxEvents: 100,
+      timeoutSeconds: 1, idleTimeoutSeconds: 1, noContentTimeoutSeconds: 1, bufferMaxEvents: 100,
     });
     prevEnv = process.env.JANUMICODE_CLAUDE_SKIP_PERMISSIONS;
     delete process.env.JANUMICODE_CLAUDE_SKIP_PERMISSIONS;

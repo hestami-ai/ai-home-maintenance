@@ -178,6 +178,11 @@ export function parseFindings(
       location: typeof f.location === 'string' ? f.location : '',
       detail: typeof f.detail === 'string' ? f.detail : '',
       recommendation: typeof f.recommendation === 'string' ? f.recommendation : '',
+      // Optional structured target fields — picked up when the validator's
+      // output contract emits them. Required for auto-mitigation; absent
+      // for advisory-only validators.
+      targetField: typeof f.target_field === 'string' ? f.target_field : undefined,
+      targetIdentifier: typeof f.target_identifier === 'string' ? f.target_identifier : undefined,
     });
   }
   return findings;

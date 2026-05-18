@@ -34,6 +34,14 @@ Rules:
 - Every System Requirement must be allocated to at least one Component (Invariant)
 - If a Responsibility is too broad for a single Executor Agent session, it is an implementability_violation
 
+# Granularity at this level — Single-Service Principle, NOT Single-Responsibility Principle
+
+This depth-0 decomposition produces top-tier components (services / bounded contexts). The governing rule is the **Single-Service Principle**: one *business capability* per component. A top-tier component SHOULD bundle multiple closely-related responsibilities that belong to the same capability or bounded context.
+
+The CM-001 single-concern rule above applies to each `responsibilities[].statement` (one verb-object per statement), NOT to the component as a whole. A component with five cohesive responsibilities that all serve one business capability is correct; splitting that into five components (one per responsibility) is over-decomposition at the architectural level — it produces microservice sprawl, chatty cross-component dependencies, and ID-suffix drift downstream (the classic `comp-foo-A`, `comp-foo-B`, `comp-foo-C` pattern of the same noun re-emerging as siblings).
+
+The Single-Responsibility Principle (one reason to change per module) governs at deeper tiers (Tier C / Tier D in Sub-Phase 4.2a saturation). Do not apply it here. Symptom check before emitting: if your component list contains multiple siblings whose names are single-verb operations on the same noun ("Validate Order", "Persist Order", "Emit Order Event"), collapse them into one capability-shaped component ("Order Lifecycle") and let the saturation pass split them by responsibility at Tier C.
+
 # Hard rules — component shape discipline
 
 **Responsibility atomicity** (enforces CM-001 invariant):

@@ -38,7 +38,7 @@ Step 2 — GENERATE
 # Critical Rules
 - PROPOSE EXPANSIVELY. The user prunes via Accept/Reject.
 - Cover EVERY accepted domain with its relevant integration points.
-- Integration ID: `INT-<SHORT-NAME>` (UPPER-CASE hyphenated, e.g. `INT-PAYMENT-GATEWAY`, `INT-BANK-SYNC`).
+- Integration ID: `INT-<SHORT-NAME>` — every letter MUST be uppercase A–Z; separators MUST be hyphens; no lowercase, no spaces, no underscores. Valid: `INT-PAYMENT-GATEWAY`, `INT-BANK-SYNC`, `INT-INCIDENT-MGMT`. Invalid: `INT-INcident-MGMT`, `INT-payment_gateway`.
 - `ownershipModel` MUST be one of: `delegated` (rely fully on third-party service), `synced` (bidirectional data flow with third-party), `consumed` (one-way data pull), `owned` (we build it ourselves).
 - `category` examples: `payment`, `communication`, `iot`, `erp`, `identity`, `storage`, `geocoding`, `ai`, `compliance`, `messaging`, `crm`, `analytics`, `other`.
 - Quality attributes MUST be strings. A quality attribute is **one concrete constraint**, not a bullet list of multiple constraints joined together.

@@ -37,6 +37,21 @@ export class OllamaProvider implements LLMProviderAdapter {
     // in a routing-level override so any caller that points at a gemma
     // model gets the right defaults automatically.
     const isGemma = modelLc.startsWith('gemma');
+    // Granite4.1 (`granite4.1:30b-q4_K_M`) is a non-thinking model.
+    // Ollama rejects `think: true` for non-thinking families with
+    // `"<model>" does not support thinking`. Skip the flag.
+    const isGranite = modelLc.startsWith('granite');
+    // gpt-oss is a thinking-mode model that, like qwen/gemma, merges
+    // the response into the `thinking` field when `format: json` is
+    // set on /api/generate — so we apply the same json-format carve-out
+    // and parse JSON from the response text instead.
+    const isGptOss = modelLc.startsWith('gpt-oss');
+    // Apriel (e.g. `servicenow-ai/apriel-1.6-15b-thinker:q4_k_m`) is a
+    // thinking-mode model. Treat like gpt-oss for json-format handling.
+    // Practical context ceiling on the RTX 4090 is 50K.
+    const isApriel = modelLc.includes('apriel');
+    const supportsThinking = !isGranite;
+    const skipJsonFormat = isQwen || isGemma || isGptOss || isApriel;
     const onChunk = (options as LLMStreamingCallOptions).onChunk;
 
     // Model-family temperature overrides. Qwen thinking models loop at
@@ -72,16 +87,17 @@ export class OllamaProvider implements LLMProviderAdapter {
       // is unset — verified by the user against /api/generate where the
       // same prompt+options completed in ~67s with `think: true` but ran
       // unboundedly without it.
-      // NOTA BENE: All of JanumiCode requires thinking / reasoning models at every stage.
-      think: true,
+      // NOTA BENE: All of JanumiCode requires thinking / reasoning models at every stage,
+      // EXCEPT non-thinking families (e.g. granite4.1) where Ollama rejects the flag.
+      ...(supportsThinking ? { think: true } : {}),
       options: {
         temperature,
-        // Per cal-24 calibration spec: gemma → 156000 ctx (gemma4:26b-a4b-it
-        // decomposer); qwen → 262141 ctx (qwen3.5:9b reviewer). Sampling
-        // profiles match the same spec — kept hardcoded by family rather
-        // than threaded through config so any caller pointing at one of
-        // these families gets the calibrated defaults automatically.
-        num_ctx: isGemma ? 128000 : 262141,
+        // Per-family context windows: gemma → 128K, granite4.1 → 11K
+        // (practical ceiling for granite4.1:30b on an RTX 4090 — the
+        // model+hardware combo can't address more; Ollama would
+        // otherwise truncate silently), gpt-oss → 128K, apriel → 50K
+        // (RTX 4090 ceiling for apriel-1.6:15b), default (qwen) → 262K.
+        num_ctx: isGemma ? 128000 : isGranite ? 11000 : isGptOss ? 128000 : isApriel ? 50000 : 262141,
         ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95, min_p: 0, repeat_penalty: 1 } : {}),
         ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
         ...(numPredict > 0 ? { num_predict: numPredict } : {}),
@@ -95,7 +111,7 @@ export class OllamaProvider implements LLMProviderAdapter {
     // judge both the reasoning chain and the output. Instead we rely
     // on the prompt template to request JSON and parse it from the
     // response text.
-    if (options.responseFormat === 'json' && !isQwen && !isGemma) {
+    if (options.responseFormat === 'json' && !skipJsonFormat) {
       body.format = 'json';
     }
 

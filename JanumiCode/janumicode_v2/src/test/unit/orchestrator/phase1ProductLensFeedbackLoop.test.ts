@@ -72,7 +72,14 @@ describe('Phase 1 — product-lens free-text feedback re-bloom loop', () => {
     // saw — MockLLMProvider doesn't expose prompts, so shim on top.
     const realCall = engine.llmCaller.call.bind(engine.llmCaller);
     (engine.llmCaller as unknown as { call: typeof engine.llmCaller.call }).call = async (opts) => {
-      if (opts.traceContext?.subPhaseId === 'business_domains_bloom') {
+      // Count only the proposer's invocations — Stage III (ingestion pipeline
+      // relationship extraction) also fires on records produced in this
+      // sub-phase, but with agentRole='ingestion_pipeline_stage3'. Filter
+      // those out so this test still measures re-bloom behaviour.
+      if (
+        opts.traceContext?.subPhaseId === 'business_domains_bloom' &&
+        opts.traceContext?.agentRole !== 'ingestion_pipeline_stage3'
+      ) {
         domainsPromptsSeen.push(opts.prompt);
       }
       return realCall(opts);
