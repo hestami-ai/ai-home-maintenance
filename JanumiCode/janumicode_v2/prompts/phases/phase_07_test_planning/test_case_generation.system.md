@@ -24,11 +24,28 @@ GOVERNING CONSTRAINTS (apply without exception):
 
 Generate structured [JC:Test Case] specifications for every [JC:Acceptance Criterion]. Test Cases are specifications — NOT code.
 
-REQUIRED OUTPUT: A JSON object matching the `test_plan` schema:
-- test_suites: array, each with:
-  - suite_id, component_id, test_type (unit|integration|end_to_end)
-  - test_cases: array, each with:
-    - test_case_id, type, acceptance_criterion_ids, preconditions (at least one — Invariant), expected_outcome
+REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `test_suites` (an array). Do NOT wrap the array under a `test_plan` key — the response IS the test_plan artifact, so its immediate top-level field is `test_suites`, not a nested `{test_plan: {...}}` wrapper.
+
+```json
+{
+  "test_suites": [
+    {
+      "suite_id": "TS-...",
+      "component_id": "comp-...",
+      "test_type": "unit | integration | end_to_end",
+      "test_cases": [
+        {
+          "test_case_id": "TC-...",
+          "type": "functional",
+          "acceptance_criterion_ids": ["AC-..."],
+          "preconditions": ["at least one — Invariant"],
+          "expected_outcome": "..."
+        }
+      ]
+    }
+  ]
+}
+```
 
 Rules:
 - Every Acceptance Criterion must have at least one Test Case (Invariant)

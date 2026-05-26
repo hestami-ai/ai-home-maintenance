@@ -1,0 +1,15 @@
+{
+  "kind": "component_decomposition_node",
+  "node_id": "cnode-abuse-send",
+  "parent_node_id": "cnode-abuse-root",
+  "status": "atomic",
+  "tier": "C",
+  "depth": 1,
+  "component": {
+    "id": "comp-abuse-notification-service",
+    "name": "Abuse Notification Service",
+    "responsibilities": [
+      { "id": "res-send-email", "statement": "Send email to administrator within 2 min of abuse flag" }
+    ]
+  }
+}

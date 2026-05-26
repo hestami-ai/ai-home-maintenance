@@ -1,0 +1,7 @@
+{
+  "kind": "product_description_handoff",
+  "product_vision": "TinyURL is a frictionless public URL shortening service that ensures links are instantly accessible and reliably tracked without user accounts.",
+  "product_description": "TinyURL is a minimal HTTP service that converts long URLs into short six-character slugs for sharing and instantly redirects traffic back to the original destination. It supports abuse reporting and per-link click analytics.",
+  "summary": "Public URL shortening with abuse handling and click analytics; serves Link Sharers, Clickers, Marketers, and Administrators.",
+  "open_loops": []
+}

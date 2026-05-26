@@ -22,6 +22,7 @@ import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseCo
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
 import { runTaskSaturationLoop } from './phase6_1a';
+import { runPhase6CycleDelta } from './runCycleDelta';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -63,6 +64,15 @@ export class Phase6Handler implements PhaseHandler {
   async execute(ctx: PhaseContext): Promise<PhaseResult> {
     const { workflowRun, engine } = ctx;
     const artifactIds: string[] = [];
+
+    // ── Cycle-delta short-circuit ───────────────────────────────
+    // When this invocation is a cycle restart from the cycle_controller,
+    // skip the normal LLM-driven task synthesis and just fill the gaps
+    // identified by the latest packet_synthesis_failure record.
+    // See docs/design/iterative-implementation-backlog.md §3.
+    if ((workflowRun.current_cycle_number ?? 0) > 0) {
+      return runPhase6CycleDelta(ctx);
+    }
 
     // ── Gather prior phase outputs ──────────────────────────────
     const allArtifacts = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');

@@ -1,0 +1,315 @@
+/**
+ * Unit tests for the coherence verifier.
+ */
+import { describe, it, expect } from 'vitest';
+import { verifyCoherence } from '../../../../lib/orchestrator/phases/packetSynthesis/coherenceVerifier';
+import type { ImplementationPacketContent } from '../../../../lib/types/records';
+import type { UpstreamIndex } from '../../../../lib/orchestrator/phases/packetSynthesis/upstreamIndex';
+
+function packet(overrides: Partial<ImplementationPacketContent> = {}): ImplementationPacketContent {
+  return {
+    kind: 'implementation_packet',
+    schemaVersion: '1.0',
+    packet_id: 'pkt-1',
+    task: {
+      id: 'task-001', node_id: 'node-001', name: 't', description: 'd',
+      task_type: 'standard', backing_tool: 'claude_code_cli', estimated_complexity: 'low',
+      completion_criteria: [], write_directory_paths: ['src/server/foo'],
+      read_directory_paths: [], dependency_task_ids: [],
+    },
+    user_stories: [{
+      id: 'US-001', role: 'r', action: 'a', outcome: 'o', priority: 'critical',
+      acceptance_criteria: [{ id: 'AC-001', description: 'ac1', measurable_condition: 'HTTP 201' }],
+    }],
+    nfrs: [],
+    component: {
+      id: 'comp-001', name: 'foo', domain_id: null,
+      responsibilities: [{ id: 'resp-1', description: 'do foo' }],
+      dependencies: [], active_constraints: [],
+    },
+    data_models: [],
+    api_definitions: [],
+    test_cases: [{
+      test_case_id: 'TC-001', type: 'functional',
+      acceptance_criterion_ids: ['AC-001'], preconditions: [], expected_outcome: 'HTTP 201',
+    }],
+    evaluation_criteria: [{
+      kind: 'functional', target_id: 'US-001',
+      evaluation_method: 'API test', success_condition: 'HTTP 201 returned',
+    }],
+    active_constraints: [],
+    compliance_items: [],
+    depends_on_packets: [],
+    coherence: { passed: true, blocking_failures: [], advisory_findings: [], annotations: { ai_proposed_root_count: 0, ai_proposed_root_ids: [] } },
+    release_id: null,
+    release_ordinal: null,
+    ...overrides,
+  };
+}
+
+function idxWithAll(ids: string[], aiProposed: string[] = []): UpstreamIndex {
+  return {
+    allUpstreamIds: new Set(ids),
+    aiProposedIds: new Set(aiProposed),
+    userSpecifiedIds: new Set(),
+    artifactsById: new Map(),
+  };
+}
+
+// ── Happy path ─────────────────────────────────────────────────────
+
+describe('verifyCoherence — happy path', () => {
+  it('passes a fully coherent packet', () => {
+    const p = packet();
+    const r = verifyCoherence({
+      packets: [p],
+      upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const result = r.byPacketId.get(p.packet_id)!;
+    expect(result.passed).toBe(true);
+    expect(result.blocking_failures).toHaveLength(0);
+    expect(r.crossPacket.size).toBe(0);
+  });
+});
+
+// ── P1..P7 per-packet assertions ──────────────────────────────────
+
+describe('verifyCoherence — per-packet assertions', () => {
+  it('P1: no user story → fail', () => {
+    const p = packet({ user_stories: [] });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['comp-001', 'resp-1']), atomicTaskIds: new Set(['task-001']),
+    });
+    const failures = r.byPacketId.get(p.packet_id)!.blocking_failures;
+    expect(failures.some((f) => f.startsWith('P1_NO_USER_STORY'))).toBe(true);
+  });
+
+  it('P2: user story with no AC → fail', () => {
+    const p = packet({
+      user_stories: [{
+        id: 'US-001', role: 'r', action: 'a', outcome: 'o', priority: 'p', acceptance_criteria: [],
+      }],
+    });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['US-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const failures = r.byPacketId.get(p.packet_id)!.blocking_failures;
+    expect(failures.some((f) => f.startsWith('P2_USER_STORY_NO_AC'))).toBe(true);
+  });
+
+  it('P3: AC with no test case → fail', () => {
+    const p = packet({ test_cases: [] });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const failures = r.byPacketId.get(p.packet_id)!.blocking_failures;
+    expect(failures.some((f) => f.startsWith('P3_AC_NO_TEST'))).toBe(true);
+  });
+
+  it('P4: user story with no evaluation criterion → fail', () => {
+    const p = packet({ evaluation_criteria: [] });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const failures = r.byPacketId.get(p.packet_id)!.blocking_failures;
+    expect(failures.some((f) => f.startsWith('P4_USER_STORY_NO_EVAL'))).toBe(true);
+  });
+
+  it('P5: NFR with no evaluation criterion → fail', () => {
+    const p = packet({
+      nfrs: [{ id: 'NFR-1', category: 'perf', description: 'd' }],
+    });
+    const r = verifyCoherence({
+      packets: [p],
+      upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001', 'NFR-1']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const failures = r.byPacketId.get(p.packet_id)!.blocking_failures;
+    expect(failures.some((f) => f.startsWith('P5_NFR_NO_EVAL'))).toBe(true);
+  });
+
+  it('P6: missing component contract → fail', () => {
+    const p = packet({
+      component: {
+        id: '', name: '', domain_id: null,
+        responsibilities: [], dependencies: [], active_constraints: [],
+      },
+    });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const failures = r.byPacketId.get(p.packet_id)!.blocking_failures;
+    expect(failures.some((f) => f.startsWith('P6_COMPONENT_CONTRACT_MISSING'))).toBe(true);
+  });
+
+  it('P7: invented id reference → fail', () => {
+    const p = packet();
+    const r = verifyCoherence({
+      packets: [p],
+      // missing US-001 from index → invented reference
+      upstreamIndex: idxWithAll(['AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const failures = r.byPacketId.get(p.packet_id)!.blocking_failures;
+    expect(failures.some((f) => f.startsWith('P7_INVENTED_ID_REFERENCE'))).toBe(true);
+  });
+
+  it('P7 (depends_on): packet refs unknown packet id → fail', () => {
+    const p = packet({ depends_on_packets: ['pkt-unknown'] });
+    const r = verifyCoherence({
+      packets: [p],
+      upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const failures = r.byPacketId.get(p.packet_id)!.blocking_failures;
+    expect(failures.some((f) => /P7_INVENTED_ID_REFERENCE.*pkt-unknown/.test(f))).toBe(true);
+  });
+});
+
+// ── Advisory findings ─────────────────────────────────────────────
+
+describe('verifyCoherence — advisory findings', () => {
+  it('A1: task write-paths do not mention component slug → advisory', () => {
+    const p = packet({
+      task: {
+        id: 'task-001', node_id: 'n', name: 'n', description: 'd',
+        task_type: 'standard', backing_tool: 'cli', estimated_complexity: 'low',
+        completion_criteria: [], write_directory_paths: ['src/somewhere/else'],
+        read_directory_paths: [], dependency_task_ids: [],
+      },
+    });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const adv = r.byPacketId.get(p.packet_id)!.advisory_findings;
+    expect(adv.some((a) => a.startsWith('A1_TASK_OUTSIDE_COMPONENT_BOUNDARY'))).toBe(true);
+  });
+
+  it('A2: duplicate test case (same ACs + expected outcome) → advisory', () => {
+    const p = packet({
+      test_cases: [
+        { test_case_id: 'TC-001', type: 'functional', acceptance_criterion_ids: ['AC-001'], preconditions: [], expected_outcome: 'returns 201' },
+        { test_case_id: 'TC-002', type: 'functional', acceptance_criterion_ids: ['AC-001'], preconditions: [], expected_outcome: 'returns 201' },
+      ],
+    });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001', 'TC-002']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const adv = r.byPacketId.get(p.packet_id)!.advisory_findings;
+    expect(adv.some((a) => a.startsWith('A2_DUPLICATE_TEST_CASE'))).toBe(true);
+  });
+
+  it('A3: eval criterion without measurable predicate → advisory', () => {
+    const p = packet({
+      evaluation_criteria: [{
+        kind: 'functional', target_id: 'US-001',
+        evaluation_method: 'review',
+        success_condition: 'the system behaves well overall',
+      }],
+    });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const adv = r.byPacketId.get(p.packet_id)!.advisory_findings;
+    expect(adv.some((a) => a.startsWith('A3_UNMEASURABLE_EVAL_CRITERION'))).toBe(true);
+  });
+});
+
+// ── Annotations ───────────────────────────────────────────────────
+
+describe('verifyCoherence — annotations', () => {
+  it('counts ai_proposed_root references and lists them', () => {
+    const p = packet();
+    const r = verifyCoherence({
+      packets: [p],
+      upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001'], ['US-001', 'comp-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const ann = r.byPacketId.get(p.packet_id)!.annotations;
+    expect(ann.ai_proposed_root_count).toBeGreaterThanOrEqual(2);
+    expect(ann.ai_proposed_root_ids).toEqual(expect.arrayContaining(['US-001', 'comp-001']));
+  });
+
+  it('passes verifier when ai_proposed refs exist (annotation, not blocking)', () => {
+    const p = packet();
+    const r = verifyCoherence({
+      packets: [p],
+      upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001'], ['US-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    expect(r.byPacketId.get(p.packet_id)!.passed).toBe(true);
+  });
+});
+
+// ── C1..C4 cross-packet assertions ────────────────────────────────
+
+describe('verifyCoherence — cross-packet assertions', () => {
+  it('C1: same task in multiple packets → fail', () => {
+    const a = packet({ packet_id: 'pkt-A' });
+    const b = packet({ packet_id: 'pkt-B' });  // same task.id (default 'task-001')
+    const r = verifyCoherence({
+      packets: [a, b], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    expect(r.crossPacket.has('C1_TASK_IN_MULTIPLE_PACKETS')).toBe(true);
+  });
+
+  it('C2: atomic task with no packet → fail', () => {
+    const p = packet();
+    const r = verifyCoherence({
+      packets: [p],
+      upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001', 'task-002']),  // task-002 has no packet
+    });
+    expect(r.crossPacket.has('C2_ATOMIC_TASK_HAS_NO_PACKET')).toBe(true);
+  });
+
+  it('C3: dependency cycle → fail', () => {
+    const a = packet({ packet_id: 'pkt-A', task: { ...packet().task, id: 'task-A' }, depends_on_packets: ['pkt-B'] });
+    const b = packet({ packet_id: 'pkt-B', task: { ...packet().task, id: 'task-B' }, depends_on_packets: ['pkt-A'] });
+    const r = verifyCoherence({
+      packets: [a, b],
+      upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-A', 'task-B']),
+    });
+    expect(r.crossPacket.has('C3_DEPENDENCY_DAG_CYCLE')).toBe(true);
+  });
+
+  it('C4: depends_on_packets references unknown packet → fail', () => {
+    const p = packet({ depends_on_packets: ['pkt-ghost'] });
+    const r = verifyCoherence({
+      packets: [p],
+      upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    expect(r.crossPacket.has('C4_DEPENDENCY_REFERENCES_UNKNOWN_PACKET')).toBe(true);
+  });
+});
+
+// ── Totals ────────────────────────────────────────────────────────
+
+describe('verifyCoherence — totals', () => {
+  it('aggregates correctly across multiple packets', () => {
+    const good = packet({ packet_id: 'pkt-G', task: { ...packet().task, id: 'task-G' } });
+    const bad = packet({
+      packet_id: 'pkt-B', task: { ...packet().task, id: 'task-B' },
+      user_stories: [],   // P1 fail
+    });
+    const r = verifyCoherence({
+      packets: [good, bad],
+      upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-G', 'task-B']),
+    });
+    expect(r.totals.packetsTotal).toBe(2);
+    expect(r.totals.packetsFailed).toBe(1);
+    expect(r.totals.blockingFailures).toBeGreaterThanOrEqual(1);
+  });
+});

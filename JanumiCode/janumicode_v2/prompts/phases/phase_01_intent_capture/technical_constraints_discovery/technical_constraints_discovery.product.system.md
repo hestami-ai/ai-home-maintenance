@@ -55,6 +55,19 @@ Every technical constraint MUST carry a `source_ref` with:
 
 If you can't ground a capture in a verbatim excerpt, DO NOT emit it.
 
+# One record per excerpt (deduplication rule — non-negotiable)
+
+Each verbatim source excerpt MUST appear in AT MOST ONE technical-constraint record. The unit of capture is the source statement, not the categories within it.
+
+When a single source sentence touches multiple categories (e.g. one sentence simultaneously names a deployment style AND an architecture style; one sentence names a database product AND its hosting model), emit a SINGLE record:
+
+- Pick the most specific category that fits (prefer a narrower category over a broader one).
+- Capture the full verbatim sentence in `excerpt`.
+- Write a `text` field that paraphrases the WHOLE constraint as the source phrased it — do not subset.
+- If two distinct facets really do warrant separate records, the two records MUST quote DIFFERENT verbatim excerpts from the source. The same excerpt repeated under different ids is a contract violation.
+
+Before emitting, scan your draft list: if any two records carry the same `source_ref.excerpt` string, collapse them into one. Downstream phases dedup by excerpt-equality; emitting near-duplicates wastes context and inflates record counts.
+
 # JSON Output Contract (strict — non-negotiable)
 
 - **No markdown fences.** Response starts with `{` and ends with `}`.

@@ -87,6 +87,15 @@ You have `parent_tier_hint`. Use it as the caller's expectation, but your `paren
 
 The `active_constraints` block carries Phase 1.0c technical constraints (e.g. SvelteKit, Bun, PostgreSQL, DBOS). Children inherit applicable constraints from the parent's `active_constraints`, narrowed to those that genuinely apply at this level. A frontend-shell child inherits `TECH-SVELTEKIT-1`; a backend-data-store child inherits `TECH-POSTGRES-1` and `TECH-BUN-1`. Do NOT invent technologies the source documents didn't already commit to.
 
+**Per-task narrowing is required, not optional.** Each leaf task's `active_constraints` MUST contain ONLY the constraints whose subject matter genuinely touches this task's implementation surface:
+
+- A task that sends an email does NOT carry a URL-encryption constraint (that constraint scopes to URL-storage tasks).
+- A task that reads a config file does NOT carry the database-engine constraint (that scopes to persistence tasks).
+- A task that writes to stdout DOES carry a logging-format constraint (that applies to every code path that emits logs).
+- A task that touches the public HTTP surface DOES carry the transport (HTTPS) constraint.
+
+Symptom of over-inclusion: every task in the plan carries the same full set of constraints. That is wrong — re-narrow. The goal is that the executor reading the task sees only the constraints it must actively respect while writing the code, not the project's entire stack inventory.
+
 The `backing_tool` field MUST be consistent with active_constraints — `claude_code_cli` for general code work, `code_editor` for ad-hoc edits, etc. When the constraints commit to a stack (SvelteKit / Bun / PostgreSQL), pick the executor that delivers in that stack rather than a generic alternative. **`backing_tool` MUST NOT be a language name** (e.g. `"Python"`, `"TypeScript"` are invalid values). Use `"claude_code_cli"`, `"code_editor"`, or a named CLI tool.
 
 ## Path Discipline Rule

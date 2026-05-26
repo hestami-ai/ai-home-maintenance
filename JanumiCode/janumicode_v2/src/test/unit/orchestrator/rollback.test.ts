@@ -1,0 +1,151 @@
+/**
+ * Unit tests for rollbackToSubPhase.
+ *
+ * Seeds an in-memory governed_stream with synthetic records across
+ * multiple phases / sub-phases and verifies that rollback:
+ *   - identifies the correct cutoff timestamp
+ *   - flips is_current_version=0 only for records produced at-or-after the cutoff
+ *   - preserves immutable history (agent_invocation, agent_output, etc.) as current
+ *   - leaves records BEFORE the cutoff untouched
+ *   - handles the "target sub-phase never ran" case cleanly
+ */
+
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createTestDatabase, initializeDatabase, type Database } from '../../../lib/database/init';
+import { rollbackToSubPhase } from '../../../lib/orchestrator/rollback';
+
+const RUN_ID = '00000000-0000-0000-0000-000000000001';
+
+function seed(
+  db: Database,
+  rows: Array<{
+    id: string;
+    record_type: string;
+    sub_phase_id: string;
+    produced_at: string;
+    is_current_version?: number;
+  }>,
+): void {
+  const stmt = db.prepare(`
+    INSERT INTO governed_stream (
+      id, record_type, schema_version, workflow_run_id,
+      phase_id, sub_phase_id, produced_by_agent_role, produced_by_record_id,
+      produced_at, effective_at, janumicode_version_sha, authority_level,
+      derived_from_system_proposal, is_current_version,
+      superseded_by_id, superseded_at, superseded_by_record_id,
+      source_workflow_run_id, derived_from_record_ids,
+      quarantined, sanitized, sanitized_fields, content
+    ) VALUES (
+      ?, ?, '1.0', ?,
+      '0', ?, NULL, NULL,
+      ?, ?, 'test', 2,
+      0, ?,
+      NULL, NULL, NULL,
+      ?, '[]',
+      0, 0, '[]', '{}'
+    )
+  `);
+  for (const r of rows) {
+    stmt.run(
+      r.id, r.record_type, RUN_ID,
+      r.sub_phase_id,
+      r.produced_at, r.produced_at,
+      r.is_current_version ?? 1,
+      RUN_ID,
+    );
+  }
+}
+
+function currentVersionCount(db: Database, sub_phase_id?: string): number {
+  const sql = sub_phase_id
+    ? `SELECT COUNT(*) AS n FROM governed_stream WHERE is_current_version=1 AND sub_phase_id=?`
+    : `SELECT COUNT(*) AS n FROM governed_stream WHERE is_current_version=1`;
+  const stmt = db.prepare(sql);
+  const row = (sub_phase_id ? stmt.get(sub_phase_id) : stmt.get()) as { n: number };
+  return row.n;
+}
+
+describe('rollbackToSubPhase', () => {
+  let db: Database;
+
+  beforeEach(() => {
+    db = createTestDatabase();
+    initializeDatabase(db);
+    // Seed a workflow_run so FKs etc. don't trip.
+    db.prepare(`
+      INSERT INTO workflow_runs (
+        id, status, intent_lens, current_phase_id, workspace_id,
+        janumicode_version_sha, initiated_at
+      ) VALUES (?, 'running', 'product', '0', 'test-ws', 'test-sha', '2026-05-21T16:00:00Z')
+    `).run(RUN_ID);
+  });
+
+  it('rolls back stateful records at-or-after the target sub-phase', () => {
+    seed(db, [
+      { id: 'r1', record_type: 'artifact_produced',          sub_phase_id: 'workspace_classification', produced_at: '2026-05-21T16:00:01Z' },
+      { id: 'r2', record_type: 'artifact_produced',          sub_phase_id: 'intent_discovery',          produced_at: '2026-05-21T16:00:02Z' },
+      { id: 'r3', record_type: 'artifact_produced',          sub_phase_id: 'business_domains_bloom',    produced_at: '2026-05-21T16:00:03Z' },
+      { id: 'r4', record_type: 'artifact_produced',          sub_phase_id: 'fr_bloom_skeleton',         produced_at: '2026-05-21T16:00:04Z' },
+    ]);
+    expect(currentVersionCount(db)).toBe(4);
+    const result = rollbackToSubPhase(db, RUN_ID, 'business_domains_bloom');
+    expect(result.cutoff_produced_at).toBe('2026-05-21T16:00:03Z');
+    expect(result.rolled_back_count).toBe(2);
+    expect(currentVersionCount(db)).toBe(2);
+    expect(currentVersionCount(db, 'workspace_classification')).toBe(1);
+    expect(currentVersionCount(db, 'intent_discovery')).toBe(1);
+    expect(currentVersionCount(db, 'business_domains_bloom')).toBe(0);
+    expect(currentVersionCount(db, 'fr_bloom_skeleton')).toBe(0);
+  });
+
+  it('preserves immutable history (agent_invocation et al.) across rollback', () => {
+    seed(db, [
+      { id: 'r1', record_type: 'agent_invocation',           sub_phase_id: 'business_domains_bloom',    produced_at: '2026-05-21T16:00:03Z' },
+      { id: 'r2', record_type: 'agent_output',               sub_phase_id: 'business_domains_bloom',    produced_at: '2026-05-21T16:00:03Z' },
+      { id: 'r3', record_type: 'artifact_produced',          sub_phase_id: 'business_domains_bloom',    produced_at: '2026-05-21T16:00:04Z' },
+      { id: 'r4', record_type: 'transformation_step',        sub_phase_id: 'business_domains_bloom',    produced_at: '2026-05-21T16:00:04Z' },
+    ]);
+    const result = rollbackToSubPhase(db, RUN_ID, 'business_domains_bloom');
+    expect(result.rolled_back_count).toBe(1); // only the artifact_produced
+    expect(result.preserved_count).toBe(3);   // agent_invocation, agent_output, transformation_step
+    expect(result.rolled_back_by_type).toEqual({ artifact_produced: 1 });
+    expect(currentVersionCount(db)).toBe(3); // r1, r2, r4 stay current
+  });
+
+  it('returns null cutoff when the target sub-phase never ran', () => {
+    seed(db, [
+      { id: 'r1', record_type: 'artifact_produced', sub_phase_id: 'intent_discovery', produced_at: '2026-05-21T16:00:01Z' },
+    ]);
+    const result = rollbackToSubPhase(db, RUN_ID, 'never_was_here');
+    expect(result.cutoff_produced_at).toBeNull();
+    expect(result.rolled_back_count).toBe(0);
+    expect(currentVersionCount(db)).toBe(1);
+  });
+
+  it('ignores records already superseded (is_current_version=0)', () => {
+    seed(db, [
+      { id: 'r1', record_type: 'artifact_produced', sub_phase_id: 'business_domains_bloom', produced_at: '2026-05-21T16:00:01Z', is_current_version: 0 },
+      { id: 'r2', record_type: 'artifact_produced', sub_phase_id: 'business_domains_bloom', produced_at: '2026-05-21T16:00:02Z', is_current_version: 1 },
+    ]);
+    const result = rollbackToSubPhase(db, RUN_ID, 'business_domains_bloom');
+    // Cutoff is the first CURRENT-version record of the target sub-phase,
+    // not the earliest of any version.
+    expect(result.cutoff_produced_at).toBe('2026-05-21T16:00:02Z');
+    expect(result.rolled_back_count).toBe(1);
+  });
+
+  it('cuts off correctly when the target sub-phase ran multiple times', () => {
+    // Earlier attempt was previously rolled back, then re-ran.
+    seed(db, [
+      { id: 'r1', record_type: 'artifact_produced', sub_phase_id: 'business_domains_bloom', produced_at: '2026-05-21T16:00:01Z', is_current_version: 0 },
+      { id: 'r2', record_type: 'artifact_produced', sub_phase_id: 'fr_bloom_skeleton',      produced_at: '2026-05-21T16:00:02Z', is_current_version: 0 },
+      { id: 'r3', record_type: 'artifact_produced', sub_phase_id: 'business_domains_bloom', produced_at: '2026-05-21T17:00:01Z', is_current_version: 1 },
+      { id: 'r4', record_type: 'artifact_produced', sub_phase_id: 'fr_bloom_skeleton',      produced_at: '2026-05-21T17:00:02Z', is_current_version: 1 },
+    ]);
+    const result = rollbackToSubPhase(db, RUN_ID, 'business_domains_bloom');
+    // Cutoff = first CURRENT occurrence, which is the second attempt.
+    expect(result.cutoff_produced_at).toBe('2026-05-21T17:00:01Z');
+    expect(result.rolled_back_count).toBe(2);
+    expect(currentVersionCount(db)).toBe(0);
+  });
+});

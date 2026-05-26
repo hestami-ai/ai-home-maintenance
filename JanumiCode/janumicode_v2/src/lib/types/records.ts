@@ -295,6 +295,18 @@ export type RecordType =
   | 'test_decomposition_node'
   | 'test_assumption_set_snapshot'
   | 'test_decomposition_pipeline'
+  // Implementation packet synthesis (Phase 8 → 9 boundary). One packet
+  // per atomic Phase 6.1a task, bundling upstream context (user stories,
+  // ACs, NFRs, component contract, data models, APIs, test cases, eval
+  // criteria, constraints, compliance items). See
+  // docs/design/implementation-packet-synthesis.md.
+  | 'implementation_packet'
+  | 'packet_synthesis_failure'
+  // Cycle controller — written by cycle_controller sub-phase to record
+  // each release-major iteration's outcome. Today only the
+  // `frontier_empty` termination branch is implemented; later steps
+  // wire delta-mode entry points for Phase 6/7/8 + the actual loop.
+  | 'cycle_iteration'
   | 'execution_wave_started'
   | 'execution_wave_completed'
   | 'task_quarantine'
@@ -334,7 +346,17 @@ export type RecordType =
   | 'warning_batch_acknowledged'
   | 'ingestion_pipeline_failure'
   | 'llm_api_failure'
-  | 'llm_api_recovery';
+  | 'llm_api_recovery'
+  // Transformation trace layer (forensic lineage). Emitted alongside
+  // existing agent_invocation/agent_output/artifact_produced records;
+  // not a replacement. See src/lib/trace/ and docs/design/transformation-trace.md.
+  | 'transformation_step'
+  // Scope gatekeeper — LLM-backed auto-prune of expansive bloom outputs.
+  // Emitted after every bloom round that has applyPrune callbacks; carries
+  // the kept ids, dropped ids + per-id rationales. Designed for the
+  // debug-iterate loop where thin-slice / auto-approve paths need scope
+  // discipline that the human-in-the-loop normally enforces.
+  | 'scope_prune_decision';
 
 // ── Decision Trace Types (§6.2) ─────────────────────────────────────
 
@@ -429,6 +451,24 @@ export interface WorkflowRun {
    * markdown/gold exporters group output by release ordinal.
    */
   active_release_plan_record_id: string | null;
+
+  /**
+   * Iterative-implementation-backlog cycle telemetry. Always non-null
+   * once cycle_controller has run; null on workflows that haven't
+   * reached Phase 9 yet.
+   */
+  current_release_ordinal?: number | null;
+  current_cycle_number?: number;
+  max_cycles_per_release?: number;
+
+  /**
+   * Implementation packet synthesis telemetry. Populated by the
+   * packet_synthesis sub-phase. Zero on workflows that haven't reached
+   * the Phase 8 → 9 boundary yet.
+   */
+  packet_count?: number;
+  packet_coherence_blocking_count?: number;
+  packet_coherence_advisory_count?: number;
 }
 
 export type WorkflowRunStatus =
@@ -1204,6 +1244,213 @@ export interface TaskDecompositionPipelineContent {
   final_max_depth?: number;
   total_llm_calls?: number;
   tier_distribution?: { A?: number; B?: number; C?: number; D?: number };
+}
+
+// ── Implementation Packet Synthesis (Phase 8 → 9 boundary) ─────────
+//
+// One packet per atomic Phase 6.1a task. The packet bundles COPIES (not
+// references) of every upstream artifact relevant to executing the task:
+// matched user stories with all ACs, NFRs, the component contract, data
+// models, API definitions, test cases that verify the ACs, evaluation
+// criteria that judge the user story, technical constraints, compliance
+// items, and dependency-packet ids.
+//
+// Phase 9's executor consumes the packet — not the bare task — so it has
+// the full context it needs to implement the task without inventing.
+//
+// See docs/design/implementation-packet-synthesis.md.
+
+export interface PacketUserStoryAc {
+  id: string;
+  description: string;
+  measurable_condition: string;
+}
+
+export interface PacketUserStory {
+  id: string;
+  role: string;
+  action: string;
+  outcome: string;
+  priority: string;
+  acceptance_criteria: PacketUserStoryAc[];
+}
+
+export interface PacketNfr {
+  id: string;
+  category: string;
+  description: string;
+  threshold?: string;
+  measurement_method?: string;
+  measurable_condition?: string;
+}
+
+export interface PacketComponentResponsibility {
+  id: string;
+  description: string;
+  statement?: string;
+}
+
+export interface PacketComponentDependency {
+  component_id: string;
+  kind: string;
+}
+
+export interface PacketComponent {
+  id: string;
+  name: string;
+  domain_id: string | null;
+  responsibilities: PacketComponentResponsibility[];
+  dependencies: PacketComponentDependency[];
+  active_constraints: string[];
+}
+
+export interface PacketDataModelField {
+  name: string;
+  type: string;
+  constraints?: string;
+}
+
+export interface PacketDataModel {
+  id: string;
+  name: string;
+  component_id: string;
+  fields: PacketDataModelField[];
+}
+
+export interface PacketApiDefinition {
+  id: string;
+  method: string;
+  path: string;
+  description: string;
+  request_shape?: unknown;
+  response_shape?: unknown;
+  error_codes?: string[];
+}
+
+export interface PacketTestCase {
+  test_case_id: string;
+  type: string;
+  acceptance_criterion_ids: string[];
+  preconditions: string[];
+  expected_outcome: string;
+}
+
+export interface PacketEvaluationCriterion {
+  kind: 'functional' | 'quality' | 'reasoning';
+  target_id: string;
+  evaluation_method: string;
+  success_condition: string;
+}
+
+export interface PacketActiveConstraint {
+  id: string;
+  category: string;
+  text: string;
+  technology?: string;
+  rationale?: string;
+}
+
+export interface PacketComplianceItem {
+  id: string;
+  kind: 'compliance' | 'vv_requirement' | 'quality_attribute';
+  description: string;
+  measurable_condition?: string;
+}
+
+export interface PacketTask {
+  id: string;
+  node_id: string;
+  name: string;
+  description: string;
+  task_type: string;
+  backing_tool: string;
+  estimated_complexity: 'low' | 'medium' | 'high' | string;
+  completion_criteria: Array<{
+    criterion_id: string;
+    description: string;
+    verification_method: string;
+  }>;
+  write_directory_paths: string[];
+  read_directory_paths: string[];
+  dependency_task_ids: string[];
+}
+
+export interface PacketCoherenceAnnotations {
+  ai_proposed_root_count: number;
+  ai_proposed_root_ids: string[];
+}
+
+export interface PacketCoherenceResult {
+  passed: boolean;
+  blocking_failures: string[];
+  advisory_findings: string[];
+  annotations: PacketCoherenceAnnotations;
+}
+
+export interface ImplementationPacketContent {
+  kind: 'implementation_packet';
+  schemaVersion: '1.0';
+  packet_id: string;
+  task: PacketTask;
+  user_stories: PacketUserStory[];
+  nfrs: PacketNfr[];
+  component: PacketComponent;
+  data_models: PacketDataModel[];
+  api_definitions: PacketApiDefinition[];
+  test_cases: PacketTestCase[];
+  evaluation_criteria: PacketEvaluationCriterion[];
+  active_constraints: PacketActiveConstraint[];
+  compliance_items: PacketComplianceItem[];
+  depends_on_packets: string[];
+  coherence: PacketCoherenceResult;
+  release_id: string | null;
+  release_ordinal: number | null;
+}
+
+/**
+ * Written when packet_synthesis encounters a blocking coherence failure.
+ * Captures the failure surface so the cycle controller (auto mode) or
+ * the operator mirror (interactive mode) can route appropriately.
+ */
+export interface PacketSynthesisFailureContent {
+  kind: 'packet_synthesis_failure';
+  schemaVersion: '1.0';
+  /** Per-packet blocking failures: packet_id → list of failure codes. */
+  failures_by_packet: Record<string, string[]>;
+  /** Cross-packet blocking failures: code → list of details. */
+  cross_packet_failures: Record<string, string[]>;
+  /** Aggregate counts for harness/telemetry consumption. */
+  total_packets: number;
+  failed_packets: number;
+  total_blocking_failures: number;
+  total_advisory_findings: number;
+  total_ai_proposed_root_count: number;
+}
+
+/**
+ * Cycle iteration record — written by the cycle_controller sub-phase.
+ * One record per release-major iteration (cycle 0 = initial, cycle 1+ =
+ * delta cycles). Minimum-viable implementation always emits
+ * `termination_reason: 'frontier_empty'`; the loop activation step
+ * extends this with the actual decision tree (frontier_empty /
+ * zero_progress / ceiling_hit / etc.).
+ */
+export interface CycleIterationContent {
+  kind: 'cycle_iteration';
+  schemaVersion: '1.0';
+  release_id: string | null;
+  release_ordinal: number | null;
+  cycle_number: number;
+  started_at: string;
+  completed_at: string;
+  termination_reason:
+    | 'frontier_empty'
+    | 'zero_progress'
+    | 'ceiling_hit'
+    | 'ceiling_hit_accepted'
+    | 'phase_failure';
+  atomic_leaves_produced: number;
+  deferred_leaves_remaining: number;
 }
 
 // ── Wave 9 — Recursive data-model decomposition (Phase 5.1a) ──────
@@ -2061,4 +2308,127 @@ export interface ProductDescriptionHandoffContent {
   // Cross-cutting — condensed human decisions + unresolved loops
   humanDecisions: HumanDecisionSummary[];
   openLoops: OpenLoop[];
+}
+
+// ── Transformation Trace Layer ──────────────────────────────────────
+//
+// A single hop in the data pipeline. Emitted at known seams (LLM call
+// entry/exit, prompt materialization, JSON parse/repair, normalizer
+// wrap, context assembly, persist) so that for any field on any
+// artifact, we can walk backward through the chain of transformations
+// that produced (or failed to produce) it. Steps form a tree via
+// parent_step_id; lateral lineage is reconstructed via input_record_ids
+// → output_record_id pointers across separate steps.
+//
+// Step metadata lives in governed_stream. Full payloads (prompts, raw
+// responses, parsed JSON, normalizer input/output) are written to disk
+// at `.janumicode/runs/<run_id>/transforms/<sub_phase>/<step_id>.json`
+// to keep the DB lean. The `payload_path` field points at the file.
+
+export type TransformationStepType =
+  /** Context assembler selected upstream records + fields. */
+  | 'context_assembled'
+  /** Prompt template substitution completed (per-variable provenance). */
+  | 'template_rendered'
+  /** Prompt template rendered with variable substitutions. */
+  | 'prompt_materialized'
+  /** LLM HTTP call dispatched (provider/model/sizes). */
+  | 'llm_invoked'
+  /** LLM HTTP call returned (raw response captured). */
+  | 'llm_returned'
+  /** JSON parse succeeded (parsed object captured). */
+  | 'json_parsed'
+  /** JSON parse failed and was repaired via repair LLM. */
+  | 'json_repaired'
+  /** A normalizer ran: input → output with field_diff. */
+  | 'normalized'
+  /** A governed_stream record was written. */
+  | 'persisted'
+  /** A previously persisted record was read by a downstream step (forward link). */
+  | 'consumed'
+  /** CLI agent (Goose, Claude Code) invoked. */
+  | 'cli_invoked'
+  /** CLI agent returned. */
+  | 'cli_returned';
+
+export interface TransformationFieldDiff {
+  /** Top-level keys present in output but not in input. */
+  added?: string[];
+  /** Top-level keys present in input but not in output (silent drops live here). */
+  removed?: string[];
+  /** Heuristic: a key disappeared from input and a similarly-shaped key appeared in output. */
+  renamed?: Array<{ from: string; to: string }>;
+  /** Top-level keys whose JSON-type changed across the transformation. */
+  type_changed?: string[];
+  /** Top-level array fields whose length changed (incl. became empty). */
+  size_changed?: Array<{ field: string; from: number; to: number }>;
+}
+
+export interface TransformationStepContent {
+  kind: 'transformation_step';
+  schemaVersion: '1.0';
+  /** UUID — stable identifier for this step. */
+  step_id: string;
+  /** Parent step in the same trace chain (null for the root of a chain). */
+  parent_step_id: string | null;
+  step_type: TransformationStepType;
+  /**
+   * Workflow correlation. sub_phase_id is required because the trace
+   * layer's primary use is "what went wrong in this sub-phase".
+   */
+  sub_phase_id: string;
+  agent_role?: AgentRole | null;
+  /** Upstream governed_stream record ids this step read from. */
+  input_record_ids: string[];
+  /** Downstream governed_stream record id this step wrote (when applicable). */
+  output_record_id?: string;
+  /**
+   * Workspace-relative path to a JSON file containing the full payload
+   * for this step (materialized prompt, raw response, parsed JSON, etc).
+   * Off-DB to keep the governed_stream lean. May be null for very small
+   * steps where the metadata alone is informative.
+   */
+  payload_path?: string;
+  /** Set on normalized / json_parsed / llm_returned where applicable. */
+  field_diff?: TransformationFieldDiff;
+  duration_ms?: number;
+  error?: { message: string; stack?: string };
+  /** Step-type-specific extras. Free-form by intent — keep small. */
+  metadata?: Record<string, unknown>;
+}
+
+// ── Scope Gatekeeper (LLM-backed prune) ─────────────────────────────
+
+export interface ScopePruneDropEntry {
+  /** ID of the dropped item (e.g., 'DOM-RATE-LIMIT'). */
+  id: string;
+  /** Human-readable name/label at time of drop (e.g., 'Rate Limiting'). */
+  label?: string;
+  /** Why the gatekeeper dropped it (verbatim from the LLM's response). */
+  reason: string;
+}
+
+export interface ScopePruneDecisionContent {
+  kind: 'scope_prune_decision';
+  schemaVersion: '1.0';
+  /** Sub-phase that produced the bloom we just pruned. */
+  sub_phase_id: string;
+  /** record_id of the original (now superseded) bloom artifact. */
+  original_artifact_id: string;
+  /** record_id of the new (pruned) bloom artifact that supersedes it. */
+  pruned_artifact_id: string;
+  /** IDs the gatekeeper kept. */
+  kept_ids: string[];
+  /** IDs the gatekeeper dropped, each with a rationale. */
+  dropped: ScopePruneDropEntry[];
+  /**
+   * One-paragraph overall justification from the gatekeeper LLM —
+   * useful for humans skimming the audit report.
+   */
+  rationale_summary: string;
+  /** LLM provider/model used for the gatekeeper call. */
+  gatekeeper_provider: string;
+  gatekeeper_model: string;
+  /** Wall-clock for the gatekeeper LLM call. */
+  duration_ms?: number;
 }

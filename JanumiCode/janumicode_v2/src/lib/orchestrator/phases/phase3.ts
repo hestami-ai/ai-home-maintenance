@@ -135,10 +135,28 @@ export class Phase3Handler implements PhaseHandler {
     // canonical externals list from Phase 1 artifacts directly and
     // merge — LLM-elaborated descriptions win for shared ids; every
     // deterministic id is guaranteed to appear.
+    //
+    // ts-102 surfaced a contamination path: the LLM had been emitting
+    // external_systems entries for TECH-* ids describing the product's
+    // own properties (HTTPS, AES-256, JSON logs, containerised service)
+    // despite explicit prompt rules. Root cause was twofold —
+    // `techConstraintToExternal` injected ALL constraints as externals
+    // regardless of category, and the LLM-emitted list passed through
+    // unfiltered. The fix gates both paths through `EXTERNAL_SERVICE_
+    // CATEGORIES` + `isPlausibleExternalSystem`.
+    const techCategoryById = buildTechCategoryIndex(allArtifacts);
     const deterministicExternals = gatherDeterministicExternals(allArtifacts);
+    const filteredLlmExternals = filterLlmExternals(
+      llmBoundary.external_systems ?? [],
+      techCategoryById,
+    );
     const boundaryContent: SystemBoundary = {
       ...llmBoundary,
-      external_systems: mergeExternals(llmBoundary.external_systems, deterministicExternals),
+      external_systems: mergeExternals(filteredLlmExternals, deterministicExternals),
+      out_of_scope: reconstructOutOfScopeFromIntent(
+        llmBoundary.out_of_scope,
+        allArtifacts,
+      ),
     };
 
     const boundaryRecord = engine.writer.writeRecord({
@@ -531,14 +549,22 @@ export class Phase3Handler implements PhaseHandler {
     });
 
     // Defensive parsing — same pattern as 3.2 (see SR derivation
-    // comment). 3.3 happens to currently emit `{ contracts: [...] }`
-    // directly so the previous single-form parse worked, but the
-    // model is free to wrap in `{ interface_contracts: [...] }` on
-    // any retry. Use the same envelope-vs-schema-key resolver so
-    // either form is accepted and we never silently fall back when
-    // the model produced real output.
+    // comment). The model can emit any of:
+    //   1. { contracts: [...] }                              (flat)
+    //   2. { interface_contracts: [...] }                    (envelope=array)
+    //   3. { interface_contracts: { contracts: [...] } }     (double envelope)
+    //
+    // ts-103 surfaced shape #3 — the LLM produced a perfectly good
+    // contracts array nested under `interface_contracts.contracts`,
+    // but the previous `pickItemsArray` call only looked one level
+    // deep and silently fell back to the placeholder file-system
+    // contract. We now unwrap the outer envelope first, then look
+    // for `contracts` on either the unwrapped or original object.
     const parsed = result.parsed as Record<string, unknown> | null;
-    const contracts = pickItemsArray<InterfaceContract>(parsed, ['interface_contracts', 'contracts']);
+    const unwrapped = pickEnvelope<Record<string, unknown>>(parsed, ['interface_contracts']);
+    const contracts =
+      pickItemsArray<InterfaceContract>(parsed, ['interface_contracts', 'contracts']) ??
+      pickItemsArray<InterfaceContract>(unwrapped, ['contracts']);
     if (contracts && contracts.length > 0) return { contracts };
     return fallback;
   }
@@ -735,15 +761,233 @@ function arr(v: unknown): Array<Record<string, unknown>> | null {
   return Array.isArray(v) ? (v as Array<Record<string, unknown>>) : null;
 }
 
+/**
+ * Categories from `technical_constraints_discovery` that designate a
+ * SEPARATE RUNNING SERVICE the product communicates with across a
+ * process boundary. Only these become `external_systems[]` entries.
+ *
+ * Excluded categories (`infrastructure` for transport like HTTPS,
+ * `security` for crypto algorithms, `deployment` for containerisation,
+ * `monitoring` for log formats, `frontend`/`backend`/`mobile` for the
+ * product's own surfaces, `build_ci` for CI tooling, `integration_protocol`
+ * for wire protocols) describe properties of the product's own
+ * implementation, not separate external systems. They remain available
+ * in technical_constraints[] for downstream phases that need them.
+ *
+ * Conservative whitelist — favours under-emission. A new category that
+ * legitimately names an external service can be added here; until then,
+ * the LLM may still introduce it via its own external_systems[] (which
+ * passes through this same filter via category if specified, else via
+ * the `isPlausibleExternalSystem` name check).
+ */
+const EXTERNAL_SERVICE_CATEGORIES = new Set([
+  'database',
+  'cdn',
+  'identity',
+  'workflow_engine',
+  'cache',
+  'messaging',
+  'queue',
+  'object_storage',
+  'auth_provider',
+  'payment',
+  'email',
+  'sms',
+  'maps',
+  'search',
+  'ml_inference',
+  'observability_service',
+]);
+
+/**
+ * Patterns that prove an entry is NOT an external system regardless of
+ * category — protocols, formats, algorithms, runtime characteristics.
+ * Applied to the LLM-emitted external_systems[] before merge so the LLM
+ * can't smuggle HTTPS/AES-256/JSON-logs through with a fabricated id
+ * even when the upstream TECH-* roster correctly excluded them.
+ */
+const NON_EXTERNAL_NAME_PATTERNS: RegExp[] = [
+  /^https?$/i,
+  /^aes[-_ ]?(128|256)$/i,
+  /^tls$/i,
+  /^json[-_ ]?logs?$/i,
+  /^containeris[ez]ed?[-_ ]service$/i,
+  /^docker$/i,
+  /^kubernetes$/i,
+  /^microservices?$/i,
+  /^monolith$/i,
+  /^rest$/i,
+  /^graphql$/i,
+  /^webhook$/i,
+];
+
+function isPlausibleExternalSystem(name: string): boolean {
+  if (!name) return false;
+  return !NON_EXTERNAL_NAME_PATTERNS.some(r => r.test(name.trim()));
+}
+
 function techConstraintToExternal(t: Record<string, unknown>): ExternalSystem | null {
   const id = typeof t.id === 'string' ? t.id : '';
   if (!id) return null;
+  const category = (t.category as string) ?? '';
+  // Allow-list: only constraints describing a separate running service
+  // become external_systems. Other constraints (transport, deployment,
+  // security algorithms, log formats) remain in technical_constraints[].
+  if (!EXTERNAL_SERVICE_CATEGORIES.has(category.toLowerCase())) return null;
+  const name = (t.technology as string) ?? (t.name as string) ?? id;
+  if (!isPlausibleExternalSystem(name)) return null;
   return {
     id,
-    name: (t.technology as string) ?? (t.name as string) ?? id,
+    name,
     purpose: (t.text as string) ?? (t.rationale as string) ?? '',
-    interface_type: (t.category as string) ?? 'technical',
+    interface_type: category || 'technical',
   };
+}
+
+/**
+ * Filter LLM-emitted external_systems[] before merge. Drops entries
+ * that fail the plausibility check by name, regardless of how the LLM
+ * categorised them — a defence against the LLM emitting `{ id:
+ * "TECH-HTTPS", name: "HTTPS", interface_type: "transport" }` after
+ * being told not to. Also drops entries whose id starts with `TECH-`
+ * but whose underlying category isn't service-like (the LLM treating
+ * the upstream constraint roster as a checklist to repopulate).
+ */
+function filterLlmExternals(
+  llmEmitted: ExternalSystem[],
+  techCategoryById: Map<string, string>,
+): ExternalSystem[] {
+  return llmEmitted.filter(e => {
+    if (!isPlausibleExternalSystem(e.name ?? '')) return false;
+    if (typeof e.id === 'string' && /^TECH-/i.test(e.id)) {
+      const cat = techCategoryById.get(e.id.toLowerCase());
+      if (cat && !EXTERNAL_SERVICE_CATEGORIES.has(cat.toLowerCase())) return false;
+    }
+    return true;
+  });
+}
+
+function buildTechCategoryIndex(
+  artifacts: GovernedStreamRecord[],
+): Map<string, string> {
+  const idx = new Map<string, string>();
+  for (const a of artifacts) {
+    const c = (a.content ?? {}) as Record<string, unknown>;
+    if (c.kind !== 'technical_constraints_discovery') continue;
+    const items = arr(c.technicalConstraints ?? c.technical_constraints);
+    if (!items) continue;
+    for (const it of items) {
+      const id = typeof it.id === 'string' ? it.id : '';
+      const cat = typeof it.category === 'string' ? it.category : '';
+      if (id) idx.set(id.toLowerCase(), cat);
+    }
+  }
+  return idx;
+}
+
+/**
+ * Words that signal a `confirmed_constraint` is an EXCLUSION rather
+ * than a positive requirement. "no microservices", "must not store
+ * plaintext", "without third-party auth" — these belong in
+ * `out_of_scope` with a rationale.
+ *
+ * Conservative — favours under-detection. We only promote a constraint
+ * to out_of_scope when its leading clause matches an exclusion verb;
+ * borderline cases stay in_scope where they were already implicitly
+ * captured. Better to under-emit out_of_scope than to misclassify a
+ * positive constraint as an exclusion.
+ */
+const EXCLUSION_PATTERNS: RegExp[] = [
+  /\bno\s+/i,
+  /\bnot\s+/i,
+  /\bwithout\s+/i,
+  /\bmust\s+not\s+/i,
+  /\bshall\s+not\s+/i,
+  /\bcannot\s+/i,
+  /\bnever\s+/i,
+  /\bexcept\s+/i,
+];
+
+function isExclusionConstraint(text: string): boolean {
+  return EXCLUSION_PATTERNS.some(r => r.test(text));
+}
+
+/**
+ * Reconstruct `out_of_scope[]` when the LLM left it empty. Three
+ * deterministic sources, in order of trust:
+ *
+ *  1. `intent_statement.out_of_scope[]` — passthrough. The intent
+ *     synthesizer's own explicit out-of-scope list (may be empty if
+ *     the synthesizer didn't carry it forward).
+ *  2. `intent_statement.confirmed_constraints[]` filtered for items
+ *     whose text contains an exclusion verb (no / not / without /
+ *     must not). Lower trust because the intent synthesizer often
+ *     rephrases spec text into positive form ("limited to a single
+ *     container" instead of "no microservices"), defeating the
+ *     pattern match.
+ *  3. `technical_constraints[].text` filtered for exclusion verbs.
+ *     The technical constraint extractor preserves source excerpts
+ *     verbatim — these still contain phrases like "no microservices"
+ *     that the intent synthesizer dropped. Most reliable source.
+ *
+ * Only runs when the LLM output is empty; non-empty LLM output stays.
+ *
+ * Returns string[] to match the existing `SystemBoundary.out_of_scope`
+ * shape — downstream serialisation (`boundarySummary`) calls
+ * `.join('; ')` so this MUST remain a flat string array.
+ */
+function reconstructOutOfScopeFromIntent(
+  llmOutOfScope: SystemBoundary['out_of_scope'] | undefined,
+  artifacts: GovernedStreamRecord[],
+): SystemBoundary['out_of_scope'] {
+  const existing = Array.isArray(llmOutOfScope) ? llmOutOfScope : [];
+  if (existing.length > 0) return existing;
+
+  const reconstructed: string[] = [];
+  const seen = new Set<string>();
+  const push = (text: string): void => {
+    const t = text.trim();
+    if (!t) return;
+    const key = t.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    reconstructed.push(t);
+  };
+
+  // Sources 1 & 2: intent_statement
+  const intentRecord = artifacts.find(
+    a => (a.content as Record<string, unknown>)?.kind === 'intent_statement',
+  );
+  if (intentRecord) {
+    const ic = intentRecord.content as Record<string, unknown>;
+    const intentOos = arr(ic.out_of_scope) ?? [];
+    for (const entry of intentOos) {
+      if (typeof entry === 'string') push(entry);
+      else if (entry && typeof entry === 'object' && typeof (entry as { capability?: unknown }).capability === 'string') {
+        push((entry as { capability: string }).capability);
+      }
+    }
+    const constraints = arr(ic.confirmed_constraints) ?? arr(ic.confirmedConstraints) ?? [];
+    for (const entry of constraints) {
+      const text = typeof entry === 'string' ? entry : '';
+      if (text && isExclusionConstraint(text)) push(text);
+    }
+  }
+
+  // Source 3: technical_constraints[].text (verbatim spec excerpts)
+  const techRecord = artifacts.find(
+    a => (a.content as Record<string, unknown>)?.kind === 'technical_constraints_discovery',
+  );
+  if (techRecord) {
+    const tc = techRecord.content as Record<string, unknown>;
+    const items = arr(tc.technicalConstraints ?? tc.technical_constraints) ?? [];
+    for (const it of items) {
+      const text = typeof it.text === 'string' ? it.text : '';
+      if (text && isExclusionConstraint(text)) push(text);
+    }
+  }
+
+  return reconstructed;
 }
 
 function integrationToExternal(i: Record<string, unknown>): ExternalSystem | null {

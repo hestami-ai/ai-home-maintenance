@@ -30,6 +30,14 @@ export default defineConfig({
     hookTimeout: 60000,
     setupFiles: ['src/test/helpers/setup.ts'],
     fileParallelism: false,
+    // Verbose reporter: this tier runs 80+ live LLM calls over ~90
+    // minutes. The default reporter produces almost no per-test output,
+    // so when the captured stdout buffer truncates on failure, the
+    // surviving tail tells you almost nothing. Verbose prints one line
+    // per fixture (`✓ phaseXX_foo__bar-001 — N ms` or the corresponding
+    // failure line) so post-run diagnosis is possible even when output
+    // is truncated to the last few KB.
+    reporters: ['verbose'],
   },
   resolve: {
     alias: {

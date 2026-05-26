@@ -1,0 +1,20 @@
+{
+  "kind": "configuration_parameters",
+  "parameters": [
+    {
+      "component_id": "comp-link-mapping-service",
+      "parameters": [
+        { "name": "SLUG_LENGTH", "type": "integer", "default": 6, "description": "Length of generated slugs.", "required": true },
+        { "name": "DATABASE_URL", "type": "string", "description": "Postgres connection string.", "required": true, "secret": true }
+      ]
+    },
+    {
+      "component_id": "comp-abuse-notification-service",
+      "parameters": [
+        { "name": "SMTP_HOST", "type": "string", "description": "SMTP relay host.", "required": true },
+        { "name": "SMTP_PORT", "type": "integer", "default": 587, "description": "SMTP relay port.", "required": true },
+        { "name": "ADMIN_EMAIL", "type": "string", "description": "Recipient for abuse notifications.", "required": true }
+      ]
+    }
+  ]
+}

@@ -8,6 +8,7 @@ required_variables:
   - component_model_summary
   - interface_contracts_summary
   - system_requirements_summary
+  - technical_constraints_summary
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -22,10 +23,20 @@ GOVERNING CONSTRAINTS (apply without exception):
 
 Produce [JC:API Definitions] for each Component's externally callable interfaces.
 
-REQUIRED OUTPUT: A JSON object matching the `api_definitions` schema:
-- definitions: array, each with:
-  - component_id
-  - endpoints: array of {path, method, inputs, outputs, error_codes, auth_requirement}
+REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `definitions` (an array). Do NOT wrap the array under an `api_definitions` key — the response IS the api_definitions artifact, so its immediate top-level field is `definitions`, not a nested `{api_definitions: {...}}` wrapper.
+
+```json
+{
+  "definitions": [
+    {
+      "component_id": "comp-...",
+      "endpoints": [
+        { "path": "/...", "method": "GET", "inputs": {...}, "outputs": {...}, "error_codes": ["400", "500"], "auth_requirement": "..." }
+      ]
+    }
+  ]
+}
+```
 
 Rules:
 - Every endpoint must have an explicit authentication requirement (Invariant: API-001)
@@ -49,7 +60,28 @@ Rules:
 - Do NOT invent example endpoint URLs (e.g., `https://api.example.com/...`), fabricate sample IDs / tokens / keys, or commit to specific timeout numbers absent from upstream.
 - Enforced by `ungrounded_operational_specifics` parameterization C (catalog §2).
 
+# Hard rules — non-contradiction with technical constraints
+
+The `technical_constraints_summary` block below is the **canonical TECH-* roster** captured in Sub-Phase 1.0c directly from the source spec. Every entry is a binding commitment the product MUST honour. API definitions MUST NOT propose endpoints that contradict an entry in this list — doing so is a defect (HIGH severity).
+
+A common failure mode is fabricating HTTP endpoints for components whose role is INTERNAL (logging, persistence, monitoring) when the spec mandates a non-HTTP transport for that role:
+
+- TECH constraint says "structured JSON logs to stdout; logs ingested by the platform's standard log aggregator" → the product does NOT expose `POST /logs` or `GET /logs` endpoints. Logs are written to stdout, period. The platform's external log aggregator is the consumer; an `interface_contracts` entry for the aggregator (e.g. `INT-LOG-AGGREGATION`) describes that external integration — it does NOT mandate a product-side logs endpoint.
+- TECH constraint says "Postgres on a single managed instance" → the product communicates with that DB via SQL/PG-wire, NOT a `POST /db/query` endpoint on the product itself.
+- TECH constraint says "HTTPS only on all public endpoints" → endpoints emitted MUST be served over HTTPS; do not emit plain-HTTP variants.
+
+When `interface_contracts_summary` lists an integration (INT-*), that describes a connection FROM the product TO an external system. It does NOT mean the product should ALSO host an internal HTTP endpoint mirroring that integration.
+
+Decide endpoint emission per component:
+- **User-facing surfaces** (the components that fulfil journey steps the user invokes directly — e.g. URL submission, URL redirection, deletion request, statistics retrieval) MUST emit endpoints.
+- **Internal services** (logging, persistence, metric collection, key management, security primitives) MUST NOT emit HTTP endpoints unless the spec explicitly mandates one. They communicate via in-process function calls or the transport their TECH constraint specifies.
+
+Enforced by `technical_constraint_contradiction` (catalog §2).
+
 CONTEXT:
 System Requirements (Phase 3.2 — what each endpoint must support): {{system_requirements_summary}}
 Component Model: {{component_model_summary}}
 Interface Contracts: {{interface_contracts_summary}}
+
+Technical Constraints (canonical TECH-* roster from Phase 1.0c — non-contradiction binding):
+{{technical_constraints_summary}}

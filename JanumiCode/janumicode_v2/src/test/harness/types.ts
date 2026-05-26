@@ -369,8 +369,22 @@ export interface PipelineRunnerConfig {
    * during development — avoids re-running earlier phases.
    */
   resumeFromDb?: string;
-  /** Phase to resume at (required when resumeFromDb is set). */
+  /** Phase to resume at (required when resumeFromDb is set, unless resumeAtSubPhase is given). */
   resumeAtPhase?: string;
+  /**
+   * Sub-phase to resume at (takes precedence over resumeAtPhase). When
+   * set, the resumed run rolls back all stateful records produced at-or-
+   * after the FIRST occurrence of this sub-phase in the prior run,
+   * preserving immutable history (agent_invocation / agent_output /
+   * transformation_step). The orchestrator then advances the state
+   * machine to the target sub-phase's phase and re-executes.
+   *
+   * Designed for the debug-iterate loop where an operator identifies a
+   * defect mid-run, edits a prompt template or normalizer, rebuilds,
+   * and wants to re-run JUST from the affected sub-phase without
+   * losing the validated upstream artifacts.
+   */
+  resumeAtSubPhase?: string;
   /**
    * Thin-slice mode: constrain the decomposition tree (depth=2,
    * fanout=1, ~2 root FRs/NFRs, all reasoning_review on) so every

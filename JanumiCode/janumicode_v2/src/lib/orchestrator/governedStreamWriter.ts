@@ -20,6 +20,7 @@ import type {
 } from '../types/records';
 import type { EventBus, SerializedRecord } from '../events/eventBus';
 import type { EmbeddingService } from '../embedding/embeddingService';
+import { emitLifecycle } from '../trace/lifecycle';
 
 /**
  * Sub-phase IDs whose `artifact_produced` outputs are Bloom Sub-Phase
@@ -39,6 +40,45 @@ const DECOMPOSITION_NODE_RECORD_TYPES = new Set<RecordType>([
   'data_model_decomposition_node',
   'test_decomposition_node',
 ]);
+
+/**
+ * Record types that warrant an artifact.produced lifecycle event.
+ * Skips high-volume bookkeeping (agent_reasoning_step, agent_output_chunk,
+ * transformation_step itself) — those would spam the NDJSON without
+ * adding signal. Decomposition nodes are included individually so the
+ * scope-creep survey can count them.
+ */
+const ARTIFACT_LIFECYCLE_RECORD_TYPES = new Set<RecordType>([
+  'artifact_produced',
+  'implementation_packet',
+  'packet_synthesis_failure',
+  'requirement_decomposition_node',
+  'component_decomposition_node',
+  'task_decomposition_node',
+  'data_model_decomposition_node',
+  'test_decomposition_node',
+  'phase_gate_evaluation',
+  'reasoning_review_harness_record',
+  'cycle_iteration',
+  'execution_wave_started',
+  'execution_wave_completed',
+  'task_quarantine',
+  'coverage_gap',
+]);
+
+/**
+ * Best-effort count summarizer for the artifact.produced event. Picks
+ * up the common array-shaped fields on substantive content so a single
+ * grep on the lifecycle NDJSON can answer "how many X did phase Y
+ * produce". Unknown shapes return an empty object — no error.
+ */
+function summarizeArtifactCounts(content: Record<string, unknown>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(content)) {
+    if (Array.isArray(v)) out[`${k}_count`] = v.length;
+  }
+  return out;
+}
 
 export interface WriteRecordOptions {
   /** Record type */
@@ -187,6 +227,24 @@ export class GovernedStreamWriter {
     // handlers that still emit `record:added` manually remain idempotent.
     if (this.eventBus) {
       this.eventBus.emit('record:added', { record: this.serializeForEvent(record) });
+    }
+
+    // Tier-1 lifecycle: emit an artifact.produced event when the record
+    // is one of the substantive content artifacts (skip the high-volume
+    // bookkeeping types like agent_reasoning_step, agent_output_chunk,
+    // transformation_step, etc.). The event summarizes key field counts
+    // so survey-level queries can spot scope creep at a glance.
+    if (ARTIFACT_LIFECYCLE_RECORD_TYPES.has(record.record_type)) {
+      emitLifecycle('artifact.produced', {
+        workflow_run_id: record.workflow_run_id,
+        phase_id: record.phase_id,
+        sub_phase_id: record.sub_phase_id,
+        record_id: record.id,
+        record_type: record.record_type,
+        kind: (record.content as { kind?: unknown }).kind ?? null,
+        agent_role: record.produced_by_agent_role,
+        counts: summarizeArtifactCounts(record.content),
+      });
     }
 
     // Enqueue for background embedding. Non-blocking; embedding failures do

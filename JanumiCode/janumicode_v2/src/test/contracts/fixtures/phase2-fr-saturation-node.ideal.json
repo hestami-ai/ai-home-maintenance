@@ -1,0 +1,15 @@
+{
+  "kind": "requirement_decomposition_node",
+  "node_id": "frnode-001",
+  "parent_node_id": null,
+  "root_kind": "fr",
+  "status": "atomic",
+  "tier": "D",
+  "depth": 2,
+  "user_story": {
+    "id": "US-012",
+    "role": "Administrator",
+    "action": "review abuse reports and take action",
+    "outcome": "abuse-flagged URLs can be blocked or removed"
+  }
+}

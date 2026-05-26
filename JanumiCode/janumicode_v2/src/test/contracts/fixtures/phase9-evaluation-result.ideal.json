@@ -1,0 +1,14 @@
+{
+  "kind": "evaluation_result",
+  "criterion_id": "EVAL-US-012-1",
+  "target_id": "US-012",
+  "evaluation_kind": "functional",
+  "verdict": "pass",
+  "rationale": "Administrator email delivered within 87 seconds of abuse flag in 10/10 test trials.",
+  "measured_value": "p95: 91s",
+  "threshold": "≤ 120s",
+  "evidence": [
+    "src/services/abuse-notification/notify.test.ts:42",
+    "test_results record TC-ABUSE-001"
+  ]
+}

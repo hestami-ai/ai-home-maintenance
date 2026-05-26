@@ -7,6 +7,7 @@ required_variables:
   - active_constraints
   - system_boundary_summary
   - system_requirements_summary
+  - business_domains_summary
   - detail_file_path
   - detail_file_content
   - janumicode_version_sha
@@ -25,12 +26,16 @@ Identify [JC:Software Domains] — cohesive groupings of related business logic 
 
 REQUIRED OUTPUT: A JSON object matching the `software_domains` schema:
 - domains: array, each with:
-  - id, name, ubiquitous_language (array of {term, definition}), system_requirement_ids
+  - `id` (lowercase, `domain-*` namespace), `name`, `ubiquitous_language` (array of {term, definition}), `system_requirement_ids`
+  - `maps_to_business_domains`: array of `DOM-*` ids from `business_domains_summary` that this software domain maps to. NON-EMPTY — every software domain must map to ≥ 1 business domain.
 
 Rules:
 - Each domain should have a clear bounded context
 - Ubiquitous language terms must be unambiguous within the domain
 - Do NOT use terms from the JanumiCode Canonical Vocabulary as domain terms
+- **Bridge the two namespaces.** Phase 1 emits `DOM-*` (CAPS) business domain ids; Phase 4 software domains use `domain-*` (lowercase). `maps_to_business_domains` is the canonical reconciliation point between them. Without it, downstream phases that need to walk `software_domain → business_domain → workflow` cannot resolve the chain.
+- A software domain may map to one Phase 1 domain (1:1), to multiple (when one software domain serves multiple business contexts), or — rarely — be a split where two software domains cover one business domain. All three are valid; just declare honestly.
+- Every `DOM-*` id you reference in `maps_to_business_domains` MUST exist in `business_domains_summary`. Do NOT invent business-domain ids.
 
 # Hard rules — vocabulary-grounding discipline
 
@@ -42,6 +47,8 @@ Rules:
 CONTEXT:
 System Boundary: {{system_boundary_summary}}
 System Requirements: {{system_requirements_summary}}
+Business Domains (Phase 1.2 — DOM-* namespace; cite these in maps_to_business_domains):
+{{business_domains_summary}}
 
 DETAIL FILE PATH (reference only): {{detail_file_path}}
 

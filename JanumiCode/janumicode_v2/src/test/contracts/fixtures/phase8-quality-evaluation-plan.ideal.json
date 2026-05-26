@@ -1,0 +1,13 @@
+{
+  "kind": "quality_evaluation_plan",
+  "criteria": [
+    {
+      "nonfunctional_requirement_id": "NFR-019",
+      "category": "security",
+      "evaluation_tool": "Direct database inspection",
+      "threshold": "100% of mappings have encrypted_url != plaintext",
+      "measurement_method": "Sample 1% of mappings; assert encrypted_url field is non-null and not equal to plaintext URL.",
+      "fallback_if_tool_unavailable": "Manual SQL query against random 50-row sample."
+    }
+  ]
+}

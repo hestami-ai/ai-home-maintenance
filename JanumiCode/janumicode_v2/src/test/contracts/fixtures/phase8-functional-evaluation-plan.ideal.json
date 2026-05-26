@@ -1,0 +1,20 @@
+{
+  "kind": "functional_evaluation_plan",
+  "criteria": [
+    {
+      "functional_requirement_id": "US-001",
+      "evaluation_method": "Manual API call with sample URL inputs, verifying slug shape, encryption, and uniqueness.",
+      "success_condition": "Slug is 6 alphanumeric characters, stored mapping has encrypted_url != plaintext, no duplicate slug across 100 calls."
+    },
+    {
+      "functional_requirement_id": "US-012",
+      "evaluation_method": "Trigger an abuse flag and measure the time-to-email delivery.",
+      "success_condition": "Administrator email received within 120 seconds of flag creation."
+    },
+    {
+      "functional_requirement_id": "US-015",
+      "evaluation_method": "Submit a user signup form and check user-record creation + welcome-email delivery.",
+      "success_condition": "User record present via GET /users/{id} within 5 seconds; welcome email status='sent' within 300 seconds."
+    }
+  ]
+}

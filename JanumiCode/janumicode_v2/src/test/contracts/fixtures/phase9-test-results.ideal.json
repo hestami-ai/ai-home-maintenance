@@ -1,0 +1,13 @@
+{
+  "kind": "test_results",
+  "task_id": "task-abuse-notification-service-send-email",
+  "passed": 3,
+  "failed": 0,
+  "skipped": 0,
+  "total": 3,
+  "cases": [
+    { "test_case_id": "TC-ABUSE-001", "status": "passed", "duration_ms": 412 },
+    { "test_case_id": "TC-ABUSE-002", "status": "passed", "duration_ms": 287 },
+    { "test_case_id": "TC-ABUSE-003", "status": "passed", "duration_ms": 198 }
+  ]
+}

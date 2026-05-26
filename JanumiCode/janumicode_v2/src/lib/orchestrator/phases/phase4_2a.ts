@@ -46,6 +46,7 @@ import type {
 } from '../../types/records';
 import type { MirrorItemDecision } from '../../types/decisionBundle';
 import { getLogger } from '../../logging';
+import { emitLifecycle } from '../../trace/lifecycle';
 import { createEmbeddingClient, findNearestAbove, type EmbeddingClient } from '../../llm/embeddings';
 
 // ── Shared decomposition helpers ───────────────────────────────────
@@ -1105,6 +1106,24 @@ export async function runComponentSaturationLoop(
     } satisfies ComponentDecompositionPipelineContent,
   });
   engine.writer.supersedByRollback(currentPipelineRecordId, pipelineFinalRecord.id);
+
+  // Tier-2 lifecycle: emit the saturation terminator with the headline
+  // counts. ts-18 produced 11 root components for a 3-FR intent — this
+  // one line in lifecycle.ndjson would have made the scope creep
+  // visible in a single grep. Pair with the artifact.produced events
+  // (one per component_decomposition_node) for full per-node trail.
+  emitLifecycle('phase4.saturation_iteration_complete', {
+    workflow_run_id: workflowRun.id,
+    phase_id: '4',
+    sub_phase_id: config.recordSubPhaseId,
+    pipeline_id: pipelineId,
+    pass_count: pipelinePasses.length,
+    final_leaf_count: atomicLeafCount,
+    final_max_depth: maxDepthReached,
+    total_llm_calls: totalLlmCalls,
+    tier_distribution: tierDistribution,
+    termination_reason: terminationReason,
+  });
 
   // Persist budget telemetry to workflow_runs columns.
   try {

@@ -30,6 +30,10 @@ import {
   createGooseCliParser,
 } from '../cli/outputParser';
 import { LLMCaller } from '../llm/llmCaller';
+import { withTraceContext } from '../trace/traceContext';
+import { configureTraceEmit } from '../trace/emit';
+import { configureLifecycleLog, emitLifecycle } from '../trace/lifecycle';
+import { configureAuditPause } from './auditPause';
 import { parseJsonWithRecovery } from '../llm/jsonRecovery';
 import { EventBus } from '../events/eventBus';
 import { DecisionTraceGenerator } from '../memory/decisionTraceGenerator';
@@ -57,6 +61,18 @@ export interface PhaseResult {
   error?: string;
   /** Artifact IDs produced by this phase */
   artifactIds: string[];
+  /**
+   * Cycle-restart back-transition target. When set by a phase handler
+   * (currently only Phase 9's cycle_controller sub-phase), the
+   * orchestrator skips the normal forward-advance logic and routes the
+   * workflow back to this phase to start a new cycle. The state
+   * machine's `cycleRestartPhase` method allows the specific
+   * back-transitions used by the iterative-implementation-backlog
+   * design.
+   *
+   * See docs/design/iterative-implementation-backlog.md §3.
+   */
+  cycleRestartTo?: PhaseId;
 }
 
 // ── Decision Surface Types ──────────────────────────────────────────
@@ -192,6 +208,36 @@ export class OrchestratorEngine {
     // files, and config overrides are workspace-resident and use workspacePath.
     this.stateMachine = new StateMachine(db);
     this.writer = new GovernedStreamWriter(db, () => randomUUID());
+
+    // Transformation trace layer — opt-out via JANUMICODE_TRACE=off.
+    // Configured once here; emit.ts is then a no-op when unconfigured.
+    if ((process.env.JANUMICODE_TRACE ?? 'on') !== 'off') {
+      configureTraceEmit({
+        writer: this.writer,
+        versionSha: this.versionSha,
+        workspaceRoot: workspacePath,
+        payloadsEnabled: (process.env.JANUMICODE_TRACE_PAYLOADS ?? 'on') !== 'off',
+      });
+    } else {
+      configureTraceEmit(null);
+    }
+
+    // Tier-1/2 lifecycle log — opt-out via JANUMICODE_LIFECYCLE_LOG=off.
+    // Distinct from transformation traces: append-only NDJSON to disk,
+    // not governed_stream records. Lifecycle events go through this
+    // module via emitLifecycle().
+    configureLifecycleLog({
+      workspaceRoot: workspacePath,
+      enabled: (process.env.JANUMICODE_LIFECYCLE_LOG ?? 'on') !== 'off',
+    });
+    // Audit-pause gate: configure with the workspace root so pause
+    // markers + ack files land under .janumicode/audit/. The pause
+    // itself is opted in via JANUMICODE_AUDIT_PAUSE=1 at runtime
+    // (isAuditPauseEnabled() reads that flag). The db handle enables
+    // the cascade-skip optimization that auto-resumes pauses for
+    // sub-phases that produced zero records this process (cached
+    // replays during --resume-from-db flows).
+    configureAuditPause({ workspaceRoot: workspacePath, db });
     this.schemaValidator = new SchemaValidator(extensionPath);
     this.invariantChecker = new InvariantChecker(
       `${extensionPath}/schemas/invariants`,
@@ -322,8 +368,14 @@ export class OrchestratorEngine {
     // routing as DMR (domain_interpreter primary). Without these deps,
     // Stage III is a no-op — appropriate for fast unit tests that
     // construct a minimal pipeline. Real runs pay the per-record cost.
+    // Harness opt-out: when JANUMICODE_INGESTION_STAGE3_OFF=1, skip wiring
+    // Stage III deps so the per-record relationship-extraction LLM call
+    // never fires. Used by the prompt-iteration harness — Stage III adds
+    // 1-2 LLM calls per artifact_produced record and is noise when the
+    // bug under investigation is in a proposer template.
+    const stage3Off = process.env.JANUMICODE_INGESTION_STAGE3_OFF === '1';
     const ipRouting = this.configManager.getLLMRouting().domain_interpreter?.primary;
-    if (ipRouting?.provider && ipRouting?.model) {
+    if (ipRouting?.provider && ipRouting?.model && !stage3Off) {
       this.ingestionPipeline.setStage3LLMDependencies({
         llmCaller: this.llmCaller,
         templateLoader: this.templateLoader,
@@ -535,9 +587,42 @@ export class OrchestratorEngine {
       // this catch is the engine-level seam that turns those throws
       // into gap-reportable phase failures.
       let result: PhaseResult;
+      const phaseStartedAt = Date.now();
       try {
-        result = await handler.execute({ workflowRun: run, engine: this });
+        // Wrap the handler's execution in a TraceCtx so any nested code
+        // (LLM calls, normalizers, context assemblers) can emit
+        // transformation_step records without arg-threading. Sub-phase
+        // id is null at the frame root; downstream code (notably the
+        // LLM caller) supplies sub_phase_id_override at emit time based
+        // on its LLMTraceContext.
+        result = await withTraceContext(
+          { workflow_run_id: runId, phase_id: phaseId, sub_phase_id: null },
+          async () => {
+            emitLifecycle('phase.entered', {
+              workflow_run_id: runId,
+              phase_id: phaseId,
+            });
+            const r = await handler.execute({ workflowRun: run, engine: this });
+            emitLifecycle('phase.exited', {
+              workflow_run_id: runId,
+              phase_id: phaseId,
+              status: r.success ? 'success' : 'failure',
+              duration_ms: Date.now() - phaseStartedAt,
+              artifact_count: r.artifactIds.length,
+              error: r.success ? undefined : r.error,
+            });
+            return r;
+          },
+        );
       } catch (err) {
+        emitLifecycle('phase.exited', {
+          workflow_run_id: runId,
+          phase_id: phaseId,
+          status: 'thrown',
+          duration_ms: Date.now() - phaseStartedAt,
+          artifact_count: 0,
+          error: err instanceof Error ? err.message : String(err),
+        });
         const message = err instanceof Error ? err.message : String(err);
         const subPhase = this.stateMachine.getWorkflowRun(runId)?.current_sub_phase_id;
         const location = subPhase ? `Phase ${subPhase}` : `Phase ${phaseId}`;
@@ -577,6 +662,25 @@ export class OrchestratorEngine {
               phase_id: phaseId,
               phase_limit: this.phaseLimit,
             }, phaseTrace);
+          } else if (result.cycleRestartTo) {
+            // Cycle controller back-transition (Phase 9 → Phase 6/7/8).
+            // The iterative-implementation-backlog cycle controller has
+            // decided to loop instead of advancing to Phase 10.
+            const restart = this.stateMachine.cycleRestartPhase(runId, result.cycleRestartTo);
+            if (restart.success) {
+              getLogger().info('workflow', 'Cycle restart — looping back', {
+                workflow_run_id: runId,
+                from_phase: phaseId,
+                to_phase: result.cycleRestartTo,
+              }, phaseTrace);
+              await this.executeCurrentPhase(runId, phaseTrace);
+            } else {
+              getLogger().error('workflow', 'Cycle restart failed', {
+                workflow_run_id: runId,
+                target_phase: result.cycleRestartTo,
+                error: restart.error,
+              }, phaseTrace);
+            }
           } else {
             const idx = PHASE_ORDER.indexOf(phaseId);
             if (idx >= 0 && idx < PHASE_ORDER.length - 1) {

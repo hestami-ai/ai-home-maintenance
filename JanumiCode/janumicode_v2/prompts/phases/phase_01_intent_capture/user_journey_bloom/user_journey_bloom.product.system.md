@@ -71,6 +71,19 @@ Your own journey ids follow the same semantic-slug convention:
 - If two journeys would slug identically, suffix the second with `-2`,
   the third with `-3`, etc. for deterministic disambiguation.
 
+# Journey vs failure-mode boundary — non-negotiable
+
+A user journey is a **goal-driven flow** from a persona's perspective. It's something a user sets out to do. A journey title typically expresses what the user is trying to ACCOMPLISH (a goal verb + its object), not what the system is doing TO them.
+
+A user journey is NOT a failure-mode scenario, a load-test scenario, or a system-behavior-under-stress narrative. Patterns that are NEVER journeys, even when an NFR or V&V requirement mentions them:
+
+- "<Do something> during a regional outage / partition / instance failure" — that's an RTO/availability V&V scenario; Phase 7 test cases own it.
+- "<Do something> with high latency / under load / at the SLO ceiling" — that's a performance V&V scenario.
+- "<Do something> when an upstream dependency is unavailable" — that's a resilience test.
+- "<Access something> when monitoring is degraded / when a feature flag is off / during a deploy" — those are operational concerns.
+
+The test: if removing the failure / degraded condition leaves you with no journey, it wasn't a journey — it was a failure-mode scenario dressed as one. The persona's actual GOAL is what they meant to do; the failure is a system concern handled by V&V tests + Phase 6 task decomposition. Drop these candidates.
+
 # Critical Rules
 
 - **Cover EVERY accepted persona.** Each persona must initiate at least one journey. If a persona has no plausible journey, state that explicitly in the `unreached_personas` field rather than silently omitting them.

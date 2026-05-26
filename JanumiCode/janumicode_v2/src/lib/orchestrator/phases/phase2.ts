@@ -98,7 +98,7 @@ function collisionSafeDisplayKey(
  * Children inherit from their parent; this helper is only called at
  * depth-0 root writes.
  */
-function assignReleaseToRoot(
+export function assignReleaseToRoot(
   rootStory: DecompositionUserStory | { traces_to?: string[] },
   plan: ReleasePlanContentV2 | null,
 ): { release_id: string | null; release_ordinal: number | null } {

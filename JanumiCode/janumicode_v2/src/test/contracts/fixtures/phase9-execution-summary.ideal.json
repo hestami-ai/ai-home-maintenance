@@ -1,0 +1,13 @@
+{
+  "kind": "execution_summary",
+  "task_id": "task-abuse-notification-service-send-email",
+  "invocation_id": "b3049aae-d309-4ad0-95f7-ae8721b3a064",
+  "success": true,
+  "files_written": [
+    { "path": "src/services/abuse-notification/notify.ts", "action": "created" },
+    { "path": "src/services/abuse-notification/notify.test.ts", "action": "created" }
+  ],
+  "test_pass_count": 3,
+  "test_fail_count": 0,
+  "duration_ms": 184000
+}

@@ -1,0 +1,29 @@
+{
+  "kind": "release_plan",
+  "schemaVersion": "2.0",
+  "releases": [
+    {
+      "release_id": "REL-1",
+      "ordinal": 1,
+      "name": "Core URL Shortening & Redirect",
+      "description": "Users can create short URLs and follow them via redirect.",
+      "rationale": "Delivers immediate value to link sharers and clickers.",
+      "contains_journeys": ["UJ-CREATE-SHORT-URL"],
+      "contains_workflows": ["WF-URL-CREATION"],
+      "contains_user_stories": ["US-001"],
+      "contains_nfrs": ["NFR-019"]
+    },
+    {
+      "release_id": "REL-2",
+      "ordinal": 2,
+      "name": "Abuse Handling & Onboarding",
+      "description": "Administrators can review abuse reports; new users can onboard.",
+      "rationale": "Operational readiness and growth.",
+      "contains_journeys": ["UJ-REPORT-ABUSE", "UJ-ONBOARD-USER"],
+      "contains_workflows": ["WF-ABUSE-REVIEW", "WF-USER-ONBOARDING"],
+      "contains_user_stories": ["US-012", "US-015"]
+    }
+  ],
+  "cross_cutting_technical_constraints": ["TECH-AES-256-ENCRYPTION", "TECH-HTTPS-ONLY", "TECH-LOGS-JSON-STDOUT"],
+  "approved": true
+}

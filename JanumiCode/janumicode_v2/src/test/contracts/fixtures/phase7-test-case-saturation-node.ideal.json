@@ -1,0 +1,14 @@
+{
+  "kind": "test_case_decomposition_node",
+  "node_id": "tcnode-abuse-001",
+  "parent_node_id": null,
+  "status": "atomic",
+  "tier": "D",
+  "depth": 1,
+  "test_case": {
+    "test_case_id": "TC-ABUSE-001",
+    "type": "functional",
+    "acceptance_criterion_ids": ["AC-012-1"],
+    "expected_outcome": "Administrator email is sent within 2 minutes of abuse flag creation."
+  }
+}

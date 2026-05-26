@@ -1,0 +1,6 @@
+{
+  "kind": "workspace_classification",
+  "classification": "greenfield",
+  "rationale": "Empty workspace; no prior artifacts or version-control metadata detected.",
+  "detected_artifacts": []
+}

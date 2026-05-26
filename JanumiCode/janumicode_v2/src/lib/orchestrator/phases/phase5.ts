@@ -122,9 +122,36 @@ export class Phase5Handler implements PhaseHandler {
     const componentIds = effectiveComponents.components
       .map(c => (typeof c.id === 'string' ? c.id : ''))
       .filter(Boolean);
-    const techConstraintsRecId = allArtifacts.find(
+    const techConstraintsArtifact = allArtifacts.find(
       r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery',
-    )?.id;
+    );
+    const techConstraintsRecId = techConstraintsArtifact?.id;
+    // Build the canonical TECH-* roster summary up front. Every Phase 5
+    // sub-phase (data_model_skeleton, api_definitions, error_handling,
+    // configuration_parameters) needs to see the verbatim spec excerpts
+    // — the LLM-rephrased active_constraints narrative loses critical
+    // exclusion phrases ("no microservices", "logs to stdout", etc.).
+    // ts-104 audit found Phase 5 prompts emitting decisions that
+    // contradicted TECH-* (e.g. POST /logs endpoints despite stdout-only
+    // mandate, max_events_per_minute despite rate-limiting being out of
+    // scope). Same fix pattern as Phase 4 ADR (cycle from 2026-05-22).
+    const techConstraintsForPrompt = (
+      techConstraintsArtifact
+        ? ((techConstraintsArtifact.content as Record<string, unknown>).technicalConstraints as Array<Record<string, unknown>> ?? [])
+        : []
+    );
+    const technicalConstraintsSummary = techConstraintsForPrompt.length === 0
+      ? 'No technical_constraints_discovery artifact available'
+      : techConstraintsForPrompt
+          .map(t => {
+            const id = (t.id as string) ?? '';
+            const tech = (t.technology as string) ?? (t.name as string) ?? '';
+            const category = (t.category as string) ?? '';
+            const text = (t.text as string) ?? (t.rationale as string) ?? '';
+            return [id, tech, category, text].filter(Boolean).join(' — ');
+          })
+          .filter(Boolean)
+          .join('\n');
     const dmr51Seeds = [
       ...(prior.componentModel ? [prior.componentModel.recordId] : []),
       ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
@@ -142,7 +169,7 @@ export class Phase5Handler implements PhaseHandler {
     });
 
     const dataModelsContent = await this.runDataModelSpecification(
-      ctx, componentSummary, domainsSummary, sysReqSummary, dmr51,
+      ctx, componentSummary, domainsSummary, sysReqSummary, technicalConstraintsSummary, dmr51,
     );
 
     // Normalize component_id refs to the canonical lowercase `comp-`
@@ -279,7 +306,7 @@ export class Phase5Handler implements PhaseHandler {
     });
 
     const apiContent = await this.runApiDefinition(
-      ctx, componentSummary, contractsSummary, sysReqSummary, dmr52,
+      ctx, componentSummary, contractsSummary, sysReqSummary, technicalConstraintsSummary, dmr52,
     );
 
     const apiRecord = engine.writer.writeRecord({
@@ -320,7 +347,7 @@ export class Phase5Handler implements PhaseHandler {
     });
 
     const errorContent = await this.runErrorHandlingStrategy(
-      ctx, componentSummary, apiSummary, sysReqSummary, dmr53,
+      ctx, componentSummary, apiSummary, sysReqSummary, technicalConstraintsSummary, dmr53,
     );
 
     const errorRecord = engine.writer.writeRecord({
@@ -361,7 +388,7 @@ export class Phase5Handler implements PhaseHandler {
     });
 
     const configContent = await this.runConfigurationParameters(
-      ctx, componentSummary, dataModelsSummary, sysReqSummary, dmr54,
+      ctx, componentSummary, dataModelsSummary, sysReqSummary, technicalConstraintsSummary, dmr54,
     );
 
     const configRecord = engine.writer.writeRecord({
@@ -482,7 +509,7 @@ export class Phase5Handler implements PhaseHandler {
 
   private async runDataModelSpecification(
     ctx: PhaseContext, componentSummary: string, domainsSummary: string,
-    sysReqSummary: string, dmr: PhaseContextPacketResult,
+    sysReqSummary: string, technicalConstraintsSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<DataModels> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', 'data_model_skeleton');
@@ -493,6 +520,7 @@ export class Phase5Handler implements PhaseHandler {
       active_constraints: dmr.activeConstraintsText, component_model_summary: componentSummary,
       software_domains_summary: domainsSummary,
       system_requirements_summary: sysReqSummary,
+      technical_constraints_summary: technicalConstraintsSummary,
       detail_file_path: dmr.detailFilePath,
       detail_file_content: dmr.detailFileContent,
       janumicode_version_sha: engine.janumiCodeVersionSha,
@@ -517,7 +545,7 @@ export class Phase5Handler implements PhaseHandler {
 
   private async runApiDefinition(
     ctx: PhaseContext, componentSummary: string, contractsSummary: string,
-    sysReqSummary: string, dmr: PhaseContextPacketResult,
+    sysReqSummary: string, technicalConstraintsSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<ApiDefinitions> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', 'api_definitions');
@@ -528,6 +556,7 @@ export class Phase5Handler implements PhaseHandler {
       active_constraints: dmr.activeConstraintsText, component_model_summary: componentSummary,
       interface_contracts_summary: contractsSummary,
       system_requirements_summary: sysReqSummary,
+      technical_constraints_summary: technicalConstraintsSummary,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;
@@ -547,7 +576,7 @@ export class Phase5Handler implements PhaseHandler {
 
   private async runErrorHandlingStrategy(
     ctx: PhaseContext, componentSummary: string, apiSummary: string,
-    sysReqSummary: string, dmr: PhaseContextPacketResult,
+    sysReqSummary: string, technicalConstraintsSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<ErrorHandlingStrategies> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', 'error_handling');
@@ -558,6 +587,7 @@ export class Phase5Handler implements PhaseHandler {
       active_constraints: dmr.activeConstraintsText, component_model_summary: componentSummary,
       api_definitions_summary: apiSummary,
       system_requirements_summary: sysReqSummary,
+      technical_constraints_summary: technicalConstraintsSummary,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;
@@ -577,7 +607,7 @@ export class Phase5Handler implements PhaseHandler {
 
   private async runConfigurationParameters(
     ctx: PhaseContext, componentSummary: string, dataModelsSummary: string,
-    sysReqSummary: string, dmr: PhaseContextPacketResult,
+    sysReqSummary: string, technicalConstraintsSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<ConfigurationParameters> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', 'configuration_parameters');
@@ -588,6 +618,7 @@ export class Phase5Handler implements PhaseHandler {
       active_constraints: dmr.activeConstraintsText, component_model_summary: componentSummary,
       data_models_summary: dataModelsSummary,
       system_requirements_summary: sysReqSummary,
+      technical_constraints_summary: technicalConstraintsSummary,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;

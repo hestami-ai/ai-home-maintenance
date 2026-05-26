@@ -7,6 +7,7 @@ required_variables:
   - active_constraints
   - component_model_summary
   - software_domains_summary
+  - technical_constraints_summary
   - janumicode_version_sha
 reasoning_review_triggers: []
 verification_ensemble_triggers: []
@@ -52,6 +53,23 @@ Rules:
 - If an architectural choice requires a specific algorithm or technology that is not yet mandated upstream, surface it as an `open_question` in the ADR's `context` field rather than committing to it silently in `decision`.
 - This is enforced by `mandated_threshold_inheritance` — see validator catalog §2.
 
+# Hard rules — non-contradiction with technical constraints
+
+The `technical_constraints_summary` block below is the **canonical TECH-* roster** captured in Sub-Phase 1.0c directly from the source spec. Every entry is a binding commitment the product MUST honour. ADRs MUST NOT propose a decision that contradicts an entry in this list — doing so is a defect (HIGH severity).
+
+Examples of forbidden contradictions:
+- TECH constraint says "single containerised service; no microservices" → an ADR proposing "implement each component as an independent microservice" is a contradiction.
+- TECH constraint says "HTTPS only on all public endpoints" → an ADR proposing "plain HTTP for the internal API" on a public endpoint is a contradiction.
+- TECH constraint says "Postgres 16+ on a single managed instance" → an ADR proposing "shard across multiple database servers" or "use MongoDB for primary persistence" is a contradiction.
+- TECH constraint says "AES-256 encryption at rest" → an ADR proposing "AES-128" or "no encryption" is a contradiction.
+
+When a `technical_constraint` text contains an exclusion phrase (`no X`, `not X`, `without X`, `must not X`, `single Y`, `Y only`), the architecture is BOUND by that exclusion. The ADR may propose HOW to implement within the constraint, but MUST NOT propose an architecture that violates it. If you believe a TECH constraint is wrong, surface that as an `open_question` in the ADR's `context` — do NOT silently override it with a contradicting decision.
+
+The non-contradiction check is enforced by the deterministic `technical_constraint_contradiction` validator. Failing it produces a HIGH-severity finding.
+
 CONTEXT:
 Component Model: {{component_model_summary}}
 Software Domains: {{software_domains_summary}}
+
+Technical Constraints (canonical TECH-* roster from Phase 1.0c — non-contradiction binding):
+{{technical_constraints_summary}}

@@ -1,0 +1,6 @@
+{
+  "kind": "intent_lens_classification",
+  "lens": "product",
+  "confidence": 0.92,
+  "rationale": "Intent describes a complete product (TinyURL service) with multiple capabilities and stakeholders, not a single feature or bugfix."
+}

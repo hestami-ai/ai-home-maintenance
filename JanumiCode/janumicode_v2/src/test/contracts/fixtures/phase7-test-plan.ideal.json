@@ -1,0 +1,41 @@
+{
+  "kind": "test_plan",
+  "test_suites": [
+    {
+      "suite_id": "TS-LINK-01",
+      "component_id": "comp-link-mapping-service",
+      "test_type": "integration",
+      "test_cases": [
+        {
+          "test_case_id": "TC-LINK-001",
+          "type": "functional",
+          "acceptance_criterion_ids": ["AC-001"],
+          "preconditions": ["Service is healthy", "Database is reachable"],
+          "expected_outcome": "POST /shorten returns 201 with a 6-character slug"
+        },
+        {
+          "test_case_id": "TC-LINK-002",
+          "type": "functional",
+          "acceptance_criterion_ids": ["AC-002"],
+          "preconditions": ["Service is healthy"],
+          "expected_outcome": "Stored URL value is encrypted (does not equal plaintext input)"
+        }
+      ]
+    },
+    {
+      "suite_id": "TS-ABUSE-01",
+      "component_id": "comp-abuse-notification-service",
+      "test_type": "integration",
+      "test_cases": [
+        {
+          "test_case_id": "TC-ABUSE-001",
+          "type": "functional",
+          "acceptance_criterion_ids": ["AC-012-1"],
+          "preconditions": ["SMTP configuration is valid", "System clock is synchronized"],
+          "expected_outcome": "Administrator email is sent within 2 minutes of abuse flag creation"
+        }
+      ]
+    }
+  ],
+  "total_test_cases": 3
+}

@@ -40,8 +40,8 @@ describe('regression deterministic layer', () => {
         expect(r.missingVariables, `fixture is missing required variables: ${r.missingVariables.join(', ')}`).toEqual([]);
       });
 
-      it('baseline response satisfies its own assertion block', () => {
-        const result = applyAssertions(
+      it('baseline response satisfies its own assertion block', async () => {
+        const result = await applyAssertions(
           fixture,
           fixture.baseline.response_text,
           fixture.baseline.parsed_json,

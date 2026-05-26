@@ -140,12 +140,54 @@ export const T3InvariantAssertionSchema = z.object({
 });
 export type T3InvariantAssertion = z.infer<typeof T3InvariantAssertionSchema>;
 
+// ── T4 Principle invariant (deterministic structural checks) ────────
+
+export const T4PrincipleAssertionSchema = z.object({
+  name: z.string(),
+  /** Only `tier_a_srp_violation` for now; enum keeps room for future kinds. */
+  kind: z.enum(['tier_a_srp_violation']),
+  /** JSONPath to the array of components/children to inspect. */
+  path: z.string(),
+  /** When set, only check items whose `tier` matches (saturation output). */
+  tier_filter: z.string().optional(),
+  /** Toggle individual smells. All default to true. */
+  noun_collision_check: z.boolean().optional(),
+  id_suffix_check: z.boolean().optional(),
+  single_verb_responsibility_check: z.boolean().optional(),
+  cross_sibling_dependency_check: z.boolean().optional(),
+  /** Threshold for Smell D (default 2). */
+  cross_sibling_dependency_threshold: z.number().nonnegative().optional(),
+  /** `advisory` (default) reports but does not fail; `blocking` fails. */
+  severity: z.enum(['advisory', 'blocking']).optional(),
+  rationale: z.string().optional(),
+});
+export type T4PrincipleAssertion = z.infer<typeof T4PrincipleAssertionSchema>;
+
+// ── T5 LLM-as-judge ─────────────────────────────────────────────────
+
+export const T5LlmJudgeAssertionSchema = z.object({
+  name: z.string(),
+  /** Only `principle_compliance` for now. */
+  kind: z.enum(['principle_compliance']),
+  /** Optional override of the default judge prompt template. */
+  judge_prompt_template: z.string().optional(),
+  /** Optional judge model override (defaults to env or 'gemma3:4b'). */
+  judge_model: z.string().optional(),
+  /** Optional provider override (defaults to 'ollama'). */
+  judge_provider: z.string().optional(),
+  severity: z.enum(['advisory', 'blocking']).optional(),
+  rationale: z.string().optional(),
+});
+export type T5LlmJudgeAssertion = z.infer<typeof T5LlmJudgeAssertionSchema>;
+
 // ── Assertion block ─────────────────────────────────────────────────
 
 export const AssertionBlockSchema = z.object({
   t1_schema: T1SchemaAssertionSchema.optional(),
   t2_id_preservation: z.array(T2IdPreservationAssertionSchema).default([]),
   t3_invariants: z.array(T3InvariantAssertionSchema).default([]),
+  t4_principle_invariants: z.array(T4PrincipleAssertionSchema).optional(),
+  t5_llm_judges: z.array(T5LlmJudgeAssertionSchema).optional(),
   /**
    * If true, the response must be parseable as JSON (independent of
    * t1_schema). Defaults to true when `invocation_params.response_format`
@@ -213,9 +255,11 @@ export interface AssertionResult {
 }
 
 export interface AssertionCheck {
-  tier: 'T1' | 'T2' | 'T3';
+  tier: 'T1' | 'T2' | 'T3' | 'T4' | 'T5';
   name: string;
   passed: boolean;
+  /** Advisory failures are reported but do not fail the aggregate result. */
+  severity?: 'blocking' | 'advisory';
   /** Detail on failure (e.g., expected vs. actual). Empty on pass. */
   detail?: string;
 }

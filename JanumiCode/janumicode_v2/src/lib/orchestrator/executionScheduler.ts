@@ -19,10 +19,13 @@
  * See docs/waveR_phase9_release_execution.md.
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { getLogger } from '../logging';
+import { emitLifecycle } from '../trace/lifecycle';
 import type { OrchestratorEngine } from './orchestratorEngine';
 import type { GovernedStreamWriter } from './governedStreamWriter';
-import type { GovernedStreamRecord } from '../types/records';
+import type { GovernedStreamRecord, ImplementationPacketContent } from '../types/records';
 import type {
   ExecutionWaveCompletedContent,
   ExecutionWaveStartedContent,
@@ -30,6 +33,7 @@ import type {
   QuarantineAttemptEntry,
   TaskQuarantineContent,
 } from '../types/records';
+import { formatPacketAsExecutorContext } from './phases/packetSynthesis/packetContextFormatter';
 import type { ExecutionContextBuilder, ImplementationTask as CtxTask } from './executionContextBuilder';
 import type { ExecutorAgent, ExecutionTask, ExecutionResult } from '../agents/executorAgent';
 import type { ReasoningReviewFindingRecordContent } from '../types/records';
@@ -92,6 +96,16 @@ export class ExecutionScheduler {
   private readonly quarantineLedger: QuarantineLedger;
   private readonly waveGate: WaveGate;
 
+  /**
+   * Implementation packet lookup, keyed by task_id. When set (by Phase 9
+   * after packet_synthesis runs), the per-leaf executor invocation
+   * prepends the rendered packet context to stdinText so the executor
+   * sees user stories, ACs, component contract, data models, APIs, test
+   * cases, eval criteria, active constraints, and compliance items —
+   * not just the bare task. See implementation-packet-synthesis.md §6.
+   */
+  private packetByTaskId: Map<string, ImplementationPacketContent> | null = null;
+
   constructor(
     private readonly engine: OrchestratorEngine,
     private readonly writer: GovernedStreamWriter,
@@ -104,6 +118,15 @@ export class ExecutionScheduler {
     this.leafTestRunner = new LeafTestRunner(writer, config.testsPerLeaf);
     this.quarantineLedger = new QuarantineLedger(writer);
     this.waveGate = new WaveGate(engine);
+  }
+
+  /**
+   * Inject the packet-by-task-id map. Called by Phase 9 after
+   * packet_synthesis emits implementation_packet records. When set, the
+   * scheduler prepends the rendered packet context to each leaf's stdin.
+   */
+  setPacketContext(packetByTaskId: Map<string, ImplementationPacketContent>): void {
+    this.packetByTaskId = packetByTaskId;
   }
 
   async run(input: {
@@ -307,6 +330,26 @@ export class ExecutionScheduler {
       derived_from_record_ids: [],
       content: startContent as unknown as Record<string, unknown>,
     });
+
+    // Tier-2 lifecycle: dispatch order per wave. ts-18's alphabetical
+    // ordering anti-pattern (every out-of-scope task ran before any
+    // in-scope task) would have been visible in a single line — the
+    // first wave's leaf_ids array was sorted lexicographically.
+    // strategy is hard-coded here because topoSortRespectingWave is
+    // the canonical ordering; if a future change introduces a
+    // different scheduling strategy, update the value.
+    emitLifecycle('phase9.dispatch_order_selected', {
+      workflow_run_id: workflowRunId,
+      phase_id: '9',
+      sub_phase_id: '9.1',
+      wave_number: waveNumber,
+      release_id: wave.release_id,
+      release_ordinal: wave.release_ordinal,
+      strategy: 'topological-within-wave',
+      leaf_ids: topo.map((l) => l.id),
+      leaf_count: topo.length,
+      distribution_by_component: distribution,
+    });
     logger.info('workflow', 'Wave R: wave started', {
       wave_number: waveNumber, kind: wave.kind, leaves: wave.leaves.length,
       release: wave.release_name ?? wave.release_id ?? '(none)',
@@ -493,6 +536,33 @@ export class ExecutionScheduler {
       undefined,
       dmrPacket,
     ).stdin.text;
+
+    // Prepend the implementation packet's bundled context when available.
+    // The packet carries user stories + ACs + tests + eval criteria +
+    // component contract + active constraints + compliance items — the
+    // structural ts-16 fix that gives the executor the full context it
+    // needs without inventing.
+    //
+    // Path N item 6: when a packet is being prepended, the legacy
+    // template's Component Context / Component Model Summary / Test
+    // Cases / Evaluation Criteria sections duplicate what the packet
+    // already provides (and historically with broken renderings —
+    // `Responsibility: undefined`, 8 unrelated eval criteria, etc.).
+    // The packet block is the canonical source; collapse the legacy
+    // sections to a single-line pointer when packet is present.
+    //
+    // Path N item 5/8: prepend a workspace orientation block. In ts-17
+    // the executor looped "Let me check the workspace structure" eight
+    // times before concluding the workspace was empty. Telling it
+    // upfront — workspace root, greenfield/existing flag, and which
+    // write-scope paths exist — removes that loop entirely.
+    const packet = this.packetByTaskId?.get(leaf.id);
+    if (packet) {
+      const orientation = buildWorkspaceOrientation(workspacePath, leaf.write_directory_paths ?? []);
+      const packetContext = formatPacketAsExecutorContext(packet);
+      stdinText = collapseLegacySectionsWhenPacketPresent(stdinText);
+      stdinText = `${orientation}\n\n${packetContext}\n\n${stdinText}`;
+    }
 
     if (augmentedContext) {
       stdinText = `${stdinText}\n\n## RETRY CONTEXT\n\n${augmentedContext}`;
@@ -836,6 +906,92 @@ export function topoSortRespectingWave(
     });
   }
   return ordered;
+}
+
+/**
+ * Path N item 6: when an implementation_packet is being prepended, the
+ * legacy executor template's Component Context / Component Model
+ * Summary / Test Cases / Evaluation Criteria sections become redundant
+ * (and historically carried broken renderings). The packet block above
+ * is canonical. Collapse the body of each duplicate section to a
+ * single-line pointer; keep the heading for navigation continuity.
+ *
+ * Replacements operate on the rendered template body; section headers
+ * are matched verbatim against the strings in
+ * implementation_task_execution.system.md. A section "body" is
+ * everything from the heading line's newline up to (but not including)
+ * the next `## ` or `# ` heading.
+ */
+/**
+ * Path N item 5/8: tell the executor where it is, whether the workspace
+ * is greenfield, and which write-scope paths already exist. Without
+ * this, the ts-17 executor looped "Let me check the workspace
+ * structure" eight times before deciding to create from scratch.
+ *
+ * The block is short (≤ 12 lines for typical tasks) and goes at the
+ * very top of stdin so the executor sees it before any of the bulky
+ * context. Existence checks are synchronous against the local
+ * filesystem — safe because the scheduler runs in the orchestrator
+ * process which already has read access to the workspace.
+ */
+export function buildWorkspaceOrientation(workspacePath: string, writeDirectoryPaths: string[]): string {
+  const lines: string[] = [];
+  lines.push('# Workspace Orientation');
+  lines.push('');
+  lines.push(`Workspace root: \`${workspacePath}\``);
+
+  let workspaceExists = false;
+  let workspaceEntryCount = 0;
+  try {
+    workspaceExists = fs.existsSync(workspacePath) && fs.statSync(workspacePath).isDirectory();
+    if (workspaceExists) {
+      workspaceEntryCount = fs.readdirSync(workspacePath).filter((name) => !name.startsWith('.')).length;
+    }
+  } catch {
+    // Filesystem probe is best-effort; defaults stay (workspace not visible).
+  }
+
+  if (!workspaceExists) {
+    lines.push('Workspace state: **not yet created** — orchestrator will mkdir on first write.');
+  } else if (workspaceEntryCount === 0) {
+    lines.push('Workspace state: **greenfield** (empty directory; no prior source files).');
+  } else {
+    lines.push(`Workspace state: **existing** (${workspaceEntryCount} top-level entries present; treat as brownfield — read before write).`);
+  }
+
+  if (writeDirectoryPaths.length > 0) {
+    lines.push('');
+    lines.push('Write-scope paths (you may create or modify ONLY these):');
+    for (const rel of writeDirectoryPaths) {
+      const abs = path.isAbsolute(rel) ? rel : path.join(workspacePath, rel);
+      let exists = false;
+      try { exists = fs.existsSync(abs); } catch { exists = false; }
+      const flag = exists ? 'exists' : 'does not exist — create it';
+      lines.push(`- \`${rel}\` (${flag})`);
+    }
+  }
+
+  lines.push('');
+  lines.push('_Do not spend tool calls probing the workspace structure — the information above is authoritative._');
+  return lines.join('\n');
+}
+
+export function collapseLegacySectionsWhenPacketPresent(stdinText: string): string {
+  const sections = [
+    'Component Context',
+    'Component Model Summary',
+    'Test Cases to Implement',
+    'Evaluation Criteria (filtered to this task\'s component)',
+  ];
+  const pointer = '_(See **Implementation Packet Context** block above — packet is the canonical source.)_';
+  let out = stdinText;
+  for (const heading of sections) {
+    // Escape regex metacharacters in the heading literal.
+    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(## ${escaped}\\n)[\\s\\S]*?(?=\\n## |\\n# |$)`, 'g');
+    out = out.replace(re, `$1${pointer}\n`);
+  }
+  return out;
 }
 
 function uniqueWritePaths(leaves: SchedulerLeaf[]): string[] {

@@ -48,7 +48,7 @@ Every task in the output array MUST include ALL of the following fields with the
 | `write_directory_paths` | array of strings | See Path Discipline Rule below. |
 | `read_directory_paths` | array of strings | See Path Discipline Rule below. |
 | `dependency_task_ids` | array of strings | Ids of tasks this task depends on. Empty array if none. No circular dependencies (Invariant). |
-| `traces_to` | array of strings | Responsibility ids, Technical Specification ids, or Component Model item ids this task satisfies. |
+| `traces_to` | array of strings | **IDs ONLY** — `res-*` responsibility ids, `TECH-*`/`SR-*` spec ids, `US-*`/`NFR-*` requirement ids, or `comp-*` component ids that this task satisfies. NEVER emit responsibility *statement text* or any prose — only the id token. If the source shows `{ "id": "res-send-email", "statement": "Send email to administrator within 2 min of abuse flag" }`, the correct trace is `"res-send-email"`, not the statement string. |
 
 For tasks where `estimated_complexity` is `"high"`, also include:
 

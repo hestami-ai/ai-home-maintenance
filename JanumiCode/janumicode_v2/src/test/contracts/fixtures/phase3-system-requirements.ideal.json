@@ -1,0 +1,23 @@
+{
+  "kind": "system_requirements",
+  "items": [
+    {
+      "id": "SR-001",
+      "statement": "POST /shorten returns a 6-character alphanumeric slug and persists an encrypted mapping.",
+      "source_requirement_ids": ["US-001", "NFR-019"],
+      "priority": 1
+    },
+    {
+      "id": "SR-009",
+      "statement": "When an abuse flag is triggered, an email must be sent to the administrator within 2 minutes.",
+      "source_requirement_ids": ["US-012", "NFR-019"],
+      "priority": 1
+    },
+    {
+      "id": "SR-015",
+      "statement": "POST /users creates a user record and triggers a welcome email within 5 minutes.",
+      "source_requirement_ids": ["US-015"],
+      "priority": 2
+    }
+  ]
+}

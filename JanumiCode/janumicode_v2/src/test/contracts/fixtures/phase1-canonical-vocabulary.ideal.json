@@ -1,0 +1,9 @@
+{
+  "kind": "canonical_vocabulary_discovery",
+  "vocabulary": [
+    { "term": "slug", "definition": "6-character alphanumeric identifier mapping to an original URL.", "category": "domain" },
+    { "term": "URL mapping", "definition": "Database record linking a slug to an encrypted long URL.", "category": "domain" },
+    { "term": "abuse flag", "definition": "User-submitted report that a slug resolves to abusive content.", "category": "domain" },
+    { "term": "Link Sharer", "definition": "Persona who creates short URLs.", "category": "persona" }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "kind": "implementation_packet",
+  "schemaVersion": "1.0",
+  "packet_id": "pkt-abuse-001",
+  "task": {
+    "id": "task-abuse-notification-service-send-email",
+    "node_id": "node-abuse-001",
+    "name": "Implement abuse notification email dispatch",
+    "description": "Add a function to the abuse-notification service that sends an email to the administrator within 2 minutes of an abuse flag.",
+    "task_type": "standard",
+    "backing_tool": "claude_code_cli",
+    "estimated_complexity": "low",
+    "completion_criteria": [
+      {
+        "criterion_id": "CC-001",
+        "description": "An abuse flag triggers an email sent to the configured administrator address",
+        "verification_method": "test_execution"
+      }
+    ],
+    "write_directory_paths": ["src/services/abuse-notification"],
+    "read_directory_paths": ["src/config"],
+    "dependency_task_ids": []
+  },
+  "user_stories": [
+    {
+      "id": "US-012",
+      "role": "Administrator",
+      "action": "review abuse reports and take action",
+      "outcome": "abuse-flagged URLs can be blocked or removed",
+      "priority": "high",
+      "acceptance_criteria": [
+        { "id": "AC-012-1", "description": "Administrator receives email within 2 minutes of abuse flag", "measurable_condition": "notification_timestamp - flag_timestamp ≤ 120s" }
+      ]
+    }
+  ],
+  "nfrs": [],
+  "component": {
+    "id": "comp-abuse-notification-service",
+    "name": "Abuse Notification Service",
+    "domain_id": "domain-abuse",
+    "responsibilities": [
+      { "id": "res-send-email", "description": "Send email to administrator within 2 min of abuse flag", "statement": "Send email to administrator within 2 min of abuse flag" }
+    ],
+    "dependencies": [],
+    "active_constraints": ["TECH-LOGS-JSON-STDOUT"]
+  },
+  "data_models": [
+    {
+      "id": "dm-abuse-notification",
+      "name": "AbuseNotification",
+      "component_id": "comp-abuse-notification-service",
+      "fields": [
+        { "name": "notification_id", "type": "uuid" },
+        { "name": "slug", "type": "string" },
+        { "name": "flag_timestamp", "type": "timestamp" },
+        { "name": "notified_at", "type": "timestamp" },
+        { "name": "status", "type": "string", "constraints": "enum: pending, sent, failed" }
+      ]
+    }
+  ],
+  "api_definitions": [],
+  "test_cases": [
+    {
+      "test_case_id": "TC-ABUSE-001",
+      "type": "functional",
+      "acceptance_criterion_ids": ["AC-012-1"],
+      "preconditions": ["SMTP configuration is valid"],
+      "expected_outcome": "Administrator email is sent within 2 minutes of abuse flag creation"
+    }
+  ],
+  "evaluation_criteria": [
+    {
+      "kind": "functional",
+      "target_id": "US-012",
+      "evaluation_method": "Trigger an abuse flag and measure the time-to-email delivery.",
+      "success_condition": "Administrator email received within 120 seconds of flag creation."
+    }
+  ],
+  "active_constraints": [
+    {
+      "id": "TECH-LOGS-JSON-STDOUT",
+      "category": "monitoring",
+      "text": "Observability: structured JSON logs to stdout; logs ingested by the platform's standard log aggregator.",
+      "technology": "log aggregator"
+    }
+  ],
+  "compliance_items": [],
+  "depends_on_packets": [],
+  "coherence": {
+    "passed": true,
+    "blocking_failures": [],
+    "advisory_findings": [],
+    "annotations": { "ai_proposed_root_count": 0, "ai_proposed_root_ids": [] }
+  },
+  "release_id": null,
+  "release_ordinal": null
+}

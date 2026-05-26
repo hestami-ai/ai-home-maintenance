@@ -1,0 +1,48 @@
+{
+  "kind": "implementation_plan",
+  "tasks": [
+    {
+      "id": "task-link-mapping-service-create-short-url",
+      "name": "Implement short URL creation",
+      "description": "Implement the create-short-url endpoint that generates a unique slug and stores the mapping.",
+      "task_type": "standard",
+      "component_id": "comp-link-mapping-service",
+      "component_responsibility": "Create a short URL from a long URL",
+      "backing_tool": "claude_code_cli",
+      "estimated_complexity": "low",
+      "completion_criteria": [
+        {
+          "criterion_id": "CC-001",
+          "description": "POST /shorten returns a 6-char slug and persists the mapping",
+          "verification_method": "test_execution"
+        }
+      ],
+      "write_directory_paths": ["src/services/link-mapping"],
+      "read_directory_paths": ["src/config"],
+      "dependency_task_ids": [],
+      "traces_to": ["res-create-short-url", "SR-001"]
+    },
+    {
+      "id": "task-abuse-notification-service-send-email",
+      "name": "Implement abuse notification email dispatch",
+      "description": "Implement the email-send function that notifies the administrator within 2 minutes of an abuse flag.",
+      "task_type": "standard",
+      "component_id": "comp-abuse-notification-service",
+      "component_responsibility": "Send email to administrator within 2 min of abuse flag",
+      "backing_tool": "claude_code_cli",
+      "estimated_complexity": "low",
+      "completion_criteria": [
+        {
+          "criterion_id": "CC-001",
+          "description": "An abuse flag triggers an email sent to the configured administrator address",
+          "verification_method": "test_execution"
+        }
+      ],
+      "write_directory_paths": ["src/services/abuse-notification"],
+      "read_directory_paths": ["src/config"],
+      "dependency_task_ids": [],
+      "traces_to": ["res-send-email", "SR-009"]
+    }
+  ],
+  "total_tasks": 2
+}

@@ -66,7 +66,19 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
   current_execution_wave          INTEGER DEFAULT 0,
   total_execution_waves           INTEGER DEFAULT 0,
   quarantined_leaf_count          INTEGER DEFAULT 0,
-  terminally_deferred_leaf_count  INTEGER DEFAULT 0
+  terminally_deferred_leaf_count  INTEGER DEFAULT 0,
+  -- Packet synthesis telemetry (Phase 8 → 9 boundary). Counts of
+  -- implementation_packet records emitted and their aggregate coherence
+  -- status. See docs/design/implementation-packet-synthesis.md.
+  packet_count                       INTEGER DEFAULT 0,
+  packet_coherence_blocking_count    INTEGER DEFAULT 0,
+  packet_coherence_advisory_count    INTEGER DEFAULT 0,
+  -- Iterative-implementation-backlog cycle controller telemetry.
+  -- Tracks which release the workflow is currently iterating and how
+  -- many cycles within that release have completed.
+  current_release_ordinal            INTEGER,
+  current_cycle_number               INTEGER DEFAULT 0,
+  max_cycles_per_release             INTEGER DEFAULT 5
 );
 
 -- ── Universal record store — the Governed Stream (lossless) ─────────

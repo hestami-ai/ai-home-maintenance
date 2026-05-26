@@ -1,0 +1,31 @@
+{
+  "kind": "business_domains_bloom",
+  "businessDomains": [
+    {
+      "id": "DOM-URL-SHORTENING",
+      "name": "URL Shortening",
+      "description": "Core URL-to-slug mapping and redirect resolution.",
+      "personas": [{ "id": "PERSONA-LINK-SHARER", "name": "Link Sharer", "role": "creator" }],
+      "source": "document-specified"
+    },
+    {
+      "id": "DOM-REDIRECT",
+      "name": "Redirect",
+      "description": "Resolving slugs to original URLs and serving redirects.",
+      "source": "document-specified"
+    },
+    {
+      "id": "DOM-ABUSE-PREVENTION",
+      "name": "Abuse Prevention",
+      "description": "Detecting and remediating abusive use of the service.",
+      "personas": [{ "id": "PERSONA-ADMINISTRATOR", "name": "Administrator", "role": "operator" }],
+      "source": "document-specified"
+    },
+    {
+      "id": "DOM-ONBOARDING",
+      "name": "Onboarding",
+      "description": "New user signup and welcome flow.",
+      "source": "domain-standard"
+    }
+  ]
+}

@@ -53,6 +53,19 @@ Most captures will be `CONSTRAINT` or `DECISION`.
 
 Every item MUST carry a `source_ref` with `document_path`, `section_heading` (when hierarchical), and a verbatim `excerpt`. No paraphrasing. No invented captures.
 
+# One record per excerpt (deduplication rule — non-negotiable)
+
+Each verbatim source excerpt MUST appear in AT MOST ONE compliance record. The unit of capture is the source statement, not the categories or implications within it.
+
+When a single source sentence touches multiple compliance dimensions (e.g. one sentence names a security mechanism AND a sensitive-data category; one sentence names a regulatory regime AND its jurisdictional scope; one sentence pairs a sensitivity classification with an erasure obligation), emit a SINGLE record that paraphrases the WHOLE obligation in `text` while quoting the FULL verbatim sentence in `excerpt`.
+
+Common splitting failure modes to AVOID (shape patterns, not specific examples):
+- Generating separate records for the mechanism and the data type when one sentence names both.
+- Generating separate records for a regime and its scope/jurisdiction qualifier when one sentence covers both.
+- Generating separate records for a permission/right and its precondition when one sentence states both.
+
+Before emitting, scan your draft list: if any two records carry the same `source_ref.excerpt` string OR substantially overlapping excerpts from the same sentence, collapse them into one. The downstream gatekeeper trusts that each compliance item represents a distinct upstream constraint; near-duplicates inflate the apparent obligation count and break that contract.
+
 # JSON Output Contract (strict — non-negotiable)
 
 **Field naming convention:** Use snake_case for all JSON property names (e.g., `compliance_extracted_items`, not `complianceExtractedItems`).

@@ -1,0 +1,13 @@
+{
+  "kind": "non_functional_requirements",
+  "requirements": [
+    {
+      "id": "NFR-019",
+      "category": "security",
+      "description": "Stored URLs must be encrypted at rest using AES-256.",
+      "priority": "critical",
+      "seed_threshold": "100% of mappings have encrypted_url != plaintext.",
+      "traces_to": ["COMP-ENCRYPTION-AT-REST"]
+    }
+  ]
+}

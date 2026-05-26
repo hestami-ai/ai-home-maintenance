@@ -1,0 +1,40 @@
+{
+  "kind": "component_model",
+  "summary": "TinyURL components — 4 services covering URL lifecycle, abuse handling, and user onboarding.",
+  "components": [
+    {
+      "id": "comp-link-mapping-service",
+      "name": "Link Mapping Service",
+      "domain_id": "domain-redirect",
+      "responsibilities": [
+        { "id": "res-create-short-url", "statement": "Create a short URL from a long URL" },
+        { "id": "res-resolve-slug", "statement": "Resolve a slug to its original URL" }
+      ],
+      "dependencies": [],
+      "traces_to": ["US-001", "US-002"]
+    },
+    {
+      "id": "comp-abuse-notification-service",
+      "name": "Abuse Notification Service",
+      "domain_id": "domain-abuse",
+      "responsibilities": [
+        { "id": "res-send-email", "statement": "Send email to administrator within 2 min of abuse flag" }
+      ],
+      "dependencies": [
+        { "target_component_id": "comp-link-mapping-service", "dependency_type": "sync_call" }
+      ],
+      "traces_to": ["US-012"]
+    },
+    {
+      "id": "comp-user-onboarding-service",
+      "name": "User Onboarding Service",
+      "domain_id": "domain-users",
+      "responsibilities": [
+        { "id": "res-create-user", "statement": "Create a user account from signup form" },
+        { "id": "res-send-welcome-email", "statement": "Send welcome email to new user" }
+      ],
+      "dependencies": [],
+      "traces_to": ["US-015"]
+    }
+  ]
+}

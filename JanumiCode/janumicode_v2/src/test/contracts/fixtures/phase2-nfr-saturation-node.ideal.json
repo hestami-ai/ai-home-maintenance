@@ -1,0 +1,16 @@
+{
+  "kind": "requirement_decomposition_node",
+  "node_id": "nfrnode-019",
+  "parent_node_id": null,
+  "root_kind": "nfr",
+  "status": "atomic",
+  "tier": "D",
+  "depth": 1,
+  "nfr": {
+    "id": "NFR-019",
+    "category": "security",
+    "description": "URLs encrypted at rest using AES-256.",
+    "threshold": "100% of stored mappings have encrypted_url != plaintext.",
+    "measurement_method": "Random sample of 50 mapping rows audited monthly."
+  }
+}

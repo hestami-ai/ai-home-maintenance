@@ -84,6 +84,9 @@ function inputs(partial: Partial<BuildManifestInputs> = {}): BuildManifestInputs
     complianceIds: partial.complianceIds ?? [],
     integrations: partial.integrations ?? [],
     vocabulary: partial.vocabulary ?? [],
+    ...(partial.vvRequirementIds !== undefined && { vvRequirementIds: partial.vvRequirementIds }),
+    ...(partial.qualityAttributeIds !== undefined && { qualityAttributeIds: partial.qualityAttributeIds }),
+    ...(partial.technicalConstraintIds !== undefined && { technicalConstraintIds: partial.technicalConstraintIds }),
   };
 }
 
@@ -321,6 +324,82 @@ describe('buildReleaseManifest — vocabulary', () => {
     for (const rel of r.releases) {
       expect(rel.contains.vocabulary).toEqual([]);
     }
+  });
+});
+
+describe('buildReleaseManifest — VV / QA / TECH (ts-13 cross-cutting routing)', () => {
+  it('routes vvRequirementIds to cross_cutting.vv_requirements', () => {
+    const r = buildReleaseManifest(inputs({
+      vvRequirementIds: ['VV-1', 'VV-2'],
+    }));
+    expect(r.crossCutting.vv_requirements.sort()).toEqual(['VV-1', 'VV-2']);
+    for (const rel of r.releases) {
+      expect(rel.contains.vv_requirements).toEqual([]);
+    }
+  });
+
+  it('routes qualityAttributeIds to cross_cutting.quality_attributes', () => {
+    const r = buildReleaseManifest(inputs({
+      qualityAttributeIds: ['QA-1', 'QA-2', 'QA-3'],
+    }));
+    expect(r.crossCutting.quality_attributes.sort()).toEqual(['QA-1', 'QA-2', 'QA-3']);
+    for (const rel of r.releases) {
+      expect(rel.contains.quality_attributes).toEqual([]);
+    }
+  });
+
+  it('routes technicalConstraintIds to cross_cutting.technical_constraints', () => {
+    const r = buildReleaseManifest(inputs({
+      technicalConstraintIds: ['TECH-1', 'TECH-2'],
+    }));
+    expect(r.crossCutting.technical_constraints.sort()).toEqual(['TECH-1', 'TECH-2']);
+    for (const rel of r.releases) {
+      expect(rel.contains.technical_constraints).toEqual([]);
+    }
+  });
+
+  it('treats omitted VV / QA / TECH inputs as empty cross_cutting slots (no crash)', () => {
+    const r = buildReleaseManifest(inputs({}));
+    expect(r.crossCutting.vv_requirements).toEqual([]);
+    expect(r.crossCutting.quality_attributes).toEqual([]);
+    expect(r.crossCutting.technical_constraints).toEqual([]);
+    for (const rel of r.releases) {
+      expect(rel.contains.vv_requirements).toEqual([]);
+      expect(rel.contains.quality_attributes).toEqual([]);
+      expect(rel.contains.technical_constraints).toEqual([]);
+    }
+  });
+
+  it('dedupes and sorts cross_cutting VV / QA / TECH inputs', () => {
+    const r = buildReleaseManifest(inputs({
+      vvRequirementIds: ['VV-2', 'VV-1', 'VV-2'],
+      qualityAttributeIds: ['QA-2', 'QA-1', 'QA-1'],
+      technicalConstraintIds: ['TECH-1', 'TECH-3', 'TECH-2'],
+    }));
+    expect(r.crossCutting.vv_requirements).toEqual(['VV-1', 'VV-2']);
+    expect(r.crossCutting.quality_attributes).toEqual(['QA-1', 'QA-2']);
+    expect(r.crossCutting.technical_constraints).toEqual(['TECH-1', 'TECH-2', 'TECH-3']);
+  });
+
+  it('keeps VV / QA / TECH ids out of every release.contains slot (exact-coverage invariant)', () => {
+    const r = buildReleaseManifest(inputs({
+      releases: [
+        skeleton('REL-1', 1, ['UJ-A']),
+        skeleton('REL-2', 2, ['UJ-B']),
+      ],
+      journeys: [journey('UJ-A'), journey('UJ-B')],
+      vvRequirementIds: ['VV-1'],
+      qualityAttributeIds: ['QA-1'],
+      technicalConstraintIds: ['TECH-1'],
+    }));
+    for (const rel of r.releases) {
+      expect(rel.contains.vv_requirements).toEqual([]);
+      expect(rel.contains.quality_attributes).toEqual([]);
+      expect(rel.contains.technical_constraints).toEqual([]);
+    }
+    expect(r.crossCutting.vv_requirements).toEqual(['VV-1']);
+    expect(r.crossCutting.quality_attributes).toEqual(['QA-1']);
+    expect(r.crossCutting.technical_constraints).toEqual(['TECH-1']);
   });
 });
 

@@ -145,16 +145,56 @@ else
   echo "[init-thin-slice] no prior cal config found; CLI will use defaults"
 fi
 
-if [[ ! -f "${REPO_ROOT}/dist/cli/janumicode.js" ]]; then
-  echo "[init-thin-slice] dist/cli/janumicode.js not found; building..."
-  (cd "${REPO_ROOT}" && pnpm build)
-fi
+# Always rebuild before launching. A thin slice costs hours of real LLM
+# time — a ~3s build is rounding error against the cost of running an
+# entire slice against a stale dist. ts-14/ts-15 (2026-05-18) burned
+# two consecutive slices on this exact footgun: a normalizer fix in
+# src/ wasn't picked up because the previous slice had populated dist/
+# (so the file-existence check passed) but with a now-outdated bundle.
+echo "[init-thin-slice] rebuilding dist..."
+(cd "${REPO_ROOT}" && pnpm build)
 
 echo "[init-thin-slice] launching CLI in --thin-slice mode..."
 export JANUMICODE_EXECUTOR_UNATTENDED=1
-exec node "${REPO_ROOT}/dist/cli/janumicode.js" run \
+# JANUMICODE_INSPECT: V8 inspector flag. Defaults to `--inspect` (port
+# open, no initial pause) so the CDP harness can always attach mid-run
+# if needed. Override with explicit empty (`JANUMICODE_INSPECT=`) to
+# disable, or with `--inspect-brk` to pause-on-start. ts-19 demonstrated
+# that --inspect-brk breaks the sidecar via execArgv propagation;
+# --inspect is the safe default.
+#
+# Process management: launch as a background child + wait, with a trap
+# that propagates kill signals down to the node process and its
+# subtree (sidecar DB server is spawned as a child of node and would
+# otherwise outlive the wrapper if we just `exec`ed).
+#
+# Why not exec: `exec node ...` replaces the bash process with node,
+# which means any caller managing this process by PID via Bash tool
+# wrappers / pipes (e.g. `bash script.sh | tee log`) can fail to
+# deliver signals through the pipe boundary on Windows/Git-Bash. The
+# background+wait+trap pattern keeps the bash supervisor alive to
+# guarantee child cleanup on SIGTERM/SIGINT/EXIT.
+cleanup_child() {
+  local code=$?
+  if [[ -n "${node_pid:-}" ]] && kill -0 "${node_pid}" 2>/dev/null; then
+    echo "[init-thin-slice] cleanup: terminating node pid=${node_pid}" >&2
+    kill -TERM "${node_pid}" 2>/dev/null || true
+    # Give it a moment to drain; force-kill if it doesn't exit.
+    for _ in 1 2 3 4 5; do
+      kill -0 "${node_pid}" 2>/dev/null || break
+      sleep 1
+    done
+    kill -KILL "${node_pid}" 2>/dev/null || true
+  fi
+  exit "${code}"
+}
+trap cleanup_child EXIT INT TERM HUP
+
+node ${JANUMICODE_INSPECT---inspect} "${REPO_ROOT}/dist/cli/janumicode.js" run \
   --intent "@${intent_file}" \
   --workspace "${workspace}" \
   --llm-mode real \
   --auto-approve \
-  --thin-slice
+  --thin-slice &
+node_pid=$!
+wait "${node_pid}"

@@ -1,0 +1,40 @@
+{
+  "kind": "functional_requirements",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "role": "Link Sharer",
+      "action": "create a short URL from a long URL",
+      "outcome": "system returns a unique 6-character slug and stores the mapping encrypted",
+      "priority": "critical",
+      "traces_to": ["UJ-CREATE-SHORT-URL", "ENT-URL-MAPPING", "WF-URL-CREATION"],
+      "acceptance_criteria": [
+        { "id": "AC-001", "description": "POST /shorten returns a 6-char slug", "measurable_condition": "Slug length === 6 alphanumeric" },
+        { "id": "AC-002", "description": "Stored URL is encrypted at rest", "measurable_condition": "encrypted_url field differs from plaintext input" }
+      ]
+    },
+    {
+      "id": "US-012",
+      "role": "Administrator",
+      "action": "review abuse reports and take action",
+      "outcome": "abuse-flagged URLs can be blocked or removed",
+      "priority": "high",
+      "traces_to": ["UJ-REPORT-ABUSE", "ENT-ABUSE-REPORT", "WF-ABUSE-REVIEW"],
+      "acceptance_criteria": [
+        { "id": "AC-012-1", "description": "Administrator receives email within 2 minutes of abuse flag", "measurable_condition": "notification_timestamp - flag_timestamp ≤ 120s" }
+      ]
+    },
+    {
+      "id": "US-015",
+      "role": "Link Sharer",
+      "action": "onboard a new user account",
+      "outcome": "account is created and welcome email received",
+      "priority": "medium",
+      "traces_to": ["UJ-ONBOARD-USER", "ENT-USER", "WF-USER-ONBOARDING"],
+      "acceptance_criteria": [
+        { "id": "AC-015-1", "description": "POST /users creates a user record", "measurable_condition": "GET /users/{id} returns the new record" },
+        { "id": "AC-015-2", "description": "Welcome email is sent within 5 minutes", "measurable_condition": "email status='sent' within 300s" }
+      ]
+    }
+  ]
+}

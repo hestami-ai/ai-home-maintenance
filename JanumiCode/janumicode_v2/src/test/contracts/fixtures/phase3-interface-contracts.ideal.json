@@ -1,0 +1,29 @@
+{
+  "kind": "interface_contracts",
+  "contracts": [
+    {
+      "id": "C-DB-001",
+      "systems_involved": ["EXT-001"],
+      "protocol": "PostgreSQL",
+      "data_format": "SQL",
+      "auth_mechanism": "Username/Password",
+      "error_handling_strategy": "Retry with exponential backoff; fallback to read-only replica.",
+      "error_responses": [
+        { "code": "500", "message": "Internal Server Error", "description": "DB encountered an unexpected condition." },
+        { "code": "503", "message": "Service Unavailable", "description": "DB temporarily unavailable." }
+      ]
+    },
+    {
+      "id": "C-SMTP-001",
+      "systems_involved": ["EXT-002"],
+      "protocol": "SMTP",
+      "data_format": "RFC-5322",
+      "auth_mechanism": "SMTP-AUTH",
+      "error_handling_strategy": "Retry up to 5 attempts with exponential backoff; quarantine on permanent failure.",
+      "error_responses": [
+        { "code": "421", "message": "Service not available", "description": "SMTP relay temporarily unavailable." },
+        { "code": "550", "message": "Mailbox unavailable", "description": "Recipient address rejected." }
+      ]
+    }
+  ]
+}

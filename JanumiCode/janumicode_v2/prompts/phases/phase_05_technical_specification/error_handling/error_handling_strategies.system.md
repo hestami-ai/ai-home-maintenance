@@ -8,6 +8,7 @@ required_variables:
   - component_model_summary
   - api_definitions_summary
   - system_requirements_summary
+  - technical_constraints_summary
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -57,7 +58,19 @@ Rules:
 - Generic descriptions ("middleware-based exception capture", "exponential backoff with jitter") are acceptable when upstream is silent on the specific mechanism. Concrete tooling names (specific middleware library names, specific retry-strategy library names) MUST be grounded in `active_constraints` / upstream tech.
 - Enforced by `ungrounded_operational_specifics` parameterization C (catalog §2).
 
+# Hard rules — non-contradiction with technical constraints
+
+The `technical_constraints_summary` block is the canonical TECH-* roster from the source spec. Error-handling strategies MUST NOT fabricate failure categories that contradict a constraint:
+
+- TECH constraint excludes per-user authentication (e.g. "no user accounts", "no per-user identity") → strategies MUST NOT list `HTTP_401_UNAUTHORIZED` or `auth_failure` as an error_type for components that have no auth boundary in the first place.
+- TECH constraint mandates a specific transport (HTTPS-only, stdout-only logs) → response/surfacing fields MUST align with that transport. Do not propose "return HTTP error to /logs endpoint" when the spec says logs go to stdout.
+
+Enforced by `technical_constraint_contradiction` (catalog §2).
+
 CONTEXT:
 System Requirements (Phase 3.2 — error-handling expectations from each SR): {{system_requirements_summary}}
 Component Model: {{component_model_summary}}
 API Definitions: {{api_definitions_summary}}
+
+Technical Constraints (canonical TECH-* roster from Phase 1.0c — non-contradiction binding):
+{{technical_constraints_summary}}

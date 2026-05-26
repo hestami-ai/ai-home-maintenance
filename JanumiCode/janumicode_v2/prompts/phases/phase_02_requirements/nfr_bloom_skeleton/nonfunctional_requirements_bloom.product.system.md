@@ -102,7 +102,11 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are dropped
 - EXACTLY ONE `seed_threshold` per NFR in Pass 1 — a single short line stating the essential measurable commitment. Pass 2 will expand into the full `threshold` + `measurement_method`. The `seed_threshold` field is REQUIRED on every requirement object — never omit it, never emit `null`, never use an empty string. If you cannot state a measurable commitment in one line, the NFR is malformed and should not be emitted.
 - `priority` is one of `critical | high | medium | low`.
 - `id` follows the `NFR-NNN` format, contiguous from `NFR-001`.
-- `applies_to_requirements` is optional; empty array is fine when the NFR is cross-cutting.
+- `applies_to_requirements` lists the FR ids (US-*) the NFR governs.
+  - **Populate it when the NFR is bounded by specific FRs** — e.g., a "redirect endpoint P95 ≤ 100 ms" NFR applies to the FR that creates the redirect endpoint; a "deletion processed within 30 days" NFR applies to the FR that accepts deletion requests.
+  - **Leave it empty (`[]`) only for truly cross-cutting NFRs** that govern the whole product — e.g., "all stored data encrypted at rest" applies wherever data is stored; "structured JSON logs to stdout" applies to every emission.
+  - Empty arrays are valid but should be the EXCEPTION, not the default. Most NFRs are derived from specific journey/workflow latency, availability, security, or compliance obligations and SHOULD link back to the FR(s) implementing those obligations.
+  - When uncertain, look at the NFR's `traces_to` upstream items: if those items relate to a specific journey (UJ-*), find the FR(s) implementing that journey and list them in `applies_to_requirements`.
 
 # Allowed categories
 

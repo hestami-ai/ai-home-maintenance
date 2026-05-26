@@ -39,7 +39,7 @@ describe('regression live layer', () => {
       expect(r.missingVariables, `missing variables: ${r.missingVariables.join(', ')}`).toEqual([]);
 
       const run = await invokeFromFixture(fixture, r.rendered);
-      const result = applyAssertions(fixture, run.fresh_response_text, run.fresh_parsed_json);
+      const result = await applyAssertions(fixture, run.fresh_response_text, run.fresh_parsed_json);
       if (!result.passed) {
         throw new Error(
           `Fresh response failed regression assertions (${run.fresh_duration_ms} ms):\n${formatFailureReport(result)}\n\nfresh_text preview:\n${run.fresh_response_text.slice(0, 600)}`,

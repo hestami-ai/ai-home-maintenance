@@ -1,0 +1,19 @@
+{
+  "kind": "system_boundary",
+  "in_scope": [
+    "URL shortening API",
+    "Redirect service",
+    "Abuse reporting and review",
+    "User onboarding",
+    "Click analytics"
+  ],
+  "out_of_scope": [
+    "Custom slug aliases",
+    "Multi-tenant organization accounts",
+    "OAuth identity provider integration"
+  ],
+  "external_systems": [
+    { "id": "EXT-001", "name": "Postgres 16", "protocol": "PostgreSQL", "description": "Primary persistence." },
+    { "id": "EXT-002", "name": "SMTP relay", "protocol": "SMTP", "description": "Email dispatch for admin notifications and welcome emails." }
+  ]
+}

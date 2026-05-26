@@ -1,0 +1,21 @@
+{
+  "kind": "intent_discovery",
+  "analysis_summary": "TinyURL is a minimal public URL shortening service with abuse handling and click analytics.",
+  "product_vision": "A reliable, frictionless URL-shortening service that turns long URLs into short shareable slugs and provides per-link click analytics.",
+  "product_description": "TinyURL is a minimal HTTP service that converts long URLs into short 6-character slugs and instantly redirects traffic to the original destination. It operates without user authentication and focuses on link compression and reliable delivery.",
+  "personas": [
+    { "id": "P-SHARER", "name": "Link Sharer", "role": "creator", "description": "Submits long URLs to receive short slugs." },
+    { "id": "P-CLICKER", "name": "Link Clicker", "role": "consumer", "description": "Follows short URLs and expects fast, reliable redirection." }
+  ],
+  "user_journeys": [],
+  "phasing_strategy": [],
+  "success_metrics": [],
+  "decisions": [
+    { "id": "DEC-001", "decision": "Slugs are 6 alphanumeric characters." },
+    { "id": "DEC-002", "decision": "Single containerized service; no microservices." }
+  ],
+  "constraints": [
+    { "id": "CON-001", "text": "All URLs persisted are encrypted at rest." }
+  ],
+  "open_questions": []
+}

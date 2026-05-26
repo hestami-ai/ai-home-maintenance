@@ -55,6 +55,8 @@ import {
   normalizeSynthesisFromWire,
   normalizeDomainFromWire,
   normalizePersonaFromWire,
+  normalizeWorkflowV2 as normalizeWorkflowV2Pure,
+  normalizeWorkflowTrigger as normalizeWorkflowTriggerPure,
 } from './phase1Normalizers';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -65,6 +67,13 @@ import type {
   MenuOptionSelection,
 } from '../../types/decisionBundle';
 import { getLogger } from '../../logging';
+import { traceNormalize } from '../../trace/traceNormalize';
+import {
+  runScopeGatekeeperPrune,
+  buildReleasePlanGatekeeperPrompt,
+  type GatekeeperUpstreamContext,
+} from '../scopeGatekeeper';
+import type { ScopePruneDecisionContent } from '../../types/records';
 import { parseJsonWithRecovery } from '../../llm/jsonRecovery';
 import { buildInterpretationMirror } from './phase1/buildInterpretationMirror';
 import { normalizeIdsInTree, normalizeIdHyphens } from '../idNormalization';
@@ -1015,6 +1024,37 @@ export class Phase1Handler implements PhaseHandler {
       ],
       buildTitle: () => 'Review Business Domains and Personas',
       buildSummary: (bloom) => `${bloom.domains.length} business domain(s) and ${bloom.personas.length} persona(s) proposed. Keep what belongs in your product; reject what doesn't.`,
+      gatekeeper: {
+        bloomDescription: 'business domains and personas',
+        applyPrune: (bloom, keptIds) => ({
+          domains:  bloom.domains.filter(d => keptIds.has(d.id)),
+          personas: bloom.personas.filter(p => keptIds.has(p.id)),
+        }),
+        overlay: `### Shape-specific guidance (domains + personas)
+
+DOMAINS are problem-space areas the product addresses. A domain is in
+scope only if at least one upstream artifact (requirement, constraint,
+journey, workflow trigger, compliance item, V&V threshold) names a
+concept that lives in that domain.
+
+PERSONAS are roles that interact with the product. A persona is in
+scope when:
+  - The upstream Analysis Summary or a user journey describes that
+    role acting on the product (sender, receiver, viewer, requester,
+    etc.), OR
+  - An upstream constraint or compliance item explicitly invokes
+    that role (e.g., a regulator named in a compliance regime).
+
+A persona whose description is purely INTERNAL/OPERATIONAL (admin,
+SRE, support agent, compliance officer, abuse handler) and is not
+named in any upstream artifact is NOT in scope at Phase 1. Phase 4
+(architecture) and Phase 6 (tasks) handle operational roles. Drop
+such personas in Pass 2 with a rationale citing the absence of
+upstream support.
+
+Apply the base-prompt Pass 1 rules first; this overlay refines Pass 2
+grounding judgements for the persona shape specifically.`,
+      },
     });
     if (!round12.success) return { success: false, error: round12.error, artifactIds };
     const domainsBloom = round12.bloom;
@@ -1084,6 +1124,37 @@ export class Phase1Handler implements PhaseHandler {
       })),
       buildTitle: () => 'Review User Journeys',
       buildSummary: (bloom) => `${bloom.userJourneys.length} user journey(s) proposed across the accepted domains.`,
+      gatekeeper: {
+        bloomDescription: 'user journeys across the accepted domains and personas',
+        overlay: `### Shape-specific guidance (user journeys)
+
+A USER JOURNEY is a sequence of interactions a persona has with the
+product to achieve a goal. A journey is in scope when:
+  - Its personaId is in the "Accepted Personas" section above, AND
+  - Its goal traces to an upstream Intent Requirement, Intent
+    Constraint, Compliance Item, V&V Requirement, or user journey
+    in the Intent Discovery output.
+
+If a journey's personaId is NOT in the "Accepted Personas" section,
+DROP it. The "Accepted Personas" section is authoritative — it lists
+the personas the business_domains_bloom gatekeeper kept. Do NOT use
+the narrative Analysis Summary as the persona list; it may name only
+the primary roles informally while other accepted personas (API
+consumers, etc.) are equally valid.
+
+If two journeys differ ONLY by interaction surface (web vs API) and
+both surfaces are accepted (e.g., spec mentions "via web form or
+API"), KEEP both — they are distinct delivery paths the product
+must serve.
+
+Apply the base-prompt Pass 1 rules first; this overlay refines Pass 2
+grounding for the journey shape.`,
+        applyPrune: (bloom, keptIds) => ({
+          userJourneys: bloom.userJourneys.filter(j => keptIds.has(j.id)),
+          unreachedPersonas: bloom.unreachedPersonas,
+          unreachedDomains: bloom.unreachedDomains,
+        }),
+      },
     });
     if (!round13a.success) return { success: false, error: round13a.error, artifactIds };
     const journeyBloom = round13a.bloom;
@@ -1134,6 +1205,37 @@ export class Phase1Handler implements PhaseHandler {
       })),
       buildTitle: () => 'Review System Workflows',
       buildSummary: (bloom) => `${bloom.workflows.length} system workflow(s) proposed — every workflow carries at least one typed trigger. Any workflow whose automatable step-backing cannot be verified will surface in the 1.3c coverage pass.`,
+      gatekeeper: {
+        bloomDescription: 'system workflows backing the accepted user journeys',
+        overlay: `### Shape-specific guidance (system workflows)
+
+A SYSTEM WORKFLOW is a server-side process that backs one or more
+user journeys or satisfies an NFR/compliance requirement. Each
+workflow has a trigger (HTTP request, scheduled tick, event, etc.).
+A workflow is in scope when:
+  - It backs a journey in the "Accepted User Journeys" section
+    above, OR
+  - It satisfies an upstream NFR / V&V requirement / Compliance Item
+    (e.g., encryption-at-rest verification, latency monitoring, RTO
+    failover, GDPR erasure), OR
+  - It is required infrastructure for an upstream Technical Constraint
+    (e.g., a startup migration workflow for an upstream-mandated
+    database).
+
+Workflow names commonly mention the same surfaces as journeys (UI,
+API, scheduled). Do NOT drop a workflow merely because its name
+contains "API" or "auth" — the base-prompt anti-pattern (do not use
+implication chains) applies here. A workflow's authentication
+mechanism is a Phase 4 architectural concern, not a Phase 1 scope
+question. Drop only when the workflow's PURPOSE is upstream-unsupported
+or contradicts an explicit constraint (Pass 1 literal-match).
+
+Apply the base-prompt Pass 1 rules first; this overlay refines Pass 2
+grounding for the workflow shape.`,
+        applyPrune: (bloom, keptIds) => ({
+          workflows: bloom.workflows.filter(w => keptIds.has(w.id)),
+        }),
+      },
     });
     if (!round13b.success) return { success: false, error: round13b.error, artifactIds };
     const workflowBloom = round13b.bloom;
@@ -1215,6 +1317,78 @@ export class Phase1Handler implements PhaseHandler {
       mapItems: (bloom) => bloom.entities.map(e => ({ id: e.id, label: `[Entity] ${e.name}`, description: e.description, tradeoffs: `domain ${e.businessDomainId}` })),
       buildTitle: () => 'Review Business Entities',
       buildSummary: (bloom) => `${bloom.entities.length} entity/entities proposed across the accepted domains.`,
+      gatekeeper: {
+        bloomDescription: 'business entities across the accepted domains',
+        applyPrune: (bloom, keptIds) => ({
+          entities: bloom.entities.filter(e => keptIds.has(e.id)),
+        }),
+        overlay: `### Shape-specific guidance (business entities)
+
+A BUSINESS ENTITY represents PERSISTENT state the product must
+maintain to satisfy its requirements. An entity is in scope when:
+  - It carries data the spec explicitly requires storing (named in
+    a requirement, journey, or compliance item), OR
+  - It is structurally necessary to record the outcome of an
+    upstream-mandated workflow (e.g., an audit record entity when
+    the spec mandates auditable operations).
+
+### MUST DROP for entities (Pass 1 inherent-requirement specialization)
+
+Drop these CATEGORIES aggressively. The proposer's "entities are
+behavior, not data" failure mode dominates this round on calibration
+runs. Identify candidates by NAME PATTERN and PURPOSE, not by literal
+match against a fixed list.
+
+- **Log-emission entities** — anything named like \`*-LOG\` or
+  \`*-EVENT-LOG\`. Logs are emissions to stdout / aggregator. Drop
+  unless the spec EXPLICITLY mandates structured log persistence
+  inside the product's own database.
+- **HTTP / transport traffic records** — entries representing
+  in-flight request/response/error transients (request, response,
+  request-error, call-record). Drop unless the spec mandates a
+  request log.
+- **Validation artifacts** — entries whose purpose is to represent
+  the BEHAVIOR of input validation (validation-result, validation-
+  error, validation-settings). Validation is workflow logic, not
+  stored business data.
+- **Telemetry / metrics** — entries representing observability data
+  emitted to external systems (\`*-METRIC\`, \`MONITORING-*\`,
+  \`PERFORMANCE-*\`, \`*-LATENCY-METRIC\`). Not product entities
+  unless the spec mandates storing them in the product database.
+- **Operational concepts as entities** — runtime / deployment /
+  config concepts proposed as data (region, outage, deployment-
+  artifact, feature-flag, configuration, environment). These are
+  operations / runtime properties, not stored business data.
+- **Auth / identity artifacts that contradict upstream constraints** —
+  when an upstream constraint forbids per-user accounts / per-user
+  history / multi-tenancy, the entities that implement those
+  mechanisms (user, session, auth-token, api-key, user-profile,
+  tenant, etc.) are also forbidden. This is Pass 1
+  inherent-requirement, not Pass 2 — drop with a rationale citing
+  the conflicting constraint.
+
+### KEEP for entities
+
+Keep an entity when:
+  - The spec names the data the entity holds (e.g. a slug→URL mapping
+    when the spec mandates persisting that mapping).
+  - The entity is the storage backing an upstream-mandated workflow
+    (e.g. a deletion-request record when the spec mandates accepting
+    deletion requests AND auditing them).
+  - The entity is the data model expression of an accepted V&V
+    requirement (e.g. an encrypted-URL record when V&V says "URLs
+    encrypted at rest").
+
+### The persistence test
+
+Before keeping any entity, ask: "Does the spec require this data to
+survive a process restart, AND is the workflow that uses it grounded
+in an accepted upstream artifact?" Both halves must hold.
+
+Apply the base-prompt Pass 1 rules first; this overlay refines both
+Pass 1 (the MUST DROP list above) and Pass 2 (the persistence test)
+for the entity shape.`,
+      },
     });
     if (!round14.success) return { success: false, error: round14.error, artifactIds };
     const entitiesBloom = round14.bloom;
@@ -1266,6 +1440,44 @@ export class Phase1Handler implements PhaseHandler {
       },
       buildTitle: () => 'Review Integrations and Quality Attributes',
       buildSummary: (bloom) => `${bloom.integrations.length} integration(s) and ${bloom.qualityAttributes.length} quality attribute(s) proposed.`,
+      gatekeeper: {
+        bloomDescription: 'integrations and quality attributes for the accepted product scope',
+        // QA-N ids are synthetic and index into qualityAttributes by position;
+        // mirrored here so both surfaces share a single keptIds set.
+        applyPrune: (bloom, keptIds) => ({
+          integrations: bloom.integrations.filter(i => keptIds.has(i.id)),
+          qualityAttributes: bloom.qualityAttributes.filter((_, i) => keptIds.has(`QA-${i + 1}`)),
+        }),
+        overlay: `### Vendor / technology specificity rule (integrations + QAs)
+
+This round's items often name SPECIFIC vendors, products, or
+technologies (a named database, cache, observability stack, CDN, IDP,
+deployment platform, etc.). The shared base prompt's "any upstream
+mention of the concept" rule is too loose here: it would let "Redis
+Cache" survive because "caching" is mentioned, even though the spec
+never picked Redis.
+
+For items that name a specific vendor / product / branded service:
+  1. Identify the specific name in the item (e.g., the product name,
+     the vendor, the branded service).
+  2. Search the upstream artifacts for that LITERAL name (or an
+     unambiguous spelling variant).
+  3. If found upstream → KEEP. The spec mandated this specific choice.
+  4. If not found upstream → DROP — even if the bare concept is
+     mentioned. Phase 4 / 5 are where implementations get chosen;
+     Phase 1 must not lock in vendor choices the spec did not make.
+
+For items that are BARE CONCEPTS (no vendor/product name) — e.g., a
+quality attribute stated abstractly, an integration described only
+as "Logging" without naming a vendor — apply the standard "any
+upstream mention" rule from the base prompt.
+
+For quality attributes specifically: also drop QAs that introduce
+NUMERIC thresholds (latencies, percentages, retention periods,
+intervals) that do not appear upstream. The upstream V&V Requirements
+section is the only authoritative source for thresholds; a QA that
+fabricates a new threshold is unsupported.`,
+      },
     });
     if (!round15.success) return { success: false, error: round15.error, artifactIds };
     const integrationsBloom = round15.bloom;
@@ -1449,6 +1661,19 @@ export class Phase1Handler implements PhaseHandler {
       })),
       buildTitle: () => 'Review the proposed release plan (v2 manifest)',
       buildSummary: (bloom) => `${bloom.releases.length} release(s) proposed. Every accepted handoff artifact is assigned to exactly one release OR to the cross_cutting bucket. The deterministic 1.8 verifier will confirm exact coverage, ordinal integrity, and forward-only dependencies before final approval.`,
+      gatekeeper: {
+        bloomDescription: 'release plan slicing the accepted handoff artifacts into ordered releases',
+        applyPrune: (bloom, keptIds) => ({
+          releases: bloom.releases.filter(r => keptIds.has(r.release_id)),
+          crossCutting: bloom.crossCutting,
+        }),
+        // release_plan's evaluation is fundamentally different from
+        // member-drop: it checks structural validity of proposed
+        // releases (malformed, hallucinated artifact ids, explicit
+        // constraint contradictions) rather than upstream grounding
+        // of a concept. Use a dedicated prompt builder.
+        customPromptBuilder: buildReleasePlanGatekeeperPrompt,
+      },
     });
     if (!round18.success) return { success: false, error: round18.error, artifactIds };
     const releasePlan = round18.bloom;
@@ -1744,6 +1969,36 @@ export class Phase1Handler implements PhaseHandler {
       mapItems: (bloom: T) => Array<{ id: string; label: string; description?: string; tradeoffs?: string }>;
       buildSummary: (bloom: T) => string;
       buildTitle: () => string;
+      /**
+       * Scope gatekeeper — opt-in per round. When provided, runs an
+       * LLM-backed prune of the bloom output BEFORE the decision card
+       * sees it. The original bloom artifact is superseded by the
+       * pruned version. Calibrated mode: defaults to keep, drops only
+       * items the LLM can justify against upstream extraction artifacts.
+       *
+       * Required pieces:
+       *   - bloomDescription: short label for the prompt ("business domains and personas")
+       *   - applyPrune: given the bloom and the set of kept ids, return a new
+       *     bloom with non-kept items filtered out
+       */
+      gatekeeper?: {
+        bloomDescription: string;
+        applyPrune: (bloom: T, keptIds: Set<string>) => T;
+        /**
+         * Optional sub-phase-specific overlay — narrow guidance for the
+         * artifact shape this round produces (personas vs entities vs
+         * integrations, etc.). Spliced into the shared base prompt
+         * between the universal criteria and the upstream context.
+         */
+        overlay?: string;
+        /**
+         * Optional fully-custom prompt builder. Use ONLY for sub-phases
+         * whose evaluation is fundamentally different from member-drop
+         * (e.g., release_plan). For ordinary shape-specific tweaks,
+         * prefer `overlay` so the universal procedure stays canonical.
+         */
+        customPromptBuilder?: import('../scopeGatekeeper').GatekeeperConfig['customPromptBuilder'];
+      };
     },
   ): Promise<
     | { success: true; bloom: T; record: GovernedStreamRecord; keptIds: string[] }
@@ -1775,8 +2030,38 @@ export class Phase1Handler implements PhaseHandler {
         ...spec.priorRecordIds,
         ...(lastRecord ? [lastRecord.id] : []),
       ];
-      const record = spec.writeBloomRecord(bloom, derivedFrom);
+      let record = spec.writeBloomRecord(bloom, derivedFrom);
       ctx.engine.ingestionPipeline.ingest(record);
+
+      // Scope gatekeeper — opt-in per round. Runs an LLM prune of the
+      // proposer's output BEFORE the decision card / downstream
+      // consumers see it. Supersedes the bloom artifact with the
+      // pruned version and writes a scope_prune_decision audit record.
+      // Env var JANUMICODE_SCOPE_GATEKEEPER=off skips it (tests with
+      // mock LLM queues that don't account for the extra gatekeeper
+      // call use this to keep their fixture counts deterministic).
+      const gatekeeperEnabled = (process.env.JANUMICODE_SCOPE_GATEKEEPER ?? 'on') !== 'off';
+      if (spec.gatekeeper && gatekeeperEnabled) {
+        const pruneOutcome = await this.runScopeGatekeeperForBloom(
+          ctx, spec.subPhaseId, spec.gatekeeper.bloomDescription,
+          spec.mapItems(bloom), record.id,
+          {
+            overlay: spec.gatekeeper.overlay,
+            customPromptBuilder: spec.gatekeeper.customPromptBuilder,
+          },
+        );
+        if (pruneOutcome.dropped.length > 0 || pruneOutcome.error) {
+          // Apply the prune to the bloom and write the pruned artifact.
+          const keptSet = new Set(pruneOutcome.kept_ids);
+          const prunedBloom = spec.gatekeeper.applyPrune(bloom, keptSet);
+          const prunedRecord = spec.writeBloomRecord(prunedBloom, [record.id]);
+          ctx.engine.ingestionPipeline.ingest(prunedRecord);
+          ctx.engine.writer.supersedByRollback(record.id, prunedRecord.id);
+          bloom = prunedBloom;
+          record = prunedRecord;
+        }
+      }
+
       lastBloom = bloom;
       lastRecord = record;
 
@@ -1812,6 +2097,156 @@ export class Phase1Handler implements PhaseHandler {
 
     // Unreachable — loop always returns via success or max-iterations path.
     return { success: false, error: `Sub-phase ${spec.subPhaseId} feedback loop exited unexpectedly`, };
+  }
+
+  /**
+   * Invoke the scope gatekeeper for a freshly-emitted bloom artifact.
+   *
+   * Loads distilled upstream-extraction artifacts (Phase 1.0a-f outputs)
+   * as the gatekeeper's ground-truth context, runs the LLM prune, and
+   * writes a `scope_prune_decision` audit record. Returns the prune
+   * outcome so the caller can apply it to the bloom shape it owns.
+   *
+   * On any failure (LLM throw, parse fail), the gatekeeper module
+   * already degrades to "keep all items" — this method propagates that
+   * safely so the workflow continues with no data loss.
+   */
+  private async runScopeGatekeeperForBloom(
+    ctx: PhaseContext,
+    subPhaseId: string,
+    bloomDescription: string,
+    items: Array<{ id: string; label: string; description?: string; tradeoffs?: string }>,
+    originalArtifactId: string,
+    options?: {
+      overlay?: string;
+      customPromptBuilder?: import('../scopeGatekeeper').GatekeeperConfig['customPromptBuilder'];
+    },
+  ): Promise<{ kept_ids: string[]; dropped: Array<{ id: string; reason: string }>; rationale_summary: string; error?: string }> {
+    const { engine, workflowRun } = ctx;
+    if (items.length === 0) {
+      return { kept_ids: [], dropped: [], rationale_summary: 'no items to prune' };
+    }
+
+    // Build upstream-extraction context from already-persisted artifacts.
+    const upstream = this.collectGatekeeperUpstreamContext(ctx);
+
+    const diRoute = engine.configManager.getRoutingModel('domain_interpreter');
+    const result = await runScopeGatekeeperPrune(
+      engine.llmCaller,
+      { provider: diRoute.provider, model: diRoute.model, baseUrl: diRoute.baseUrl },
+      {
+        workflowRunId: workflowRun.id,
+        phaseId: '1',
+        subPhaseId,
+        bloomDescription,
+        items,
+        upstreamContext: upstream,
+        agentRole: 'domain_interpreter',
+        overlay: options?.overlay,
+        customPromptBuilder: options?.customPromptBuilder,
+      },
+    );
+
+    // Write the audit record. Even when nothing was dropped, we emit
+    // it so the run's history shows the gatekeeper was consulted.
+    const auditContent: ScopePruneDecisionContent = {
+      kind: 'scope_prune_decision',
+      schemaVersion: '1.0',
+      sub_phase_id: subPhaseId,
+      original_artifact_id: originalArtifactId,
+      pruned_artifact_id: '',  // set after the pruned write — fixed up below by caller
+      kept_ids: result.kept_ids,
+      dropped: result.dropped.map((d) => {
+        const orig = items.find((it) => it.id === d.id);
+        return { id: d.id, label: orig?.label, reason: d.reason };
+      }),
+      rationale_summary: result.rationale_summary,
+      gatekeeper_provider: result.provider,
+      gatekeeper_model: result.model,
+      duration_ms: result.duration_ms,
+    };
+    engine.writer.writeRecord({
+      record_type: 'scope_prune_decision',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: subPhaseId,
+      produced_by_agent_role: 'domain_interpreter',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [originalArtifactId],
+      content: auditContent as unknown as Record<string, unknown>,
+    });
+
+    getLogger().info('workflow', 'Scope gatekeeper prune complete', {
+      workflow_run_id: workflowRun.id,
+      sub_phase_id: subPhaseId,
+      items_in: items.length,
+      kept: result.kept_ids.length,
+      dropped: result.dropped.length,
+      duration_ms: result.duration_ms,
+    });
+
+    return {
+      kept_ids: result.kept_ids,
+      dropped: result.dropped,
+      rationale_summary: result.rationale_summary,
+      error: result.error,
+    };
+  }
+
+  /**
+   * Assemble the gatekeeper's upstream-context object by pulling the
+   * latest current-version Phase 1 extraction artifacts from the
+   * governed stream.
+   */
+  private collectGatekeeperUpstreamContext(ctx: PhaseContext): GatekeeperUpstreamContext {
+    const { engine, workflowRun } = ctx;
+    const all = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
+    const byKind = new Map<string, Record<string, unknown>>();
+    for (const r of all) {
+      if (!r.is_current_version) continue;
+      const c = r.content as Record<string, unknown>;
+      const kind = typeof c.kind === 'string' ? c.kind : undefined;
+      if (kind) byKind.set(kind, c);
+    }
+    const id = byKind.get('intent_discovery');
+    const tcd = byKind.get('technical_constraints_discovery');
+    const crd = byKind.get('compliance_retention_discovery');
+    const vvd = byKind.get('vv_requirements_discovery');
+    const sc = byKind.get('scope_classification');
+    // Read the LATEST cv=1 bloom artifacts (the gatekeeper-pruned
+    // outputs) so downstream gatekeepers see the AUTHORITATIVE
+    // accepted set, not just the narrative Analysis Summary.
+    const bdb = byKind.get('business_domains_bloom');
+    const ujb = byKind.get('user_journey_bloom');
+    const swb = byKind.get('system_workflow_bloom');
+    const eb  = byKind.get('entities_bloom');
+    const ctx_: GatekeeperUpstreamContext = {
+      analysisSummary: typeof id?.analysisSummary === 'string' ? id.analysisSummary as string : undefined,
+      intentConstraints: Array.isArray(id?.constraints) ? id.constraints as Array<{id?: string; text: string}> : undefined,
+      intentRequirements: Array.isArray(id?.requirements) ? id.requirements as Array<{id?: string; text: string}> : undefined,
+      intentOpenQuestions: Array.isArray(id?.openQuestions) ? id.openQuestions as Array<{id?: string; text: string}> : undefined,
+      technicalConstraints: Array.isArray(tcd?.technicalConstraints) ? tcd.technicalConstraints as Array<{id?: string; text: string}> : undefined,
+      complianceItems: Array.isArray(crd?.complianceExtractedItems) ? crd.complianceExtractedItems as Array<{id?: string; text: string; type?: string}> : undefined,
+      vvRequirements: Array.isArray(vvd?.vvRequirements) ? vvd.vvRequirements as Array<{id?: string; target?: string; threshold?: string}> : undefined,
+      scopeClassification: sc ? { breadth: sc.breadth as string, depth: sc.depth as string } : undefined,
+      acceptedDomains: Array.isArray(bdb?.domains)
+        ? (bdb.domains as Array<Record<string, unknown>>).map(d => ({ id: String(d.id), name: String(d.name ?? ''), description: typeof d.description === 'string' ? d.description : undefined }))
+        : undefined,
+      acceptedPersonas: Array.isArray(bdb?.personas)
+        ? (bdb.personas as Array<Record<string, unknown>>).map(p => ({ id: String(p.id), name: String(p.name ?? ''), description: typeof p.description === 'string' ? p.description : undefined }))
+        : undefined,
+      acceptedJourneys: Array.isArray(ujb?.userJourneys)
+        ? (ujb.userJourneys as Array<Record<string, unknown>>).map(j => ({ id: String(j.id), title: String(j.title ?? j.name ?? ''), personaId: typeof j.personaId === 'string' ? j.personaId : undefined }))
+        : undefined,
+      acceptedWorkflows: Array.isArray(swb?.workflows)
+        ? (swb.workflows as Array<Record<string, unknown>>).map(w => ({ id: String(w.id), name: String(w.name ?? ''), businessDomainId: typeof w.businessDomainId === 'string' ? w.businessDomainId : undefined }))
+        : undefined,
+      acceptedEntities: Array.isArray(eb?.entities)
+        ? (eb.entities as Array<Record<string, unknown>>).map(e => ({ id: String(e.id), name: String(e.name ?? ''), businessDomainId: typeof e.businessDomainId === 'string' ? e.businessDomainId : undefined }))
+        : undefined,
+    };
+    return ctx_;
   }
 
   /**
@@ -2346,14 +2781,67 @@ export class Phase1Handler implements PhaseHandler {
     vvRequirements?: VVRequirement[];
     canonicalVocabulary?: VocabularyTerm[];
   }): ProductDescriptionHandoffContent {
-    // Refresh phasing's journeyIds against the accepted journeys — journeys
-    // pruned in 1.3 must not linger in any phase's journeyIds list. This
-    // replaces v1's finalized-plan merge behaviour deterministically.
-    const acceptedJourneyIds = new Set(input.journeys.map(j => j.id));
-    const phasingStrategy = input.discovery.phasingStrategy.map(phase => ({
-      ...phase,
-      journeyIds: (phase.journeyIds ?? []).filter(id => acceptedJourneyIds.has(id)),
-    }));
+    // Refresh phasing's journeyIds against the accepted journeys.
+    //
+    // History: intent_discovery (Phase 1.0b) emits seed phasing entries
+    // with abstract journey IDs the LLM invented at that stage (e.g.
+    // UJ-SHORTEN_URL). user_journey_bloom (Phase 1.3a) then produces the
+    // authoritative kept journey set with DIFFERENT IDs (e.g.
+    // UJ-CREATE-SHORT-LINK-WEB). The seed IDs are dead by this point.
+    //
+    // Resolution: strip the seed `journey_ids` / `journeyIds` fields and
+    // re-populate `journeyIds` from the accepted set. Each accepted
+    // journey carries an `implementationPhase` tag (set by 1.3a per the
+    // validated phasing strategy). We distribute kept journeys to phases
+    // by matching `UserJourney.implementationPhase` against
+    // `PhasingPhase.phase`. Falls back to single-phase ("assign all")
+    // when only one phase exists, which is the dominant thin-slice shape.
+    const acceptedJourneyIds = input.journeys.map(j => j.id);
+    const acceptedJourneyIdSet = new Set(acceptedJourneyIds);
+
+    // Build phase-tag → [journeyId] index from the accepted set so each
+    // phase can claim its assigned journeys. Normalise the tag (trim +
+    // case-fold) since the LLM occasionally emits "phase 1" / "PHASE 1".
+    const normalisePhaseTag = (s: unknown): string =>
+      typeof s === 'string' ? s.trim().toLowerCase() : '';
+    const journeysByPhaseTag = new Map<string, string[]>();
+    for (const j of input.journeys) {
+      const tag = normalisePhaseTag(j.implementationPhase);
+      if (!tag) continue;
+      const bucket = journeysByPhaseTag.get(tag) ?? [];
+      bucket.push(j.id);
+      journeysByPhaseTag.set(tag, bucket);
+    }
+
+    const phasingStrategy = input.discovery.phasingStrategy.map((phase, _idx, arr) => {
+      const preFiltered = (phase.journeyIds ?? []).filter(id => acceptedJourneyIdSet.has(id));
+      const seedSnake = ((phase as unknown as { journey_ids?: unknown }).journey_ids);
+      const seedSnakeFiltered = Array.isArray(seedSnake)
+        ? (seedSnake as unknown[]).filter((id): id is string => typeof id === 'string' && acceptedJourneyIdSet.has(id))
+        : [];
+      let journeyIds = [...new Set([...preFiltered, ...seedSnakeFiltered])];
+
+      // Multi-phase distribution: when the filter produced nothing,
+      // claim journeys whose `implementationPhase` matches this phase's
+      // tag. This is the correct path when the seed IDs are dead but
+      // 1.3a tagged each kept journey with the validated phase name.
+      if (journeyIds.length === 0) {
+        const tagged = journeysByPhaseTag.get(normalisePhaseTag(phase.phase)) ?? [];
+        journeyIds = [...tagged];
+      }
+
+      // Single-phase fallback: when the strategy has exactly one phase
+      // and we still have nothing (e.g. 1.3a omitted the tag), assign
+      // all accepted journeys. Correct for "Phase 1 = deliver" plans.
+      if (journeyIds.length === 0 && arr.length === 1 && acceptedJourneyIds.length > 0) {
+        journeyIds = [...acceptedJourneyIds];
+      }
+
+      // Strip seed snake_case so only camelCase leaves this function.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { journey_ids: _stripped, ...phaseSansSnake } = phase as unknown as Record<string, unknown>;
+      return { ...phaseSansSnake, journeyIds } as typeof phase;
+    });
 
     return {
       kind: 'product_description_handoff',
@@ -2399,9 +2887,21 @@ export class Phase1Handler implements PhaseHandler {
    * phases to read the richer handoff directly.
    */
   private deriveIntentStatementFromHandoff(handoff: ProductDescriptionHandoffContent): Record<string, unknown> {
-    const primaryPersona = handoff.personas[0];
-    const whoItServes = primaryPersona ? `${primaryPersona.name} — ${primaryPersona.description}` : 'unspecified';
-    const problemItSolves = handoff.productDescription.length > 0 ? handoff.productDescription : handoff.summary;
+    // DEFECT-5 fix: previously problem_it_solves was set to
+    // productDescription verbatim, duplicating the description field.
+    // Derive a distinct problem framing from the analysis summary's
+    // first sentence (which typically articulates the problem statement)
+    // and the personas' pain points (each persona's description often
+    // names the user's pain — "Anyone who wants to share a long URL").
+    // Compose a problem-focused statement that is structurally distinct
+    // from the description.
+    //
+    // who_it_serves: previously single persona; widen to all primary
+    // personas so the intent_statement reflects the full audience.
+    const whoItServes = handoff.personas.length > 0
+      ? handoff.personas.map(p => `${p.name} (${p.description})`).join('; ')
+      : 'unspecified';
+    const problemItSolves = this.deriveProblemStatement(handoff);
     return {
       product_concept: {
         name: handoff.productVision || 'Untitled product',
@@ -2419,6 +2919,48 @@ export class Phase1Handler implements PhaseHandler {
         .filter(l => l.category === 'deferred_decision' || l.category === 'followup')
         .map(l => l.description),
     };
+  }
+
+  /**
+   * Derive a problem-focused statement that is structurally distinct
+   * from the product description. Used by intent_statement's
+   * problem_it_solves slot.
+   *
+   * Heuristic strategy:
+   *   1. If any persona has `painPoints`, weave those into a "users
+   *      face X" statement — most directly answers "what problem does
+   *      this solve?".
+   *   2. Else if the analysisSummary contains a sentence with problem-
+   *      indicating phrasing (problem, need, frustration, pain, want,
+   *      lack, difficult), surface that sentence.
+   *   3. Else fall back to a synthetic statement composed from the
+   *      product vision: "<Personas> need <vision-paraphrase>".
+   *
+   * The output is intentionally shorter and more focused than the
+   * description, and never duplicates it verbatim.
+   */
+  private deriveProblemStatement(handoff: ProductDescriptionHandoffContent): string {
+    // Strategy 1: persona pain points.
+    const painPoints = handoff.personas.flatMap(p => p.painPoints ?? []).filter(s => s.trim().length > 0);
+    if (painPoints.length > 0) {
+      const personaName = handoff.personas[0]?.name ?? 'Users';
+      const uniquePains = [...new Set(painPoints)].slice(0, 3);
+      return `${personaName} and similar users face the following challenges: ${uniquePains.join('; ')}.`;
+    }
+
+    // Strategy 2: problem-indicating sentence in analysisSummary.
+    const summary = handoff.summary ?? '';
+    const sentences = summary.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+    const problemKeywords = /\b(problem|need|frustrat|pain|want|lack|difficult|tedious|cumbersome|awkward)\b/i;
+    const problemSentence = sentences.find(s => problemKeywords.test(s));
+    if (problemSentence && problemSentence !== handoff.productDescription) {
+      return problemSentence.trim();
+    }
+
+    // Strategy 3: synthetic fallback from vision.
+    const personaList = handoff.personas.slice(0, 2).map(p => p.name).join(' and ') || 'users';
+    const vision = handoff.productVision || handoff.productDescription || handoff.summary || 'a streamlined solution';
+    return `${personaList} need ${vision.replace(/^[A-Z]/, c => c.toLowerCase())}`;
   }
 
   // ── Format helpers (human-readable context blocks for templates) ──
@@ -2489,7 +3031,7 @@ export class Phase1Handler implements PhaseHandler {
   ): ExtractedItem[] {
     if (!Array.isArray(raw) || raw.length === 0) return fallback;
     const now = new Date().toISOString();
-    return raw.map((r, i) => {
+    const out = raw.map((r, i) => {
       if (typeof r === 'string') {
         return { id: `${idPrefix}-${i + 1}`, type, text: r, timestamp: now };
       }
@@ -2502,6 +3044,16 @@ export class Phase1Handler implements PhaseHandler {
         timestamp: (obj.timestamp as string) ?? now,
       };
     });
+    // Wrap in synthetic { items } so the field-diff's size_changed
+    // surfaces drops where, e.g., the LLM emitted 12 items but a key
+    // mismatch caused 0 to survive. Same shape as
+    // normalizeTechnicalConstraints to keep grep queries consistent.
+    traceNormalize(
+      `phase1.normalizeExtractedItems.${type}`,
+      { items: raw },
+      { items: out },
+    );
+    return out;
   }
 
   /**
@@ -3184,56 +3736,14 @@ Re-emit this single journey as a JSON object that matches the original schema (i
   // ── Wave 7 helpers ───────────────────────────────────────────────
 
   private normalizeWorkflowV2(w: Record<string, unknown>): WorkflowV2 {
-    const rawTriggers = Array.isArray(w.triggers) ? w.triggers as Array<Record<string, unknown>> : [];
-    const triggers: WorkflowTrigger[] = rawTriggers
-      .map(t => this.normalizeWorkflowTrigger(t))
-      .filter((t): t is WorkflowTrigger => t !== null);
-    const rawSteps = Array.isArray(w.steps) ? w.steps as Array<Record<string, unknown>> : [];
-    const steps: WorkflowStep[] = rawSteps.map((s, i) => ({
-      stepNumber: typeof s.stepNumber === 'number' ? s.stepNumber : i + 1,
-      actor: typeof s.actor === 'string' ? s.actor : 'System',
-      action: typeof s.action === 'string' ? s.action : '',
-      expectedOutcome: typeof s.expectedOutcome === 'string' ? s.expectedOutcome : '',
-    }));
-    const rawActors = Array.isArray(w.actors) ? w.actors.filter((x): x is string => typeof x === 'string') : [];
-    // Always derive backs_journeys from triggers; the LLM-supplied list
-    // is a hint and frequently drifts (extras without matching triggers,
-    // missing entries when the LLM forgets to populate it). The verifier
-    // compares against derived truth, so we normalize unconditionally.
-    const backs_journeys = Array.from(new Set(triggers
-      .filter((t): t is Extract<WorkflowTrigger, { kind: 'journey_step' }> => t.kind === 'journey_step')
-      .map(t => t.journey_id)));
-    return {
-      id: typeof w.id === 'string' ? w.id : '',
-      businessDomainId: typeof w.businessDomainId === 'string' ? w.businessDomainId : '',
-      name: typeof w.name === 'string' ? w.name : '',
-      description: typeof w.description === 'string' ? w.description : '',
-      steps,
-      triggers,
-      actors: rawActors,
-      backs_journeys,
-      source: (typeof w.source === 'string' ? w.source : undefined) as WorkflowV2['source'],
-    };
+    // Delegated to the extracted pure-function module so the dual-shape
+    // (snake_case / camelCase) tolerance is unit-tested in isolation.
+    // See phase1Normalizers.ts and feedback_normalizer_case_dual_keys.md.
+    return normalizeWorkflowV2Pure(w);
   }
 
   private normalizeWorkflowTrigger(t: Record<string, unknown>): WorkflowTrigger | null {
-    const kind = t.kind;
-    if (kind === 'journey_step' && typeof t.journey_id === 'string' && typeof t.step_number === 'number') {
-      return { kind, journey_id: t.journey_id, step_number: t.step_number };
-    }
-    if (kind === 'schedule' && typeof t.cadence === 'string') {
-      return { kind, cadence: t.cadence };
-    }
-    if (kind === 'event' && typeof t.event_type === 'string') {
-      return { kind, event_type: t.event_type };
-    }
-    if (kind === 'compliance' && typeof t.regime_id === 'string' && typeof t.rule === 'string') {
-      return { kind, regime_id: t.regime_id, rule: t.rule };
-    }
-    if (kind === 'integration' && typeof t.integration_id === 'string' && typeof t.event === 'string') {
-      return { kind, integration_id: t.integration_id, event: t.event };
-    }
-    return null;
+    return normalizeWorkflowTriggerPure(t);
   }
 
   private formatJourneysWithSteps(js: UserJourney[]): string {

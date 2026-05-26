@@ -46,6 +46,29 @@ export function loadFixtures(filterSubPhases?: Set<string>): Map<string, LoadedF
   return out;
 }
 
+/**
+ * Load a single fixture by absolute path. Used by the acceptance
+ * harness which addresses fixtures by registered path rather than
+ * discovering all of them.
+ */
+export function loadFixture(absPath: string): Fixture {
+  const raw = readFileSync(absPath, 'utf-8');
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Fixture ${absPath} is not valid JSON: ${(err as Error).message}`);
+  }
+  const parsed = FixtureSchema.safeParse(json);
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((i) => `  ${i.path.join('.') || '<root>'}: ${i.message}`)
+      .join('\n');
+    throw new Error(`Fixture ${absPath} failed schema validation:\n${issues}`);
+  }
+  return parsed.data;
+}
+
 export function parseTemplateFilter(env: string | undefined): Set<string> | undefined {
   if (!env) return undefined;
   const items = env.split(',').map((s) => s.trim()).filter(Boolean);

@@ -13,6 +13,9 @@ import { InvocationLogFile } from '../llm/invocationLogger';
 import { buildLogFilenamePrefix } from '../llm/llmCaller';
 import type { GovernedStreamWriter } from './governedStreamWriter';
 import type { AgentRole, PhaseId } from '../types/records';
+import { emitTransformationStep } from '../trace/emit';
+import { emitLifecycle } from '../trace/lifecycle';
+import { getLogger } from '../logging';
 
 export interface CLITraceContext {
   workflowRunId: string;
@@ -206,6 +209,55 @@ export class AgentInvoker {
     let chunkSequence = 0;
     let cumulativeChars = 0;
 
+    // Tier-1 lifecycle: executor.dispatched. ts-18's alphabetical-order
+    // anti-pattern would have been visible in seconds with this in place
+    // (one event per dispatch, in DB-insertion order).
+    emitLifecycle('executor.dispatched', {
+      workflow_run_id: options.traceContext?.workflowRunId ?? null,
+      phase_id: options.traceContext?.phaseId ?? null,
+      sub_phase_id: options.traceContext?.subPhaseId ?? null,
+      backing_tool: options.backingTool,
+      model: options.model ?? null,
+      task_id: options.traceContext?.taskId ?? null,
+      invocation_record_id: invocationRecordId,
+      label: options.traceContext?.label ?? null,
+      cwd: options.cwd ?? null,
+    });
+    emitLifecycle('executor.invocation_status_change', {
+      workflow_run_id: options.traceContext?.workflowRunId ?? null,
+      sub_phase_id: options.traceContext?.subPhaseId ?? null,
+      invocation_record_id: invocationRecordId,
+      task_id: options.traceContext?.taskId ?? null,
+      from: null,
+      to: 'running',
+    });
+
+    // Transformation trace: capture the materialized CLI invocation (command
+    // + args + prompt). Paired with a cli_returned emit below. Both carry
+    // `invocation_id` in metadata so the walk-back CLI can group them.
+    const traceSubPhaseId = options.traceContext?.subPhaseId ?? undefined;
+    const traceAgentRole = options.traceContext?.agentRole ?? null;
+    const cliInvokedStepId = emitTransformationStep({
+      step_type: 'cli_invoked',
+      sub_phase_id_override: traceSubPhaseId,
+      agent_role: traceAgentRole,
+      payload: {
+        backingTool: options.backingTool,
+        model: options.model ?? null,
+        command,
+        args,
+        cwd: options.cwd ?? null,
+        prompt: options.prompt,
+        system: options.system ?? null,
+      },
+      metadata: {
+        invocation_id: invocationRecordId,
+        task_id: options.traceContext?.taskId ?? null,
+        label: options.traceContext?.label ?? null,
+        prompt_size_chars: options.prompt.length,
+      },
+    });
+
     // Open the per-invocation live log (parity with LLMCaller). Writes
     // a header carrying the full stdin upfront, appends chunks as they
     // stream, and writes a trailer on completion with final text +
@@ -311,6 +363,52 @@ export class AgentInvoker {
         reasoningText,
       );
 
+      // Tier-1 lifecycle: executor.invocation_status_change to terminal
+      // state. This is the seam whose absence let ts-18's 20 executors
+      // sit in `status="running"` forever. agent_output records are
+      // separate; this event closes the loop unconditionally so the
+      // orchestrator's stall watchdog can correlate.
+      emitLifecycle('executor.invocation_status_change', {
+        workflow_run_id: options.traceContext?.workflowRunId ?? null,
+        sub_phase_id: options.traceContext?.subPhaseId ?? null,
+        invocation_record_id: invocationRecordId,
+        task_id: options.traceContext?.taskId ?? null,
+        from: 'running',
+        to: success ? 'completed' : 'failed',
+        exit_code: result.exitCode,
+        timed_out: result.timedOut,
+        idled_out: result.idledOut,
+        duration_ms: Date.now() - startedAt,
+        agent_output_record_id: agentOutputId,
+      });
+
+      // Transformation trace: capture the CLI return. Critical because
+      // CLI returns are the most opaque part of the pipeline (subprocess
+      // output, stream parsing). Carries the parent's invocation_id +
+      // step_id so walk-back can pair this with the cli_invoked step.
+      emitTransformationStep({
+        step_type: 'cli_returned',
+        sub_phase_id_override: traceSubPhaseId,
+        agent_role: traceAgentRole,
+        output_record_id: agentOutputId ?? undefined,
+        payload: {
+          exitCode: result.exitCode,
+          timedOut: result.timedOut,
+          idledOut: result.idledOut,
+          stdoutText: result.stdoutText ?? '',
+          finalText,
+          reasoningText: reasoningText || null,
+        },
+        duration_ms: Date.now() - startedAt,
+        error: success ? undefined : { message: errorMessage ?? 'CLI invocation failed' },
+        metadata: {
+          invocation_id: invocationRecordId,
+          parent_cli_invoked_step_id: cliInvokedStepId,
+          status: success ? 'success' : 'error',
+          stdout_chars: (result.stdoutText ?? '').length,
+        },
+      });
+
       logFile?.writeFinal({
         status: success ? 'success' : 'error',
         text: finalText,
@@ -394,7 +492,25 @@ export class AgentInvoker {
     command: string,
     args: string[],
   ): string | null {
-    if (!this.writer || !options.traceContext) return null;
+    if (!this.writer) {
+      // Precondition gate. Emit a lifecycle event so the "why is agent_output
+      // missing?" question has a grep-able answer. ts-18 surfaced exactly
+      // this category of silent gap; observability prevents recurrence.
+      emitLifecycle('executor.agent_invocation_skipped', {
+        workflow_run_id: options.traceContext?.workflowRunId ?? null,
+        sub_phase_id: options.traceContext?.subPhaseId ?? null,
+        task_id: options.traceContext?.taskId ?? null,
+        reason: 'writer_not_attached',
+      });
+      return null;
+    }
+    if (!options.traceContext) {
+      emitLifecycle('executor.agent_invocation_skipped', {
+        reason: 'no_trace_context',
+        backing_tool: options.backingTool,
+      });
+      return null;
+    }
     const ctx = options.traceContext;
     try {
       const record = this.writer.writeRecord({
@@ -424,7 +540,25 @@ export class AgentInvoker {
         },
       });
       return record.id;
-    } catch {
+    } catch (err) {
+      // Previously this catch was silent. ts-18 archaeology suggests
+      // sidecar-DB-shutdown races caused some writes to throw here and
+      // be lost. Now we surface the failure both to stderr and as a
+      // lifecycle event so the operator can correlate it with the
+      // session-abort path.
+      const message = err instanceof Error ? err.message : String(err);
+      getLogger().warn('agent', 'agent_invocation write failed', {
+        workflow_run_id: ctx.workflowRunId,
+        sub_phase_id: ctx.subPhaseId ?? null,
+        task_id: ctx.taskId ?? null,
+        error: message,
+      });
+      emitLifecycle('executor.agent_invocation_write_failed', {
+        workflow_run_id: ctx.workflowRunId,
+        sub_phase_id: ctx.subPhaseId ?? null,
+        task_id: ctx.taskId ?? null,
+        error: message,
+      });
       return null;
     }
   }
@@ -454,7 +588,39 @@ export class AgentInvoker {
     text: string = '',
     thinking: string = '',
   ): { agentOutputId: string | null } {
-    if (!this.writer || !invocationId || !options.traceContext) return { agentOutputId: null };
+    // Precondition gates — the load-bearing observability fix from FU1.
+    // ts-18 ran 20 CLI executor invocations to terminal state, yet zero
+    // agent_output records landed. The most plausible root cause was the
+    // sidecar-DB process shutting down before this method completed,
+    // throwing inside writeRecord and being silently swallowed by the
+    // original catch. Now each gate emits a distinct lifecycle event so
+    // the operator can grep for the cause.
+    if (!this.writer) {
+      emitLifecycle('executor.agent_output_skipped', {
+        workflow_run_id: options.traceContext?.workflowRunId ?? null,
+        sub_phase_id: options.traceContext?.subPhaseId ?? null,
+        invocation_record_id: invocationId,
+        task_id: options.traceContext?.taskId ?? null,
+        reason: 'writer_not_attached',
+      });
+      return { agentOutputId: null };
+    }
+    if (!invocationId) {
+      emitLifecycle('executor.agent_output_skipped', {
+        workflow_run_id: options.traceContext?.workflowRunId ?? null,
+        sub_phase_id: options.traceContext?.subPhaseId ?? null,
+        task_id: options.traceContext?.taskId ?? null,
+        reason: 'no_invocation_id_upstream_write_failed',
+      });
+      return { agentOutputId: null };
+    }
+    if (!options.traceContext) {
+      emitLifecycle('executor.agent_output_skipped', {
+        invocation_record_id: invocationId,
+        reason: 'no_trace_context',
+      });
+      return { agentOutputId: null };
+    }
     const ctx = options.traceContext;
     const status = errorMessage === null ? 'success' : 'error';
     try {
@@ -494,8 +660,29 @@ export class AgentInvoker {
         },
       });
       return { agentOutputId: rec.id };
-    } catch {
-      /* best-effort */
+    } catch (err) {
+      // Previously silent (/* best-effort */). Surfacing the failure
+      // because of the ts-18 root-cause investigation: sidecar shutdown
+      // / DB-closed errors here directly produce "executor stuck in
+      // running" symptoms. A logged warning + lifecycle event gives the
+      // operator a concrete signal instead of a silent gap.
+      const message = err instanceof Error ? err.message : String(err);
+      getLogger().warn('agent', 'agent_output write failed', {
+        workflow_run_id: ctx.workflowRunId,
+        sub_phase_id: ctx.subPhaseId ?? null,
+        task_id: ctx.taskId ?? null,
+        invocation_id: invocationId,
+        error: message,
+      });
+      emitLifecycle('executor.agent_output_write_failed', {
+        workflow_run_id: ctx.workflowRunId,
+        sub_phase_id: ctx.subPhaseId ?? null,
+        invocation_record_id: invocationId,
+        task_id: ctx.taskId ?? null,
+        status,
+        error_message: errorMessage,
+        write_error: message,
+      });
       return { agentOutputId: null };
     }
   }

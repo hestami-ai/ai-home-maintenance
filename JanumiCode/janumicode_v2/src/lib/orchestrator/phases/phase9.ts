@@ -27,7 +27,10 @@ import { TestRunner, type TestSuite } from '../testRunner';
 import { EvalRunner, type EvaluationCriterion } from '../evalRunner';
 import { ExecutionScheduler, type SchedulerLeaf, type SchedulerReleaseEntry } from '../executionScheduler';
 import { extractPriorPhaseContext, buildEffectiveTaskView, buildEffectiveTestPlanView } from './phaseContext';
+import { runPacketSynthesisSubPhase } from './packetSynthesis';
+import { runCycleControllerSubPhase } from './cycleController';
 import { randomUUID } from 'node:crypto';
+import type { ImplementationPacketContent } from '../../types/records';
 
 export class Phase9Handler implements PhaseHandler {
   readonly phaseId: PhaseId = '9';
@@ -95,6 +98,28 @@ export class Phase9Handler implements PhaseHandler {
     const artifacts = execContextBuilder.extractArtifacts(workflowRun.id);
     const planRecord = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced')
       .find(r => (r.content as Record<string, unknown>).kind === 'implementation_plan');
+
+    // ── 9.0 — Packet Synthesis (NEW) ─────────────────────────
+    // Bundles upstream context (user stories, ACs, NFRs, component
+    // contract, data models, APIs, test cases, eval criteria, technical
+    // constraints, compliance items) into one implementation_packet
+    // per atomic Phase 6.1a task. Phase 9's executor then receives the
+    // packet's rendered context — the structural ts-16 fix that gives
+    // the executor everything it needs without inventing.
+    // See docs/design/implementation-packet-synthesis.md.
+    const packetResult = runPacketSynthesisSubPhase({ workflowRun, engine });
+    const packetByTaskId = new Map<string, ImplementationPacketContent>();
+    for (const p of packetResult.packets) {
+      packetByTaskId.set(p.task.id, p);
+    }
+    getLogger().info('workflow', 'Phase 9.0 packet_synthesis complete', {
+      workflow_run_id: workflowRun.id,
+      packets_total: packetResult.packets.length,
+      packets_failed: packetResult.failedPackets,
+      blocking_failures: packetResult.totalBlockingFailures,
+      advisory_findings: packetResult.totalAdvisoryFindings,
+      ai_proposed_root_count: packetResult.totalAiProposedRoots,
+    });
 
     // ── 9.1 — Implementation Task Execution ───────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'implementation_task_execution');
@@ -175,6 +200,12 @@ export class Phase9Handler implements PhaseHandler {
       },
       generateId,
     );
+
+    // Inject the packet map so each leaf's executor invocation sees the
+    // full bundled context (user stories, ACs, tests, etc.).
+    if (packetByTaskId.size > 0) {
+      scheduler.setPacketContext(packetByTaskId);
+    }
 
     const scheduleResult = await scheduler.run({
       workflowRunId: workflowRun.id,
@@ -508,6 +539,24 @@ export class Phase9Handler implements PhaseHandler {
     artifactIds.push(gateRecord.id);
     engine.eventBus.emit('phase_gate:pending', { phaseId: '9' });
 
+    // ── 9.9 — Cycle Controller ─────────────────────────────
+    // Decides whether to terminate (advance to Phase 10) or loop back
+    // to Phase 6/7/8 to fill gaps surfaced by packet_synthesis. The
+    // orchestrator main loop honors PhaseResult.cycleRestartTo by
+    // calling StateMachine.cycleRestartPhase.
+    // See docs/design/iterative-implementation-backlog.md §4.
+    const cycleResult = await runCycleControllerSubPhase({ workflowRun, engine }, {
+      atomicLeavesProduced: scheduleResult.successfulLeafCount,
+      deferredLeavesRemaining: scheduleResult.terminallyDeferredLeafCount,
+    });
+    artifactIds.push(cycleResult.recordId);
+
+    if (cycleResult.abort) {
+      return { success: false, error: 'Operator aborted at cycle ceiling mirror', artifactIds };
+    }
+    if (cycleResult.cycleRestartTo) {
+      return { success: true, artifactIds, cycleRestartTo: cycleResult.cycleRestartTo };
+    }
     return { success: true, artifactIds };
   }
 

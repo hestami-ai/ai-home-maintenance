@@ -4,5 +4,6 @@
     "chatgpt.commentCodeLensEnabled": false,
     "codium.codeCompletion.enable": false,
     "claudeCode.showThinkingSummaries":true,
-    "claudeCode.environmentVariables": []
+    "claudeCode.environmentVariables": [],
+    "claudeCode.allowDangerouslySkipPermissions": true
 }

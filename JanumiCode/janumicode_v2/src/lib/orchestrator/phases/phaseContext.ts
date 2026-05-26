@@ -19,6 +19,7 @@ import type { GovernedStreamRecord } from '../../types/records';
 export interface PriorPhaseContext {
   /** Phase 1 outputs */
   intentStatement: ArtifactContext | null;
+  businessDomainsBloom: ArtifactContext | null;
   /** Phase 2 outputs */
   functionalRequirements: ArtifactContext | null;
   nonFunctionalRequirements: ArtifactContext | null;
@@ -69,6 +70,7 @@ export function extractPriorPhaseContext(
 ): PriorPhaseContext {
   const ctx: PriorPhaseContext = {
     intentStatement: null,
+    businessDomainsBloom: null,
     functionalRequirements: null,
     nonFunctionalRequirements: null,
     systemBoundary: null,
@@ -104,6 +106,13 @@ export function extractPriorPhaseContext(
           recordId: record.id,
           content: base,
           summary: summarizeIntentStatement(base),
+        };
+        break;
+      case 'business_domains_bloom':
+        ctx.businessDomainsBloom = {
+          recordId: record.id,
+          content: base,
+          summary: summarizeBusinessDomainsBloom(base),
         };
         break;
       case 'functional_requirements':
@@ -255,6 +264,20 @@ function summarizeIntentStatement(c: Record<string, unknown>): string {
     `Confirmed constraints: ${JSON.stringify(c.confirmed_constraints ?? [])}`,
     `Out of scope: ${JSON.stringify(c.out_of_scope ?? [])}`,
   ].join('\n');
+}
+
+function summarizeBusinessDomainsBloom(c: Record<string, unknown>): string {
+  // Phase 1.2 emits `businessDomains[]` (preferred) or `domains[]`
+  // depending on the path; tolerate both shapes when summarizing.
+  const list = ((c.businessDomains ?? c.domains) as Array<Record<string, unknown>> | undefined) ?? [];
+  if (list.length === 0) return 'No business domains identified';
+  const lines = list.map((d) => {
+    const id = (d.id as string) ?? '(no id)';
+    const name = (d.name as string) ?? '';
+    const description = (d.description as string) ?? '';
+    return `- ${id}${name ? ` — ${name}` : ''}${description ? `: ${description}` : ''}`;
+  });
+  return `Business Domains (${list.length}):\n${lines.join('\n')}`;
 }
 
 function summarizeFunctionalRequirements(c: Record<string, unknown>): string {

@@ -1,0 +1,29 @@
+{
+  "kind": "system_workflow_bloom",
+  "workflows": [
+    {
+      "id": "WF-URL-CREATION",
+      "name": "URL Creation and Storage",
+      "description": "Handles short URL creation: validate input, generate slug, encrypt, persist.",
+      "businessDomainId": "DOM-URL-SHORTENING",
+      "backs_journeys": ["UJ-CREATE-SHORT-URL"],
+      "source": "document-specified"
+    },
+    {
+      "id": "WF-ABUSE-REVIEW",
+      "name": "Abuse Review",
+      "description": "Display flagged URLs and process block/delete actions.",
+      "businessDomainId": "DOM-ABUSE-PREVENTION",
+      "backs_journeys": ["UJ-REPORT-ABUSE"],
+      "source": "document-specified"
+    },
+    {
+      "id": "WF-USER-ONBOARDING",
+      "name": "User Onboarding",
+      "description": "Create user account and dispatch welcome email.",
+      "businessDomainId": "DOM-ONBOARDING",
+      "backs_journeys": ["UJ-ONBOARD-USER"],
+      "source": "domain-standard"
+    }
+  ]
+}

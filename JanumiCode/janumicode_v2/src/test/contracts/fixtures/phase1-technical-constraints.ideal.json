@@ -1,0 +1,36 @@
+{
+  "kind": "technical_constraints_discovery",
+  "technical_extracted_items": [
+    {
+      "id": "TECH-AES-256-ENCRYPTION",
+      "category": "security",
+      "text": "Original URLs stored in the mappings table must be encrypted at rest using AES-256.",
+      "technology": "AES-256",
+      "rationale": "URLs may incidentally contain personally identifying or session tokens."
+    },
+    {
+      "id": "TECH-HTTPS-ONLY",
+      "category": "security",
+      "text": "Transport: HTTPS only on all public endpoints; HTTP requests redirect to HTTPS.",
+      "technology": "HTTPS"
+    },
+    {
+      "id": "TECH-LOGS-JSON-STDOUT",
+      "category": "monitoring",
+      "text": "Observability: structured JSON logs to stdout; logs ingested by the platform's standard log aggregator.",
+      "technology": "log aggregator"
+    },
+    {
+      "id": "TECH-PG-16",
+      "category": "database",
+      "text": "Persistence: Postgres 16+ on a single managed instance.",
+      "technology": "PostgreSQL"
+    },
+    {
+      "id": "TECH-CONTAINERIZED-SERVICE",
+      "category": "deployment",
+      "text": "Runtime: a single containerised service; no microservices.",
+      "technology": "Docker"
+    }
+  ]
+}

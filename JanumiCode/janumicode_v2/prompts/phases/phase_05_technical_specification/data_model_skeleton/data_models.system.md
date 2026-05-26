@@ -8,6 +8,7 @@ required_variables:
   - component_model_summary
   - software_domains_summary
   - system_requirements_summary
+  - technical_constraints_summary
   - detail_file_path
   - detail_file_content
   - janumicode_version_sha
@@ -55,10 +56,25 @@ Rules:
 - Do NOT invent plausible-sounding defaults to satisfy schema fields when source is silent.
 - Enforced by `ungrounded_operational_specifics` parameterization C (catalog §2).
 
+# Hard rules — non-contradiction with technical constraints
+
+The `technical_constraints_summary` block below is the **canonical TECH-* roster** captured in Sub-Phase 1.0c directly from the source spec. Data models MUST NOT contradict an entry — doing so is a defect (HIGH severity).
+
+Common failure modes to avoid:
+
+- TECH constraint mandates an encryption algorithm (e.g. "AES-256 at rest"): the entity storing the encrypted data MUST have a field for the ciphertext (e.g. `original_url_encrypted`) and SHOULD have a related field for an external KMS reference (e.g. `encryption_key_id`). The entity MUST NOT have a field storing key MATERIAL directly (e.g. `key_material: string`) — encryption keys belong in a KMS, not a database row, and modeling key material as a stored field defeats the encryption-at-rest constraint entirely.
+- TECH constraint says "logs to stdout" → there is NO `LogEvent` entity persisted in the product's own database for routine event logs. (A dedicated audit-trail entity for compliance-mandated audit history IS permitted when the spec mandates auditable history.)
+- TECH constraint says "Postgres single managed instance" → the data model targets ONE database. Do not model entities as "in component A's DB" vs "in component B's DB" — there is one DB.
+
+Enforced by `technical_constraint_contradiction` (catalog §2).
+
 CONTEXT:
 System Requirements (Phase 3.2 — what each entity must support): {{system_requirements_summary}}
 Component Model: {{component_model_summary}}
 Software Domains: {{software_domains_summary}}
+
+Technical Constraints (canonical TECH-* roster from Phase 1.0c — non-contradiction binding):
+{{technical_constraints_summary}}
 
 DETAIL FILE PATH (reference only): {{detail_file_path}}
 

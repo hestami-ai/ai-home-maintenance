@@ -1,0 +1,6 @@
+{
+  "kind": "scope_classification",
+  "breadth": "single_product",
+  "depth": "production_grade",
+  "rationale": "TinyURL is a single small product with explicit production-grade NFRs (latency, encryption, uptime)."
+}

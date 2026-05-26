@@ -1,0 +1,37 @@
+{
+  "kind": "entities_bloom",
+  "entities": [
+    {
+      "id": "ENT-URL-MAPPING",
+      "name": "URL Mapping",
+      "description": "Maps a short slug to an encrypted long URL.",
+      "businessDomainId": "DOM-URL-SHORTENING",
+      "keyAttributes": ["slug", "userId", "createdAt"],
+      "source": "domain-standard"
+    },
+    {
+      "id": "ENT-ABUSE-REPORT",
+      "name": "Abuse Report",
+      "description": "A report submitted against a slug indicating abusive use.",
+      "businessDomainId": "DOM-ABUSE-PREVENTION",
+      "keyAttributes": ["report_id", "slug", "submitted_at"],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-ABUSE-ACTION",
+      "name": "Abuse Action",
+      "description": "An administrative action taken against a slug after abuse review.",
+      "businessDomainId": "DOM-ABUSE-PREVENTION",
+      "keyAttributes": ["action_id", "slug", "action_type", "performed_at"],
+      "source": "document-specified"
+    },
+    {
+      "id": "ENT-USER",
+      "name": "User",
+      "description": "A registered Link Sharer or API user account.",
+      "businessDomainId": "DOM-ONBOARDING",
+      "keyAttributes": ["userId", "email"],
+      "source": "domain-standard"
+    }
+  ]
+}

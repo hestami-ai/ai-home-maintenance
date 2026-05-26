@@ -157,6 +157,14 @@ function ensureSchemaColumns(db: { exec: (sql: string) => void }): void {
     { table: 'workflow_runs', column: 'total_execution_waves',           ddl: 'INTEGER DEFAULT 0' },
     { table: 'workflow_runs', column: 'quarantined_leaf_count',          ddl: 'INTEGER DEFAULT 0' },
     { table: 'workflow_runs', column: 'terminally_deferred_leaf_count',  ddl: 'INTEGER DEFAULT 0' },
+    // Implementation packet synthesis (Phase 8 → 9 boundary).
+    { table: 'workflow_runs', column: 'packet_count',                       ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'packet_coherence_blocking_count',    ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'packet_coherence_advisory_count',    ddl: 'INTEGER DEFAULT 0' },
+    // Iterative-implementation-backlog cycle controller telemetry.
+    { table: 'workflow_runs', column: 'current_release_ordinal',            ddl: 'INTEGER' },
+    { table: 'workflow_runs', column: 'current_cycle_number',               ddl: 'INTEGER DEFAULT 0' },
+    { table: 'workflow_runs', column: 'max_cycles_per_release',             ddl: 'INTEGER DEFAULT 5' },
   ];
   for (const { table, column, ddl } of additive) {
     try {

@@ -1,0 +1,27 @@
+{
+  "kind": "intent_quality_check",
+  "completeness_findings": [
+    {
+      "field": "what_is_being_built",
+      "status": "present",
+      "severity": "high",
+      "explanation": "Intent explicitly defines TinyURL as a URL shortening service with HTTP API and web form backed by Postgres."
+    },
+    {
+      "field": "who_it_serves",
+      "status": "present",
+      "severity": "high",
+      "explanation": "Intent identifies Link Sharer and Link Clicker as the user personas."
+    },
+    {
+      "field": "what_problem_it_solves",
+      "status": "present",
+      "severity": "high",
+      "explanation": "Intent states the value is reliable redirect from short URLs to long destinations."
+    }
+  ],
+  "consistency_findings": [],
+  "coherence_findings": [],
+  "overall_status": "pass",
+  "system_proposal_offered_for": []
+}

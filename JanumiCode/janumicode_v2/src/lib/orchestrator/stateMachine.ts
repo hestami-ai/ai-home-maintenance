@@ -15,6 +15,9 @@
 import type { Database } from '../database/init';
 import type { IntentLens, PhaseId, WorkflowRun, WorkflowRunStatus } from '../types/records';
 import { PHASE_ORDER } from '../types/records';
+import { emitLifecycle } from '../trace/lifecycle';
+import { setSubPhase as setTraceSubPhase } from '../trace/traceContext';
+import { auditPauseSync, auditPhaseExitPauseSync, isAuditPauseEnabled } from './auditPause';
 
 // ── Valid Transitions ───────────────────────────────────────────────
 
@@ -116,6 +119,12 @@ export class StateMachine {
       decomposition_nfr_calls_used: (row.decomposition_nfr_calls_used as number) ?? 0,
       decomposition_max_depth_reached: (row.decomposition_max_depth_reached as number) ?? 0,
       active_release_plan_record_id: (row.active_release_plan_record_id as string) || null,
+      current_release_ordinal: (row.current_release_ordinal as number | null) ?? null,
+      current_cycle_number: (row.current_cycle_number as number) ?? 0,
+      max_cycles_per_release: (row.max_cycles_per_release as number) ?? 5,
+      packet_count: (row.packet_count as number) ?? 0,
+      packet_coherence_blocking_count: (row.packet_coherence_blocking_count as number) ?? 0,
+      packet_coherence_advisory_count: (row.packet_coherence_advisory_count as number) ?? 0,
     };
   }
 
@@ -136,6 +145,63 @@ export class StateMachine {
    * Attempt to transition to the next phase.
    * Validates against FORWARD_TRANSITIONS.
    */
+  /**
+   * Cycle-restart back-transition. Used by the cycle_controller sub-phase
+   * to route the workflow back to Phase 6/7/8 to fill gaps surfaced by
+   * packet_synthesis coherence failures, then continue forward through
+   * Phase 9 again. This bypasses the FORWARD_TRANSITIONS check that
+   * `advancePhase` enforces, but only for the specific subset of
+   * backward transitions the iterative-implementation-backlog design
+   * authorizes: Phase 9 (the only legitimate origin) → Phase 6 / 7 / 8.
+   *
+   * Also bumps `current_cycle_number` so the cycle counter and the
+   * iteration ceiling (`max_cycles_per_release`) work correctly.
+   *
+   * See docs/design/iterative-implementation-backlog.md §3.
+   */
+  cycleRestartPhase(runId: string, targetPhase: PhaseId): TransitionResult {
+    const run = this.getWorkflowRun(runId);
+    if (!run) {
+      return {
+        success: false,
+        error: `Workflow run ${runId} not found`,
+        previousPhase: null,
+        newPhase: targetPhase,
+      };
+    }
+    const currentPhase = run.current_phase_id;
+    if (currentPhase !== '9') {
+      return {
+        success: false,
+        error: `cycleRestartPhase only valid from Phase 9; current is ${currentPhase ?? '(none)'}`,
+        previousPhase: currentPhase,
+        newPhase: targetPhase,
+      };
+    }
+    if (!['6', '7', '8'].includes(targetPhase)) {
+      return {
+        success: false,
+        error: `cycleRestartPhase only allows targets 6, 7, 8; got ${targetPhase}`,
+        previousPhase: currentPhase,
+        newPhase: targetPhase,
+      };
+    }
+
+    const nextCycle = (run.current_cycle_number ?? 0) + 1;
+    this.db.prepare(`
+      UPDATE workflow_runs
+      SET current_phase_id = ?, current_sub_phase_id = NULL,
+          current_cycle_number = ?
+      WHERE id = ?
+    `).run(targetPhase, nextCycle, runId);
+
+    return {
+      success: true,
+      previousPhase: currentPhase,
+      newPhase: targetPhase,
+    };
+  }
+
   advancePhase(runId: string, targetPhase: PhaseId): TransitionResult {
     const run = this.getWorkflowRun(runId);
     if (!run) {
@@ -182,6 +248,24 @@ export class StateMachine {
       }
     }
 
+    // Read the prior sub-phase BEFORE the UPDATE so we can fire the
+    // phase-exit audit pause for it. advancePhase clears the sub_phase
+    // atomically with the phase change, so a sub_phase.exited emission
+    // from the next phase's first setSubPhase would see prior=null and
+    // never run. The phase-boundary hook below covers that gap.
+    const priorSubPhaseRow = this.db.prepare(
+      `SELECT current_sub_phase_id FROM workflow_runs WHERE id = ?`,
+    ).get(runId) as { current_sub_phase_id: string | null } | undefined;
+    const priorSubPhaseId = priorSubPhaseRow?.current_sub_phase_id ?? null;
+
+    // Emit phase.exited lifecycle event for the prior phase.
+    emitLifecycle('phase.exited', {
+      workflow_run_id: runId,
+      phase_id: currentPhase,
+      last_sub_phase_id: priorSubPhaseId,
+      next_phase_id: targetPhase,
+    });
+
     // Apply transition
     const status: WorkflowRunStatus = targetPhase === '10' ? 'in_progress' : 'in_progress';
     this.db.prepare(`
@@ -189,6 +273,20 @@ export class StateMachine {
       SET current_phase_id = ?, current_sub_phase_id = NULL, status = ?
       WHERE id = ?
     `).run(targetPhase, status, runId);
+
+    // Phase-boundary audit pause: covers the gap left by setSubPhase's
+    // sub_phase.exited not firing across phase boundaries (because the
+    // sub_phase_id was just cleared above). The pause runs ONCE per
+    // transition, captures the last sub-phase of the prior phase as
+    // the "prior" coordinate, and signals which phase comes next.
+    if (isAuditPauseEnabled() && priorSubPhaseId) {
+      auditPhaseExitPauseSync({
+        workflowRunId: runId,
+        priorPhaseId: currentPhase,
+        priorSubPhaseId,
+        nextPhaseId: targetPhase,
+      });
+    }
 
     return {
       success: true,
@@ -201,9 +299,44 @@ export class StateMachine {
    * Set the current sub-phase within the current phase.
    */
   setSubPhase(runId: string, subPhaseId: string): void {
+    // Read the prior sub-phase before we overwrite it so we can emit
+    // a sub_phase.exited event for it. This is the only seam where the
+    // orchestrator observes a transition; we can't get it elsewhere
+    // without re-reading workflow_runs everywhere.
+    const prior = this.db.prepare(
+      `SELECT current_sub_phase_id FROM workflow_runs WHERE id = ?`,
+    ).get(runId) as { current_sub_phase_id: string | null } | undefined;
     this.db.prepare(`
       UPDATE workflow_runs SET current_sub_phase_id = ? WHERE id = ?
     `).run(subPhaseId, runId);
+    if (prior?.current_sub_phase_id && prior.current_sub_phase_id !== subPhaseId) {
+      emitLifecycle('sub_phase.exited', {
+        workflow_run_id: runId,
+        sub_phase_id: prior.current_sub_phase_id,
+      });
+      // Audit-pause gate: when JANUMICODE_AUDIT_PAUSE=1, halt synchronously
+      // here so the audit agent can review the prior sub-phase's artifacts
+      // before the next handler runs. No-op when the env flag is off.
+      if (isAuditPauseEnabled()) {
+        const run = this.db.prepare(
+          `SELECT current_phase_id FROM workflow_runs WHERE id = ?`,
+        ).get(runId) as { current_phase_id: string | null } | undefined;
+        auditPauseSync({
+          workflowRunId: runId,
+          priorPhaseId: run?.current_phase_id ?? null,
+          priorSubPhaseId: prior.current_sub_phase_id,
+          nextSubPhaseId: subPhaseId,
+        });
+      }
+    }
+    emitLifecycle('sub_phase.entered', {
+      workflow_run_id: runId,
+      sub_phase_id: subPhaseId,
+    });
+    // Also push the new sub_phase_id into the TraceCtx so any downstream
+    // emit (transformation_step / lifecycle) without an override gets
+    // the current sub-phase automatically.
+    setTraceSubPhase(subPhaseId);
   }
 
   /**

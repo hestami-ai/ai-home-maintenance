@@ -21,6 +21,7 @@ import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveFrView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { runTestSaturationLoop } from './phase7_1a';
+import { runPhase7CycleDelta } from './runCycleDelta';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -64,6 +65,11 @@ export class Phase7Handler implements PhaseHandler {
   async execute(ctx: PhaseContext): Promise<PhaseResult> {
     const { workflowRun, engine } = ctx;
     const artifactIds: string[] = [];
+
+    // ── Cycle-delta short-circuit ───────────────────────────────
+    if ((workflowRun.current_cycle_number ?? 0) > 0) {
+      return runPhase7CycleDelta(ctx);
+    }
 
     // ── Gather prior phase outputs ──────────────────────────────
     const allArtifacts = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');

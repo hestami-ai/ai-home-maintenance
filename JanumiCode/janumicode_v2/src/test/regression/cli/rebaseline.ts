@@ -54,7 +54,7 @@ async function main(): Promise<void> {
 
   console.log(`Invoking Ollama for ${args.id}...`);
   const run = await invokeFromFixture(loaded.fixture, r.rendered);
-  const result = applyAssertions(loaded.fixture, run.fresh_response_text, run.fresh_parsed_json);
+  const result = await applyAssertions(loaded.fixture, run.fresh_response_text, run.fresh_parsed_json);
   if (!result.passed) {
     console.error('Fresh response failed assertions; aborting rebaseline.');
     console.error(formatFailureReport(result));

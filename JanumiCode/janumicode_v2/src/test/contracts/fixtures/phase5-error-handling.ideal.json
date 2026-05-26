@@ -1,0 +1,19 @@
+{
+  "kind": "error_handling_strategies",
+  "strategies": [
+    {
+      "component_id": "comp-link-mapping-service",
+      "error_types": ["validation_error", "503", "unique_violation"],
+      "detection": "Input validation at API entry; Postgres client surface for 5xx and unique-constraint violations.",
+      "response": "Return 400 on validation; retry with exponential backoff on 503; regenerate slug on unique_violation up to 5 attempts.",
+      "surfacing": "Structured JSON log entry per error; HTTP status code to client; oncall page on persistent 5xx."
+    },
+    {
+      "component_id": "comp-abuse-notification-service",
+      "error_types": ["smtp_4xx", "smtp_5xx"],
+      "detection": "SMTP client surface for relay errors.",
+      "response": "Enqueue for retry with backoff up to 5 attempts; alert oncall after final failure.",
+      "surfacing": "Structured JSON log; admin dashboard notification badge; oncall page on persistent failure."
+    }
+  ]
+}

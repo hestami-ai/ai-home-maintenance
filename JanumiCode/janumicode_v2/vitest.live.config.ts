@@ -17,18 +17,35 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
 
+// Default-on T5 LLM-as-judge for the live tier (one extra Ollama call per
+// fixture that declares a t5_llm_judges entry). Set the env var to '0'
+// or 'false' to disable — see assertions/t5LlmJudge.ts isJudgeEnabled().
+if (process.env.JANUMICODE_REGRESSION_LLM_JUDGE === undefined) {
+  process.env.JANUMICODE_REGRESSION_LLM_JUDGE = '1';
+}
+
 export default defineConfig({
   test: {
     root: '.',
     include: [
       'src/test/unit/**/*.live.test.ts',
       'src/test/integration/**/*.live.test.ts',
+      // Acceptance harness — per-boundary live LLM call validated
+      // against the contract registry. Runs under the live config so
+      // it inherits the Ollama-serialized fileParallelism settings.
+      // Skipped gracefully when Ollama is unreachable so contributors
+      // without a local daemon don't see false test failures.
+      'src/test/acceptance/**/*.live.test.ts',
     ],
     globals: false,
     testTimeout: 300000, // 5 minutes per test — first model load can be slow
     hookTimeout: 60000,
     setupFiles: ['src/test/helpers/setup.ts'],
     fileParallelism: false, // Critical: serialize files to avoid GPU queue overload
+    // Verbose reporter: long-running LLM tier where the default reporter
+    // emits almost nothing until failure. Captured-output truncation on
+    // long runs hides which test was running when something tripped.
+    reporters: ['verbose'],
   },
   resolve: {
     alias: {

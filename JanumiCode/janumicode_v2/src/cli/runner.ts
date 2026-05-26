@@ -18,6 +18,9 @@ import { createTestEngine } from '../test/helpers/createTestEngine';
 import type { PhaseId } from '../lib/types/records';
 import { generateLLMGapSuggestion } from '../test/harness/gapReportEnhancer';
 import { collectHarnessResult } from '../test/harness/collectResults';
+import { rollbackToSubPhase } from '../lib/orchestrator/rollback';
+import { emitLifecycle } from '../lib/trace/lifecycle';
+import { withTraceContext } from '../lib/trace/traceContext';
 
 // Re-export types for consumers
 export type { HarnessResult, GapReport, SemanticWarning, DecisionOverride, PipelineRunnerConfig } from '../test/harness/types';
@@ -272,15 +275,92 @@ export async function runPipeline(
     // from a stall or clean completion.
     let quiescenceReason: QuiescenceExitReason = 'completed';
 
-    if (config.resumeFromDb && config.resumeAtPhase) {
+    if (config.resumeFromDb && (config.resumeAtPhase || config.resumeAtSubPhase)) {
       // ── Resume mode: skip bootstrapIntent, advance to target phase ──
       workflowRunId = findLatestRunId(db);
       if (!workflowRunId) {
         throw new Error(`No workflow run found in resumed database: ${config.resumeFromDb}`);
       }
 
-      const targetPhase = config.resumeAtPhase as PhaseId;
-      console.log(`Resuming run ${workflowRunId} at Phase ${targetPhase}`);
+      // Resolve the target phase. When --resume-at-sub-phase is given,
+      // look up that sub-phase's owning phase in the prior run's records.
+      // The sub-phase flag takes precedence over the phase flag.
+      let targetPhase: PhaseId;
+      let targetSubPhase: string | null = config.resumeAtSubPhase ?? null;
+      if (targetSubPhase) {
+        const row = db.prepare(`
+          SELECT phase_id FROM governed_stream
+           WHERE workflow_run_id = ? AND sub_phase_id = ?
+           ORDER BY produced_at ASC LIMIT 1
+        `).get(workflowRunId, targetSubPhase) as { phase_id: string | null } | undefined;
+        if (!row?.phase_id) {
+          throw new Error(
+            `Could not resolve phase for sub_phase_id="${targetSubPhase}" — no records found in the prior run`,
+          );
+        }
+        targetPhase = row.phase_id as PhaseId;
+      } else {
+        targetPhase = config.resumeAtPhase as PhaseId;
+      }
+
+      // Roll back stale records before advancing the state machine.
+      // When resuming at a sub-phase, the cutoff is the FIRST occurrence
+      // of that sub-phase. When resuming only at a phase (legacy flag),
+      // we'd need a phase-cutoff variant — for now we use the first
+      // record of the phase as the cutoff target.
+      let rollbackResult = null;
+      if (targetSubPhase) {
+        rollbackResult = rollbackToSubPhase(db, workflowRunId, targetSubPhase);
+        if (!rollbackResult.cutoff_produced_at) {
+          throw new Error(
+            `Sub-phase "${targetSubPhase}" has no current-version records in the prior run; cannot resume from there.`,
+          );
+        }
+        console.log(
+          `[resume] Rolled back ${rollbackResult.rolled_back_count} stale records ` +
+          `(preserved ${rollbackResult.preserved_count} immutable history). ` +
+          `Cutoff: ${rollbackResult.cutoff_produced_at}`,
+        );
+      }
+      console.log(`Resuming run ${workflowRunId} at Phase ${targetPhase}${targetSubPhase ? ` (sub-phase: ${targetSubPhase})` : ''}`);
+
+      // Prime the LLM call cache from the prior run's persisted
+      // agent_invocation + agent_output pairs. Phase handlers below the
+      // resume cutoff still re-execute their pipeline (parse, normalize,
+      // persist) — but any LLM call whose prompt matches the prior run
+      // returns instantly from cache instead of hitting the provider.
+      // The rolled-back records remain is_current_version=0 (so reads
+      // see the clean upstream state) while the cache holds the
+      // original outputs keyed by prompt hash. This is the single-seam
+      // replacement for per-handler "skip if already done" logic.
+      try {
+        const cacheStats = engine.llmCaller.loadCacheFromDb(db, workflowRunId);
+        console.log(
+          `[resume] LLM-call cache primed: ${cacheStats.entries} entries ` +
+          `(scanned ${cacheStats.scanned} invocations, skipped ${cacheStats.skipped})`,
+        );
+      } catch (err) {
+        console.warn(
+          `[resume] LLM-call cache prime failed (non-fatal — calls will re-execute): ` +
+          `${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+
+      // Emit a workflow.resumed marker so the auditor and any human
+      // reader can see exactly where this re-run starts. Must be wrapped
+      // in a TraceCtx because emitLifecycle reads workflow_run_id from
+      // it when not given explicitly.
+      withTraceContext(
+        { workflow_run_id: workflowRunId, phase_id: targetPhase, sub_phase_id: null },
+        () => {
+          emitLifecycle('workflow.resumed', {
+            workflow_run_id: workflowRunId!,
+            from_phase: targetPhase,
+            from_sub_phase: targetSubPhase,
+            rollback: rollbackResult,
+          });
+        },
+      );
 
       // Advance through intermediate phases to reach the target.
       // The state machine only allows adjacent forward transitions.
@@ -293,7 +373,23 @@ export async function runPipeline(
           engine.advanceToNextPhase(workflowRunId, phaseOrder[i]);
         }
       } else if (run?.current_phase_id !== targetPhase) {
-        throw new Error(`Could not advance to Phase ${targetPhase}. Current: ${run?.current_phase_id}`);
+        // We're already at or past the target phase. Reset the
+        // state-machine cursor so we re-execute. is_current_version=0
+        // on the rolled-back records means the phase will see clean
+        // upstream + empty target-phase outputs.
+        // Note: this uses the same advanceToNextPhase API but in
+        // "reset" mode. If the API doesn't support backward moves,
+        // we fall back to a direct DB update.
+        try {
+          db.prepare(`UPDATE workflow_runs SET current_phase_id = ? WHERE id = ?`)
+            .run(targetPhase, workflowRunId);
+          console.log(`[resume] Reset current_phase_id to ${targetPhase} (state machine cursor moved backward)`);
+        } catch (err) {
+          throw new Error(
+            `Could not reset to Phase ${targetPhase}. Current: ${run?.current_phase_id}. ` +
+            `Error: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       }
 
       // Session abort plumbing: create a controller, hand it to the

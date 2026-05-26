@@ -74,6 +74,24 @@ Your own workflow ids follow the same semantic-slug convention:
 - If two workflows would slug identically, suffix the second with `-2`,
   the third with `-3`, etc. for deterministic disambiguation.
 
+# Workflow granularity — non-negotiable
+
+A workflow is an END-TO-END SYSTEM PROCESS, not a single internal step. The actions inside a workflow are its `steps[]`, not separate workflows.
+
+The pattern to avoid: a single user-initiated operation gets fragmented into many workflows where each workflow is really one step. For example, when a journey says "create something", the right shape is one workflow named after the user-facing operation with steps for validation, generation, persistence, response. The wrong shape is one workflow per step.
+
+When in doubt, ask: "Is this the unit a user/integration triggers, or is it a step inside a larger trigger?" The unit of trigger granularity is the workflow boundary. If two candidate workflows share the same trigger (same journey_step, same schedule, same event), they are almost certainly one workflow with two steps.
+
+Excessive splitting is the dominant failure mode of this round on calibration runs. Resist it. Aim for cohesive, trigger-rooted workflows. If a candidate workflow has only one step, it is probably a step in another workflow — fold it in.
+
+# Failure-mode / fault-injection workflows — never propose
+
+Do NOT propose workflows whose purpose is to INDUCE a failure, slowdown, or fault condition. The system does not deliberately misbehave. Workflows whose names describe self-inflicted faults must not appear: names of the shape "Introduce / Inject / Simulate / Corrupt / Fail <something>" describing self-imposed failure, latency, or data damage are out of scope.
+
+A "RESPOND TO failure X" workflow is valid (the system reacts to an external/incoming fault). A workflow that CAUSES failure X is not. Distinguish by reading the workflow's purpose: if it intentionally degrades the product, it's failure-mode injection — drop it. Failure-handling lives in V&V tests (Phase 7), task decomposition (Phase 6), and architecture's fault tolerance (Phase 4).
+
+Exception: if the spec EXPLICITLY mandates an operational workflow that exercises a failure path on a schedule (a documented chaos-engineering / DR-drill mandate in the source), that workflow IS in scope and references the spec text as its source.
+
 # Critical Rules — Workflow Shape
 
 - **Every workflow MUST have at least one `triggers[]` entry.** A workflow without a trigger cannot exist — this is the load-bearing invariant that replaces the legacy 1.3's free-floating trigger strings.

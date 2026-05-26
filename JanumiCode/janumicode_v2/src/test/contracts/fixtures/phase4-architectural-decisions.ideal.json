@@ -1,0 +1,8 @@
+{
+  "kind": "architectural_decisions",
+  "adrs": [
+    { "id": "ADR-001", "title": "Encryption Algorithm", "decision": "Use AES-256 in CBC mode with PKCS7 padding for all data encrypted at rest.", "status": "accepted" },
+    { "id": "ADR-004", "title": "Abuse Notification Email Latency", "decision": "Send notification emails asynchronously via message queue, ensuring delivery within 2 minutes of abuse flag.", "status": "accepted" },
+    { "id": "ADR-005", "title": "Rate Limiting Strategy", "decision": "Implement token-bucket algorithm with capacity of 100 tokens per minute per API key.", "status": "accepted" }
+  ]
+}

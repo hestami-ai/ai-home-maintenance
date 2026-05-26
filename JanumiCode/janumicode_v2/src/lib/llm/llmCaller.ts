@@ -19,9 +19,13 @@
  * a writer or trace context, instrumentation is a no-op.
  */
 
+import { createHash } from 'node:crypto';
+import type { Database } from '../database/init';
 import type { GovernedStreamWriter } from '../orchestrator/governedStreamWriter';
 import type { AgentRole } from '../types/records';
 import { InvocationLogFile } from './invocationLogger';
+import { emitTransformationStep } from '../trace/emit';
+import { emitLifecycle } from '../trace/lifecycle';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -185,6 +189,26 @@ export interface LLMCallerConfig {
 }
 
 /**
+ * In-memory cache entry for an LLM call's reproducible output. Stored
+ * under a sha256 of (provider, model, response_format, temperature,
+ * max_tokens, system, prompt, tools, toolChoice). When call() hits
+ * the cache, the live HTTP call is skipped and this output is returned
+ * as-if it was freshly produced.
+ */
+interface CachedLLMOutput {
+  text: string;
+  parsed: Record<string, unknown> | null;
+  thinking?: string;
+  toolCalls: ToolCall[];
+  provider: string;
+  model: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  /** record_id of the agent_invocation that originally produced this output. */
+  sourceInvocationId: string;
+}
+
+/**
  * Hook signature for the reasoning-review HARNESS dispatch (Track D
  * Commit 10 cutover). Invoked once per successful agent_output, with
  * the freshly-written records' ids and the full LLM result. Synchronous:
@@ -239,8 +263,157 @@ export class LLMCaller {
   private liveLogDir: string | null = null;
   private reviewHarnessHook: ReviewHarnessHook | null = null;
   private jsonRepairRouting: import('./jsonRepairLLM').JsonRepairRouting | null = null;
+  /**
+   * LLM-call cache. Keyed by sha256(prompt + system + provider + model +
+   * responseFormat + temperature + maxTokens + tools + toolChoice). When
+   * a cache entry exists, call() returns the cached result instantly
+   * without making the HTTP call. The cache is populated either from
+   * the persisted governed_stream (via loadCacheFromDb on resume) or
+   * from successful live calls within this session.
+   *
+   * Design: this is the resume-optimization seam. Per-handler sub-phase
+   * skip would require per-phase deserialization logic; LLM-call caching
+   * achieves ~95% of the wall-clock savings with one central change.
+   * Phase handlers still run their full pipeline (parse, normalize,
+   * persist) on cached outputs, but the expensive HTTP-to-Ollama hop
+   * is bypassed.
+   *
+   * Caveats:
+   *  - Cache hits skip the agent_invocation/agent_output write path,
+   *    so the resumed run's DB does NOT gain duplicate invocation
+   *    records for pre-target sub-phases — the originals remain
+   *    is_current_version=1 and serve as the "what happened" history.
+   *  - lifecycle + transformation_step events ARE still emitted for
+   *    cache hits (with metadata.cache_hit=true) so the audit trail
+   *    of the resumed session stays complete.
+   */
+  private llmCache = new Map<string, CachedLLMOutput>();
 
   constructor(private readonly config: LLMCallerConfig) {}
+
+  /**
+   * Compute the SHA256 cache key for a set of call options. Order of
+   * fields here must stay stable across releases — changing it
+   * invalidates every cached entry from prior runs. The hash inputs
+   * mirror the agent_invocation.content fields persisted by
+   * writeInvocationRecord() so loadCacheFromDb() can reconstruct the
+   * exact same key from history.
+   */
+  private computeCacheKey(opts: {
+    provider: string;
+    model: string;
+    responseFormat: string;
+    temperature: number | null;
+    maxTokens: number | null;
+    system: string | null;
+    prompt: string;
+    tools: ToolDefinition[];
+    toolChoice: LLMCallOptions['toolChoice'] | null;
+  }): string {
+    const canonical = JSON.stringify({
+      p: opts.provider,
+      m: opts.model,
+      rf: opts.responseFormat,
+      t: opts.temperature,
+      mt: opts.maxTokens,
+      s: opts.system ?? '',
+      pr: opts.prompt,
+      tl: opts.tools ?? [],
+      tc: opts.toolChoice ?? null,
+    });
+    return createHash('sha256').update(canonical).digest('hex');
+  }
+
+  /**
+   * Populate the in-memory LLM call cache from a prior run's persisted
+   * agent_invocation + agent_output pairs in the governed_stream. Called
+   * once during resume bootstrap (before phases re-execute) so that every
+   * LLM call replayed below the resume cutoff returns instantly from the
+   * cached output instead of re-hitting the provider.
+   *
+   * Only success-status outputs are cached — failed invocations are
+   * intentionally re-executed on resume (sampling variance may rescue
+   * them, and the operator likely fixed something to trigger the resume).
+   *
+   * Safe to call on a live writer DB: queries are read-only and the
+   * cache map is process-local. Returns counts for logging.
+   */
+  loadCacheFromDb(
+    db: import('../database/init').Database,
+    workflowRunId: string,
+  ): { entries: number; scanned: number; skipped: number } {
+    let entries = 0;
+    let skipped = 0;
+    const invocations = db.prepare(`
+      SELECT id, content FROM governed_stream
+       WHERE workflow_run_id = ?
+         AND record_type = 'agent_invocation'
+         AND is_current_version = 1
+    `).all(workflowRunId) as Array<{ id: string; content: string }>;
+
+    const outputStmt = db.prepare(`
+      SELECT content FROM governed_stream
+       WHERE record_type = 'agent_output'
+         AND is_current_version = 1
+         AND derived_from_record_ids LIKE ?
+       LIMIT 1
+    `);
+
+    for (const inv of invocations) {
+      let invContent: Record<string, unknown>;
+      try {
+        invContent = JSON.parse(inv.content);
+      } catch {
+        skipped++;
+        continue;
+      }
+      const outRow = outputStmt.get(`%${inv.id}%`) as { content: string } | undefined;
+      if (!outRow) { skipped++; continue; }
+      let outContent: Record<string, unknown>;
+      try {
+        outContent = JSON.parse(outRow.content);
+      } catch {
+        skipped++;
+        continue;
+      }
+      if (outContent.status !== 'success') { skipped++; continue; }
+
+      const key = this.computeCacheKey({
+        provider: String(invContent.provider ?? ''),
+        model: String(invContent.model ?? ''),
+        responseFormat: String(invContent.response_format ?? 'text'),
+        temperature: (invContent.temperature as number | null) ?? null,
+        maxTokens: (invContent.max_tokens as number | null) ?? null,
+        system: (invContent.system as string | null) ?? null,
+        prompt: String(invContent.prompt ?? ''),
+        tools: (invContent.tools as ToolDefinition[] | undefined) ?? [],
+        toolChoice: null,
+      });
+
+      let parsed: Record<string, unknown> | null = null;
+      const text = String(outContent.text ?? '');
+      // The output record persists raw text; re-parse JSON responses on
+      // load so callers that read result.parsed see the same value as
+      // they would on a live call.
+      if (invContent.response_format === 'json' && text.trim().length > 0) {
+        try { parsed = JSON.parse(text); } catch { parsed = null; }
+      }
+
+      this.llmCache.set(key, {
+        text,
+        parsed,
+        thinking: (outContent.thinking as string | undefined) ?? undefined,
+        toolCalls: [],
+        provider: String(outContent.provider ?? invContent.provider ?? ''),
+        model: String(outContent.model ?? invContent.model ?? ''),
+        inputTokens: (outContent.input_tokens as number | null) ?? null,
+        outputTokens: (outContent.output_tokens as number | null) ?? null,
+        sourceInvocationId: inv.id,
+      });
+      entries++;
+    }
+    return { entries, scanned: invocations.length, skipped };
+  }
 
   /**
    * Configure the LLM-based JSON repair fallback (`json_repair` agent
@@ -337,12 +510,120 @@ export class LLMCaller {
       );
     }
 
+    // Cache short-circuit (resume optimization). If this exact prompt was
+    // already executed in a prior run that is being resumed, return the
+    // cached output without hitting the provider. The agent_invocation /
+    // agent_output records from the original run remain authoritative —
+    // we don't re-write them. lifecycle + transformation_step ARE emitted
+    // with cache_hit=true so the resumed session's audit trail stays
+    // complete and walk-back can show "this call came from cache".
+    if (this.llmCache.size > 0) {
+      const cacheKey = this.computeCacheKey({
+        provider: options.provider,
+        model: options.model,
+        responseFormat: options.responseFormat ?? 'text',
+        temperature: options.temperature ?? null,
+        maxTokens: options.maxTokens ?? null,
+        system: options.system ?? null,
+        prompt: options.prompt,
+        tools: options.tools ?? [],
+        toolChoice: options.toolChoice ?? null,
+      });
+      const cached = this.llmCache.get(cacheKey);
+      if (cached) {
+        const cacheStartedAt = Date.now();
+        const traceSubPhaseId = options.traceContext?.subPhaseId ?? undefined;
+        const traceAgentRole = options.traceContext?.agentRole ?? null;
+        const cachedResult: LLMCallResult = {
+          text: cached.text,
+          parsed: cached.parsed,
+          thinking: cached.thinking,
+          toolCalls: cached.toolCalls,
+          provider: cached.provider,
+          model: cached.model,
+          inputTokens: cached.inputTokens,
+          outputTokens: cached.outputTokens,
+          usedFallback: false,
+          retryAttempts: 0,
+        };
+        emitTransformationStep({
+          step_type: 'llm_returned',
+          sub_phase_id_override: traceSubPhaseId,
+          agent_role: traceAgentRole,
+          payload: {
+            text: cached.text,
+            thinking: cached.thinking ?? null,
+            toolCalls: cached.toolCalls,
+            inputTokens: cached.inputTokens,
+            outputTokens: cached.outputTokens,
+            usedFallback: false,
+            retryAttempts: 0,
+          },
+          metadata: {
+            cache_hit: true,
+            source_invocation_id: cached.sourceInvocationId,
+            label: options.traceContext?.label ?? null,
+            status: 'success',
+            parsed: cached.parsed !== null,
+          },
+        });
+        emitLifecycle('llm.call', {
+          workflow_run_id: options.traceContext?.workflowRunId ?? null,
+          phase_id: options.traceContext?.phaseId ?? null,
+          sub_phase_id: traceSubPhaseId ?? null,
+          agent_role: traceAgentRole,
+          provider: cached.provider,
+          model: cached.model,
+          status: 'success',
+          duration_ms: Date.now() - cacheStartedAt,
+          response_format: options.responseFormat ?? 'text',
+          prompt_size_chars: options.prompt.length,
+          input_tokens: cached.inputTokens,
+          output_tokens: cached.outputTokens,
+          response_size_chars: cached.text.length,
+          cache_hit: true,
+          source_invocation_id: cached.sourceInvocationId,
+        });
+        return cachedResult;
+      }
+    }
+
     // Pre-call instrumentation: write agent_invocation BEFORE the call so the
     // webview sees it as 'running' immediately. The card flips to ✅/❌ when
     // the agent_output record arrives.
     const invocationId = this.writeInvocationRecord(options);
     const startedAt = Date.now();
     this._inFlightCount++;
+
+    // Transformation trace: capture the materialized prompt at call entry
+    // so walk-back can answer "what was the input to this LLM call?". The
+    // four trace steps (prompt_materialized / llm_returned / json_parsed
+    // or json_repaired) all share an `invocation_id` in their metadata so
+    // the walk-back CLI can group them into a single call's chain even
+    // without explicit parent_step_id linking.
+    const traceSubPhaseId = options.traceContext?.subPhaseId ?? undefined;
+    const traceAgentRole = options.traceContext?.agentRole ?? null;
+    const promptStepId = emitTransformationStep({
+      step_type: 'prompt_materialized',
+      sub_phase_id_override: traceSubPhaseId,
+      agent_role: traceAgentRole,
+      payload: {
+        provider: options.provider,
+        model: options.model,
+        responseFormat: options.responseFormat ?? 'text',
+        system: options.system ?? null,
+        prompt: options.prompt,
+        temperature: options.temperature ?? null,
+        maxTokens: options.maxTokens ?? null,
+        toolCount: options.tools?.length ?? 0,
+      },
+      metadata: {
+        invocation_id: invocationId,
+        label: options.traceContext?.label ?? null,
+        prompt_size_chars: options.prompt.length,
+        system_size_chars: (options.system ?? '').length,
+      },
+    });
 
     // Open the per-invocation live log (C8). Writes the prompt header
     // immediately, then appends chunks as they stream, and a trailer on
@@ -405,6 +686,10 @@ export class LLMCaller {
       // agent_output_chunk records as tokens arrive. Adapters that don't
       // stream just ignore the extra field on the options object.
       let chunkSequence = 0;
+      // Tracks whether the in-loop JSON repair branch fired this attempt.
+      // When true, we skip the post-call json_parsed trace emit because
+      // a json_repaired step already covered the parse outcome.
+      let repairEmitted = false;
       // Invocation-log size cap — primary in-stream stall signature.
       // We measure the bytes written to the per-invocation .log file
       // (prompt + chunk metadata + streamed text), not just cumulative
@@ -646,6 +931,26 @@ export class LLMCaller {
             // returned). Useful even on success — confirms which model
             // ultimately produced the parsed output.
             this.writeJsonRepairRecord(invocationId, options, repair);
+            // Transformation trace: capture the repair attempt outcomes.
+            // Suppresses the later json_parsed emit at the call's success
+            // path — the repair *is* the parse for this invocation.
+            emitTransformationStep({
+              step_type: 'json_repaired',
+              sub_phase_id_override: traceSubPhaseId,
+              agent_role: 'json_repair',
+              payload: {
+                originalText: result.text,
+                originalThinking: result.thinking ?? null,
+                attempts: repair.attempts,
+                parsed: repair.parsed,
+              },
+              metadata: {
+                invocation_id: invocationId,
+                parent_prompt_step_id: promptStepId,
+                success: repair.parsed !== null,
+              },
+            });
+            repairEmitted = true;
           }
           const { agentOutputId } = this.writeOutputRecords(invocationId, options, result, Date.now() - startedAt, null);
           logFile?.writeFinal({
@@ -657,6 +962,105 @@ export class LLMCaller {
             durationMs: Date.now() - startedAt,
             retryAttempts,
           });
+          // Transformation trace: capture the raw response + parse outcome.
+          // promptStepId becomes the parent so the walk-back CLI can render
+          // a tidy per-call sub-tree.
+          emitTransformationStep({
+            step_type: 'llm_returned',
+            sub_phase_id_override: traceSubPhaseId,
+            agent_role: traceAgentRole,
+            output_record_id: agentOutputId ?? undefined,
+            payload: {
+              text: result.text,
+              thinking: result.thinking ?? null,
+              toolCalls: result.toolCalls,
+              inputTokens: result.inputTokens,
+              outputTokens: result.outputTokens,
+              usedFallback: result.usedFallback,
+              retryAttempts: result.retryAttempts,
+            },
+            duration_ms: Date.now() - startedAt,
+            metadata: {
+              invocation_id: invocationId,
+              parent_prompt_step_id: promptStepId,
+              status: 'success',
+              parsed: result.parsed !== null,
+            },
+          });
+          // Emit the parse-or-repair outcome step. If a repair ran above
+          // (writeJsonRepairRecord branch), the json_repaired step was
+          // already emitted there; here we only emit json_parsed when
+          // the raw response parsed without repair.
+          if (
+            result.parsed !== null &&
+            options.responseFormat === 'json' &&
+            !repairEmitted
+          ) {
+            emitTransformationStep({
+              step_type: 'json_parsed',
+              sub_phase_id_override: traceSubPhaseId,
+              agent_role: traceAgentRole,
+              payload: { parsed: result.parsed },
+              metadata: {
+                invocation_id: invocationId,
+                parent_prompt_step_id: promptStepId,
+                parsed_top_level_keys: Object.keys(result.parsed),
+              },
+            });
+          }
+          // Tier-1 lifecycle: one-line per-call summary. Cheap to grep:
+          // counts, durations, repair status, fallback usage. Sits at
+          // the natural Tier-1 layer over the Tier-3 prompt/response
+          // pair already emitted above.
+          emitLifecycle('llm.call', {
+            workflow_run_id: options.traceContext?.workflowRunId ?? null,
+            phase_id: options.traceContext?.phaseId ?? null,
+            sub_phase_id: traceSubPhaseId ?? null,
+            agent_role: traceAgentRole,
+            provider: result.provider,
+            model: result.model,
+            status: 'success',
+            duration_ms: Date.now() - startedAt,
+            response_format: options.responseFormat ?? 'text',
+            prompt_size_chars: options.prompt.length,
+            input_tokens: result.inputTokens,
+            output_tokens: result.outputTokens,
+            response_size_chars: result.text.length,
+            thinking_size_chars: (result.thinking ?? '').length,
+            tool_call_count: result.toolCalls.length,
+            retry_attempts: result.retryAttempts,
+            used_fallback: result.usedFallback,
+            parsed: result.parsed !== null,
+            repaired: repairEmitted,
+            invocation_record_id: invocationId,
+          });
+          // Populate cache so within-session repeats of the same prompt
+          // (and any future resume of THIS run) short-circuit. Only cache
+          // successful calls — error results would mask provider recovery.
+          if (invocationId) {
+            const cacheKey = this.computeCacheKey({
+              provider: options.provider,
+              model: options.model,
+              responseFormat: options.responseFormat ?? 'text',
+              temperature: options.temperature ?? null,
+              maxTokens: options.maxTokens ?? null,
+              system: options.system ?? null,
+              prompt: options.prompt,
+              tools: options.tools ?? [],
+              toolChoice: options.toolChoice ?? null,
+            });
+            this.llmCache.set(cacheKey, {
+              text: result.text,
+              parsed: result.parsed,
+              thinking: result.thinking,
+              toolCalls: result.toolCalls,
+              provider: result.provider,
+              model: result.model,
+              inputTokens: result.inputTokens,
+              outputTokens: result.outputTokens,
+              sourceInvocationId: invocationId,
+            });
+          }
           await this.runReviewerHook(invocationId, agentOutputId, options, result);
           return result;
         } catch (err) {
@@ -751,6 +1155,41 @@ export class LLMCaller {
         durationMs: Date.now() - startedAt,
         retryAttempts,
         errorMessage: lastError?.message ?? 'unknown',
+      });
+      // Transformation trace: emit a terminal llm_returned with the error
+      // so walk-back can show the failure shape without having to read
+      // the agent_output record separately.
+      emitTransformationStep({
+        step_type: 'llm_returned',
+        sub_phase_id_override: traceSubPhaseId,
+        agent_role: traceAgentRole,
+        duration_ms: Date.now() - startedAt,
+        error: lastError
+          ? { message: lastError.message, stack: lastError.stack }
+          : { message: 'unknown' },
+        metadata: {
+          invocation_id: invocationId,
+          parent_prompt_step_id: promptStepId,
+          status: 'error',
+          retry_attempts: retryAttempts,
+        },
+      });
+      // Tier-1 lifecycle: error path summary.
+      emitLifecycle('llm.call', {
+        workflow_run_id: options.traceContext?.workflowRunId ?? null,
+        phase_id: options.traceContext?.phaseId ?? null,
+        sub_phase_id: traceSubPhaseId ?? null,
+        agent_role: traceAgentRole,
+        provider: options.provider,
+        model: options.model,
+        status: 'error',
+        duration_ms: Date.now() - startedAt,
+        response_format: options.responseFormat ?? 'text',
+        prompt_size_chars: options.prompt.length,
+        retry_attempts: retryAttempts,
+        error_type: lastError?.errorType ?? 'unknown',
+        error_message: lastError?.message ?? 'unknown',
+        invocation_record_id: invocationId,
       });
       throw lastError ?? new LLMError('LLM call failed', 'unknown');
     } finally {

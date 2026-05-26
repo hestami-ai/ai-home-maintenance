@@ -1,0 +1,29 @@
+{
+  "kind": "vv_requirements_discovery",
+  "vvRequirements": [
+    {
+      "id": "VV-REDIRECT-LATENCY",
+      "category": "performance",
+      "target": "Redirect endpoint p95 latency under nominal load.",
+      "measurement": "Server-side p95 latency measured over rolling 5-minute windows via Prometheus histogram.",
+      "threshold": "p95 ≤ 100ms over any rolling 5-minute window.",
+      "source_ref": {
+        "document_path": "specs/tinyurl-thin-slice.md",
+        "section_heading": "Performance Requirements",
+        "excerpt": "Redirect endpoint p95 latency must be ≤ 100ms over a rolling 5-minute window."
+      }
+    },
+    {
+      "id": "VV-ENCRYPTION-AUDIT",
+      "category": "security",
+      "target": "All stored URL mappings are encrypted at rest.",
+      "measurement": "Periodic audit of random row sample.",
+      "threshold": "100% of sampled rows have encrypted_url != plaintext.",
+      "source_ref": {
+        "document_path": "specs/tinyurl-thin-slice.md",
+        "section_heading": "Security Audit",
+        "excerpt": "Monthly audit verifies all mappings remain encrypted."
+      }
+    }
+  ]
+}

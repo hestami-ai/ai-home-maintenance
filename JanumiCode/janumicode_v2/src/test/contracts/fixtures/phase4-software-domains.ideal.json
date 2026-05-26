@@ -1,0 +1,8 @@
+{
+  "kind": "software_domains",
+  "domains": [
+    { "id": "domain-redirect", "name": "Redirect", "maps_to_business_domains": ["DOM-URL-SHORTENING", "DOM-REDIRECT"] },
+    { "id": "domain-abuse", "name": "Abuse", "maps_to_business_domains": ["DOM-ABUSE-PREVENTION"] },
+    { "id": "domain-users", "name": "Users", "maps_to_business_domains": ["DOM-ONBOARDING"] }
+  ]
+}

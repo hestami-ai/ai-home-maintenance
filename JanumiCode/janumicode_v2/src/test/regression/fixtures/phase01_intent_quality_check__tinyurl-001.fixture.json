@@ -10,7 +10,7 @@
   },
   "invocation_params": {
     "provider": "ollama",
-    "model": "qwen3.5:9b",
+    "model": "gpt-oss:20b",
     "temperature": 0.3,
     "response_format": "json"
   },

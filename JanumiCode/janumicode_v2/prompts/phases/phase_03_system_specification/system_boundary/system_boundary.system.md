@@ -51,8 +51,24 @@ Invalid (do NOT do any of these):
 
 Rules:
 - in_scope must cover all Functional Requirements
-- out_of_scope must match the Intent Statement's out_of_scope list
+- **out_of_scope MUST faithfully list every confirmed out-of-scope item from the Intent Statement** (e.g., the intent's `confirmed_constraints` of the form "no X", or its explicit out-of-scope mentions in the analysis summary). Empty `out_of_scope` is INVALID when the Intent Statement contains explicit exclusions — copy them through with rationale. The verifier flags empty out_of_scope as a defect when the source spec has exclusions.
 - Every External System identified must have at least one Interface Contract in Sub-Phase 3.3
+
+# External System vs technology choice — non-negotiable
+
+An **external system** in `external_systems[]` is a SEPARATE RUNNING PROCESS, SERVICE, or SaaS that the product integrates with via a network/IPC boundary. Examples: a managed Postgres instance (network database service), an external log aggregator (separate process the product writes to), a third-party payment provider's API, an OAuth identity provider's authorization endpoint.
+
+A **technology choice** is NOT an external system. The following are technology constraints from the prior phase's `technical_constraints` and MUST NOT be repeated here as external systems:
+- "HTTPS" (a protocol the service speaks, not a separate system)
+- "Container" / "single containerised service" (a deployment characteristic)
+- "Microservices" / "no microservices" (architecture style)
+- "JSON logs" (a log format)
+- "AES-256" (an encryption algorithm)
+- "Web form" / "HTTP API" (interface surfaces, not separate systems)
+
+Test for inclusion: "Is this a separate process / service / vendor that the product COMMUNICATES WITH across a process boundary?" If yes → external_systems. If it's a property OF the product's own implementation → drop, it's already covered by Phase 1.0c technical constraints.
+
+When the spec mandates "Postgres 16+ on a managed instance", the **managed Postgres service** is the external system (one entry). The fact that we use SQL or PG-wire protocol or AES-256 are properties of THAT integration, not separate external systems. One entry per distinct external running thing, not one entry per technology attribute of it.
 
 CONTEXT:
 Intent: {{intent_statement_summary}}

@@ -1,0 +1,18 @@
+{
+  "kind": "data_model_decomposition_node",
+  "node_id": "dmnode-abuse-notification",
+  "parent_node_id": null,
+  "status": "atomic",
+  "tier": "D",
+  "depth": 1,
+  "entity": {
+    "id": "ent-abuse-notification",
+    "name": "AbuseNotification",
+    "component_id": "comp-abuse-notification-service",
+    "fields": [
+      { "name": "notification_id", "type": "uuid" },
+      { "name": "slug", "type": "string" },
+      { "name": "flag_timestamp", "type": "timestamp" }
+    ]
+  }
+}

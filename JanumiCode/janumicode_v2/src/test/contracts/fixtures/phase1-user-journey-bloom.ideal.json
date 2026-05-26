@@ -1,0 +1,26 @@
+{
+  "kind": "user_journey_bloom",
+  "user_journeys": [
+    {
+      "id": "UJ-CREATE-SHORT-URL",
+      "title": "Create a short URL",
+      "scenario": "A Link Sharer submits a long URL via the web form and receives a short URL in return.",
+      "persona_id": "PERSONA-LINK-SHARER",
+      "source": "document-specified"
+    },
+    {
+      "id": "UJ-REPORT-ABUSE",
+      "title": "Report an abusive URL",
+      "scenario": "An end user reports a slug that resolves to abusive content; administrator is notified within 2 minutes.",
+      "persona_id": "PERSONA-END-USER",
+      "source": "document-specified"
+    },
+    {
+      "id": "UJ-ONBOARD-USER",
+      "title": "Onboard a new user",
+      "scenario": "A new Link Sharer signs up and receives a welcome email confirming account creation.",
+      "persona_id": "PERSONA-LINK-SHARER",
+      "source": "domain-standard"
+    }
+  ]
+}

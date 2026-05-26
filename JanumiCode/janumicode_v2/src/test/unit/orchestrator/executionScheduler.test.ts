@@ -10,9 +10,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
   sliceLeavesIntoWaves,
   topoSortRespectingWave,
+  collapseLegacySectionsWhenPacketPresent,
+  buildWorkspaceOrientation,
   type SchedulerLeaf,
 } from '../../../lib/orchestrator/executionScheduler';
 import {
@@ -201,5 +206,114 @@ describe('QuarantineLedger.buildAugmentedContext', () => {
     expect(text).toContain('tests_failed');
     expect(text).toContain('Failing tests');
     expect(text).toContain('address each flaw');
+  });
+});
+
+describe('collapseLegacySectionsWhenPacketPresent — Path N #6', () => {
+  const sample = [
+    '[JC:SYSTEM SCOPE]',
+    '',
+    '# CONTEXT SUMMARY',
+    '',
+    '## Component Context',
+    'Name: Foo (comp-foo)',
+    'Responsibility: do x; do y',
+    '',
+    '## Component Model Summary',
+    'Foo bar baz.',
+    '',
+    '## Test Cases to Implement',
+    '- [TC-001] (integration) when X, then Y',
+    '',
+    "## Evaluation Criteria (filtered to this task's component)",
+    '- [US-001] something',
+    '',
+    '## Dependency Tasks (already completed)',
+    '(no dependency tasks)',
+    '',
+    '## Upstream Validator Findings (HIGH/MEDIUM against motivating artifacts)',
+    '(none)',
+  ].join('\n');
+
+  it('replaces duplicated section bodies with a pointer when packet is present', () => {
+    const out = collapseLegacySectionsWhenPacketPresent(sample);
+    // Headings are preserved.
+    expect(out).toContain('## Component Context');
+    expect(out).toContain('## Component Model Summary');
+    expect(out).toContain('## Test Cases to Implement');
+    expect(out).toContain("## Evaluation Criteria (filtered to this task's component)");
+    // Bodies are collapsed.
+    expect(out).not.toContain('Responsibility: do x; do y');
+    expect(out).not.toContain('Foo bar baz.');
+    expect(out).not.toContain('TC-001');
+    expect(out).not.toContain('[US-001] something');
+    // Pointer appears in each suppressed section.
+    expect((out.match(/Implementation Packet Context/g) ?? []).length).toBe(4);
+  });
+
+  it('does NOT touch sections that are not duplicated by the packet', () => {
+    const out = collapseLegacySectionsWhenPacketPresent(sample);
+    expect(out).toContain('## Dependency Tasks (already completed)');
+    expect(out).toContain('(no dependency tasks)');
+    expect(out).toContain('## Upstream Validator Findings (HIGH/MEDIUM against motivating artifacts)');
+    expect(out).toContain('(none)');
+  });
+
+  it('is idempotent when run twice', () => {
+    const once = collapseLegacySectionsWhenPacketPresent(sample);
+    const twice = collapseLegacySectionsWhenPacketPresent(once);
+    expect(twice).toBe(once);
+  });
+});
+
+describe('buildWorkspaceOrientation — Path N #5/#8', () => {
+  it('reports greenfield when the workspace exists and is empty', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'janum-ws-empty-'));
+    try {
+      const out = buildWorkspaceOrientation(tmp, ['src/services/abuse-notification']);
+      expect(out).toContain('# Workspace Orientation');
+      expect(out).toContain(tmp);
+      expect(out).toContain('greenfield');
+      expect(out).toContain('`src/services/abuse-notification` (does not exist — create it)');
+      expect(out).toContain('Do not spend tool calls probing');
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('reports existing brownfield when workspace has top-level entries', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'janum-ws-brown-'));
+    try {
+      fs.writeFileSync(path.join(tmp, 'package.json'), '{}');
+      fs.mkdirSync(path.join(tmp, 'src'));
+      const out = buildWorkspaceOrientation(tmp, []);
+      expect(out).toContain('existing');
+      expect(out).toContain('2 top-level entries');
+      expect(out).toContain('treat as brownfield');
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('marks each write-scope path as exists / does not exist', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'janum-ws-mixed-'));
+    try {
+      fs.mkdirSync(path.join(tmp, 'src', 'services', 'abuse-notification'), { recursive: true });
+      const out = buildWorkspaceOrientation(tmp, [
+        'src/services/abuse-notification',
+        'src/services/missing',
+      ]);
+      expect(out).toContain('`src/services/abuse-notification` (exists)');
+      expect(out).toContain('`src/services/missing` (does not exist — create it)');
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('reports "not yet created" when the workspace path itself does not exist', () => {
+    const ghost = path.join(os.tmpdir(), `janum-ws-ghost-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const out = buildWorkspaceOrientation(ghost, ['src/foo']);
+    expect(out).toContain('not yet created');
+    expect(out).toContain('orchestrator will mkdir');
   });
 });

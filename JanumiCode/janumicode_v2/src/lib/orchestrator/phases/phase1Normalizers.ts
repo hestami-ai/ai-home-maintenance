@@ -15,7 +15,8 @@
  * directly testable.
  */
 
-import type { TechnicalConstraint, SourceRef } from '../../types/records';
+import type { TechnicalConstraint, SourceRef, WorkflowV2, WorkflowStep, WorkflowTrigger } from '../../types/records';
+import { traceNormalize } from '../../trace/traceNormalize';
 
 /**
  * Wire-format → record-type adapter: maps snake_case agent JSON keys to the
@@ -64,7 +65,7 @@ export function normalizeJourneyFromWire(raw: Record<string, unknown>): Record<s
       return s;
     });
   }
-  return j;
+  return traceNormalize('phase1.normalizeJourneyFromWire', raw, j);
 }
 
 const INTENT_DISCOVERY_WIRE_MAP: Record<string, string> = {
@@ -85,7 +86,11 @@ const INTENT_DISCOVERY_WIRE_MAP: Record<string, string> = {
 export function normalizeIntentDiscoveryFromWire(
   parsed: Record<string, unknown>,
 ): Record<string, unknown> {
-  return snakeToCamel(parsed, INTENT_DISCOVERY_WIRE_MAP);
+  return traceNormalize(
+    'phase1.normalizeIntentDiscoveryFromWire',
+    parsed,
+    snakeToCamel(parsed, INTENT_DISCOVERY_WIRE_MAP),
+  );
 }
 
 const SYNTHESIS_WIRE_MAP: Record<string, string> = {
@@ -101,7 +106,11 @@ const SYNTHESIS_WIRE_MAP: Record<string, string> = {
 export function normalizeSynthesisFromWire(
   parsed: Record<string, unknown>,
 ): Record<string, unknown> {
-  return snakeToCamel(parsed, SYNTHESIS_WIRE_MAP);
+  return traceNormalize(
+    'phase1.normalizeSynthesisFromWire',
+    parsed,
+    snakeToCamel(parsed, SYNTHESIS_WIRE_MAP),
+  );
 }
 
 const DOMAIN_WIRE_MAP: Record<string, string> = {
@@ -115,7 +124,11 @@ const DOMAIN_WIRE_MAP: Record<string, string> = {
  * expected by BusinessDomain TS record consumers.
  */
 export function normalizeDomainFromWire(raw: Record<string, unknown>): Record<string, unknown> {
-  return snakeToCamel(raw, DOMAIN_WIRE_MAP);
+  return traceNormalize(
+    'phase1.normalizeDomainFromWire',
+    raw,
+    snakeToCamel(raw, DOMAIN_WIRE_MAP),
+  );
 }
 
 const PERSONA_WIRE_MAP: Record<string, string> = {
@@ -127,7 +140,11 @@ const PERSONA_WIRE_MAP: Record<string, string> = {
  * expected by Persona TS record consumers.
  */
 export function normalizePersonaFromWire(raw: Record<string, unknown>): Record<string, unknown> {
-  return snakeToCamel(raw, PERSONA_WIRE_MAP);
+  return traceNormalize(
+    'phase1.normalizePersonaFromWire',
+    raw,
+    snakeToCamel(raw, PERSONA_WIRE_MAP),
+  );
 }
 
 export function normalizeSourceRef(raw: unknown): SourceRef | undefined {
@@ -161,8 +178,90 @@ export function normalizeSourceRef(raw: unknown): SourceRef | undefined {
  * not punishing the LLM for routing the description into a sibling
  * field.
  */
+/**
+ * Normalize a single workflow from wire format. The Phase 1.3b
+ * system_workflow_bloom prompt asks the LLM for snake_case keys
+ * (`business_domain_id`, `steps[*].step_number`, `steps[*].expected_outcome`).
+ * Internally JanumiCode uses camelCase shapes. This normalizer accepts
+ * EITHER convention and emits the internal camelCase WorkflowV2.
+ *
+ * ts-14 (2026-05-18) tripped on the legacy version that read only the
+ * camelCase keys — gpt-oss correctly emitted snake_case per the prompt,
+ * so `businessDomainId` was always undefined, defaulted to empty string,
+ * and the Phase 1.3b self-heal dropped every workflow as
+ * "domain-not-accepted". See feedback_normalizer_case_dual_keys.md.
+ */
+export function normalizeWorkflowV2(w: Record<string, unknown>): WorkflowV2 {
+  const pickKey = (obj: Record<string, unknown>, snake: string, camel: string): unknown =>
+    obj[snake] !== undefined ? obj[snake] : obj[camel];
+
+  const rawTriggers = Array.isArray(w.triggers) ? w.triggers as Array<Record<string, unknown>> : [];
+  const triggers: WorkflowTrigger[] = rawTriggers
+    .map(t => normalizeWorkflowTrigger(t))
+    .filter((t): t is WorkflowTrigger => t !== null);
+
+  const rawSteps = Array.isArray(w.steps) ? w.steps as Array<Record<string, unknown>> : [];
+  const steps: WorkflowStep[] = rawSteps.map((s, i) => {
+    const stepNumber = pickKey(s, 'step_number', 'stepNumber');
+    const expectedOutcome = pickKey(s, 'expected_outcome', 'expectedOutcome');
+    return {
+      stepNumber: typeof stepNumber === 'number' ? stepNumber : i + 1,
+      actor: typeof s.actor === 'string' ? s.actor : 'System',
+      action: typeof s.action === 'string' ? s.action : '',
+      expectedOutcome: typeof expectedOutcome === 'string' ? expectedOutcome : '',
+    };
+  });
+
+  const rawActors = Array.isArray(w.actors)
+    ? w.actors.filter((x): x is string => typeof x === 'string')
+    : [];
+  // Always derive backs_journeys from triggers; LLM-supplied list drifts.
+  const backs_journeys = Array.from(new Set(triggers
+    .filter((t): t is Extract<WorkflowTrigger, { kind: 'journey_step' }> => t.kind === 'journey_step')
+    .map(t => t.journey_id)));
+
+  const businessDomainId = pickKey(w, 'business_domain_id', 'businessDomainId');
+  const normalized: WorkflowV2 = {
+    id: typeof w.id === 'string' ? w.id : '',
+    businessDomainId: typeof businessDomainId === 'string' ? businessDomainId : '',
+    name: typeof w.name === 'string' ? w.name : '',
+    description: typeof w.description === 'string' ? w.description : '',
+    steps,
+    triggers,
+    actors: rawActors,
+    backs_journeys,
+    source: (typeof w.source === 'string' ? w.source : undefined) as WorkflowV2['source'],
+  };
+  return traceNormalize('phase1.normalizeWorkflowV2', w, normalized);
+}
+
+/**
+ * Normalize a single workflow trigger object. Returns null when the
+ * trigger's `kind` is unknown or required fields for that kind are
+ * missing — the caller drops null entries.
+ */
+export function normalizeWorkflowTrigger(t: Record<string, unknown>): WorkflowTrigger | null {
+  const kind = t.kind;
+  if (kind === 'journey_step' && typeof t.journey_id === 'string' && typeof t.step_number === 'number') {
+    return { kind, journey_id: t.journey_id, step_number: t.step_number };
+  }
+  if (kind === 'schedule' && typeof t.cadence === 'string') {
+    return { kind, cadence: t.cadence };
+  }
+  if (kind === 'event' && typeof t.event_type === 'string') {
+    return { kind, event_type: t.event_type };
+  }
+  if (kind === 'compliance' && typeof t.regime_id === 'string' && typeof t.rule === 'string') {
+    return { kind, regime_id: t.regime_id, rule: t.rule };
+  }
+  if (kind === 'integration' && typeof t.integration_id === 'string' && typeof t.event === 'string') {
+    return { kind, integration_id: t.integration_id, event: t.event };
+  }
+  return null;
+}
+
 export function normalizeTechnicalConstraints(raw: unknown[]): TechnicalConstraint[] {
-  return raw.map((r, i) => {
+  const mapped = raw.map((r, i) => {
     const o = (r ?? {}) as Record<string, unknown>;
     const sourceRef = normalizeSourceRef(o.source_ref);
     const text =
@@ -180,5 +279,16 @@ export function normalizeTechnicalConstraints(raw: unknown[]): TechnicalConstrai
       rationale: typeof o.rationale === 'string' ? o.rationale : undefined,
       source_ref: sourceRef,
     };
-  }).filter(t => t.text.length > 0);
+  });
+  const filtered = mapped.filter(t => t.text.length > 0);
+  // cal-22b silent-drop: 21 raw items → 0 emitted because none of them
+  // had a `text` field. Wrap in a synthetic { items } record so the
+  // field-diff's size_changed catches the drop. The trace will say
+  // "items: size [21→0]" which is exactly the signal that was needed.
+  traceNormalize(
+    'phase1.normalizeTechnicalConstraints',
+    { items: raw },
+    { items: filtered },
+  );
+  return filtered;
 }

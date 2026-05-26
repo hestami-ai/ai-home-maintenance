@@ -8,6 +8,7 @@ required_variables:
   - component_model_summary
   - data_models_summary
   - system_requirements_summary
+  - technical_constraints_summary
   - janumicode_version_sha
 reasoning_review_triggers:
   - completeness_shortcut
@@ -62,7 +63,21 @@ These are concrete commitments that bind downstream phases. Inventing them is a 
 
 - Enforced by `ungrounded_operational_specifics` parameterization C (catalog §2) — primary surface for this validator.
 
+# Hard rules — non-contradiction with technical constraints
+
+The `technical_constraints_summary` block is the canonical TECH-* roster from the source spec. Configuration parameters MUST NOT introduce a setting that contradicts a constraint or that surfaces an out-of-scope capability:
+
+- If a capability is in the spec's Out of Scope section (e.g. "Rate limiting on submission"), do NOT emit a parameter that exposes that capability (e.g. `max_events_per_minute`). The capability is not in scope; configuring it is not in scope either.
+- If a constraint mandates stdout-only log emission, do NOT emit `max_log_file_size_mb` or `log_file_path` parameters — there is no log file. Log level (`log_level`) IS permitted because the stdout-bound log can still be filtered by level.
+- If a constraint mandates AES-256 at rest with key material in KMS, do NOT emit `encryption_key_material` as a config string. Emit only `encryption_key_id` (the KMS handle) and `encryption_algorithm` (which the constraint pins to AES-256, so its default is grounded).
+- Naming consistency: when the same logical resource appears in multiple components (e.g. the single Postgres instance), use ONE canonical parameter name (e.g. `database_url`) instead of inventing a per-component alias for each (`persistence_url`, `db_uri`, etc.).
+
+Enforced by `technical_constraint_contradiction` (catalog §2) AND the existing `ungrounded_operational_specifics` validator.
+
 CONTEXT:
 System Requirements (Phase 3.2 — config-affecting SRs like retention, audit, SLO): {{system_requirements_summary}}
 Component Model: {{component_model_summary}}
 Data Models: {{data_models_summary}}
+
+Technical Constraints (canonical TECH-* roster from Phase 1.0c — non-contradiction binding):
+{{technical_constraints_summary}}

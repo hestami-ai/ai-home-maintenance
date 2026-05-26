@@ -122,8 +122,10 @@ export class Phase4Handler implements PhaseHandler {
       requiredOutputSpec: 'software_domains JSON — domains array with ubiquitous_language',
     });
 
+    const businessDomainsSummary = prior.businessDomainsBloom?.summary
+      ?? 'No Phase 1 business domains available (maps_to_business_domains may be left empty).';
     const domainsContent = await this.runSoftwareDomainIdentification(
-      ctx, boundarySummary, sysReqSummary, dmr41,
+      ctx, boundarySummary, sysReqSummary, businessDomainsSummary, dmr41,
     );
 
     const domainsRecord = engine.writer.writeRecord({
@@ -164,8 +166,15 @@ export class Phase4Handler implements PhaseHandler {
       requiredOutputSpec: 'component_model JSON — components with responsibilities and dependencies',
     });
 
+    // Gap #2 keystone: Phase 4.2 needs functional_requirements_summary
+    // so the LLM can declare `component.traces_to: [US-...]` — the
+    // canonical US ↔ component edge that downstream phases (especially
+    // Phase 9 packet builder Pass 2) rely on to populate per-task user
+    // story context without per-task LLM annotation.
+    const frSummary = prior.functionalRequirements?.summary
+      ?? 'No Phase 2 user stories available (traces_to may be left empty).';
     const componentContent = await this.runComponentDecomposition(
-      ctx, domainsSummary, sysReqSummary, dmr42,
+      ctx, domainsSummary, sysReqSummary, frSummary, dmr42,
     );
 
     const componentRecord = engine.writer.writeRecord({
@@ -327,8 +336,28 @@ export class Phase4Handler implements PhaseHandler {
       requiredOutputSpec: 'architectural_decisions JSON — adrs with context, decision, alternatives, consequences',
     });
 
+    // ts-103 surfaced ADR-009 contradicting TECH-CONTAINER-1 ("no
+    // microservices") because the ADR prompt only received the
+    // DMR-derived `active_constraints` narrative, not the canonical
+    // TECH-* roster. Pass the verbatim roster so the LLM can do a
+    // text-level non-contradiction check on its own decisions.
+    const technicalConstraintsSummary = technicalConstraints.length === 0
+      ? 'No technical_constraints_discovery artifact available'
+      : technicalConstraints
+          .map(t => {
+            const id = (t as { id?: string }).id ?? '';
+            const tech = (t as { technology?: string; name?: string }).technology
+              ?? (t as { name?: string }).name ?? '';
+            const category = (t as { category?: string }).category ?? '';
+            const text = (t as { text?: string; rationale?: string }).text
+              ?? (t as { rationale?: string }).rationale ?? '';
+            return [id, tech, category, text].filter(Boolean).join(' — ');
+          })
+          .filter(Boolean)
+          .join('\n');
+
     const adrsContent = await this.runADRCapture(
-      ctx, componentSummary, domainsSummary, dmr43,
+      ctx, componentSummary, domainsSummary, technicalConstraintsSummary, dmr43,
     );
 
     const adrsRecord = engine.writer.writeRecord({
@@ -467,6 +496,7 @@ export class Phase4Handler implements PhaseHandler {
     ctx: PhaseContext,
     boundarySummary: string,
     sysReqSummary: string,
+    businessDomainsSummary: string,
     dmr: PhaseContextPacketResult,
   ): Promise<SoftwareDomains> {
     const { engine } = ctx;
@@ -487,6 +517,7 @@ export class Phase4Handler implements PhaseHandler {
       active_constraints: dmr.activeConstraintsText,
       system_boundary_summary: boundarySummary,
       system_requirements_summary: sysReqSummary,
+      business_domains_summary: businessDomainsSummary,
       detail_file_path: dmr.detailFilePath,
       detail_file_content: dmr.detailFileContent,
       janumicode_version_sha: engine.janumiCodeVersionSha,
@@ -523,6 +554,7 @@ export class Phase4Handler implements PhaseHandler {
     ctx: PhaseContext,
     domainsSummary: string,
     sysReqSummary: string,
+    functionalRequirementsSummary: string,
     dmr: PhaseContextPacketResult,
   ): Promise<ComponentModel> {
     const { engine } = ctx;
@@ -544,6 +576,7 @@ export class Phase4Handler implements PhaseHandler {
       active_constraints: dmr.activeConstraintsText,
       software_domains_summary: domainsSummary,
       system_requirements_summary: sysReqSummary,
+      functional_requirements_summary: functionalRequirementsSummary,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;
@@ -574,6 +607,7 @@ export class Phase4Handler implements PhaseHandler {
     ctx: PhaseContext,
     componentSummary: string,
     domainsSummary: string,
+    technicalConstraintsSummary: string,
     dmr: PhaseContextPacketResult,
   ): Promise<ArchitecturalDecisions> {
     const { engine } = ctx;
@@ -598,6 +632,7 @@ export class Phase4Handler implements PhaseHandler {
       active_constraints: dmr.activeConstraintsText,
       component_model_summary: componentSummary,
       software_domains_summary: domainsSummary,
+      technical_constraints_summary: technicalConstraintsSummary,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;

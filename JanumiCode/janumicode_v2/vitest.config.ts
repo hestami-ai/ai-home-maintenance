@@ -28,6 +28,9 @@ export default defineConfig({
       // `pnpm test` and `pnpm test:unit` so a template change that breaks
       // a fixture's required-variables contract fails the build instantly.
       'src/test/regression/**/*.test.ts',
+      // Contract harness — forward tests proving each boundary's
+      // synthetic fixture passes its own contract.
+      'src/test/contracts/**/*.test.ts',
     ],
     exclude: [
       // Archive of pre-regression-suite probes / captures, kept for

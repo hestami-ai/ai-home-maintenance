@@ -7,10 +7,16 @@ import { verifyReleaseManifest, type ReleaseManifestVerifierInputs } from '../..
 import type { ReleasePlanContentV2, UserJourney, WorkflowV2, Integration, VocabularyTerm } from '../../../../lib/types/records';
 
 function emptyContains() {
-  return { journeys: [], workflows: [], entities: [], compliance: [], integrations: [], vocabulary: [] };
+  return {
+    journeys: [], workflows: [], entities: [], compliance: [], integrations: [], vocabulary: [],
+    vv_requirements: [], quality_attributes: [], technical_constraints: [],
+  };
 }
 function emptyCrossCutting() {
-  return { workflows: [], compliance: [], integrations: [], vocabulary: [] };
+  return {
+    workflows: [], compliance: [], integrations: [], vocabulary: [],
+    vv_requirements: [], quality_attributes: [], technical_constraints: [],
+  };
 }
 function plan(partial?: Partial<ReleasePlanContentV2>): ReleasePlanContentV2 {
   return {
@@ -53,6 +59,9 @@ function inputs(partial: Partial<ReleaseManifestVerifierInputs> = {}): ReleaseMa
     complianceIds: partial.complianceIds ?? [],
     integrations: partial.integrations ?? [],
     vocabulary: partial.vocabulary ?? [],
+    ...(partial.vvRequirementIds !== undefined && { vvRequirementIds: partial.vvRequirementIds }),
+    ...(partial.qualityAttributeIds !== undefined && { qualityAttributeIds: partial.qualityAttributeIds }),
+    ...(partial.technicalConstraintIds !== undefined && { technicalConstraintIds: partial.technicalConstraintIds }),
   };
 }
 
@@ -102,7 +111,7 @@ describe('verifyReleaseManifest — exact coverage', () => {
     const p = plan({
       releases: [{
         release_id: 'REL-1', ordinal: 1, name: 'A', description: 'd', rationale: 'r',
-        contains: { journeys: ['UJ-1'], workflows: ['WF-1'], entities: ['ENT-A'], compliance: ['COMP-A'], integrations: ['INT-A'], vocabulary: ['VOC-A'] },
+        contains: { journeys: ['UJ-1'], workflows: ['WF-1'], entities: ['ENT-A'], compliance: ['COMP-A'], integrations: ['INT-A'], vocabulary: ['VOC-A'], vv_requirements: [], quality_attributes: [], technical_constraints: [] },
       }],
     });
     const r = verifyReleaseManifest(inputs({
@@ -183,5 +192,93 @@ describe('verifyReleaseManifest — trace coherence (advisory)', () => {
     const gap = r.find(g => g.check === 'release_trace_coherence');
     expect(gap).toBeDefined();
     expect(gap!.severity).toBe('advisory');
+  });
+});
+
+describe('verifyReleaseManifest — VV / QA / TECH exact coverage (ts-13)', () => {
+  it('reports gap when a VV-* id is missing from the plan', () => {
+    const r = verifyReleaseManifest(inputs({
+      vvRequirementIds: ['VV-1'],
+    }));
+    const gap = r.find(g => g.check === 'release_exact_coverage_vv_requirements');
+    expect(gap).toBeDefined();
+    expect(gap!.missing).toEqual(['VV-1']);
+    expect(gap!.severity).toBe('blocking');
+  });
+
+  it('reports double-count when VV-* appears in both a release.contains and cross_cutting', () => {
+    const p = plan({
+      releases: [{
+        release_id: 'REL-1', ordinal: 1, name: 'A', description: 'd', rationale: 'r',
+        contains: { ...emptyContains(), vv_requirements: ['VV-1'] },
+      }],
+      cross_cutting: { ...emptyCrossCutting(), vv_requirements: ['VV-1'] },
+    });
+    const r = verifyReleaseManifest(inputs({ plan: p, vvRequirementIds: ['VV-1'] }));
+    expect(r.find(g => g.check === 'release_exact_coverage_vv_requirements_double_count')).toBeDefined();
+  });
+
+  it('reports gap when a QA-N id is missing from the plan', () => {
+    const r = verifyReleaseManifest(inputs({
+      qualityAttributeIds: ['QA-1'],
+    }));
+    const gap = r.find(g => g.check === 'release_exact_coverage_quality_attributes');
+    expect(gap).toBeDefined();
+    expect(gap!.missing).toEqual(['QA-1']);
+    expect(gap!.severity).toBe('blocking');
+  });
+
+  it('reports double-count when QA-N appears in both a release.contains and cross_cutting', () => {
+    const p = plan({
+      releases: [{
+        release_id: 'REL-1', ordinal: 1, name: 'A', description: 'd', rationale: 'r',
+        contains: { ...emptyContains(), quality_attributes: ['QA-1'] },
+      }],
+      cross_cutting: { ...emptyCrossCutting(), quality_attributes: ['QA-1'] },
+    });
+    const r = verifyReleaseManifest(inputs({ plan: p, qualityAttributeIds: ['QA-1'] }));
+    expect(r.find(g => g.check === 'release_exact_coverage_quality_attributes_double_count')).toBeDefined();
+  });
+
+  it('reports gap when a TECH-* id is missing from the plan', () => {
+    const r = verifyReleaseManifest(inputs({
+      technicalConstraintIds: ['TECH-1'],
+    }));
+    const gap = r.find(g => g.check === 'release_exact_coverage_technical_constraints');
+    expect(gap).toBeDefined();
+    expect(gap!.missing).toEqual(['TECH-1']);
+    expect(gap!.severity).toBe('blocking');
+  });
+
+  it('reports double-count when TECH-* appears in both a release.contains and cross_cutting', () => {
+    const p = plan({
+      releases: [{
+        release_id: 'REL-1', ordinal: 1, name: 'A', description: 'd', rationale: 'r',
+        contains: { ...emptyContains(), technical_constraints: ['TECH-1'] },
+      }],
+      cross_cutting: { ...emptyCrossCutting(), technical_constraints: ['TECH-1'] },
+    });
+    const r = verifyReleaseManifest(inputs({ plan: p, technicalConstraintIds: ['TECH-1'] }));
+    expect(r.find(g => g.check === 'release_exact_coverage_technical_constraints_double_count')).toBeDefined();
+  });
+
+  it('passes when VV / QA / TECH ids are exactly covered in cross_cutting only', () => {
+    const p = plan({
+      cross_cutting: { ...emptyCrossCutting(), vv_requirements: ['VV-1', 'VV-2'], quality_attributes: ['QA-1'], technical_constraints: ['TECH-1', 'TECH-2'] },
+    });
+    const r = verifyReleaseManifest(inputs({
+      plan: p,
+      vvRequirementIds: ['VV-1', 'VV-2'],
+      qualityAttributeIds: ['QA-1'],
+      technicalConstraintIds: ['TECH-1', 'TECH-2'],
+    }));
+    expect(r.filter(g => g.severity === 'blocking')).toHaveLength(0);
+  });
+
+  it('skips VV / QA / TECH checks when the verifier inputs omit them (backwards-compatible)', () => {
+    const r = verifyReleaseManifest(inputs({}));
+    expect(r.find(g => g.check === 'release_exact_coverage_vv_requirements')).toBeUndefined();
+    expect(r.find(g => g.check === 'release_exact_coverage_quality_attributes')).toBeUndefined();
+    expect(r.find(g => g.check === 'release_exact_coverage_technical_constraints')).toBeUndefined();
   });
 });

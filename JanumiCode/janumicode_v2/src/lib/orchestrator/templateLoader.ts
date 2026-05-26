@@ -26,6 +26,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'fs';
 import { join, relative } from 'path';
 import { getLogger } from '../logging';
+import { emitTemplateRendered } from '../trace/templateRendered';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -291,6 +292,14 @@ export class TemplateLoader {
         value,
       );
     }
+
+    // Transformation trace: capture per-variable provenance. This is the
+    // load-bearing step for forensics — the rendered string alone doesn't
+    // tell you which {{variable}} contributed which bytes, so a silent
+    // empty (e.g. {{active_constraints}} resolved to "") would otherwise
+    // be invisible. Now grep on payload_path shows the exact substitution
+    // table that produced this prompt.
+    emitTemplateRendered(template, variables, rendered, missing);
 
     return { rendered, missing_variables: missing };
   }

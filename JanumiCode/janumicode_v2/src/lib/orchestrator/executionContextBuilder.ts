@@ -155,13 +155,21 @@ function formatImplementationTaskHeader(task: ImplementationTask): string {
 
 function formatComponentContext(
   task: ImplementationTask,
-  componentModel: { components: Array<{ id: string; name: string; responsibility: string }> } | null,
+  componentModel: { components: Array<{ id: string; name: string; responsibility?: string; responsibilities?: Array<{ id?: string; statement?: string }> }> } | null,
 ): string {
   const component = componentModel ? lookupComponent(task.component_id, componentModel) : undefined;
   if (!component) {
     return `Component: ${task.component_id}\nResponsibility: ${task.component_responsibility}`;
   }
-  return `Name: ${component.name} (${component.id})\nResponsibility: ${component.responsibility}`;
+  // Component model emits `responsibilities[]` (plural) per Phase 4 schema.
+  // The legacy `.responsibility` singular field was never produced; reading
+  // it gave us `Responsibility: undefined` in every packet. Join the
+  // statements when the plural array is present; fall back to the legacy
+  // singular only if a caller wired it that way.
+  const responsibilityText = Array.isArray(component.responsibilities) && component.responsibilities.length > 0
+    ? component.responsibilities.map((r) => r.statement ?? '').filter(Boolean).join('; ')
+    : (component.responsibility ?? task.component_responsibility);
+  return `Name: ${component.name} (${component.id})\nResponsibility: ${responsibilityText}`;
 }
 
 function formatCompletionCriteria(criteria: CompletionCriterion[]): string {
@@ -418,8 +426,8 @@ function componentIdMatches(a: string | undefined | null, b: string | undefined 
  */
 function lookupComponent(
   taskComponentId: string,
-  componentModel: { components: Array<{ id: string; name: string; responsibility: string }> },
-): { id: string; name: string; responsibility: string } | undefined {
+  componentModel: { components: Array<{ id: string; name: string; responsibility?: string; responsibilities?: Array<{ id?: string; statement?: string }> }> },
+): { id: string; name: string; responsibility?: string; responsibilities?: Array<{ id?: string; statement?: string }> } | undefined {
   return componentModel.components.find(c => componentIdMatches(c.id, taskComponentId));
 }
 
@@ -558,6 +566,12 @@ export class ExecutionContextBuilder {
 
     // ── 2. Build the detail file first, so we can inline its content
     //       and pass the path to the rendered template. ───────────
+    // Issue #12: ADRs are already surfaced in the prompt via the
+    // `governing_adrs` template variable. Including them again in
+    // `decisionTraces` here causes the executor to read the same ADR
+    // list twice (once in the governing section, once via the inlined
+    // detail file). The detail file's other content (contextPacket,
+    // technicalSpecs) is still preserved.
     const detailContent: DetailFileContent = {
       contextPacket: JSON.stringify({
         task,
@@ -572,7 +586,7 @@ export class ExecutionContextBuilder {
         || (task.traces_to ?? []).includes(s.component_id)
         || componentIdMatches(s.component_id, task.component_id),
       ).map(s => ({ componentId: s.component_id, content: s.content })),
-      decisionTraces: governingADRsStr,
+      decisionTraces: '',
     };
 
     const subPhaseId = `9.1_${task.id}`;
@@ -595,15 +609,24 @@ export class ExecutionContextBuilder {
 
     // When a per-task DMR packet was supplied, prefer its active
     // constraints (DMR-retrieved + authority-attributed) over the
-    // builder-time fallback, and concatenate its detail file content
-    // (material findings, supersession chains, contradictions,
-    // completeness narrative) after the task-execution detail so both
-    // are visible inline.
+    // builder-time fallback.
+    //
+    // Issue #11: the DMR detail-file content was being inlined verbatim
+    // into every executor prompt, adding ~600 lines of materiality
+    // scores and decision-trace UUIDs per task. The DMR content is also
+    // written to disk via the detail-file path the executor already
+    // knows about. We now embed only a one-line reference by default;
+    // setting JANUMICODE_INLINE_DMR=1 restores the verbose inline mode
+    // for cases where the executor cannot read the detail file from
+    // disk (e.g. some CI sandboxes).
     const activeConstraintsResolved = dmrPacket?.activeConstraintsText
       ?? this.options.activeConstraints
       ?? '(no active constraints surfaced for this run)';
+    const inlineDmr = process.env.JANUMICODE_INLINE_DMR === '1';
     const detailFileContentInline = dmrPacket?.detailFileContent
-      ? `${taskDetailFileContent}\n\n---\n\n## Deep Memory Research — Per-Task Context Packet\n\n${dmrPacket.detailFileContent}`
+      ? (inlineDmr
+        ? `${taskDetailFileContent}\n\n---\n\n## Deep Memory Research — Per-Task Context Packet\n\n${dmrPacket.detailFileContent}`
+        : `${taskDetailFileContent}\n\n---\n\n_Deep Memory Research per-task packet available at the detail file path above. Read selectively if you need supporting material findings, supersession chains, or contradiction reports._`)
       : taskDetailFileContent;
 
     // ── 3. Render the template (when loader is available) ─────────
@@ -724,14 +747,18 @@ export class ExecutionContextBuilder {
     dependencyTasks: string,
     upstreamFindings: string,
   ): string {
+    const summary = componentModelSummary && componentModelSummary.trim().length > 0
+      && componentModelSummary !== '(component model unavailable)'
+      ? `### Component Model Summary\n${componentModelSummary}`
+      : '';
     return [
       `## Component Context\n${componentContext}`,
-      `### Component Model Summary\n${componentModelSummary}`,
+      summary,
       `## Test Cases to Implement\n${testCases}`,
       `## Evaluation Criteria\n${evalCriteriaRendered}`,
       `## Dependency Tasks\n${dependencyTasks}`,
       `## Upstream Validator Findings\n${upstreamFindings}`,
-    ].join('\n\n');
+    ].filter(Boolean).join('\n\n');
   }
 
   /**

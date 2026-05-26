@@ -1,0 +1,10 @@
+{
+  "host": "smtp.example.com",
+  "port": 587,
+  "secure": false,
+  "auth": {
+    "user": "admin@example.com",
+    "pass": "${SMTP_PASSWORD}"
+  },
+  "from": "abuse-notifications@example.com"
+}

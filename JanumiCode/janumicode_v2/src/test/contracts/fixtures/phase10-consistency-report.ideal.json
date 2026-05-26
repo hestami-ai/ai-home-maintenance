@@ -1,0 +1,8 @@
+{
+  "kind": "consistency_report",
+  "status": "pass",
+  "findings": [],
+  "high_count": 0,
+  "medium_count": 0,
+  "low_count": 0
+}

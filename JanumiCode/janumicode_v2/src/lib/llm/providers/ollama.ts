@@ -92,12 +92,14 @@ export class OllamaProvider implements LLMProviderAdapter {
       ...(supportsThinking ? { think: true } : {}),
       options: {
         temperature,
-        // Per-family context windows: gemma → 128K, granite4.1 → 11K
-        // (practical ceiling for granite4.1:30b on an RTX 4090 — the
-        // model+hardware combo can't address more; Ollama would
-        // otherwise truncate silently), gpt-oss → 128K, apriel → 50K
+        // Per-family context windows: gemma → 131072 (native max; was
+        // 128000 which rounded down ~3K tokens of usable window),
+        // granite4.1 → 11K (practical ceiling for granite4.1:30b on an
+        // RTX 4090 — the model+hardware combo can't address more;
+        // Ollama would otherwise truncate silently), gpt-oss → 131072
+        // (also native max; same rounding fix as gemma), apriel → 50K
         // (RTX 4090 ceiling for apriel-1.6:15b), default (qwen) → 262K.
-        num_ctx: isGemma ? 128000 : isGranite ? 11000 : isGptOss ? 128000 : isApriel ? 50000 : 262141,
+        num_ctx: isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : 262141,
         ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95, min_p: 0, repeat_penalty: 1 } : {}),
         ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
         ...(numPredict > 0 ? { num_predict: numPredict } : {}),
@@ -343,6 +345,9 @@ export class OllamaProvider implements LLMProviderAdapter {
     const modelLc = options.model.toLowerCase();
     const isQwen = modelLc.startsWith('qwen');
     const isGemma = modelLc.startsWith('gemma');
+    const isGptOss = modelLc.startsWith('gpt-oss');
+    const isGranite = modelLc.startsWith('granite');
+    const isApriel = modelLc.startsWith('apriel');
     const messages: Array<Record<string, unknown>> = [];
     if (options.system) messages.push({ role: 'system', content: options.system });
     messages.push({ role: 'user', content: options.prompt });
@@ -367,7 +372,10 @@ export class OllamaProvider implements LLMProviderAdapter {
       })),
       options: {
         temperature,
-        num_ctx: isGemma ? 128000 : 262141,
+        // Mirrors the per-family num_ctx in callGenerate (single source of
+        // truth would be cleaner but the two paths take different option
+        // shapes). Keep these in sync when adjusting.
+        num_ctx: isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : 262141,
         ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95, min_p: 0, repeat_penalty: 1 } : {}),
         ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
         ...(options.maxTokens ? { num_predict: options.maxTokens } : {}),

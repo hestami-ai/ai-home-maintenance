@@ -7,6 +7,7 @@ required_variables:
   - active_constraints
   - software_domains_summary
   - system_requirements_summary
+  - functional_requirements_summary
   - janumicode_version_sha
 reasoning_review_triggers:
   - implementability_violation
@@ -24,15 +25,21 @@ Decompose the system into [JC:Components] with defined responsibilities and depe
 
 REQUIRED OUTPUT: A JSON object matching the `component_model` schema:
 - components: array, each with:
-  - id, name, domain_id
-  - responsibilities: array of {id, statement} — at least one per Component (Invariant)
-  - dependencies: array of {target_component_id, dependency_type}
+  - `id` (lowercase `comp-*` namespace), `name`, `domain_id` (lowercase `domain-*` matching software_domains)
+  - `responsibilities`: array of `{id, statement}` — at least one per Component (Invariant). Responsibility `id` uses the `res-*` namespace.
+  - `dependencies`: array of `{target_component_id, dependency_type}`
+  - `traces_to`: **MANDATORY, NON-EMPTY array** of `US-*` ids from `functional_requirements_summary`. Every component MUST cite ≥ 1 user story it serves. A missing or empty `traces_to` array is a CM-003 invariant violation. Do not emit a component without this field populated.
 
 Rules:
 - Every Component Responsibility statement must be a SINGLE concern — no conjunctions ("and", "or") connecting distinct concerns (Invariant: CM-001)
 - Every Component must have at least one Responsibility (Invariant: CM-002)
 - Every System Requirement must be allocated to at least one Component (Invariant)
 - If a Responsibility is too broad for a single Executor Agent session, it is an implementability_violation
+- **Every Component MUST declare `traces_to: [US-*]`** (Invariant CM-003) — the canonical "what users need" ↔ "what we build" edge. The downstream Phase 9 packet builder uses this field to populate per-task user-story context; an empty or missing list starves every task on that component of narrative grounding.
+- **No exemptions for "pure infrastructure" components.** Even shared libraries, logging utilities, and cross-cutting concerns serve specific user-facing stories — list those stories. If a component is allegedly pure-infrastructure with no story it serves, it is over-decomposed (collapse into a parent that does serve stories) or the wrong components have been emitted.
+- **Self-check before emitting:** for each component you've drafted, ask "which US-* ids in `functional_requirements_summary` describe behavior this component is necessary to satisfy?" If you cannot answer that question for a component, re-examine the component's purpose. Do NOT emit it with an empty `traces_to`.
+- Components that serve multiple user stories list all of them. Components that serve cross-cutting infrastructure list all stories that depend on it.
+- Every `US-*` id in `traces_to` MUST exist in `functional_requirements_summary`. Do NOT invent user-story ids.
 
 # Granularity at this level — Single-Service Principle, NOT Single-Responsibility Principle
 
@@ -57,3 +64,5 @@ The Single-Responsibility Principle (one reason to change per module) governs at
 CONTEXT:
 Software Domains: {{software_domains_summary}}
 System Requirements: {{system_requirements_summary}}
+Functional Requirements (Phase 2.1 — US-* user stories; cite these in component.traces_to):
+{{functional_requirements_summary}}

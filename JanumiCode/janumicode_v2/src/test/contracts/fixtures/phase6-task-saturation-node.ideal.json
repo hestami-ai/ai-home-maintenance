@@ -1,0 +1,15 @@
+{
+  "kind": "task_decomposition_node",
+  "node_id": "tnode-abuse-001",
+  "parent_node_id": null,
+  "status": "atomic",
+  "tier": "D",
+  "depth": 2,
+  "pass_number": 1,
+  "task": {
+    "id": "task-abuse-notification-service-send-email",
+    "name": "Implement abuse notification email dispatch",
+    "description": "Add a function to the abuse-notification service that sends an email to the administrator within 2 minutes of an abuse flag.",
+    "component_id": "comp-abuse-notification-service"
+  }
+}

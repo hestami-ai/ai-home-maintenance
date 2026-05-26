@@ -23,6 +23,8 @@ import type {
 import { checkT1Schema } from './assertions/t1Schema.js';
 import { checkT2IdPreservation } from './assertions/t2IdPreservation.js';
 import { checkT3Invariant } from './assertions/t3Invariants.js';
+import { checkT4Principle } from './assertions/t4PrincipleInvariants.js';
+import { checkT5LlmJudge } from './assertions/t5LlmJudge.js';
 import { ollamaBaseUrl } from './ollamaPrecheck.js';
 
 export interface RunResult {
@@ -110,11 +112,11 @@ export async function invokeFromFixture(
 
 // ── Assertions ──────────────────────────────────────────────────────
 
-export function applyAssertions(
+export async function applyAssertions(
   fixture: Fixture,
   responseText: string,
   parsedJson: unknown | null,
-): AssertionResult {
+): Promise<AssertionResult> {
   const checks: AssertionCheck[] = [];
   const requireJsonParse = fixture.assertions.require_json_parse
     ?? fixture.invocation_params.response_format === 'json';
@@ -124,6 +126,7 @@ export function applyAssertions(
       tier: 'T1',
       name: 'json_parse',
       passed: false,
+      severity: 'blocking',
       detail: `response did not parse as JSON (length ${responseText.length})`,
     });
   }
@@ -146,16 +149,29 @@ export function applyAssertions(
     checks.push(checkT3Invariant(a, parsedJson));
   }
 
-  return {
-    passed: checks.every((c) => c.passed),
-    checks,
-  };
+  for (const a of fixture.assertions.t4_principle_invariants ?? []) {
+    checks.push(checkT4Principle(a, parsedJson));
+  }
+
+  for (const a of fixture.assertions.t5_llm_judges ?? []) {
+    checks.push(await checkT5LlmJudge(a, responseText));
+  }
+
+  // Aggregate `passed`: a check is considered failing only if it is NOT
+  // passed AND its severity is blocking (or unspecified — pre-T4 checks
+  // are blocking by convention). Advisory failures are reported in the
+  // checks array but do not flip the overall verdict.
+  const passed = checks.every((c) => c.passed || c.severity === 'advisory');
+  return { passed, checks };
 }
 
 export function formatFailureReport(result: AssertionResult): string {
   const fails = result.checks.filter((c) => !c.passed);
   if (fails.length === 0) return 'all checks passed';
   return fails
-    .map((c) => `  [${c.tier}] ${c.name}: ${c.detail ?? '(no detail)'}`)
+    .map((c) => {
+      const sev = c.severity === 'advisory' ? ' (advisory)' : '';
+      return `  [${c.tier}${sev}] ${c.name}: ${c.detail ?? '(no detail)'}`;
+    })
     .join('\n');
 }

@@ -1,0 +1,38 @@
+{
+  "kind": "api_definitions",
+  "definitions": [
+    {
+      "component_id": "comp-link-mapping-service",
+      "endpoints": [
+        {
+          "path": "/shorten",
+          "method": "POST",
+          "inputs": { "url": "string" },
+          "outputs": { "slug": "string" },
+          "error_codes": ["400", "401", "429"],
+          "auth_requirement": "API Key"
+        },
+        {
+          "path": "/{slug}",
+          "method": "GET",
+          "outputs": { "redirect_to": "string" },
+          "error_codes": ["404"],
+          "auth_requirement": "none"
+        }
+      ]
+    },
+    {
+      "component_id": "comp-abuse-notification-service",
+      "endpoints": [
+        {
+          "path": "/notifications",
+          "method": "POST",
+          "inputs": { "slug": "string", "reason": "string" },
+          "outputs": { "notification_id": "uuid" },
+          "error_codes": ["400", "401", "500"],
+          "auth_requirement": "internal"
+        }
+      ]
+    }
+  ]
+}

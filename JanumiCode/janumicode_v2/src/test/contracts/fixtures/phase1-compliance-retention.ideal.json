@@ -1,0 +1,35 @@
+{
+  "kind": "compliance_retention_discovery",
+  "compliance_extracted_items": [
+    {
+      "id": "COMP-ENCRYPTION-AT-REST",
+      "type": "CONSTRAINT",
+      "text": "All persisted URL mappings must be encrypted at rest using AES-256.",
+      "timestamp": "2026-05-20T00:00:00Z",
+      "source_ref": {
+        "document_path": "specs/tinyurl-thin-slice.md",
+        "section_heading": "Security Requirements",
+        "excerpt": "All stored URLs must be encrypted at rest using AES-256."
+      }
+    },
+    {
+      "id": "COMP-GDPR-EU-SHARERS",
+      "type": "CONSTRAINT",
+      "text": "EU-based link sharers' personal data must be processed under GDPR requirements.",
+      "timestamp": "2026-05-20T00:00:00Z",
+      "source_ref": {
+        "document_path": "specs/tinyurl-thin-slice.md",
+        "section_heading": "Compliance",
+        "excerpt": "EU users covered by GDPR."
+      }
+    }
+  ],
+  "retention_rules": [
+    {
+      "id": "RETENTION-CLICK-EVENTS",
+      "entity": "ClickEvent",
+      "duration": "P90D",
+      "rationale": "Operational analytics retention window."
+    }
+  ]
+}
