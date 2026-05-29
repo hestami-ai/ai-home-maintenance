@@ -23,6 +23,8 @@ import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrCon
 import { pickItemsArray } from '../parsedResponseHelpers';
 import { runTaskSaturationLoop } from './phase6_1a';
 import { runPhase6CycleDelta } from './runCycleDelta';
+import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
+import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -40,7 +42,6 @@ interface ImplementationTask {
   component_responsibility: string;
   description: string;
   technical_spec_ids?: string[];
-  backing_tool: string;
   dependency_task_ids?: string[];
   estimated_complexity: 'low' | 'medium' | 'high';
   complexity_flag?: string;
@@ -155,7 +156,7 @@ export class Phase6Handler implements PhaseHandler {
       })),
     };
 
-    const planRecord = engine.writer.writeRecord({
+    let planRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
@@ -174,6 +175,52 @@ export class Phase6Handler implements PhaseHandler {
     });
     artifactIds.push(planRecord.id);
     engine.ingestionPipeline.ingest(planRecord);
+
+    // Phase-exit scope gatekeeper. Cross-checks each task against the
+    // accepted components (Phase 4.2 post-gatekeeper). A task whose
+    // component_id is absent from the accepted set serves a component
+    // that was previously dropped — it's stale and would generate an
+    // unbacked packet at Phase 9.
+    const taskPrune = await runDownstreamScopeGatekeeper(ctx, {
+      phaseId: '6',
+      subPhaseId: 'task_skeleton',
+      bloomDescription: 'implementation tasks',
+      items: planContent.tasks.map(t => ({
+        id: t.id,
+        label: `${t.id}: ${t.name} [component: ${t.component_id ?? '?'}]`,
+        description: t.description,
+        tradeoffs: t.component_responsibility ?? undefined,
+      })),
+      originalArtifactId: planRecord.id,
+      overlay: 'DROP tasks whose `component_id` is NOT in Accepted Components — those components were pruned upstream and any task tied to them is stale. DROP tasks that describe work explicitly Out-of-Scope in upstream Intent Constraints. KEEP infrastructure/cross-cutting tasks (CI, observability) when their component anchor is accepted.',
+    });
+    if (!taskPrune.skipped && taskPrune.dropped.length > 0) {
+      const keptTaskSet = new Set(taskPrune.kept_ids);
+      const prunedTasks = planContent.tasks.filter(t => keptTaskSet.has(t.id));
+      const prunedPlanContent: ImplementationPlan = { ...planContent, tasks: prunedTasks };
+      const prunedPlanRecord = engine.writer.writeRecord({
+        record_type: 'artifact_produced',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '6',
+        sub_phase_id: 'task_skeleton',
+        produced_by_agent_role: 'implementation_planner',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [planRecord.id],
+        content: {
+          kind: 'implementation_plan',
+          ...prunedPlanContent,
+          total_tasks: prunedPlanContent.tasks.length,
+          complexity_flagged_count: prunedPlanContent.tasks.filter(t => t.complexity_flag).length,
+          refactoring_tasks_included: prunedPlanContent.tasks.some(t => t.task_type === 'refactoring'),
+        },
+      });
+      engine.writer.supersedByRollback(planRecord.id, prunedPlanRecord.id);
+      engine.ingestionPipeline.ingest(prunedPlanRecord);
+      planContent.tasks = prunedTasks;
+      planRecord = prunedPlanRecord;
+      artifactIds.push(prunedPlanRecord.id);
+    }
 
     // ── 6.1a — Recursive Task Decomposition (Wave 8) ──────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'task_saturation');
@@ -341,6 +388,7 @@ export class Phase6Handler implements PhaseHandler {
     });
     artifactIds.push(gateRecord.id);
     engine.eventBus.emit('phase_gate:pending', { phaseId: '6' });
+    aoddEmit('gate.pending', { gate_kind: 'phase_gate' });
 
     return { success: true, artifactIds };
   }
@@ -361,7 +409,6 @@ export class Phase6Handler implements PhaseHandler {
         component_id: 'COMP-001',
         component_responsibility: 'Implement core application logic',
         description: 'Set up the project structure and implement the primary module',
-        backing_tool: 'code_editor',
         estimated_complexity: 'medium',
         completion_criteria: [{
           criterion_id: 'CC-001',
@@ -587,8 +634,6 @@ export function normalizeWorkspacePath(p: string): string {
  *     made sibling context render as `task-N: task-N`)
  *   - `completion_criteria` emitted as array of strings, not objects
  *     (renderer printed `[undefined] undefined` per item)
- *   - `backing_tool` set to a language name like "Python" outside the
- *     active_constraints stack (hallucinated from training data)
  *
  * The Phase 6 prompt rewrite (Track B) tightens the contract; this helper
  * (Track A) catches whatever the LLM still drifts on. Logs a single
@@ -660,19 +705,6 @@ export function normalizeRootTaskShape(
     drifts.push('completion_criteria_empty');
   }
 
-  // 3. `backing_tool` constraint check: warn (do not auto-correct) when
-  // the LLM picks a language name outside the active_constraints stack.
-  // Auto-correcting is risky — the safer behavior is to flag, let the
-  // saturation pass's stricter prompt re-emit a sensible value, and surface
-  // the rate via warning logs.
-  const KNOWN_BACKING_TOOLS = new Set([
-    'claude_code_cli', 'codex_cli', 'gemini_cli', 'goose_cli', 'code_editor', 'direct_llm_api',
-  ]);
-  const backing_tool = typeof t.backing_tool === 'string' ? t.backing_tool : undefined;
-  if (backing_tool && !KNOWN_BACKING_TOOLS.has(backing_tool)) {
-    drifts.push(`backing_tool_outside_known_set:${backing_tool}`);
-  }
-
   if (drifts.length > 0) {
     getLogger().warn('workflow', 'Phase 6.1 task shape drift coerced', {
       task_id: t.id,
@@ -688,7 +720,6 @@ export function normalizeRootTaskShape(
     task_type: t.task_type as DecompositionTask['task_type'],
     component_id: typeof t.component_id === 'string' ? t.component_id : '',
     component_responsibility: typeof t.component_responsibility === 'string' ? t.component_responsibility : '',
-    backing_tool,
     estimated_complexity: t.estimated_complexity as DecompositionTask['estimated_complexity'],
     complexity_flag: typeof t.complexity_flag === 'string' ? t.complexity_flag : undefined,
     completion_criteria,

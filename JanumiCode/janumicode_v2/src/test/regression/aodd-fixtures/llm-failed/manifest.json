@@ -1,0 +1,31 @@
+{
+  "scenario": "llm-failed",
+  "description": "Single sub-phase that hits an LLM rate-limit and exhausts retries. Run ends in failure (run.failed emitted, status=failed).",
+  "schema_version": 1,
+  "expected_sub_phases": [
+    {
+      "phase_id": "1",
+      "sub_phase_id": "check",
+      "expected_status": "failed",
+      "must_answer_5wh": true,
+      "spot_checks": [
+        {
+          "path": "who.model",
+          "equals": "claude-sonnet-4-6"
+        },
+        {
+          "path": "how.status",
+          "equals": "failed"
+        },
+        {
+          "path": "how.retries",
+          "equals": 3
+        },
+        {
+          "path": "how.error.message",
+          "matches": "rate limited"
+        }
+      ]
+    }
+  ]
+}

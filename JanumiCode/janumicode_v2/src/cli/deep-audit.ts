@@ -39,6 +39,8 @@ import Database from 'better-sqlite3';
 import type { ContractContext, ContractResult, ContractSuite } from '../test/contracts/types';
 import { CONTRACT_SUITES } from '../test/contracts/registry';
 import { runContractSuite } from '../test/contracts/runner';
+import { readEventsSync } from '../lib/aodd';
+import type { AoddEvent } from '../lib/aodd';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -193,26 +195,92 @@ function loadArtifacts(db: Database.Database, runId: string): DbArtifact[] {
   return out;
 }
 
+// AODD event_type → legacy step_type, mirroring the
+// TRANSFORM_STEP_TYPE_BY_AODD table that lived in
+// src/lib/aodd/legacyProjection.ts (now deleted). Events not in this
+// map are dropped from the projection — they have no transformation_step
+// counterpart that the deep-audit categories know how to interpret.
+const TRANSFORM_STEP_TYPE_BY_AODD: Record<string, string> = {
+  'prompt.template_rendered': 'template_rendered',
+  'prompt.materialized': 'prompt_materialized',
+  'llm.invoked': 'llm_invoked',
+  'llm.returned': 'llm_returned',
+  'llm.failed': 'llm_returned',
+  'llm.cache_hit': 'llm_returned',
+  'repair.json_succeeded': 'json_repaired',
+  'repair.json_failed': 'json_repaired',
+  'context.assembled': 'context_assembled',
+  'record.added': 'persisted',
+  'agent.invocation_started': 'cli_invoked',
+  'agent.invocation_completed': 'cli_returned',
+};
+
+const LIFECYCLE_EVENT_BY_AODD: Record<string, string> = {
+  'phase.entered': 'phase.entered',
+  'phase.exited': 'phase.exited',
+  'sub_phase.entered': 'sub_phase.entered',
+  'sub_phase.exited': 'sub_phase.exited',
+  'run.resumed': 'workflow.resumed',
+  'llm.invoked': 'llm.call',
+  'llm.returned': 'llm.call',
+  'llm.failed': 'llm.call',
+  'llm.cache_hit': 'llm.call',
+  'agent.invocation_started': 'executor.dispatched',
+  'agent.invocation_completed': 'executor.invocation_status_change',
+  'record.added': 'artifact.produced',
+};
+
+function eventToTransformStep(e: AoddEvent, stepType: string): TransformStep {
+  const payload = e.payload as Record<string, unknown>;
+  const metadata: Record<string, unknown> = { ...(e.metadata ?? {}) };
+  if (e.invocation_id !== null) metadata.invocation_id = e.invocation_id;
+  const step: TransformStep = {
+    step_id: e.event_id,
+    ts: e.ts,
+    step_type: stepType,
+    sub_phase_id: e.sub_phase_id ?? '',
+    parent_step_id: e.parent_event_id,
+    input_record_ids: [],
+    metadata,
+    payload,
+  };
+  if (typeof payload.duration_ms === 'number') step.duration_ms = payload.duration_ms;
+  if (payload.error && typeof payload.error === 'object') {
+    const errObj = payload.error as Record<string, unknown>;
+    const msg = typeof errObj.message === 'string' ? errObj.message : '';
+    step.error = { message: msg };
+  }
+  return step;
+}
+
 function loadTransforms(workspace: string, runId: string): TransformStep[] {
-  const file = path.join(workspace, '.janumicode', 'runs', runId, 'transforms.jsonl');
-  if (!fs.existsSync(file)) return [];
+  // Sole source of truth: AODD events.ndjson. The legacy
+  // transforms.jsonl writer has been removed.
   const out: TransformStep[] = [];
-  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-    const t = line.trim();
-    if (!t) continue;
-    try { out.push(JSON.parse(t) as TransformStep); } catch { /* skip */ }
+  for (const e of readEventsSync(workspace, runId)) {
+    const stepType = TRANSFORM_STEP_TYPE_BY_AODD[e.event_type];
+    if (!stepType) continue;
+    out.push(eventToTransformStep(e, stepType));
   }
   return out;
 }
 
 function loadLifecycle(workspace: string, runId: string): LifecycleEvent[] {
-  const file = path.join(workspace, '.janumicode', 'runs', runId, 'lifecycle.ndjson');
-  if (!fs.existsSync(file)) return [];
+  // Sole source of truth: AODD events.ndjson. The legacy
+  // lifecycle.ndjson writer has been removed.
   const out: LifecycleEvent[] = [];
-  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-    const t = line.trim();
-    if (!t) continue;
-    try { out.push(JSON.parse(t) as LifecycleEvent); } catch { /* skip */ }
+  for (const e of readEventsSync(workspace, runId)) {
+    const event = LIFECYCLE_EVENT_BY_AODD[e.event_type];
+    if (!event) continue;
+    const payload = e.payload as Record<string, unknown>;
+    out.push({
+      ts: e.ts,
+      event,
+      workflow_run_id: e.run_id,
+      phase_id: e.phase_id,
+      sub_phase_id: e.sub_phase_id,
+      ...payload,
+    });
   }
   return out;
 }

@@ -30,6 +30,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  emit as aoddEmit,
+  phaseIdToFilenameSegment,
+  subPhaseIdToFilenameSegment,
+} from '../aodd';
+import type { PhaseId } from '../types/records';
 
 interface AuditPauseConfig {
   workspaceRoot: string;
@@ -159,9 +165,11 @@ export function auditPauseSync(args: {
 
   const seq = ++pauseSeq;
   const ts = new Date().toISOString();
-  const safeSub = args.priorSubPhaseId.replace(/[^a-zA-Z0-9_]/g, '_');
-  const safePhase = (args.priorPhaseId ?? 'no_phase').replace(/[^a-zA-Z0-9_]/g, '_');
-  const basename = `${String(seq).padStart(4, '0')}__phase${safePhase}__${safeSub}`;
+  const safeSub = subPhaseIdToFilenameSegment(args.priorSubPhaseId);
+  const phaseSeg = args.priorPhaseId
+    ? phaseIdToFilenameSegment(args.priorPhaseId as PhaseId, { padded: false })
+    : 'phaseno_phase';
+  const basename = `${String(seq).padStart(4, '0')}__${phaseSeg}__${safeSub}`;
 
   const pendingDir = path.join(config.workspaceRoot, '.janumicode', 'audit', 'pending');
   const ackDir = path.join(config.workspaceRoot, '.janumicode', 'audit', 'acks');
@@ -179,6 +187,7 @@ export function auditPauseSync(args: {
   const markerPath = path.join(pendingDir, `${basename}.json`);
   const ackPath = path.join(ackDir, `${basename}.ack`);
   fs.writeFileSync(markerPath, JSON.stringify(marker, null, 2), 'utf8');
+  aoddEmit('audit.pause_emitted', { seq, marker_path: markerPath });
 
   process.stderr.write(
     `[audit-pause] PAUSED at sub_phase.exited prior=${args.priorSubPhaseId} next=${args.nextSubPhaseId} seq=${seq}\n` +
@@ -223,8 +232,18 @@ export function auditPauseSync(args: {
       } catch { /* best effort */ }
 
       if (parsed.action === 'abort') {
+        aoddEmit('audit.pause_resolved', {
+          seq,
+          ack_path: ackPath,
+          action: 'abort',
+        });
         throw new Error(`[audit-pause] aborted by audit agent at sub_phase.exited "${args.priorSubPhaseId}": ${parsed.reason ?? 'no reason given'}`);
       }
+      aoddEmit('audit.pause_resolved', {
+        seq,
+        ack_path: ackPath,
+        ...(parsed.action ? { action: parsed.action } : {}),
+      });
       process.stderr.write(`[audit-pause] resumed seq=${seq}\n`);
       return;
     }
@@ -287,9 +306,9 @@ export function auditPhaseExitPauseSync(args: {
 
   const seq = ++pauseSeq;
   const ts = new Date().toISOString();
-  const safeSub = args.priorSubPhaseId.replaceAll(/\W/g, '_');
-  const safePhase = args.priorPhaseId.replaceAll(/\W/g, '_');
-  const basename = `${String(seq).padStart(4, '0')}__phase${safePhase}_exit__lastsub_${safeSub}`;
+  const safeSub = subPhaseIdToFilenameSegment(args.priorSubPhaseId);
+  const phaseSeg = phaseIdToFilenameSegment(args.priorPhaseId as PhaseId, { padded: false });
+  const basename = `${String(seq).padStart(4, '0')}__${phaseSeg}_exit__lastsub_${safeSub}`;
 
   const pendingDir = path.join(config.workspaceRoot, '.janumicode', 'audit', 'pending');
   const ackDir = path.join(config.workspaceRoot, '.janumicode', 'audit', 'acks');
@@ -309,6 +328,7 @@ export function auditPhaseExitPauseSync(args: {
   const markerPath = path.join(pendingDir, `${basename}.json`);
   const ackPath = path.join(ackDir, `${basename}.ack`);
   fs.writeFileSync(markerPath, JSON.stringify(marker, null, 2), 'utf8');
+  aoddEmit('audit.pause_emitted', { seq, marker_path: markerPath });
 
   process.stderr.write(
     `[audit-pause] PAUSED at phase.exited prior_phase=${args.priorPhaseId} last_sub=${args.priorSubPhaseId} ` +
@@ -336,8 +356,18 @@ export function auditPhaseExitPauseSync(args: {
         fs.renameSync(ackPath, path.join(doneDir, `${basename}.ack`));
       } catch { /* best effort */ }
       if (parsed.action === 'abort') {
+        aoddEmit('audit.pause_resolved', {
+          seq,
+          ack_path: ackPath,
+          action: 'abort',
+        });
         throw new Error(`[audit-pause] aborted at phase.exited "${args.priorPhaseId}": ${parsed.reason ?? 'no reason given'}`);
       }
+      aoddEmit('audit.pause_resolved', {
+        seq,
+        ack_path: ackPath,
+        ...(parsed.action ? { action: parsed.action } : {}),
+      });
       process.stderr.write(`[audit-pause] resumed phase_exit seq=${seq}\n`);
       return;
     }

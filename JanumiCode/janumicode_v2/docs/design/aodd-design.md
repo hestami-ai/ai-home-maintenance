@@ -1,6 +1,6 @@
 # AODD Design Memo — janumicode v2
 
-**Status**: Draft — resolves the ten open questions in `aodd-principles.md`. Awaiting review before implementation.
+**Status**: Approved 2026-05-26. Resolves the ten open questions in `aodd-principles.md`. Implementation proceeds per the phased migration in §11.3, with per-phase confirmation.
 **Date**: 2026-05-26.
 **Companion**: `aodd-principles.md` (locks the principles and architectural boundary).
 

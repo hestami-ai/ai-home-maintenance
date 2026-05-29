@@ -129,7 +129,81 @@ describe('buildPackets — happy path', () => {
     expect(packets[0].test_cases[0].test_case_id).toBe('TC-001');
   });
 
-  it('bundles test cases via US-id-prefix composite (ts-16 namespace failure mode)', () => {
+  it('Pass 4: resolves user_stories via composite AC parent extraction from component-matched test cases (ts-109 fix)', () => {
+    // ts-109 audit: tasks bind to components only (traces_to: [comp-X]),
+    // components have empty traces_to, NFRs don't link this task → the
+    // three earlier US-matching passes all miss. But the Phase 7 test
+    // suite IS keyed by component_id, and its test cases reference
+    // composite ACs whose parent encodes the story id. Pass 4 closes
+    // the loop without requiring any new prompt-level changes.
+    const input: BuilderInput = {
+      ...emptyInput(),
+      atomicTasks: [atomicTask({ traces_to: [], component_id: 'comp-001' })],
+      userStories: [
+        // Saturation leaf — the matcher should resolve to THIS one
+        // (not US-001), because the test case references its AC.
+        {
+          id: 'FR-CAM-1.1',
+          action: 'Create campaign link via POST /campaigns',
+          acceptance_criteria: [{ id: 'AC-FR-CAM-1.1-001', description: 'POST /campaigns returns slug' }],
+        },
+        // Sibling that should NOT match — different AC parent.
+        {
+          id: 'US-001',
+          action: 'shorten URL',
+          acceptance_criteria: [{ id: 'AC-US001-001', description: 'returns 201' }],
+        },
+      ],
+      componentsById: new Map([['comp-001', {
+        id: 'comp-001',
+        responsibilities: [],   // empty — guarantees Pass 2 misses
+        traces_to: [],          // empty — Pass 2 (Phase 1 trace path) misses
+      } as BuilderComponent]]),
+      testSuites: [{
+        suite_id: 'suite-cam',
+        component_id: 'comp-001',
+        test_cases: [
+          {
+            test_case_id: 'TC-001',
+            acceptance_criterion_ids: ['AC-FR-CAM-1.1-001'],
+            preconditions: [],
+            expected_outcome: 'campaign link created',
+          },
+        ],
+      }],
+    };
+    const packets = buildPackets(input);
+    expect(packets[0].user_stories).toHaveLength(1);
+    expect(packets[0].user_stories[0].id).toBe('FR-CAM-1.1');
+  });
+
+  it('Pass 4 handles compact canonical US-{nnn} composite ACs', () => {
+    const input: BuilderInput = {
+      ...emptyInput(),
+      atomicTasks: [atomicTask({ traces_to: [], component_id: 'comp-001' })],
+      userStories: [
+        { id: 'US-001', action: 'a', acceptance_criteria: [{ id: 'AC-US001-001', description: 'd' }] },
+      ],
+      componentsById: new Map([['comp-001', { id: 'comp-001', responsibilities: [] }]]),
+      testSuites: [{
+        suite_id: 'suite-x',
+        component_id: 'comp-001',
+        test_cases: [{ test_case_id: 'TC-1', acceptance_criterion_ids: ['AC-US001-001'], preconditions: [], expected_outcome: '...' }],
+      }],
+    };
+    const packets = buildPackets(input);
+    expect(packets[0].user_stories.map(u => u.id)).toEqual(['US-001']);
+  });
+
+  it('REGRESSION: matcher is strict on AC ids (no fuzzy bridging in the consumer)', () => {
+    // Removed 2026-05-27 along with the `r.startsWith(${us}-) /
+    // includes(-${us}-) / endsWith(-${us})` band-aid. Phase 7 now
+    // canonicalizes AC refs at exit (see phase7/acRefResolver.ts), so
+    // by the time data reaches packet_synthesis every test case
+    // already references the FR-canonical id. If a drifted ref ever
+    // slips through to here (e.g. `US-001-A1`), the matcher should
+    // NOT silently rescue it — coverage / audit metrics will surface
+    // the gap and operators fix the prompt or the resolver upstream.
     const input: BuilderInput = {
       ...emptyInput(),
       atomicTasks: [atomicTask({ traces_to: ['US-001'] })],
@@ -141,13 +215,15 @@ describe('buildPackets — happy path', () => {
       componentsById: new Map([['comp-001', { id: 'comp-001', responsibilities: [{ id: 'resp-1', description: 'd' }] }]]),
       testSuites: [{
         suite_id: 'suite-001',
+        // Note: component_id intentionally absent so the legitimate
+        // component_id Pass 2 fallback can't mask the regression.
         test_cases: [
           { test_case_id: 'TC-001', acceptance_criterion_ids: ['US-001-A1'], preconditions: [], expected_outcome: 'returns 201' },
         ],
       }],
     };
     const packets = buildPackets(input);
-    expect(packets[0].test_cases).toHaveLength(1);
+    expect(packets[0].test_cases).toHaveLength(0);
   });
 
   it('bundles evaluation criteria matching the packet user stories', () => {

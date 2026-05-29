@@ -37,7 +37,6 @@ const TASK: ExecutionTask = {
   componentId: 'cmp-security',
   componentResponsibility: 'RSP-014: Enforce RLS.',
   description: 'Implement RLS policies.',
-  backingTool: 'DBOS Middleware / PostgreSQL RLS Policies',
   completionCriteria: [{ criterionId: 'cc-1', description: 'RLS applied.' }],
   writeDirectoryPaths: [],
 };
@@ -79,16 +78,14 @@ describe('ExecutorAgent — backing tool routing', () => {
 
   afterEach(() => { db.close(); });
 
-  it('routes through the default executor backing tool, not the task infrastructure', async () => {
+  it('routes through the default executor backing tool', async () => {
     const executor = new ExecutorAgent(db, agentInvoker, writer, eventBus, testId);
     await executor.execute(TASK, runId, 'prompt content', '/tmp', 'dev');
 
     expect(invokeSpy).toHaveBeenCalledTimes(1);
     const invokeArgs = invokeSpy.mock.calls[0][0] as { backingTool: string; agentRole: string };
-    // The routing target is the executor's own identity, NOT the infra
-    // description carried by the task.
+    // Routing is the executor's own identity; default = claude_code_cli.
     expect(invokeArgs.backingTool).toBe('claude_code_cli');
-    expect(invokeArgs.backingTool).not.toBe(TASK.backingTool);
     expect(invokeArgs.agentRole).toBe('executor_agent');
   });
 
@@ -102,11 +99,17 @@ describe('ExecutorAgent — backing tool routing', () => {
     expect(invokeArgs.backingTool).toBe('direct_llm_api');
   });
 
-  it('forwards task infrastructure + task_id to AgentInvoker via traceContext for audit-row capture', async () => {
+  it('forwards task_id to AgentInvoker via traceContext for audit-row capture', async () => {
     // The agent_invocation record is written by AgentInvoker.invokeCLI
     // (CLI persistence parity work). ExecutorAgent's contract is to
-    // ensure the audit fields (task_id, taskBackingTool) reach the
-    // invoker via traceContext so they land in the record's content.
+    // ensure task_id reaches the invoker via traceContext so it lands
+    // in the record's content.
+    //
+    // Note: the previous version of this test also asserted that a
+    // `taskBackingTool` descriptive field was forwarded. That field
+    // was removed (2026-05-27) along with `ExecutionTask.backingTool`
+    // — see executorAgent.ts header. Routing comes from config, not
+    // from per-task descriptive metadata.
     const executor = new ExecutorAgent(db, agentInvoker, writer, eventBus, testId);
     await executor.execute(TASK, runId, 'prompt content', '/tmp', 'dev');
 
@@ -115,7 +118,10 @@ describe('ExecutorAgent — backing tool routing', () => {
     };
     expect(invokeArgs.traceContext).toBeDefined();
     expect(invokeArgs.traceContext?.taskId).toBe('TASK-SEC-001');
-    expect(invokeArgs.traceContext?.taskBackingTool).toBe('DBOS Middleware / PostgreSQL RLS Policies');
     expect(invokeArgs.traceContext?.phaseId).toBe('9');
+    // Regression: taskBackingTool should NOT be set — the descriptive
+    // metadata path was removed; the executor identity goes through
+    // `backingTool` (asserted in the test above), not via traceContext.
+    expect(invokeArgs.traceContext?.taskBackingTool).toBeUndefined();
   });
 });

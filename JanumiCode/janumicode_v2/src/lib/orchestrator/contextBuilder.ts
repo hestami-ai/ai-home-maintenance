@@ -12,6 +12,7 @@
 
 import { writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
+import { emit as aoddEmit } from '../aodd';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -287,9 +288,12 @@ export class ContextBuilder {
     mkdirSync(dirname(filePath), { recursive: true });
     writeFileSync(filePath, markdown, 'utf-8');
 
+    const sizeBytes = Buffer.byteLength(markdown, 'utf-8');
+    aoddEmit('context.detail_file_written', { path: filePath, bytes: sizeBytes });
+
     return {
       path: filePath,
-      sizeBytes: Buffer.byteLength(markdown, 'utf-8'),
+      sizeBytes,
       truncated,
       content: markdown,
     };

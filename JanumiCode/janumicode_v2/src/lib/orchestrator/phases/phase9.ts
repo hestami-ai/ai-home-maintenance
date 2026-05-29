@@ -31,6 +31,7 @@ import { runPacketSynthesisSubPhase } from './packetSynthesis';
 import { runCycleControllerSubPhase } from './cycleController';
 import { randomUUID } from 'node:crypto';
 import type { ImplementationPacketContent } from '../../types/records';
+import { emit as aoddEmit } from '../../aodd';
 
 export class Phase9Handler implements PhaseHandler {
   readonly phaseId: PhaseId = '9';
@@ -107,6 +108,13 @@ export class Phase9Handler implements PhaseHandler {
     // packet's rendered context — the structural ts-16 fix that gives
     // the executor everything it needs without inventing.
     // See docs/design/implementation-packet-synthesis.md.
+    // setSubPhase BEFORE the work so the audit-pause hook fires at the
+    // Phase 8 → 9 / packet_synthesis boundary, giving the operator a
+    // chance to verify Phase 8 outputs before packet bundling begins.
+    // The next setSubPhase below (implementation_task_execution) then
+    // pauses on packet_synthesis EXIT — letting the operator verify
+    // packet contents before any executor LLM call fires.
+    engine.stateMachine.setSubPhase(workflowRun.id, 'packet_synthesis');
     const packetResult = runPacketSynthesisSubPhase({ workflowRun, engine });
     const packetByTaskId = new Map<string, ImplementationPacketContent>();
     for (const p of packetResult.packets) {
@@ -538,6 +546,7 @@ export class Phase9Handler implements PhaseHandler {
     });
     artifactIds.push(gateRecord.id);
     engine.eventBus.emit('phase_gate:pending', { phaseId: '9' });
+    aoddEmit('gate.pending', { gate_kind: 'phase_gate' });
 
     // ── 9.9 — Cycle Controller ─────────────────────────────
     // Decides whether to terminate (advance to Phase 10) or loop back

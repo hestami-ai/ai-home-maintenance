@@ -35,7 +35,6 @@ import type {
   PacketCoherenceResult,
 } from '../../../types/records';
 import type { UpstreamIndex } from './upstreamIndex';
-import { emitLifecycle } from '../../../trace/lifecycle';
 
 export interface VerifierInput {
   packets: ImplementationPacketContent[];
@@ -143,18 +142,11 @@ function verifyPacket(
   for (const ref of collectReferencedIds(packet)) {
     if (!ref) continue;
     const resolved = upstreamIndex.allUpstreamIds.has(ref);
-    // Tier-2 lifecycle: emit a ref_resolution event per id checked.
-    // ts-18 had dozens of fabricated dm-*/api-* ids; this surfaces
-    // each one as its own grep-able event keyed by namespace + status.
-    // The packet.synthesized event aggregates counts; this fans out
-    // for the cases where you need to know exactly which id was bogus.
-    emitLifecycle('phase8_5.ref_resolution', {
-      packet_id: packet.packet_id,
-      task_id: packet.task?.id ?? null,
-      ref,
-      ref_namespace: ref.split('-')[0] ?? 'unknown',
-      resolved,
-    });
+    // (Per-ref resolution events used to fan out into lifecycle.ndjson
+    // for granular forensics on fabricated dm-*/api-* ids. With the
+    // legacy lifecycle stream retired, unresolved refs are still
+    // surfaced via the blocking-failure list below; the packet record's
+    // coherence verdict captures the rollup.)
     if (resolved) continue;
     // ACs use a per-user-story namespace (AC-001 may appear under multiple
     // user stories); a literal AC-id may not appear in the upstream index

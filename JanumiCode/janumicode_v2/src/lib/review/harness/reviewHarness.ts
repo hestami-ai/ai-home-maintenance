@@ -44,6 +44,7 @@ import {
   type ValidatorFinding,
   type ValidatorRuntimeParams,
 } from './validatorRegistry';
+import { emit as aoddEmit } from '../../aodd';
 
 /**
  * Agent roles that must NEVER trigger a harness run, to prevent the
@@ -306,6 +307,11 @@ export async function runReviewHarness(
       },
     );
     const validatorDuration = Date.now() - validatorStart;
+    aoddEmit('validator.run', {
+      validator_name: entry.id,
+      target_record_id: agentOutputId,
+      duration_ms: validatorDuration,
+    });
 
     const tokens = tokensByValidator.get(entry.id) ?? null;
     for (const finding of findings) {
@@ -544,5 +550,20 @@ function writeFindingRecord(args: {
     record_type: 'reasoning_review_finding_record',
     derived_from_record_ids: [args.harnessRecordId],
     content: content as unknown as Record<string, unknown>,
+  });
+  // AODD paired emit: validator.finding events let an agent see what a
+  // validator surfaced without joining DB tables. Map the validator
+  // framework's HIGH/MEDIUM/LOW to the AODD-canonical error/warning/info.
+  const aoddSeverity: 'error' | 'warning' | 'info' =
+    args.finding.severity === 'HIGH'
+      ? 'error'
+      : args.finding.severity === 'MEDIUM'
+        ? 'warning'
+        : 'info';
+  aoddEmit('validator.finding', {
+    validator_name: args.finding.validatorId,
+    target_record_id: args.finding.targetIdentifier ?? args.harnessRecordId,
+    severity: aoddSeverity,
+    message: args.finding.summary,
   });
 }

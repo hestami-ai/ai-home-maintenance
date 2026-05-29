@@ -139,6 +139,17 @@ For each child you produce, list any **precondition, fixture-setup choice, oracl
 - `parent_branch_classification` is required and exactly one of the three values.
 - Use `decomposition_rationale` to explain *why this child, not another*.
 
+# Acceptance Criterion referencing
+
+`acceptance_criterion_ids[]` on children should reference ACs from
+`{{acceptance_criteria_summary}}` (or, for `atomic_step`, the parent's own
+list). AC ids are workflow-globally unique composites of the form
+`AC-US{nnn}-{mmm}` — copy them as written. A downstream resolver
+canonicalizes minor near-misses, so concentrate on *which AC each child
+verifies* rather than character-perfect transcription. If no AC covers a
+child's behaviour, classify the parent as `invalid_parent` instead of
+inventing one.
+
 # JSON Output Contract (strict)
 
 - **No markdown fences.** Response starts with `{` and ends with `}`.

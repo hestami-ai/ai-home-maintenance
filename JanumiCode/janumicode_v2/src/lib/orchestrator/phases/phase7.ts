@@ -16,12 +16,16 @@ import type {
   TechnicalConstraint,
   DecompositionTestCase,
   TestDecompositionNodeContent,
+  GovernedStreamRecord,
 } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveFrView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { runTestSaturationLoop } from './phase7_1a';
 import { runPhase7CycleDelta } from './runCycleDelta';
+import { emit as aoddEmit } from '../../aodd';
+import { buildCanonicalAcIndex, resolveAcReferences, type CanonicalAcIndex } from './phase7/acRefResolver';
+import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -54,6 +58,7 @@ interface TestPlan {
 
 interface TestCoverageReport {
   gaps: Array<{ acceptance_criterion_id: string; reason: string }>;
+  component_gaps: Array<{ component_id: string; reason: string }>;
   coverage_percentage: number;
 }
 
@@ -94,6 +99,10 @@ export class Phase7Handler implements PhaseHandler {
       }
     }
 
+    // Canonical AC index drives the deterministic ref-resolver applied
+    // before this phase persists. See phase7/acRefResolver.ts header.
+    const canonicalAcIndex = buildCanonicalAcIndex(frStories);
+
     const derivedFromIds = prior.allRecordIds;
 
     // ── 7.1 — Test Case Generation ────────────────────────────
@@ -118,11 +127,30 @@ export class Phase7Handler implements PhaseHandler {
       requiredOutputSpec: 'test_plan JSON — test_suites with test_cases tracing to acceptance_criterion_ids',
     });
 
-    const testPlanContent = await this.runTestCaseGeneration(
-      ctx, frSummary, planSummary, componentSummary, dmr71,
+    // Pull the component id list — every id must end up as a
+    // `suite.component_id` in the emitted test plan (Phase 7 coverage
+    // invariant; packet_synthesis joins suites to tasks by component_id).
+    const componentIds: string[] = (
+      (prior.componentModel?.content.components as Array<Record<string, unknown>> | undefined) ?? []
+    )
+      .map(c => (typeof c.id === 'string' ? c.id : ''))
+      .filter(Boolean);
+
+    let testPlanContent = await this.runTestCaseGeneration(
+      ctx, frSummary, planSummary, componentSummary, componentIds, dmr71,
     );
 
-    const testPlanRecord = engine.writer.writeRecord({
+    // Phase exit correction: canonicalize every emitted AC ref against
+    // the FR view's canonical AC set so downstream coverage and packet
+    // synthesis never have to bridge LLM id drift themselves.
+    normalizeTestPlanAcRefs(testPlanContent, canonicalAcIndex, 'test_case_skeleton');
+
+    // Phase exit correction: ensure every component has at least one
+    // test suite — components without one would produce unbacked packets
+    // at Phase 9. Empty stub suites get filled by 7.1a saturation.
+    backfillMissingComponentSuites(testPlanContent, componentIds);
+
+    let testPlanRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
@@ -144,6 +172,18 @@ export class Phase7Handler implements PhaseHandler {
     });
     artifactIds.push(testPlanRecord.id);
     engine.ingestionPipeline.ingest(testPlanRecord);
+
+    // Phase-exit scope gatekeeper. Cross-checks each test suite against
+    // the accepted components. A suite for a rejected component is
+    // stale and would produce a packet test_case binding to a component
+    // that no longer exists.
+    const pruned = await applyTestPlanGatekeeper(
+      ctx, testPlanContent, testPlanRecord.id, artifactIds,
+    );
+    if (pruned) {
+      testPlanContent = pruned.content;
+      testPlanRecord = pruned.record;
+    }
 
     // ── 7.1a — Recursive Test Decomposition (Wave 10) ─────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'test_case_saturation');
@@ -242,13 +282,14 @@ export class Phase7Handler implements PhaseHandler {
         rootTestCases,
         rootNodeRecordIds: rootTestRecordIds,
         rootLogicalIds: rootTestLogicalIds,
+        canonicalAcIndex,
       });
     }
 
     // ── 7.2 — Test Coverage Analysis ──────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'test_plan_synthesis');
 
-    const coverageReport = this.runCoverageAnalysis(testPlanContent, allAcIds);
+    const coverageReport = this.runCoverageAnalysis(testPlanContent, allAcIds, componentIds);
 
     const coverageRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -326,12 +367,14 @@ export class Phase7Handler implements PhaseHandler {
         test_coverage_record_id: coverageRecord.id,
         coverage_percentage: coverageReport.coverage_percentage,
         gaps_count: coverageReport.gaps.length,
-        has_unresolved_warnings: coverageReport.gaps.length > 0,
+        component_gaps_count: coverageReport.component_gaps.length,
+        has_unresolved_warnings: coverageReport.gaps.length > 0 || coverageReport.component_gaps.length > 0,
         has_high_severity_flaws: false,
       },
     });
     artifactIds.push(gateRecord.id);
     engine.eventBus.emit('phase_gate:pending', { phaseId: '7' });
+    aoddEmit('gate.pending', { gate_kind: 'phase_gate' });
 
     return { success: true, artifactIds };
   }
@@ -340,7 +383,7 @@ export class Phase7Handler implements PhaseHandler {
 
   private async runTestCaseGeneration(
     ctx: PhaseContext, frSummary: string, planSummary: string, componentSummary: string,
-    dmr: PhaseContextPacketResult,
+    componentIds: string[], dmr: PhaseContextPacketResult,
   ): Promise<TestPlan> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('test_design_agent', 'test_case_skeleton');
@@ -357,11 +400,16 @@ export class Phase7Handler implements PhaseHandler {
 
     if (!template) return fallback;
 
+    const componentIdList = componentIds.length > 0
+      ? componentIds.map(id => `- ${id}`).join('\n')
+      : '(no components available)';
+
     const rendered = engine.templateLoader.render(template, {
       active_constraints: dmr.activeConstraintsText,
       functional_requirements_summary: frSummary,
       implementation_plan_summary: planSummary,
       component_model_summary: componentSummary,
+      component_id_list: componentIdList,
       detail_file_path: dmr.detailFilePath,
       detail_file_content: dmr.detailFileContent,
       janumicode_version_sha: engine.janumiCodeVersionSha,
@@ -383,8 +431,18 @@ export class Phase7Handler implements PhaseHandler {
     return fallback;
   }
 
-  /** Deterministic coverage analysis: check every AC ID is referenced by at least one test case. */
-  private runCoverageAnalysis(testPlan: TestPlan, allAcIds: string[]): TestCoverageReport {
+  /**
+   * Deterministic coverage analysis: every AC must be referenced by at
+   * least one test case, AND every component must own at least one test
+   * suite. The component check exists because `packet_synthesis` matches
+   * test suites to tasks by `suite.component_id === task.component_id`;
+   * a component without a suite leaves its tasks unbacked at Phase 9.
+   */
+  private runCoverageAnalysis(
+    testPlan: TestPlan,
+    allAcIds: string[],
+    componentIds: string[],
+  ): TestCoverageReport {
     const coveredAcIds = new Set<string>();
     for (const suite of testPlan.test_suites) {
       for (const tc of suite.test_cases) {
@@ -393,17 +451,162 @@ export class Phase7Handler implements PhaseHandler {
         }
       }
     }
-
     const gaps = allAcIds
       .filter(id => !coveredAcIds.has(id))
       .map(id => ({ acceptance_criterion_id: id, reason: `No test case references ${id}` }));
+
+    const suiteComponentIds = new Set(testPlan.test_suites.map(s => s.component_id));
+    const componentGaps = componentIds
+      .filter(id => !suiteComponentIds.has(id))
+      .map(id => ({
+        component_id: id,
+        reason: `No test suite has component_id="${id}" — its tasks will get unbacked packets at Phase 9`,
+      }));
 
     const total = allAcIds.length || 1;
     const covered = allAcIds.length - gaps.length;
 
     return {
       gaps,
+      component_gaps: componentGaps,
       coverage_percentage: Math.round((covered / total) * 100),
     };
+  }
+}
+
+/**
+ * Phase exit correction: insert empty stub suites for any component
+ * that the LLM didn't cover. Each stub gets a single placeholder test
+ * case so `packet_synthesis`'s component-id fallback can match. The
+ * 7.1a saturation pass will then receive the stub and either flesh it
+ * out or surface a `deferred` status — both visible in the audit.
+ */
+function backfillMissingComponentSuites(
+  testPlan: TestPlan,
+  componentIds: string[],
+): void {
+  if (componentIds.length === 0) return;
+  const covered = new Set(testPlan.test_suites.map(s => s.component_id));
+  let backfilled = 0;
+  for (const compId of componentIds) {
+    if (covered.has(compId)) continue;
+    testPlan.test_suites.push({
+      suite_id: `TS-AUTO-${compId}`,
+      component_id: compId,
+      test_type: 'integration',
+      test_cases: [{
+        test_case_id: `TC-AUTO-${compId}-001`,
+        type: 'functional',
+        acceptance_criterion_ids: [],
+        preconditions: [`Component ${compId} is deployed and reachable.`],
+        expected_outcome: `Component ${compId} responds to its primary interface call without error (stub — 7.1a saturation will refine this against component responsibilities).`,
+      }],
+    });
+    backfilled++;
+  }
+  if (backfilled > 0) {
+    getLogger().info('workflow', 'Phase 7.1 component-coverage backfill applied', {
+      backfilled_components: backfilled,
+      total_components: componentIds.length,
+    });
+  }
+}
+
+/**
+ * Phase 7.1 scope-gatekeeper pass on the emitted test plan. Runs the
+ * downstream gatekeeper, supersedes the original artifact with a pruned
+ * copy when items were dropped, and returns the new content+record
+ * (or `null` when nothing changed).
+ */
+async function applyTestPlanGatekeeper(
+  ctx: PhaseContext,
+  testPlanContent: TestPlan,
+  originalArtifactId: string,
+  artifactIds: string[],
+): Promise<{ content: TestPlan; record: GovernedStreamRecord } | null> {
+  const prune = await runDownstreamScopeGatekeeper(ctx, {
+    phaseId: '7',
+    subPhaseId: 'test_case_skeleton',
+    bloomDescription: 'test suites',
+    items: testPlanContent.test_suites.map(s => ({
+      id: s.suite_id,
+      label: `${s.suite_id}: ${s.test_type} suite for ${s.component_id}`,
+      description: `${s.test_cases.length} test case(s)`,
+      tradeoffs: s.test_cases.map(tc => tc.test_case_id).join(', '),
+    })),
+    originalArtifactId,
+    overlay: 'DROP test suites whose `component_id` is NOT in Accepted Components. KEEP suites whose component is accepted, even if individual test cases reference removed ACs — the resolver will canonicalize references at 7.1a saturation.',
+  });
+  if (prune.skipped || prune.dropped.length === 0) return null;
+  const keptSet = new Set(prune.kept_ids);
+  const prunedSuites = testPlanContent.test_suites.filter(s => keptSet.has(s.suite_id));
+  const prunedContent: TestPlan = { test_suites: prunedSuites };
+  const { engine, workflowRun } = ctx;
+  const prunedRecord = engine.writer.writeRecord({
+    record_type: 'artifact_produced',
+    schema_version: '1.0',
+    workflow_run_id: workflowRun.id,
+    phase_id: '7',
+    sub_phase_id: 'test_case_skeleton',
+    produced_by_agent_role: 'test_design_agent',
+    janumicode_version_sha: engine.janumiCodeVersionSha,
+    derived_from_record_ids: [originalArtifactId],
+    content: {
+      kind: 'test_plan',
+      ...prunedContent,
+      total_test_cases: prunedSuites.reduce((n, s) => n + s.test_cases.length, 0),
+      coverage_by_type: {
+        unit: prunedSuites.filter(s => s.test_type === 'unit').reduce((n, s) => n + s.test_cases.length, 0),
+        integration: prunedSuites.filter(s => s.test_type === 'integration').reduce((n, s) => n + s.test_cases.length, 0),
+        end_to_end: prunedSuites.filter(s => s.test_type === 'end_to_end').reduce((n, s) => n + s.test_cases.length, 0),
+      },
+    },
+  });
+  engine.writer.supersedByRollback(originalArtifactId, prunedRecord.id);
+  engine.ingestionPipeline.ingest(prunedRecord);
+  artifactIds.push(prunedRecord.id);
+  return { content: prunedContent, record: prunedRecord };
+}
+
+/**
+ * Phase exit correction: replace each test case's `acceptance_criterion_ids[]`
+ * with canonical ids resolved against the FR view. Logs aggregate bridge
+ * activity at INFO so operators see the drift rate trend over time.
+ * Unresolved refs are preserved so coverage analysis still flags them.
+ */
+function normalizeTestPlanAcRefs(
+  testPlan: TestPlan,
+  index: CanonicalAcIndex,
+  subPhase: string,
+): void {
+  let bridged = 0;
+  let unresolved = 0;
+  let touchedCases = 0;
+  for (const suite of testPlan.test_suites) {
+    for (const tc of suite.test_cases) {
+      const refs = tc.acceptance_criterion_ids ?? [];
+      if (refs.length === 0) continue;
+      const contextText = [tc.expected_outcome, ...(tc.execution_steps ?? [])]
+        .filter((x): x is string => typeof x === 'string' && x.length > 0)
+        .join(' ');
+      const result = resolveAcReferences(refs, index, { contextText });
+      bridged += result.bridgedCount;
+      unresolved += result.unresolvedCount;
+      const changed =
+        result.resolvedIds.length !== refs.length ||
+        result.resolvedIds.some((id, i) => id !== refs[i]);
+      if (changed) {
+        tc.acceptance_criterion_ids = result.resolvedIds;
+        touchedCases++;
+      }
+    }
+  }
+  if (bridged > 0 || unresolved > 0) {
+    getLogger().info('workflow', 'Phase 7 AC ref normalizer applied', {
+      subPhase,
+      touchedCases,
+      refsBridged: bridged,
+      refsUnresolved: unresolved,
+    });
   }
 }

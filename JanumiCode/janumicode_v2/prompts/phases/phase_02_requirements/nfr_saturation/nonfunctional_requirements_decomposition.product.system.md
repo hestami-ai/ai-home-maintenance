@@ -124,7 +124,7 @@ For each child, list assumptions / constraints / compliance citations / open que
       "action": "retain financial audit records for the statutory minimum",
       "outcome": "Records older than 7 years remain queryable; retention policy is fixed commitment",
       "acceptance_criteria": [
-        { "id": "AC-001", "description": "Audit records are retained for the full statutory period.", "measurable_condition": "SELECT COUNT(*) on audit_records older than 7 years returns > 0 rows across a rolling annual sample" }
+        { "id": "AC-NFR-AUDIT-1.1-001", "description": "Audit records are retained for the full statutory period.", "measurable_condition": "SELECT COUNT(*) on audit_records older than 7 years returns > 0 rows across a rolling annual sample" }
       ],
       "priority": "critical",
       "traces_to": ["VV-12", "COMP-AUDIT-7YR"],

@@ -99,17 +99,20 @@ describe('rollbackToSubPhase', () => {
   });
 
   it('preserves immutable history (agent_invocation et al.) across rollback', () => {
+    // transformation_step used to be in the preserve set too, but the
+    // record_type was retired with the legacy transforms.jsonl writer.
+    // The remaining preserved-history types still include the
+    // agent_invocation / agent_output pair the test cares about.
     seed(db, [
-      { id: 'r1', record_type: 'agent_invocation',           sub_phase_id: 'business_domains_bloom',    produced_at: '2026-05-21T16:00:03Z' },
-      { id: 'r2', record_type: 'agent_output',               sub_phase_id: 'business_domains_bloom',    produced_at: '2026-05-21T16:00:03Z' },
-      { id: 'r3', record_type: 'artifact_produced',          sub_phase_id: 'business_domains_bloom',    produced_at: '2026-05-21T16:00:04Z' },
-      { id: 'r4', record_type: 'transformation_step',        sub_phase_id: 'business_domains_bloom',    produced_at: '2026-05-21T16:00:04Z' },
+      { id: 'r1', record_type: 'agent_invocation',  sub_phase_id: 'business_domains_bloom', produced_at: '2026-05-21T16:00:03Z' },
+      { id: 'r2', record_type: 'agent_output',      sub_phase_id: 'business_domains_bloom', produced_at: '2026-05-21T16:00:03Z' },
+      { id: 'r3', record_type: 'artifact_produced', sub_phase_id: 'business_domains_bloom', produced_at: '2026-05-21T16:00:04Z' },
     ]);
     const result = rollbackToSubPhase(db, RUN_ID, 'business_domains_bloom');
     expect(result.rolled_back_count).toBe(1); // only the artifact_produced
-    expect(result.preserved_count).toBe(3);   // agent_invocation, agent_output, transformation_step
+    expect(result.preserved_count).toBe(2);   // agent_invocation, agent_output
     expect(result.rolled_back_by_type).toEqual({ artifact_produced: 1 });
-    expect(currentVersionCount(db)).toBe(3); // r1, r2, r4 stay current
+    expect(currentVersionCount(db)).toBe(2);  // r1, r2 stay current
   });
 
   it('returns null cutoff when the target sub-phase never ran', () => {

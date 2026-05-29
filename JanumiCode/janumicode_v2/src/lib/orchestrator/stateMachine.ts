@@ -15,9 +15,9 @@
 import type { Database } from '../database/init';
 import type { IntentLens, PhaseId, WorkflowRun, WorkflowRunStatus } from '../types/records';
 import { PHASE_ORDER } from '../types/records';
-import { emitLifecycle } from '../trace/lifecycle';
 import { setSubPhase as setTraceSubPhase } from '../trace/traceContext';
 import { auditPauseSync, auditPhaseExitPauseSync, isAuditPauseEnabled } from './auditPause';
+import { consumeSubPhaseState, emit as aoddEmit } from '../aodd';
 
 // ── Valid Transitions ───────────────────────────────────────────────
 
@@ -258,13 +258,8 @@ export class StateMachine {
     ).get(runId) as { current_sub_phase_id: string | null } | undefined;
     const priorSubPhaseId = priorSubPhaseRow?.current_sub_phase_id ?? null;
 
-    // Emit phase.exited lifecycle event for the prior phase.
-    emitLifecycle('phase.exited', {
-      workflow_run_id: runId,
-      phase_id: currentPhase,
-      last_sub_phase_id: priorSubPhaseId,
-      next_phase_id: targetPhase,
-    });
+    // (phase.exited is emitted at the orchestrator-engine layer with full
+    // status + duration_ms data; no duplicate emit here.)
 
     // Apply transition
     const status: WorkflowRunStatus = targetPhase === '10' ? 'in_progress' : 'in_progress';
@@ -310,10 +305,17 @@ export class StateMachine {
       UPDATE workflow_runs SET current_sub_phase_id = ? WHERE id = ?
     `).run(subPhaseId, runId);
     if (prior?.current_sub_phase_id && prior.current_sub_phase_id !== subPhaseId) {
-      emitLifecycle('sub_phase.exited', {
-        workflow_run_id: runId,
-        sub_phase_id: prior.current_sub_phase_id,
-      });
+      // Consume the tracked entered_at + accumulated status from the
+      // AODD sub-phase tracker so the payload carries the real duration
+      // and reflects whether any failure marker fired during the
+      // sub-phase. Falls back to 0 / 'success' when no entry exists
+      // (e.g. tests that didn't trigger sub_phase.entered).
+      const exitState = consumeSubPhaseState(prior.current_sub_phase_id);
+      aoddEmit(
+        'sub_phase.exited',
+        { status: exitState.status, duration_ms: exitState.duration_ms },
+        { sub_phase_id_override: prior.current_sub_phase_id },
+      );
       // Audit-pause gate: when JANUMICODE_AUDIT_PAUSE=1, halt synchronously
       // here so the audit agent can review the prior sub-phase's artifacts
       // before the next handler runs. No-op when the env flag is off.
@@ -329,13 +331,14 @@ export class StateMachine {
         });
       }
     }
-    emitLifecycle('sub_phase.entered', {
-      workflow_run_id: runId,
-      sub_phase_id: subPhaseId,
-    });
-    // Also push the new sub_phase_id into the TraceCtx so any downstream
-    // emit (transformation_step / lifecycle) without an override gets
-    // the current sub-phase automatically.
+    aoddEmit(
+      'sub_phase.entered',
+      { sub_phase_name: subPhaseId },
+      { sub_phase_id_override: subPhaseId },
+    );
+    // Push the new sub_phase_id into the TraceCtx so any downstream
+    // AODD emit without an override picks up the current sub-phase
+    // automatically.
     setTraceSubPhase(subPhaseId);
   }
 

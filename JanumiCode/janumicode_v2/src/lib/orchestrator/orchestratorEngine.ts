@@ -31,9 +31,18 @@ import {
 } from '../cli/outputParser';
 import { LLMCaller } from '../llm/llmCaller';
 import { withTraceContext } from '../trace/traceContext';
-import { configureTraceEmit } from '../trace/emit';
-import { configureLifecycleLog, emitLifecycle } from '../trace/lifecycle';
 import { configureAuditPause } from './auditPause';
+import {
+  DEFAULT_RETENTION,
+  consumeSubPhaseState,
+  emit as aoddEmit,
+  endRun as aoddEndRun,
+  initialize as initializeAodd,
+  pruneAoddRuns,
+  registerAoddLogHandler,
+  startRun as aoddStartRun,
+  type RetentionConfig,
+} from '../aodd';
 import { parseJsonWithRecovery } from '../llm/jsonRecovery';
 import { EventBus } from '../events/eventBus';
 import { DecisionTraceGenerator } from '../memory/decisionTraceGenerator';
@@ -209,27 +218,9 @@ export class OrchestratorEngine {
     this.stateMachine = new StateMachine(db);
     this.writer = new GovernedStreamWriter(db, () => randomUUID());
 
-    // Transformation trace layer — opt-out via JANUMICODE_TRACE=off.
-    // Configured once here; emit.ts is then a no-op when unconfigured.
-    if ((process.env.JANUMICODE_TRACE ?? 'on') !== 'off') {
-      configureTraceEmit({
-        writer: this.writer,
-        versionSha: this.versionSha,
-        workspaceRoot: workspacePath,
-        payloadsEnabled: (process.env.JANUMICODE_TRACE_PAYLOADS ?? 'on') !== 'off',
-      });
-    } else {
-      configureTraceEmit(null);
-    }
-
-    // Tier-1/2 lifecycle log — opt-out via JANUMICODE_LIFECYCLE_LOG=off.
-    // Distinct from transformation traces: append-only NDJSON to disk,
-    // not governed_stream records. Lifecycle events go through this
-    // module via emitLifecycle().
-    configureLifecycleLog({
-      workspaceRoot: workspacePath,
-      enabled: (process.env.JANUMICODE_LIFECYCLE_LOG ?? 'on') !== 'off',
-    });
+    // Legacy `transforms.jsonl` and `lifecycle.ndjson` writers have
+    // been removed entirely. Observability is provided by the AODD
+    // layer (configured below).
     // Audit-pause gate: configure with the workspace root so pause
     // markers + ack files land under .janumicode/audit/. The pause
     // itself is opted in via JANUMICODE_AUDIT_PAUSE=1 at runtime
@@ -238,6 +229,37 @@ export class OrchestratorEngine {
     // sub-phases that produced zero records this process (cached
     // replays during --resume-from-db flows).
     configureAuditPause({ workspaceRoot: workspacePath, db });
+
+    // AODD observability layer (docs/design/aodd-{principles,design}.md).
+    // Parallel observability surface for AI coding agents finishing v2;
+    // file-first NDJSON under runs/<run_id>/aodd/. Opt-out via
+    // JANUMICODE_AODD=off. P2 wires the Logger handler here so log
+    // entries become log.<level> AODD events when a run is active;
+    // the run lifecycle (startRun / endRun) is wired in P3. P9 adds
+    // retention pruning right after initialize (before any new run
+    // is started), so the new run does not race against prune.
+    if ((process.env.JANUMICODE_AODD ?? 'on') !== 'off') {
+      initializeAodd({
+        workspaceRoot: workspacePath,
+        janumicodeVersionSha: this.versionSha,
+        enabled: true,
+      });
+      // Retention: read the optional `aodd.retention` block from the
+      // workspace config; fall back to DEFAULT_RETENTION. Pruning is
+      // synchronous and deterministic — runs before any new AODD
+      // activity for this process.
+      const aoddCfg = (config as { aodd?: { retention?: Partial<RetentionConfig> } }).aodd;
+      const retention: RetentionConfig = {
+        max_runs: aoddCfg?.retention?.max_runs ?? DEFAULT_RETENTION.max_runs,
+        ttl_days: aoddCfg?.retention?.ttl_days ?? DEFAULT_RETENTION.ttl_days,
+        min_runs: aoddCfg?.retention?.min_runs ?? DEFAULT_RETENTION.min_runs,
+      };
+      pruneAoddRuns(workspacePath, retention);
+      registerAoddLogHandler(getLogger());
+    } else {
+      initializeAodd(null);
+    }
+
     this.schemaValidator = new SchemaValidator(extensionPath);
     this.invariantChecker = new InvariantChecker(
       `${extensionPath}/schemas/invariants`,
@@ -515,6 +537,11 @@ export class OrchestratorEngine {
     });
 
     this.eventBus.emit('workflow:started', { workflowRunId: runId });
+    // AODD: open the per-run trace directory before any logger.info or
+    // downstream emit so they're captured into events.ndjson. Paired
+    // with the legacy EventBus emit above per design memo §5 dual-emit.
+    aoddStartRun(runId);
+    aoddEmit('run.started', { intent_brief: rawIntentText ?? null });
     getLogger().info('workflow', 'Workflow started', { workflow_run_id: runId, workspace_id: workspaceId, trace_id: trace.trace_id }, trace);
     return { run, trace };
   }
@@ -522,6 +549,28 @@ export class OrchestratorEngine {
   /** Number of phase executions currently in-flight. Used by quiescence detection. */
   private _executingPhaseCount = 0;
   get executingPhaseCount(): number { return this._executingPhaseCount; }
+
+  /**
+   * Emit a terminal `sub_phase.exited` AODD event for the workflow's
+   * current sub-phase, if any. Used at phase exit so the final
+   * sub-phase of each phase gets its summary written incrementally
+   * rather than only via the endRun bulk pass.
+   *
+   * stateMachine.setSubPhase only fires sub_phase.exited for the
+   * *prior* sub-phase when a new one is set — so without this helper
+   * the LAST sub-phase of every phase never has an exit event during
+   * the run.
+   */
+  private emitFinalSubPhaseExitedIfAny(runId: string): void {
+    const current = this.stateMachine.getWorkflowRun(runId)?.current_sub_phase_id;
+    if (!current) return;
+    const exitState = consumeSubPhaseState(current);
+    aoddEmit(
+      'sub_phase.exited',
+      { status: exitState.status, duration_ms: exitState.duration_ms },
+      { sub_phase_id_override: current },
+    );
+  }
 
   /**
    * Execute the current phase of a workflow run.
@@ -598,30 +647,41 @@ export class OrchestratorEngine {
         result = await withTraceContext(
           { workflow_run_id: runId, phase_id: phaseId, sub_phase_id: null },
           async () => {
-            emitLifecycle('phase.entered', {
-              workflow_run_id: runId,
-              phase_id: phaseId,
+            aoddEmit('phase.entered', {
+              phase_name: PHASE_NAMES[phaseId] ?? phaseId,
             });
             const r = await handler.execute({ workflowRun: run, engine: this });
-            emitLifecycle('phase.exited', {
-              workflow_run_id: runId,
-              phase_id: phaseId,
-              status: r.success ? 'success' : 'failure',
-              duration_ms: Date.now() - phaseStartedAt,
+            // Cover the last sub-phase of the phase: stateMachine.setSubPhase
+            // only fires sub_phase.exited for the *prior* sub-phase when a
+            // new one is set, so the final sub-phase never gets one.
+            // Emit it here so per-sub-phase-exit summary writes also cover
+            // the terminal sub-phase, and so its diagnostic status carries
+            // through.
+            this.emitFinalSubPhaseExitedIfAny(runId);
+            const phaseDuration = Date.now() - phaseStartedAt;
+            aoddEmit('phase.exited', {
+              phase_name: PHASE_NAMES[phaseId] ?? phaseId,
+              status: r.success ? 'success' : 'failed',
+              duration_ms: phaseDuration,
               artifact_count: r.artifactIds.length,
-              error: r.success ? undefined : r.error,
+              ...(r.success ? {} : { error: { message: r.error ?? 'unknown error' } }),
             });
             return r;
           },
         );
       } catch (err) {
-        emitLifecycle('phase.exited', {
-          workflow_run_id: runId,
-          phase_id: phaseId,
-          status: 'thrown',
-          duration_ms: Date.now() - phaseStartedAt,
+        const phaseDuration = Date.now() - phaseStartedAt;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        // Same coverage as the happy path: close out the current sub-phase
+        // before emitting phase.exited so the bulk-derive and per-exit
+        // summary writers see a complete picture.
+        this.emitFinalSubPhaseExitedIfAny(runId);
+        aoddEmit('phase.exited', {
+          phase_name: PHASE_NAMES[phaseId] ?? phaseId,
+          status: 'failed',
+          duration_ms: phaseDuration,
           artifact_count: 0,
-          error: err instanceof Error ? err.message : String(err),
+          error: { message: errMsg },
         });
         const message = err instanceof Error ? err.message : String(err);
         const subPhase = this.stateMachine.getWorkflowRun(runId)?.current_sub_phase_id;
@@ -694,6 +754,10 @@ export class OrchestratorEngine {
             } else if (idx === PHASE_ORDER.length - 1) {
               this.stateMachine.completeWorkflowRun(runId);
               this.eventBus.emit('workflow:completed', { workflowRunId: runId });
+              // AODD: close the trace. endRun emits run.completed and
+              // writes index.json. After this point, AODD emits for runId
+              // are no-ops until startRun is called again.
+              aoddEndRun({ status: 'success' });
             }
           }
         }
@@ -839,6 +903,11 @@ export class OrchestratorEngine {
 
       this.eventBus.emit('decision:requested', { runId, decisionId, surfaceType });
       this.eventBus.emit('decision:resolved', { runId, decisionId, resolution: synthetic });
+      aoddEmit('decision.requested', { decision_id: decisionId, surface_type: surfaceType });
+      aoddEmit('decision.resolved', {
+        decision_id: decisionId,
+        resolution: { type: synthetic.type, payload: (synthetic as { payload?: unknown }).payload },
+      });
       return Promise.resolve(synthetic);
     }
 
@@ -852,6 +921,7 @@ export class OrchestratorEngine {
         createdAt: Date.now(),
       });
       this.eventBus.emit('decision:requested', { runId, decisionId, surfaceType });
+      aoddEmit('decision.requested', { decision_id: decisionId, surface_type: surfaceType });
     });
   }
 
@@ -976,6 +1046,10 @@ export class OrchestratorEngine {
       decisionId,
       resolution,
     });
+    aoddEmit('decision.resolved', {
+      decision_id: decisionId,
+      resolution: { type: resolution.type, payload: (resolution as { payload?: unknown }).payload },
+    });
     pending.resolver(resolution);
     return true;
   }
@@ -1048,6 +1122,10 @@ export class OrchestratorEngine {
     this.eventBus.emit('inconsistency:escalated', {
       runId: escalation.runId,
       escalationRecordId: record.id,
+      description: escalation.description,
+    });
+    aoddEmit('decision.escalated', {
+      escalation_record_id: record.id,
       description: escalation.description,
     });
     this.eventBus.emit('error:occurred', {

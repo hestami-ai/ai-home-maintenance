@@ -22,7 +22,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getLogger } from '../logging';
-import { emitLifecycle } from '../trace/lifecycle';
 import type { OrchestratorEngine } from './orchestratorEngine';
 import type { GovernedStreamWriter } from './governedStreamWriter';
 import type { GovernedStreamRecord, ImplementationPacketContent } from '../types/records';
@@ -332,24 +331,10 @@ export class ExecutionScheduler {
     });
 
     // Tier-2 lifecycle: dispatch order per wave. ts-18's alphabetical
-    // ordering anti-pattern (every out-of-scope task ran before any
-    // in-scope task) would have been visible in a single line — the
-    // first wave's leaf_ids array was sorted lexicographically.
-    // strategy is hard-coded here because topoSortRespectingWave is
-    // the canonical ordering; if a future change introduces a
-    // different scheduling strategy, update the value.
-    emitLifecycle('phase9.dispatch_order_selected', {
-      workflow_run_id: workflowRunId,
-      phase_id: '9',
-      sub_phase_id: '9.1',
-      wave_number: waveNumber,
-      release_id: wave.release_id,
-      release_ordinal: wave.release_ordinal,
-      strategy: 'topological-within-wave',
-      leaf_ids: topo.map((l) => l.id),
-      leaf_count: topo.length,
-      distribution_by_component: distribution,
-    });
+    // (Phase 9 dispatch ordering used to fire a dedicated lifecycle
+    // event for grep-able diagnostics. With the legacy lifecycle stream
+    // retired, the dispatch order is captured in the sub-phase summary
+    // via the per-task `record.added` events that follow.)
     logger.info('workflow', 'Wave R: wave started', {
       wave_number: waveNumber, kind: wave.kind, leaves: wave.leaves.length,
       release: wave.release_name ?? wave.release_id ?? '(none)',
@@ -574,7 +559,6 @@ export class ExecutionScheduler {
       componentId: leaf.component_id,
       componentResponsibility: leaf.component_responsibility,
       description: leaf.description,
-      backingTool: leaf.backing_tool,
       completionCriteria: leaf.completion_criteria.map(c => ({
         criterionId: c.criterion_id,
         description: c.description,

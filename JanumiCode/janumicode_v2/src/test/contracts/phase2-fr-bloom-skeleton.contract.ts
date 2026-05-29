@@ -169,18 +169,28 @@ export const phase2FrBloomSkeletonContract: ContractSuite<FunctionalRequirements
     },
     {
       id: 'C-2.1.7',
-      description: 'AC ids are unique within each user story.',
+      description: 'AC ids are unique at workflow scope (after Phase 2 exit-normalizer mints composite ids).',
       severity: 'blocking',
       check: (artifact) => {
-        const bad: Array<{ storyId: string; dups: string[] }> = [];
+        // After the Phase 2 normalizer (`mintCompositeAcIds`), every AC
+        // id should be globally unique because it encodes the parent
+        // story: AC-US{nnn}-{mmm}. Downstream join contracts depend on
+        // this — packetSynthesis matches `acceptance_criterion_ids[]`
+        // by exact-string membership across the full canonical set.
+        const seen = new Map<string, string[]>(); // ac_id → stories carrying it
         for (const us of artifact.user_stories) {
-          const counts = new Map<string, number>();
-          for (const ac of us.acceptance_criteria ?? []) counts.set(ac.id, (counts.get(ac.id) ?? 0) + 1);
-          const dups = [...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id);
-          if (dups.length > 0) bad.push({ storyId: us.id, dups });
+          for (const ac of us.acceptance_criteria ?? []) {
+            const list = seen.get(ac.id) ?? [];
+            list.push(us.id);
+            seen.set(ac.id, list);
+          }
         }
-        if (bad.length === 0) return true;
-        return { message: `${bad.length} story(ies) have duplicate AC ids`, details: { bad } };
+        const dups = [...seen.entries()].filter(([, stories]) => stories.length > 1);
+        if (dups.length === 0) return true;
+        return {
+          message: `${dups.length} AC id(s) appear under multiple stories — namespace is not globally unique`,
+          details: { duplicates: dups.map(([acId, stories]) => ({ acId, stories })) },
+        };
       },
     },
   ],

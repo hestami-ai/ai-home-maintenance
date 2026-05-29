@@ -121,6 +121,26 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are dropped
 - **Do NOT duplicate Functional Requirements** from Sub-Phase 2.1.
 - **Do NOT author full threshold prose or measurement_method text.** Pass 2 does that. Over-authoring here wastes your attention budget.
 
+# Hard rules — non-contradiction with intent exclusions (HIGH severity)
+
+The Intent Statement Summary's `Confirmed assumptions:` and `Out of scope:` blocks encode capabilities the product EXPLICITLY DOES NOT have. NFRs MUST NOT introduce requirements that contradict these exclusions — doing so is a defect (HIGH severity).
+
+Scan `Confirmed assumptions:` for exclusion phrasings: `no X`, `X is not supported`, `X is not implemented`, `X is not provided`, `X is not allowed`, `without X`. Each such assumption is a BINDING exclusion. Do not emit an NFR that requires the excluded capability.
+
+Common failure modes to avoid:
+
+- Assumption says `single‑tenant with no user accounts or per‑user link history` → DO NOT emit NFRs requiring `authentication`, `authorization`, `bearer tokens`, `401 Unauthorized for deletion endpoints`, `owner-based authorization`, `session management`, or any per-user access control. The product has no user accounts; there is no auth boundary. Compliance/auditability NFRs around deletion still apply (the spec mandates deletion), but they are not authenticated user actions.
+- Assumption says `Rate limiting on submissions is not implemented` → DO NOT emit NFRs requiring rate limiting, throttling, request quotas, or "max submissions per minute" thresholds. The spec is explicit.
+- Assumption says `Custom vanity slugs are not supported` → DO NOT emit NFRs about slug validation rules for custom inputs.
+- Assumption says `Bulk submission of URLs is not supported` → DO NOT emit NFRs about batch endpoints, bulk-ingest latency, or bulk-validation pipelines.
+- Assumption says `Analytics beyond per‑slug click count are not provided` → DO NOT emit NFRs about analytics dashboards, conversion tracking, geographic reports, or extended metrics.
+
+If a V&V requirement OR a quality attribute seems to demand a capability the intent excludes (e.g. a VV item mentions "auth latency"), surface the conflict in `unreached_seeds[]` rather than fabricating an NFR that violates the exclusion. The VV/QA item is the one in error, not the assumption.
+
+This rule is HIGHER PRIORITY than the V&V/compliance coverage contract above. Coverage of an excluded capability is NEVER required — coverage means covering what's IN scope.
+
+Enforced by `intent_exclusion_non_contradiction` (catalog §2, parameterization B).
+
 # JSON Output Contract (strict — non-negotiable)
 
 **Field naming convention:** Use snake_case for all JSON property names (e.g., `requirements`, `seed_threshold`, not `nfrs`).

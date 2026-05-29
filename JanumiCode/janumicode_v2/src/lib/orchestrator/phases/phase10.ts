@@ -14,6 +14,7 @@
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
 import type { PhaseId } from '../../types/records';
 import { getLogger } from '../../logging';
+import { emit as aoddEmit } from '../../aodd';
 
 export class Phase10Handler implements PhaseHandler {
   readonly phaseId: PhaseId = '10';
@@ -136,6 +137,7 @@ export class Phase10Handler implements PhaseHandler {
     });
     artifactIds.push(mirrorRecord.id);
     engine.eventBus.emit('mirror:presented', { mirrorId: closureMirror.mirrorId, artifactType: 'workflow_run_summary' });
+    aoddEmit('mirror.presented', { mirror_id: closureMirror.mirrorId, artifact_type: 'workflow_run_summary' });
 
     try {
       const resolution = await engine.pauseForDecision(workflowRun.id, mirrorRecord.id, 'mirror');

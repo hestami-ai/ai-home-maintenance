@@ -13,6 +13,7 @@
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
 import type { PhaseId } from '../../types/records';
 import { writeAndIngestArtifact } from './phaseUtils';
+import { emit as aoddEmit } from '../../aodd';
 
 export class Phase05Handler implements PhaseHandler {
   readonly phaseId: PhaseId = '0.5';
@@ -68,6 +69,7 @@ export class Phase05Handler implements PhaseHandler {
 
     // Present impact report as Mirror for human decision
     engine.eventBus.emit('phase_gate:pending', { phaseId: '0.5' });
+    aoddEmit('gate.pending', { gate_kind: 'phase_gate' });
 
     return { success: true, artifactIds };
   }

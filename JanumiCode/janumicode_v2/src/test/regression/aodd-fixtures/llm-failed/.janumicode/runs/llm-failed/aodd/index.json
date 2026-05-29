@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "run_id": "llm-failed",
+  "started_at": "2026-05-26T15:37:07.254Z",
+  "completed_at": "2026-05-26T15:37:07.256Z",
+  "status": "failed",
+  "events": {
+    "first_event_id": "01KSJEXEDPDBY9V0ZEAW0WVY7Q",
+    "last_event_id": "01KSJEXEDRD17QJ70NJKG66MKX",
+    "count": 6
+  }
+}

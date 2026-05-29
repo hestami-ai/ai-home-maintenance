@@ -41,10 +41,13 @@ import type {
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { runFrBloomThreePass } from './phase2/frBloomThreePass';
 import { runNfrBloomThreePass } from './phase2/nfrBloomThreePass';
+import { mintCompositeAcIds, type AcStoryLike } from './phase2/acIdNormalizer';
+import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
 import type { NfrSkeleton } from './phase2/verifyNfrCoverage';
 import type { DecisionBundleContent, MirrorItem, MirrorItemDecision } from '../../types/decisionBundle';
 import { createEmbeddingClient, findNearestAbove, type EmbeddingClient } from '../../llm/embeddings';
 import { randomUUID } from 'node:crypto';
+import { emit as aoddEmit } from '../../aodd';
 
 // ── Logical-identity helpers ───────────────────────────────────────
 
@@ -387,6 +390,20 @@ export class Phase2Handler implements PhaseHandler {
       frCoverageGaps = three.coverageGaps;
     }
 
+    // Phase-exit correction: mint workflow-globally-unique composite AC
+    // ids (`AC-US{nnn}-{mmm}`) so downstream consumers can join via
+    // exact-string membership instead of carrying parallel story scope.
+    // Idempotent — preserves existing composite ids and extends the
+    // per-story counter for new ACs (matters for enrichment/replay).
+    const acMint = mintCompositeAcIds(frContent.user_stories);
+    if (acMint.minted > 0 || acMint.skippedStoryIds.length > 0) {
+      getLogger().info('workflow', 'Phase 2.1 AC id normalizer applied', {
+        minted: acMint.minted,
+        preserved: acMint.preserved,
+        skippedStoryIds: acMint.skippedStoryIds,
+      });
+    }
+
     // Include both the intent_statement id AND (when available) the
     // product_description_handoff id in the derived_from chain — that
     // way the traceability spine `handoff → FR → …` is walkable from
@@ -395,7 +412,7 @@ export class Phase2Handler implements PhaseHandler {
       ...(prior.intentStatement ? [prior.intentStatement.recordId] : []),
       ...(handoffRecordId ? [handoffRecordId] : []),
     ];
-    const frRecord = engine.writer.writeRecord({
+    let frRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
@@ -411,6 +428,47 @@ export class Phase2Handler implements PhaseHandler {
     });
     artifactIds.push(frRecord.id);
     engine.ingestionPipeline.ingest(frRecord);
+
+    // Phase-exit scope gatekeeper. Cross-checks each user story against
+    // the Phase 1 accepted sets (journeys/workflows/entities) + the
+    // intent's Out-of-Scope statements. A story whose action describes
+    // spec-marked OOS behavior is dropped even when its `traces_to`
+    // cites a valid journey id — that's the case the deterministic
+    // contract checks cannot catch.
+    const frPrune = await runDownstreamScopeGatekeeper(ctx, {
+      phaseId: '2',
+      subPhaseId: 'fr_bloom_skeleton',
+      bloomDescription: 'functional user stories',
+      items: frContent.user_stories.map(s => ({
+        id: s.id,
+        label: `${s.id}: As a ${s.role}, I want to ${s.action}, so that ${s.outcome}`,
+        description: (s.acceptance_criteria ?? []).map(ac => `${ac.id}: ${ac.measurable_condition ?? ac.description}`).join('; '),
+        tradeoffs: Array.isArray(s.traces_to) ? `traces_to: ${s.traces_to.join(', ')}` : undefined,
+      })),
+      originalArtifactId: frRecord.id,
+      overlay: 'Each user story should describe a behavior the product genuinely needs. DROP stories whose action describes spec-marked Out-of-Scope behavior (e.g., bulk submission, user accounts, custom slugs when explicitly excluded) even when their `traces_to` cites a valid journey id — the journey id alone is not enough to justify the story.',
+    });
+    if (!frPrune.skipped && frPrune.dropped.length > 0) {
+      const keptSet = new Set(frPrune.kept_ids);
+      const prunedStories = frContent.user_stories.filter(s => keptSet.has(s.id));
+      const prunedFrContent = { user_stories: prunedStories };
+      const prunedRecord = engine.writer.writeRecord({
+        record_type: 'artifact_produced',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '2',
+        sub_phase_id: 'fr_bloom_skeleton',
+        produced_by_agent_role: 'requirements_agent',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [frRecord.id],
+        content: { kind: 'functional_requirements', ...prunedFrContent },
+      });
+      engine.writer.supersedByRollback(frRecord.id, prunedRecord.id);
+      engine.ingestionPipeline.ingest(prunedRecord);
+      frContent = prunedFrContent;
+      frRecord = prunedRecord;
+      artifactIds.push(prunedRecord.id);
+    }
 
     // Wave 8 Pass 3 — persist coverage_gap records from the deterministic
     // verifier. Blocking severity halts the phase; advisory severity logs
@@ -597,7 +655,7 @@ export class Phase2Handler implements PhaseHandler {
     }
 
     const nfrDerivedFrom = [frRecord.id, handoffRecordId];
-    const nfrRecord = engine.writer.writeRecord({
+    let nfrRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
@@ -613,6 +671,49 @@ export class Phase2Handler implements PhaseHandler {
     });
     artifactIds.push(nfrRecord.id);
     engine.ingestionPipeline.ingest(nfrRecord);
+
+    // Phase-exit scope gatekeeper. ts-109 surfaced LLM-fabricated NFR
+    // thresholds that contradict spec (50ms vs spec's 100ms; 99.95%
+    // monthly vs 99.9%; rate-limit specifics when rate-limiting is
+    // explicitly Out of Scope). The gatekeeper sees the V&V upstream
+    // and the spec's positive constraints and drops NFRs that
+    // contradict or fabricate beyond them.
+    const nfrPrune = await runDownstreamScopeGatekeeper(ctx, {
+      phaseId: '2',
+      subPhaseId: 'nfr_bloom_skeleton',
+      bloomDescription: 'non-functional requirements',
+      items: nfrContent.requirements.map(n => ({
+        id: n.id,
+        label: `${n.id} [${n.category}]: ${n.description}`,
+        description: n.threshold ? `threshold: ${n.threshold}` : undefined,
+        tradeoffs: Array.isArray(n.applies_to_requirements)
+          ? `applies_to: ${n.applies_to_requirements.join(', ')}`
+          : undefined,
+      })),
+      originalArtifactId: nfrRecord.id,
+      overlay: 'NFR thresholds must NOT contradict upstream V&V Requirements or Intent Constraints. DROP NFRs whose threshold tightens, loosens, or fabricates a number the spec did not state (e.g., asserting 50ms when the spec says 100ms; 99.95% when the spec says 99.9%). DROP NFRs whose category names a feature the Intent Constraints mark Out-of-Scope (e.g., a rate-limiting NFR when rate-limiting is explicitly excluded).',
+    });
+    if (!nfrPrune.skipped && nfrPrune.dropped.length > 0) {
+      const keptNfrSet = new Set(nfrPrune.kept_ids);
+      const prunedNfrs = nfrContent.requirements.filter(n => keptNfrSet.has(n.id));
+      const prunedNfrContent = { requirements: prunedNfrs };
+      const prunedNfrRecord = engine.writer.writeRecord({
+        record_type: 'artifact_produced',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '2',
+        sub_phase_id: 'nfr_bloom_skeleton',
+        produced_by_agent_role: 'requirements_agent',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [nfrRecord.id],
+        content: { kind: 'non_functional_requirements', ...prunedNfrContent },
+      });
+      engine.writer.supersedByRollback(nfrRecord.id, prunedNfrRecord.id);
+      engine.ingestionPipeline.ingest(prunedNfrRecord);
+      nfrContent = prunedNfrContent;
+      nfrRecord = prunedNfrRecord;
+      artifactIds.push(prunedNfrRecord.id);
+    }
 
     // Wave 8 Pass 3 — persist NFR coverage_gap records. Blocking halts
     // the phase; advisory logs and proceeds. Only runs on non-resume
@@ -647,6 +748,11 @@ export class Phase2Handler implements PhaseHandler {
       let nfrRootNodeIds: string[];
       let nfrRootLogicalIds: string[];
       const nfrAsStories: UserStory[] = nfrContent.requirements.map(adaptNfrToUserStory);
+      // Phase-exit correction: mint composite AC ids on the NFR-derived
+      // stubs (otherwise every stub carries the hard-coded `AC-001` from
+      // `adaptNfrToUserStory`, producing one collision per NFR). Anchored
+      // on the stub's NFR id, e.g. `AC-NFR-001-001`.
+      mintCompositeAcIds(nfrAsStories as unknown as AcStoryLike[]);
       if (resumingNfr) {
         nfrRootNodeIds = existingNfrRootNodes.map(r => r.id);
         nfrRootLogicalIds = existingNfrRootNodes.map(r => (r.content as unknown as RequirementDecompositionNodeContent).node_id);
@@ -874,6 +980,7 @@ export class Phase2Handler implements PhaseHandler {
     });
     artifactIds.push(gateRecord.id);
     engine.eventBus.emit('phase_gate:pending', { phaseId: '2' });
+    aoddEmit('gate.pending', { gate_kind: 'phase_gate' });
 
     return { success: true, artifactIds };
   }
@@ -1367,6 +1474,12 @@ export class Phase2Handler implements PhaseHandler {
             }
             const story = sanitizeChildStory(c, { rootId: entry.displayKey, childIndex: fanoutCount });
             if (!story) continue;
+            // Phase-exit correction: mint composite AC ids anchored on
+            // the leaf's own story.id (`AC-{story.id}-NNN`). Each leaf
+            // carries its own AC namespace; downstream consumers join
+            // by exact-string membership without per-parent scope
+            // logic. See phase2/acIdNormalizer.ts header for the rule.
+            mintCompositeAcIds([story as unknown as AcStoryLike]);
             const tier = normalizeTier(c.tier);
             const rationale = typeof c.decomposition_rationale === 'string'
               ? c.decomposition_rationale : undefined;

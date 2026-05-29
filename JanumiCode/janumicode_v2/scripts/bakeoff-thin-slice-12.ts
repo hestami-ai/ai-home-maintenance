@@ -23,6 +23,13 @@ import { FixtureSchema, type Fixture } from '../src/test/regression/fixtureSchem
 import { checkT1Schema } from '../src/test/regression/assertions/t1Schema';
 import { checkT2IdPreservation } from '../src/test/regression/assertions/t2IdPreservation';
 import { checkT3Invariant } from '../src/test/regression/assertions/t3Invariants';
+import {
+  emit as aoddEmit,
+  endRun as aoddEndRun,
+  initialize as initializeAodd,
+  startRun as aoddStartRun,
+} from '../src/lib/aodd';
+import { withTraceContext } from '../src/lib/trace/traceContext';
 
 const REPO = resolve(__dirname, '..');
 const TS12_DB = join(
@@ -307,6 +314,21 @@ async function main(): Promise<void> {
   mkdirSync(join(outDir, 'raw'), { recursive: true });
   console.log(`[bakeoff] output dir: ${outDir}`);
 
+  // Adopt this bakeoff invocation as an AODD-traced "run" (design memo
+  // §10). The bakeoff's workspace is its outDir so the trace lands
+  // alongside the bakeoff artifacts under
+  //   <outDir>/.janumicode/runs/<runId>/aodd/
+  const bakeoffRunId = `bakeoff-${stamp}`;
+  initializeAodd({
+    workspaceRoot: outDir,
+    janumicodeVersionSha: 'bakeoff',
+    enabled: true,
+  });
+  aoddStartRun(bakeoffRunId);
+  aoddEmit('run.started', {
+    intent_brief: `bakeoff thin-slice-12 (models: ${CANDIDATE_MODELS.join(', ')})`,
+  });
+
   const db = new Database(TS12_DB, { readonly: true });
   const caller = new LLMCaller({ maxRetries: 1 });
   caller.registerProvider(new OllamaProvider(OLLAMA_URL));
@@ -449,7 +471,19 @@ async function main(): Promise<void> {
   }
 
   const reportPath = join(outDir, 'bakeoff-report.md');
-  writeFileSync(reportPath, reportLines.join('\n'), 'utf-8');
+  const reportContent = reportLines.join('\n');
+  writeFileSync(reportPath, reportContent, 'utf-8');
+  // Link the report into the AODD trace + close the run.
+  await withTraceContext(
+    { workflow_run_id: bakeoffRunId, phase_id: null, sub_phase_id: null },
+    async () => {
+      aoddEmit('context.detail_file_written', {
+        path: reportPath,
+        bytes: Buffer.byteLength(reportContent, 'utf-8'),
+      });
+    },
+  );
+  aoddEndRun({ status: 'success' });
   console.log(`\n[bakeoff] done — report at ${reportPath}`);
   db.close();
 }

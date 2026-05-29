@@ -11,6 +11,7 @@ import { GovernedStreamWriter } from './governedStreamWriter';
 import { EventBus } from '../events/eventBus';
 import { getLogger } from '../logging';
 import { LLMCaller, type LLMCallResult } from '../llm/llmCaller';
+import { emit as aoddEmit } from '../aodd';
 
 // Types
 
@@ -107,6 +108,7 @@ export class EvalRunner {
       workflowRunId: implementationContext.workflowRunId,
       evalType: 'all',
     });
+    aoddEmit('eval.started', { eval_type: 'all' });
 
     // Group criteria by type
     const functionalCriteria = criteria.filter(c => c.type === 'functional');
@@ -162,6 +164,7 @@ export class EvalRunner {
       evalType: 'all',
       passed: overallPass,
     });
+    aoddEmit('eval.completed', { eval_type: 'all', passed: overallPass });
 
     return {
       functional,

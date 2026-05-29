@@ -25,6 +25,38 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+// P11 fallback: AODD event_type → legacy lifecycle event name. Used
+// when we're tailing events.ndjson instead of lifecycle.ndjson (i.e.
+// JANUMICODE_LIFECYCLE_LOG=off was active during the run). Mirrors
+// LIFECYCLE_EVENT_BY_AODD in src/lib/aodd/legacyProjection.ts.
+const LIFECYCLE_EVENT_BY_AODD = {
+  'phase.entered': 'phase.entered',
+  'phase.exited': 'phase.exited',
+  'run.resumed': 'workflow.resumed',
+  'llm.invoked': 'llm.call',
+  'llm.returned': 'llm.call',
+  'llm.failed': 'llm.call',
+  'llm.cache_hit': 'llm.call',
+  'agent.invocation_started': 'executor.dispatched',
+  'agent.invocation_completed': 'executor.invocation_status_change',
+  'record.added': 'artifact.produced',
+};
+
+function translateAoddToLifecycleShape(aoddEvent) {
+  const event = LIFECYCLE_EVENT_BY_AODD[aoddEvent.event_type];
+  if (!event) return null;
+  const payload = aoddEvent.payload && typeof aoddEvent.payload === 'object'
+    ? aoddEvent.payload : {};
+  return {
+    ts: aoddEvent.ts,
+    event,
+    workflow_run_id: aoddEvent.run_id,
+    phase_id: aoddEvent.phase_id,
+    sub_phase_id: aoddEvent.sub_phase_id,
+    ...payload,
+  };
+}
+
 function parseArgs(argv) {
   const out = {};
   for (let i = 2; i < argv.length; i++) {
@@ -291,7 +323,10 @@ function streamLifecycle(workspacePath, expectations, state) {
     process.stderr.write('audit: waiting for it to appear...\n');
   }
 
-  // Watch all runs subdirectories; tail their lifecycle.ndjson if any.
+  // Watch all runs subdirectories; tail their AODD events.ndjson.
+  // lifecycle.ndjson has been retired (P11); the tail loop below
+  // translates AODD envelopes to the legacy lifecycle shape that
+  // onEvent expects.
   const tailers = new Map(); // runId → { offset, watcher }
 
   const tryAttach = () => {
@@ -300,9 +335,10 @@ function streamLifecycle(workspacePath, expectations, state) {
       if (!dirent.isDirectory()) continue;
       const runId = dirent.name;
       if (tailers.has(runId)) continue;
-      const filepath = path.join(runsDir, runId, 'lifecycle.ndjson');
-      if (!fs.existsSync(filepath)) continue;
-      attachTail(runId, filepath);
+      const aoddPath = path.join(runsDir, runId, 'aodd', 'events.ndjson');
+      if (fs.existsSync(aoddPath)) {
+        attachTail(runId, aoddPath);
+      }
     }
   };
 
@@ -352,6 +388,13 @@ function streamLifecycle(workspacePath, expectations, state) {
           if (!t) continue;
           let ev;
           try { ev = JSON.parse(t); } catch { continue; }
+          // P11 fallback: if this line is an AODD envelope (has
+          // event_type instead of event), translate to the legacy
+          // lifecycle shape onEvent expects.
+          if (ev.event_type && !ev.event) {
+            ev = translateAoddToLifecycleShape(ev);
+            if (!ev) continue;
+          }
           onEvent(state, expectations, ev);
         }
         persistState();

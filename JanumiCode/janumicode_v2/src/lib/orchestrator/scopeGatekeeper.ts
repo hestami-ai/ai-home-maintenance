@@ -111,6 +111,19 @@ export interface GatekeeperUpstreamContext {
   acceptedJourneys?: Array<{ id: string; title: string; personaId?: string }>;
   acceptedWorkflows?: Array<{ id: string; name: string; businessDomainId?: string }>;
   acceptedEntities?: Array<{ id: string; name: string; businessDomainId?: string }>;
+  /**
+   * Downstream-phase accepted sets (post-gatekeeper). Populated when
+   * the gatekeeper runs at Phase 2+ exits, so each later phase's
+   * gatekeeper has the canonical pruned upstream set to cross-check
+   * against (e.g., Phase 4 component gatekeeper checks that each
+   * component's `traces_to` US ids appear in `acceptedUserStories`).
+   *
+   * Each field is optional — only the phases that have completed
+   * their gatekeeper pass populate them.
+   */
+  acceptedUserStories?: Array<{ id: string; action: string; role?: string; outcome?: string }>;
+  acceptedNfrs?: Array<{ id: string; category?: string; description?: string; threshold?: string }>;
+  acceptedComponents?: Array<{ id: string; name: string; domain_id?: string }>;
 }
 
 export interface GatekeeperConfig {
@@ -246,6 +259,9 @@ function buildGatekeeperPrompt(cfg: GatekeeperConfig): string {
     renderUpstreamSection('Accepted User Journeys (kept by user_journey_bloom gatekeeper)', u.acceptedJourneys?.map(j => ({ id: j.id, text: j.title + (j.personaId ? ` [persona: ${j.personaId}]` : '') }))),
     renderUpstreamSection('Accepted System Workflows (kept by system_workflow_bloom gatekeeper)', u.acceptedWorkflows?.map(w => ({ id: w.id, text: w.name + (w.businessDomainId ? ` [domain: ${w.businessDomainId}]` : '') }))),
     renderUpstreamSection('Accepted Entities (kept by entities_bloom gatekeeper)', u.acceptedEntities?.map(e => ({ id: e.id, text: e.name + (e.businessDomainId ? ` [domain: ${e.businessDomainId}]` : '') }))),
+    renderUpstreamSection('Accepted User Stories (kept by Phase 2.1 fr_bloom_skeleton gatekeeper)', u.acceptedUserStories?.map(s => ({ id: s.id, text: s.action + (s.role ? ` [role: ${s.role}]` : '') + (s.outcome ? ` → ${s.outcome}` : '') }))),
+    renderUpstreamSection('Accepted NFRs (kept by Phase 2.2 nfr_bloom_skeleton gatekeeper)', u.acceptedNfrs?.map(n => ({ id: n.id, text: (n.category ? `[${n.category}] ` : '') + (n.description ?? '') + (n.threshold ? ` (threshold: ${n.threshold})` : '') }))),
+    renderUpstreamSection('Accepted Components (kept by Phase 4.2 component_skeleton gatekeeper)', u.acceptedComponents?.map(c => ({ id: c.id, text: c.name + (c.domain_id ? ` [domain: ${c.domain_id}]` : '') }))),
   ].filter((b) => b.length > 0).join('\n');
 
   const rawIntentBlock = u.rawIntentDoc
@@ -502,12 +518,34 @@ export async function runScopeGatekeeperPrune(
     : 'no summary provided';
 
   // Defensive: ensure every input item is accounted for. Items missing
-  // from BOTH kept and dropped get kept (calibrated mode favours keeping).
+  // from BOTH kept and dropped get a deterministic literal-match safety
+  // net (see `deterministicLiteralDrop` below); anything still
+  // unmatched defaults to KEEP — calibrated mode favours keeping when
+  // the model and the safety net are both unsure.
   const inputIds = new Set(cfg.items.map((it) => it.id));
   const accountedFor = new Set([...kept_ids, ...dropped.map((d) => d.id)]);
   const unaccounted = [...inputIds].filter((id) => !accountedFor.has(id));
   // Strip drops that reference unknown ids (the LLM may have hallucinated).
   const finalDropped = dropped.filter((d) => inputIds.has(d.id));
+
+  // ts-110 defect: gpt-oss:20b silently omitted DOM-RATE_LIMITING from
+  // both kept_ids AND dropped — the prior default-to-keep behaviour
+  // sneaked it past the gatekeeper despite CON-3 ("No rate limiting on
+  // URL submission") being a textbook Pass-1 literal match. We now run
+  // a deterministic literal-match pass over every unaccounted item:
+  // if any upstream constraint contains a "no X / X out of scope / X
+  // forbidden / X not supported" pattern that matches the item's id or
+  // label, force-drop it with an explicit safety-net rationale.
+  const safetyNetDrops = unaccounted
+    .map((id) => {
+      const item = cfg.items.find((it) => it.id === id);
+      if (!item) return null;
+      const hit = deterministicLiteralDrop(item, cfg.upstreamContext);
+      return hit ? { id, reason: hit } : null;
+    })
+    .filter((x): x is { id: string; reason: string } => x != null);
+  for (const drop of safetyNetDrops) finalDropped.push(drop);
+
   const droppedSet = new Set(finalDropped.map((d) => d.id));
   // DEFECT-2 fix: when an id appears in BOTH kept_ids AND dropped[],
   // prefer drop. The LLM emitted an explicit rationale for dropping;
@@ -521,10 +559,12 @@ export async function runScopeGatekeeperPrune(
     .filter((id) => !droppedSet.has(id));
 
   if (unaccounted.length > 0) {
-    getLogger().info('workflow', 'Scope gatekeeper omitted some ids; defaulting to keep', {
+    getLogger().info('workflow', 'Scope gatekeeper omitted some ids; literal-match safety net applied', {
       workflow_run_id: cfg.workflowRunId,
       sub_phase_id: cfg.subPhaseId,
       unaccounted_count: unaccounted.length,
+      safety_net_dropped: safetyNetDrops.length,
+      defaulted_to_keep: unaccounted.length - safetyNetDrops.length,
     });
   }
   if (contradictions.length > 0) {
@@ -543,6 +583,56 @@ export async function runScopeGatekeeperPrune(
     model: result.model,
     duration_ms,
   };
+}
+
+/**
+ * Deterministic literal-match safety net for the post-processor.
+ *
+ * Scans the upstream context's negative-constraint sources
+ * (intentConstraints + technicalConstraints + analysisSummary) for
+ * "no X" / "X out of scope" / "X forbidden" / "X not supported" /
+ * "X not allowed" patterns. If any such phrase has a meaningful
+ * overlap with the input item's id or label tokens, returns a
+ * drop rationale string. Otherwise returns null.
+ *
+ * Conservative on purpose — only acts on EXPLICIT negative phrases.
+ * A constraint that says "we support X" doesn't trigger drops, and
+ * generic mentions of X without a negative qualifier don't trigger.
+ * The intent is to catch the textbook Pass-1 cases the LLM silently
+ * skipped (ts-110 DOM-RATE_LIMITING + CON-3 "No rate limiting" was
+ * the canonical example).
+ */
+function deterministicLiteralDrop(
+  item: BloomItemForPrune,
+  ctx: GatekeeperUpstreamContext,
+): string | null {
+  const negativePhrases = /\b(?:no|not|never|without|forbidden|out[- ]of[- ]scope|not[- ]allowed|not[- ]supported|excluded|prohibited|do not|don't|cannot)\b/i;
+  const candidates: string[] = [];
+  for (const c of ctx.intentConstraints ?? []) if (c.text) candidates.push(c.text);
+  for (const c of ctx.technicalConstraints ?? []) if (c.text) candidates.push(c.text);
+  if (ctx.analysisSummary) candidates.push(ctx.analysisSummary);
+
+  // Tokenize the item's id+label into meaningful keywords (≥4 chars,
+  // alphanumeric, lower-cased). Skip generic stopwords that would
+  // false-positive on any constraint.
+  const stopwords = new Set(['domain', 'persona', 'feature', 'workflow', 'integration', 'system', 'service', 'component', 'requirement', 'support', 'management']);
+  const itemText = `${item.id} ${item.label} ${item.description ?? ''}`.toLowerCase();
+  const tokens = itemText
+    .replace(/[[\](){}]/g, ' ')
+    .split(/[^a-z0-9]+/)
+    .filter(t => t.length >= 4 && !stopwords.has(t));
+  if (tokens.length === 0) return null;
+
+  // For each candidate constraint, check (a) it contains a negative
+  // phrase, AND (b) it mentions one of the item's keyword tokens.
+  for (const text of candidates) {
+    const lower = text.toLowerCase();
+    if (!negativePhrases.test(lower)) continue;
+    const matched = tokens.find(t => lower.includes(t));
+    if (!matched) continue;
+    return `Deterministic safety-net Pass-1 literal match: upstream constraint "${text.slice(0, 200)}" contains negative phrase + item keyword "${matched}". LLM omitted this item from its decisions; the safety net force-drops it.`;
+  }
+  return null;
 }
 
 /**
@@ -572,6 +662,19 @@ export function buildReleasePlanGatekeeperPrompt(cfg: GatekeeperConfig): string 
     .join('\n');
 
   const u = cfg.upstreamContext;
+
+  // Render the accepted artifact id sets the deterministic 1.8 verifier
+  // will count against. Without these the gatekeeper has been
+  // hallucinating upstream counts ("3 journeys defined upstream" when
+  // 8 journeys were accepted — ts-105 seq=14 dropped the only release
+  // that actually populated artifacts because the LLM compared the
+  // proposed counts against its own invented baseline).
+  const renderIdList = (label: string, items: Array<{ id: string; name?: string; title?: string }> | undefined): string => {
+    if (!items || items.length === 0) return '';
+    const lines = items.map(i => `  - ${i.id}: ${i.title ?? i.name ?? ''}`.trim()).join('\n');
+    return `## ${label} (${items.length} total — these are the upstream-accepted ids; do NOT invent counts or alternate totals)\n${lines}\n`;
+  };
+
   const upstreamBlocks = [
     u.analysisSummary
       ? `## Upstream Analysis Summary\n\n${u.analysisSummary}\n`
@@ -582,6 +685,9 @@ export function buildReleasePlanGatekeeperPrompt(cfg: GatekeeperConfig): string 
     renderUpstreamSection('Upstream Intent Constraints', u.intentConstraints),
     renderUpstreamSection('Upstream Intent Requirements', u.intentRequirements),
     renderUpstreamSection('Upstream Compliance Items', u.complianceItems),
+    renderIdList('Accepted Journeys', u.acceptedJourneys),
+    renderIdList('Accepted Workflows', u.acceptedWorkflows),
+    renderIdList('Accepted Entities', u.acceptedEntities),
   ].filter((b) => b.length > 0).join('\n');
 
   return `[JC:SYSTEM RELEASE-PLAN GATEKEEPER]
@@ -597,17 +703,37 @@ out of bounds. The downstream deterministic 1.8 verifier handles
 ordinal sequencing, dependency direction, and exact coverage; you do
 NOT need to verify those.
 
+# Ground-truth id sets
+
+The 'Accepted Journeys', 'Accepted Workflows', and 'Accepted Entities'
+blocks below are the AUTHORITATIVE upstream sets. The deterministic 1.8
+verifier checks that every accepted id appears in exactly one release
+(or cross_cutting for workflow/integration/compliance/vocabulary).
+
+When evaluating a release's 'tradeoffs' line (shape: "5j/2w/3e/1c/0i/4v"):
+  - These counts describe how many ids the release CLAIMS.
+  - You can ONLY judge "too many" by checking each claimed id against
+    the accepted sets above. A release claiming 5 journeys is FINE if
+    the upstream set has at least 5 accepted journeys — and even
+    legitimate when it's the ONLY release claiming them.
+  - You can ONLY judge "hallucinated" by id-matching: a claimed id
+    must appear in the corresponding accepted set verbatim.
+
 # When to DROP a release
 
 Drop a release when ANY of these holds:
 
-  - The release's contains lists reference upstream artifacts that do
-    not exist (the proposer hallucinated an id).
+  - The release's contains lists reference upstream artifact ids that
+    do NOT appear in the Accepted Journeys / Workflows / Entities lists
+    above (the proposer hallucinated an id). Cite the specific bad id
+    in the rationale.
   - The release's description describes features that EXPLICITLY
     contradict an upstream Intent Constraint (e.g., a release that
     introduces "user accounts" when CON-N forbids user accounts).
-    Cite the constraint in the rationale.
-  - The release is empty (no contained artifacts AND not cross-cutting).
+    Cite the constraint id in the rationale.
+  - The release is empty (zero contained artifacts AND not cross-cutting).
+    A 'tradeoffs' line of '0j/0w/0e/0c/0i/0v' is the empty-release
+    signature.
   - The release's name/description is generic placeholder text
     ("TBD release", "future release", "miscellaneous") with no
     discernible scope tied to upstream artifacts.
@@ -617,10 +743,15 @@ Drop a release when ANY of these holds:
 Default to KEEP. Releases that are structurally well-formed and whose
 contained artifacts trace to the upstream-accepted set are in scope,
 even if their ordering looks suboptimal — the deterministic verifier
-handles ordering.
+handles ordering. A release with NON-EMPTY contains lists whose ids
+all match the accepted sets MUST be kept.
 
 # Anti-patterns (do NOT drop for these)
 
+  - Do NOT drop a release for "having more artifacts than expected"
+    based on a count you invented. The accepted-set blocks above ARE
+    the upstream totals; if a release claims fewer than or equal to
+    those totals AND all its ids match, it is structurally valid.
   - Do NOT drop a release for being "too small" or "too large".
   - Do NOT drop a release because its ordinal seems wrong relative to
     its dependencies. The deterministic 1.8 verifier handles that.
@@ -630,6 +761,11 @@ handles ordering.
   - Do NOT use implication chains. "This release implies X which
     requires Y which violates Z" is invalid here just as in the
     member-drop gatekeepers.
+  - Do NOT prefer a near-empty release ("0j/0w/0e") over a
+    well-populated one ("5j/2w/3e") just because the populated one
+    looks risky — coverage failures are the deterministic verifier's
+    concern. The empty release is the structural defect (per the DROP
+    rule above), not the populated one.
 
 # Upstream Extraction Context
 

@@ -55,6 +55,27 @@ export class Logger {
   }
 
   /**
+   * Append a log handler. Returns a dispose function that removes it.
+   *
+   * Additive seam used by the AODD trace layer (see
+   * `docs/design/aodd-design.md` §6) and by any other module that wants
+   * to tap into log entries without displacing ConsoleHandler /
+   * OutputChannelHandler. Each handler still applies its own
+   * `setLevel()` filter on top of the Logger-level filter.
+   */
+  addHandler(handler: LogHandler): () => void {
+    this.handlers.push(handler);
+    return () => this.removeHandler(handler);
+  }
+
+  /**
+   * Remove a specific handler instance. No-op if not registered.
+   */
+  removeHandler(handler: LogHandler): void {
+    this.handlers = this.handlers.filter((h) => h !== handler);
+  }
+
+  /**
    * Set the default log level.
    */
   setLevel(level: LogLevel): void {

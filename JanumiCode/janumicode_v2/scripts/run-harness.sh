@@ -16,15 +16,16 @@
 #
 # Usage:
 #   scripts/run-harness.sh [-n <slice-number>] [-s <spec-path>] [-y]
-#                          [--with-gatekeeper] [--no-pause]
+#                          [--no-gatekeeper] [--no-pause]
 #
 # Options:
 #   -n <N>            Slice number (defaults to next sequential).
 #   -s <spec-path>    Source spec (defaults to tinyurl thin-slice spec).
 #   -y                Skip confirmation.
-#   --with-gatekeeper Keep scope_gatekeeper on (default: off — when
-#                     iterating on proposer prompts the gatekeeper's
-#                     own LLM call is just more noise).
+#   --no-gatekeeper   Disable scope_gatekeeper (default: ON — so each
+#                     bloom output gets cross-checked against the
+#                     accepted upstream sets; ts-109 documented the
+#                     cost of letting expansive blooms through).
 #   --no-pause        Disable audit pause (un-attended mode — only useful
 #                     for full smoke runs, not for iteration).
 #
@@ -47,7 +48,7 @@ TINYURL_SPEC="${REPO_ROOT}/test-and-evaluation/thin-slice-specs/tinyurl-thin-sli
 slice_number=""
 spec_path="${TINYURL_SPEC}"
 skip_confirm=0
-with_gatekeeper=0
+no_gatekeeper=0
 no_pause=0
 
 while [[ $# -gt 0 ]]; do
@@ -55,7 +56,7 @@ while [[ $# -gt 0 ]]; do
     -n) slice_number="$2"; shift 2 ;;
     -s) spec_path="$2"; shift 2 ;;
     -y) skip_confirm=1; shift ;;
-    --with-gatekeeper) with_gatekeeper=1; shift ;;
+    --no-gatekeeper) no_gatekeeper=1; shift ;;
     --no-pause) no_pause=1; shift ;;
     -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
     *) echo "[harness] unknown option: $1" >&2; exit 2 ;;
@@ -84,10 +85,10 @@ if (( no_pause )); then
 else
   export JANUMICODE_AUDIT_PAUSE=1                   # default: audit pause ON for Claude review
 fi
-if (( with_gatekeeper )); then
-  export JANUMICODE_SCOPE_GATEKEEPER=on
+if (( no_gatekeeper )); then
+  export JANUMICODE_SCOPE_GATEKEEPER=off
 else
-  export JANUMICODE_SCOPE_GATEKEEPER=off            # default: gatekeeper off for fastest proposer iteration
+  export JANUMICODE_SCOPE_GATEKEEPER=on             # default: gatekeeper ON — Phase 1 + Phase 2/4/6/7 cross-checks
 fi
 
 echo "[harness] profile:"

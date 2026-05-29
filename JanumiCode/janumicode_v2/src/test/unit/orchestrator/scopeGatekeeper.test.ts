@@ -95,17 +95,94 @@ describe('runScopeGatekeeperPrune — deterministic post-processing', () => {
     expect(r.dropped).toEqual([]);
   });
 
-  it('defaults unaccounted ids (missing from both kept and dropped) to KEEP', async () => {
+  it('defaults unaccounted ids (missing from both kept and dropped) to KEEP when no literal match', async () => {
     const items = makeItems(['A', 'B', 'C']);
     const parsed = {
       kept_ids: ['A'],
       dropped: [{ id: 'B', reason: 'x' }],
-      // C is missing from both lists
+      // C is missing from both lists; no upstream constraint about it
       rationale_summary: 'partial',
     };
     const r = await runScopeGatekeeperPrune(mockCaller({ text: JSON.stringify(parsed), parsed }), routing, makeConfig(items));
     expect(r.kept_ids.sort()).toEqual(['A', 'C']);
     expect(r.dropped.map((d) => d.id)).toEqual(['B']);
+  });
+
+  it('ts-110 safety net: unaccounted id force-dropped when its keyword matches a negative upstream constraint', async () => {
+    // The classic ts-110 case: LLM silently omits DOM-RATE_LIMITING
+    // from both kept_ids and dropped, but CON-3 ("No rate limiting on
+    // URL submission") is a literal Pass-1 match. The deterministic
+    // safety net catches it.
+    const items: BloomItemForPrune[] = [
+      { id: 'DOM-URL_SHORTENING', label: '[Domain] URL Shortening' },
+      { id: 'DOM-RATE_LIMITING', label: '[Domain] Rate Limiting' },
+    ];
+    const parsed = {
+      kept_ids: ['DOM-URL_SHORTENING'],
+      dropped: [],
+      // DOM-RATE_LIMITING silently omitted
+      rationale_summary: 'partial',
+    };
+    const cfg: GatekeeperConfig = {
+      workflowRunId: 'wf-ts110',
+      phaseId: '1',
+      subPhaseId: 'business_domains_bloom',
+      bloomDescription: 'domains',
+      items,
+      upstreamContext: {
+        intentConstraints: [{ id: 'CON-3', text: 'No rate limiting on URL submission.' }],
+      },
+    };
+    const r = await runScopeGatekeeperPrune(mockCaller({ text: JSON.stringify(parsed), parsed }), routing, cfg);
+    expect(r.kept_ids).toEqual(['DOM-URL_SHORTENING']);
+    expect(r.dropped.map(d => d.id)).toEqual(['DOM-RATE_LIMITING']);
+    expect(r.dropped[0].reason).toMatch(/safety-net.*rate limiting|safety-net.*rate/i);
+  });
+
+  it('safety net does NOT fire when upstream constraint is positive (no negative phrase)', async () => {
+    const items: BloomItemForPrune[] = [
+      { id: 'DOM-ANALYTICS', label: '[Domain] Analytics' },
+    ];
+    const parsed = { kept_ids: [], dropped: [], rationale_summary: 'silent' };
+    const cfg: GatekeeperConfig = {
+      workflowRunId: 'wf-pos',
+      phaseId: '1',
+      subPhaseId: 'business_domains_bloom',
+      bloomDescription: 'domains',
+      items,
+      upstreamContext: {
+        intentConstraints: [{ id: 'CON-9', text: 'Analytics must include click counter per slug.' }],
+      },
+    };
+    const r = await runScopeGatekeeperPrune(mockCaller({ text: JSON.stringify(parsed), parsed }), routing, cfg);
+    // CON-9 mentions analytics but is POSITIVE → no force-drop
+    expect(r.kept_ids).toEqual(['DOM-ANALYTICS']);
+    expect(r.dropped).toEqual([]);
+  });
+
+  it('safety net does NOT fire on generic stopword overlap (avoid false positives)', async () => {
+    // CON-5 says "No analytics beyond per-slug click counter" — but the
+    // overlapping keyword is "analytics" which is a meaningful token.
+    // Test the inverse: a constraint with generic stopwords only
+    // shouldn't pull every input item into drops.
+    const items: BloomItemForPrune[] = [
+      { id: 'DOM-PAYMENT', label: '[Domain] Payment Processing' },
+    ];
+    const parsed = { kept_ids: [], dropped: [], rationale_summary: 'silent' };
+    const cfg: GatekeeperConfig = {
+      workflowRunId: 'wf-stop',
+      phaseId: '1',
+      subPhaseId: 'business_domains_bloom',
+      bloomDescription: 'domains',
+      items,
+      upstreamContext: {
+        intentConstraints: [{ id: 'CON-X', text: 'No support requirement for legacy systems.' }],
+      },
+    };
+    const r = await runScopeGatekeeperPrune(mockCaller({ text: JSON.stringify(parsed), parsed }), routing, cfg);
+    // No item keyword overlaps with the negative constraint → keep
+    expect(r.kept_ids).toEqual(['DOM-PAYMENT']);
+    expect(r.dropped).toEqual([]);
   });
 
   it('falls back to "keep all" when LLM returns unparseable JSON', async () => {

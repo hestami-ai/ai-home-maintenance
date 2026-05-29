@@ -28,6 +28,7 @@ import { runContractSuite, summarize } from '../contracts/runner';
 import type { ContractContext, ContractResult, ContractSuite } from '../contracts/types';
 import { findSuite } from '../contracts/registry';
 import type { Fixture } from '../regression/fixtureSchema';
+import { emit as aoddEmit } from '../../lib/aodd';
 
 export interface AcceptanceTestSpec {
   /** Path to the regression fixture (synthetic input). Relative to project root. */
@@ -207,6 +208,14 @@ export async function runAcceptanceTest(
       const dumpPath = path.resolve(projectRoot, `.tmp/acceptance-raw-${slug}.txt`);
       fs.mkdirSync(path.dirname(dumpPath), { recursive: true });
       fs.writeFileSync(dumpPath, responseText);
+      // AODD: link the raw dump to the current run (if one is active).
+      // The acceptance suite usually runs inside a vitest process with
+      // an AODD run set up by the test harness; emit is a no-op when
+      // no run is active.
+      aoddEmit('context.detail_file_written', {
+        path: dumpPath,
+        bytes: Buffer.byteLength(responseText, 'utf-8'),
+      });
     } catch {
       // best-effort — don't let dump failure mask the original problem
     }

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "run_id": "llm-failed",
+  "phase_id": "1",
+  "sub_phase_id": "check",
+  "started_at": "2026-05-26T15:37:07.254Z",
+  "completed_at": "2026-05-26T15:37:07.255Z",
+  "duration_ms": 1,
+  "who": {
+    "agent_role": "requirements_agent",
+    "model": "claude-sonnet-4-6",
+    "model_parameters": {},
+    "invocation_chain": [
+      {
+        "invocation_id": "inv-fail-1",
+        "depth": 0
+      }
+    ]
+  },
+  "what": {
+    "inputs_consumed": [],
+    "outputs_produced": [],
+    "decisions": []
+  },
+  "why": {
+    "template_key": "phase01/check",
+    "template_source_sha": "unknown",
+    "rendered_prompt_ref": "01KSJEXEDQFBB9QVAJ90XGV88T",
+    "governing_constraints": []
+  },
+  "how": {
+    "retries": 3,
+    "repairs": 0,
+    "escalations": 0,
+    "fallbacks": [],
+    "status": "failed",
+    "error": {
+      "event_id": "01KSJEXEDQ35SY3HQPATN64WE5",
+      "message": "rate limited"
+    }
+  },
+  "events": {
+    "first_event_id": "01KSJEXEDP433HR37K0BNHR9X9",
+    "last_event_id": "01KSJEXEDQ35SY3HQPATN64WE5",
+    "count": 4
+  }
+}

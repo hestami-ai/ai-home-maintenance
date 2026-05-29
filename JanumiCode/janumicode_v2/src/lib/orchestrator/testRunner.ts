@@ -13,6 +13,7 @@ import type { Database } from '../database/init';
 import { GovernedStreamWriter } from './governedStreamWriter';
 import { EventBus } from '../events/eventBus';
 import { getLogger } from '../logging';
+import { emit as aoddEmit } from '../aodd';
 
 // Types
 
@@ -106,6 +107,7 @@ export class TestRunner {
       workflowRunId,
       suiteCount: orderedSuites.length,
     });
+    aoddEmit('test.run_started', { suite_count: orderedSuites.length });
 
     for (const suite of orderedSuites) {
       getLogger().info('workflow', 'Running test suite', {
@@ -137,6 +139,13 @@ export class TestRunner {
         failed: result.failed,
         skipped: result.skipped,
       });
+      aoddEmit('test.suite_completed', {
+        suite_id: suite.id,
+        suite_name: suite.name,
+        passed: result.passed,
+        failed: result.failed,
+        skipped: result.skipped,
+      });
 
       // Stop on first failure if configured
       if (result.failed > 0 && !this.config.parallelSuites) {
@@ -157,6 +166,13 @@ export class TestRunner {
       totalFailed,
       totalSkipped,
       durationMs,
+      success,
+    });
+    aoddEmit('test.run_completed', {
+      total_passed: totalPassed,
+      total_failed: totalFailed,
+      total_skipped: totalSkipped,
+      duration_ms: durationMs,
       success,
     });
 

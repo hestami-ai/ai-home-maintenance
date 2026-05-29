@@ -1152,7 +1152,6 @@ export interface DecompositionTask {
   /** Component (logical id or display key) this task belongs to. */
   component_id: string;
   component_responsibility: string;
-  backing_tool?: string;
   estimated_complexity?: 'low' | 'medium' | 'high';
   complexity_flag?: string;
   completion_criteria: TaskCompletionCriterion[];
@@ -1363,7 +1362,6 @@ export interface PacketTask {
   name: string;
   description: string;
   task_type: string;
-  backing_tool: string;
   estimated_complexity: 'low' | 'medium' | 'high' | string;
   completion_criteria: Array<{
     criterion_id: string;

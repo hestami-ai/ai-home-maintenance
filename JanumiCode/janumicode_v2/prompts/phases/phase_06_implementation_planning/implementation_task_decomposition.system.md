@@ -42,7 +42,6 @@ Every task in the output array MUST include ALL of the following fields with the
 | `task_type` | `"standard"` \| `"refactoring"` | Use `refactoring` only when the task modifies existing production code without adding net-new behaviour. |
 | `component_id` | string | **VERBATIM** component id from the Component Model — copy it byte-for-byte. Do NOT prepend `comp-`. Do NOT modify case, prefix, or suffix. If the Component Model shows `link-mapping-repository`, emit `link-mapping-repository` — never `comp-link-mapping-repository`. Downstream phases match this against `component_model.components[].id` exactly. |
 | `component_responsibility` | string | **Verbatim** text of the responsibility from the Component Model. (Invariant: IP-002 — do not paraphrase.) |
-| `backing_tool` | string | See Backing-Tool Rule below. |
 | `estimated_complexity` | `"low"` \| `"medium"` \| `"high"` | |
 | `completion_criteria` | array of objects | See Completion-Criteria Shape below. At least one criterion required (Invariant: IP-001). |
 | `write_directory_paths` | array of strings | See Path Discipline Rule below. |
@@ -78,18 +77,6 @@ Verification method definitions:
 - `schema_check` — the criterion is verified by inspecting a schema (DB migration, JSON Schema, Zod, etc.).
 - `invariant` — the criterion is a runtime invariant checked by an assertion or constraint enforced at the DB or service layer.
 - `output_comparison` — the criterion is verified by diffing actual vs. expected output (API response, rendered markup, serialised data).
-
----
-
-# Backing-Tool Rule
-
-`backing_tool` MUST be one of:
-
-- `"claude_code_cli"` — general code authoring and editing via Claude Code CLI (the default for most tasks).
-- `"code_editor"` — ad-hoc file edits best done directly in an IDE (rare; use only when the task is a targeted edit not warranting a full CLI session).
-- Other named CLI tools if the task genuinely targets a specific tool (e.g. `"prisma_cli"` for schema-only migration authoring).
-
-**The `backing_tool` value MUST align with `active_constraints`.** If `active_constraints` commits to Node.js, Bun, SvelteKit, PostgreSQL, or any other stack, the backing tool for code-authoring tasks is `"claude_code_cli"` — NOT a language name such as `"Python"` or `"TypeScript"`. Language names are never valid values for this field.
 
 ---
 
@@ -136,7 +123,6 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
       "task_type": "standard",
       "component_id": "auth-middleware",
       "component_responsibility": "Validate inbound requests against Better-Auth session tokens and expose the authenticated session to downstream handlers",
-      "backing_tool": "claude_code_cli",
       "estimated_complexity": "medium",
       "completion_criteria": [
         {
@@ -164,7 +150,6 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
       "task_type": "standard",
       "component_id": "vendor-data",
       "component_responsibility": "Persist vendor credential records in the database with expiry and revocation tracking",
-      "backing_tool": "claude_code_cli",
       "estimated_complexity": "low",
       "completion_criteria": [
         {
@@ -198,11 +183,10 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
 3. **`completion_criteria` MUST be an array of objects**, each with `criterion_id`, `description`, and `verification_method`. Plain strings are forbidden.
 4. **`component_responsibility` MUST be verbatim** text from the Component Model (Invariant: IP-002). Do not paraphrase.
 5. **All paths MUST be workspace-relative.** No absolute paths, no drive letters, no leading `./`.
-6. **`backing_tool` MUST NOT be a language name.** Use `"claude_code_cli"`, `"code_editor"`, or a named CLI tool.
-7. **Every Technical Specification must be covered** by at least one task's `traces_to`.
-8. **No circular task dependencies.**
-9. **Tasks with `estimated_complexity: "high"` MUST include `complexity_flag`.**
-10. **`component_id` MUST be byte-for-byte identical to a `components[].id` value in the Component Model.** Never prepend `comp-`. Never modify case, prefix, or suffix. Downstream Phase 9 looks up the component by exact id; a mismatch breaks the component-context, test-case filtering, and eval-criteria filtering for every task on that component. If the Component Model shows `link-mapping-repository`, the task's `component_id` MUST be `link-mapping-repository`.
+6. **Every Technical Specification must be covered** by at least one task's `traces_to`.
+7. **No circular task dependencies.**
+8. **Tasks with `estimated_complexity: "high"` MUST include `complexity_flag`.**
+9. **`component_id` MUST be byte-for-byte identical to a `components[].id` value in the Component Model.** Never prepend `comp-`. Never modify case, prefix, or suffix. Downstream Phase 9 looks up the component by exact id; a mismatch breaks the component-context, test-case filtering, and eval-criteria filtering for every task on that component. If the Component Model shows `link-mapping-repository`, the task's `component_id` MUST be `link-mapping-repository`.
 
 # JSON Output Contract (strict — non-negotiable)
 

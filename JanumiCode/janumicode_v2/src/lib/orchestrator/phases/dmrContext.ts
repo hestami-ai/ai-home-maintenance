@@ -19,7 +19,7 @@
 import type { PhaseContext } from '../orchestratorEngine';
 import type { ContextPacket, ScopeTier } from '../../agents/deepMemoryResearch';
 import { getLogger } from '../../logging';
-import { emitTransformationStep } from '../../trace/emit';
+import { emit as aoddEmit } from '../../aodd';
 
 export interface PhaseContextPacketOptions {
   /** Sub-phase ID for trace context and detail file naming */
@@ -144,33 +144,10 @@ export async function buildPhaseContextPacket(
     ...packet.materialFindings.slice(0, 10).flatMap(f => f.sourceRecordIds),
   ]));
 
-  // Transformation trace: capture the context-assembly outcome. This is
-  // the seam that would have caught "Phase 8.5 never read user_stories
-  // from Phase 2" on ts-18 — the input_record_ids list shows exactly
-  // which upstream records the assembler pulled, and the payload preserves
-  // the full packet for forensics.
-  emitTransformationStep({
-    step_type: 'context_assembled',
-    sub_phase_id_override: options.subPhaseId,
-    input_record_ids: derivedFromRecordIds,
-    payload: {
-      query: options.query,
-      requestingAgentRole: options.requestingAgentRole,
-      scopeTier: options.scopeTier ?? 'all_runs',
-      knownRelevantRecordIds: options.knownRelevantRecordIds ?? [],
-      completenessStatus: packet.completenessStatus,
-      completenessNarrative: packet.completenessNarrative,
-      activeConstraints: packet.activeConstraints,
-      materialFindings: packet.materialFindings,
-      detailFilePath: detailFile?.path ?? null,
-    },
-    metadata: {
-      active_constraint_count: packet.activeConstraints.length,
-      material_finding_count: packet.materialFindings.length,
-      derived_from_record_count: derivedFromRecordIds.length,
-      detail_file_present: Boolean(detailFile),
-    },
-  });
+  // AODD: context-assembly outcome. The input_record_ids list shows
+  // exactly which upstream records the assembler pulled — would have
+  // caught "Phase 8.5 never read user_stories from Phase 2" on ts-18.
+  aoddEmit('context.assembled', { input_record_ids: derivedFromRecordIds });
 
   return {
     packet,

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "happy-path",
+  "workspace": "C:\\Users\\mchen\\AppData\\Local\\Temp\\aodd-fix-hp-oA87qw",
+  "intent_brief": "fixture: happy path",
+  "started_at": "2026-05-26T15:37:07.232Z",
+  "completed_at": "2026-05-26T15:37:07.235Z",
+  "duration_ms": 3,
+  "status": "success",
+  "janumicode_version_sha": "fixture-gen",
+  "phases": [
+    {
+      "phase_id": "1",
+      "status": "success",
+      "sub_phase_count": 1,
+      "duration_ms": 900
+    }
+  ],
+  "totals": {
+    "sub_phases": 1,
+    "llm_invocations": 1,
+    "retries": 0,
+    "repairs": 0,
+    "escalations": 0,
+    "events": 9
+  },
+  "events": {
+    "first_event_id": "01KSJEXED0C8RHGBQBBSQY7YFQ",
+    "last_event_id": "01KSJEXED3EQJTYHG3JDTNKSJ8",
+    "count": 9
+  }
+}

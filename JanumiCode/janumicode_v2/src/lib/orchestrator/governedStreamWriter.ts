@@ -20,7 +20,7 @@ import type {
 } from '../types/records';
 import type { EventBus, SerializedRecord } from '../events/eventBus';
 import type { EmbeddingService } from '../embedding/embeddingService';
-import { emitLifecycle } from '../trace/lifecycle';
+import { emit as aoddEmit, summarizeRecordContent } from '../aodd';
 
 /**
  * Sub-phase IDs whose `artifact_produced` outputs are Bloom Sub-Phase
@@ -32,6 +32,24 @@ import { emitLifecycle } from '../trace/lifecycle';
  * DECOMPOSITION_NODE_RECORD_TYPES.
  */
 const BLOOM_SUB_PHASE_PATTERN = /(_bloom|_saturation)(_|$)/;
+
+/**
+ * Record types whose `produced_by_record_id` points back at the
+ * `agent_invocation` record that produced them. Used to populate the
+ * AODD `record.added` envelope's `invocation_id` so trace consumers can
+ * filter every record produced by a single LLM call.
+ */
+const INVOCATION_BOUND_RECORD_TYPES = new Set<RecordType>([
+  'agent_output',
+  'agent_output_chunk',
+  'agent_reasoning_step',
+  'agent_self_correction',
+  'tool_call',
+  'tool_result',
+  'json_repair_record',
+  'llm_api_failure',
+  'llm_api_recovery',
+]);
 
 const DECOMPOSITION_NODE_RECORD_TYPES = new Set<RecordType>([
   'requirement_decomposition_node',
@@ -228,24 +246,42 @@ export class GovernedStreamWriter {
     if (this.eventBus) {
       this.eventBus.emit('record:added', { record: this.serializeForEvent(record) });
     }
-
-    // Tier-1 lifecycle: emit an artifact.produced event when the record
-    // is one of the substantive content artifacts (skip the high-volume
-    // bookkeeping types like agent_reasoning_step, agent_output_chunk,
-    // transformation_step, etc.). The event summarizes key field counts
-    // so survey-level queries can spot scope creep at a glance.
-    if (ARTIFACT_LIFECYCLE_RECORD_TYPES.has(record.record_type)) {
-      emitLifecycle('artifact.produced', {
-        workflow_run_id: record.workflow_run_id,
-        phase_id: record.phase_id,
-        sub_phase_id: record.sub_phase_id,
+    // AODD paired emit. Every governed_stream record fires record.added
+    // here so the trace is the single source of truth for "what records
+    // were produced in this sub-phase".
+    //
+    // Resolve the envelope's invocation_id so `aodd events --invocation
+    // <id>` can find every record produced by a single LLM call. For
+    // `agent_invocation` records the record's own id IS the invocation
+    // id. For records descended from an invocation, `produced_by_record_id`
+    // points back at the parent `agent_invocation`.
+    const recordInvocationId =
+      record.record_type === 'agent_invocation'
+        ? record.id
+        : INVOCATION_BOUND_RECORD_TYPES.has(record.record_type)
+          ? record.produced_by_record_id ?? undefined
+          : undefined;
+    // Compute a per-record-type structural summary so trace consumers
+    // can see shape-level diagnostics (field counts, status flags,
+    // blocking-failure rollups) without opening the DB. Run 108's
+    // packet_synthesis bug surfaced the missing-summary gap. See
+    // src/lib/aodd/recordSummary.ts for the per-type extractors.
+    const recordSummary = summarizeRecordContent(
+      record.record_type,
+      record.content,
+    );
+    aoddEmit(
+      'record.added',
+      {
         record_id: record.id,
         record_type: record.record_type,
-        kind: (record.content as { kind?: unknown }).kind ?? null,
-        agent_role: record.produced_by_agent_role,
-        counts: summarizeArtifactCounts(record.content),
-      });
-    }
+        ...(recordSummary ? { summary: recordSummary } : {}),
+      },
+      recordInvocationId ? { invocation_id: recordInvocationId } : {},
+    );
+
+    // (The legacy `artifact.produced` lifecycle event has been removed;
+    // survey-level queries should filter `record.added` by record_type.)
 
     // Enqueue for background embedding. Non-blocking; embedding failures do
     // not affect the write path. See EmbeddingService for the queue lifecycle.
@@ -264,6 +300,22 @@ export class GovernedStreamWriter {
     this.db.prepare(`
       UPDATE governed_stream SET quarantined = 1 WHERE id = ?
     `).run(recordId);
+    // Record-type isn't returned by the UPDATE; look it up so the AODD
+    // payload carries useful identification. Best-effort.
+    let recordType = 'unknown';
+    try {
+      const row = this.db
+        .prepare(`SELECT record_type FROM governed_stream WHERE id = ?`)
+        .get(recordId) as { record_type?: string } | undefined;
+      if (row?.record_type) recordType = row.record_type;
+    } catch {
+      // ignore
+    }
+    aoddEmit('record.quarantined', {
+      record_id: recordId,
+      record_type: recordType,
+      reason: 'reasoning_review_high_severity',
+    });
   }
 
   /**
@@ -271,11 +323,86 @@ export class GovernedStreamWriter {
    */
   supersedByRollback(recordId: string, supersededById: string): void {
     const now = new Date().toISOString();
+    // Look up the record_type before the UPDATE so the AODD event
+    // payload can carry it; the UPDATE itself flips
+    // is_current_version → 0 without changing record_type. Best-effort
+    // — when the lookup fails the emit just carries 'unknown'.
+    let recordType = 'unknown';
+    try {
+      const row = this.db
+        .prepare(`SELECT record_type FROM governed_stream WHERE id = ?`)
+        .get(recordId) as { record_type?: string } | undefined;
+      if (row?.record_type) recordType = row.record_type;
+    } catch {
+      // ignore
+    }
     this.db.prepare(`
       UPDATE governed_stream
       SET is_current_version = 0, superseded_by_id = ?, superseded_at = ?
       WHERE id = ?
     `).run(supersededById, now, recordId);
+    aoddEmit('record.superseded', {
+      record_id: recordId,
+      record_type: recordType,
+      superseded_by_id: supersededById,
+      reason: 'rollback',
+    });
+  }
+
+  /**
+   * Shared implementation for the per-record-type supersession methods
+   * below. Selects the rows about to be superseded so each can be
+   * announced via `record.superseded` AODD events, then runs the
+   * UPDATE. Idempotent — when no rows match (the typical "first write"
+   * case for a freshly-minted logical node), no events fire.
+   */
+  private supersedeDecompositionNodeImpl(
+    recordType: RecordType,
+    workflowRunId: string,
+    logicalNodeId: string,
+    supersedingRecordId: string,
+  ): void {
+    const now = new Date().toISOString();
+    const affected = this.db
+      .prepare(
+        `SELECT id FROM governed_stream
+          WHERE workflow_run_id = ?
+            AND record_type = ?
+            AND is_current_version = 1
+            AND id != ?
+            AND json_extract(content, '$.node_id') = ?`,
+      )
+      .all(workflowRunId, recordType, supersedingRecordId, logicalNodeId) as Array<{
+        id: string;
+      }>;
+    this.db
+      .prepare(
+        `UPDATE governed_stream
+            SET is_current_version = 0,
+                superseded_by_id = ?,
+                superseded_at = ?
+          WHERE workflow_run_id = ?
+            AND record_type = ?
+            AND is_current_version = 1
+            AND id != ?
+            AND json_extract(content, '$.node_id') = ?`,
+      )
+      .run(
+        supersedingRecordId,
+        now,
+        workflowRunId,
+        recordType,
+        supersedingRecordId,
+        logicalNodeId,
+      );
+    for (const row of affected) {
+      aoddEmit('record.superseded', {
+        record_id: row.id,
+        record_type: recordType,
+        superseded_by_id: supersedingRecordId,
+        reason: 'decomposition_revision',
+      });
+    }
   }
 
   /**
@@ -293,18 +420,12 @@ export class GovernedStreamWriter {
     logicalNodeId: string,
     supersedingRecordId: string,
   ): void {
-    const now = new Date().toISOString();
-    this.db.prepare(`
-      UPDATE governed_stream
-         SET is_current_version = 0,
-             superseded_by_id = ?,
-             superseded_at = ?
-       WHERE workflow_run_id = ?
-         AND record_type = 'requirement_decomposition_node'
-         AND is_current_version = 1
-         AND id != ?
-         AND json_extract(content, '$.node_id') = ?
-    `).run(supersedingRecordId, now, workflowRunId, supersedingRecordId, logicalNodeId);
+    this.supersedeDecompositionNodeImpl(
+      'requirement_decomposition_node',
+      workflowRunId,
+      logicalNodeId,
+      supersedingRecordId,
+    );
   }
 
   /**
@@ -319,18 +440,12 @@ export class GovernedStreamWriter {
     logicalNodeId: string,
     supersedingRecordId: string,
   ): void {
-    const now = new Date().toISOString();
-    this.db.prepare(`
-      UPDATE governed_stream
-         SET is_current_version = 0,
-             superseded_by_id = ?,
-             superseded_at = ?
-       WHERE workflow_run_id = ?
-         AND record_type = 'component_decomposition_node'
-         AND is_current_version = 1
-         AND id != ?
-         AND json_extract(content, '$.node_id') = ?
-    `).run(supersedingRecordId, now, workflowRunId, supersedingRecordId, logicalNodeId);
+    this.supersedeDecompositionNodeImpl(
+      'component_decomposition_node',
+      workflowRunId,
+      logicalNodeId,
+      supersedingRecordId,
+    );
   }
 
   /**
@@ -344,18 +459,12 @@ export class GovernedStreamWriter {
     logicalNodeId: string,
     supersedingRecordId: string,
   ): void {
-    const now = new Date().toISOString();
-    this.db.prepare(`
-      UPDATE governed_stream
-         SET is_current_version = 0,
-             superseded_by_id = ?,
-             superseded_at = ?
-       WHERE workflow_run_id = ?
-         AND record_type = 'task_decomposition_node'
-         AND is_current_version = 1
-         AND id != ?
-         AND json_extract(content, '$.node_id') = ?
-    `).run(supersedingRecordId, now, workflowRunId, supersedingRecordId, logicalNodeId);
+    this.supersedeDecompositionNodeImpl(
+      'task_decomposition_node',
+      workflowRunId,
+      logicalNodeId,
+      supersedingRecordId,
+    );
   }
 
   /**
@@ -367,18 +476,12 @@ export class GovernedStreamWriter {
     logicalNodeId: string,
     supersedingRecordId: string,
   ): void {
-    const now = new Date().toISOString();
-    this.db.prepare(`
-      UPDATE governed_stream
-         SET is_current_version = 0,
-             superseded_by_id = ?,
-             superseded_at = ?
-       WHERE workflow_run_id = ?
-         AND record_type = 'data_model_decomposition_node'
-         AND is_current_version = 1
-         AND id != ?
-         AND json_extract(content, '$.node_id') = ?
-    `).run(supersedingRecordId, now, workflowRunId, supersedingRecordId, logicalNodeId);
+    this.supersedeDecompositionNodeImpl(
+      'data_model_decomposition_node',
+      workflowRunId,
+      logicalNodeId,
+      supersedingRecordId,
+    );
   }
 
   /**
@@ -389,18 +492,12 @@ export class GovernedStreamWriter {
     logicalNodeId: string,
     supersedingRecordId: string,
   ): void {
-    const now = new Date().toISOString();
-    this.db.prepare(`
-      UPDATE governed_stream
-         SET is_current_version = 0,
-             superseded_by_id = ?,
-             superseded_at = ?
-       WHERE workflow_run_id = ?
-         AND record_type = 'test_decomposition_node'
-         AND is_current_version = 1
-         AND id != ?
-         AND json_extract(content, '$.node_id') = ?
-    `).run(supersedingRecordId, now, workflowRunId, supersedingRecordId, logicalNodeId);
+    this.supersedeDecompositionNodeImpl(
+      'test_decomposition_node',
+      workflowRunId,
+      logicalNodeId,
+      supersedingRecordId,
+    );
   }
 
   /**

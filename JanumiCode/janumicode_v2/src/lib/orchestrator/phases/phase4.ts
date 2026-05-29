@@ -25,6 +25,8 @@ import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseCo
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
 import { runComponentSaturationLoop } from './phase4_2a';
+import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
+import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -177,7 +179,7 @@ export class Phase4Handler implements PhaseHandler {
       ctx, domainsSummary, sysReqSummary, frSummary, dmr42,
     );
 
-    const componentRecord = engine.writer.writeRecord({
+    let componentRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
@@ -190,6 +192,47 @@ export class Phase4Handler implements PhaseHandler {
     });
     artifactIds.push(componentRecord.id);
     engine.ingestionPipeline.ingest(componentRecord);
+
+    // Phase-exit scope gatekeeper. Cross-check each component against
+    // the accepted business domains (Phase 1.2 post-gatekeeper) +
+    // accepted user stories (Phase 2.1 post-gatekeeper). A component
+    // for a rejected domain or whose responsibilities only serve
+    // rejected stories is dropped.
+    const compItems = ((componentContent as { components?: Array<Record<string, unknown>> }).components ?? []).map(c => ({
+      id: typeof c.id === 'string' ? c.id : '',
+      label: `${c.id}: ${c.name} [domain: ${(c as Record<string, unknown>).domain_id ?? '?'}]`,
+      description: typeof c.description === 'string' ? c.description : undefined,
+      tradeoffs: Array.isArray(c.traces_to) ? `traces_to: ${(c.traces_to as string[]).join(', ')}` : undefined,
+    }));
+    const compPrune = await runDownstreamScopeGatekeeper(ctx, {
+      phaseId: '4',
+      subPhaseId: 'component_skeleton',
+      bloomDescription: 'software components',
+      items: compItems,
+      originalArtifactId: componentRecord.id,
+      overlay: 'DROP components whose `domain_id` is NOT in Accepted Domains. DROP components that ONLY serve user stories absent from Accepted User Stories. Components that span multiple domains may stay if at least one is accepted. Auxiliary/cross-cutting components (monitoring, logging) that no upstream domain rejects are KEPT by default.',
+    });
+    if (!compPrune.skipped && compPrune.dropped.length > 0) {
+      const keptCompSet = new Set(compPrune.kept_ids);
+      const allComps = ((componentContent as { components?: Array<Record<string, unknown>> }).components ?? []);
+      const prunedComps = allComps.filter(c => keptCompSet.has(c.id as string));
+      const prunedCompContent = { ...componentContent, components: prunedComps };
+      const prunedCompRecord = engine.writer.writeRecord({
+        record_type: 'artifact_produced',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '4',
+        sub_phase_id: 'component_skeleton',
+        produced_by_agent_role: 'architecture_agent',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [componentRecord.id],
+        content: { kind: 'component_model', ...prunedCompContent },
+      });
+      engine.writer.supersedByRollback(componentRecord.id, prunedCompRecord.id);
+      engine.ingestionPipeline.ingest(prunedCompRecord);
+      componentRecord = prunedCompRecord;
+      artifactIds.push(prunedCompRecord.id);
+    }
 
     // ── 4.2a — Recursive Component Decomposition (Wave 7) ─────
     engine.stateMachine.setSubPhase(workflowRun.id, 'component_saturation');
@@ -486,6 +529,7 @@ export class Phase4Handler implements PhaseHandler {
     });
     artifactIds.push(gateRecord.id);
     engine.eventBus.emit('phase_gate:pending', { phaseId: '4' });
+    aoddEmit('gate.pending', { gate_kind: 'phase_gate' });
 
     return { success: true, artifactIds };
   }

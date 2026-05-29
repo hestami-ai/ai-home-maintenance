@@ -22,6 +22,17 @@
  * The file is flushed on every chunk so an aborted process still
  * leaves a useful artifact — the previous capture run lost 1h of
  * qwen3 output because nothing was persisted until the CLI exited.
+ *
+ * ── P11 status: kept as projection ───────────────────────────────
+ * The AODD layer captures the same content via `llm.invoked` (prompt +
+ * system at call entry) and `llm.returned` / `llm.failed` (final text +
+ * thinking + tokens + duration on completion), with `maybeSpillText`
+ * routing large bodies into `runs/<run_id>/aodd/payloads/<ulid>.txt`.
+ * `live/*.log` is retained nonetheless because it serves a distinct
+ * operator workflow: `tail -f` on an in-flight invocation streams token
+ * output to a terminal during long runs. AODD's structured events.ndjson
+ * is line-per-completed-event and is not a substitute for live token
+ * streaming. The two surfaces coexist by design.
  */
 
 import * as fs from 'node:fs';

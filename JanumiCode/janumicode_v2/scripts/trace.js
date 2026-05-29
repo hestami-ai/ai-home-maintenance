@@ -292,29 +292,41 @@ function loadTransformsJsonl(dbPath, steps) {
   const fs = require('node:fs');
   const path = require('node:path');
   // DB path is usually <workspace>/.janumicode/test-harness/<file>.db OR
-  // <workspace>/.janumicode/runs/<run_id>/<file>.db — try the runs/ dir
-  // sibling of the DB first; fall back to scanning all runs/ subdirs.
+  // <workspace>/.janumicode/runs/<run_id>/<file>.db — scan all runs/
+  // subdirs for their AODD events.ndjson, project the step_id → payload
+  // map from event_id → payload. transforms.jsonl is gone (P11 retirement).
   const dbDir = path.dirname(dbPath);
   const workspaceJC = path.resolve(dbDir, '..');
   const runsDir = path.join(workspaceJC, 'runs');
   const index = new Map();
   if (!fs.existsSync(runsDir)) return index;
+  // Mirrors TRANSFORM_STEP_TYPE_BY_AODD in deep-audit.ts — only events
+  // that carry payloads the walk-back UI knows how to render.
+  const projectable = new Set([
+    'prompt.template_rendered', 'prompt.materialized',
+    'llm.invoked', 'llm.returned', 'llm.failed', 'llm.cache_hit',
+    'repair.json_succeeded', 'repair.json_failed',
+    'context.assembled', 'record.added',
+    'agent.invocation_started', 'agent.invocation_completed',
+  ]);
   for (const dirent of fs.readdirSync(runsDir, { withFileTypes: true })) {
     if (!dirent.isDirectory()) continue;
-    const jsonl = path.join(runsDir, dirent.name, 'transforms.jsonl');
-    if (!fs.existsSync(jsonl)) continue;
+    const aoddPath = path.join(runsDir, dirent.name, 'aodd', 'events.ndjson');
+    if (!fs.existsSync(aoddPath)) continue;
     try {
-      const content = fs.readFileSync(jsonl, 'utf8');
+      const content = fs.readFileSync(aoddPath, 'utf8');
       for (const line of content.split('\n')) {
         const t = line.trim();
         if (!t) continue;
         try {
           const rec = JSON.parse(t);
-          if (rec.step_id) index.set(rec.step_id, rec.payload);
+          if (rec.event_id && projectable.has(rec.event_type)) {
+            index.set(rec.event_id, rec.payload);
+          }
         } catch { /* skip malformed line */ }
       }
     } catch (err) {
-      process.stderr.write(`warn: failed to read ${jsonl}: ${err.message}\n`);
+      process.stderr.write(`warn: failed to read ${aoddPath}: ${err.message}\n`);
     }
   }
   return index;

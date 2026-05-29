@@ -29,26 +29,52 @@
  *   1. `{ <kind_name>: [item, item, ...] }`   (envelope = kind name)
  *   2. `{ <schema_key>: [item, item, ...] }`  (envelope = schema property name)
  *   3. `[item, item, ...]`                    (no envelope)
+ *   4. `{ <kind_name>: { <schema_key>: [item, ...] } }` (DOUBLE envelope)
  *
- * Walk the candidate keys in order; first non-empty array wins. Falls
- * through to the parsed root if the root itself is an array (case 3).
+ * Walk the candidate keys in order at the top level first. If a
+ * candidate yields an object (not an array), recurse one level: look
+ * for any of the remaining candidate keys INSIDE that object. This
+ * handles shape #4 — observed for gpt-oss:20b at interface_contracts
+ * (ts-103) and system_requirements (ts-107) where the model wraps
+ * the items array under BOTH the kind name AND the schema key.
+ *
  * Returns null when no resolution succeeds — caller decides whether
  * to fall back to a placeholder or surface an error.
  *
  * Order matters: list the kind-name envelope first, schema key
- * second. When the model emits *both* (which has happened on long
- * outputs), the kind-name envelope is the primary payload; the
- * schema-key envelope tends to be a partial summary.
+ * second. When the model emits *both* at the top level (rare but
+ * observed on long outputs), the kind-name envelope is the primary
+ * payload; the schema-key envelope tends to be a partial summary.
  */
+function findArrayAtKeys<T>(
+  obj: Record<string, unknown>,
+  keys: string[],
+  exclude?: string,
+): T[] | null {
+  for (const k of keys) {
+    if (k === exclude) continue;
+    const v = obj[k];
+    if (Array.isArray(v) && v.length > 0) return v as T[];
+  }
+  return null;
+}
+
 export function pickItemsArray<T>(
   parsed: Record<string, unknown> | null | undefined,
   candidateKeys: string[],
 ): T[] | null {
   if (!parsed) return null;
   if (Array.isArray(parsed)) return parsed as T[];
-  for (const k of candidateKeys) {
-    const v = (parsed as Record<string, unknown>)[k];
-    if (Array.isArray(v) && v.length > 0) return v as T[];
+  const root = parsed as Record<string, unknown>;
+  // Pass 1: flat — array directly under one of the candidate keys.
+  const flat = findArrayAtKeys<T>(root, candidateKeys);
+  if (flat) return flat;
+  // Pass 2: double-envelope — `{ outer: { inner: [...] } }`.
+  for (const outer of candidateKeys) {
+    const v = root[outer];
+    if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+    const nested = findArrayAtKeys<T>(v as Record<string, unknown>, candidateKeys, outer);
+    if (nested) return nested;
   }
   return null;
 }

@@ -550,7 +550,11 @@ export function buildEffectiveFrView(
     const storyRecords = sortedLeaves.map(l => l.user_story as unknown as Record<string, unknown>);
     const summaryLines = sortedLeaves.map(l => {
       const release = l.release_ordinal != null ? `Release ${l.release_ordinal}` : 'Backlog';
-      return `[${release}] ${l.display_key} [${l.user_story.priority}] (Tier ${l.tier ?? '?'} leaf under ${l.root_display_key}): As a ${l.user_story.role}, I want to ${l.user_story.action}, so that ${l.user_story.outcome}.`;
+      const head = `[${release}] ${l.display_key} [${l.user_story.priority}] (Tier ${l.tier ?? '?'} leaf under ${l.root_display_key}): As a ${l.user_story.role}, I want to ${l.user_story.action}, so that ${l.user_story.outcome}.`;
+      const acs = l.user_story.acceptance_criteria ?? [];
+      if (acs.length === 0) return head;
+      const acLines = acs.map(ac => `    ${ac.id}: ${ac.measurable_condition ?? ac.description}`).join('\n');
+      return `${head}\n  Acceptance Criteria:\n${acLines}`;
     });
     return {
       stories: storyRecords,
@@ -608,6 +612,12 @@ export function getFrozenFrLeaves(
   for (const r of latestByNodeId.values()) {
     const c = r.content as Record<string, unknown>;
     if (c.status !== 'atomic') continue;
+    // Exclude NFR-rooted leaves — they're decomposition stubs of NFRs
+    // adapted via `adaptNfrToUserStory`, not FR user stories. Without
+    // this filter they leak into the FR view consumed by Phase 4/5/6/7
+    // prompts and contaminate AC/story counts. `root_kind` lives on
+    // every decomposition node; absence (legacy records) → treat as FR.
+    if (c.root_kind && c.root_kind !== 'fr') continue;
     const story = c.user_story as FrozenFrLeaf['user_story'] | undefined;
     if (!story) continue;
     const rootFrId = typeof c.root_fr_id === 'string' ? c.root_fr_id : '';

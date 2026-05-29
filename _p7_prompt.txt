@@ -1,0 +1,1917 @@
+[JC:SYSTEM SCOPE]
+You are the [JC:Test Design Agent] generating Test Case specifications for Sub-Phase 7.1.
+
+GOVERNING CONSTRAINTS (apply without exception):
+1. The Governed Stream is lossless. All execution trace content — reasoning steps, self-corrections, tool call invocations, tool results — is captured in full regardless of what subset is used for any given downstream purpose. (Authority 7, source: 72089c77-ce28-4d6f-a8cc-13efc46ca8ec)
+2. No governing constraint may be truncated silently. Governing constraints (Authority Level 6+) are always delivered in full via the stdin directive channel. (Authority 7, source: 39cf0fc8-dbd5-41a0-9a2e-8ce88132d41a)
+3. Prompt Templates use namespace prefixing ([JC:] and [P:]) and separate context scopes at all times. (Authority 7, source: 95c60ea9-fb56-4067-a511-3ce4e48a80a6)
+4. All Artifacts are owned by JanumiCode and stored in the Governed Stream database. (Authority 7, source: 91b5e053-fa13-49ae-86a0-f54766bfed6c)
+5. The Governed Stream is single-threaded. No parallel Workflow Runs in a Workspace. (Authority 7, source: cfcd35b9-6382-43ee-9e0b-7001edb749a2)
+6. Agents never exercise judgment. Judgment is always escalated to the human. (Authority 7, source: 7ce970f5-3223-4597-a07a-e6b0a0ecaa1a)
+7. Every human interaction is recorded in the Governed Stream in full detail. (Authority 7, source: 55259472-fad9-4de4-855f-96d53fd71051)
+8. Every Phase Gate requires human approval. No automated gate passage. (Authority 7, source: 97575434-4ff0-4b58-9e7d-2c29b715ef35)
+9. Every phase is mandatory and executed in order. The Orchestrator cannot skip phases. (Authority 7, source: 454daa5b-c913-4b14-8c22-248478867b70)
+10. 100% correctness and completeness — always. All three layers of correctness (Section 1.6) are required. (Authority 7, source: 277a5812-9a7e-4d99-9d37-7a310b573ba5)
+
+Generate structured [JC:Test Case] specifications for every [JC:Acceptance Criterion]. Test Cases are specifications — NOT code.
+
+REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `test_suites` (an array). Do NOT wrap the array under a `test_plan` key — the response IS the test_plan artifact, so its immediate top-level field is `test_suites`, not a nested `{test_plan: {...}}` wrapper.
+
+```json
+{
+  "test_suites": [
+    {
+      "suite_id": "TS-...",
+      "component_id": "comp-...",
+      "test_type": "unit | integration | end_to_end",
+      "test_cases": [
+        {
+          "test_case_id": "TC-...",
+          "type": "functional",
+          "acceptance_criterion_ids": ["AC-US001-001"],
+          "preconditions": ["at least one — Invariant"],
+          "expected_outcome": "..."
+        }
+      ]
+    }
+  ]
+}
+```
+
+Rules:
+- Every Acceptance Criterion must have at least one Test Case (Invariant)
+- Every Test Case must have at least one precondition (Invariant)
+- Cover functional behavior only — NFR coverage is Phase 8's responsibility
+
+[JC:ACCEPTANCE CRITERION REFERENCING]
+
+`acceptance_criterion_ids[]` references ACs from each story's `Acceptance
+Criteria:` block in `[Release 1] NFR-REDIRECT-LATENCY-1 [medium] (Tier D leaf under NFR-001): As a system, I want to ensure redirect endpoint latency ≤ 100 ms for 99.9% of requests over any rolling 5‑minute window, so that Redirect latency meets the performance threshold.
+  Acceptance Criteria:
+    AC-NFR-REDIRECT-LATENCY-1-001: histogram_quantile(0.95, sum(rate(redirect_latency_seconds_bucket[5m])) by (le)) <= 0.1
+[Release 1] NFR-AES-256-1 [medium] (Tier D leaf under NFR-002): As a system, I want to verify that all stored URLs are encrypted at rest using AES‑256, so that No plaintext occurrence of any submitted URL is found in the underlying Postgres data files.
+  Acceptance Criteria:
+    AC-NFR-AES-256-1-001: grep -E 'https?://[\s]+' /var/lib/postgresql/data/*.dat | wc -l = 0
+[Release 1] US-004-AUTH-D1 [critical] (Tier D leaf under US-004): As a API Authentication Handler, I want to validate API key, so that Authentication succeeds or fails.
+  Acceptance Criteria:
+    AC-US-004-AUTH-D1-001: POST /api/shorten with header 'X-API-Key: valid_key' returns HTTP status 201 and a JSON body containing the short URL
+    AC-US-004-AUTH-D1-002: POST /api/shorten without 'X-API-Key' header returns HTTP status 401, response_body.error_code == 'AUTH_REQUIRED', and no new row is inserted into ENT-URL-MAPPING
+[Release 1] US-005-1 [medium] (Tier D leaf under US-005): As a Analytics API endpoint, I want to retrieve analytics via API, so that returns click statistics for a short URL.
+  Acceptance Criteria:
+    AC-US-005-1-001: response_time <= 1s AND JSON contains keys 'click_count' (integer) and 'click_timestamps' (array)
+    AC-US-005-1-002: JSON.click_count == N AND len(JSON.click_timestamps) == N
+    AC-US-005-1-003: JSON.click_timestamps sorted ascending AND each timestamp in ISO 8601 UTC AND each timestamp <= current_time AND >= earliest_click_timestamp
+    AC-US-005-1-004: GET /api/analytics/{nonexistent_slug} returns HTTP 404 AND JSON.error_code == 'SLUG_NOT_FOUND'
+    AC-US-005-1-005: GET /api/analytics/{invalid_slug} where slug not 6-char alphanumeric returns HTTP 400 AND JSON.error_code == 'INVALID_SLUG'
+    AC-US-005-1-006: Unauthenticated request returns HTTP 401; authenticated request returns HTTP 200 AND audit log contains actor_id, action='analytics.retrieve', slug before response flush
+[Release 1] US-008-D1 [medium] (Tier D leaf under US-008): As a Regulatory Officer, I want to generate compliance report, so that compliance PDF report is produced and downloadable.
+  Acceptance Criteria:
+    AC-US-008-D1-001: POST /reports/generate returns 202 and GET /reports/{id} returns status 'ready' within 5 seconds
+    AC-US-008-D1-002: GET /reports/{id}/pdf returns a non-empty PDF file that, when parsed, includes the text labels for every field specified in the ENT-COMPLIANCE-REPORT schema
+    AC-US-008-D1-003: GET /reports/{id}/download returns HTTP 200 with content-type application/pdf within 5 seconds
+    AC-US-008-D1-004: Audit log contains an entry with actor_id, action='generate_compliance_report', and report_id within 5 seconds
+    AC-US-008-D1-005: POST /reports/generate with missing mandatory field returns HTTP 400 with error code INVALID_REQUEST
+[Release 1] FR-CAM-1.1 [critical] (Tier D leaf under US-013): As a Campaign link creation, I want to Create campaign link via POST /campaigns, so that Campaign slug returned and analytics record appears within 3s.
+  Acceptance Criteria:
+    AC-FR-CAM-1.1-001: POST /campaigns returns slug and GET /analytics/campaign/{slug} returns click_counter=0 and total_visits=0 within 3s
+[Release 1] US-014-AC-001 [critical] (Tier D leaf under US-014): As a login success, I want to authenticate reseller and load dashboard, so that HTTP 200 and dashboard renders within 3 seconds.
+  Acceptance Criteria:
+    AC-US-014-AC-001-001: HTTP response status 200 and dashboard page load time <= 3 seconds
+[Release 1] FR-US-017-1-1 [medium] (Tier D leaf under US-017): As a Dashboard performance, I want to ensure dashboard loads within 4 seconds, so that Dashboard fully rendered within 4 seconds of request start.
+  Acceptance Criteria:
+    AC-FR-US-017-1-1-001: response_time <= 4000ms
+[Release 1] FR-INV-REPORT-1 [critical] (Tier D leaf under US-018): As a download_start, I want to initiate download of financial report, so that Download request returns 200 and starts streaming within 5 seconds.
+  Acceptance Criteria:
+    AC-FR-INV-REPORT-1-001: time_from_request_to_first_byte <= 5s
+[Release 1] US-019-1 [medium] (Tier D leaf under US-019): As a Export Generator, I want to generate personal data export ZIP, so that ZIP file containing all personal data records for the authenticated user.
+  Acceptance Criteria:
+    AC-US-019-1-001: HTTP 200 response with a ZIP file size > 0 and download time <= 10 seconds
+[Release 1] US-020-VAL-1 [critical] (Tier D leaf under US-020): As a Request Validator, I want to Validate incoming correction request payload, so that Reject invalid requests with HTTP 400 and no audit log entry.
+  Acceptance Criteria:
+    AC-US-020-VAL-1-001: HTTP response status code is 400 and response body contains error code FIELD_REQUIRED; audit_log table has no new entry for this request
+[Release 1] FR-URL-VALID-1.1 [medium] (Tier D leaf under US-021): As a Input Validation Policy, I want to validate input URLs, so that Any invalid URL causes a 400 response and no mappings are persisted.
+  Acceptance Criteria:
+    AC-FR-URL-VALID-1.1-001: response.status === 400 && response.body.error_code === 'INVALID_URL' && NOT EXISTS (SELECT 1 FROM ENT-URL-MAPPING WHERE slug = ?)
+[Release 1] US-022 [medium] (Tier D leaf under US-022): As a set custom slug, I want to set custom slug, so that custom slug assigned and unique.
+  Acceptance Criteria:
+    AC-US022-001: POST /url-mappings with duplicate slug returns HTTP 409 and mapping is not persisted
+    AC-US022-002: POST /url-mappings with slug length ≠ 6 returns HTTP 400 and error code SLUG_LENGTH_INVALID
+    AC-US022-003: POST /url-mappings with valid slug returns HTTP 201; GET /url-mappings/{slug} within 2s returns JSON with slug, original_url, created_at
+    AC-US022-004: GET /{slug} returns HTTP 302 to original_url and click counter increments by 1
+    AC-US022-005: POST /url-mappings without slug field returns HTTP 400 and error code SLUG_REQUIRED
+[Release 1] FR-ARCHIVE-1.1 [critical] (Tier D leaf under US-024): As a archive inactive accounts, I want to archive inactive accounts, so that inactive accounts are archived and audit logged.
+  Acceptance Criteria:
+    AC-FR-ARCHIVE-1.1-001: GET /users/{id} returns 403 with error code ACCOUNT_ARCHIVED; status='archived'; archived_at within 5 seconds of workflow completion; audit log entry exists with actor_id=admin, action='archive_account', account_id matches, archived_at within 5 seconds of archival.
+    AC-FR-ARCHIVE-1.1-002: GET /users/{id} returns 200 with status='active'; no audit log entry with action='archive_account' exists.
+    AC-FR-ARCHIVE-1.1-003: If DB error occurs during archive, account status remains 'active'; no audit log entry with action='archive_account'; error log entry with error_code='ARCHIVE_FAILED' exists.
+    AC-FR-ARCHIVE-1.1-004: GET /users?status=active returns list of users where status='active'; archived accounts not included; response contains zero users with status='archived'.
+    AC-FR-ARCHIVE-1.1-005: Audit log archived_at timestamp is within 5 seconds of account status change to 'archived' by workflow.
+[Release 2] FR-VAL-1 [critical] (Tier D leaf under US-012): As a ticket creation validation, I want to enforce required fields on ticket creation, so that Ticket creation fails with appropriate error when required fields are missing.
+  Acceptance Criteria:
+    AC-FR-VAL-1-001: POST /support/tickets with missing subject field returns HTTP 400 with error code SUBJECT_REQUIRED and no ticket is persisted
+    AC-FR-VAL-1-002: POST /support/tickets with missing user_id field returns HTTP 400 with error code USER_ID_REQUIRED and no ticket is persisted
+[Release 2] US-026-1 [critical] (Tier D leaf under US-026): As a Recovery orchestrator, I want to complete recovery, so that Recovery event status set to completed within 15 minutes.
+  Acceptance Criteria:
+    AC-US-026-1-001: recovery_completion_timestamp - outage_start_timestamp <= 15 minutes
+[Release 2] US-027-1-D1 [critical] (Tier D leaf under US-027): As a API endpoint, I want to serve starter guide markdown, so that Client receives markdown content with correct headers.
+  Acceptance Criteria:
+    AC-US-027-1-D1-001: GET /api/docs returns HTTP 200, Content-Type 'text/markdown', and body contains '## API Starter Guide'
+[Release 3] FR-US015-1-D [medium] (Tier D leaf under US-015): As a Webhook registration validator, I want to validate webhook registration request, so that Return appropriate HTTP status and error code for invalid requests.
+  Acceptance Criteria:
+    AC-FR-US015-1-D-001: response.status == 400 && response.body.error_code == 'MISSING_WEBHOOK_URL'
+    AC-FR-US015-1-D-002: response.status == 400 && response.body.error_code == 'INVALID_PROTOCOL'
+    AC-FR-US015-1-D-003: response.status == 409 && response.body.error_code == 'DUPLICATE_WEBHOOK'`. AC ids are
+workflow-globally unique composites of the form `AC-US{nnn}-{mmm}` — copy
+the id as written (e.g. `AC-US001-002`). A downstream resolver canonicalizes
+minor near-misses (case, lost zero-padding, reordering), so focus on *which
+AC each test verifies* rather than character-perfect transcription. Each
+test case may cite multiple ACs when one test exercises several.
+
+CONTEXT:
+Functional Requirements: [Release 1] NFR-REDIRECT-LATENCY-1 [medium] (Tier D leaf under NFR-001): As a system, I want to ensure redirect endpoint latency ≤ 100 ms for 99.9% of requests over any rolling 5‑minute window, so that Redirect latency meets the performance threshold.
+  Acceptance Criteria:
+    AC-NFR-REDIRECT-LATENCY-1-001: histogram_quantile(0.95, sum(rate(redirect_latency_seconds_bucket[5m])) by (le)) <= 0.1
+[Release 1] NFR-AES-256-1 [medium] (Tier D leaf under NFR-002): As a system, I want to verify that all stored URLs are encrypted at rest using AES‑256, so that No plaintext occurrence of any submitted URL is found in the underlying Postgres data files.
+  Acceptance Criteria:
+    AC-NFR-AES-256-1-001: grep -E 'https?://[\s]+' /var/lib/postgresql/data/*.dat | wc -l = 0
+[Release 1] US-004-AUTH-D1 [critical] (Tier D leaf under US-004): As a API Authentication Handler, I want to validate API key, so that Authentication succeeds or fails.
+  Acceptance Criteria:
+    AC-US-004-AUTH-D1-001: POST /api/shorten with header 'X-API-Key: valid_key' returns HTTP status 201 and a JSON body containing the short URL
+    AC-US-004-AUTH-D1-002: POST /api/shorten without 'X-API-Key' header returns HTTP status 401, response_body.error_code == 'AUTH_REQUIRED', and no new row is inserted into ENT-URL-MAPPING
+[Release 1] US-005-1 [medium] (Tier D leaf under US-005): As a Analytics API endpoint, I want to retrieve analytics via API, so that returns click statistics for a short URL.
+  Acceptance Criteria:
+    AC-US-005-1-001: response_time <= 1s AND JSON contains keys 'click_count' (integer) and 'click_timestamps' (array)
+    AC-US-005-1-002: JSON.click_count == N AND len(JSON.click_timestamps) == N
+    AC-US-005-1-003: JSON.click_timestamps sorted ascending AND each timestamp in ISO 8601 UTC AND each timestamp <= current_time AND >= earliest_click_timestamp
+    AC-US-005-1-004: GET /api/analytics/{nonexistent_slug} returns HTTP 404 AND JSON.error_code == 'SLUG_NOT_FOUND'
+    AC-US-005-1-005: GET /api/analytics/{invalid_slug} where slug not 6-char alphanumeric returns HTTP 400 AND JSON.error_code == 'INVALID_SLUG'
+    AC-US-005-1-006: Unauthenticated request returns HTTP 401; authenticated request returns HTTP 200 AND audit log contains actor_id, action='analytics.retrieve', slug before response flush
+[Release 1] US-008-D1 [medium] (Tier D leaf under US-008): As a Regulatory Officer, I want to generate compliance report, so that compliance PDF report is produced and downloadable.
+  Acceptance Criteria:
+    AC-US-008-D1-001: POST /reports/generate returns 202 and GET /reports/{id} returns status 'ready' within 5 seconds
+    AC-US-008-D1-002: GET /reports/{id}/pdf returns a non-empty PDF file that, when parsed, includes the text labels for every field specified in the ENT-COMPLIANCE-REPORT schema
+    AC-US-008-D1-003: GET /reports/{id}/download returns HTTP 200 with content-type application/pdf within 5 seconds
+    AC-US-008-D1-004: Audit log contains an entry with actor_id, action='generate_compliance_report', and report_id within 5 seconds
+    AC-US-008-D1-005: POST /reports/generate with missing mandatory field returns HTTP 400 with error code INVALID_REQUEST
+[Release 1] FR-CAM-1.1 [critical] (Tier D leaf under US-013): As a Campaign link creation, I want to Create campaign link via POST /campaigns, so that Campaign slug returned and analytics record appears within 3s.
+  Acceptance Criteria:
+    AC-FR-CAM-1.1-001: POST /campaigns returns slug and GET /analytics/campaign/{slug} returns click_counter=0 and total_visits=0 within 3s
+[Release 1] US-014-AC-001 [critical] (Tier D leaf under US-014): As a login success, I want to authenticate reseller and load dashboard, so that HTTP 200 and dashboard renders within 3 seconds.
+  Acceptance Criteria:
+    AC-US-014-AC-001-001: HTTP response status 200 and dashboard page load time <= 3 seconds
+[Release 1] FR-US-017-1-1 [medium] (Tier D leaf under US-017): As a Dashboard performance, I want to ensure dashboard loads within 4 seconds, so that Dashboard fully rendered within 4 seconds of request start.
+  Acceptance Criteria:
+    AC-FR-US-017-1-1-001: response_time <= 4000ms
+[Release 1] FR-INV-REPORT-1 [critical] (Tier D leaf under US-018): As a download_start, I want to initiate download of financial report, so that Download request returns 200 and starts streaming within 5 seconds.
+  Acceptance Criteria:
+    AC-FR-INV-REPORT-1-001: time_from_request_to_first_byte <= 5s
+[Release 1] US-019-1 [medium] (Tier D leaf under US-019): As a Export Generator, I want to generate personal data export ZIP, so that ZIP file containing all personal data records for the authenticated user.
+  Acceptance Criteria:
+    AC-US-019-1-001: HTTP 200 response with a ZIP file size > 0 and download time <= 10 seconds
+[Release 1] US-020-VAL-1 [critical] (Tier D leaf under US-020): As a Request Validator, I want to Validate incoming correction request payload, so that Reject invalid requests with HTTP 400 and no audit log entry.
+  Acceptance Criteria:
+    AC-US-020-VAL-1-001: HTTP response status code is 400 and response body contains error code FIELD_REQUIRED; audit_log table has no new entry for this request
+[Release 1] FR-URL-VALID-1.1 [medium] (Tier D leaf under US-021): As a Input Validation Policy, I want to validate input URLs, so that Any invalid URL causes a 400 response and no mappings are persisted.
+  Acceptance Criteria:
+    AC-FR-URL-VALID-1.1-001: response.status === 400 && response.body.error_code === 'INVALID_URL' && NOT EXISTS (SELECT 1 FROM ENT-URL-MAPPING WHERE slug = ?)
+[Release 1] US-022 [medium] (Tier D leaf under US-022): As a set custom slug, I want to set custom slug, so that custom slug assigned and unique.
+  Acceptance Criteria:
+    AC-US022-001: POST /url-mappings with duplicate slug returns HTTP 409 and mapping is not persisted
+    AC-US022-002: POST /url-mappings with slug length ≠ 6 returns HTTP 400 and error code SLUG_LENGTH_INVALID
+    AC-US022-003: POST /url-mappings with valid slug returns HTTP 201; GET /url-mappings/{slug} within 2s returns JSON with slug, original_url, created_at
+    AC-US022-004: GET /{slug} returns HTTP 302 to original_url and click counter increments by 1
+    AC-US022-005: POST /url-mappings without slug field returns HTTP 400 and error code SLUG_REQUIRED
+[Release 1] FR-ARCHIVE-1.1 [critical] (Tier D leaf under US-024): As a archive inactive accounts, I want to archive inactive accounts, so that inactive accounts are archived and audit logged.
+  Acceptance Criteria:
+    AC-FR-ARCHIVE-1.1-001: GET /users/{id} returns 403 with error code ACCOUNT_ARCHIVED; status='archived'; archived_at within 5 seconds of workflow completion; audit log entry exists with actor_id=admin, action='archive_account', account_id matches, archived_at within 5 seconds of archival.
+    AC-FR-ARCHIVE-1.1-002: GET /users/{id} returns 200 with status='active'; no audit log entry with action='archive_account' exists.
+    AC-FR-ARCHIVE-1.1-003: If DB error occurs during archive, account status remains 'active'; no audit log entry with action='archive_account'; error log entry with error_code='ARCHIVE_FAILED' exists.
+    AC-FR-ARCHIVE-1.1-004: GET /users?status=active returns list of users where status='active'; archived accounts not included; response contains zero users with status='archived'.
+    AC-FR-ARCHIVE-1.1-005: Audit log archived_at timestamp is within 5 seconds of account status change to 'archived' by workflow.
+[Release 2] FR-VAL-1 [critical] (Tier D leaf under US-012): As a ticket creation validation, I want to enforce required fields on ticket creation, so that Ticket creation fails with appropriate error when required fields are missing.
+  Acceptance Criteria:
+    AC-FR-VAL-1-001: POST /support/tickets with missing subject field returns HTTP 400 with error code SUBJECT_REQUIRED and no ticket is persisted
+    AC-FR-VAL-1-002: POST /support/tickets with missing user_id field returns HTTP 400 with error code USER_ID_REQUIRED and no ticket is persisted
+[Release 2] US-026-1 [critical] (Tier D leaf under US-026): As a Recovery orchestrator, I want to complete recovery, so that Recovery event status set to completed within 15 minutes.
+  Acceptance Criteria:
+    AC-US-026-1-001: recovery_completion_timestamp - outage_start_timestamp <= 15 minutes
+[Release 2] US-027-1-D1 [critical] (Tier D leaf under US-027): As a API endpoint, I want to serve starter guide markdown, so that Client receives markdown content with correct headers.
+  Acceptance Criteria:
+    AC-US-027-1-D1-001: GET /api/docs returns HTTP 200, Content-Type 'text/markdown', and body contains '## API Starter Guide'
+[Release 3] FR-US015-1-D [medium] (Tier D leaf under US-015): As a Webhook registration validator, I want to validate webhook registration request, so that Return appropriate HTTP status and error code for invalid requests.
+  Acceptance Criteria:
+    AC-FR-US015-1-D-001: response.status == 400 && response.body.error_code == 'MISSING_WEBHOOK_URL'
+    AC-FR-US015-1-D-002: response.status == 400 && response.body.error_code == 'INVALID_PROTOCOL'
+    AC-FR-US015-1-D-003: response.status == 409 && response.body.error_code == 'DUPLICATE_WEBHOOK'
+Implementation Plan: 45 Implementation Tasks:
+  task-comp-accessibility-service-serve-terms [medium]: Implement the /terms endpoint to serve the terms page ensuring accessibility compliance. The handler should render the terms template and set appropriate headers.
+    Component: comp-accessibility-service, Responsibility: Serve terms page with accessibility compliance
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: GET /terms returns 200 with HTML content containing the terms text
+  task-comp-accessibility-service-ensure-wcag [high]: Add accessibility checks and ARIA attributes to the terms page and other UI components to meet WCAG 2.1 AA. Verify contrast ratios and semantic markup.
+    Component: comp-accessibility-service, Responsibility: Ensure UI meets WCAG 2.1 AA standards
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: All UI components pass automated WCAG 2.1 AA audit
+  task-comp-analytics-dashboard-render-analytics [medium]: Create the /analytics-dashboard route that renders the analytics dashboard view. It should fetch data from the analytics query service and display it.
+    Component: comp-analytics-dashboard, Responsibility: Render analytics dashboard page
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: GET /analytics-dashboard returns 200 and includes dashboard data
+  task-comp-analytics-dashboard-render-kpi [medium]: Implement the /kpi-dashboard route to display key performance indicators. It should aggregate data from the analytics query service.
+    Component: comp-analytics-dashboard, Responsibility: Render KPI dashboard page
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: GET /kpi-dashboard returns 200 and includes KPI data
+  task-comp-analytics-query-service-provide-analytics [medium]: Expose GET /api/analytics/{slug} that returns click count and timestamps. Validate slug and query the click event store.
+    Component: comp-analytics-query-service, Responsibility: Provide analytics data for a short URL
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: GET /api/analytics/{slug} returns 200 with correct analytics JSON
+  task-comp-click-event-store-store-click [medium]: Implement the click event store to persist click events with UTC ISO 8601 timestamps and millisecond precision.
+    Component: comp-click-event-store, Responsibility: Store click events with timestamps
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Click event is persisted with correct timestamp format
+  task-comp-api-security-validate-api-key [medium]: Add middleware to validate the presence and validity of API keys on protected endpoints.
+    Component: comp-api-security, Responsibility: Validate API key for incoming requests
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Requests with valid API key receive 200
+  task-comp-api-security-enforce-rotation [high]: Implement logic to rotate API keys automatically according to the rotation policy and invalidate old keys.
+    Component: comp-api-security, Responsibility: Enforce API key rotation schedule
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: API keys are rotated every 180 days and old keys are revoked
+  task-comp-api-security-enforce-header [low]: Ensure that all protected endpoints reject requests lacking the API key header with a 401 status.
+    Component: comp-api-security, Responsibility: Enforce presence of API key header
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Missing API key header results in 401
+  task-comp-compliance-service-generate-report [high]: Implement POST /api/compliance/report to generate a compliance PDF and return 202 with ready status within 5 seconds.
+    Component: comp-compliance-service, Responsibility: Generate compliance PDF report
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: POST /api/compliance/report returns 202 and report status is ready within 5 seconds
+  task-comp-compliance-service-sign-pdf [high]: Implement logic to sign the generated compliance PDF using a digital certificate before making it available for download.
+    Component: comp-compliance-service, Responsibility: Sign compliance PDF with digital certificate
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Signed PDF is returned with correct signature metadata
+  task-comp-developer-experience-service-serve-docs [low]: Implement GET /api/docs to return the starter guide markdown with correct headers and content type.
+    Component: comp-developer-experience-service, Responsibility: Serve starter guide markdown at /api/docs
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: GET /api/docs returns 200 with markdown content
+  task-comp-backup-executor-execute-backup [high]: Implement the backup executor to run backup jobs, copy data to a remote region, and verify integrity.
+    Component: comp-backup-executor, Responsibility: Execute backup job, copy data to remote region
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Backup job completes and data integrity is verified
+  task-comp-backup-executor-verify-integrity [medium]: After copying backup data to remote region, verify that the data matches the source and is not corrupted.
+    Component: comp-backup-executor, Responsibility: Verify data integrity post-copy
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Integrity check passes for all copied files
+  task-comp-backup-job-scheduler-schedule-backups [medium]: Implement scheduler to trigger backup jobs at defined intervals and store schedule metadata.
+    Component: comp-backup-job-scheduler, Responsibility: Schedule periodic backup jobs to remote region
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Backup jobs are scheduled and executed as per schedule
+  task-comp-backup-schedule-validator-validate-schedule [medium]: Check that backup schedules comply with retention policy and raise alerts if not.
+    Component: comp-backup-schedule-validator, Responsibility: Validate backup schedule against retention policy
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Schedule validation passes for compliant schedules
+  task-comp-encryption-key-rotation-rotate-keys [high]: Implement key rotation logic that rotates keys per policy and publishes rotation events.
+    Component: comp-encryption-key-rotation, Responsibility: Rotate encryption keys every 90 days according to policy
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Keys are rotated every 90 days and rotation event is published
+  task-comp-encryption-key-rotation-publish-event [medium]: Emit a key-rotation event after each rotation to notify the encryption engine to reload the new key.
+    Component: comp-encryption-key-rotation, Responsibility: Publish a key‑rotation event that signals the encryption engine to reload the new key
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Key-rotation event is published to the event bus
+  task-comp-url-encryption-engine-encrypt-urls [high]: Implement encryption of URLs before storing them in PostgreSQL and decryption on read.
+    Component: comp-url-encryption-engine, Responsibility: Encrypt URLs at rest using AES‑256 before persisting to PostgreSQL
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: URLs are stored encrypted and decrypted correctly on read
+  task-comp-url-encryption-engine-decrypt-urls [medium]: Ensure that URLs are decrypted when read and never exposed in plaintext in logs or responses.
+    Component: comp-url-encryption-engine, Responsibility: Decrypt URLs on read requests, ensuring no plaintext exposure
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Decrypted URLs are returned correctly and no plaintext logs are produced
+  task-comp-integration-service-register-webhook [medium]: Implement POST /api/webhooks/register to allow clients to register webhook URLs for events.
+    Component: comp-integration-service, Responsibility: Register webhook for events
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Webhook registration succeeds with valid URL
+  task-comp-integration-service-deliver-webhook [high]: Send event payloads to registered webhooks and handle retries up to 3 times with exponential backoff.
+    Component: comp-integration-service, Responsibility: Deliver webhook events
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Webhook events are delivered successfully with retries on failure
+  task-comp-logging-service-emit-audit-logs [medium]: Implement logging middleware to emit audit logs for key system events in structured JSON format.
+    Component: comp-logging-service, Responsibility: Emit audit logs for system events
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Audit logs are emitted in JSON format to stdout
+  task-comp-logging-service-emit-structured-logs [medium]: Ensure all logs are structured JSON and written to stdout for ingestion by log aggregation services.
+    Component: comp-logging-service, Responsibility: Emit structured JSON logs to stdout
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Logs are valid JSON and contain required fields
+  task-comp-alert-trigger-evaluate-metrics [high]: Implement alert trigger to compare metrics with thresholds and send alerts to the alerting platform.
+    Component: comp-alert-trigger, Responsibility: Evaluate collected metrics against alert thresholds and trigger alerts to the alerting platform
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Alerts are triggered when thresholds are exceeded
+  task-comp-metrics-exporter-expose-metrics [medium]: Implement GET /metrics endpoint that returns Prometheus-compatible metrics for monitoring.
+    Component: comp-metrics-exporter, Responsibility: Collect system health metrics and expose them via an HTTP endpoint to the monitoring system
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: GET /metrics returns Prometheus metrics format
+  task-comp-deployment-service-deploy-version [medium]: Implement deployment service to deploy new application versions to the runtime environment.
+    Component: comp-deployment-service, Responsibility: Deploy new application version
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Deployment service triggers deployment and verifies success
+  task-comp-health-check-service-expose-health [low]: Implement GET /health that returns service health status and metrics.
+    Component: comp-health-check-service, Responsibility: Expose health‑check endpoint
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: GET /health returns 200 and health JSON
+  task-comp-privacy-service-export-personal-data [medium]: Implement GET /api/privacy/export to return a ZIP archive of personal data for the authenticated user.
+    Component: comp-privacy-service, Responsibility: Export personal data as ZIP archive
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: GET /api/privacy/export returns ZIP with user data
+  task-comp-privacy-service-export-gdpr-data [medium]: Implement GET /api/privacy/gdpr-export to return GDPR-compliant data ZIP archive.
+    Component: comp-privacy-service, Responsibility: Export GDPR data as ZIP archive
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: GET /api/privacy/gdpr-export returns GDPR ZIP
+  task-comp-redirection-redirect-short-url [medium]: Implement GET /{slug} to resolve the slug, redirect to the original URL, and record a click event.
+    Component: comp-redirection, Responsibility: Redirect short URL to original URL
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: GET /{slug} redirects to original URL and records click
+  task-comp-redirection-record-click [medium]: When a redirect occurs, store a click event with timestamp in the click event store.
+    Component: comp-redirection, Responsibility: Record click event for a redirect
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Click event is persisted with correct timestamp
+  task-comp-financial-report-metadata-persistor-persist-metadata [medium]: Implement persistence of financial report metadata after PDF generation.
+    Component: comp-financial-report-metadata-persistor, Responsibility: Persist the generated report metadata to the reporting database
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Metadata is stored in reporting DB with correct fields
+  task-comp-financial-report-pdf-generator-generate-pdf [high]: Implement GET /api/report/financial to generate a PDF report from aggregated financial data.
+    Component: comp-financial-report-pdf-generator, Responsibility: Generate a financial report in PDF format based on aggregated financial data
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: GET /api/report/financial returns PDF with correct content
+  task-comp-raw-data-exporter-export-csv [medium]: Implement endpoint to export raw financial data as a CSV file for external consumption.
+    Component: comp-raw-data-exporter, Responsibility: Export raw financial data as a CSV file for external consumption
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Export endpoint returns CSV with correct data
+  task-comp-raw-data-exporter-validate-params [medium]: Ensure export requests have valid parameters and that the exported data size does not exceed limits.
+    Component: comp-raw-data-exporter, Responsibility: Validate export parameters and enforce size limits
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Invalid parameters result in 400 error and size limits are enforced
+  task-comp-security-admin-service-run-audit [medium]: Implement job to run a security audit and store results.
+    Component: comp-security-admin-service, Responsibility: Run security audit job
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Security audit job runs and stores results
+  task-comp-support-service-create-ticket [medium]: Implement POST /api/support/ticket to create a support ticket with proper validation.
+    Component: comp-support-service, Responsibility: Create support ticket
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: POST /api/support/ticket creates ticket and returns 201
+  task-comp-support-service-validate-ticket [low]: Ensure support ticket payloads meet required fields and reject invalid ones with 400.
+    Component: comp-support-service, Responsibility: Validate support ticket payload
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Invalid payload results in 400 and no ticket persisted
+  task-comp-url-shortening-create-short-url [medium]: Implement POST /api/shorten to validate long URL, generate unique slug, and persist mapping.
+    Component: comp-url-shortening, Responsibility: Create short URL mapping for a valid long URL
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: POST /api/shorten returns 201 with slug and stores mapping
+  task-comp-url-shortening-generate-unique-slug [medium]: Implement slug generation logic ensuring uniqueness and collision avoidance.
+    Component: comp-url-shortening, Responsibility: Generate unique 6-character slug
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Generated slug is 6 characters and unique
+  task-comp-url-shortening-persist-mapping [medium]: Store the short URL mapping in PostgreSQL with proper indexing and constraints.
+    Component: comp-url-shortening, Responsibility: Persist URL mapping in PostgreSQL
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Mapping is persisted in DB and retrievable
+  task-comp-user-management-archive-inactive [medium]: Implement logic to mark inactive user accounts as archived and deny access.
+    Component: comp-user-management, Responsibility: Archive inactive user accounts
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Inactive accounts are archived and access denied
+  task-comp-user-management-process-deletion [medium]: Handle deletion requests and ensure data is removed within 30 days.
+    Component: comp-user-management, Responsibility: Process user data deletion requests
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Deletion requests are processed and data removed
+  task-comp-user-management-apply-corrections [medium]: Implement functionality to apply user data corrections and confirm changes.
+    Component: comp-user-management, Responsibility: Apply data corrections for users
+    Backing tool: undefined
+    Dependencies: []
+    Completion criteria: Corrections are applied and verified
+Component Model: 19 Components:
+  comp-api-security: API Security Service (domain: domain-api-security)
+    Responsibilities:
+    res-validate-api-key: Validate API key for incoming requests
+    res-enforce-api-key-rotation: Enforce API key rotation schedule
+    res-enforce-api-key-header: Enforce presence of API key header
+    Dependencies: comp-logging-service (depends_on)
+  comp-url-shortening: URL Shortening Service (domain: domain-url-shortening)
+    Responsibilities:
+    res-create-short-url: Create short URL mapping for a valid long URL
+    res-generate-slug: Generate unique 6‑character slug
+    res-persist-mapping: Persist URL mapping in PostgreSQL
+    Dependencies: comp-logging-service (depends_on), comp-analytics-service (depends_on), comp-encryption-service (depends_on), comp-api-security (depends_on)
+  comp-redirection: Redirection Service (domain: domain-redirection)
+    Responsibilities:
+    res-redirect-short-url: Redirect short URL to original URL
+    res-record-click-event: Record click event for a redirect
+    Dependencies: comp-url-shortening (depends_on), comp-analytics-service (depends_on), comp-logging-service (depends_on)
+  comp-analytics-service: Analytics Service (domain: domain-analytics)
+    Responsibilities:
+    res-store-click-events: Store click events with timestamps
+    res-provide-analytics: Provide analytics data for a short URL
+    Dependencies: comp-logging-service (depends_on)
+  comp-analytics-dashboard: Analytics Dashboard Service (domain: domain-analytics-dashboard)
+    Responsibilities:
+    res-render-analytics-dashboard: Render analytics dashboard page
+    res-render-kpi-dashboard: Render KPI dashboard page
+    Dependencies: comp-analytics-service (depends_on), comp-monitoring-service (depends_on)
+  comp-compliance-service: Compliance Service (domain: domain-compliance)
+    Responsibilities:
+    res-generate-compliance-report: Generate compliance PDF report
+    res-sign-compliance-pdf: Sign compliance PDF with digital certificate
+    Dependencies: comp-logging-service (depends_on), comp-privacy-service (depends_on)
+  comp-privacy-service: Privacy Service (domain: domain-privacy)
+    Responsibilities:
+    res-export-personal-data: Export personal data as ZIP archive
+    res-export-gdpr-data: Export GDPR data as ZIP archive
+    Dependencies: comp-logging-service (depends_on)
+  comp-user-management: User Management Service (domain: domain-user-management)
+    Responsibilities:
+    res-archive-inactive-accounts: Archive inactive user accounts
+    res-process-deletion-requests: Process user data deletion requests
+    res-apply-data-corrections: Apply data corrections for users
+    Dependencies: comp-logging-service (depends_on)
+  comp-support-service: Support Service (domain: domain-user-support)
+    Responsibilities:
+    res-create-support-ticket: Create support ticket
+    res-validate-ticket-payload: Validate support ticket payload
+    Dependencies: comp-logging-service (depends_on)
+  comp-integration-service: Integration Service (domain: domain-integration)
+    Responsibilities:
+    res-register-webhook: Register webhook for events
+    res-deliver-webhook: Deliver webhook events
+    Dependencies: comp-logging-service (depends_on)
+  comp-reporting-service: Reporting Service (domain: domain-reporting)
+    Responsibilities:
+    res-generate-financial-report: Generate financial report
+    res-export-raw-data: Export raw data as CSV
+    Dependencies: comp-logging-service (depends_on)
+  comp-operations-service: Operations Service (domain: domain-operations)
+    Responsibilities:
+    res-expose-health-check: Expose health‑check endpoint
+    res-deploy-new-version: Deploy new application version
+    res-incident-response: Respond to incidents and recover services
+    Dependencies: comp-monitoring-service (depends_on), comp-logging-service (depends_on)
+  comp-accessibility-service: Accessibility Service (domain: domain-accessibility)
+    Responsibilities:
+    res-serve-terms-page: Serve terms page with accessibility compliance
+    res-meet-wcag-standards: Ensure UI meets WCAG 2.1 AA standards
+    Dependencies: comp-logging-service (depends_on)
+  comp-encryption-service: Encryption Service (domain: domain-encryption)
+    Responsibilities:
+    res-encrypt-urls-at-rest: Encrypt URLs at rest using AES‑256
+    res-rotate-encryption-keys: Rotate encryption keys every 90 days
+    Dependencies: comp-logging-service (depends_on)
+  comp-disaster-recovery-service: Disaster Recovery Service (domain: domain-disaster-recovery)
+    Responsibilities:
+    res-backup-data: Backup data to a separate geographic region
+    res-recover-from-regional-failure: Recover services after regional failure
+    Dependencies: comp-logging-service (depends_on)
+  comp-developer-experience-service: Developer Experience Service (domain: domain-developer-experience)
+    Responsibilities:
+    res-serve-starter-guide: Serve starter guide markdown at /api/docs
+    Dependencies: comp-logging-service (depends_on)
+  comp-security-admin-service: Security Administration Service (domain: domain-security-admin)
+    Responsibilities:
+    res-run-security-audit: Run security audit job
+    Dependencies: comp-logging-service (depends_on)
+  comp-logging-service: Logging Service (domain: domain-logging)
+    Responsibilities:
+    res-emit-audit-logs: Emit audit logs for system events
+    res-emit-structured-logs: Emit structured JSON logs to stdout
+    Dependencies: none
+  comp-monitoring-service: Monitoring Service (domain: domain-monitoring)
+    Responsibilities:
+    res-expose-health-metrics: Expose health metrics to monitoring system
+    res-trigger-alerts: Trigger alerts based on health metrics
+    Dependencies: comp-logging-service (depends_on)
+
+DETAIL FILE PATH (reference only): E:\Projects\hestami-ai\JanumiCode\janumicode_v2\test-and-evaluation\thin-slice-workspaces\thin-slice-workspace-109/.janumicode/runs/2f658224-0274-4473-92c4-840f14e70883/context/test_case_skeleton_p7_1_tests-2f658224.md
+
+DEEP MEMORY RESEARCH CONTEXT (full detail file content — read this carefully; it contains prior-phase findings, supersession chains, contradictions, and completeness assessment that govern this sub-phase):
+
+# JanumiCode Context Detail File
+Generated: 2026-05-27T21:22:54.261Z
+
+
+## Deep Memory Research — Full Context Packet
+
+```json
+{
+  "queryDecomposition": {
+    "topicEntities": [
+      "AC-NFR-REDIRECT-LATENCY-1-001",
+      "AC-NFR-AES-256-1-001",
+      "AC-US-004-AUTH-D1-001",
+      "AC-US-004-AUTH-D1-002",
+      "AC-US-005-1-001",
+      "AC-US-005-1-002",
+      "AC-US-005-1-003",
+      "AC-US-005-1-004",
+      "AC-US-005-1-005",
+      "AC-US-005-1-006",
+      "AC-US-008-D1-001",
+      "AC-US-008-D1-002"
+    ],
+    "decisionTypesSought": [
+      "menu_selection",
+      "mirror_approval",
+      "phase_gate_approval"
+    ],
+    "temporalScope": {
+      "from": "1970-01-01T00:00:00Z",
+      "to": "2026-05-27T21:22:28.175Z"
+    },
+    "authorityLevelsIncluded": [
+      5,
+      6,
+      7
+    ],
+    "sourcesInScope": [
+      "governed_stream_all_runs"
+    ],
+    "knownConflictZones": []
+  },
+  "completenessStatus": "complete",
+  "decisionContextSummary": "The Governed Stream records indicate that the intent is to execute the TinyURL service as described in the attached intent document (record 2d72d3dd‑2970‑4edc‑bc8a‑67080a3b81bf).  The system has captured all functional and non‑functional requirements (artifact_produced records 5b163e31‑308d‑47e6‑9674‑c1dfeea1c95d and e07fd7ee‑d4ff‑493b‑b8de‑ed9cb90d3db7) as well as the component model (record 03ad48ae‑c921‑4920‑873c‑51ef15a8e879) and implementation plan (record 82d83a86‑5d60‑41e4‑bf4a‑a3ea6d3df20e).  Governing constraints at authority level 7 enforce lossless capture (record 72089c77‑ce28‑4d6f‑a8cc‑13efc46ca8ec), non‑truncation of constraints (record 39cf0fc8‑dbd5‑41a0‑9a2e‑8ce88132d41a), namespace prefixing (record 95c60ea9‑fb56‑4067‑a511‑3ce4e48a80a6), ownership (record 91b5e053‑fa13‑49ae‑86a0‑f54766bfed6c), single‑threaded execution (record cfcd35b9‑6382‑43ee‑9e0b‑7001edb749a2), no judgment by agents (record 7ce970f5‑3223‑4597‑a07a‑e6b0a0ecaa1a), full recording of human interactions (record 55259472‑fad9‑4de4‑855f‑96d53fd71051), mandatory human approval at each phase gate (record 97575434‑4ff0‑4b58‑9e7d‑2c29b715ef35), mandatory sequential phases (record 454daa5b‑c913‑4b14‑8c22‑248478867b70), and 100 % correctness and completeness (record 277a5812‑9a7e‑4d99‑9d37‑7a310b573ba5).  These constraints collectively govern the decision process for the TinyURL service implementation.",
+  "completenessNarrative": "All governing constraints and the high‑level intent have been captured from the Governed Stream.  However, the specific content of the functional, non‑functional, component, and implementation artifacts is not present in the queried records, leaving critical details of the requirements and design unknown.  This partial knowledge limits the ability to fully evaluate compliance or to make definitive decisions about the TinyURL service implementation.",
+  "unavailableSources": [],
+  "materialFindings": [
+    {
+      "id": "5b163e31-308d-47e6-9674-c1dfeea1c95d",
+      "recordType": "artifact_produced",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[functional_requirements]",
+      "sourceRecordIds": [
+        "5b163e31-308d-47e6-9674-c1dfeea1c95d"
+      ],
+      "materialityScore": 1
+    },
+    {
+      "id": "e07fd7ee-d4ff-493b-b8de-ed9cb90d3db7",
+      "recordType": "artifact_produced",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[non_functional_requirements]",
+      "sourceRecordIds": [
+        "e07fd7ee-d4ff-493b-b8de-ed9cb90d3db7"
+      ],
+      "materialityScore": 1
+    },
+    {
+      "id": "03ad48ae-c921-4920-873c-51ef15a8e879",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[component_model]",
+      "sourceRecordIds": [
+        "03ad48ae-c921-4920-873c-51ef15a8e879"
+      ],
+      "materialityScore": 1
+    },
+    {
+      "id": "82d83a86-5d60-41e4-bf4a-a3ea6d3df20e",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[implementation_plan]",
+      "sourceRecordIds": [
+        "82d83a86-5d60-41e4-bf4a-a3ea6d3df20e"
+      ],
+      "materialityScore": 1
+    },
+    {
+      "id": "72089c77-ce28-4d6f-a8cc-13efc46ca8ec",
+      "recordType": "constitutional_invariant",
+      "authorityLevel": 7,
+      "governingStatus": "active",
+      "summary": "The Governed Stream is lossless. All execution trace content — reasoning steps, self-corrections, tool call invocations, tool results — is captured in full regardless of what subset is used for any given downstream purpose.",
+      "sourceRecordIds": [
+        "72089c77-ce28-4d6f-a8cc-13efc46ca8ec"
+      ],
+      "materialityScore": 0.6991712382721641,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 1,
+        "authorityScore": 1,
+        "temporalRecency": 0.9944749218144273,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "39cf0fc8-dbd5-41a0-9a2e-8ce88132d41a",
+      "recordType": "constitutional_invariant",
+      "authorityLevel": 7,
+      "governingStatus": "active",
+      "summary": "No governing constraint may be truncated silently. Governing constraints (Authority Level 6+) are always delivered in full via the stdin directive channel.",
+      "sourceRecordIds": [
+        "39cf0fc8-dbd5-41a0-9a2e-8ce88132d41a"
+      ],
+      "materialityScore": 0.699171229735478,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 1,
+        "authorityScore": 1,
+        "temporalRecency": 0.9944748649031857,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "95c60ea9-fb56-4067-a511-3ce4e48a80a6",
+      "recordType": "constitutional_invariant",
+      "authorityLevel": 7,
+      "governingStatus": "active",
+      "summary": "Prompt Templates use namespace prefixing ([JC:] and [P:]) and separate context scopes at all times.",
+      "sourceRecordIds": [
+        "95c60ea9-fb56-4067-a511-3ce4e48a80a6"
+      ],
+      "materialityScore": 0.6991712296556958,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 1,
+        "authorityScore": 1,
+        "temporalRecency": 0.9944748643713051,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "91b5e053-fa13-49ae-86a0-f54766bfed6c",
+      "recordType": "constitutional_invariant",
+      "authorityLevel": 7,
+      "governingStatus": "active",
+      "summary": "All Artifacts are owned by JanumiCode and stored in the Governed Stream database.",
+      "sourceRecordIds": [
+        "91b5e053-fa13-49ae-86a0-f54766bfed6c"
+      ],
+      "materialityScore": 0.6991712295360226,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 1,
+        "authorityScore": 1,
+        "temporalRecency": 0.9944748635734839,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "cfcd35b9-6382-43ee-9e0b-7001edb749a2",
+      "recordType": "constitutional_invariant",
+      "authorityLevel": 7,
+      "governingStatus": "active",
+      "summary": "The Governed Stream is single-threaded. No parallel Workflow Runs in a Workspace.",
+      "sourceRecordIds": [
+        "cfcd35b9-6382-43ee-9e0b-7001edb749a2"
+      ],
+      "materialityScore": 0.6991712294163495,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 1,
+        "authorityScore": 1,
+        "temporalRecency": 0.9944748627756628,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "7ce970f5-3223-4597-a07a-e6b0a0ecaa1a",
+      "recordType": "constitutional_invariant",
+      "authorityLevel": 7,
+      "governingStatus": "active",
+      "summary": "Agents never exercise judgment. Judgment is always escalated to the human.",
+      "sourceRecordIds": [
+        "7ce970f5-3223-4597-a07a-e6b0a0ecaa1a"
+      ],
+      "materialityScore": 0.6991712292567852,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 1,
+        "authorityScore": 1,
+        "temporalRecency": 0.9944748617119012,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "55259472-fad9-4de4-855f-96d53fd71051",
+      "recordType": "constitutional_invariant",
+      "authorityLevel": 7,
+      "governingStatus": "active",
+      "summary": "Every human interaction is recorded in the Governed Stream in full detail.",
+      "sourceRecordIds": [
+        "55259472-fad9-4de4-855f-96d53fd71051"
+      ],
+      "materialityScore": 0.699171229097221,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 1,
+        "authorityScore": 1,
+        "temporalRecency": 0.9944748606481398,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "97575434-4ff0-4b58-9e7d-2c29b715ef35",
+      "recordType": "constitutional_invariant",
+      "authorityLevel": 7,
+      "governingStatus": "active",
+      "summary": "Every Phase Gate requires human approval. No automated gate passage.",
+      "sourceRecordIds": [
+        "97575434-4ff0-4b58-9e7d-2c29b715ef35"
+      ],
+      "materialityScore": 0.6991712290174389,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 1,
+        "authorityScore": 1,
+        "temporalRecency": 0.9944748601162591,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "454daa5b-c913-4b14-8c22-248478867b70",
+      "recordType": "constitutional_invariant",
+      "authorityLevel": 7,
+      "governingStatus": "active",
+      "summary": "Every phase is mandatory and executed in order. The Orchestrator cannot skip phases.",
+      "sourceRecordIds": [
+        "454daa5b-c913-4b14-8c22-248478867b70"
+      ],
+      "materialityScore": 0.6991712288977657,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 1,
+        "authorityScore": 1,
+        "temporalRecency": 0.9944748593184379,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "277a5812-9a7e-4d99-9d37-7a310b573ba5",
+      "recordType": "constitutional_invariant",
+      "authorityLevel": 7,
+      "governingStatus": "active",
+      "summary": "100% correctness and completeness — always. All three layers of correctness (Section 1.6) are required.",
+      "sourceRecordIds": [
+        "277a5812-9a7e-4d99-9d37-7a310b573ba5"
+      ],
+      "materialityScore": 0.6991712287382015,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 1,
+        "authorityScore": 1,
+        "temporalRecency": 0.9944748582546764,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "2d72d3dd-2970-4edc-bc8a-67080a3b81bf",
+      "recordType": "raw_intent_received",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "Execute the intent described in the attached document.\n\n=== ATTACHED DOCUMENT: intent.md ===\nExecute the intent described in the attached document.\n\n=== ATTACHED DOCUMENT: tinyurl-thin-slice.md ===\n# TinyURL — A Minimal URL Shortener Service\n\n## Product Overview\n\nTinyURL is a public-facing service t",
+      "sourceRecordIds": [
+        "2d72d3dd-2970-4edc-bc8a-67080a3b81bf"
+      ],
+      "materialityScore": 0.5270283795735557,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9944749114427522,
+        "causalRelevance": 0.6,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "f4ddea83-58d2-401f-b4b1-8fa8bc586035",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "f4ddea83-58d2-401f-b4b1-8fa8bc586035"
+      ],
+      "materialityScore": 0.4678570789175381,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9999995737359683,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "2b173087-085e-4745-b016-e8f1cbcc5984",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "2b173087-085e-4745-b016-e8f1cbcc5984"
+      ],
+      "materialityScore": 0.4675461745258269,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9979268777912275,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "c95418e5-5d7b-4af5-b28d-e4d2ba3620c7",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "c95418e5-5d7b-4af5-b28d-e4d2ba3620c7"
+      ],
+      "materialityScore": 0.46752546980513154,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9977888463199247,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "a364cca3-2f38-4ba0-8bd1-f011f26d270b",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "a364cca3-2f38-4ba0-8bd1-f011f26d270b"
+      ],
+      "materialityScore": 0.4674841778700659,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9975135667528204,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "ce64a299-03eb-4e33-97b8-f7cb7f744508",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "ce64a299-03eb-4e33-97b8-f7cb7f744508"
+      ],
+      "materialityScore": 0.4674683199392131,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9974078472138022,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "ed35c313-26c3-4c19-b0c3-556d95cf121f",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "ed35c313-26c3-4c19-b0c3-556d95cf121f"
+      ],
+      "materialityScore": 0.46746831597835137,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9974078208080567,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "4eb2fb14-8b18-48e7-aede-e028121a0c45",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "4eb2fb14-8b18-48e7-aede-e028121a0c45"
+      ],
+      "materialityScore": 0.46723604133508656,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9958593231862913,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "b5fac7bb-9e8b-49b5-b4a9-99c94901055b",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "b5fac7bb-9e8b-49b5-b4a9-99c94901055b"
+      ],
+      "materialityScore": 0.46723604117530015,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.995859322121049,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "abd35793-da62-41ea-949c-055f8fcdfd11",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "abd35793-da62-41ea-949c-055f8fcdfd11"
+      ],
+      "materialityScore": 0.4672360410554604,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9958593213221172,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "b0ae528b-65da-4c36-a3d4-70abdf75b486",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "b0ae528b-65da-4c36-a3d4-70abdf75b486"
+      ],
+      "materialityScore": 0.46723604085572745,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9958593199905641,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "493efd6b-1f69-4cd6-86e9-e0742442d938",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "493efd6b-1f69-4cd6-86e9-e0742442d938"
+      ],
+      "materialityScore": 0.4672360406959411,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9958593189253218,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "067ce6c0-908f-4192-b052-d70dd9c80220",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "067ce6c0-908f-4192-b052-d70dd9c80220"
+      ],
+      "materialityScore": 0.4672180193995461,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9957391769493553,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "e36b3477-9982-475e-a577-f1d2b53bcdd8",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "e36b3477-9982-475e-a577-f1d2b53bcdd8"
+      ],
+      "materialityScore": 0.467218019239779,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9957391758842414,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "bcd0ace7-b339-477e-9846-f81e41bb2a1d",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "bcd0ace7-b339-477e-9846-f81e41bb2a1d"
+      ],
+      "materialityScore": 0.46721801911995375,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.995739175085406,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "75beacda-27c0-497c-94cd-1667da444d26",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "75beacda-27c0-497c-94cd-1667da444d26"
+      ],
+      "materialityScore": 0.46721801896018667,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9957391740202921,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "7915c9d1-c188-4a49-975a-103694605631",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "7915c9d1-c188-4a49-975a-103694605631"
+      ],
+      "materialityScore": 0.4672180188004196,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9957391729551782,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "f184df1e-0317-4f2c-b130-22cf556d41db",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "f184df1e-0317-4f2c-b130-22cf556d41db"
+      ],
+      "materialityScore": 0.4670909561150891,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9948920883863086,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "62065a1b-69da-4050-af9b-14f3b4895f0b",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "62065a1b-69da-4050-af9b-14f3b4895f0b"
+      ],
+      "materialityScore": 0.46708989952012814,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9948850444199021,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "1d1eb579-4c41-42e8-94bc-92586b8510e7",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "1d1eb579-4c41-42e8-94bc-92586b8510e7"
+      ],
+      "materialityScore": 0.4670841451278407,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9948466818046526,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "aae8422a-a5df-4f9b-a4f5-97649140922f",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "aae8422a-a5df-4f9b-a4f5-97649140922f"
+      ],
+      "materialityScore": 0.4670811256332156,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9948265518404852,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "2f6f9da5-c6c1-4a7b-b3b5-c39e97c12eb4",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "2f6f9da5-c6c1-4a7b-b3b5-c39e97c12eb4"
+      ],
+      "materialityScore": 0.4670762718077306,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9947941930039185,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "152c792c-a75f-4110-a0d9-b976e7ac4090",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "152c792c-a75f-4110-a0d9-b976e7ac4090"
+      ],
+      "materialityScore": 0.4670670750084067,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9947328810084258,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "ee126b00-dfee-4b87-af65-2d9de9d6d39b",
+      "recordType": "decision_trace",
+      "authorityLevel": 5,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "ee126b00-dfee-4b87-af65-2d9de9d6d39b"
+      ],
+      "materialityScore": 0.46706017848911174,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.7142857142857143,
+        "temporalRecency": 0.9946869042131262,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "c1eaebd8-8a7c-4c7b-96cf-d2d2c9a12bc0",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[intent_statement]",
+      "sourceRecordIds": [
+        "c1eaebd8-8a7c-4c7b-96cf-d2d2c9a12bc0"
+      ],
+      "materialityScore": 0.44137303723964444,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9948678673119157,
+        "causalRelevance": 0.6,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "eb5a8cad-9276-4244-85c7-35be9bb89284",
+      "recordType": "product_description_handoff",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "TinyURL’s vision is to be the most reliable, secure, and developer‑friendly public URL shortener. It serves a broad set of personas—from casual link sharers to API users, marketers, and compliance officers—who need quick, dependable short links and transparent analytics. The core pillars are URL cre",
+      "sourceRecordIds": [
+        "eb5a8cad-9276-4244-85c7-35be9bb89284"
+      ],
+      "materialityScore": 0.4313730370002035,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9948678657156429,
+        "causalRelevance": 0.5,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "488c08b8-b3d6-48d5-869c-311258905727",
+      "recordType": "artifact_produced",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[business_domains_bloom]",
+      "sourceRecordIds": [
+        "488c08b8-b3d6-48d5-869c-311258905727"
+      ],
+      "materialityScore": 0.4027744734201965,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.14285714285714285,
+        "temporalRecency": 0.9946869656584528,
+        "causalRelevance": 0.5,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "8119b7ef-d86d-42e4-ba83-527e6b809b29",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[intent_discovery]",
+      "sourceRecordIds": [
+        "8119b7ef-d86d-42e4-ba83-527e6b809b29"
+      ],
+      "materialityScore": 0.401319187356177,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9945088680887989,
+        "causalRelevance": 0.2,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "fb331550-1e5b-47fc-b183-ff3ee2782ef3",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[release_plan]",
+      "sourceRecordIds": [
+        "fb331550-1e5b-47fc-b183-ff3ee2782ef3"
+      ],
+      "materialityScore": 0.391376677424575,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9948921352114524,
+        "causalRelevance": 0.1,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "db6acab9-7d06-467b-8bbb-ce13721f5cae",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[vv_requirements_discovery]",
+      "sourceRecordIds": [
+        "db6acab9-7d06-467b-8bbb-ce13721f5cae"
+      ],
+      "materialityScore": 0.39133252147486663,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9945977622133969,
+        "causalRelevance": 0.1,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "2dbfb224-3f88-475f-bb2e-c13d8f0bbef4",
+      "recordType": "intent_quality_report",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "2dbfb224-3f88-475f-bb2e-c13d8f0bbef4"
+      ],
+      "materialityScore": 0.3913149577824132,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9944806709303738,
+        "causalRelevance": 0.1,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "eb4a996e-53c0-4a39-b03d-3e4c94e51b45",
+      "recordType": "retrieval_brief_record",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "eb4a996e-53c0-4a39-b03d-3e4c94e51b45"
+      ],
+      "materialityScore": 0.38214279685350505,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9999995980709865,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "bda2f7c9-b328-4a5f-9c67-bffe489eb8d7",
+      "recordType": "query_decomposition_record",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[query_decomposition]",
+      "sourceRecordIds": [
+        "bda2f7c9-b328-4a5f-9c67-bffe489eb8d7"
+      ],
+      "materialityScore": 0.38214279685350505,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9999995980709865,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "f1b013c7-7450-4d81-8844-5fb10ab01f2c",
+      "recordType": "context_packet",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "",
+      "sourceRecordIds": [
+        "f1b013c7-7450-4d81-8844-5fb10ab01f2c"
+      ],
+      "materialityScore": 0.3813818771016241,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9949267997251132,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "ac1cea91-51fc-4d3f-9d7e-d58c6a0cf787",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[release_plan]",
+      "sourceRecordIds": [
+        "ac1cea91-51fc-4d3f-9d7e-d58c6a0cf787"
+      ],
+      "materialityScore": 0.3813766777039295,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9948921370738161,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "c6b915f5-0a70-4092-b405-7a6b76994b29",
+      "recordType": "coverage_gap",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[coverage_gap]",
+      "sourceRecordIds": [
+        "c6b915f5-0a70-4092-b405-7a6b76994b29"
+      ],
+      "materialityScore": 0.3813649035733555,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9948136428699893,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "19a8c4c8-ab9f-4869-bc18-ba585325622a",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[attached_file]",
+      "sourceRecordIds": [
+        "19a8c4c8-ab9f-4869-bc18-ba585325622a"
+      ],
+      "materialityScore": 0.3813140949363285,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.2857142857142857,
+        "temporalRecency": 0.9944749186231427,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "f7861e62-6ed4-4fc1-886f-199b963f8129",
+      "recordType": "artifact_produced",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[user_journey_bloom]",
+      "sourceRecordIds": [
+        "f7861e62-6ed4-4fc1-886f-199b963f8129"
+      ],
+      "materialityScore": 0.3727813695808048,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.14285714285714285,
+        "temporalRecency": 0.9947329400625082,
+        "causalRelevance": 0.2,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "a0c24c41-c589-4406-ab0b-034779a3c4b8",
+      "recordType": "artifact_produced",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[entities_bloom]",
+      "sourceRecordIds": [
+        "a0c24c41-c589-4406-ab0b-034779a3c4b8"
+      ],
+      "materialityScore": 0.36279541948815486,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.14285714285714285,
+        "temporalRecency": 0.9948266061115085,
+        "causalRelevance": 0.1,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "7d81b4a9-d1fe-40e1-8b2e-2c82dfe08748",
+      "recordType": "requirement_decomposition_node",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[requirement_decomposition_node]",
+      "sourceRecordIds": [
+        "7d81b4a9-d1fe-40e1-8b2e-2c82dfe08748"
+      ],
+      "materialityScore": 0.35317941351293947,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.14285714285714285,
+        "temporalRecency": 0.9973865662767396,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "3872ec53-8ebd-43df-8b25-9f98a59fc103",
+      "recordType": "requirement_decomposition_node",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[requirement_decomposition_node]",
+      "sourceRecordIds": [
+        "3872ec53-8ebd-43df-8b25-9f98a59fc103"
+      ],
+      "materialityScore": 0.35317419846027476,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.14285714285714285,
+        "temporalRecency": 0.9973517992589748,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "5f4ba505-b888-4e1f-9d7b-7b0eed1e9dd3",
+      "recordType": "requirement_decomposition_node",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[requirement_decomposition_node]",
+      "sourceRecordIds": [
+        "5f4ba505-b888-4e1f-9d7b-7b0eed1e9dd3"
+      ],
+      "materialityScore": 0.3529333332984402,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.14285714285714285,
+        "temporalRecency": 0.9957460315134107,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "b5be3d1b-e083-4974-92ca-ccc2dcc53988",
+      "recordType": "requirement_decomposition_node",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[requirement_decomposition_node]",
+      "sourceRecordIds": [
+        "b5be3d1b-e083-4974-92ca-ccc2dcc53988"
+      ],
+      "materialityScore": 0.35290669956109244,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.14285714285714285,
+        "temporalRecency": 0.995568473264426,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "2c062828-126c-4920-ac7c-b7300e0684da",
+      "recordType": "requirement_decomposition_node",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[requirement_decomposition_node]",
+      "sourceRecordIds": [
+        "2c062828-126c-4920-ac7c-b7300e0684da"
+      ],
+      "materialityScore": 0.3529035457338024,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.14285714285714285,
+        "temporalRecency": 0.9955474477491588,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "44617905-8e3a-4a33-ba1f-014e557f81c4",
+      "recordType": "artifact_produced",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[integrations_qa_bloom]",
+      "sourceRecordIds": [
+        "44617905-8e3a-4a33-ba1f-014e557f81c4"
+      ],
+      "materialityScore": 0.3527984386237909,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.14285714285714285,
+        "temporalRecency": 0.9948467336824157,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "85857291-23cc-4196-9a96-f9d4cfc23005",
+      "recordType": "artifact_produced",
+      "authorityLevel": 1,
+      "governingStatus": "active",
+      "summary": "[system_workflow_bloom]",
+      "sourceRecordIds": [
+        "85857291-23cc-4196-9a96-f9d4cfc23005"
+      ],
+      "materialityScore": 0.35279056606144377,
+      "materialityBreakdown": {
+        "semanticSimilarity": 0.5,
+        "constraintRelevance": 0.3,
+        "authorityScore": 0.14285714285714285,
+        "temporalRecency": 0.9947942499334345,
+        "causalRelevance": 0,
+        "contradictionSignal": 0
+      }
+    },
+    {
+      "id": "75f42ba0-a628-4bd8-8e3b-71c4b8ef54f3",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[software_domains]",
+      "sourceRecordIds": [
+        "75f42ba0-a628-4bd8-8e3b-71c4b8ef54f3"
+      ],
+      "materialityScore": 0.7
+    },
+    {
+      "id": "a3c14dba-9f3f-46b3-9180-45ea1662d3f9",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[system_boundary]",
+      "sourceRecordIds": [
+        "a3c14dba-9f3f-46b3-9180-45ea1662d3f9"
+      ],
+      "materialityScore": 0.7
+    },
+    {
+      "id": "1c326116-f953-4961-b15d-31016f9f764c",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[system_requirements]",
+      "sourceRecordIds": [
+        "1c326116-f953-4961-b15d-31016f9f764c"
+      ],
+      "materialityScore": 0.7
+    },
+    {
+      "id": "240d3acc-c7f3-43c4-98af-4c7666984933",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[interface_contracts]",
+      "sourceRecordIds": [
+        "240d3acc-c7f3-43c4-98af-4c7666984933"
+      ],
+      "materialityScore": 0.7
+    },
+    {
+      "id": "5a1ca508-5cb4-4cd9-8691-d7b810cf4e06",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[architectural_decisions]",
+      "sourceRecordIds": [
+        "5a1ca508-5cb4-4cd9-8691-d7b810cf4e06"
+      ],
+      "materialityScore": 0.7
+    },
+    {
+      "id": "1298c246-e119-46c8-a2b1-054bdba5e783",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[data_models]",
+      "sourceRecordIds": [
+        "1298c246-e119-46c8-a2b1-054bdba5e783"
+      ],
+      "materialityScore": 0.7
+    },
+    {
+      "id": "e8168146-f08a-477b-994b-287b52bd6ddd",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[api_definitions]",
+      "sourceRecordIds": [
+        "e8168146-f08a-477b-994b-287b52bd6ddd"
+      ],
+      "materialityScore": 0.7
+    },
+    {
+      "id": "03193769-d1e3-4cbe-b7c3-9a4365bf59b7",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[error_handling_strategies]",
+      "sourceRecordIds": [
+        "03193769-d1e3-4cbe-b7c3-9a4365bf59b7"
+      ],
+      "materialityScore": 0.7
+    },
+    {
+      "id": "a4d20954-2ee1-4843-a951-094c324c5ba1",
+      "recordType": "artifact_produced",
+      "authorityLevel": 2,
+      "governingStatus": "active",
+      "summary": "[configuration_parameters]",
+      "sourceRecordIds": [
+        "a4d20954-2ee1-4843-a951-094c324c5ba1"
+      ],
+      "materialityScore": 0.7
+    }
+  ],
+  "activeConstraints": [
+    {
+      "id": "72089c77-ce28-4d6f-a8cc-13efc46ca8ec",
+      "statement": "The Governed Stream is lossless. All execution trace content — reasoning steps, self-corrections, tool call invocations, tool results — is captured in full regardless of what subset is used for any given downstream purpose.",
+      "authorityLevel": 7,
+      "sourceRecordIds": [
+        "72089c77-ce28-4d6f-a8cc-13efc46ca8ec"
+      ]
+    },
+    {
+      "id": "39cf0fc8-dbd5-41a0-9a2e-8ce88132d41a",
+      "statement": "No governing constraint may be truncated silently. Governing constraints (Authority Level 6+) are always delivered in full via the stdin directive channel.",
+      "authorityLevel": 7,
+      "sourceRecordIds": [
+        "39cf0fc8-dbd5-41a0-9a2e-8ce88132d41a"
+      ]
+    },
+    {
+      "id": "95c60ea9-fb56-4067-a511-3ce4e48a80a6",
+      "statement": "Prompt Templates use namespace prefixing ([JC:] and [P:]) and separate context scopes at all times.",
+      "authorityLevel": 7,
+      "sourceRecordIds": [
+        "95c60ea9-fb56-4067-a511-3ce4e48a80a6"
+      ]
+    },
+    {
+      "id": "91b5e053-fa13-49ae-86a0-f54766bfed6c",
+      "statement": "All Artifacts are owned by JanumiCode and stored in the Governed Stream database.",
+      "authorityLevel": 7,
+      "sourceRecordIds": [
+        "91b5e053-fa13-49ae-86a0-f54766bfed6c"
+      ]
+    },
+    {
+      "id": "cfcd35b9-6382-43ee-9e0b-7001edb749a2",
+      "statement": "The Governed Stream is single-threaded. No parallel Workflow Runs in a Workspace.",
+      "authorityLevel": 7,
+      "sourceRecordIds": [
+        "cfcd35b9-6382-43ee-9e0b-7001edb749a2"
+      ]
+    },
+    {
+      "id": "7ce970f5-3223-4597-a07a-e6b0a0ecaa1a",
+      "statement": "Agents never exercise judgment. Judgment is always escalated to the human.",
+      "authorityLevel": 7,
+      "sourceRecordIds": [
+        "7ce970f5-3223-4597-a07a-e6b0a0ecaa1a"
+      ]
+    },
+    {
+      "id": "55259472-fad9-4de4-855f-96d53fd71051",
+      "statement": "Every human interaction is recorded in the Governed Stream in full detail.",
+      "authorityLevel": 7,
+      "sourceRecordIds": [
+        "55259472-fad9-4de4-855f-96d53fd71051"
+      ]
+    },
+    {
+      "id": "97575434-4ff0-4b58-9e7d-2c29b715ef35",
+      "statement": "Every Phase Gate requires human approval. No automated gate passage.",
+      "authorityLevel": 7,
+      "sourceRecordIds": [
+        "97575434-4ff0-4b58-9e7d-2c29b715ef35"
+      ]
+    },
+    {
+      "id": "454daa5b-c913-4b14-8c22-248478867b70",
+      "statement": "Every phase is mandatory and executed in order. The Orchestrator cannot skip phases.",
+      "authorityLevel": 7,
+      "sourceRecordIds": [
+        "454daa5b-c913-4b14-8c22-248478867b70"
+      ]
+    },
+    {
+      "id": "277a5812-9a7e-4d99-9d37-7a310b573ba5",
+      "statement": "100% correctness and completeness — always. All three layers of correctness (Section 1.6) are required.",
+      "authorityLevel": 7,
+      "sourceRecordIds": [
+        "277a5812-9a7e-4d99-9d37-7a310b573ba5"
+      ]
+    }
+  ],
+  "supersessionChains": [],
+  "contradictions": [],
+  "openQuestions": [
+    {
+      "question": "What is the precise latency requirement for AC‑NFR‑REDIRECT‑LATENCY‑1‑001?",
+      "firstRaised": "2026-05-27T21:22:54.253Z",
+      "stillUnresolved": true,
+      "sourceRecordId": "2d72d3dd-2970-4edc-bc8a-67080a3b81bf"
+    },
+    {
+      "question": "What encryption parameters are mandated by AC‑NFR‑AES‑256‑1‑001?",
+      "firstRaised": "2026-05-27T21:22:54.253Z",
+      "stillUnresolved": true,
+      "sourceRecordId": "2d72d3dd-2970-4edc-bc8a-67080a3b81bf"
+    },
+    {
+      "question": "What authentication flow is required for AC‑US‑004‑AUTH‑D1‑001 and AC‑US‑004‑AUTH‑D1‑002?",
+      "firstRaised": "2026-05-27T21:22:54.253Z",
+      "stillUnresolved": true,
+      "sourceRecordId": "2d72d3dd-2970-4edc-bc8a-67080a3b81bf"
+    },
+    {
+      "question": "What are the functional requirements for AC‑US‑005‑1‑001 through AC‑US‑005‑1‑006?",
+      "firstRaised": "2026-05-27T21:22:54.253Z",
+      "stillUnresolved": true,
+      "sourceRecordId": "2d72d3dd-2970-4edc-bc8a-67080a3b81bf"
+    },
+    {
+      "question": "What are the detailed steps in the implementation plan (record 82d83a86‑5d60‑41e4‑bf4a‑a3ea6d3df20e)?",
+      "firstRaised": "2026-05-27T21:22:54.253Z",
+      "stillUnresolved": true,
+      "sourceRecordId": "2d72d3dd-2970-4edc-bc8a-67080a3b81bf"
+    }
+  ],
+  "implicitDecisions": [],
+  "recommendedDrilldowns": [],
+  "coverageAssessment": {
+    "sourcesQueried": [
+      "governed_stream_all_runs"
+    ],
+    "sourcesUnavailable": [],
+    "knownGaps": [],
+    "confidence": 1
+  }
+}
+```

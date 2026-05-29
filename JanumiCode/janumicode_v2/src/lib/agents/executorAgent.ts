@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getLogger } from '../logging';
+import { emit as aoddEmit } from '../aodd';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -26,7 +27,6 @@ export interface ExecutionTask {
   componentId: string;
   componentResponsibility: string;
   description: string;
-  backingTool: string;
   completionCriteria: { criterionId: string; description: string }[];
   writeDirectoryPaths: string[];
   /** Refactoring task fields */
@@ -86,15 +86,13 @@ export interface FileWriteRecord {
 }
 
 /**
- * Which backing tool actually does the execution work. Distinct from
- * `ExecutionTask.backingTool`, which is descriptive infrastructure
- * metadata (e.g. "DBOS Middleware / PostgreSQL RLS Policies" — not an
- * invocation target). Routing the task's backing_tool to AgentInvoker
- * always produces "No output parser registered" errors because those
- * strings aren't registered executor CLIs; they're the dependencies
- * the generated code will touch. The executor's *own* backing tool
- * is the coding agent we hand the task off to (Claude Code, or a
- * direct LLM API), and it's the same value for every task in a run.
+ * Which backing tool actually does the execution work. Resolved from
+ * `config.llm_routing.executor.primary.backing_tool` and applied to
+ * every task in a Phase 9 run. The previous design also carried a
+ * per-task descriptive `backing_tool` string ("DBOS Middleware /
+ * PostgreSQL RLS Policies" etc.) but it routinely got confused with
+ * this routing field and was removed; task-context now describes
+ * infrastructure via `active_constraints[]` instead.
  */
 export type ExecutorBackingTool =
   | 'claude_code_cli'
@@ -129,10 +127,10 @@ export interface ExecutorAgentOptions {
   /**
    * Workflow-level forced executor backing tool. When set, every
    * execute() call routes the subprocess invocation through this tool
-   * regardless of `executorBackingTool` or per-task descriptive
-   * backing_tool. Used by `--thin-slice` and calibration runs to pin
-   * Phase 9 to `goose_cli` for cost-bounded local execution. Log line
-   * fires per-task so the override is audit-visible.
+   * regardless of `executorBackingTool`. Used by `--thin-slice` and
+   * calibration runs to pin Phase 9 to `goose_cli` for cost-bounded
+   * local execution. Log line fires per-task so the override is
+   * audit-visible.
    */
   forcedExecutorBackingTool?: ExecutorBackingTool;
 }
@@ -200,14 +198,18 @@ export class ExecutorAgent {
     // (since the CLI persistence parity work) using the traceContext we
     // pass below. This gives us the live log + llm:started/llm:finished
     // events + stdin/stdout/thinking captured in the same shape as
-    // direct-LLM-API invocations. We surface task_id + task.backingTool
-    // (the infra descriptor) through traceContext so they land in
-    // agent_invocation content for trace correlation + audit, while
-    // AgentInvoker writes the executor tool itself into provider/model.
+    // direct-LLM-API invocations. We surface task_id through traceContext
+    // so it lands in agent_invocation content for trace correlation,
+    // while AgentInvoker writes the executor tool itself into
+    // provider/model.
 
     this.eventBus.emit('agent:invocation_started', {
       invocationId,
       agentRole: 'executor_agent',
+    });
+    aoddEmit('agent.invocation_started', {
+      invocation_id: invocationId,
+      agent_role: 'executor_agent',
     });
 
     // Pre-snapshot the task's declared write directories. File writes
@@ -216,24 +218,17 @@ export class ExecutorAgent {
     // CLI agent announces each write in its tool-call stream.
     const preSnapshot = this.snapshotWriteDirectories(task.writeDirectoryPaths, cwd);
 
-    // Invoke the coding agent. IMPORTANT: backingTool here is the
-    // executor identity (claude_code_cli et al.) — NOT the task's
-    // `backing_tool` descriptive field, which describes the
-    // infrastructure the generated code will touch. Conflating those
-    // was the source of the "No output parser registered for backing
-    // tool: DBOS Middleware / PostgreSQL RLS Policies" cascade.
-    //
-    // The task's own backing_tool is surfaced to the executor via the
-    // stdinContent assembled upstream by ExecutionContextBuilder, so
-    // the coding agent still knows what dependencies it's writing
-    // against.
-    // Workflow-level force override (e.g. `--thin-slice` pins to
-    // goose_cli). Logged per-task so the audit trail shows exactly
-    // when and where the override fired.
+    // Invoke the coding agent. backingTool here is the executor identity
+    // (claude_code_cli / goose_cli / etc.) resolved from config —
+    // `llm_routing.executor.primary.backing_tool` — with optional
+    // workflow-level force override (`workflow.force_executor_backing_tool`,
+    // used by `--thin-slice` calibration to pin Phase 9 to goose_cli).
+    // Logged per-task so the audit trail shows exactly when and where
+    // the override fired.
     let effectiveBackingTool = this.executorBackingTool;
     if (this.forcedExecutorBackingTool && this.forcedExecutorBackingTool !== this.executorBackingTool) {
       getLogger().info('workflow', 'force_executor_backing_tool override applied', {
-        from: task.backingTool,
+        from: this.executorBackingTool,
         to: this.forcedExecutorBackingTool,
         task_id: task.id,
       });
@@ -254,7 +249,6 @@ export class ExecutorAgent {
         agentRole: 'executor_agent',
         label: `Phase 9.1 — ${task.id}`,
         taskId: task.id,
-        taskBackingTool: task.backingTool,
       },
     });
 
@@ -284,26 +278,59 @@ export class ExecutorAgent {
           content: event.data,
         });
 
-        // Emit real-time events for the webview
+        // Emit real-time events for the webview (EventBus) + persistent
+        // AODD trace (dual-emit per design memo §5).
         if (event.recordType === 'agent_reasoning_step') {
+          const content = (event.data.content ?? event.data.text ?? '') as string;
           this.eventBus.emit('agent:reasoning_step', {
             invocationId,
-            content: (event.data.content ?? event.data.text ?? '') as string,
+            content,
             sequencePosition: event.sequencePosition,
           });
+          aoddEmit(
+            'agent.reasoning_step',
+            {
+              invocation_id: invocationId,
+              content,
+              sequence_position: event.sequencePosition,
+            },
+            { invocation_id: invocationId },
+          );
         } else if (event.recordType === 'agent_self_correction') {
+          const content = (event.data.content ?? '') as string;
           this.eventBus.emit('agent:self_correction', {
             invocationId,
-            content: (event.data.content ?? '') as string,
+            content,
             sequencePosition: event.sequencePosition,
           });
+          aoddEmit(
+            'agent.self_correction',
+            {
+              invocation_id: invocationId,
+              content,
+              sequence_position: event.sequencePosition,
+            },
+            { invocation_id: invocationId },
+          );
         } else if (event.recordType === 'tool_call') {
+          const toolName = (event.data.name ?? '') as string;
+          const params = JSON.stringify(event.data.input ?? '');
           this.eventBus.emit('agent:tool_call', {
             invocationId,
-            toolName: (event.data.name ?? '') as string,
-            params: JSON.stringify(event.data.input ?? ''),
+            toolName,
+            params,
             sequencePosition: event.sequencePosition,
           });
+          aoddEmit(
+            'agent.tool_call',
+            {
+              invocation_id: invocationId,
+              tool_name: toolName,
+              params,
+              sequence_position: event.sequencePosition,
+            },
+            { invocation_id: invocationId },
+          );
         }
       }
     }
@@ -312,6 +339,11 @@ export class ExecutorAgent {
       invocationId,
       success: result.success,
     });
+    aoddEmit(
+      'agent.invocation_completed',
+      { invocation_id: invocationId, success: result.success },
+      { invocation_id: invocationId },
+    );
 
     // Post-snapshot and merge the two detection streams. Each detected
     // write lands as a file_system_writes row AND a

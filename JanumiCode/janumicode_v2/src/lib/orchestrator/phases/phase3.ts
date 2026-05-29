@@ -16,6 +16,7 @@ import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveFrView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray, pickEnvelope } from '../parsedResponseHelpers';
+import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -302,6 +303,10 @@ export class Phase3Handler implements PhaseHandler {
       mirrorId: specMirror.mirrorId,
       artifactType: 'system_specification',
     });
+    aoddEmit('mirror.presented', {
+      mirror_id: specMirror.mirrorId,
+      artifact_type: 'system_specification',
+    });
 
     try {
       const resolution = await engine.pauseForDecision(
@@ -359,6 +364,7 @@ export class Phase3Handler implements PhaseHandler {
     });
     artifactIds.push(gateRecord.id);
     engine.eventBus.emit('phase_gate:pending', { phaseId: '3' });
+    aoddEmit('gate.pending', { gate_kind: 'phase_gate' });
 
     return { success: true, artifactIds };
   }
@@ -485,16 +491,23 @@ export class Phase3Handler implements PhaseHandler {
       },
     });
 
-    // Parse defensively — qwen-3.5:9b emits the array under whichever
-    // envelope name reads naturally to it (the agent has been observed
-    // returning `{ system_requirements: [...] }` directly while the
-    // schema property is `items`). cal-21 lost all 16 SRs to this
-    // mismatch (reading sr[0] as a single-SR object then checking
-    // .items, which doesn't exist on a single SR). Order: try the
-    // envelope key, then the schema key, then fall through to parsed.
-    // Whichever first contains a non-empty array wins.
+    // Parse defensively — the model can emit any of:
+    //   1. { items: [...] }                              (flat)
+    //   2. { system_requirements: [...] }                (envelope=array)
+    //   3. { system_requirements: { items: [...] } }     (double envelope)
+    //
+    // ts-107 seq=20 hit shape #3 — gpt-oss:20b produced a perfectly
+    // good 10+ SR list nested under `system_requirements.items` but
+    // the previous single-level `pickItemsArray` lookup couldn't see
+    // through the wrapper and silently fell back to the boilerplate
+    // SR-001 "System shall implement core functionality..." This is
+    // the same parser bug that broke interface_contracts at ts-103
+    // (already fixed for that sub-phase). Same fix pattern here.
     const parsed = result.parsed as Record<string, unknown> | null;
-    const items = pickItemsArray<SystemRequirementItem>(parsed, ['system_requirements', 'items']);
+    const unwrapped = pickEnvelope<Record<string, unknown>>(parsed, ['system_requirements']);
+    const items =
+      pickItemsArray<SystemRequirementItem>(parsed, ['system_requirements', 'items']) ??
+      pickItemsArray<SystemRequirementItem>(unwrapped, ['items']);
     if (items && items.length > 0) return { items };
     return fallback;
   }

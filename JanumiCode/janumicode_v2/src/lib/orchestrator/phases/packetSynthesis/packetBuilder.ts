@@ -25,6 +25,7 @@ import type {
   PacketTestCase,
   PacketUserStory,
 } from '../../../types/records';
+import { parentRefFromCompositeAc } from '../phase2/acIdNormalizer';
 
 // ── Input shapes (just enough structural typing to build the packet) ──
 
@@ -41,7 +42,6 @@ export interface BuilderAtomicTask {
       task_type?: string;
       component_id?: string;
       component_responsibility?: string;
-      backing_tool?: string;
       estimated_complexity?: string;
       completion_criteria?: Array<{
         criterion_id: string;
@@ -82,6 +82,12 @@ export interface BuilderNfr {
   threshold?: string;
   measurement_method?: string;
   traces_to?: string[];
+  /** FR ids (US-*) this NFR is bounded by. Phase 2.2 NFR bloom emits
+   *  this when an NFR governs specific user stories rather than being
+   *  cross-cutting. Used by the packetBuilder Pass-3 user-story matcher
+   *  to bridge tasks → NFR → US (tasks trace SR-/NFR- but never US- in
+   *  practice). */
+  applies_to_requirements?: string[];
   acceptance_criteria?: Array<{
     id?: string;
     description?: string;
@@ -195,31 +201,69 @@ function findUserStoriesForTask(
   task: BuilderAtomicTask['content']['task'],
   userStories: BuilderUserStory[],
   componentsById: Map<string, BuilderComponent>,
+  matchedNfrs: BuilderNfr[],
+  testCaseAcParents: Set<string>,
+): BuilderUserStory[] {
+  // Each pass is short-circuit: first non-empty result wins.
+  let matched = matchUsViaTaskTraces(task, userStories);
+  if (matched.length > 0) return matched;
+  matched = matchUsViaComponent(task, userStories, componentsById);
+  if (matched.length > 0) return matched;
+  matched = matchUsViaNfrAppliesTo(userStories, matchedNfrs);
+  if (matched.length > 0) return matched;
+  // Pass 4 — composite AC parent extraction. ts-109 audit: when
+  // task.traces_to/component.traces_to/NFR routes all miss, Phase 7
+  // test cases (matched via suite.component_id == task.component_id)
+  // still carry `acceptance_criterion_ids[]` referencing composite
+  // ACs whose parent encodes the story id (`AC-FR-CAM-1.1-001` →
+  // `FR-CAM-1.1`). Recovering the parent closes the gap.
+  return matchUsViaCompositeAcParents(userStories, testCaseAcParents);
+}
+
+function matchUsViaTaskTraces(
+  task: BuilderAtomicTask['content']['task'],
+  userStories: BuilderUserStory[],
 ): BuilderUserStory[] {
   const traces = new Set(task.traces_to ?? []);
-  const matched: BuilderUserStory[] = [];
+  if (traces.size === 0) return [];
+  return userStories.filter((us) => traces.has(us.id));
+}
 
-  // Pass 1 — task.traces_to literally cites US ids.
-  for (const us of userStories) {
-    if (traces.has(us.id)) matched.push(us);
-  }
-  if (matched.length > 0) return matched;
-
-  // Pass 2 — fallback: match via the task's component → user stories whose
-  // traces_to or any other reference cites the component id or one of its
-  // responsibility ids.
-  if (!task.component_id) return matched;
+function matchUsViaComponent(
+  task: BuilderAtomicTask['content']['task'],
+  userStories: BuilderUserStory[],
+  componentsById: Map<string, BuilderComponent>,
+): BuilderUserStory[] {
+  if (!task.component_id) return [];
   const comp = componentsById.get(task.component_id);
-  if (!comp) return matched;
+  if (!comp) return [];
   const compIds = new Set<string>([comp.id]);
   for (const r of comp.responsibilities ?? []) {
     if (r.id) compIds.add(r.id);
   }
-  for (const us of userStories) {
-    const usTraces = us.traces_to ?? [];
-    if (usTraces.some((t) => compIds.has(t))) matched.push(us);
+  return userStories.filter((us) =>
+    (us.traces_to ?? []).some((t) => compIds.has(t)),
+  );
+}
+
+function matchUsViaNfrAppliesTo(
+  userStories: BuilderUserStory[],
+  matchedNfrs: BuilderNfr[],
+): BuilderUserStory[] {
+  const usByIdFromNfrs = new Set<string>();
+  for (const n of matchedNfrs) {
+    for (const usId of n.applies_to_requirements ?? []) usByIdFromNfrs.add(usId);
   }
-  return matched;
+  if (usByIdFromNfrs.size === 0) return [];
+  return userStories.filter((us) => usByIdFromNfrs.has(us.id));
+}
+
+function matchUsViaCompositeAcParents(
+  userStories: BuilderUserStory[],
+  testCaseAcParents: Set<string>,
+): BuilderUserStory[] {
+  if (testCaseAcParents.size === 0) return [];
+  return userStories.filter((us) => testCaseAcParents.has(us.id));
 }
 
 function findNfrsForTask(
@@ -323,19 +367,26 @@ function findTestCasesForAcs(
   acIds: Set<string>,
   usIds: Set<string>,
   testSuites: BuilderTestSuite[],
+  componentId?: string,
 ): PacketTestCase[] {
   const out: PacketTestCase[] = [];
   for (const suite of testSuites) {
+    // Pass 2 path (component-id match) — picks up entire suites attached
+    // to the task's component when AC-id matching misses.
+    const suiteMatchesComponent =
+      !!componentId && !!suite.component_id && suite.component_id === componentId;
+
     for (const tc of suite.test_cases ?? []) {
       const refs = tc.acceptance_criterion_ids ?? [];
-      // Strict match: an AC id appears directly OR a `${us}-${suffix}`
-      // style ref is used (the ts-16 failure mode where test cases use a
-      // composite-id namespace).
-      const hits = refs.some((r) =>
-        acIds.has(r) ||
-        Array.from(usIds).some((us) => r === us || r.startsWith(`${us}-`)),
-      );
-      if (hits) {
+      // Pass 1 — strict AC id match. Phase 7 prompts (test_case_skeleton
+      // + test_case_saturation) require `acceptance_criterion_ids[]`
+      // verbatim from the FR summary; the matcher does not paper over
+      // prompt drift with fuzzy id rewriting.
+      const acMatch = refs.some((r) => acIds.has(r));
+      // Direct US id matching is still legitimate when a test case
+      // references a story rather than a specific AC.
+      const usMatch = refs.some((r) => usIds.has(r));
+      if (acMatch || usMatch || suiteMatchesComponent) {
         out.push({
           test_case_id: tc.test_case_id,
           type: tc.type ?? 'functional',
@@ -412,6 +463,25 @@ function buildComplianceItems(
   return out;
 }
 
+/**
+ * Extract the set of upstream parent story/leaf ids that the given test
+ * cases' `acceptance_criterion_ids[]` resolve back to. Used to bridge
+ * the task→user_story join gap via composite AC IDs: a test case
+ * referencing `AC-FR-CAM-1.1-001` tells us the originating story leaf
+ * is `FR-CAM-1.1`, even when no other trace edge connects task and
+ * story.
+ */
+function parentRefsFromTestCases(testCases: PacketTestCase[]): Set<string> {
+  const out = new Set<string>();
+  for (const tc of testCases) {
+    for (const acRef of tc.acceptance_criterion_ids ?? []) {
+      const parent = parentRefFromCompositeAc(acRef);
+      if (parent) out.add(parent);
+    }
+  }
+  return out;
+}
+
 function toPacketTask(t: BuilderAtomicTask): PacketTask {
   const task = t.content.task;
   return {
@@ -420,7 +490,6 @@ function toPacketTask(t: BuilderAtomicTask): PacketTask {
     name: task.name,
     description: task.description,
     task_type: task.task_type ?? 'standard',
-    backing_tool: task.backing_tool ?? 'claude_code_cli',
     estimated_complexity: task.estimated_complexity ?? 'medium',
     completion_criteria: task.completion_criteria ?? [],
     write_directory_paths: task.write_directory_paths ?? [],
@@ -454,8 +523,30 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
 
   for (const t of input.atomicTasks) {
     const task = t.content.task;
-    const matchedUs = findUserStoriesForTask(task, input.userStories, input.componentsById);
+    const componentId = task.component_id ?? '';
+    // Provisional test-case match using only the suite.component_id
+    // fallback — populated even when matchedUs/acIds are still empty.
+    // We extract composite-AC parents from these and feed them into the
+    // US/NFR matchers (Pass 4) so the join can recover from the
+    // task-only-traces-to-component shape that broke ts-108/ts-109.
+    const provisionalTestCases = findTestCasesForAcs(
+      new Set(),
+      new Set(),
+      input.testSuites,
+      componentId,
+    );
+    const provisionalAcParents = parentRefsFromTestCases(provisionalTestCases);
+
+    // Match NFRs first — US matcher's Pass 3 walks matchedNfrs[].applies_to_requirements
+    // to bridge the tasks-trace-NFR-but-not-US gap.
     const matchedNfrs = findNfrsForTask(task, input.nfrs, input.componentsById);
+    const matchedUs = findUserStoriesForTask(
+      task,
+      input.userStories,
+      input.componentsById,
+      matchedNfrs,
+      provisionalAcParents,
+    );
 
     const usIds = new Set(matchedUs.map((us) => us.id));
     const nfrIds = new Set(matchedNfrs.map((n) => n.id));
@@ -464,7 +555,6 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
       for (const ac of us.acceptance_criteria ?? []) acIds.add(ac.id);
     }
 
-    const componentId = task.component_id ?? '';
     const comp = componentId ? input.componentsById.get(componentId) : undefined;
     const packetComponent: PacketComponent = comp
       ? toPacketComponent(comp)
@@ -479,7 +569,7 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
 
     const dataModels = findDataModelsForComponent(componentId, input.dataModels);
     const apis = findApisForComponent(componentId, input.apiDefinitions);
-    const testCases = findTestCasesForAcs(acIds, usIds, input.testSuites);
+    const testCases = findTestCasesForAcs(acIds, usIds, input.testSuites, componentId);
     const evals = findEvalsForUserStoriesAndNfrs(usIds, nfrIds, input.evaluationCriteria);
 
     // Active constraints inherited from the atomic task's saturation node.
@@ -487,18 +577,27 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
     const activeConstraints = buildActiveConstraints(activeConstraintIds, input.technicalConstraintsById);
 
     // Compliance items — gather all upstream COMP-*/VV-*/QA-* refs from
-    // user_stories.traces_to + component.traces_to.
+    // every reachable trace path:
+    //   user_stories.traces_to    (when US matching produces hits)
+    //   component.traces_to       (when components reference compliance directly)
+    //   task.traces_to            (rarely — tasks usually trace SR-/NFR-)
+    //   matchedNfrs.traces_to     (the load-bearing path in ts-108 — tasks trace
+    //                              NFR-* ids; those NFRs in turn trace VV-* ids)
+    //
+    // ts-108 audit: tasks emit only SR-*/NFR-* in their traces_to; without
+    // walking matchedNfrs.traces_to, VV-* compliance items never reach
+    // the packet. Same shape as the US-traces gap but one hop deeper.
     const complianceRefs = new Set<string>();
-    for (const us of matchedUs) {
-      for (const t of us.traces_to ?? []) {
+    const collectFromTraces = (traces: string[] | undefined): void => {
+      if (!traces) return;
+      for (const t of traces) {
         if (/^(COMP|VV|QA)-/.test(t)) complianceRefs.add(t);
       }
-    }
-    if (comp) {
-      for (const t of comp.traces_to ?? []) {
-        if (/^(COMP|VV|QA)-/.test(t)) complianceRefs.add(t);
-      }
-    }
+    };
+    for (const us of matchedUs) collectFromTraces(us.traces_to);
+    if (comp) collectFromTraces(comp.traces_to);
+    collectFromTraces(task.traces_to);
+    for (const n of matchedNfrs) collectFromTraces(n.traces_to);
     const complianceItems = buildComplianceItems(complianceRefs, input.complianceItemsById);
 
     // depends_on_packets — translate dependency_task_ids → packet ids.

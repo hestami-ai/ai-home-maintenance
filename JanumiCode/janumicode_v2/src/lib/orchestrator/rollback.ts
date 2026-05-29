@@ -53,7 +53,6 @@ const IMMUTABLE_HISTORY_TYPES = new Set([
   'json_repair_record',
   'llm_api_failure',
   'llm_api_recovery',
-  'transformation_step',
 ]);
 
 export interface RollbackResult {

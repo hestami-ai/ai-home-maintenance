@@ -22,10 +22,15 @@
 import { createHash } from 'node:crypto';
 import type { Database } from '../database/init';
 import type { GovernedStreamWriter } from '../orchestrator/governedStreamWriter';
-import type { AgentRole } from '../types/records';
+import type { AgentRole, PhaseId } from '../types/records';
 import { InvocationLogFile } from './invocationLogger';
-import { emitTransformationStep } from '../trace/emit';
-import { emitLifecycle } from '../trace/lifecycle';
+import {
+  emit as aoddEmit,
+  maybeSpillText,
+  phaseIdToFilenameSegment,
+  subPhaseIdToFilenameSegment,
+} from '../aodd';
+import { setInvocation } from '../trace/traceContext';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -531,7 +536,6 @@ export class LLMCaller {
       });
       const cached = this.llmCache.get(cacheKey);
       if (cached) {
-        const cacheStartedAt = Date.now();
         const traceSubPhaseId = options.traceContext?.subPhaseId ?? undefined;
         const traceAgentRole = options.traceContext?.agentRole ?? null;
         const cachedResult: LLMCallResult = {
@@ -546,44 +550,17 @@ export class LLMCaller {
           usedFallback: false,
           retryAttempts: 0,
         };
-        emitTransformationStep({
-          step_type: 'llm_returned',
-          sub_phase_id_override: traceSubPhaseId,
-          agent_role: traceAgentRole,
-          payload: {
-            text: cached.text,
-            thinking: cached.thinking ?? null,
-            toolCalls: cached.toolCalls,
-            inputTokens: cached.inputTokens,
-            outputTokens: cached.outputTokens,
-            usedFallback: false,
-            retryAttempts: 0,
-          },
-          metadata: {
-            cache_hit: true,
+        aoddEmit(
+          'llm.cache_hit',
+          {
             source_invocation_id: cached.sourceInvocationId,
-            label: options.traceContext?.label ?? null,
-            status: 'success',
-            parsed: cached.parsed !== null,
+            text: maybeSpillText(cached.text),
           },
-        });
-        emitLifecycle('llm.call', {
-          workflow_run_id: options.traceContext?.workflowRunId ?? null,
-          phase_id: options.traceContext?.phaseId ?? null,
-          sub_phase_id: traceSubPhaseId ?? null,
-          agent_role: traceAgentRole,
-          provider: cached.provider,
-          model: cached.model,
-          status: 'success',
-          duration_ms: Date.now() - cacheStartedAt,
-          response_format: options.responseFormat ?? 'text',
-          prompt_size_chars: options.prompt.length,
-          input_tokens: cached.inputTokens,
-          output_tokens: cached.outputTokens,
-          response_size_chars: cached.text.length,
-          cache_hit: true,
-          source_invocation_id: cached.sourceInvocationId,
-        });
+          {
+            sub_phase_id_override: traceSubPhaseId,
+            agent_role: traceAgentRole ?? undefined,
+          },
+        );
         return cachedResult;
       }
     }
@@ -594,6 +571,11 @@ export class LLMCaller {
     const invocationId = this.writeInvocationRecord(options);
     const startedAt = Date.now();
     this._inFlightCount++;
+    // Publish the active invocation_id into TraceCtx so any AODD event
+    // fired during this call (log.*, record.*, etc.) carries it in the
+    // envelope without the caller threading it manually. Cleared in
+    // the finally below.
+    if (invocationId) setInvocation(invocationId);
 
     // Transformation trace: capture the materialized prompt at call entry
     // so walk-back can answer "what was the input to this LLM call?". The
@@ -603,27 +585,38 @@ export class LLMCaller {
     // without explicit parent_step_id linking.
     const traceSubPhaseId = options.traceContext?.subPhaseId ?? undefined;
     const traceAgentRole = options.traceContext?.agentRole ?? null;
-    const promptStepId = emitTransformationStep({
-      step_type: 'prompt_materialized',
-      sub_phase_id_override: traceSubPhaseId,
-      agent_role: traceAgentRole,
-      payload: {
+    // AODD emits. prompt.materialized captures the finalized prompt;
+    // llm.invoked marks the boundary just before the API call so
+    // llm.returned / llm.failed can be paired with it on replay.
+    const promptForAodd = maybeSpillText(options.prompt);
+    const systemForAodd = options.system ? maybeSpillText(options.system) : undefined;
+    if (invocationId) {
+      aoddEmit(
+        'prompt.materialized',
+        { invocation_id: invocationId, final_prompt: promptForAodd },
+        {
+          invocation_id: invocationId,
+          sub_phase_id_override: traceSubPhaseId,
+          agent_role: traceAgentRole ?? undefined,
+        },
+      );
+    }
+    aoddEmit(
+      'llm.invoked',
+      {
         provider: options.provider,
         model: options.model,
-        responseFormat: options.responseFormat ?? 'text',
-        system: options.system ?? null,
-        prompt: options.prompt,
-        temperature: options.temperature ?? null,
-        maxTokens: options.maxTokens ?? null,
-        toolCount: options.tools?.length ?? 0,
+        temperature: options.temperature ?? undefined,
+        max_tokens: options.maxTokens ?? undefined,
+        prompt: promptForAodd,
+        ...(systemForAodd !== undefined ? { system: systemForAodd } : {}),
       },
-      metadata: {
-        invocation_id: invocationId,
-        label: options.traceContext?.label ?? null,
-        prompt_size_chars: options.prompt.length,
-        system_size_chars: (options.system ?? '').length,
+      {
+        invocation_id: invocationId ?? undefined,
+        sub_phase_id_override: traceSubPhaseId,
+        agent_role: traceAgentRole ?? undefined,
       },
-    });
+    );
 
     // Open the per-invocation live log (C8). Writes the prompt header
     // immediately, then appends chunks as they stream, and a trailer on
@@ -686,10 +679,6 @@ export class LLMCaller {
       // agent_output_chunk records as tokens arrive. Adapters that don't
       // stream just ignore the extra field on the options object.
       let chunkSequence = 0;
-      // Tracks whether the in-loop JSON repair branch fired this attempt.
-      // When true, we skip the post-call json_parsed trace emit because
-      // a json_repaired step already covered the parse outcome.
-      let repairEmitted = false;
       // Invocation-log size cap — primary in-stream stall signature.
       // We measure the bytes written to the per-invocation .log file
       // (prompt + chunk metadata + streamed text), not just cumulative
@@ -931,26 +920,37 @@ export class LLMCaller {
             // returned). Useful even on success — confirms which model
             // ultimately produced the parsed output.
             this.writeJsonRepairRecord(invocationId, options, repair);
-            // Transformation trace: capture the repair attempt outcomes.
-            // Suppresses the later json_parsed emit at the call's success
-            // path — the repair *is* the parse for this invocation.
-            emitTransformationStep({
-              step_type: 'json_repaired',
-              sub_phase_id_override: traceSubPhaseId,
-              agent_role: 'json_repair',
-              payload: {
-                originalText: result.text,
-                originalThinking: result.thinking ?? null,
-                attempts: repair.attempts,
-                parsed: repair.parsed,
-              },
-              metadata: {
-                invocation_id: invocationId,
-                parent_prompt_step_id: promptStepId,
-                success: repair.parsed !== null,
-              },
-            });
-            repairEmitted = true;
+            // AODD emit. We synthesize `repair.json_succeeded` when
+            // the repair recovered a parsed payload, `repair.json_failed`
+            // otherwise. `strategy` is a coarse identifier — the per-attempt
+            // detail lives in the json_repair_record DB row.
+            if (repair.parsed !== null) {
+              aoddEmit(
+                'repair.json_succeeded',
+                {
+                  strategy: 'multi_attempt',
+                  repaired: maybeSpillText(JSON.stringify(repair.parsed)),
+                },
+                {
+                  invocation_id: invocationId ?? undefined,
+                  sub_phase_id_override: traceSubPhaseId,
+                  agent_role: 'json_repair',
+                },
+              );
+            } else {
+              aoddEmit(
+                'repair.json_failed',
+                {
+                  strategy: 'multi_attempt',
+                  error: { message: 'repair exhausted attempts' },
+                },
+                {
+                  invocation_id: invocationId ?? undefined,
+                  sub_phase_id_override: traceSubPhaseId,
+                  agent_role: 'json_repair',
+                },
+              );
+            }
           }
           const { agentOutputId } = this.writeOutputRecords(invocationId, options, result, Date.now() - startedAt, null);
           logFile?.writeFinal({
@@ -962,78 +962,23 @@ export class LLMCaller {
             durationMs: Date.now() - startedAt,
             retryAttempts,
           });
-          // Transformation trace: capture the raw response + parse outcome.
-          // promptStepId becomes the parent so the walk-back CLI can render
-          // a tidy per-call sub-tree.
-          emitTransformationStep({
-            step_type: 'llm_returned',
-            sub_phase_id_override: traceSubPhaseId,
-            agent_role: traceAgentRole,
-            output_record_id: agentOutputId ?? undefined,
-            payload: {
-              text: result.text,
-              thinking: result.thinking ?? null,
-              toolCalls: result.toolCalls,
-              inputTokens: result.inputTokens,
-              outputTokens: result.outputTokens,
-              usedFallback: result.usedFallback,
-              retryAttempts: result.retryAttempts,
+          const llmReturnedDurationMs = Date.now() - startedAt;
+          aoddEmit(
+            'llm.returned',
+            {
+              text: maybeSpillText(result.text),
+              thinking: result.thinking ? maybeSpillText(result.thinking) : null,
+              input_tokens: result.inputTokens,
+              output_tokens: result.outputTokens,
+              duration_ms: llmReturnedDurationMs,
+              retry_attempts: result.retryAttempts,
             },
-            duration_ms: Date.now() - startedAt,
-            metadata: {
-              invocation_id: invocationId,
-              parent_prompt_step_id: promptStepId,
-              status: 'success',
-              parsed: result.parsed !== null,
-            },
-          });
-          // Emit the parse-or-repair outcome step. If a repair ran above
-          // (writeJsonRepairRecord branch), the json_repaired step was
-          // already emitted there; here we only emit json_parsed when
-          // the raw response parsed without repair.
-          if (
-            result.parsed !== null &&
-            options.responseFormat === 'json' &&
-            !repairEmitted
-          ) {
-            emitTransformationStep({
-              step_type: 'json_parsed',
+            {
+              invocation_id: invocationId ?? undefined,
               sub_phase_id_override: traceSubPhaseId,
-              agent_role: traceAgentRole,
-              payload: { parsed: result.parsed },
-              metadata: {
-                invocation_id: invocationId,
-                parent_prompt_step_id: promptStepId,
-                parsed_top_level_keys: Object.keys(result.parsed),
-              },
-            });
-          }
-          // Tier-1 lifecycle: one-line per-call summary. Cheap to grep:
-          // counts, durations, repair status, fallback usage. Sits at
-          // the natural Tier-1 layer over the Tier-3 prompt/response
-          // pair already emitted above.
-          emitLifecycle('llm.call', {
-            workflow_run_id: options.traceContext?.workflowRunId ?? null,
-            phase_id: options.traceContext?.phaseId ?? null,
-            sub_phase_id: traceSubPhaseId ?? null,
-            agent_role: traceAgentRole,
-            provider: result.provider,
-            model: result.model,
-            status: 'success',
-            duration_ms: Date.now() - startedAt,
-            response_format: options.responseFormat ?? 'text',
-            prompt_size_chars: options.prompt.length,
-            input_tokens: result.inputTokens,
-            output_tokens: result.outputTokens,
-            response_size_chars: result.text.length,
-            thinking_size_chars: (result.thinking ?? '').length,
-            tool_call_count: result.toolCalls.length,
-            retry_attempts: result.retryAttempts,
-            used_fallback: result.usedFallback,
-            parsed: result.parsed !== null,
-            repaired: repairEmitted,
-            invocation_record_id: invocationId,
-          });
+              agent_role: traceAgentRole ?? undefined,
+            },
+          );
           // Populate cache so within-session repeats of the same prompt
           // (and any future resume of THIS run) short-circuit. Only cache
           // successful calls — error results would mask provider recovery.
@@ -1108,9 +1053,27 @@ export class LLMCaller {
 
           // Backoff before retry
           const delay = this.getBackoffDelay(lastError, attempt);
+          aoddEmit(
+            'retry.scheduled',
+            { attempt: retryAttempts, reason: lastError.message },
+            {
+              invocation_id: invocationId ?? undefined,
+              sub_phase_id_override: traceSubPhaseId,
+              agent_role: traceAgentRole ?? undefined,
+            },
+          );
           if (delay > 0) {
             await this.sleep(delay);
           }
+          aoddEmit(
+            'retry.attempted',
+            { attempt: retryAttempts },
+            {
+              invocation_id: invocationId ?? undefined,
+              sub_phase_id_override: traceSubPhaseId,
+              agent_role: traceAgentRole ?? undefined,
+            },
+          );
         } finally {
           externalCleanup?.();
           if (callTimeoutHandle) clearTimeout(callTimeoutHandle);
@@ -1156,44 +1119,30 @@ export class LLMCaller {
         retryAttempts,
         errorMessage: lastError?.message ?? 'unknown',
       });
-      // Transformation trace: emit a terminal llm_returned with the error
-      // so walk-back can show the failure shape without having to read
-      // the agent_output record separately.
-      emitTransformationStep({
-        step_type: 'llm_returned',
-        sub_phase_id_override: traceSubPhaseId,
-        agent_role: traceAgentRole,
-        duration_ms: Date.now() - startedAt,
-        error: lastError
-          ? { message: lastError.message, stack: lastError.stack }
-          : { message: 'unknown' },
-        metadata: {
-          invocation_id: invocationId,
-          parent_prompt_step_id: promptStepId,
-          status: 'error',
+      // AODD emit: terminal llm.failed with the error.
+      const llmFailedDurationMs = Date.now() - startedAt;
+      aoddEmit(
+        'llm.failed',
+        {
+          error: {
+            message: lastError?.message ?? 'unknown',
+            code: lastError?.errorType,
+          },
+          duration_ms: llmFailedDurationMs,
           retry_attempts: retryAttempts,
         },
-      });
-      // Tier-1 lifecycle: error path summary.
-      emitLifecycle('llm.call', {
-        workflow_run_id: options.traceContext?.workflowRunId ?? null,
-        phase_id: options.traceContext?.phaseId ?? null,
-        sub_phase_id: traceSubPhaseId ?? null,
-        agent_role: traceAgentRole,
-        provider: options.provider,
-        model: options.model,
-        status: 'error',
-        duration_ms: Date.now() - startedAt,
-        response_format: options.responseFormat ?? 'text',
-        prompt_size_chars: options.prompt.length,
-        retry_attempts: retryAttempts,
-        error_type: lastError?.errorType ?? 'unknown',
-        error_message: lastError?.message ?? 'unknown',
-        invocation_record_id: invocationId,
-      });
+        {
+          invocation_id: invocationId ?? undefined,
+          sub_phase_id_override: traceSubPhaseId,
+          agent_role: traceAgentRole ?? undefined,
+        },
+      );
       throw lastError ?? new LLMError('LLM call failed', 'unknown');
     } finally {
       this._inFlightCount--;
+      // Clear the invocation_id we set above so subsequent emits in the
+      // same TraceCtx frame don't inherit a stale id.
+      if (invocationId) setInvocation(null);
       this.eventBus?.emit('llm:finished', {
         provider: options.provider,
         lane: 'phase',
@@ -1505,11 +1454,17 @@ export function buildLogFilenamePrefix(
   subPhaseId: string | null,
 ): string | null {
   if (!phaseId && !subPhaseId) return null;
+  // Routed through the AODD canonicalization helper so the three ad-hoc
+  // PhaseId stringifications across the codebase converge on one rule.
+  // `phaseId` arrives typed as `string | null` from the Logger trace
+  // context; at runtime it is always a valid PhaseId. The cast is
+  // defensive only — phaseIdToFilenameSegment splits on '.' and pads
+  // each component, which is a superset of valid PhaseId shapes.
   const phasePart = phaseId
-    ? phaseId.split('.').map((p) => p.padStart(2, '0')).join('_')
-    : '';
-  const subSafe = subPhaseId ? subPhaseId.replaceAll(/[^a-zA-Z0-9_]/g, '_') : '';
+    ? phaseIdToFilenameSegment(phaseId as PhaseId, { padded: true })
+    : null;
+  const subSafe = subPhaseId ? subPhaseIdToFilenameSegment(subPhaseId) : '';
   if (!phasePart) return `phase_${subSafe}`;
-  if (!subSafe) return `phase${phasePart}`;
-  return `phase${phasePart}_${subSafe}`;
+  if (!subSafe) return phasePart;
+  return `${phasePart}_${subSafe}`;
 }

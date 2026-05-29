@@ -79,6 +79,7 @@ import { buildInterpretationMirror } from './phase1/buildInterpretationMirror';
 import { normalizeIdsInTree, normalizeIdHyphens } from '../idNormalization';
 import { MitigationEngine } from '../../review/mitigation/mitigationEngine';
 import { loadMostRecentFindings } from '../../review/mitigation/findingsLookup';
+import { emit as aoddEmit } from '../../aodd';
 
 /** An assumption may be a plain string or a structured object from the LLM. */
 type AssumptionEntry = string | { statement?: string; inference?: string; assumption?: string; basis?: string };
@@ -1580,6 +1581,10 @@ fabricates a new threshold is unsupported.`,
       mirrorId: approvalMirror.mirrorId,
       artifactType: 'product_description_handoff',
     });
+    aoddEmit('mirror.presented', {
+      mirror_id: approvalMirror.mirrorId,
+      artifact_type: 'product_description_handoff',
+    });
 
     let approvalResolution: { type: string; payload?: Record<string, unknown> };
     try {
@@ -1816,6 +1821,7 @@ fabricates a new threshold is unsupported.`,
     });
     artifactIds.push(gateRecord.id);
     engine.eventBus.emit('phase_gate:pending', { phaseId: '1' });
+    aoddEmit('gate.pending', { gate_kind: 'phase_gate' });
     return { success: true, artifactIds };
   }
 
@@ -1885,6 +1891,7 @@ fabricates a new threshold is unsupported.`,
     });
     opts.artifactIds.push(bundleRecord.id);
     engine.eventBus.emit('mirror:presented', { mirrorId: bundleRecord.id, artifactType: 'product_bloom_mirror' });
+    aoddEmit('mirror.presented', { mirror_id: bundleRecord.id, artifact_type: 'product_bloom_mirror' });
     engine.eventBus.emit('menu:presented', { menuId: bundleRecord.id, options: opts.items.map(i => i.id) });
 
     let resolution: {

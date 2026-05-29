@@ -28,6 +28,15 @@ export interface TraceCtx {
   workflow_run_id: string;
   phase_id: string | null;
   sub_phase_id: string | null;
+  /**
+   * Id of the LLM / CLI invocation currently in flight (the
+   * `agent_invocation` record's id). Set by LLMCaller / AgentInvoker
+   * after the invocation record is written, cleared in their try/finally.
+   * Read by AODD `emit()` so any event fired inside an invocation —
+   * `log.*`, `record.*`, etc. — carries the envelope `invocation_id`
+   * without the caller having to thread it manually.
+   */
+  invocation_id: string | null;
   /** Stack of step_ids. Bottom = root, top = current parent for the next step. */
   step_chain: string[];
 }
@@ -40,13 +49,17 @@ const als = new AsyncLocalStorage<TraceCtx>();
  * a new frame; descendants see only the innermost frame.
  */
 export function withTraceContext<T>(
-  ctx: Omit<TraceCtx, 'step_chain'> & { step_chain?: string[] },
+  ctx: Omit<TraceCtx, 'step_chain' | 'invocation_id'> & {
+    step_chain?: string[];
+    invocation_id?: string | null;
+  },
   fn: () => T,
 ): T {
   const full: TraceCtx = {
     workflow_run_id: ctx.workflow_run_id,
     phase_id: ctx.phase_id ?? null,
     sub_phase_id: ctx.sub_phase_id ?? null,
+    invocation_id: ctx.invocation_id ?? null,
     step_chain: ctx.step_chain ?? [],
   };
   return als.run(full, fn);
@@ -95,6 +108,21 @@ export function setSubPhase(sub_phase_id: string | null): void {
 }
 
 /**
+ * Update the invocation_id on the current frame. Called by LLMCaller /
+ * AgentInvoker after writing the agent_invocation record, and reset to
+ * null in their try/finally so subsequent emits in the same frame don't
+ * inherit a stale id.
+ *
+ * No-op when no TraceCtx is active (e.g. unit tests that don't
+ * establish a frame).
+ */
+export function setInvocation(invocation_id: string | null): void {
+  const ctx = als.getStore();
+  if (!ctx) return;
+  ctx.invocation_id = invocation_id;
+}
+
+/**
  * Convenience wrapper that pushes a step_id, runs the body, and pops
  * in a finally block. Use when the body is synchronous-shaped from
  * the caller's perspective (an `await`able promise factory).
@@ -122,6 +150,7 @@ export function snapshotTraceContext(): TraceCtx | null {
     workflow_run_id: ctx.workflow_run_id,
     phase_id: ctx.phase_id,
     sub_phase_id: ctx.sub_phase_id,
+    invocation_id: ctx.invocation_id,
     step_chain: [...ctx.step_chain],
   };
 }

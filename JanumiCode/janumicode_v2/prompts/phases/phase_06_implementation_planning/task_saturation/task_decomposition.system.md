@@ -50,7 +50,7 @@ Do NOT decompose an atomic unit further just because more tiers exist. Over-deco
 
 # Step 2a — Branch: `atomic_unit`
 
-Emit exactly one Tier-D child whose `name`, `description`, `completion_criteria`, `component_id`, `component_responsibility`, `backing_tool`, `write_directory_paths`, and `read_directory_paths` **mirror the parent**, plus a `decomposition_rationale` explaining why the parent is already atomic (what makes the completion criteria individually verifiable in one session).
+Emit exactly one Tier-D child whose `name`, `description`, `completion_criteria`, `component_id`, `component_responsibility`, `write_directory_paths`, and `read_directory_paths` **mirror the parent**, plus a `decomposition_rationale` explaining why the parent is already atomic (what makes the completion criteria individually verifiable in one session).
 
 Set `parent_tier_assessment.tier = "D"` and `parent_tier_assessment.rationale` to the same atomicity reason.
 
@@ -95,8 +95,6 @@ The `active_constraints` block carries Phase 1.0c technical constraints (e.g. Sv
 - A task that touches the public HTTP surface DOES carry the transport (HTTPS) constraint.
 
 Symptom of over-inclusion: every task in the plan carries the same full set of constraints. That is wrong — re-narrow. The goal is that the executor reading the task sees only the constraints it must actively respect while writing the code, not the project's entire stack inventory.
-
-The `backing_tool` field MUST be consistent with active_constraints — `claude_code_cli` for general code work, `code_editor` for ad-hoc edits, etc. When the constraints commit to a stack (SvelteKit / Bun / PostgreSQL), pick the executor that delivers in that stack rather than a generic alternative. **`backing_tool` MUST NOT be a language name** (e.g. `"Python"`, `"TypeScript"` are invalid values). Use `"claude_code_cli"`, `"code_editor"`, or a named CLI tool.
 
 ## Path Discipline Rule
 
@@ -178,7 +176,6 @@ For each child you produce, list any **implementation choice, sequencing constra
       "task_type": "standard",
       "component_id": "comp-work-order-assignment",
       "component_responsibility": "Validate vendor eligibility before persisting work-order assignment",
-      "backing_tool": "claude_code_cli",
       "estimated_complexity": "medium",
       "completion_criteria": [
         { "criterion_id": "CC-VC-001", "description": "assign_vendor() rejects expired credentials with a 422 and a structured error body", "verification_method": "test_execution" },
@@ -206,7 +203,6 @@ For each child you produce, list any **implementation choice, sequencing constra
 - Every child MUST carry a non-empty `component_id` and `component_responsibility` (verbatim from `component_context`).
 - Every child SHOULD have a non-empty `traces_to[]` referencing parent responsibility ids, completion criteria ids, or sibling task ids listed under `sibling_context`.
 - All `write_directory_paths` and `read_directory_paths` entries MUST be workspace-relative (no absolute paths, no drive letters, no leading `./`).
-- `backing_tool` MUST NOT be a language name — use `"claude_code_cli"`, `"code_editor"`, or a named CLI tool.
 - Use `decomposition_rationale` to explain *why this child, not another*.
 - `parent_branch_classification` is **required** and must be exactly one of the three enum values.
 

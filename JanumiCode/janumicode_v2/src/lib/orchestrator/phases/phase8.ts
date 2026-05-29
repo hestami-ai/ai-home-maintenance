@@ -19,6 +19,7 @@ import { getLogger } from '../../logging';
 import { extractPriorPhaseContext } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { runPhase8CycleDelta } from './runCycleDelta';
+import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -219,6 +220,7 @@ export class Phase8Handler implements PhaseHandler {
     });
     artifactIds.push(gateRecord.id);
     engine.eventBus.emit('phase_gate:pending', { phaseId: '8' });
+    aoddEmit('gate.pending', { gate_kind: 'phase_gate' });
 
     return { success: true, artifactIds };
   }

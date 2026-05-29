@@ -19,8 +19,11 @@ import type { PhaseId } from '../lib/types/records';
 import { generateLLMGapSuggestion } from '../test/harness/gapReportEnhancer';
 import { collectHarnessResult } from '../test/harness/collectResults';
 import { rollbackToSubPhase } from '../lib/orchestrator/rollback';
-import { emitLifecycle } from '../lib/trace/lifecycle';
 import { withTraceContext } from '../lib/trace/traceContext';
+import {
+  emit as aoddEmit,
+  startRun as aoddStartRun,
+} from '../lib/aodd';
 
 // Re-export types for consumers
 export type { HarnessResult, GapReport, SemanticWarning, DecisionOverride, PipelineRunnerConfig } from '../test/harness/types';
@@ -346,19 +349,14 @@ export async function runPipeline(
         );
       }
 
-      // Emit a workflow.resumed marker so the auditor and any human
-      // reader can see exactly where this re-run starts. Must be wrapped
-      // in a TraceCtx because emitLifecycle reads workflow_run_id from
-      // it when not given explicitly.
+      // Re-open the per-run AODD trace before emitting run.resumed.
+      // The orchestrator was constructed for an existing workflow_run_id,
+      // so startWorkflowRun() did not call aoddStartRun for this run id.
+      aoddStartRun(workflowRunId!);
       withTraceContext(
         { workflow_run_id: workflowRunId, phase_id: targetPhase, sub_phase_id: null },
         () => {
-          emitLifecycle('workflow.resumed', {
-            workflow_run_id: workflowRunId!,
-            from_phase: targetPhase,
-            from_sub_phase: targetSubPhase,
-            rollback: rollbackResult,
-          });
+          aoddEmit('run.resumed', { resumed_at: new Date().toISOString() });
         },
       );
 

@@ -38,6 +38,7 @@ import type {
 import type { MirrorItemDecision } from '../../types/decisionBundle';
 import { getLogger } from '../../logging';
 import { createEmbeddingClient, findNearestAbove, type EmbeddingClient } from '../../llm/embeddings';
+import { resolveAcReferences, type CanonicalAcIndex } from './phase7/acRefResolver';
 
 function mintLogicalNodeId(): string { return randomUUID(); }
 function collisionSafeDisplayKey(rawId: string, sib: Set<string>, nid: string): string {
@@ -90,6 +91,15 @@ export interface TestSaturationInput {
   rootTestCases: DecompositionTestCase[];
   rootNodeRecordIds: string[];
   rootLogicalIds: string[];
+  /**
+   * Canonical AC index built from the FR view. The saturation loop
+   * normalizes every child's `acceptance_criterion_ids[]` against it
+   * before persistence so downstream consumers (packet synthesis,
+   * coverage analysis) never see drift modes like `AC-URL-001` or
+   * `AC-US-002-atomic`. Optional only to keep test callers terse;
+   * production callers pass it.
+   */
+  canonicalAcIndex?: CanonicalAcIndex;
 }
 
 interface QueueEntry {
@@ -257,6 +267,21 @@ function sanitizeChildTestCase(
     active_constraints: stringArr('active_constraints'),
     traces_to: stringArr('traces_to'),
   };
+}
+
+function normalizeChildAcRefs(
+  refs: ReadonlyArray<string>,
+  child: DecompositionTestCase,
+  index: CanonicalAcIndex | undefined,
+): string[] {
+  const mutable = [...refs];
+  if (!index || mutable.length === 0) return mutable;
+  const stepText = (child.steps ?? []).map(s => s.description).join(' ');
+  const contextText = [child.expected_outcome ?? '', child.name ?? '', stepText]
+    .filter(s => typeof s === 'string' && s.length > 0)
+    .join(' ');
+  const result = resolveAcReferences(mutable, index, { contextText });
+  return result.resolvedIds.length > 0 ? result.resolvedIds : mutable;
 }
 
 function formatTestCaseForPrompt(t: DecompositionTestCase): string {
@@ -525,7 +550,21 @@ export async function runTestSaturationLoop(
           const childActiveConstraints = child.active_constraints && child.active_constraints.length > 0
             ? child.active_constraints
             : entry.activeConstraints;
-          const enrichedChild: DecompositionTestCase = { ...child, active_constraints: childActiveConstraints };
+          // Phase-exit correction: canonicalize the child's AC refs
+          // against the FR index before persistence (see
+          // phase7/acRefResolver.ts header). Carrying canonical ids
+          // through the saturation tree keeps packet synthesis and
+          // coverage analysis off the fuzzy-bridge path entirely.
+          const canonicalChildAcIds = normalizeChildAcRefs(
+            child.acceptance_criterion_ids ?? [],
+            child,
+            input.canonicalAcIndex,
+          );
+          const enrichedChild: DecompositionTestCase = {
+            ...child,
+            acceptance_criterion_ids: canonicalChildAcIds,
+            active_constraints: childActiveConstraints,
+          };
 
           const childRec = engine.writer.writeRecord({
             record_type: 'test_decomposition_node',

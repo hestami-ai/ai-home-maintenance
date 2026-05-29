@@ -1,0 +1,47 @@
+{
+  "scenario": "happy-path",
+  "description": "Single phase 1 sub-phase (entities_bloom) with a full LLM bracket (template_rendered → materialized → invoked → returned) and a validator.run event. Completes successfully.",
+  "schema_version": 1,
+  "expected_sub_phases": [
+    {
+      "phase_id": "1",
+      "sub_phase_id": "entities_bloom",
+      "expected_status": "success",
+      "must_answer_5wh": true,
+      "spot_checks": [
+        {
+          "path": "who.agent_role",
+          "equals": "requirements_agent"
+        },
+        {
+          "path": "who.model",
+          "equals": "claude-sonnet-4-6"
+        },
+        {
+          "path": "why.template_key",
+          "equals": "phase01/entities_bloom"
+        },
+        {
+          "path": "how.status",
+          "equals": "success"
+        },
+        {
+          "path": "how.retries",
+          "equals": 0
+        },
+        {
+          "path": "how.error",
+          "equals": null
+        },
+        {
+          "path": "events.first_event_id",
+          "not_null": true
+        },
+        {
+          "path": "events.last_event_id",
+          "not_null": true
+        }
+      ]
+    }
+  ]
+}

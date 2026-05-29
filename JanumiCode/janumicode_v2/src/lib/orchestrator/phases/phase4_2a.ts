@@ -46,8 +46,8 @@ import type {
 } from '../../types/records';
 import type { MirrorItemDecision } from '../../types/decisionBundle';
 import { getLogger } from '../../logging';
-import { emitLifecycle } from '../../trace/lifecycle';
 import { createEmbeddingClient, findNearestAbove, type EmbeddingClient } from '../../llm/embeddings';
+import { emit as aoddEmit } from '../../aodd';
 
 // ── Shared decomposition helpers ───────────────────────────────────
 
@@ -1107,23 +1107,11 @@ export async function runComponentSaturationLoop(
   });
   engine.writer.supersedByRollback(currentPipelineRecordId, pipelineFinalRecord.id);
 
-  // Tier-2 lifecycle: emit the saturation terminator with the headline
-  // counts. ts-18 produced 11 root components for a 3-FR intent — this
-  // one line in lifecycle.ndjson would have made the scope creep
-  // visible in a single grep. Pair with the artifact.produced events
-  // (one per component_decomposition_node) for full per-node trail.
-  emitLifecycle('phase4.saturation_iteration_complete', {
-    workflow_run_id: workflowRun.id,
-    phase_id: '4',
-    sub_phase_id: config.recordSubPhaseId,
-    pipeline_id: pipelineId,
-    pass_count: pipelinePasses.length,
-    final_leaf_count: atomicLeafCount,
-    final_max_depth: maxDepthReached,
-    total_llm_calls: totalLlmCalls,
-    tier_distribution: tierDistribution,
-    termination_reason: terminationReason,
-  });
+  // (Saturation-terminator counts used to fire as a Tier-2 lifecycle
+  // event for one-line `grep` visibility on scope creep. With the
+  // legacy lifecycle stream retired, the pipeline_final record holds
+  // the same counts in its content; the per-sub-phase summary rolls
+  // them up via the record.* events for the pipeline + per-node writes.)
 
   // Persist budget telemetry to workflow_runs columns.
   try {
@@ -1320,6 +1308,10 @@ function emitTierBGateBundles(
     engine.eventBus.emit('mirror:presented', {
       mirrorId: bundleId,
       artifactType: 'component_decomposition_bundle',
+    });
+    aoddEmit('mirror.presented', {
+      mirror_id: bundleId,
+      artifact_type: 'component_decomposition_bundle',
     });
 
     plans.push({

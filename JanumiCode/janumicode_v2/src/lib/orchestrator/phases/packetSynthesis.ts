@@ -21,7 +21,6 @@
  */
 
 import { getLogger } from '../../logging';
-import { emitLifecycle } from '../../trace/lifecycle';
 import type { OrchestratorEngine } from '../orchestratorEngine';
 import type {
   WorkflowRun,
@@ -99,25 +98,64 @@ function collectAtomicTasks(records: GovernedStreamRecord[]): BuilderAtomicTask[
   return out;
 }
 
-function collectUserStories(records: GovernedStreamRecord[]): BuilderUserStory[] {
+export function collectUserStories(records: GovernedStreamRecord[]): BuilderUserStory[] {
+  const byId = new Map<string, BuilderUserStory>();
+  // Roots first (the canonical 27 US-001..US-NNN from fr_bloom_skeleton).
   for (const r of records) {
     if (r.record_type !== 'artifact_produced') continue;
     if (r.sub_phase_id !== 'fr_bloom_skeleton') continue;
     const content = r.content as Record<string, unknown>;
     if (content.kind !== 'functional_requirements') continue;
     const us = content.user_stories;
-    if (Array.isArray(us)) return us as BuilderUserStory[];
+    if (!Array.isArray(us)) continue;
+    for (const story of us as BuilderUserStory[]) {
+      if (story?.id && !byId.has(story.id)) byId.set(story.id, story);
+    }
   }
-  return [];
+  // Atomic FR-rooted saturation leaves — each carries a user_story under
+  // the leaf's own id (e.g. `FR-CAM-1.1`, `US-004-AUTH-D1`). These are the
+  // anchors for composite AC ids that Phase 7 test cases reference. Without
+  // them in the userStories pool, packet_synthesis cannot recover the
+  // parent story from a test case's `acceptance_criterion_ids[]`.
+  // Latest-per-node selection — supersession-aware.
+  const latestByNodeId = new Map<string, GovernedStreamRecord>();
+  for (const r of records) {
+    if (r.record_type !== 'requirement_decomposition_node') continue;
+    const c = r.content as Record<string, unknown>;
+    if (c.kind !== 'requirement_decomposition_node') continue;
+    if (c.root_kind && c.root_kind !== 'fr') continue;
+    if (c.status !== 'atomic') continue;
+    const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
+    if (!nodeId) continue;
+    const existing = latestByNodeId.get(nodeId);
+    if (!existing || r.produced_at > existing.produced_at) {
+      latestByNodeId.set(nodeId, r);
+    }
+  }
+  for (const r of latestByNodeId.values()) {
+    const c = r.content as Record<string, unknown>;
+    const story = c.user_story as BuilderUserStory | undefined;
+    if (!story?.id || byId.has(story.id)) continue;
+    byId.set(story.id, story);
+  }
+  return [...byId.values()];
 }
 
-function collectNfrs(records: GovernedStreamRecord[]): BuilderNfr[] {
+export function collectNfrs(records: GovernedStreamRecord[]): BuilderNfr[] {
   for (const r of records) {
     if (r.record_type !== 'artifact_produced') continue;
     if (r.sub_phase_id !== 'nfr_bloom_skeleton') continue;
     const content = r.content as Record<string, unknown>;
-    if (content.kind !== 'nonfunctional_requirements') continue;
-    const arr = content.nonfunctional_requirements;
+    // The nfr_bloom_skeleton artifact stores its kind as
+    // `non_functional_requirements` (with underscore) and the array
+    // under `requirements`. The earlier collector mismatched both
+    // (looked for `nonfunctional_requirements` as both kind and array
+    // key), silently returning [] for every run. ts-108 audit traced
+    // every implementation_packet having `nfrs: []` to this bug:
+    // the executor at Phase 9 was receiving no NFR context for any
+    // task even though Phase 2.2 had emitted them correctly.
+    if (content.kind !== 'non_functional_requirements') continue;
+    const arr = content.requirements;
     if (Array.isArray(arr)) return arr as BuilderNfr[];
   }
   return [];
@@ -228,7 +266,7 @@ function collectApiDefs(records: GovernedStreamRecord[]): BuilderApiDef[] {
   return out;
 }
 
-function collectTestSuites(records: GovernedStreamRecord[]): BuilderTestSuite[] {
+export function collectTestSuites(records: GovernedStreamRecord[]): BuilderTestSuite[] {
   for (const r of records) {
     if (r.record_type !== 'artifact_produced') continue;
     if (r.sub_phase_id !== 'test_case_skeleton') continue;
@@ -239,34 +277,83 @@ function collectTestSuites(records: GovernedStreamRecord[]): BuilderTestSuite[] 
   return [];
 }
 
-function collectEvaluationCriteria(records: GovernedStreamRecord[]): BuilderEvaluationCriterion[] {
+function extractCriteriaArray(
+  records: GovernedStreamRecord[],
+  subPhase: string,
+  kind: BuilderEvaluationCriterion['kind'],
+  idField: string,
+): BuilderEvaluationCriterion[] {
   const out: BuilderEvaluationCriterion[] = [];
-  const mappings: Array<{ subPhase: string; kind: BuilderEvaluationCriterion['kind']; idField: string }> = [
-    { subPhase: 'evaluation_design', kind: 'functional', idField: 'functional_requirement_id' },
-    { subPhase: 'evaluation_metrics', kind: 'quality', idField: 'nonfunctional_requirement_id' },
-    { subPhase: 'evaluation_thresholds', kind: 'reasoning', idField: 'functional_requirement_id' },
-  ];
-  for (const { subPhase, kind, idField } of mappings) {
-    for (const r of records) {
-      if (r.record_type !== 'artifact_produced') continue;
-      if (r.sub_phase_id !== subPhase) continue;
-      const content = r.content as Record<string, unknown>;
-      const criteria = content.criteria;
-      if (!Array.isArray(criteria)) continue;
-      for (const c of criteria) {
-        const obj = c as Record<string, unknown>;
-        const targetId = (obj[idField] ?? obj.functional_requirement_id ?? obj.nonfunctional_requirement_id) as string | undefined;
-        if (!targetId) continue;
-        out.push({
-          kind,
-          target_id: targetId,
-          evaluation_method: typeof obj.evaluation_method === 'string' ? obj.evaluation_method : '',
-          success_condition: typeof obj.success_condition === 'string' ? obj.success_condition : '',
-        });
-      }
+  for (const r of records) {
+    if (r.record_type !== 'artifact_produced') continue;
+    if (r.sub_phase_id !== subPhase) continue;
+    const content = r.content as Record<string, unknown>;
+    const criteria = content.criteria;
+    if (!Array.isArray(criteria)) continue;
+    for (const c of criteria) {
+      const obj = c as Record<string, unknown>;
+      // ts-108 audit: evaluation_metrics actually emits `nfr_id` (not
+      // `nonfunctional_requirement_id`), `measurement_method` (not
+      // `evaluation_method`), and `threshold` (not `success_condition`).
+      // Accept both field families so the collector tolerates either
+      // schema. Same pattern as the FR/NFR collector key fixes.
+      const targetId = (obj[idField]
+        ?? obj.functional_requirement_id
+        ?? obj.nonfunctional_requirement_id
+        ?? obj.nfr_id
+        ?? obj.fr_id) as string | undefined;
+      if (!targetId) continue;
+      const evaluation_method = typeof obj.evaluation_method === 'string'
+        ? obj.evaluation_method
+        : (typeof obj.measurement_method === 'string' ? obj.measurement_method : '');
+      const success_condition = typeof obj.success_condition === 'string'
+        ? obj.success_condition
+        : (typeof obj.threshold === 'string' ? obj.threshold : '');
+      out.push({
+        kind,
+        target_id: targetId,
+        evaluation_method,
+        success_condition,
+      });
     }
   }
   return out;
+}
+
+function extractThresholdScenarios(records: GovernedStreamRecord[]): BuilderEvaluationCriterion[] {
+  const out: BuilderEvaluationCriterion[] = [];
+  for (const r of records) {
+    if (r.record_type !== 'artifact_produced') continue;
+    if (r.sub_phase_id !== 'evaluation_thresholds') continue;
+    const content = r.content as Record<string, unknown>;
+    const scenarios = content.scenarios;
+    if (!Array.isArray(scenarios)) continue;
+    for (const s of scenarios) {
+      const obj = s as Record<string, unknown>;
+      const id = typeof obj.id === 'string' ? obj.id : '';
+      if (!id) continue;
+      out.push({
+        kind: 'reasoning',
+        target_id: id,
+        evaluation_method: typeof obj.description === 'string' ? obj.description : '',
+        success_condition: typeof obj.pass_criteria === 'string' ? obj.pass_criteria : '',
+      });
+    }
+  }
+  return out;
+}
+
+export function collectEvaluationCriteria(records: GovernedStreamRecord[]): BuilderEvaluationCriterion[] {
+  // evaluation_design + evaluation_metrics emit `criteria` arrays with
+  // shape {target_id, evaluation_method, success_condition}.
+  // evaluation_thresholds emits a different shape (`scenarios[]` with
+  // {id, description, pass_criteria}); each scenario becomes a
+  // reasoning-kind criterion via `extractThresholdScenarios`.
+  return [
+    ...extractCriteriaArray(records, 'evaluation_design', 'functional', 'functional_requirement_id'),
+    ...extractCriteriaArray(records, 'evaluation_metrics', 'quality', 'nonfunctional_requirement_id'),
+    ...extractThresholdScenarios(records),
+  ];
 }
 
 function collectTechnicalConstraints(records: GovernedStreamRecord[]): Map<string, BuilderTechnicalConstraint> {
@@ -284,10 +371,14 @@ function collectTechnicalConstraints(records: GovernedStreamRecord[]): Map<strin
   return byId;
 }
 
-function collectComplianceItems(records: GovernedStreamRecord[]): Map<string, BuilderComplianceItem> {
+export function collectComplianceItems(records: GovernedStreamRecord[]): Map<string, BuilderComplianceItem> {
   const byId = new Map<string, BuilderComplianceItem>();
+  // compliance_retention_discovery emits its array under
+  // `complianceExtractedItems` (camelCase); the previous spelling
+  // (`compliance_extracted_items`, snake) silently returned no items.
+  // Same shape-mismatch class as the collectNfrs fix.
   const mappings: Array<{ subPhase: string; arrayKey: string; kind: BuilderComplianceItem['kind'] }> = [
-    { subPhase: 'compliance_retention_discovery', arrayKey: 'compliance_extracted_items', kind: 'compliance' },
+    { subPhase: 'compliance_retention_discovery', arrayKey: 'complianceExtractedItems', kind: 'compliance' },
     { subPhase: 'vv_requirements_discovery', arrayKey: 'vvRequirements', kind: 'vv_requirement' },
   ];
   for (const { subPhase, arrayKey, kind } of mappings) {
@@ -337,6 +428,7 @@ export function runPacketSynthesisSubPhase(
   // Walk the DB once per record type we need.
   const recordTypes = [
     'artifact_produced',
+    'requirement_decomposition_node',
     'task_decomposition_node',
     'component_decomposition_node',
     'data_model_decomposition_node',
@@ -393,30 +485,12 @@ export function runPacketSynthesisSubPhase(
       derived_from_record_ids: [],
       content: packet as unknown as Record<string, unknown>,
     });
-    // Tier-1 lifecycle: emit one packet.synthesized per packet with the
-    // coherence verdict and the per-field shape that the ts-18 archaeology
-    // was reduced to inferring from the DB. With this in place,
-    // `grep '"event":"packet.synthesized"' lifecycle.ndjson | jq` answers
-    // "how many packets failed coherence?" in one shell command.
-    emitLifecycle('packet.synthesized', {
-      workflow_run_id: workflowRun.id,
-      phase_id: '9',
-      sub_phase_id: 'packet_synthesis',
-      packet_id: packet.packet_id,
-      task_id: packet.task?.id ?? null,
-      component_id: packet.component?.id ?? null,
-      coherence_passed: packet.coherence.passed,
-      blocking_failure_codes: packet.coherence.blocking_failures.map((f) => f.split(':')[0]),
-      blocking_failure_count: packet.coherence.blocking_failures.length,
-      advisory_finding_count: packet.coherence.advisory_findings.length,
-      user_story_count: packet.user_stories?.length ?? 0,
-      nfr_count: packet.nfrs?.length ?? 0,
-      data_model_count: packet.data_models?.length ?? 0,
-      api_definition_count: packet.api_definitions?.length ?? 0,
-      test_case_count: packet.test_cases?.length ?? 0,
-      evaluation_criteria_count: packet.evaluation_criteria?.length ?? 0,
-      active_constraint_count: packet.active_constraints?.length ?? 0,
-    });
+    // (packet.synthesized used to fire as a Tier-1 lifecycle event with
+    // per-field counts so `grep | jq` could answer "how many packets
+    // failed coherence?" With the legacy lifecycle stream retired, the
+    // packet record itself fires record.added, the coherence verdict is
+    // in the packet content, and per-sub-phase summaries roll up
+    // packet counts via the record.* event stream.)
   }
 
   // Persist failure record if any blocking failures occurred.

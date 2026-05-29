@@ -26,6 +26,7 @@ import { normalizeIdsInTree, normalizeComponentIdRef } from '../idNormalization'
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
 import { runDataModelSaturationLoop } from './phase5_1a';
+import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -445,6 +446,10 @@ export class Phase5Handler implements PhaseHandler {
       mirrorId: specMirror.mirrorId,
       artifactType: 'technical_specification',
     });
+    aoddEmit('mirror.presented', {
+      mirror_id: specMirror.mirrorId,
+      artifact_type: 'technical_specification',
+    });
 
     try {
       const resolution = await engine.pauseForDecision(
@@ -501,6 +506,7 @@ export class Phase5Handler implements PhaseHandler {
     });
     artifactIds.push(gateRecord.id);
     engine.eventBus.emit('phase_gate:pending', { phaseId: '5' });
+    aoddEmit('gate.pending', { gate_kind: 'phase_gate' });
 
     return { success: true, artifactIds };
   }

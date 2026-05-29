@@ -16,6 +16,7 @@ import type {
 import { getLogger } from '../logging';
 import type { WaveDiffSummary } from './workspaceSnapshot';
 import { revertWaveSnapshot } from './workspaceSnapshot';
+import { emit as aoddEmit } from '../aodd';
 
 export interface WaveGateInput {
   workflowRunId: string;
@@ -81,6 +82,10 @@ export class WaveGate {
     this.engine.eventBus.emit('mirror:presented', {
       mirrorId: mirror.mirrorId,
       artifactType: 'execution_wave',
+    });
+    aoddEmit('mirror.presented', {
+      mirror_id: mirror.mirrorId,
+      artifact_type: 'execution_wave',
     });
 
     let decisionKind: WaveGateDecisionKind;

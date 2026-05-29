@@ -1,36 +1,22 @@
 /**
- * Helper that emits a `template_rendered` transformation step capturing
+ * Helper that emits an AODD `prompt.template_rendered` event capturing
  * the per-variable substitution table from a template render.
  *
- * This is the seam that closes the "prompt_materialized only stores the
- * final string, not where its bytes came from" gap. With this step in
- * place, walk-back can answer "why is the {{active_constraints}} block
- * empty?" by reading the variables map: the variable was present in
- * the substitution but its value was an empty string (caller-side bug,
- * not template-side).
+ * This is the seam that closes the "the final string is captured but
+ * we can't see where the bytes came from" gap. With the rendered
+ * provenance attached as metadata, walk-back can answer "why is the
+ * {{active_constraints}} block empty?" — the variable was present in
+ * the substitution but its value was empty (caller-side bug, not
+ * template-side).
  *
- * Payload format on disk (off-DB):
- *   {
- *     template_key,
- *     template_metadata: { required_variables, ... },
- *     variables: {
- *       active_constraints: { value, size_chars, lines, empty: false },
- *       prior_records:      { value, size_chars, lines, empty: false },
- *       intent_summary:     { value: "",  size_chars: 0, lines: 0, empty: true }, // ← obvious drop
- *       ...
- *     },
- *     missing_variables: ['ud_required_variable'],
- *     rendered_size: 24831,
- *     body_size: 3245
- *   }
- *
- * The variable values are captured verbatim — they're typically already
- * stringified by the caller, and the whole point is to inspect exactly
- * what went into the final prompt.
+ * Previously this helper also wrote a `template_rendered` row to
+ * `transforms.jsonl`; that legacy stream has been retired (see
+ * docs/design/aodd-parity-matrix.md). The AODD event below is now the
+ * sole source.
  */
 
 import type { PromptTemplate } from '../orchestrator/templateLoader';
-import { emitTransformationStep } from './emit';
+import { emit as aoddEmit } from '../aodd';
 
 interface VariableProvenance {
   value: string;
@@ -63,30 +49,28 @@ export function emitTemplateRendered(
     };
   }
 
-  emitTransformationStep({
-    step_type: 'template_rendered',
-    payload: {
-      template_key: getTemplateKey(template),
-      template_metadata: template.metadata,
-      variables: provenance,
-      missing_variables: missing,
-      rendered_size: rendered.length,
-      body_size: template.body.length,
-      // The fully rendered text is intentionally NOT included here —
-      // it's already captured by the downstream prompt_materialized
-      // step inside LLMCaller.call(). Avoiding the duplicate keeps
-      // per-call disk footprint smaller. To get the final prompt,
-      // open the prompt_materialized payload sibling file.
+  const templateKey = getTemplateKey(template);
+  // template_source_sha is not yet captured here; design memo §12 open
+  // question 7 (prompt-template provenance) lands in a later phase.
+  aoddEmit(
+    'prompt.template_rendered',
+    {
+      template_key: templateKey,
+      template_source_sha: 'unknown',
     },
-    metadata: {
-      template_key: getTemplateKey(template),
-      variable_count: Object.keys(variables).length,
-      empty_variable_count: emptyVarCount,
-      missing_variable_count: missing.length,
-      total_variable_bytes: totalVarChars,
-      rendered_size: rendered.length,
+    {
+      metadata: {
+        variable_count: Object.keys(variables).length,
+        empty_variable_count: emptyVarCount,
+        missing_variable_count: missing.length,
+        total_variable_bytes: totalVarChars,
+        rendered_size: rendered.length,
+        body_size: template.body.length,
+        provenance,
+        missing_variables: missing,
+      },
     },
-  });
+  );
 }
 
 function getTemplateKey(t: PromptTemplate): string {

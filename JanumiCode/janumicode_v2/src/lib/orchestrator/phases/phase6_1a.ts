@@ -278,7 +278,6 @@ function sanitizeChildTask(
     return null;
   }
   const taskType = c.task_type === 'refactoring' ? 'refactoring' as const : 'standard' as const;
-  const backing_tool = typeof c.backing_tool === 'string' ? c.backing_tool : undefined;
   const validComplexity = ['low', 'medium', 'high'];
   const estimated_complexity = typeof c.estimated_complexity === 'string'
     && validComplexity.includes(c.estimated_complexity)
@@ -298,7 +297,6 @@ function sanitizeChildTask(
     task_type: taskType,
     component_id: componentId,
     component_responsibility: componentResp,
-    backing_tool,
     estimated_complexity,
     complexity_flag,
     completion_criteria,
@@ -327,7 +325,6 @@ function formatRootTaskForPrompt(t: DecompositionTask): string {
     `Description: ${t.description}`,
     `Component: ${t.component_id}`,
     `Component responsibility: ${t.component_responsibility}`,
-    t.backing_tool ? `Backing tool: ${t.backing_tool}` : null,
     t.estimated_complexity ? `Complexity: ${t.estimated_complexity}` : null,
     'Completion criteria:',
     ccs,

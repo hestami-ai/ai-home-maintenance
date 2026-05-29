@@ -64,7 +64,6 @@ describe('normalizeRootTaskShape', () => {
       task_type: 'standard',
       component_id: 'comp-auth',
       component_responsibility: 'Verify identity',
-      backing_tool: 'claude_code_cli',
       estimated_complexity: 'medium',
       completion_criteria: [
         { criterion_id: 'CC-001', description: 'Returns 401 on bad token', verification_method: 'test_execution' },
@@ -78,7 +77,6 @@ describe('normalizeRootTaskShape', () => {
     expect(t.name).toBe('Implement auth middleware');
     expect(t.completion_criteria).toHaveLength(1);
     expect(t.completion_criteria[0].criterion_id).toBe('CC-001');
-    expect(t.backing_tool).toBe('claude_code_cli');
     expect(t.active_constraints).toEqual(constraints);
   });
 
@@ -154,27 +152,20 @@ describe('normalizeRootTaskShape', () => {
     expect(t.read_directory_paths).toEqual(['src/shared/models']);
   });
 
-  it('preserves backing_tool verbatim even when outside known set (warn-only)', () => {
-    // The coercer warns but does NOT auto-correct — auto-correction is risky;
-    // the saturation pass with the new (Track B) prompt is the right place
-    // to re-derive a sensible value. Here we just verify pass-through.
+  it('REGRESSION: ignores LLM-emitted backing_tool field (removed 2026-05-27)', () => {
+    // Task-level `backing_tool` was descriptive metadata that the
+    // executor never used for routing (routing is config-driven via
+    // llm_routing.executor.primary.backing_tool). The field was
+    // removed to stop confusing readers. This test pins that
+    // re-introducing it on the LLM side does NOT cause it to surface
+    // on DecompositionTask (no auto-include from raw input).
     const raw = {
       id: 'task-004', description: 'd', component_id: 'c', component_responsibility: 'r',
       backing_tool: 'Python',
       completion_criteria: [],
     };
     const t = normalizeRootTaskShape(raw, 0, constraints);
-    expect(t.backing_tool).toBe('Python');
-  });
-
-  it('accepts known backing tools without warning trigger', () => {
-    const raw = {
-      id: 't', description: 'd', component_id: 'c', component_responsibility: 'r',
-      backing_tool: 'codex_cli',
-      completion_criteria: [],
-    };
-    const t = normalizeRootTaskShape(raw, 0, constraints);
-    expect(t.backing_tool).toBe('codex_cli');
+    expect((t as unknown as { backing_tool?: unknown }).backing_tool).toBeUndefined();
   });
 
   it('uses technical_spec_ids as traces_to when present (Phase 5 → Phase 6 wiring)', () => {

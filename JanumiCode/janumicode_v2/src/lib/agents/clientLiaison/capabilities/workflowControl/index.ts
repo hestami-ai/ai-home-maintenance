@@ -4,6 +4,7 @@
 
 import type { Capability, CapabilityContext } from '../index';
 import type { PhaseId, WorkflowRun } from '../../../../types/records';
+import { endRun as aoddEndRun } from '../../../../aodd';
 
 interface StartWorkflowParams {
   intent: string;
@@ -183,6 +184,13 @@ export const cancelWorkflow: Capability<CancelParams, { runId: string; status: s
     const run = resolveRun(ctx, params.runId);
     if (!run) throw new Error('Run not found');
     ctx.orchestrator.stateMachine.failWorkflowRun(run.id);
+    // AODD: emit run.failed + close the trace. Mirrors the success
+    // path's aoddEndRun call in orchestratorEngine.ts. The user-initiated
+    // cancel is recorded as the failure reason.
+    aoddEndRun({
+      status: 'failed',
+      error: { message: 'workflow cancelled by user' },
+    });
     return { runId: run.id, status: 'cancelled' };
   },
   formatResponse: (r) => `Workflow ${r.runId} cancelled.`,

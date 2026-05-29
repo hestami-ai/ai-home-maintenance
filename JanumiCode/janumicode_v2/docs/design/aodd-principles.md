@@ -1,6 +1,6 @@
 # AODD Principles — janumicode v2
 
-**Status**: Draft — direction locked, awaiting design memo.
+**Status**: Approved 2026-05-26. Companion design memo at `aodd-design.md`.
 **Date**: 2026-05-26.
 **Scope**: Internal engineering infrastructure for v2. Not a product surface (yet).
 

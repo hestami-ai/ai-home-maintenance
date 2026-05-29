@@ -130,7 +130,7 @@ For each child you produce, list any **assumption, constraint, compliance citati
       "action": "enforce debit-credit balance invariant on every posting",
       "outcome": "No entry can be persisted whose debits and credits differ",
       "acceptance_criteria": [
-        { "id": "AC-001", "description": "Every persisted journal entry balances.", "measurable_condition": "sum(debits) - sum(credits) === 0 for every row in journal_entries at commit time" }
+        { "id": "AC-FR-ACCT-1.1-001", "description": "Every persisted journal entry balances.", "measurable_condition": "sum(debits) - sum(credits) === 0 for every row in journal_entries at commit time" }
       ],
       "priority": "critical",
       "traces_to": ["VV-3"],

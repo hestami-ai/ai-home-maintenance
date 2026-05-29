@@ -44,7 +44,6 @@ export interface ImplementationTask {
    *  ids) that the task satisfies. Used by lineage-aware filtering and
    *  upstream-findings walks in Phase 9. */
   traces_to?: string[];
-  backing_tool: string;
   dependency_task_ids?: string[];
   estimated_complexity: 'low' | 'medium' | 'high';
   complexity_flag?: string;

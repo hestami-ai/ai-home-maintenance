@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "happy-path",
+  "phase_id": "1",
+  "sub_phase_id": "entities_bloom",
+  "started_at": "2026-05-26T15:37:07.233Z",
+  "completed_at": "2026-05-26T15:37:07.234Z",
+  "duration_ms": 1,
+  "who": {
+    "agent_role": "requirements_agent",
+    "model": "claude-sonnet-4-6",
+    "model_parameters": {
+      "temperature": 0
+    },
+    "invocation_chain": [
+      {
+        "invocation_id": "inv-happy-1",
+        "depth": 0
+      }
+    ]
+  },
+  "what": {
+    "inputs_consumed": [],
+    "outputs_produced": [],
+    "decisions": []
+  },
+  "why": {
+    "template_key": "phase01/entities_bloom",
+    "template_source_sha": "unknown",
+    "rendered_prompt_ref": "01KSJEXED1C89SA6JXDPDAVJ7K",
+    "governing_constraints": []
+  },
+  "how": {
+    "retries": 0,
+    "repairs": 0,
+    "escalations": 0,
+    "fallbacks": [],
+    "status": "success",
+    "error": null
+  },
+  "events": {
+    "first_event_id": "01KSJEXED137F3YP160A5A617D",
+    "last_event_id": "01KSJEXED29JTX2GJ5CTGMTVRK",
+    "count": 5
+  }
+}

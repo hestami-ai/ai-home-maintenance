@@ -1,100 +1,51 @@
 /**
- * Thin wrapper for normalizers that emits a `normalized` transformation
- * step with the input/output field-diff. Designed to be the smallest
- * possible touchpoint at every existing normalizer call site:
+ * Thin pass-through helpers retained from the pre-AODD era for the
+ * (small) set of phase-1 normalizer call-sites that still invoke them.
  *
- *   // Before:
- *   const normalized = normalizeFRBloom(raw);
+ * Previously these wrapped a normalizer call with a `normalized`
+ * `transformation_step` emit. The legacy transforms.jsonl stream has
+ * been retired (see docs/design/aodd-parity-matrix.md), and the AODD
+ * registry has no `context.normalized` counterpart — normalizers are
+ * deterministic transforms; their inputs and outputs already flow
+ * through AODD via the prompt.* / llm.* / record.* events that bracket
+ * them.
  *
- *   // After:
- *   const normalized = traceNormalize('phase1.fr_bloom', raw, normalizeFRBloom(raw));
- *
- * Or, when the normalizer accepts its own input:
- *
- *   const normalized = traceNormalizeFn('phase1.fr_bloom', raw, normalizeFRBloom);
- *
- * Either form emits a single `normalized` step whose `field_diff`
- * highlights silent drops, renames, and size changes — the most common
- * shapes of normalizer bugs. See feedback_normalizer_case_dual_keys.md
- * for the snake_case ↔ camelCase footgun this is designed to catch.
+ * These helpers are kept as pass-throughs so the existing call-sites
+ * don't need touching. They can be replaced with direct normalizer
+ * calls in a follow-up cleanup.
  */
 
-import { computeFieldDiff, fieldDiffIsEmpty } from './fieldDiff';
-import { emitTransformationStep } from './emit';
-
 export interface TraceNormalizeOptions {
-  /** Optional sub_phase_id override; defaults to the current TraceCtx. */
+  /** Reserved for backwards compatibility. Unused. */
   subPhaseId?: string;
-  /** Optional record id this normalization was sourced from. */
+  /** Reserved for backwards compatibility. Unused. */
   sourceRecordId?: string;
-  /** Persist input/output to the per-step payload file. Defaults to true. */
+  /** Reserved for backwards compatibility. Unused. */
   capturePayload?: boolean;
 }
 
 /**
- * Emits a `normalized` step for an input → output transformation. Returns
- * `output` so this is a transparent pass-through at the call site.
+ * Pass-through: returns `output` unchanged. Originally emitted a
+ * `normalized` transformation_step capturing the input → output diff.
  */
 export function traceNormalize<I, O>(
-  normalizer: string,
-  input: I,
+  _normalizer: string,
+  _input: I,
   output: O,
-  opts: TraceNormalizeOptions = {},
+  _opts: TraceNormalizeOptions = {},
 ): O {
-  const diff = computeFieldDiff(input, output);
-  emitTransformationStep({
-    step_type: 'normalized',
-    sub_phase_id_override: opts.subPhaseId,
-    input_record_ids: opts.sourceRecordId ? [opts.sourceRecordId] : [],
-    payload: (opts.capturePayload ?? true) ? { input, output } : undefined,
-    field_diff: fieldDiffIsEmpty(diff) ? undefined : diff,
-    metadata: {
-      normalizer,
-      input_top_keys: topLevelKeys(input),
-      output_top_keys: topLevelKeys(output),
-    },
-  });
   return output;
 }
 
 /**
- * Companion form that owns the normalizer call. Useful when the call
- * site looks like `normalizeX(raw)` and wrapping both sides is awkward.
- *
- * Catches throws and re-throws after emitting a step with the error
- * field set, so a normalizer that crashes shows up in the trace.
+ * Pass-through: runs `fn(input)` and returns the result. Originally
+ * wrapped the call to capture inputs/outputs plus any throw.
  */
 export function traceNormalizeFn<I, O>(
-  normalizer: string,
+  _normalizer: string,
   input: I,
   fn: (input: I) => O,
-  opts: TraceNormalizeOptions = {},
+  _opts: TraceNormalizeOptions = {},
 ): O {
-  let output: O;
-  try {
-    output = fn(input);
-  } catch (err) {
-    emitTransformationStep({
-      step_type: 'normalized',
-      sub_phase_id_override: opts.subPhaseId,
-      input_record_ids: opts.sourceRecordId ? [opts.sourceRecordId] : [],
-      payload: (opts.capturePayload ?? true) ? { input } : undefined,
-      error: {
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-      },
-      metadata: {
-        normalizer,
-        input_top_keys: topLevelKeys(input),
-        output_top_keys: [],
-      },
-    });
-    throw err;
-  }
-  return traceNormalize(normalizer, input, output, opts);
-}
-
-function topLevelKeys(v: unknown): string[] {
-  if (typeof v !== 'object' || v === null || Array.isArray(v)) return [];
-  return Object.keys(v);
+  return fn(input);
 }

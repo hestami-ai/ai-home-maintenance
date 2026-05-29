@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "run_id": "happy-path",
+  "started_at": "2026-05-26T15:37:07.231Z",
+  "completed_at": "2026-05-26T15:37:07.235Z",
+  "status": "success",
+  "events": {
+    "first_event_id": "01KSJEXED0C8RHGBQBBSQY7YFQ",
+    "last_event_id": "01KSJEXED3EQJTYHG3JDTNKSJ8",
+    "count": 9
+  }
+}
