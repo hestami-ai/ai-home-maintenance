@@ -519,7 +519,11 @@ export class Phase5Handler implements PhaseHandler {
   ): Promise<DataModels> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', 'data_model_skeleton');
-    const fallback: DataModels = { models: [{ component_id: 'COMP-001', entities: [{ name: 'Record', fields: [{ name: 'id', type: 'uuid' }, { name: 'created_at', type: 'timestamp' }] }] }] };
+    // Empty — NEVER fabricate placeholder content (ts-117: a fabricated
+    // api fallback shipped spec-violating endpoints downstream). On
+    // failure we emit an honest empty result + a loud error log so the
+    // gap is visible, not silently wrong.
+    const fallback: DataModels = { models: [] };
     if (!template) return fallback;
 
     const rendered = engine.templateLoader.render(template, {
@@ -546,7 +550,23 @@ export class Phase5Handler implements PhaseHandler {
     const parsed = result.parsed as Record<string, unknown> | null;
     const models = pickItemsArray<DataModels['models'][number]>(parsed, ['data_models', 'models']);
     if (models && models.length > 0) return { models };
+    this.logPhase5ParseFailure(ctx, 'data_model_skeleton', result.text);
     return fallback;
+  }
+
+  /**
+   * Loud, queryable signal that a Phase 5 sub-phase's JSON could not be
+   * parsed even after deterministic structural recovery + LLM repair, so
+   * an EMPTY (never fabricated) result is being emitted. The json_repair
+   * trail records the repair attempts; this surfaces the downstream gap
+   * explicitly rather than letting a fabricated placeholder pass silently.
+   */
+  private logPhase5ParseFailure(ctx: PhaseContext, subPhaseId: string, rawText: string | undefined): void {
+    getLogger().error('workflow', `Phase 5 ${subPhaseId}: JSON parse + repair FAILED — emitting EMPTY result (no fabrication). Downstream will show a visible gap, not fabricated/spec-violating content.`, {
+      workflow_run_id: ctx.workflowRun.id,
+      sub_phase_id: subPhaseId,
+      raw_excerpt: (rawText ?? '').slice(0, 400),
+    });
   }
 
   private async runApiDefinition(
@@ -555,7 +575,7 @@ export class Phase5Handler implements PhaseHandler {
   ): Promise<ApiDefinitions> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', 'api_definitions');
-    const fallback: ApiDefinitions = { definitions: [{ component_id: 'COMP-001', endpoints: [{ path: '/api/v1/resource', method: 'GET', auth_requirement: 'bearer_token' }] }] };
+    const fallback: ApiDefinitions = { definitions: [] };
     if (!template) return fallback;
 
     const rendered = engine.templateLoader.render(template, {
@@ -577,6 +597,7 @@ export class Phase5Handler implements PhaseHandler {
     const parsed = result.parsed as Record<string, unknown> | null;
     const definitions = pickItemsArray<ApiDefinitions['definitions'][number]>(parsed, ['api_definitions', 'definitions']);
     if (definitions && definitions.length > 0) return { definitions };
+    this.logPhase5ParseFailure(ctx, 'api_definitions', result.text);
     return fallback;
   }
 
@@ -586,7 +607,7 @@ export class Phase5Handler implements PhaseHandler {
   ): Promise<ErrorHandlingStrategies> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', 'error_handling');
-    const fallback: ErrorHandlingStrategies = { strategies: [{ component_id: 'COMP-001', error_types: ['validation_error', 'not_found'], detection: 'try/catch with typed errors', response: 'return error response with appropriate status code', surfacing: 'HTTP status codes and JSON error body' }] };
+    const fallback: ErrorHandlingStrategies = { strategies: [] };
     if (!template) return fallback;
 
     const rendered = engine.templateLoader.render(template, {
@@ -608,6 +629,7 @@ export class Phase5Handler implements PhaseHandler {
     const parsed = result.parsed as Record<string, unknown> | null;
     const strategies = pickItemsArray<ErrorHandlingStrategies['strategies'][number]>(parsed, ['error_handling_strategies', 'strategies']);
     if (strategies && strategies.length > 0) return { strategies };
+    this.logPhase5ParseFailure(ctx, 'error_handling', result.text);
     return fallback;
   }
 
@@ -617,7 +639,7 @@ export class Phase5Handler implements PhaseHandler {
   ): Promise<ConfigurationParameters> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', 'configuration_parameters');
-    const fallback: ConfigurationParameters = { params: [{ component_id: 'COMP-001', name: 'port', type: 'integer', default: 3000, required: false, description: 'HTTP server listen port' }] };
+    const fallback: ConfigurationParameters = { params: [] };
     if (!template) return fallback;
 
     const rendered = engine.templateLoader.render(template, {
@@ -640,6 +662,7 @@ export class Phase5Handler implements PhaseHandler {
     const parsed = result.parsed as Record<string, unknown> | null;
     const params = pickItemsArray<ConfigurationParameters['params'][number]>(parsed, ['configuration_parameters', 'params']);
     if (params && params.length > 0) return { params };
+    this.logPhase5ParseFailure(ctx, 'configuration_parameters', result.text);
     return fallback;
   }
 

@@ -29,9 +29,9 @@ REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `definitions` (an a
 {
   "definitions": [
     {
-      "component_id": "comp-...",
+      "component_id": "comp-shortening-service",
       "endpoints": [
-        { "path": "/...", "method": "GET", "inputs": {...}, "outputs": {...}, "error_codes": ["400", "500"], "auth_requirement": "..." }
+        { "path": "/shorten", "method": "POST", "inputs": { "long_url": "string" }, "outputs": { "slug": "string", "short_url": "string" }, "error_codes": ["400", "409", "500"], "auth_requirement": "None" }
       ]
     }
   ]
@@ -42,6 +42,7 @@ Rules:
 - Every endpoint must have an explicit authentication requirement (Invariant: API-001)
 - API Definitions must be consistent with Interface Contracts from Phase 3
 - Include error codes for all failure scenarios
+- `inputs` and `outputs` are FLAT one-level maps of `field_name -> type-string` (e.g. `{ "long_url": "string", "expires_at": "timestamp" }`). Do NOT emit nested JSON Schema (`{ "type": "object", "properties": {...}, "required": [...] }`) — deep nesting causes malformed JSON. Keep every object SHALLOW; a value is either a type-string or a flat map of type-strings, never deeper.
 
 # Hard rules — JSON output discipline
 

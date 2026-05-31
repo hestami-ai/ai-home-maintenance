@@ -124,6 +124,70 @@ export interface GatekeeperUpstreamContext {
   acceptedUserStories?: Array<{ id: string; action: string; role?: string; outcome?: string }>;
   acceptedNfrs?: Array<{ id: string; category?: string; description?: string; threshold?: string }>;
   acceptedComponents?: Array<{ id: string; name: string; domain_id?: string }>;
+  /**
+   * Phase 4.1 software domains (ids like `domain-shortening`). DISTINCT
+   * from `acceptedDomains` (Phase 1 BUSINESS domains, ids like
+   * `DOM-URL_SHORTENING`). Phase 4.2 components reference SOFTWARE-domain
+   * ids in their `domain_id`, so the component gatekeeper must validate
+   * `domain_id` membership against THIS set, not the business-domain set
+   * (ts-113: checking against business domains dropped every component —
+   * `domain-shortening` ∉ `{DOM-URL_SHORTENING…}`). Software domains are
+   * already scope-bounded (4.1 only derives them from accepted business
+   * domains), so membership here is a sufficient scope check.
+   */
+  acceptedSoftwareDomains?: Array<{ id: string; name: string }>;
+}
+
+/**
+ * Map of gatekeeper sub-phase id → the `accepted*` upstream-context
+ * field(s) that THAT sub-phase's own bloom produces.
+ *
+ * Why this exists: every gatekeeper's bloom artifact is written to the
+ * governed stream BEFORE its gatekeeper runs. The upstream-context
+ * collectors read the latest current-version artifact for each kind, so
+ * a gatekeeper would otherwise receive its OWN un-pruned proposal as the
+ * "## Accepted X (kept by <this> gatekeeper)" section — a circular
+ * "you already accepted all of these" signal that biases the LLM toward
+ * keep-all and overrides its Pass-1/Pass-2 drop reasoning. (ts-112
+ * business_domains_bloom: proposer over-bloomed 40 domains incl.
+ * Kubernetes/Docker/CI-CD; the gatekeeper reasoned "drop X, drop Y" then
+ * reversed to keep all 49 because its prompt listed all 40 as already
+ * accepted. ts-110 resisted it nondeterministically.)
+ *
+ * The `accepted*` sets are meant to carry forward what EARLIER
+ * (already-pruned) gatekeepers accepted — never the current sub-phase's
+ * own output. `stripSelfProducedAcceptedSets` nulls the owned field(s)
+ * so the gatekeeper grounds its decision on the spec extractions + truly
+ * upstream accepted sets, not on itself.
+ */
+export const SELF_PRODUCED_ACCEPTED_FIELDS: Record<string, Array<keyof GatekeeperUpstreamContext>> = {
+  // Phase 1 member-drop blooms.
+  business_domains_bloom: ['acceptedDomains', 'acceptedPersonas'],
+  user_journey_bloom: ['acceptedJourneys'],
+  system_workflow_bloom: ['acceptedWorkflows'],
+  entities_bloom: ['acceptedEntities'],
+  // Phase 2/4 downstream blooms (Phase 6 task_skeleton / Phase 7
+  // test_case_skeleton produce no `accepted*` field, so no self-ref).
+  fr_bloom_skeleton: ['acceptedUserStories'],
+  nfr_bloom_skeleton: ['acceptedNfrs'],
+  component_skeleton: ['acceptedComponents'],
+};
+
+/**
+ * Return a copy of the upstream context with the `accepted*` field(s)
+ * produced by `subPhaseId`'s own bloom removed, so a gatekeeper never
+ * sees its own un-pruned proposal as an already-accepted set. No-op for
+ * sub-phases not in {@link SELF_PRODUCED_ACCEPTED_FIELDS}.
+ */
+export function stripSelfProducedAcceptedSets(
+  ctx: GatekeeperUpstreamContext,
+  subPhaseId: string,
+): GatekeeperUpstreamContext {
+  const owned = SELF_PRODUCED_ACCEPTED_FIELDS[subPhaseId];
+  if (!owned || owned.length === 0) return ctx;
+  const out: GatekeeperUpstreamContext = { ...ctx };
+  for (const field of owned) delete out[field];
+  return out;
 }
 
 export interface GatekeeperConfig {
@@ -226,7 +290,7 @@ function renderUpstreamSection(label: string, items: Array<unknown> | undefined)
  * the raw intent doc. The raw intent is included as a last-resort
  * cross-check when the structured context isn't enough.
  */
-function buildGatekeeperPrompt(cfg: GatekeeperConfig): string {
+export function buildGatekeeperPrompt(cfg: GatekeeperConfig): string {
   const itemList = cfg.items
     .map((it) => {
       const desc = it.description ? `\n      description: ${it.description.slice(0, 400)}` : '';
@@ -256,6 +320,7 @@ function buildGatekeeperPrompt(cfg: GatekeeperConfig): string {
     // checks that a journey's persona appears in acceptedPersonas).
     renderUpstreamSection('Accepted Domains (kept by business_domains_bloom gatekeeper)', u.acceptedDomains),
     renderUpstreamSection('Accepted Personas (kept by business_domains_bloom gatekeeper)', u.acceptedPersonas),
+    renderUpstreamSection('Accepted Software Domains (Phase 4.1 — components reference THESE domain_id values, e.g. domain-shortening; NOT the business DOM-* ids above)', u.acceptedSoftwareDomains),
     renderUpstreamSection('Accepted User Journeys (kept by user_journey_bloom gatekeeper)', u.acceptedJourneys?.map(j => ({ id: j.id, text: j.title + (j.personaId ? ` [persona: ${j.personaId}]` : '') }))),
     renderUpstreamSection('Accepted System Workflows (kept by system_workflow_bloom gatekeeper)', u.acceptedWorkflows?.map(w => ({ id: w.id, text: w.name + (w.businessDomainId ? ` [domain: ${w.businessDomainId}]` : '') }))),
     renderUpstreamSection('Accepted Entities (kept by entities_bloom gatekeeper)', u.acceptedEntities?.map(e => ({ id: e.id, text: e.name + (e.businessDomainId ? ` [domain: ${e.businessDomainId}]` : '') }))),

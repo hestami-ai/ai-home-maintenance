@@ -23,6 +23,7 @@
 import type { PhaseContext } from '../orchestratorEngine';
 import {
   runScopeGatekeeperPrune,
+  stripSelfProducedAcceptedSets,
   type BloomItemForPrune,
   type GatekeeperUpstreamContext,
 } from '../scopeGatekeeper';
@@ -71,7 +72,7 @@ export async function runDownstreamScopeGatekeeper(
     return { kept_ids: [], dropped: [], rationale_summary: 'no items to prune', skipped: true };
   }
 
-  const upstream = collectDownstreamGatekeeperUpstreamContext(ctx);
+  const upstream = collectDownstreamGatekeeperUpstreamContext(ctx, req.subPhaseId);
 
   const diRoute = engine.configManager.getRoutingModel('domain_interpreter');
   const result = await runScopeGatekeeperPrune(
@@ -142,7 +143,7 @@ export async function runDownstreamScopeGatekeeper(
  * accepted sets (post-gatekeeper) so downstream phases see the full
  * authoritative cumulative view.
  */
-function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext): GatekeeperUpstreamContext {
+function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext, subPhaseId?: string): GatekeeperUpstreamContext {
   const { engine, workflowRun } = ctx;
   const all = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
   const byKind = new Map<string, Record<string, unknown>>();
@@ -164,8 +165,9 @@ function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext): Gatekeep
   const fr  = byKind.get('functional_requirements');
   const nfr = byKind.get('non_functional_requirements');
   const cm  = byKind.get('component_model');
+  const sd  = byKind.get('software_domains');
 
-  return {
+  const ctx_: GatekeeperUpstreamContext = {
     analysisSummary: typeof id?.analysisSummary === 'string' ? id.analysisSummary as string : undefined,
     intentConstraints: asTextArray(id?.constraints),
     intentRequirements: asTextArray(id?.requirements),
@@ -189,20 +191,8 @@ function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext): Gatekeep
           personaId: typeof j.personaId === 'string' ? j.personaId : (typeof j.persona_id === 'string' ? j.persona_id : undefined),
         }))
       : undefined,
-    acceptedWorkflows: Array.isArray(swb?.workflows)
-      ? (swb.workflows as Array<Record<string, unknown>>).map(w => ({
-          id: String(w.id),
-          name: String(w.name ?? ''),
-          businessDomainId: typeof w.businessDomainId === 'string' ? w.businessDomainId : (typeof w.business_domain_id === 'string' ? w.business_domain_id : undefined),
-        }))
-      : undefined,
-    acceptedEntities: Array.isArray(eb?.entities)
-      ? (eb.entities as Array<Record<string, unknown>>).map(e => ({
-          id: String(e.id),
-          name: String(e.name ?? ''),
-          businessDomainId: typeof e.businessDomainId === 'string' ? e.businessDomainId : (typeof e.business_domain_id === 'string' ? e.business_domain_id : undefined),
-        }))
-      : undefined,
+    acceptedWorkflows: asIdNameDomainArray(swb?.workflows),
+    acceptedEntities: asIdNameDomainArray(eb?.entities),
     acceptedUserStories: Array.isArray(fr?.user_stories)
       ? (fr.user_stories as Array<Record<string, unknown>>).map(s => ({
           id: String(s.id),
@@ -226,7 +216,16 @@ function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext): Gatekeep
           domain_id: typeof c.domain_id === 'string' ? c.domain_id : (typeof c.domainId === 'string' ? c.domainId : undefined),
         }))
       : undefined,
+    // Phase 4.1 software domains — the namespace Phase 4.2 components'
+    // `domain_id` actually references (e.g. domain-shortening). The
+    // component gatekeeper validates domain membership against THIS set.
+    acceptedSoftwareDomains: asIdNameArray(sd?.domains)?.map(d => ({ id: d.id, name: d.name })),
   };
+  // Strip the accepted set this gatekeeper's own bloom produced (written
+  // before the gatekeeper runs) so it doesn't see its un-pruned proposal
+  // as already-accepted — e.g. Phase 2.1 fr_bloom_skeleton must not get
+  // its own user_stories back as acceptedUserStories.
+  return subPhaseId ? stripSelfProducedAcceptedSets(ctx_, subPhaseId) : ctx_;
 }
 
 function asTextArray(v: unknown): Array<{ id?: string; text: string; type?: string }> | undefined {
@@ -245,4 +244,16 @@ function asIdNameArray(v: unknown): Array<{ id: string; name: string; descriptio
     name: String(it.name ?? ''),
     description: typeof it.description === 'string' ? it.description : undefined,
   }));
+}
+
+/** Map workflow/entity records to {id, name, businessDomainId} with snake/camel fallback. */
+function asIdNameDomainArray(v: unknown): Array<{ id: string; name: string; businessDomainId?: string }> | undefined {
+  if (!Array.isArray(v)) return undefined;
+  return (v as Array<Record<string, unknown>>).map(it => {
+    let businessDomainId: string | undefined;
+    if (typeof it.businessDomainId === 'string') businessDomainId = it.businessDomainId;
+    else if (typeof it.business_domain_id === 'string') businessDomainId = it.business_domain_id;
+    const name = typeof it.name === 'string' ? it.name : '';
+    return { id: String(it.id), name, businessDomainId };
+  });
 }

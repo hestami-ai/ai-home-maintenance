@@ -61,3 +61,67 @@ describe('tryParseJson', () => {
     expect(result.parsed).toBeNull();
   });
 });
+
+import { repairStructuralJson } from '../../../lib/llm/jsonRecovery';
+
+describe('repairStructuralJson — deterministic structural completion', () => {
+  it('appends a missing closing brace', () => {
+    expect(JSON.parse(repairStructuralJson('{"a":1'))).toEqual({ a: 1 });
+  });
+
+  it('appends missing closing brackets and braces in nesting order', () => {
+    const broken = '{"defs":[{"id":"x","items":["a","b"';
+    expect(JSON.parse(repairStructuralJson(broken))).toEqual({ defs: [{ id: 'x', items: ['a', 'b'] }] });
+  });
+
+  it('strips a trailing comma before a closer', () => {
+    expect(JSON.parse(repairStructuralJson('{"a":1,}'))).toEqual({ a: 1 });
+    expect(JSON.parse(repairStructuralJson('{"a":[1,2,]}'))).toEqual({ a: [1, 2] });
+  });
+
+  it('closes an unterminated trailing string', () => {
+    expect(JSON.parse(repairStructuralJson('{"a":"unterminated'))).toEqual({ a: 'unterminated' });
+  });
+
+  it('does NOT treat braces inside string values as structure', () => {
+    const s = '{"a":"a } weird { value","b":1';
+    expect(JSON.parse(repairStructuralJson(s))).toEqual({ a: 'a } weird { value', b: 1 });
+  });
+
+  it('respects escaped quotes inside strings', () => {
+    const s = '{"a":"he said \\"hi\\"","b":2';
+    expect(JSON.parse(repairStructuralJson(s))).toEqual({ a: 'he said "hi"', b: 2 });
+  });
+
+  it('returns equivalent JSON when already valid', () => {
+    const valid = '{"a":1,"b":[2,3]}';
+    expect(JSON.parse(repairStructuralJson(valid))).toEqual({ a: 1, b: [2, 3] });
+  });
+
+  it('recovers a truncated api-definitions-shaped object (ts-117 failure mode)', () => {
+    // Model emitted nested endpoint JSON but ran out of closers.
+    const truncated = '{"definitions":[{"component_id":"comp-shortening-service","endpoints":[{"path":"/shorten","method":"POST","inputs":{"long_url":"string"},"outputs":{"slug":"string"},"error_codes":["400"],"auth_requirement":"None"}';
+    const obj = JSON.parse(repairStructuralJson(truncated)) as { definitions: Array<{ endpoints: unknown[] }> };
+    expect(obj.definitions).toHaveLength(1);
+    expect(obj.definitions[0].endpoints).toHaveLength(1);
+  });
+});
+
+describe('tryParseJson — structural recovery integration', () => {
+  it('flags structurallyRepaired and recovers a brace-truncated object', () => {
+    const r = tryParseJson('{"a":1,"b":[2,3');
+    expect(r.parsed).toEqual({ a: 1, b: [2, 3] });
+    expect(r.structurallyRepaired).toBe(true);
+  });
+
+  it('does NOT set structurallyRepaired for already-valid JSON', () => {
+    const r = tryParseJson('{"a":1}');
+    expect(r.parsed).toEqual({ a: 1 });
+    expect(r.structurallyRepaired).toBeUndefined();
+  });
+
+  it('still returns null for genuinely unrecoverable garbage', () => {
+    const r = tryParseJson('not json at all, no braces');
+    expect(r.parsed).toBeNull();
+  });
+});

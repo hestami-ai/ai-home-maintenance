@@ -84,6 +84,11 @@ if (( no_pause )); then
   export JANUMICODE_AUDIT_PAUSE=0
 else
   export JANUMICODE_AUDIT_PAUSE=1                   # default: audit pause ON for Claude review
+  # Widen the ack timeout for interactive audits. The 4h default kills a
+  # run if a single pause sits unacked while the auditor implements a fix
+  # or steps away across a long session (ts-115 died this way). 48h gives
+  # an agent-driven audit ample room; the run still aborts if abandoned.
+  export JANUMICODE_AUDIT_ACK_TIMEOUT_SECONDS="${JANUMICODE_AUDIT_ACK_TIMEOUT_SECONDS:-172800}"
 fi
 if (( no_gatekeeper )); then
   export JANUMICODE_SCOPE_GATEKEEPER=off

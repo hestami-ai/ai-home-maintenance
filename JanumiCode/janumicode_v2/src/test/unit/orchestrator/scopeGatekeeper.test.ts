@@ -17,8 +17,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   runScopeGatekeeperPrune,
+  stripSelfProducedAcceptedSets,
+  SELF_PRODUCED_ACCEPTED_FIELDS,
   type BloomItemForPrune,
   type GatekeeperConfig,
+  type GatekeeperUpstreamContext,
 } from '../../../lib/orchestrator/scopeGatekeeper';
 import type { LLMCaller, LLMCallOptions, LLMCallResult } from '../../../lib/llm/llmCaller';
 
@@ -242,5 +245,111 @@ describe('runScopeGatekeeperPrune — deterministic post-processing', () => {
     const r = await runScopeGatekeeperPrune(mockCaller({ text: JSON.stringify(parsed), parsed }), routing, makeConfig(items));
     expect(r.kept_ids.sort()).toEqual(['A', 'C']); // C unaccounted → keep; B dropped
     expect(r.dropped.map((d) => d.id)).toEqual(['B']);
+  });
+});
+
+describe('stripSelfProducedAcceptedSets — gatekeeper self-reference guard', () => {
+  function fullContext(): GatekeeperUpstreamContext {
+    return {
+      analysisSummary: 'summary',
+      acceptedDomains: [{ id: 'DOM-A', name: 'A' }],
+      acceptedPersonas: [{ id: 'P-A', name: 'A' }],
+      acceptedJourneys: [{ id: 'UJ-A', title: 'A' }],
+      acceptedWorkflows: [{ id: 'WF-A', name: 'A' }],
+      acceptedEntities: [{ id: 'ENT-A', name: 'A' }],
+      acceptedUserStories: [{ id: 'US-A', action: 'do' }],
+      acceptedNfrs: [{ id: 'NFR-A' }],
+      acceptedComponents: [{ id: 'comp-a', name: 'A' }],
+    };
+  }
+
+  it('business_domains_bloom: strips its OWN acceptedDomains + acceptedPersonas, keeps the rest', () => {
+    const out = stripSelfProducedAcceptedSets(fullContext(), 'business_domains_bloom');
+    expect(out.acceptedDomains).toBeUndefined();
+    expect(out.acceptedPersonas).toBeUndefined();
+    // Everything else is genuinely upstream → preserved.
+    expect(out.acceptedJourneys).toBeDefined();
+    expect(out.acceptedWorkflows).toBeDefined();
+    expect(out.analysisSummary).toBe('summary');
+  });
+
+  it('user_journey_bloom strips only acceptedJourneys (keeps upstream domains/personas)', () => {
+    const out = stripSelfProducedAcceptedSets(fullContext(), 'user_journey_bloom');
+    expect(out.acceptedJourneys).toBeUndefined();
+    expect(out.acceptedDomains).toBeDefined();
+    expect(out.acceptedPersonas).toBeDefined();
+  });
+
+  it('downstream fr_bloom_skeleton strips its OWN acceptedUserStories, keeps Phase 1 sets', () => {
+    const out = stripSelfProducedAcceptedSets(fullContext(), 'fr_bloom_skeleton');
+    expect(out.acceptedUserStories).toBeUndefined();
+    expect(out.acceptedDomains).toBeDefined();
+    expect(out.acceptedJourneys).toBeDefined();
+  });
+
+  it('nfr_bloom_skeleton strips acceptedNfrs; component_skeleton strips acceptedComponents', () => {
+    expect(stripSelfProducedAcceptedSets(fullContext(), 'nfr_bloom_skeleton').acceptedNfrs).toBeUndefined();
+    expect(stripSelfProducedAcceptedSets(fullContext(), 'component_skeleton').acceptedComponents).toBeUndefined();
+    // ...but each keeps the other's set (they ARE legitimate upstream for each other).
+    expect(stripSelfProducedAcceptedSets(fullContext(), 'nfr_bloom_skeleton').acceptedUserStories).toBeDefined();
+    expect(stripSelfProducedAcceptedSets(fullContext(), 'component_skeleton').acceptedUserStories).toBeDefined();
+  });
+
+  it('task_skeleton / test_case_skeleton produce no accepted set → context unchanged', () => {
+    const before = fullContext();
+    for (const sp of ['task_skeleton', 'test_case_skeleton', 'integrations_qa_bloom', 'release_plan']) {
+      const out = stripSelfProducedAcceptedSets(fullContext(), sp);
+      expect(Object.keys(out).sort()).toEqual(Object.keys(before).sort());
+    }
+  });
+
+  it('every mapped sub-phase removes exactly the fields it declares as self-produced', () => {
+    for (const [sp, fields] of Object.entries(SELF_PRODUCED_ACCEPTED_FIELDS)) {
+      const out = stripSelfProducedAcceptedSets(fullContext(), sp);
+      for (const f of fields) expect(out[f], `${sp} should strip ${String(f)}`).toBeUndefined();
+    }
+  });
+
+  it('does not mutate the input context', () => {
+    const input = fullContext();
+    stripSelfProducedAcceptedSets(input, 'business_domains_bloom');
+    expect(input.acceptedDomains).toBeDefined();
+    expect(input.acceptedPersonas).toBeDefined();
+  });
+
+  it('acceptedSoftwareDomains is NOT stripped at component_skeleton (it is the namespace components reference)', () => {
+    const ctx: GatekeeperUpstreamContext = {
+      acceptedDomains: [{ id: 'DOM-URL_SHORTENING', name: 'URL Shortening' }],
+      acceptedSoftwareDomains: [{ id: 'domain-shortening', name: 'Shortening' }],
+      acceptedComponents: [{ id: 'comp-a', name: 'A', domain_id: 'domain-shortening' }],
+    };
+    const out = stripSelfProducedAcceptedSets(ctx, 'component_skeleton');
+    // component_skeleton produces acceptedComponents → stripped.
+    expect(out.acceptedComponents).toBeUndefined();
+    // Software domains are upstream (Phase 4.1), needed for the domain_id
+    // check → preserved. Business domains also preserved.
+    expect(out.acceptedSoftwareDomains).toBeDefined();
+    expect(out.acceptedSoftwareDomains?.[0].id).toBe('domain-shortening');
+    expect(out.acceptedDomains).toBeDefined();
+  });
+});
+
+describe('component gatekeeper prompt renders software-domain namespace (ts-113 fix)', () => {
+  it('buildGatekeeperPrompt includes the Accepted Software Domains section with domain-* ids', async () => {
+    const { buildGatekeeperPrompt } = await import('../../../lib/orchestrator/scopeGatekeeper');
+    const cfg: GatekeeperConfig = {
+      workflowRunId: 'wf', phaseId: '4', subPhaseId: 'component_skeleton',
+      bloomDescription: 'software components',
+      items: [{ id: 'comp-url-shortening', label: 'comp [domain: domain-shortening]' }],
+      upstreamContext: {
+        acceptedDomains: [{ id: 'DOM-URL_SHORTENING', name: 'URL Shortening' }],
+        acceptedSoftwareDomains: [{ id: 'domain-shortening', name: 'Shortening' }],
+      },
+    };
+    const prompt = buildGatekeeperPrompt(cfg);
+    expect(prompt).toContain('Accepted Software Domains');
+    expect(prompt).toContain('domain-shortening');
+    // and still carries the business set distinctly
+    expect(prompt).toContain('DOM-URL_SHORTENING');
   });
 });

@@ -40,6 +40,13 @@ interface SoftwareDomain {
   name: string;
   ubiquitous_language: UbiquitousLanguageTerm[];
   system_requirement_ids?: string[];
+  /**
+   * Business-domain ids (Phase 1.2 `DOM-*`) this software domain
+   * realizes. Used by the deterministic 2-hop component scope filter:
+   * a component is in scope iff its software domain maps to >=1 accepted
+   * business domain. The LLM emits this; it isn't gatekept at 4.1.
+   */
+  maps_to_business_domains?: string[];
 }
 
 interface SoftwareDomains {
@@ -64,6 +71,13 @@ interface Component {
   dependencies?: Dependency[];
   /** IDs of requirements this component satisfies (for Architecture Canvas edges) */
   satisfies_requirement_ids?: string[];
+  /**
+   * Accepted user-story ids this component serves. Emitted by the 4.2
+   * proposer (the canonical US ↔ component edge). Used by the
+   * deterministic component-scope filter: a component with traces_to but
+   * NO accepted story is out of scope; empty traces_to = cross-cutting.
+   */
+  traces_to?: string[];
 }
 
 interface ComponentModel {
@@ -85,6 +99,104 @@ interface ADR {
 
 interface ArchitecturalDecisions {
   adrs: ADR[];
+}
+
+// ── Deterministic component domain-scope filter ─────────────────────
+
+/**
+ * Deterministic 2-hop domain scope filter for Phase 4.2 components.
+ *
+ * Components reference Phase 4.1 SOFTWARE-domain ids in `domain_id`
+ * (e.g. `domain-shortening`), a DIFFERENT namespace from the Phase 1.2
+ * BUSINESS domains (`DOM-*`). A component is in scope iff its software
+ * domain maps (via `maps_to_business_domains`) to at least one ACCEPTED
+ * business domain. Returns the components that FAIL this check, each with
+ * a rationale. Pure set math — kept out of the LLM gatekeeper, which
+ * proved unreliable at cross-namespace membership (ts-112/113).
+ *
+ * Conservative: a component whose software domain is unknown, or whose
+ * software domain declares no `maps_to_business_domains`, is treated as
+ * OUT of scope (dropped) — an unmapped component has no demonstrable link
+ * to accepted business scope.
+ */
+export function deterministicDomainScopeDrops(
+  components: Array<{ id: string; domain_id?: string | null }>,
+  softwareDomains: Array<{ id: string; maps_to_business_domains?: string[] }>,
+  acceptedBusinessDomainIds: Set<string>,
+): Array<{ id: string; reason: string }> {
+  // Normalize ids for comparison: LLM id formatting drifts between
+  // sub-phases (ts-113 emitted `DOM-URL_SHORTENING`, ts-116 emitted
+  // `DOM-URL-SHORTENING` for the same domain). business_domains_bloom and
+  // software_domains generate their ids independently, so an exact-string
+  // join would silently drop every component on a hyphen/underscore/case
+  // mismatch — the same catastrophic 0-component failure this filter
+  // exists to prevent. Canonicalize both sides before intersecting.
+  const norm = (s: string): string => s.trim().toUpperCase().replace(/_/g, '-');
+  const acceptedNorm = new Set([...acceptedBusinessDomainIds].map(norm));
+  const swMaps = new Map<string, string[]>(
+    softwareDomains.map(d => [norm(d.id), d.maps_to_business_domains ?? []]),
+  );
+  const drops: Array<{ id: string; reason: string }> = [];
+  for (const c of components) {
+    const maps = swMaps.get(norm(c.domain_id ?? '')) ?? [];
+    const inScope = maps.some(b => acceptedNorm.has(norm(b)));
+    if (!inScope) {
+      drops.push({
+        id: c.id,
+        reason: `Deterministic 2-hop domain scope: software domain '${c.domain_id ?? '(none)'}' maps_to_business_domains=[${maps.join(', ') || 'none'}], none accepted (accepted: ${[...acceptedBusinessDomainIds].join(', ') || 'none'}). Component out of scope.`,
+      });
+    }
+  }
+  return drops;
+}
+
+/**
+ * Authoritative deterministic component-scope filter (ts-116 full fix).
+ *
+ * Decides which Phase 4.2 components are in scope using TWO deterministic
+ * checks, returning the components that FAIL (to be dropped):
+ *
+ *   1. Domain scope (2-hop): the component's SOFTWARE domain maps to >=1
+ *      ACCEPTED business domain. (see `deterministicDomainScopeDrops`.)
+ *   2. User-story coverage: a component that declares `traces_to` stories
+ *      but has NONE in the accepted user-story set is unbacked → dropped.
+ *      A component with EMPTY traces_to is treated as cross-cutting
+ *      (monitoring/logging/encryption) and is NOT dropped on this ground.
+ *
+ * This REPLACES the LLM gatekeeper as the binding decision for components.
+ * The LLM proved unreliable here — it dropped `comp-encryption-service`
+ * (ts-116) even though that component traces to accepted stories
+ * US-009/010/011, which would have lost URL-decryption coverage. The LLM
+ * gatekeeper still runs as an ADVISORY pass (its `scope_prune_decision`
+ * is recorded for audit / disagreement visibility) but no longer binds.
+ *
+ * The result drives BOTH the `component_model` artifact AND the Phase
+ * 4.2a saturation seed, so they stay consistent (the prior bug: artifact
+ * pruned to 3 while saturation re-expanded to the un-pruned 7).
+ */
+export function deterministicComponentDrops(
+  components: Array<{ id: string; domain_id?: string | null; traces_to?: string[] }>,
+  softwareDomains: Array<{ id: string; maps_to_business_domains?: string[] }>,
+  acceptedBusinessDomainIds: Set<string>,
+  acceptedUserStoryIds: Set<string>,
+): Array<{ id: string; reason: string }> {
+  const drops = new Map<string, string>();
+  // 1. Domain 2-hop (hard scope).
+  for (const d of deterministicDomainScopeDrops(components, softwareDomains, acceptedBusinessDomainIds)) {
+    drops.set(d.id, d.reason);
+  }
+  // 2. User-story coverage.
+  for (const c of components) {
+    if (drops.has(c.id)) continue;
+    const traces = Array.isArray(c.traces_to) ? c.traces_to : [];
+    if (traces.length > 0 && !traces.some(us => acceptedUserStoryIds.has(us))) {
+      drops.set(
+        c.id,
+        `Deterministic user-story coverage: component traces_to=[${traces.join(', ')}], none in the accepted user-story set. No accepted story backs this component.`,
+      );
+    }
+  }
+  return [...drops.entries()].map(([id, reason]) => ({ id, reason }));
 }
 
 // ── Handler ────────────────────────────────────────────────────────
@@ -193,12 +305,16 @@ export class Phase4Handler implements PhaseHandler {
     artifactIds.push(componentRecord.id);
     engine.ingestionPipeline.ingest(componentRecord);
 
-    // Phase-exit scope gatekeeper. Cross-check each component against
-    // the accepted business domains (Phase 1.2 post-gatekeeper) +
-    // accepted user stories (Phase 2.1 post-gatekeeper). A component
-    // for a rejected domain or whose responsibilities only serve
-    // rejected stories is dropped.
-    const compItems = ((componentContent as { components?: Array<Record<string, unknown>> }).components ?? []).map(c => ({
+    // Phase-exit scope gatekeeper. Component scope is decided
+    // DETERMINISTICALLY (domain 2-hop + user-story coverage) and is
+    // authoritative; the LLM gatekeeper runs only as an ADVISORY pass
+    // whose `scope_prune_decision` is recorded for audit/disagreement
+    // visibility but does NOT bind (ts-116: the LLM dropped
+    // comp-encryption-service though it traces to accepted stories,
+    // which would have lost URL-decryption coverage). The deterministic
+    // result drives BOTH the artifact AND the 4.2a saturation seed so
+    // they stay consistent.
+    const compItems = ((componentContent as unknown as { components?: Array<Record<string, unknown>> }).components ?? []).map(c => ({
       id: typeof c.id === 'string' ? c.id : '',
       label: `${c.id}: ${c.name} [domain: ${(c as Record<string, unknown>).domain_id ?? '?'}]`,
       description: typeof c.description === 'string' ? c.description : undefined,
@@ -210,13 +326,54 @@ export class Phase4Handler implements PhaseHandler {
       bloomDescription: 'software components',
       items: compItems,
       originalArtifactId: componentRecord.id,
-      overlay: 'DROP components whose `domain_id` is NOT in Accepted Domains. DROP components that ONLY serve user stories absent from Accepted User Stories. Components that span multiple domains may stay if at least one is accepted. Auxiliary/cross-cutting components (monitoring, logging) that no upstream domain rejects are KEPT by default.',
+      // ADVISORY ONLY — recorded but non-binding. Domain scope AND
+      // user-story coverage are both enforced deterministically below.
+      overlay: 'ADVISORY pass only — your decision is recorded but not binding (scope is enforced by deterministic code). For reference: a component is out of scope if its software domain maps to no accepted business domain, OR it traces only to dropped user stories. Cross-cutting components (monitoring/logging/encryption) with no traces_to are in scope.',
     });
-    if (!compPrune.skipped && compPrune.dropped.length > 0) {
-      const keptCompSet = new Set(compPrune.kept_ids);
-      const allComps = ((componentContent as { components?: Array<Record<string, unknown>> }).components ?? []);
-      const prunedComps = allComps.filter(c => keptCompSet.has(c.id as string));
-      const prunedCompContent = { ...componentContent, components: prunedComps };
+
+    // ── Deterministic component-scope filter (ts-114 + ts-116) ─────
+    // Authoritative: domain 2-hop + user-story coverage. See
+    // `deterministicComponentDrops`. Accepted business domains come from
+    // the Phase 1.2 post-gatekeeper set; accepted user stories from the
+    // Phase 2.1 post-gatekeeper functional_requirements artifact.
+    const acceptedBizDomainIds = new Set(
+      allArtifacts
+        .filter(r => r.is_current_version && (r.content as Record<string, unknown>).kind === 'business_domains_bloom')
+        .flatMap(r => (((r.content as Record<string, unknown>).domains as Array<{ id?: string }>) ?? []))
+        .map(d => d.id)
+        .filter((x): x is string => typeof x === 'string'),
+    );
+    const acceptedUserStoryIds = new Set(
+      allArtifacts
+        .filter(r => r.is_current_version && (r.content as Record<string, unknown>).kind === 'functional_requirements')
+        .flatMap(r => (((r.content as Record<string, unknown>).user_stories as Array<{ id?: string }>) ?? []))
+        .map(s => s.id)
+        .filter((x): x is string => typeof x === 'string'),
+    );
+    const componentDrops = deterministicComponentDrops(
+      componentContent.components, domainsContent.domains, acceptedBizDomainIds, acceptedUserStoryIds,
+    );
+    const compDropSet = new Set(componentDrops.map(d => d.id));
+    // finalKeptComps drives BOTH the artifact and the 4.2a saturation seed.
+    const finalKeptComps = componentContent.components.filter(c => !compDropSet.has(c.id));
+
+    // Surface LLM-vs-deterministic disagreement for the audit trail.
+    const llmDroppedIds = new Set(compPrune.skipped ? [] : compPrune.dropped.map(d => d.id));
+    const disagreements = componentContent.components
+      .filter(c => llmDroppedIds.has(c.id) && !compDropSet.has(c.id))
+      .map(c => c.id);
+    if (componentDrops.length > 0 || disagreements.length > 0) {
+      getLogger().info('workflow', 'Deterministic component-scope filter (authoritative)', {
+        workflow_run_id: workflowRun.id,
+        deterministic_dropped: componentDrops.map(d => d.id),
+        llm_advisory_dropped: [...llmDroppedIds],
+        kept_over_llm_advice: disagreements,
+        accepted_business_domains: [...acceptedBizDomainIds],
+      });
+    }
+
+    if (componentDrops.length > 0) {
+      const prunedCompContent = { ...componentContent, components: finalKeptComps };
       const prunedCompRecord = engine.writer.writeRecord({
         record_type: 'artifact_produced',
         schema_version: '1.0',
@@ -233,6 +390,40 @@ export class Phase4Handler implements PhaseHandler {
       componentRecord = prunedCompRecord;
       artifactIds.push(prunedCompRecord.id);
     }
+    // Authoritative deterministic audit record (the LLM's advisory
+    // scope_prune_decision was already written by runDownstreamScopeGatekeeper).
+    if (componentDrops.length > 0) {
+      engine.writer.writeRecord({
+        record_type: 'scope_prune_decision',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '4',
+        sub_phase_id: 'component_skeleton',
+        produced_by_agent_role: 'architecture_agent',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [componentRecord.id],
+        content: {
+          kind: 'scope_prune_decision',
+          schemaVersion: '1.0',
+          sub_phase_id: 'component_skeleton',
+          original_artifact_id: componentRecord.id,
+          pruned_artifact_id: componentRecord.id,
+          kept_ids: finalKeptComps.map(c => c.id),
+          dropped: componentDrops.map(d => ({ id: d.id, reason: d.reason })),
+          rationale_summary: 'Authoritative deterministic component-scope filter: domain 2-hop (software domain must map to an accepted business domain) + user-story coverage (must trace to >=1 accepted story, unless cross-cutting with no traces_to). LLM gatekeeper is advisory only.',
+          gatekeeper_provider: 'deterministic',
+          gatekeeper_model: 'component_scope_filter_v2',
+          duration_ms: 0,
+        } as unknown as Record<string, unknown>,
+      });
+    }
+
+    // Collapse the in-memory component set to the kept components so EVERY
+    // downstream use within this phase (4.2a saturation seed, 4.3 ADR
+    // capture, 4.5 consistency check, metrics) sees the same pruned set.
+    // Safe: the original un-pruned artifact (written above) was already
+    // serialized to the DB; this mutation only affects in-memory reads.
+    componentContent.components = finalKeptComps;
 
     // ── 4.2a — Recursive Component Decomposition (Wave 7) ─────
     engine.stateMachine.setSubPhase(workflowRun.id, 'component_saturation');
@@ -267,7 +458,12 @@ export class Phase4Handler implements PhaseHandler {
       rootNodeRecordIds = existingRoots.map(r => r.id);
       rootLogicalIds = existingRoots.map(r => (r.content as unknown as ComponentDecompositionNodeContent).node_id);
     } else {
-      rootComponents = componentContent.components.map(c => ({
+      // Seed saturation from the DETERMINISTICALLY PRUNED set (finalKeptComps),
+      // NOT the un-pruned componentContent.components — otherwise the
+      // gatekeeper/scope prune is cosmetic and dropped components re-enter
+      // downstream as depth-0 roots (ts-116: artifact said 3, saturation
+      // re-expanded to 7).
+      rootComponents = finalKeptComps.map(c => ({
         id: c.id,
         name: c.name,
         domain_id: c.domain_id ?? null,

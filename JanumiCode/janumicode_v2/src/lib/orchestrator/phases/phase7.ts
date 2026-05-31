@@ -496,7 +496,10 @@ function backfillMissingComponentSuites(
       test_type: 'integration',
       test_cases: [{
         test_case_id: `TC-AUTO-${compId}-001`,
-        type: 'functional',
+        // Mirror the parent suite's `test_type: 'integration'`. The
+        // TestCase.type union doesn't include 'functional' — the
+        // previous value caused a TS2322 here.
+        type: 'integration',
         acceptance_criterion_ids: [],
         preconditions: [`Component ${compId} is deployed and reachable.`],
         expected_outcome: `Component ${compId} responds to its primary interface call without error (stub — 7.1a saturation will refine this against component responsibilities).`,

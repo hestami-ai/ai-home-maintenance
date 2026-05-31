@@ -228,7 +228,17 @@ export class OrchestratorEngine {
     // the cascade-skip optimization that auto-resumes pauses for
     // sub-phases that produced zero records this process (cached
     // replays during --resume-from-db flows).
-    configureAuditPause({ workspaceRoot: workspacePath, db });
+    // ackTimeoutSeconds: env override for long interactive audits. The
+    // default (4h) is fine for unattended abort-on-abandon, but an agent
+    // walking every sub-phase across a multi-hour session can leave a
+    // pause outstanding longer than that while implementing a fix — which
+    // would kill the run mid-audit (ts-115 died this way). Operators set
+    // JANUMICODE_AUDIT_ACK_TIMEOUT_SECONDS to widen the window.
+    const ackTimeoutEnv = process.env.JANUMICODE_AUDIT_ACK_TIMEOUT_SECONDS;
+    const ackTimeoutSeconds = ackTimeoutEnv && Number.isFinite(Number(ackTimeoutEnv))
+      ? Number(ackTimeoutEnv)
+      : undefined;
+    configureAuditPause({ workspaceRoot: workspacePath, db, ackTimeoutSeconds });
 
     // AODD observability layer (docs/design/aodd-{principles,design}.md).
     // Parallel observability surface for AI coding agents finishing v2;

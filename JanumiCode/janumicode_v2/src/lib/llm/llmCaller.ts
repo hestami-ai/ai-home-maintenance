@@ -874,6 +874,31 @@ export class LLMCaller {
         try {
           const result = await adapter.call(streamingOptions);
           result.retryAttempts = retryAttempts;
+          // Layer 2a — DETERMINISTIC structural recovery FIRST. Before the
+          // expensive LLM repair, try cheap brace/bracket-balancing +
+          // trailing-comma stripping (`tryParseJson`). Models reliably
+          // miscount closers on deeply nested output (Phase 5
+          // api_definitions); this salvages the model's REAL content
+          // without an extra LLM round-trip or risk of semantic drift.
+          if (
+            options.responseFormat === 'json' &&
+            !result.parsed &&
+            typeof result.text === 'string' &&
+            result.text.trim().length > 0 &&
+            options.traceContext?.agentRole !== 'json_repair' &&
+            options.traceContext?.agentRole !== 'reasoning_review'
+          ) {
+            const { tryParseJson } = await import('./jsonRecovery.js');
+            const recov = tryParseJson(result.text);
+            if (recov.parsed && recov.structurallyRepaired) {
+              result.parsed = recov.parsed;
+              aoddEmit(
+                'repair.json_succeeded',
+                { strategy: 'deterministic_structural', repaired: maybeSpillText(recov.jsonText ?? '') },
+                { invocation_id: invocationId ?? undefined, sub_phase_id_override: traceSubPhaseId, agent_role: traceAgentRole ?? undefined },
+              );
+            }
+          }
           // LLM-based JSON repair fallback (json_repair agent role): if
           // the call requested json and the response didn't parse, hand
           // the broken text to a dedicated repair sequence (primary →

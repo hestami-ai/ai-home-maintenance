@@ -187,7 +187,10 @@ export class Phase6Handler implements PhaseHandler {
       bloomDescription: 'implementation tasks',
       items: planContent.tasks.map(t => ({
         id: t.id,
-        label: `${t.id}: ${t.name} [component: ${t.component_id ?? '?'}]`,
+        // ImplementationTask has no short `name` field — the full task
+        // text lives in `description`, which is already routed to the
+        // gatekeeper via the field below. Keeping the label compact.
+        label: `${t.id} [component: ${t.component_id ?? '?'}]`,
         description: t.description,
         tradeoffs: t.component_responsibility ?? undefined,
       })),

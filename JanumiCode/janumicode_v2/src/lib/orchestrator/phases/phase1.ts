@@ -71,6 +71,7 @@ import { traceNormalize } from '../../trace/traceNormalize';
 import {
   runScopeGatekeeperPrune,
   buildReleasePlanGatekeeperPrompt,
+  stripSelfProducedAcceptedSets,
   type GatekeeperUpstreamContext,
 } from '../scopeGatekeeper';
 import type { ScopePruneDecisionContent } from '../../types/records';
@@ -2135,7 +2136,11 @@ fabricates a new threshold is unsupported.`,
     }
 
     // Build upstream-extraction context from already-persisted artifacts.
-    const upstream = this.collectGatekeeperUpstreamContext(ctx);
+    // Pass subPhaseId so the collector can strip this gatekeeper's OWN
+    // un-pruned bloom output from the accepted sets (it's written before
+    // the gatekeeper runs; feeding it back as "already accepted" biases
+    // the LLM toward keep-all — see stripSelfProducedAcceptedSets).
+    const upstream = this.collectGatekeeperUpstreamContext(ctx, subPhaseId);
 
     const diRoute = engine.configManager.getRoutingModel('domain_interpreter');
     const result = await runScopeGatekeeperPrune(
@@ -2206,7 +2211,7 @@ fabricates a new threshold is unsupported.`,
    * latest current-version Phase 1 extraction artifacts from the
    * governed stream.
    */
-  private collectGatekeeperUpstreamContext(ctx: PhaseContext): GatekeeperUpstreamContext {
+  private collectGatekeeperUpstreamContext(ctx: PhaseContext, subPhaseId?: string): GatekeeperUpstreamContext {
     const { engine, workflowRun } = ctx;
     const all = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
     const byKind = new Map<string, Record<string, unknown>>();
@@ -2253,7 +2258,9 @@ fabricates a new threshold is unsupported.`,
         ? (eb.entities as Array<Record<string, unknown>>).map(e => ({ id: String(e.id), name: String(e.name ?? ''), businessDomainId: typeof e.businessDomainId === 'string' ? e.businessDomainId : undefined }))
         : undefined,
     };
-    return ctx_;
+    // Strip the accepted set(s) this gatekeeper's own bloom produced so
+    // it doesn't see its un-pruned proposal as "already accepted".
+    return subPhaseId ? stripSelfProducedAcceptedSets(ctx_, subPhaseId) : ctx_;
   }
 
   /**
