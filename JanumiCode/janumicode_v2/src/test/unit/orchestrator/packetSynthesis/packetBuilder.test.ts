@@ -324,3 +324,57 @@ describe('buildPackets — happy path', () => {
     expect(ids.size).toBe(3);
   });
 });
+
+import { canonicalUsId, findNfrsByUserStories } from '../../../../lib/orchestrator/phases/packetSynthesis/packetBuilder';
+
+describe('canonicalUsId — leaf→canonical US-id reduction (ts-118 fix)', () => {
+  it('reduces a decomposed leaf to its canonical parent', () => {
+    expect(canonicalUsId('US-004-1')).toBe('US-004');
+    expect(canonicalUsId('US-004-2')).toBe('US-004');
+    expect(canonicalUsId('US-012-3')).toBe('US-012');
+  });
+  it('reduces a D-suffixed leaf', () => {
+    expect(canonicalUsId('US-004-D1')).toBe('US-004');
+  });
+  it('reduces a MULTI-LEVEL nested leaf in one step (ts-119 upstream fix)', () => {
+    // fr_saturation now mints nested ids (nestChildStoryId) so a
+    // drifted FR-named leaf becomes US-001-1 / US-001-1-1.
+    expect(canonicalUsId('US-001-1-1')).toBe('US-001');
+    expect(canonicalUsId('US-004-2-3')).toBe('US-004');
+    expect(canonicalUsId('US-001-1-1-1')).toBe('US-001');
+    expect(canonicalUsId('US-004-D1-2')).toBe('US-004');
+  });
+  it('leaves a canonical US id unchanged', () => {
+    expect(canonicalUsId('US-004')).toBe('US-004');
+    expect(canonicalUsId('US-016')).toBe('US-016');
+  });
+  it('leaves non-US / FR-named ids unchanged', () => {
+    expect(canonicalUsId('FR-URL-SHORTEN-1.1')).toBe('FR-URL-SHORTEN-1.1');
+    expect(canonicalUsId('NFR-003')).toBe('NFR-003');
+  });
+});
+
+describe('findNfrsByUserStories — bridge NFRs via applies_to_requirements (ts-118 fix)', () => {
+  const nfrs: BuilderNfr[] = [
+    { id: 'NFR-001', applies_to_requirements: ['US-004', 'US-006'], traces_to: ['VV-LAT'] },
+    { id: 'NFR-002', applies_to_requirements: ['US-009'], traces_to: ['COMP-GDPR'] },
+    { id: 'NFR-003', traces_to: ['QA-1'] }, // no applies_to → cross-cutting, not bridged here
+  ];
+  it('matches NFRs whose applies_to_requirements intersects the (expanded) US set', () => {
+    const out = findNfrsByUserStories(new Set(['US-004-1', 'US-004']), nfrs);
+    expect(out.map((n) => n.id)).toEqual(['NFR-001']);
+  });
+  it('matches multiple NFRs across the US set', () => {
+    const out = findNfrsByUserStories(new Set(['US-004', 'US-009']), nfrs);
+    expect(out.map((n) => n.id).sort()).toEqual(['NFR-001', 'NFR-002']);
+  });
+  it('returns nothing when no canonical US overlaps (leaf-only set, the ts-118 0% case)', () => {
+    // Before the canonicalUsId expansion, only the leaf id would be in the
+    // set and nothing matched. The CALLER must seed canonical ids.
+    expect(findNfrsByUserStories(new Set(['US-004-1']), nfrs)).toEqual([]);
+  });
+  it('does not bridge NFRs lacking applies_to_requirements', () => {
+    const out = findNfrsByUserStories(new Set(['US-004', 'US-009', 'US-006']), nfrs);
+    expect(out.map((n) => n.id)).not.toContain('NFR-003');
+  });
+});

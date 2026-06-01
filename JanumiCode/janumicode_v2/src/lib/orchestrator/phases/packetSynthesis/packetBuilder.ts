@@ -289,6 +289,37 @@ function findNfrsForTask(
   return matched;
 }
 
+/**
+ * Reduce a (possibly multi-level decomposed-leaf) user-story id to its
+ * CANONICAL parent: `US-004-1` / `US-004-D1` / `US-004-1-1` → `US-004`.
+ * Canonical `US-004`, NFR/FR ids, and non-matching forms are returned
+ * unchanged. This bridges the leaf↔canonical namespace gap: packets match
+ * leaf stories (fr_saturation, which now mints nested ids like
+ * `US-001-1-1`), but NFR.applies_to_requirements and eval target_id key
+ * on the canonical fr_bloom ids. The `(?:-D?\d+)+` tail strips every
+ * nesting segment so leaves at any decomposition depth reduce in one step.
+ */
+export function canonicalUsId(id: string): string {
+  const m = /^(US-\d+)(?:-D?\d+)+$/.exec(id);
+  return m ? m[1] : id;
+}
+
+/**
+ * Bridge NFRs to a task via the user stories the task implements: return
+ * every NFR whose `applies_to_requirements` intersects `usIds` (which the
+ * caller seeds with both leaf and canonical story ids). Complements
+ * `findNfrsForTask` (trace/component passes) for the common case where
+ * tasks trace SR-* and NFRs predate components, so the only link is
+ * NFR→US.
+ */
+export function findNfrsByUserStories(usIds: Set<string>, nfrs: BuilderNfr[]): BuilderNfr[] {
+  const out: BuilderNfr[] = [];
+  for (const n of nfrs) {
+    if ((n.applies_to_requirements ?? []).some((r) => usIds.has(r))) out.push(n);
+  }
+  return out;
+}
+
 function toPacketUserStory(us: BuilderUserStory): PacketUserStory {
   return {
     id: us.id,
@@ -548,8 +579,25 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
       provisionalAcParents,
     );
 
-    const usIds = new Set(matchedUs.map((us) => us.id));
-    const nfrIds = new Set(matchedNfrs.map((n) => n.id));
+    // Expand matched story ids (often DECOMPOSED leaves, e.g. US-004-1)
+    // with their CANONICAL parents (US-004) so the NFR / eval / compliance
+    // joins — which key on canonical US ids — resolve. ts-118: packets
+    // matched leaf US-004-1 while NFR.applies_to_requirements and eval
+    // target_id use canonical US-004, giving zero overlap → nfrs/evals/
+    // compliance all 0%.
+    const usIds = new Set<string>();
+    for (const us of matchedUs) {
+      usIds.add(us.id);
+      usIds.add(canonicalUsId(us.id));
+    }
+    // Bridge NFRs that GOVERN the matched user stories. findNfrsForTask's
+    // trace/component passes miss them here (tasks trace SR-*; NFRs predate
+    // Phase-4 components), but NFR.applies_to_requirements carries the
+    // canonical US ids the matched leaves normalize to.
+    const directNfrIds = new Set(matchedNfrs.map((n) => n.id));
+    const bridgedNfrs = findNfrsByUserStories(usIds, input.nfrs).filter((n) => !directNfrIds.has(n.id));
+    const allNfrs = [...matchedNfrs, ...bridgedNfrs];
+    const nfrIds = new Set(allNfrs.map((n) => n.id));
     const acIds = new Set<string>();
     for (const us of matchedUs) {
       for (const ac of us.acceptance_criteria ?? []) acIds.add(ac.id);
@@ -597,7 +645,7 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
     for (const us of matchedUs) collectFromTraces(us.traces_to);
     if (comp) collectFromTraces(comp.traces_to);
     collectFromTraces(task.traces_to);
-    for (const n of matchedNfrs) collectFromTraces(n.traces_to);
+    for (const n of allNfrs) collectFromTraces(n.traces_to);
     const complianceItems = buildComplianceItems(complianceRefs, input.complianceItemsById);
 
     // depends_on_packets — translate dependency_task_ids → packet ids.
@@ -615,7 +663,7 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
       packet_id: packetId,
       task: toPacketTask(t),
       user_stories: matchedUs.map(toPacketUserStory),
-      nfrs: matchedNfrs.map(toPacketNfr),
+      nfrs: allNfrs.map(toPacketNfr),
       component: packetComponent,
       data_models: dataModels,
       api_definitions: apis,

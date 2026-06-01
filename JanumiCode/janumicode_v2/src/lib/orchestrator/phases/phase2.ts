@@ -81,6 +81,63 @@ function collisionSafeDisplayKey(
   return `${rawStoryId}#${logicalNodeId.slice(0, 4)}`;
 }
 
+/**
+ * A parent display key that sits in the canonical `US-NNN` / `NFR-NNN`
+ * lineage that packet_synthesis joins on — including already-nested
+ * descendants (`US-001-1`, `NFR-002-001`, `US-004-D1-2`). Only children
+ * under such a parent are id-normalized (see nestChildStoryId); generic
+ * decomposition trees with other root namespaces are left untouched.
+ */
+const CANONICAL_LINEAGE_KEY_RE = /^(?:US|NFR)-\d+(?:-D?\d+)*$/;
+
+/**
+ * Normalize a saturation child's `user_story.id` so it nests under its
+ * parent's display key — guaranteeing a pure-string path from any leaf
+ * back to its canonical root (`US-001` → `US-001-1` → `US-001-1-1`).
+ *
+ * The decomposer LLM usually emits a nested id (`US-004` → `US-004-1`),
+ * but sometimes drifts to an unrelated namespace (parent `US-001` →
+ * child `FR-URL-SHORTEN-1.1`). That drift severs the string path that
+ * packet_synthesis walks to match a leaf to its canonical user story /
+ * NFRs, so those packets fill `nfrs`/`evaluation_criteria`/`compliance`
+ * at 0%. The authoritative UUID linkage (`node_id` / `parent_node_id` /
+ * `root_fr_id`) is unaffected either way; this only repairs the
+ * presentational id, which is what actually flows downstream into joins.
+ *
+ * Scope: ONLY repairs children whose parent sits in the `US-`/`NFR-`
+ * canonical lineage (the namespace packet_synthesis joins on). Parents
+ * in any other namespace pass their children through verbatim, so
+ * generic decomposition trees are unaffected.
+ *
+ * Conforming ids (already prefixed by `${parent}-`) pass through
+ * unchanged. Non-conforming ids are rewritten to `${parent}-${index}`.
+ * The result is de-duplicated against sibling ids already assigned this
+ * batch so a derived id can never collide with a kept LLM id.
+ */
+export function nestChildStoryId(
+  rawId: string,
+  parentDisplayKey: string,
+  childIndex: number,
+  takenSiblingIds: Set<string>,
+): string {
+  // Only normalize within the canonical US/NFR lineage joined downstream.
+  if (!CANONICAL_LINEAGE_KEY_RE.test(parentDisplayKey)) {
+    takenSiblingIds.add(rawId);
+    return rawId;
+  }
+  let id = rawId;
+  if (!rawId.startsWith(`${parentDisplayKey}-`)) {
+    id = `${parentDisplayKey}-${childIndex}`;
+  }
+  if (takenSiblingIds.has(id)) {
+    let n = childIndex + 1;
+    while (takenSiblingIds.has(`${id}-${n}`)) n++;
+    id = `${id}-${n}`;
+  }
+  takenSiblingIds.add(id);
+  return id;
+}
+
 // ── Release-plan propagation (Wave 6 — release prioritization) ─────
 
 /**
@@ -1463,6 +1520,10 @@ export class Phase2Handler implements PhaseHandler {
           // LLM's repeated use of e.g. `FR-ACCT-1.1` for multiple children
           // under the same parent resolves to distinct display labels.
           const siblingDisplayKeys = new Set<string>();
+          // Track the canonical-nested `user_story.id` assigned to each
+          // sibling so a drift-repaired id can never collide with a kept
+          // LLM id (see nestChildStoryId).
+          const siblingStoryIds = new Set<string>();
           let fanoutCount = 0;
           for (const c of childrenRaw) {
             if (++fanoutCount > caps.fanout_cap) {
@@ -1474,6 +1535,13 @@ export class Phase2Handler implements PhaseHandler {
             }
             const story = sanitizeChildStory(c, { rootId: entry.displayKey, childIndex: fanoutCount });
             if (!story) continue;
+            // Drift repair: force the leaf id to nest under its parent so
+            // packet_synthesis can walk leaf → canonical root by string
+            // (parent `US-001` → child `US-001-1`, not the LLM's drifted
+            // `FR-URL-SHORTEN-1.1`). Runs BEFORE AC minting + display-key
+            // so both anchor on the corrected id and children queued from
+            // this node inherit the nested parent key. See nestChildStoryId.
+            story.id = nestChildStoryId(story.id, entry.displayKey, fanoutCount, siblingStoryIds);
             // Phase-exit correction: mint composite AC ids anchored on
             // the leaf's own story.id (`AC-{story.id}-NNN`). Each leaf
             // carries its own AC namespace; downstream consumers join

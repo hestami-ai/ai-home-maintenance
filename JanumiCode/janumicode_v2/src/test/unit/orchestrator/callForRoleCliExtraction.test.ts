@@ -95,11 +95,13 @@ describe('callForRole — CLI text extraction via stdoutText', () => {
     expect(result.parsed?.overall_status).toBe('pass');
   });
 
-  it('does NOT locally recover trailing-comma pathologies (handed to LLM repair)', async () => {
-    // Local regex recovery passes were removed — JSON malformations are
-    // now handled by the json_repair LLM fallback (separate test path).
-    // Confirm that a clearly-broken JSON returns parsed=null here so
-    // the upstream caller knows to dispatch repair (or halt).
+  it('locally recovers trailing-comma pathologies via deterministic structural repair', async () => {
+    // The json-repair fix added a deterministic structural-repair pass
+    // (jsonRecovery.repairStructuralJson, run from llmCaller BEFORE the
+    // LLM repair fallback). Trailing commas are now stripped locally — no
+    // LLM round-trip needed — so a single common malformation parses
+    // cleanly here. Genuinely unrecoverable JSON still falls through to
+    // the LLM repair path (covered separately).
     const stdout = `{
   "completeness_findings": [
     {"field": "x", "status": "present", "severity": "low", "explanation": "ok",},
@@ -112,7 +114,11 @@ describe('callForRole — CLI text extraction via stdoutText', () => {
       prompt: 'IQC prompt',
       responseFormat: 'json',
     });
-    expect(result.parsed).toBeNull();
+    expect(result.parsed).not.toBeNull();
+    expect(result.parsed?.overall_status).toBe('pass');
+    const findings = result.parsed?.completeness_findings as Array<{ field: string }>;
+    expect(findings).toHaveLength(1);
+    expect(findings[0].field).toBe('x');
   });
 
   it('falls back to extractFinalText when stdoutText is absent (older CLI invoker mocks)', async () => {

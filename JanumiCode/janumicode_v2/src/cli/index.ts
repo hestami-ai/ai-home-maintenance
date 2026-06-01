@@ -129,7 +129,11 @@ function lookupParentPid(pid: number): number | null {
   return null;
 }
 
-installParentWatcher();
+// NOTE: installParentWatcher() is deliberately NOT called here at module
+// scope. Its startup line writes to stderr, which would contaminate the
+// bootstrap-error JSON envelope (also stderr) that machine consumers parse
+// on exit 4. The watcher only matters during the long-running pipeline, so
+// it is installed inside the `run` action AFTER bootstrap validation passes.
 
 // Load .env BEFORE any subprocess could spawn. The Gemini CLI
 // (Orchestrator backing), Claude Code (Phase 9 executor), and Ollama
@@ -203,6 +207,12 @@ program
         process.exit(4);
       }
     }
+
+    // Bootstrap validation passed — now install the ancestor watcher for
+    // the long-running pipeline. Installed here (not at module scope) so
+    // its stderr startup line can't contaminate the bootstrap-error JSON
+    // envelope that exit-4 consumers parse from stderr.
+    installParentWatcher();
 
     const config: PipelineRunnerConfig = {
       workspacePath,
