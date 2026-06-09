@@ -26,6 +26,7 @@ import type {
   PacketUserStory,
 } from '../../../types/records';
 import { parentRefFromCompositeAc } from '../phase2/acIdNormalizer';
+import type { RequirementLineage } from './idResolution';
 
 // ── Input shapes (just enough structural typing to build the packet) ──
 
@@ -141,8 +142,26 @@ export interface BuilderTestSuite {
     type?: string;
     acceptance_criterion_ids?: string[];
     preconditions?: string[];
-    expected_outcome?: string;
+    // The LLM (test_case_saturation) sometimes emits expected_outcome as an
+    // ARRAY of outcome strings rather than a single string. Typed as unknown
+    // so the coercion below is forced; never assume `.trim()` is callable.
+    expected_outcome?: unknown;
   }>;
+}
+
+/**
+ * Coerce an LLM-emitted expected_outcome (string | string[] | other) to a
+ * single trimmed string. An array of outcomes becomes a `; `-joined string so
+ * no assertion text is lost; non-string scalars stringify; nullish → ''.
+ * Centralised so the packet producer and the coherence verifier agree.
+ */
+export function coerceOutcomeString(raw: unknown): string {
+  if (typeof raw === 'string') return raw.trim();
+  if (Array.isArray(raw)) {
+    return raw.filter((x): x is string => typeof x === 'string').map((x) => x.trim()).filter(Boolean).join('; ');
+  }
+  if (raw == null) return '';
+  return String(raw).trim();
 }
 
 export interface BuilderEvaluationCriterion {
@@ -193,6 +212,17 @@ export interface BuilderInput {
   technicalConstraintsById: Map<string, BuilderTechnicalConstraint>;
   /** Phase 1.0d/0e/1.5 compliance / V&V / QA items lookup by id. */
   complianceItemsById: Map<string, BuilderComplianceItem>;
+  /** Lever 1a cross-cutting NFR concerns (delivered as constraints, not tasks). */
+  crossCuttingConstraints: BuilderCrossCuttingConstraint[];
+  /** Pillar C — cross-phase SR→US/NFR resolver (the primary task→US/NFR join). */
+  lineage: RequirementLineage;
+}
+
+export interface BuilderCrossCuttingConstraint {
+  id: string;
+  name: string;
+  responsibilities: string[];
+  applies_to_components: string[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -203,8 +233,37 @@ function findUserStoriesForTask(
   componentsById: Map<string, BuilderComponent>,
   matchedNfrs: BuilderNfr[],
   testCaseAcParents: Set<string>,
+  lineage: RequirementLineage,
 ): BuilderUserStory[] {
-  // Each pass is short-circuit: first non-empty result wins.
+  // Pass 0′ (MOST PRECISE) — task→leaf-AC→story. A Phase-6 task that cites the
+  // specific leaf AC ids it implements (in traces_to) resolves to exactly the
+  // leaf stories owning those ACs — the whole point of the Phase-6 binding.
+  // Scopes the packet to the task's slice, not the whole component. Each matched
+  // story is TRIMMED to the ACs the task actually cites (a leaf story can span
+  // several tasks); otherwise the packet would carry sibling-task ACs that have
+  // no test in THIS packet and fire P3. Falls through when a task carries no
+  // leaf AC ids (refactoring tasks / pre-binding runs), preserving the passes below.
+  const citedAcIds = new Set((task.traces_to ?? []).filter((t) => t.startsWith('AC-')));
+  const { storyIds: acStoryIds } = lineage.resolveAcs(citedAcIds);
+  if (acStoryIds.size > 0) {
+    const mAc = userStories
+      .filter((us) => acStoryIds.has(us.id))
+      .map((us) => ({ ...us, acceptance_criteria: (us.acceptance_criteria ?? []).filter((ac) => citedAcIds.has(ac.id)) }))
+      .filter((us) => us.acceptance_criteria.length > 0);
+    if (mAc.length > 0) return mAc;
+  }
+
+  // Pass 0 (PRIMARY) — deterministic SR→US/NFR lineage bridge (Pillar C):
+  // a task tracing SR-*/NFR-* resolves to the canonical US ids it serves via
+  // system_requirements.source_requirement_ids + NFR.applies_to_requirements.
+  // This is what fills user_stories (was ~0% before). The passes below remain
+  // as fallback for runs where the lineage is incomplete.
+  const { usIds: resolvedUs } = lineage.resolveTraces(task.traces_to ?? []);
+  if (resolvedUs.size > 0) {
+    const m0 = userStories.filter((us) => resolvedUs.has(us.id) || resolvedUs.has(lineage.canonicalize(us.id)));
+    if (m0.length > 0) return m0;
+  }
+  // Each remaining pass is short-circuit: first non-empty result wins.
   let matched = matchUsViaTaskTraces(task, userStories);
   if (matched.length > 0) return matched;
   matched = matchUsViaComponent(task, userStories, componentsById);
@@ -270,7 +329,15 @@ function findNfrsForTask(
   task: BuilderAtomicTask['content']['task'],
   nfrs: BuilderNfr[],
   componentsById: Map<string, BuilderComponent>,
+  lineage: RequirementLineage,
 ): BuilderNfr[] {
+  // Pass 0 (PRIMARY) — lineage bridge: SR.source_requirement_ids carries the
+  // NFR ids a task's SR traces derive from.
+  const { nfrIds: resolvedNfr } = lineage.resolveTraces(task.traces_to ?? []);
+  if (resolvedNfr.size > 0) {
+    const m0 = nfrs.filter((n) => resolvedNfr.has(n.id) || resolvedNfr.has(lineage.canonicalize(n.id)));
+    if (m0.length > 0) return m0;
+  }
   const traces = new Set(task.traces_to ?? []);
   const matched: BuilderNfr[] = [];
 
@@ -290,18 +357,41 @@ function findNfrsForTask(
 }
 
 /**
- * Reduce a (possibly multi-level decomposed-leaf) user-story id to its
- * CANONICAL parent: `US-004-1` / `US-004-D1` / `US-004-1-1` → `US-004`.
- * Canonical `US-004`, NFR/FR ids, and non-matching forms are returned
- * unchanged. This bridges the leaf↔canonical namespace gap: packets match
- * leaf stories (fr_saturation, which now mints nested ids like
- * `US-001-1-1`), but NFR.applies_to_requirements and eval target_id key
- * on the canonical fr_bloom ids. The `(?:-D?\d+)+` tail strips every
- * nesting segment so leaves at any decomposition depth reduce in one step.
+ * Collapse a matched user-story set to a single, consistent LEAF granularity
+ * (the deterministic task→leaf binding). Group the stories by their canonical
+ * root; for any group that contains a decomposed leaf, DROP the root and keep
+ * the leaves — the root is represented by its leaves, which carry the leaf ACs
+ * that the (leaf-grained) Phase-7 tests reference. A group with only its
+ * never-decomposed root keeps the root unchanged.
+ *
+ * Without this, a packet double-lists `US-001` (root, ACs `AC-US001-001`) AND
+ * its leaves (`US-001-01-1`, ACs `AC-US-001-01-1-001`); the root ACs have no
+ * leaf test, so the coherence verifier fires P3_AC_NO_TEST on every one. After
+ * collapse the packet carries only the leaf stories the task implements, whose
+ * ACs the packet's tests cover.
+ *
+ * `canonicalize` MUST be the structural decomposition-tree resolver
+ * (`lineage.canonicalize`) — leaf-vs-root is decided by walking the real
+ * `requirement_decomposition_node` parent tree, never a regex on the id string
+ * (no regex reliably models the LLM-minted leaf-id space).
  */
-export function canonicalUsId(id: string): string {
-  const m = /^(US-\d+)(?:-D?\d+)+$/.exec(id);
-  return m ? m[1] : id;
+export function preferLeafStories<T extends { id: string }>(
+  stories: T[],
+  canonicalize: (id: string) => string,
+): T[] {
+  const byRoot = new Map<string, T[]>();
+  for (const s of stories) {
+    const root = canonicalize(s.id);
+    const group = byRoot.get(root);
+    if (group) group.push(s);
+    else byRoot.set(root, [s]);
+  }
+  const out: T[] = [];
+  for (const [root, group] of byRoot) {
+    const leaves = group.filter((s) => s.id !== root);
+    out.push(...(leaves.length > 0 ? leaves : group));
+  }
+  return out;
 }
 
 /**
@@ -394,7 +484,7 @@ function findApisForComponent(componentId: string, apis: BuilderApiDef[]): Packe
     }));
 }
 
-function findTestCasesForAcs(
+export function findTestCasesForAcs(
   acIds: Set<string>,
   usIds: Set<string>,
   testSuites: BuilderTestSuite[],
@@ -402,8 +492,30 @@ function findTestCasesForAcs(
 ): PacketTestCase[] {
   const out: PacketTestCase[] = [];
   for (const suite of testSuites) {
-    // Pass 2 path (component-id match) — picks up entire suites attached
-    // to the task's component when AC-id matching misses.
+    // Suite→packet binding is driven by the AC/US id INTERSECTION below, not
+    // by suite.component_id. Phase 7 organizes (and groups) its suites by the
+    // coarse ROOT component model (comp-url-shortening), while Phase-9 packets
+    // are scoped to the SATURATED LEAF components (comp-creation-api,
+    // comp-slug-generator, …) that Phase 4.1a decomposed those roots into.
+    // A hard `suite.component_id !== task.component_id` filter therefore
+    // discarded every root-component suite from its own descendant leaf
+    // packets, leaving them with zero test cases (the P3_AC_NO_TEST flood:
+    // 162/192 packets had no tests though every packet AC was in fact covered
+    // by a root-suite case). We no longer pre-filter by component.
+    //
+    // Bleed is prevented STRUCTURALLY by the leaf-AC namespace, not by the
+    // component filter: since the task→leaf-AC binding, each packet's `acIds`
+    // are the precise leaf ACs that one task implements (AC-US-001-1-003 maps
+    // to exactly one leaf story → one task → one component). A test case binds
+    // only when it references one of THIS packet's exact leaf ACs, so a
+    // url-shortener case can never land in a persistence packet — their leaf
+    // AC sets are disjoint. (The earlier cross-component bleed predated leaf-AC
+    // binding, when packets carried whole-story ACs shared across components.)
+
+    // Whole-suite pull — only when the suite is keyed to THIS task's exact
+    // component. Kept narrow (exact match, never an ancestor) so a root suite
+    // is NOT bulk-attached to every descendant leaf packet; the precise AC/US
+    // intersection below is what pulls each leaf its own cases.
     const suiteMatchesComponent =
       !!componentId && !!suite.component_id && suite.component_id === componentId;
 
@@ -423,7 +535,7 @@ function findTestCasesForAcs(
           type: tc.type ?? 'functional',
           acceptance_criterion_ids: refs,
           preconditions: tc.preconditions ?? [],
-          expected_outcome: tc.expected_outcome ?? '',
+          expected_outcome: coerceOutcomeString(tc.expected_outcome),
         });
       }
     }
@@ -529,6 +641,34 @@ function toPacketTask(t: BuilderAtomicTask): PacketTask {
   };
 }
 
+/**
+ * Bind each completion criterion to the packet test cases that cover it.
+ * A criterion is covered by a test case when the test references one of the
+ * criterion's `verifies_acceptance_criteria` (Phase-6 minted, validated) — or,
+ * when the criterion cites no AC, by any of the task's own ACs (`taskAcIds`),
+ * so leaf tasks whose criteria don't carry explicit AC links still bind to
+ * their AC-bound tests. Returns the completion criteria with
+ * `covered_by_test_ids` populated (deterministic; no fabrication).
+ */
+export function bindCompletionCriteriaToTests(
+  completionCriteria: PacketTask['completion_criteria'],
+  testCases: PacketTestCase[],
+  taskAcIds: Set<string>,
+): PacketTask['completion_criteria'] {
+  return completionCriteria.map((cc) => {
+    const linkedAcs = (cc.verifies_acceptance_criteria && cc.verifies_acceptance_criteria.length > 0)
+      ? new Set(cc.verifies_acceptance_criteria)
+      : taskAcIds;
+    const covered = new Set<string>();
+    for (const tc of testCases) {
+      if ((tc.acceptance_criterion_ids ?? []).some((ac) => linkedAcs.has(ac))) {
+        covered.add(tc.test_case_id);
+      }
+    }
+    return { ...cc, covered_by_test_ids: [...covered] };
+  });
+}
+
 // ── Main entry ─────────────────────────────────────────────────────
 
 /**
@@ -570,25 +710,54 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
 
     // Match NFRs first — US matcher's Pass 3 walks matchedNfrs[].applies_to_requirements
     // to bridge the tasks-trace-NFR-but-not-US gap.
-    const matchedNfrs = findNfrsForTask(task, input.nfrs, input.componentsById);
+    const matchedNfrs = findNfrsForTask(task, input.nfrs, input.componentsById, input.lineage);
     const matchedUs = findUserStoriesForTask(
       task,
       input.userStories,
       input.componentsById,
       matchedNfrs,
       provisionalAcParents,
+      input.lineage,
     );
+
+    // Collapse to a consistent LEAF granularity for the packet CONTENT: the
+    // leaf stories the task implements, matching its leaf-grained tests. The
+    // canonical roots are dropped from `user_stories`/`acIds` (so P3 no longer
+    // fires on un-tested root ACs) but kept in `usIds` below for the joins.
+    // Leaf-vs-root is resolved STRUCTURALLY via the decomposition tree.
+    const leafPreferredStories = preferLeafStories(matchedUs, input.lineage.canonicalize);
+
+    // Fix 4 — cross-cutting fallback containment. A task with NO leaf-AC binding
+    // (its traces_to cites no AC-* id) reaches the SR/component fallback, which
+    // can leaf-expand a broad NFR-derived story (e.g. monitoring US-007/US-008)
+    // into a dozen stories it doesn't really implement (the slice-135 13-story
+    // packet). Cap such AC-less tasks to ONE representative per canonical root so
+    // the packet doesn't balloon. Functional, AC-bound tasks are untouched.
+    const taskCitesAc = (task.traces_to ?? []).some((x) => x.startsWith('AC-'));
+    let packetStories = leafPreferredStories;
+    if (!taskCitesAc && leafPreferredStories.length > 1) {
+      const seenRoot = new Set<string>();
+      packetStories = leafPreferredStories.filter((us) => {
+        const root = input.lineage.canonicalize(us.id);
+        if (seenRoot.has(root)) return false;
+        seenRoot.add(root);
+        return true;
+      });
+    }
 
     // Expand matched story ids (often DECOMPOSED leaves, e.g. US-004-1)
     // with their CANONICAL parents (US-004) so the NFR / eval / compliance
     // joins — which key on canonical US ids — resolve. ts-118: packets
     // matched leaf US-004-1 while NFR.applies_to_requirements and eval
     // target_id use canonical US-004, giving zero overlap → nfrs/evals/
-    // compliance all 0%.
+    // compliance all 0%. (Built from matchedUs so both leaf + root ids are
+    // present even after the content-level leaf collapse above.) Canonicalize
+    // via the decomposition tree — handles every leaf form (US-002-1-D,
+    // US-002-3-Leaf) that no regex could.
     const usIds = new Set<string>();
     for (const us of matchedUs) {
       usIds.add(us.id);
-      usIds.add(canonicalUsId(us.id));
+      usIds.add(input.lineage.canonicalize(us.id));
     }
     // Bridge NFRs that GOVERN the matched user stories. findNfrsForTask's
     // trace/component passes miss them here (tasks trace SR-*; NFRs predate
@@ -599,7 +768,7 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
     const allNfrs = [...matchedNfrs, ...bridgedNfrs];
     const nfrIds = new Set(allNfrs.map((n) => n.id));
     const acIds = new Set<string>();
-    for (const us of matchedUs) {
+    for (const us of packetStories) {
       for (const ac of us.acceptance_criteria ?? []) acIds.add(ac.id);
     }
 
@@ -623,6 +792,20 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
     // Active constraints inherited from the atomic task's saturation node.
     const activeConstraintIds = task.active_constraints ?? [];
     const activeConstraints = buildActiveConstraints(activeConstraintIds, input.technicalConstraintsById);
+    // Lever 1a delivery: attach cross-cutting NFR concerns whose
+    // applies_to_components includes this task's component (or that apply to
+    // all). The executor receives them as constraints-to-honor, NOT as
+    // separate modules/tasks to build.
+    for (const cc of input.crossCuttingConstraints ?? []) {
+      const applies = cc.applies_to_components ?? [];
+      if (applies.length === 0 || applies.includes(componentId)) {
+        activeConstraints.push({
+          id: cc.id,
+          category: 'cross_cutting_nfr',
+          text: `NFR concern (${cc.name}): ${(cc.responsibilities ?? []).join('; ')}`,
+        });
+      }
+    }
 
     // Compliance items — gather all upstream COMP-*/VV-*/QA-* refs from
     // every reachable trace path:
@@ -657,12 +840,20 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
 
     const packetId = packetIdByTaskId.get(task.id) as string;
 
+    // Bind each completion criterion to its covering test cases (via its
+    // verified ACs, or the task's AC set as fallback) so the executor's
+    // authoritative deliverable is test-backed, not just the ACs.
+    const packetTask = toPacketTask(t);
+    packetTask.completion_criteria = bindCompletionCriteriaToTests(
+      packetTask.completion_criteria, testCases, acIds,
+    );
+
     packets.push({
       kind: 'implementation_packet',
       schemaVersion: '1.0',
       packet_id: packetId,
-      task: toPacketTask(t),
-      user_stories: matchedUs.map(toPacketUserStory),
+      task: packetTask,
+      user_stories: packetStories.map(toPacketUserStory),
       nfrs: allNfrs.map(toPacketNfr),
       component: packetComponent,
       data_models: dataModels,

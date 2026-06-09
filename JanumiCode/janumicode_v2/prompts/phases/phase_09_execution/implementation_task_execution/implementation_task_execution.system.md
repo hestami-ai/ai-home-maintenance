@@ -10,6 +10,7 @@ required_variables:
   - component_model_summary
   - completion_criteria
   - write_scope_constraints
+  - shared_module_constraints
   - governing_adrs
   - task_specific_test_cases
   - task_specific_eval_criteria
@@ -39,6 +40,9 @@ You are the [JC:Executor Agent] executing [JC:Implementation Task]: {{implementa
 
 ## Write Scope Constraint
 {{write_scope_constraints}}
+
+## Shared Modules — Import, Do NOT Reinvent
+{{shared_module_constraints}}
 
 ## Governing Architectural Decisions
 {{governing_adrs}}

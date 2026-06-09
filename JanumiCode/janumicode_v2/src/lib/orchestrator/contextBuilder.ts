@@ -72,8 +72,17 @@ export interface StdinContent {
 }
 
 export interface DetailFileContent {
-  /** Full Context Packet from Deep Memory Research */
+  /** Full Context Packet from Deep Memory Research (raw JSON — legacy; used by
+   *  the executor task-bundle, phase 1, and client liaison). Prefer
+   *  `hydratedPacket` for DMR context. */
   contextPacket?: string;
+  /** Curated, resolved DMR context (markdown, NOT json-fenced) produced by
+   *  `renderHydratedPacket`. Rendered first as the highest-priority section. */
+  hydratedPacket?: string;
+  /** Per-task implementation bundle (markdown/JSON) for the Phase 9 executor —
+   *  task + component contract + test cases + eval criteria. Distinct from DMR
+   *  content; rendered under its own heading to avoid the DMR mislabel. */
+  taskBundle?: string;
   /** Narrative Memories from all prior phases */
   narrativeMemories?: { phaseId: string; phaseName: string; content: string }[];
   /** Decision Traces relevant to this Sub-Phase */
@@ -229,6 +238,21 @@ export class ContextBuilder {
       `# JanumiCode Context Detail File\n` +
       `Generated: ${new Date().toISOString()}\n`,
     );
+
+    // Highest-priority section: the curated, resolved DMR reference (markdown).
+    // Rendered first so size-cap truncation sheds lower-priority sections last.
+    if (content.hydratedPacket) {
+      sections.push(content.hydratedPacket);
+    }
+
+    // Per-task implementation bundle (Phase 9 executor) under its own heading —
+    // this is task content, NOT a DMR packet, so it must not carry the DMR label.
+    if (content.taskBundle) {
+      sections.push(
+        '## Task Implementation Bundle\n\n' +
+        '```json\n' + content.taskBundle + '\n```',
+      );
+    }
 
     if (content.contextPacket) {
       sections.push(

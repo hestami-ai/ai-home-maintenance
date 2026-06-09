@@ -17,6 +17,7 @@ import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEng
 import type { PhaseId } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext } from './phaseContext';
+import { buildRequirementLineage } from './packetSynthesis/idResolution';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { runPhase8CycleDelta } from './runCycleDelta';
 import { emit as aoddEmit } from '../../aodd';
@@ -99,6 +100,51 @@ export class Phase8Handler implements PhaseHandler {
     });
 
     const evalResult = await this.runEvaluationDesign(ctx, testPlanSummary, frSummary, nfrSummary, dmr81);
+
+    // ── Deterministic eval-target canonicalization (structural, no regex) ──
+    // runEvaluationDesign (a single LLM call) emits `functional_requirement_id`s
+    // as a chaotic mix of root (US-003) and scattered decomposed leaves
+    // (US-007-2-1-D). A packet carries a DIFFERENT leaf of the same story, so it
+    // finds no eval whose target matches → P4_USER_STORY_NO_EVAL. Collapse every
+    // target to its decomposition-tree root so each story with any eval is
+    // covered at root; the packet builder's P4 bridge then satisfies all its
+    // leaves. Walk the real requirement_decomposition_node tree — never a regex.
+    const lineage = buildRequirementLineage([
+      ...allArtifacts,
+      ...engine.writer.getRecordsByType(workflowRun.id, 'requirement_decomposition_node'),
+    ]);
+    evalResult.functional_evaluation_plan.criteria = canonicalizeFunctionalEvalTargets(
+      evalResult.functional_evaluation_plan.criteria,
+      lineage.canonicalize,
+    );
+
+    // ── Eval coverage report (visibility only — NO fabricated backfill) ──
+    // Surface root US / NFR that the LLM left un-evaluated as honest gaps,
+    // mirroring Phase-7's test_coverage_report. The genuine gaps remain blocking
+    // P4/P5 failures downstream; this just makes them operator-visible.
+    const evalCoverage = computeEvalCoverage(
+      frIds, nfrIds,
+      evalResult.functional_evaluation_plan.criteria,
+      evalResult.quality_evaluation_plan.criteria,
+    );
+    const evalCoverageRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '8',
+      sub_phase_id: 'evaluation_design',
+      produced_by_agent_role: 'eval_design_agent',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: derivedFromIds,
+      content: { kind: 'evaluation_coverage_report', ...evalCoverage },
+    });
+    artifactIds.push(evalCoverageRecord.id);
+    if (evalCoverage.gaps.length > 0) {
+      getLogger().warn('workflow', 'Phase 8 evaluation coverage gaps (honest — not backfilled)', {
+        workflow_run_id: workflowRun.id,
+        gaps: evalCoverage.gaps.map((g) => g.requirement_id),
+      });
+    }
 
     // Write functional evaluation plan
     const funcEvalRecord = engine.writer.writeRecord({
@@ -275,4 +321,60 @@ export class Phase8Handler implements PhaseHandler {
       },
     };
   }
+}
+
+// ── Pure helpers (exported for unit tests) ─────────────────────────
+
+export interface EvaluationCoverageGap {
+  requirement_id: string;
+  kind: 'functional' | 'quality';
+  reason: string;
+}
+
+/**
+ * Reduce every functional eval criterion's `functional_requirement_id` to its
+ * decomposition-tree root via `canonicalize` (structural — never a regex), and
+ * dedupe by `(root_target, evaluation_method)`. Consolidates the LLM's mix of
+ * root + scattered-leaf targets so each story with any eval is covered at root.
+ */
+export function canonicalizeFunctionalEvalTargets(
+  criteria: FunctionalEvalCriterion[],
+  canonicalize: (id: string) => string,
+): FunctionalEvalCriterion[] {
+  const seen = new Set<string>();
+  const out: FunctionalEvalCriterion[] = [];
+  for (const c of criteria) {
+    const target = canonicalize(c.functional_requirement_id);
+    const key = `${target}::${c.evaluation_method}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...c, functional_requirement_id: target });
+  }
+  return out;
+}
+
+/**
+ * Deterministic eval-coverage report (visibility, NO backfill): every root US
+ * should carry ≥1 functional criterion and every NFR ≥1 quality criterion.
+ * Returns the un-covered ids as honest gaps + a coverage percentage. Mirrors
+ * Phase-7's `runCoverageAnalysis`.
+ */
+export function computeEvalCoverage(
+  frIds: string[],
+  nfrIds: string[],
+  funcCriteria: FunctionalEvalCriterion[],
+  qualCriteria: QualityEvalCriterion[],
+): { gaps: EvaluationCoverageGap[]; coverage_percentage: number } {
+  const funcCovered = new Set(funcCriteria.map((c) => c.functional_requirement_id));
+  const qualCovered = new Set(qualCriteria.map((c) => c.nfr_id));
+  const usGaps = frIds.filter((id) => !funcCovered.has(id));
+  const nfrGaps = nfrIds.filter((id) => !qualCovered.has(id));
+  const total = (frIds.length + nfrIds.length) || 1;
+  return {
+    gaps: [
+      ...usGaps.map((id): EvaluationCoverageGap => ({ requirement_id: id, kind: 'functional', reason: `No functional evaluation criterion targets ${id}` })),
+      ...nfrGaps.map((id): EvaluationCoverageGap => ({ requirement_id: id, kind: 'quality', reason: `No quality evaluation criterion targets ${id}` })),
+    ],
+    coverage_percentage: Math.round(((total - usGaps.length - nfrGaps.length) / total) * 100),
+  };
 }

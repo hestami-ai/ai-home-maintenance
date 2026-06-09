@@ -34,8 +34,9 @@ This is a PRODUCT VISION pass — your goal is **comprehensive domain coverage**
 5. **Refine the personas** — the 1.0b output is a seed. Confirm all are complete (goals + painPoints), add any missing personas, and include ALL in your output.
 
 # Critical Rules
-- PROPOSE EXPANSIVELY. The user will Accept/Reject each domain individually.
-- Do NOT exclude domains because they seem low priority or future scope — the user decides, not you.
+- PROPOSE EXPANSIVELY across FUNCTIONAL capability areas. The user will Accept/Reject each domain individually.
+- A business domain is a user-facing FUNCTIONAL capability area (e.g. URL submission, redirection, statistics, deletion, API access). Do NOT propose domains whose essence is a NON-FUNCTIONAL / operational quality concern — monitoring & logging, observability, reliability & availability, uptime, performance & latency, security/encryption-as-a-property, HTTPS/transport enforcement, compliance-as-a-property. Those are captured as Non-Functional Requirements (Phase 2.2) and as cross-cutting constraints folded into the functional components — they are NOT business domains. (The underlying requirements — encryption, uptime, observability — are still honored, via the NFR roster, not as a domain.)
+- Do NOT exclude FUNCTIONAL domains because they seem low priority or future scope — the user decides, not you.
 - If source documents describe implementation phases or pillars, note that in the rationale but still propose every domain.
 - Every domain ID MUST use the prefix `DOM-<SHORT-NAME>` (e.g. `DOM-PROPERTY`, `DOM-WORK-ORDER`). The short-name is UPPER-CASE with hyphens.
 - Every persona ID MUST be a semantic slug of the form `P-<UPPER-SLUG>` — evocative of the persona, NOT a running number. Use the persona role uppercased with hyphens (e.g. `P-HOMEOWNER`, `P-SERVICE-PROVIDER`, `P-HOA-MANAGER`, `P-UNDERWRITER`). Slug MUST match `^P-[A-Z0-9_-]+$`. If two personas would slug identically, suffix the second with `-2`, etc.

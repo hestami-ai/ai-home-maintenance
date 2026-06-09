@@ -16,6 +16,7 @@ import type { PriorityLLMCaller } from '../../llm/priorityLLMCaller';
 import type { TemplateLoader } from '../../orchestrator/templateLoader';
 import type { LLMCallResult } from '../../llm/llmCaller';
 import type { GovernedStreamRecord } from '../../types/records';
+import { renderRecordExcerpt } from '../../orchestrator/phases/dmrHydration';
 import type {
   CapabilityCallResult,
   OpenQuery,
@@ -275,12 +276,17 @@ export class Synthesizer {
   private summarizeSupersession(retrieval: RetrievalResult): string {
     const p = retrieval.contextPacket;
     if (!p || p.supersessionChains.length === 0) return '(none detected)';
+    const byId = this.recordsById(retrieval);
+    const label = (id: string): string => {
+      const rec = byId.get(id);
+      return rec ? `[${id.slice(0, 8)}] ${this.excerpt(rec, 120)}` : `[${id}]`;
+    };
     return p.supersessionChains
       .map(sc => {
         const current = sc.chain.find(e => e.position === 'current_governing');
         const superseded = sc.chain.filter(e => e.position === 'superseded');
-        const currentStr = current ? `current: [${current.recordId}]` : 'no current';
-        const supItems = superseded.map(e => `[${e.recordId}]`).join(', ');
+        const currentStr = current ? `current: ${label(current.recordId)}` : 'no current';
+        const supItems = superseded.map(e => label(e.recordId)).join('; ');
         const supStr = supItems.length > 0 ? `superseded: ${supItems}` : 'nothing superseded';
         return `- Subject "${sc.subject}": ${currentStr}; ${supStr}`;
       })
@@ -290,10 +296,13 @@ export class Synthesizer {
   private summarizeContradictions(retrieval: RetrievalResult): string {
     const p = retrieval.contextPacket;
     if (!p || p.contradictions.length === 0) return '(none detected)';
+    const byId = this.recordsById(retrieval);
     return p.contradictions
       .map(c => {
-        const idList = c.recordIds.map(id => `[${id}]`);
-        const ids = idList.join(' vs ');
+        const ids = c.recordIds.map(id => {
+          const rec = byId.get(id);
+          return rec ? `[${id.slice(0, 8)}] ${this.excerpt(rec, 100)}` : `[${id}]`;
+        }).join(' vs ');
         return `- ${ids} (${c.resolutionStatus}): ${c.explanation}`;
       })
       .join('\n');
@@ -302,9 +311,34 @@ export class Synthesizer {
   private summarizeActiveConstraints(retrieval: RetrievalResult): string {
     const p = retrieval.contextPacket;
     if (!p || p.activeConstraints.length === 0) return '(none)';
+    const byId = this.recordsById(retrieval);
     return p.activeConstraints
-      .map(c => `- [${c.id}] (authority ${c.authorityLevel}): ${c.statement}`)
+      .map(c => {
+        // Resolve `[label]`-only placeholder statements to the referenced
+        // record's actual content so the response carries real governing
+        // detail, not a bare type label + UUID.
+        let statement = c.statement;
+        if (/^\[[^\]]+\]$/.test(statement.trim())) {
+          const rec = byId.get(c.sourceRecordIds[0] ?? '');
+          if (rec) statement = `${statement.trim()} — ${this.excerpt(rec, 300)}`;
+        }
+        return `- [${c.id}] (authority ${c.authorityLevel}): ${statement}`;
+      })
       .join('\n');
+  }
+
+  /** Index the retrieval's fetched records by id for placeholder resolution. */
+  private recordsById(retrieval: RetrievalResult): Map<string, GovernedStreamRecord> {
+    const m = new Map<string, GovernedStreamRecord>();
+    for (const r of retrieval.records) m.set(r.id, r);
+    return m;
+  }
+
+  private excerpt(rec: GovernedStreamRecord, cap: number): string {
+    return renderRecordExcerpt(
+      { record_type: rec.record_type, content: (rec.content ?? {}) as Record<string, unknown> },
+      cap,
+    ).replace(/\s+/g, ' ').trim();
   }
 
   private summarizeOpenQuestions(retrieval: RetrievalResult): string {

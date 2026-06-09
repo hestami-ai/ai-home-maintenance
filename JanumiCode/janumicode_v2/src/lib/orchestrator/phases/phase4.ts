@@ -24,8 +24,17 @@ import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
+import { resolveAgainstOracle } from '../idResolver';
 import { runComponentSaturationLoop } from './phase4_2a';
 import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
+import {
+  normalizeComponentKinds,
+  partitionComponentsByKind,
+  buildCrossCuttingConstraints,
+  computeComponentBudget,
+  consolidateToBudget,
+  type ShapingComponent,
+} from './phase4ScopeShaping';
 import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
@@ -78,6 +87,17 @@ interface Component {
    * NO accepted story is out of scope; empty traces_to = cross-cutting.
    */
   traces_to?: string[];
+  /**
+   * Lever 1a — 'functional' (a buildable service realizing user stories)
+   * or 'cross_cutting' (an NFR concern: latency/encryption/availability/
+   * security/compliance). Cross-cutting components are NOT decomposed or
+   * built as standalone services; they become cross_cutting_constraints
+   * attached to the functional components they apply to. Absent ⇒
+   * 'functional' (backward compatible).
+   */
+  component_kind?: 'functional' | 'cross_cutting';
+  /** Lever 1a — functional component ids a cross-cutting concern applies to. */
+  applies_to_components?: string[];
 }
 
 interface ComponentModel {
@@ -291,6 +311,58 @@ export class Phase4Handler implements PhaseHandler {
       ctx, domainsSummary, sysReqSummary, frSummary, dmr42,
     );
 
+    // ── Lever 1a — NFRs are cross-cutting concerns, not services ───
+    // Partition the LLM's components into functional (buildable services
+    // realizing user stories) and cross_cutting (NFR concerns: latency,
+    // encryption, availability, security, compliance). Cross-cutting
+    // components are NEVER decomposed/built as standalone services — they
+    // are persisted as `cross_cutting_constraints` attached to the
+    // functional components they apply to. The NFR information still reaches
+    // the executor independently via the packet's NFR section, so nothing
+    // is lost. Only the FUNCTIONAL set flows into the component_model
+    // artifact and the saturation loop below.
+    // Normalize first: local models often omit the per-component
+    // `component_kind` field (schema-adherence wobble). Infer it structurally
+    // (empty traces_to / applies_to_components present ⇒ cross_cutting) so 1a
+    // is not a silent no-op when the field is missing.
+    const kindNorm = normalizeComponentKinds(
+      componentContent.components as unknown as Array<{ component_kind?: string; traces_to?: string[]; applies_to_components?: string[] }>,
+    );
+    if (kindNorm.inferred > 0) {
+      componentContent.components = kindNorm.components as unknown as Component[];
+      getLogger().info('workflow', 'Lever 1a: inferred component_kind for components missing the field', {
+        workflow_run_id: workflowRun.id, inferred: kindNorm.inferred,
+      });
+    }
+    const kindPartition = partitionComponentsByKind(
+      componentContent.components as unknown as Array<{ component_kind?: string }>,
+    );
+    const crossCuttingComponents = kindPartition.crossCutting as unknown as Component[];
+    if (crossCuttingComponents.length > 0) {
+      componentContent.components = kindPartition.functional as unknown as Component[];
+      const ccContent = buildCrossCuttingConstraints(
+        crossCuttingComponents as unknown as ShapingComponent[],
+      );
+      const ccRecord = engine.writer.writeRecord({
+        record_type: 'artifact_produced',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '4',
+        sub_phase_id: 'component_skeleton',
+        produced_by_agent_role: 'architecture_agent',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [domainsRecord.id],
+        content: ccContent as unknown as Record<string, unknown>,
+      });
+      artifactIds.push(ccRecord.id);
+      engine.ingestionPipeline.ingest(ccRecord);
+      getLogger().info('workflow', 'Lever 1a: NFR/cross-cutting components reified as constraints (not services)', {
+        workflow_run_id: workflowRun.id,
+        cross_cutting: crossCuttingComponents.map(c => c.id),
+        functional_remaining: componentContent.components.length,
+      });
+    }
+
     let componentRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
@@ -355,7 +427,72 @@ export class Phase4Handler implements PhaseHandler {
     );
     const compDropSet = new Set(componentDrops.map(d => d.id));
     // finalKeptComps drives BOTH the artifact and the 4.2a saturation seed.
-    const finalKeptComps = componentContent.components.filter(c => !compDropSet.has(c.id));
+    let finalKeptComps = componentContent.components.filter(c => !compDropSet.has(c.id));
+
+    // ── Lever 1b — decomposition scale budget ──────────────────────
+    // Right-size the functional component count to intent scale, keyed to
+    // upstream artifact counts (accepted user stories + software domains),
+    // NOT a hardcoded number. When the proposed set exceeds the budget,
+    // consolidate by merging within the same software domain (union-ing
+    // coverage so no accepted user story is dropped). A `decomposition_
+    // scale_decision` record audits the result; a consolidation that would
+    // drop coverage is rejected (fail-safe: original set kept).
+    const scaleRatio = (engine.configManager.get().decomposition as unknown as {
+      component_scale_ratio?: number;
+    }).component_scale_ratio ?? 1.0;
+    // Floor on the domains that actually host a FUNCTIONAL component (post-1a /
+    // post-drop), NOT the total software-domain count. Otherwise NFR domains
+    // (which 1a strips at the component level but which remain in
+    // domainsContent.domains) inflate the floor and the gate never bites.
+    const functionalDomainCount = new Set(
+      finalKeptComps.map(c => c.domain_id).filter((d): d is string => typeof d === 'string'),
+    ).size;
+    const componentBudget = computeComponentBudget(
+      acceptedUserStoryIds.size, functionalDomainCount, scaleRatio,
+    );
+    let scaleConsolidated = false;
+    if (Number.isFinite(componentBudget) && finalKeptComps.length > componentBudget) {
+      const consolidation = consolidateToBudget(
+        finalKeptComps as unknown as ShapingComponent[],
+        componentBudget,
+        acceptedUserStoryIds,
+      );
+      const accepted = consolidation.coveragePreserved && consolidation.merges.length > 0;
+      if (accepted) {
+        finalKeptComps = consolidation.components as unknown as Component[];
+        scaleConsolidated = true;
+      }
+      engine.writer.writeRecord({
+        record_type: 'artifact_produced',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '4',
+        sub_phase_id: 'component_skeleton',
+        produced_by_agent_role: 'architecture_agent',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [componentRecord.id],
+        content: {
+          kind: 'decomposition_scale_decision',
+          budget: componentBudget,
+          scale_ratio: scaleRatio,
+          accepted_user_story_count: acceptedUserStoryIds.size,
+          software_domain_count: domainsContent.domains.length,
+          functional_domain_count: functionalDomainCount,
+          proposed_functional_count: componentContent.components.length,
+          post_drop_count: componentContent.components.filter(c => !compDropSet.has(c.id)).length,
+          consolidated: accepted,
+          coverage_preserved: consolidation.coveragePreserved,
+          merges: consolidation.merges,
+          final_count: finalKeptComps.length,
+        },
+      });
+      getLogger().info('workflow', 'Lever 1b: decomposition scale budget applied', {
+        workflow_run_id: workflowRun.id,
+        budget: componentBudget, proposed: componentContent.components.length,
+        consolidated: accepted, coverage_preserved: consolidation.coveragePreserved,
+        final: finalKeptComps.length,
+      });
+    }
 
     // Surface LLM-vs-deterministic disagreement for the audit trail.
     const llmDroppedIds = new Set(compPrune.skipped ? [] : compPrune.dropped.map(d => d.id));
@@ -372,7 +509,7 @@ export class Phase4Handler implements PhaseHandler {
       });
     }
 
-    if (componentDrops.length > 0) {
+    if (componentDrops.length > 0 || scaleConsolidated) {
       const prunedCompContent = { ...componentContent, components: finalKeptComps };
       const prunedCompRecord = engine.writer.writeRecord({
         record_type: 'artifact_produced',
@@ -598,6 +735,20 @@ export class Phase4Handler implements PhaseHandler {
     const adrsContent = await this.runADRCapture(
       ctx, componentSummary, domainsSummary, technicalConstraintsSummary, dmr43,
     );
+
+    // Resolve drifted component ids in each ADR's governs_components against the
+    // real component-id oracle, so the downstream per-task ADR filter
+    // (filterADRsForTask) matches. Drop ids that don't resolve (LLM invented a
+    // non-component); an empty list stays empty = global ADR.
+    {
+      const componentOracle = new Set(adrComponentIds);
+      for (const adr of adrsContent.adrs ?? []) {
+        if (!Array.isArray(adr.governs_components)) continue;
+        adr.governs_components = adr.governs_components
+          .map((id) => resolveAgainstOracle(id, componentOracle))
+          .filter((id): id is string => id !== null);
+      }
+    }
 
     const adrsRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',

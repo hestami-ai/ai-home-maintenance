@@ -96,7 +96,7 @@ export interface CycleControllerResult {
  * decide where the next cycle should resume from. Returns null when
  * no failures exist (terminate the run).
  */
-function decideRestartTarget(
+export function decideRestartTarget(
   ctx: CycleControllerContext,
 ): { target: PhaseId; reason: string } | null {
   const failures = ctx.engine.writer.getRecordsByType(ctx.workflowRun.id, 'packet_synthesis_failure');

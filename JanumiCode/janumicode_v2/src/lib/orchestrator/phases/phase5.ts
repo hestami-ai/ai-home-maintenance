@@ -26,6 +26,7 @@ import { normalizeIdsInTree, normalizeComponentIdRef } from '../idNormalization'
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
 import { runDataModelSaturationLoop } from './phase5_1a';
+import { mintEntityIds, mintEndpointIds } from './phase5/dataModelIdMinter';
 import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
@@ -34,6 +35,8 @@ interface DataModels {
   models: Array<{
     component_id: string;
     entities: Array<{
+      /** Producer-minted stable id (DM-<comp>-<name>); see dataModelIdMinter. */
+      id?: string;
       name: string;
       fields: Array<{ name: string; type: string; constraints?: string }>;
       relationships?: string[];
@@ -45,6 +48,8 @@ interface ApiDefinitions {
   definitions: Array<{
     component_id: string;
     endpoints: Array<{
+      /** Producer-minted stable id (API-<comp>-<method>-<path>); see dataModelIdMinter. */
+      id?: string;
       path: string;
       method: string;
       inputs?: Record<string, unknown>;
@@ -181,6 +186,9 @@ export class Phase5Handler implements PhaseHandler {
     // Phase 6 task decomposition.
     const dmContent = { kind: 'data_models', ...dataModelsContent } as unknown as Record<string, unknown>;
     normalizeIdsInTree(dmContent, new Set(['component_id']), normalizeComponentIdRef);
+    // Producer-side stable entity ids (Pillar A) — deterministic + idempotent,
+    // so the packet collector + coherence index reference the same real id.
+    mintEntityIds(dmContent as Parameters<typeof mintEntityIds>[0]);
     const dataModelsRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
@@ -224,7 +232,9 @@ export class Phase5Handler implements PhaseHandler {
       const constraintIds = technicalConstraints.map(t => t.id);
       rootEntities = dataModelsContent.models.flatMap(m =>
         m.entities.map(e => ({
-          id: e.name,
+          // Use the producer-minted stable id (Pillar A) so the saturation
+          // tree references the same DM-* id as the skeleton + packets.
+          id: e.id ?? e.name,
           name: e.name,
           kind: 'aggregate' as const,
           component_id: m.component_id,
@@ -310,6 +320,9 @@ export class Phase5Handler implements PhaseHandler {
       ctx, componentSummary, contractsSummary, sysReqSummary, technicalConstraintsSummary, dmr52,
     );
 
+    // Producer-side stable endpoint ids (Pillar A) — deterministic + idempotent.
+    const apiContentWithKind = { kind: 'api_definitions', ...apiContent } as unknown as Record<string, unknown>;
+    mintEndpointIds(apiContentWithKind as Parameters<typeof mintEndpointIds>[0]);
     const apiRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
@@ -319,7 +332,7 @@ export class Phase5Handler implements PhaseHandler {
       produced_by_agent_role: 'technical_spec_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [dataModelsRecord.id, ...(prior.interfaceContracts ? [prior.interfaceContracts.recordId] : [])],
-      content: { kind: 'api_definitions', ...apiContent },
+      content: apiContentWithKind,
     });
     artifactIds.push(apiRecord.id);
     engine.ingestionPipeline.ingest(apiRecord);

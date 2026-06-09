@@ -173,7 +173,7 @@ describe('ExecutionContextBuilder.buildTaskContext', () => {
     );
 
     const payload = builder.buildTaskContext(
-      makeTask(),
+      makeTask({ active_constraints: ['TECH-FOO-1'] }),
       'wf-1',
       'inv-1',
       {
@@ -190,11 +190,105 @@ describe('ExecutionContextBuilder.buildTaskContext', () => {
     // `## Implementation Task:` from the old hardcoded path.
     expect(payload.stdin.text).toContain('# GOVERNING CONSTRAINTS');
     expect(payload.stdin.text).toContain('## Completion Criteria');
-    expect(payload.stdin.text).toContain('Use TypeScript strict mode');
+    // Executor active_constraints = the TASK's technical constraints, NOT the
+    // workflow's process governance (options.activeConstraints is no longer fed
+    // to the executor — it was Authority-7 process noise).
+    expect(payload.stdin.text).toContain('TECH-FOO-1');
+    expect(payload.stdin.text).not.toContain('Use TypeScript strict mode');
     expect(payload.stdin.text).toContain('Implement foo');
     // Empty-case fallbacks render:
     expect(payload.stdin.text).toContain('(no test cases registered for this component');
     expect(payload.stdin.text).toContain('(no HIGH/MEDIUM upstream validator findings');
+  });
+
+  it('sources the detail bundle test_cases + evals from the packet, and renders CC as the gate with covering tests', () => {
+    const loader = new TemplateLoader(REPO_ROOT);
+    const writer = makeFakeWriter([]);
+    const builder = new ExecutionContextBuilder(
+      {} as never,
+      writer,
+      { stdinMaxTokens: 16000, detailFileMaxBytes: 1_000_000, detailFilePathTemplate: '/tmp/{workflow_run_id}/{sub_phase_id}_{invocation_id}.md', workspacePath: '/tmp', janumiCodeVersionSha: 'sha-test' },
+      loader,
+    );
+
+    // A whole-project test plan + eval plan that the raw-artifact heuristics
+    // would mis-scope (root component_id ≠ task leaf; keep-all evals).
+    const artifacts = {
+      implementationPlan: null,
+      testPlan: { test_suites: [
+        { suite_id: 'TS-ROOT', component_id: 'comp-root', test_type: 'unit' as const,
+          test_cases: [{ test_case_id: 'TC-DEL', type: 'unit' as const, acceptance_criterion_ids: ['AC-1'], preconditions: [], expected_outcome: 'deleted' }] },
+      ] },
+      evaluationPlans: { functional: { criteria: [
+        { functional_requirement_id: 'US-001', evaluation_method: 'm', success_condition: 's' },
+        { functional_requirement_id: 'US-999', evaluation_method: 'unrelated', success_condition: 's' },
+      ] } },
+      componentModel: null,
+      technicalSpecs: null,
+      adrs: [],
+    };
+
+    const packet = {
+      kind: 'implementation_packet', schemaVersion: '1.0', packet_id: 'pkt-1',
+      task: {
+        id: 'task-leaf', node_id: 'n1', name: 't', description: 'd', task_type: 'standard', estimated_complexity: 'low',
+        completion_criteria: [
+          { criterion_id: 'CC-1', description: 'delete rows', verification_method: 'test_execution', covered_by_test_ids: ['TC-DEL'] },
+          { criterion_id: 'CC-2', description: 'return 200', verification_method: 'test_execution', covered_by_test_ids: [] },
+        ],
+        write_directory_paths: ['src/leaf'], read_directory_paths: [], dependency_task_ids: [],
+      },
+      user_stories: [], nfrs: [],
+      component: { id: 'comp-leaf', name: 'L', domain_id: null, responsibilities: [], dependencies: [], active_constraints: [] },
+      data_models: [], api_definitions: [],
+      test_cases: [{ test_case_id: 'TC-DEL', type: 'unit', acceptance_criterion_ids: ['AC-1'], preconditions: [], expected_outcome: 'deleted' }],
+      evaluation_criteria: [{ kind: 'functional', target_id: 'US-001', evaluation_method: 'm', success_condition: 's' }],
+      active_constraints: [], compliance_items: [], depends_on_packets: [],
+      coherence: { passed: true, blocking_failures: [], advisory_findings: [], annotations: { ai_proposed_root_count: 0, ai_proposed_root_ids: [] } },
+      release_id: null, release_ordinal: null,
+    } as never;
+
+    const payload = builder.buildTaskContext(
+      makeTask({ id: 'task-leaf', component_id: 'comp-leaf' }),
+      'wf-1', 'inv-1', artifacts, undefined, null, null, packet,
+    );
+    const detail = payload.detailFile?.content ?? '';
+    // Detail bundle test_cases come from the packet (TC-DEL present), NOT the
+    // root-suite re-derivation that would mismatch comp-leaf and yield [].
+    expect(detail).toContain('TC-DEL');
+    // Eval bundle is the packet's scoped eval (US-001), not the unrelated US-999.
+    expect(detail).toContain('US-001');
+    expect(detail).not.toContain('US-999');
+    // Completion criteria render as the authoritative gate with covering tests.
+    expect(payload.stdin.text).toContain('AUTHORITATIVE pass/fail gate');
+    expect(payload.stdin.text).toMatch(/Covering test\(s\): TC-DEL/);
+    expect(payload.stdin.text).toContain('you MUST author a test'); // CC-2 uncovered
+  });
+
+  it('filters ADRs to those governing the task component + global ADRs (structural, via governs_components)', () => {
+    const loader = new TemplateLoader(REPO_ROOT);
+    const writer = makeFakeWriter([]);
+    const builder = new ExecutionContextBuilder(
+      {} as never, writer,
+      { stdinMaxTokens: 16000, detailFileMaxBytes: 1_000_000, detailFilePathTemplate: '/tmp/{workflow_run_id}/{sub_phase_id}_{invocation_id}.md', workspacePath: '/tmp', janumiCodeVersionSha: 'sha-test' },
+      loader,
+    );
+    const payload = builder.buildTaskContext(
+      makeTask({ component_id: 'comp-foo' }),
+      'wf-1', 'inv-1',
+      {
+        implementationPlan: null, testPlan: null, evaluationPlans: {}, componentModel: null, technicalSpecs: null,
+        adrs: [
+          { id: 'ADR-FOO', title: 'Foo decision', decision: 'do foo', governs_components: ['comp-foo'] },
+          { id: 'ADR-PDF', title: 'PDF Report Generation', decision: 'render pdfs', governs_components: ['comp-reports'] },
+          { id: 'ADR-HTTPS', title: 'HTTPS only', decision: 'tls everywhere' }, // global (no governs list)
+        ],
+      },
+    );
+    expect(payload.stdin.text).toContain('ADR-FOO');
+    expect(payload.stdin.text).toContain('ADR-HTTPS');      // global → kept
+    expect(payload.stdin.text).not.toContain('ADR-PDF');    // other component → dropped
+    expect(payload.stdin.text).not.toContain('PDF Report Generation');
   });
 
   it('falls back to legacy inline assembly when no templateLoader is supplied', () => {

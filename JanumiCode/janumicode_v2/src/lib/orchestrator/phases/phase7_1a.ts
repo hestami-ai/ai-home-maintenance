@@ -261,7 +261,13 @@ function sanitizeChildTestCase(
     component_ids: stringArr('component_ids'),
     acceptance_criterion_ids: stringArr('acceptance_criterion_ids'),
     preconditions: stringArr('preconditions'),
-    expected_outcome: typeof c.expected_outcome === 'string' ? c.expected_outcome : undefined,
+    // The LLM sometimes emits expected_outcome as an array of outcome strings;
+    // join (don't drop to undefined, which silently loses the assertion text).
+    expected_outcome: typeof c.expected_outcome === 'string'
+      ? c.expected_outcome
+      : (Array.isArray(c.expected_outcome)
+          ? (c.expected_outcome as unknown[]).filter((x): x is string => typeof x === 'string').join('; ') || undefined
+          : undefined),
     edge_cases: stringArr('edge_cases'),
     test_file_path: typeof c.test_file_path === 'string' ? c.test_file_path : undefined,
     active_constraints: stringArr('active_constraints'),

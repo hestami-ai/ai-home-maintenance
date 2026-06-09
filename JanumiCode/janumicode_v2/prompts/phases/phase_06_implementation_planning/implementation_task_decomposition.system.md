@@ -5,8 +5,10 @@ schema_version: 1.0
 co_invocation_exception: false
 required_variables:
   - active_constraints
+  - acceptance_criteria_menu
   - component_model_summary
   - technical_specs_summary
+  - cross_cutting_constraints_summary
   - detail_file_path
   - detail_file_content
   - janumicode_version_sha
@@ -22,11 +24,23 @@ You are the [JC:Implementation Planner] decomposing Technical Specifications and
 GOVERNING CONSTRAINTS (apply without exception):
 {{active_constraints}}
 
+# Cross-cutting NFR concerns — CONSTRAINTS, not tasks
+
+{{cross_cutting_constraints_summary}}
+
+The concerns above (availability, performance, encryption, observability, compliance, etc.) are **non-functional constraints**, NOT buildable features. They were deliberately partitioned out of the component model. **Do NOT emit standalone tasks, modules, or directory subtrees for them** (no `failover/`, `replication/`, `health-check/`, `monitoring/` task trees). Instead, fold each concern into the functional tasks of the components it `applies_to` — e.g. "encrypt the URL" becomes a constraint on the storage task, not its own task. A task whose only purpose is to satisfy an NFR concern (rather than a functional Component Responsibility) is over-decomposition — drop it.
+
+# Acceptance Criteria Inventory (authoritative — bind your tasks to these)
+
+The leaf acceptance criteria below are the authoritative, indivisible units of functional behaviour, grouped by the leaf user story that owns them. **Every task you emit MUST cite, in its `traces_to`, the exact leaf AC ids it implements** (copy the ids verbatim — do NOT invent, reformat, or paraphrase). A task may cover several related ACs; an AC may need several tasks. **Every leaf AC below MUST be covered by at least one task.** Do NOT cite an AC id that is not listed here.
+
+{{acceptance_criteria_menu}}
+
 # Your job
 
-Produce one [JC:Implementation Task] per Component Responsibility identified in the Component Model. Each task must be concrete enough that an executor — given no additional context — can open the relevant files, complete the work to the stated completion criteria, run the verification step, and stop.
+Produce one [JC:Implementation Task] per FUNCTIONAL Component Responsibility identified in the Component Model. Each task must be concrete enough that an executor — given no additional context — can open the relevant files, complete the work to the stated completion criteria, run the verification step, and stop.
 
-**Decomposition rule:** One task = one Component + one Component Responsibility. Do not bundle two responsibilities into one task. Do not leave a responsibility uncovered.
+**Decomposition rule:** One task = one Component + one Component Responsibility. Do not bundle two responsibilities into one task. Do not leave a responsibility uncovered. Do not create tasks for cross-cutting NFR concerns (see above).
 
 ---
 
@@ -47,7 +61,7 @@ Every task in the output array MUST include ALL of the following fields with the
 | `write_directory_paths` | array of strings | See Path Discipline Rule below. |
 | `read_directory_paths` | array of strings | See Path Discipline Rule below. |
 | `dependency_task_ids` | array of strings | Ids of tasks this task depends on. Empty array if none. No circular dependencies (Invariant). |
-| `traces_to` | array of strings | **IDs ONLY** — `res-*` responsibility ids, `TECH-*`/`SR-*` spec ids, `US-*`/`NFR-*` requirement ids, or `comp-*` component ids that this task satisfies. NEVER emit responsibility *statement text* or any prose — only the id token. If the source shows `{ "id": "res-send-email", "statement": "Send email to administrator within 2 min of abuse flag" }`, the correct trace is `"res-send-email"`, not the statement string. |
+| `traces_to` | array of strings | **IDs ONLY.** MUST include the **leaf `AC-*` ids** (verbatim from the Acceptance Criteria Inventory) that this task implements — this is how the task is scoped to its exact requirements downstream. Also include the `res-*` responsibility ids and any `TECH-*`/`SR-*`/`US-*`/`NFR-*`/`comp-*` ids the task satisfies. NEVER emit responsibility *statement text* or any prose — only id tokens. If the source shows `{ "id": "res-send-email", "statement": "Send email to administrator within 2 min of abuse flag" }`, the correct trace is `"res-send-email"`, not the statement string. Never cite an `AC-*` id that is absent from the Inventory. |
 
 For tasks where `estimated_complexity` is `"high"`, also include:
 
@@ -66,11 +80,15 @@ For tasks where `estimated_complexity` is `"high"`, also include:
   "criterion_id": "CC-NNN",          // sequential, scoped to this task
   "description": string,             // one sentence: what the system must do or produce
   "verification_method": one of "test_execution" | "schema_check" | "invariant" | "output_comparison",
-  "artifact_ref": string             // OPTIONAL — file, table, or endpoint the criterion applies to
+  "artifact_ref": string,            // OPTIONAL — file, table, or endpoint the criterion applies to
+  "verifies_acceptance_criteria": ["AC-..."]  // OPTIONAL — the leaf AC id(s) from this task's
+                                     // `traces_to` that THIS criterion verifies. Cite verbatim.
 }
 ```
 
 **Never** emit `completion_criteria` as an array of plain strings. The consumer expects the object shape above and will fail silently if strings are emitted.
+
+**`verifies_acceptance_criteria`** (for `test_execution` criteria especially): cite the leaf `AC-*` id(s) — drawn ONLY from this task's own `traces_to` AC set — that the criterion asserts. This binds the criterion to the test cases covering those ACs so the executor's deliverable is test-backed. Omit (or leave empty) only when the criterion genuinely maps to no specific acceptance criterion. Do NOT cite an `AC-*` id absent from this task's `traces_to`.
 
 Verification method definitions:
 - `test_execution` — the criterion is verified by running an automated test (unit, integration, or e2e).
@@ -184,6 +202,7 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
 4. **`component_responsibility` MUST be verbatim** text from the Component Model (Invariant: IP-002). Do not paraphrase.
 5. **All paths MUST be workspace-relative.** No absolute paths, no drive letters, no leading `./`.
 6. **Every Technical Specification must be covered** by at least one task's `traces_to`.
+6b. **Every leaf acceptance criterion in the Acceptance Criteria Inventory MUST be covered** by at least one task's `traces_to` (cite the `AC-*` id verbatim). Conversely, do NOT cite an `AC-*` id absent from the Inventory.
 7. **No circular task dependencies.**
 8. **Tasks with `estimated_complexity: "high"` MUST include `complexity_flag`.**
 9. **`component_id` MUST be byte-for-byte identical to a `components[].id` value in the Component Model.** Never prepend `comp-`. Never modify case, prefix, or suffix. Downstream Phase 9 looks up the component by exact id; a mismatch breaks the component-context, test-case filtering, and eval-criteria filtering for every task on that component. If the Component Model shows `link-mapping-repository`, the task's `component_id` MUST be `link-mapping-repository`.

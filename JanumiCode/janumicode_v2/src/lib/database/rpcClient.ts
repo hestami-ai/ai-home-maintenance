@@ -141,8 +141,11 @@ export class DatabaseRPCClient implements Database {
     Atomics.store(this.ctrl, CTRL_OFFSET, CTRL_REQUEST);
     Atomics.notify(this.ctrl, CTRL_OFFSET);
 
-    // Wait for response
-    const timeout = 30000; // 30s
+    // Wait for response. Default 30s; raise via JANUMICODE_RPC_TIMEOUT_MS when
+    // the sidecar startup ping can be starved under load (e.g. opening a large
+    // existing DB while a local model server is reloading models — seen on the
+    // two-run cross-run driver).
+    const timeout = Number.parseInt(process.env.JANUMICODE_RPC_TIMEOUT_MS ?? '', 10) || 30000;
     const waitResult = Atomics.wait(this.ctrl, CTRL_OFFSET, CTRL_REQUEST, timeout);
 
     if (waitResult === 'timed-out') {

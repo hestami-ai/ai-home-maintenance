@@ -353,3 +353,82 @@ describe('component gatekeeper prompt renders software-domain namespace (ts-113 
     expect(prompt).toContain('DOM-URL_SHORTENING');
   });
 });
+
+describe('release_plan gatekeeper prompt renders the actual contained ids (slice-138 fix)', () => {
+  it('buildReleasePlanGatekeeperPrompt emits each release\'s contained member ids, not just counts', async () => {
+    const { buildReleasePlanGatekeeperPrompt } = await import('../../../lib/orchestrator/scopeGatekeeper');
+    const cfg: GatekeeperConfig = {
+      workflowRunId: 'wf', phaseId: '1', subPhaseId: 'release_plan',
+      bloomDescription: 'release plan',
+      items: [{
+        id: 'REL-1',
+        label: 'Release 1: Core',
+        description: 'core shortener',
+        tradeoffs: 'rationale • contains 2j/1w/1e/0c/0i/0v',
+        // The detail block is what phase1.mapItems now populates.
+        detail: [
+          '      contains:',
+          '      journeys (2): UJ-CREATE-SHORTLINK, UJ-REDIRECT-SHORTLINK',
+          '      workflows (1): WF-URL-SHORTENING',
+          '      entities (1): ENT-MAPPING',
+          '      compliance (0): —',
+          '      integrations (0): —',
+          '      vocabulary (0): —',
+        ].join('\n'),
+      }],
+      upstreamContext: {
+        acceptedJourneys: [
+          { id: 'UJ-CREATE-SHORTLINK', name: 'Create' },
+          { id: 'UJ-REDIRECT-SHORTLINK', name: 'Redirect' },
+        ],
+        acceptedWorkflows: [{ id: 'WF-URL-SHORTENING', name: 'Shorten' }],
+        acceptedEntities: [{ id: 'ENT-MAPPING', name: 'Mapping' }],
+      },
+    };
+    const prompt = buildReleasePlanGatekeeperPrompt(cfg);
+    // The specific contained ids must be present so the gatekeeper can
+    // id-match them against the accepted sets — the whole point of the fix.
+    expect(prompt).toContain('UJ-CREATE-SHORTLINK');
+    expect(prompt).toContain('UJ-REDIRECT-SHORTLINK');
+    expect(prompt).toContain('WF-URL-SHORTENING');
+    expect(prompt).toContain('ENT-MAPPING');
+    // And the instruction text now points at the contains: block, not counts.
+    expect(prompt).toContain("'contains:' block");
+  });
+
+  it('THROWS (fail-closed) when a release claims members but no ids were rendered (blind gatekeeper)', async () => {
+    const { buildReleasePlanGatekeeperPrompt } = await import('../../../lib/orchestrator/scopeGatekeeper');
+    const blindCfg: GatekeeperConfig = {
+      workflowRunId: 'wf', phaseId: '1', subPhaseId: 'release_plan',
+      bloomDescription: 'release plan',
+      items: [{
+        id: 'REL-1',
+        label: 'Release 1: Core',
+        // Claims 6 journeys / 3 workflows / 1 entity but NO detail block — the
+        // exact slice-138 defect.
+        tradeoffs: 'rationale • contains 6j/3w/1e/0c/0i/0v',
+      }],
+      upstreamContext: {
+        acceptedJourneys: [{ id: 'UJ-CREATE-SHORTLINK', name: 'Create' }],
+      },
+    };
+    expect(() => buildReleasePlanGatekeeperPrompt(blindCfg)).toThrow(/assembly defect/i);
+  });
+
+  it('does NOT throw for a legitimately empty release (0 contained artifacts)', async () => {
+    const { buildReleasePlanGatekeeperPrompt } = await import('../../../lib/orchestrator/scopeGatekeeper');
+    const emptyCfg: GatekeeperConfig = {
+      workflowRunId: 'wf', phaseId: '1', subPhaseId: 'release_plan',
+      bloomDescription: 'release plan',
+      items: [{
+        id: 'REL-EMPTY',
+        label: 'Release: Backlog',
+        tradeoffs: 'placeholder • contains 0j/0w/0e/0c/0i/0v',
+      }],
+      upstreamContext: { acceptedJourneys: [{ id: 'UJ-X', name: 'X' }] },
+    };
+    // An empty release is a VALID (droppable) state the gatekeeper can judge
+    // without ids — the guard must not false-positive on it.
+    expect(() => buildReleasePlanGatekeeperPrompt(emptyCfg)).not.toThrow();
+  });
+});

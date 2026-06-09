@@ -47,6 +47,7 @@ import { QuarantineLedger } from './quarantineLedger';
 import { WaveGate, type WaveGateOutcome } from './waveGate';
 import { buildPhaseContextPacket } from './phases/dmrContext';
 import type { PhaseContext } from './orchestratorEngine';
+import type { ScaffoldManifest } from './phases/scaffoldSynthesis';
 
 // ── Public types ───────────────────────────────────────────────────
 
@@ -86,6 +87,10 @@ export interface ExecutionScheduleResult {
     decision: WaveGateOutcome['decision'];
   }>;
   invocationIds: string[];
+  /** Ids of every leaf that completed successfully across all waves
+   *  (including rescued deferred leaves). Used by Phase 9.1 to emit a
+   *  cross_run_modification for each completed Refactoring Task. */
+  successfulLeafIds: string[];
 }
 
 // ── Scheduler ──────────────────────────────────────────────────────
@@ -104,6 +109,15 @@ export class ExecutionScheduler {
    * not just the bare task. See implementation-packet-synthesis.md §6.
    */
   private packetByTaskId: Map<string, ImplementationPacketContent> | null = null;
+
+  /**
+   * Lever 2a/2b — the scaffold manifest (resolved project profile, canonical
+   * shared files, protected paths, conventions). When set (by Phase 9 after
+   * scaffold_synthesis), the executor context lists the shared modules with
+   * an "import, don't reinvent" directive, and the post-leaf guard quarantines
+   * any leaf that writes into a protected path (the shared dir or root config).
+   */
+  private scaffoldManifest: ScaffoldManifest | null = null;
 
   constructor(
     private readonly engine: OrchestratorEngine,
@@ -128,6 +142,15 @@ export class ExecutionScheduler {
     this.packetByTaskId = packetByTaskId;
   }
 
+  /**
+   * Inject the scaffold manifest (Lever 2a). Called by Phase 9 after
+   * scaffold_synthesis. Drives the "import, don't reinvent" executor section
+   * and the post-leaf write-scope guard.
+   */
+  setScaffoldManifest(manifest: ScaffoldManifest): void {
+    this.scaffoldManifest = manifest;
+  }
+
   async run(input: {
     workflowRunId: string;
     workspacePath: string;
@@ -138,10 +161,30 @@ export class ExecutionScheduler {
     const { workflowRunId, workspacePath, janumiCodeVersionSha, leaves, releases } = input;
     const logger = getLogger();
 
-    const waves = sliceLeavesIntoWaves(leaves, releases);
+    // ── Leaf-level resume ───────────────────────────────────────────
+    // Skip leaves that already PASSED in a prior (pre-resume) execution of
+    // this run. Their implementation files persist on disk (a resume rolls
+    // back DB records but not the workspace), so re-running them is wasted
+    // work — and on a slow local executor, re-doing the ~half that already
+    // succeeded is the difference between "picks up where it left off" and
+    // "starts Phase 9 over".
+    const priorDone = this.loadPriorSuccessfulLeafIds(workflowRunId);
+    const skippedLeaves = priorDone.size > 0 ? leaves.filter(l => priorDone.has(l.id)) : [];
+    const leavesToRun = skippedLeaves.length > 0 ? leaves.filter(l => !priorDone.has(l.id)) : leaves;
+    if (skippedLeaves.length > 0) {
+      logger.info('workflow', 'Wave R: resume — skipping leaves that already succeeded', {
+        skipped: skippedLeaves.length, remaining: leavesToRun.length,
+      });
+    }
+    const seededSuccessIds = skippedLeaves.map(l => l.id);
+
+    const waves = sliceLeavesIntoWaves(leavesToRun, releases);
     if (waves.length === 0) {
-      logger.info('workflow', 'Wave R: no leaves to execute; skipping scheduler');
-      return emptyScheduleResult();
+      logger.info('workflow', 'Wave R: no leaves left to execute (all skipped or none); scheduler complete');
+      const done = emptyScheduleResult();
+      done.successfulLeafIds = seededSuccessIds;
+      done.successfulLeafCount = seededSuccessIds.length;
+      return done;
     }
 
     // Persist scheduling totals up front.
@@ -149,13 +192,14 @@ export class ExecutionScheduler {
 
     const result: ExecutionScheduleResult = {
       totalWaves: waves.length,
-      successfulLeafCount: 0,
+      successfulLeafCount: seededSuccessIds.length,
       quarantinedLeafCount: 0,
       rescuedLeafCount: 0,
       terminallyDeferredLeafCount: 0,
       rejectedWaveCount: 0,
       waveOutcomes: [],
       invocationIds: [],
+      successfulLeafIds: [...seededSuccessIds],
     };
 
     let waveNumber = 0;
@@ -172,6 +216,7 @@ export class ExecutionScheduler {
       });
       result.successfulLeafCount += outcome.successCount;
       result.quarantinedLeafCount += outcome.quarantineCount;
+      result.successfulLeafIds.push(...outcome.successfulLeafIds);
       result.invocationIds.push(...outcome.invocationIds);
       result.waveOutcomes.push({
         waveNumber,
@@ -236,6 +281,7 @@ export class ExecutionScheduler {
             reason: 'rescued in deferred-batch wave',
           });
           result.rescuedLeafCount++;
+          result.successfulLeafIds.push(leaf.id);
         } else {
           this.quarantineLedger.updateRescueStatus({
             workflowRunId,
@@ -269,6 +315,34 @@ export class ExecutionScheduler {
     });
 
     return result;
+  }
+
+  /**
+   * Leaf-level resume support: the ids of leaves that PASSED in any prior
+   * execution of this run. Unioned from every `execution_wave_completed`
+   * record's `successful_leaf_ids` across ALL versions — a resume rolls these
+   * records back to `is_current_version=0`, but they remain in the DB and are
+   * still the authority on what already succeeded (and the leaves' written
+   * files persist on disk). Empty on a fresh run (no prior wave-completed
+   * records), so this is naturally a no-op except on resume.
+   */
+  private loadPriorSuccessfulLeafIds(workflowRunId: string): Set<string> {
+    const done = new Set<string>();
+    try {
+      const rows = this.engine.db.prepare(
+        `SELECT content FROM governed_stream
+          WHERE workflow_run_id = ? AND record_type = 'execution_wave_completed'`,
+      ).all(workflowRunId) as Array<{ content: string }>;
+      for (const r of rows) {
+        try {
+          const ids = (JSON.parse(r.content) as { successful_leaf_ids?: unknown }).successful_leaf_ids;
+          if (Array.isArray(ids)) {
+            for (const id of ids) if (typeof id === 'string') done.add(id);
+          }
+        } catch { /* skip unparseable */ }
+      }
+    } catch { /* table/schema drift — no skip */ }
+    return done;
   }
 
   // ── per-wave loop ──────────────────────────────────────────────
@@ -513,6 +587,13 @@ export class ExecutionScheduler {
     // active_constraints option.
     const dmrPacket = await this.fetchDmrPacketForTask(leaf, workflowRunId);
 
+    // The task's implementation packet is the single coherent source of its
+    // scoped context — pass it into the builder so the detail bundle's
+    // test_cases + evaluation_criteria come from the packet (root/leaf-safe,
+    // task-scoped) rather than the raw-artifact re-derivation, and the
+    // detail file stays consistent with the prepended packet block below.
+    const packet = this.packetByTaskId?.get(leaf.id);
+
     let stdinText = this.executionContextBuilder.buildTaskContext(
       leaf as unknown as CtxTask,
       workflowRunId,
@@ -520,6 +601,15 @@ export class ExecutionScheduler {
       this.artifacts,
       undefined,
       dmrPacket,
+      this.scaffoldManifest
+        ? {
+            conventions: this.scaffoldManifest.conventions,
+            sharedDir: this.scaffoldManifest.profile.shared_dir,
+            canonicalFiles: this.scaffoldManifest.canonical_files,
+            protectedPaths: this.scaffoldManifest.protected_paths,
+          }
+        : null,
+      packet,
     ).stdin.text;
 
     // Prepend the implementation packet's bundled context when available.
@@ -541,7 +631,6 @@ export class ExecutionScheduler {
     // times before concluding the workspace was empty. Telling it
     // upfront — workspace root, greenfield/existing flag, and which
     // write-scope paths exist — removes that loop entirely.
-    const packet = this.packetByTaskId?.get(leaf.id);
     if (packet) {
       const orientation = buildWorkspaceOrientation(workspacePath, leaf.write_directory_paths ?? []);
       const packetContext = formatPacketAsExecutorContext(packet);
@@ -604,6 +693,37 @@ export class ExecutionScheduler {
           invocation_id: executionResult.invocationId,
           outcome: 'execution_failed',
           error_message: executionResult.error,
+          files_written_count: executionResult.filesWritten.length,
+        },
+      };
+    }
+
+    // Lever 2b — write-scope guard. A leaf must IMPORT the shared modules
+    // and root project config the scaffold step owns; it must never write
+    // into a protected path (the shared dir or a root config file). A
+    // violation is the fragmentation/divergence symptom itself (a leaf
+    // re-creating package.json or its own copy of a shared module), so we
+    // quarantine + retry with explicit "import, don't reinvent" context.
+    const scopeViolations = this.detectWriteScopeViolations(executionResult.filesWritten, workspacePath);
+    if (scopeViolations.length > 0) {
+      logger.warn('workflow', 'Wave R: leaf wrote into protected scaffold scope (quarantining)', {
+        leaf: leaf.id, attempt: attemptNumber, violations: scopeViolations,
+      });
+      return {
+        invocationId: executionResult.invocationId,
+        testResult: null,
+        entry: {
+          attempt_number: attemptNumber,
+          invocation_id: executionResult.invocationId,
+          outcome: 'reasoning_review_failed',
+          reasoning_review_flaws: [{
+            flaw_type: 'write_scope_violation',
+            severity: 'high',
+            description:
+              'Wrote into protected scaffold paths. Import the canonical shared ' +
+              'modules / root config instead of recreating them: ' +
+              scopeViolations.join(', '),
+          }],
           files_written_count: executionResult.filesWritten.length,
         },
       };
@@ -689,6 +809,36 @@ export class ExecutionScheduler {
   // ── helpers ────────────────────────────────────────────────────
 
   /**
+   * Lever 2b — detect writes into protected scaffold paths. Returns the
+   * workspace-relative paths a leaf wrote that fall under a manifest
+   * protected prefix (the shared dir) or that ARE a protected root config
+   * file. Deny-only: it does NOT enforce the full write_directory_paths
+   * allow-list (too aggressive), only the scaffold-owned scope. No-op when
+   * no scaffold manifest is set.
+   */
+  private detectWriteScopeViolations(
+    filesWritten: Array<{ filePath: string; operation: 'create' | 'modify' | 'delete' }>,
+    workspacePath: string,
+  ): string[] {
+    if (!this.scaffoldManifest) return [];
+    const protectedPaths = this.scaffoldManifest.protected_paths;
+    const violations = new Set<string>();
+    for (const w of filesWritten) {
+      if (w.operation === 'delete') continue;
+      const rel = path.relative(workspacePath, w.filePath).split(path.sep).join('/');
+      if (!rel || rel.startsWith('..')) continue; // outside workspace — not this guard's concern
+      for (const p of protectedPaths) {
+        const isDirPrefix = p.endsWith('/');
+        if (isDirPrefix ? (rel === p.slice(0, -1) || rel.startsWith(p)) : rel === p) {
+          violations.add(rel);
+          break;
+        }
+      }
+    }
+    return [...violations];
+  }
+
+  /**
    * Per-task DMR call. Constructs a structured query that names the
    * task's component_id, FRs/NFRs (derived from completion_criteria
    * artifact_refs + technical_spec_ids), and seeds
@@ -700,10 +850,38 @@ export class ExecutionScheduler {
    * prompt; only the active_constraints + per-task DMR detail are
    * missing.
    */
+  /**
+   * Latest current-version `artifact_produced` record id for each requested
+   * `content.kind`, scoped to the run. Used to seed the executor-task DMR with
+   * the task's real technical context (component model, data models, APIs,
+   * test plan, eval plans) so those out-rank governance records.
+   */
+  private latestArtifactIdsByKind(workflowRunId: string, kinds: string[]): string[] {
+    const out: string[] = [];
+    try {
+      const stmt = this.engine.db.prepare(
+        `SELECT id FROM governed_stream
+           WHERE workflow_run_id = ? AND record_type = 'artifact_produced'
+             AND is_current_version = 1
+             AND json_extract(content, '$.kind') = ?
+           ORDER BY rowid DESC LIMIT 1`,
+      );
+      for (const kind of kinds) {
+        const row = stmt.get(workflowRunId, kind) as { id: string } | undefined;
+        if (row?.id) out.push(row.id);
+      }
+    } catch (err) {
+      getLogger().debug('workflow', 'latestArtifactIdsByKind lookup failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return out;
+  }
+
   private async fetchDmrPacketForTask(
     leaf: SchedulerLeaf,
     workflowRunId: string,
-  ): Promise<{ activeConstraintsText: string; detailFileContent: string } | null> {
+  ): Promise<{ activeConstraintsText: string; detailFileContent: string; detailFilePath: string } | null> {
     try {
       const componentId = leaf.component_id ?? 'unknown';
       const specIds = leaf.technical_spec_ids ?? [];
@@ -717,6 +895,15 @@ export class ExecutionScheduler {
 
       const known: string[] = [];
       if (leaf.derived_from_record_ids) for (const id of leaf.derived_from_record_ids) known.push(id);
+      // Seed the task's upstream TECHNICAL artifacts so they enter the DMR
+      // findings at max materiality (known-relevant = 1.0) rather than being
+      // out-ranked by authority-7 governance. Without this the executor DMR
+      // surfaced only constitutional invariants and no component/data-model/
+      // test context (slice-138). Latest current-version record per kind.
+      for (const id of this.latestArtifactIdsByKind(workflowRunId, [
+        'component_model', 'data_models', 'api_definitions', 'interface_contracts',
+        'test_plan', 'functional_evaluation_plan', 'quality_evaluation_plan',
+      ])) known.push(id);
 
       const ctxShim: PhaseContext = {
         workflowRun: {
@@ -737,9 +924,21 @@ export class ExecutionScheduler {
       });
 
       if (!packet.packet) return null;
+      // Suppress a governance-only / empty DMR side channel: with the
+      // constitutional invariants excluded and the task's technical artifacts
+      // seeded, a packet with zero material findings means DMR resolved nothing
+      // task-relevant — attaching it would only add a boilerplate reference.
+      const findingCount = packet.packet.materialFindings?.length ?? 0;
+      if (findingCount === 0) {
+        getLogger().debug('workflow', 'per-task DMR resolved no task-relevant findings; omitting DMR reference', {
+          leaf: leaf.id,
+        });
+        return null;
+      }
       return {
         activeConstraintsText: packet.activeConstraintsText,
         detailFileContent: packet.detailFileContent,
+        detailFilePath: packet.detailFilePath,
       };
     } catch (err) {
       getLogger().warn('workflow', 'per-task DMR call failed; proceeding without DMR context', {
@@ -1088,6 +1287,7 @@ function emptyScheduleResult(): ExecutionScheduleResult {
     rejectedWaveCount: 0,
     waveOutcomes: [],
     invocationIds: [],
+    successfulLeafIds: [],
   };
 }
 

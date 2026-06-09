@@ -69,6 +69,13 @@ export interface SubPhaseEntry {
    * The group occupies one numeric slot at the parent level.
    */
   readonly group?: string;
+  /**
+   * Optional explicit display code. When set, the entry uses this code
+   * VERBATIM and does NOT consume a positional slot — so preliminary steps
+   * (e.g. `9.0`, `9.0a`) can be listed before the first numbered sub-phase
+   * without renumbering it. Omit for normal positional numbering.
+   */
+  readonly displayCode?: string;
   /** Human-readable name. */
   readonly displayName: string;
   /** One-line description. */
@@ -700,6 +707,22 @@ export const SUB_PHASES: readonly SubPhaseEntry[] = [
 
   // ── Phase 9 — execution ─────────────────────────────────────────────
   {
+    id: 'scaffold_synthesis',
+    parentPhase: 'execution',
+    displayCode: '9.0a',
+    displayName: 'Scaffold Synthesis',
+    description: 'Materialize the canonical project scaffold + shared modules (Phase 9.0a).',
+    agentRole: null,
+  },
+  {
+    id: 'packet_synthesis',
+    parentPhase: 'execution',
+    displayCode: '9.0',
+    displayName: 'Packet Synthesis',
+    description: 'Bundle upstream context into one implementation packet per atomic task (Phase 9.0).',
+    agentRole: null,
+  },
+  {
     id: 'implementation_task_execution',
     parentPhase: 'execution',
     displayName: 'Implementation Task Execution',
@@ -886,7 +909,10 @@ function computeDisplayCodesForParent(parentId: string): void {
   const groupIntra = new Map<string, number>();
   let nextSlot = 1;
   for (const sp of subs) {
-    if (sp.group) {
+    if (sp.displayCode) {
+      // Explicit code — use verbatim, do NOT consume a positional slot.
+      DISPLAY_CODE_CACHE.set(sp.id, sp.displayCode);
+    } else if (sp.group) {
       let slot = groupSlot.get(sp.group);
       if (slot === undefined) {
         slot = nextSlot++;

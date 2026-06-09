@@ -349,12 +349,34 @@ export interface PipelineRunnerConfig {
   llmMode: 'mock' | 'real';
   /** Auto-approve all decisions */
   autoApprove: boolean;
+  /**
+   * Explicit DB path (absolute, or relative to the workspace test-harness dir).
+   * Reuses an existing DB — a fresh workflow run is appended — instead of
+   * minting a new timestamped DB. Enables cross-run scenarios where a second
+   * run must share the first run's DB (the two-run semantic-supersession driver).
+   */
+  dbPath?: string;
+  /**
+   * When true (with autoApprove), certify each phase gate through the real
+   * approval path so phase_gate_approved + `validates` edges form and the
+   * phase's governing artifacts elevate to Authority 6 — exercising the DMR's
+   * active_constraints accumulation that is otherwise dormant headless.
+   */
+  simulateHumanDecisions?: boolean;
   /** Stop after completing this phase */
   phaseLimit?: string;
   /** Directory containing LLM fixtures for mock mode */
   fixtureDir?: string;
   /** Decision overrides keyed by sub-phase ID */
   decisionOverrides?: Record<string, DecisionOverride>;
+  /**
+   * Scripted prior_decision_override injections (semantic-supersession
+   * exerciser). Each fires once after its `afterPhase` completes. For a
+   * cross-run scenario, run twice against the same workspace DB: run 1
+   * establishes the governing record, run 2 injects an override of it.
+   * Shape matches OrchestratorEngine.OverrideInjectionSpec.
+   */
+  overrideInjections?: import('../../lib/orchestrator/orchestratorEngine').OverrideInjectionSpec[];
   /**
    * When true AND llmMode is 'real', capture every LLM call as a fixture
    * JSON file for future mock-mode replay.
@@ -392,6 +414,13 @@ export interface PipelineRunnerConfig {
    * for prompt-template validation between full calibration runs.
    */
   thinSlice?: boolean;
+  /**
+   * Full-slice mode: implement the ENTIRE intent (no decomposition caps)
+   * while keeping the headless operational rails thin-slice uses — 60-min
+   * records-idle stall window, forced goose_cli executor, 30-min per-call
+   * cap. For a real end-to-end build rather than template iteration.
+   */
+  fullSlice?: boolean;
   /**
    * When set, the runner calls an LLM to produce a rich suggested_fix
    * for the gap report by grounding its suggestion in the governed

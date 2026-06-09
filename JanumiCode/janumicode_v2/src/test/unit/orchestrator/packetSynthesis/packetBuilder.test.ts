@@ -16,6 +16,7 @@ import {
   type BuilderApiDef,
   type BuilderInput,
 } from '../../../../lib/orchestrator/phases/packetSynthesis/packetBuilder';
+import { buildRequirementLineage } from '../../../../lib/orchestrator/phases/packetSynthesis/idResolution';
 
 function atomicTask(overrides: Partial<BuilderAtomicTask['content']['task']> = {}): BuilderAtomicTask {
   return {
@@ -55,8 +56,35 @@ function emptyInput(): BuilderInput {
     evaluationCriteria: [],
     technicalConstraintsById: new Map(),
     complianceItemsById: new Map(),
+    crossCuttingConstraints: [],
+    lineage: buildRequirementLineage([]),
   };
 }
+
+describe('buildPackets — cross-cutting NFR constraint routing (Lever 1a)', () => {
+  it('attaches a concern only to packets whose component is in applies_to_components', () => {
+    const input: BuilderInput = {
+      ...emptyInput(),
+      atomicTasks: [
+        atomicTask({ id: 'task-a', component_id: 'comp-analytics' }),
+        atomicTask({ id: 'task-b', component_id: 'comp-redirect' }),
+      ],
+      crossCuttingConstraints: [
+        { id: 'CC-availability', name: 'Availability', responsibilities: ['retry on failure'], applies_to_components: ['comp-analytics'] },
+        { id: 'CC-global', name: 'Logging', responsibilities: ['log all ops'], applies_to_components: [] },
+      ],
+    };
+    const packets = buildPackets(input);
+    const analytics = packets.find(p => p.task.id === 'task-a')!;
+    const redirect = packets.find(p => p.task.id === 'task-b')!;
+    const ids = (p: typeof analytics) => p.active_constraints.map(c => c.id);
+    // comp-analytics gets its targeted concern + the applies-to-all concern.
+    expect(ids(analytics)).toEqual(expect.arrayContaining(['CC-availability', 'CC-global']));
+    // comp-redirect gets only the applies-to-all concern, NOT the analytics one.
+    expect(ids(redirect)).toContain('CC-global');
+    expect(ids(redirect)).not.toContain('CC-availability');
+  });
+});
 
 describe('buildPackets — happy path', () => {
   it('builds one packet per atomic task and bundles matching user story', () => {
@@ -325,34 +353,44 @@ describe('buildPackets — happy path', () => {
   });
 });
 
-import { canonicalUsId, findNfrsByUserStories } from '../../../../lib/orchestrator/phases/packetSynthesis/packetBuilder';
+import { findNfrsByUserStories, preferLeafStories, findTestCasesForAcs, bindCompletionCriteriaToTests } from '../../../../lib/orchestrator/phases/packetSynthesis/packetBuilder';
 
-describe('canonicalUsId — leaf→canonical US-id reduction (ts-118 fix)', () => {
-  it('reduces a decomposed leaf to its canonical parent', () => {
-    expect(canonicalUsId('US-004-1')).toBe('US-004');
-    expect(canonicalUsId('US-004-2')).toBe('US-004');
-    expect(canonicalUsId('US-012-3')).toBe('US-012');
+describe('bindCompletionCriteriaToTests — CC→test coverage', () => {
+  const tc = (id: string, acs: string[]) => ({
+    test_case_id: id, type: 'unit', acceptance_criterion_ids: acs, preconditions: [], expected_outcome: 'ok',
   });
-  it('reduces a D-suffixed leaf', () => {
-    expect(canonicalUsId('US-004-D1')).toBe('US-004');
+
+  it('binds a criterion to tests covering its declared verified AC', () => {
+    const out = bindCompletionCriteriaToTests(
+      [{ criterion_id: 'CC-1', description: 'delete rows', verification_method: 'test_execution', verifies_acceptance_criteria: ['AC-US-001-1-002'] }],
+      [tc('TC-DEL', ['AC-US-001-1-002']), tc('TC-OTHER', ['AC-US-002-1-001'])],
+      new Set(['AC-US-001-1-002']),
+    );
+    expect(out[0].covered_by_test_ids).toEqual(['TC-DEL']);
   });
-  it('reduces a MULTI-LEVEL nested leaf in one step (ts-119 upstream fix)', () => {
-    // fr_saturation now mints nested ids (nestChildStoryId) so a
-    // drifted FR-named leaf becomes US-001-1 / US-001-1-1.
-    expect(canonicalUsId('US-001-1-1')).toBe('US-001');
-    expect(canonicalUsId('US-004-2-3')).toBe('US-004');
-    expect(canonicalUsId('US-001-1-1-1')).toBe('US-001');
-    expect(canonicalUsId('US-004-D1-2')).toBe('US-004');
+
+  it('falls back to the task AC set when the criterion declares no AC', () => {
+    const out = bindCompletionCriteriaToTests(
+      [{ criterion_id: 'CC-1', description: 'x', verification_method: 'test_execution' }],
+      [tc('TC-A', ['AC-US-001-1-001'])],
+      new Set(['AC-US-001-1-001']),
+    );
+    expect(out[0].covered_by_test_ids).toEqual(['TC-A']);
   });
-  it('leaves a canonical US id unchanged', () => {
-    expect(canonicalUsId('US-004')).toBe('US-004');
-    expect(canonicalUsId('US-016')).toBe('US-016');
-  });
-  it('leaves non-US / FR-named ids unchanged', () => {
-    expect(canonicalUsId('FR-URL-SHORTEN-1.1')).toBe('FR-URL-SHORTEN-1.1');
-    expect(canonicalUsId('NFR-003')).toBe('NFR-003');
+
+  it('leaves covered_by_test_ids empty when no test covers the criterion (honest gap)', () => {
+    const out = bindCompletionCriteriaToTests(
+      [{ criterion_id: 'CC-1', description: 'x', verification_method: 'test_execution', verifies_acceptance_criteria: ['AC-US-009-1-001'] }],
+      [tc('TC-A', ['AC-US-001-1-001'])],
+      new Set(['AC-US-009-1-001']),
+    );
+    expect(out[0].covered_by_test_ids).toEqual([]);
   });
 });
+
+// Structural canonicalizer stub: a Map lookup standing in for the real
+// decomposition-tree walk (lineage.canonicalize). No regex — exactly the point.
+const treeCanon = (map: Record<string, string>) => (id: string): string => map[id] ?? id;
 
 describe('findNfrsByUserStories — bridge NFRs via applies_to_requirements (ts-118 fix)', () => {
   const nfrs: BuilderNfr[] = [
@@ -376,5 +414,176 @@ describe('findNfrsByUserStories — bridge NFRs via applies_to_requirements (ts-
   it('does not bridge NFRs lacking applies_to_requirements', () => {
     const out = findNfrsByUserStories(new Set(['US-004', 'US-009', 'US-006']), nfrs);
     expect(out.map((n) => n.id)).not.toContain('NFR-003');
+  });
+});
+
+describe('preferLeafStories — collapse root+leaf to consistent leaf granularity (task→leaf binding)', () => {
+  // Canonicalize via the structural tree stub — includes the `-D`/`-Leaf` forms
+  // the deleted regex could never reduce.
+  const canon = treeCanon({
+    'US-001-01-1': 'US-001', 'US-001-01-2': 'US-001',
+    'US-003-D1': 'US-003',
+    'US-002-1-D': 'US-002', 'US-002-3-Leaf': 'US-002', 'US-007-2-1-D': 'US-007',
+  });
+  it('drops the root when its decomposed leaves are present', () => {
+    const stories = [{ id: 'US-001' }, { id: 'US-001-01-1' }, { id: 'US-001-01-2' }];
+    expect(preferLeafStories(stories, canon).map((s) => s.id).sort())
+      .toEqual(['US-001-01-1', 'US-001-01-2']);
+  });
+  it('keeps a never-decomposed root (no leaves in its group)', () => {
+    expect(preferLeafStories([{ id: 'US-002' }], canon).map((s) => s.id)).toEqual(['US-002']);
+  });
+  it('handles mixed sets — collapse decomposed roots, keep undecomposed ones', () => {
+    const stories = [
+      { id: 'US-001' }, { id: 'US-001-01-1' }, // US-001 decomposed → leaf only
+      { id: 'US-002' },                        // US-002 undecomposed → kept
+      { id: 'US-003-D1' },                     // leaf whose root isn't in the set → kept
+    ];
+    expect(preferLeafStories(stories, canon).map((s) => s.id).sort())
+      .toEqual(['US-001-01-1', 'US-002', 'US-003-D1']);
+  });
+  it('collapses the `-D`/`-Leaf` forms the old regex missed (structural, not regex)', () => {
+    const stories = [
+      { id: 'US-002' }, { id: 'US-002-1-D' }, { id: 'US-002-3-Leaf' }, // US-002 decomposed → leaves only
+      { id: 'US-007-2-1-D' },                                          // root US-007 not in set → kept
+    ];
+    expect(preferLeafStories(stories, canon).map((s) => s.id).sort())
+      .toEqual(['US-002-1-D', 'US-002-3-Leaf', 'US-007-2-1-D']);
+  });
+});
+
+describe('buildPackets — task→leaf-AC binding scopes user_stories to the task slice', () => {
+  // Lineage with a leaf node carrying US-001-01-1 + its leaf AC.
+  const lineageRecords = [
+    { id: 'r1', record_type: 'requirement_decomposition_node', produced_at: '2026-01-01T00:00:00Z',
+      content: { kind: 'requirement_decomposition_node', node_id: 'n1', root_kind: 'fr', status: 'atomic', display_key: 'US-001-01-1',
+        user_story: { id: 'US-001-01-1', acceptance_criteria: [{ id: 'AC-US-001-01-1-001' }] } } },
+  ] as unknown as Parameters<typeof buildRequirementLineage>[0];
+
+  const stories: BuilderUserStory[] = [
+    { id: 'US-001-01-1', role: 'r', action: 'a', outcome: 'o', priority: 'high', acceptance_criteria: [{ id: 'AC-US-001-01-1-001', description: 'ac' }] },
+    { id: 'US-001-02-1', role: 'r', action: 'a', outcome: 'o', priority: 'high', acceptance_criteria: [{ id: 'AC-US-001-02-1-001', description: 'other' }] },
+  ] as unknown as BuilderUserStory[];
+
+  it('a task citing a leaf AC gets ONLY that AC\'s owning leaf story, not sibling component stories', () => {
+    const input: BuilderInput = {
+      ...emptyInput(),
+      atomicTasks: [atomicTask({ traces_to: ['AC-US-001-01-1-001'] })],
+      userStories: stories,
+      componentsById: new Map([['comp-001', { id: 'comp-001', name: 'C', responsibilities: [], dependencies: [], active_constraints: [] } as unknown as BuilderComponent]]),
+      lineage: buildRequirementLineage(lineageRecords),
+    };
+    const packets = buildPackets(input);
+    expect(packets).toHaveLength(1);
+    expect(packets[0].user_stories.map((u) => u.id)).toEqual(['US-001-01-1']);
+  });
+
+  it('trims the matched story to the ACs the task actually cites (not sibling-task ACs)', () => {
+    // US-001-01-1 owns two ACs; the task cites only one → packet story carries only that one.
+    const records2 = [
+      { id: 'r1', record_type: 'requirement_decomposition_node', produced_at: '2026-01-01T00:00:00Z',
+        content: { kind: 'requirement_decomposition_node', node_id: 'n1', root_kind: 'fr', status: 'atomic', display_key: 'US-001-01-1',
+          user_story: { id: 'US-001-01-1', acceptance_criteria: [{ id: 'AC-US-001-01-1-001' }, { id: 'AC-US-001-01-1-002' }] } } },
+    ] as unknown as Parameters<typeof buildRequirementLineage>[0];
+    const stories2: BuilderUserStory[] = [
+      { id: 'US-001-01-1', role: 'r', action: 'a', outcome: 'o', priority: 'high', acceptance_criteria: [{ id: 'AC-US-001-01-1-001', description: 'x' }, { id: 'AC-US-001-01-1-002', description: 'y' }] },
+    ] as unknown as BuilderUserStory[];
+    const input: BuilderInput = {
+      ...emptyInput(),
+      atomicTasks: [atomicTask({ traces_to: ['AC-US-001-01-1-001'] })],
+      userStories: stories2,
+      componentsById: new Map([['comp-001', { id: 'comp-001', name: 'C', responsibilities: [], dependencies: [], active_constraints: [] } as unknown as BuilderComponent]]),
+      lineage: buildRequirementLineage(records2),
+    };
+    const packets = buildPackets(input);
+    expect(packets[0].user_stories).toHaveLength(1);
+    expect(packets[0].user_stories[0].acceptance_criteria.map((a) => a.id)).toEqual(['AC-US-001-01-1-001']);
+  });
+
+  it('caps an AC-less task to one story per canonical root (Fix 4 containment)', () => {
+    // US-007 decomposes into 3 leaves; an AC-less task tracing US-007 would
+    // leaf-expand to all 3 → capped to 1 representative.
+    const records3 = [
+      ...['US-007-1', 'US-007-2', 'US-007-3'].map((lk, i) => ({
+        id: `r${i}`, record_type: 'requirement_decomposition_node', produced_at: '2026-01-01T00:00:00Z',
+        content: { kind: 'requirement_decomposition_node', node_id: `n${i}`, root_kind: 'fr', status: 'atomic', display_key: lk,
+          parent_node_id: 'root7', user_story: { id: lk, acceptance_criteria: [{ id: `AC-${lk}-001` }] } },
+      })),
+      { id: 'rroot', record_type: 'requirement_decomposition_node', produced_at: '2026-01-01T00:00:00Z',
+        content: { kind: 'requirement_decomposition_node', node_id: 'root7', depth: 0, display_key: 'US-007' } },
+    ] as unknown as Parameters<typeof buildRequirementLineage>[0];
+    const stories3 = ['US-007-1', 'US-007-2', 'US-007-3'].map((id) => ({ id, role: 'r', action: 'a', outcome: 'o', priority: 'low', acceptance_criteria: [{ id: `AC-${id}-001`, description: 'x' }] })) as unknown as BuilderUserStory[];
+    // Task traces the component (no AC ids) → fallback via component match.
+    const input: BuilderInput = {
+      ...emptyInput(),
+      atomicTasks: [atomicTask({ traces_to: ['comp-007'], component_id: 'comp-007' })],
+      userStories: stories3,
+      componentsById: new Map([['comp-007', { id: 'comp-007', name: 'C', responsibilities: [], dependencies: [], active_constraints: [],
+        // component traces to all three leaf stories → matchUsViaComponent returns all 3
+      } as unknown as BuilderComponent]]),
+      lineage: buildRequirementLineage(records3),
+    };
+    // Wire the component→story trace so the fallback matches all 3.
+    (stories3 as Array<{ traces_to?: string[] }>).forEach((s) => { s.traces_to = ['comp-007']; });
+    (input.componentsById.get('comp-007') as unknown as { responsibilities: unknown[] }).responsibilities = [];
+    const packets = buildPackets(input);
+    // AC-less task → capped to one story per canonical root (US-007) ⇒ 1 story.
+    expect(packets[0].user_stories.length).toBeLessThanOrEqual(1);
+  });
+
+  it('a task with no leaf AC ids falls back to the existing passes (back-compat)', () => {
+    const input: BuilderInput = {
+      ...emptyInput(),
+      atomicTasks: [atomicTask({ traces_to: [], component_id: 'comp-001' })],
+      userStories: stories,
+      componentsById: new Map([['comp-001', { id: 'comp-001', name: 'C', responsibilities: [], dependencies: [], active_constraints: [] } as unknown as BuilderComponent]]),
+      lineage: buildRequirementLineage(lineageRecords),
+    };
+    // No AC ids → AC pass is skipped; no SR/component match here → empty stories (the
+    // fallback passes run, just don't match this minimal fixture). Asserts no throw + AC pass not over-reaching.
+    expect(() => buildPackets(input)).not.toThrow();
+  });
+});
+
+describe('findTestCasesForAcs — root-suite → leaf-packet binding by AC intersection', () => {
+  // Phase 7 keys suites to the COARSE ROOT component (comp-url-shortening);
+  // Phase-9 packets are scoped to the SATURATED LEAF components that root was
+  // decomposed into (comp-creation-api, comp-slug-generator). Binding is by
+  // the exact leaf-AC namespace, NOT by suite.component_id — otherwise every
+  // root suite is discarded from its own descendant leaf packets (the
+  // P3_AC_NO_TEST flood). Bleed is prevented structurally: leaf-AC sets are
+  // disjoint across leaf tasks, so a case only binds to the one packet whose
+  // task implements its AC.
+  const suites = [
+    // One root suite holding cases for TWO different leaf stories.
+    { suite_id: 'TS-URL', component_id: 'comp-url-shortening', test_cases: [
+      { test_case_id: 'TC-CREATE-001', acceptance_criterion_ids: ['AC-US-001-1-001'], preconditions: [], expected_outcome: '201' },
+      { test_case_id: 'TC-SLUG-001', acceptance_criterion_ids: ['AC-US-002-1-001'], preconditions: [], expected_outcome: 'slug minted' },
+    ] },
+    // A persistence suite whose case references a disjoint leaf AC.
+    { suite_id: 'TS-DATA', component_id: 'comp-mapping-persistence', test_cases: [
+      { test_case_id: 'TC-DATA-001', acceptance_criterion_ids: ['AC-US-008-1-001'], preconditions: [], expected_outcome: 'encrypted' },
+    ] },
+  ];
+
+  it('binds a ROOT suite case to its descendant LEAF packet via exact AC match', () => {
+    // Leaf packet comp-creation-api implements only AC-US-001-1-001.
+    const out = findTestCasesForAcs(new Set(['AC-US-001-1-001']), new Set(), suites, 'comp-creation-api');
+    const ids = out.map((t) => t.test_case_id).sort();
+    expect(ids).toContain('TC-CREATE-001');       // root-suite case reaches its leaf packet
+    expect(ids).not.toContain('TC-SLUG-001');     // sibling leaf's case (disjoint AC) NOT pulled
+    expect(ids).not.toContain('TC-DATA-001');     // unrelated leaf's case NOT pulled
+  });
+
+  it('routes each sibling leaf its OWN cases from the shared root suite (no bleed)', () => {
+    const slug = findTestCasesForAcs(new Set(['AC-US-002-1-001']), new Set(), suites, 'comp-slug-generator');
+    const ids = slug.map((t) => t.test_case_id).sort();
+    expect(ids).toContain('TC-SLUG-001');
+    expect(ids).not.toContain('TC-CREATE-001');   // disjoint leaf-AC namespace prevents bleed
+  });
+
+  it('still pulls the whole suite when component_id matches exactly', () => {
+    const out = findTestCasesForAcs(new Set(), new Set(), suites, 'comp-mapping-persistence');
+    expect(out.map((t) => t.test_case_id)).toContain('TC-DATA-001');
   });
 });

@@ -77,6 +77,7 @@ import {
 import type { ScopePruneDecisionContent } from '../../types/records';
 import { parseJsonWithRecovery } from '../../llm/jsonRecovery';
 import { buildInterpretationMirror } from './phase1/buildInterpretationMirror';
+import { renderHydratedPacket } from './dmrHydration';
 import { normalizeIdsInTree, normalizeIdHyphens } from '../idNormalization';
 import { MitigationEngine } from '../../review/mitigation/mitigationEngine';
 import { loadMostRecentFindings } from '../../review/mitigation/findingsLookup';
@@ -741,7 +742,18 @@ export class Phase1Handler implements PhaseHandler {
           detailFileReference: '',
         },
         {
-          contextPacket: contextPacket ? JSON.stringify(contextPacket, null, 2) : '',
+          // Curated, resolved DMR reference (consistent with the phase 2-9
+          // path) instead of the raw ContextPacket JSON dump. Raw recoverable
+          // via JANUMICODE_DMR_RAW_DETAIL=1.
+          hydratedPacket: contextPacket
+            ? renderHydratedPacket(contextPacket, (id) => {
+                const rec = engine.writer.getRecord(id);
+                return rec ? { record_type: rec.record_type, content: rec.content } : null;
+              })
+            : '',
+          ...(contextPacket && process.env.JANUMICODE_DMR_RAW_DETAIL === '1'
+            ? { contextPacket: JSON.stringify(contextPacket, null, 2) }
+            : {}),
           narrativeMemories: [],
           decisionTraces: '',
           technicalSpecs: [],
@@ -1039,6 +1051,19 @@ scope only if at least one upstream artifact (requirement, constraint,
 journey, workflow trigger, compliance item, V&V threshold) names a
 concept that lives in that domain.
 
+A business domain is a user-facing FUNCTIONAL capability area (e.g. URL
+submission, redirection, statistics, deletion, API access). DROP any
+domain whose essence is a NON-FUNCTIONAL / operational quality concern —
+monitoring & logging, observability, reliability & availability, uptime
+& failover, performance & latency, security/encryption-as-a-property,
+HTTPS/transport enforcement, compliance-as-a-property. Those are captured
+as Non-Functional Requirements (Phase 2.2) and as cross-cutting
+constraints folded into the functional components — they are NOT business
+domains. Example drops: "Monitoring & Logging", "Reliability &
+Availability", "Security & Encryption", "HTTPS-Only Traffic Enforcement".
+(Encryption-at-rest, uptime, and observability are still required — they
+live in the NFR roster, not as their own domain.)
+
 PERSONAS are roles that interact with the product. A persona is in
 scope when:
   - The upstream Analysis Summary or a user journey describes that
@@ -1211,18 +1236,26 @@ grounding for the journey shape.`,
         bloomDescription: 'system workflows backing the accepted user journeys',
         overlay: `### Shape-specific guidance (system workflows)
 
-A SYSTEM WORKFLOW is a server-side process that backs one or more
-user journeys or satisfies an NFR/compliance requirement. Each
-workflow has a trigger (HTTP request, scheduled tick, event, etc.).
-A workflow is in scope when:
+A SYSTEM WORKFLOW is a server-side process that backs a user-facing
+FUNCTIONAL behaviour. Each workflow has a trigger (HTTP request,
+scheduled tick, event, etc.). A workflow is in scope when:
   - It backs a journey in the "Accepted User Journeys" section
-    above, OR
-  - It satisfies an upstream NFR / V&V requirement / Compliance Item
-    (e.g., encryption-at-rest verification, latency monitoring, RTO
-    failover, GDPR erasure), OR
+    above (this includes functional compliance behaviours such as GDPR
+    erasure — the delete journey), OR
   - It is required infrastructure for an upstream Technical Constraint
     (e.g., a startup migration workflow for an upstream-mandated
     database).
+
+DROP workflows whose PURPOSE is operational NON-FUNCTIONAL measurement,
+monitoring, or alerting — uptime calculation, health-check monitoring,
+latency/performance monitoring, availability/RTO failover testing,
+metric publishing, log aggregation. These are NFR *verification methods*
+(captured in the NFR roster and the Phase-8 evaluation plans) and
+cross-cutting constraints folded into the functional components — they
+are NOT system workflows. Example drops: "Monthly Uptime Calculation",
+"Health-Check Endpoint Monitor", "Redirect Latency Monitor".
+(The underlying NFRs — availability, observability, latency — are still
+required; they live in the NFR roster, not as workflows.)
 
 Workflow names commonly mention the same surfaces as journeys (UI,
 API, scheduled). Do NOT drop a workflow merely because its name
@@ -1659,20 +1692,58 @@ fabricates a new threshold is unsupported.`,
         artifactIds.push(rec.id);
         return rec;
       },
-      mapItems: (bloom) => bloom.releases.map(r => ({
-        id: r.release_id,
-        label: `Release ${r.ordinal}: ${r.name}`,
-        description: r.description,
-        tradeoffs: `${r.rationale} • contains ${r.contains.journeys.length}j/${r.contains.workflows.length}w/${r.contains.entities.length}e/${r.contains.compliance.length}c/${r.contains.integrations.length}i/${r.contains.vocabulary.length}v`,
-      })),
+      mapItems: (bloom) => bloom.releases.map(r => {
+        // Render the ACTUAL contained ids per category — not just counts —
+        // so the gatekeeper can id-match each claimed member against the
+        // Accepted Journeys/Workflows/Entities sets (its core DROP rule).
+        // Rendering only "6j/3w/1e" left the model structurally unable to
+        // detect a hallucinated or over-claimed id and it rubber-stamped
+        // KEEP (observed in slice-138 release_plan log).
+        const fmt = (label: string, ids: string[]): string =>
+          ids.length > 0 ? `      ${label} (${ids.length}): ${ids.join(', ')}` : `      ${label} (0): —`;
+        const detail = [
+          `      contains:`,
+          fmt('journeys', r.contains.journeys),
+          fmt('workflows', r.contains.workflows),
+          fmt('entities', r.contains.entities),
+          fmt('compliance', r.contains.compliance),
+          fmt('integrations', r.contains.integrations),
+          fmt('vocabulary', r.contains.vocabulary),
+        ].join('\n');
+        return {
+          id: r.release_id,
+          label: `Release ${r.ordinal}: ${r.name}`,
+          description: r.description,
+          tradeoffs: `${r.rationale} • contains ${r.contains.journeys.length}j/${r.contains.workflows.length}w/${r.contains.entities.length}e/${r.contains.compliance.length}c/${r.contains.integrations.length}i/${r.contains.vocabulary.length}v`,
+          detail,
+        };
+      }),
       buildTitle: () => 'Review the proposed release plan (v2 manifest)',
       buildSummary: (bloom) => `${bloom.releases.length} release(s) proposed. Every accepted handoff artifact is assigned to exactly one release OR to the cross_cutting bucket. The deterministic 1.8 verifier will confirm exact coverage, ordinal integrity, and forward-only dependencies before final approval.`,
       gatekeeper: {
         bloomDescription: 'release plan slicing the accepted handoff artifacts into ordered releases',
-        applyPrune: (bloom, keptIds) => ({
-          releases: bloom.releases.filter(r => keptIds.has(r.release_id)),
-          crossCutting: bloom.crossCutting,
-        }),
+        applyPrune: (bloom, keptIds) => {
+          // A release plan with ZERO releases is structurally invalid — there
+          // is nothing to implement. When the (LLM-backed) gatekeeper drops
+          // EVERY release it is over-pruning, not signalling a real defect
+          // (slice-128/129 kept 2/2; slice-130's gatekeeper dropped 2/2 on the
+          // same input). Treat a total wipeout as keep-all and let the
+          // deterministic 1.8 verifier below do the real structural check
+          // (coverage, ordinals, forward-only deps). Without this, applyPrune
+          // empties `releases` and the downstream keep-all guard never sees
+          // them → "no releases remain" hard-abort on gatekeeper whim.
+          if (keptIds.size === 0) {
+            getLogger().warn('workflow', 'Phase 1.8 release_plan gatekeeper dropped ALL releases — keeping all (zero releases is invalid; deferring to the deterministic 1.8 verifier)', {
+              workflow_run_id: workflowRun.id,
+              proposed_releases: bloom.releases.length,
+            });
+            return { releases: bloom.releases, crossCutting: bloom.crossCutting };
+          }
+          return {
+            releases: bloom.releases.filter(r => keptIds.has(r.release_id)),
+            crossCutting: bloom.crossCutting,
+          };
+        },
         // release_plan's evaluation is fundamentally different from
         // member-drop: it checks structural validity of proposed
         // releases (malformed, hallucinated artifact ids, explicit

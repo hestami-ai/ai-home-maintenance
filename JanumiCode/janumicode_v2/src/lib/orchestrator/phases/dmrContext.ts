@@ -20,6 +20,7 @@ import type { PhaseContext } from '../orchestratorEngine';
 import type { ContextPacket, ScopeTier } from '../../agents/deepMemoryResearch';
 import { getLogger } from '../../logging';
 import { emit as aoddEmit } from '../../aodd';
+import { renderHydratedPacket } from './dmrHydration';
 
 export interface PhaseContextPacketOptions {
   /** Sub-phase ID for trace context and detail file naming */
@@ -118,7 +119,16 @@ export async function buildPhaseContextPacket(
         detailFileReference: '',
       },
       {
-        contextPacket: JSON.stringify(packet, null, 2),
+        // Curated, resolved DMR reference (record-id references hydrated into
+        // actual content excerpts) — replaces the old raw JSON dump. The raw
+        // packet is still recoverable behind JANUMICODE_DMR_RAW_DETAIL=1.
+        hydratedPacket: renderHydratedPacket(packet, (id) => {
+          const rec = engine.writer.getRecord(id);
+          return rec ? { record_type: rec.record_type, content: rec.content } : null;
+        }),
+        ...(process.env.JANUMICODE_DMR_RAW_DETAIL === '1'
+          ? { contextPacket: JSON.stringify(packet, null, 2) }
+          : {}),
         narrativeMemories: [],
         decisionTraces: '',
         technicalSpecs: [],

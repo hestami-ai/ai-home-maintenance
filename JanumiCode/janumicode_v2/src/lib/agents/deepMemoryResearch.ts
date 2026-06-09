@@ -3,7 +3,7 @@
  * Based on JanumiCode Spec v2.3, §8.4.
  *
  * Seven-stage process:
- *   1. Query Decomposition           — LLM call (template-driven) + deterministic fallback
+ *   1. Query Decomposition           — deterministic (ID-token extraction; no LLM call)
  *   2. Broad Candidate Harvest        — FTS5 + vector similarity + graph traversal
  *   3. Materiality Scoring            — real semantic similarity, temporal recency, causal relevance
  *   4. Relationship Expansion         — memory_edge traversal
@@ -45,7 +45,10 @@ const DMR_STAGE_NAMES: Record<number, string> = {
 };
 
 const DMR_STAGE_KINDS: Record<number, DmrStageEntry['kind']> = {
-  1: 'llm',
+  // Stage 1 is deterministic: `decomposeQuery` makes NO LLM call (the prior
+  // qwen3.5:9b decomposition was removed — see decomposeQuery header). The
+  // only remaining LLM stage is Stage 7 synthesis.
+  1: 'deterministic',
   2: 'deterministic',
   3: 'deterministic',
   4: 'deterministic',
@@ -94,6 +97,22 @@ const REASONING_TRAIL_RECORD_TYPES = new Set<string>([
 ]);
 
 const REASONING_TRAIL_MULTIPLIER = 0.4;
+
+/**
+ * Record types that are JanumiCode's own PROCESS-GOVERNANCE operating model
+ * (constitutional invariants: "agents never exercise judgment", "every phase
+ * gate requires human approval", "the governed stream is lossless"). They are
+ * authority-7 and therefore dominate the authority-weighted materiality score,
+ * but they are never relevant to a CODE-EXECUTOR task — they describe how
+ * JanumiCode runs, not what to build. For `executor_agent` requests they are
+ * excluded so the task's own technical artifacts (component contract, data
+ * models, tests) surface instead. Genuine governing TECH constraints are
+ * separate record types (artifacts / technical_constraints_discovery) and are
+ * NOT excluded.
+ */
+const EXECUTOR_IRRELEVANT_RECORD_TYPES = new Set<string>([
+  'constitutional_invariant',
+]);
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -341,7 +360,23 @@ export class DeepMemoryResearchAgent {
 
     // Stage 2 — Broad Candidate Harvest
     markStart(2);
-    const candidates = await this.harvestCandidates(brief, decomposition);
+    let candidates = await this.harvestCandidates(brief, decomposition);
+    // Executor tasks: drop JanumiCode's process-governance constitutional
+    // invariants. They are authority-7 and otherwise dominate the materiality
+    // ranking (authority-weighted), crowding out the task's own technical
+    // artifacts — the slice-138 failure where the DMR packet held only
+    // governance boilerplate and no component/data-model/test context. Never
+    // drops a seeded known-relevant record (we never seed invariants).
+    if (brief.requestingAgentRole === 'executor_agent') {
+      const before = candidates.length;
+      candidates = candidates.filter(c => !EXECUTOR_IRRELEVANT_RECORD_TYPES.has(c.recordType));
+      const dropped = before - candidates.length;
+      if (dropped > 0) {
+        getLogger().debug('dmr', 'executor DMR: excluded process-governance records', {
+          dropped, requestingAgentRole: brief.requestingAgentRole,
+        });
+      }
+    }
     for (const c of candidates) {
       c.authorityLevel = effectiveAuthorityLevel(
         { id: c.id, record_type: c.recordType, authority_level: c.authorityLevel },

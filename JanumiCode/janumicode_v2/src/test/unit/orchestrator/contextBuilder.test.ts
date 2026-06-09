@@ -168,4 +168,29 @@ describe('ContextBuilder', () => {
       expect(selection.selectedRecordIds).toContain('r99');
     });
   });
+
+  describe('writeDetailFile — DMR hydration sections', () => {
+    it('renders hydratedPacket as a markdown section (not json-fenced) ahead of other sections', () => {
+      const builder = new ContextBuilder(testOptions);
+      const file = builder.writeDetailFile('/tmp/test/hydrate.md', {
+        hydratedPacket: '# Deep Memory Research — Context Reference\n## Governing Constraints (Authority ≥ 6)\n- IC-1: rest',
+        contextPacket: '{"legacy":"dump"}',
+      });
+      // hydrated content is present verbatim (NOT wrapped in ```json).
+      expect(file.content).toContain('## Governing Constraints (Authority ≥ 6)');
+      expect(file.content).toContain('- IC-1: rest');
+      // hydrated section precedes the legacy raw packet section.
+      expect(file.content.indexOf('Governing Constraints'))
+        .toBeLessThan(file.content.indexOf('Full Context Packet'));
+    });
+
+    it('renders taskBundle under its own heading (not the DMR label)', () => {
+      const builder = new ContextBuilder(testOptions);
+      const file = builder.writeDetailFile('/tmp/test/bundle.md', {
+        taskBundle: '{"task":{"id":"T-1"}}',
+      });
+      expect(file.content).toContain('## Task Implementation Bundle');
+      expect(file.content).not.toContain('Deep Memory Research — Full Context Packet');
+    });
+  });
 });

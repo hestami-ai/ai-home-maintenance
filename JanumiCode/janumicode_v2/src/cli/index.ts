@@ -168,11 +168,15 @@ program
   .option('--resume-at-phase <phase>', 'Phase to resume at (requires --resume-from-db)')
   .option('--resume-at-sub-phase <sub-phase>', 'Sub-phase to resume at (requires --resume-from-db; takes precedence over --resume-at-phase). Triggers rollback of stale records at-or-after this sub-phase before re-execution.')
   .option('--thin-slice', 'Constrain decomposition (depth=2, fanout=1, ~2 roots per kind, all reasoning_review on) so every prompt template fires end-to-end in hours, not days. Used for prompt-template validation.', false)
+  .option('--full-slice', 'Implement the ENTIRE intent (no decomposition caps) but KEEP the headless operational rails the thin-slice mode uses: 60-min records-idle stall window, forced goose_cli executor, 30-min per-call cap. For a real end-to-end build rather than template iteration.', false)
+  .option('--simulate-human-decisions', 'In headless auto-approve runs, certify each phase gate through the real approval path (phase_gate_approved + validates edges → Authority-6 elevation) so the Deep Memory Research agent\'s active_constraints accumulation is exercised instead of staying dormant.', false)
+  .option('--inject-overrides <json>', 'JSON array of scripted prior_decision_override injections (semantic-supersession exerciser). Each: {afterPhase, superseded:{recordType,contentMatch?,scope?}, superseding?:{statement,kind}|selector}. For a cross-run chain, run twice against the same workspace DB.')
+  .option('--db-path <path>', 'Explicit DB path (absolute, or relative to the workspace test-harness dir). Reuses the DB if it exists (appends a fresh workflow run) so a second run shares the first run\'s records for all_runs DMR scope. Mutually exclusive with --resume-from-db.')
   .option('--json', 'Emit the full HarnessResult as JSON on stdout instead of the human banner. Intended for virtuous-cycle coding agents that parse the result programmatically.', false)
   .option('--llm-gap-enhance', 'Call an LLM to produce a grounded suggested_fix on the gap report. Opt-in: adds one LLM call per failed run.', false)
   .option('--llm-gap-provider <provider>', 'Provider for --llm-gap-enhance. When omitted, the runner uses the workspace orchestrator routing.')
   .option('--llm-gap-model <model>', 'Model for --llm-gap-enhance. When omitted, the runner uses the workspace orchestrator routing.')
-  .action(async (options: { intent: string; workspace: string; llmMode: string; autoApprove: boolean; phaseLimit?: string; fixtureDir?: string; gapReport?: string; decisionOverrides?: string; captureFixtures?: boolean; captureOutputDir?: string; resumeFromDb?: string; resumeAtPhase?: string; resumeAtSubPhase?: string; thinSlice?: boolean; json?: boolean; llmGapEnhance?: boolean; llmGapProvider?: string; llmGapModel?: string }) => {
+  .action(async (options: { intent: string; workspace: string; llmMode: string; autoApprove: boolean; phaseLimit?: string; fixtureDir?: string; gapReport?: string; decisionOverrides?: string; captureFixtures?: boolean; captureOutputDir?: string; resumeFromDb?: string; resumeAtPhase?: string; resumeAtSubPhase?: string; thinSlice?: boolean; fullSlice?: boolean; simulateHumanDecisions?: boolean; injectOverrides?: string; dbPath?: string; json?: boolean; llmGapEnhance?: boolean; llmGapProvider?: string; llmGapModel?: string }) => {
     // When JSON output is requested, redirect INFO/DEBUG logs to stderr
     // via the logging handler's env-controlled switch. Otherwise stdout
     // would carry both JSON and logger lines, and nothing downstream
@@ -207,6 +211,15 @@ program
         process.exit(4);
       }
     }
+    let parsedInjectOverrides: PipelineRunnerConfig['overrideInjections'] | undefined;
+    if (options.injectOverrides) {
+      try {
+        parsedInjectOverrides = JSON.parse(options.injectOverrides);
+      } catch (err) {
+        emitError(options.json, `Invalid --inject-overrides JSON: ${(err as Error).message}`, 'bootstrap_error');
+        process.exit(4);
+      }
+    }
 
     // Bootstrap validation passed — now install the ancestor watcher for
     // the long-running pipeline. Installed here (not at module scope) so
@@ -218,6 +231,9 @@ program
       workspacePath,
       llmMode: options.llmMode as 'mock' | 'real',
       autoApprove: options.autoApprove,
+      simulateHumanDecisions: options.simulateHumanDecisions,
+      overrideInjections: parsedInjectOverrides,
+      dbPath: options.dbPath,
       phaseLimit: options.phaseLimit,
       fixtureDir: options.fixtureDir ? path.resolve(options.fixtureDir) : undefined,
       decisionOverrides: parsedOverrides as PipelineRunnerConfig['decisionOverrides'],
@@ -227,6 +243,7 @@ program
       resumeAtPhase: options.resumeAtPhase,
       resumeAtSubPhase: options.resumeAtSubPhase,
       thinSlice: options.thinSlice,
+      fullSlice: options.fullSlice,
       llmGapEnhance: options.llmGapEnhance
         ? {
             // Empty strings here signal "let the runner resolve from

@@ -28,7 +28,8 @@ import { EvalRunner, type EvaluationCriterion } from '../evalRunner';
 import { ExecutionScheduler, type SchedulerLeaf, type SchedulerReleaseEntry } from '../executionScheduler';
 import { extractPriorPhaseContext, buildEffectiveTaskView, buildEffectiveTestPlanView } from './phaseContext';
 import { runPacketSynthesisSubPhase } from './packetSynthesis';
-import { runCycleControllerSubPhase } from './cycleController';
+import { runScaffoldSynthesis, type ScaffoldManifest } from './scaffoldSynthesis';
+import { runCycleControllerSubPhase, decideRestartTarget } from './cycleController';
 import { randomUUID } from 'node:crypto';
 import type { ImplementationPacketContent } from '../../types/records';
 import { emit as aoddEmit } from '../../aodd';
@@ -114,6 +115,25 @@ export class Phase9Handler implements PhaseHandler {
     // The next setSubPhase below (implementation_task_execution) then
     // pauses on packet_synthesis EXIT — letting the operator verify
     // packet contents before any executor LLM call fires.
+    // ── 9.0a — Scaffold Synthesis (Lever 2a) ─────────────────
+    // BEFORE packet synthesis and any executor leaf: materialize ONE
+    // canonical project config + a shared module directory from
+    // interface_contracts + data_models, so leaves import shared modules
+    // and conform to a single pinned convention instead of reinventing
+    // dependencies divergently. The returned manifest (protected paths +
+    // conventions + canonical files) is threaded to the scheduler so the
+    // executor context says "import, don't reinvent" (2b) and the post-leaf
+    // guard can quarantine writes into the shared/root scope.
+    engine.stateMachine.setSubPhase(workflowRun.id, 'scaffold_synthesis');
+    let scaffoldManifest: ScaffoldManifest | null = null;
+    try {
+      scaffoldManifest = runScaffoldSynthesis({ workflowRun, engine });
+    } catch (err) {
+      getLogger().warn('workflow', 'Phase 9.0a scaffold_synthesis failed (continuing without scaffold)', {
+        workflow_run_id: workflowRun.id, error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     engine.stateMachine.setSubPhase(workflowRun.id, 'packet_synthesis');
     const packetResult = runPacketSynthesisSubPhase({ workflowRun, engine });
     const packetByTaskId = new Map<string, ImplementationPacketContent>();
@@ -128,6 +148,29 @@ export class Phase9Handler implements PhaseHandler {
       advisory_findings: packetResult.totalAdvisoryFindings,
       ai_proposed_root_count: packetResult.totalAiProposedRoots,
     });
+
+    // ── 9.0b — Pre-execution self-correction (Pillar D) ───────
+    // With the id-integrity layer (Pillars A–C) the coherence failures are now
+    // REAL (no false-P7 flood). If routable blocking failures remain, route
+    // back to the responsible upstream phase to REGENERATE before executing on
+    // broken packets — bounded by max_cycles_per_release. At/over the cap, or
+    // when no delta phase can fix it, fall through to execution; the
+    // end-of-Phase-9 cycle_controller surfaces the ceiling to the operator.
+    if (packetResult.totalBlockingFailures > 0) {
+      const cycleNumber = workflowRun.current_cycle_number ?? 0;
+      const cfgMaxCycles = (cfg as unknown as { execution?: { max_cycles_per_release?: number } })
+        .execution?.max_cycles_per_release ?? 3;
+      const maxCycles = workflowRun.max_cycles_per_release ?? cfgMaxCycles;
+      const restart = decideRestartTarget({ workflowRun, engine });
+      if (restart && cycleNumber + 1 <= maxCycles) {
+        getLogger().warn('workflow', 'Phase 9.0b: routable packet coherence failures — regenerating before execution', {
+          workflow_run_id: workflowRun.id, target_phase: restart.target, reason: restart.reason,
+          cycle_number: cycleNumber, max_cycles: maxCycles,
+          blocking_failures: packetResult.totalBlockingFailures,
+        });
+        return { success: true, artifactIds, cycleRestartTo: restart.target };
+      }
+    }
 
     // ── 9.1 — Implementation Task Execution ───────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'implementation_task_execution');
@@ -215,6 +258,13 @@ export class Phase9Handler implements PhaseHandler {
       scheduler.setPacketContext(packetByTaskId);
     }
 
+    // Lever 2b — hand the scaffold manifest to the scheduler so the
+    // executor context lists shared modules ("import, don't reinvent") and
+    // the post-leaf guard can quarantine writes into protected paths.
+    if (scaffoldManifest) {
+      scheduler.setScaffoldManifest(scaffoldManifest);
+    }
+
     const scheduleResult = await scheduler.run({
       workflowRunId: workflowRun.id,
       workspacePath: engine.workspacePath,
@@ -262,6 +312,15 @@ export class Phase9Handler implements PhaseHandler {
     });
     artifactIds.push(executionRecord.id);
     engine.ingestionPipeline.ingest(executionRecord);
+
+    // ── 9.1b — Cross-run modification records (spec §8.8, §10.1) ──
+    // For each completed Refactoring Task (executed successfully OR skipped as
+    // already-applied/idempotent), emit a cross_run_modification documenting
+    // that this run changed a prior-run Implementation Artifact. Phase 10.1
+    // verifies one exists per Refactoring Task before the commit gate.
+    if (workflowRun.cross_run_impact_triggered) {
+      artifactIds.push(...this.emitCrossRunModifications(ctx, effectiveTasks, scheduleResult));
+    }
 
     // ── 9.2 — Test Execution ──────────────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'test_execution');
@@ -595,6 +654,88 @@ export class Phase9Handler implements PhaseHandler {
    * per-leaf test execution inside the executor loop where the
    * executor authors AND runs the tests against its own writes.
    */
+  /**
+   * Emit a `cross_run_modification` record for each completed Refactoring Task
+   * (spec §8.8 / §10.1). "Completed" = executed successfully in the scheduler
+   * OR skipped as already-applied (refactoring_skipped_idempotent — the
+   * idempotency protocol treats a verified prior application as done). Metadata
+   * (prior run, target artifact, modification_type, impact report) is read back
+   * from the run's refactoring_scope, keyed by task id.
+   */
+  private emitCrossRunModifications(
+    ctx: PhaseContext,
+    effectiveTasks: { tasks: Array<Record<string, unknown>> },
+    scheduleResult: { successfulLeafIds: string[] },
+  ): string[] {
+    const { engine, workflowRun } = ctx;
+    const runId = workflowRun.id;
+    const out: string[] = [];
+
+    const refactoringLeafIds = effectiveTasks.tasks
+      .filter(t => t.task_type === 'refactoring' && typeof t.id === 'string')
+      .map(t => t.id as string);
+    if (refactoringLeafIds.length === 0) return out;
+
+    // Per-task metadata from the refactoring_scope (newest wins).
+    const scopes = engine.writer.getRecordsByType(runId, 'refactoring_scope');
+    const metaById = new Map<string, Record<string, unknown>>();
+    let impactReportId = '';
+    if (scopes.length > 0) {
+      const scope = scopes.reduce((a, b) => (a.produced_at >= b.produced_at ? a : b));
+      const content = scope.content as Record<string, unknown>;
+      impactReportId = typeof content.cross_run_impact_report_id === 'string'
+        ? content.cross_run_impact_report_id : '';
+      const tasks = Array.isArray(content.refactoring_tasks) ? content.refactoring_tasks : [];
+      for (const raw of tasks as Array<Record<string, unknown>>) {
+        if (typeof raw.id === 'string') metaById.set(raw.id, raw);
+      }
+    }
+
+    const succeeded = new Set(scheduleResult.successfulLeafIds);
+    const skipped = new Set(
+      engine.writer.getRecordsByType(runId, 'refactoring_skipped_idempotent')
+        .map(r => (r.content as Record<string, unknown>).task_id)
+        .filter((id): id is string => typeof id === 'string'),
+    );
+
+    for (const taskId of refactoringLeafIds) {
+      const wasSkipped = skipped.has(taskId);
+      if (!succeeded.has(taskId) && !wasSkipped) continue; // not completed → no record
+      const meta = metaById.get(taskId) ?? {};
+      const modType = meta.modification_type;
+      const rec = engine.writer.writeRecord({
+        record_type: 'cross_run_modification',
+        schema_version: '1.0',
+        workflow_run_id: runId,
+        phase_id: '9',
+        sub_phase_id: 'implementation_task_execution',
+        produced_by_agent_role: 'executor_agent',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: impactReportId ? [impactReportId] : [],
+        content: {
+          kind: 'cross_run_modification',
+          current_workflow_run_id: runId,
+          prior_workflow_run_id: typeof meta.target_workflow_run_id === 'string' ? meta.target_workflow_run_id : null,
+          modified_artifact_id: typeof meta.target_artifact_id === 'string' ? meta.target_artifact_id : null,
+          changed_interface_id: typeof meta.changed_interface_id === 'string' ? meta.changed_interface_id : null,
+          modification_type: (modType === 'additive' || modType === 'breaking' || modType === 'non_breaking') ? modType : null,
+          refactoring_task_id: taskId,
+          verification_passed: true,
+          applied_status: wasSkipped ? 'skipped_idempotent' : 'applied',
+          cross_run_impact_report_id: impactReportId || null,
+        },
+      });
+      engine.ingestionPipeline.ingest(rec);
+      out.push(rec.id);
+    }
+    if (out.length > 0) {
+      getLogger().info('workflow', 'Phase 9.1: emitted cross_run_modification records', {
+        workflow_run_id: runId, count: out.length,
+      });
+    }
+    return out;
+  }
+
   private extractTestSuites(
     testPlanContent: string,
     generateId: () => string,

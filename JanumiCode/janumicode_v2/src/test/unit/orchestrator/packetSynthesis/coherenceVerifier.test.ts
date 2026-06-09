@@ -221,6 +221,31 @@ describe('verifyCoherence — advisory findings', () => {
     const adv = r.byPacketId.get(p.packet_id)!.advisory_findings;
     expect(adv.some((a) => a.startsWith('A3_UNMEASURABLE_EVAL_CRITERION'))).toBe(true);
   });
+
+  it('P8_CC_NO_TEST: test_execution criterion with no covering test → advisory', () => {
+    const p = packet({
+      task: {
+        id: 'task-001', node_id: 'node-001', name: 't', description: 'd',
+        task_type: 'standard', estimated_complexity: 'low',
+        completion_criteria: [
+          { criterion_id: 'CC-1', description: 'delete rows', verification_method: 'test_execution', covered_by_test_ids: [] },
+          { criterion_id: 'CC-2', description: 'return 200', verification_method: 'test_execution', covered_by_test_ids: ['TC-001'] },
+          { criterion_id: 'CC-3', description: 'schema ok', verification_method: 'schema_check', covered_by_test_ids: [] },
+        ],
+        write_directory_paths: ['src/server/foo'], read_directory_paths: [], dependency_task_ids: [],
+      } as ImplementationPacketContent['task'],
+    });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const adv = r.byPacketId.get(p.packet_id)!.advisory_findings;
+    // Only CC-1 fires: CC-2 is covered, CC-3 is not test_execution.
+    expect(adv.filter((a) => a.startsWith('P8_CC_NO_TEST')).length).toBe(1);
+    expect(adv.some((a) => a.startsWith('P8_CC_NO_TEST') && a.includes('CC-1'))).toBe(true);
+    // P8 is advisory, never blocking.
+    expect(r.byPacketId.get(p.packet_id)!.blocking_failures.some((b) => b.includes('P8'))).toBe(false);
+  });
 });
 
 // ── Annotations ───────────────────────────────────────────────────
@@ -311,5 +336,85 @@ describe('verifyCoherence — totals', () => {
     expect(r.totals.packetsTotal).toBe(2);
     expect(r.totals.packetsFailed).toBe(1);
     expect(r.totals.blockingFailures).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── expected_outcome robustness (slice-129 crash) ──────────────────
+// The LLM (test_case_saturation) sometimes emits expected_outcome as an
+// ARRAY of outcome strings. The A2 advisory did `tc.expected_outcome.trim()`
+// and threw "trim is not a function", halting the whole packet_synthesis
+// phase. The verifier must coerce defensively, never crash.
+
+describe('verifyCoherence — expected_outcome is not a string', () => {
+  it('does not throw when a test case carries an array expected_outcome', () => {
+    const p = packet({
+      test_cases: [{
+        test_case_id: 'TC-001', type: 'functional', acceptance_criterion_ids: ['AC-001'],
+        preconditions: [],
+        // Deliberately malformed shape the verifier must tolerate.
+        expected_outcome: ['HTTP 201 returned', 'body has id'] as unknown as string,
+      }],
+    });
+    expect(() => verifyCoherence({
+      packets: [p],
+      upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    })).not.toThrow();
+  });
+});
+
+describe('coerceOutcomeString', () => {
+  it('joins array outcomes, trims strings, and empties nullish', async () => {
+    const { coerceOutcomeString } = await import('../../../../lib/orchestrator/phases/packetSynthesis/packetBuilder');
+    expect(coerceOutcomeString('  HTTP 201  ')).toBe('HTTP 201');
+    expect(coerceOutcomeString(['a', 'b', 1 as unknown as string])).toBe('a; b');
+    expect(coerceOutcomeString(undefined)).toBe('');
+    expect(coerceOutcomeString(null)).toBe('');
+  });
+});
+
+// ── P4 leaf-via-root eval bridge (task→leaf binding) ───────────────
+// Packets carry LEAF stories (US-001-01-1) while Phase-8 evals target the
+// canonical ROOT (US-001). P4 must accept the root eval as satisfying the leaf
+// via the lineage canonicalizer; without it, every leaf story falsely fires
+// P4_USER_STORY_NO_EVAL (slice-131: 384 of them).
+
+describe('verifyCoherence — P4 leaf story satisfied by root-targeted eval', () => {
+  // A packet whose user story is a decomposed LEAF, with a matching leaf test
+  // (so P3 passes) and an eval that targets only the canonical ROOT.
+  const leafPacket = () => packet({
+    user_stories: [{
+      id: 'US-001-01-1', role: 'r', action: 'a', outcome: 'o', priority: 'critical',
+      acceptance_criteria: [{ id: 'AC-US-001-01-1-001', description: 'ac', measurable_condition: 'HTTP 201' }],
+    }],
+    test_cases: [{
+      test_case_id: 'TC-001', type: 'functional',
+      acceptance_criterion_ids: ['AC-US-001-01-1-001'], preconditions: [], expected_outcome: 'HTTP 201',
+    }],
+    evaluation_criteria: [{
+      kind: 'functional', target_id: 'US-001', // ROOT, not the leaf
+      evaluation_method: 'API test', success_condition: 'works',
+    }],
+  });
+  const idx = () => idxWithAll(['US-001-01-1', 'AC-US-001-01-1-001', 'comp-001', 'resp-1', 'TC-001', 'US-001']);
+
+  it('passes P4 when canonicalize maps the leaf to the eval-targeted root', () => {
+    const r = verifyCoherence({
+      packets: [leafPacket()], upstreamIndex: idx(), atomicTaskIds: new Set(['task-001']),
+      canonicalize: (id) => (id === 'US-001-01-1' ? 'US-001' : id),
+    });
+    const res = r.byPacketId.get('pkt-1')!;
+    expect(res.blocking_failures.filter((f) => f.startsWith('P4'))).toHaveLength(0);
+    expect(res.blocking_failures.filter((f) => f.startsWith('P3'))).toHaveLength(0);
+  });
+
+  it('still fires P4 when neither the leaf nor its root is eval-targeted', () => {
+    const p = leafPacket();
+    p.evaluation_criteria = [{ kind: 'functional', target_id: 'US-999', evaluation_method: 'x', success_condition: 'y' }];
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idx(), atomicTaskIds: new Set(['task-001']),
+      canonicalize: (id) => (id === 'US-001-01-1' ? 'US-001' : id),
+    });
+    expect(r.byPacketId.get('pkt-1')!.blocking_failures.some((f) => f.startsWith('P4_USER_STORY_NO_EVAL'))).toBe(true);
   });
 });

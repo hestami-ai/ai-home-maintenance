@@ -20,6 +20,8 @@
  * See docs/design/implementation-packet-synthesis.md §3.
  */
 
+import { ALL_ID_SPECS } from './artifactIdSpec';
+
 export interface UpstreamArtifactInput {
   /** Sub-phase id from governed_stream (e.g. 'business_domains_bloom'). */
   sub_phase_id: string;
@@ -47,84 +49,31 @@ interface ExtractionRule {
   arrayKey: string;
   /** Field name within each item that holds the id. */
   idField: string;
-  /**
-   * Optional path-prefix-style synthetic id generator (used when the
-   * array elements are bare strings, not objects with `id`). E.g.
-   * `qualityAttributes: ['encrypts URLs', 'low latency']` becomes
-   * QA-1, QA-2. The function takes (item, index) and returns the
-   * synthetic id; if not provided, items without `idField` are skipped.
-   */
+  /** Position-indexed synthetic id (for bare-string arrays like QA). */
   syntheticId?: (item: unknown, index: number) => string | null;
-  /**
-   * Optional sub-array path → recurse into sub-items. Used for nested
-   * structures like `user_stories[].acceptance_criteria[]` where both
-   * tiers carry ids.
-   */
+  /** One level of sub-array nesting (e.g. user_stories[].acceptance_criteria[]). */
   nested?: ExtractionRule[];
 }
 
 /**
- * Per sub-phase: which array(s) in the content carry id-bearing items.
- * Keyed by sub_phase_id. Extending the pipeline with a new phase that
- * produces ids? Add an entry here.
+ * Per sub-phase extraction rules, DERIVED from the single source of truth
+ * (ARTIFACT_ID_SPECS). The index and the packet collectors now read the same
+ * keys, so they cannot drift (the bug that produced the false-P7 flood).
+ * Extend the pipeline by adding to artifactIdSpec.ts — not here.
  */
-const EXTRACTION_RULES: Record<string, ExtractionRule[]> = {
-  // ── Phase 1 — discovery & blooms ─────────────────────────────────
-  technical_constraints_discovery: [{ arrayKey: 'technicalConstraints', idField: 'id' }],
-  compliance_retention_discovery: [{ arrayKey: 'compliance_extracted_items', idField: 'id' }],
-  vv_requirements_discovery: [{ arrayKey: 'vvRequirements', idField: 'id' }],
-  canonical_vocabulary_discovery: [{ arrayKey: 'canonicalVocabulary', idField: 'id' }],
-  business_domains_bloom: [
-    { arrayKey: 'domains', idField: 'id' },
-    { arrayKey: 'personas', idField: 'id' },
-  ],
-  user_journey_bloom: [{ arrayKey: 'userJourneys', idField: 'id' }],
-  system_workflow_bloom: [{ arrayKey: 'workflows', idField: 'id' }],
-  entities_bloom: [{ arrayKey: 'entities', idField: 'id' }],
-  integrations_qa_bloom: [
-    { arrayKey: 'integrations', idField: 'id' },
-    // Quality attributes are emitted as a string[] at the gate; we
-    // mirror the synthetic QA-N id pattern used in phase1.ts/buildQaItems.
-    {
-      arrayKey: 'qualityAttributes',
-      idField: '__synthetic__',
-      syntheticId: (_item, i) => `QA-${i + 1}`,
-    },
-  ],
-  release_plan: [{ arrayKey: 'releases', idField: 'release_id' }],
-
-  // ── Phase 2 — requirements ──────────────────────────────────────
-  // The fr_bloom_skeleton emits `user_stories[].id` (US-*) plus nested
-  // `acceptance_criteria[].id` (AC-* per-story namespace). The NFR
-  // skeleton mirrors that shape.
-  fr_bloom_skeleton: [
-    {
-      arrayKey: 'user_stories',
-      idField: 'id',
-      nested: [{ arrayKey: 'acceptance_criteria', idField: 'id' }],
-    },
-  ],
-  nfr_bloom_skeleton: [
-    {
-      arrayKey: 'nonfunctional_requirements',
-      idField: 'id',
-      nested: [{ arrayKey: 'acceptance_criteria', idField: 'id' }],
-    },
-  ],
-
-  // ── Phase 4–7 skeletons (saturation node ids handled separately) ─
-  component_skeleton: [{ arrayKey: 'components', idField: 'id' }],
-  data_model_skeleton: [{ arrayKey: 'data_models', idField: 'id' }],
-  api_definitions: [{ arrayKey: 'api_definitions', idField: 'id' }],
-  task_skeleton: [{ arrayKey: 'tasks', idField: 'id' }],
-  test_case_skeleton: [
-    {
-      arrayKey: 'test_suites',
-      idField: 'suite_id',
-      nested: [{ arrayKey: 'test_cases', idField: 'test_case_id' }],
-    },
-  ],
-};
+const EXTRACTION_RULES: Record<string, ExtractionRule[]> = (() => {
+  const rules: Record<string, ExtractionRule[]> = {};
+  for (const spec of ALL_ID_SPECS) {
+    const rule: ExtractionRule = {
+      arrayKey: spec.arrayKey,
+      idField: spec.idField ?? '__none__',
+      ...(spec.nested ? { nested: [{ arrayKey: spec.nested.arrayKey, idField: spec.nested.idField }] } : {}),
+      ...(spec.syntheticIdPrefix ? { syntheticId: (_i: unknown, i: number) => `${spec.syntheticIdPrefix}${i + 1}` } : {}),
+    };
+    (rules[spec.subPhaseId] ??= []).push(rule);
+  }
+  return rules;
+})();
 
 /**
  * Walk one content blob, applying the rules registered for its
@@ -189,9 +138,34 @@ function extractFromSaturationNode(
   const ids: string[] = [];
   const nodeId = content.node_id;
   if (typeof nodeId === 'string' && nodeId.length > 0) ids.push(nodeId);
+
+  // FR/NFR-saturation leaves: the decomposed user story lives at
+  // content.user_story with its OWN leaf id (e.g. US-002-D1) and composite
+  // acceptance-criterion ids (AC-US-002-D1-001). Index both the leaf story id
+  // and every leaf AC id — Phase 7/8 trace to these, and the canonical roots
+  // alone (US-002 / AC-US002-001) leave every leaf reference flagged as a
+  // false P7_INVENTED_ID_REFERENCE.
+  if (nodeRecordType === 'requirement_decomposition_node') {
+    const story = content.user_story;
+    if (story && typeof story === 'object') {
+      const s = story as Record<string, unknown>;
+      if (typeof s.id === 'string' && s.id.length > 0) ids.push(s.id);
+      const acs = s.acceptance_criteria;
+      if (Array.isArray(acs)) {
+        for (const ac of acs) {
+          if (ac && typeof ac === 'object') {
+            const acId = (ac as Record<string, unknown>).id;
+            if (typeof acId === 'string' && acId.length > 0) ids.push(acId);
+          }
+        }
+      }
+    }
+    return ids;
+  }
+
   const entityKey =
     nodeRecordType === 'component_decomposition_node' ? 'component'
-    : nodeRecordType === 'data_model_decomposition_node' ? 'data_model'
+    : nodeRecordType === 'data_model_decomposition_node' ? 'entity'
     : nodeRecordType === 'task_decomposition_node' ? 'task'
     : nodeRecordType === 'test_decomposition_node' ? 'test_case'
     : null;
@@ -251,6 +225,7 @@ export function indexArtifacts(input: IndexInput): UpstreamIndex {
           : node.recordType === 'data_model_decomposition_node' ? 'data_model'
           : node.recordType === 'task_decomposition_node' ? 'task'
           : node.recordType === 'test_decomposition_node' ? 'test_case'
+          : node.recordType === 'requirement_decomposition_node' ? 'user_story'
           : null;
         const entity = entityKey ? node.content[entityKey] : node.content;
         artifactsById.set(id, entity ?? node.content);

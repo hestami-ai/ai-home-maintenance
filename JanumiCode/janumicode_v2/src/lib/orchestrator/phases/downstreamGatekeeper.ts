@@ -29,6 +29,7 @@ import {
 } from '../scopeGatekeeper';
 import type { PhaseId, ScopePruneDecisionContent } from '../../types/records';
 import { getLogger } from '../../logging';
+import { buildEffectiveComponentView, extractPriorPhaseContext } from './phaseContext';
 
 export interface DownstreamGatekeeperRequest {
   phaseId: PhaseId;
@@ -143,7 +144,7 @@ export async function runDownstreamScopeGatekeeper(
  * accepted sets (post-gatekeeper) so downstream phases see the full
  * authoritative cumulative view.
  */
-function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext, subPhaseId?: string): GatekeeperUpstreamContext {
+export function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext, subPhaseId?: string): GatekeeperUpstreamContext {
   const { engine, workflowRun } = ctx;
   const all = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
   const byKind = new Map<string, Record<string, unknown>>();
@@ -209,13 +210,29 @@ function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext, subPhaseI
           threshold: typeof n.threshold === 'string' ? n.threshold : undefined,
         }))
       : undefined,
-    acceptedComponents: Array.isArray(cm?.components)
-      ? (cm.components as Array<Record<string, unknown>>).map(c => ({
-          id: String(c.id),
-          name: String(c.name ?? ''),
-          domain_id: typeof c.domain_id === 'string' ? c.domain_id : (typeof c.domainId === 'string' ? c.domainId : undefined),
-        }))
-      : undefined,
+    // Accepted components must reflect the EFFECTIVE component set the
+    // downstream producer actually targets. When Phase 4.2a saturated the
+    // root component_model into a leaf tree, Phase 5/6 plan against those
+    // leaf components (buildEffectiveComponentView → source: 'leaves'), so
+    // a gatekeeper that only knew the coarse `component_model.components[]`
+    // roots would drop EVERY leaf-targeted task/model as "not in Accepted
+    // Components" (slice-128: all 25 Phase-6 tasks pruned → 0 packets → 0
+    // code). Mirror the producer's view: prefer leaves, fall back to roots.
+    acceptedComponents: ((): Array<{ id: string; name: string; domain_id?: string }> | undefined => {
+      const effective = buildEffectiveComponentView(
+        engine.writer.getRecordsByType(workflowRun.id, 'component_decomposition_node'),
+        extractPriorPhaseContext(all),
+      );
+      const src = effective.components.length > 0
+        ? effective.components
+        : (Array.isArray(cm?.components) ? (cm.components as Array<Record<string, unknown>>) : []);
+      if (src.length === 0) return undefined;
+      return src.map(c => ({
+        id: String(c.id),
+        name: String(c.name ?? ''),
+        domain_id: typeof c.domain_id === 'string' ? c.domain_id : (typeof c.domainId === 'string' ? c.domainId : undefined),
+      }));
+    })(),
     // Phase 4.1 software domains — the namespace Phase 4.2 components'
     // `domain_id` actually references (e.g. domain-shortening). The
     // component gatekeeper validates domain membership against THIS set.

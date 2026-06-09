@@ -126,6 +126,26 @@ describe('getFrozenTaskLeaves', () => {
     expect(leaves[0].node_id).toBe('n1');
   });
 
+  it('surfaces a depth-0 atomic refactoring leaf with its idempotency fields (Phase 0.5 → 6 → 9.1)', () => {
+    // Mirrors Phase 6's injected refactoring leaf: depth-0, status=atomic, never
+    // decomposed, carrying task_type:'refactoring' + the executor idempotency fields.
+    const refLeaf = taskNode({ id: 'REFACTOR-1', rootId: 'REFACTOR-1', depth: 0, status: 'atomic' });
+    refLeaf.task.task_type = 'refactoring';
+    refLeaf.task.expected_pre_state_hash = 'deadbeef';
+    refLeaf.task.verification_step = 'confirm contract conformance';
+    refLeaf.task.refactoring_instructions = '## Cross-Run Refactoring Instruction\nremove delete endpoint';
+    const leaves = getFrozenTaskLeaves([rec(refLeaf)]);
+    expect(leaves).toHaveLength(1);
+
+    const view = buildEffectiveTaskView([rec(refLeaf)], emptyPrior());
+    expect(view.source).toBe('leaves');
+    const t = view.tasks[0] as Record<string, unknown>;
+    expect(t.task_type).toBe('refactoring');
+    expect(t.expected_pre_state_hash).toBe('deadbeef');
+    expect(t.verification_step).toBe('confirm contract conformance');
+    expect(t.refactoring_instructions).toContain('Cross-Run Refactoring Instruction');
+  });
+
   it('drops superseded atomic if newer revision is non-atomic', () => {
     const records = [
       rec(taskNode({ id: 'n1', rootId: 'n1', depth: 0, status: 'atomic', tier: 'D' }), 0),

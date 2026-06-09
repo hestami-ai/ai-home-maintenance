@@ -122,6 +122,37 @@ describe('IngestionPipelineRunner', () => {
       const result = pipeline.ingest(override);
       expect(result.edgesCreated).toHaveLength(1);
       expect(result.edgesCreated[0].edgeType).toBe('supersedes');
+      // No superseding_record_id → source falls back to the decision_trace.
+      expect(result.edgesCreated[0].sourceRecordId).toBe(override.id);
+      expect(result.edgesCreated[0].targetRecordId).toBe(priorDecision.id);
+    });
+
+    it('prior_decision_override edge runs superseding → superseded when a superseding record is named', () => {
+      const prior = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc', content: { kind: 'interface_contract', statement: 'auth required' },
+      });
+      const replacement = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc', content: { kind: 'interface_contract', statement: 'no auth' },
+      });
+      const override = writer.writeRecord({
+        record_type: 'decision_trace', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc',
+        content: {
+          decision_type: 'prior_decision_override',
+          superseded_record_id: prior.id,
+          superseding_record_id: replacement.id,
+        },
+      });
+
+      const result = pipeline.ingest(override);
+      expect(result.edgesCreated).toHaveLength(1);
+      const edge = result.edgesCreated[0];
+      expect(edge.edgeType).toBe('supersedes');
+      // Source is the NEW governing artifact (harvestable), not the trace.
+      expect(edge.sourceRecordId).toBe(replacement.id);
+      expect(edge.targetRecordId).toBe(prior.id);
     });
 
     it('creates no edges for record types without rules', () => {

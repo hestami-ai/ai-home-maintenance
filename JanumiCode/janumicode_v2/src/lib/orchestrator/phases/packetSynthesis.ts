@@ -41,7 +41,11 @@ import {
   type BuilderEvaluationCriterion,
   type BuilderTechnicalConstraint,
   type BuilderComplianceItem,
+  type BuilderCrossCuttingConstraint,
 } from './packetSynthesis/packetBuilder';
+import { ARTIFACT_ID_SPECS } from './packetSynthesis/artifactIdSpec';
+import { mintEntityId, mintEndpointId } from './phase5/dataModelIdMinter';
+import { buildRequirementLineage } from './packetSynthesis/idResolution';
 import { verifyCoherence, applyCoherenceResults } from './packetSynthesis/coherenceVerifier';
 
 export interface PacketSynthesisContext {
@@ -75,7 +79,13 @@ function collectSaturationNodes(records: GovernedStreamRecord[]): Array<{ record
       r.record_type === 'component_decomposition_node'
       || r.record_type === 'data_model_decomposition_node'
       || r.record_type === 'task_decomposition_node'
-      || r.record_type === 'test_decomposition_node',
+      || r.record_type === 'test_decomposition_node'
+      // FR/NFR-saturation leaves carry decomposed user-story ids (US-002-D1)
+      // and their composite ACs (AC-US-002-D1-001) under content.user_story.
+      // Phase 7 test cases + Phase 8 evals trace to THOSE leaf ids, not just
+      // the canonical roots — without indexing them every leaf reference is a
+      // false P7_INVENTED_ID_REFERENCE (slice-131: 8111 of them).
+      || r.record_type === 'requirement_decomposition_node',
     )
     .map((r) => ({
       recordType: r.record_type as string,
@@ -186,26 +196,27 @@ function collectComponents(records: GovernedStreamRecord[]): Map<string, Builder
 }
 
 function collectDataModels(records: GovernedStreamRecord[]): BuilderDataModel[] {
-  // Phase 5.1 emits `data_models` artifact with shape:
-  //   { kind: 'data_models', models: [{ component_id, entities: [{ name, fields[] }] }] }
-  // Flatten one BuilderDataModel per (component_id, entity) pair so the
-  // downstream packet builder can find entities by component_id without
-  // re-walking nested structure. Synthesizing the per-entity id from
-  // component_id + entity name keeps it stable across runs.
+  // Phase 5.1 emits `data_models` with shape:
+  //   { kind: 'data_models', models: [{ component_id, entities: [{ id, name, fields[] }] }] }
+  // Entity `id` is producer-minted (Pillar A, dataModelIdMinter: DM-<comp>-<name>)
+  // — we read it directly so the packet and the coherence index reference the
+  // SAME real id (no synthetic minting → no false P7). Array key from the
+  // single-source spec so collector + index can't drift.
+  const spec = ARTIFACT_ID_SPECS.dataModels;
   const out: BuilderDataModel[] = [];
   for (const r of records) {
     if (r.record_type !== 'artifact_produced') continue;
-    if (r.sub_phase_id !== 'data_model_skeleton') continue;
+    if (r.sub_phase_id !== spec.subPhaseId) continue;
     const content = r.content as Record<string, unknown>;
-    const models = content.models;
+    const models = content[spec.arrayKey];
     if (!Array.isArray(models)) continue;
     for (const m of models as Array<Record<string, unknown>>) {
       const componentId = typeof m.component_id === 'string' ? m.component_id : '';
       const entities = Array.isArray(m.entities) ? (m.entities as Array<Record<string, unknown>>) : [];
       for (const e of entities) {
         const name = typeof e.name === 'string' ? e.name : '';
+        const id = typeof e.id === 'string' ? e.id : mintEntityId(componentId, name);
         if (!name) continue;
-        const id = `dm-${componentId}-${name}`.toLowerCase();
         const fields = Array.isArray(e.fields)
           ? (e.fields as Array<Record<string, unknown>>).map((f) => ({
               name: typeof f.name === 'string' ? f.name : '',
@@ -219,27 +230,20 @@ function collectDataModels(records: GovernedStreamRecord[]): BuilderDataModel[] 
       }
     }
   }
-  // Saturation leaves keep their existing shape — `content.data_model` is
-  // a BuilderDataModel directly. Preserve the path for backward compat.
-  for (const r of records) {
-    if (r.record_type !== 'data_model_decomposition_node') continue;
-    const content = r.content as Record<string, unknown>;
-    const dm = content.data_model as BuilderDataModel | undefined;
-    if (dm?.id && !out.find((x) => x.id === dm.id)) out.push(dm);
-  }
   return out;
 }
 
 function collectApiDefs(records: GovernedStreamRecord[]): BuilderApiDef[] {
-  // Phase 5.2 emits `api_definitions` artifact with shape:
-  //   { kind: 'api_definitions', definitions: [{ component_id, endpoints: [{ path, method, inputs, outputs, error_codes }] }] }
-  // Flatten one BuilderApiDef per (component_id, method, path).
+  // Phase 5.2 emits `api_definitions` with shape:
+  //   { kind: 'api_definitions', definitions: [{ component_id, endpoints: [{ id, path, method, ... }] }] }
+  // Endpoint `id` is producer-minted (Pillar A: API-<comp>-<method>-<path>).
+  const spec = ARTIFACT_ID_SPECS.apiDefinitions;
   const out: BuilderApiDef[] = [];
   for (const r of records) {
     if (r.record_type !== 'artifact_produced') continue;
-    if (r.sub_phase_id !== 'api_definitions') continue;
+    if (r.sub_phase_id !== spec.subPhaseId) continue;
     const content = r.content as Record<string, unknown>;
-    const defs = content.definitions;
+    const defs = content[spec.arrayKey];
     if (!Array.isArray(defs)) continue;
     for (const d of defs as Array<Record<string, unknown>>) {
       const componentId = typeof d.component_id === 'string' ? d.component_id : '';
@@ -248,7 +252,7 @@ function collectApiDefs(records: GovernedStreamRecord[]): BuilderApiDef[] {
         const method = typeof ep.method === 'string' ? ep.method : '';
         const path = typeof ep.path === 'string' ? ep.path : '';
         if (!method && !path) continue;
-        const id = `api-${componentId}-${method}-${path}`.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+        const id = typeof ep.id === 'string' ? ep.id : mintEndpointId(componentId, method, path);
         if (out.find((x) => x.id === id)) continue;
         out.push({
           id,
@@ -416,6 +420,33 @@ export function collectComplianceItems(records: GovernedStreamRecord[]): Map<str
   return byId;
 }
 
+/** Lever 1a cross-cutting NFR concerns (the `cross_cutting_constraints` artifact). */
+export function collectCrossCuttingConstraints(
+  records: GovernedStreamRecord[],
+): BuilderCrossCuttingConstraint[] {
+  const out: BuilderCrossCuttingConstraint[] = [];
+  for (const r of records) {
+    if (r.record_type !== 'artifact_produced') continue;
+    if (!r.is_current_version) continue;
+    const content = r.content as Record<string, unknown>;
+    if (content.kind !== 'cross_cutting_constraints') continue;
+    const concerns = content.concerns;
+    if (!Array.isArray(concerns)) continue;
+    for (const c of concerns as Array<Record<string, unknown>>) {
+      if (typeof c.id !== 'string') continue;
+      out.push({
+        id: c.id,
+        name: typeof c.name === 'string' ? c.name : c.id,
+        responsibilities: Array.isArray(c.responsibilities)
+          ? (c.responsibilities as unknown[]).filter((x): x is string => typeof x === 'string') : [],
+        applies_to_components: Array.isArray(c.applies_to_components)
+          ? (c.applies_to_components as unknown[]).filter((x): x is string => typeof x === 'string') : [],
+      });
+    }
+  }
+  return out;
+}
+
 // ── Main entry ──────────────────────────────────────────────────────
 
 export function runPacketSynthesisSubPhase(
@@ -454,6 +485,7 @@ export function runPacketSynthesisSubPhase(
     return { packets: [], totalBlockingFailures: 0, totalAdvisoryFindings: 0, totalAiProposedRoots: 0, failedPackets: 0 };
   }
 
+  const lineage = buildRequirementLineage(allRecords);
   const packets = buildPackets({
     atomicTasks,
     userStories: collectUserStories(allRecords),
@@ -465,11 +497,14 @@ export function runPacketSynthesisSubPhase(
     evaluationCriteria: collectEvaluationCriteria(allRecords),
     technicalConstraintsById: collectTechnicalConstraints(allRecords),
     complianceItemsById: collectComplianceItems(allRecords),
+    crossCuttingConstraints: collectCrossCuttingConstraints(allRecords),
+    lineage,
   });
 
-  // Run coherence verifier.
+  // Run coherence verifier. Pass the lineage canonicalizer so P4 accepts a
+  // root-grained eval as satisfying the leaf stories the packet carries.
   const atomicTaskIds = new Set(atomicTasks.map((t) => t.content.task.id));
-  const verifierResult = verifyCoherence({ packets, upstreamIndex, atomicTaskIds });
+  const verifierResult = verifyCoherence({ packets, upstreamIndex, atomicTaskIds, canonicalize: lineage.canonicalize });
   applyCoherenceResults(packets, verifierResult.byPacketId);
 
   // Persist each packet.
@@ -491,6 +526,41 @@ export function runPacketSynthesisSubPhase(
     // packet record itself fires record.added, the coherence verdict is
     // in the packet content, and per-sub-phase summaries roll up
     // packet counts via the record.* event stream.)
+  }
+
+  // Honest completion-criteria test-coverage report (aggregate of the per-CC
+  // P8_CC_NO_TEST binding). Mirrors the other coverage reports — surfaces real
+  // gaps (no fabrication); the executor authors tests for uncovered criteria.
+  {
+    let ccTotal = 0;
+    let ccCovered = 0;
+    const uncovered: Array<{ packet_id: string; task_id: string; criterion_id: string }> = [];
+    for (const p of packets) {
+      for (const cc of p.task.completion_criteria) {
+        if (cc.verification_method !== 'test_execution') continue;
+        ccTotal++;
+        if (cc.covered_by_test_ids && cc.covered_by_test_ids.length > 0) ccCovered++;
+        else uncovered.push({ packet_id: p.packet_id, task_id: p.task.id, criterion_id: cc.criterion_id });
+      }
+    }
+    engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '9',
+      sub_phase_id: 'packet_synthesis',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [],
+      content: {
+        kind: 'completion_criteria_coverage_report',
+        total_test_execution_criteria: ccTotal,
+        covered: ccCovered,
+        uncovered_count: uncovered.length,
+        coverage_percentage: ccTotal > 0 ? Math.round((ccCovered / ccTotal) * 100) : 100,
+        uncovered,
+      },
+    });
   }
 
   // Persist failure record if any blocking failures occurred.

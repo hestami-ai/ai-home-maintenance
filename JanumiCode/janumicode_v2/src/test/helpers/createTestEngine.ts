@@ -15,6 +15,7 @@ import { createTestDatabase, initializeDatabase, type Database } from '../../lib
 import { ConfigManager } from '../../lib/config/configManager';
 import { OrchestratorEngine } from '../../lib/orchestrator/orchestratorEngine';
 import { Phase0Handler } from '../../lib/orchestrator/phases/phase0';
+import { Phase05Handler } from '../../lib/orchestrator/phases/phase05';
 import { Phase1Handler } from '../../lib/orchestrator/phases/phase1';
 import { Phase2Handler } from '../../lib/orchestrator/phases/phase2';
 import { Phase3Handler } from '../../lib/orchestrator/phases/phase3';
@@ -181,6 +182,7 @@ export async function createTestEngine(
 
   // 4. Register phase handlers
   engine.registerPhase(new Phase0Handler());
+  engine.registerPhase(new Phase05Handler());
   engine.registerPhase(new Phase1Handler());
   engine.registerPhase(new Phase2Handler());
   engine.registerPhase(new Phase3Handler());

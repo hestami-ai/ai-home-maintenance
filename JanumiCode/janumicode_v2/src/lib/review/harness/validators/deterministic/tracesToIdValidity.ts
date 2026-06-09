@@ -114,8 +114,18 @@ function collectKnownIds(
     }
   }
 
-  // From prompt — extract well-formed IDs (FR-*, NFR-*, COMP-*, ENT-*)
-  const promptIdPattern = /\b((FR|NFR|US|COMP|ENT|SR|SYS)-[A-Z0-9._-]+)\b/g;
+  // From prompt — extract well-formed IDs. The prefix set MUST cover every id
+  // namespace the prompts actually emit as trace targets, or valid traces are
+  // flagged as fabricated. The saturation/bloom prompts use UJ-* (user
+  // journeys) and WF-* (workflows) as the PRIMARY trace targets, plus
+  // VV-/TECH-/QA-/VOC-/OPEN-/Q-/DM-/API- across the requirements & spec phases.
+  // (Earlier this regex only listed FR|NFR|US|COMP|ENT|SR|SYS, which produced
+  // 100% false positives on every UJ-/WF- trace in fr_saturation — see
+  // dspy/reports/fr_saturation.findings.md.) Broadening is safe: ids are scanned
+  // FROM the prompt, so a wider prefix set only recognizes ids actually present —
+  // a fabricated id (absent from the prompt) still never matches.
+  const promptIdPattern =
+    /\b((FR|NFR|US|UJ|WF|VV|TECH|QA|VOC|OPEN|COMP|ENT|SR|SYS|DM|API|Q)-[A-Z0-9._-]+)\b/g;
   promptIdPattern.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = promptIdPattern.exec(prompt)) !== null) {

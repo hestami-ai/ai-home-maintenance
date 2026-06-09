@@ -137,9 +137,13 @@ describe('normalizeRootTaskShape', () => {
     expect(t.completion_criteria[0].criterion_id).toBe('CC-99');
   });
 
-  it('normalizes write/read paths through normalizeWorkspacePath', () => {
+  it('OVERRIDES write paths with the deterministic canonical component dir; normalizes read paths', () => {
+    // Project Layout Contract: write_directory_paths is no longer the
+    // LLM-invented value — it is deterministically derived from component_id
+    // (here comp-foo → src/foo). read_directory_paths stays LLM-driven (just
+    // normalized) since a task legitimately reads other components/shared.
     const raw = {
-      id: 't', description: 'd', component_id: 'c', component_responsibility: 'r',
+      id: 't', description: 'd', component_id: 'comp-foo', component_responsibility: 'r',
       completion_criteria: [],
       write_directory_paths: [
         'E:/Projects/hestami-ai/JanumiCode/janumicode_v2/src/components/comp-foo',
@@ -148,7 +152,7 @@ describe('normalizeRootTaskShape', () => {
       read_directory_paths: ['./src/shared/models'],
     };
     const t = normalizeRootTaskShape(raw, 0, constraints);
-    expect(t.write_directory_paths).toEqual(['src/components/comp-foo', 'old-spec/path']);
+    expect(t.write_directory_paths).toEqual(['src/foo']);
     expect(t.read_directory_paths).toEqual(['src/shared/models']);
   });
 

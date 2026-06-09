@@ -166,6 +166,17 @@ export interface JanumiCodeConfig {
     component_fanout_cap: number;
     component_mirror_gate_depth: number;
     /**
+     * Lever 1b — decomposition scale budget. The maximum number of
+     * FUNCTIONAL components allowed out of Phase 4.2 is keyed to upstream
+     * intent scale, not a hardcoded constant:
+     *   budget = max(#acceptedSoftwareDomains, ceil(ratio × #acceptedUserStories))
+     * When the proposed functional set exceeds this budget, Phase 4 runs a
+     * consolidation pass (merge to ≤ budget) guarded so user-story coverage
+     * is never reduced. Default 1.0 (a component per user story is the
+     * upper band; the domain count is the floor). 0 disables the gate.
+     */
+    component_scale_ratio: number;
+    /**
      * Wave 7 Step 4c analog — when true, audit Tier-C component
      * children for "responsibility shape" (verb-led / mutually
      * exclusive / collectively exhausting / no implied subcomponents).
@@ -246,6 +257,64 @@ export interface JanumiCodeConfig {
     };
     /** Optional wave-level reasoning review at the gate. */
     wave_reasoning_review_on_gate: boolean;
+    /**
+     * Pillar D — max delta-cycle restarts per release before the cycle
+     * controller stops routing and surfaces the ceiling to the operator.
+     * Bounds the packet-coherence self-correction loop. Default 3.
+     */
+    max_cycles_per_release: number;
+  };
+
+  /**
+   * Lever 2a — canonical project profile + shared scaffold. Phase 9.0
+   * (scaffold_synthesis) materializes ONE root project configuration and a
+   * shared module directory from interface_contracts + data_models BEFORE
+   * any executor leaf runs, so leaves import shared modules instead of
+   * reinventing them divergently. The profile is resolved by precedence:
+   * detected existing workspace config (brownfield) → Phase-4 ADR override
+   * → this default (greenfield). Only the TS/ESM/vitest materializer ships
+   * today; other languages can be declared but are not yet materialized.
+   */
+  scaffold: {
+    /** Master switch — false skips Phase 9.0 entirely. */
+    enabled: boolean;
+    /**
+     * After materializing the root package.json, run `npm install` ONCE so the
+     * declared test runner (vitest/jest) resolves — otherwise every leaf
+     * quarantines on `npm test` (command not found). Skipped if node_modules
+     * already exists; non-fatal on failure (the run continues, tests may fail).
+     */
+    install_dependencies: boolean;
+    /** Test-file placement convention enforced by the layout contract. */
+    test_placement: 'colocated' | 'subdir';
+    project_profile: {
+      language: 'typescript' | 'javascript';
+      module: 'esm' | 'commonjs';
+      test_runner: 'vitest' | 'jest' | 'node';
+      /** Workspace-relative dir owned exclusively by the scaffold step. */
+      shared_dir: string;
+    };
+  };
+
+  /** Lever 2c — Phase 10.1 pre-commit consistency check. */
+  consistency: {
+    /**
+     * Severity for divergent-duplicate findings (same basename, different
+     * content hash across paths). 'block' fails the Phase 10 gate; 'warn'
+     * records the finding + technical debt but passes. Default 'block'.
+     */
+    divergence_severity: 'block' | 'warn';
+    /**
+     * Severity for project-layout violations (stray top-level dirs, stray
+     * shared trees, foreign-language files, dist source). Default 'advisory'
+     * — recorded but never blocks (prevention does the work).
+     */
+    layout_violation_severity: 'advisory' | 'block';
+    /**
+     * Severity for `tsc --noEmit` errors on the generated workspace (broken
+     * imports, type errors). Default 'advisory'.
+     */
+    tsc_validation_severity: 'advisory' | 'block';
   };
 
   /**
@@ -476,6 +545,8 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     component_fanout_cap: 12,
     component_mirror_gate_depth: 2,
     component_reasoning_review_on_tier_c: false,
+    // Lever 1b — functional-component scale budget (per accepted user story).
+    component_scale_ratio: 1.0,
     // Wave 8 task-tree caps. Tasks fan out per component leaf and are
     // already finer-grained than components, so depth_cap=5 (vs
     // component depth_cap=6), fanout_cap=10 (typical 2–6 stories per
@@ -517,6 +588,25 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
       timeout_ms: 120_000,
     },
     wave_reasoning_review_on_gate: false,
+    max_cycles_per_release: 3,
+  },
+
+  scaffold: {
+    enabled: true,
+    install_dependencies: true,
+    test_placement: 'colocated',
+    project_profile: {
+      language: 'typescript',
+      module: 'esm',
+      test_runner: 'vitest',
+      shared_dir: 'src/shared',
+    },
+  },
+
+  consistency: {
+    divergence_severity: 'block',
+    layout_violation_severity: 'advisory',
+    tsc_validation_severity: 'advisory',
   },
 
   // Spec §10 canonical:

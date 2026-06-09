@@ -202,6 +202,7 @@ For each child you produce, list any **implementation choice, sequencing constra
 - Every child MUST carry a `tier` of A, B, C, or D.
 - Every child MUST carry a non-empty `component_id` and `component_responsibility` (verbatim from `component_context`).
 - Every child SHOULD have a non-empty `traces_to[]` referencing parent responsibility ids, completion criteria ids, or sibling task ids listed under `sibling_context`.
+- **Carry the leaf `AC-*` ids forward.** Each child's `traces_to[]` MUST include the subset of the parent's leaf acceptance-criterion ids (`AC-*`, present in the parent's `traces_to`) that THAT child implements. Every `AC-*` id on the parent must be carried by at least one child. Copy the ids verbatim; never invent a new `AC-*` id.
 - All `write_directory_paths` and `read_directory_paths` entries MUST be workspace-relative (no absolute paths, no drive letters, no leading `./`).
 - Use `decomposition_rationale` to explain *why this child, not another*.
 - `parent_branch_classification` is **required** and must be exactly one of the three enum values.

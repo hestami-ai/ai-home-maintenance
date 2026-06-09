@@ -134,6 +134,33 @@ describe('DeepMemoryResearchAgent', () => {
       expect(packet.queryDecomposition.topicEntities.length).toBeGreaterThan(0);
     });
 
+    it('executor_agent: excludes constitutional_invariant process-governance records (kept for other roles)', async () => {
+      const invariant = writer.writeRecord({
+        record_type: 'constitutional_invariant',
+        schema_version: '1.0',
+        workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc',
+        content: { statement: 'Agents never exercise judgment; escalate to the human.' },
+      });
+
+      // Seeded as known-relevant so it is guaranteed a candidate; the executor
+      // role filter still drops it (runs post-harvest, by record_type).
+      const execPacket = await agent.research(baseBrief({
+        requestingAgentRole: 'executor_agent',
+        query: 'judgment escalation',
+        knownRelevantRecordIds: [invariant.id],
+      }));
+      expect(execPacket.materialFindings.some(f => f.id === invariant.id)).toBe(false);
+
+      // A non-executor role keeps it.
+      const otherPacket = await agent.research(baseBrief({
+        requestingAgentRole: 'architecture_agent',
+        query: 'judgment escalation',
+        knownRelevantRecordIds: [invariant.id],
+      }));
+      expect(otherPacket.materialFindings.some(f => f.id === invariant.id)).toBe(true);
+    });
+
     it('includes known relevant records with max materiality', async () => {
       const record = writer.writeRecord({
         record_type: 'artifact_produced',
@@ -479,10 +506,11 @@ describe('DeepMemoryResearchAgent', () => {
       // pipeline_id should be patched to the record's own id via json_set.
       expect(content.pipeline_id).toBe(pipeline.id);
       expect(content.stages).toHaveLength(7);
-      // Stage kinds: 1 + 7 are LLM, 2-6 are deterministic. The
-      // webview uses this to show "kind" chips so the user
-      // understands why only 2 stages produce nested cards.
-      expect(content.stages[0].kind).toBe('llm');
+      // Stage kinds: only Stage 7 is LLM. Stage 1 (query decomposition)
+      // is deterministic — `decomposeQuery` makes no LLM call. Stages 2-6
+      // are deterministic. The webview uses this to show "kind" chips so
+      // the user understands which stages invoke a model.
+      expect(content.stages[0].kind).toBe('deterministic');
       expect(content.stages[1].kind).toBe('deterministic');
       expect(content.stages[5].kind).toBe('deterministic');
       expect(content.stages[6].kind).toBe('llm');

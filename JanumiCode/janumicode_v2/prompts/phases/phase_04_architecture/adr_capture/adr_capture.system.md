@@ -24,6 +24,7 @@ Produce [JC:Architectural Decision Records] for every significant choice made du
 REQUIRED OUTPUT: A JSON object whose **single top-level key is `adrs`** (do NOT use `architectural_decisions` as the top-level key — use `adrs`):
 - `adrs`: array, each entry has fields:
   - `id`, `title`, `status` (`proposed`|`accepted`), `context`, `decision`, `alternatives`, `rationale`, `consequences`
+  - `governs_components`: array of the component ids (from the Component Model below) this decision actually governs. Copy ids **verbatim** from the Component Model. For a genuinely project-wide/cross-cutting decision (e.g. HTTPS-only, logging format) emit an **empty array** `[]` — that marks it global. A component-specific decision (e.g. "PDF rendering library", "encryption-audit schedule") MUST list only the component(s) it applies to, so downstream task prompts don't carry irrelevant ADRs. Do NOT list every component by default.
 
 Valid skeleton:
 ```json

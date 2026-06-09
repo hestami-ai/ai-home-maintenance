@@ -17,6 +17,7 @@
  */
 
 import type { CycleRestartSeed } from './cycleSeed';
+import { canonicalComponentDir } from './layoutContract';
 
 // ── Phase 6 delta — synthesize tasks for orphan user stories ──────
 
@@ -90,7 +91,7 @@ export function synthesizeDeltaTasks(input: PhaseSixSynthInput): PhaseSixTask[] 
         description: `All acceptance criteria of ${usId} hold true`,
         verification_method: 'test_execution',
       }],
-      write_directory_paths: [`src/server/${input.defaultComponentId.replace(/^comp[-_]/, '')}`],
+      write_directory_paths: [canonicalComponentDir(input.defaultComponentId, 'src')],
       read_directory_paths: [],
       dependency_task_ids: [],
       traces_to: [usId],

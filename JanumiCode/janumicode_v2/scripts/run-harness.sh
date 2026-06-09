@@ -28,6 +28,36 @@
 #                     cost of letting expansive blooms through).
 #   --no-pause        Disable audit pause (un-attended mode — only useful
 #                     for full smoke runs, not for iteration).
+#   --full            Drop the --thin-slice depth/fanout caps so the run
+#                     decomposes and implements the ENTIRE intent (not the
+#                     one-template-each calibration sliver). Much longer +
+#                     more LLM calls; for a real end-to-end build, not
+#                     template iteration. (Single-run path only.)
+#   --simulate-decisions
+#                     Certify each phase gate through the real approval path
+#                     (phase_gate_approved + validates edges → Authority-6
+#                     elevation) so the DMR's active_constraints accumulation
+#                     is exercised instead of staying dormant headless. Off by
+#                     default. Pairs well with the audit pause to inspect how
+#                     active_constraints grow phase-over-phase.
+#   --two-run         Cross-run driver (semantic supersession + Phase 0.5).
+#                     Runs the CLI TWICE against one shared workspace DB: run 1
+#                     establishes + gate-certifies governing artifacts
+#                     (--simulate-human-decisions), run 2 injects a
+#                     prior_decision_override of a CERTIFIED INTERFACE from run 1.
+#                     That exercises both (a) the supersedes edge + DMR
+#                     supersession_chains AND (b) Phase 0.5 Cross-Run Impact
+#                     Analysis → 6 (refactoring tasks) → 9.1
+#                     (cross_run_modification) → 10.1 (verification). Prints both
+#                     verifications. Both runs share one workspace + DB, so
+#                     run 1 (full pipeline by default) writes the prior-run
+#                     files run 2's refactor tasks target (true brownfield).
+#                     Env: JANUMICODE_TWO_RUN_LIMIT (run-1 phase-limit, default
+#                     none = full; set =5 for a cheap establish-only run that
+#                     writes no code), JANUMICODE_TWO_RUN_RUN2_LIMIT (run-2
+#                     phase-limit, default none = full pipeline),
+#                     JANUMICODE_OVERRIDE_SPEC (--inject-overrides JSON).
+#                     Best paired with --no-pause (unattended two-run sequence).
 #
 # What the harness does NOT change:
 #   - --thin-slice (depth=2 fanout=1) still applies — each decomposition
@@ -50,14 +80,20 @@ spec_path="${TINYURL_SPEC}"
 skip_confirm=0
 no_gatekeeper=0
 no_pause=0
+simulate_decisions=0
+two_run=0
+full=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -n) slice_number="$2"; shift 2 ;;
     -s) spec_path="$2"; shift 2 ;;
     -y) skip_confirm=1; shift ;;
+    --full) full=1; shift ;;
     --no-gatekeeper) no_gatekeeper=1; shift ;;
     --no-pause) no_pause=1; shift ;;
+    --simulate-decisions) simulate_decisions=1; shift ;;
+    --two-run) two_run=1; shift ;;
     -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
     *) echo "[harness] unknown option: $1" >&2; exit 2 ;;
   esac
@@ -95,12 +131,17 @@ if (( no_gatekeeper )); then
 else
   export JANUMICODE_SCOPE_GATEKEEPER=on             # default: gatekeeper ON — Phase 1 + Phase 2/4/6/7 cross-checks
 fi
+if (( simulate_decisions )); then
+  export JANUMICODE_SIMULATE_DECISIONS=1            # certify phase gates → DMR authority elevation (Finding 1 exerciser)
+fi
 
 echo "[harness] profile:"
 echo "[harness]   JANUMICODE_REVIEW_ENABLED       = ${JANUMICODE_REVIEW_ENABLED}"
 echo "[harness]   JANUMICODE_INGESTION_STAGE3_OFF = ${JANUMICODE_INGESTION_STAGE3_OFF}"
 echo "[harness]   JANUMICODE_AUDIT_PAUSE          = ${JANUMICODE_AUDIT_PAUSE}"
 echo "[harness]   JANUMICODE_SCOPE_GATEKEEPER     = ${JANUMICODE_SCOPE_GATEKEEPER}"
+echo "[harness]   JANUMICODE_SIMULATE_DECISIONS   = ${JANUMICODE_SIMULATE_DECISIONS:-0}"
+echo "[harness]   two-run supersession driver     = ${two_run}"
 echo "[harness]   slice number                    = ${slice_number}"
 echo "[harness]   spec                            = ${spec_path}"
 
@@ -128,4 +169,7 @@ fi
 # which stays alive. Collapsing to one bash supervisor fixes both:
 # the bash trap MAY fire on SIGTERM, and if not, node's watcher
 # sees its direct parent gone and self-exits.
-exec bash "${SCRIPT_DIR}/init-thin-slice-run.sh" -n "${slice_number}" -s "${spec_path}" -y
+init_args=(-n "${slice_number}" -s "${spec_path}" -y)
+if (( two_run )); then init_args+=(--two-run); fi
+if (( full )); then init_args+=(--full); fi
+exec bash "${SCRIPT_DIR}/init-thin-slice-run.sh" "${init_args[@]}"

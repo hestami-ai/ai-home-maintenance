@@ -26,19 +26,27 @@ Decompose the system into [JC:Components] with defined responsibilities and depe
 REQUIRED OUTPUT: A JSON object matching the `component_model` schema:
 - components: array, each with:
   - `id` (lowercase `comp-*` namespace), `name`, `domain_id` (lowercase `domain-*` matching software_domains)
+  - `component_kind`: **REQUIRED** — `"functional"` or `"cross_cutting"` (see "Functional vs cross-cutting" below)
   - `responsibilities`: array of `{id, statement}` — at least one per Component (Invariant). Responsibility `id` uses the `res-*` namespace.
   - `dependencies`: array of `{target_component_id, dependency_type}`
-  - `traces_to`: **MANDATORY, NON-EMPTY array** of `US-*` ids from `functional_requirements_summary`. Every component MUST cite ≥ 1 user story it serves. A missing or empty `traces_to` array is a CM-003 invariant violation. Do not emit a component without this field populated.
+  - `traces_to`: for **functional** components, a **MANDATORY, NON-EMPTY array** of `US-*` ids from `functional_requirements_summary`. Every functional component MUST cite ≥ 1 user story it serves.
+  - `applies_to_components`: for **cross_cutting** components, the `comp-*` ids of the functional components this concern constrains. Cross-cutting components do NOT declare `traces_to` user stories.
+
+# Functional vs cross-cutting — do NOT create a service per NFR
+
+A `functional` component is a buildable service realizing one or more user stories. A `cross_cutting` component is a non-functional concern (NFR) — performance/latency, encryption/security, availability/resilience, observability/logging, compliance/retention — that is realized WITHIN functional components, not as its own deployable service.
+
+- **Do NOT emit a standalone `*-service` component for an NFR.** "Encryption", "rate limiting", "logging", "monitoring", "availability", "compliance" are NOT services — they are cross-cutting constraints. The system reifies them as `cross_cutting_constraints` attached to the functional components they apply to; it does NOT build them as separate services.
+- Prefer folding an NFR concern into the functional component that owns the relevant behavior (e.g. URL encryption belongs to the component that stores/serves URLs). Only emit a `cross_cutting` component when the concern genuinely spans multiple functional components, and then set `applies_to_components` to the components it constrains.
+- The NFR's own requirements still reach downstream implementation independently (via the non-functional-requirements artifact), so marking a concern cross-cutting loses nothing — it only prevents microservice sprawl.
 
 Rules:
 - Every Component Responsibility statement must be a SINGLE concern — no conjunctions ("and", "or") connecting distinct concerns (Invariant: CM-001)
 - Every Component must have at least one Responsibility (Invariant: CM-002)
 - Every System Requirement must be allocated to at least one Component (Invariant)
 - If a Responsibility is too broad for a single Executor Agent session, it is an implementability_violation
-- **Every Component MUST declare `traces_to: [US-*]`** (Invariant CM-003) — the canonical "what users need" ↔ "what we build" edge. The downstream Phase 9 packet builder uses this field to populate per-task user-story context; an empty or missing list starves every task on that component of narrative grounding.
-- **No exemptions for "pure infrastructure" components.** Even shared libraries, logging utilities, and cross-cutting concerns serve specific user-facing stories — list those stories. If a component is allegedly pure-infrastructure with no story it serves, it is over-decomposed (collapse into a parent that does serve stories) or the wrong components have been emitted.
-- **Self-check before emitting:** for each component you've drafted, ask "which US-* ids in `functional_requirements_summary` describe behavior this component is necessary to satisfy?" If you cannot answer that question for a component, re-examine the component's purpose. Do NOT emit it with an empty `traces_to`.
-- Components that serve multiple user stories list all of them. Components that serve cross-cutting infrastructure list all stories that depend on it.
+- **Every FUNCTIONAL component MUST declare `traces_to: [US-*]`** (Invariant CM-003) — the canonical "what users need" ↔ "what we build" edge. The downstream Phase 9 packet builder uses this field to populate per-task user-story context. (Cross-cutting components are exempt — they declare `applies_to_components` instead.)
+- **Self-check before emitting:** for each component, first decide its `component_kind`. If it is functional, ask "which US-* ids describe behavior this component is necessary to satisfy?" — if you cannot answer, it is mis-classified (likely cross-cutting) or over-decomposed. If it is cross-cutting, ask "which functional components does this concern constrain?" and list them in `applies_to_components`.
 - Every `US-*` id in `traces_to` MUST exist in `functional_requirements_summary`. Do NOT invent user-story ids.
 
 # Granularity at this level — Single-Service Principle, NOT Single-Responsibility Principle

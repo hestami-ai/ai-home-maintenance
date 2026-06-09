@@ -233,3 +233,84 @@ export function detectOverlapConflicts(
   }
   return conflicts;
 }
+
+// ── Lever 2c — divergent-duplicate detection ─────────────────────────
+
+export interface DivergentDuplicateFinding {
+  /** The shared basename (lowercased) that appears in ≥2 places. */
+  basename: string;
+  /** The divergent files — workspace-relative path + content hash. */
+  files: Array<{ path: string; hash: string }>;
+}
+
+/**
+ * Structural file basenames that legitimately recur across a codebase and
+ * carry no "same module, divergent impl" signal. Pure naming conventions
+ * (NOT domain keywords) so the detector stays general across any intent.
+ */
+const UBIQUITOUS_BASENAMES = new Set([
+  'index', 'types', 'main', 'mod', '__init__', 'setup', 'conftest',
+]);
+
+function isTestFile(base: string): boolean {
+  return /\.(test|spec)\./i.test(base) || base.startsWith('test_');
+}
+
+/**
+ * Lever 2c — detect divergent duplicate modules across the generated
+ * workspace: files that share a basename but have DIFFERENT content hashes
+ * in different directories (e.g. two `encryption-service.js`, one ESM/sync
+ * and one CJS/async — the exact fragmentation symptom the shared scaffold
+ * is meant to prevent). Purely structural (basename + content hash); no
+ * domain keywords. Common structural names, test files, and root config
+ * files are skipped to avoid false positives.
+ *
+ * `protectedPrefixes` (the scaffold's shared dir) are excluded from the
+ * scan entirely — the scaffold owns single canonical copies there.
+ */
+export function detectDivergentDuplicates(
+  workspaceRoot: string,
+  protectedPrefixes: string[] = [],
+): DivergentDuplicateFinding[] {
+  const files: string[] = [];
+  listFilesRecursive(workspaceRoot, files);
+
+  const normPrefixes = protectedPrefixes
+    .filter(p => p.endsWith('/'))
+    .map(p => p.replace(/\\/g, '/'));
+
+  const byBase = new Map<string, Array<{ path: string; hash: string }>>();
+  for (const abs of files) {
+    const rel = path.relative(workspaceRoot, abs).split(path.sep).join('/');
+    if (normPrefixes.some(p => rel === p.slice(0, -1) || rel.startsWith(p))) continue;
+    const base = path.basename(abs).toLowerCase();
+    const stem = base.replace(/\.[^.]+$/, '');
+    if (UBIQUITOUS_BASENAMES.has(stem) || isTestFile(base)) continue;
+    if (ROOT_CONFIG_BASENAMES.has(base)) continue;
+    let hash: string;
+    try {
+      const stat = fs.statSync(abs);
+      if (!stat.isFile() || stat.size > PER_FILE_BYTE_CAP) continue;
+      hash = safeHash(fs.readFileSync(abs));
+    } catch {
+      continue;
+    }
+    const group = byBase.get(base);
+    if (group) group.push({ path: rel, hash });
+    else byBase.set(base, [{ path: rel, hash }]);
+  }
+
+  const findings: DivergentDuplicateFinding[] = [];
+  for (const [base, group] of byBase) {
+    if (group.length < 2) continue;
+    const distinctHashes = new Set(group.map(g => g.hash));
+    if (distinctHashes.size < 2) continue; // identical copies — not divergent
+    findings.push({ basename: base, files: group });
+  }
+  return findings;
+}
+
+const ROOT_CONFIG_BASENAMES = new Set([
+  'package.json', 'tsconfig.json', 'package-lock.json', 'pnpm-lock.yaml',
+  'yarn.lock', 'vitest.config.ts', 'jest.config.js', '.gitignore', 'readme.md',
+]);

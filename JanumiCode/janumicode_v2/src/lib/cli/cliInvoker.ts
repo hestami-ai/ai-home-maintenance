@@ -6,7 +6,7 @@
  * handles process lifecycle (timeout, idle timeout, SIGTERM/SIGKILL).
  */
 
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, spawnSync, type ChildProcess } from 'child_process';
 import { type OutputParser, type ParsedEvent } from './outputParser';
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -104,6 +104,17 @@ export class CLIInvoker {
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
       let noContentTimer: ReturnType<typeof setTimeout> | null = null;
       let processTimer: ReturnType<typeof setTimeout> | null = null;
+      let forceSettleTimer: ReturnType<typeof setTimeout> | null = null;
+      // Guards against double-resolve. The promise settles on the FIRST of:
+      // child 'close', child 'error', or a timeout's force-settle — so a hung
+      // CLI whose process won't emit 'close' (e.g. an orphaned grandchild
+      // holding the stdout pipe after a kill) can no longer hang invoke()
+      // forever. Before this, a timer firing only set a flag + killed the
+      // process and WAITED for 'close'; if 'close' never came, the whole run
+      // stalled until the global idle window. Grace after a kill lets a clean
+      // 'close' win (real exit code + flushed buffer) before we force-settle.
+      let settled = false;
+      const KILL_GRACE_MS = 5000;
 
       // Merge environment
       const env = { ...process.env, ...options.env };
@@ -172,7 +183,11 @@ export class CLIInvoker {
 
       // ── Process exit ─────────────────────────────────────────
 
-      child.on('close', (code) => {
+      // Settle the invocation exactly once, from whichever happens first:
+      // clean 'close', 'error', or a timeout's force-settle.
+      function settle(exitCode: number | null) {
+        if (settled) return;
+        settled = true;
         clearTimers();
 
         // Process any remaining buffered stdout
@@ -182,7 +197,7 @@ export class CLIInvoker {
         }
 
         resolve({
-          exitCode: code,
+          exitCode,
           timedOut,
           idledOut,
           noContentTimedOut,
@@ -191,22 +206,23 @@ export class CLIInvoker {
           stderr,
           durationMs: Date.now() - startTime,
         });
-      });
+      }
+
+      child.on('close', (code) => settle(code));
 
       child.on('error', (err) => {
-        clearTimers();
         stderr += `\nProcess error: ${err.message}`;
-        resolve({
-          exitCode: null,
-          timedOut,
-          idledOut,
-          noContentTimedOut,
-          events,
-          stdoutText,
-          stderr,
-          durationMs: Date.now() - startTime,
-        });
+        settle(null);
       });
+
+      // After a timeout kills the process, give 'close' a short grace window to
+      // win (clean exit code + flushed buffer); if the process won't die/close,
+      // force-settle so invoke() never hangs.
+      function killAndForceSettle() {
+        killProcess(child);
+        if (forceSettleTimer) clearTimeout(forceSettleTimer);
+        forceSettleTimer = setTimeout(() => settle(null), KILL_GRACE_MS);
+      }
 
       // ── Pipe stdin ───────────────────────────────────────────
 
@@ -220,7 +236,7 @@ export class CLIInvoker {
       // Process timeout
       processTimer = setTimeout(() => {
         timedOut = true;
-        killProcess(child);
+        killAndForceSettle();
       }, timeoutMs);
 
       // Idle timeout — fires when no stdout byte arrives at all.
@@ -228,7 +244,7 @@ export class CLIInvoker {
         if (idleTimer) clearTimeout(idleTimer);
         idleTimer = setTimeout(() => {
           idledOut = true;
-          killProcess(child);
+          killAndForceSettle();
         }, idleTimeoutMs);
       }
 
@@ -240,7 +256,7 @@ export class CLIInvoker {
         if (noContentTimeoutMs <= 0) return;
         noContentTimer = setTimeout(() => {
           noContentTimedOut = true;
-          killProcess(child);
+          killAndForceSettle();
         }, noContentTimeoutMs);
       }
 
@@ -251,12 +267,26 @@ export class CLIInvoker {
         if (processTimer) clearTimeout(processTimer);
         if (idleTimer) clearTimeout(idleTimer);
         if (noContentTimer) clearTimeout(noContentTimer);
+        if (forceSettleTimer) clearTimeout(forceSettleTimer);
       }
 
       function killProcess(proc: ChildProcess) {
         try {
           if (process.platform === 'win32') {
-            proc.kill(); // SIGTERM equivalent on Windows
+            // `proc.kill()` terminates ONLY the spawned process (the cmd shell
+            // wrapping goose) — NOT the descendant tree it created (goose →
+            // cmd → npm → node → vitest). A hung child (e.g. `npm test` in
+            // watch mode, a dev server, an interactive prompt) keeps the
+            // stdout pipe open, so the 'close' event never fires and invoke()
+            // never resolves — the whole run then stalls until the global idle
+            // kill. `taskkill /T /F` terminates the ENTIRE tree so the pipe
+            // closes, invoke() resolves (timed-out), and the executor
+            // quarantines that task and proceeds.
+            if (proc.pid !== undefined) {
+              spawnSync('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true });
+            } else {
+              proc.kill();
+            }
           } else {
             proc.kill('SIGTERM');
             // SIGKILL after 10s if still running

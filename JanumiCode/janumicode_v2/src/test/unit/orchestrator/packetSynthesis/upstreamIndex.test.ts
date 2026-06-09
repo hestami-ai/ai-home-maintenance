@@ -44,7 +44,7 @@ describe('indexArtifacts — basic extraction', () => {
     const idx = indexArtifacts({
       artifacts: [
         { sub_phase_id: 'technical_constraints_discovery', content: { technicalConstraints: [{ id: 'TECH-1', text: 'foo' }] } },
-        { sub_phase_id: 'compliance_retention_discovery', content: { compliance_extracted_items: [{ id: 'COMP-1', text: 'foo' }] } },
+        { sub_phase_id: 'compliance_retention_discovery', content: { complianceExtractedItems: [{ id: 'COMP-1', text: 'foo' }] } },
         { sub_phase_id: 'vv_requirements_discovery', content: { vvRequirements: [{ id: 'VV-1', target: 'foo' }] } },
       ],
     });
@@ -102,7 +102,8 @@ describe('indexArtifacts — basic extraction', () => {
     const idx = indexArtifacts({
       artifacts: [
         { sub_phase_id: 'component_skeleton', content: { components: [{ id: 'comp-001', name: 'A' }] } },
-        { sub_phase_id: 'data_model_skeleton', content: { data_models: [{ id: 'dm-001', name: 'M' }] } },
+        // Producer-minted entity ids live under models[].entities[].id (Pillar A/B).
+        { sub_phase_id: 'data_model_skeleton', content: { models: [{ component_id: 'comp-001', entities: [{ id: 'DM-001', name: 'M' }] }] } },
         { sub_phase_id: 'task_skeleton', content: { tasks: [{ id: 'task-001', name: 'T' }] } },
         {
           sub_phase_id: 'test_case_skeleton',
@@ -116,7 +117,7 @@ describe('indexArtifacts — basic extraction', () => {
       ],
     });
     expect(idx.allUpstreamIds.has('comp-001')).toBe(true);
-    expect(idx.allUpstreamIds.has('dm-001')).toBe(true);
+    expect(idx.allUpstreamIds.has('DM-001')).toBe(true);
     expect(idx.allUpstreamIds.has('task-001')).toBe(true);
     expect(idx.allUpstreamIds.has('suite-001')).toBe(true);
     expect(idx.allUpstreamIds.has('TC-001')).toBe(true);

@@ -36,7 +36,12 @@ export interface InboundDecision {
     | 'phase_gate_approval'
     | 'phase_gate_rejection'
     | 'system_proposal_approval'
-    | 'system_proposal_rejection';
+    | 'system_proposal_rejection'
+    // A human knowingly establishes a new governing position that
+    // contradicts a prior Phase-Gate-Certified decision (spec §3.2). The
+    // payload MUST carry `superseded_record_id` (the prior governing record)
+    // and SHOULD carry `superseding_record_id` (the new one).
+    | 'prior_decision_override';
   /** Decision-type-specific payload (e.g. selected option ids, edited content). */
   payload?: Record<string, unknown>;
 }
@@ -48,7 +53,14 @@ export class DecisionRouter {
     const versionSha = this.engine.janumiCodeVersionSha;
     const writer = this.engine.writer;
 
-    // 1. Write the decision_trace record.
+    // 1. Write the decision_trace record. For a prior_decision_override, the
+    //    `superseded_record_id` (and superseding_record_id) MUST sit at
+    //    top-level content — that is the shape the Ingestion Pipeline's Stage
+    //    II reads to assert the `supersedes` Memory Edge (spec §5.2 + §8.12).
+    //    Leaving them only inside `payload` is the same trap GAP-1 was.
+    const overrideFields = decision.type === 'prior_decision_override'
+      ? this.overrideSupersessionFields(decision.payload)
+      : {};
     const decisionTraceRecord = writer.writeRecord({
       record_type: 'decision_trace',
       schema_version: '1.0',
@@ -59,61 +71,48 @@ export class DecisionRouter {
         decision_type: decision.type,
         target_record_id: decision.recordId,
         payload: decision.payload ?? {},
+        ...overrideFields,
       },
     });
 
-    // 2. Write the typed follow-up record.
-    const followUpType = this.followUpRecordType(decision.type);
-    let followUpRecordId: string | null = null;
-    if (followUpType) {
-      const followUpRecord = writer.writeRecord({
-        record_type: followUpType,
-        schema_version: '1.0',
-        workflow_run_id: runId,
-        janumicode_version_sha: versionSha,
-        derived_from_record_ids: [decision.recordId],
-        content: {
-          target_record_id: decision.recordId,
-          payload: decision.payload ?? {},
-        },
-      });
-      followUpRecordId = followUpRecord.id;
+    // 1b. Ingest the override decision_trace so Stage II creates the
+    //     `supersedes` edge (the DMR Stage 5 semantic-supersession signal).
+    //     Without this the edge is never created — the producer side of the
+    //     path was missing entirely. [semantic-supersession wiring fix]
+    if (decision.type === 'prior_decision_override' && overrideFields.superseded_record_id) {
+      try {
+        this.engine.ingestionPipeline.ingest(decisionTraceRecord);
+      } catch (err) {
+        getLogger().warn('decision', 'Ingestion of prior_decision_override failed — supersedes edge not created', {
+          recordId: decisionTraceRecord.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
-    // 2b. For phase-gate approvals, write the phase_gates row that the
-    //     dependency-closure resolver reads during rollback. Without this
-    //     insert the resolver always sees an empty gate set, so validated
-    //     artifacts never get their gates invalidated on rollback — a
-    //     silent audit-trail hole.
-    //
-    //     We use the phase_gate_approved record's id as phase_gates.id so
-    //     the `validates` memory_edges (which ingestion creates with
-    //     source_record_id = phase_gate_approved record id) line up with
-    //     the resolver's `SELECT target_record_id FROM memory_edge WHERE
-    //     source_record_id = gate.id`.
-    if (decision.type === 'phase_gate_approval' && followUpRecordId) {
-      const run = this.engine.stateMachine.getWorkflowRun(runId);
-      const phaseId = run?.current_phase_id ?? null;
-      if (phaseId) {
-        this.engine.db.prepare(`
-          INSERT INTO phase_gates
-            (id, workflow_run_id, phase_id, sub_phase_id, completed_at,
-             human_approved, approval_record_id, decision_trace_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          followUpRecordId,
-          runId,
-          phaseId,
-          run?.current_sub_phase_id ?? null,
-          new Date().toISOString(),
-          1,
-          followUpRecordId,
-          decisionTraceRecord.id,
-        );
-      } else {
-        getLogger().warn('decision', 'phase_gate_approval without current_phase_id; phase_gates row skipped', {
-          runId,
-          recordId: decision.recordId,
+    // 2. Write the typed follow-up record. Phase-gate approvals delegate to
+    //    engine.certifyPhaseGate (shared with the headless simulate path): it
+    //    writes phase_gate_approved with the gate-evaluated artifacts top-level
+    //    as `approved_artifact_ids`, ingests it so Stage II's `validates` edges
+    //    form (→ Authority-6 elevation feeding the DMR), and writes the
+    //    phase_gates row the dependency-closure resolver reads.
+    if (decision.type === 'phase_gate_approval') {
+      this.engine.certifyPhaseGate(
+        runId, decision.recordId, decisionTraceRecord.id, decision.payload ?? {},
+      );
+    } else {
+      const followUpType = this.followUpRecordType(decision.type);
+      if (followUpType) {
+        writer.writeRecord({
+          record_type: followUpType,
+          schema_version: '1.0',
+          workflow_run_id: runId,
+          janumicode_version_sha: versionSha,
+          derived_from_record_ids: [decision.recordId],
+          content: {
+            target_record_id: decision.recordId,
+            payload: decision.payload ?? {},
+          },
         });
       }
     }
@@ -232,6 +231,23 @@ export class DecisionRouter {
     }
   }
 
+  /**
+   * Extract the semantic-supersession fields from a prior_decision_override
+   * payload, hoisting them to top-level decision_trace content. Only
+   * string-valued ids are accepted; an absent `superseded_record_id` yields
+   * `{}` (no edge will be created — surfaced as a warn at the call site).
+   */
+  private overrideSupersessionFields(
+    payload: Record<string, unknown> | undefined,
+  ): { superseded_record_id?: string; superseding_record_id?: string } {
+    const out: { superseded_record_id?: string; superseding_record_id?: string } = {};
+    const sup = payload?.superseded_record_id;
+    if (typeof sup === 'string' && sup.length > 0) out.superseded_record_id = sup;
+    const by = payload?.superseding_record_id;
+    if (typeof by === 'string' && by.length > 0) out.superseding_record_id = by;
+    return out;
+  }
+
   private followUpRecordType(type: InboundDecision['type']): RecordType | null {
     switch (type) {
       case 'mirror_approval': return 'mirror_approved';
@@ -242,6 +258,7 @@ export class DecisionRouter {
       case 'menu_selection':
       case 'system_proposal_approval':
       case 'system_proposal_rejection':
+      case 'prior_decision_override':
         return null; // captured solely by the decision_trace record
     }
   }
@@ -364,7 +381,24 @@ export class DecisionRouter {
   private computeNextPhase(runId: string): PhaseId | null {
     const run = this.engine.stateMachine.getWorkflowRun(runId);
     if (!run?.current_phase_id) return null;
-    const idx = PHASE_ORDER.indexOf(run.current_phase_id);
+    const current = run.current_phase_id;
+
+    // Cross-run impact routing (spec §4 Phase 0.5): after the Phase 1 gate, if
+    // a prior_decision_override changed a certified prior-run interface, detour
+    // through Phase 0.5 before Phase 2. Phase 0.5's own gate advances to Phase
+    // 2. The override decision_trace was already written + ingested by route()
+    // when the human confirmed it during Phase 1, so the trigger is detectable
+    // here.
+    if (current === '1') {
+      if (this.engine.detectCrossRunImpactTrigger(runId)) {
+        this.engine.stateMachine.setCrossRunImpactTriggered(runId, true);
+        return '0.5';
+      }
+      return '2';
+    }
+    if (current === '0.5') return '2';
+
+    const idx = PHASE_ORDER.indexOf(current);
     if (idx < 0 || idx >= PHASE_ORDER.length - 1) return null;
     return PHASE_ORDER[idx + 1];
   }

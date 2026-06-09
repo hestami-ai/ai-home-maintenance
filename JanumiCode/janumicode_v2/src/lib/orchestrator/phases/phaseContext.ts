@@ -30,6 +30,7 @@ export interface PriorPhaseContext {
   /** Phase 4 outputs */
   softwareDomains: ArtifactContext | null;
   componentModel: ArtifactContext | null;
+  crossCuttingConstraints: ArtifactContext | null;
   architecturalDecisions: ArtifactContext | null;
   /** Phase 5 outputs */
   dataModels: ArtifactContext | null;
@@ -78,6 +79,7 @@ export function extractPriorPhaseContext(
     interfaceContracts: null,
     softwareDomains: null,
     componentModel: null,
+    crossCuttingConstraints: null,
     architecturalDecisions: null,
     dataModels: null,
     apiDefinitions: null,
@@ -162,6 +164,13 @@ export function extractPriorPhaseContext(
           recordId: record.id,
           content: base,
           summary: summarizeComponentModel(base),
+        };
+        break;
+      case 'cross_cutting_constraints':
+        ctx.crossCuttingConstraints = {
+          recordId: record.id,
+          content: base,
+          summary: summarizeCrossCuttingConstraints(base),
         };
         break;
       case 'architectural_decisions':
@@ -346,6 +355,16 @@ function summarizeComponentModel(c: Record<string, unknown>): string {
     return `  ${comp.id}: ${comp.name} (domain: ${comp.domain_id ?? 'unassigned'})\n    Responsibilities:\n${respList}\n    Dependencies: ${depList || 'none'}`;
   });
   return `${components.length} Components:\n${lines.join('\n')}`;
+}
+
+function summarizeCrossCuttingConstraints(c: Record<string, unknown>): string {
+  const concerns = (c.concerns as Array<Record<string, unknown>>) ?? [];
+  const lines = concerns.map(cc => {
+    const applies = (cc.applies_to_components as string[]) ?? [];
+    const resps = (cc.responsibilities as string[]) ?? [];
+    return `  ${cc.id}: ${cc.name} — applies to: ${applies.length ? applies.join(', ') : 'all'} — ${resps.join('; ')}`;
+  });
+  return `${concerns.length} cross-cutting NFR concerns (delivered as CONSTRAINTS, not buildable components):\n${lines.join('\n')}`;
 }
 
 function summarizeArchitecturalDecisions(c: Record<string, unknown>): string {
@@ -836,6 +855,10 @@ export interface FrozenTaskLeaf {
     dependency_task_ids?: string[];
     active_constraints?: string[];
     traces_to?: string[];
+    // Refactoring idempotency fields (Phase 0.5 → 6 → 9.1).
+    expected_pre_state_hash?: string;
+    verification_step?: string;
+    refactoring_instructions?: string;
   };
 }
 
@@ -945,6 +968,11 @@ export function buildEffectiveTaskView(
       write_directory_paths: l.task.write_directory_paths ?? [],
       read_directory_paths: l.task.read_directory_paths ?? [],
       active_constraints: l.task.active_constraints ?? [],
+      // Refactoring idempotency fields (Phase 0.5 → 6 → 9.1) — carried so the
+      // executor can run the pre-state-hash protocol on refactoring leaves.
+      expected_pre_state_hash: l.task.expected_pre_state_hash,
+      verification_step: l.task.verification_step,
+      refactoring_instructions: l.task.refactoring_instructions,
       _leaf_node_id: l.node_id,
       _leaf_display_key: l.display_key,
       _leaf_root_display_key: l.root_display_key,

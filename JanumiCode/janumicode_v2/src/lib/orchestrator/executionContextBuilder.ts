@@ -23,7 +23,7 @@ import type { Database } from '../database/init';
 import type { TemplateLoader } from './templateLoader';
 import { normalizeWorkspacePath } from './phases/phase6';
 import { getLogger } from '../logging';
-import type { ReasoningReviewFindingRecordContent } from '../types/records';
+import type { ReasoningReviewFindingRecordContent, ImplementationPacketContent } from '../types/records';
 
 // Re-export types from contextBuilder for convenience
 export type { StdinContent, DetailFileContent, ContextPayload };
@@ -47,6 +47,10 @@ export interface ImplementationTask {
   dependency_task_ids?: string[];
   estimated_complexity: 'low' | 'medium' | 'high';
   complexity_flag?: string;
+  /** Technical-constraint ids (TECH-*) scoped to this task — the executor's
+   *  binding constraints (full text rendered in the packet's Technical
+   *  Constraints block). Distinct from the workflow's process governance. */
+  active_constraints?: string[];
   completion_criteria: CompletionCriterion[];
   write_directory_paths?: string[];
   read_directory_paths?: string[];
@@ -57,6 +61,9 @@ export interface ImplementationTask {
   // Refactoring task fields
   expected_pre_state_hash?: string;
   verification_step?: string;
+  /** Pre-rendered refactoring directive (old/new def + member diff + files),
+   *  surfaced verbatim by formatRefactoringConstraints. */
+  refactoring_instructions?: string;
 }
 
 export interface CompletionCriterion {
@@ -64,6 +71,8 @@ export interface CompletionCriterion {
   description: string;
   verification_method: 'schema_check' | 'invariant' | 'output_comparison' | 'test_execution';
   artifact_ref?: string;
+  /** Packet test_case_id(s) covering this criterion (from packet synthesis). */
+  covered_by_test_ids?: string[];
 }
 
 export interface TestCase {
@@ -173,39 +182,107 @@ function formatComponentContext(
 
 function formatCompletionCriteria(criteria: CompletionCriterion[]): string {
   if (!criteria.length) return '(none specified)';
-  return criteria.map((c, i) => {
+  const body = criteria.map((c, i) => {
     const verification = c.artifact_ref
       ? `${c.verification_method} (ref: ${c.artifact_ref})`
       : c.verification_method;
-    return `${i + 1}. [${c.criterion_id}] ${c.description}\n   Verification: ${verification}`;
+    // Make completion criteria the authoritative test gate. When packet
+    // synthesis bound covering tests, name them; when none, the executor must
+    // author one — do NOT rely on an incidentally-listed component test (it may
+    // belong to a sibling task and verify different behavior).
+    let testLine = '';
+    if (c.verification_method === 'test_execution') {
+      testLine = (c.covered_by_test_ids && c.covered_by_test_ids.length > 0)
+        ? `\n   Covering test(s): ${c.covered_by_test_ids.join(', ')} — make these assert this criterion and pass.`
+        : `\n   No pre-written test — you MUST author a test that asserts this criterion.`;
+    }
+    return `${i + 1}. [${c.criterion_id}] ${c.description}\n   Verification: ${verification}${testLine}`;
   }).join('\n');
+  return `These completion criteria are the AUTHORITATIVE pass/fail gate for this task — passing the listed component test cases is neither necessary nor sufficient if it does not satisfy these.\n\n${body}`;
 }
 
-function formatWriteScopeConstraints(task: ImplementationTask): string {
+function formatWriteScopeConstraints(task: ImplementationTask, protectedPaths?: string[]): string {
+  const denySection = (protectedPaths && protectedPaths.length)
+    ? '\n\nNEVER create or modify these scaffold-owned paths (import from them instead — '
+      + 'writing here is rejected and the task is retried):\n'
+      + protectedPaths.map(p => `- ${p}`).join('\n')
+    : '';
   if (!task.write_directory_paths?.length) {
-    return '(no write scope declared — clarify before writing anything)';
+    return '(no write scope declared — clarify before writing anything)' + denySection;
   }
   // Defensive normalize: legacy DBs persist absolute paths like
   // `/opt/hestami/PROP/...`. Strip system-root prefixes so Phase 9
   // resolves them against workspacePath consistently.
   const normalized = task.write_directory_paths.map(p => normalizeWorkspacePath(p));
   return 'Files may ONLY be created/modified in:\n' +
-    normalized.map(p => `- ${p}`).join('\n');
+    normalized.map(p => `- ${p}`).join('\n') + denySection;
 }
 
-function formatADRs(adrs: Array<{ id: string; title: string; decision: string }>): string {
+/**
+ * Lever 2b — render the "import the shared modules, do NOT reinvent them"
+ * directive from the scaffold manifest. Lists the canonical shared files and
+ * the pinned project conventions (module system, test command). Empty string
+ * when no scaffold is present so the template variable degrades gracefully.
+ */
+function formatSharedModuleConstraints(scaffold?: {
+  conventions: string;
+  sharedDir: string;
+  canonicalFiles: string[];
+} | null): string {
+  if (!scaffold) return '(no shared scaffold for this run)';
+  const lines: string[] = [];
+  lines.push('A canonical project scaffold already exists. CONFORM to it:');
+  lines.push('');
+  lines.push(scaffold.conventions);
+  if (scaffold.canonicalFiles.length) {
+    lines.push('');
+    lines.push('Canonical shared files (import these — do NOT redefine types, models, contracts, or config):');
+    for (const f of scaffold.canonicalFiles) lines.push(`- ${f}`);
+  }
+  lines.push('');
+  lines.push('Do NOT create another package.json/lockfile, your own copy of a shared '
+    + 'module, or a divergent module system. Reuse the shared modules above.');
+  return lines.join('\n');
+}
+
+interface ExtractedADR { id: string; title: string; decision: string; governs_components?: string[] }
+
+function formatADRs(adrs: ExtractedADR[]): string {
   if (!adrs.length) return '(no architectural decisions recorded)';
   return adrs.map(adr => `### ${adr.id}: ${adr.title}\n${adr.decision}`).join('\n\n');
 }
 
+/**
+ * Keep only the ADRs that govern THIS task's component, plus global/cross-cutting
+ * ADRs (those with no `governs_components` list). Structural — uses the Phase-4
+ * `governs_components` edges, never keyword matching on ADR text. Without this, a
+ * 2-line AES task received all ~10 ADRs incl. "PDF Report Generation" as
+ * "apply without exception" (Phase-9 prompt review).
+ */
+function filterADRsForTask(adrs: ExtractedADR[], componentId: string | undefined): ExtractedADR[] {
+  if (!componentId) return adrs;
+  return adrs.filter((adr) =>
+    !adr.governs_components || adr.governs_components.length === 0 || adr.governs_components.includes(componentId),
+  );
+}
+
 function formatRefactoringConstraints(task: ImplementationTask): string {
   if (task.task_type !== 'refactoring') return '(not applicable — standard implementation task)';
-  if (!task.expected_pre_state_hash) return '(refactoring task — no pre-state hash recorded)';
-  return (
-    `Expected pre-state hash: ${task.expected_pre_state_hash}\n` +
-    `Verification step: ${task.verification_step ?? 'Not specified'}\n` +
-    `If hash matches, task is already applied. Skip and report.`
-  );
+
+  // The substantive directive (old/new definition, member diff, target files),
+  // pre-resolved by Phase 0.5 — this is what makes the refactor actionable.
+  const instructions = task.refactoring_instructions?.trim();
+
+  // Idempotency protocol. A refactoring task may legitimately have no recorded
+  // pre-state hash (the prior-run file was absent when the scope was built); in
+  // that case skip the hash gate but still deliver the instructions.
+  const idempotency = task.expected_pre_state_hash
+    ? `Expected pre-state hash: ${task.expected_pre_state_hash}\n` +
+      `Verification step: ${task.verification_step ?? 'Not specified'}\n` +
+      `If the target file's current hash matches the expected pre-state hash, the refactor is already applied — skip and report.`
+    : `No pre-state hash recorded (the prior-run file was not resolvable when this task was created). Apply the change described above; do not assume it is already applied.`;
+
+  return instructions ? `${instructions}\n\n### Idempotency\n${idempotency}` : idempotency;
 }
 
 function formatTestCasesForComponent(testPlan: TestPlan | null, componentId: string): string {
@@ -240,6 +317,8 @@ export interface FilteredEvalResult {
   keptFunctional: number;
   keptQuality: number;
   keptReasoning: number;
+  /** Task-scoped criteria objects (for the detail-file bundle). */
+  keptCriteria: EvaluationPlans;
 }
 
 /**
@@ -290,6 +369,9 @@ export function filterEvalCriteriaForTask(
   }
 
   let kf = 0, fq = 0, kq = 0, fqq = 0, kr = 0, fr = 0;
+  let keptFunctionalCriteria: FunctionalEvalCriterion[] = [];
+  let keptQualityCriteria: QualityEvalCriterion[] = [];
+  let keptReasoningScenarios: ReasoningScenario[] = [];
 
   const sections: string[] = [];
 
@@ -300,6 +382,7 @@ export function filterEvalCriteriaForTask(
     const kept = effectiveRelated === null
       ? all
       : all.filter(c => idMatches(c.functional_requirement_id, effectiveRelated, componentToken));
+    keptFunctionalCriteria = kept;
     kf = kept.length; fq = all.length - kept.length;
     if (kept.length) {
       sections.push('### Functional Criteria\n' + kept.map(c =>
@@ -313,6 +396,7 @@ export function filterEvalCriteriaForTask(
     const kept = effectiveRelated === null
       ? all
       : all.filter(c => idMatches(c.nfr_id, effectiveRelated, componentToken));
+    keptQualityCriteria = kept;
     kq = kept.length; fqq = all.length - kept.length;
     if (kept.length) {
       sections.push('### Quality Criteria\n' + kept.map(c =>
@@ -330,6 +414,7 @@ export function filterEvalCriteriaForTask(
         || idMatches(s.id, effectiveRelated, componentToken)
         || [...effectiveRelated].some(id => s.description.includes(id)),
       );
+    keptReasoningScenarios = kept;
     kr = kept.length; fr = all.length - kept.length;
     if (kept.length) {
       sections.push('### Reasoning Scenarios\n' + kept.map(s =>
@@ -352,7 +437,14 @@ export function filterEvalCriteriaForTask(
   }
 
   return { rendered, filteredFunctional: fq, filteredQuality: fqq, filteredReasoning: fr,
-    keptFunctional: kf, keptQuality: kq, keptReasoning: kr };
+    keptFunctional: kf, keptQuality: kq, keptReasoning: kr,
+    // The task-scoped criteria objects — used by the detail-file bundle so it
+    // carries only this task's evals, not the full plan.
+    keptCriteria: {
+      functional: { criteria: keptFunctionalCriteria },
+      quality: { criteria: keptQualityCriteria },
+      reasoning: { scenarios: keptReasoningScenarios, ai_subsystems_detected: plans.reasoning?.ai_subsystems_detected ?? false },
+    } as EvaluationPlans };
 }
 
 function idMatches(id: string, related: Set<string>, componentToken: string): boolean {
@@ -537,7 +629,7 @@ export class ExecutionContextBuilder {
       evaluationPlans: EvaluationPlans;
       componentModel: { summary: string; components: Array<{ id: string; name: string; responsibility: string }> } | null;
       technicalSpecs: Array<{ component_id: string; content: string }> | null;
-      adrs: Array<{ id: string; title: string; decision: string }>;
+      adrs: ExtractedADR[];
     },
     retryContext?: {
       invariantViolations?: string;
@@ -546,15 +638,44 @@ export class ExecutionContextBuilder {
     dmrPacket?: {
       activeConstraintsText: string;
       detailFileContent: string;
+      detailFilePath?: string;
     } | null,
+    scaffold?: {
+      conventions: string;
+      sharedDir: string;
+      canonicalFiles: string[];
+      protectedPaths: string[];
+    } | null,
+    /**
+     * The task's implementation packet (Phase 9.0). When present it is the
+     * SINGLE SOURCE OF TRUTH for the task's scoped context — its `test_cases`
+     * and `evaluation_criteria` are already root/leaf-safe and task-scoped
+     * (P3 leaf-AC binding + eval scoping). The detail bundle sources them from
+     * here instead of re-deriving from raw artifacts, which historically
+     * produced `test_cases: []` (root-vs-leaf component_id mismatch) and an
+     * unfiltered whole-project `evaluation_criteria` (keep-all fallback) that
+     * contradicted the inline packet block.
+     */
+    packet?: ImplementationPacketContent | null,
   ): ContextPayload {
     // ── 1. Assemble template variables ────────────────────────────
     const implementationTaskStr = formatImplementationTaskHeader(task);
     const componentContextStr = formatComponentContext(task, artifacts.componentModel);
     const componentModelSummary = artifacts.componentModel?.summary ?? '(component model unavailable)';
-    const completionCriteriaStr = formatCompletionCriteria(task.completion_criteria);
-    const writeScopeStr = formatWriteScopeConstraints(task);
-    const governingADRsStr = formatADRs(artifacts.adrs);
+    // Prefer the packet's completion criteria — they carry `covered_by_test_ids`
+    // (the CC→test binding from packet synthesis) which the raw task does not.
+    const completionCriteriaForRender: CompletionCriterion[] = packet
+      ? packet.task.completion_criteria.map(c => ({
+          criterion_id: c.criterion_id,
+          description: c.description,
+          verification_method: (c.verification_method as CompletionCriterion['verification_method']) ?? 'test_execution',
+          covered_by_test_ids: c.covered_by_test_ids,
+        }))
+      : task.completion_criteria;
+    const completionCriteriaStr = formatCompletionCriteria(completionCriteriaForRender);
+    const writeScopeStr = formatWriteScopeConstraints(task, scaffold?.protectedPaths);
+    const sharedModulesStr = formatSharedModuleConstraints(scaffold);
+    const governingADRsStr = formatADRs(filterADRsForTask(artifacts.adrs, task.component_id));
     const refactoringConstraintsStr = formatRefactoringConstraints(task);
     const testCasesStr = formatTestCasesForComponent(artifacts.testPlan, task.component_id);
     const evalFilterResult = filterEvalCriteriaForTask(
@@ -572,13 +693,26 @@ export class ExecutionContextBuilder {
     // detail file). The detail file's other content (contextPacket,
     // technicalSpecs) is still preserved.
     const detailContent: DetailFileContent = {
-      contextPacket: JSON.stringify({
+      // The per-task implementation bundle — task + component + tests + eval.
+      // Routed through `taskBundle` (not the DMR-labelled `contextPacket`) so
+      // the executor file is no longer mis-titled "Deep Memory Research".
+      taskBundle: JSON.stringify({
         task,
         component: artifacts.componentModel ? lookupComponent(task.component_id, artifacts.componentModel) : undefined,
-        test_cases: artifacts.testPlan?.test_suites
-          .filter(s => componentIdMatches(s.component_id, task.component_id))
-          .flatMap(s => s.test_cases),
-        evaluation_criteria: artifacts.evaluationPlans,
+        // Source the task's tests + evals from the PACKET (the single coherent,
+        // task-scoped source) when available; the packet's `test_cases` are
+        // root/leaf-safe (P3 binding) and its `evaluation_criteria` are scoped
+        // to the packet's user-stories/NFRs. Fall back to the raw-artifact
+        // re-derivation only for no-packet callers (tests / calibration shims),
+        // where the naive component_id filter + keep-all eval fallback apply.
+        test_cases: packet
+          ? packet.test_cases
+          : artifacts.testPlan?.test_suites
+              .filter(s => componentIdMatches(s.component_id, task.component_id))
+              .flatMap(s => s.test_cases),
+        evaluation_criteria: packet
+          ? packet.evaluation_criteria
+          : evalFilterResult.keptCriteria,
       }, null, 2),
       technicalSpecs: artifacts.technicalSpecs?.filter(s =>
         task.technical_spec_ids?.includes(s.component_id)
@@ -618,14 +752,29 @@ export class ExecutionContextBuilder {
     // setting JANUMICODE_INLINE_DMR=1 restores the verbose inline mode
     // for cases where the executor cannot read the detail file from
     // disk (e.g. some CI sandboxes).
-    const activeConstraintsResolved = dmrPacket?.activeConstraintsText
-      ?? this.options.activeConstraints
-      ?? '(no active constraints surfaced for this run)';
+    // The executor's binding constraints are its TASK's technical constraints
+    // (TECH-*), already resolved to full text under "Technical Constraints" in
+    // the Implementation Packet Context block. Do NOT inject the workflow's
+    // Authority-7 PROCESS governance (lossless stream, namespace prefixing,
+    // phase gates, "agents never exercise judgment", "100% correctness — always")
+    // — that is JanumiCode's own operating model: irrelevant to, and partly
+    // contradictory for, a code executor, and it dominated the prompt's
+    // GOVERNING CONSTRAINTS section with pure noise (Phase-9 prompt review).
+    const taskConstraintIds = task.active_constraints ?? [];
+    const activeConstraintsResolved = taskConstraintIds.length > 0
+      ? `Honor the technical constraints scoped to THIS task (full text under "Technical Constraints" in the Implementation Packet Context above): ${taskConstraintIds.join(', ')}.`
+      : '(No task-specific technical constraints. Honor the governing ADRs and write scope below.)';
+    // The DMR detail file is now a CURATED, RESOLVED reference (governing
+    // constraint bodies, supersession chains, contradictions, top findings) —
+    // worth surfacing. Inline it when JANUMICODE_INLINE_DMR=1; otherwise point
+    // the agent at its real path (NOT the executor-bundle file, which the old
+    // pointer wrongly referenced) with a read-selectively note.
     const inlineDmr = process.env.JANUMICODE_INLINE_DMR === '1';
+    const dmrDetailPath = dmrPacket?.detailFilePath;
     const detailFileContentInline = dmrPacket?.detailFileContent
       ? (inlineDmr
-        ? `${taskDetailFileContent}\n\n---\n\n## Deep Memory Research — Per-Task Context Packet\n\n${dmrPacket.detailFileContent}`
-        : `${taskDetailFileContent}\n\n---\n\n_Deep Memory Research per-task packet available at the detail file path above. Read selectively if you need supporting material findings, supersession chains, or contradiction reports._`)
+        ? `${taskDetailFileContent}\n\n---\n\n${dmrPacket.detailFileContent}`
+        : `${taskDetailFileContent}\n\n---\n\n_A curated Deep Memory Research context reference (governing constraints, supersession chains, contradictions, material findings — with record references resolved to actual content) is on disk${dmrDetailPath ? `:\n\n    ${dmrDetailPath}` : ''}\n\nRead it selectively if you need supporting governing context beyond what is inlined above._`)
       : taskDetailFileContent;
 
     // ── 3. Render the template (when loader is available) ─────────
@@ -636,13 +785,17 @@ export class ExecutionContextBuilder {
       component_model_summary: componentModelSummary,
       completion_criteria: completionCriteriaStr,
       write_scope_constraints: writeScopeStr,
+      shared_module_constraints: sharedModulesStr,
       governing_adrs: governingADRsStr,
       task_specific_test_cases: testCasesStr,
       task_specific_eval_criteria: evalFilterResult.rendered,
       dependency_tasks_summary: dependencyTasksStr,
       upstream_validator_findings: upstreamFindingsStr,
       refactoring_constraints: refactoringConstraintsStr,
-      detail_file_path: detailFilePath,
+      // Prefer the curated DMR reference path (the template's "Consult for:
+      // Technical Specs / API Definitions / Data Models" now lives there);
+      // fall back to the executor-bundle file when DMR is unavailable.
+      detail_file_path: dmrDetailPath ?? detailFilePath,
       detail_file_content: detailFileContentInline,
       janumicode_version_sha: this.options.janumiCodeVersionSha,
     };
@@ -711,7 +864,7 @@ export class ExecutionContextBuilder {
 
   private legacyGoverningConstraints(
     task: ImplementationTask,
-    adrs: Array<{ id: string; title: string; decision: string }>,
+    adrs: ExtractedADR[],
   ): string {
     return [
       `## Implementation Task: ${task.id}\nComponent: ${task.component_id}\nResponsibility: ${task.component_responsibility}\nType: ${task.task_type}`,
@@ -769,7 +922,7 @@ export class ExecutionContextBuilder {
     evaluationPlans: EvaluationPlans;
     componentModel: { summary: string; components: Array<{ id: string; name: string; responsibility: string }> } | null;
     technicalSpecs: Array<{ component_id: string; content: string }> | null;
-    adrs: Array<{ id: string; title: string; decision: string }>;
+    adrs: ExtractedADR[];
   } {
     const records = this.writer.getRecordsByType(workflowRunId, 'artifact_produced');
 
@@ -778,7 +931,7 @@ export class ExecutionContextBuilder {
     const evaluationPlans: EvaluationPlans = {};
     let componentModel: { summary: string; components: Array<{ id: string; name: string; responsibility: string }> } | null = null;
     let technicalSpecs: Array<{ component_id: string; content: string }> | null = null;
-    const adrs: Array<{ id: string; title: string; decision: string }> = [];
+    const adrs: ExtractedADR[] = [];
 
     for (const record of records) {
       const content = record.content as ArtifactContent;
@@ -819,6 +972,7 @@ export class ExecutionContextBuilder {
             id: (content.id as string) ?? record.id,
             title: (content.title as string) ?? '',
             decision: (content.decision as string) ?? JSON.stringify(content, null, 2),
+            governs_components: Array.isArray(content.governs_components) ? content.governs_components as string[] : undefined,
           });
           break;
         case 'architectural_decisions': {
@@ -827,12 +981,13 @@ export class ExecutionContextBuilder {
           // consumers see each ADR individually. Without this branch,
           // every workflow run reaches Phase 9 with an empty ADR set
           // even though Phase 4 produced a dozen well-formed entries.
-          const batchedAdrs = (content as unknown as { adrs?: Array<{ id?: string; title?: string; decision?: string }> }).adrs ?? [];
+          const batchedAdrs = (content as unknown as { adrs?: Array<{ id?: string; title?: string; decision?: string; governs_components?: string[] }> }).adrs ?? [];
           for (const a of batchedAdrs) {
             adrs.push({
               id: a.id ?? record.id,
               title: a.title ?? '',
               decision: a.decision ?? JSON.stringify(a, null, 2),
+              governs_components: Array.isArray(a.governs_components) ? a.governs_components : undefined,
             });
           }
           break;

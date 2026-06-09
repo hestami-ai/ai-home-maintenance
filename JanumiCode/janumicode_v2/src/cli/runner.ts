@@ -111,6 +111,12 @@ export async function runPipeline(
       const src = config.resumeFromDb + ext;
       if (fs.existsSync(src)) fs.copyFileSync(src, resolvedDbPath + ext);
     }
+  } else if (config.dbPath) {
+    // Explicit DB path — reuse an existing DB (a fresh workflow run is appended
+    // to it) or create it. Enables cross-run scenarios (the two-run
+    // semantic-supersession driver) where run 2 must SHARE run 1's DB so the
+    // all_runs DMR scope sees run 1's records.
+    resolvedDbPath = path.isAbsolute(config.dbPath) ? config.dbPath : path.join(dbDir, config.dbPath);
   } else {
     resolvedDbPath = path.join(dbDir, `${Date.now()}.db`);
   }
@@ -138,6 +144,24 @@ export async function runPipeline(
     engine.setPhaseLimit(config.phaseLimit as PhaseId);
   }
 
+  // --simulate-human-decisions: in headless auto-approve runs, certify each
+  // phase gate through the real approval path (phase_gate_approved + ingested
+  // → `validates` edges → Authority-6 elevation) instead of advancing silently.
+  // This exercises the governance machinery the DMR depends on — active
+  // constraints accumulation in particular — which is otherwise dormant in
+  // headless mode. Off by default.
+  if (config.simulateHumanDecisions) {
+    engine.setSimulateHumanDecisions(true);
+  }
+
+  // --inject-overrides: scripted prior_decision_override injections fired at
+  // phase boundaries, exercising the DMR's semantic-supersession path. For a
+  // cross-run chain, run twice against the same workspace DB (run 1 establishes
+  // the governing record; run 2 overrides it).
+  if (config.overrideInjections && config.overrideInjections.length > 0) {
+    engine.setOverrideInjections(config.overrideInjections);
+  }
+
   // --thin-slice mode: tighten every decomposition cap and limit root
   // counts so the workflow exercises every sub-phase prompt template
   // end-to-end without saturating fully. Goal: validate prompt
@@ -146,7 +170,10 @@ export async function runPipeline(
   // the audit prompt templates are also exercised. Override is applied
   // after createTestEngine so it takes precedence over any inherited
   // workspace config.
-  if (config.thinSlice) {
+  // Operational rails — applied for BOTH thin-slice (template iteration) and
+  // full-slice (real end-to-end build). These are headless-real-LLM safety
+  // settings, independent of the decomposition caps (which are thin-slice only).
+  if (config.thinSlice || config.fullSlice) {
     // Workflow overrides: extend the records-idle stall window. Phase 1
     // bloom prompts on qwen3.5:9b legitimately stream 200+ KB of valid
     // JSON over 4-7 minutes. The no-progress timer now catches genuine
@@ -174,7 +201,11 @@ export async function runPipeline(
     if (!process.env.JANUMICODE_LLM_MAX_CALL_SECONDS) {
       process.env.JANUMICODE_LLM_MAX_CALL_SECONDS = '1800';
     }
+  }
 
+  // Decomposition caps — thin-slice ONLY. Full-slice decomposes the entire
+  // intent (no caps) while keeping the operational rails set above.
+  if (config.thinSlice) {
     engine.configManager.setDecompositionOverrides({
       depth_cap: 2,
       budget_cap: 30,

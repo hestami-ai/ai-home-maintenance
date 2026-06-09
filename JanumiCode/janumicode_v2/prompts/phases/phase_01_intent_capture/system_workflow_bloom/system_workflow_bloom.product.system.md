@@ -38,10 +38,10 @@ Step 2 — PROPOSE NON-JOURNEY WORKFLOWS
 - For each accepted compliance regime with runtime obligations (retention enforcement, audit log emission, consent re-checking), propose a workflow driven by a `compliance` trigger.
 - For each retention rule that acts autonomously (nightly archive sweep, inactive-account GC), propose a workflow with a `schedule` trigger.
 - For each accepted integration that can push events into the system (webhook receivers, subscription deltas, third-party state changes), propose a workflow with an `integration` trigger.
-- For each continuous V&V requirement (latency SLO monitoring, integrity hashing, anomaly detection), propose a workflow with a `schedule` or `event` trigger as appropriate.
+- Do NOT propose standalone workflows for operational NON-FUNCTIONAL measurement/monitoring/alerting — uptime calculation, health-check monitoring, latency/SLO monitoring, availability/RTO failover testing, anomaly detection, metric publishing, log aggregation. These are NFR *verification methods* (they live in the NFR roster and the Phase-8 evaluation plans) and become cross-cutting constraints on the functional components — they are NOT system workflows and must not become their own component. (A workflow that performs functional work and *happens* to record a metric is fine; a workflow whose sole purpose is to monitor/measure/alert is not.)
 
 Step 3 — PROPOSE EXPANSIVELY
-Do NOT pre-filter. If you think the product *might* need a workflow for reconciliation, cleanup, observability, or developer tooling that ties to an accepted artifact upstream, propose it. The human prunes.
+Do NOT pre-filter functional processes. If you think the product *might* need a workflow for reconciliation, cleanup, or developer tooling that ties to an accepted FUNCTIONAL artifact upstream, propose it. The human prunes. (But still do not propose pure observability/monitoring workflows — see the exclusion above.)
 
 # Reference-ID Discipline — CRITICAL
 

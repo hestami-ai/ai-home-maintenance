@@ -484,11 +484,21 @@ export class IngestionPipelineRunner {
       }
 
       case 'decision_trace': {
-        const decisionType = (record.content as Record<string, unknown>).decision_type as string;
-        if (decisionType === 'prior_decision_override') {
-          const supersededId = (record.content as Record<string, unknown>).superseded_record_id as string;
+        const content = record.content as Record<string, unknown>;
+        if (content.decision_type === 'prior_decision_override') {
+          const supersededId = content.superseded_record_id as string;
           if (supersededId) {
-            edges.push(this.createEdge('supersedes', record.id, supersededId, 'system_asserted'));
+            // The record that supersedes is the NEW governing decision
+            // (`superseding_record_id`) — so the edge reads
+            // superseding → superseded and its source is a harvestable
+            // governing artifact (which DMR Stage 5 actually surfaces).
+            // Fall back to the decision_trace itself as source only when no
+            // superseding record is named, preserving the prior contract.
+            const supersedingId = typeof content.superseding_record_id === 'string'
+              && content.superseding_record_id.length > 0
+              ? content.superseding_record_id
+              : record.id;
+            edges.push(this.createEdge('supersedes', supersedingId, supersededId, 'system_asserted'));
           }
         }
         break;

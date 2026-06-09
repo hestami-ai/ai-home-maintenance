@@ -503,7 +503,7 @@ export class Phase2Handler implements PhaseHandler {
         tradeoffs: Array.isArray(s.traces_to) ? `traces_to: ${s.traces_to.join(', ')}` : undefined,
       })),
       originalArtifactId: frRecord.id,
-      overlay: 'Each user story should describe a behavior the product genuinely needs. DROP stories whose action describes spec-marked Out-of-Scope behavior (e.g., bulk submission, user accounts, custom slugs when explicitly excluded) even when their `traces_to` cites a valid journey id — the journey id alone is not enough to justify the story.',
+      overlay: 'Each user story should describe a user-facing FUNCTIONAL behavior the product genuinely needs. DROP stories whose action describes spec-marked Out-of-Scope behavior (e.g., bulk submission, user accounts, custom slugs when explicitly excluded) even when their `traces_to` cites a valid journey id — the journey id alone is not enough to justify the story. ALSO DROP stories whose CORE PURPOSE is a non-functional quality/operational concern — monitoring/observing uptime, alerting on failure, ensuring latency/availability/reliability, health-checking, metric publishing, encryption-as-a-property — rather than a user-facing product behavior. Those are Non-Functional Requirements (Sub-Phase 2.2) and cross-cutting constraints folded into the functional components, NOT functional user stories. (The underlying NFR is still captured in the NFR roster.)',
     });
     if (!frPrune.skipped && frPrune.dropped.length > 0) {
       const keptSet = new Set(frPrune.kept_ids);

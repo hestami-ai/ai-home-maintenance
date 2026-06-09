@@ -41,6 +41,7 @@ import type {
 import type { MirrorItemDecision } from '../../types/decisionBundle';
 import { getLogger } from '../../logging';
 import { createEmbeddingClient, findNearestAbove, type EmbeddingClient } from '../../llm/embeddings';
+import { canonicalComponentDir } from './layoutContract';
 
 // ── Shared helpers ─────────────────────────────────────────────────
 
@@ -253,6 +254,14 @@ function sanitizeChildTask(
     });
     return null;
   }
+  // The child's own cited AC set (traces_to AC-* ids) bounds any CC→AC link
+  // it carries — propagated alongside AC inheritance so a saturation child's
+  // completion criteria stay test-bindable. When the child cites no ACs the
+  // link passes through (packet synthesis falls back to the task's AC set).
+  const childAcSet = new Set(
+    (Array.isArray(c.traces_to) ? c.traces_to as unknown[] : [])
+      .filter((x): x is string => typeof x === 'string' && x.startsWith('AC-')),
+  );
   const rawCriteria = Array.isArray(c.completion_criteria)
     ? c.completion_criteria as Array<Record<string, unknown>> : [];
   const completion_criteria: TaskCompletionCriterion[] = rawCriteria
@@ -262,12 +271,21 @@ function sanitizeChildTask(
       const vm = typeof r.verification_method === 'string' ? r.verification_method : undefined;
       const ar = typeof r.artifact_ref === 'string' ? r.artifact_ref : undefined;
       const validVms = ['schema_check', 'invariant', 'output_comparison', 'test_execution'];
+      const rawVacs = r.verifies_acceptance_criteria ?? r.verifies_acs;
+      const citedVacs = Array.isArray(rawVacs)
+        ? (rawVacs as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0)
+        : [];
+      const verifies_acceptance_criteria = citedVacs.length === 0
+        ? undefined
+        : (childAcSet.size > 0 ? citedVacs.filter(ac => childAcSet.has(ac)) : citedVacs);
       return {
         criterion_id: cid,
         description: desc,
         verification_method: vm && validVms.includes(vm)
           ? vm as TaskCompletionCriterion['verification_method'] : undefined,
         artifact_ref: ar,
+        verifies_acceptance_criteria: verifies_acceptance_criteria && verifies_acceptance_criteria.length > 0
+          ? verifies_acceptance_criteria : undefined,
       };
     })
     .filter(r => r.description.length > 0);
@@ -300,7 +318,10 @@ function sanitizeChildTask(
     estimated_complexity,
     complexity_flag,
     completion_criteria,
-    write_directory_paths: stringArr('write_directory_paths'),
+    // Deterministic write-scope (Project Layout Contract): saturation children
+    // inherit the canonical component dir regardless of what the LLM emitted,
+    // so a task's whole subtree stays under src/<component>.
+    write_directory_paths: [canonicalComponentDir(componentId || 'unknown', 'src')],
     read_directory_paths: stringArr('read_directory_paths'),
     dependency_task_ids: stringArr('dependency_task_ids'),
     active_constraints: stringArr('active_constraints'),
@@ -645,9 +666,28 @@ export async function runTaskSaturationLoop(
           const childActiveConstraints = child.active_constraints && child.active_constraints.length > 0
             ? child.active_constraints
             : entry.activeConstraints;
+          // Carry the parent's leaf AC ids (the task→leaf-AC binding) down to a
+          // child that didn't cite its own. Deterministic — the LLM routinely
+          // drops the AC ids during saturation, which would strand every atomic
+          // leaf with no binding and force the packet builder back to coarse
+          // component lineage (the whole point of the binding lost). When the
+          // child DID partition the ACs itself, keep its (more precise) set.
+          const parentAcIds = (entry.task?.traces_to ?? [])
+            .filter((x): x is string => typeof x === 'string' && x.startsWith('AC-'));
+          const childTraces = child.traces_to ?? [];
+          const childCitesAc = childTraces.some((x) => typeof x === 'string' && x.startsWith('AC-'));
+          // Saturation keeps a task's whole subtree within ONE component, so a
+          // child inherits the parent's (already id-drift-resolved) component_id
+          // rather than the LLM's possibly-drifted re-emission. Deterministic —
+          // no oracle needed at this depth.
+          const parentComponentId = entry.task?.component_id;
+          const childComponentId = (parentComponentId && parentComponentId.length > 0) ? parentComponentId : child.component_id;
           const enrichedChild: DecompositionTask = {
             ...child,
+            component_id: childComponentId,
+            write_directory_paths: [canonicalComponentDir(childComponentId || 'unknown', 'src')],
             active_constraints: childActiveConstraints,
+            traces_to: childCitesAc ? childTraces : [...childTraces, ...parentAcIds],
           };
 
           const childRec = engine.writer.writeRecord({

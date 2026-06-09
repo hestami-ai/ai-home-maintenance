@@ -49,6 +49,15 @@ export interface BloomItemForPrune {
   description?: string;
   /** Optional rationale / source attribution from the bloom proposer. */
   tradeoffs?: string;
+  /**
+   * Optional pre-formatted multi-line detail block rendered verbatim by
+   * prompt builders that need MORE than the one-line label/tradeoffs —
+   * e.g. the release_plan gatekeeper, whose DROP rules require the actual
+   * contained artifact ids (not just their counts) to id-match against
+   * the accepted sets. Kept generic so other custom-prompt gatekeepers
+   * can carry structured evidence the flat fields can't hold.
+   */
+  detail?: string;
 }
 
 /**
@@ -718,11 +727,42 @@ function deterministicLiteralDrop(
  * so the shared post-processing applies unchanged.
  */
 export function buildReleasePlanGatekeeperPrompt(cfg: GatekeeperConfig): string {
+  // ── Fail-closed assembly invariant ──────────────────────────────
+  // This gatekeeper's DROP rules can ONLY act by id-matching each
+  // release's contained member ids against the accepted sets. If a
+  // release CLAIMS members (non-zero counts in `tradeoffs`) but no member
+  // ids were rendered into the item (`detail` missing or all-empty), the
+  // gatekeeper would run BLIND and silently rubber-stamp KEEP — a
+  // prompt-assembly defect masquerading as a clean verdict (slice-138).
+  // Refuse to build a blind prompt; surface the wiring bug loudly rather
+  // than emitting a confident decision from absent evidence.
+  //
+  // Note: the regex here parses our OWN fixed count token ("…contains
+  // 6j/3w/1e/0c/0i/0v") and asserts a populated `detail` category — it is
+  // a structural sanity check, NOT id reduction/resolution.
+  for (const it of cfg.items) {
+    const m = /contains\s+(\d+)j\/(\d+)w\/(\d+)e\/(\d+)c\/(\d+)i\/(\d+)v/i.exec(it.tradeoffs ?? '');
+    const claimedMembers = m ? m.slice(1, 7).reduce((n, x) => n + Number(x), 0) : 0;
+    const hasRenderedIds = !!it.detail && /\([1-9]\d*\):/.test(it.detail);
+    if (claimedMembers > 0 && !hasRenderedIds) {
+      throw new Error(
+        `release_plan gatekeeper assembly defect: release '${it.id}' claims ${claimedMembers} contained ` +
+        `artifact(s) but no member ids were rendered into the prompt — the gatekeeper cannot id-match and ` +
+        `would blindly KEEP. Populate BloomItemForPrune.detail with the contained ids ` +
+        `(see phase1.ts release_plan mapItems).`,
+      );
+    }
+  }
+
   const itemList = cfg.items
     .map((it) => {
       const desc = it.description ? `\n      description: ${it.description.slice(0, 600)}` : '';
       const tradeoffs = it.tradeoffs ? `\n      tradeoffs: ${it.tradeoffs.slice(0, 400)}` : '';
-      return `  - id: ${it.id}\n      label: ${it.label}${desc}${tradeoffs}`;
+      // The `detail` block carries the release's ACTUAL contained ids
+      // (journeys/workflows/entities/…) so the id-matching DROP rules
+      // below have the ids they require. Rendered verbatim, generous cap.
+      const detail = it.detail ? `\n${it.detail.slice(0, 2000)}` : '';
+      return `  - id: ${it.id}\n      label: ${it.label}${desc}${tradeoffs}${detail}`;
     })
     .join('\n');
 
@@ -775,14 +815,20 @@ blocks below are the AUTHORITATIVE upstream sets. The deterministic 1.8
 verifier checks that every accepted id appears in exactly one release
 (or cross_cutting for workflow/integration/compliance/vocabulary).
 
-When evaluating a release's 'tradeoffs' line (shape: "5j/2w/3e/1c/0i/4v"):
-  - These counts describe how many ids the release CLAIMS.
-  - You can ONLY judge "too many" by checking each claimed id against
-    the accepted sets above. A release claiming 5 journeys is FINE if
-    the upstream set has at least 5 accepted journeys — and even
-    legitimate when it's the ONLY release claiming them.
-  - You can ONLY judge "hallucinated" by id-matching: a claimed id
-    must appear in the corresponding accepted set verbatim.
+Each release lists its ACTUAL contained ids under a 'contains:' block
+(grouped by journeys / workflows / entities / compliance / integrations
+/ vocabulary). The 'tradeoffs' line additionally gives the counts
+(shape: "5j/2w/3e/1c/0i/4v") as a quick summary — but judge from the
+EXPLICIT ids in the 'contains:' block, not the counts:
+  - You can ONLY judge "hallucinated" by id-matching: every id in a
+    release's 'contains:' block must appear VERBATIM in the
+    corresponding accepted set above. If an id does not, cite it and
+    drop the release.
+  - You can ONLY judge "too many" by checking each contained id against
+    the accepted sets. A release listing 5 journeys is FINE if those 5
+    ids are all accepted — even when it's the ONLY release claiming them.
+  - A release whose 'contains:' ids ALL match the accepted sets is
+    structurally valid; KEEP it.
 
 # When to DROP a release
 

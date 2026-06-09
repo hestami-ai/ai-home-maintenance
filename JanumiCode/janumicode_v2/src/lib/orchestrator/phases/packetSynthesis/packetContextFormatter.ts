@@ -18,19 +18,21 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
   const lines: string[] = [];
   lines.push('# Implementation Packet Context');
   lines.push('');
-  lines.push('The sections below contain EVERYTHING you need to implement this task. The acceptance criteria, test cases, and evaluation criteria below are authoritative. Do not invent additional ACs, tests, components, APIs, or constraints.');
+  lines.push('Your authoritative deliverable is the **Implementation Task** and its **Completion Criteria** (in the GOVERNING CONSTRAINTS section below) — that is exactly what you must build and what you will be judged on.');
+  lines.push('');
+  lines.push('The sections below are the surrounding **component context**: the user stories, test cases, and evaluation methods for the *whole component* this task belongs to. Your task implements ONE slice of this component, not all of it. Use this context to stay consistent with the component — do NOT attempt to satisfy every story, test, or evaluation listed here in this single task, and do NOT invent ACs, tests, components, APIs, or constraints beyond what is given.');
   lines.push('');
 
   // ── User Stories ────────────────────────────────────────────────
   if (packet.user_stories.length > 0) {
-    lines.push('## User Stories This Task Implements');
+    lines.push('## Component Context — User Stories');
     lines.push('');
     for (const us of packet.user_stories) {
       lines.push(`### ${us.id} — As a ${us.role || '(no role)'}, I want to ${us.action || '(no action)'}, so that ${us.outcome || '(no outcome)'}.`);
       lines.push(`Priority: ${us.priority || 'medium'}`);
       lines.push('');
       if (us.acceptance_criteria.length > 0) {
-        lines.push('**Acceptance criteria (these MUST hold true when this task completes):**');
+        lines.push('**Acceptance criteria for this story (component-level — your task may satisfy only the subset within its scope):**');
         for (const ac of us.acceptance_criteria) {
           lines.push(`- **${ac.id}** — ${ac.description}`);
           if (ac.measurable_condition) {
@@ -123,7 +125,7 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
 
   // ── Test cases ──────────────────────────────────────────────────
   if (packet.test_cases.length > 0) {
-    lines.push('## Test Cases Your Implementation Must Pass');
+    lines.push('## Component Test Cases (context — may belong to sibling tasks; your gate is the Completion Criteria, not these)');
     lines.push('');
     for (const tc of packet.test_cases) {
       const refs = tc.acceptance_criterion_ids.join(', ');
@@ -139,7 +141,7 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
 
   // ── Evaluation criteria ────────────────────────────────────────
   if (packet.evaluation_criteria.length > 0) {
-    lines.push('## How This Task Will Be Evaluated');
+    lines.push('## How This Component Is Evaluated (context — these are component/system-level methods, not your task\'s unit of work)');
     lines.push('');
     for (const ec of packet.evaluation_criteria) {
       lines.push(`- Target \`${ec.target_id}\` (${ec.kind})`);

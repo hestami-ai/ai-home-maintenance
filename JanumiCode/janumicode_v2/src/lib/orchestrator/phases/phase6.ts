@@ -16,6 +16,7 @@ import type {
   DecompositionTask,
   TaskCompletionCriterion,
   TaskDecompositionNodeContent,
+  GovernedStreamRecord,
 } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseContext';
@@ -24,6 +25,8 @@ import { pickItemsArray } from '../parsedResponseHelpers';
 import { runTaskSaturationLoop } from './phase6_1a';
 import { runPhase6CycleDelta } from './runCycleDelta';
 import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
+import { canonicalComponentDir } from './layoutContract';
+import { resolveAgainstOracle } from '../idResolver';
 import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
@@ -33,6 +36,9 @@ interface CompletionCriterion {
   description: string;
   verification_method: 'schema_check' | 'invariant' | 'output_comparison' | 'test_execution';
   artifact_ref?: string;
+  /** Leaf AC id(s) this criterion verifies — validated against the task's
+   *  cited leaf-AC set; non-members dropped. See normalizeRootTaskShape. */
+  verifies_acceptance_criteria?: string[];
 }
 
 interface ImplementationTask {
@@ -48,6 +54,18 @@ interface ImplementationTask {
   completion_criteria: CompletionCriterion[];
   write_directory_paths?: string[];
   read_directory_paths?: string[];
+  // ── Refactoring-task fields (Phase 0.5 → 6 → 9.1 chain) ──────────
+  // Present only on `task_type:'refactoring'` tasks injected from a
+  // refactoring_scope. Carried through buildEffectiveTaskView so Phase 9.1
+  // can run the idempotency protocol and emit cross_run_modification.
+  target_artifact_id?: string;
+  target_workflow_run_id?: string;
+  changed_interface_id?: string;
+  expected_pre_state_hash?: string;
+  verification_step?: string;
+  modification_type?: 'additive' | 'breaking' | 'non_breaking';
+  cross_run_impact_report_id?: string;
+  refactoring_instructions?: string;
 }
 
 interface ImplementationPlan {
@@ -93,6 +111,10 @@ export class Phase6Handler implements PhaseHandler {
       });
     }
     const componentSummary = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${effectiveComponents.summary || (prior.componentModel?.summary ?? 'No component model available')}`;
+    // Cross-cutting NFR concerns (Lever 1a) — delivered so the planner does NOT
+    // emit standalone tasks/subtrees for them (the analytics/failover sprawl).
+    const crossCuttingSummary = prior.crossCuttingConstraints?.summary
+      ?? '(no cross-cutting NFR concerns)';
     // Hard rule #7 of the task_skeleton template: every Technical
     // Specification id must appear in at least one task's traces_to[].
     // The audit's older roll-up dropped system_requirements (SR-*) and
@@ -137,8 +159,20 @@ export class Phase6Handler implements PhaseHandler {
       requiredOutputSpec: 'implementation_plan JSON — tasks with component_id, dependencies, completion_criteria',
     });
 
+    // Wave 8 — feed the FR-saturation LEAF acceptance criteria into task
+    // generation so each task cites the specific leaf ACs it implements
+    // (task→leaf-AC binding). Same leaf set Phase 7 tests bind to. The id set
+    // is the structural membership oracle for traces_to validation at exit.
+    const requirementDecompositionNodes = engine.writer.getRecordsByType(workflowRun.id, 'requirement_decomposition_node');
+    const leafAcceptanceCriteria = collectLeafAcceptanceCriteria(requirementDecompositionNodes);
+    const acceptanceCriteriaMenu = renderAcceptanceCriteriaMenu(leafAcceptanceCriteria);
+    const leafAcIdSet = new Set(leafAcceptanceCriteria.flatMap((s) => s.acs.map((a) => a.id)));
+    // Oracles for bounded id-drift resolution (Fix 1): the real component +
+    // technical-constraint id sets a task may reference.
+    const componentIdOracle = new Set(componentIds);
+
     const rawPlan = await this.runTaskDecomposition(
-      ctx, componentSummary, techSpecsSummary, dmr61,
+      ctx, componentSummary, techSpecsSummary, crossCuttingSummary, dmr61, acceptanceCriteriaMenu,
     );
 
     // Normalize write/read paths to workspace-relative form. cal-21
@@ -155,6 +189,25 @@ export class Phase6Handler implements PhaseHandler {
         read_directory_paths: t.read_directory_paths?.map(normalizeWorkspacePath),
       })),
     };
+
+    // ── Cross-run refactoring injection (spec §4 Phase 0.5 → §4 Phase 6) ──
+    // When Phase 0.5 produced a refactoring_scope, append its Refactoring
+    // Tasks to the plan so the record carries them (refactoring_tasks_included
+    // recomputes true) and Phase 10.1 can enumerate them. These tasks are kept
+    // OUT of the scope gatekeeper (they target prior-run artifacts, not current
+    // components) and OUT of saturation (they are already atomic) — handled
+    // below. `injectedRefactoringTasks` is the authoritative set used for both.
+    const injectedRefactoringTasks = workflowRun.cross_run_impact_triggered
+      ? this.loadRefactoringTasks(ctx)
+      : [];
+    if (injectedRefactoringTasks.length > 0) {
+      planContent.tasks.push(...injectedRefactoringTasks);
+      getLogger().info('workflow', 'Phase 6: injected cross-run Refactoring Tasks', {
+        workflow_run_id: workflowRun.id,
+        count: injectedRefactoringTasks.length,
+      });
+    }
+    const isRefactoringTaskId = new Set(injectedRefactoringTasks.map(t => t.id));
 
     let planRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -185,7 +238,10 @@ export class Phase6Handler implements PhaseHandler {
       phaseId: '6',
       subPhaseId: 'task_skeleton',
       bloomDescription: 'implementation tasks',
-      items: planContent.tasks.map(t => ({
+      // Refactoring tasks target prior-run artifacts (not current components),
+      // so the "component_id must be in Accepted Components" overlay would
+      // wrongly drop them. Exclude them from the gatekeeper candidate set.
+      items: planContent.tasks.filter(t => !isRefactoringTaskId.has(t.id)).map(t => ({
         id: t.id,
         // ImplementationTask has no short `name` field — the full task
         // text lives in `description`, which is already routed to the
@@ -199,7 +255,10 @@ export class Phase6Handler implements PhaseHandler {
     });
     if (!taskPrune.skipped && taskPrune.dropped.length > 0) {
       const keptTaskSet = new Set(taskPrune.kept_ids);
-      const prunedTasks = planContent.tasks.filter(t => keptTaskSet.has(t.id));
+      // Refactoring tasks were never gatekeeper candidates — always retain them.
+      const prunedTasks = planContent.tasks.filter(
+        t => keptTaskSet.has(t.id) || isRefactoringTaskId.has(t.id),
+      );
       const prunedPlanContent: ImplementationPlan = { ...planContent, tasks: prunedTasks };
       const prunedPlanRecord = engine.writer.writeRecord({
         record_type: 'artifact_produced',
@@ -249,14 +308,66 @@ export class Phase6Handler implements PhaseHandler {
       rootLogicalIds = existingTaskRoots.map(r => (r.content as unknown as TaskDecompositionNodeContent).node_id);
     } else {
       const constraintIds = technicalConstraints.map(t => t.id);
-      rootTasks = planContent.tasks.map((t, taskIdx) => {
-        // cal-26 surfaced three LLM-output shape defects the prompt didn't
-        // explicitly forbid; coerce them defensively here so downstream
-        // saturation/render code sees a clean shape regardless of whether
-        // the (rewritten) prompt also enforces them. Logged via the
-        // post-coercion warning in normalizeRootTaskShape() below.
-        return normalizeRootTaskShape(t as unknown as Record<string, unknown>, taskIdx, constraintIds);
-      });
+      // Standard tasks get decomposed by saturation. Refactoring tasks are
+      // already atomic (one prior-run artifact each) — they must NOT be
+      // decomposed, so they are seeded separately as depth-0 `atomic` leaf
+      // nodes below and excluded from the saturation root set here.
+      rootTasks = planContent.tasks
+        .filter(t => !isRefactoringTaskId.has(t.id))
+        .map((t, taskIdx) => {
+          // cal-26 surfaced three LLM-output shape defects the prompt didn't
+          // explicitly forbid; coerce them defensively here so downstream
+          // saturation/render code sees a clean shape regardless of whether
+          // the (rewritten) prompt also enforces them. Logged via the
+          // post-coercion warning in normalizeRootTaskShape() below.
+          return normalizeRootTaskShape(t as unknown as Record<string, unknown>, taskIdx, constraintIds, 'src', leafAcIdSet, componentIdOracle, new Set(constraintIds));
+        });
+      // Seed refactoring tasks as terminal (atomic) leaves so Phase 9 consumes
+      // them unchanged via getFrozenTaskLeaves (status === 'atomic').
+      for (const rt of injectedRefactoringTasks) {
+        const logicalNodeId = randomUUID();
+        const refLeaf = engine.writer.writeRecord({
+          record_type: 'task_decomposition_node',
+          schema_version: '1.0',
+          workflow_run_id: workflowRun.id,
+          phase_id: '6',
+          sub_phase_id: 'task_saturation',
+          produced_by_agent_role: 'implementation_planner',
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+          derived_from_record_ids: [planRecord.id],
+          content: {
+            kind: 'task_decomposition_node',
+            node_id: logicalNodeId,
+            parent_node_id: null,
+            display_key: rt.id,
+            root_task_id: logicalNodeId,
+            depth: 0,
+            pass_number: 0,
+            status: 'atomic',
+            task: {
+              id: rt.id,
+              name: rt.id,
+              description: rt.description,
+              task_type: 'refactoring',
+              component_id: rt.component_id,
+              component_responsibility: rt.component_responsibility,
+              estimated_complexity: rt.estimated_complexity,
+              completion_criteria: rt.completion_criteria,
+              write_directory_paths: rt.write_directory_paths,
+              dependency_task_ids: rt.dependency_task_ids,
+              // Idempotency fields the Phase 9.1 executor reads.
+              expected_pre_state_hash: rt.expected_pre_state_hash,
+              verification_step: rt.verification_step,
+              // Self-contained refactoring directive (old/new def + diff + files).
+              refactoring_instructions: rt.refactoring_instructions,
+            },
+            surfaced_assumption_ids: [],
+            release_id: null,
+            release_ordinal: 0,
+          } satisfies TaskDecompositionNodeContent,
+        });
+        artifactIds.push(refLeaf.id);
+      }
       rootNodeRecordIds = [];
       rootLogicalIds = [];
       for (const rt of rootTasks) {
@@ -288,6 +399,30 @@ export class Phase6Handler implements PhaseHandler {
         rootNodeRecordIds.push(rec.id);
         rootLogicalIds.push(logicalNodeId);
         artifactIds.push(rec.id);
+      }
+    }
+
+    // task→AC coverage report (visibility only — honest gaps, NO backfill).
+    if (leafAcceptanceCriteria.length > 0) {
+      const acCoverage = computeTaskAcCoverage(rootTasks, leafAcceptanceCriteria);
+      const acCoverageRecord = engine.writer.writeRecord({
+        record_type: 'artifact_produced',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '6',
+        sub_phase_id: 'task_skeleton',
+        produced_by_agent_role: 'implementation_planner',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [planRecord.id],
+        content: acCoverage as unknown as Record<string, unknown>,
+      });
+      artifactIds.push(acCoverageRecord.id);
+      if (acCoverage.gaps.length > 0) {
+        getLogger().warn('workflow', 'Phase 6 task→AC coverage gaps (honest — not backfilled)', {
+          workflow_run_id: workflowRun.id,
+          uncovered: acCoverage.gaps.length,
+          total: acCoverage.total_leaf_acs,
+        });
       }
     }
 
@@ -396,11 +531,83 @@ export class Phase6Handler implements PhaseHandler {
     return { success: true, artifactIds };
   }
 
+  // ── Cross-run refactoring (spec §4 Phase 0.5 → Phase 6) ───────
+
+  /**
+   * Read the current run's `refactoring_scope` (produced by Phase 0.5.2
+   * "Proceed") and map each Refactoring Task into the ImplementationTask shape
+   * the plan + saturation expect. The cross-run idempotency fields
+   * (target_artifact_id, expected_pre_state_hash, modification_type, …) are
+   * carried through so they persist in the implementation_plan record; Phase
+   * 9.1 reads them back (from the refactoring_scope) to emit
+   * cross_run_modification. Returns [] when no scope exists.
+   */
+  private loadRefactoringTasks(ctx: PhaseContext): ImplementationTask[] {
+    const { engine, workflowRun } = ctx;
+    const scopes = engine.writer.getRecordsByType(workflowRun.id, 'refactoring_scope');
+    if (scopes.length === 0) return [];
+    // Newest scope wins (a revise loop could produce more than one).
+    const scope = scopes.reduce((a, b) => (a.produced_at >= b.produced_at ? a : b));
+    const content = scope.content as Record<string, unknown>;
+    const rawTasks = Array.isArray(content.refactoring_tasks) ? content.refactoring_tasks : [];
+    const out: ImplementationTask[] = [];
+    for (const raw of rawTasks as Array<Record<string, unknown>>) {
+      const id = typeof raw.id === 'string' ? raw.id : null;
+      if (!id) continue;
+      const targetArtifactId = typeof raw.target_artifact_id === 'string' ? raw.target_artifact_id : '';
+      const description = typeof raw.description === 'string' ? raw.description : `Refactoring task ${id}`;
+      const modType = raw.modification_type;
+      out.push({
+        id,
+        task_type: 'refactoring',
+        // A refactoring task has NO current component — it modifies a prior-run
+        // artifact. Use a stable, human-readable anchor (NOT the prior-run UUID,
+        // which produced confusing "Component: <uuid> — (no name)" noise and
+        // matched nothing in the current run). The substantive content reaches
+        // the executor via `refactoring_instructions`, not component-keyed
+        // channels (component context / packet / tests all legitimately empty).
+        component_id: 'cross_run_refactoring',
+        component_responsibility: `Cross-run refactoring of prior-run artifact ${targetArtifactId || '(unknown)'}`,
+        description,
+        estimated_complexity: 'medium',
+        completion_criteria: [{
+          criterion_id: `${id}-VERIFY`,
+          description: typeof raw.verification_step === 'string'
+            ? raw.verification_step
+            : 'Confirm prior-run artifact conforms to the revised interface.',
+          verification_method: 'test_execution',
+        }],
+        write_directory_paths: Array.isArray(raw.write_directory_paths)
+          ? (raw.write_directory_paths as string[])
+          : [],
+        dependency_task_ids: Array.isArray(raw.dependency_task_ids)
+          ? (raw.dependency_task_ids as string[])
+          : [],
+        target_artifact_id: targetArtifactId,
+        target_workflow_run_id: typeof raw.target_workflow_run_id === 'string' ? raw.target_workflow_run_id : undefined,
+        changed_interface_id: typeof raw.changed_interface_id === 'string' ? raw.changed_interface_id : undefined,
+        expected_pre_state_hash: typeof raw.expected_pre_state_hash === 'string' ? raw.expected_pre_state_hash : '',
+        verification_step: typeof raw.verification_step === 'string' ? raw.verification_step : undefined,
+        modification_type: (modType === 'additive' || modType === 'breaking' || modType === 'non_breaking')
+          ? modType
+          : undefined,
+        cross_run_impact_report_id: typeof content.cross_run_impact_report_id === 'string'
+          ? content.cross_run_impact_report_id
+          : undefined,
+        refactoring_instructions: typeof raw.refactoring_instructions === 'string'
+          ? raw.refactoring_instructions
+          : undefined,
+      });
+    }
+    return out;
+  }
+
   // ── LLM call helper ───────────────────────────────────────────
 
   private async runTaskDecomposition(
     ctx: PhaseContext, componentSummary: string, techSpecsSummary: string,
-    dmr: PhaseContextPacketResult,
+    crossCuttingSummary: string, dmr: PhaseContextPacketResult,
+    acceptanceCriteriaMenu: string,
   ): Promise<ImplementationPlan> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('implementation_planner', 'task_skeleton');
@@ -425,8 +632,10 @@ export class Phase6Handler implements PhaseHandler {
 
     const rendered = engine.templateLoader.render(template, {
       active_constraints: dmr.activeConstraintsText,
+      acceptance_criteria_menu: acceptanceCriteriaMenu,
       component_model_summary: componentSummary,
       technical_specs_summary: techSpecsSummary,
+      cross_cutting_constraints_summary: crossCuttingSummary,
       detail_file_path: dmr.detailFilePath,
       detail_file_content: dmr.detailFileContent,
       janumicode_version_sha: engine.janumiCodeVersionSha,
@@ -627,6 +836,98 @@ export function normalizeWorkspacePath(p: string): string {
   return out;
 }
 
+// ── Leaf acceptance-criteria menu (task→leaf-AC binding) ───────────
+
+export interface LeafAcceptanceCriteria {
+  leafStoryId: string;
+  storyText: string;
+  acs: Array<{ id: string; text: string }>;
+}
+
+/**
+ * Collect the FR-saturation LEAF acceptance criteria — the authoritative AC
+ * inventory each Phase-6 task binds against. Reads the atomic FR-rooted
+ * `requirement_decomposition_node` leaves (latest-per-node, supersession-aware),
+ * each carrying `user_story.acceptance_criteria[]`. This is the same leaf set
+ * Phase 7 tests reference, so task↔test alignment becomes structural.
+ */
+export function collectLeafAcceptanceCriteria(records: GovernedStreamRecord[]): LeafAcceptanceCriteria[] {
+  const latestByNodeId = new Map<string, GovernedStreamRecord>();
+  for (const r of records) {
+    if (r.record_type !== 'requirement_decomposition_node') continue;
+    const c = r.content as Record<string, unknown>;
+    if (c.kind && c.kind !== 'requirement_decomposition_node') continue;
+    if (c.root_kind && c.root_kind !== 'fr') continue;
+    if (c.status !== 'atomic') continue;
+    const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
+    if (!nodeId) continue;
+    const existing = latestByNodeId.get(nodeId);
+    if (!existing || r.produced_at > existing.produced_at) latestByNodeId.set(nodeId, r);
+  }
+  const out: LeafAcceptanceCriteria[] = [];
+  for (const r of latestByNodeId.values()) {
+    const story = (r.content as Record<string, unknown>).user_story as Record<string, unknown> | undefined;
+    if (!story || typeof story.id !== 'string') continue;
+    const acsRaw = Array.isArray(story.acceptance_criteria) ? story.acceptance_criteria : [];
+    const acs = (acsRaw as Array<Record<string, unknown>>)
+      .filter((a) => a && typeof a.id === 'string' && (a.id as string).length > 0)
+      .map((a) => ({ id: a.id as string, text: typeof a.description === 'string' ? a.description : (typeof a.text === 'string' ? a.text : '') }));
+    if (acs.length === 0) continue;
+    const storyText = [story.role, story.action, story.outcome]
+      .filter((x): x is string => typeof x === 'string' && x.length > 0).join(' / ')
+      || (typeof story.description === 'string' ? story.description : '');
+    out.push({ leafStoryId: story.id, storyText, acs });
+  }
+  return out;
+}
+
+export interface TaskAcCoverageReport {
+  kind: 'task_ac_coverage_report';
+  total_leaf_acs: number;
+  covered: number;
+  gaps: Array<{ acceptance_criterion_id: string; leaf_story_id: string }>;
+  coverage_percentage: number;
+}
+
+/**
+ * Deterministic task→AC coverage: every leaf AC should be cited by ≥1 task's
+ * traces_to. Reports uncovered ACs as honest gaps (visibility, NO fabrication)
+ * — mirrors Phase-7 runCoverageAnalysis / the Phase-8 evaluation_coverage_report.
+ */
+export function computeTaskAcCoverage(
+  tasks: Array<{ traces_to?: string[] }>,
+  leaves: LeafAcceptanceCriteria[],
+): TaskAcCoverageReport {
+  const cited = new Set<string>();
+  for (const t of tasks) for (const id of t.traces_to ?? []) cited.add(id);
+  const gaps: Array<{ acceptance_criterion_id: string; leaf_story_id: string }> = [];
+  let total = 0;
+  for (const l of leaves) {
+    for (const ac of l.acs) {
+      total++;
+      if (!cited.has(ac.id)) gaps.push({ acceptance_criterion_id: ac.id, leaf_story_id: l.leafStoryId });
+    }
+  }
+  return {
+    kind: 'task_ac_coverage_report',
+    total_leaf_acs: total,
+    covered: total - gaps.length,
+    gaps,
+    coverage_percentage: total > 0 ? Math.round(((total - gaps.length) / total) * 100) : 100,
+  };
+}
+
+/** Render the leaf-AC menu for the task_skeleton prompt — grouped by leaf story. */
+export function renderAcceptanceCriteriaMenu(leaves: LeafAcceptanceCriteria[]): string {
+  if (leaves.length === 0) return '(no leaf acceptance criteria available)';
+  const lines: string[] = [];
+  for (const l of leaves) {
+    lines.push(`- ${l.leafStoryId}${l.storyText ? ` — ${l.storyText}` : ''}`);
+    for (const ac of l.acs) lines.push(`  - ${ac.id}${ac.text ? `: ${ac.text}` : ''}`);
+  }
+  return lines.join('\n');
+}
+
 /**
  * Coerce a Phase 6.1 LLM-emitted task into the canonical DecompositionTask
  * shape that Phase 6.1a saturation + downstream consumers expect.
@@ -647,6 +948,10 @@ export function normalizeRootTaskShape(
   raw: Record<string, unknown>,
   taskIdx: number,
   constraintIds: string[],
+  srcRoot = 'src',
+  leafAcIds?: Set<string>,
+  componentOracle?: Set<string>,
+  techOracle?: Set<string>,
 ): DecompositionTask {
   const t = raw as Partial<DecompositionTask> & Record<string, unknown>;
   const drifts: string[] = [];
@@ -671,6 +976,21 @@ export function normalizeRootTaskShape(
   // arrays surface as a single placeholder so downstream invariants
   // (Invariant IP-001 — at least one CC per task) can flag rather than
   // crash on undefined access.
+  // CC→AC validation: keep only AC ids the LLM cited that are genuinely in
+  // this task's leaf-AC set (regex-free membership; never invents). When the
+  // task carries no leaf-AC set (lineage absent), pass the cited ids through
+  // untouched rather than dropping all — coverage > precision when unknown.
+  const validateVerifiesAcs = (cobj: Record<string, unknown>): string[] | undefined => {
+    const rawIds = cobj.verifies_acceptance_criteria ?? cobj.verifies_acs ?? cobj.acceptance_criterion_ids;
+    if (!Array.isArray(rawIds)) return undefined;
+    const cited = rawIds.filter((x): x is string => typeof x === 'string' && x.length > 0);
+    if (cited.length === 0) return undefined;
+    if (!leafAcIds || leafAcIds.size === 0) return cited;
+    const kept = cited.filter(id => leafAcIds.has(id));
+    if (kept.length < cited.length) drifts.push('completion_criteria_verifies_ac_dropped_nonmember');
+    return kept.length > 0 ? kept : undefined;
+  };
+
   const rawCC = Array.isArray(t.completion_criteria) ? t.completion_criteria : [];
   const completion_criteria: TaskCompletionCriterion[] = rawCC.map((c, idx) => {
     if (typeof c === 'string') {
@@ -695,7 +1015,8 @@ export function normalizeRootTaskShape(
         ? cobj.verification_method as TaskCompletionCriterion['verification_method']
         : 'test_execution';
       const artifact_ref = typeof cobj.artifact_ref === 'string' ? cobj.artifact_ref : undefined;
-      return { criterion_id, description, verification_method, artifact_ref };
+      const verifies_acceptance_criteria = validateVerifiesAcs(cobj);
+      return { criterion_id, description, verification_method, artifact_ref, verifies_acceptance_criteria };
     }
     drifts.push('completion_criteria_unparseable');
     return {
@@ -706,6 +1027,59 @@ export function normalizeRootTaskShape(
   });
   if (completion_criteria.length === 0) {
     drifts.push('completion_criteria_empty');
+  }
+
+  // Deterministic write-scope (Project Layout Contract): the orchestrator owns
+  // directories, the LLM owns task semantics. Override the LLM-invented
+  // write_directory_paths with the canonical component dir so every task on a
+  // component lands in the same place (no stray ./shared, no per-leaf layout
+  // drift). The discarded LLM value is logged as a drift metric.
+  let componentId = typeof t.component_id === 'string' ? t.component_id : '';
+  // Resolve LLM separator/case drift in component_id against the real
+  // component-model id set (the oracle). The planner routinely emits
+  // `comp-redirect_handling_service` for the canonical
+  // `comp-redirect-handling-service`; bounded similarity resolution maps it
+  // back so the index / gatekeeper / packets see a real id (no exact-naming
+  // dependency on the LLM).
+  if (componentId && componentOracle) {
+    const resolved = resolveAgainstOracle(componentId, componentOracle);
+    if (resolved && resolved !== componentId) {
+      drifts.push(`component_id_resolved:${componentId}→${resolved}`);
+      componentId = resolved;
+    }
+  }
+  const canonicalDir = canonicalComponentDir(componentId || 'unknown', srcRoot);
+  const llmWriteDirs = Array.isArray(t.write_directory_paths)
+    ? t.write_directory_paths.filter((p): p is string => typeof p === 'string').map(normalizeWorkspacePath)
+    : [];
+  if (llmWriteDirs.length > 0 && llmWriteDirs[0] !== canonicalDir) {
+    drifts.push(`write_dirs_overridden:[${llmWriteDirs.join(',')}]→${canonicalDir}`);
+  }
+
+  // traces_to — accept `technical_spec_ids` alias, else `traces_to`. When the
+  // leaf-AC set is supplied, VALIDATE cited AC ids STRUCTURALLY: an `AC-`
+  // prefixed id (namespace classification, not a regex reduction) must be an
+  // exact member of the leaf-AC set; non-members are LLM-invented refs and are
+  // dropped (logged as drift). Non-AC ids (res-*/TECH-*/SR-*/comp-*) pass through.
+  const rawTraces = Array.isArray((t as Record<string, unknown>).technical_spec_ids)
+    ? ((t as Record<string, unknown>).technical_spec_ids as unknown[]).filter((p): p is string => typeof p === 'string')
+    : (Array.isArray(t.traces_to) ? t.traces_to.filter((p): p is string => typeof p === 'string') : []);
+  let traces_to = rawTraces;
+  if (leafAcIds) {
+    const droppedAcRefs = rawTraces.filter((id) => id.startsWith('AC-') && !leafAcIds.has(id));
+    if (droppedAcRefs.length > 0) {
+      traces_to = rawTraces.filter((id) => !id.startsWith('AC-') || leafAcIds.has(id));
+      drifts.push(`invalid_ac_refs_dropped:[${droppedAcRefs.join(',')}]`);
+    }
+  }
+  // Resolve drifted comp-*/TECH-* ids in traces_to against their oracles, so
+  // P7 doesn't flag a real component/constraint referenced under a drifted id.
+  if (componentOracle || techOracle) {
+    traces_to = traces_to.map((id) => {
+      if (componentOracle && id.startsWith('comp')) return resolveAgainstOracle(id, componentOracle) ?? id;
+      if (techOracle && id.startsWith('TECH-')) return resolveAgainstOracle(id, techOracle) ?? id;
+      return id;
+    });
   }
 
   if (drifts.length > 0) {
@@ -721,14 +1095,12 @@ export function normalizeRootTaskShape(
     name,
     description: typeof t.description === 'string' ? t.description : '',
     task_type: t.task_type as DecompositionTask['task_type'],
-    component_id: typeof t.component_id === 'string' ? t.component_id : '',
+    component_id: componentId,
     component_responsibility: typeof t.component_responsibility === 'string' ? t.component_responsibility : '',
     estimated_complexity: t.estimated_complexity as DecompositionTask['estimated_complexity'],
     complexity_flag: typeof t.complexity_flag === 'string' ? t.complexity_flag : undefined,
     completion_criteria,
-    write_directory_paths: Array.isArray(t.write_directory_paths)
-      ? t.write_directory_paths.filter((p): p is string => typeof p === 'string').map(normalizeWorkspacePath)
-      : [],
+    write_directory_paths: [canonicalDir],
     read_directory_paths: Array.isArray(t.read_directory_paths)
       ? t.read_directory_paths.filter((p): p is string => typeof p === 'string').map(normalizeWorkspacePath)
       : [],
@@ -736,8 +1108,6 @@ export function normalizeRootTaskShape(
       ? t.dependency_task_ids.filter((p): p is string => typeof p === 'string')
       : [],
     active_constraints: constraintIds,
-    traces_to: Array.isArray((t as Record<string, unknown>).technical_spec_ids)
-      ? ((t as Record<string, unknown>).technical_spec_ids as unknown[]).filter((p): p is string => typeof p === 'string')
-      : (Array.isArray(t.traces_to) ? t.traces_to.filter((p): p is string => typeof p === 'string') : []),
+    traces_to,
   };
 }

@@ -81,7 +81,11 @@ describe('formatPacketAsExecutorContext — full packet', () => {
   it('renders every section when all bundled context is present', () => {
     const md = formatPacketAsExecutorContext(fullPacket());
     expect(md).toMatch(/# Implementation Packet Context/);
-    expect(md).toMatch(/## User Stories This Task Implements/);
+    // Sections are framed as COMPONENT context (not the task's own work) so the
+    // executor binds to its Completion Criteria, not the whole component's stories.
+    expect(md).toMatch(/## Component Context — User Stories/);
+    expect(md).toMatch(/component context/i);
+    expect(md).not.toMatch(/This Task Implements/);
     expect(md).toMatch(/US-001 — As a Link Sharer/);
     expect(md).toMatch(/AC-001.*returns 201/);
     expect(md).toMatch(/Measurable: HTTP 201/);
@@ -95,9 +99,9 @@ describe('formatPacketAsExecutorContext — full packet', () => {
     expect(md).toMatch(/## API Endpoints/);
     expect(md).toMatch(/`POST \/shorten`/);
     expect(md).toMatch(/INVALID_URL/);
-    expect(md).toMatch(/## Test Cases/);
+    expect(md).toMatch(/## Component Test Cases/);
     expect(md).toMatch(/TC-001.*functional.*verifies AC-001/);
-    expect(md).toMatch(/## How This Task Will Be Evaluated/);
+    expect(md).toMatch(/## How This Component Is Evaluated/);
     expect(md).toMatch(/## Technical Constraints/);
     expect(md).toMatch(/TECH-PG-16/);
     expect(md).toMatch(/## Compliance/);

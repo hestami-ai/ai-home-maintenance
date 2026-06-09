@@ -52,6 +52,7 @@ import type { EmbeddingService } from '../embedding/embeddingService';
 import type { ConfigManager } from '../config/configManager';
 import type { PhaseId, WorkflowRun } from '../types/records';
 import { PHASE_NAMES, PHASE_ORDER } from '../types/records';
+import { isCrossRunInterfaceKind } from './phases/crossRunImpact';
 
 // ── Phase Handler Interface ─────────────────────────────────────────
 
@@ -63,6 +64,54 @@ export interface PhaseHandler {
 export interface PhaseContext {
   workflowRun: WorkflowRun;
   engine: OrchestratorEngine;
+}
+
+// ── Headless decision injection (semantic supersession) ─────────────
+
+/** Resolves to one existing governed_stream record at injection time. */
+export interface RecordSelector {
+  /** record_type to match (e.g. 'artifact_produced', 'interface_contracts'). */
+  recordType: string;
+  /** Optional substring matched against the record's JSON content (e.g. a
+   *  kind or a statement fragment) to disambiguate. */
+  contentMatch?: string;
+  /** 'any' (default — finds prior-run records too, which is what semantic
+   *  supersession overrides) or 'current_run'. */
+  scope?: 'any' | 'current_run';
+}
+
+/**
+ * A scripted `prior_decision_override` injected during a headless run, so the
+ * semantic-supersession path (supersedes Memory Edge → DMR Stage 5
+ * supersession_chains) can be exercised end-to-end. `superseded` is the prior
+ * governing record being overridden; `superseding` is the new governing
+ * position — either an existing record (selector) or a synthetic governing
+ * artifact written from a statement.
+ */
+export interface OverrideInjectionSpec {
+  /** Fire after this phase completes (in the auto-advance loop). */
+  afterPhase: PhaseId;
+  superseded: RecordSelector;
+  superseding?: RecordSelector | { statement: string; kind: string };
+}
+
+/**
+ * Result of `detectCrossRunImpactTrigger` — present only when Phase 0.5's
+ * entry criterion is met (a prior-run, certified interface artifact was
+ * overridden in this run). Consumed by the routing logic and by Phase 0.5.1.
+ */
+export interface CrossRunImpactTrigger {
+  triggered: true;
+  /** The prior_decision_override decision_trace id. */
+  overrideTraceId: string;
+  /** The superseded (prior-run) interface artifact id being changed. */
+  changedInterfaceId: string;
+  /** The new governing record id, when the override named one. */
+  supersedingRecordId?: string;
+  /** workflow_run_id of the prior run that produced the changed interface. */
+  priorWorkflowRunId: string;
+  /** content.kind of the changed interface (interface_contracts | api_definitions | data_models). */
+  interfaceKind: string;
 }
 
 export interface PhaseResult {
@@ -82,6 +131,14 @@ export interface PhaseResult {
    * See docs/design/iterative-implementation-backlog.md §3.
    */
   cycleRestartTo?: PhaseId;
+  /**
+   * Phase 0.5 "Revise the override" back-transition. When Phase 0.5.2's
+   * human decision is (B) Revise, the handler sets `reviseTo = '1'` so the
+   * orchestrator routes back to Phase 1 to reconsider the interface change
+   * (spec §4 Phase 0.5.2, StateMachine allows 0.5→1). Distinct from
+   * `cycleRestartTo`, which is the Phase-9 iterative-backlog loop.
+   */
+  reviseTo?: PhaseId;
 }
 
 // ── Decision Surface Types ──────────────────────────────────────────
@@ -716,13 +773,39 @@ export class OrchestratorEngine {
         });
         getLogger().info('workflow', 'Phase completed', { workflow_run_id: runId, phase_id: phaseId, artifact_count: result.artifactIds.length }, phaseTrace);
 
+        // Phase 0.5.2 "Revise the override" back-transition (spec §4 Phase
+        // 0.5.2 B) — honored in BOTH approval modes (it is a deterministic
+        // routing instruction, not a gate approval, and the revise branch
+        // writes no phase gate). Clearing the trigger prevents Phase 1 from
+        // immediately bouncing back into 0.5 on its re-run.
+        if (result.reviseTo) {
+          this.stateMachine.setCrossRunImpactTriggered(runId, false);
+          const reback = this.advanceToNextPhase(runId, result.reviseTo);
+          if (reback) {
+            getLogger().info('workflow', 'Phase 0.5 revise — returning to Phase 1', {
+              workflow_run_id: runId, to_phase: result.reviseTo,
+            }, phaseTrace);
+            await this.executeCurrentPhase(runId, phaseTrace);
+          }
+        }
         // In auto-approve mode, chain to the next phase automatically.
         // In normal (webview) mode, the DecisionRouter handles this when
         // the human approves the phase gate. We await here (not fire-and-forget)
         // so the full pipeline completes before the caller returns, which
         // lets waitForQuiescence track in-flight LLM calls correctly.
         // Skip Phase 0 — the ClientLiaisonAgent handles 0→1 advancement itself.
-        if (this.autoApproveDecisions && phaseId !== '0') {
+        else if (this.autoApproveDecisions && phaseId !== '0') {
+          // Headless simulate-human-decisions: certify this phase's gate the
+          // way a human approval would — writing phase_gate_approved + ingesting
+          // it so `validates` edges form and the phase's governing artifacts
+          // elevate to Authority 6 (which the DMR surfaces as active_constraints).
+          // Auto-approve otherwise advances silently and never certifies. [headless injection]
+          if (this.simulateHumanDecisions) {
+            this.simulateGateApproval(runId, phaseId);
+          }
+          // Fire any scripted prior_decision_override injections registered for
+          // this just-completed phase (semantic-supersession exerciser). [headless injection]
+          this.runOverrideInjectionsForPhase(runId, phaseId);
           // phaseLimit stops the chain AFTER the named phase completes,
           // so the harness can capture phase-N fixtures + assertions in
           // isolation instead of running the whole pipeline to phase 10.
@@ -752,9 +835,25 @@ export class OrchestratorEngine {
               }, phaseTrace);
             }
           } else {
+            // Cross-run impact routing (spec §4 Phase 0.5): after Phase 1, if a
+            // prior_decision_override changed a certified prior-run interface,
+            // detour through Phase 0.5 before Phase 2. Phase 0.5 itself advances
+            // to Phase 2. All other phases follow PHASE_ORDER.
             const idx = PHASE_ORDER.indexOf(phaseId);
-            if (idx >= 0 && idx < PHASE_ORDER.length - 1) {
-              const nextPhase = PHASE_ORDER[idx + 1];
+            let nextPhase: PhaseId | undefined;
+            if (phaseId === '1') {
+              if (this.detectCrossRunImpactTrigger(runId)) {
+                this.stateMachine.setCrossRunImpactTriggered(runId, true);
+                nextPhase = '0.5';
+              } else {
+                nextPhase = '2';
+              }
+            } else if (phaseId === '0.5') {
+              nextPhase = '2';
+            } else if (idx >= 0 && idx < PHASE_ORDER.length - 1) {
+              nextPhase = PHASE_ORDER[idx + 1];
+            }
+            if (nextPhase) {
               if (this.phaseHandlers.has(nextPhase)) {
                 const advanced = this.advanceToNextPhase(runId, nextPhase);
                 if (advanced) {
@@ -800,6 +899,327 @@ export class OrchestratorEngine {
   private autoApproveDecisions = false;
   setAutoApproveDecisions(enabled: boolean): void {
     this.autoApproveDecisions = enabled;
+  }
+
+  /**
+   * Headless simulate-human-decisions mode. When true (and autoApprove is on),
+   * the auto-advance loop CERTIFIES each phase gate through the same path a
+   * human approval would (writes `phase_gate_approved` + ingests it →
+   * `validates` edges → Authority-6 elevation) instead of silently advancing.
+   * This lets a headless run exercise the governance machinery the DMR
+   * depends on — active_constraints accumulation in particular — which is
+   * otherwise dormant because auto-approve never produces a phase_gate_approved
+   * record. Off by default so existing harness runs are unchanged.
+   */
+  private simulateHumanDecisions = false;
+  setSimulateHumanDecisions(enabled: boolean): void {
+    this.simulateHumanDecisions = enabled;
+  }
+
+  /**
+   * Headless gate-approval injection: find this phase's gate evaluation, write
+   * a `simulated_human_approval` decision_trace, and certify it. Best-effort —
+   * a phase with no gate evaluation (or a transient DB error) is a no-op, never
+   * a halt. Called from the auto-advance loop when simulateHumanDecisions is on.
+   */
+  private simulateGateApproval(runId: string, phaseId: PhaseId): void {
+    try {
+      const gate = this.db.prepare(`
+        SELECT id FROM governed_stream
+        WHERE workflow_run_id = ? AND phase_id = ? AND record_type = 'phase_gate_evaluation'
+          AND is_current_version = 1
+        ORDER BY produced_at DESC LIMIT 1
+      `).get(runId, phaseId) as { id: string } | undefined;
+      if (!gate) return;
+      const trace = this.writer.writeRecord({
+        record_type: 'decision_trace',
+        schema_version: '1.0',
+        workflow_run_id: runId,
+        phase_id: phaseId,
+        janumicode_version_sha: this.versionSha,
+        derived_from_record_ids: [gate.id],
+        content: {
+          decision_type: 'phase_gate_approval',
+          target_record_id: gate.id,
+          attribution: 'simulated_human_approval',
+          auto_approved: false,
+        },
+      });
+      this.certifyPhaseGate(runId, gate.id, trace.id);
+    } catch (err) {
+      getLogger().warn('workflow', 'simulateGateApproval failed — gate not certified', {
+        runId, phaseId, error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * Certify a phase gate: write the `phase_gate_approved` record carrying the
+   * gate-evaluated artifacts top-level as `approved_artifact_ids`, ingest it so
+   * the Ingestion Pipeline's Stage II asserts the `validates` edges (which
+   * elevate those artifacts to Authority 6 — effectiveAuthority.ts), and write
+   * the `phase_gates` row the dependency-closure resolver reads. Does NOT
+   * resolve the pending decision or advance the phase — the caller owns that.
+   *
+   * Single-sourced here so the webview approval path (DecisionRouter.route) and
+   * the headless simulate path share one certification implementation.
+   * Returns the approved record id.
+   */
+  certifyPhaseGate(
+    runId: string,
+    gateEvaluationRecordId: string,
+    decisionTraceId: string,
+    payload: Record<string, unknown> = {},
+  ): string {
+    const approvedArtifactIds = this.certifiedArtifactIds(gateEvaluationRecordId);
+    const approved = this.writer.writeRecord({
+      record_type: 'phase_gate_approved',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      janumicode_version_sha: this.versionSha,
+      derived_from_record_ids: [gateEvaluationRecordId],
+      content: {
+        target_record_id: gateEvaluationRecordId,
+        payload,
+        ...(approvedArtifactIds.length > 0 ? { approved_artifact_ids: approvedArtifactIds } : {}),
+      },
+    });
+    try {
+      this.ingestionPipeline.ingest(approved);
+    } catch (err) {
+      getLogger().warn('decision', 'Ingestion of phase_gate_approved failed — validates edges not created', {
+        recordId: approved.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    const run = this.stateMachine.getWorkflowRun(runId);
+    const phaseId = run?.current_phase_id ?? null;
+    if (phaseId) {
+      this.db.prepare(`
+        INSERT INTO phase_gates
+          (id, workflow_run_id, phase_id, sub_phase_id, completed_at,
+           human_approved, approval_record_id, decision_trace_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        approved.id, runId, phaseId, run?.current_sub_phase_id ?? null,
+        new Date().toISOString(), 1, approved.id, decisionTraceId,
+      );
+    } else {
+      getLogger().warn('decision', 'certifyPhaseGate without current_phase_id; phase_gates row skipped', {
+        runId, gateEvaluationRecordId,
+      });
+    }
+    return approved.id;
+  }
+
+  /**
+   * The artifacts a phase gate certifies = the records the
+   * `phase_gate_evaluation` derived from (its inputs ARE the phase's governing
+   * artifacts). Excludes the gate record itself and blank ids.
+   */
+  private certifiedArtifactIds(gateEvaluationRecordId: string): string[] {
+    const gate = this.writer.getRecord(gateEvaluationRecordId);
+    if (!gate) return [];
+    return (gate.derived_from_record_ids ?? []).filter(
+      (id) => typeof id === 'string' && id.length > 0 && id !== gateEvaluationRecordId,
+    );
+  }
+
+  /**
+   * Scripted prior_decision_override injections, fired from the auto-advance
+   * loop after their `afterPhase` completes (simulate-human-decisions mode).
+   * Each fires at most once.
+   */
+  private overrideInjections: OverrideInjectionSpec[] = [];
+  private firedOverrideInjections = new Set<OverrideInjectionSpec>();
+  setOverrideInjections(specs: OverrideInjectionSpec[]): void {
+    this.overrideInjections = specs;
+    this.firedOverrideInjections.clear();
+  }
+
+  /** Fire any override injections registered for a just-completed phase. */
+  private runOverrideInjectionsForPhase(runId: string, phaseId: PhaseId): void {
+    for (const spec of this.overrideInjections) {
+      if (spec.afterPhase !== phaseId || this.firedOverrideInjections.has(spec)) continue;
+      this.firedOverrideInjections.add(spec);
+      this.injectPriorDecisionOverride(runId, spec);
+    }
+  }
+
+  /**
+   * Phase 0.5 entry test (spec §4 Phase 0.5 entry criterion). Returns trigger
+   * metadata when a `prior_decision_override` decision_trace in THIS run
+   * overrides a Phase-Gate-Certified Interface Contract / API Definition /
+   * Data Model that was produced in a PRIOR Workflow Run; otherwise null.
+   *
+   * Three conditions, all required:
+   *   (a) the superseded record belongs to a different (prior) workflow run —
+   *       this is what distinguishes a true cross-run change from the
+   *       within-run supersession the headless harness also exercises;
+   *   (b) it is an interface artifact (`content.kind` ∈ the cross-run kinds);
+   *   (c) it is Phase-Gate-Certified — the target of a `validates` edge from a
+   *       `phase_gate_approved` record (same signal effectiveAuthority uses to
+   *       elevate to Authority 6).
+   *
+   * Read-only and defensive: any missing record / table-schema drift yields
+   * null (Phase 0.5 simply does not trigger), never a throw.
+   */
+  detectCrossRunImpactTrigger(runId: string): CrossRunImpactTrigger | null {
+    try {
+      // Newest current-version prior_decision_override in this run.
+      const traceRow = this.db.prepare(`
+        SELECT id, content FROM governed_stream
+        WHERE workflow_run_id = ? AND record_type = 'decision_trace'
+          AND is_current_version = 1
+          AND content LIKE '%"decision_type":"prior_decision_override"%'
+        ORDER BY produced_at DESC LIMIT 1
+      `).get(runId) as { id: string; content: string } | undefined;
+      if (!traceRow) return null;
+
+      let traceContent: Record<string, unknown>;
+      try {
+        traceContent = JSON.parse(traceRow.content) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+      const supersededId = typeof traceContent.superseded_record_id === 'string'
+        ? traceContent.superseded_record_id
+        : undefined;
+      if (!supersededId) return null;
+
+      const superseded = this.writer.getRecord(supersededId);
+      if (!superseded) return null;
+
+      // (a) Must originate in a PRIOR workflow run.
+      if (!superseded.workflow_run_id || superseded.workflow_run_id === runId) return null;
+
+      // (b) Must be an interface artifact (artifact_produced carrying a
+      //     cross-run-significant content.kind).
+      if (superseded.record_type !== 'artifact_produced') return null;
+      const kind = (superseded.content as Record<string, unknown> | undefined)?.kind;
+      if (!isCrossRunInterfaceKind(kind)) return null;
+
+      // (c) Must be Phase-Gate-Certified (target of a validates edge from a
+      //     phase_gate_approved record — the Authority-6 elevation signal).
+      const certified = this.db.prepare(`
+        SELECT 1 FROM memory_edge me
+        JOIN governed_stream gs ON gs.id = me.source_record_id
+        WHERE me.edge_type = 'validates'
+          AND me.target_record_id = ?
+          AND gs.record_type = 'phase_gate_approved'
+          AND gs.is_current_version = 1
+        LIMIT 1
+      `).get(supersededId) as { 1: number } | undefined;
+      if (!certified) return null;
+
+      const supersedingId = typeof traceContent.superseding_record_id === 'string'
+        ? traceContent.superseding_record_id
+        : undefined;
+
+      return {
+        triggered: true,
+        overrideTraceId: traceRow.id,
+        changedInterfaceId: supersededId,
+        supersedingRecordId: supersedingId,
+        priorWorkflowRunId: superseded.workflow_run_id,
+        interfaceKind: kind,
+      };
+    } catch (err) {
+      getLogger().warn('workflow', 'detectCrossRunImpactTrigger failed — Phase 0.5 not triggered', {
+        runId, error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Inject a semantic supersession: resolve the prior governing record being
+   * overridden (and the new governing record, synthesising one from a
+   * statement if asked), then write a `prior_decision_override` decision_trace
+   * (superseded/superseding ids top-level) and ingest it so Stage II asserts
+   * the `supersedes` edge the DMR's Stage 5 surfaces as a supersession_chain.
+   * Returns the decision_trace id, or null when the superseded record can't be
+   * resolved (a no-op, never a halt).
+   */
+  injectPriorDecisionOverride(runId: string, spec: OverrideInjectionSpec): string | null {
+    const supersededId = this.resolveRecordBySelector(runId, spec.superseded);
+    if (!supersededId) {
+      getLogger().warn('decision', 'injectPriorDecisionOverride: superseded record not found — skipped', {
+        runId, selector: spec.superseded,
+      });
+      return null;
+    }
+    let supersedingId: string | undefined;
+    if (spec.superseding) {
+      supersedingId = 'statement' in spec.superseding
+        ? this.writeSupersedingArtifact(runId, spec.superseding)
+        : (this.resolveRecordBySelector(runId, spec.superseding) ?? undefined);
+    }
+
+    const run = this.stateMachine.getWorkflowRun(runId);
+    const trace = this.writer.writeRecord({
+      record_type: 'decision_trace',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      phase_id: run?.current_phase_id ?? null,
+      sub_phase_id: run?.current_sub_phase_id ?? null,
+      janumicode_version_sha: this.versionSha,
+      derived_from_record_ids: supersedingId ? [supersededId, supersedingId] : [supersededId],
+      content: {
+        decision_type: 'prior_decision_override',
+        target_record_id: supersededId,
+        superseded_record_id: supersededId,
+        ...(supersedingId ? { superseding_record_id: supersedingId } : {}),
+        attribution: 'simulated_human_override',
+        auto_approved: false,
+      },
+    });
+    try {
+      this.ingestionPipeline.ingest(trace);
+    } catch (err) {
+      getLogger().warn('decision', 'Ingestion of injected prior_decision_override failed — supersedes edge not created', {
+        recordId: trace.id, error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return trace.id;
+  }
+
+  /** Resolve a selector to the most recent current-version record id, or null. */
+  private resolveRecordBySelector(runId: string, sel: RecordSelector): string | null {
+    const clauses = ['record_type = ?', 'is_current_version = 1'];
+    const params: unknown[] = [sel.recordType];
+    if (sel.scope === 'current_run') {
+      clauses.push('workflow_run_id = ?');
+      params.push(runId);
+    }
+    if (sel.contentMatch) {
+      clauses.push('content LIKE ?');
+      params.push(`%${sel.contentMatch}%`);
+    }
+    const row = this.db.prepare(
+      `SELECT id FROM governed_stream WHERE ${clauses.join(' AND ')} ORDER BY produced_at DESC LIMIT 1`,
+    ).get(...params) as { id: string } | undefined;
+    return row?.id ?? null;
+  }
+
+  /** Write (and ingest) a new governing artifact representing the human's
+   *  superseding decision, so the supersedes edge originates from a real,
+   *  harvestable record. */
+  private writeSupersedingArtifact(runId: string, spec: { statement: string; kind: string }): string {
+    const run = this.stateMachine.getWorkflowRun(runId);
+    const rec = this.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      phase_id: run?.current_phase_id ?? null,
+      janumicode_version_sha: this.versionSha,
+      content: { kind: spec.kind, statement: spec.statement, source: 'simulated_human_override' },
+    });
+    try {
+      this.ingestionPipeline.ingest(rec);
+    } catch { /* best-effort; edge creation tolerates an unindexed source */ }
+    return rec.id;
   }
 
   /**

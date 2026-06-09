@@ -44,6 +44,13 @@ export interface VerifierInput {
    * atomic task with no corresponding packet.
    */
   atomicTaskIds: Set<string>;
+  /**
+   * Leaf→root canonicalizer (from the requirement lineage). Lets P4 accept a
+   * root-grained eval as satisfying a leaf user story: Phase-8 evals target the
+   * canonical root (`US-001`) while packets carry the leaf slices (`US-001-01-1`)
+   * the task implements. Defaults to identity when not supplied.
+   */
+  canonicalize?: (id: string) => string;
 }
 
 export interface VerifierResult {
@@ -87,6 +94,7 @@ function verifyPacket(
   packet: ImplementationPacketContent,
   upstreamIndex: UpstreamIndex,
   packetIds: Set<string>,
+  canonicalize: (id: string) => string,
 ): PacketCoherenceResult {
   const blocking: string[] = [];
   const advisory: string[] = [];
@@ -119,9 +127,11 @@ function verifyPacket(
   }
 
   // P4 — Every user story has at least one functional evaluation criterion.
+  // A leaf story (US-001-01-1) is satisfied by an eval targeting its canonical
+  // root (US-001): Phase-8 evals are root-grained, packets carry leaf slices.
   const evalTargets = new Set(packet.evaluation_criteria.map((e) => e.target_id));
   for (const us of packet.user_stories) {
-    if (!evalTargets.has(us.id)) {
+    if (!evalTargets.has(us.id) && !evalTargets.has(canonicalize(us.id))) {
       blocking.push(`P4_USER_STORY_NO_EVAL: ${us.id} has no evaluation criterion`);
     }
   }
@@ -174,10 +184,31 @@ function verifyPacket(
     }
   }
 
+  // P8 — Each test_execution completion criterion should be covered by a test
+  // case (advisory). The criterion is the executor's authoritative deliverable;
+  // packetBuilder binds covering tests via the criterion's verified ACs (or the
+  // task's AC set). An uncovered criterion means the deliverable has no
+  // pre-written test — the executor must author one. Advisory, not blocking:
+  // routing to Phase 7 cannot synthesize a CC-targeted test (CC live outside
+  // Phase 7's AC namespace); honest gap surfaced for the executor + telemetry.
+  for (const cc of packet.task.completion_criteria) {
+    if (cc.verification_method !== 'test_execution') continue;
+    if (!cc.covered_by_test_ids || cc.covered_by_test_ids.length === 0) {
+      advisory.push(`P8_CC_NO_TEST: completion criterion ${cc.criterion_id} (task ${packet.task.id}) has no covering test case — executor must author one`);
+    }
+  }
+
   // A2 — No two test cases share identical AC refs + expected_outcome.
   const seenTests = new Map<string, string>();
   for (const tc of packet.test_cases) {
-    const key = `${[...tc.acceptance_criterion_ids].sort().join(',')}::${tc.expected_outcome.trim()}`;
+    // expected_outcome is normalised to a string by the packet builder, but
+    // never assume — a stray array/undefined here would crash the whole phase.
+    const outcome = typeof tc.expected_outcome === 'string'
+      ? tc.expected_outcome.trim()
+      : Array.isArray(tc.expected_outcome)
+        ? (tc.expected_outcome as unknown[]).filter((x) => typeof x === 'string').join('; ')
+        : String(tc.expected_outcome ?? '');
+    const key = `${[...tc.acceptance_criterion_ids].sort().join(',')}::${outcome}`;
     if (seenTests.has(key)) {
       advisory.push(`A2_DUPLICATE_TEST_CASE: ${tc.test_case_id} duplicates ${seenTests.get(key)}`);
     } else {
@@ -291,6 +322,7 @@ function verifyCrossPacket(input: VerifierInput): Map<string, string[]> {
 
 export function verifyCoherence(input: VerifierInput): VerifierResult {
   const packetIds = new Set(input.packets.map((p) => p.packet_id));
+  const canonicalize = input.canonicalize ?? ((id: string) => id);
   const byPacketId = new Map<string, PacketCoherenceResult>();
   let blockingTotal = 0;
   let advisoryTotal = 0;
@@ -298,7 +330,7 @@ export function verifyCoherence(input: VerifierInput): VerifierResult {
   let failedPackets = 0;
 
   for (const p of input.packets) {
-    const result = verifyPacket(p, input.upstreamIndex, packetIds);
+    const result = verifyPacket(p, input.upstreamIndex, packetIds, canonicalize);
     byPacketId.set(p.packet_id, result);
     if (!result.passed) failedPackets++;
     blockingTotal += result.blocking_failures.length;

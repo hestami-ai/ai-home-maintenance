@@ -133,7 +133,7 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are rejecte
 - **Every accepted journey → ≥1 FR OR explicit `unreached_journeys[]` entry with reason.** Silent drops fail the verifier.
 - **Traces_to MUST reference only ids from the handoff lists below.** The self-heal filter drops invalid refs with a WARN.
 - **Use canonical vocabulary verbatim** — if the glossary says "assessment", don't say "dues" or "charge".
-- **Do NOT include Non-Functional Requirements** (those are Sub-Phase 2.2).
+- **Do NOT include Non-Functional Requirements** (those are Sub-Phase 2.2). This covers not only thresholds but any story whose CORE PURPOSE is a quality/operational concern — monitoring or verifying uptime, alerting on failure, ensuring latency/availability/reliability, health-checking, publishing metrics, log aggregation, encryption-as-a-property. A "Uptime monitor verifies monthly uptime and alerts below threshold" is an NFR, NOT a functional user story. These belong to the NFR roster (2.2) and become cross-cutting constraints on the functional components — do not author functional stories for them.
 - **Do NOT propose domains, pillars, or release plans** — those are Phase 1 decisions, fixed here.
 - **Do NOT author more than one AC per FR in this pass.** Pass 2 handles AC expansion; over-authoring here wastes your attention budget.
 

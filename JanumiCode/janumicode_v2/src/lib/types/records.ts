@@ -317,6 +317,10 @@ export type RecordType =
   | 'intent_quality_report'
   | 'cross_run_impact_report'
   | 'cross_run_modification'
+  // Output of Phase 0.5.2 when the human chooses "Proceed" — lists the
+  // Refactoring Tasks (idempotency fields per spec §8.8) that Phase 6
+  // injects into the implementation plan to update prior-run artifacts.
+  | 'refactoring_scope'
   | 'coverage_gap'
   // Client Liaison Records (§6.4)
   | 'open_query_received'
@@ -1142,6 +1146,15 @@ export interface TaskCompletionCriterion {
   description: string;
   verification_method?: 'schema_check' | 'invariant' | 'output_comparison' | 'test_execution';
   artifact_ref?: string;
+  /**
+   * Leaf acceptance-criterion id(s) this completion criterion verifies. Phase 6
+   * mints these (LLM-cited, then validated against the task's cited leaf-AC set
+   * — non-members dropped). Lets packet synthesis bind each completion criterion
+   * to the test cases covering those ACs, so the executor's authoritative
+   * deliverable (the CC) is test-backed, not just the ACs. Empty/absent when the
+   * criterion maps to no specific AC.
+   */
+  verifies_acceptance_criteria?: string[];
 }
 
 export interface DecompositionTask {
@@ -1167,6 +1180,18 @@ export interface DecompositionTask {
   active_constraints?: string[];
   /** References to upstream artifacts this task realises (component ids, responsibility ids, AC ids). */
   traces_to?: string[];
+  /**
+   * Refactoring-task idempotency fields (spec §8.8). Present only on
+   * `task_type:'refactoring'` leaves injected from a Phase 0.5 refactoring_scope.
+   * Carried through buildEffectiveTaskView → ExecutionScheduler so Phase 9.1's
+   * executor runs the pre-state-hash idempotency protocol.
+   */
+  expected_pre_state_hash?: string;
+  verification_step?: string;
+  /** Self-contained refactoring directive (old/new definition + member diff +
+   *  target files), pre-rendered by Phase 0.5 so the executor needs no DB
+   *  access to dereference record ids. Carried through to Phase 9.1. */
+  refactoring_instructions?: string;
 }
 
 export interface TaskDecompositionAtomicCriteria {
@@ -1367,6 +1392,12 @@ export interface PacketTask {
     criterion_id: string;
     description: string;
     verification_method: string;
+    /** Leaf AC id(s) this criterion verifies (from Phase 6, validated). */
+    verifies_acceptance_criteria?: string[];
+    /** Packet test_case_id(s) that cover this criterion (via its ACs, or the
+     *  task's full AC set when it cites none). Empty ⇒ no pre-written test;
+     *  the executor must author one (advisory P8_CC_NO_TEST). */
+    covered_by_test_ids?: string[];
   }>;
   write_directory_paths: string[];
   read_directory_paths: string[];

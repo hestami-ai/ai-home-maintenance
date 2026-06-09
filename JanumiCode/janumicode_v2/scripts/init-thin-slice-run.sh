@@ -53,6 +53,8 @@ slice_number=""
 spec_path="${DEFAULT_SPEC}"
 skip_confirm=0
 dry_run=0
+two_run=0
+full=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -60,6 +62,8 @@ while [[ $# -gt 0 ]]; do
     -s) spec_path="$2"; shift 2 ;;
     -y) skip_confirm=1; shift ;;
     --dry-run) dry_run=1; shift ;;
+    --two-run) two_run=1; shift ;;
+    --full) full=1; shift ;;
     -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
     *) echo "[init-thin-slice] unknown option: $1" >&2; exit 2 ;;
   esac
@@ -156,6 +160,13 @@ echo "[init-thin-slice] rebuilding dist..."
 
 echo "[init-thin-slice] launching CLI in --thin-slice mode..."
 export JANUMICODE_EXECUTOR_UNATTENDED=1
+# Force DIRECT better-sqlite3 (the headless CLI is plain Node, never the VS Code
+# extension host). Without this, launching from a VS Code terminal leaks
+# VSCODE_PID into the environment, which the DB factory misreads as
+# "extension host" and selects the sidecar — whose startup ping then hangs when
+# reopening an existing DB (seen on the two-run driver's run 2). Direct mode is
+# what tests use and avoids the sidecar entirely.
+export JANUMICODE_DB_MODE="${JANUMICODE_DB_MODE:-direct}"
 # JANUMICODE_INSPECT: V8 inspector flag. Defaults to `--inspect` (port
 # open, no initial pause) so the CDP harness can always attach mid-run
 # if needed. Override with explicit empty (`JANUMICODE_INSPECT=`) to
@@ -190,11 +201,119 @@ cleanup_child() {
 }
 trap cleanup_child EXIT INT TERM HUP
 
+if (( two_run )); then
+  # ── TWO-RUN cross-run driver (semantic supersession + Phase 0.5) ─────
+  # Two Workflow Runs share one DB so run 2's all_runs DMR sees run 1. Run 1
+  # establishes + gate-certifies the governing artifacts; run 2 injects a
+  # prior_decision_override of a CERTIFIED INTERFACE from run 1. Targeting an
+  # interface_contracts (vs a system_boundary) exercises BOTH:
+  #   (a) cross-run semantic supersession (spec §5.2 — supersedes edge + DMR
+  #       supersession_chains), and
+  #   (b) Phase 0.5 Cross-Run Impact Analysis (spec §4 Phase 0.5 → 6 → 9.1 →
+  #       10.1), because the override changes a certified prior-run interface.
+  #
+  # Overridable env:
+  #   JANUMICODE_TWO_RUN_LIMIT       run-1 phase-limit (default: none — run the
+  #                                  FULL pipeline so run 1 EXECUTES (Phase 9)
+  #                                  and writes its source files INTO THE SHARED
+  #                                  WORKSPACE. This is what makes run 2 a faithful
+  #                                  brownfield refactor: the prior-run files
+  #                                  physically exist, so the Refactoring Tasks
+  #                                  have real targets and a non-empty pre-state
+  #                                  hash. Set e.g. =5 for a cheap establish-only
+  #                                  run that certifies interfaces but writes no
+  #                                  code (refactor tasks then have no file to
+  #                                  modify — they rely solely on the inlined
+  #                                  refactoring_instructions).
+  #   JANUMICODE_TWO_RUN_RUN2_LIMIT  run-2 phase-limit (default: none — run the
+  #                                  FULL pipeline so 0.5 → 6 (refactoring tasks)
+  #                                  → 9.1 (cross_run_modification) → 10.1
+  #                                  (verification) all execute).
+  #   JANUMICODE_OVERRIDE_SPEC       --inject-overrides JSON (default below).
+  #
+  # NOTE: both runs share one --workspace AND one --db-path, so run 1's files
+  # and governed-stream records are present for run 2 (true brownfield).
+  shared_db="${workspace}/.janumicode/test-harness/two-run-shared.db"
+  run1_limit="${JANUMICODE_TWO_RUN_LIMIT:-}"
+  run2_limit="${JANUMICODE_TWO_RUN_RUN2_LIMIT:-}"
+  # Default override spec kept in a single-quoted literal (its JSON braces would
+  # otherwise close a ${VAR:-default} parameter-expansion early). Override the
+  # whole thing via JANUMICODE_OVERRIDE_SPEC.
+  #
+  # afterPhase=1 is deliberate: it fires BEFORE run 2 regenerates its own
+  # interface_contracts (phase 3), so the selector resolves run 1's certified
+  # record — a genuine CROSS-run change (Phase 0.5 detectCrossRunImpactTrigger
+  # requires the superseded record to belong to a prior run). Firing later would
+  # match run 2's own fresh interface and route as a within-run override.
+  override_spec='[{"afterPhase":"1","superseded":{"recordType":"artifact_produced","contentMatch":"interface_contracts"},"superseding":{"statement":"Interface revised by human override of the PRIOR run: the delete-by-key endpoint is REMOVED from the contract.","kind":"interface_contracts"}}]'
+  if [[ -n "${JANUMICODE_OVERRIDE_SPEC:-}" ]]; then override_spec="${JANUMICODE_OVERRIDE_SPEC}"; fi
+
+  echo "[init-thin-slice] TWO-RUN mode — shared DB: ${shared_db} (run1 phase-limit=${run1_limit:-none}, run2 phase-limit=${run2_limit:-none})"
+  echo "[init-thin-slice] === RUN 1/2: establish + EXECUTE (writes prior-run files) + certify gates (--simulate-human-decisions) ==="
+  run1_phase_limit_arg=()
+  if [[ -n "${run1_limit}" ]]; then run1_phase_limit_arg=(--phase-limit "${run1_limit}"); fi
+  node ${JANUMICODE_INSPECT---inspect} "${REPO_ROOT}/dist/cli/janumicode.js" run \
+    --intent "@${intent_file}" \
+    --workspace "${workspace}" \
+    --llm-mode real \
+    --auto-approve \
+    --simulate-human-decisions \
+    --db-path "${shared_db}" \
+    "${run1_phase_limit_arg[@]}" \
+    --thin-slice &
+  node_pid=$!
+  # A phase-limited run exits 1 (partial — the normal "gap found" virtuous-cycle
+  # signal), so do NOT let `set -e` abort the driver here. Tolerate 0/1; only a
+  # hard exception (>=2) aborts before run 2.
+  set +e; wait "${node_pid}"; run1_code=$?; set -e
+  echo "[init-thin-slice] run 1 exited ${run1_code} (0=success, 1=partial — both expected for a phase-limited establish run)"
+  if (( run1_code >= 2 )); then
+    echo "[init-thin-slice] run 1 hard-failed (exit ${run1_code}) — aborting two-run before run 2" >&2
+    exit "${run1_code}"
+  fi
+
+  echo "[init-thin-slice] === RUN 2/2: inject prior_decision_override → Phase 0.5 cross-run impact ==="
+  run2_phase_limit_arg=()
+  if [[ -n "${run2_limit}" ]]; then run2_phase_limit_arg=(--phase-limit "${run2_limit}"); fi
+  node ${JANUMICODE_INSPECT---inspect} "${REPO_ROOT}/dist/cli/janumicode.js" run \
+    --intent "@${intent_file}" \
+    --workspace "${workspace}" \
+    --llm-mode real \
+    --auto-approve \
+    --simulate-human-decisions \
+    --db-path "${shared_db}" \
+    --inject-overrides "${override_spec}" \
+    "${run2_phase_limit_arg[@]}" \
+    --thin-slice &
+  node_pid=$!
+  set +e; wait "${node_pid}"; run2_code=$?; set -e
+  echo "[init-thin-slice] run 2 exited ${run2_code} (0/1 expected)"
+
+  echo "[init-thin-slice] === TWO-RUN verification (shared DB) ==="
+  node "${REPO_ROOT}/scripts/verify-two-run-supersession.mjs" "${shared_db}" || true
+  echo "[init-thin-slice] === PHASE 0.5 cross-run-impact verification (shared DB) ==="
+  node "${REPO_ROOT}/scripts/verify-cross-run-impact.mjs" "${shared_db}" || true
+  exit 0
+fi
+
+# JANUMICODE_SIMULATE_DECISIONS=1 adds --simulate-human-decisions so the run
+# certifies each phase gate through the real approval path (phase_gate_approved
+# + validates edges → Authority-6 elevation), exercising the DMR's
+# active_constraints accumulation that is otherwise dormant headless.
+# --full uses --full-slice: drops the depth/fanout caps so the run implements
+# the ENTIRE intent, while KEEPING the operational rails (60-min stall window,
+# forced goose_cli executor, 30-min call cap).
+thin_slice_arg=(--thin-slice)
+if (( full )); then
+  thin_slice_arg=(--full-slice)
+  echo "[init-thin-slice] FULL mode — decomposition caps DISABLED (entire intent); operational rails (goose_cli, 60-min stall, 30-min call cap) KEPT. Long run."
+fi
 node ${JANUMICODE_INSPECT---inspect} "${REPO_ROOT}/dist/cli/janumicode.js" run \
   --intent "@${intent_file}" \
   --workspace "${workspace}" \
   --llm-mode real \
   --auto-approve \
-  --thin-slice &
+  ${JANUMICODE_SIMULATE_DECISIONS:+--simulate-human-decisions} \
+  "${thin_slice_arg[@]}" &
 node_pid=$!
 wait "${node_pid}"
