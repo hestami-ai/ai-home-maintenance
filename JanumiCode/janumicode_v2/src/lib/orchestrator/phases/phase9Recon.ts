@@ -107,6 +107,21 @@ export function buildWorkspaceInventory(workspacePath: string): WorkspaceInvento
 
 export type ReconConfidence = 'high' | 'medium' | 'low';
 
+export interface ReconCanonicalModule {
+  /** Workspace-relative file path the area produces, e.g. 'src/shared/models/Mapping.ts'. */
+  path: string;
+  /** Stable specifier consumers import, e.g. '@shared/models/Mapping'. */
+  import_specifier: string;
+  description: string;
+}
+
+export interface ReconImportAlias {
+  /** e.g. '@shared/*'. */
+  alias: string;
+  /** Workspace-relative target, e.g. 'src/shared/*'. */
+  target: string;
+}
+
 export interface ReconArea {
   area_id: string;
   description: string;
@@ -118,8 +133,19 @@ export interface ReconArea {
   /** Surfaced conflicts (e.g. stated Django vs existing Spring) — NOT silently resolved. */
   conflicts: string[];
   alternatives_rejected: string[];
-  /** Workspace-relative dirs this area owns (source + tests). */
+  /** Workspace-relative dirs this area owns (source). */
   source_roots: string[];
+  /** Workspace-relative dirs holding this area's tests. */
+  test_roots: string[];
+  // ── Enforcement manifest (Stage 1+2 inc.2 — replaces the scaffold's substrate) ──
+  /** Paths agents must NOT author (shared/config owned by the scaffolding step). */
+  protected_paths: string[];
+  /** This area's dependency manifest file (package.json, Cargo.toml, …). */
+  dependency_manifest: string;
+  /** Canonical shared modules this area exposes ("import, don't reinvent"). */
+  canonical_modules: ReconCanonicalModule[];
+  /** Import aliases the area's code uses (e.g. @shared/* → src/shared/*). */
+  import_aliases: ReconImportAlias[];
   /** Per-area verification gates (supersede the generic resolver). */
   gate_commands: GateCommand[];
 }
@@ -152,6 +178,59 @@ export function reconGlobalGates(plan: Phase9ReconPlan | null): GateCommand[] {
   return plan.areas.flatMap(a => a.gate_commands);
 }
 
+// ── Enforcement manifest derivation (inc.2 — replaces the scaffold substrate) ─
+
+/** The kernel-enforcement substrate the recon plan provides — the polyglot
+ *  successor to the (TS-shaped) scaffold manifest. The scheduler's write-scope
+ *  guard + executor "import, don't reinvent" directives consume this. */
+export interface ReconEnforcement {
+  /** Union of every area's protected paths (dir prefixes end with '/'). */
+  protected_paths: string[];
+  /** Canonical shared modules across all areas. */
+  canonical_modules: ReconCanonicalModule[];
+  /** Per-area allowed source extensions (layout-violation checks). */
+  allowed_extensions_by_area: Record<string, string[]>;
+  /** Agent-facing conventions text (per-area stacks, aliases, import rules). */
+  conventions: string;
+}
+
+/** Source-file extensions per stack (for per-area layout enforcement). */
+const STACK_EXTENSIONS: Record<string, string[]> = {
+  node: ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'],
+  python: ['.py', '.pyi'],
+  rust: ['.rs'],
+  go: ['.go'],
+  java: ['.java', '.kt'],
+};
+
+export function buildReconEnforcementManifest(plan: Phase9ReconPlan): ReconEnforcement {
+  const protectedSet = new Set<string>();
+  const modules: ReconCanonicalModule[] = [];
+  const extByArea: Record<string, string[]> = {};
+  for (const a of plan.areas) {
+    for (const p of a.protected_paths) protectedSet.add(p);
+    if (a.dependency_manifest) protectedSet.add(a.dependency_manifest);
+    modules.push(...a.canonical_modules);
+    extByArea[a.area_id] = STACK_EXTENSIONS[a.stack] ?? [];
+  }
+  const conventions = plan.areas.map(a => {
+    const aliases = a.import_aliases.map(al => `${al.alias} → ${al.target}`).join(', ');
+    return `Area ${a.area_id} (${a.stack}): source ${a.source_roots.join(', ') || '(unset)'}; `
+      + `tests ${a.test_roots.join(', ') || '(unset)'}; `
+      + (aliases ? `import aliases: ${aliases}; ` : '')
+      + (a.canonical_modules.length
+          ? `import (do NOT reinvent): ${a.canonical_modules.map(m => m.import_specifier).filter(Boolean).join(', ')}; `
+          : '')
+      + `do NOT author: ${a.protected_paths.join(', ') || '(none)'}.`;
+  }).join('\n');
+  return {
+    protected_paths: [...protectedSet].sort(),
+    canonical_modules: modules,
+    allowed_extensions_by_area: extByArea,
+    conventions,
+  };
+}
+
 // ── Sub-phase orchestration ─────────────────────────────────────────
 
 /**
@@ -176,6 +255,14 @@ export function deterministicReconFallback(workspacePath: string, inv: Workspace
       conflicts: [],
       alternatives_rejected: [],
       source_roots: ['src'],
+      test_roots: ['src'],
+      protected_paths: ['src/shared/', 'package.json', 'tsconfig.json'],
+      dependency_manifest: stack === 'rust' ? 'Cargo.toml' : stack === 'go' ? 'go.mod'
+        : stack === 'python' ? 'pyproject.toml' : stack === 'java' ? 'pom.xml' : 'package.json',
+      canonical_modules: [],
+      import_aliases: stack === 'node' || !stack
+        ? [{ alias: '@shared/*', target: 'src/shared/*' }, { alias: '@/*', target: 'src/*' }]
+        : [],
       gate_commands: resolveGateCommands(workspacePath),
     }],
     integration_boundaries: [],
@@ -200,6 +287,21 @@ function coerceArea(raw: unknown, workspacePath: string): ReconArea | null {
   const gates = Array.isArray(o.gate_commands)
     ? (o.gate_commands as unknown[]).map(g => coerceGate(g, workspacePath)).filter((g): g is GateCommand => g !== null)
     : [];
+  const modules: ReconCanonicalModule[] = Array.isArray(o.canonical_modules)
+    ? (o.canonical_modules as unknown[]).map(m => {
+        const mo = (m ?? {}) as Record<string, unknown>;
+        const p = str(mo.path).trim();
+        return p ? { path: p, import_specifier: str(mo.import_specifier).trim(), description: str(mo.description) } : null;
+      }).filter((m): m is ReconCanonicalModule => m !== null)
+    : [];
+  const aliases: ReconImportAlias[] = Array.isArray(o.import_aliases)
+    ? (o.import_aliases as unknown[]).map(a => {
+        const ao = (a ?? {}) as Record<string, unknown>;
+        const al = str(ao.alias).trim();
+        const tg = str(ao.target).trim();
+        return al && tg ? { alias: al, target: tg } : null;
+      }).filter((a): a is ReconImportAlias => a !== null)
+    : [];
   return {
     area_id,
     description: str(o.description),
@@ -209,6 +311,11 @@ function coerceArea(raw: unknown, workspacePath: string): ReconArea | null {
     conflicts: strArr(o.conflicts),
     alternatives_rejected: strArr(o.alternatives_rejected),
     source_roots: strArr(o.source_roots),
+    test_roots: strArr(o.test_roots),
+    protected_paths: strArr(o.protected_paths),
+    dependency_manifest: str(o.dependency_manifest).trim(),
+    canonical_modules: modules,
+    import_aliases: aliases,
     gate_commands: gates,
   };
 }
@@ -393,6 +500,7 @@ ${components.length ? components.map(c => `- ${c.id}${c.name ? ` (${c.name})` : 
 - An "area" is a coherent slice of the workspace that uses ONE stack (a new feature, or an existing subsystem). Greenfield single-stack ⇒ ONE area.
 - Choose each area's stack from the BINDING constraints when stated; else from the filesystem; else the most reasonable conventional choice for the intent. Put the evidence in \`source_refs\` and any tension in \`conflicts\`.
 - For each area, author its gate commands: at minimum a \`test\` gate, plus \`typecheck\`/\`build\` where the stack has them. Use real commands for the stack (e.g. node: {"command":"npm","args":["test","--silent"]}; rust: {"command":"cargo","args":["test"]}; python: {"command":"pytest","args":["-q"]}). Set \`cwd\` (area-relative) when the area is not the workspace root.
+- Author each area's ENFORCEMENT MANIFEST: \`dependency_manifest\` (the stack's manifest file), \`protected_paths\` (dirs/files the coding agents must NOT author — the shared module dir + the dependency manifest/config), \`canonical_modules\` (shared types/contracts the area exposes for cross-area import, with their import specifier), and \`import_aliases\` (the canonical import form, e.g. @shared/* → src/shared/*). These REPLACE the deterministic scaffold's substrate, so the kernel enforces against them.
 
 Return JSON only (no markdown fences):
 {
@@ -406,7 +514,12 @@ Return JSON only (no markdown fences):
       "source_refs": ["<file path, TECH-* id, or intent excerpt>"],
       "conflicts": ["<stated-vs-reality tension, if any>"],
       "alternatives_rejected": ["<stack considered and why not>"],
-      "source_roots": ["<workspace-relative dir>"],
+      "source_roots": ["<workspace-relative source dir>"],
+      "test_roots": ["<workspace-relative test dir>"],
+      "dependency_manifest": "package.json" | "Cargo.toml" | "pyproject.toml" | "go.mod" | "pom.xml",
+      "protected_paths": ["<dir/ or file the agents must not author>"],
+      "canonical_modules": [ { "path": "<workspace-relative file>", "import_specifier": "<how consumers import it>", "description": "<one line>" } ],
+      "import_aliases": [ { "alias": "@shared/*", "target": "src/shared/*" } ],
       "gate_commands": [
         { "name": "<area:kind>", "kind": "test"|"typecheck"|"build", "command": "<exe>", "args": ["..."], "cwd": "<area-relative dir or omit>", "timeoutMs": 600000 }
       ]

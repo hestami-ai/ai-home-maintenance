@@ -13,6 +13,7 @@ import {
   parseReconPlan,
   deterministicReconFallback,
   reconGlobalGates,
+  buildReconEnforcementManifest,
 } from '../../../../lib/orchestrator/phases/phase9Recon';
 
 let ws: string;
@@ -97,6 +98,25 @@ describe('parseReconPlan — coerce + validate LLM output', () => {
     expect(reconGlobalGates(plan).map(g2 => g2.command)).toEqual(['mvn', 'pytest']);
   });
 
+  it('parses the per-area enforcement manifest fields', () => {
+    const plan = parseReconPlan({
+      areas: [{
+        area_id: 'web', stack: 'node', confidence: 'high',
+        source_roots: ['src/web'], test_roots: ['src/web'],
+        dependency_manifest: 'package.json',
+        protected_paths: ['src/shared/', 'package.json'],
+        canonical_modules: [{ path: 'src/shared/models/User.ts', import_specifier: '@shared/models/User', description: 'user' }],
+        import_aliases: [{ alias: '@shared/*', target: 'src/shared/*' }],
+        gate_commands: [{ kind: 'test', command: 'npm', args: ['test'] }],
+      }],
+    }, ws);
+    const a = plan!.areas[0];
+    expect(a.dependency_manifest).toBe('package.json');
+    expect(a.protected_paths).toContain('src/shared/');
+    expect(a.canonical_modules[0].import_specifier).toBe('@shared/models/User');
+    expect(a.import_aliases[0].alias).toBe('@shared/*');
+  });
+
   it('returns null on no usable areas (caller falls back)', () => {
     expect(parseReconPlan({ areas: [] }, ws)).toBeNull();
     expect(parseReconPlan({ areas: [{ description: 'no id or stack' }] }, ws)).toBeNull();
@@ -114,5 +134,33 @@ describe('parseReconPlan — coerce + validate LLM output', () => {
     expect(plan!.areas).toHaveLength(1);
     expect(plan!.areas[0].confidence).toBe('medium'); // invalid 'banana' → medium
     expect(plan!.areas[0].gate_commands).toHaveLength(1); // the command-less gate dropped
+  });
+});
+
+describe('buildReconEnforcementManifest — polyglot enforcement substrate', () => {
+  it('unions protected paths (+ dependency manifests), flattens modules, maps per-area extensions', () => {
+    const plan = parseReconPlan({
+      workspace_kind: 'mixed',
+      areas: [
+        { area_id: 'web', stack: 'node', confidence: 'high', dependency_manifest: 'package.json',
+          protected_paths: ['src/shared/'], source_roots: ['src/web'],
+          canonical_modules: [{ path: 'src/shared/models/User.ts', import_specifier: '@shared/models/User', description: '' }],
+          gate_commands: [{ kind: 'test', command: 'npm', args: ['test'] }] },
+        { area_id: 'engine', stack: 'rust', confidence: 'high', dependency_manifest: 'Cargo.toml',
+          protected_paths: ['crates/shared/'], source_roots: ['crates/engine'],
+          gate_commands: [{ kind: 'test', command: 'cargo', args: ['test'], cwd: 'crates/engine' }] },
+      ],
+    }, ws)!;
+    const m = buildReconEnforcementManifest(plan);
+    expect(m.protected_paths).toContain('src/shared/');
+    expect(m.protected_paths).toContain('crates/shared/');
+    expect(m.protected_paths).toContain('package.json'); // dependency manifest folded in
+    expect(m.protected_paths).toContain('Cargo.toml');
+    expect(m.canonical_modules).toHaveLength(1);
+    expect(m.allowed_extensions_by_area.web).toContain('.ts');
+    expect(m.allowed_extensions_by_area.engine).toContain('.rs');
+    expect(m.allowed_extensions_by_area.web).not.toContain('.rs'); // per-area, not global
+    expect(m.conventions).toContain('Area web (node)');
+    expect(m.conventions).toContain('Area engine (rust)');
   });
 });
