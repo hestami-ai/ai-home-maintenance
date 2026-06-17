@@ -14,6 +14,7 @@ import {
   deterministicReconFallback,
   reconGlobalGates,
   buildReconEnforcementManifest,
+  buildReconLayoutContract,
 } from '../../../../lib/orchestrator/phases/phase9Recon';
 
 let ws: string;
@@ -162,5 +163,27 @@ describe('buildReconEnforcementManifest — polyglot enforcement substrate', () 
     expect(m.allowed_extensions_by_area.web).not.toContain('.rs'); // per-area, not global
     expect(m.conventions).toContain('Area web (node)');
     expect(m.conventions).toContain('Area engine (rust)');
+  });
+});
+
+describe('buildReconLayoutContract — Phase-10 layout check under the recon path', () => {
+  it('unions per-area extensions (no polyglot false-positives) + collects area top-level dirs', () => {
+    const plan = parseReconPlan({
+      areas: [
+        { area_id: 'web', stack: 'node', confidence: 'high', source_roots: ['src/web'],
+          import_aliases: [{ alias: '@shared/*', target: 'src/shared/*' }],
+          gate_commands: [{ kind: 'test', command: 'npm', args: ['test'] }] },
+        { area_id: 'engine', stack: 'rust', confidence: 'high', source_roots: ['crates/engine'],
+          protected_paths: ['crates/shared/'],
+          gate_commands: [{ kind: 'test', command: 'cargo', args: ['test'] }] },
+      ],
+    }, ws)!;
+    const c = buildReconLayoutContract(plan);
+    expect(c.allowed_source_extensions).toContain('.ts'); // node legit
+    expect(c.allowed_source_extensions).toContain('.rs'); // rust legit — NOT a foreign-file false positive
+    expect(c.allowed_top_level_dirs).toContain('crates'); // engine area root segment
+    expect(c.allowed_top_level_dirs).toContain('src');
+    expect(c.shared_dir).toBe('crates/shared'); // from the dir-prefix protected path
+    expect(c.import_aliases.find(a => a.alias === '@shared/*')?.target).toBe('src/shared/*');
   });
 });

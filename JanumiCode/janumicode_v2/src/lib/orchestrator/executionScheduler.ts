@@ -45,6 +45,7 @@ import {
 import { LeafTestRunner, type LeafTestRunnerConfig, type LeafTestRunResult } from './leafTestRunner';
 import { resolveGateCommands, type GateCommand } from './gateCommands';
 import { runGateCommands } from './gateRunner';
+import type { ReconEnforcement } from './phases/phase9Recon';
 import { QuarantineLedger } from './quarantineLedger';
 import { WaveGate, type WaveGateOutcome } from './waveGate';
 import { buildPhaseContextPacket } from './phases/dmrContext';
@@ -180,6 +181,23 @@ export class ExecutionScheduler {
    * scaffold_synthesis. Drives the "import, don't reinvent" executor section
    * and the post-leaf write-scope guard.
    */
+  /**
+   * Stage 1+2 inc.2 — recon-authored enforcement substrate (per-area protected
+   * paths, canonical modules, conventions). When set it SUPERSEDES the
+   * (TS-shaped) scaffold manifest for the write-scope guard + executor
+   * "import, don't reinvent" directives — the polyglot enforcement path.
+   */
+  private reconEnforcement: ReconEnforcement | null = null;
+  setReconEnforcement(enforcement: ReconEnforcement): void {
+    this.reconEnforcement = enforcement;
+  }
+
+  /** Protected paths in force — recon enforcement wins, else the scaffold manifest. */
+  private effectiveProtectedPaths(): string[] {
+    if (this.reconEnforcement) return this.reconEnforcement.protected_paths;
+    return this.scaffoldManifest?.protected_paths ?? [];
+  }
+
   setScaffoldManifest(manifest: ScaffoldManifest): void {
     this.scaffoldManifest = manifest;
   }
@@ -900,14 +918,21 @@ export class ExecutionScheduler {
       this.artifacts,
       undefined,
       dmrPacket,
-      this.scaffoldManifest
+      this.reconEnforcement
         ? {
-            conventions: this.scaffoldManifest.conventions,
-            sharedDir: this.scaffoldManifest.profile.shared_dir,
-            canonicalFiles: this.scaffoldManifest.canonical_files,
-            protectedPaths: this.scaffoldManifest.protected_paths,
+            conventions: this.reconEnforcement.conventions,
+            sharedDir: '', // recon is per-area; the conventions carry the aliases/paths
+            canonicalFiles: this.reconEnforcement.canonical_modules.map(m => m.path),
+            protectedPaths: this.reconEnforcement.protected_paths,
           }
-        : null,
+        : this.scaffoldManifest
+          ? {
+              conventions: this.scaffoldManifest.conventions,
+              sharedDir: this.scaffoldManifest.profile.shared_dir,
+              canonicalFiles: this.scaffoldManifest.canonical_files,
+              protectedPaths: this.scaffoldManifest.protected_paths,
+            }
+          : null,
       packet,
     ).stdin.text;
 
@@ -943,9 +968,11 @@ export class ExecutionScheduler {
     // session), framed ADVISORY so it never re-creates the slice-139
     // "everything authoritative" incoherence, with a proportionality note so
     // tiny leaves don't grow health checks.
-    if (this.scaffoldManifest?.engineering_constitution_path) {
+    const constitutionPath = this.reconEnforcement?.engineering_constitution_path
+      ?? this.scaffoldManifest?.engineering_constitution_path;
+    if (constitutionPath) {
       stdinText += '\n\n## Engineering Constitution (advisory craft standard)\n'
-        + `Before implementing, read the file \`${this.scaffoldManifest.engineering_constitution_path}\` (workspace-relative) — `
+        + `Before implementing, read the file \`${constitutionPath}\` (workspace-relative) — `
         + 'engineering best practices for code comments, debugging/observability, and testing. '
         + 'Follow these practices wherever they do not conflict with this task\'s specification, completion criteria, or technical constraints — those always win. '
         + 'Apply them proportionally to the scope of THIS task; application-level concerns (health checks, app-wide observability wiring) belong to the composition-root task, not ordinary leaves.';
@@ -1018,11 +1045,11 @@ export class ExecutionScheduler {
     // re-creating package.json or its own copy of a shared module), so we
     // quarantine + retry with explicit "import, don't reinvent" context.
     let scopeViolations = this.detectWriteScopeViolations(executionResult.filesWritten, workspacePath);
-    if (scopeViolations.length > 0 && leaf._composition_root && this.scaffoldManifest) {
+    if (scopeViolations.length > 0 && leaf._composition_root) {
       // The composition root OWNS root-config edits (dependency installs,
       // entrypoint scripts). Only directory-prefix protections (the shared
       // dir) still apply to it.
-      const dirPrefixes = this.scaffoldManifest.protected_paths.filter((p) => p.endsWith('/'));
+      const dirPrefixes = this.effectiveProtectedPaths().filter((p) => p.endsWith('/'));
       scopeViolations = scopeViolations.filter((rel) =>
         dirPrefixes.some((p) => rel === p.slice(0, -1) || rel.startsWith(p)));
     }
@@ -1153,8 +1180,8 @@ export class ExecutionScheduler {
     filesWritten: Array<{ filePath: string; operation: 'create' | 'modify' | 'delete' }>,
     workspacePath: string,
   ): string[] {
-    if (!this.scaffoldManifest) return [];
-    const protectedPaths = this.scaffoldManifest.protected_paths;
+    const protectedPaths = this.effectiveProtectedPaths();
+    if (protectedPaths.length === 0) return [];
     const violations = new Set<string>();
     for (const w of filesWritten) {
       if (w.operation === 'delete') continue;

@@ -99,6 +99,31 @@ interface InterfaceContractsContent {
   contracts: InterfaceContract[];
 }
 
+/**
+ * Copy the configured Engineering Constitution into the workspace as a
+ * side-channel file every executor attempt can read (advisory craft standard;
+ * spec/criteria/TECH-* win on conflict). Returns the workspace-relative path,
+ * or undefined when no source is configured / found. Reusable across the
+ * deterministic scaffold AND the recon/scaffolding-agent path so the
+ * side-channel survives the author→enforce cutover. Always refreshed
+ * (harness-owned, not brownfield code); warn-and-skip when missing.
+ */
+export function copyEngineeringConstitution(workspacePath: string, sourcePath: string | undefined): string | undefined {
+  if (!sourcePath) return undefined;
+  const srcAbs = path.isAbsolute(sourcePath) ? sourcePath : path.resolve(process.cwd(), sourcePath);
+  if (!fs.existsSync(srcAbs)) {
+    getLogger().warn('workflow', 'Phase 9.0: engineering constitution source not found — executor prompts will omit it', {
+      path: srcAbs,
+    });
+    return undefined;
+  }
+  const rel = '.janumicode/engineering-constitution.md';
+  const destAbs = path.join(workspacePath, rel);
+  fs.mkdirSync(path.dirname(destAbs), { recursive: true });
+  fs.copyFileSync(srcAbs, destAbs);
+  return rel;
+}
+
 // ── Profile resolution ──────────────────────────────────────────────
 
 const ROOT_CONFIG_FILES = [
@@ -591,25 +616,8 @@ export function runScaffoldSynthesis(ctx: PhaseContext): ScaffoldManifest | null
   const conventions = renderLayoutConventions(layoutContract, profile);
 
   // Engineering Constitution — copy the configured craft-standards doc into
-  // the workspace so every executor attempt can read it as a side-channel
-  // file (advisory: spec/criteria/TECH-* win on conflict). Always refreshed
-  // (harness-owned, not brownfield code); warn-and-skip when the source is
-  // missing so runs outside the repo degrade gracefully.
-  let constitutionRel: string | undefined;
-  const constitutionSrc = scaffoldCfg?.engineering_constitution_path;
-  if (constitutionSrc) {
-    const srcAbs = path.isAbsolute(constitutionSrc) ? constitutionSrc : path.resolve(process.cwd(), constitutionSrc);
-    if (fs.existsSync(srcAbs)) {
-      constitutionRel = '.janumicode/engineering-constitution.md';
-      const destAbs = path.join(workspacePath, constitutionRel);
-      fs.mkdirSync(path.dirname(destAbs), { recursive: true });
-      fs.copyFileSync(srcAbs, destAbs);
-    } else {
-      getLogger().warn('workflow', 'Phase 9.0: engineering constitution source not found — executor prompts will omit it', {
-        workflow_run_id: workflowRun.id, path: srcAbs,
-      });
-    }
-  }
+  // the workspace (advisory side-channel; see copyEngineeringConstitution).
+  const constitutionRel = copyEngineeringConstitution(workspacePath, scaffoldCfg?.engineering_constitution_path);
 
   const manifest: ScaffoldManifest = {
     kind: 'scaffold_manifest',

@@ -28,6 +28,7 @@
 import { scanWorkspace } from '../../workspace/workspaceScanner';
 import { detectWorkspaceStack, resolveGateCommands, type GateCommand, type GateKind } from '../gateCommands';
 import { getLogger } from '../../logging';
+import type { ProjectLayoutContract } from './layoutContract';
 import type { PhaseContext } from '../orchestratorEngine';
 
 // ── Deterministic workspace inventory (facts) ───────────────────────
@@ -192,6 +193,9 @@ export interface ReconEnforcement {
   allowed_extensions_by_area: Record<string, string[]>;
   /** Agent-facing conventions text (per-area stacks, aliases, import rules). */
   conventions: string;
+  /** Workspace-relative Engineering Constitution copy (set by the caller; the
+   *  side-channel survives the author→enforce cutover off the scaffold manifest). */
+  engineering_constitution_path?: string;
 }
 
 /** Source-file extensions per stack (for per-area layout enforcement). */
@@ -228,6 +232,46 @@ export function buildReconEnforcementManifest(plan: Phase9ReconPlan): ReconEnfor
     canonical_modules: modules,
     allowed_extensions_by_area: extByArea,
     conventions,
+  };
+}
+
+/** Non-source extensions any stack legitimately carries (mirrors layoutContract). */
+const COMMON_NON_SOURCE_EXT = ['.json', '.md', '.yaml', '.yml', '.env', '.gitignore', '.txt', '.sql', '.sh', '.toml', '.lock', '.cfg', '.ini'];
+const BASE_TOP_LEVEL = ['src', 'node_modules', '.git', '.janumicode', 'dist', 'target', 'build', 'docs', '__pycache__', '.venv', 'venv'];
+
+/**
+ * Build a {@link ProjectLayoutContract} from the recon plan so Phase-10's
+ * layout check works under the recon (Replace) path — where there is no
+ * scaffold manifest. Allowed extensions are the UNION across every area's
+ * stack (so a legitimate polyglot file is never a "foreign-language"
+ * false-positive); allowed top-level dirs include every area's source/test
+ * root segments.
+ */
+export function buildReconLayoutContract(plan: Phase9ReconPlan): ProjectLayoutContract {
+  const exts = new Set<string>(COMMON_NON_SOURCE_EXT);
+  const topLevel = new Set<string>(BASE_TOP_LEVEL);
+  const aliases = new Map<string, string>();
+  const componentDirMap: Record<string, string> = {};
+  let sharedDir = 'src/shared';
+  for (const a of plan.areas) {
+    for (const e of STACK_EXTENSIONS[a.stack] ?? []) exts.add(e);
+    for (const r of [...a.source_roots, ...a.test_roots]) {
+      const top = r.replace(/\\/g, '/').split('/')[0];
+      if (top && top !== '.') topLevel.add(top);
+    }
+    if (a.source_roots[0]) componentDirMap[a.area_id] = a.source_roots[0];
+    for (const al of a.import_aliases) aliases.set(al.alias, al.target);
+    const sharedProtected = a.protected_paths.find(p => p.endsWith('/'));
+    if (sharedProtected) sharedDir = sharedProtected.replace(/\/+$/g, '');
+  }
+  return {
+    kind: 'project_layout_contract',
+    component_dir_map: componentDirMap,
+    import_aliases: [...aliases].map(([alias, target]) => ({ alias, target })),
+    test_placement: 'colocated',
+    shared_dir: sharedDir,
+    allowed_top_level_dirs: [...topLevel].sort(),
+    allowed_source_extensions: [...exts].sort(),
   };
 }
 

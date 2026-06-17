@@ -28,10 +28,11 @@ import { EvalRunner, type EvaluationCriterion } from '../evalRunner';
 import { ExecutionScheduler, type SchedulerLeaf, type SchedulerReleaseEntry } from '../executionScheduler';
 import { extractPriorPhaseContext, buildEffectiveTaskView, buildEffectiveTestPlanView } from './phaseContext';
 import { runPacketSynthesisSubPhase } from './packetSynthesis';
-import { runScaffoldSynthesis, type ScaffoldManifest } from './scaffoldSynthesis';
+import { runScaffoldSynthesis, copyEngineeringConstitution, type ScaffoldManifest } from './scaffoldSynthesis';
+import { runScaffoldingAgentSubPhase } from './scaffoldingAgent';
 import { runModuleOwnershipPlanningSubPhase, type ModuleOwnershipPlan } from './moduleOwnershipPlanner';
 import { buildCompositionRootLeaf } from './compositionRoot';
-import { runPhase9ReconSubPhase, reconGlobalGates } from './phase9Recon';
+import { runPhase9ReconSubPhase, reconGlobalGates, buildReconEnforcementManifest } from './phase9Recon';
 import { runCycleControllerSubPhase, decideRestartTarget } from './cycleController';
 import { randomUUID } from 'node:crypto';
 import type { ImplementationPacketContent } from '../../types/records';
@@ -149,14 +150,33 @@ export class Phase9Handler implements PhaseHandler {
     engine.stateMachine.setSubPhase(workflowRun.id, 'module_ownership_planning');
     const ownershipPlan = runModuleOwnershipPlanningSubPhase({ workflowRun, engine });
 
+    // ── 9.0 — Scaffolding (Stage 1+2 inc.2: REPLACE) ──────────────
+    // The scaffolding AGENT authors the project skeleton from the recon plan
+    // (per-area stack + canonical modules + aliases); the kernel only enforces.
+    // The deterministic materializer is a CATASTROPHIC SAFETY NET (not a hybrid
+    // fast-path): if the agent produced no primary dependency manifest — a
+    // foundational failure that would break every downstream leaf — fall back
+    // to it. Enforcement source matches whoever authored: recon when the agent
+    // succeeded, the scaffold manifest when the safety net ran.
     engine.stateMachine.setSubPhase(workflowRun.id, 'scaffold_synthesis');
+    const reconEnforcement = buildReconEnforcementManifest(reconPlan);
+    reconEnforcement.engineering_constitution_path = copyEngineeringConstitution(
+      engine.workspacePath,
+      (cfg as unknown as { scaffold?: { engineering_constitution_path?: string } }).scaffold?.engineering_constitution_path,
+    );
     let scaffoldManifest: ScaffoldManifest | null = null;
-    try {
-      scaffoldManifest = runScaffoldSynthesis({ workflowRun, engine });
-    } catch (err) {
-      getLogger().warn('workflow', 'Phase 9.0a scaffold_synthesis failed (continuing without scaffold)', {
-        workflow_run_id: workflowRun.id, error: err instanceof Error ? err.message : String(err),
+    const scaffoldingResult = await runScaffoldingAgentSubPhase({ workflowRun, engine }, reconPlan, executorAgent);
+    if (!scaffoldingResult.producedPrimaryManifest) {
+      getLogger().warn('workflow', 'Phase 9.0: scaffolding agent produced no primary manifest — catastrophic safety net (deterministic materializer)', {
+        workflow_run_id: workflowRun.id, manifests_present: scaffoldingResult.manifestsPresent,
       });
+      try {
+        scaffoldManifest = runScaffoldSynthesis({ workflowRun, engine });
+      } catch (err) {
+        getLogger().warn('workflow', 'Phase 9.0a scaffold_synthesis safety-net failed (continuing without scaffold)', {
+          workflow_run_id: workflowRun.id, error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     engine.stateMachine.setSubPhase(workflowRun.id, 'packet_synthesis');
@@ -305,17 +325,24 @@ export class Phase9Handler implements PhaseHandler {
       scheduler.setPacketContext(packetByTaskId);
     }
 
-    // Lever 2b — hand the scaffold manifest to the scheduler so the
-    // executor context lists shared modules ("import, don't reinvent") and
-    // the post-leaf guard can quarantine writes into protected paths.
+    // Enforcement source matches whoever authored the skeleton: recon when the
+    // scaffolding agent succeeded (the polyglot path), the scaffold manifest
+    // when the deterministic safety net ran. Both feed the executor "import,
+    // don't reinvent" directives + the post-leaf protected-path guard.
     if (scaffoldManifest) {
       scheduler.setScaffoldManifest(scaffoldManifest);
+    } else {
+      scheduler.setReconEnforcement(reconEnforcement);
     }
 
-    // Tier-A coordination: hand the ownership plan to the scheduler so the
-    // executor context emits per-task owns/consumes import directives and the
-    // wave ordering runs producers before consumers.
-    if (ownershipPlan) {
+    // Tier-A coordination: hand the (deterministic, TS-shaped) ownership plan to
+    // the scheduler ONLY on the safety-net path. Under the recon Replace path
+    // it is superseded: the scaffolding agent pre-authors the canonical shared
+    // modules and the recon enforcement's conventions already carry the
+    // "import the canonical module, don't reinvent" directive — so applying the
+    // deterministic plan too would duplicate/conflict (and mis-shape paths for a
+    // non-TS area).
+    if (ownershipPlan && scaffoldManifest) {
       scheduler.setOwnershipPlan(ownershipPlan);
     }
 

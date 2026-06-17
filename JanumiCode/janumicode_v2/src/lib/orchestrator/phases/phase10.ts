@@ -17,6 +17,7 @@ import { getLogger } from '../../logging';
 import { emit as aoddEmit } from '../../aodd';
 import { detectDivergentDuplicates, type DivergentDuplicateFinding } from '../workspaceSnapshot';
 import { detectLayoutViolations, type ProjectLayoutContract } from './layoutContract';
+import { buildReconLayoutContract, type Phase9ReconPlan } from './phase9Recon';
 import { runTscNoEmit } from './tscValidator';
 
 export class Phase10Handler implements PhaseHandler {
@@ -349,7 +350,15 @@ export class Phase10Handler implements PhaseHandler {
     const findings: Array<Record<string, unknown>> = [];
 
     const manifest = engine.writer.getArtifactByKind(workflowRun.id, 'scaffold_manifest');
-    const contract = (manifest?.content as Record<string, unknown>)?.project_layout_contract as ProjectLayoutContract | undefined;
+    let contract = (manifest?.content as Record<string, unknown>)?.project_layout_contract as ProjectLayoutContract | undefined;
+    // Under the recon (Replace) path there is no scaffold manifest — derive the
+    // layout contract from the recon plan (per-area extension union) so the
+    // layout check still runs and doesn't false-flag legitimate polyglot files.
+    if (!contract) {
+      const recon = engine.writer.getArtifactByKind(workflowRun.id, 'phase9_recon_plan');
+      const reconPlan = recon?.content as unknown as Phase9ReconPlan | undefined;
+      if (reconPlan?.areas?.length) contract = buildReconLayoutContract(reconPlan);
+    }
 
     let layoutViolations = 0;
     if (contract) {
