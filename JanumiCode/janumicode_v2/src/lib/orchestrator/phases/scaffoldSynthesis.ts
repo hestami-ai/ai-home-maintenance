@@ -71,6 +71,13 @@ export interface ScaffoldManifest {
    * of the generated codebase's structure.
    */
   project_layout_contract: ProjectLayoutContract;
+  /**
+   * Workspace-relative path of the Engineering Constitution copy (craft
+   * best practices for the generated code). Set only when the configured
+   * source document was found and copied; the scheduler references it in
+   * every executor attempt as an ADVISORY standard.
+   */
+  engineering_constitution_path?: string;
 }
 
 interface DataModelEntity {
@@ -183,6 +190,59 @@ function extractAdrProjectProfile(
   return null;
 }
 
+/**
+ * Extract DECLARED runtime dependencies from the architecture artifacts —
+ * generically. The tech stack is whatever the user's intent + decomposition
+ * require (fastify/pg are particulars of one test scenario), so this never
+ * name-guesses from prose (TECH-PGSQL-16 ≠ npm `pg`): it only honors
+ * STRUCTURED `dependencies` / `runtime_dependencies` fields (string array
+ * `"name"`/`"name@range"` or `{name: range}` map) wherever they appear —
+ * top-level, on project_profile/tech_stack, or on individual decisions.
+ * Empty result is normal today; the composition-root task remains the
+ * backstop ("install anything the code imports that package.json lacks").
+ */
+export function extractDeclaredDependencies(
+  adrsContent: Record<string, unknown> | null,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  const absorb = (raw: unknown): void => {
+    if (!raw) return;
+    if (Array.isArray(raw)) {
+      for (const item of raw) {
+        if (typeof item !== 'string' || !item.trim()) continue;
+        const s = item.trim();
+        const at = s.lastIndexOf('@');
+        if (at > 0) out[s.slice(0, at)] = s.slice(at + 1) || '*';
+        else out[s] = '*';
+      }
+    } else if (typeof raw === 'object') {
+      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (k && typeof v === 'string' && v) out[k] = v;
+      }
+    }
+  };
+  if (!adrsContent) return out;
+  const holders: Array<Record<string, unknown> | undefined> = [
+    adrsContent,
+    adrsContent.project_profile as Record<string, unknown> | undefined,
+    adrsContent.tech_stack as Record<string, unknown> | undefined,
+  ];
+  const decisions = adrsContent.decisions ?? adrsContent.architectural_decisions;
+  if (Array.isArray(decisions)) {
+    for (const d of decisions as Array<Record<string, unknown>>) {
+      holders.push(d,
+        d.project_profile as Record<string, unknown> | undefined,
+        d.tech_stack as Record<string, unknown> | undefined);
+    }
+  }
+  for (const h of holders) {
+    if (!h) continue;
+    absorb(h.dependencies);
+    absorb(h.runtime_dependencies);
+  }
+  return out;
+}
+
 // ── Code generation helpers ─────────────────────────────────────────
 
 function pascalCase(raw: string): string {
@@ -246,7 +306,11 @@ function renderContractModule(c: InterfaceContract): string {
   return lines.join('\n');
 }
 
-function renderRootPackageJson(name: string, profile: ProjectProfile): string {
+function renderRootPackageJson(
+  name: string,
+  profile: ProjectProfile,
+  runtimeDeps: Record<string, string> = {},
+): string {
   const pkg: Record<string, unknown> = {
     name,
     version: '0.1.0',
@@ -254,6 +318,11 @@ function renderRootPackageJson(name: string, profile: ProjectProfile): string {
     scripts: { test: testCommand(profile.test_runner) },
   };
   if (profile.module === 'esm') pkg.type = 'module';
+  // Declared tech-stack deps (artifact-driven, generic) — preinstalled so
+  // leaves code against the real framework instead of writing type shims.
+  if (Object.keys(runtimeDeps).length) {
+    pkg.dependencies = Object.fromEntries(Object.entries(runtimeDeps).sort(([a], [b]) => a.localeCompare(b)));
+  }
   const devDeps: Record<string, string> = {};
   if (profile.language === 'typescript') devDeps.typescript = '^5.4.0';
   if (profile.test_runner === 'vitest') devDeps.vitest = '^1.6.0';
@@ -324,13 +393,15 @@ export function materializeScaffold(
   dataModels: DataModelsContent | null,
   contracts: InterfaceContractsContent | null,
   layoutContract: ProjectLayoutContract,
+  runtimeDeps: Record<string, string> = {},
 ): MaterializeResult {
   const result: MaterializeResult = { created: [], preExisting: [] };
   const e = ext(profile);
   const shared = profile.shared_dir.replace(/\\/g, '/').replace(/\/+$/, '');
 
-  // Root project config.
-  writeIfAbsent(workspacePath, 'package.json', renderRootPackageJson(projectName, profile), result);
+  // Root project config. (Brownfield package.json wins — skip-if-exists —
+  // so declared deps only land on greenfield scaffolds.)
+  writeIfAbsent(workspacePath, 'package.json', renderRootPackageJson(projectName, profile, runtimeDeps), result);
   if (profile.language === 'typescript') {
     writeIfAbsent(workspacePath, 'tsconfig.json', renderTsconfig(profile, layoutContract), result);
   }
@@ -426,6 +497,7 @@ export function runScaffoldSynthesis(ctx: PhaseContext): ScaffoldManifest | null
       enabled?: boolean;
       install_dependencies?: boolean;
       test_placement?: 'colocated' | 'subdir';
+      engineering_constitution_path?: string;
       project_profile?: Omit<ProjectProfile, 'source'>;
     };
   }).scaffold;
@@ -471,10 +543,17 @@ export function runScaffoldSynthesis(ctx: PhaseContext): ScaffoldManifest | null
   const testPlacement = (scaffoldCfg?.test_placement ?? 'colocated') as 'colocated' | 'subdir';
   const layoutContract = buildProjectLayoutContract(components, profile, testPlacement);
 
+  // Declared tech-stack runtime deps (generic, artifact-driven — never
+  // name-guessed from prose). Empty today unless Phase-4 artifacts carry
+  // structured dependency fields; the composition root is the backstop.
+  const runtimeDeps = extractDeclaredDependencies(
+    (adrsRecord?.content as Record<string, unknown>) ?? null,
+  );
+
   // Materialize.
   let materialize: MaterializeResult;
   try {
-    materialize = materializeScaffold(workspacePath, projectName, profile, dataModels, contracts, layoutContract);
+    materialize = materializeScaffold(workspacePath, projectName, profile, dataModels, contracts, layoutContract, runtimeDeps);
   } catch (err) {
     getLogger().warn('workflow', 'Phase 9.0 scaffold_synthesis: materialization failed', {
       workflow_run_id: workflowRun.id, error: err instanceof Error ? err.message : String(err),
@@ -497,6 +576,27 @@ export function runScaffoldSynthesis(ctx: PhaseContext): ScaffoldManifest | null
   // import form + co-located test rule), not advisory prose.
   const conventions = renderLayoutConventions(layoutContract, profile);
 
+  // Engineering Constitution — copy the configured craft-standards doc into
+  // the workspace so every executor attempt can read it as a side-channel
+  // file (advisory: spec/criteria/TECH-* win on conflict). Always refreshed
+  // (harness-owned, not brownfield code); warn-and-skip when the source is
+  // missing so runs outside the repo degrade gracefully.
+  let constitutionRel: string | undefined;
+  const constitutionSrc = scaffoldCfg?.engineering_constitution_path;
+  if (constitutionSrc) {
+    const srcAbs = path.isAbsolute(constitutionSrc) ? constitutionSrc : path.resolve(process.cwd(), constitutionSrc);
+    if (fs.existsSync(srcAbs)) {
+      constitutionRel = '.janumicode/engineering-constitution.md';
+      const destAbs = path.join(workspacePath, constitutionRel);
+      fs.mkdirSync(path.dirname(destAbs), { recursive: true });
+      fs.copyFileSync(srcAbs, destAbs);
+    } else {
+      getLogger().warn('workflow', 'Phase 9.0: engineering constitution source not found — executor prompts will omit it', {
+        workflow_run_id: workflowRun.id, path: srcAbs,
+      });
+    }
+  }
+
   const manifest: ScaffoldManifest = {
     kind: 'scaffold_manifest',
     profile,
@@ -504,6 +604,7 @@ export function runScaffoldSynthesis(ctx: PhaseContext): ScaffoldManifest | null
     protected_paths: protectedPaths,
     conventions,
     project_layout_contract: layoutContract,
+    engineering_constitution_path: constitutionRel,
   };
 
   const record = engine.writer.writeRecord({

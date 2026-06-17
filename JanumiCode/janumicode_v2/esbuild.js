@@ -117,6 +117,7 @@ const extensionBuild = {
     'vscode',
     'better-sqlite3',
     '@sqliteai/sqlite-vector',
+    'node-pty',
   ],
 };
 
@@ -131,6 +132,7 @@ const sidecarBuild = {
   external: [
     'better-sqlite3',
     '@sqliteai/sqlite-vector',
+    'node-pty',
   ],
   plugins: [copyNativeModulesPlugin()],
 };
@@ -161,6 +163,7 @@ const cliBuild = {
   external: [
     'better-sqlite3',
     '@sqliteai/sqlite-vector',
+    'node-pty',
   ],
 };
 

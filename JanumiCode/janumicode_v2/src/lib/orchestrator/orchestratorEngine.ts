@@ -435,6 +435,27 @@ export class OrchestratorEngine {
     });
     this.agentInvoker.setWriter(this.writer, this.versionSha);
 
+    // Session Responder (session_responder agent role): the LLM playing the
+    // human side of an interactive Phase-9 executor session — answers the
+    // coding agent's clarifying questions from the task spec and composes
+    // contextual continuation nudges. Read from
+    // `config.llm_routing.session_responder`, env-overridable for live
+    // calibration (JANUMICODE_SESSION_RESPONDER_PROVIDER / _MODEL). Skipped
+    // silently when unconfigured — interactive adapters fall back to their
+    // canned responses.
+    const responderConfig = this.configManager.getLLMRouting().session_responder;
+    const responderProvider = process.env.JANUMICODE_SESSION_RESPONDER_PROVIDER ?? responderConfig?.primary?.provider;
+    const responderModel = process.env.JANUMICODE_SESSION_RESPONDER_MODEL ?? responderConfig?.primary?.model;
+    if (responderProvider && responderModel) {
+      this.agentInvoker.setSessionResponderRoute({
+        provider: responderProvider,
+        model: responderModel,
+        baseUrl: responderConfig?.primary?.base_url,
+        temperature: responderConfig?.temperature,
+        maxTokens: responderConfig?.max_tokens,
+      });
+    }
+
     this.eventBus = new EventBus();
 
     // Connect the writer to the eventBus so every successful write emits

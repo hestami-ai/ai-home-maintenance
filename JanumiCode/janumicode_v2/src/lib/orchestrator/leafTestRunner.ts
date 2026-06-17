@@ -83,7 +83,13 @@ export class LeafTestRunner {
         cwd: input.workspacePath,
         timeout: this.config.timeoutMs,
         encoding: 'utf-8',
-        shell: false,
+        // Windows: `npm.cmd` (and any .cmd/.bat) REQUIRES a shell since the
+        // CVE-2024-27980 hardening — `shell:false` throws EINVAL, which made
+        // every leaf verification fail with empty counts and every successful
+        // task get retried as tests_failed (slice-144 live). Same pattern as
+        // tscValidator/scaffoldSynthesis; args here are static, not user input.
+        shell: process.platform === 'win32',
+        windowsHide: true,
         env: { ...process.env, CI: '1' },
       });
       exitCode = typeof proc.status === 'number' ? proc.status : null;
@@ -98,7 +104,12 @@ export class LeafTestRunner {
     }
     const durationMs = Date.now() - startedAt;
     const counts = parseTestCounts(stdout, stderr);
-    const passed = (exitCode === 0)
+    // A SCOPED run on a leaf that wrote no tests makes the runner exit
+    // non-zero with "no test files found" — that is not a test failure.
+    // (Output-based, not a --passWithNoTests flag: the test script is
+    // whatever package.json declares, and flags are runner-specific.)
+    const noTestsInScope = /no test files? (found|matched)/i.test(`${stdout}\n${stderr}`);
+    const passed = ((exitCode === 0) || noTestsInScope)
       && counts.failed === 0
       && (counts.passed > 0 || counts.skipped > 0 || counts.passed + counts.failed + counts.skipped === 0);
     const result: LeafTestRunResult = {
@@ -150,7 +161,18 @@ export class LeafTestRunner {
           };
           if (pkg.scripts && pkg.scripts.test) {
             const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-            return { executable: npm, args: ['test', '--silent'] };
+            // SCOPE the run to the leaf's write directories (slice-144: the
+            // workspace-global gate terminal-failed a good leaf on ANOTHER
+            // leaf's hanging test, and rewarded out-of-scope fixes). Paths
+            // after `--` reach the test script as positional filters (vitest/
+            // jest/node:test all accept them). Leaves with no resolvable dirs
+            // (and the composition root, which has none scoped) run the full
+            // suite — the global gate is the composition root's job.
+            const scopeDirs = (input.writeDirectoryPaths ?? [])
+              .map((p) => p.replace(/\\/g, '/').replace(/\/+$/g, ''))
+              .filter((p) => p && fs.existsSync(path.join(input.workspacePath, p)));
+            const scopeArgs = scopeDirs.length > 0 ? ['--', ...scopeDirs] : [];
+            return { executable: npm, args: ['test', '--silent', ...scopeArgs] };
           }
         } catch (err) {
           getLogger().warn('workflow', 'leafTestRunner: failed to read package.json', {

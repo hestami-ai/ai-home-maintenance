@@ -129,6 +129,21 @@ describe('deterministicComponentDrops — authoritative domain + user-story cove
     expect(drops).toEqual([]); // kept despite the LLM's advisory drop
   });
 
+  it('slice-140 regression: keeps a component tracing to LEAF story ids when they canonicalize to an accepted ROOT', () => {
+    // Components trace to leaf-grained ids (US-001-D) from the leaf-aware FR
+    // view; the accepted set is root-grained (US-001). With identity
+    // canonicalize this would (wrongly) drop every component and wipe the model.
+    const canon = (id: string): string => id.replace(/-D\d*$/, ''); // stand-in for lineage.canonicalize
+    const comps = [
+      { id: 'comp-shortening', domain_id: 'domain-shortening', traces_to: ['US-001-D', 'US-003-D1'] },
+    ];
+    const dropsWithoutCanon = deterministicComponentDrops(comps, sw, acceptedBiz, acceptedUS);
+    expect(dropsWithoutCanon.map(d => d.id)).toEqual(['comp-shortening']); // the old (buggy) behavior
+
+    const dropsWithCanon = deterministicComponentDrops(comps, sw, acceptedBiz, acceptedUS, canon);
+    expect(dropsWithCanon).toEqual([]); // US-001-D → US-001 (accepted) → kept
+  });
+
   it('drops a component whose traces_to are ALL non-accepted stories', () => {
     const drops = deterministicComponentDrops(
       [{ id: 'comp-stale', domain_id: 'domain-shortening', traces_to: ['US-099', 'US-100'] }], sw, acceptedBiz, acceptedUS,

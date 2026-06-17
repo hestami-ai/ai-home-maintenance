@@ -102,7 +102,12 @@ export type AgentRole =
   // Ingestion Pipeline Stage III — LLM relationship extraction
   // (spec §8.12). Stamped on agent_invocation records emitted when
   // Stage III fires per ingested governed-stream record.
-  | 'ingestion_pipeline_stage3';
+  | 'ingestion_pipeline_stage3'
+  // Interactive-executor session responder — the LLM playing the HUMAN
+  // side of a Phase-9 TUI session (answers the coding agent's clarifying
+  // questions from the task spec, composes continuation nudges). Stamped
+  // on the agent_invocation/agent_output records its calls produce.
+  | 'session_responder';
 
 // ── Phase IDs (§4) ──────────────────────────────────────────────────
 

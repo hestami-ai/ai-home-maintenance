@@ -1,20 +1,21 @@
 /**
- * Regression tests for Goose CLI wiring.
+ * Regression tests for Goose CLI wiring — the STRUCTURED (one-shot
+ * `goose run`) invocation.
  *
- * Pins the three properties that together unlock Phase 9 actually
- * running Goose instead of failing with
- * "No output parser registered for backing tool: goose_cli":
+ * Pins the structured-path properties:
+ *   1. `registerBuiltinCLIParsers()` installs the Goose parser.
+ *   2. `buildCLICommand('goose_cli')` spawns `goose run` with stdin-only
+ *      prompt (`-i -`), `--no-session`, `--quiet`,
+ *      `--output-format stream-json`, `--with-builtin developer`.
+ *   3. Env-var knobs thread through; per-invocation `options.model` wins.
  *
- *   1. `registerBuiltinCLIParsers()` installs the Goose parser
- *      alongside the Claude Code one.
- *   2. `buildCLICommand('goose_cli')` spawns `goose run` with
- *      stdin-only prompt (`-i -`), `--no-session`, `--quiet`,
- *      `--output-format stream-json`, and `--with-builtin developer`
- *      by default.
- *   3. Env-var knobs (`JANUMICODE_GOOSE_PROVIDER`,
- *      `JANUMICODE_GOOSE_MODEL`, `JANUMICODE_GOOSE_MAX_TURNS`) thread
- *      through to the spawn args; per-invocation `options.model`
- *      wins over the env default.
+ * NOTE: as of the interactive-session work (M4), an `executor_agent`
+ * goose task routes through the Tier-3 TUI session adapter by default
+ * (`goose session` over a PTY) — covered by capabilityRegistry.test +
+ * gooseTuiAdapter.test. The structured command below is the role-agnostic
+ * builder, still used for non-executor goose calls and the executor's
+ * no-pty fallback; these tests exercise it via a non-executor role so the
+ * interactive divert does not apply (and we never spawn a real session).
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -71,7 +72,7 @@ describe('Goose CLI invocation wiring', () => {
   it('registers a parser for goose_cli (no "parser not registered" error)', async () => {
     const spy = stubCli();
     const result = await engine.agentInvoker.invoke({
-      agentRole: 'executor_agent',
+      agentRole: 'requirements_agent', // non-executor: exercises the structured goose path (executor goes interactive)
       backingTool: 'goose_cli',
       invocationId: 'inv-1',
       prompt: 'build a todo app',
@@ -85,7 +86,7 @@ describe('Goose CLI invocation wiring', () => {
   it('builds the default command with `goose run -i - --no-session --output-format stream-json --quiet --with-builtin developer`', async () => {
     const spy = stubCli();
     await engine.agentInvoker.invoke({
-      agentRole: 'executor_agent',
+      agentRole: 'requirements_agent', // non-executor: exercises the structured goose path (executor goes interactive)
       backingTool: 'goose_cli',
       invocationId: 'inv-2',
       prompt: 'task prompt',
@@ -122,7 +123,7 @@ describe('Goose CLI invocation wiring', () => {
 
     const spy = stubCli();
     await engine.agentInvoker.invoke({
-      agentRole: 'executor_agent',
+      agentRole: 'requirements_agent', // non-executor: exercises the structured goose path (executor goes interactive)
       backingTool: 'goose_cli',
       invocationId: 'inv-3',
       prompt: 'p',
@@ -142,7 +143,7 @@ describe('Goose CLI invocation wiring', () => {
 
     const spy = stubCli();
     await engine.agentInvoker.invoke({
-      agentRole: 'executor_agent',
+      agentRole: 'requirements_agent', // non-executor: exercises the structured goose path (executor goes interactive)
       backingTool: 'goose_cli',
       invocationId: 'inv-4',
       prompt: 'p',
@@ -159,7 +160,7 @@ describe('Goose CLI invocation wiring', () => {
 
     const spy = stubCli();
     await engine.agentInvoker.invoke({
-      agentRole: 'executor_agent',
+      agentRole: 'requirements_agent', // non-executor: exercises the structured goose path (executor goes interactive)
       backingTool: 'goose_cli',
       invocationId: 'inv-5',
       prompt: 'p',
@@ -169,5 +170,35 @@ describe('Goose CLI invocation wiring', () => {
     expect(args).toContain('--debug');
     expect(args).toContain('--max-tool-repetitions');
     expect(args[args.indexOf('--max-tool-repetitions') + 1]).toBe('3');
+  });
+
+  it('sets GOOSE_CLI_SHOW_THINKING=true and GOOSE_RANDOM_THINKING_MESSAGES=false on every goose spawn', async () => {
+    const spy = stubCli();
+    await engine.agentInvoker.invoke({
+      agentRole: 'requirements_agent', // non-executor: exercises the structured goose path (executor goes interactive)
+      backingTool: 'goose_cli',
+      invocationId: 'inv-6',
+      prompt: 'p',
+      cwd: '/tmp/ws',
+    });
+    const env = (spy.mock.calls[0][0] as { env?: Record<string, string> }).env;
+    expect(env?.GOOSE_CLI_SHOW_THINKING).toBe('true');
+    expect(env?.GOOSE_RANDOM_THINKING_MESSAGES).toBe('false');
+  });
+
+  it('caller-supplied env overrides the goose reasoning-visibility defaults', async () => {
+    const spy = stubCli();
+    await engine.agentInvoker.invoke({
+      agentRole: 'requirements_agent',
+      backingTool: 'goose_cli',
+      invocationId: 'inv-7',
+      prompt: 'p',
+      cwd: '/tmp/ws',
+      env: { GOOSE_CLI_SHOW_THINKING: '0', CUSTOM_VAR: 'kept' },
+    });
+    const env = (spy.mock.calls[0][0] as { env?: Record<string, string> }).env;
+    expect(env?.GOOSE_CLI_SHOW_THINKING).toBe('0');
+    expect(env?.GOOSE_RANDOM_THINKING_MESSAGES).toBe('false');
+    expect(env?.CUSTOM_VAR).toBe('kept');
   });
 });

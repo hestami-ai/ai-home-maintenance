@@ -48,6 +48,7 @@ import { WaveGate, type WaveGateOutcome } from './waveGate';
 import { buildPhaseContextPacket } from './phases/dmrContext';
 import type { PhaseContext } from './orchestratorEngine';
 import type { ScaffoldManifest } from './phases/scaffoldSynthesis';
+import type { ModuleOwnershipPlan } from './phases/moduleOwnershipPlanner';
 
 // ── Public types ───────────────────────────────────────────────────
 
@@ -57,6 +58,13 @@ export interface SchedulerLeaf extends CtxTask {
   release_ordinal?: number | null;
   /** Wave 8 leaf node id when leaf came from a recursive tree. */
   _leaf_node_id?: string;
+  /**
+   * Set on the deterministic Phase-9 composition-root injection ("make it
+   * run"). Grants a scoped exemption from the Lever-2b ROOT-CONFIG
+   * protection — this leaf owns dependency installs / entrypoint scripts in
+   * package.json — while the shared dir stays protected for it too.
+   */
+  _composition_root?: boolean;
 }
 
 export interface SchedulerReleaseEntry {
@@ -119,6 +127,15 @@ export class ExecutionScheduler {
    */
   private scaffoldManifest: ScaffoldManifest | null = null;
 
+  /**
+   * Tier-A module-ownership plan (Phase 9.0a). When set, each leaf's prompt
+   * gets a two-sided "Shared Module Ownership" section — the modules this
+   * task's component OWNS (produce at the canonical path) and CONSUMES (import
+   * from the canonical specifier; do NOT reinvent) — and the wave scheduler
+   * runs producer components before their consumers.
+   */
+  private ownershipPlan: ModuleOwnershipPlan | null = null;
+
   constructor(
     private readonly engine: OrchestratorEngine,
     private readonly writer: GovernedStreamWriter,
@@ -149,6 +166,99 @@ export class ExecutionScheduler {
    */
   setScaffoldManifest(manifest: ScaffoldManifest): void {
     this.scaffoldManifest = manifest;
+  }
+
+  /** Inject the Tier-A module-ownership plan (Phase 9.0a). */
+  setOwnershipPlan(plan: ModuleOwnershipPlan): void {
+    this.ownershipPlan = plan;
+  }
+
+  /**
+   * Render the two-sided "Shared Module Ownership" directive for a task's
+   * component: the shared modules this component OWNS (it must produce them at
+   * the canonical path so consumers can import them) and CONSUMES (import from
+   * the canonical specifier — do NOT reinvent). This replaces the phantom
+   * cross-component `read_directory_paths` guidance with real, single-home
+   * import targets — the fix for divergent-duplicate modules. Empty string when
+   * no plan or nothing applies to this component.
+   */
+  private renderOwnershipDirective(componentId: string | undefined): string {
+    const plan = this.ownershipPlan;
+    if (!plan || !componentId) return '';
+    const owns = plan.shared_modules.filter((m) => m.owner_component_id === componentId);
+    const consumes = plan.shared_modules.filter(
+      (m) => m.owner_component_id !== componentId && m.consumer_component_ids.includes(componentId),
+    );
+    if (owns.length === 0 && consumes.length === 0) return '';
+
+    const lines: string[] = ['## Shared Module Ownership (single-home — prevents divergent duplicates)', ''];
+    if (owns.length > 0) {
+      lines.push('Your component OWNS these shared modules — implement each at its canonical path so other components import (not re-create) it:');
+      for (const m of owns) {
+        lines.push(`- \`${m.basename}\` → produce at \`${m.canonical_path}\` (consumed by: ${m.consumer_component_ids.filter((c) => c !== componentId).join(', ') || 'others'})`);
+      }
+      lines.push('');
+    }
+    if (consumes.length > 0) {
+      lines.push('Your task DEPENDS ON these shared modules owned elsewhere — IMPORT them; do NOT create your own copy:');
+      for (const m of consumes) {
+        const owner = m.owner_component_id === 'shared' ? 'the shared scaffold' : m.owner_component_id;
+        lines.push(`- \`${m.basename}\` → \`import { … } from '${m.import_specifier}'\` (owned by ${owner})`);
+      }
+      lines.push('');
+    }
+    lines.push('Do NOT invent a second implementation of any module above under your own directory.');
+    return lines.join('\n');
+  }
+
+  /**
+   * Stable-sort leaves so producer components precede their consumers, using a
+   * component rank derived from the ownership plan's `ordering_edges` (Kahn —
+   * owners get a lower rank than the components that depend on them). Pure
+   * reordering; the subsequent topo-sort still enforces real task deps. A
+   * dependency cycle among components degrades gracefully (tied ranks → stable
+   * original order). No-op when no plan.
+   */
+  private biasLeavesByOwnership(leaves: SchedulerLeaf[]): SchedulerLeaf[] {
+    const plan = this.ownershipPlan;
+    if (!plan || plan.ordering_edges.length === 0) return leaves;
+
+    const comps = new Set<string>();
+    for (const l of leaves) if (l.component_id) comps.add(l.component_id);
+    const indeg = new Map<string, number>();
+    const out = new Map<string, string[]>();
+    for (const c of comps) { indeg.set(c, 0); out.set(c, []); }
+    for (const e of plan.ordering_edges) {
+      if (!comps.has(e.before_component_id) || !comps.has(e.after_component_id)) continue;
+      out.get(e.before_component_id)!.push(e.after_component_id);
+      indeg.set(e.after_component_id, (indeg.get(e.after_component_id) ?? 0) + 1);
+    }
+    // Kahn rank: BFS layers from indegree-0 producers.
+    const rank = new Map<string, number>();
+    let frontier = [...comps].filter((c) => (indeg.get(c) ?? 0) === 0);
+    let r = 0;
+    const seen = new Set<string>();
+    while (frontier.length > 0) {
+      const next: string[] = [];
+      for (const c of frontier) {
+        if (seen.has(c)) continue;
+        seen.add(c);
+        rank.set(c, r);
+        for (const m of out.get(c) ?? []) {
+          const d = (indeg.get(m) ?? 0) - 1;
+          indeg.set(m, d);
+          if (d <= 0 && !seen.has(m)) next.push(m);
+        }
+      }
+      frontier = next;
+      r++;
+    }
+    const rankOf = (c: string | undefined): number => (c && rank.has(c) ? rank.get(c)! : Number.MAX_SAFE_INTEGER);
+    // Stable sort: decorate with original index to preserve order within a rank.
+    return leaves
+      .map((l, i) => ({ l, i }))
+      .sort((a, b) => (rankOf(a.l.component_id) - rankOf(b.l.component_id)) || (a.i - b.i))
+      .map((x) => x.l);
   }
 
   async run(input: {
@@ -368,11 +478,15 @@ export class ExecutionScheduler {
     const logger = getLogger();
     const startedAt = new Date().toISOString();
 
-    // Topo-sort within the wave (only on dependencies that point at
-    // leaves IN this wave; cross-wave deps are honored by the outer
-    // wave-order loop, since later waves run after earlier ones).
+    // Producer-before-consumer bias (Tier-A): pre-order the wave's leaves by
+    // their component's ownership rank BEFORE the topo-sort. The topo-sort
+    // seeds its ready-queue in input order, so this makes producer components
+    // run ahead of their consumers wherever real task-dependencies leave the
+    // order free — so a shared module's owner implements it before consumers
+    // reach for it — WITHOUT overriding any genuine dependency_task_ids edge.
     const idsInWave = new Set(wave.leaves.map(l => l.id));
-    const topo = topoSortRespectingWave(wave.leaves, idsInWave);
+    const biased = this.biasLeavesByOwnership(wave.leaves);
+    const topo = topoSortRespectingWave(biased, idsInWave);
 
     // Component distribution for telemetry.
     const distribution: Record<string, number> = {};
@@ -634,8 +748,22 @@ export class ExecutionScheduler {
     if (packet) {
       const orientation = buildWorkspaceOrientation(workspacePath, leaf.write_directory_paths ?? []);
       const packetContext = formatPacketAsExecutorContext(packet);
+      const ownership = this.renderOwnershipDirective(leaf.component_id);
       stdinText = collapseLegacySectionsWhenPacketPresent(stdinText);
-      stdinText = `${orientation}\n\n${packetContext}\n\n${stdinText}`;
+      stdinText = `${orientation}${ownership ? `\n\n${ownership}` : ''}\n\n${packetContext}\n\n${stdinText}`;
+    }
+
+    // Engineering Constitution — side-channel craft standard (user decision
+    // 2026-06-11): referenced in EVERY attempt (each retry is a fresh
+    // session), framed ADVISORY so it never re-creates the slice-139
+    // "everything authoritative" incoherence, with a proportionality note so
+    // tiny leaves don't grow health checks.
+    if (this.scaffoldManifest?.engineering_constitution_path) {
+      stdinText += '\n\n## Engineering Constitution (advisory craft standard)\n'
+        + `Before implementing, read the file \`${this.scaffoldManifest.engineering_constitution_path}\` (workspace-relative) — `
+        + 'engineering best practices for code comments, debugging/observability, and testing. '
+        + 'Follow these practices wherever they do not conflict with this task\'s specification, completion criteria, or technical constraints — those always win. '
+        + 'Apply them proportionally to the scope of THIS task; application-level concerns (health checks, app-wide observability wiring) belong to the composition-root task, not ordinary leaves.';
     }
 
     if (augmentedContext) {
@@ -704,7 +832,15 @@ export class ExecutionScheduler {
     // violation is the fragmentation/divergence symptom itself (a leaf
     // re-creating package.json or its own copy of a shared module), so we
     // quarantine + retry with explicit "import, don't reinvent" context.
-    const scopeViolations = this.detectWriteScopeViolations(executionResult.filesWritten, workspacePath);
+    let scopeViolations = this.detectWriteScopeViolations(executionResult.filesWritten, workspacePath);
+    if (scopeViolations.length > 0 && leaf._composition_root && this.scaffoldManifest) {
+      // The composition root OWNS root-config edits (dependency installs,
+      // entrypoint scripts). Only directory-prefix protections (the shared
+      // dir) still apply to it.
+      const dirPrefixes = this.scaffoldManifest.protected_paths.filter((p) => p.endsWith('/'));
+      scopeViolations = scopeViolations.filter((rel) =>
+        dirPrefixes.some((p) => rel === p.slice(0, -1) || rel.startsWith(p)));
+    }
     if (scopeViolations.length > 0) {
       logger.warn('workflow', 'Wave R: leaf wrote into protected scaffold scope (quarantining)', {
         leaf: leaf.id, attempt: attemptNumber, violations: scopeViolations,

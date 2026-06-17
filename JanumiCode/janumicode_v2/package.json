@@ -176,11 +176,13 @@
     "vitest": "^4.1.4"
   },
   "dependencies": {
+    "@xterm/headless": "^6.0.0",
     "ajv": "^8.17.0",
     "ajv-formats": "^3.0.0",
     "better-sqlite3": "^12.8.0",
     "commander": "^13.0.0",
     "elkjs": "^0.11.1",
+    "node-pty": "^1.1.0",
     "zod": "^4.4.3"
   }
 }

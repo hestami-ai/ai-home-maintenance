@@ -27,6 +27,7 @@ import { pickItemsArray } from '../parsedResponseHelpers';
 import { resolveAgainstOracle } from '../idResolver';
 import { runComponentSaturationLoop } from './phase4_2a';
 import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
+import { buildRequirementLineage } from './packetSynthesis/idResolution';
 import {
   normalizeComponentKinds,
   partitionComponentsByKind,
@@ -199,20 +200,34 @@ export function deterministicComponentDrops(
   softwareDomains: Array<{ id: string; maps_to_business_domains?: string[] }>,
   acceptedBusinessDomainIds: Set<string>,
   acceptedUserStoryIds: Set<string>,
+  /**
+   * Maps a leaf user-story id to its decomposition ROOT (structural tree walk,
+   * no regex — see idResolution.buildRequirementLineage). Components trace to
+   * LEAF-grained story ids (the Phase-4 FR view is leaf-aware, e.g. `US-001-D`)
+   * while `acceptedUserStoryIds` is ROOT-grained (`US-001`). Without
+   * canonicalizing before membership, EVERY leaf-tracing component fails
+   * coverage and the whole component model is wiped (slice-140). Defaults to
+   * identity for back-compat.
+   */
+  canonicalizeStoryId: (id: string) => string = (id) => id,
 ): Array<{ id: string; reason: string }> {
   const drops = new Map<string, string>();
   // 1. Domain 2-hop (hard scope).
   for (const d of deterministicDomainScopeDrops(components, softwareDomains, acceptedBusinessDomainIds)) {
     drops.set(d.id, d.reason);
   }
-  // 2. User-story coverage.
+  // 2. User-story coverage — backed if ANY trace, raw OR canonicalized-to-root,
+  //    is in the accepted set.
   for (const c of components) {
     if (drops.has(c.id)) continue;
     const traces = Array.isArray(c.traces_to) ? c.traces_to : [];
-    if (traces.length > 0 && !traces.some(us => acceptedUserStoryIds.has(us))) {
+    const backed = traces.some(
+      us => acceptedUserStoryIds.has(us) || acceptedUserStoryIds.has(canonicalizeStoryId(us)),
+    );
+    if (traces.length > 0 && !backed) {
       drops.set(
         c.id,
-        `Deterministic user-story coverage: component traces_to=[${traces.join(', ')}], none in the accepted user-story set. No accepted story backs this component.`,
+        `Deterministic user-story coverage: component traces_to=[${traces.join(', ')}] (canonicalized roots: [${traces.map(canonicalizeStoryId).join(', ')}]), none in the accepted user-story set. No accepted story backs this component.`,
       );
     }
   }
@@ -422,12 +437,37 @@ export class Phase4Handler implements PhaseHandler {
         .map(s => s.id)
         .filter((x): x is string => typeof x === 'string'),
     );
+    // Requirement decomposition lineage canonicalizes the components' LEAF
+    // story traces (`US-001-D`) to their accepted ROOT (`US-001`) before the
+    // coverage check — without it every leaf-tracing component is dropped and
+    // the whole model wiped (slice-140 root cause).
+    const reqDecompNodes = engine.writer.getRecordsByType(workflowRun.id, 'requirement_decomposition_node');
+    const reqLineage = buildRequirementLineage([...allArtifacts, ...reqDecompNodes]);
     const componentDrops = deterministicComponentDrops(
       componentContent.components, domainsContent.domains, acceptedBizDomainIds, acceptedUserStoryIds,
+      reqLineage.canonicalize,
     );
     const compDropSet = new Set(componentDrops.map(d => d.id));
     // finalKeptComps drives BOTH the artifact and the 4.2a saturation seed.
     let finalKeptComps = componentContent.components.filter(c => !compDropSet.has(c.id));
+
+    // ── Keep-all-on-total-wipeout guard ───────────────────────────
+    // A deterministic filter that drops EVERY component is a filter failure,
+    // not a real result — an empty component_model superseding the real one
+    // breaks all of Phase 9 (decomposition, packets, scaffold, ownership). When
+    // the proposer produced components but the filter would keep none, KEEP ALL
+    // and log loudly (defense-in-depth beneath the leaf→root canonicalization
+    // above). Mirrors the release_plan / domains total-wipeout guards.
+    if (componentContent.components.length > 0 && finalKeptComps.length === 0) {
+      getLogger().warn('workflow', 'Phase 4: deterministic component filter dropped ALL components — keeping all (filter failure, not a real wipeout)', {
+        workflow_run_id: workflowRun.id,
+        proposed: componentContent.components.length,
+        drop_reasons: componentDrops.slice(0, 3).map(d => d.reason),
+      });
+      finalKeptComps = componentContent.components;
+      compDropSet.clear();
+      componentDrops.length = 0;
+    }
 
     // ── Lever 1b — decomposition scale budget ──────────────────────
     // Right-size the functional component count to intent scale, keyed to

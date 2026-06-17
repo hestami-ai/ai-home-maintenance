@@ -7,6 +7,9 @@
  */
 
 import { CLIInvoker, type CLIInvocationResult } from '../cli/cliInvoker';
+import { selectExecutorAdapter } from '../cli/session/capabilityRegistry';
+import type { ExecutorTaskOutcome } from '../cli/session/adapter';
+import type { ResponderInput, SessionResponder } from '../cli/session/responder';
 import { type OutputParser } from '../cli/outputParser';
 import { LLMCaller, type LLMCallOptions, type LLMCallResult } from '../llm/llmCaller';
 import { InvocationLogFile } from '../llm/invocationLogger';
@@ -28,6 +31,60 @@ export interface CLITraceContext {
    *  record's `task_id` field so trace consumers can correlate across
    *  task boundaries. */
   taskId?: string;
+}
+
+/** Routing for the session-responder LLM (llm_routing.session_responder). */
+export interface SessionResponderRoute {
+  provider: string;
+  model: string;
+  baseUrl?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+/**
+ * The responder is the OPERATOR persona: it answers on behalf of the human
+ * the TUI thinks it is talking to. Spec-grounded, decisive, never reflective
+ * — a question back, a hedge, or a stop instruction from this seat stalls
+ * the session it exists to unstall. Output constraints mirror what the
+ * adapter's sanitizer enforces (one line, no slash commands, no completion
+ * sentinel) so well-behaved replies pass through unmodified.
+ */
+const SESSION_RESPONDER_SYSTEM =
+  'You are the operator supervising an automated coding agent that is working in an interactive terminal session. '
+  + 'The agent has paused and is waiting for your input. The task specification is the source of truth. '
+  + 'Rules: answer concrete questions concretely using the specification (answer EVERY question if several are numbered); '
+  + 'when the specification is silent, make the most reasonable conventional choice and state it as a firm decision; '
+  + 'only reference file paths and module names that appear in the task specification or in the agent\'s own output — never introduce new paths; '
+  + 'keep every file instruction inside the write scope the specification states for this task; '
+  + 'never ask the agent a question back; never tell it to stop or wait; never include slash commands; '
+  + 'never write the phrase TASK COMPLETE. '
+  + 'Reply with plain text only — a few sentences at most, formatted as a single line (no line breaks).';
+
+/** The ask comes FIRST (a reader — human or model — should not have to scroll
+ *  16KB of spec to learn what is being asked), and the reply instruction is
+ *  restated at the end after the grounding context. */
+function renderSessionResponderPrompt(input: ResponderInput): string {
+  const ask = input.kind === 'question'
+    ? '## The agent asked\n' + (input.question || '(see the end of its recent output below)')
+    : '## The agent stopped without finishing the task\n'
+      + 'Its turn ended mid-work — see its recent output below.';
+  const reply = input.kind === 'question'
+    ? '## Reply with the operator answer that unblocks it (one line):'
+    : '## Reply with a one-line continuation instruction telling it specifically what to do next to finish:';
+  return ask
+    + '\n\n## Task specification\n' + clipSpec(input.taskSpec)
+    + '\n\n## Recent agent output (tail)\n' + (input.agentContext || '(none)')
+    + '\n\n' + reply;
+}
+
+/** Keep the responder call small: head + tail of long specs (completion
+ *  criteria conventionally sit at the end; identity/scope at the start). */
+function clipSpec(spec: string, maxChars = 16_000): string {
+  if (spec.length <= maxChars) return spec;
+  const head = Math.floor(maxChars * 0.7);
+  const tail = maxChars - head;
+  return spec.slice(0, head) + '\n…[specification clipped]…\n' + spec.slice(-tail);
 }
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -108,6 +165,7 @@ export class AgentInvoker {
   private versionSha = 'dev';
   private eventBus: import('../events/eventBus').EventBus | null = null;
   private liveLogDir: string | null = null;
+  private sessionResponderRoute: SessionResponderRoute | null = null;
 
   constructor(
     private readonly llmCaller: LLMCaller,
@@ -155,6 +213,64 @@ export class AgentInvoker {
   }
 
   /**
+   * Configure the SESSION RESPONDER — the LLM that plays the human side of
+   * an interactive executor session (answers the coding agent's clarifying
+   * questions FROM THE TASK SPEC, composes contextual continuation nudges).
+   * Read from `llm_routing.session_responder` by the engine. When unset,
+   * interactive adapters fall back to their canned responses.
+   */
+  setSessionResponderRoute(route: SessionResponderRoute | null): void {
+    this.sessionResponderRoute = route;
+  }
+
+  /**
+   * Build the responder closure handed to the interactive executor adapter.
+   * Lives here (not the session layer) because this is where LLMCaller +
+   * routing + trace context meet. Every Q→A pair is a real llmCaller.call,
+   * so it lands in the governed stream as a session_responder
+   * agent_invocation/agent_output pair — reviewable after the run.
+   * Returns null inside the closure on any failure so the adapter degrades
+   * to canned responses instead of stalling the session.
+   */
+  private buildSessionResponder(options: AgentInvocationOptions): SessionResponder | undefined {
+    const route = this.sessionResponderRoute;
+    if (!route) return undefined;
+    const trace = options.traceContext;
+    return async (input: ResponderInput) => {
+      try {
+        const result = await this.llmCaller.call({
+          provider: route.provider,
+          model: route.model,
+          baseUrl: route.baseUrl,
+          system: SESSION_RESPONDER_SYSTEM,
+          prompt: renderSessionResponderPrompt(input),
+          responseFormat: 'text',
+          temperature: route.temperature ?? 0.2,
+          maxTokens: route.maxTokens ?? 600,
+          traceContext: trace
+            ? {
+                workflowRunId: trace.workflowRunId,
+                phaseId: trace.phaseId ?? null,
+                subPhaseId: trace.subPhaseId ?? null,
+                agentRole: 'session_responder',
+                // Kind in the label: a log reader must be able to tell a
+                // nudge (no question existed) from a question-answer without
+                // scrolling the prompt (live confusion, slice-142 review).
+                label: (trace.label ?? 'executor session') + ' — responder (' + input.kind + ')',
+              }
+            : undefined,
+        });
+        return result.text?.trim() || null;
+      } catch (err) {
+        getLogger().warn('workflow', 'session responder call failed — using canned fallback', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+      }
+    };
+  }
+
+  /**
    * Register an output parser for a backing tool.
    */
   registerOutputParser(backingTool: string, parser: OutputParser): void {
@@ -192,6 +308,23 @@ export class AgentInvoker {
     parser.reset();
 
     const { command, args } = this.buildCLICommand(options);
+
+    if (options.backingTool === 'goose_cli') {
+      // Goose only surfaces model reasoning when asked (env-driven, no CLI
+      // flag), and its random "thinking…" spinner phrases are noise in
+      // captured streams. Applied to BOTH goose paths — this env flows to
+      // the structured `goose run` spawn and to the interactive TUI
+      // adapter (req.env) below. options.env spreads last so callers can
+      // still override either var per invocation.
+      options = {
+        ...options,
+        env: {
+          GOOSE_CLI_SHOW_THINKING: 'true',
+          GOOSE_RANDOM_THINKING_MESSAGES: 'false',
+          ...options.env,
+        },
+      };
+    }
 
     // Persist the invocation envelope up front. Captures the EXACT command
     // line, arguments, stdin, cwd, and env we're about to run — so the
@@ -259,56 +392,105 @@ export class AgentInvoker {
       subPhaseId: ctx?.subPhaseId ?? null,
     });
 
-    try {
-      const result = await this.cliInvoker.invoke({
-        command,
-        args,
-        stdinContent: options.prompt,
-        cwd: options.cwd,
-        env: options.env,
-        timeoutSeconds: this.cliConfig.timeoutSeconds,
-        idleTimeoutSeconds: this.cliConfig.idleTimeoutSeconds,
-        noContentTimeoutSeconds: this.cliConfig.noContentTimeoutSeconds,
-        bufferMaxEvents: this.cliConfig.bufferMaxEvents,
-        outputParser: parser,
-        onStdoutChunk: (text) => {
-          cumulativeChars += text.length;
-          logFile?.writeChunk({
-            channel: 'stdout',
-            msSinceStart: Date.now() - startedAt,
-            cumulativeChars,
-            text,
-          });
-          this.writeCLIOutputChunk(invocationRecordId, options, 'stdout', text, chunkSequence++);
-        },
-        onStderrChunk: (text) => {
-          cumulativeChars += text.length;
-          logFile?.writeChunk({
-            channel: 'stderr',
-            msSinceStart: Date.now() - startedAt,
-            cumulativeChars,
-            text,
-          });
-          this.writeCLIOutputChunk(invocationRecordId, options, 'stderr', text, chunkSequence++);
-        },
+    // ── Executor adapter selection (M4) ──────────────────────────────
+    // For Phase-9 executor tasks the DEFAULT is the highest interactive tier
+    // the CLI supports — the mandatory filesystem research→plan→implement step
+    // is TUI-resident (phases 1–8 are FS-blind). The structured one-shot path
+    // (below) is the fallback when the CLI has no interactive adapter or the
+    // PTY substrate (node-pty) is unavailable. Live chunks from the session are
+    // forwarded into the same output-chunk + live-log plumbing.
+    const interactiveSel = options.agentRole === 'executor_agent'
+      ? selectExecutorAdapter(options.backingTool, {
+          cwd: options.cwd,
+          env: options.env,
+          responder: this.buildSessionResponder(options),
+          onLog: (e) => {
+            if (e.kind !== 'data') return;
+            cumulativeChars += e.chunk.length;
+            logFile?.writeChunk({ channel: 'stdout', msSinceStart: Date.now() - startedAt, cumulativeChars, text: e.chunk });
+            this.writeCLIOutputChunk(invocationRecordId, options, 'stdout', e.chunk, chunkSequence++);
+          },
+        })
+      : { adapter: null, fallbackReason: 'no_interactive_adapter' as const };
+    if (interactiveSel.adapter) {
+      getLogger().info('workflow', 'executor: routing through interactive TUI session adapter', {
+        backing_tool: options.backingTool,
       });
+    } else if (options.agentRole === 'executor_agent' && interactiveSel.fallbackReason === 'pty_unavailable') {
+      getLogger().warn('workflow', 'executor: node-pty unavailable — falling back to one-shot structured executor (run `npm install node-pty` for interactive research→plan→implement)', {
+        backing_tool: options.backingTool,
+      });
+    }
+
+    try {
+      let result: CLIInvocationResult;
+      let finalText: string;
+      let reasoningText = '';
+
+      if (interactiveSel.adapter) {
+        // Tier-2/3 interactive session (PTY). The adapter spawns + drives the
+        // CLI's own plan/research mode and returns the settled outcome.
+        const outcome = await interactiveSel.adapter.run({
+          command,
+          args,
+          cwd: options.cwd,
+          prompt: options.prompt,
+          env: options.env,
+          timeoutSeconds: this.cliConfig.timeoutSeconds,
+          idleTimeoutSeconds: this.cliConfig.idleTimeoutSeconds,
+        });
+        result = adaptOutcomeToCliResult(outcome);
+        finalText = outcome.finalText || (result.stdoutText ?? '');
+      } else {
+        result = await this.cliInvoker.invoke({
+          command,
+          args,
+          stdinContent: options.prompt,
+          cwd: options.cwd,
+          env: options.env,
+          timeoutSeconds: this.cliConfig.timeoutSeconds,
+          idleTimeoutSeconds: this.cliConfig.idleTimeoutSeconds,
+          noContentTimeoutSeconds: this.cliConfig.noContentTimeoutSeconds,
+          bufferMaxEvents: this.cliConfig.bufferMaxEvents,
+          outputParser: parser,
+          onStdoutChunk: (text) => {
+            cumulativeChars += text.length;
+            logFile?.writeChunk({
+              channel: 'stdout',
+              msSinceStart: Date.now() - startedAt,
+              cumulativeChars,
+              text,
+            });
+            this.writeCLIOutputChunk(invocationRecordId, options, 'stdout', text, chunkSequence++);
+          },
+          onStderrChunk: (text) => {
+            cumulativeChars += text.length;
+            logFile?.writeChunk({
+              channel: 'stderr',
+              msSinceStart: Date.now() - startedAt,
+              cumulativeChars,
+              text,
+            });
+            this.writeCLIOutputChunk(invocationRecordId, options, 'stderr', text, chunkSequence++);
+          },
+        });
+
+        // Best-effort extraction of final text + reasoning from the parsed
+        // event stream — parity with the LLM agent_output shape (text +
+        // thinking). Imported lazily to avoid a circular module reference
+        // (orchestratorEngine imports agentInvoker).
+        finalText = result.stdoutText ?? '';
+        try {
+          const { extractFinalText, extractReasoningText } = await import('./orchestratorEngine.js');
+          finalText = extractFinalText(result.events) || (result.stdoutText ?? '');
+          reasoningText = extractReasoningText(result.events) ?? '';
+        } catch {
+          /* fall back to raw stdoutText */
+        }
+      }
 
       const errorMessage = this.resolveCLIError(result);
       const success = result.exitCode === 0 && !result.timedOut && !result.idledOut;
-
-      // Best-effort extraction of final text + reasoning from the parsed
-      // event stream — parity with the LLM agent_output shape (text +
-      // thinking). Imported lazily to avoid a circular module reference
-      // (orchestratorEngine imports agentInvoker).
-      let finalText = result.stdoutText ?? '';
-      let reasoningText = '';
-      try {
-        const { extractFinalText, extractReasoningText } = await import('./orchestratorEngine.js');
-        finalText = extractFinalText(result.events) || (result.stdoutText ?? '');
-        reasoningText = extractReasoningText(result.events) ?? '';
-      } catch {
-        /* fall back to raw stdoutText */
-      }
 
       const { agentOutputId } = this.writeCLIOutputRecord(
         invocationRecordId,
@@ -811,4 +993,25 @@ export class AgentInvoker {
         throw new Error(`Unknown backing tool: ${options.backingTool}`);
     }
   }
+}
+
+/**
+ * Map an interactive-session outcome into the {@link CLIInvocationResult} shape
+ * the rest of the executor path consumes (output record, reviewer hook, file
+ * detection). The session produces no parsed event stream, so `events` is empty
+ * and the agent's settled text rides in `stdoutText` / the caller's finalText.
+ * A self-ended session (we `/endplan` + kill) reports a null exit → treated as
+ * exit 0 (completed); a non-zero exit or timeout is preserved as a failure.
+ */
+function adaptOutcomeToCliResult(o: ExecutorTaskOutcome): CLIInvocationResult {
+  return {
+    exitCode: o.exitCode ?? 0,
+    timedOut: o.timedOut,
+    idledOut: false,
+    noContentTimedOut: false,
+    events: [],
+    stdoutText: o.rawOutput,
+    stderr: '',
+    durationMs: o.durationMs,
+  };
 }

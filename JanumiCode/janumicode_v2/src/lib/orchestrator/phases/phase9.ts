@@ -29,6 +29,8 @@ import { ExecutionScheduler, type SchedulerLeaf, type SchedulerReleaseEntry } fr
 import { extractPriorPhaseContext, buildEffectiveTaskView, buildEffectiveTestPlanView } from './phaseContext';
 import { runPacketSynthesisSubPhase } from './packetSynthesis';
 import { runScaffoldSynthesis, type ScaffoldManifest } from './scaffoldSynthesis';
+import { runModuleOwnershipPlanningSubPhase, type ModuleOwnershipPlan } from './moduleOwnershipPlanner';
+import { buildCompositionRootLeaf } from './compositionRoot';
 import { runCycleControllerSubPhase, decideRestartTarget } from './cycleController';
 import { randomUUID } from 'node:crypto';
 import type { ImplementationPacketContent } from '../../types/records';
@@ -124,6 +126,17 @@ export class Phase9Handler implements PhaseHandler {
     // conventions + canonical files) is threaded to the scheduler so the
     // executor context says "import, don't reinvent" (2b) and the post-leaf
     // guard can quarantine writes into the shared/root scope.
+    // ── 9.0a(i) — Module-Ownership Planning (Tier A coordination) ──
+    // Deterministically resolve, from the leaf tasks' read-path demand + the
+    // component sync_call graph + data-model ownership, a SINGLE owner +
+    // canonical path per shared module and producer-before-consumer ordering.
+    // Runs before scaffold so the layout can declare the canonical paths, and
+    // is threaded to the scheduler for ordering + the executor's import
+    // directives ("import X from <canonical>, owned by <component>; do NOT
+    // reinvent") — the fix for the divergent-duplicate modules.
+    engine.stateMachine.setSubPhase(workflowRun.id, 'module_ownership_planning');
+    const ownershipPlan = runModuleOwnershipPlanningSubPhase({ workflowRun, engine });
+
     engine.stateMachine.setSubPhase(workflowRun.id, 'scaffold_synthesis');
     let scaffoldManifest: ScaffoldManifest | null = null;
     try {
@@ -227,6 +240,26 @@ export class Phase9Handler implements PhaseHandler {
       };
     });
 
+    // Tier-A injection #3 — the COMPOSITION ROOT ("make it run"). Slice-144:
+    // app bootstrap/wiring was nobody's task, so the run produced a parts bin
+    // (no entrypoint, framework type-shimmed instead of installed). Injected
+    // deterministically (not via Phase 6) because the NFR/operational gates
+    // legitimately prune "start the server"-shaped items from functional
+    // decomposition. Depends on every other leaf + carries no release →
+    // lands last; owns the GLOBAL verification gate (src-wide write scope)
+    // now that ordinary leaf gates are scoped to their own write dirs.
+    if (schedulerLeaves.length > 0) {
+      const icRecord = engine.writer.getArtifactByKind(workflowRun.id, 'interface_contracts');
+      const icContracts = ((icRecord?.content as Record<string, unknown> | undefined)
+        ?.contracts as Array<{ id: string; protocol?: string; data_format?: string }> | undefined) ?? [];
+      schedulerLeaves.push(buildCompositionRootLeaf(schedulerLeaves, scaffoldManifest, icContracts));
+      getLogger().info('workflow', 'Phase 9: composition-root leaf injected', {
+        workflow_run_id: workflowRun.id,
+        depends_on: schedulerLeaves.length - 1,
+        contracts: icContracts.length,
+      });
+    }
+
     const scheduler = new ExecutionScheduler(
       engine,
       engine.writer,
@@ -263,6 +296,13 @@ export class Phase9Handler implements PhaseHandler {
     // the post-leaf guard can quarantine writes into protected paths.
     if (scaffoldManifest) {
       scheduler.setScaffoldManifest(scaffoldManifest);
+    }
+
+    // Tier-A coordination: hand the ownership plan to the scheduler so the
+    // executor context emits per-task owns/consumes import directives and the
+    // wave ordering runs producers before consumers.
+    if (ownershipPlan) {
+      scheduler.setOwnershipPlan(ownershipPlan);
     }
 
     const scheduleResult = await scheduler.run({

@@ -287,6 +287,17 @@ export interface JanumiCodeConfig {
     install_dependencies: boolean;
     /** Test-file placement convention enforced by the layout contract. */
     test_placement: 'colocated' | 'subdir';
+    /**
+     * Engineering Constitution — coding/craft best practices for the
+     * GENERATED codebase (commenting, debugging/observability, testing).
+     * Scaffold synthesis copies this file into the workspace
+     * (`.janumicode/engineering-constitution.md`) and every Phase-9
+     * executor attempt is instructed to review it as an ADVISORY standard
+     * (task spec / completion criteria / TECH-* constraints win on
+     * conflict; applied proportionally to task scope). Resolved relative
+     * to cwd when not absolute; warn-and-skip when missing.
+     */
+    engineering_constitution_path?: string;
     project_profile: {
       language: 'typescript' | 'javascript';
       module: 'esm' | 'commonjs';
@@ -457,6 +468,21 @@ export interface JanumiCodeConfig {
       temperature?: number;
       max_socratic_turns?: number;
     };
+    /**
+     * Session Responder — the LLM playing the HUMAN side of an interactive
+     * Phase-9 executor session (the coding agent's TUI thinks it is talking
+     * to a person). Answers the agent's clarifying questions from the task
+     * spec and composes contextual continuation nudges. Direct LLM call,
+     * latency-sensitive: a small fast model is appropriate (the questions
+     * are answerable from a provided spec). Omit to fall back to the
+     * adapters' canned responses. Env overrides:
+     * JANUMICODE_SESSION_RESPONDER_PROVIDER / _MODEL.
+     */
+    session_responder?: {
+      primary: { provider: string; model: string; base_url?: string };
+      temperature?: number;
+      max_tokens?: number;
+    };
   };
 }
 
@@ -595,6 +621,7 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
     enabled: true,
     install_dependencies: true,
     test_placement: 'colocated',
+    engineering_constitution_path: 'docs/JanumiCode v2 Engineering Constitution.md',
     project_profile: {
       language: 'typescript',
       module: 'esm',
@@ -655,6 +682,17 @@ export const DEFAULT_CONFIG: JanumiCodeConfig = {
       primary: { provider: 'google', model: 'gemini-2.5-flash' },
       temperature: 0.3,
       max_socratic_turns: 3,
+    },
+    // Session Responder default — answers an interactive executor session's
+    // clarifying questions FROM THE SPEC. Routed through ollama (the live
+    // thin-slice setup); the spec is provided in-context so a small local
+    // model suffices, and latency matters (the coding agent is sitting at
+    // a prompt waiting). If the provider isn't registered, the responder
+    // closure fails soft to the adapters' canned responses.
+    session_responder: {
+      primary: { provider: 'ollama', model: 'gpt-oss:20b' },
+      temperature: 0.2,
+      max_tokens: 600,
     },
   },
 };
