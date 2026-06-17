@@ -31,6 +31,7 @@ import { runPacketSynthesisSubPhase } from './packetSynthesis';
 import { runScaffoldSynthesis, type ScaffoldManifest } from './scaffoldSynthesis';
 import { runModuleOwnershipPlanningSubPhase, type ModuleOwnershipPlan } from './moduleOwnershipPlanner';
 import { buildCompositionRootLeaf } from './compositionRoot';
+import { runPhase9ReconSubPhase, reconGlobalGates } from './phase9Recon';
 import { runCycleControllerSubPhase, decideRestartTarget } from './cycleController';
 import { randomUUID } from 'node:crypto';
 import type { ImplementationPacketContent } from '../../types/records';
@@ -126,6 +127,17 @@ export class Phase9Handler implements PhaseHandler {
     // conventions + canonical files) is threaded to the scheduler so the
     // executor context says "import, don't reinvent" (2b) and the post-leaf
     // guard can quarantine writes into the shared/root scope.
+    // ── 9.0(recon) — Reconnaissance (Stage 1+2, agentic kernel) ───
+    // FIRST in Phase 9.0: with the filesystem facts + advisory intent in hand,
+    // decide per-area stack + per-area verification gates (evidence-backed
+    // JUDGMENT, deterministic fallback). Runs before ownership/scaffold/packet
+    // so downstream reflects per-area decisions; its per-area gates feed the
+    // stabilization loop. Increment 1: produced + gates consumed; kernel
+    // author→enforce retirement is a later increment, so the deterministic
+    // scaffold below still runs and the greenfield path is unaffected.
+    engine.stateMachine.setSubPhase(workflowRun.id, 'reconnaissance');
+    const reconPlan = await runPhase9ReconSubPhase({ workflowRun, engine });
+
     // ── 9.0a(i) — Module-Ownership Planning (Tier A coordination) ──
     // Deterministically resolve, from the leaf tasks' read-path demand + the
     // component sync_call graph + data-model ownership, a SINGLE owner +
@@ -281,6 +293,8 @@ export class Phase9Handler implements PhaseHandler {
           resolution: cfg.execution?.tests_per_leaf?.test_command_resolution ?? 'package_json_scripts',
           timeoutMs: cfg.execution?.tests_per_leaf?.timeout_ms ?? 120_000,
         },
+        stabilizationBudget: (cfg as unknown as { execution?: { stabilization_budget?: number } })
+          .execution?.stabilization_budget ?? 2,
       },
       generateId,
     );
@@ -311,6 +325,9 @@ export class Phase9Handler implements PhaseHandler {
       janumiCodeVersionSha: engine.janumiCodeVersionSha,
       leaves: schedulerLeaves,
       releases,
+      // Recon-authored per-area gates supersede the stabilization loop's
+      // generic manifest-detection resolver (empty ⇒ scheduler falls back).
+      globalGates: reconGlobalGates(reconPlan),
     });
 
     getLogger().info('workflow', 'Wave R: scheduler completed', {
@@ -626,7 +643,27 @@ export class Phase9Handler implements PhaseHandler {
     }
     void anyRejected;
 
-    // Phase Gate
+    // Phase Gate — derived from REAL execution state, not hardcoded clean
+    // (Stage 0). High-severity = something genuinely unresolved blocks the
+    // run: terminally-deferred leaves, a rejected wave, failed global tests,
+    // or failed evaluation.
+    //
+    // IMPORTANT: do NOT use scheduleResult.quarantinedLeafCount for high
+    // severity — the scheduler ACCUMULATES it and never decrements it on a
+    // deferred rescue (executionScheduler.ts: `quarantinedLeafCount +=` vs the
+    // rescue path's `rescuedLeafCount++`), so a run whose quarantines were all
+    // rescued would be falsely flagged. A quarantine that NEEDED a rescue is a
+    // (resolved) warning, not a flaw. (A stabilization residual will OR into
+    // has_high_severity_flaws in Stage 0.5 once that loop exists.)
+    const execHighSeverity =
+      scheduleResult.terminallyDeferredLeafCount > 0
+      || scheduleResult.rejectedWaveCount > 0
+      || scheduleResult.stabilizationResidual != null
+      || testResults.totalFailed > 0
+      || !evalResults.overallPass;
+    const execUnresolvedWarnings =
+      scheduleResult.quarantinedLeafCount > 0
+      || testResults.totalSkipped > 0;
     const gateRecord = engine.writer.writeRecord({
       record_type: 'phase_gate_evaluation',
       schema_version: '1.0',
@@ -639,8 +676,8 @@ export class Phase9Handler implements PhaseHandler {
       content: {
         kind: 'phase_gate',
         phase_id: '9',
-        has_unresolved_warnings: false,
-        has_high_severity_flaws: false,
+        has_unresolved_warnings: execUnresolvedWarnings,
+        has_high_severity_flaws: execHighSeverity,
       },
     });
     artifactIds.push(gateRecord.id);

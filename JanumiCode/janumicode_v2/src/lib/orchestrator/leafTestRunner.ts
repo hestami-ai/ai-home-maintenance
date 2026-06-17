@@ -28,6 +28,16 @@ export interface LeafTestRunInput {
   workspacePath: string;
   /** Leaf's `write_directory_paths` — used to scope tests when supported. */
   writeDirectoryPaths: string[];
+  /**
+   * Workspace-relative test files THIS leaf authored (accumulated across its
+   * attempts from the executor's `filesWritten`). When present, the verdict is
+   * scoped to exactly these files — a leaf is graded only on the tests it wrote,
+   * not a sibling's broken test that happens to share its write directory
+   * (slice-145: an un-imported `beforeEach` in a sibling file failed several
+   * leaves until a retry healed it). Falls back to `writeDirectoryPaths` when
+   * the leaf authored no test files.
+   */
+  ownTestFiles?: string[];
   /** Optional explicit per-leaf test command. */
   explicitCommand?: string;
 }
@@ -161,17 +171,21 @@ export class LeafTestRunner {
           };
           if (pkg.scripts && pkg.scripts.test) {
             const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-            // SCOPE the run to the leaf's write directories (slice-144: the
-            // workspace-global gate terminal-failed a good leaf on ANOTHER
-            // leaf's hanging test, and rewarded out-of-scope fixes). Paths
-            // after `--` reach the test script as positional filters (vitest/
-            // jest/node:test all accept them). Leaves with no resolvable dirs
-            // (and the composition root, which has none scoped) run the full
-            // suite — the global gate is the composition root's job.
-            const scopeDirs = (input.writeDirectoryPaths ?? [])
-              .map((p) => p.replace(/\\/g, '/').replace(/\/+$/g, ''))
-              .filter((p) => p && fs.existsSync(path.join(input.workspacePath, p)));
-            const scopeArgs = scopeDirs.length > 0 ? ['--', ...scopeDirs] : [];
+            // SCOPE the run to positional filters after `--` (vitest/jest/
+            // node:test all accept them). PREFER the leaf's OWN test files
+            // (file-level attribution — the leaf is graded only on tests it
+            // authored, never a sibling's broken file in the same dir,
+            // slice-145). Fall back to the write DIRECTORIES when the leaf
+            // authored no test files (slice-144: still better than the
+            // workspace-global gate). Leaves with neither (e.g. the
+            // composition root) run the full suite — that global gate is the
+            // composition root's / stabilization loop's job.
+            const norm = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/g, '');
+            const exists = (p: string): boolean => fs.existsSync(path.join(input.workspacePath, p));
+            const ownFiles = (input.ownTestFiles ?? []).map(norm).filter((p) => p && exists(p));
+            const scopeDirs = (input.writeDirectoryPaths ?? []).map(norm).filter((p) => p && exists(p));
+            const scope = ownFiles.length > 0 ? ownFiles : scopeDirs;
+            const scopeArgs = scope.length > 0 ? ['--', ...scope] : [];
             return { executable: npm, args: ['test', '--silent', ...scopeArgs] };
           }
         } catch (err) {

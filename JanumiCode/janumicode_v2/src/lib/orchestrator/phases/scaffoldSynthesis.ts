@@ -268,6 +268,19 @@ function toTsType(raw: string | undefined): string {
   return 'string';
 }
 
+/**
+ * A field is nullable when its type/constraints say so AND nothing marks it
+ * required/not-null/primary-key. Slice-145 bug: `deleted_at` carried `nullable`
+ * in its constraints but rendered as `string` (non-null), so every test fixture
+ * passing `null` failed strict-mode tsc. The negation guard prevents a stray
+ * "null" inside "not null" from flipping a required field.
+ */
+function isNullableField(f: { type?: string; constraints?: string }): boolean {
+  const hay = `${f.type ?? ''} ${f.constraints ?? ''}`.toLowerCase();
+  if (/\bnot[\s_-]?null\b|\bnot[\s_-]?nullable\b|\brequired\b|\bprimary[\s_-]?key\b/.test(hay)) return false;
+  return /\bnullable\b|\boptional\b/.test(hay);
+}
+
 function renderEntityModule(entity: DataModelEntity, componentId: string): string {
   const name = pascalCase(entity.name);
   const lines: string[] = [];
@@ -276,8 +289,9 @@ function renderEntityModule(entity: DataModelEntity, componentId: string): strin
   lines.push(`export interface ${name} {`);
   for (const f of entity.fields ?? []) {
     const tsType = toTsType(f.type);
+    const fieldType = isNullableField(f) ? `${tsType} | null` : tsType;
     const comment = [f.type, f.constraints].filter(Boolean).join(' — ');
-    lines.push(`  ${f.name}: ${tsType};${comment ? ` // ${comment}` : ''}`);
+    lines.push(`  ${f.name}: ${fieldType};${comment ? ` // ${comment}` : ''}`);
   }
   lines.push(`}`);
   if (entity.relationships?.length) {

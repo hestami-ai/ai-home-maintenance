@@ -18,6 +18,7 @@ import {
   topoSortRespectingWave,
   collapseLegacySectionsWhenPacketPresent,
   buildWorkspaceOrientation,
+  isTestFilePath,
   type SchedulerLeaf,
 } from '../../../lib/orchestrator/executionScheduler';
 import {
@@ -27,6 +28,27 @@ import {
 } from '../../../lib/orchestrator/workspaceSnapshot';
 import { QuarantineLedger } from '../../../lib/orchestrator/quarantineLedger';
 import type { TaskQuarantineContent } from '../../../lib/types/records';
+
+describe('isTestFilePath — file-level test detection (attribution)', () => {
+  it('matches common test conventions across stacks', () => {
+    for (const p of [
+      'src/url-validator/validator.test.ts',
+      'src/a/stats.spec.ts',
+      'src/b/handler_test.go',
+      'pkg/mod/test_views.py',
+      'src/c/__tests__/foo.ts',
+      'tests/integration/boot.ts',
+    ]) expect(isTestFilePath(p)).toBe(true);
+  });
+  it('does NOT match implementation files', () => {
+    for (const p of [
+      'src/url-validator/validator.ts',
+      'src/a/index.ts',
+      'src/b/handler.go',
+      'src/contest/latest.ts', // "test" as a substring, not a test file
+    ]) expect(isTestFilePath(p)).toBe(false);
+  });
+});
 
 function leaf(id: string, opts: Partial<SchedulerLeaf> = {}): SchedulerLeaf {
   return {

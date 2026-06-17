@@ -101,6 +101,28 @@ describe('materializeScaffold — file generation + idempotency', () => {
     expect(model).toContain('id: string');
   });
 
+  it('renders nullable/optional fields as `T | null`, keeps required fields non-null', () => {
+    // Slice-145 bug: a nullable field rendered as non-null, so fixtures passing
+    // `null` failed strict-mode tsc. Required / not-null / primary-key stay non-null.
+    const nullableModels = {
+      models: [{ component_id: 'comp-url', entities: [
+        { name: 'Mapping', fields: [
+          { name: 'id', type: 'uuid', constraints: 'primary_key' },
+          { name: 'slug', type: 'string', constraints: 'not null,unique' },
+          { name: 'deleted_at', type: 'timestamp', constraints: 'nullable' },
+          { name: 'note', type: 'text', constraints: 'optional' },
+        ] },
+      ] }],
+    };
+    materializeScaffold(ws, 'tinyurl', profile, nullableModels, contracts, contract);
+    const model = fs.readFileSync(path.join(ws, 'src/shared/models/Mapping.ts'), 'utf-8');
+    expect(model).toContain('deleted_at: string | null');
+    expect(model).toContain('note: string | null');
+    expect(model).toContain('id: string;'); // primary key → not null
+    expect(model).toContain('slug: string;'); // not null
+    expect(model).not.toContain('slug: string | null');
+  });
+
   it('is skip-if-exists (never clobbers existing files)', () => {
     fs.writeFileSync(path.join(ws, 'package.json'), '{"name":"keep-me"}');
     const r = materializeScaffold(ws, 'tinyurl', profile, dataModels, contracts, contract);

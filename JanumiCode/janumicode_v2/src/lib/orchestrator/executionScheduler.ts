@@ -43,6 +43,8 @@ import {
   type WaveDiffSummary,
 } from './workspaceSnapshot';
 import { LeafTestRunner, type LeafTestRunnerConfig, type LeafTestRunResult } from './leafTestRunner';
+import { resolveGateCommands, type GateCommand } from './gateCommands';
+import { runGateCommands } from './gateRunner';
 import { QuarantineLedger } from './quarantineLedger';
 import { WaveGate, type WaveGateOutcome } from './waveGate';
 import { buildPhaseContextPacket } from './phases/dmrContext';
@@ -78,6 +80,17 @@ export interface ExecutionSchedulerConfig {
   deferredRetryBudget: number;
   autoApproveWaveGates: boolean;
   testsPerLeaf: LeafTestRunnerConfig;
+  /** Max repair sessions in the Stage-0.5 stabilization loop (default 2). */
+  stabilizationBudget?: number;
+}
+
+/** Stage 0.5 — what the global gates still complain about after the closing
+ *  act (composition root + bounded repair loop) gives up. Null = green / no
+ *  detectable gates. Feeds the honest Phase-9 gate. */
+export interface StabilizationResidual {
+  failingGateNames: string[];
+  repairAttempts: number;
+  evidence: string;
 }
 
 export interface ExecutionScheduleResult {
@@ -99,6 +112,9 @@ export interface ExecutionScheduleResult {
    *  (including rescued deferred leaves). Used by Phase 9.1 to emit a
    *  cross_run_modification for each completed Refactoring Task. */
   successfulLeafIds: string[];
+  /** Stage 0.5 — unresolved global-gate failures after the closing act, or
+   *  null when the workspace's gates are green / no detectable gates. */
+  stabilizationResidual: StabilizationResidual | null;
 }
 
 // ── Scheduler ──────────────────────────────────────────────────────
@@ -267,6 +283,9 @@ export class ExecutionScheduler {
     janumiCodeVersionSha: string;
     leaves: SchedulerLeaf[];
     releases: SchedulerReleaseEntry[];
+    /** Stage 1+2: recon-authored per-area global gates. When present they
+     *  supersede the stabilization loop's generic manifest-detection resolver. */
+    globalGates?: GateCommand[];
   }): Promise<ExecutionScheduleResult> {
     const { workflowRunId, workspacePath, janumiCodeVersionSha, leaves, releases } = input;
     const logger = getLogger();
@@ -278,9 +297,17 @@ export class ExecutionScheduler {
     // work — and on a slow local executor, re-doing the ~half that already
     // succeeded is the difference between "picks up where it left off" and
     // "starts Phase 9 over".
+    // The composition root is NOT a normal backlog leaf — it is the closing
+    // act (Stage 0.5). Pull it out of the wave set so it runs AFTER the
+    // deferred wave (its predecessors must all have had their last chance);
+    // the old placement let it run in the backlog wave before deferred
+    // rescues, inheriting their failures by construction.
+    const closingLeaves = leaves.filter(l => l._composition_root);
+    const normalLeaves = closingLeaves.length > 0 ? leaves.filter(l => !l._composition_root) : leaves;
+
     const priorDone = this.loadPriorSuccessfulLeafIds(workflowRunId);
-    const skippedLeaves = priorDone.size > 0 ? leaves.filter(l => priorDone.has(l.id)) : [];
-    const leavesToRun = skippedLeaves.length > 0 ? leaves.filter(l => !priorDone.has(l.id)) : leaves;
+    const skippedLeaves = priorDone.size > 0 ? normalLeaves.filter(l => priorDone.has(l.id)) : [];
+    const leavesToRun = skippedLeaves.length > 0 ? normalLeaves.filter(l => !priorDone.has(l.id)) : normalLeaves;
     if (skippedLeaves.length > 0) {
       logger.info('workflow', 'Wave R: resume — skipping leaves that already succeeded', {
         skipped: skippedLeaves.length, remaining: leavesToRun.length,
@@ -289,13 +316,6 @@ export class ExecutionScheduler {
     const seededSuccessIds = skippedLeaves.map(l => l.id);
 
     const waves = sliceLeavesIntoWaves(leavesToRun, releases);
-    if (waves.length === 0) {
-      logger.info('workflow', 'Wave R: no leaves left to execute (all skipped or none); scheduler complete');
-      const done = emptyScheduleResult();
-      done.successfulLeafIds = seededSuccessIds;
-      done.successfulLeafCount = seededSuccessIds.length;
-      return done;
-    }
 
     // Persist scheduling totals up front.
     this.updateRunTotals(workflowRunId, { total_execution_waves: waves.length });
@@ -310,7 +330,11 @@ export class ExecutionScheduler {
       waveOutcomes: [],
       invocationIds: [],
       successfulLeafIds: [...seededSuccessIds],
+      stabilizationResidual: null,
     };
+    if (waves.length === 0) {
+      logger.info('workflow', 'Wave R: no normal leaves to execute (all skipped or none); proceeding to closing act');
+    }
 
     let waveNumber = 0;
     for (const wave of waves) {
@@ -424,7 +448,161 @@ export class ExecutionScheduler {
       terminally_deferred_leaf_count: result.terminallyDeferredLeafCount,
     });
 
+    // ── Closing act (Stage 0.5) — runs AFTER every wave incl. deferred ──
+    // 1. Composition root (wiring agent) — moved here from the backlog wave.
+    // 2. Stabilization loop — run the workspace's global gates and, while red,
+    //    launch a repair-mandated agent session with the failure evidence,
+    //    re-run, bounded by stabilizationBudget; record the honest residual.
+    await this.runClosingAct({
+      closingLeaves, workflowRunId, workspacePath, janumiCodeVersionSha, waveNumber, result,
+      globalGates: input.globalGates,
+    });
+
     return result;
+  }
+
+  /**
+   * Stage 0.5 closing act: composition-root wiring, then a bounded
+   * gate→repair→re-gate stabilization loop over the workspace's GLOBAL gates.
+   * Stack-agnostic: the gate commands come from the generic manifest-detection
+   * resolver (Stage 1+2 swaps in recon-authored per-area gates without
+   * touching this loop). No detectable gates ⇒ the loop is a no-op.
+   */
+  private async runClosingAct(input: {
+    closingLeaves: SchedulerLeaf[];
+    workflowRunId: string;
+    workspacePath: string;
+    janumiCodeVersionSha: string;
+    waveNumber: number;
+    result: ExecutionScheduleResult;
+    globalGates?: GateCommand[];
+  }): Promise<void> {
+    const { closingLeaves, workflowRunId, workspacePath, janumiCodeVersionSha, result } = input;
+    const logger = getLogger();
+    let waveNumber = input.waveNumber;
+
+    // 1. Composition-root wiring leaf(s), as their own wave after deferred.
+    if (closingLeaves.length > 0) {
+      waveNumber++;
+      const outcome = await this.runWave({
+        wave: {
+          kind: 'single',
+          release_id: null,
+          release_ordinal: null,
+          release_name: 'Composition root',
+          leaves: closingLeaves,
+        },
+        waveNumber,
+        workflowRunId,
+        workspacePath,
+        janumiCodeVersionSha,
+        retryBudget: this.config.leafRetryBudget,
+        attemptHintBuilder: null,
+      });
+      result.successfulLeafCount += outcome.successCount;
+      result.quarantinedLeafCount += outcome.quarantineCount;
+      result.successfulLeafIds.push(...outcome.successfulLeafIds);
+      result.invocationIds.push(...outcome.invocationIds);
+      result.totalWaves = waveNumber;
+      result.waveOutcomes.push({
+        waveNumber, waveKind: 'single',
+        successful: outcome.successCount, quarantined: outcome.quarantineCount,
+        decision: outcome.gateDecision,
+      });
+    }
+
+    // 2. Stabilization loop over the GLOBAL gates. Prefer recon-authored
+    // per-area gates (Stage 1+2); fall back to the generic manifest-detection
+    // resolver (Stage 0.5) when recon produced none.
+    const gates = (input.globalGates && input.globalGates.length > 0)
+      ? input.globalGates
+      : resolveGateCommands(workspacePath);
+    if (gates.length === 0) {
+      logger.info('workflow', 'Wave R: stabilization — no gates (recon empty + no detectable single-stack); skipping', {
+        workflow_run_id: workflowRunId,
+      });
+      return;
+    }
+    const budget = this.config.stabilizationBudget ?? 2;
+    logger.info('workflow', 'Wave R: stabilization loop starting', {
+      workflow_run_id: workflowRunId, gates: gates.map(g => g.name), repair_budget: budget,
+    });
+
+    let summary = runGateCommands(workspacePath, gates);
+    let repairAttempts = 0;
+    while (!summary.allPassed && repairAttempts < budget) {
+      repairAttempts++;
+      logger.warn('workflow', 'Wave R: stabilization — global gates RED, launching repair session', {
+        workflow_run_id: workflowRunId, attempt: repairAttempts,
+        failing: summary.results.filter(r => !r.passed).map(r => r.gate.name),
+      });
+      const invId = await this.runStabilizationRepair({
+        evidence: summary.failureEvidence, attempt: repairAttempts,
+        workflowRunId, workspacePath, janumiCodeVersionSha,
+      });
+      if (invId) result.invocationIds.push(invId);
+      summary = runGateCommands(workspacePath, gates);
+    }
+
+    if (summary.allPassed) {
+      logger.info('workflow', 'Wave R: stabilization — global gates GREEN', {
+        workflow_run_id: workflowRunId, repair_attempts: repairAttempts,
+      });
+      result.stabilizationResidual = null;
+    } else {
+      const failingGateNames = summary.results.filter(r => !r.passed).map(r => r.gate.name);
+      logger.warn('workflow', 'Wave R: stabilization — gates still RED after budget (honest residual recorded)', {
+        workflow_run_id: workflowRunId, repair_attempts: repairAttempts, failing: failingGateNames,
+      });
+      result.stabilizationResidual = {
+        failingGateNames, repairAttempts, evidence: summary.failureEvidence.slice(0, 4000),
+      };
+    }
+  }
+
+  /**
+   * Launch one repair-mandated executor session: the workspace fails its global
+   * gates; here is the evidence; fix it and re-run the gates yourself until
+   * green. Distinct from a feature leaf — the failing workspace IS the task.
+   * Returns the invocation id, or null on a hard executor failure.
+   */
+  private async runStabilizationRepair(input: {
+    evidence: string;
+    attempt: number;
+    workflowRunId: string;
+    workspacePath: string;
+    janumiCodeVersionSha: string;
+  }): Promise<string | null> {
+    const { evidence, attempt, workflowRunId, workspacePath, janumiCodeVersionSha } = input;
+    const task: ExecutionTask = {
+      id: `task-stabilization-repair-${attempt}`,
+      taskType: 'standard',
+      componentId: 'stabilization',
+      componentResponsibility: 'Workspace stabilization: make the global verification gates pass.',
+      description:
+        'STABILIZATION REPAIR. The workspace fails its global verification gates (full output below). '
+        + 'Investigate the failures, fix the code/configuration/dependencies that cause them, and re-run '
+        + 'the gates yourself until they pass. Do not add features; only resolve what blocks the gates. '
+        + 'Prefer the canonical shared modules and each component\'s existing public surface; do not '
+        + 'rewrite component internals beyond what the failures require.',
+      completionCriteria: [
+        { criterionId: 'CC-STAB-001', description: 'The workspace global gates (typecheck + full test suite + build) all pass.' },
+      ],
+      writeDirectoryPaths: ['src'],
+    };
+    const stdin =
+      `# Stabilization Repair (attempt ${attempt})\n\n`
+      + `The workspace failed its global verification gates. Fix the workspace so every gate passes, `
+      + `then verify by re-running the gates.\n\n## Failing gate evidence\n\n${evidence}\n`;
+    try {
+      const r = await this.executorAgent.execute(task, workflowRunId, stdin, workspacePath, janumiCodeVersionSha);
+      return r.invocationId;
+    } catch (err) {
+      getLogger().warn('workflow', 'Wave R: stabilization repair session threw (continuing)', {
+        workflow_run_id: workflowRunId, attempt, error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
   }
 
   /**
@@ -543,6 +721,9 @@ export class ExecutionScheduler {
     for (const leaf of topo) {
       const attempts: QuarantineAttemptEntry[] = [];
       let leafPassed = false;
+      // Test files this leaf authors, accumulated across its attempts — the
+      // file-level ownership evidence the per-leaf verdict is scoped to.
+      const ownedTestFiles = new Set<string>();
       let priorFailureContext: string | null = input.attemptHintBuilder
         ? input.attemptHintBuilder(leaf.id)
         : null;
@@ -556,6 +737,7 @@ export class ExecutionScheduler {
           workspacePath,
           janumiCodeVersionSha,
           augmentedContext: priorFailureContext,
+          ownedTestFiles,
         });
         invocationIds.push(attemptOutcome.invocationId);
         attempts.push(attemptOutcome.entry);
@@ -687,8 +869,11 @@ export class ExecutionScheduler {
     workspacePath: string;
     janumiCodeVersionSha: string;
     augmentedContext: string | null;
+    /** Accumulates, across this leaf's attempts, the test files it authored —
+     *  the file-level ownership evidence the verdict is scoped to. */
+    ownedTestFiles: Set<string>;
   }): Promise<{ entry: QuarantineAttemptEntry; invocationId: string; testResult: LeafTestRunResult | null }> {
-    const { leaf, attemptNumber, waveNumber, workflowRunId, workspacePath, janumiCodeVersionSha, augmentedContext } = input;
+    const { leaf, attemptNumber, waveNumber, workflowRunId, workspacePath, janumiCodeVersionSha, augmentedContext, ownedTestFiles } = input;
     const logger = getLogger();
     const contextFileId = this.generateId();
 
@@ -902,7 +1087,18 @@ export class ExecutionScheduler {
       };
     }
 
-    // Per-leaf test execution.
+    // Record the test files THIS attempt authored (file-level ownership
+    // evidence), accumulated across the leaf's attempts so a test written in an
+    // earlier attempt still scopes the verdict even if a later attempt only
+    // touched the implementation.
+    for (const w of executionResult.filesWritten) {
+      if (w.operation === 'delete') continue;
+      const rel = path.relative(workspacePath, w.filePath).split(path.sep).join('/');
+      if (rel && !rel.startsWith('..') && isTestFilePath(rel)) ownedTestFiles.add(rel);
+    }
+
+    // Per-leaf test execution. Scoped to the leaf's OWN test files when it
+    // authored any (file-level attribution); else its write directories.
     const testResult = await this.leafTestRunner.run({
       leafTaskId: leaf.id,
       attemptNumber,
@@ -911,6 +1107,7 @@ export class ExecutionScheduler {
       janumiCodeVersionSha,
       workspacePath,
       writeDirectoryPaths: leaf.write_directory_paths ?? [],
+      ownTestFiles: [...ownedTestFiles],
     });
 
     if (!testResult.passed) {
@@ -1120,6 +1317,17 @@ interface WaveSlice {
   release_ordinal: number | null;
   release_name?: string;
   leaves: SchedulerLeaf[];
+}
+
+/** Whether a workspace-relative path is a test file (common conventions across
+ *  vitest/jest/pytest/go/rust): `*.test.*` / `*.spec.*` / `*_test.*` /
+ *  `test_*` basenames, or a path under a `__tests__` / `tests` directory. */
+export function isTestFilePath(rel: string): boolean {
+  const p = rel.replace(/\\/g, '/').toLowerCase();
+  const base = p.split('/').pop() ?? p;
+  if (/\.(test|spec)\.[a-z0-9]+$/.test(base)) return true;
+  if (/(^|[._-])test[._-]/.test(base) || /_test\.[a-z0-9]+$/.test(base)) return true;
+  return /(^|\/)(__tests__|tests?)\//.test(p);
 }
 
 /** Slice leaves into ordered waves keyed by release_ordinal. Backlog
@@ -1424,6 +1632,7 @@ function emptyScheduleResult(): ExecutionScheduleResult {
     waveOutcomes: [],
     invocationIds: [],
     successfulLeafIds: [],
+    stabilizationResidual: null,
   };
 }
 

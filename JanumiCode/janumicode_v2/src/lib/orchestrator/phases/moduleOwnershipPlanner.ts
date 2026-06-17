@@ -24,6 +24,7 @@
 
 import { idComparisonKey } from '../idResolver';
 import { canonicalComponentDir } from './layoutContract';
+import { resolveProjectProfile, type ProjectProfile } from './scaffoldSynthesis';
 import type { PhaseContext } from '../orchestratorEngine';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveTaskView, buildEffectiveComponentView } from './phaseContext';
@@ -450,10 +451,23 @@ export function runModuleOwnershipPlanningSubPhase(ctx: PhaseContext): ModuleOwn
       }
     }
 
-    const profile = (engine.configManager.get() as unknown as {
-      scaffold?: { project_profile?: { shared_dir?: string } };
-    }).scaffold?.project_profile;
-    const sharedDir = profile?.shared_dir ?? 'src/shared';
+    // Resolve the shared_dir the SAME way scaffold synthesis will (brownfield >
+    // ADR override > config default) rather than reading the raw config default.
+    // Ownership runs before scaffold, but resolveProjectProfile is deterministic
+    // over already-present inputs (workspace files + the Phase-4 ADR artifact),
+    // so both compute an identical shared_dir — without it, an ADR shared_dir
+    // override would make ownership's canonical paths diverge from the scaffold's.
+    const configProfile: Omit<ProjectProfile, 'source'> = (engine.configManager.get() as unknown as {
+      scaffold?: { project_profile?: Omit<ProjectProfile, 'source'> };
+    }).scaffold?.project_profile ?? {
+      language: 'typescript', module: 'esm', test_runner: 'vitest', shared_dir: 'src/shared',
+    };
+    const adrsRecord = engine.writer.getArtifactByKind(workflowRun.id, 'architectural_decisions');
+    const sharedDir = resolveProjectProfile(
+      engine.workspacePath,
+      (adrsRecord?.content as Record<string, unknown>) ?? null,
+      configProfile,
+    ).shared_dir;
 
     // Component leaf→root lineage + root-level dependency edges. Dependency
     // knowledge is declared on the depth-0 components; saturation children
