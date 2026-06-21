@@ -366,6 +366,12 @@ function renderRootPackageJson(
   if (profile.language === 'typescript') devDeps.typescript = '^5.4.0';
   if (profile.test_runner === 'vitest') devDeps.vitest = '^1.6.0';
   if (profile.test_runner === 'jest') devDeps.jest = '^29.7.0';
+  // Property-based testing library for the JS/TS stack — preinstalled (runner-
+  // agnostic: works inside vitest or jest) so a leaf authoring a property test
+  // case doesn't quarantine on "cannot find module 'fast-check'".
+  if (profile.test_runner === 'vitest' || profile.test_runner === 'jest') {
+    devDeps['fast-check'] = '^3.19.0';
+  }
   if (Object.keys(devDeps).length) pkg.devDependencies = devDeps;
   return JSON.stringify(pkg, null, 2) + '\n';
 }

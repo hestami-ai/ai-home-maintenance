@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_ALT_PORT,
   effectiveNumCtx,
-  resolveAltPort,
+  expandLanguageSweep,
   validateSweepConfig,
   type BakeoffSweepConfig,
   type CandidateSpec,
+  type SweepModel,
 } from '../../../../../scripts/model-bakeoff/bakeoffConfig';
 
 function baseSweep(overrides: Partial<BakeoffSweepConfig> = {}): BakeoffSweepConfig {
@@ -43,6 +43,13 @@ describe('validateSweepConfig', () => {
     expect(r.errors.join(' ')).toContain('referenceWorkspace');
     expect(r.errors.join(' ')).toContain('referenceDb');
     expect(r.errors.join(' ')).toContain('outputDir');
+  });
+
+  it('accepts a valid forceStack and rejects an unknown one', () => {
+    expect(validateSweepConfig(baseSweep({ candidates: [candidate({ forceStack: 'python' })] })).errors).toEqual([]);
+    const bad = validateSweepConfig(baseSweep({ candidates: [candidate({ forceStack: 'cobol' })] }));
+    expect(bad.config).toBeNull();
+    expect(bad.errors.join(' ')).toContain('forceStack');
   });
 
   it('rejects empty candidates', () => {
@@ -132,11 +139,29 @@ describe('effectiveNumCtx precedence', () => {
   });
 });
 
-describe('resolveAltPort', () => {
-  it('candidate port > sweep altPort > default', () => {
-    const sweep = baseSweep({ altPort: 11600 });
-    expect(resolveAltPort(sweep, candidate({ server: { port: 11700 } }))).toBe(11700);
-    expect(resolveAltPort(sweep, candidate())).toBe(11600);
-    expect(resolveAltPort(baseSweep(), candidate())).toBe(DEFAULT_ALT_PORT);
+describe('expandLanguageSweep', () => {
+  const model = (slug: string): SweepModel => ({ slug, modelTag: `${slug}:tag`, server: { contextLength: 65536 } });
+
+  it('crosses models × languages LANGUAGE-MAJOR, deriving slug + forceStack and preserving server/goose', () => {
+    const out = expandLanguageSweep([model('gptoss'), model('gemma12')], ['node', 'python', 'go']);
+    expect(out).toHaveLength(6);
+    // language-major: all models for node, then all for python, then go
+    expect(out.map(c => c.slug)).toEqual([
+      'gptoss__node', 'gemma12__node',
+      'gptoss__python', 'gemma12__python',
+      'gptoss__go', 'gemma12__go',
+    ]);
+    expect(out.every(c => c.forceStack === c.slug.split('__')[1])).toBe(true);
+    expect(out[0].modelTag).toBe('gptoss:tag');
+    expect(out[0].server?.contextLength).toBe(65536);
+  });
+
+  it('throws on an unknown language (a typo would silently no-op the force)', () => {
+    expect(() => expandLanguageSweep([model('m')], ['python', 'cobol'])).toThrow(/cobol/);
+  });
+
+  it('the expanded candidates validate inside a sweep config', () => {
+    const sweep = baseSweep({ candidates: expandLanguageSweep([model('m')], ['node', 'rust']) });
+    expect(validateSweepConfig(sweep).errors).toEqual([]);
   });
 });

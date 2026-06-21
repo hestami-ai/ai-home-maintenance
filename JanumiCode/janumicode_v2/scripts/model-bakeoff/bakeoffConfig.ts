@@ -10,10 +10,14 @@
  * is pure — no I/O beyond what the caller hands in.
  */
 
+/**
+ * ADVISORY only. The harness no longer spawns its own ollama server (it uses
+ * the running system server), so these per-candidate server knobs are NOT
+ * applied as `ollama serve` env. Only `contextLength` is still consulted — by
+ * {@link effectiveNumCtx}, to choose the num_ctx the VRAM fit-check requests.
+ */
 export interface OllamaServerConfig {
-  /** Alt port for the harness-owned `ollama serve` (default: sweep.altPort). */
-  port?: number;
-  /** OLLAMA_CONTEXT_LENGTH — server-side default num_ctx. */
+  /** OLLAMA_CONTEXT_LENGTH — server-side default num_ctx (advisory; feeds the fit check). */
   contextLength?: number;
   /** OLLAMA_FLASH_ATTENTION=1 */
   flashAttention?: boolean;
@@ -50,7 +54,7 @@ export interface GooseEnvConfig {
 /**
  * Modelfile-defined candidate (Ollama 0.30 GGUF imports, Unsloth quants,
  * baked-in PARAMETER num_ctx, ...). The harness renders this to a
- * Modelfile and runs `ollama create <modelTag> -f <file>` on the alt port.
+ * Modelfile and runs `ollama create <modelTag> -f <file>` on the system server.
  */
 export interface ModelfileSpec {
   /** FROM line: a GGUF file/dir path or a base model tag. */
@@ -65,10 +69,22 @@ export interface CandidateSpec {
   /** Ollama tag to run (and to create, when `modelfile` is present). */
   modelTag: string;
   modelfile?: ModelfileSpec;
-  server: OllamaServerConfig;
+  /** Advisory server knobs (only `contextLength` is consulted, for the fit
+   *  check). Optional now that the harness never spawns its own server. */
+  server?: OllamaServerConfig;
   goose?: GooseEnvConfig;
+  /**
+   * Executor LANGUAGE-sweep lever. When set, the run exports
+   * JANUMICODE_FORCE_STACK so Phase-9 recon pins every area to this stack
+   * (topology preserved) — isolating language as the only variable across
+   * candidates. One of node|python|go|rust|java; omit for "recon decides".
+   */
+  forceStack?: string;
   notes?: string;
 }
+
+/** Stacks a candidate may force (mirrors KNOWN_FORCED_STACKS in phase9Recon). */
+export const FORCEABLE_STACKS = ['node', 'python', 'go', 'rust', 'java'] as const;
 
 export interface BakeoffSweepConfig {
   /** Phase-8-complete reference workspace (Tier 1 resume source). */
@@ -77,14 +93,43 @@ export interface BakeoffSweepConfig {
   referenceDb: string;
   /** Sweep output root, e.g. test-and-evaluation/bakeoff-results/<name>. */
   outputDir: string;
-  /** Default alt port for the harness-owned ollama serve. Default 11500. */
-  altPort?: number;
-  /** Where the system Ollama listens (for VRAM eviction). Default 11434. */
+  /** Port the running system Ollama listens on. Default 11434. The harness
+   *  ALWAYS uses this server — it never spawns its own. */
   systemOllamaPort?: number;
   candidates: CandidateSpec[];
   tier1?: {
     /** Per-run wall clock cap for the whole resumed pipeline (seconds). */
     globalTimeoutSeconds?: number;
+    /**
+     * Cap the implemented leaf set to the first N (JANUMICODE_BAKEOFF_MAX_LEAVES).
+     * A full ~20-leaf Phase 9 is hours per candidate; a few representative leaves
+     * give the per-language code-quality signal far faster. Omit for no cap.
+     */
+    maxLeaves?: number;
+    /**
+     * Per-attempt no-progress stream timeout in seconds
+     * (JANUMICODE_LLM_NO_PROGRESS_SECONDS). The default 90s kills REASONING
+     * models (e.g. gpt-oss) mid-thought — they emit no stream chunk for minutes
+     * while reasoning, so context-prep/codegen calls abort + retry to failure.
+     * Raise it for reasoning candidates. Omit to keep the product default.
+     */
+    noProgressSeconds?: number;
+    /**
+     * Wall-clock cap per llmCaller attempt in seconds
+     * (JANUMICODE_LLM_MAX_CALL_SECONDS). The 600s default also cuts long
+     * reasoning generations. Omit to keep the product default.
+     */
+    maxCallSeconds?: number;
+    /**
+     * Total per-leaf EXECUTOR (goose) process cap in seconds
+     * (JANUMICODE_CLI_TIMEOUT_SECONDS). The 600s default quarantines a slow
+     * reasoning model's leaves as "Process timed out" — measuring speed, not
+     * code quality. Raise to give capable-but-slow models room to finish.
+     */
+    cliTimeoutSeconds?: number;
+    /** Executor idle cap in seconds (JANUMICODE_CLI_IDLE_TIMEOUT_SECONDS); the
+     *  120s default is short for a model that reasons silently between chunks. */
+    cliIdleTimeoutSeconds?: number;
   };
   /** Slugs promoted to Tier-2 full-slice runs. */
   tier2Finalists?: string[];
@@ -92,7 +137,6 @@ export interface BakeoffSweepConfig {
   intentFile?: string;
 }
 
-export const DEFAULT_ALT_PORT = 11500;
 export const DEFAULT_SYSTEM_PORT = 11434;
 export const DEFAULT_TIER1_TIMEOUT_SECONDS = 4 * 60 * 60;
 
@@ -109,7 +153,7 @@ export interface ValidationResult {
 export function effectiveNumCtx(candidate: CandidateSpec): number | null {
   return candidate.goose?.inputLimit
     ?? numCtxFromModelfile(candidate)
-    ?? candidate.server.contextLength
+    ?? candidate.server?.contextLength
     ?? null;
 }
 
@@ -120,8 +164,35 @@ function numCtxFromModelfile(candidate: CandidateSpec): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function resolveAltPort(sweep: BakeoffSweepConfig, candidate: CandidateSpec): number {
-  return candidate.server.port ?? sweep.altPort ?? DEFAULT_ALT_PORT;
+/** A model under test in a language sweep: a base candidate (model + server +
+ *  goose config) WITHOUT a forceStack — the cross-product adds that. */
+export type SweepModel = Omit<CandidateSpec, 'forceStack' | 'slug'> & { slug: string };
+
+/**
+ * Cross {models} × {languages} into one candidate per combination, deriving
+ * `slug = <modelSlug>__<lang>` and `forceStack = <lang>`. Pure — the live
+ * runner consumes the result. Languages are validated against FORCEABLE_STACKS;
+ * an unknown language throws (a sweep typo would otherwise silently no-op the
+ * force and measure recon's own pick).
+ *
+ * Ordering is LANGUAGE-MAJOR (outer loop = language, inner = model): all models
+ * for `node`, then all for `python`, … — so a cross-model comparison for each
+ * language completes as early as possible, rather than finishing one model
+ * across every language first.
+ */
+export function expandLanguageSweep(models: SweepModel[], languages: string[]): CandidateSpec[] {
+  for (const lang of languages) {
+    if (!(FORCEABLE_STACKS as readonly string[]).includes(lang)) {
+      throw new Error(`expandLanguageSweep: unknown language "${lang}" (allowed: ${FORCEABLE_STACKS.join(', ')})`);
+    }
+  }
+  const out: CandidateSpec[] = [];
+  for (const lang of languages) {
+    for (const m of models) {
+      out.push({ ...m, slug: `${m.slug}__${lang}`, forceStack: lang });
+    }
+  }
+  return out;
 }
 
 /**
@@ -159,11 +230,11 @@ export function validateSweepConfig(raw: unknown): ValidationResult {
     if (typeof c.modelTag !== 'string' || c.modelTag.length === 0) {
       errors.push(`${where} (${c.slug}): modelTag is required`);
     }
-    if (c.server === null || typeof c.server !== 'object') {
-      errors.push(`${where} (${c.slug}): server block is required (use {} for all-defaults)`);
+    if (c.server !== undefined && (c.server === null || typeof c.server !== 'object')) {
+      errors.push(`${where} (${c.slug}): server, when present, must be an object`);
       continue;
     }
-    if (c.server.kvCacheType !== undefined && !KV_CACHE_TYPES.has(c.server.kvCacheType)) {
+    if (c.server?.kvCacheType !== undefined && !KV_CACHE_TYPES.has(c.server.kvCacheType)) {
       errors.push(`${where} (${c.slug}): kvCacheType must be one of ${[...KV_CACHE_TYPES].join(', ')}`);
     }
     if (c.modelfile !== undefined && (typeof c.modelfile.from !== 'string' || c.modelfile.from.length === 0)) {
@@ -173,6 +244,9 @@ export function validateSweepConfig(raw: unknown): ValidationResult {
     if (thr !== undefined && (typeof thr !== 'number' || thr < 0 || thr > 1)) {
       errors.push(`${where} (${c.slug}): goose.autoCompactThreshold must be in [0, 1]`);
     }
+    if (c.forceStack !== undefined && !(FORCEABLE_STACKS as readonly string[]).includes(c.forceStack)) {
+      errors.push(`${where} (${c.slug}): forceStack must be one of ${FORCEABLE_STACKS.join(', ')} (got ${JSON.stringify(c.forceStack)})`);
+    }
 
     // Context-window agreement: GOOSE_INPUT_LIMIT (per-request num_ctx),
     // Modelfile num_ctx, and OLLAMA_CONTEXT_LENGTH (server default) should
@@ -181,7 +255,7 @@ export function validateSweepConfig(raw: unknown): ValidationResult {
     const sources = [
       ['goose.inputLimit', c.goose?.inputLimit],
       ['modelfile num_ctx', numCtxFromModelfile(c)],
-      ['server.contextLength', c.server.contextLength],
+      ['server.contextLength', c.server?.contextLength],
     ].filter((s): s is [string, number] => typeof s[1] === 'number');
     const distinct = new Set(sources.map(([, v]) => v));
     if (distinct.size > 1) {

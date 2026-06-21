@@ -62,6 +62,32 @@ Constraints:
 - Follow all governing ADRs
 - Never claim `success: true` without verifiable evidence (build output, test pass count, file path)
 
+## Property-based test cases
+
+A test case marked **PROPERTY** (it carries an invariant + an input domain, not a
+single example) must be implemented as a **property-based test** using the
+property-testing library native to this project's stack — not as one hard-coded
+example. The library generates many inputs across the domain and shrinks any
+failure to a minimal counterexample, catching encoding/boundary/collision/ordering
+bugs a single example misses. Use whichever library matches the stack you are
+building in:
+
+| Stack | Library | Idiom |
+|---|---|---|
+| TypeScript / JavaScript | fast-check (devDependency) | `fc.assert(fc.property(fc.<arb>(), (x) => { /* assert invariant */ }))` inside the existing vitest/jest `it(...)` |
+| Python | Hypothesis | `@given(st.<strategy>())` on a pytest test function asserting the invariant |
+| Rust | proptest | `proptest! { #[test] fn p(x in <strategy>) { prop_assert!(<invariant>) } }` |
+| Go | gopter (or testing/quick) | a `properties.Property`/`quick.Check` asserting the invariant |
+
+Map the property spec to code: build the generator/arbitrary from the stated
+**input domain** (and any suggested generators), check the **invariant** in the
+assertion, and use the stated **oracle** (identity, an inverse, a reference
+recomputation, or — for metamorphic — the related-input relation) as the truth
+source. If the stack's PBT library is not already a dependency, add it (it is a
+test-only/dev dependency). A property test lives in the normal test files and runs
+under the normal test command, so a discovered counterexample fails the suite like
+any other test.
+
 # CONTEXT SUMMARY
 
 ## Component Context

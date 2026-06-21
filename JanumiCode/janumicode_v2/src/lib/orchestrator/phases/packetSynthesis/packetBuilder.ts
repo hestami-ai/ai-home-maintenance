@@ -24,6 +24,7 @@ import type {
   PacketTask,
   PacketTestCase,
   PacketUserStory,
+  PropertySpec,
 } from '../../../types/records';
 import { parentRefFromCompositeAc } from '../phase2/acIdNormalizer';
 import type { RequirementLineage } from './idResolution';
@@ -146,6 +147,8 @@ export interface BuilderTestSuite {
     // ARRAY of outcome strings rather than a single string. Typed as unknown
     // so the coercion below is forced; never assume `.trim()` is callable.
     expected_outcome?: unknown;
+    /** Present on 'property' test cases (Phase 7.1a) — carried to the packet for the executor. */
+    property_spec?: PropertySpec;
   }>;
 }
 
@@ -170,6 +173,8 @@ export interface BuilderEvaluationCriterion {
   target_id: string;
   evaluation_method?: string;
   success_condition?: string;
+  /** Present on a quality criterion whose NFR threshold is a generative property. */
+  property_spec?: PropertySpec;
 }
 
 export interface BuilderTechnicalConstraint {
@@ -536,6 +541,7 @@ export function findTestCasesForAcs(
           acceptance_criterion_ids: refs,
           preconditions: tc.preconditions ?? [],
           expected_outcome: coerceOutcomeString(tc.expected_outcome),
+          ...(tc.property_spec ? { property_spec: tc.property_spec } : {}),
         });
       }
     }
@@ -556,6 +562,7 @@ function findEvalsForUserStoriesAndNfrs(
         target_id: c.target_id,
         evaluation_method: c.evaluation_method ?? '',
         success_condition: c.success_condition ?? '',
+        ...(c.property_spec ? { property_spec: c.property_spec } : {}),
       });
     }
   }

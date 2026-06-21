@@ -14,7 +14,7 @@
  */
 
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
-import type { PhaseId } from '../../types/records';
+import type { PhaseId, PropertySpec } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext } from './phaseContext';
 import { buildRequirementLineage } from './packetSynthesis/idResolution';
@@ -37,6 +37,12 @@ interface QualityEvalCriterion {
   threshold: string;
   measurement_method: string;
   fallback_if_tool_unavailable?: string;
+  /**
+   * Present when the NFR threshold is expressible as a generative property —
+   * the measurement becomes "generate inputs from the domain, assert the
+   * threshold invariant holds for all of them" rather than a manual inspection.
+   */
+  property_spec?: PropertySpec;
 }
 
 interface ReasoningScenario {

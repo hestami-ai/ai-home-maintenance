@@ -1,19 +1,18 @@
 /**
  * Tier-1 driver: per candidate config, re-execute Phase 9 (+10) from the
- * Phase-8-complete reference DB against a harness-owned alt-port Ollama.
+ * Phase-8-complete reference DB against the RUNNING system Ollama.
  *
  * Per-config flow:
- *   1. fresh workspace seeded from the reference (corpusPrep)
- *   2. evict the system Ollama's resident models (VRAM contention)
- *   3. spawn `ollama serve` on the alt port with the candidate's server env
- *   4. pull/create the candidate model, context-fit pre-check, VRAM sample
- *   5. spawn `node dist/cli/janumicode.js run ... --resume-from-db <ref>
- *      --resume-at-sub-phase scaffold_synthesis` with Goose pointed at the
- *      alt port; sample VRAM peak while it runs
- *   6. collect metrics from the workspace DB, write result + rolling report
- *   7. tear the alt-port server down
+ *   1. fresh workspace seeded from the reference (corpusPrep) + seeded goose cfg
+ *   2. pull/create the candidate model on the system server, context-fit
+ *      pre-check, VRAM sample
+ *   3. spawn `node dist/cli/janumicode.js run ... --resume-from-db <ref>
+ *      --resume-at-sub-phase reconnaissance` with Goose pointed at the system
+ *      Ollama; sample VRAM peak while it runs
+ *   4. collect metrics from the workspace DB, write result + rolling report
  *
- * Sequential by design — one GPU.
+ * The harness NEVER spawns its own `ollama serve` (an earlier alt-port design
+ * could orphan and hold GPU VRAM on a hard kill). Sequential by design — one GPU.
  */
 import { spawn } from 'node:child_process';
 import { createWriteStream, mkdirSync, readFileSync } from 'node:fs';
@@ -24,16 +23,13 @@ import type { BakeoffSweepConfig, CandidateSpec } from './bakeoffConfig';
 import {
   DEFAULT_SYSTEM_PORT,
   DEFAULT_TIER1_TIMEOUT_SECONDS,
-  resolveAltPort,
 } from './bakeoffConfig';
-import { prepareConfigWorkspace } from './corpusPrep';
+import { prepareConfigWorkspace, seedGooseConfig } from './corpusPrep';
 import {
   checkContextFit,
   defaultDeps,
-  evictResidentModels,
   pullOrCreateModel,
   sampleVram,
-  spawnOllamaServer,
   type LifecycleDeps,
   type VramSample,
 } from './ollamaLifecycle';
@@ -50,15 +46,22 @@ export const REPO_ROOT = resolve(__dirname, '..', '..');
  */
 export function buildCliEnv(
   candidate: CandidateSpec,
-  altPort: number,
+  ollamaPort: number,
   gooseRoot: string,
   baseEnv: NodeJS.ProcessEnv = process.env,
+  tuning: {
+    maxLeaves?: number;
+    noProgressSeconds?: number;
+    maxCallSeconds?: number;
+    cliTimeoutSeconds?: number;
+    cliIdleTimeoutSeconds?: number;
+  } = {},
 ): NodeJS.ProcessEnv {
-  const altUrl = `http://127.0.0.1:${altPort}`;
+  const altUrl = `http://127.0.0.1:${ollamaPort}`;
   const env: NodeJS.ProcessEnv = {
     ...baseEnv,
-    // Route EVERYTHING at the harness-owned alt-port server.
-    OLLAMA_HOST: `127.0.0.1:${altPort}`,
+    // Route EVERYTHING at the (system) ollama server.
+    OLLAMA_HOST: `127.0.0.1:${ollamaPort}`,
     OLLAMA_URL: altUrl,
     GOOSE_PROVIDER__HOST: altUrl,
     JANUMICODE_GOOSE_PROVIDER: 'ollama',
@@ -85,6 +88,23 @@ export function buildCliEnv(
   if (g?.toolCallCutoff !== undefined) env.GOOSE_TOOL_CALL_CUTOFF = String(g.toolCallCutoff);
   if (g?.maxTokens !== undefined) env.GOOSE_MAX_TOKENS = String(g.maxTokens);
   if (g?.temperature !== undefined) env.GOOSE_TEMPERATURE = String(g.temperature);
+  // Language-sweep lever: Phase-9 recon pins every area to this stack.
+  if (candidate.forceStack !== undefined) env.JANUMICODE_FORCE_STACK = candidate.forceStack;
+  // Suppress goose's first-run telemetry-consent onboarding (the hermetic
+  // GOOSE_PATH_ROOT has no prior consent → goose would block on a Yes/No TUI
+  // prompt and never call the model). Belt-and-suspenders with seedGooseConfig.
+  env.GOOSE_TELEMETRY_ENABLED = 'false';
+  // Bakeoff levers: cap the leaf set and lengthen the no-progress watchdog so a
+  // REASONING model's silent thinking is not aborted as a "hang" (the 90s
+  // default killed gpt-oss's per-leaf context/codegen calls 3× → leaf errors).
+  if (tuning.maxLeaves !== undefined) env.JANUMICODE_BAKEOFF_MAX_LEAVES = String(tuning.maxLeaves);
+  if (tuning.noProgressSeconds !== undefined) env.JANUMICODE_LLM_NO_PROGRESS_SECONDS = String(tuning.noProgressSeconds);
+  // Wall-clock cap per llmCaller attempt (default 600s also cut long reasoning).
+  if (tuning.maxCallSeconds !== undefined) env.JANUMICODE_LLM_MAX_CALL_SECONDS = String(tuning.maxCallSeconds);
+  // Per-leaf executor (goose) process caps — the 600s/120s defaults quarantine
+  // a slow reasoning model's leaves as "Process timed out" (speed, not quality).
+  if (tuning.cliTimeoutSeconds !== undefined) env.JANUMICODE_CLI_TIMEOUT_SECONDS = String(tuning.cliTimeoutSeconds);
+  if (tuning.cliIdleTimeoutSeconds !== undefined) env.JANUMICODE_CLI_IDLE_TIMEOUT_SECONDS = String(tuning.cliIdleTimeoutSeconds);
   return env;
 }
 
@@ -151,8 +171,12 @@ export async function runCandidateTierOne(
   deps: LifecycleDeps = defaultDeps,
 ): Promise<ConfigMetrics> {
   const outputDir = sweep.outputDir;
-  const altPort = resolveAltPort(sweep, candidate);
-  const systemBaseUrl = `http://127.0.0.1:${sweep.systemOllamaPort ?? DEFAULT_SYSTEM_PORT}`;
+  // The harness ALWAYS uses the already-running system ollama — it never spawns
+  // its own server (the removed alt instance could orphan + hold VRAM on a
+  // hard kill). The candidate's `server` block (flash/KV/context) is therefore
+  // advisory only; the running system server's own config governs.
+  const ollamaPort = sweep.systemOllamaPort ?? DEFAULT_SYSTEM_PORT;
+  const ollamaBaseUrl = `http://127.0.0.1:${ollamaPort}`;
   const logsDir = join(outputDir, 'logs');
 
   const { workspaceDir, intentPath } = prepareConfigWorkspace({
@@ -161,16 +185,17 @@ export async function runCandidateTierOne(
     workspacesRoot: join(outputDir, 'workspaces'),
   });
 
-  await evictResidentModels(systemBaseUrl, deps);
-  const server = await spawnOllamaServer(
-    candidate,
-    { port: altPort, logFile: join(logsDir, `${candidate.slug}.ollama-serve.log`) },
-    deps,
-  );
+  // Pre-seed the hermetic goose root so the session does not block on goose's
+  // first-run onboarding (the smoke run hung here, GPU idle, model never called).
+  seedGooseConfig(join(outputDir, 'goose-roots', candidate.slug), { modelTag: candidate.modelTag, ollamaPort });
 
-  try {
-    pullOrCreateModel(candidate, altPort, deps);
-    const contextFit = await checkContextFit(candidate, server.baseUrl, deps);
+  deps.log(`${candidate.slug}: using system ollama at ${ollamaBaseUrl} (no server spawned)`);
+  const ver = await deps.fetchFn(`${ollamaBaseUrl}/api/version`).then(r => r.json()).catch(() => ({ version: 'unknown' }));
+  const ollamaVersion = (ver as { version?: string }).version ?? 'unknown';
+
+  {
+    pullOrCreateModel(candidate, ollamaPort, deps);
+    const contextFit = await checkContextFit(candidate, ollamaBaseUrl, deps);
     const vramAfterLoad = sampleVram(deps);
     if (contextFit.verdict === 'cpu_offload') {
       deps.log(`${candidate.slug}: model does NOT fit in VRAM at num_ctx=${contextFit.numCtx} — running anyway, all tasks will be classed context_overflow`);
@@ -186,9 +211,21 @@ export async function runCandidateTierOne(
         '--auto-approve',
         '--full-slice',
         '--resume-from-db', sweep.referenceDb,
-        '--resume-at-sub-phase', 'scaffold_synthesis',
+        // Re-enter Phase 9 at its FIRST sub-phase (reconnaissance) — not
+        // scaffold_synthesis (stale: predates the recon/author->enforce
+        // redesign). Resuming here rolls back any partial Phase-9 records to
+        // is_current_version=0, so the LLM cache excludes them and Phase 9
+        // (recon -> scaffold -> implement -> closing act) runs fresh with the
+        // candidate model and the forced stack. Required for the language sweep.
+        '--resume-at-sub-phase', 'reconnaissance',
       ],
-      env: buildCliEnv(candidate, altPort, join(outputDir, 'goose-roots', candidate.slug)),
+      env: buildCliEnv(candidate, ollamaPort, join(outputDir, 'goose-roots', candidate.slug), process.env, {
+        maxLeaves: sweep.tier1?.maxLeaves,
+        noProgressSeconds: sweep.tier1?.noProgressSeconds,
+        maxCallSeconds: sweep.tier1?.maxCallSeconds,
+        cliTimeoutSeconds: sweep.tier1?.cliTimeoutSeconds,
+        cliIdleTimeoutSeconds: sweep.tier1?.cliIdleTimeoutSeconds,
+      }),
       logFile: join(logsDir, `${candidate.slug}.janumicode.log`),
       timeoutSeconds: sweep.tier1?.globalTimeoutSeconds ?? DEFAULT_TIER1_TIMEOUT_SECONDS,
       deps,
@@ -196,7 +233,7 @@ export async function runCandidateTierOne(
 
     const env: RunEnvironment = {
       contextFit,
-      ollamaVersion: server.version,
+      ollamaVersion,
       vramAfterLoad,
       vramPeak: cliResult.vramPeak,
       cliExitCode: cliResult.exitCode,
@@ -208,14 +245,12 @@ export async function runCandidateTierOne(
     }
     const db = new Database(dbPath, { readonly: true });
     try {
-      const metrics = collectMetrics({ db, candidate, env });
+      const metrics = collectMetrics({ db, candidate, env, gooseRootDir: join(outputDir, 'goose-roots', candidate.slug) });
       if (cliResult.timedOut) metrics.notes.push('CLI run hit the sweep global timeout and was killed');
       return metrics;
     } finally {
       db.close();
     }
-  } finally {
-    await server.teardown();
   }
 }
 

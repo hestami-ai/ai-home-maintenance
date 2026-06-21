@@ -84,6 +84,58 @@ The `active_constraints` block carries TECH-* IDs (e.g. SvelteKit, Bun, PostgreS
 
 **Produce 1–10 children.** Test scenarios typically yield 2–6 cases; cap is 10.
 
+## Property children (Tier B "Property/Invariant scenario" → concrete properties)
+
+A **property** test asserts a rule that holds for EVERY input across a domain;
+the executor implements it with the stack's property-based-testing library
+(which generates many inputs and shrinks any failure to a minimal
+counterexample). Properties catch encoding/boundary/collision/ordering bugs that
+a single example never reaches.
+
+When decomposing a **Property/Invariant scenario** (Tier B flavour 3), emit its
+children as `test_type: "property"` with a `property_spec` — and **fan a broad
+invariant out into the distinct concrete properties it implies** (this is the
+expected use of the 1–10 fanout here). Example: *"State transitions are
+append-only"* fans into `no_update` (rows are never mutated in place),
+`no_delete` (rows are never removed), and `monotonic_version` (version only
+increases). Also classify an ordinary Tier-C/D child as `property` when its AC is
+property-amenable: a round_trip (encode/decode), idempotence (`f(f(x))==f(x)`),
+commutativity/ordering, conservation (a preserved count/sum/set), a format/uniqueness
+invariant, an oracle comparison, or a metamorphic relation. A property child still
+carries `steps` (a single `assert` step is fine) so it satisfies the per-child
+step rule. `invariant` + `input_domain` are REQUIRED on a property child; without
+them it degrades to an example test. Do NOT force a property where the AC is
+genuinely example-shaped (a specific error message, a particular redirect).
+
+A property child adds a `property_spec` to the standard child shape:
+```json
+{
+  "id": "TC-SLUG-RT-001",
+  "tier": "D",
+  "name": "shorten/resolve round-trips any valid URL",
+  "test_type": "property",
+  "component_ids": ["comp-slug-generator"],
+  "acceptance_criterion_ids": ["AC-US002-001"],
+  "preconditions": ["store is empty"],
+  "steps": [
+    { "id": "s1", "phase": "assert", "description": "For all valid URLs u: resolve(shorten(u)) === u", "expected_outcome": "no counterexample" }
+  ],
+  "expected_outcome": "Round-trip holds for every generated URL (no counterexample).",
+  "property_spec": {
+    "invariant": "resolve(shorten(u)) === u",
+    "property_kind": "round_trip",
+    "input_domain": "valid http/https URLs incl. query string, fragment, percent-encoding, unicode host",
+    "generators": ["validUrl"],
+    "oracle": "identity (the original input URL)"
+  },
+  "decomposition_rationale": "Round-trip invariant generalizes across the whole URL input domain — a property, not a single example."
+}
+```
+`property_kind` is one of: round_trip, idempotence, commutativity, invariant,
+conservation, ordering, oracle, metamorphic. When the parent already carries a
+`property_spec` and is atomic, the `atomic_step` branch echoes it on the single
+Tier-D child unchanged.
+
 # Step 2c — Branch: `invalid_parent`
 
 Emit empty `children[]`, set `parent_tier_assessment.tier = null`, and put the reason in the rationale.
@@ -135,6 +187,7 @@ For each child you produce, list any **precondition, fixture-setup choice, oracl
 
 - Every child MUST have at least one step with a non-empty `description`.
 - Every child MUST carry a `tier` of A, B, C, or D and a `test_type`.
+- A `test_type: "property"` child MUST carry a `property_spec` with non-empty `invariant` and `input_domain` (else use an ordinary example `test_type`).
 - Every child MUST trace to at least one `acceptance_criterion_ids` entry OR sibling test case OR explicit `traces_to`.
 - `parent_branch_classification` is required and exactly one of the three values.
 - Use `decomposition_rationale` to explain *why this child, not another*.

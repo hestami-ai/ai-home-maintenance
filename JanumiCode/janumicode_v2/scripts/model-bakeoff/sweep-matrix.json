@@ -3,51 +3,92 @@
   "referenceWorkspace": "test-and-evaluation/bakeoff-reference/reference-workspace",
   "referenceDb": "test-and-evaluation/bakeoff-reference/reference-phase8.db",
   "outputDir": "test-and-evaluation/bakeoff-results/sweep-1",
-  "altPort": 11500,
   "systemOllamaPort": 11434,
-  "tier1": { "globalTimeoutSeconds": 14400 },
+  "tier1": {
+    "globalTimeoutSeconds": 14400
+  },
   "tier2Finalists": [],
   "candidates": [
     {
       "slug": "gptoss-20b-131k-fa",
       "modelTag": "gpt-oss:20b",
-      "server": { "flashAttention": true, "contextLength": 131072 },
-      "goose": { "inputLimit": 131072, "contextLimit": 131072 },
+      "server": {
+        "flashAttention": true,
+        "contextLength": 131072
+      },
+      "goose": {
+        "inputLimit": 131072,
+        "contextLimit": 131072
+      },
       "notes": "Incumbent: full native 131k context fits VRAM."
     },
     {
       "slug": "gptoss-20b-131k-fa-q8kv",
       "modelTag": "gpt-oss:20b",
-      "server": { "flashAttention": true, "kvCacheType": "q8_0", "contextLength": 131072 },
-      "goose": { "inputLimit": 131072, "contextLimit": 131072 },
+      "server": {
+        "flashAttention": true,
+        "kvCacheType": "q8_0",
+        "contextLength": 131072
+      },
+      "goose": {
+        "inputLimit": 131072,
+        "contextLimit": 131072
+      },
       "notes": "Incumbent + quantized KV cache: does q8_0 KV change quality/speed?"
     },
     {
       "slug": "gemma4-12b-131k-fa",
       "modelTag": "gemma4:12b-it-qat",
-      "server": { "flashAttention": true, "contextLength": 131072 },
-      "goose": { "inputLimit": 131072, "contextLimit": 131072 },
+      "server": {
+        "flashAttention": true,
+        "contextLength": 131072
+      },
+      "goose": {
+        "inputLimit": 131072,
+        "contextLimit": 131072
+      },
       "notes": "12B QAT at 131k: large context with full VRAM headroom."
     },
     {
       "slug": "gemma4-12b-262k-fa-q8kv",
       "modelTag": "gemma4:12b-it-qat",
-      "server": { "flashAttention": true, "kvCacheType": "q8_0", "contextLength": 262144 },
-      "goose": { "inputLimit": 262144, "contextLimit": 262144 },
+      "server": {
+        "flashAttention": true,
+        "kvCacheType": "q8_0",
+        "contextLength": 262144
+      },
+      "goose": {
+        "inputLimit": 262144,
+        "contextLimit": 262144
+      },
       "notes": "12B QAT pushing the full 256k window with q8_0 KV — fit pre-check decides."
     },
     {
       "slug": "gemma4-26b-65k-fa-q8kv",
       "modelTag": "gemma4:26b-a4b-it-qat",
-      "server": { "flashAttention": true, "kvCacheType": "q8_0", "contextLength": 65536 },
-      "goose": { "inputLimit": 65536, "contextLimit": 65536 },
+      "server": {
+        "flashAttention": true,
+        "kvCacheType": "q8_0",
+        "contextLength": 65536
+      },
+      "goose": {
+        "inputLimit": 65536,
+        "contextLimit": 65536
+      },
       "notes": "26B QAT at quarter context (64k): strongest coder candidate, tightest VRAM."
     },
     {
       "slug": "gemma4-26b-65k-fa-q4kv",
       "modelTag": "gemma4:26b-a4b-it-qat",
-      "server": { "flashAttention": true, "kvCacheType": "q4_0", "contextLength": 65536 },
-      "goose": { "inputLimit": 65536, "contextLimit": 65536 },
+      "server": {
+        "flashAttention": true,
+        "kvCacheType": "q4_0",
+        "contextLength": 65536
+      },
+      "goose": {
+        "inputLimit": 65536,
+        "contextLimit": 65536
+      },
       "notes": "26B QAT with q4_0 KV: trades KV fidelity for headroom — does quality hold?"
     }
   ]

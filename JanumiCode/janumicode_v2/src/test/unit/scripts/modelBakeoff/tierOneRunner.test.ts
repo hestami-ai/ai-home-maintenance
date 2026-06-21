@@ -20,6 +20,11 @@ describe('buildCliEnv', () => {
     expect(env.PATH).toBe('/bin'); // base env preserved
   });
 
+  it('exports JANUMICODE_FORCE_STACK only when the candidate forces a stack (language sweep)', () => {
+    expect(buildCliEnv(candidate(), 11500, '/g', BASE).JANUMICODE_FORCE_STACK).toBeUndefined();
+    expect(buildCliEnv(candidate({ forceStack: 'python' }), 11500, '/g', BASE).JANUMICODE_FORCE_STACK).toBe('python');
+  });
+
   it('sets the hermetic + metrics-hygiene goose baseline', () => {
     const env = buildCliEnv(candidate(), 11500, '/out/goose-roots/c1', BASE);
     expect(env.GOOSE_PATH_ROOT).toBe('/out/goose-roots/c1');

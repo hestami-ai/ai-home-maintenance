@@ -4,14 +4,11 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  buildServerEnv,
   checkContextFit,
   classifyFit,
-  evictResidentModels,
   pullOrCreateModel,
   renderModelfile,
   sampleVram,
-  spawnOllamaServer,
   type LifecycleDeps,
 } from '../../../../../scripts/model-bakeoff/ollamaLifecycle';
 import type { CandidateSpec } from '../../../../../scripts/model-bakeoff/bakeoffConfig';
@@ -35,39 +32,6 @@ function makeDeps(overrides: Partial<LifecycleDeps> = {}): LifecycleDeps {
     ...overrides,
   };
 }
-
-describe('buildServerEnv', () => {
-  it('maps every server dimension to its OLLAMA_* env var', () => {
-    const env = buildServerEnv(
-      candidate({
-        server: {
-          flashAttention: true,
-          kvCacheType: 'q8_0',
-          contextLength: 65536,
-          numParallel: 1,
-          maxLoadedModels: 1,
-        },
-      }),
-      11500,
-      { PATH: '/bin' },
-    );
-    expect(env.OLLAMA_HOST).toBe('127.0.0.1:11500');
-    expect(env.OLLAMA_FLASH_ATTENTION).toBe('1');
-    expect(env.OLLAMA_KV_CACHE_TYPE).toBe('q8_0');
-    expect(env.OLLAMA_CONTEXT_LENGTH).toBe('65536');
-    expect(env.OLLAMA_NUM_PARALLEL).toBe('1');
-    expect(env.OLLAMA_MAX_LOADED_MODELS).toBe('1');
-    expect(env.PATH).toBe('/bin');
-  });
-
-  it('leaves unset dimensions absent (server defaults apply)', () => {
-    const env = buildServerEnv(candidate(), 11500, {});
-    expect(env.OLLAMA_HOST).toBe('127.0.0.1:11500');
-    expect(env.OLLAMA_FLASH_ATTENTION).toBeUndefined();
-    expect(env.OLLAMA_KV_CACHE_TYPE).toBeUndefined();
-    expect(env.OLLAMA_CONTEXT_LENGTH).toBeUndefined();
-  });
-});
 
 describe('renderModelfile', () => {
   it('renders FROM + PARAMETER lines', () => {
@@ -98,103 +62,6 @@ describe('classifyFit', () => {
     expect(classifyFit(undefined).verdict).toBe('unknown');
     expect(classifyFit({}).verdict).toBe('unknown');
     expect(classifyFit({ size: 0, size_vram: 0 }).verdict).toBe('unknown');
-  });
-});
-
-describe('evictResidentModels', () => {
-  it('unloads every resident model via keep_alive: 0', async () => {
-    const calls: { url: string; body?: unknown }[] = [];
-    const deps = makeDeps({
-      fetchFn: (async (url: string, init?: RequestInit) => {
-        calls.push({ url, body: init?.body ? JSON.parse(init.body as string) : undefined });
-        if (url.endsWith('/api/ps')) {
-          return jsonResponse({ models: [{ model: 'gpt-oss:20b' }, { name: 'qwen3.5:9b' }] });
-        }
-        return jsonResponse({});
-      }) as unknown as typeof fetch,
-    });
-    const evicted = await evictResidentModels('http://127.0.0.1:11434', deps);
-    expect(evicted).toEqual(['gpt-oss:20b', 'qwen3.5:9b']);
-    const gens = calls.filter((c) => c.url.endsWith('/api/generate'));
-    expect(gens).toHaveLength(2);
-    expect(gens[0].body).toEqual({ model: 'gpt-oss:20b', keep_alive: 0 });
-  });
-
-  it('returns empty when the server is unreachable', async () => {
-    const deps = makeDeps({
-      fetchFn: (async () => {
-        throw new Error('ECONNREFUSED');
-      }) as unknown as typeof fetch,
-    });
-    expect(await evictResidentModels('http://127.0.0.1:11434', deps)).toEqual([]);
-  });
-});
-
-describe('spawnOllamaServer', () => {
-  let logDir: string;
-
-  beforeEach(() => {
-    logDir = mkdtempSync(join(tmpdir(), 'bakeoff-ollama-'));
-  });
-
-  afterEach(() => {
-    rmSync(logDir, { recursive: true, force: true });
-  });
-
-  function fakeChild(pid = 4242) {
-    return { pid, stdout: null, stderr: null, on: vi.fn() };
-  }
-
-  it('refuses to spawn over an already-serving port', async () => {
-    const deps = makeDeps({
-      fetchFn: (async () => jsonResponse({ version: '0.30.0' })) as unknown as typeof fetch,
-    });
-    await expect(
-      spawnOllamaServer(candidate(), { port: 11500, logFile: join(logDir, 's.log') }, deps),
-    ).rejects.toThrow(/already serves/);
-    expect(deps.spawnFn).not.toHaveBeenCalled();
-  });
-
-  it('spawns, waits for readiness, captures the server version', async () => {
-    let call = 0;
-    const spawnFn = vi.fn(() => fakeChild());
-    const deps = makeDeps({
-      spawnFn: spawnFn as unknown as LifecycleDeps['spawnFn'],
-      fetchFn: (async () => {
-        call++;
-        if (call === 1) throw new Error('ECONNREFUSED'); // stale-port pre-check
-        return jsonResponse({ version: '0.30.0' });       // readiness
-      }) as unknown as typeof fetch,
-    });
-    const handle = await spawnOllamaServer(
-      candidate({ server: { flashAttention: true } }),
-      { port: 11500, logFile: join(logDir, 's.log') },
-      deps,
-    );
-    expect(handle.version).toBe('0.30.0');
-    expect(handle.pid).toBe(4242);
-    expect(handle.baseUrl).toBe('http://127.0.0.1:11500');
-    const spawnEnv = (spawnFn.mock.calls[0] as unknown[])[2] as { env: NodeJS.ProcessEnv };
-    expect(spawnEnv.env.OLLAMA_HOST).toBe('127.0.0.1:11500');
-    expect(spawnEnv.env.OLLAMA_FLASH_ATTENTION).toBe('1');
-  });
-
-  it('teardown kills the process tree on Windows and confirms the port freed', async () => {
-    let call = 0;
-    const spawnSyncFn = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
-    const deps = makeDeps({
-      spawnFn: vi.fn(() => fakeChild(777)) as unknown as LifecycleDeps['spawnFn'],
-      spawnSyncFn: spawnSyncFn as unknown as LifecycleDeps['spawnSyncFn'],
-      fetchFn: (async () => {
-        call++;
-        if (call === 1) throw new Error('ECONNREFUSED'); // pre-check
-        if (call === 2) return jsonResponse({ version: '0.30.0' }); // readiness
-        throw new Error('ECONNREFUSED'); // post-teardown port check: freed
-      }) as unknown as typeof fetch,
-    });
-    const handle = await spawnOllamaServer(candidate(), { port: 11500, logFile: join(logDir, 's.log') }, deps);
-    await handle.teardown();
-    expect(spawnSyncFn).toHaveBeenCalledWith('taskkill', ['/pid', '777', '/T', '/F'], { shell: false });
   });
 });
 

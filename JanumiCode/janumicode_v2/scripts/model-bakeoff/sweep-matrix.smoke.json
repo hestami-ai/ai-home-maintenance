@@ -3,22 +3,33 @@
   "referenceWorkspace": "test-and-evaluation/bakeoff-reference/reference-workspace",
   "referenceDb": "test-and-evaluation/bakeoff-reference/reference-phase8.db",
   "outputDir": "test-and-evaluation/bakeoff-results/smoke",
-  "altPort": 11500,
   "systemOllamaPort": 11434,
-  "tier1": { "globalTimeoutSeconds": 10800 },
+  "tier1": {
+    "globalTimeoutSeconds": 10800
+  },
   "candidates": [
     {
       "slug": "gemma4-12b-baseline",
       "modelTag": "gemma4:12b-it-qat",
       "server": {},
-      "goose": { "inputLimit": 65536, "contextLimit": 65536 },
+      "goose": {
+        "inputLimit": 65536,
+        "contextLimit": 65536
+      },
       "notes": "Smoke baseline: stock server defaults, 64k goose-side num_ctx."
     },
     {
       "slug": "gemma4-12b-fa-q8kv",
       "modelTag": "gemma4:12b-it-qat",
-      "server": { "flashAttention": true, "kvCacheType": "q8_0", "contextLength": 65536 },
-      "goose": { "inputLimit": 65536, "contextLimit": 65536 },
+      "server": {
+        "flashAttention": true,
+        "kvCacheType": "q8_0",
+        "contextLength": 65536
+      },
+      "goose": {
+        "inputLimit": 65536,
+        "contextLimit": 65536
+      },
       "notes": "Smoke variant: flash attention + q8_0 KV cache at the same 64k context."
     }
   ]

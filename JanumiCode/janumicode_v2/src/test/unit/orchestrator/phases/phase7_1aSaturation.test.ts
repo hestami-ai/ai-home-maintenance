@@ -162,6 +162,85 @@ describe('runTestSaturationLoop — Wave 10 saturation', () => {
     expect(snap.assumptions).toHaveLength(1);
   });
 
+  it('carries a property child (test_type=property + property_spec) through the loop; synthesizes an assert step when none given', async () => {
+    const mock = new MockLLMProvider();
+    mock.setFixture('decompose-root', {
+      match: 'test-root',
+      parsedJson: {
+        parent_branch_classification: 'decomposable',
+        parent_tier_assessment: { tier: 'B', agrees_with_hint: true, rationale: 'property/invariant scenario' },
+        children: [
+          {
+            id: 'test-prop-1', tier: 'D', name: 'round-trips any URL',
+            test_type: 'property',
+            component_ids: ['comp-x'],
+            acceptance_criterion_ids: ['AC-001'],
+            preconditions: ['store empty'],
+            steps: [], // property children may omit arrange/act/assert steps
+            expected_outcome: 'no counterexample',
+            property_spec: {
+              invariant: 'resolve(shorten(u)) === u',
+              property_kind: 'round_trip',
+              input_domain: 'valid http/https URLs incl. query/fragment',
+              generators: ['validUrl'],
+              oracle: 'identity',
+            },
+          },
+          {
+            // property test_type but NO valid spec → degrades to example (kept, not dropped)
+            id: 'test-prop-bad', tier: 'D', name: 'malformed property',
+            test_type: 'property',
+            component_ids: ['comp-x'],
+            acceptance_criterion_ids: ['AC-002'],
+            preconditions: [],
+            steps: [{ id: 's1', phase: 'act', description: 'do thing' }],
+            expected_outcome: 'works',
+            property_spec: { property_kind: 'round_trip' }, // missing invariant + input_domain
+          },
+        ],
+        surfaced_assumptions: [],
+      },
+    });
+    configureMock(mock);
+
+    const { run } = engine.startWorkflowRun('ws', 'test');
+    const root = tinyTest('test-root');
+    const seeded = seedRootNode(engine, run.id, root);
+
+    await runTestSaturationLoop(
+      { engine, workflowRun: { id: run.id } as Parameters<typeof runTestSaturationLoop>[0]['workflowRun'] },
+      {
+        technicalConstraints: [],
+        componentSummary: 'comp-x: Component X',
+        acceptanceCriteriaSummary: 'AC-001, AC-002',
+        interfaceContractsSummary: 'IC-001',
+        rootTestCases: [root],
+        rootNodeRecordIds: [seeded.recordId],
+        rootLogicalIds: [seeded.logicalNodeId],
+      },
+    );
+
+    const nodes = engine.writer.getRecordsByType(run.id, 'test_decomposition_node');
+    const children = nodes
+      .map(n => n.content as unknown as TestDecompositionNodeContent)
+      .filter(c => c.depth === 1);
+    expect(children).toHaveLength(2);
+
+    const prop = children.find(c => c.test_case.id === 'test-prop-1')!;
+    expect(prop.test_case.test_type).toBe('property');
+    expect(prop.test_case.property_spec?.invariant).toBe('resolve(shorten(u)) === u');
+    expect(prop.test_case.property_spec?.property_kind).toBe('round_trip');
+    // No steps were provided → a single assert step is synthesized from the invariant.
+    expect(prop.test_case.steps).toHaveLength(1);
+    expect(prop.test_case.steps[0].phase).toBe('assert');
+    expect(prop.test_case.steps[0].description).toContain('resolve(shorten(u)) === u');
+
+    // Malformed property_spec → child is kept (not dropped) but spec is undefined.
+    const bad = children.find(c => c.test_case.id === 'test-prop-bad')!;
+    expect(bad.test_case.property_spec).toBeUndefined();
+    expect(bad.test_case.steps.length).toBeGreaterThan(0);
+  });
+
   it('Tier-B children fire mirror gate; auto-accept queues for Tier-C decomposition', async () => {
     const mock = new MockLLMProvider();
     mock.setFixture('decompose-root', {

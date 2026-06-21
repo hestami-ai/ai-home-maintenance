@@ -354,6 +354,7 @@ describe('buildPackets — happy path', () => {
 });
 
 import { findNfrsByUserStories, preferLeafStories, findTestCasesForAcs, bindCompletionCriteriaToTests } from '../../../../lib/orchestrator/phases/packetSynthesis/packetBuilder';
+import { parseTestCounts } from '../../../../lib/orchestrator/leafTestRunner';
 
 describe('bindCompletionCriteriaToTests — CC→test coverage', () => {
   const tc = (id: string, acs: string[]) => ({
@@ -585,5 +586,47 @@ describe('findTestCasesForAcs — root-suite → leaf-packet binding by AC inter
   it('still pulls the whole suite when component_id matches exactly', () => {
     const out = findTestCasesForAcs(new Set(), new Set(), suites, 'comp-mapping-persistence');
     expect(out.map((t) => t.test_case_id)).toContain('TC-DATA-001');
+  });
+
+  it('carries property_spec from a property test case into the packet test case', () => {
+    const propSuites = [
+      { suite_id: 'TS-SLUG', component_id: 'comp-slug-generator', test_cases: [
+        {
+          test_case_id: 'TC-RT-001', type: 'property',
+          acceptance_criterion_ids: ['AC-US-002-1-001'], preconditions: [],
+          expected_outcome: 'no counterexample',
+          property_spec: {
+            invariant: 'resolve(shorten(u)) === u',
+            property_kind: 'round_trip' as const,
+            input_domain: 'valid URLs',
+            oracle: 'identity',
+          },
+        },
+      ] },
+    ];
+    const out = findTestCasesForAcs(new Set(['AC-US-002-1-001']), new Set(), propSuites, 'comp-slug-generator');
+    const rt = out.find((t) => t.test_case_id === 'TC-RT-001')!;
+    expect(rt.property_spec?.invariant).toBe('resolve(shorten(u)) === u');
+    expect(rt.property_spec?.property_kind).toBe('round_trip');
+    expect(rt.type).toBe('property');
+  });
+});
+
+describe('parseTestCounts — cargo test (Rust / proptest)', () => {
+  it('sums passed/failed/ignored across multiple cargo result lines', () => {
+    const stdout = [
+      'running 3 tests',
+      'test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out',
+      'running 1 test',
+      'test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out',
+    ].join('\n');
+    const counts = parseTestCounts(stdout, '');
+    expect(counts.passed).toBe(2);
+    expect(counts.failed).toBe(1);   // proptest counterexample surfaces as a failed count
+    expect(counts.skipped).toBe(1);
+  });
+
+  it('returns zeros when no recognized runner output is present', () => {
+    expect(parseTestCounts('some unrelated log line', '')).toEqual({ passed: 0, failed: 0, skipped: 0 });
   });
 });

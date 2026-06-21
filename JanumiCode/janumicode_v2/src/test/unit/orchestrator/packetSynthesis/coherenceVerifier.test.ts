@@ -222,6 +222,27 @@ describe('verifyCoherence — advisory findings', () => {
     expect(adv.some((a) => a.startsWith('A3_UNMEASURABLE_EVAL_CRITERION'))).toBe(true);
   });
 
+  it('A3: a property-backed criterion is measurable by construction → no advisory', () => {
+    const p = packet({
+      evaluation_criteria: [{
+        kind: 'quality', target_id: 'US-001',
+        evaluation_method: 'property-based test',
+        success_condition: 'the system behaves well overall', // would otherwise trip A3
+        property_spec: {
+          invariant: 'codes are pairwise distinct for distinct urls',
+          property_kind: 'invariant',
+          input_domain: 'sets of distinct valid URLs',
+        },
+      }],
+    });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    const adv = r.byPacketId.get(p.packet_id)!.advisory_findings;
+    expect(adv.some((a) => a.startsWith('A3_UNMEASURABLE_EVAL_CRITERION'))).toBe(false);
+  });
+
   it('P8_CC_NO_TEST: test_execution criterion with no covering test → advisory', () => {
     const p = packet({
       task: {

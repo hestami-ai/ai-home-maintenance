@@ -71,7 +71,18 @@ function metrics(overrides: Partial<ConfigMetrics> = {}): ConfigMetrics {
     divergentDuplicateCount: 0,
     layoutViolationCount: 0,
     phase10OverallPass: false,
+    forcedStack: 'node',
+    stabilizationGatesPassed: false,
+    stabilizationFailingGates: ['node:tsc'],
+    stabilizationRepairAttempts: 1,
+    leafTasksAttempted: 4,
+    leafTasksCompleted: 2,
+    leafTasksFailed: 0,
+    leafTasksQuarantined: 0,
     cliExitCode: 0,
+    servedModel: 'gemma4:12b-it-qat',
+    servedHost: 'http://127.0.0.1:11434',
+    servedModelMatches: true,
     notes: ['something noteworthy'],
     ...overrides,
   };
@@ -96,6 +107,22 @@ describe('buildCrossConfigReport', () => {
     expect(summaryRow).toContain('| 0.30.0 |');
     expect(summaryRow).toContain('| 50% |');
     expect(summaryRow).toContain('| ok |');
+    // Caveat columns: served-model verified, leaf completion, stabilization.
+    expect(summaryRow).toContain('| ✓ |');            // servedModelMatches === true
+    expect(summaryRow).toContain('| 2/4 |');          // leaves completed/attempted
+    expect(summaryRow).toContain('| FAIL:node:tsc |'); // stabilization failing gate
+  });
+
+  it('flags a served-model mismatch up front and in the row', () => {
+    const report = buildCrossConfigReport({
+      sweepId: 's', generatedAt: 'now', referenceWorkspace: '/ref',
+      candidates: CANDIDATES,
+      results: [metrics({ servedModel: 'gpt-oss:20b', servedModelMatches: false })],
+    });
+    expect(report).toContain('SERVED-MODEL MISMATCH');
+    expect(report).toContain("ran 'gpt-oss:20b'");
+    const row = report.split('\n').find((l) => l.startsWith('| gemma4-12b-fa |'));
+    expect(row).toContain('✗ gpt-oss:20b');
   });
 
   it('renders per-task rows, escaping pipes in error messages', () => {

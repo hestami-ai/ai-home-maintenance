@@ -93,6 +93,9 @@ describe('materializeScaffold — file generation + idempotency', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(ws, 'package.json'), 'utf-8'));
     expect(pkg.type).toBe('module');
     expect(pkg.scripts.test).toBe('vitest run');
+    // fast-check is preinstalled (dev) so property test cases don't quarantine
+    // on a missing module.
+    expect(pkg.devDependencies['fast-check']).toBeDefined();
 
     // Model maps types to permissive TS types.
     const model = fs.readFileSync(path.join(ws, 'src/shared/models/ShortLink.ts'), 'utf-8');

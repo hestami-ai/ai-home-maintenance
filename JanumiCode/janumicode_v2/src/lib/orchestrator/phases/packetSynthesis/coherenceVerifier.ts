@@ -220,6 +220,9 @@ function verifyPacket(
   // an HTTP status, a number, a comparison operator, a percentile, or a time unit).
   const measurablePattern = /HTTP|\b[12345]\d{2}\b|\b\d+(\.\d+)?\s*(ms|s|min|hr|%|MB|GB)\b|<=|>=|≤|≥|<|>|equal/i;
   for (const ec of packet.evaluation_criteria) {
+    // A property-backed criterion IS measurable by construction: a generator
+    // samples the input domain and asserts the invariant for every case.
+    if (ec.property_spec && ec.property_spec.invariant.length > 0) continue;
     if (!measurablePattern.test(ec.success_condition)) {
       advisory.push(`A3_UNMEASURABLE_EVAL_CRITERION: target ${ec.target_id} success_condition lacks measurable predicate`);
     }

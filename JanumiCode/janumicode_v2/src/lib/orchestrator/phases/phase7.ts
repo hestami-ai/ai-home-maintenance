@@ -17,6 +17,7 @@ import type {
   DecompositionTestCase,
   TestDecompositionNodeContent,
   GovernedStreamRecord,
+  PropertySpec,
 } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveFrView } from './phaseContext';
@@ -31,7 +32,7 @@ import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
 
 interface TestCase {
   test_case_id: string;
-  type: 'unit' | 'integration' | 'end_to_end';
+  type: 'unit' | 'integration' | 'end_to_end' | 'property';
   acceptance_criterion_ids: string[];
   component_ids?: string[];
   preconditions: string[];
@@ -40,6 +41,8 @@ interface TestCase {
   expected_outcome: string;
   edge_cases?: string[];
   implementation_notes?: string;
+  /** Present iff type === 'property' (emerges in 7.1a saturation, not the skeleton). */
+  property_spec?: PropertySpec;
 }
 
 interface TestSuite {
@@ -229,6 +232,9 @@ export class Phase7Handler implements PhaseHandler {
           expected_outcome: tc.expected_outcome,
           edge_cases: tc.edge_cases,
           active_constraints: constraintIds,
+          // Carry a skeleton-minted property into the saturation tree so the
+          // decomposition pass can refine/fan it out rather than re-derive it.
+          property_spec: tc.property_spec,
         })),
       );
       rootTestRecordIds = [];

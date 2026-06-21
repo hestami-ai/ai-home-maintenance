@@ -1,14 +1,35 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   classifyOutcome,
   collectMetrics,
+  readGooseServedModel,
   type RunEnvironment,
 } from '../../../../../scripts/model-bakeoff/metricsCollector';
 import type { CandidateSpec } from '../../../../../scripts/model-bakeoff/bakeoffConfig';
 
 const CANDIDATE: CandidateSpec = { slug: 'c1', modelTag: 'gemma4:12b-it-qat', server: {} };
+
+describe('readGooseServedModel', () => {
+  let root: string;
+  beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'goose-root-')); });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+  it('parses model + OLLAMA_HOST from the goose config.yaml', () => {
+    mkdirSync(join(root, 'config'), { recursive: true });
+    writeFileSync(join(root, 'config', 'config.yaml'),
+      'OLLAMA_HOST: http://127.0.0.1:11434\nactive_provider: ollama\nproviders:\n    model: gemma4:26b-a4b-it-qat\n', 'utf-8');
+    expect(readGooseServedModel(root)).toEqual({ model: 'gemma4:26b-a4b-it-qat', host: 'http://127.0.0.1:11434' });
+  });
+
+  it('returns nulls when no config.yaml exists', () => {
+    expect(readGooseServedModel(root)).toEqual({ model: null, host: null });
+  });
+});
 
 function env(overrides: Partial<RunEnvironment> = {}): RunEnvironment {
   return {
@@ -66,6 +87,7 @@ describe('collectMetrics', () => {
       record_type TEXT NOT NULL,
       sub_phase_id TEXT,
       produced_at TEXT NOT NULL,
+      derived_from_record_ids TEXT,
       content TEXT NOT NULL
     )`);
     seq = 0;
@@ -75,12 +97,15 @@ describe('collectMetrics', () => {
     db.close();
   });
 
-  function insert(recordType: string, subPhaseId: string | null, content: unknown): void {
+  function insert(recordType: string, subPhaseId: string | null, content: unknown, derivedFrom?: string[], id?: string): string {
     seq++;
+    const rid = id ?? `r${seq}`;
     db.prepare(
-      `INSERT INTO governed_stream (id, record_type, sub_phase_id, produced_at, content)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(`r${seq}`, recordType, subPhaseId, `2026-06-11T00:00:${String(seq).padStart(2, '0')}Z`, JSON.stringify(content));
+      `INSERT INTO governed_stream (id, record_type, sub_phase_id, produced_at, derived_from_record_ids, content)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(rid, recordType, subPhaseId, `2026-06-11T00:00:${String(seq).padStart(2, '0')}Z`,
+      derivedFrom ? JSON.stringify(derivedFrom) : null, JSON.stringify(content));
+    return rid;
   }
 
   function executorOutput(taskId: string, overrides: Record<string, unknown> = {}): void {
@@ -140,6 +165,49 @@ describe('collectMetrics', () => {
     expect(m.vramPeakMb).toBe(18000);
   });
 
+  it('reads the language-agnostic stabilization outcome + forcedStack from execution_summary', () => {
+    executorOutput('T-1');
+    testResult('T-1', 3, 0);
+    // green closing act
+    insert('artifact_produced', 'implementation_task_execution', {
+      kind: 'execution_summary',
+      tasks_attempted: 3,
+      tasks_completed: 2,
+      tasks_failed: 1,
+      tasks_quarantined: 0,
+      stabilization_gates_passed: true,
+      stabilization_residual: null,
+    });
+    const green = collectMetrics({ db, candidate: { ...CANDIDATE, forceStack: 'python' }, env: env() });
+    expect(green.forcedStack).toBe('python');
+    expect(green.stabilizationGatesPassed).toBe(true);
+    expect(green.stabilizationFailingGates).toEqual([]);
+    // authoritative leaf rollup (the headline language-comparison signal)
+    expect(green.leafTasksAttempted).toBe(3);
+    expect(green.leafTasksCompleted).toBe(2);
+    expect(green.leafTasksFailed).toBe(1);
+
+    // red closing act with residual (supersedes — latest by produced_at)
+    insert('artifact_produced', 'implementation_task_execution', {
+      kind: 'execution_summary',
+      stabilization_gates_passed: false,
+      stabilization_residual: { failingGateNames: ['python:test'], repairAttempts: 2, evidence: 'x' },
+    });
+    const red = collectMetrics({ db, candidate: { ...CANDIDATE, forceStack: 'python' }, env: env() });
+    expect(red.stabilizationGatesPassed).toBe(false);
+    expect(red.stabilizationFailingGates).toEqual(['python:test']);
+    expect(red.stabilizationRepairAttempts).toBe(2);
+  });
+
+  it('leaves stabilization fields null and notes the gap when no execution_summary exists', () => {
+    executorOutput('T-1');
+    testResult('T-1', 1, 0);
+    const m = collectMetrics({ db, candidate: CANDIDATE, env: env() });
+    expect(m.forcedStack).toBeNull();
+    expect(m.stabilizationGatesPassed).toBeNull();
+    expect(m.notes.some(n => n.includes('no execution_summary'))).toBe(true);
+  });
+
   it('later attempts supersede earlier rows for the same task', () => {
     executorOutput('T-1', { exit_code: 1, status: 'error' });
     testResult('T-1', 0, 3);
@@ -148,6 +216,35 @@ describe('collectMetrics', () => {
     const m = collectMetrics({ db, candidate: CANDIDATE, env: env() });
     expect(m.tasks).toHaveLength(1);
     expect(m.tasks[0].outcome).toBe('pass');
+  });
+
+  it('binds CLI-executor outputs to tasks via the invocation→output join (no task_id on the output)', () => {
+    // The goose/CLI executor: invocation carries task_id; the derived output
+    // carries the timing (duration/bytes/timed_out) under sub_phase '9.1' with
+    // NO task_id inside the output content. This is the real-run shape that the
+    // old `implementation_task_execution` + content.task_id query missed.
+    const invId = insert('agent_invocation', '9.1', { task_id: 'task-deletion-1', model: 'goose_cli', provider: 'goose_cli' });
+    insert('agent_output', '9.1',
+      { model: 'goose_cli', status: 'success', duration_ms: 245_000, bytes_stdout: 190_000, exit_code: 0, timed_out: false },
+      [invId]);
+    // A timed-out scaffolding task (also CLI-executor, also no content.task_id).
+    const invId2 = insert('agent_invocation', '9.1', { task_id: 'task-scaffold-1', model: 'goose_cli', provider: 'goose_cli' });
+    insert('agent_output', '9.1',
+      { model: 'goose_cli', status: 'error', duration_ms: 1_800_000, bytes_stdout: 500_000, exit_code: 0, timed_out: true },
+      [invId2]);
+    // A session-responder direct call (gpt-oss, no task_id, no derived task) — must be ignored.
+    insert('agent_output', '9.1', { model: 'gpt-oss:20b', status: 'success', duration_ms: 20_000 });
+    testResult('task-deletion-1', 4, 0);
+
+    const m = collectMetrics({ db, candidate: CANDIDATE, env: env() });
+    const byId = new Map(m.tasks.map((t) => [t.taskId, t]));
+    expect(byId.get('task-deletion-1')?.outcome).toBe('pass');
+    expect(byId.get('task-deletion-1')?.durationMs).toBe(245_000);
+    expect(byId.get('task-scaffold-1')?.outcome).toBe('timeout'); // timed_out wins
+    expect(m.timeoutCount).toBe(1);
+    // The anonymous session-responder output created no phantom task.
+    expect(m.tasks).toHaveLength(2);
+    expect(m.meanCharsPerSec).not.toBeNull(); // bytes_stdout/duration now measurable
   });
 
   it('classes every task context_overflow when the pre-check failed', () => {
@@ -171,12 +268,14 @@ describe('collectMetrics', () => {
     expect(m.notes.some((n) => n.includes('consistency_report'))).toBe(true);
   });
 
-  it('excludes executor rows without task_id from per-task metrics, with a note', () => {
-    insert('agent_output', 'implementation_task_execution', { status: 'success', duration_ms: 1000 });
+  it('silently excludes anonymous phase-9 outputs (e.g. session-responder) from per-task metrics', () => {
+    // A phase-9 agent_output with neither a task_id nor a derived-from invocation
+    // (the session responder / DMR direct calls) must NOT become a phantom task.
+    insert('agent_output', '9.1', { model: 'gpt-oss:20b', status: 'success', duration_ms: 1000 });
     executorOutput('T-1');
     testResult('T-1', 1, 0);
     const m = collectMetrics({ db, candidate: CANDIDATE, env: env() });
     expect(m.tasks).toHaveLength(1);
-    expect(m.notes.some((n) => n.includes('no task_id'))).toBe(true);
+    expect(m.tasks[0].taskId).toBe('T-1');
   });
 });

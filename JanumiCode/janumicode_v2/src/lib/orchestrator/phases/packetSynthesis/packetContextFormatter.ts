@@ -135,6 +135,15 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
         for (const p of tc.preconditions) lines.push(`- ${p}`);
       }
       lines.push(`Expected outcome: ${tc.expected_outcome}`);
+      if (tc.property_spec) {
+        const ps = tc.property_spec;
+        lines.push(`PROPERTY TEST (${ps.property_kind}) — implement with the stack's property-based-testing library (fast-check / Hypothesis / proptest / gopter), not a single example:`);
+        lines.push(`  Invariant (must hold for ALL inputs): ${ps.invariant}`);
+        lines.push(`  Input domain to generate over: ${ps.input_domain}`);
+        if (ps.generators && ps.generators.length > 0) lines.push(`  Suggested generators: ${ps.generators.join(', ')}`);
+        if (ps.oracle) lines.push(`  Oracle: ${ps.oracle}`);
+        if (ps.metamorphic_relation) lines.push(`  Metamorphic relation: ${ps.metamorphic_relation}`);
+      }
       lines.push('');
     }
   }
@@ -147,6 +156,10 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
       lines.push(`- Target \`${ec.target_id}\` (${ec.kind})`);
       lines.push(`  Method: ${ec.evaluation_method}`);
       lines.push(`  Success: ${ec.success_condition}`);
+      if (ec.property_spec) {
+        const ps = ec.property_spec;
+        lines.push(`  PROPERTY (${ps.property_kind}) — verify generatively with the stack's PBT library: assert "${ps.invariant}" for all inputs in {${ps.input_domain}}${ps.oracle ? ` (oracle: ${ps.oracle})` : ''}.`);
+      }
     }
     lines.push('');
   }

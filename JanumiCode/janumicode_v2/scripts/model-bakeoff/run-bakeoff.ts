@@ -14,7 +14,7 @@
  *
  * Preconditions for a live run (NOT enforced here):
  *   - `pnpm build` so dist/cli/janumicode.js is current
- *   - the GPU is otherwise idle (the harness evicts the system Ollama's
+ *   - the GPU has headroom for the candidate model (the harness uses the system
  *     resident models but won't fight another training/eval process)
  *   - a Phase-8-complete reference workspace + DB (run the TinyURL intent
  *     with --phase-limit 8 once and point the matrix at it)

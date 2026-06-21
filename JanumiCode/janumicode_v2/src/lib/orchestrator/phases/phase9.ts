@@ -272,6 +272,19 @@ export class Phase9Handler implements PhaseHandler {
       };
     });
 
+    // Bakeoff/experiment lever: cap the implemented leaf set to the first N
+    // (JANUMICODE_BAKEOFF_MAX_LEAVES). A model bakeoff measures per-leaf code
+    // quality on a few representative leaves — running all ~20 is hours per
+    // candidate. The composition root is injected AFTER this, so the capped
+    // project still wires + gates. Unset/<=0 ⇒ no cap (normal runs).
+    const leafCapRaw = Number.parseInt(process.env.JANUMICODE_BAKEOFF_MAX_LEAVES ?? '', 10);
+    if (Number.isFinite(leafCapRaw) && leafCapRaw > 0 && schedulerLeaves.length > leafCapRaw) {
+      getLogger().warn('workflow', 'Phase 9: BAKEOFF leaf cap applied — implementing a SUBSET', {
+        workflow_run_id: workflowRun.id, cap: leafCapRaw, original_leaf_count: schedulerLeaves.length,
+      });
+      schedulerLeaves.length = leafCapRaw;
+    }
+
     // Tier-A injection #3 — the COMPOSITION ROOT ("make it run"). Slice-144:
     // app bootstrap/wiring was nobody's task, so the run produced a parts bin
     // (no entrypoint, framework type-shimmed instead of installed). Injected
@@ -392,6 +405,11 @@ export class Phase9Handler implements PhaseHandler {
         rejected_waves: scheduleResult.rejectedWaveCount,
         execution_trace_count: scheduleResult.invocationIds.length,
         wave_outcomes: scheduleResult.waveOutcomes,
+        // Closing-act stabilization outcome — the language-AGNOSTIC build/test
+        // signal (per-stack GateCommands), as opposed to the TS-only tsc count
+        // in the Phase-10 consistency_report. null ⇒ gates green or no gates.
+        stabilization_residual: scheduleResult.stabilizationResidual,
+        stabilization_gates_passed: scheduleResult.stabilizationResidual === null,
       },
     });
     artifactIds.push(executionRecord.id);

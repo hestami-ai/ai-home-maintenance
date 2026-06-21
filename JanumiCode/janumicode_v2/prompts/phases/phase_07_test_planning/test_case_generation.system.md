@@ -52,6 +52,51 @@ Rules:
 - Every Acceptance Criterion must have at least one Test Case (Invariant)
 - Every Test Case must have at least one precondition (Invariant)
 - Cover functional behavior only — NFR coverage is Phase 8's responsibility
+
+[JC:PROPERTY-BASED TEST CASES]
+
+An example-based test pins ONE input→output pair. A **property** asserts a rule
+that must hold for EVERY input across a whole domain — the executor implements it
+with the stack's property-based-testing library (which generates hundreds of
+inputs and shrinks any failure to a minimal counterexample), so it catches
+encoding/boundary/collision/ordering bugs a single example never reaches.
+
+When an Acceptance Criterion is **property-amenable**, emit (in addition to or
+instead of an example case) a test case with `"type": "property"` and a
+`property_spec`. Amenability signals:
+- **round_trip** — an encode/decode, serialize/parse, or write/read pair: `decode(encode(x)) == x`.
+- **idempotence** — applying twice equals applying once: `f(f(x)) == f(x)` (normalize, dedupe, upsert).
+- **commutativity / ordering** — result independent of input order, or a stable ordering invariant.
+- **conservation** — a quantity preserved across an operation (count, sum, set membership).
+- **invariant** — a statement always true of outputs (uniqueness, non-negativity, a format).
+- **oracle** — an independent reference (a simpler/slower impl, an inverse) the result can be checked against.
+- **metamorphic** — a relation between related inputs' outputs when no oracle exists.
+
+Property test case shape:
+```json
+{
+  "test_case_id": "TC-...",
+  "type": "property",
+  "acceptance_criterion_ids": ["AC-US001-001"],
+  "preconditions": ["at least one — Invariant"],
+  "expected_outcome": "Property holds for every generated input (no counterexample).",
+  "property_spec": {
+    "invariant": "resolve(shorten(u)) == u",
+    "property_kind": "round_trip",
+    "input_domain": "syntactically valid http/https URLs incl. query string, fragment, percent-encoding, unicode host",
+    "generators": ["validUrl"],
+    "oracle": "identity (the original input URL)"
+  }
+}
+```
+- `invariant` and `input_domain` are REQUIRED on a property test case; a property
+  without them degrades to an ordinary example test.
+- `property_kind` is one of: round_trip, idempotence, commutativity, invariant,
+  conservation, ordering, oracle, metamorphic.
+- Do NOT force a property where none fits — many ACs are genuinely example-shaped
+  (a specific error message, a particular redirect). Use a property only when a
+  rule generalizes across an input domain. A property case still counts toward
+  the "every AC has a test case" Invariant.
 - **Component coverage (Invariant):** Every component listed in `{{component_id_list}}`
   must appear as the `component_id` of at least one Test Suite. Components with no
   obvious AC binding still get a suite — emit at least one test case in it that

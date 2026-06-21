@@ -27,6 +27,7 @@ import type {
   ImplementationPacketContent,
   PacketSynthesisFailureContent,
   GovernedStreamRecord,
+  PropertySpec,
 } from '../../types/records';
 import { indexArtifacts, type UpstreamArtifactInput } from './packetSynthesis/upstreamIndex';
 import {
@@ -313,11 +314,24 @@ function extractCriteriaArray(
       const success_condition = typeof obj.success_condition === 'string'
         ? obj.success_condition
         : (typeof obj.threshold === 'string' ? obj.threshold : '');
+      // A quality criterion may carry a generative property_spec (Phase 8).
+      // Validate the minimal shape here so a malformed spec never reaches the
+      // executor as a property with no rule to check.
+      const ps = obj.property_spec;
+      let property_spec: PropertySpec | undefined;
+      if (ps !== null && typeof ps === 'object') {
+        const p = ps as Record<string, unknown>;
+        if (typeof p.invariant === 'string' && p.invariant.length > 0
+          && typeof p.input_domain === 'string' && p.input_domain.length > 0) {
+          property_spec = p as unknown as PropertySpec;
+        }
+      }
       out.push({
         kind,
         target_id: targetId,
         evaluation_method,
         success_condition,
+        ...(property_spec ? { property_spec } : {}),
       });
     }
   }

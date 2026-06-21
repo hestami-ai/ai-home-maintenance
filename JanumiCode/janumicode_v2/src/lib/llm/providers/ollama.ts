@@ -37,6 +37,10 @@ export class OllamaProvider implements LLMProviderAdapter {
     // in a routing-level override so any caller that points at a gemma
     // model gets the right defaults automatically.
     const isGemma = modelLc.startsWith('gemma');
+    // Large gemma4 MoE coders (gemma4:26b-a4b-it-qat, gemma4:12b-it-qat) run
+    // comfortably at the full 256K window on the 4090 (verified live); the small
+    // gemma4:e4b stays at the 131072 ceiling below.
+    const isGemmaLarge = isGemma && (modelLc.includes('26b') || modelLc.includes('12b'));
     // Granite4.1 (`granite4.1:30b-q4_K_M`) is a non-thinking model.
     // Ollama rejects `think: true` for non-thinking families with
     // `"<model>" does not support thinking`. Skip the flag.
@@ -55,12 +59,17 @@ export class OllamaProvider implements LLMProviderAdapter {
     const onChunk = (options as LLMStreamingCallOptions).onChunk;
 
     // Model-family temperature overrides. Qwen thinking models loop at
-    // low temperatures (see big comment in the original impl). Gemma's
-    // sampling recommendation is temperature=1 with top_k=64, top_p=0.95.
-    // Non-family callers keep their own temperature.
+    // low temperatures (see big comment in the original impl). The gemma4 docs
+    // mandate a FIXED sampling profile — temperature=1, top_k=64, top_p=0.95 —
+    // for ALL gemma calls. A prior hardcoded `temperature = 0` (greedy) here
+    // made gemma4:26b repeat its Phase-7 test-case output ~16× until the 1.5 MB
+    // log cap fired, while the SAME prompt at temperature=1 (verified directly
+    // via Ollama) completed cleanly. So gemma is pinned to 1 (top_k/top_p set
+    // in the options block below) — never greedy. Non-family callers keep their
+    // own temperature.
     let temperature: number;
     if (isQwen) temperature = 1;
-    else if (isGemma) temperature = 0;
+    else if (isGemma) temperature = 1;
     else temperature = options.temperature ?? 0.7;
 
     // Token cap (`num_predict`) — off by default to match the
@@ -99,7 +108,7 @@ export class OllamaProvider implements LLMProviderAdapter {
         // Ollama would otherwise truncate silently), gpt-oss → 131072
         // (also native max; same rounding fix as gemma), apriel → 50K
         // (RTX 4090 ceiling for apriel-1.6:15b), default (qwen) → 262K.
-        num_ctx: isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : 262141,
+        num_ctx: isGemmaLarge ? 262144 : isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : 262141,
         ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95, min_p: 0, repeat_penalty: 1 } : {}),
         ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
         ...(numPredict > 0 ? { num_predict: numPredict } : {}),
@@ -345,6 +354,10 @@ export class OllamaProvider implements LLMProviderAdapter {
     const modelLc = options.model.toLowerCase();
     const isQwen = modelLc.startsWith('qwen');
     const isGemma = modelLc.startsWith('gemma');
+    // Large gemma4 MoE coders (gemma4:26b-a4b-it-qat, gemma4:12b-it-qat) run
+    // comfortably at the full 256K window on the 4090 (verified live); the small
+    // gemma4:e4b stays at the 131072 ceiling below.
+    const isGemmaLarge = isGemma && (modelLc.includes('26b') || modelLc.includes('12b'));
     const isGptOss = modelLc.startsWith('gpt-oss');
     const isGranite = modelLc.startsWith('granite');
     const isApriel = modelLc.startsWith('apriel');
@@ -354,7 +367,7 @@ export class OllamaProvider implements LLMProviderAdapter {
 
     let temperature: number;
     if (isQwen) temperature = 1;
-    else if (isGemma) temperature = 0;
+    else if (isGemma) temperature = 1;
     else temperature = options.temperature ?? 0.7;
 
     const body: Record<string, unknown> = {
@@ -375,7 +388,7 @@ export class OllamaProvider implements LLMProviderAdapter {
         // Mirrors the per-family num_ctx in callGenerate (single source of
         // truth would be cleaner but the two paths take different option
         // shapes). Keep these in sync when adjusting.
-        num_ctx: isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : 262141,
+        num_ctx: isGemmaLarge ? 262144 : isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : 262141,
         ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95, min_p: 0, repeat_penalty: 1 } : {}),
         ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
         ...(options.maxTokens ? { num_predict: options.maxTokens } : {}),

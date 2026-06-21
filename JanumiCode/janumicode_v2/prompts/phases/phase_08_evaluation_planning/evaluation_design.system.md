@@ -60,6 +60,40 @@ Rules:
 - No evaluation criterion should duplicate a Test Case from Phase 7
 - Compliance-related NFRs from compliance_context must have evaluation criteria
 
+[JC:PROPERTY-BASED QUALITY CRITERIA]
+
+Many NFR thresholds are not a one-off sample but a rule that must hold for EVERY
+input — "no two URLs ever collide", "decode is the exact inverse of encode for
+all payloads", "the response is always idempotent under retry". For those,
+sampling 1% and eyeballing it is weak. Instead, attach a `property_spec` to the
+quality criterion: the executor implements it with the stack's property-based-
+testing library, which generates many inputs, asserts the threshold invariant on
+all of them, and shrinks any violation to a minimal counterexample. This turns a
+vague `measurement_method` into an executable, generative measurement.
+
+Add `property_spec` to a quality criterion ONLY when the threshold generalizes
+across an input domain:
+```json
+{
+  "nfr_id": "NFR-007",
+  "category": "Reliability",
+  "evaluation_tool": "property-based test (stack-native: fast-check / Hypothesis / proptest / gopter)",
+  "threshold": "0 collisions across generated URL sets",
+  "measurement_method": "Generate sets of distinct URLs; assert the shortened codes are pairwise unique.",
+  "fallback_if_tool_unavailable": "example-based uniqueness test over a fixed seed list",
+  "property_spec": {
+    "invariant": "for distinct URLs u1..un, shorten(u1)..shorten(un) are pairwise distinct",
+    "property_kind": "invariant",
+    "input_domain": "sets of 2–1000 distinct valid http/https URLs",
+    "generators": ["distinctUrlSet"],
+    "oracle": "set cardinality (|codes| === |urls|)"
+  }
+}
+```
+- `property_kind` ∈ round_trip, idempotence, commutativity, invariant, conservation, ordering, oracle, metamorphic.
+- `invariant` and `input_domain` are REQUIRED inside `property_spec`; omit the whole `property_spec` if the threshold is genuinely a one-off measurement (a fixed latency budget measured once, a manual audit) rather than a per-input rule.
+- A `property_spec` does NOT replace `threshold`/`measurement_method` — it makes them executable. Keep all standard fields.
+
 # Hard rules — id grounding (PRIMARY surface for this phase)
 
 Thin-slice-1 evidence: when this prompt was given only NFRs and the test plan, the model fabricated `functional_requirement_id` values like `FR-SEC-001`, `FR-COMPL-001`, `FR-MNT-001` that did not exist in the upstream requirement set. The fix is grounding via the new `functional_requirements_summary` block; the rules below close the loop.

@@ -10,15 +10,13 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 
 import type { BakeoffSweepConfig, CandidateSpec } from './bakeoffConfig';
-import { DEFAULT_SYSTEM_PORT, DEFAULT_TIER1_TIMEOUT_SECONDS, resolveAltPort } from './bakeoffConfig';
+import { DEFAULT_SYSTEM_PORT, DEFAULT_TIER1_TIMEOUT_SECONDS } from './bakeoffConfig';
 import { prepareConfigWorkspace } from './corpusPrep';
 import {
   checkContextFit,
   defaultDeps,
-  evictResidentModels,
   pullOrCreateModel,
   sampleVram,
-  spawnOllamaServer,
   type LifecycleDeps,
 } from './ollamaLifecycle';
 import { collectMetrics, findWorkspaceDb, type ConfigMetrics, type RunEnvironment } from './metricsCollector';
@@ -32,8 +30,9 @@ export async function runCandidateTierTwo(
   tier2Dir: string,
   deps: LifecycleDeps = defaultDeps,
 ): Promise<ConfigMetrics> {
-  const altPort = resolveAltPort(sweep, candidate);
-  const systemBaseUrl = `http://127.0.0.1:${sweep.systemOllamaPort ?? DEFAULT_SYSTEM_PORT}`;
+  // Always uses the running system ollama — never spawns its own server.
+  const ollamaPort = sweep.systemOllamaPort ?? DEFAULT_SYSTEM_PORT;
+  const ollamaBaseUrl = `http://127.0.0.1:${ollamaPort}`;
   const logsDir = join(tier2Dir, 'logs');
 
   const { workspaceDir, intentPath } = prepareConfigWorkspace({
@@ -42,16 +41,13 @@ export async function runCandidateTierTwo(
     workspacesRoot: join(tier2Dir, 'workspaces'),
   });
 
-  await evictResidentModels(systemBaseUrl, deps);
-  const server = await spawnOllamaServer(
-    candidate,
-    { port: altPort, logFile: join(logsDir, `${candidate.slug}.ollama-serve.log`) },
-    deps,
-  );
+  deps.log(`${candidate.slug}: using system ollama at ${ollamaBaseUrl} (no server spawned)`);
+  const ver = await deps.fetchFn(`${ollamaBaseUrl}/api/version`).then(r => r.json()).catch(() => ({ version: 'unknown' }));
+  const ollamaVersion = (ver as { version?: string }).version ?? 'unknown';
 
-  try {
-    pullOrCreateModel(candidate, altPort, deps);
-    const contextFit = await checkContextFit(candidate, server.baseUrl, deps);
+  {
+    pullOrCreateModel(candidate, ollamaPort, deps);
+    const contextFit = await checkContextFit(candidate, ollamaBaseUrl, deps);
     const vramAfterLoad = sampleVram(deps);
 
     // Fresh end-to-end run: no --resume flags. Tier-2 budgets twice the
@@ -66,7 +62,13 @@ export async function runCandidateTierTwo(
         '--auto-approve',
         '--full-slice',
       ],
-      env: buildCliEnv(candidate, altPort, join(tier2Dir, 'goose-roots', candidate.slug)),
+      env: buildCliEnv(candidate, ollamaPort, join(tier2Dir, 'goose-roots', candidate.slug), process.env, {
+        maxLeaves: sweep.tier1?.maxLeaves,
+        noProgressSeconds: sweep.tier1?.noProgressSeconds,
+        maxCallSeconds: sweep.tier1?.maxCallSeconds,
+        cliTimeoutSeconds: sweep.tier1?.cliTimeoutSeconds,
+        cliIdleTimeoutSeconds: sweep.tier1?.cliIdleTimeoutSeconds,
+      }),
       logFile: join(logsDir, `${candidate.slug}.janumicode.log`),
       timeoutSeconds: (sweep.tier1?.globalTimeoutSeconds ?? DEFAULT_TIER1_TIMEOUT_SECONDS) * 2,
       deps,
@@ -74,7 +76,7 @@ export async function runCandidateTierTwo(
 
     const env: RunEnvironment = {
       contextFit,
-      ollamaVersion: server.version,
+      ollamaVersion,
       vramAfterLoad,
       vramPeak: cliResult.vramPeak,
       cliExitCode: cliResult.exitCode,
@@ -86,15 +88,13 @@ export async function runCandidateTierTwo(
     }
     const db = new Database(dbPath, { readonly: true });
     try {
-      const metrics = collectMetrics({ db, candidate, env });
+      const metrics = collectMetrics({ db, candidate, env, gooseRootDir: join(tier2Dir, 'goose-roots', candidate.slug) });
       metrics.notes.push('tier-2 full-slice run (fresh Phase 0→10, no resume)');
       if (cliResult.timedOut) metrics.notes.push('CLI run hit the sweep global timeout and was killed');
       return metrics;
     } finally {
       db.close();
     }
-  } finally {
-    await server.teardown();
   }
 }
 

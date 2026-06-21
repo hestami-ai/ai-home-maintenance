@@ -295,5 +295,20 @@ export function parseTestCounts(stdout: string, stderr: string): {
     if (passed + failed + skipped > 0) return { passed, failed, skipped };
   }
 
+  // cargo test (Rust; covers proptest) — one or more lines of the form:
+  //   "test result: ok. 12 passed; 0 failed; 1 ignored; ..."
+  // A binary/integration run emits several such lines; sum them so a proptest
+  // counterexample (which increments `failed`) is reported, not just exit-coded.
+  const cargoLine = /test result:\s+\w+\.\s+(\d+)\s+passed;\s+(\d+)\s+failed(?:;\s+(\d+)\s+ignored)?/gi;
+  let cargoMatch: RegExpExecArray | null;
+  let cargoSeen = false;
+  while ((cargoMatch = cargoLine.exec(text)) !== null) {
+    cargoSeen = true;
+    passed += Number.parseInt(cargoMatch[1], 10);
+    failed += Number.parseInt(cargoMatch[2], 10);
+    skipped += cargoMatch[3] ? Number.parseInt(cargoMatch[3], 10) : 0;
+  }
+  if (cargoSeen) return { passed, failed, skipped };
+
   return { passed: 0, failed: 0, skipped: 0 };
 }

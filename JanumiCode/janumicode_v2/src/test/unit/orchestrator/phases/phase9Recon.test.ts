@@ -15,7 +15,12 @@ import {
   reconGlobalGates,
   buildReconEnforcementManifest,
   buildReconLayoutContract,
+  gatherTechnicalConstraints,
+  applyForcedStack,
+  defaultGatesForStack,
+  manifestForStack,
 } from '../../../../lib/orchestrator/phases/phase9Recon';
+import type { PhaseContext } from '../../../../lib/orchestrator/orchestratorEngine';
 
 let ws: string;
 beforeEach(() => { ws = fs.mkdtempSync(path.join(os.tmpdir(), 'recon-')); });
@@ -163,6 +168,95 @@ describe('buildReconEnforcementManifest — polyglot enforcement substrate', () 
     expect(m.allowed_extensions_by_area.web).not.toContain('.rs'); // per-area, not global
     expect(m.conventions).toContain('Area web (node)');
     expect(m.conventions).toContain('Area engine (rust)');
+  });
+});
+
+describe('applyForcedStack — executor language-sweep lever', () => {
+  // A two-area, node-shaped plan with TS canonical modules + @shared aliases.
+  const nodePlan = () => parseReconPlan({
+    workspace_kind: 'greenfield',
+    areas: [{
+      area_id: 'link_manager', stack: 'node', confidence: 'high',
+      source_roots: ['src'], test_roots: ['src/__tests__'],
+      dependency_manifest: 'package.json',
+      protected_paths: ['src/shared/', 'package.json', 'tsconfig.json'],
+      canonical_modules: [{ path: 'src/shared/models.ts', import_specifier: '@shared/models', description: 'm' }],
+      import_aliases: [{ alias: '@shared/*', target: 'src/shared/*' }],
+      gate_commands: [{ kind: 'test', command: 'npm', args: ['test'] }],
+    }],
+  }, '/ws')!;
+
+  it('repoints stack/manifest/gates/extensions to python while preserving topology', () => {
+    const forced = applyForcedStack(nodePlan(), 'python');
+    const a = forced.areas[0];
+    expect(forced.forced_stack).toBe('python');
+    expect(a.stack).toBe('python');
+    expect(a.dependency_manifest).toBe('pyproject.toml');
+    expect(a.gate_commands).toEqual(defaultGatesForStack('python'));
+    expect(a.gate_commands.some(g => g.command === 'pytest')).toBe(true);
+    // topology preserved
+    expect(a.area_id).toBe('link_manager');
+    expect(a.source_roots).toEqual(['src']);
+    expect(a.test_roots).toEqual(['src/__tests__']);
+    // canonical module extension retargeted; node-only aliases dropped
+    expect(a.canonical_modules[0].path).toBe('src/shared/models.py');
+    expect(a.import_aliases).toEqual([]);
+    // protected dir kept, manifest swapped (no stale tsconfig/package.json)
+    expect(a.protected_paths).toContain('src/shared/');
+    expect(a.protected_paths).toContain('pyproject.toml');
+    expect(a.protected_paths).not.toContain('package.json');
+    expect(a.protected_paths).not.toContain('tsconfig.json');
+  });
+
+  it('keeps @shared aliases when forcing back to node, and uses .rs/.go for rust/go', () => {
+    expect(applyForcedStack(nodePlan(), 'node').areas[0].import_aliases.length).toBe(2);
+    expect(applyForcedStack(nodePlan(), 'rust').areas[0].canonical_modules[0].path).toBe('src/shared/models.rs');
+    expect(applyForcedStack(nodePlan(), 'go').areas[0].canonical_modules[0].path).toBe('src/shared/models.go');
+    expect(manifestForStack('rust')).toBe('Cargo.toml');
+    expect(manifestForStack('java')).toBe('pom.xml');
+  });
+
+  it('returns the plan unchanged for an unknown stack', () => {
+    const p = nodePlan();
+    const out = applyForcedStack(p, 'cobol');
+    expect(out.forced_stack).toBeUndefined();
+    expect(out.areas[0].stack).toBe('node');
+  });
+});
+
+describe('gatherTechnicalConstraints — Phase-1 → recon contract', () => {
+  // Build a fake engine whose writer returns the records Phase 1.0c actually
+  // writes. The shape here MUST mirror phase1.ts:864 + records.ts:TechnicalConstraint.
+  const fakeEngine = (records: Array<Record<string, unknown>>): PhaseContext['engine'] =>
+    ({ writer: { getRecordsByType: () => records.map(content => ({ content })) } } as unknown as PhaseContext['engine']);
+
+  it('reads the camelCase `technicalConstraints` key + the `.text` item field Phase 1.0c emits', () => {
+    // Exactly the shape phase1.ts persists. A reader keyed on snake_case or on
+    // `.constraint`/`.statement` (the pre-fix bug) returns [] here → the recon
+    // agent sees "(none stated)" and free-invents a stack/topology.
+    const out = gatherTechnicalConstraints(fakeEngine([
+      {
+        kind: 'technical_constraints_discovery',
+        technicalConstraints: [
+          { id: 'TECH-1', category: 'infrastructure', text: 'a single containerised service; no microservices' },
+          { id: 'TECH-2', category: 'database', text: 'Postgres 16+ on a single managed instance' },
+        ],
+      },
+    ]), 'run-1');
+    expect(out).toHaveLength(2);
+    expect(out[0]).toBe('TECH-1: a single containerised service; no microservices');
+    expect(out[1]).toContain('Postgres 16+');
+  });
+
+  it('still tolerates snake_case container + alternate item fields (LLM-shaped sources)', () => {
+    const out = gatherTechnicalConstraints(fakeEngine([
+      { kind: 'technical_constraints', constraints: [{ id: 'TC-1', constraint: 'HTTPS only' }] },
+    ]), 'run-1');
+    expect(out).toEqual(['TC-1: HTTPS only']);
+  });
+
+  it('returns empty for unrelated artifact kinds', () => {
+    expect(gatherTechnicalConstraints(fakeEngine([{ kind: 'component_model', components: [] }]), 'run-1')).toEqual([]);
   });
 });
 

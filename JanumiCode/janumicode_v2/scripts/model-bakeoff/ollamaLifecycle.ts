@@ -1,20 +1,18 @@
 /**
- * Harness-owned Ollama server lifecycle for the model bakeoff.
- *
- * The system Ollama (default port 11434) stays untouched — the harness
- * spawns its OWN `ollama serve` on an alternate port with the per-config
- * env (flash attention, KV-cache type, context length, ...). Both servers
- * share the default model blob store (~/.ollama/models), so pulls are
- * reused. The system server's resident models are evicted (keep_alive: 0)
- * before each config so the candidate has the full GPU.
+ * Ollama helpers for the model bakeoff. The harness uses the ALREADY-RUNNING
+ * system Ollama (default port 11434) — it never spawns its own server. (An
+ * earlier design spawned a harness-owned `ollama serve` on an alt port; that
+ * could orphan and hold GPU VRAM when the run was hard-killed, so the alt-
+ * instance launching was removed entirely.) These helpers only pull/create the
+ * candidate model, verify VRAM fit, and sample GPU memory against that server.
  *
  * Every function takes injectable deps so unit tests run without a GPU,
  * Ollama install, or open ports.
  */
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 import type { CandidateSpec, ModelfileSpec } from './bakeoffConfig';
 import { effectiveNumCtx } from './bakeoffConfig';
@@ -37,14 +35,6 @@ export const defaultDeps: LifecycleDeps = {
   log: (msg) => console.log(`[ollama-lifecycle] ${msg}`),
 };
 
-export interface OllamaHandle {
-  port: number;
-  baseUrl: string;
-  version: string;
-  pid: number;
-  teardown(): Promise<void>;
-}
-
 export type ContextFitVerdict = 'ok' | 'cpu_offload' | 'unknown';
 
 export interface ContextFitResult {
@@ -64,22 +54,6 @@ interface PsModel {
   model?: string;
   size?: number;
   size_vram?: number;
-}
-
-/** Env block for the harness-owned `ollama serve` process. Pure. */
-export function buildServerEnv(
-  candidate: CandidateSpec,
-  port: number,
-  baseEnv: NodeJS.ProcessEnv = process.env,
-): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...baseEnv, OLLAMA_HOST: `127.0.0.1:${port}` };
-  const s = candidate.server;
-  if (s.flashAttention !== undefined) env.OLLAMA_FLASH_ATTENTION = s.flashAttention ? '1' : '0';
-  if (s.kvCacheType !== undefined) env.OLLAMA_KV_CACHE_TYPE = s.kvCacheType;
-  if (s.contextLength !== undefined) env.OLLAMA_CONTEXT_LENGTH = String(s.contextLength);
-  if (s.numParallel !== undefined) env.OLLAMA_NUM_PARALLEL = String(s.numParallel);
-  if (s.maxLoadedModels !== undefined) env.OLLAMA_MAX_LOADED_MODELS = String(s.maxLoadedModels);
-  return env;
 }
 
 /** Render a ModelfileSpec to Modelfile text. Pure. */
@@ -105,145 +79,9 @@ export function classifyFit(ps: PsModel | undefined): Omit<ContextFitResult, 'nu
   return { verdict: sizeVram / size < 0.99 ? 'cpu_offload' : 'ok', size, sizeVram };
 }
 
-export async function isPortServing(baseUrl: string, deps: LifecycleDeps = defaultDeps): Promise<boolean> {
-  try {
-    const res = await deps.fetchFn(`${baseUrl}/api/version`, { signal: AbortSignal.timeout(3000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
 
 /**
- * Evict every model resident on a server (normally the SYSTEM Ollama at
- * 11434) so the candidate gets the whole GPU. `keep_alive: 0` unloads
- * after the (empty) request completes. The server itself keeps running.
- */
-export async function evictResidentModels(baseUrl: string, deps: LifecycleDeps = defaultDeps): Promise<string[]> {
-  let models: PsModel[] = [];
-  try {
-    const res = await deps.fetchFn(`${baseUrl}/api/ps`, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) return [];
-    models = ((await res.json()) as { models?: PsModel[] }).models ?? [];
-  } catch {
-    deps.log(`no server reachable at ${baseUrl} — nothing to evict`);
-    return [];
-  }
-  const evicted: string[] = [];
-  for (const m of models) {
-    const name = m.model ?? m.name;
-    if (!name) continue;
-    deps.log(`evicting ${name} from ${baseUrl}`);
-    try {
-      await deps.fetchFn(`${baseUrl}/api/generate`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model: name, keep_alive: 0 }),
-        signal: AbortSignal.timeout(30_000),
-      });
-      evicted.push(name);
-    } catch (err) {
-      deps.log(`evict ${name} failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-  return evicted;
-}
-
-function killTree(pid: number, deps: LifecycleDeps): void {
-  if (deps.platform === 'win32') {
-    deps.spawnSyncFn('taskkill', ['/pid', String(pid), '/T', '/F'], { shell: false });
-  } else {
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      /* already dead */
-    }
-  }
-}
-
-/**
- * Spawn the harness-owned `ollama serve` on the alt port and wait until
- * /api/version answers. Refuses to spawn over a stale/foreign listener.
- */
-export async function spawnOllamaServer(
-  candidate: CandidateSpec,
-  opts: { port: number; logFile: string },
-  deps: LifecycleDeps = defaultDeps,
-): Promise<OllamaHandle> {
-  const baseUrl = `http://127.0.0.1:${opts.port}`;
-  if (await isPortServing(baseUrl, deps)) {
-    throw new Error(
-      `Something already serves on ${baseUrl} (stale bakeoff server or other process). ` +
-      `Stop it before sweeping — the harness won't kill a process it didn't spawn.`,
-    );
-  }
-
-  mkdirSync(dirname(opts.logFile), { recursive: true });
-  const logStream = createWriteStream(opts.logFile, { flags: 'a' });
-  // A log-write failure must not take down the sweep (and the stream's
-  // async open would otherwise surface as an uncaught exception).
-  logStream.on('error', (err) => deps.log(`server log write failed: ${err.message}`));
-  const child: ChildProcess = deps.spawnFn('ollama', ['serve'], {
-    env: buildServerEnv(candidate, opts.port),
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: false,
-  });
-  child.stdout?.pipe(logStream);
-  child.stderr?.pipe(logStream);
-  const pid = child.pid;
-  if (pid === undefined) {
-    logStream.end();
-    throw new Error('ollama serve failed to spawn (no pid)');
-  }
-
-  let exited = false;
-  child.on('exit', () => {
-    exited = true;
-  });
-
-  // Readiness: up to 60s. Cold service start on Windows can be slow.
-  let version = '';
-  for (let attempt = 0; attempt < 30; attempt++) {
-    if (exited) throw new Error(`ollama serve exited during startup — see ${opts.logFile}`);
-    try {
-      const res = await deps.fetchFn(`${baseUrl}/api/version`, { signal: AbortSignal.timeout(2000) });
-      if (res.ok) {
-        version = ((await res.json()) as { version?: string }).version ?? 'unknown';
-        break;
-      }
-    } catch {
-      /* not up yet */
-    }
-    await deps.sleep(2000);
-  }
-  if (version === '') {
-    killTree(pid, deps);
-    logStream.end();
-    throw new Error(`ollama serve on port ${opts.port} never became ready — see ${opts.logFile}`);
-  }
-  deps.log(`ollama ${version} serving at ${baseUrl} (pid ${pid})`);
-
-  return {
-    port: opts.port,
-    baseUrl,
-    version,
-    pid,
-    teardown: async () => {
-      killTree(pid, deps);
-      logStream.end();
-      // Confirm the port actually freed so the next config can't trip the
-      // stale-listener guard.
-      for (let i = 0; i < 10; i++) {
-        if (!(await isPortServing(baseUrl, deps))) return;
-        await deps.sleep(1000);
-      }
-      deps.log(`WARNING: port ${opts.port} still serving after teardown`);
-    },
-  };
-}
-
-/**
- * Ensure the candidate's model exists on the alt-port server: `ollama pull`
+ * Ensure the candidate's model exists on the system server: `ollama pull`
  * for stock tags, or render + `ollama create` for Modelfile candidates.
  * Blobs land in the shared store, so repeat sweeps are cheap.
  */

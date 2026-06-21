@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { mergeExecutorConfig, prepareConfigWorkspace } from '../../../../../scripts/model-bakeoff/corpusPrep';
+import { mergeExecutorConfig, prepareConfigWorkspace, seedGooseConfig } from '../../../../../scripts/model-bakeoff/corpusPrep';
 import type { CandidateSpec } from '../../../../../scripts/model-bakeoff/bakeoffConfig';
 
 const CANDIDATE: CandidateSpec = {
@@ -100,5 +100,23 @@ describe('prepareConfigWorkspace', () => {
         workspacesRoot: join(root, 'out', 'workspaces'),
       }),
     ).toThrow(/intent\.md/);
+  });
+});
+
+describe('seedGooseConfig', () => {
+  let root: string;
+  beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'goose-seed-')); });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+  it('writes config/config.yaml with telemetry consent + a configured ollama provider at the system port', () => {
+    const p = seedGooseConfig(root, { modelTag: 'gpt-oss:20b', ollamaPort: 11434 });
+    expect(p).toBe(join(root, 'config', 'config.yaml'));
+    const yaml = readFileSync(p, 'utf-8');
+    // Telemetry key present ⇒ goose treats consent as decided ⇒ no onboarding prompt.
+    expect(yaml).toMatch(/GOOSE_TELEMETRY_ENABLED:/);
+    expect(yaml).toContain('active_provider: ollama');
+    expect(yaml).toContain('configured: true');
+    expect(yaml).toContain('model: gpt-oss:20b');
+    expect(yaml).toContain('http://127.0.0.1:11434');
   });
 });

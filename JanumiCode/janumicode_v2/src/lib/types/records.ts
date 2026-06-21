@@ -1362,6 +1362,8 @@ export interface PacketTestCase {
   acceptance_criterion_ids: string[];
   preconditions: string[];
   expected_outcome: string;
+  /** Carried into the packet so the executor can author a PBT test for a 'property' case. */
+  property_spec?: PropertySpec;
 }
 
 export interface PacketEvaluationCriterion {
@@ -1369,6 +1371,8 @@ export interface PacketEvaluationCriterion {
   target_id: string;
   evaluation_method: string;
   success_condition: string;
+  /** Present on a 'quality' criterion whose NFR threshold is a generative property. */
+  property_spec?: PropertySpec;
 }
 
 export interface PacketActiveConstraint {
@@ -1612,7 +1616,37 @@ export type TestDecompositionTestType =
   | 'integration'
   | 'end_to_end'
   | 'performance'
-  | 'contract';
+  | 'contract'
+  | 'property';
+
+/**
+ * Property-based test specification. Present only on a `test_type: 'property'`
+ * leaf. Describes an invariant that must hold across a generated input domain —
+ * the executor implements it with the stack's PBT library (fast-check,
+ * Hypothesis, proptest, gopter). A property is an alternative FORM of an atomic
+ * test, not a decomposable subtree; the existing 7.1a tiers provide any fan-out.
+ */
+export interface PropertySpec {
+  /** The rule that must always hold, e.g. "resolve(shorten(u)) === u". */
+  invariant: string;
+  property_kind:
+    | 'round_trip'
+    | 'idempotence'
+    | 'commutativity'
+    | 'invariant'
+    | 'conservation'
+    | 'ordering'
+    | 'oracle'
+    | 'metamorphic';
+  /** The space of inputs to generate over, e.g. "valid http/https URLs incl. query, fragment, percent-encoding". */
+  input_domain: string;
+  /** Optional named generators / arbitraries the executor should compose. */
+  generators?: string[];
+  /** The truth source the result is checked against (identity, a reference impl, a recomputation). */
+  oracle?: string;
+  /** For metamorphic properties: the relation between related inputs' outputs. */
+  metamorphic_relation?: string;
+}
 
 export interface DecompositionTestStep {
   id: string;
@@ -1637,6 +1671,8 @@ export interface DecompositionTestCase {
   test_file_path?: string;
   active_constraints?: string[];
   traces_to?: string[];
+  /** Present iff test_type === 'property'. The invariant + input domain the executor turns into a PBT test. */
+  property_spec?: PropertySpec;
 }
 
 export interface TestDecompositionAtomicCriteria {

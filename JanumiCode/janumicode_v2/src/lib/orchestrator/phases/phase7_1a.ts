@@ -29,6 +29,7 @@ import type {
   DecompositionTestCase,
   DecompositionTestStep,
   TestDecompositionTestType,
+  PropertySpec,
   DecompositionTier,
   DecompositionNodeStatus,
   DecompositionPassEntry,
@@ -51,7 +52,11 @@ function normalizeTier(raw: unknown): DecompositionTier {
 }
 
 const TEST_TYPES: readonly TestDecompositionTestType[] = [
-  'unit', 'integration', 'end_to_end', 'performance', 'contract',
+  'unit', 'integration', 'end_to_end', 'performance', 'contract', 'property',
+];
+const PROPERTY_KINDS: readonly NonNullable<PropertySpec['property_kind']>[] = [
+  'round_trip', 'idempotence', 'commutativity', 'invariant',
+  'conservation', 'ordering', 'oracle', 'metamorphic',
 ];
 const STEP_PHASES: readonly NonNullable<DecompositionTestStep['phase']>[] = [
   'arrange', 'act', 'assert', 'teardown',
@@ -226,6 +231,7 @@ function sanitizeChildTestCase(
   const tt = typeof c.test_type === 'string' ? c.test_type : 'unit';
   const test_type: TestDecompositionTestType = (TEST_TYPES as readonly string[]).includes(tt)
     ? tt as TestDecompositionTestType : 'unit';
+  const property_spec = test_type === 'property' ? parsePropertySpec(c.property_spec) : undefined;
   const rawSteps = Array.isArray(c.steps) ? c.steps as Array<Record<string, unknown>> : [];
   const steps: DecompositionTestStep[] = [];
   for (let idx = 0; idx < rawSteps.length; idx++) {
@@ -246,9 +252,24 @@ function sanitizeChildTestCase(
       expected_outcome: typeof s.expected_outcome === 'string' ? s.expected_outcome : undefined,
     });
   }
+  // A property is invariant-driven, not arrange/act/assert — the LLM may emit
+  // no steps. Synthesize one assert step from the invariant so the
+  // steps-non-empty contract (and downstream rendering) holds, rather than
+  // dropping a valid property child.
+  if (steps.length === 0 && property_spec) {
+    steps.push({
+      id: 'step-01',
+      description: `For all inputs in {${property_spec.input_domain}}, assert: ${property_spec.invariant}`,
+      phase: 'assert',
+      expected_outcome: 'Property holds for every generated input (no counterexample).',
+    });
+  }
   if (steps.length === 0) {
     getLogger().warn('workflow', 'Phase 7.1a: dropped malformed child (no valid steps)', { ...ctx, childId: id });
     return null;
+  }
+  if (test_type === 'property' && !property_spec) {
+    getLogger().warn('workflow', 'Phase 7.1a: property test missing/invalid property_spec — keeping as example test', { ...ctx, childId: id });
   }
   const stringArr = (key: string): string[] | undefined => {
     const raw = c[key];
@@ -272,6 +293,40 @@ function sanitizeChildTestCase(
     test_file_path: typeof c.test_file_path === 'string' ? c.test_file_path : undefined,
     active_constraints: stringArr('active_constraints'),
     traces_to: stringArr('traces_to'),
+    // `property` test_type without a valid spec degrades to an example test
+    // (test_type stays 'property' for visibility; executor falls back to steps).
+    property_spec,
+  };
+}
+
+/**
+ * Parse a property_spec from raw LLM output. Returns undefined unless the
+ * minimal shape (invariant + input_domain) is present, so a malformed spec
+ * never silently produces a property test with no rule to check.
+ */
+function parsePropertySpec(raw: unknown): PropertySpec | undefined {
+  if (raw === null || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const invariant = typeof r.invariant === 'string' ? r.invariant.trim() : '';
+  const input_domain = typeof r.input_domain === 'string' ? r.input_domain.trim() : '';
+  if (invariant.length === 0 || input_domain.length === 0) return undefined;
+  const kindRaw = typeof r.property_kind === 'string' ? r.property_kind : '';
+  const property_kind: PropertySpec['property_kind'] =
+    (PROPERTY_KINDS as readonly string[]).includes(kindRaw)
+      ? kindRaw as PropertySpec['property_kind']
+      : 'invariant';
+  const generators = Array.isArray(r.generators)
+    ? (r.generators as unknown[]).filter((x): x is string => typeof x === 'string')
+    : undefined;
+  return {
+    invariant,
+    property_kind,
+    input_domain,
+    generators: generators && generators.length > 0 ? generators : undefined,
+    oracle: typeof r.oracle === 'string' && r.oracle.length > 0 ? r.oracle : undefined,
+    metamorphic_relation:
+      typeof r.metamorphic_relation === 'string' && r.metamorphic_relation.length > 0
+        ? r.metamorphic_relation : undefined,
   };
 }
 
@@ -311,6 +366,12 @@ function formatTestCaseForPrompt(t: DecompositionTestCase): string {
     steps,
     t.expected_outcome ? `Expected outcome: ${t.expected_outcome}` : null,
     t.edge_cases && t.edge_cases.length > 0 ? `Edge cases: ${t.edge_cases.join('; ')}` : null,
+    t.property_spec
+      ? `Property: [${t.property_spec.property_kind}] ${t.property_spec.invariant}`
+        + `\n  over inputs: ${t.property_spec.input_domain}`
+        + (t.property_spec.oracle ? `\n  oracle: ${t.property_spec.oracle}` : '')
+        + (t.property_spec.metamorphic_relation ? `\n  relation: ${t.property_spec.metamorphic_relation}` : '')
+      : null,
   ].filter(Boolean).join('\n');
 }
 

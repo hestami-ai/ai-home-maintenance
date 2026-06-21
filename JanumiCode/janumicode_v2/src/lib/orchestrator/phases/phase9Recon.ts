@@ -165,6 +165,8 @@ export interface Phase9ReconPlan {
   workspace_kind: 'greenfield' | 'brownfield' | 'mixed';
   /** How the plan was produced (audit): the LLM judgment or the deterministic fallback. */
   source: 'agent' | 'deterministic_fallback';
+  /** Set when JANUMICODE_FORCE_STACK pinned every area to one stack (experiment audit). */
+  forced_stack?: string;
   areas: ReconArea[];
   integration_boundaries: IntegrationBoundary[];
   notes: string;
@@ -316,6 +318,105 @@ export function deterministicReconFallback(workspacePath: string, inv: Workspace
   };
 }
 
+// ── Forced-stack override (experiment lever, e.g. the executor LANGUAGE sweep) ──
+
+/** Stacks `applyForcedStack` knows how to materialize (manifest + gates + ext). */
+export const KNOWN_FORCED_STACKS = ['node', 'python', 'go', 'rust', 'java'] as const;
+
+const _FIVE_MIN = 300_000;
+const _TEN_MIN = 600_000;
+
+/** Canonical dependency manifest filename for a stack. */
+export function manifestForStack(stack: string): string {
+  switch (stack) {
+    case 'rust': return 'Cargo.toml';
+    case 'go': return 'go.mod';
+    case 'python': return 'pyproject.toml';
+    case 'java': return 'pom.xml';
+    default: return 'package.json';
+  }
+}
+
+/**
+ * Pure per-stack default gate commands — the no-filesystem mirror of
+ * {@link resolveGateCommands}'s per-stack arms. Used when forcing a stack onto a
+ * greenfield plan (no manifest on disk yet, so the FS resolver can't fire).
+ */
+export function defaultGatesForStack(stack: string): GateCommand[] {
+  switch (stack) {
+    case 'rust':
+      return [
+        { name: 'rust:test', kind: 'test', command: 'cargo', args: ['test'], timeoutMs: _TEN_MIN },
+        { name: 'rust:check', kind: 'typecheck', command: 'cargo', args: ['check'], timeoutMs: _FIVE_MIN },
+      ];
+    case 'go':
+      return [
+        { name: 'go:test', kind: 'test', command: 'go', args: ['test', './...'], timeoutMs: _TEN_MIN },
+        { name: 'go:vet', kind: 'typecheck', command: 'go', args: ['vet', './...'], timeoutMs: _FIVE_MIN },
+      ];
+    case 'python':
+      return [
+        { name: 'python:test', kind: 'test', command: 'pytest', args: ['-q'], timeoutMs: _TEN_MIN },
+      ];
+    case 'java':
+      return [
+        { name: 'java:test', kind: 'test', command: 'mvn', args: ['-q', 'test'], timeoutMs: _TEN_MIN },
+      ];
+    case 'node':
+    default:
+      return [
+        { name: 'node:test', kind: 'test', command: 'npm', args: ['test', '--silent'], timeoutMs: _TEN_MIN },
+        { name: 'node:tsc', kind: 'typecheck', command: 'npx', args: ['--no-install', 'tsc', '--noEmit'], timeoutMs: _FIVE_MIN },
+      ];
+  }
+}
+
+function primaryExtForStack(stack: string): string {
+  return (STACK_EXTENSIONS[stack] ?? ['.ts'])[0];
+}
+
+/** Swap a file path's source extension to the target stack's primary one. */
+function retargetExtension(p: string, stack: string): string {
+  const ext = primaryExtForStack(stack);
+  return p.replace(/\.[A-Za-z0-9]+$/, ext);
+}
+
+/**
+ * Rewrite every area of a recon plan to a single forced stack, preserving
+ * TOPOLOGY (area ids, source/test roots, integration boundaries, conflicts) so
+ * the ONLY variable that changes is the language. This is the deterministic
+ * primitive behind the executor language-sweep bakeoff (and the future
+ * production "preferred stack" tiebreaker). Unknown stacks are returned
+ * unchanged (caller logs).
+ */
+export function applyForcedStack(plan: Phase9ReconPlan, stack: string): Phase9ReconPlan {
+  if (!(KNOWN_FORCED_STACKS as readonly string[]).includes(stack)) return plan;
+  const manifest = manifestForStack(stack);
+  const aliases: ReconImportAlias[] = stack === 'node'
+    ? [{ alias: '@shared/*', target: 'src/shared/*' }, { alias: '@/*', target: 'src/*' }]
+    : [];
+  const areas = plan.areas.map(a => {
+    // Preserve directory protected-paths; replace the old manifest with the new.
+    const protectedDirs = a.protected_paths.filter(p => p.endsWith('/'));
+    return {
+      ...a,
+      stack,
+      dependency_manifest: manifest,
+      gate_commands: defaultGatesForStack(stack),
+      protected_paths: [...protectedDirs, manifest],
+      canonical_modules: a.canonical_modules.map(m => ({ ...m, path: retargetExtension(m.path, stack) })),
+      import_aliases: aliases,
+      source_refs: [...a.source_refs, `forced-stack:${stack}`],
+    };
+  });
+  return {
+    ...plan,
+    forced_stack: stack,
+    areas,
+    notes: `${plan.notes} [stack forced to '${stack}' for executor language sweep — topology preserved]`,
+  };
+}
+
 /** Coerce an LLM-proposed area object into a validated {@link ReconArea}, or null. */
 function coerceArea(raw: unknown, workspacePath: string): ReconArea | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -449,6 +550,23 @@ export async function runPhase9ReconSubPhase(ctx: PhaseContext): Promise<Phase9R
     plan = deterministicReconFallback(workspacePath, inv);
   }
 
+  // Experiment lever: pin the whole plan to one stack (executor language sweep).
+  // Topology stays as recon decided; only the language changes. Deterministic,
+  // so a cached/fallback recon plan is overridden identically.
+  const forced = (process.env.JANUMICODE_FORCE_STACK ?? '').trim().toLowerCase();
+  if (forced) {
+    if ((KNOWN_FORCED_STACKS as readonly string[]).includes(forced)) {
+      plan = applyForcedStack(plan, forced);
+      getLogger().info('workflow', 'Phase 9.0 recon: stack FORCED via JANUMICODE_FORCE_STACK', {
+        workflow_run_id: workflowRun.id, forced_stack: forced,
+      });
+    } else {
+      getLogger().warn('workflow', 'Phase 9.0 recon: JANUMICODE_FORCE_STACK is not a known stack — ignored', {
+        workflow_run_id: workflowRun.id, forced_stack: forced, known: KNOWN_FORCED_STACKS,
+      });
+    }
+  }
+
   try {
     const record = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -481,7 +599,7 @@ export async function runPhase9ReconSubPhase(ctx: PhaseContext): Promise<Phase9R
 
 // ── Prompt + context gathering ──────────────────────────────────────
 
-function gatherTechnicalConstraints(engine: PhaseContext['engine'], runId: string): string[] {
+export function gatherTechnicalConstraints(engine: PhaseContext['engine'], runId: string): string[] {
   const out: string[] = [];
   try {
     const recs = engine.writer.getRecordsByType(runId, 'artifact_produced');
@@ -489,11 +607,18 @@ function gatherTechnicalConstraints(engine: PhaseContext['engine'], runId: strin
       const c = r.content as Record<string, unknown>;
       const kind = typeof c.kind === 'string' ? c.kind : '';
       if (!/technical_constraint/i.test(kind)) continue;
-      const list = (c.technical_constraints ?? c.constraints) as Array<Record<string, unknown>> | undefined;
+      // Accept both the camelCase key Phase 1.0c writes (`technicalConstraints`,
+      // see phase1.ts) and the snake_case an LLM might emit — the dual-key
+      // normalizer principle. A single-key reader silently empties the list and
+      // the recon agent then sees "(none stated)" and free-invents a stack.
+      const list = (c.technicalConstraints ?? c.technical_constraints ?? c.constraints) as Array<Record<string, unknown>> | undefined;
       for (const tc of Array.isArray(list) ? list : []) {
         const id = typeof tc.id === 'string' ? tc.id : '';
-        const text = typeof tc.constraint === 'string' ? tc.constraint
-          : (typeof tc.statement === 'string' ? tc.statement : (typeof tc.description === 'string' ? tc.description : ''));
+        // `TechnicalConstraint.text` is the real field (records.ts); keep the
+        // other names as fallbacks for differently-shaped sources.
+        const text = typeof tc.text === 'string' ? tc.text
+          : (typeof tc.constraint === 'string' ? tc.constraint
+            : (typeof tc.statement === 'string' ? tc.statement : (typeof tc.description === 'string' ? tc.description : '')));
         if (text) out.push(`${id ? id + ': ' : ''}${text}`);
       }
     }
@@ -529,7 +654,7 @@ function buildReconPrompt(
           + (d.manifests.length ? `; manifests: ${d.manifests.join(', ')}` : '')),
       ].join('\n');
 
-  return `You are the Phase 9 RECONNAISSANCE agent. With the filesystem facts and the advisory intent below, decide the EXECUTION ground: per-area tech stack, the directories each area owns, how areas integrate, and the per-area verification gate commands. This is JUDGMENT — show your evidence and surface conflicts; do not pretend certainty.
+  return `You are the Phase 9 RECONNAISSANCE agent. From the filesystem facts and the BINDING technical constraints below, decide the EXECUTION ground: per-area tech stack, the directories each area owns, how areas integrate, and the per-area verification gate commands. This is JUDGMENT — show your evidence and surface conflicts; do not pretend certainty. The technical constraints are binding, not advisory: obey them (including topology constraints like "a single service" / "no microservices") unless the filesystem makes one infeasible, in which case surface it in \`conflicts\` rather than silently overriding.
 
 ## Filesystem facts (deterministic scan)
 ${invStr}
@@ -541,7 +666,7 @@ ${techConstraints.length ? techConstraints.map(t => `- ${t}`).join('\n') : '(non
 ${components.length ? components.map(c => `- ${c.id}${c.name ? ` (${c.name})` : ''}${c.domain ? ` [domain ${c.domain}]` : ''}`).join('\n') : '(none)'}
 
 ## Rules
-- An "area" is a coherent slice of the workspace that uses ONE stack (a new feature, or an existing subsystem). Greenfield single-stack ⇒ ONE area.
+- An "area" is a coherent slice of the workspace that uses ONE stack (a new feature, or an existing subsystem). Greenfield single-stack ⇒ ONE area. Default to the FEWEST areas the work needs: prefer a single area unless the filesystem shows distinct existing subsystems, or a binding constraint requires separate deployables. Multiple internal concerns inside ONE deployable service are ONE area, not several — do NOT split a single-service intent into per-feature microservices.
 - Choose each area's stack from the BINDING constraints when stated; else from the filesystem; else the most reasonable conventional choice for the intent. Put the evidence in \`source_refs\` and any tension in \`conflicts\`.
 - For each area, author its gate commands: at minimum a \`test\` gate, plus \`typecheck\`/\`build\` where the stack has them. Use real commands for the stack (e.g. node: {"command":"npm","args":["test","--silent"]}; rust: {"command":"cargo","args":["test"]}; python: {"command":"pytest","args":["-q"]}). Set \`cwd\` (area-relative) when the area is not the workspace root.
 - Author each area's ENFORCEMENT MANIFEST: \`dependency_manifest\` (the stack's manifest file), \`protected_paths\` (dirs/files the coding agents must NOT author — the shared module dir + the dependency manifest/config), \`canonical_modules\` (shared types/contracts the area exposes for cross-area import, with their import specifier), and \`import_aliases\` (the canonical import form, e.g. @shared/* → src/shared/*). These REPLACE the deterministic scaffold's substrate, so the kernel enforces against them.
