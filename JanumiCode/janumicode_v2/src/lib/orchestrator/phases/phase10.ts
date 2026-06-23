@@ -19,6 +19,7 @@ import { detectDivergentDuplicates, type DivergentDuplicateFinding } from '../wo
 import { detectLayoutViolations, type ProjectLayoutContract } from './layoutContract';
 import { buildReconLayoutContract, type Phase9ReconPlan } from './phase9Recon';
 import { runTscNoEmit } from './tscValidator';
+import { detectCraftConformance } from './craftConformance';
 
 export class Phase10Handler implements PhaseHandler {
   readonly phaseId: PhaseId = '10';
@@ -79,6 +80,36 @@ export class Phase10Handler implements PhaseHandler {
     if (structural.tscSeverity === 'block' && structural.tscErrors > 0) {
       blockingFailures.push({ kind: 'tsc_errors', count: structural.tscErrors, detail: `${structural.tscErrors} TypeScript error(s) in the generated workspace.` });
     }
+
+    // Craft-conformance (Engineering Constitution) — advisory by default.
+    // Verifies the executor prompt's "verified at Phase 10" claim: did exported
+    // symbols get doc/why comments, did code cite the requirements it satisfies?
+    // Report-only unless `consistency.craft_severity` is flipped to 'block'.
+    const craftCfg = (engine.configManager.get() as unknown as {
+      consistency?: { craft_severity?: 'block' | 'warn' | 'advisory'; craft_documented_ratio_min?: number };
+    }).consistency;
+    const craftSeverity = craftCfg?.craft_severity ?? 'advisory';
+    const craftMinRatio = craftCfg?.craft_documented_ratio_min ?? 0.5;
+    const craft = detectCraftConformance(engine.projectRoot);
+    const craftBelow = craft.exportedSymbols > 0 && craft.documentedRatio < craftMinRatio;
+    internalFindings.push({ kind: 'craft_conformance', ...craft, documented_ratio_min: craftMinRatio, below_threshold: craftBelow });
+    getLogger().info('workflow', 'Phase 10.1: engineering-constitution craft conformance', {
+      workflow_run_id: workflowRun.id,
+      files_scanned: craft.filesScanned,
+      documented_ratio: Number(craft.documentedRatio.toFixed(2)),
+      exported_symbols: craft.exportedSymbols,
+      files_citing_requirements: craft.filesCitingRequirements,
+      uncommented_files: craft.uncommentedFiles,
+      below_threshold: craftBelow, severity: craftSeverity,
+    });
+    if (craftSeverity === 'block' && craftBelow) {
+      blockingFailures.push({
+        kind: 'craft_conformance',
+        documented_ratio: Number(craft.documentedRatio.toFixed(2)),
+        detail: `Engineering-constitution craft below threshold: ${Math.round(craft.documentedRatio * 100)}% of exported symbols documented (min ${Math.round(craftMinRatio * 100)}%).`,
+      });
+    }
+
     const overallPass = blockingFailures.length === 0;
 
     const consistencyRecord = engine.writer.writeRecord({
@@ -103,6 +134,9 @@ export class Phase10Handler implements PhaseHandler {
         divergent_duplicate_count: divergence.findings.length,
         layout_violation_count: structural.layoutViolations,
         tsc_error_count: structural.tscErrors,
+        craft_documented_ratio: Number(craft.documentedRatio.toFixed(3)),
+        craft_files_citing_requirements: craft.filesCitingRequirements,
+        craft_uncommented_files: craft.uncommentedFiles,
       },
     });
     artifactIds.push(consistencyRecord.id);
@@ -292,7 +326,7 @@ export class Phase10Handler implements PhaseHandler {
 
     let findings: DivergentDuplicateFinding[] = [];
     try {
-      findings = detectDivergentDuplicates(engine.workspacePath, protectedPaths);
+      findings = detectDivergentDuplicates(engine.projectRoot, protectedPaths);
     } catch (err) {
       getLogger().warn('workflow', 'Phase 10.1: divergent-duplicate scan failed', {
         workflow_run_id: workflowRun.id, error: err instanceof Error ? err.message : String(err),
@@ -363,7 +397,7 @@ export class Phase10Handler implements PhaseHandler {
     let layoutViolations = 0;
     if (contract) {
       try {
-        const report = detectLayoutViolations(engine.workspacePath, contract);
+        const report = detectLayoutViolations(engine.projectRoot, contract);
         if (!report.passed) {
           layoutViolations = report.stray_top_level_dirs.length + report.stray_shared_trees.length
             + report.foreign_language_files.length + (report.build_output_has_source ? 1 : 0);
@@ -387,7 +421,7 @@ export class Phase10Handler implements PhaseHandler {
     const isTs = (manifest?.content as Record<string, unknown> | undefined) &&
       ((manifest!.content as { profile?: { language?: string } }).profile?.language === 'typescript');
     if (isTs) {
-      const tsc = runTscNoEmit(engine.workspacePath);
+      const tsc = runTscNoEmit(engine.projectRoot);
       if (tsc.ran && !tsc.passed) {
         tscErrors = tsc.errorCount;
         findings.push({ kind: 'tsc_errors', error_count: tscErrors, excerpt: tsc.errorExcerpt.slice(0, 800), severity: tscSeverity });

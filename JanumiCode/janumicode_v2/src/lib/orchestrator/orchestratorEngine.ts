@@ -12,6 +12,7 @@ import type { Database } from '../database/init';
 import { getLogger, createTraceContext, type TraceContext } from '../logging';
 import { StateMachine } from './stateMachine';
 import { GovernedStreamWriter } from './governedStreamWriter';
+import { projectRootOf } from './workspaceLayout';
 import { runReviewHarness } from '../review/harness/reviewHarness';
 import { SchemaValidator } from './schemaValidator';
 import { InvariantChecker } from './invariantChecker';
@@ -28,6 +29,7 @@ import {
   createCodexCliParser,
   createGeminiCliParser,
   createGooseCliParser,
+  createMimoCliParser,
 } from '../cli/outputParser';
 import { LLMCaller } from '../llm/llmCaller';
 import { withTraceContext } from '../trace/traceContext';
@@ -181,6 +183,12 @@ export class OrchestratorEngine {
   readonly narrativeMemoryGenerator: NarrativeMemoryGenerator;
   readonly deepMemoryResearch: DeepMemoryResearchAgent;
   readonly workspacePath: string;
+  /**
+   * Agent-owned generated-code root = `<workspacePath>/<PROJECT_CODE_DIR>`.
+   * Distinct from `workspacePath` (control plane) so the coding agent's cwd
+   * never includes `.janumicode`. See workspaceLayout.ts.
+   */
+  readonly projectRoot: string;
 
   private readonly phaseHandlers = new Map<PhaseId, PhaseHandler>();
   private readonly versionSha: string;
@@ -542,6 +550,7 @@ export class OrchestratorEngine {
     );
 
     this.workspacePath = workspacePath;
+    this.projectRoot = projectRootOf(workspacePath);
   }
 
   /**
@@ -1258,6 +1267,7 @@ export class OrchestratorEngine {
     this.agentInvoker.registerOutputParser('gemini_cli', createGeminiCliParser());
     this.agentInvoker.registerOutputParser('goose_cli', createGooseCliParser());
     this.agentInvoker.registerOutputParser('codex_cli', createCodexCliParser());
+    this.agentInvoker.registerOutputParser('mimo_cli', createMimoCliParser());
   }
 
   /**
@@ -1311,55 +1321,7 @@ export class OrchestratorEngine {
     surfaceType: DecisionSurfaceType,
   ): Promise<DecisionResolution> {
     if (this.autoApproveDecisions) {
-      const run = this.stateMachine.getWorkflowRun(runId);
-      const currentSubPhase = run?.current_sub_phase_id ?? null;
-      const overrideSelection = currentSubPhase
-        ? this.decisionOverrides.get(currentSubPhase)
-        : undefined;
-
-      const synthetic = this.synthesizeResolution(
-        decisionId,
-        surfaceType,
-        overrideSelection,
-      );
-
-      // Write an attribution record so the audit trail (and the harness
-      // oracle) can distinguish a headless auto-approval from a human
-      // approval. Without this, the governed stream is silent at every
-      // decision point in auto-approve mode — the gap report can't tell
-      // whether a phase gate was actually approved or just skipped.
-      try {
-        this.writer.writeRecord({
-          record_type: 'decision_trace',
-          schema_version: '1.0',
-          workflow_run_id: runId,
-          phase_id: run?.current_phase_id ?? null,
-          sub_phase_id: currentSubPhase,
-          janumicode_version_sha: this.versionSha,
-          derived_from_record_ids: [decisionId],
-          content: {
-            decision_type: synthetic.type,
-            target_record_id: decisionId,
-            surface_type: surfaceType,
-            attribution: overrideSelection ? 'headless_override' : 'auto_approve',
-            auto_approved: !overrideSelection,
-            auto_approved_by: overrideSelection ? null : 'orchestrator_auto_approve',
-            override_selection: overrideSelection ?? null,
-            payload: synthetic.payload ?? {},
-          },
-        });
-      } catch {
-        // Best-effort — attribution must never block the resolution.
-      }
-
-      this.eventBus.emit('decision:requested', { runId, decisionId, surfaceType });
-      this.eventBus.emit('decision:resolved', { runId, decisionId, resolution: synthetic });
-      aoddEmit('decision.requested', { decision_id: decisionId, surface_type: surfaceType });
-      aoddEmit('decision.resolved', {
-        decision_id: decisionId,
-        resolution: { type: synthetic.type, payload: (synthetic as { payload?: unknown }).payload },
-      });
-      return Promise.resolve(synthetic);
+      return this.resolveHeadless(runId, decisionId, surfaceType);
     }
 
     return new Promise((resolve, reject) => {
@@ -1374,6 +1336,151 @@ export class OrchestratorEngine {
       this.eventBus.emit('decision:requested', { runId, decisionId, surfaceType });
       aoddEmit('decision.requested', { decision_id: decisionId, surface_type: surfaceType });
     });
+  }
+
+  /**
+   * Headless decision resolution. Default = `synthesizeResolution` (auto-approve
+   * / injected override), recorded as an `auto_approve`/`headless_override`
+   * attribution. When `JANUMICODE_SIMULATE_DECISION_AGENT=1` AND there is no
+   * explicit override, a lightweight LLM "decision-maker" instead PICKS among
+   * the surface's options and records a one-line rationale — so the
+   * decision_trace carries a real selection + reasoning (which the DMR surfaces)
+   * rather than an empty auto-approval. Falls back to the default on any agent
+   * failure. (Extracted from pauseForDecision so the agent call can be async.)
+   */
+  private async resolveHeadless(
+    runId: string,
+    decisionId: string,
+    surfaceType: DecisionSurfaceType,
+  ): Promise<DecisionResolution> {
+    const run = this.stateMachine.getWorkflowRun(runId);
+    const currentSubPhase = run?.current_sub_phase_id ?? null;
+    const overrideSelection = currentSubPhase
+      ? this.decisionOverrides.get(currentSubPhase)
+      : undefined;
+
+    const agent = (!overrideSelection && process.env.JANUMICODE_SIMULATE_DECISION_AGENT === '1')
+      ? await this.runDecisionAgent(decisionId, surfaceType).catch(() => null)
+      : null;
+
+    let resolution: DecisionResolution;
+    let content: Record<string, unknown>;
+    if (agent) {
+      resolution = agent.resolution;
+      content = {
+        decision_type: resolution.type,
+        target_record_id: decisionId,
+        surface_type: surfaceType,
+        attribution: 'simulated_decision_agent',
+        auto_approved: false,
+        auto_approved_by: null,
+        override_selection: null,
+        human_selection: agent.humanSelection,
+        rationale_captured: agent.rationale,
+        context_presented: agent.contextPresented,
+        payload: (resolution as { payload?: unknown }).payload ?? {},
+      };
+    } else {
+      resolution = this.synthesizeResolution(decisionId, surfaceType, overrideSelection);
+      content = {
+        decision_type: resolution.type,
+        target_record_id: decisionId,
+        surface_type: surfaceType,
+        attribution: overrideSelection ? 'headless_override' : 'auto_approve',
+        auto_approved: !overrideSelection,
+        auto_approved_by: overrideSelection ? null : 'orchestrator_auto_approve',
+        override_selection: overrideSelection ?? null,
+        payload: (resolution as { payload?: unknown }).payload ?? {},
+      };
+    }
+
+    // Attribution decision_trace — distinguishes auto-approval / override /
+    // simulated-agent in the audit trail. Best-effort: never blocks resolution.
+    try {
+      this.writer.writeRecord({
+        record_type: 'decision_trace',
+        schema_version: '1.0',
+        workflow_run_id: runId,
+        phase_id: run?.current_phase_id ?? null,
+        sub_phase_id: currentSubPhase,
+        janumicode_version_sha: this.versionSha,
+        derived_from_record_ids: [decisionId],
+        content,
+      });
+    } catch { /* best-effort */ }
+
+    this.eventBus.emit('decision:requested', { runId, decisionId, surfaceType });
+    this.eventBus.emit('decision:resolved', { runId, decisionId, resolution });
+    aoddEmit('decision.requested', { decision_id: decisionId, surface_type: surfaceType });
+    aoddEmit('decision.resolved', {
+      decision_id: decisionId,
+      resolution: { type: resolution.type, payload: (resolution as { payload?: unknown }).payload },
+    });
+    return resolution;
+  }
+
+  /**
+   * LLM decision-maker for headless runs (opt-in via
+   * JANUMICODE_SIMULATE_DECISION_AGENT=1). Reads the presented surface, asks the
+   * orchestrator-routed model to choose among its options + justify in one
+   * sentence, and maps the answer to a DecisionResolution plus the
+   * human_selection / rationale_captured / context_presented fields. Best-effort:
+   * returns null (→ caller falls back to auto-approve) on any problem.
+   */
+  private async runDecisionAgent(
+    decisionId: string,
+    surfaceType: DecisionSurfaceType,
+  ): Promise<{ resolution: DecisionResolution; humanSelection: string; rationale: string; contextPresented: string } | null> {
+    let surface = '';
+    try {
+      const row = this.db.prepare('SELECT content FROM governed_stream WHERE id = ?')
+        .get(decisionId) as { content: string } | undefined;
+      if (row?.content) surface = String(row.content).slice(0, 4000);
+    } catch { /* surface unavailable */ }
+
+    const allowed = surfaceType === 'phase_gate' ? "'approve'"
+      : surfaceType === 'mirror' ? "'approve' or 'reject'"
+      : "the chosen option_id (or 'approve' if no menu)";
+    const prompt =
+      'You simulate a thoughtful senior engineer making ONE project decision in an automated build.\n'
+      + `Decision surface type: ${surfaceType}.\nSurface content (JSON):\n${surface || '(unavailable)'}\n\n`
+      + 'Choose the best resolution and give a ONE-sentence rationale grounded in the surface. '
+      + `"selection" must be ${allowed}.\n`
+      + 'Return ONLY JSON: {"selection": "...", "rationale": "..."}';
+
+    let parsed: { selection?: unknown; rationale?: unknown } | null = null;
+    try {
+      const res = await this.callForRole('orchestrator', { prompt, responseFormat: 'json', temperature: 0.2 });
+      parsed = (res.parsed as { selection?: unknown; rationale?: unknown }) ?? null;
+    } catch { return null; }
+    if (!parsed) return null;
+
+    const selection = typeof parsed.selection === 'string' ? parsed.selection.trim() : '';
+    const rationale = typeof parsed.rationale === 'string' ? parsed.rationale.trim() : '';
+    if (!rationale) return null;
+
+    let resolution: DecisionResolution;
+    if (surfaceType === 'phase_gate') {
+      resolution = { type: 'phase_gate_approval' };
+    } else if (surfaceType === 'mirror') {
+      resolution = /^rej/i.test(selection)
+        ? { type: 'mirror_rejection', payload: { decisions: [] } }
+        : { type: 'mirror_approval' };
+    } else {
+      // decision_bundle — map the literal/index selection to a real option_id.
+      const optionId = this.resolveBundleOptionId(decisionId, selection)
+        ?? (selection && !/^(app|rej)/i.test(selection) ? selection : null);
+      resolution = optionId
+        ? { type: 'decision_bundle_resolution', payload: { mirror_decisions: [], menu_selections: [{ option_id: optionId }] } }
+        : { type: 'decision_bundle_resolution', payload: { mirror_decisions: [], menu_selections: [] } };
+    }
+
+    return {
+      resolution,
+      humanSelection: selection || resolution.type,
+      rationale,
+      contextPresented: `${surfaceType} surface presented (${surface.length} chars)`,
+    };
   }
 
   /**

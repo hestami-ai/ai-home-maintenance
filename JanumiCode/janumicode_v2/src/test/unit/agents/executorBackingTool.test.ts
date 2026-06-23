@@ -12,7 +12,7 @@
  *
  * These tests pin:
  *   1. ExecutorAgent invokes with its own configured backing tool
- *      (default `claude_code_cli`), NOT the task's `backingTool` field.
+ *      (default `mimo_cli`), NOT the task's `backingTool` field.
  *   2. A custom `executorBackingTool` option flows through to the
  *      invoker, so tests can steer away from a real CLI binary.
  *   3. The task's `backing_tool` descriptive value is still recorded
@@ -84,8 +84,9 @@ describe('ExecutorAgent — backing tool routing', () => {
 
     expect(invokeSpy).toHaveBeenCalledTimes(1);
     const invokeArgs = invokeSpy.mock.calls[0][0] as { backingTool: string; agentRole: string };
-    // Routing is the executor's own identity; default = claude_code_cli.
-    expect(invokeArgs.backingTool).toBe('claude_code_cli');
+    // Routing is the executor's own identity; default = mimo_cli (HTTP/SSE
+    // compose agent; goose_cli is the fallback).
+    expect(invokeArgs.backingTool).toBe('mimo_cli');
     expect(invokeArgs.agentRole).toBe('executor_agent');
   });
 

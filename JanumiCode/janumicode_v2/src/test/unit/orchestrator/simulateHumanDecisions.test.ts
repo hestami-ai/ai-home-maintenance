@@ -104,4 +104,34 @@ describe('OrchestratorEngine — simulate-human-decisions gate certification', (
     // the simulate flag exists to lift).
     expect(engine.writer.getRecordsByType(run.id, 'phase_gate_approved').length).toBe(0);
   });
+
+  it('decision agent (opt-in) records the LLM selection + rationale on the trace', async () => {
+    process.env.JANUMICODE_SIMULATE_DECISION_AGENT = '1';
+    try {
+      // Stub the orchestrator-routed LLM the decision agent calls.
+      (engine as unknown as { callForRole: unknown }).callForRole = async () => ({
+        parsed: { selection: 'approve', rationale: 'Single-tenant fits the stated scope and avoids premature multi-tenant complexity.' },
+        text: '', raw: '',
+      });
+
+      const { run } = engine.startWorkflowRun('ws-1', 'test');
+      const surface = engine.writer.writeRecord({
+        record_type: 'mirror_presented', schema_version: '1.0', workflow_run_id: run.id,
+        phase_id: '1', janumicode_version_sha: engine.janumiCodeVersionSha,
+        content: { kind: 'mirror', assumptions: [{ id: 'a1', text: 'single tenant' }] },
+      });
+
+      const resolution = await engine.pauseForDecision(run.id, surface.id, 'mirror');
+      expect(resolution.type).toBe('mirror_approval');
+
+      const trace = engine.writer.getRecordsByType(run.id, 'decision_trace')
+        .find(r => (r.content as Record<string, unknown>).attribution === 'simulated_decision_agent');
+      expect(trace, 'a simulated_decision_agent trace should be written').toBeDefined();
+      const c = trace!.content as Record<string, unknown>;
+      expect(c.human_selection).toBe('approve');
+      expect(String(c.rationale_captured)).toMatch(/single-tenant/i);
+    } finally {
+      delete process.env.JANUMICODE_SIMULATE_DECISION_AGENT;
+    }
+  });
 });

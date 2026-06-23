@@ -127,6 +127,14 @@ export interface RetrievalBrief {
   workflowRunId: string;
   phaseId: string;
   subPhaseId: string;
+  /**
+   * Optional component this request is scoped to (e.g. a per-leaf executor
+   * DMR sets it to the leaf's `component_id`). When present, structured
+   * artifact findings (component_model / data_models / interface_contracts /
+   * api_definitions) are distilled to THAT component's governing detail in the
+   * Context Packet instead of the whole project — see `distillContentSummary`.
+   */
+  focusComponentId?: string;
 }
 
 export interface ContextPacket {
@@ -850,6 +858,28 @@ export class DeepMemoryResearchAgent {
     knownGaps: string[],
     brief: RetrievalBrief,
   ): Promise<ContextPacket> {
+    // Enrich the summaries of the findings that will actually be emitted
+    // (active_constraints + the Stage-7 prompt + hydration) with the query's
+    // component scope. Harvest-time summaries are component-blind and were
+    // `[kind]`/"" for structured artifacts + decision_traces; re-derive them
+    // here via the record-type-aware, component-scoped distiller so the
+    // synthesis — and `activeConstraint.statement` below — carry real substance.
+    for (const f of findings) {
+      if (f.authorityLevel < 6 && f.materialityScore < this.materialityThreshold) continue;
+      try {
+        const rec = this.db.prepare(
+          'SELECT record_type, content FROM governed_stream WHERE id = ?',
+        ).get(f.id) as { record_type: string; content: string } | undefined;
+        if (rec) {
+          const enriched = this.extractSummary(
+            { record_type: rec.record_type, content: rec.content },
+            brief.focusComponentId,
+          );
+          if (enriched) f.summary = enriched;
+        }
+      } catch { /* keep the harvest-time summary */ }
+    }
+
     // Deterministic base — always built. LLM synthesis adds narrative.
     const activeConstraints: ActiveConstraint[] = findings
       .filter(f => f.authorityLevel >= 6 && f.governingStatus === 'active')
@@ -1083,7 +1113,7 @@ export class DeepMemoryResearchAgent {
         recordType: r.record_type,
         authorityLevel: r.authority_level,
         governingStatus: 'active' as const,
-        summary: this.extractSummary({ content: r.content }),
+        summary: this.extractSummary({ record_type: r.record_type, content: r.content }),
         sourceRecordIds: [r.id],
         materialityScore: 0,
       }));
@@ -1138,7 +1168,7 @@ export class DeepMemoryResearchAgent {
           recordType: s.row.record_type,
           authorityLevel: s.row.authority_level,
           governingStatus: 'active' as const,
-          summary: this.extractSummary({ content: s.row.content }),
+          summary: this.extractSummary({ record_type: s.row.record_type, content: s.row.content }),
           sourceRecordIds: [s.row.id],
           materialityScore: 0,
         }));
@@ -1181,7 +1211,7 @@ export class DeepMemoryResearchAgent {
         recordType: r.record_type,
         authorityLevel: r.authority_level,
         governingStatus: 'active' as const,
-        summary: this.extractSummary({ content: r.content }),
+        summary: this.extractSummary({ record_type: r.record_type, content: r.content }),
         sourceRecordIds: [r.id],
         materialityScore: 0,
       }));
@@ -1204,23 +1234,173 @@ export class DeepMemoryResearchAgent {
     return tokens.map(t => `"${t}"`).join(' OR ');
   }
 
-  private extractSummary(record: Record<string, unknown>): string {
+  private extractSummary(record: Record<string, unknown>, focusComponentId?: string): string {
     let content: Record<string, unknown>;
     if (typeof record.content === 'string') {
       try { content = JSON.parse(record.content) as Record<string, unknown>; }
-      catch { return String(record.content).slice(0, 200); }
+      catch { return String(record.content).slice(0, 300); }
     } else if (record.content && typeof record.content === 'object') {
       content = record.content as Record<string, unknown>;
     } else {
       return '';
     }
 
-    if (typeof content.summary === 'string') return content.summary.slice(0, 300);
-    if (typeof content.description === 'string') return content.description.slice(0, 300);
-    if (typeof content.statement === 'string') return content.statement.slice(0, 300);
-    if (typeof content.text === 'string') return content.text.slice(0, 300);
-    if (typeof content.response_text === 'string') return content.response_text.slice(0, 300);
-    if (typeof content.kind === 'string') return `[${content.kind}]`;
+    // Fast path: records that expose a direct narrative field.
+    if (typeof content.summary === 'string' && content.summary.trim()) return content.summary.slice(0, 300);
+    if (typeof content.description === 'string' && content.description.trim()) return content.description.slice(0, 300);
+    if (typeof content.statement === 'string' && content.statement.trim()) return content.statement.slice(0, 300);
+    if (typeof content.text === 'string' && content.text.trim()) return content.text.slice(0, 300);
+    if (typeof content.response_text === 'string' && content.response_text.trim()) return content.response_text.slice(0, 300);
+
+    // Record-type-aware distillation — the substance the fast-path fields miss.
+    // Without it, decision_traces summarised to "" (their content lives in
+    // decision_type/human_selection/rationale_captured) and structured artifacts
+    // (component_model, interface_contracts, …) collapsed to a bare `[kind]`
+    // label, so the Stage-7 synthesis had nothing to reason over.
+    const recordType = typeof record.record_type === 'string' ? record.record_type : '';
+    const kind = typeof content.kind === 'string' ? content.kind : recordType;
+    const distilled = this.distillContentSummary(kind, content, focusComponentId);
+    if (distilled) return distilled.slice(0, 500);
+
+    if (kind) return `[${kind}]`;
+    return '';
+  }
+
+  /**
+   * Record-type-aware content distillation — turns a structured artifact /
+   * decision record into a bounded, substantive summary instead of a `[kind]`
+   * label or empty string. When `focusComponentId` is supplied, structured
+   * artifacts are scoped to THAT component (a per-leaf executor DMR sees its own
+   * governing detail, not the whole project). Best-effort + defensive: any
+   * shape mismatch yields '' so the caller falls back to the `[kind]` label.
+   */
+  private distillContentSummary(
+    kind: string,
+    content: Record<string, unknown>,
+    focusComponentId?: string,
+  ): string {
+    const arr = (v: unknown): Record<string, unknown>[] =>
+      Array.isArray(v) ? (v as Record<string, unknown>[]) : [];
+    const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+    const focus = focusComponentId?.toLowerCase();
+    const matchesFocus = (id: unknown): boolean =>
+      !!focus && typeof id === 'string' && id.toLowerCase() === focus;
+
+    try {
+      // Human decisions — the substance lives in fields the fast-path never
+      // reads. Prefer the canonical selection/rationale (populated by a real or
+      // simulated decision-maker); otherwise derive from what the DecisionRouter
+      // actually writes (decision_type / attribution / option_id / action /
+      // payload bundle) so an auto-approved trace still summarises as "what
+      // happened" instead of "".
+      if (kind === 'decision_trace' || /decision|override|approval/.test(kind)) {
+        const dt = str(content.decision_type) || kind || 'decision';
+        const sel = str(content.human_selection) || str(content.option_id) || str(content.action);
+        const rat = str(content.rationale_captured);
+        const ctxP = str(content.context_presented);
+        const attribution = str(content.attribution);
+        const autoBy = str(content.auto_approved_by);
+        const payload = (content.payload && typeof content.payload === 'object')
+          ? content.payload as Record<string, unknown> : {};
+        const menu = arr(payload.menu_selections);
+        const mirror = arr(payload.mirror_decisions);
+        const bundle = [
+          menu.length ? `${menu.length} menu selection(s)` : '',
+          mirror.length ? `${mirror.length} mirror decision(s)` : '',
+        ].filter(Boolean).join(', ');
+        const parts = [
+          sel && `chose: ${sel}`,
+          rat && `rationale: ${rat}`,
+          !sel && !rat && attribution && (attribution === 'auto_approve'
+            ? `auto-approved${autoBy ? ` by ${autoBy}` : ''}`
+            : attribution),
+          bundle,
+          !sel && !rat && !attribution && ctxP && `context: ${ctxP.slice(0, 200)}`,
+        ].filter(Boolean);
+        return parts.length ? `${dt} — ${parts.join('; ')}` : dt;
+      }
+
+      // Component model — the (focus) component's responsibilities.
+      if (kind === 'component_model' || content.components) {
+        const all = arr(content.components);
+        const scoped = focus ? all.filter(c => matchesFocus(c.id) || matchesFocus(c.component_id)) : [];
+        const pick = (scoped.length ? scoped : all).slice(0, focus ? 1 : 3);
+        return pick.map(c => {
+          const id = str(c.id) || str(c.component_id) || str(c.name);
+          const resp = arr(c.responsibilities)
+            .map(r => str(r.statement) || str(r.description) || str(r)).filter(Boolean);
+          return `${id}: ${resp.slice(0, 5).join('; ')}`;
+        }).filter(Boolean).join(' | ');
+      }
+
+      // Data models — the (focus) component's entities + key fields.
+      if (kind === 'data_models' || content.models) {
+        const all = arr(content.models);
+        const scoped = focus ? all.filter(m => matchesFocus(m.component_id)) : [];
+        const pick = (scoped.length ? scoped : all).slice(0, focus ? 3 : 4);
+        return pick.map(m => {
+          const ents = arr(m.entities).map(e => {
+            const fields = arr(e.fields).map(f => str(f.name)).filter(Boolean).slice(0, 6);
+            return `${str(e.name)}(${fields.join(',')})`;
+          });
+          return `${str(m.component_id)}: ${ents.join(', ')}`;
+        }).filter(Boolean).join(' | ');
+      }
+
+      // Interface contracts — ids + protocol + auth posture.
+      if (kind === 'interface_contracts' || content.contracts) {
+        return arr(content.contracts).slice(0, 5).map(c =>
+          `${str(c.id)}: ${str(c.protocol)}${str(c.auth_mechanism) ? ` auth=${str(c.auth_mechanism)}` : ''}`.trim(),
+        ).filter(Boolean).join(' | ');
+      }
+
+      // API definitions — endpoint signatures.
+      if (kind === 'api_definitions' || content.api_definitions || content.endpoints) {
+        const eps = arr(content.api_definitions).length ? arr(content.api_definitions) : arr(content.endpoints);
+        return eps.slice(0, 6).map(e =>
+          `${str(e.method) || str(e.verb)} ${str(e.path) || str(e.route) || str(e.name)}`.trim(),
+        ).filter(Boolean).join(', ');
+      }
+
+      // Intent statement — the product concept. Its substance lives in
+      // `product_concept` (an object with name/description), which the fast-path
+      // never reads, so a certified intent collapsed to `[intent_statement]`.
+      if (kind === 'intent_statement' || content.product_concept) {
+        const pc = content.product_concept;
+        if (pc && typeof pc === 'object') {
+          const o = pc as Record<string, unknown>;
+          const line = str(o.description) || str(o.name);
+          if (line) return line;
+        }
+        if (typeof pc === 'string' && pc.trim()) return pc;
+      }
+
+      // Functional requirements — user-story lines (id + the action/outcome).
+      // The certified FR collection holds an array under `user_stories`; each
+      // story has no narrative field, so compose one from id + action.
+      if (kind === 'functional_requirements' || content.user_stories) {
+        return arr(content.user_stories).slice(0, 5).map(s => {
+          const id = str(s.id);
+          const body = str(s.action) || str(s.outcome) || str(s.role);
+          return id || body ? `${id}: ${body}`.trim() : '';
+        }).filter(Boolean).join(' | ');
+      }
+
+      // Non-functional requirements — id (category): description. The certified
+      // NFR collection holds an array under `requirements`.
+      if (kind === 'non_functional_requirements' || content.requirements) {
+        return arr(content.requirements).slice(0, 5).map(n => {
+          const id = str(n.id);
+          const cat = str(n.category);
+          const desc = str(n.description) || str(n.statement) || str(n.threshold);
+          return id || desc ? `${id}${cat ? ` (${cat})` : ''}: ${desc}`.trim() : '';
+        }).filter(Boolean).join(' | ');
+      }
+
+      // Requirements / intent — a name/title line.
+      const title = str(content.title) || str(content.name) || str(content.intent) || str(content.requirement);
+      if (title) return title;
+    } catch { /* fall through to the [kind] label */ }
     return '';
   }
 

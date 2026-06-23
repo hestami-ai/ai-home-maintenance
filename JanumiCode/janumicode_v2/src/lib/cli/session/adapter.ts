@@ -15,7 +15,7 @@
  * FS-blind); `structured` is the fallback/exception.
  */
 
-export type AdapterTier = 'structured' | 'interactive_prompt' | 'full_tui';
+export type AdapterTier = 'structured' | 'interactive_prompt' | 'full_tui' | 'agentic_server';
 
 export interface ExecutorTaskRequest {
   /** Executable, e.g. 'goose' / 'claude'. */
@@ -24,6 +24,15 @@ export interface ExecutorTaskRequest {
   cwd: string;
   /** The fully-assembled task prompt (orientation + packet + ownership + criteria). */
   prompt: string;
+  /**
+   * Absolute directory where the harness writes the task-spec file the agent
+   * reads. Defaults to `<cwd>/.janumicode/task-specs` when unset. The Phase-9
+   * executor sets it to the PROJECT ROOT (= cwd): weak interactive models
+   * anchor their writes on the spec file's directory, so the spec must live at
+   * the project root to keep the agent's code INSIDE the sandbox (and out of
+   * any `.janumicode`). The agent always receives an absolute path to the spec.
+   */
+  taskSpecDir?: string;
   env?: Record<string, string>;
   /** Hard wall-clock cap. */
   timeoutSeconds?: number;

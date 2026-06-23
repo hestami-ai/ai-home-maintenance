@@ -963,19 +963,61 @@ export class ExecutionScheduler {
       stdinText = `${orientation}${ownership ? `\n\n${ownership}` : ''}\n\n${packetContext}\n\n${stdinText}`;
     }
 
-    // Engineering Constitution — side-channel craft standard (user decision
-    // 2026-06-11): referenced in EVERY attempt (each retry is a fresh
-    // session), framed ADVISORY so it never re-creates the slice-139
-    // "everything authoritative" incoherence, with a proportionality note so
-    // tiny leaves don't grow health checks.
+    // Engineering Constitution — craft standard inlined into EVERY attempt (each
+    // retry is a fresh session). slice-151 showed the executor READ the inlined
+    // doc but never acted on it: it was framed purely ADVISORY, buried as the
+    // prompt tail, and craft doesn't affect the test/typecheck gate the model
+    // optimises for (a probe confirmed the model reads the content fine — the
+    // `<engineering_constitution>` tags don't filter it). So we now (a) LEAD with
+    // a short, specific, actionable craft directive framed as VERIFIED (the
+    // Phase-10 craft-conformance check), to pull it into the model's optimisation
+    // target, then (b) inline the full doc as the detailed reference. Still
+    // SUBORDINATE to the task spec / completion criteria / technical constraints
+    // (those always win) to avoid the slice-139 "everything authoritative" mess.
     const constitutionPath = this.reconEnforcement?.engineering_constitution_path
       ?? this.scaffoldManifest?.engineering_constitution_path;
     if (constitutionPath) {
-      stdinText += '\n\n## Engineering Constitution (advisory craft standard)\n'
-        + `Before implementing, read the file \`${constitutionPath}\` (workspace-relative) — `
-        + 'engineering best practices for code comments, debugging/observability, and testing. '
-        + 'Follow these practices wherever they do not conflict with this task\'s specification, completion criteria, or technical constraints — those always win. '
-        + 'Apply them proportionally to the scope of THIS task; application-level concerns (health checks, app-wide observability wiring) belong to the composition-root task, not ordinary leaves.';
+      // Resolve to ABSOLUTE against the control-plane workspace root before
+      // reading. The path can arrive RELATIVE (`.janumicode/…`), and the
+      // executor's cwd is the projectRoot sandbox, so a relative read resolves
+      // to `<projectRoot>/.janumicode/…` and THROWS — slice-151 had 15/45 leaves
+      // silently fall back to an unreadable path-reference for exactly this
+      // reason. The orchestrator reads the control plane directly (the agent
+      // never needs filesystem access to it).
+      const constitutionAbs = path.isAbsolute(constitutionPath)
+        ? constitutionPath
+        : path.join(this.engine.workspacePath, constitutionPath);
+      const CONSTITUTION_MAX_CHARS = 80_000;
+      let constitutionBody = '';
+      try {
+        constitutionBody = fs.readFileSync(constitutionAbs, 'utf8').trim();
+      } catch (err) {
+        getLogger().warn('workflow', 'executionScheduler: could not read engineering constitution to inline; falling back to path reference', {
+          path: constitutionAbs, error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      let truncatedNote = '';
+      if (constitutionBody.length > CONSTITUTION_MAX_CHARS) {
+        constitutionBody = constitutionBody.slice(0, CONSTITUTION_MAX_CHARS);
+        truncatedNote = '\n\n[NOTE: engineering constitution truncated to fit the prompt budget.]';
+      }
+      const craftLead =
+        'Craft requirements for THIS task (subordinate ONLY to its specification, completion criteria, and technical constraints — those always win):\n'
+        + '- Every exported function / class / module carries a brief doc comment stating WHY it exists and citing the completion criterion, acceptance criterion, or constraint it satisfies (e.g. `// CC-001: …`, `// per SR-005`).\n'
+        + '- Comment the non-obvious "why", not the "what"; prefer self-documenting names over narration; leave no commented-out code.\n'
+        + '- Apply proportionally to the scope of THIS leaf (no app-wide health checks in an ordinary leaf). These are VERIFIED after the run by a Phase-10 craft-conformance check — treat them as a soft completion requirement.';
+      stdinText += '\n\n## Engineering Constitution (required craft standard — verified at Phase 10)\n';
+      if (constitutionBody) {
+        stdinText += craftLead + '\n\nFull standard (detailed reference) below:\n'
+          + '<engineering_constitution>\n'
+          + constitutionBody
+          + '\n</engineering_constitution>'
+          + truncatedNote;
+      } else {
+        // Read failed (file genuinely missing) — keep the actionable craft lead;
+        // it stands on its own without the full doc.
+        stdinText += craftLead + `\n\n(Full standard at \`${constitutionAbs}\` was unavailable to inline.)`;
+      }
     }
 
     if (augmentedContext) {
@@ -1044,6 +1086,42 @@ export class ExecutionScheduler {
     // violation is the fragmentation/divergence symptom itself (a leaf
     // re-creating package.json or its own copy of a shared module), so we
     // quarantine + retry with explicit "import, don't reinvent" context.
+    // Sandbox-escape guard (defense-in-depth behind the relative-path steering).
+    // A write whose resolved path lands OUTSIDE the project root is the most
+    // severe violation — the agent mangled an absolute path into a directory
+    // beyond the sandbox (slice-150 created garbage as high as the drive root).
+    // Never exempt (not even the composition root): nothing legitimately writes
+    // outside the project. Quarantine + retry with feedback, and best-effort
+    // delete the exact escaped files the agent reported (safe — known agent
+    // creations outside the sandbox).
+    const sandboxEscapes = detectSandboxEscapes(executionResult.filesWritten, workspacePath);
+    if (sandboxEscapes.length > 0) {
+      logger.error('workflow', 'SANDBOX ESCAPE: leaf wrote OUTSIDE the project root (quarantining + cleaning up)', {
+        leaf: leaf.id, attempt: attemptNumber, escapes: sandboxEscapes,
+      });
+      for (const esc of sandboxEscapes) {
+        try { fs.rmSync(esc, { force: true }); } catch { /* dir or locked — leave for operator */ }
+      }
+      return {
+        invocationId: executionResult.invocationId,
+        testResult: null,
+        entry: {
+          attempt_number: attemptNumber,
+          invocation_id: executionResult.invocationId,
+          outcome: 'reasoning_review_failed',
+          reasoning_review_flaws: [{
+            flaw_type: 'write_scope_violation',
+            severity: 'high',
+            description:
+              'Wrote files OUTSIDE the project root using absolute or parent (`..`) paths — these are rejected: ' +
+              sandboxEscapes.join(', ') +
+              '. Write ONLY paths relative to your current directory (the project root); never absolute paths.',
+          }],
+          files_written_count: executionResult.filesWritten.length,
+        },
+      };
+    }
+
     let scopeViolations = this.detectWriteScopeViolations(executionResult.filesWritten, workspacePath);
     if (scopeViolations.length > 0 && leaf._composition_root) {
       // The composition root OWNS root-config edits (dependency installs,
@@ -1279,6 +1357,7 @@ export class ExecutionScheduler {
         query,
         scopeTier: 'all_runs',
         knownRelevantRecordIds: known,
+        focusComponentId: componentId,
         detailFileLabel: `9_1_task_${leaf.id}`,
         requiredOutputSpec: 'Implementation artifacts + tests per completion criteria',
       });
@@ -1488,11 +1567,46 @@ export function topoSortRespectingWave(
  * filesystem — safe because the scheduler runs in the orchestrator
  * process which already has read access to the workspace.
  */
+/**
+ * Detect writes that landed OUTSIDE the project root. Catches the
+ * absolute-path-mangling escape: the agent builds an absolute path from the
+ * workspace path it was shown, corrupts it, and the write lands beyond the
+ * sandbox (slice-150 created garbage as high as the drive root). `filesWritten`
+ * includes goose's announced tool-event writes (resolved to absolute), so
+ * reported escapes are visible here. Returns POSIX absolute paths of escapes.
+ */
+export function detectSandboxEscapes(
+  filesWritten: Array<{ filePath: string; operation: 'create' | 'modify' | 'delete' }>,
+  projectRoot: string,
+): string[] {
+  const escapes = new Set<string>();
+  for (const w of filesWritten) {
+    if (w.operation === 'delete') continue;
+    const abs = path.isAbsolute(w.filePath) ? w.filePath : path.resolve(projectRoot, w.filePath);
+    const rel = path.relative(projectRoot, abs);
+    // Outside the project root iff the relative path climbs out (`..`) or is
+    // itself absolute (e.g. a different drive letter on Windows).
+    if (rel !== '' && (rel.startsWith('..') || path.isAbsolute(rel))) {
+      escapes.add(abs.split(path.sep).join('/'));
+    }
+  }
+  return [...escapes];
+}
+
 export function buildWorkspaceOrientation(workspacePath: string, writeDirectoryPaths: string[]): string {
   const lines: string[] = [];
   lines.push('# Workspace Orientation');
   lines.push('');
-  lines.push(`Workspace root: \`${workspacePath}\``);
+  // Steer the agent to RELATIVE paths. We deliberately do NOT print the
+  // absolute workspace root: it is the longest literal string the agent
+  // echoes, and weak models mangle it into out-of-sandbox absolute paths
+  // (dropped hyphens, escape-sequence mashing) that escape the project dir.
+  // The agent's current working directory IS the project root, so relative
+  // paths suffice — and a mistyped RELATIVE path still stays inside the
+  // sandbox, whereas a mistyped ABSOLUTE path does not.
+  lines.push('You are running INSIDE the project root — it is your current working directory (`.`).');
+  lines.push('Write every file using a path RELATIVE to it (e.g. `src/foo.ts`, `internal/x/y.go`).');
+  lines.push('NEVER use an absolute path and never `cd` out of this directory — writes outside it are rejected.');
 
   let workspaceExists = false;
   let workspaceEntryCount = 0;

@@ -65,15 +65,26 @@ export class DecisionTraceGenerator {
       const content = JSON.parse(row.content as string) as Record<string, unknown>;
       const decisionType = content.decision_type as DecisionType;
 
+      // The DecisionRouter writes selection/rationale across several fields
+      // depending on the surface (canonical context_presented/human_selection/
+      // rationale_captured are only set by a real/simulated decision-maker;
+      // auto-approve + menu/mirror surfaces use attribution/option_id/action).
+      // Fall back through them so an auto-approved decision still records WHAT
+      // happened instead of empty strings.
+      const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+      const attribution = str(content.attribution);
+      const autoBy = str(content.auto_approved_by);
       decisions.push({
         decisionId: row.id as string,
         subPhaseId: (row.sub_phase_id as string) ?? '',
         decisionType,
         governedStreamRecordId: row.id as string,
         timestamp: row.produced_at as string,
-        contextPresented: (content.context_presented as string) ?? '',
-        humanSelection: (content.human_selection as string) ?? '',
-        rationaleCaptured: (content.rationale_captured as string) ?? '',
+        contextPresented: str(content.context_presented) || str(content.surface_type) || '',
+        humanSelection: str(content.human_selection) || str(content.option_id) || str(content.action)
+          || (attribution === 'auto_approve' ? 'auto-approved' : attribution),
+        rationaleCaptured: str(content.rationale_captured)
+          || (autoBy ? `auto-approved by ${autoBy}` : ''),
       });
 
       // Count by type

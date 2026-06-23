@@ -21,6 +21,8 @@ import type {
   TaskQuarantineContent,
 } from '../../types/records';
 import { getLogger } from '../../logging';
+import { ensureProjectRoot, toPosixPath } from '../workspaceLayout';
+import { MimoServerManager } from '../../cli/mimo/mimoServerManager';
 import { ExecutorAgent, type ExecutorBackingTool } from '../../agents/executorAgent';
 import { ExecutionContextBuilder, type ImplementationTask as CtxTask } from '../executionContextBuilder';
 import { TestRunner, type TestSuite } from '../testRunner';
@@ -46,6 +48,14 @@ export class Phase9Handler implements PhaseHandler {
     const artifactIds: string[] = [];
     const generateId = () => randomUUID();
 
+    // ── Sandbox the coding agent away from the control plane ───────
+    // All generated code lives under engine.projectRoot (= <workspace>/project),
+    // a sibling of — never a parent of — `.janumicode`. The executor PTY, gates,
+    // test runner, layout scan, and scaffolding all operate at projectRoot so a
+    // plain `ls` of the agent's cwd never exposes `.janumicode`. Control-plane
+    // writes (detail files, engineering constitution) stay on workspacePath.
+    ensureProjectRoot(engine.workspacePath);
+
     // ── Initialize Execution Context Builder ───────────────────────
     const execContextBuilder = new ExecutionContextBuilder(
       engine.db,
@@ -53,8 +63,13 @@ export class Phase9Handler implements PhaseHandler {
       {
         stdinMaxTokens: 8000,
         detailFileMaxBytes: 100000,
-        detailFilePathTemplate: `${engine.workspacePath}/.janumicode/runs/{workflow_run_id}/context/{sub_phase_id}_{invocation_id}.md`,
-        workspacePath: engine.workspacePath,
+        // Detail files are CONTROL PLANE → workspacePath/.janumicode (unchanged).
+        // POSIX-normalize the absolute prefix so the agent-facing detail path
+        // is uniformly forward-slash (workspacePath is native-backslash on
+        // Windows; the template segments are forward-slash → otherwise mixed).
+        detailFilePathTemplate: `${toPosixPath(engine.workspacePath)}/.janumicode/runs/{workflow_run_id}/context/{sub_phase_id}_{invocation_id}.md`,
+        // Agent-facing path resolution (write-scope paths in prompts) → projectRoot.
+        workspacePath: engine.projectRoot,
         janumiCodeVersionSha: engine.janumiCodeVersionSha,
       },
       engine.templateLoader,
@@ -361,7 +376,8 @@ export class Phase9Handler implements PhaseHandler {
 
     const scheduleResult = await scheduler.run({
       workflowRunId: workflowRun.id,
-      workspacePath: engine.workspacePath,
+      // Code root: executor cwd, gates, snapshots, write-scope all resolve here.
+      workspacePath: engine.projectRoot,
       janumiCodeVersionSha: engine.janumiCodeVersionSha,
       leaves: schedulerLeaves,
       releases,
@@ -473,7 +489,7 @@ export class Phase9Handler implements PhaseHandler {
 
     const testResults = await testRunner.runSuites(
       testSuites,
-      engine.workspacePath,
+      engine.projectRoot,
       workflowRun.id,
       engine.janumiCodeVersionSha,
     );
@@ -532,7 +548,7 @@ export class Phase9Handler implements PhaseHandler {
       evalCriteria,
       {
         workflowRunId: workflowRun.id,
-        workspacePath: engine.workspacePath,
+        workspacePath: engine.projectRoot,
         executionSummary: executionRecord.content,
         testResults: testResultsRecord.content,
       },
@@ -740,6 +756,13 @@ export class Phase9Handler implements PhaseHandler {
       deferredLeavesRemaining: scheduleResult.terminallyDeferredLeafCount,
     });
     artifactIds.push(cycleResult.recordId);
+
+    // Tear down the mimo executor server (if one was started for this run) on
+    // terminal completion. On a cycle restart, keep it warm for the next cycle;
+    // the MimoServerManager process-exit hook is the final safety net.
+    if (!cycleResult.cycleRestartTo) {
+      MimoServerManager.shutdown(engine.projectRoot);
+    }
 
     if (cycleResult.abort) {
       return { success: false, error: 'Operator aborted at cycle ceiling mirror', artifactIds };

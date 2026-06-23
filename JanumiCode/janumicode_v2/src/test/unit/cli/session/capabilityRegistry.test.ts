@@ -24,7 +24,15 @@ describe('selectExecutorAdapter', () => {
     expect(sel.fallbackReason).toBe('no_interactive_adapter');
   });
 
+  it('selects the mimo adapter even when node-pty is UNavailable (HTTP/SSE, no PTY)', () => {
+    const sel = selectExecutorAdapter('mimo_cli', { cwd: '/ws' }, /* ptyAvailable */ false);
+    expect(sel.adapter).not.toBeNull();
+    expect(sel.adapter!.tier).toBe('agentic_server');
+    expect(sel.fallbackReason).toBeNull();
+  });
+
   it('reports interactive capability per tool', () => {
+    expect(isInteractiveCapable('mimo_cli')).toBe(true);
     expect(isInteractiveCapable('goose_cli')).toBe(true);
     expect(isInteractiveCapable('claude_code_cli')).toBe(false);
     expect(isInteractiveCapable('unknown_cli')).toBe(false);

@@ -59,6 +59,136 @@ describe('DeepMemoryResearchAgent', () => {
 
   afterEach(() => { db.close(); });
 
+  // ── content-blindness fix: record-type-aware, component-scoped summaries ──
+  describe('extractSummary distillation (via research)', () => {
+    it('surfaces decision_trace rationale (not "") and scopes component_model to the focus component', async () => {
+      const dt = writer.writeRecord({
+        record_type: 'decision_trace', schema_version: '1.0', workflow_run_id: 'run-1',
+        phase_id: '2', janumicode_version_sha: 'abc',
+        content: {
+          decision_type: 'menu_selection',
+          human_selection: 'AES-256-GCM',
+          rationale_captured: 'FIPS compliance required',
+          context_presented: 'cipher choice',
+        },
+      });
+      const cm = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        phase_id: '4', janumicode_version_sha: 'abc',
+        content: {
+          kind: 'component_model',
+          components: [
+            { id: 'comp-crypto-engine', responsibilities: [{ id: 'r1', statement: 'Encrypt and decrypt URLs with AES-256-GCM' }] },
+            { id: 'comp-url-shortener', responsibilities: [{ id: 'r2', statement: 'Generate 6-character slugs' }] },
+          ],
+        },
+      });
+
+      const packet = await agent.research(baseBrief({
+        scopeTier: 'all_runs',
+        query: 'crypto engine governing decisions',
+        knownRelevantRecordIds: [dt.id, cm.id],
+        focusComponentId: 'comp-crypto-engine',
+      }));
+
+      const dtFinding = packet.materialFindings.find(f => f.id === dt.id);
+      expect(dtFinding, 'decision_trace should surface as a material finding').toBeDefined();
+      expect(dtFinding!.summary).not.toBe('');
+      expect(dtFinding!.summary).toMatch(/AES-256-GCM|FIPS/);
+
+      const cmFinding = packet.materialFindings.find(f => f.id === cm.id);
+      expect(cmFinding, 'component_model should surface').toBeDefined();
+      expect(cmFinding!.summary).not.toBe('[component_model]');
+      expect(cmFinding!.summary).toContain('Encrypt and decrypt');       // focus component's responsibility
+      expect(cmFinding!.summary).not.toContain('Generate 6-character');  // other component scoped OUT
+    });
+
+    it('summarises decision_traces from the fields the router actually writes (not "")', async () => {
+      // Auto-approve bundle — content lives in attribution/auto_approved_by.
+      const auto = writer.writeRecord({
+        record_type: 'decision_trace', schema_version: '1.0', workflow_run_id: 'run-1',
+        phase_id: '1', janumicode_version_sha: 'abc',
+        content: {
+          decision_type: 'decision_bundle_resolution', attribution: 'auto_approve',
+          auto_approved: true, auto_approved_by: 'orchestrator_auto_approve',
+          payload: { mirror_decisions: [], menu_selections: [] },
+        },
+      });
+      // Menu selection — content lives in option_id.
+      const menu = writer.writeRecord({
+        record_type: 'decision_trace', schema_version: '1.0', workflow_run_id: 'run-1',
+        phase_id: '1', janumicode_version_sha: 'abc',
+        content: { decision_type: 'menu_selection', option_id: 'OPT-SLUG-6CHAR', payload: {} },
+      });
+
+      const packet = await agent.research(baseBrief({
+        scopeTier: 'all_runs', query: 'governing decisions',
+        knownRelevantRecordIds: [auto.id, menu.id],
+      }));
+
+      const a = packet.materialFindings.find(f => f.id === auto.id);
+      expect(a!.summary).not.toBe('');
+      expect(a!.summary).toMatch(/auto-approved/i);
+
+      const m = packet.materialFindings.find(f => f.id === menu.id);
+      expect(m!.summary).toContain('OPT-SLUG-6CHAR');
+    });
+
+    it('distills the certified governing collections (intent / FR / NFR) instead of `[kind]` labels', async () => {
+      // These three are the highest-authority certified collections; their
+      // substance lives in product_concept / user_stories / requirements —
+      // fields the fast-path never reads, so they used to collapse to labels.
+      const intent = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        phase_id: '1', janumicode_version_sha: 'abc',
+        content: {
+          kind: 'intent_statement',
+          product_concept: { name: 'TinyURL tagline', description: 'A high-availability URL shortening service' },
+          confirmed_constraints: ['GDPR data minimization'],
+        },
+      });
+      const fr = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        phase_id: '2', janumicode_version_sha: 'abc',
+        content: {
+          kind: 'functional_requirements',
+          user_stories: [
+            { id: 'US-001', role: 'Link Sharer', action: 'convert a long URL into a 6-character slug', outcome: 'a compact identifier' },
+          ],
+        },
+      });
+      const nfr = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        phase_id: '2', janumicode_version_sha: 'abc',
+        content: {
+          kind: 'non_functional_requirements',
+          requirements: [
+            { id: 'NFR-002', category: 'security', description: 'At-rest encryption of all mapped URLs using AES-256' },
+          ],
+        },
+      });
+
+      const packet = await agent.research(baseBrief({
+        scopeTier: 'all_runs', query: 'governing requirements',
+        knownRelevantRecordIds: [intent.id, fr.id, nfr.id],
+      }));
+
+      const iFinding = packet.materialFindings.find(f => f.id === intent.id);
+      expect(iFinding!.summary).not.toBe('[intent_statement]');
+      expect(iFinding!.summary).toContain('high-availability URL shortening');
+
+      const frFinding = packet.materialFindings.find(f => f.id === fr.id);
+      expect(frFinding!.summary).not.toBe('[functional_requirements]');
+      expect(frFinding!.summary).toContain('US-001');
+      expect(frFinding!.summary).toContain('6-character slug');
+
+      const nfrFinding = packet.materialFindings.find(f => f.id === nfr.id);
+      expect(nfrFinding!.summary).not.toBe('[non_functional_requirements]');
+      expect(nfrFinding!.summary).toContain('NFR-002');
+      expect(nfrFinding!.summary).toMatch(/security|AES-256/);
+    });
+  });
+
   // ── computeMateriality (legacy sync API) ──────────────────────────
   describe('computeMateriality', () => {
     it('scores high-authority records higher', () => {

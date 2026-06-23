@@ -95,6 +95,7 @@ export interface FileWriteRecord {
  * infrastructure via `active_constraints[]` instead.
  */
 export type ExecutorBackingTool =
+  | 'mimo_cli'
   | 'claude_code_cli'
   | 'gemini_cli'
   | 'goose_cli'
@@ -150,7 +151,9 @@ export class ExecutorAgent {
     private readonly generateId: () => string,
     options?: ExecutorAgentOptions,
   ) {
-    this.executorBackingTool = options?.executorBackingTool ?? 'claude_code_cli';
+    // mimo (HTTP/SSE compose agent) is the DEFAULT Phase-9 executor; an explicit
+    // config/env backing_tool (or the goose fallback) overrides it.
+    this.executorBackingTool = options?.executorBackingTool ?? 'mimo_cli';
     this.unattendedSkipPermissions = options?.unattendedSkipPermissions ?? false;
     this.forcedExecutorBackingTool = options?.forcedExecutorBackingTool ?? null;
   }

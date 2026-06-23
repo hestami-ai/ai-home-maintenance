@@ -184,11 +184,15 @@ export async function runPipeline(
     engine.configManager.setWorkflowOverrides({
       records_idle_stall_ms: 3600000,
       auto_mitigation_policy: 'auto',
-      // Thin-slice runs always route Phase 9 executor invocations
-      // through goose_cli, overriding whatever the implementation_planner
-      // chose per task. Calibration cycles need cost-bounded local
-      // execution and a single executor surface to debug.
-      force_executor_backing_tool: 'goose_cli',
+      // Thin/full-slice runs pin a SINGLE Phase-9 executor surface (overriding
+      // the implementation_planner's per-task choice) so calibration cycles are
+      // debuggable. Default is now `mimo_cli` (the default executor); override
+      // via JANUMICODE_EXECUTOR_BACKING_TOOL (e.g. `goose_cli` to pin the local
+      // PTY executor).
+      force_executor_backing_tool:
+        (process.env.JANUMICODE_EXECUTOR_BACKING_TOOL as
+          | 'mimo_cli' | 'goose_cli' | 'claude_code_cli' | 'gemini_cli' | 'codex_cli' | 'direct_llm_api'
+          | undefined) ?? 'mimo_cli',
     });
 
     // The no-progress timer (default 90s, env JANUMICODE_LLM_NO_PROGRESS_SECONDS)

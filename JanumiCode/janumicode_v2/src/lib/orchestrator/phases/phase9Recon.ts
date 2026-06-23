@@ -519,7 +519,9 @@ export function parseReconPlan(parsed: unknown, workspacePath: string): Phase9Re
  */
 export async function runPhase9ReconSubPhase(ctx: PhaseContext): Promise<Phase9ReconPlan> {
   const { workflowRun, engine } = ctx;
-  const workspacePath = engine.workspacePath;
+  // Recon scans the agent-owned project root (where generated code/manifests
+  // live), not the control-plane workspace root.
+  const workspacePath = engine.projectRoot;
   const inv = buildWorkspaceInventory(workspacePath);
 
   let plan: Phase9ReconPlan;

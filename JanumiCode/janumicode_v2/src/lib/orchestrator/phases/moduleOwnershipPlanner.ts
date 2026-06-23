@@ -464,7 +464,7 @@ export function runModuleOwnershipPlanningSubPhase(ctx: PhaseContext): ModuleOwn
     };
     const adrsRecord = engine.writer.getArtifactByKind(workflowRun.id, 'architectural_decisions');
     const sharedDir = resolveProjectProfile(
-      engine.workspacePath,
+      engine.projectRoot,
       (adrsRecord?.content as Record<string, unknown>) ?? null,
       configProfile,
     ).shared_dir;

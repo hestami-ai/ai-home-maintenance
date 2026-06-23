@@ -90,6 +90,7 @@ function clipSpec(spec: string, maxChars = 16_000): string {
 // ── Types ───────────────────────────────────────────────────────────
 
 export type BackingTool =
+  | 'mimo_cli'
   | 'claude_code_cli'
   | 'gemini_cli'
   | 'goose_cli'
@@ -435,6 +436,14 @@ export class AgentInvoker {
           args,
           cwd: options.cwd,
           prompt: options.prompt,
+          // Write the task spec at the PROJECT ROOT (the agent's own cwd).
+          // Weak interactive models anchor their writes on the spec file's
+          // directory rather than the PTY cwd (slice-149: gemma created
+          // `<specDir>/implementations/...`). Putting the spec at the project
+          // root keeps the agent's anchored writes INSIDE the sandbox and
+          // aligned with where the gates expect the dependency manifest — and
+          // never under `.janumicode` (control plane or otherwise).
+          taskSpecDir: options.cwd,
           env: options.env,
           timeoutSeconds: this.cliConfig.timeoutSeconds,
           idleTimeoutSeconds: this.cliConfig.idleTimeoutSeconds,
@@ -786,6 +795,7 @@ export class AgentInvoker {
       case 'gemini_cli':      return 'Gemini CLI';
       case 'goose_cli':       return 'Goose CLI';
       case 'codex_cli':       return 'Codex CLI';
+      case 'mimo_cli':        return 'mimo';
       default:                return backingTool;
     }
   }
@@ -988,6 +998,16 @@ export class AgentInvoker {
           command: 'codex',
           args: codexArgs,
         };
+      }
+      case 'mimo_cli': {
+        // mimo runs as a Phase-9 executor via the `mimo serve` HTTP/SSE server
+        // adapter (MimoServerAdapter), which manages its own server process and
+        // ignores this command/args pair (the request's cwd drives session
+        // binding; the binary/port/agent come from mimoServerManager via
+        // JANUMICODE_MIMO_* env). buildCLICommand is still called before the
+        // adapter is selected, so return a harmless placeholder rather than
+        // throwing on the default branch.
+        return { command: 'mimo', args: ['serve'] };
       }
       default:
         throw new Error(`Unknown backing tool: ${options.backingTool}`);

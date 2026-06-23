@@ -204,6 +204,7 @@ export class GooseTuiAdapter implements ExecutorAdapter {
           if (!driver.exited && !timedOut) {
             const r = await this.exchange(driver,
               'Create a plan for the task you just read, then act on it: implement the task fully and verify its completion criteria. '
+              + this.relativePathRule()
               + this.sentinelInstruction(),
               deadline, now, 'task-prompt', /* requireCompletion */ true);
             timedOut = r.timedOut || timedOut;
@@ -220,6 +221,7 @@ export class GooseTuiAdapter implements ExecutorAdapter {
             + '(2) PLAN — state a short plan consistent with what you found; '
             + '(3) IMPLEMENT — write the code and tests, honoring the write scope and the Shared Module Ownership rules, and verify the completion criteria. '
             + 'Do not ask me questions; make reasonable decisions and proceed to completion. '
+            + this.relativePathRule()
             + this.sentinelInstruction(),
             deadline, now, 'task-prompt', /* requireCompletion */ true);
           timedOut = r.timedOut || timedOut;
@@ -357,6 +359,20 @@ export class GooseTuiAdapter implements ExecutorAdapter {
   }
 
   /**
+   * Sandbox discipline: every goose session is spawned with cwd = the project
+   * root, so relative paths suffice. Absolute paths are the escape vector —
+   * weak models mangle the long literal (dropped hyphens, escape-sequence
+   * mashing) into directories OUTSIDE the project, even above the workspace.
+   * Stated on every task turn so it survives plan-mode's fresh context.
+   */
+  private relativePathRule(): string {
+    return 'IMPORTANT — file paths: you are already inside the project root (your current directory). '
+      + 'Create and edit files using paths RELATIVE to it (e.g. `src/foo.ts`). '
+      + 'NEVER use an absolute path, never `cd` out of this directory, and never include the workspace path in a filename — '
+      + 'writes outside the project directory are rejected and discarded. ';
+  }
+
+  /**
    * Completion = the marker as its own content LINE (exact, or with a short
    * decoration prefix like "◆ "), never a substring match — our own echoed
    * instruction contains the marker mid-sentence, and interior wrapped echo
@@ -414,11 +430,21 @@ export class GooseTuiAdapter implements ExecutorAdapter {
 
   /** Materialize the full task spec to a file the agent reads. */
   private writeTaskSpec(req: ExecutorTaskRequest): string {
-    const dir = path.join(req.cwd, '.janumicode', 'task-specs');
+    // Prefer the caller-provided (control-plane) spec dir so no `.janumicode`
+    // is created inside the agent's cwd. The agent receives the absolute path
+    // returned below, so the spec's location is independent of cwd.
+    const dir = req.taskSpecDir ?? path.join(req.cwd, '.janumicode', 'task-specs');
     fs.mkdirSync(dir, { recursive: true });
     const name = `task-spec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.md`;
     const abs = path.join(dir, name);
     fs.writeFileSync(abs, req.prompt, 'utf-8');
-    return abs;
+    // Hand the agent a RELATIVE reference (relative to its cwd), never an
+    // absolute path. The agent anchors its writes on the spec path's directory;
+    // an absolute path is the longest literal string it echoes and weak models
+    // mangle it into out-of-sandbox paths. A relative ref keeps the agent
+    // anchored on its cwd (= project root), and the agent's read tool resolves
+    // it against the session cwd. POSIX-normalized + `./`-prefixed for clarity.
+    const rel = path.relative(req.cwd, abs).split(path.sep).join('/');
+    return rel.startsWith('.') || rel.startsWith('/') ? rel : `./${rel}`;
   }
 }

@@ -201,6 +201,66 @@ describe('ExecutionContextBuilder.buildTaskContext', () => {
     expect(payload.stdin.text).toContain('(no HIGH/MEDIUM upstream validator findings');
   });
 
+  // Regression (slice-151): the Phase-9 executor runs inside the projectRoot
+  // cwd-sandbox, where the control-plane `.janumicode/runs/…` detail-file path is
+  // unreadable. The curated DMR context must therefore be INLINED by default, not
+  // pointed at via a dead on-disk reference (0/23 leaves could read it before).
+  it('inlines the curated DMR context by default (on-disk pointer is the opt-out)', () => {
+    const prev = process.env.JANUMICODE_INLINE_DMR;
+    delete process.env.JANUMICODE_INLINE_DMR;
+    try {
+      const loader = new TemplateLoader(REPO_ROOT);
+      const writer = makeFakeWriter([]);
+      const builder = new ExecutionContextBuilder(
+        {} as never, writer,
+        { stdinMaxTokens: 16000, detailFileMaxBytes: 1_000_000, detailFilePathTemplate: '/tmp/{workflow_run_id}/{sub_phase_id}_{invocation_id}.md', workspacePath: '/tmp', janumiCodeVersionSha: 'sha-test' },
+        loader,
+      );
+      const dmrPacket = { detailFileContent: 'DMR_SUPERSESSION_MARKER_XYZ', detailFilePath: '/tmp/wf-1/dmr.md' } as never;
+      const payload = builder.buildTaskContext(
+        makeTask({}), 'wf-1', 'inv-1',
+        { implementationPlan: null, testPlan: null, evaluationPlans: {}, componentModel: null, technicalSpecs: null, adrs: [] },
+        undefined, dmrPacket,
+      );
+      // DMR body is embedded (readable by a sandboxed executor), NOT replaced by
+      // a "read it from disk" pointer.
+      expect(payload.stdin.text).toContain('DMR_SUPERSESSION_MARKER_XYZ');
+      expect(payload.stdin.text).not.toContain('Read it selectively if you need supporting governing context');
+      // The "# DETAIL FILE — Path:" pointer must NOT send the agent to the
+      // now-redundant unreadable file; it surfaces the inlined-above sentinel.
+      expect(payload.stdin.text).not.toContain('/tmp/wf-1/dmr.md');
+      expect(payload.stdin.text).toContain('the full curated context is inlined above');
+    } finally {
+      if (prev === undefined) delete process.env.JANUMICODE_INLINE_DMR; else process.env.JANUMICODE_INLINE_DMR = prev;
+    }
+  });
+
+  it('honors JANUMICODE_INLINE_DMR=0 to keep the on-disk DMR pointer (non-sandboxed runs)', () => {
+    const prev = process.env.JANUMICODE_INLINE_DMR;
+    process.env.JANUMICODE_INLINE_DMR = '0';
+    try {
+      const loader = new TemplateLoader(REPO_ROOT);
+      const writer = makeFakeWriter([]);
+      const builder = new ExecutionContextBuilder(
+        {} as never, writer,
+        { stdinMaxTokens: 16000, detailFileMaxBytes: 1_000_000, detailFilePathTemplate: '/tmp/{workflow_run_id}/{sub_phase_id}_{invocation_id}.md', workspacePath: '/tmp', janumiCodeVersionSha: 'sha-test' },
+        loader,
+      );
+      const dmrPacket = { detailFileContent: 'DMR_SUPERSESSION_MARKER_XYZ', detailFilePath: '/tmp/wf-1/dmr.md' } as never;
+      const payload = builder.buildTaskContext(
+        makeTask({}), 'wf-1', 'inv-1',
+        { implementationPlan: null, testPlan: null, evaluationPlans: {}, componentModel: null, technicalSpecs: null, adrs: [] },
+        undefined, dmrPacket,
+      );
+      expect(payload.stdin.text).not.toContain('DMR_SUPERSESSION_MARKER_XYZ');
+      expect(payload.stdin.text).toContain('Read it selectively');
+      // Opt-out keeps the real on-disk path (readable in a non-sandboxed run).
+      expect(payload.stdin.text).toContain('/tmp/wf-1/dmr.md');
+    } finally {
+      if (prev === undefined) delete process.env.JANUMICODE_INLINE_DMR; else process.env.JANUMICODE_INLINE_DMR = prev;
+    }
+  });
+
   it('sources the detail bundle test_cases + evals from the packet, and renders CC as the gate with covering tests', () => {
     const loader = new TemplateLoader(REPO_ROOT);
     const writer = makeFakeWriter([]);

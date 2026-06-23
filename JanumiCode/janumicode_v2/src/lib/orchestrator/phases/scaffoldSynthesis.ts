@@ -34,6 +34,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { PhaseContext } from '../orchestratorEngine';
+import { toPosixPath } from '../workspaceLayout';
 import { getLogger } from '../../logging';
 import {
   buildProjectLayoutContract,
@@ -117,11 +118,15 @@ export function copyEngineeringConstitution(workspacePath: string, sourcePath: s
     });
     return undefined;
   }
-  const rel = '.janumicode/engineering-constitution.md';
-  const destAbs = path.join(workspacePath, rel);
+  // CONTROL PLANE: always written under <workspacePath>/.janumicode (the
+  // caller passes the control root, NOT the project root). Return an ABSOLUTE
+  // path: the executor agent's cwd is the project root, so a workspace-relative
+  // `.janumicode/…` would resolve to `<projectRoot>/.janumicode/…` and miss.
+  const destAbs = path.join(workspacePath, '.janumicode', 'engineering-constitution.md');
   fs.mkdirSync(path.dirname(destAbs), { recursive: true });
   fs.copyFileSync(srcAbs, destAbs);
-  return rel;
+  // POSIX-normalize: this absolute path is rendered into the executor prompt.
+  return toPosixPath(destAbs);
 }
 
 // ── Profile resolution ──────────────────────────────────────────────
@@ -558,7 +563,10 @@ export function runScaffoldSynthesis(ctx: PhaseContext): ScaffoldManifest | null
     language: 'typescript', module: 'esm', test_runner: 'vitest', shared_dir: 'src/shared',
   };
 
-  const workspacePath = engine.workspacePath;
+  // Code root (where the deterministic materializer writes the project). The
+  // engineering constitution below is the one exception — it lives in the
+  // control plane (engine.workspacePath/.janumicode), not the project tree.
+  const workspacePath = engine.projectRoot;
 
   // Resolve profile (precedence: brownfield > ADR > default).
   const adrsRecord = engine.writer.getArtifactByKind(workflowRun.id, 'architectural_decisions');
@@ -623,7 +631,7 @@ export function runScaffoldSynthesis(ctx: PhaseContext): ScaffoldManifest | null
 
   // Engineering Constitution — copy the configured craft-standards doc into
   // the workspace (advisory side-channel; see copyEngineeringConstitution).
-  const constitutionRel = copyEngineeringConstitution(workspacePath, scaffoldCfg?.engineering_constitution_path);
+  const constitutionRel = copyEngineeringConstitution(engine.workspacePath, scaffoldCfg?.engineering_constitution_path);
 
   const manifest: ScaffoldManifest = {
     kind: 'scaffold_manifest',

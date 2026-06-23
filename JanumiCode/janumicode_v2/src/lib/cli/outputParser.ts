@@ -317,6 +317,25 @@ export function createGenericParser(): OutputParser {
 }
 
 /**
+ * mimo (mimocode) CLI parser.
+ *
+ * mimo runs as a Phase-9 executor through the `mimo serve` HTTP/SSE server
+ * adapter ({@link MimoServerAdapter}) — NOT a stdout-streaming subprocess. The
+ * adapter builds the {@link CLIInvocationResult} directly via
+ * `adaptOutcomeToCliResult` (events:[]); file-writes come from the
+ * executorAgent filesystem-snapshot diff. This parser therefore exists only to
+ * satisfy AgentInvoker's pre-flight "is a parser registered for this backing
+ * tool?" gate (and as a graceful text fallback should mimo ever route through
+ * the one-shot structured path). There is no stdout event stream to map.
+ */
+export function createMimoCliParser(): OutputParser {
+  return new OutputParser({
+    outputFormat: 'text',
+    recordMapping: {},
+  });
+}
+
+/**
  * OpenAI Codex CLI output parser.
  *
  * Codex invoked as `codex exec --json -` emits Responses-API-style

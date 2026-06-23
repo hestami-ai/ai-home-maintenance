@@ -13,6 +13,7 @@
 
 import { NodePtySpawner, isNodePtyAvailable } from './nodePtySpawner';
 import { GooseTuiAdapter, type GooseTuiConfig } from './adapters/gooseTuiAdapter';
+import { MimoServerAdapter } from './adapters/mimoServerAdapter';
 import type { ExecutorAdapter } from './adapter';
 import type { SessionLogEvent } from './sessionDriver';
 import type { SessionResponder } from './responder';
@@ -35,16 +36,25 @@ export interface CliCapability {
   backingTool: string;
   /** Build the interactive (Tier-2/3) executor adapter, or null if none yet. */
   makeInteractive: ((ctx: AdapterBuildContext) => ExecutorAdapter) | null;
+  /** Whether the adapter needs the node-pty substrate. HTTP/SSE adapters don't. */
+  requiresPty?: boolean;
 }
 
 /**
- * Registry. Goose is fully wired (Tier-3 `/plan` TUI — the active executor).
- * Claude Code / Codex / Gemini are registered as structured-only for now; their
- * interactive (plan-mode) adapters slot in here without touching the dispatch.
+ * Registry. mimo (HTTP/SSE `compose` agent) is the DEFAULT executor; goose
+ * (Tier-3 `/plan` PTY TUI) is the fallback. Claude Code / Codex / Gemini are
+ * structured-only for now; their adapters slot in here without touching dispatch.
  */
 const REGISTRY: Record<string, CliCapability> = {
+  mimo_cli: {
+    backingTool: 'mimo_cli',
+    // HTTP/SSE — no PTY substrate required.
+    requiresPty: false,
+    makeInteractive: (ctx) => new MimoServerAdapter({ onLog: ctx.onLog }),
+  },
   goose_cli: {
     backingTool: 'goose_cli',
+    requiresPty: true,
     makeInteractive: (ctx) =>
       new GooseTuiAdapter(new NodePtySpawner(), {
         onLog: ctx.onLog,
@@ -85,9 +95,12 @@ export function selectExecutorAdapter(
   if (!cap || !cap.makeInteractive) {
     return { adapter: null, fallbackReason: 'no_interactive_adapter' };
   }
-  const ptyOk = ptyAvailableOverride ?? isNodePtyAvailable();
-  if (!ptyOk) {
-    return { adapter: null, fallbackReason: 'pty_unavailable' };
+  // PTY adapters (goose) need the node-pty substrate; HTTP/SSE adapters (mimo) don't.
+  if (cap.requiresPty !== false) {
+    const ptyOk = ptyAvailableOverride ?? isNodePtyAvailable();
+    if (!ptyOk) {
+      return { adapter: null, fallbackReason: 'pty_unavailable' };
+    }
   }
   return { adapter: cap.makeInteractive(ctx), fallbackReason: null };
 }

@@ -769,7 +769,17 @@ export class ExecutionContextBuilder {
     // worth surfacing. Inline it when JANUMICODE_INLINE_DMR=1; otherwise point
     // the agent at its real path (NOT the executor-bundle file, which the old
     // pointer wrongly referenced) with a read-selectively note.
-    const inlineDmr = process.env.JANUMICODE_INLINE_DMR === '1';
+    // Inline the curated DMR context BY DEFAULT. The Phase-9 executor runs
+    // inside the projectRoot cwd-sandbox, so the on-disk detail-file pointer
+    // (control-plane `.janumicode/runs/…`) is unreadable — outside the cwd and
+    // behind the executor's `external_directory: deny` policy. Issue #11
+    // de-inlined this for token economy, but a dead pointer means the executor
+    // silently loses the curated governing context (supersession chains,
+    // contradictions, resolved constraints, material findings) — worse than the
+    // tokens (slice-151: 0/23 leaves could read it). Set JANUMICODE_INLINE_DMR=0
+    // to force the on-disk pointer instead — only safe when the executor cwd can
+    // actually read `.janumicode/` (e.g. a non-sandboxed run).
+    const inlineDmr = process.env.JANUMICODE_INLINE_DMR !== '0';
     const dmrDetailPath = dmrPacket?.detailFilePath;
     const detailFileContentInline = dmrPacket?.detailFileContent
       ? (inlineDmr
@@ -792,10 +802,17 @@ export class ExecutionContextBuilder {
       dependency_tasks_summary: dependencyTasksStr,
       upstream_validator_findings: upstreamFindingsStr,
       refactoring_constraints: refactoringConstraintsStr,
-      // Prefer the curated DMR reference path (the template's "Consult for:
-      // Technical Specs / API Definitions / Data Models" now lives there);
-      // fall back to the executor-bundle file when DMR is unavailable.
-      detail_file_path: dmrDetailPath ?? detailFilePath,
+      // The template's "# DETAIL FILE — Path: {detail_file_path}" pointer. When
+      // the curated context is inlined (the sandbox default), there is NO
+      // readable on-disk file: the path lives in the control-plane
+      // `.janumicode/runs/…`, outside the executor's projectRoot cwd and behind
+      // its `external_directory: deny` policy. Pointing a sandboxed agent at it
+      // just wastes a tool call on an unreadable file (slice-151). Surface a
+      // sentinel that tells the agent the content is inlined; keep the real path
+      // only for the non-sandboxed opt-out (INLINE_DMR=0).
+      detail_file_path: inlineDmr
+        ? '(the full curated context is inlined above — there is no separate file to read)'
+        : (dmrDetailPath ?? detailFilePath),
       detail_file_content: detailFileContentInline,
       janumicode_version_sha: this.options.janumiCodeVersionSha,
     };

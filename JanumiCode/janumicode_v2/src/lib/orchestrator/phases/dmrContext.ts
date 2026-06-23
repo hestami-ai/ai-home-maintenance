@@ -37,6 +37,9 @@ export interface PhaseContextPacketOptions {
   detailFileLabel?: string;
   /** Required output spec to include in the detail file's stdin section */
   requiredOutputSpec?: string;
+  /** Component to scope structured-artifact distillation to (e.g. a per-leaf
+   *  executor DMR passes the leaf's component_id). Forwarded to the DMR brief. */
+  focusComponentId?: string;
 }
 
 export interface PhaseContextPacketResult {
@@ -85,6 +88,7 @@ export async function buildPhaseContextPacket(
       workflowRunId: workflowRun.id,
       phaseId: ctx.workflowRun.current_phase_id ?? '',
       subPhaseId: options.subPhaseId,
+      focusComponentId: options.focusComponentId,
     });
   } catch (err) {
     getLogger().warn('phase_dmr', 'DMR invocation failed — proceeding without packet', {

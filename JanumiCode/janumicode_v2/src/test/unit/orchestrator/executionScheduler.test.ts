@@ -18,6 +18,7 @@ import {
   topoSortRespectingWave,
   collapseLegacySectionsWhenPacketPresent,
   buildWorkspaceOrientation,
+  detectSandboxEscapes,
   isTestFilePath,
   type SchedulerLeaf,
 } from '../../../lib/orchestrator/executionScheduler';
@@ -288,13 +289,46 @@ describe('collapseLegacySectionsWhenPacketPresent — Path N #6', () => {
   });
 });
 
+describe('detectSandboxEscapes — out-of-project-root write guard', () => {
+  const root = path.join(path.sep, 'ws', 'thin-slice-workspace-150', 'project');
+  const mk = (filePath: string, operation: 'create' | 'modify' | 'delete' = 'create') => ({ filePath, operation });
+
+  it('passes relative in-sandbox writes', () => {
+    expect(detectSandboxEscapes([mk('src/foo.ts'), mk('internal/x/y.go')], root)).toEqual([]);
+  });
+
+  it('passes absolute writes that resolve INSIDE the project root', () => {
+    expect(detectSandboxEscapes([mk(path.join(root, 'src', 'foo.ts'))], root)).toEqual([]);
+  });
+
+  it('flags a parent-climbing (`..`) write as an escape', () => {
+    const escapes = detectSandboxEscapes([mk('../../thin-slice-workspace150/x.go')], root);
+    expect(escapes.length).toBe(1);
+    expect(escapes[0]).not.toMatch(/\\/); // POSIX-normalized
+  });
+
+  it('flags an absolute write OUTSIDE the project root', () => {
+    const outside = path.join(path.sep, 'ws', 'thin-slice-workspaces150', 'keystore.go');
+    expect(detectSandboxEscapes([mk(outside)], root)).toEqual([outside.split(path.sep).join('/')]);
+  });
+
+  it('ignores deletes', () => {
+    expect(detectSandboxEscapes([mk('../escape.go', 'delete')], root)).toEqual([]);
+  });
+});
+
 describe('buildWorkspaceOrientation — Path N #5/#8', () => {
   it('reports greenfield when the workspace exists and is empty', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'janum-ws-empty-'));
     try {
       const out = buildWorkspaceOrientation(tmp, ['src/services/abuse-notification']);
       expect(out).toContain('# Workspace Orientation');
-      expect(out).toContain(tmp);
+      // The absolute workspace root is deliberately NOT printed (sandbox-escape
+      // mangling vector); the agent is steered to relative paths instead.
+      expect(out).not.toContain(tmp);
+      expect(out).not.toContain(tmp.replace(/\\/g, '/'));
+      expect(out).toMatch(/RELATIVE to it/);
+      expect(out).toMatch(/NEVER use an absolute path/);
       expect(out).toContain('greenfield');
       expect(out).toContain('`src/services/abuse-notification` (does not exist — create it)');
       expect(out).toContain('Do not spend tool calls probing');

@@ -74,6 +74,7 @@ export interface JanumiCodeConfig {
      * Logged per-task when the override fires.
      */
     force_executor_backing_tool?:
+      | 'mimo_cli'
       | 'claude_code_cli'
       | 'gemini_cli'
       | 'goose_cli'

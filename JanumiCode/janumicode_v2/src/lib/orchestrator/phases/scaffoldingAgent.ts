@@ -22,6 +22,7 @@ import { getLogger } from '../../logging';
 import type { PhaseContext } from '../orchestratorEngine';
 import type { ExecutorAgent } from '../../agents/executorAgent';
 import type { Phase9ReconPlan } from './phase9Recon';
+import { canonicalComponentDir } from './layoutContract';
 
 export interface ScaffoldingAgentResult {
   /** True when every area's primary dependency manifest exists on disk after. */
@@ -37,11 +38,16 @@ export async function runScaffoldingAgentSubPhase(
   executorAgent: ExecutorAgent,
 ): Promise<ScaffoldingAgentResult> {
   const { workflowRun, engine } = ctx;
-  const workspacePath = engine.workspacePath;
+  // Project root: the scaffolding agent's cwd + where manifests are checked.
+  const workspacePath = engine.projectRoot;
   const logger = getLogger();
 
   const dataModels = gatherDataModels(engine, workflowRun.id);
   const contracts = gatherContracts(engine, workflowRun.id);
+  // Canonical component→dir map (= where impl tasks write + Phase 10 enforces).
+  // Fed into every area's scaffold prompt so the agent never invents a divergent
+  // per-component layout.
+  const componentDirs = gatherComponentDirs(engine, workflowRun.id);
 
   // ONE session per area — a polyglot workspace must not cram N stacks into a
   // single agent context; each area's session sees only its own stack + the
@@ -64,7 +70,7 @@ export async function runScaffoldingAgentSubPhase(
       ],
       writeDirectoryPaths: areaWriteScope(area),
     };
-    const stdin = buildAreaScaffoldingPrompt(area, dataModels, contracts);
+    const stdin = buildAreaScaffoldingPrompt(area, dataModels, contracts, componentDirs);
     try {
       const r = await executorAgent.execute(task, workflowRun.id, stdin, workspacePath, engine.janumiCodeVersionSha);
       invocationIds.push(r.invocationId);
@@ -126,11 +132,66 @@ function gatherContracts(engine: PhaseContext['engine'], runId: string): string 
   } catch { return '(none)'; }
 }
 
-function buildAreaScaffoldingPrompt(area: Phase9ReconPlan['areas'][number], dataModels: string, contracts: string): string {
+/**
+ * The CANONICAL component_id → source-directory map, computed the same way the
+ * layout contract ({@link canonicalComponentDir}) and the Phase-6 task
+ * `write_directory_paths` do (`comp-analytics-ingestion` → `src/analytics-ingestion`).
+ *
+ * Feeding this into the scaffolding prompt is what prevents the scaffold agent
+ * from inventing a divergent per-component layout (e.g. `src/components/<comp>/`):
+ * with no canonical paths the agent fills the vacuum, and its guess collides with
+ * where the implementation tasks actually write + what Phase 10 enforces. Sourced
+ * from the structured component_model + data_models artifacts (NOT the sliced
+ * prompt strings) so the roster is complete; pseudo-components (shared /
+ * cross-cutting / root) collapse onto the shared dir / src root as the contract
+ * specifies.
+ */
+function gatherComponentDirs(
+  engine: PhaseContext['engine'],
+  runId: string,
+): Array<{ id: string; dir: string }> {
+  const ids = new Set<string>();
+  const collect = (kind: string, arrayKeys: string[], idKey = 'id') => {
+    try {
+      const rec = engine.writer.getArtifactByKind(runId, kind);
+      const content = (rec?.content ?? {}) as Record<string, unknown>;
+      for (const key of arrayKeys) {
+        const arr = content[key];
+        if (Array.isArray(arr)) {
+          for (const item of arr) {
+            const v = (item as Record<string, unknown>)?.[idKey];
+            if (typeof v === 'string' && v.trim()) ids.add(v.trim());
+          }
+        }
+      }
+    } catch { /* artifact absent — skip */ }
+  };
+  collect('component_model', ['components', 'component_model']);
+  collect('data_models', ['models'], 'component_id');
+  return [...ids]
+    .sort()
+    .map(id => ({ id, dir: canonicalComponentDir(id) }));
+}
+
+export function buildAreaScaffoldingPrompt(
+  area: Phase9ReconPlan['areas'][number],
+  dataModels: string,
+  contracts: string,
+  componentDirs: Array<{ id: string; dir: string }> = [],
+): string {
   const mods = area.canonical_modules.length
     ? area.canonical_modules.map(m => `  - ${m.path}  (import as ${m.import_specifier})${m.description ? ` — ${m.description}` : ''}`).join('\n')
     : '  (none listed — derive the shared types this area needs from the data models / contracts)';
   const aliases = area.import_aliases.map(al => `${al.alias} → ${al.target}`).join(', ') || '(none)';
+  // The CANONICAL per-component directories — the exact paths the implementation
+  // tasks will write to and Phase 10 enforces. Rendering them (and forbidding any
+  // alternative layout) is what stops the agent inventing a divergent
+  // `src/components/<comp>/` tree when `canonical_modules` is empty.
+  const componentDirsBlock = componentDirs.length
+    ? `## Component directories (canonical — implementation tasks write to these EXACT paths)\n`
+      + componentDirs.map(c => `  - ${c.id} → ${c.dir}/`).join('\n')
+      + `\nDo NOT pre-create feature files in these — the implementation tasks own them. You may create the directory + an empty barrel only if the ${area.stack} stack needs it.\n\n`
+    : '';
   return `# Project Scaffolding — area "${area.area_id}" (stack ${area.stack})\n\n`
     + `Author ONLY this area's skeleton. No feature logic.\n\n`
     + `## Layout\n`
@@ -138,12 +199,14 @@ function buildAreaScaffoldingPrompt(area: Phase9ReconPlan['areas'][number], data
     + `- test roots: ${area.test_roots.join(', ') || '(unset)'}\n`
     + `- dependency manifest: ${area.dependency_manifest || 'package.json'}\n`
     + `- import aliases: ${aliases}\n\n`
+    + componentDirsBlock
     + `## Canonical shared modules to create (exact paths)\n${mods}\n\n`
-    + `## Shared data models (materialize the types this area exposes)\n${dataModels}\n\n`
-    + `## Interface contracts (materialize the contracts this area exposes)\n${contracts}\n\n`
+    + `## Shared data models — materialize as SHARED types under the shared dir (imported via the shared alias), NOT per-component\n${dataModels}\n\n`
+    + `## Interface contracts — materialize as SHARED contracts under the shared dir, NOT per-component\n${contracts}\n\n`
     + `## Rules\n`
     + `- Create the dependency manifest with a runnable test script and the dependencies the ${area.stack} stack needs.\n`
-    + `- Create the canonical shared modules at EXACTLY the listed paths, importable via the listed aliases — do not duplicate them.\n`
+    + `- Create the canonical shared modules + shared data-model/contract types ONCE under the shared dir at EXACTLY the listed paths, importable via the listed aliases — do not duplicate them per component.\n`
+    + `- Component code lives ONLY in the canonical per-component directories listed above (the same paths the implementation tasks write to). Do NOT create a \`components/\` subtree, a \`src/components/\` directory, or any alternative per-component layout.\n`
     + `- Honor the ${area.stack} stack; do not introduce another language.\n`
     + `- Verify the skeleton type-checks / parses before finishing.`;
 }
