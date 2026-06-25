@@ -134,4 +134,76 @@ describe('OrchestratorEngine — simulate-human-decisions gate certification', (
       delete process.env.JANUMICODE_SIMULATE_DECISION_AGENT;
     }
   });
+
+  it('passes the FULL surface to the decision agent (no premature truncation)', async () => {
+    // Regression for the 4000-char cap that cut a 4539-char requirements mirror
+    // mid-acceptance-criterion → the agent rejected the "incomplete" artifact →
+    // phase failed. The whole surface must reach the prompt.
+    process.env.JANUMICODE_SIMULATE_DECISION_AGENT = '1';
+    let capturedPrompt = '';
+    try {
+      (engine as unknown as { callForRole: unknown }).callForRole = async (_role: string, opts: { prompt: string }) => {
+        capturedPrompt = opts.prompt;
+        return { parsed: { selection: 'approve', rationale: 'Complete and well-scoped.' }, text: '', raw: '' };
+      };
+
+      const { run } = engine.startWorkflowRun('ws-1', 'test');
+      // A surface whose JSON far exceeds the old 4000-char cap, with a sentinel
+      // only present near the very end (inside the last story's criteria).
+      const sentinel = 'TAIL_SENTINEL_US060_FINAL_AC';
+      const bigStories = Array.from({ length: 60 }, (_, i) => ({
+        id: `US-${String(i + 1).padStart(3, '0')}`,
+        text: `As a user I want capability number ${i} so that the documented outcome ${i} is met`,
+        acceptance_criteria: [`AC for story ${i} — the system behaves per WF-${i}`],
+      }));
+      bigStories[bigStories.length - 1].acceptance_criteria.push(sentinel);
+      const surface = engine.writer.writeRecord({
+        record_type: 'mirror_presented', schema_version: '1.0', workflow_run_id: run.id,
+        phase_id: '2', janumicode_version_sha: engine.janumiCodeVersionSha,
+        content: { kind: 'requirements_mirror', user_stories: bigStories },
+      });
+
+      await engine.pauseForDecision(run.id, surface.id, 'mirror');
+
+      expect(capturedPrompt.length).toBeGreaterThan(4000);
+      expect(capturedPrompt, 'the tail of a >4KB surface must reach the prompt uncut').toContain(sentinel);
+    } finally {
+      delete process.env.JANUMICODE_SIMULATE_DECISION_AGENT;
+    }
+  });
+
+  it('endorsing a bloom decision_bundle keeps the whole set (coverage-safe, no prune)', async () => {
+    // Fidelity: the fixture stands in for a stakeholder building the FULL
+    // product, so on an expansive "keep what belongs" bundle it endorses with
+    // "approve" → empty menu_selections → keep-all. Prior infidelity (prune to a
+    // subset) dropped coverage and failed the Phase 1.8 manifest gate.
+    process.env.JANUMICODE_SIMULATE_DECISION_AGENT = '1';
+    let capturedPrompt = '';
+    try {
+      (engine as unknown as { callForRole: unknown }).callForRole = async (_role: string, opts: { prompt: string }) => {
+        capturedPrompt = opts.prompt;
+        return { parsed: { selection: 'approve', rationale: 'All proposed domains belong to the full product.' }, text: '', raw: '' };
+      };
+
+      const { run } = engine.startWorkflowRun('ws-1', 'test');
+      const surface = engine.writer.writeRecord({
+        record_type: 'decision_bundle_presented', schema_version: '1.0', workflow_run_id: run.id,
+        phase_id: '1', janumicode_version_sha: engine.janumiCodeVersionSha,
+        content: { kind: 'product_bloom_mirror', title: 'Review Business Domains',
+          mirror: { items: [{ id: 'DOM-A' }, { id: 'DOM-B' }, { id: 'DOM-C' }] }, menu: [] },
+      });
+
+      const resolution = await engine.pauseForDecision(run.id, surface.id, 'decision_bundle');
+
+      // Endorsement keeps everything — empty menu_selections is the keep-all default.
+      expect(resolution.type).toBe('decision_bundle_resolution');
+      const payload = (resolution as { payload?: { menu_selections?: unknown[] } }).payload;
+      expect(payload?.menu_selections).toEqual([]);
+      // The prompt frames the fixture as building the full product, not minimizing scope.
+      expect(capturedPrompt).toMatch(/FULL product/);
+      expect(capturedPrompt).toMatch(/keep the whole proposed set|keep all/i);
+    } finally {
+      delete process.env.JANUMICODE_SIMULATE_DECISION_AGENT;
+    }
+  });
 });

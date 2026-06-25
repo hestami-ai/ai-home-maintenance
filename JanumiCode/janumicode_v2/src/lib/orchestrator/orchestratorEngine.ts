@@ -1435,16 +1435,42 @@ export class OrchestratorEngine {
     try {
       const row = this.db.prepare('SELECT content FROM governed_stream WHERE id = ?')
         .get(decisionId) as { content: string } | undefined;
-      if (row?.content) surface = String(row.content).slice(0, 4000);
+      // No size cap: decision surfaces are single-artifact JSON (typically a few
+      // KB). A premature 4000-char cap silently cut a 4539-char requirements
+      // mirror mid-acceptance-criterion, which the agent then (correctly)
+      // rejected as "incomplete" — failing the phase and a multi-hour run. Sizes
+      // aren't characterized yet and a bad cap costs a full rerun, so pass the
+      // whole surface and make the prompt robust to truncation from ANY layer.
+      if (row?.content) surface = String(row.content);
     } catch { /* surface unavailable */ }
 
+    // This agent is a TEST FIXTURE that stands in for the human stakeholder
+    // reading/judging/deciding on a presented surface, so the human-decision-
+    // dependent DMR paths (certified gates → active_constraints; overrides →
+    // supersession_chains; decision_trace content) get exercised headless. It is
+    // an ADJUDICATOR of what is shown — not a scope-minimizer and not an author
+    // of new requirements. Fidelity = decide as the in-role stakeholder building
+    // the FULL product would; the prior "senior engineer minimizing scope"
+    // framing made it prune like a cost-cutter, dropping on-scope items and
+    // killing the run (and the DMR test) at coverage gates.
     const allowed = surfaceType === 'phase_gate' ? "'approve'"
       : surfaceType === 'mirror' ? "'approve' or 'reject'"
-      : "the chosen option_id (or 'approve' if no menu)";
+      : "the option_id of a specific item to DROP, or 'approve' to keep the whole proposed set";
+    const posture = surfaceType === 'phase_gate'
+      ? 'This is a phase-gate approval. Approve unless the surface shows a BLOCKING inconsistency a reviewer would actually halt the build for. Default: approve.'
+      : surfaceType === 'mirror'
+        ? 'This is a review mirror. If it presents a complete, coherent artifact, APPROVE it. Reject ONLY for a substantive defect in what is shown — never because you would have scoped it more narrowly. Default: approve.'
+        : 'This surface proposes a set of items expansively ("keep what belongs to the product, reject what does not"). Because you are building the FULL product, ENDORSE the whole proposed set with "approve"; reject only a specific item that is genuinely OUTSIDE this product. Dropping items that belong leaves journeys/workflows/components uncovered and blocks the build. Default: approve (keep all).';
     const prompt =
-      'You simulate a thoughtful senior engineer making ONE project decision in an automated build.\n'
-      + `Decision surface type: ${surfaceType}.\nSurface content (JSON):\n${surface || '(unavailable)'}\n\n`
-      + 'Choose the best resolution and give a ONE-sentence rationale grounded in the surface. '
+      'You stand in for the HUMAN STAKEHOLDER reviewing ONE decision surface in an automated build. '
+      + 'You are committed to building the FULL product described by the intent — NOT a reduced MVP — and you '
+      + 'decide exactly as that stakeholder would when reading and judging what is shown. You do not invent new '
+      + 'requirements; you only adjudicate what is presented.\n'
+      + `Decision surface type: ${surfaceType}.\n${posture}\n\nSurface content (JSON):\n${surface || '(unavailable)'}\n\n`
+      + 'Give a ONE-sentence rationale grounded in the surface. '
+      + 'The surface above is authoritative as provided; if any field looks cut off, treat that as a '
+      + 'rendering artifact of this prompt and do NOT reject solely because content appears truncated '
+      + 'or incomplete — reject only for a substantive defect in what is shown. '
       + `"selection" must be ${allowed}.\n`
       + 'Return ONLY JSON: {"selection": "...", "rationale": "..."}';
 

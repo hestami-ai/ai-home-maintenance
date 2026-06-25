@@ -212,7 +212,10 @@ export interface ActiveConstraint {
 
 export interface SupersessionChain {
   subject: string;
-  chain: { recordId: string; position: string; timestamp: string }[];
+  // `summary` carries the distilled CONTENT of each link so the chain conveys
+  // WHAT changed (e.g. "delete-by-key endpoint REMOVED"), not just that record
+  // X superseded record Y. Without it a consumer sees only ids/positions.
+  chain: { recordId: string; position: string; timestamp: string; summary: string }[];
 }
 
 export interface Contradiction {
@@ -776,6 +779,7 @@ export class DeepMemoryResearchAgent {
           recordId: finding.id,
           position: 'current_governing',
           timestamp: new Date().toISOString(),
+          summary: finding.summary || this.summaryForRecordId(finding.id),
         });
         for (const sup of supersedes) {
           const superseded = findings.find(f => f.id === sup.target_record_id);
@@ -784,6 +788,10 @@ export class DeepMemoryResearchAgent {
             recordId: sup.target_record_id,
             position: 'superseded',
             timestamp: new Date().toISOString(),
+            // The superseded record may not be independently material (not in
+            // `findings`); distill its content directly so the chain still says
+            // what was replaced.
+            summary: superseded?.summary || this.summaryForRecordId(sup.target_record_id),
           });
         }
       }
@@ -804,6 +812,20 @@ export class DeepMemoryResearchAgent {
     }
 
     return { supersessionChains: chains, contradictions };
+  }
+
+  /**
+   * Distill a record's content by id — used for supersession-chain links whose
+   * record is not an independently-material finding (so it has no precomputed
+   * summary). Best-effort: returns '' if the record is missing/unreadable.
+   */
+  private summaryForRecordId(recordId: string): string {
+    try {
+      const row = this.db.prepare('SELECT content, record_type FROM governed_stream WHERE id = ?')
+        .get(recordId) as { content: string; record_type: string } | undefined;
+      if (!row) return '';
+      return this.extractSummary({ content: row.content, record_type: row.record_type });
+    } catch { return ''; }
   }
 
   // ── Stage 6: Gap Detection ──────────────────────────────────────

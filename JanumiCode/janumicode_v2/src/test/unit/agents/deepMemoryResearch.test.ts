@@ -503,6 +503,38 @@ describe('DeepMemoryResearchAgent', () => {
       expect(packet.supersessionChains.length).toBeGreaterThan(0);
     });
 
+    it('chain links carry distilled CONTENT (what changed), not just record ids', async () => {
+      // The superseded record is NOT independently material (no FTS match for
+      // the query) — its summary must still be distilled directly so the chain
+      // says what was replaced. The superseding record's statement is the
+      // human-override rule (cf. the real cross-run "delete-by-key removed").
+      const prior = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc', authority_level: 5,
+        content: { kind: 'interface_contracts', contracts: [{ id: 'IC-DELETE-001', protocol: 'HTTP', auth_mechanism: 'api-key' }] },
+      });
+      const override = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc', authority_level: 6,
+        content: { kind: 'interface_contracts', statement: 'Human override: the delete-by-key endpoint is REMOVED from the contract.' },
+      });
+      db.prepare(`
+        INSERT INTO memory_edge (id, source_record_id, target_record_id, edge_type, asserted_by, asserted_at, authority_level, status)
+        VALUES ('e-ov', ?, ?, 'supersedes', 'system', ?, 6, 'system_asserted')
+      `).run(override.id, prior.id, new Date().toISOString());
+
+      // Query matches the override (so it's material) but not the prior contract.
+      const packet = await agent.research(baseBrief({ scopeTier: 'all_runs', query: 'delete-by-key endpoint override removed' }));
+
+      const chain = packet.supersessionChains.find(c => c.chain.some(l => l.recordId === override.id));
+      expect(chain, 'a chain containing the override should exist').toBeDefined();
+      const governing = chain!.chain.find(l => l.position === 'current_governing');
+      const superseded = chain!.chain.find(l => l.position === 'superseded');
+      expect(governing!.summary).toContain('delete-by-key endpoint is REMOVED');
+      // superseded link distilled directly even though it wasn't a material finding
+      expect(superseded!.summary).toContain('IC-DELETE-001');
+    });
+
     it('captures contradictions via memory edges', async () => {
       const a = writer.writeRecord({
         record_type: 'artifact_produced',
