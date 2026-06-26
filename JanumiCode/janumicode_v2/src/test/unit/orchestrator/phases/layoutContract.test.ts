@@ -8,10 +8,54 @@ import * as path from 'node:path';
 import {
   canonicalComponentDir,
   normalizeComponentDirForStack,
+  resolveWriteScopeForComponent,
   buildProjectLayoutContract,
   detectLayoutViolations,
   renderLayoutConventions,
 } from '../../../../lib/orchestrator/phases/layoutContract';
+
+describe('resolveWriteScopeForComponent — Phase-9 single write-scope authority', () => {
+  it('greenfield python: component_id → stack-correct underscore dir', () => {
+    expect(resolveWriteScopeForComponent({
+      componentId: 'comp-data-governance', isCompositionRoot: false, stack: 'python', workspaceKind: 'greenfield',
+    })).toEqual(['src/data_governance']);
+  });
+  it('greenfield node: hyphenated dir (TS convention)', () => {
+    expect(resolveWriteScopeForComponent({
+      componentId: 'comp-data-governance', isCompositionRoot: false, stack: 'node', workspaceKind: 'greenfield',
+    })).toEqual(['src/data-governance']);
+  });
+  it('composition root → whole tree (never slugged)', () => {
+    expect(resolveWriteScopeForComponent({
+      componentId: 'composition_root', isCompositionRoot: true, stack: 'python', workspaceKind: 'greenfield',
+    })).toEqual(['src']);
+  });
+  it('shared/cross_cutting → the shared dir', () => {
+    expect(resolveWriteScopeForComponent({
+      componentId: 'cross_cutting', isCompositionRoot: false, stack: 'python', workspaceKind: 'greenfield',
+    })).toEqual(['src/shared']);
+  });
+  it('BROWNFIELD: returns null (keep persisted/detected dirs)', () => {
+    expect(resolveWriteScopeForComponent({
+      componentId: 'comp-data-governance', isCompositionRoot: false, stack: 'python', workspaceKind: 'brownfield',
+    })).toBeNull();
+  });
+  it('falls back to scaffoldSource when workspaceKind is absent', () => {
+    // greenfield-ish scaffold (config_default/recon_stack) → resolve
+    expect(resolveWriteScopeForComponent({
+      componentId: 'comp-x', isCompositionRoot: false, stack: 'python', scaffoldSource: 'recon_stack',
+    })).toEqual(['src/x']);
+    // brownfield_detected → null
+    expect(resolveWriteScopeForComponent({
+      componentId: 'comp-x', isCompositionRoot: false, stack: 'python', scaffoldSource: 'brownfield_detected',
+    })).toBeNull();
+  });
+  it('no signal at all → null (safe default: do not override)', () => {
+    expect(resolveWriteScopeForComponent({
+      componentId: 'comp-x', isCompositionRoot: false, stack: 'python',
+    })).toBeNull();
+  });
+});
 
 const profile = { language: 'typescript', module: 'esm', test_runner: 'vitest', shared_dir: 'src/shared', source: 'config_default' } as const;
 

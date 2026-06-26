@@ -116,6 +116,35 @@ export function normalizeComponentDirForStack(p: string, stack?: string): string
   return p.replace(/-/g, '_');
 }
 
+/**
+ * Resolve a component's write scope (directory) at PHASE 9 — the first phase that
+ * knows the stack. This is the single authority that replaces the persisted
+ * (Phase-6, pre-language) `write_directory_paths`, so every executor-prompt site
+ * reads one consistent, stack-correct directory. Returns null to leave persisted
+ * paths untouched. GREENFIELD ONLY: brownfield keeps its recon-detected real dirs
+ * (pass `workspaceKind` from recon, or `scaffoldSource` as the fallback signal).
+ */
+export function resolveWriteScopeForComponent(opts: {
+  componentId: string | undefined;
+  isCompositionRoot: boolean;
+  stack: string;
+  workspaceKind?: string;
+  scaffoldSource?: string;
+}): string[] | null {
+  const greenfield = opts.workspaceKind !== undefined
+    ? opts.workspaceKind === 'greenfield'
+    : opts.scaffoldSource !== undefined
+      ? opts.scaffoldSource !== 'brownfield_detected'
+      : false;
+  if (!greenfield) return null;
+  if (opts.isCompositionRoot) return ['src']; // owns the whole tree — never slug
+  const id = (opts.componentId ?? '').trim();
+  if (!id) return null;
+  // canonicalComponentDir special-cases shared/cross_cutting → the shared dir,
+  // and uses the stack's package separator (underscore for python/rust/go/java).
+  return [canonicalComponentDir(id, 'src', 'src/shared', opts.stack)];
+}
+
 // ── Allowed extensions per language ─────────────────────────────────
 
 const COMMON_NON_SOURCE_EXT = [

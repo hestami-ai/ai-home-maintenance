@@ -207,6 +207,9 @@ export interface ReconEnforcement {
   /** Primary stack (first area). Drives stack-aware path normalization (e.g.
    *  python component dirs must be underscore packages, not hyphenated). */
   primary_stack?: string;
+  /** Workspace kind. The scheduler resolves component_id→dir ONLY for greenfield
+   *  (brownfield keeps the recon-detected real directories). */
+  workspace_kind?: string;
   /** Workspace-relative Engineering Constitution copy (set by the caller; the
    *  side-channel survives the author→enforce cutover off the scaffold manifest). */
   engineering_constitution_path?: string;
@@ -276,6 +279,7 @@ export function buildReconEnforcementManifest(plan: Phase9ReconPlan): ReconEnfor
     allowed_extensions_by_area: extByArea,
     conventions,
     primary_stack: plan.areas[0]?.stack,
+    workspace_kind: plan.workspace_kind,
   };
 }
 

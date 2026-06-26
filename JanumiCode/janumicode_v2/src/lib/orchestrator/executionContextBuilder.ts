@@ -231,7 +231,9 @@ export function formatWriteScopeConstraints(task: ImplementationTask, protectedP
     '\n\nThis write scope is AUTHORITATIVE. If the task description, goal, or any '
     + 'instruction names a DIFFERENT directory, ignore that path and create the '
     + 'described artifact INSIDE one of the write-scope directories above (creating '
-    + 'subdirectories within them as needed).';
+    + 'subdirectories within them as needed). Use the EXACT path(s) above '
+    + 'character-for-character (mind underscores vs hyphens); do NOT derive a '
+    + 'directory name from the component id or task name.';
   return 'Files may ONLY be created/modified in:\n' +
     normalized.map(p => `- ${p}`).join('\n') + authoritative + denySection;
 }

@@ -46,7 +46,7 @@ import { LeafTestRunner, type LeafTestRunnerConfig, type LeafTestRunResult } fro
 import { resolveGateCommands, type GateCommand } from './gateCommands';
 import { runGateCommands } from './gateRunner';
 import type { ReconEnforcement } from './phases/phase9Recon';
-import { normalizeComponentDirForStack } from './phases/layoutContract';
+import { normalizeComponentDirForStack, resolveWriteScopeForComponent } from './phases/layoutContract';
 import { QuarantineLedger } from './quarantineLedger';
 import { WaveGate, type WaveGateOutcome } from './waveGate';
 import { buildPhaseContextPacket } from './phases/dmrContext';
@@ -197,6 +197,33 @@ export class ExecutionScheduler {
   private effectiveProtectedPaths(): string[] {
     if (this.reconEnforcement) return this.reconEnforcement.protected_paths;
     return this.scaffoldManifest?.protected_paths ?? [];
+  }
+
+  /** Primary stack in force (recon wins, else scaffold profile, else node). */
+  private effectiveStack(): string {
+    return this.reconEnforcement?.primary_stack ?? this.scaffoldManifest?.profile.language ?? 'node';
+  }
+
+  /**
+   * Resolve a leaf's write scope from its `component_id` using the stack's
+   * directory convention. Phase 9 is the SOLE authority for component_id→dir —
+   * it's the first phase that knows the stack — so the persisted (Phase-6,
+   * pre-language) hyphenated `write_directory_paths` are a stale placeholder we
+   * REPLACE here. With one resolution feeding every prompt site (orientation,
+   * write-scope, snapshot, union), the dir is consistent and stack-correct, for
+   * resume AND fresh. GREENFIELD ONLY — brownfield keeps the recon-detected real
+   * directories. Returns null to leave the persisted paths untouched.
+   */
+  private resolveLeafWriteScope(leaf: SchedulerLeaf): string[] | null {
+    return resolveWriteScopeForComponent({
+      componentId: leaf.component_id,
+      isCompositionRoot: !!leaf._composition_root,
+      stack: this.effectiveStack(),
+      // recon's workspace_kind is authoritative; else fall back to the scaffold
+      // profile source (brownfield_detected ⇒ brownfield).
+      workspaceKind: this.reconEnforcement?.workspace_kind,
+      scaffoldSource: this.reconEnforcement ? undefined : this.scaffoldManifest?.profile.source,
+    });
   }
 
   setScaffoldManifest(manifest: ScaffoldManifest): void {
@@ -677,6 +704,17 @@ export class ExecutionScheduler {
     const { wave, waveNumber, workflowRunId, workspacePath, janumiCodeVersionSha } = input;
     const logger = getLogger();
     const startedAt = new Date().toISOString();
+
+    // SINGLE WRITE-SCOPE AUTHORITY: resolve each leaf's component_id → the
+    // stack-correct directory (Phase 9 is the first phase that knows the stack;
+    // the persisted Phase-6 paths predate the language). This is the ONE choke
+    // point before the pre-wave snapshot and the per-leaf prompt build, so the
+    // orientation, write-scope constraint, snapshot, and union all read one
+    // consistent dir — ending the hyphen/underscore fragmentation (greenfield).
+    for (const leaf of wave.leaves) {
+      const resolved = this.resolveLeafWriteScope(leaf);
+      if (resolved) leaf.write_directory_paths = resolved;
+    }
 
     // Producer-before-consumer bias (Tier-A): pre-order the wave's leaves by
     // their component's ownership rank BEFORE the topo-sort. The topo-sort
