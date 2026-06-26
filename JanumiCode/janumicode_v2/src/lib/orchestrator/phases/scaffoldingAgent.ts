@@ -63,8 +63,8 @@ export async function runScaffoldingAgentSubPhase(
         `PROJECT SCAFFOLDING for area "${area.area_id}" (stack ${area.stack}). Author ONLY the skeleton the implementation `
         + 'tasks will build on — no feature logic. (1) create the dependency manifest with the dependencies the stack needs and '
         + 'a runnable test script; (2) create the language/build configuration; (3) create the canonical shared modules this area '
-        + 'exposes (from the data models / contracts) at EXACTLY the given paths, importable via the given aliases; (4) create the '
-        + 'directory layout. Match the stack exactly; keep modules minimal canonical type/interface definitions.',
+        + 'exposes (from the data models / contracts) at EXACTLY the given paths, importable via the given stack-idiomatic import specifiers; (4) create the '
+        + 'directory layout. Match the stack exactly; keep modules to minimal canonical type/record definitions.',
       completionCriteria: [
         { criterionId: 'CC-SCAF-001', description: `Area ${area.area_id} has its dependency manifest + build/test config, and its canonical shared modules exist at their stated paths with working imports.` },
       ],
@@ -179,10 +179,19 @@ export function buildAreaScaffoldingPrompt(
   contracts: string,
   componentDirs: Array<{ id: string; dir: string }> = [],
 ): string {
+  const stack = area.stack;
+  // Each module's `import_specifier` is STACK-IDIOMATIC (recon emits it per
+  // language — see phase9Recon). Render it as "importable as (per <stack>)" so
+  // the agent honors the same specifier the implementation tasks will import by.
   const mods = area.canonical_modules.length
-    ? area.canonical_modules.map(m => `  - ${m.path}  (import as ${m.import_specifier})${m.description ? ` — ${m.description}` : ''}`).join('\n')
+    ? area.canonical_modules.map(m =>
+        `  - ${m.path}${m.import_specifier ? `  — importable as (per ${stack}): ${m.import_specifier}` : ''}${m.description ? `  — ${m.description}` : ''}`).join('\n')
     : '  (none listed — derive the shared types this area needs from the data models / contracts)';
-  const aliases = area.import_aliases.map(al => `${al.alias} → ${al.target}`).join(', ') || '(none)';
+  // Aliases are a stack-SPECIFIC concept (TS/JS path aliases); only render the
+  // line when recon actually emitted them. Other stacks import by module path.
+  const aliasLine = area.import_aliases.length
+    ? `- import aliases (${stack}): ${area.import_aliases.map(al => `${al.alias} → ${al.target}`).join(', ')}\n`
+    : '';
   // The CANONICAL per-component directories — the exact paths the implementation
   // tasks will write to and Phase 10 enforces. Rendering them (and forbidding any
   // alternative layout) is what stops the agent inventing a divergent
@@ -190,23 +199,35 @@ export function buildAreaScaffoldingPrompt(
   const componentDirsBlock = componentDirs.length
     ? `## Component directories (canonical — implementation tasks write to these EXACT paths)\n`
       + componentDirs.map(c => `  - ${c.id} → ${c.dir}/`).join('\n')
-      + `\nDo NOT pre-create feature files in these — the implementation tasks own them. You may create the directory + an empty barrel only if the ${area.stack} stack needs it.\n\n`
+      + `\nCreate these directories EMPTY — plus the ${stack} package/namespace init file ONLY if the stack requires one (e.g. \`__init__.py\`, \`mod.rs\`). Do NOT put feature files here (the implementation tasks own them), and do NOT invent an alternative layout (no \`components/\` or \`src/components/\` tree).\n\n`
     : '';
-  return `# Project Scaffolding — area "${area.area_id}" (stack ${area.stack})\n\n`
-    + `Author ONLY this area's skeleton. No feature logic.\n\n`
+  const manifest = area.dependency_manifest || `(the ${stack} standard manifest)`;
+  return `# Project Scaffolding — area "${area.area_id}" (stack: ${stack})\n\n`
+    + `You are scaffolding the **${stack}** skeleton for this area. Produce IDIOMATIC ${stack} — `
+    + `you know its conventions (manifest, module/package layout, import syntax, test runner, and the `
+    + `language's type/record constructs). Author ONLY the skeleton below; the implementation tasks add feature behavior on top.\n\n`
+    + `## Produce exactly these artifacts\n`
+    + `1. The dependency manifest (${manifest}) with the dependencies this area needs and a runnable test command.\n`
+    + `2. Any build / language configuration the ${stack} stack requires.\n`
+    + `3. The canonical shared modules listed below, at their EXACT paths.\n`
+    + `4. The shared data-model and interface-contract type/record DEFINITIONS (the data shapes below), materialized ONCE under the shared module dir.\n`
+    + `5. The component directories listed below — created EMPTY.\n`
+    + `Then verify it builds / type-checks / parses.\n\n`
+    + `## What "skeleton" means here\n`
+    + `Skeleton = directory + module structure, the dependency manifest/config, and the shared TYPE / CONTRACT DEFINITIONS (data shapes, signatures). It does NOT include feature behavior or algorithms — those belong to the implementation tasks. A type or record definition IS skeleton; business logic is not.\n\n`
     + `## Layout\n`
     + `- source roots: ${area.source_roots.join(', ') || '(unset)'}\n`
     + `- test roots: ${area.test_roots.join(', ') || '(unset)'}\n`
-    + `- dependency manifest: ${area.dependency_manifest || 'package.json'}\n`
-    + `- import aliases: ${aliases}\n\n`
+    + `- dependency manifest: ${manifest}\n`
+    + aliasLine + `\n`
     + componentDirsBlock
     + `## Canonical shared modules to create (exact paths)\n${mods}\n\n`
-    + `## Shared data models — materialize as SHARED types under the shared dir (imported via the shared alias), NOT per-component\n${dataModels}\n\n`
-    + `## Interface contracts — materialize as SHARED contracts under the shared dir, NOT per-component\n${contracts}\n\n`
+    + `## Shared data models — define as shared types/records under the shared module dir; components IMPORT them (never duplicate per-component)\n${dataModels}\n\n`
+    + `## Interface contracts — define as shared contract types under the shared module dir\n${contracts}\n\n`
     + `## Rules\n`
-    + `- Create the dependency manifest with a runnable test script and the dependencies the ${area.stack} stack needs.\n`
-    + `- Create the canonical shared modules + shared data-model/contract types ONCE under the shared dir at EXACTLY the listed paths, importable via the listed aliases — do not duplicate them per component.\n`
-    + `- Component code lives ONLY in the canonical per-component directories listed above (the same paths the implementation tasks write to). Do NOT create a \`components/\` subtree, a \`src/components/\` directory, or any alternative per-component layout.\n`
-    + `- Honor the ${area.stack} stack; do not introduce another language.\n`
-    + `- Verify the skeleton type-checks / parses before finishing.`;
+    + `- Materialize the shared modules + data-model/contract definitions ONCE at the EXACT listed paths; components import them — never duplicate.\n`
+    + `- Use ${stack}-idiomatic constructs throughout (types/records, modules, imports, manifest, test runner). Do not import another language's conventions or filenames.\n`
+    + `- Component code lives ONLY in the canonical per-component directories above (the same paths the implementation tasks write to).\n`
+    + `- Honor the ${stack} stack; do not introduce another language.\n`
+    + `- Verify the skeleton builds / type-checks / parses before finishing.`;
 }

@@ -22,6 +22,7 @@ import type { GovernedStreamWriter } from './governedStreamWriter';
 import type { Database } from '../database/init';
 import type { TemplateLoader } from './templateLoader';
 import { normalizeWorkspacePath } from './phases/phase6';
+import { normalizeComponentDirForStack } from './phases/layoutContract';
 import { getLogger } from '../logging';
 import type { ReasoningReviewFindingRecordContent, ImplementationPacketContent } from '../types/records';
 
@@ -201,11 +202,18 @@ function formatCompletionCriteria(criteria: CompletionCriterion[]): string {
   return `These completion criteria are the AUTHORITATIVE pass/fail gate for this task — passing the listed component test cases is neither necessary nor sufficient if it does not satisfy these.\n\n${body}`;
 }
 
-function formatWriteScopeConstraints(task: ImplementationTask, protectedPaths?: string[]): string {
+export function formatWriteScopeConstraints(task: ImplementationTask, protectedPaths?: string[], language?: string): string {
+  // Stack-aware package normalization: a python (etc.) run cannot use a
+  // hyphenated component dir as a package (`import data-governance` is a syntax
+  // error). Persisted write_directory_paths minted by an earlier node-shaped
+  // Phase 6 are hyphenated, so convert them to the stack's package convention
+  // here — otherwise the executor writes to `src/data-governance` while every
+  // import + the layout map use `src/data_governance` → fragmentation (slice-156).
+  const pkg = (p: string): string => normalizeComponentDirForStack(p, language);
   const denySection = (protectedPaths && protectedPaths.length)
     ? '\n\nNEVER create or modify these scaffold-owned paths (import from them instead — '
       + 'writing here is rejected and the task is retried):\n'
-      + protectedPaths.map(p => `- ${p}`).join('\n')
+      + protectedPaths.map(p => `- ${pkg(p)}`).join('\n')
     : '';
   if (!task.write_directory_paths?.length) {
     return '(no write scope declared — clarify before writing anything)' + denySection;
@@ -213,9 +221,19 @@ function formatWriteScopeConstraints(task: ImplementationTask, protectedPaths?: 
   // Defensive normalize: legacy DBs persist absolute paths like
   // `/opt/hestami/PROP/...`. Strip system-root prefixes so Phase 9
   // resolves them against workspacePath consistently.
-  const normalized = task.write_directory_paths.map(p => normalizeWorkspacePath(p));
+  const normalized = task.write_directory_paths.map(p => pkg(normalizeWorkspacePath(p)));
+  // Precedence note: the task DESCRIPTION (LLM-authored upstream) sometimes names
+  // a different target directory than this deterministic write scope (e.g.
+  // "create … in src/config/security" while the scope is src/link-management).
+  // Without this line the executor deadlocks trying to reconcile the two. The
+  // write scope WINS — create the described artifact inside it.
+  const authoritative =
+    '\n\nThis write scope is AUTHORITATIVE. If the task description, goal, or any '
+    + 'instruction names a DIFFERENT directory, ignore that path and create the '
+    + 'described artifact INSIDE one of the write-scope directories above (creating '
+    + 'subdirectories within them as needed).';
   return 'Files may ONLY be created/modified in:\n' +
-    normalized.map(p => `- ${p}`).join('\n') + denySection;
+    normalized.map(p => `- ${p}`).join('\n') + authoritative + denySection;
 }
 
 /**
@@ -645,6 +663,8 @@ export class ExecutionContextBuilder {
       sharedDir: string;
       canonicalFiles: string[];
       protectedPaths: string[];
+      /** Primary stack/language — drives package-dir normalization (python etc). */
+      language?: string;
     } | null,
     /**
      * The task's implementation packet (Phase 9.0). When present it is the
@@ -673,7 +693,7 @@ export class ExecutionContextBuilder {
         }))
       : task.completion_criteria;
     const completionCriteriaStr = formatCompletionCriteria(completionCriteriaForRender);
-    const writeScopeStr = formatWriteScopeConstraints(task, scaffold?.protectedPaths);
+    const writeScopeStr = formatWriteScopeConstraints(task, scaffold?.protectedPaths, scaffold?.language);
     const sharedModulesStr = formatSharedModuleConstraints(scaffold);
     const governingADRsStr = formatADRs(filterADRsForTask(artifacts.adrs, task.component_id));
     const refactoringConstraintsStr = formatRefactoringConstraints(task);

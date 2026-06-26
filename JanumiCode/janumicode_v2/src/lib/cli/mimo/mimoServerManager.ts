@@ -26,7 +26,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { getLogger } from '../../logging';
-import { MimoClient } from './mimoClient';
+import { MimoClient, parseModelRef } from './mimoClient';
 
 export type MimoPermissionMode = 'static' | 'relay';
 
@@ -50,6 +50,22 @@ export function resolveMimoConfig(env: NodeJS.ProcessEnv = process.env): MimoCon
 }
 
 /**
+ * Environment for the `mimo serve` child. JanumiCode never needs mimo to import
+ * the user's `~/.claude/projects` sessions — that startup `claude-import` (35s+)
+ * and the subsequent session backfill bloat `mimocode.db` and race in-flight
+ * compose turns (observed: a 2.3GB DB → ~2.5min startup storm that dropped the
+ * Phase-9 turn mid-stream). Disable it, plus auto-update (no mid-run self-update
+ * churn). The caller can still opt back in by pre-setting either env var.
+ */
+export function buildServerEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return {
+    ...env,
+    MIMOCODE_DISABLE_CLAUDE_IMPORT: env.MIMOCODE_DISABLE_CLAUDE_IMPORT ?? '1',
+    MIMOCODE_DISABLE_AUTOUPDATE: env.MIMOCODE_DISABLE_AUTOUPDATE ?? '1',
+  };
+}
+
+/**
  * Build the project-root `mimocode.json` permission policy.
  * `static`: deny-by-default, no `ask` (headless). `relay`: sensitive tools
  * (shell/network/out-of-dir) become `ask` so a human approves via the relay.
@@ -66,8 +82,16 @@ export function buildPermissionPolicy(mode: MimoPermissionMode): Record<string, 
       doom_loop: mode === 'relay' ? 'ask' : 'deny',
       bash: {
         '*': sensitive,
-        'ls*': 'allow', 'cat *': 'allow', 'go *': 'allow', 'npm *': 'allow',
-        'node *': 'allow', 'pnpm *': 'allow', 'grep *': 'allow', 'git status*': 'allow',
+        // Read/inspect + directory creation (the executor must be able to mkdir
+        // its own component directory — denying it deadlocks the leaf).
+        'ls*': 'allow', 'cat *': 'allow', 'grep *': 'allow', 'git status*': 'allow',
+        'mkdir *': 'allow', 'touch *': 'allow',
+        // Stack-generic build/test runners (node, python, rust, go, java) so the
+        // per-leaf gate command resolved by gateCommands.ts can actually run. A
+        // node-only allowlist silently fails every python/rust/etc gate.
+        'npm *': 'allow', 'node *': 'allow', 'pnpm *': 'allow',
+        'python *': 'allow', 'python3 *': 'allow', 'pytest*': 'allow', 'pip *': 'allow', 'pip3 *': 'allow',
+        'go *': 'allow', 'cargo *': 'allow', 'mvn *': 'allow', 'gradle *': 'allow',
       },
       external_directory: {
         '*': sensitive,
@@ -76,6 +100,84 @@ export function buildPermissionPolicy(mode: MimoPermissionMode): Record<string, 
       },
     },
   };
+}
+
+/**
+ * Provider id for a LOCAL, OpenAI-compatible endpoint (Ollama by default, but
+ * any `/v1`-shaped server — vLLM, llama.cpp — via JANUMICODE_MIMO_OPENAI_BASE_URL).
+ * mimo ships only `ollama-cloud` (→ ollama.com); there is no built-in *local*
+ * ollama provider, so we synthesize one. Selecting it removes Xiaomi's free-tier
+ * cloud from the executor loop entirely → a deterministic, offline executor.
+ */
+export const LOCAL_PROVIDER_ID = 'ollama-local';
+
+/**
+ * When `model` targets the local provider (`ollama-local/<model>`), synthesize
+ * the mimocode.json `provider` block that points an openai-compatible client at
+ * the local endpoint. Returns null for any cloud model (`mimo/*`,
+ * `ollama-cloud/*`, …) so the cloud path's written config is byte-unchanged.
+ *
+ * mimo bundles `@ai-sdk/openai-compatible` (its built-in `ollama-cloud` uses it),
+ * so referencing it by `npm` resolves without an install. Ollama's `/v1`
+ * endpoint ignores the key, but the SDK wants a non-empty `apiKey` → placeholder.
+ */
+export function buildLocalProvider(
+  model: string,
+  env: NodeJS.ProcessEnv = process.env,
+): { provider: Record<string, unknown>; model: string } | null {
+  const { providerID, modelID } = parseModelRef(model);
+  if (providerID !== LOCAL_PROVIDER_ID) return null;
+  const baseURL = env.JANUMICODE_MIMO_OPENAI_BASE_URL || 'http://localhost:11434/v1';
+  // CRITICAL: declare the model's context/output window. A custom openai-compatible
+  // provider model with NO `limit` makes mimo fall back to a small default context,
+  // and mimo's conversation COMPACTION then summarizes earlier context away once the
+  // (under-declared) window fills — silently truncating large prompts (e.g. the
+  // inlined engineering constitution) server-side before the model ever sees them.
+  // Declaring the REAL window (Ollama loads gemma4:26b at 262144) stops the spurious
+  // compaction. Override per local model via env when its window differs.
+  const contextWindow = Number(env.JANUMICODE_MIMO_OPENAI_CONTEXT) || 262144;
+  const maxOutput = Number(env.JANUMICODE_MIMO_OPENAI_MAX_OUTPUT) || 32768;
+  return {
+    provider: {
+      [LOCAL_PROVIDER_ID]: {
+        npm: '@ai-sdk/openai-compatible',
+        name: 'Local (OpenAI-compatible)',
+        options: { baseURL, apiKey: env.JANUMICODE_MIMO_OPENAI_API_KEY || 'ollama' },
+        // Custom openai-compatible providers don't auto-discover; declare the
+        // model AND its capabilities. `tool_call: true` is REQUIRED — the
+        // tool-heavy `compose` agent only receives tools for tool-capable models
+        // (use a tool-calling Ollama model: qwen3.*, gpt-oss, granite). `reasoning`
+        // off so a thinking model's chain-of-thought is treated as plain output
+        // (no `reasoning_content` field is demanded of Ollama's `/v1`). `limit`
+        // declares the real context window so mimo doesn't truncate/compact (above).
+        models: {
+          [modelID]: {
+            name: modelID, tool_call: true, reasoning: false, attachment: false,
+            limit: { context: contextWindow, output: maxOutput },
+          },
+        },
+      },
+    },
+    model: `${LOCAL_PROVIDER_ID}/${modelID}`,
+  };
+}
+
+/**
+ * The full `mimocode.json` written into a project root: the permission policy
+ * plus, when a local provider is selected, the synthesized `provider` + default
+ * `model`. mimocode.json is OpenCode's unified config (permission + provider +
+ * model in one file), so both live together — and because `writePolicyAndTrust`
+ * rewrites this file on every `ensure()`, the provider MUST be merged here
+ * rather than written to a separate file it would clobber.
+ */
+export function buildProjectConfig(cfg: MimoConfig, env: NodeJS.ProcessEnv = process.env): Record<string, unknown> {
+  const config: Record<string, unknown> = buildPermissionPolicy(cfg.permissionMode);
+  const local = buildLocalProvider(cfg.model, env);
+  if (local) {
+    config.provider = local.provider;
+    config.model = local.model;
+  }
+  return config;
 }
 
 /** Parse `mimocode server listening on http://127.0.0.1:PORT` from server stdout. */
@@ -119,18 +221,18 @@ class MimoServerManagerImpl {
     const existing = this.servers.get(key);
     if (existing && existing.proc.exitCode === null) return existing;
 
-    this.writePolicyAndTrust(key, cfg.permissionMode);
+    this.writePolicyAndTrust(key, cfg);
     const server = await this.spawnServer(key, cfg);
     this.servers.set(key, server);
     this.hookProcessExit();
     return server;
   }
 
-  private writePolicyAndTrust(projectRoot: string, mode: MimoPermissionMode): void {
+  private writePolicyAndTrust(projectRoot: string, cfg: MimoConfig): void {
     fs.mkdirSync(projectRoot, { recursive: true });
     fs.writeFileSync(
       path.join(projectRoot, 'mimocode.json'),
-      JSON.stringify(buildPermissionPolicy(mode), null, 2),
+      JSON.stringify(buildProjectConfig(cfg), null, 2),
       'utf8',
     );
     addTrustedPath(path.join(os.homedir(), '.local', 'share', 'mimocode', 'trusted-workspaces.json'), projectRoot);
@@ -139,7 +241,7 @@ class MimoServerManagerImpl {
   private spawnServer(projectRoot: string, cfg: MimoConfig): Promise<RunningServer> {
     const proc = spawn(cfg.binary, ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
       cwd: projectRoot,
-      env: process.env,
+      env: buildServerEnv(),
       // shell:true so Windows resolves the `mimo` npm shim (.cmd) on PATH.
       shell: process.platform === 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],

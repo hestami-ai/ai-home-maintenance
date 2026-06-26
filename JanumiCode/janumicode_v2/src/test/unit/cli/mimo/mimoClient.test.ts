@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSse, parseModelRef, type MimoSseEvent } from '../../../../lib/cli/mimo/mimoClient';
+import { parseSse, parseModelRef, MimoClient, type MimoSseEvent } from '../../../../lib/cli/mimo/mimoClient';
 
 async function* chunks(...c: string[]): AsyncGenerator<string> {
   for (const x of c) yield x;
@@ -19,6 +19,33 @@ describe('parseModelRef', () => {
   });
   it('keeps only the first slash as the separator', () => {
     expect(parseModelRef('openrouter/anthropic/claude')).toEqual({ providerID: 'openrouter', modelID: 'anthropic/claude' });
+  });
+});
+
+describe('MimoClient.postJson long-running routing', () => {
+  // Regression: the no-timeout fix attached a standalone-`undici`-package Agent
+  // as a `dispatcher` on Node's BUILT-IN global fetch, which throws "invalid
+  // onRequestStart method" on an undici-version mismatch (pkg 8.x vs Node 7.x).
+  // An INJECTED fetchImpl must be used verbatim — never carrying that dispatcher
+  // (it would break a non-undici/test fetch) and never routed through undici.
+  it('uses the injected fetchImpl for a long-running sendMessage, with NO dispatcher attached', async () => {
+    const seen: Array<{ url: string; init: RequestInit & { dispatcher?: unknown } }> = [];
+    const fakeFetch = (async (url: string, init?: RequestInit) => {
+      seen.push({ url, init: (init ?? {}) as RequestInit & { dispatcher?: unknown } });
+      return new Response(JSON.stringify({ info: { finish: 'stop' } }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const client = new MimoClient('http://127.0.0.1:9/', fakeFetch);
+    const res = await client.sendMessage('ses_1', {
+      agent: 'build',
+      model: { providerID: 'ollama-local', modelID: 'm' },
+      text: 'hi',
+    });
+
+    expect(res.finish).toBe('stop');
+    expect(seen).toHaveLength(1);
+    expect(seen[0].url).toBe('http://127.0.0.1:9/session/ses_1/message'); // trailing slash trimmed
+    expect(seen[0].init.dispatcher).toBeUndefined(); // the version-mismatched Agent never leaks here
   });
 });
 

@@ -453,9 +453,9 @@ export class DeepMemoryResearchAgent {
   // (e.g. `COMP-1`, `FR-3`, `NFR-2`) so the deterministic path provides
   // strictly better signal than the LLM did, in a fraction of the time.
   //
-  // Spec §8.4's full Stage 1 design (including `known_conflict_zones`
-  // derived from governed-stream inspection) requires a CLI-backed DMR
-  // with tool access. Tracked as SPEC GAP — see study notes.
+  // Spec §8.4 Stage 1 derives `known_conflict_zones` from governed-stream
+  // inspection. We have direct DB access (no CLI tool needed), so this is a
+  // deterministic query — see `deriveConflictZones`.
 
   private async decomposeQuery(
     brief: RetrievalBrief,
@@ -468,8 +468,41 @@ export class DeepMemoryResearchAgent {
       sourcesInScope: brief.scopeTier === 'current_run'
         ? ['governed_stream_current_run']
         : ['governed_stream_all_runs'],
-      knownConflictZones: [],
+      knownConflictZones: this.deriveConflictZones(brief),
     };
+  }
+
+  /**
+   * Stage 1 conflict-zone derivation (spec §8.4). A "conflict zone" is a subject
+   * — a component or artifact kind — that already carries unresolved tension in
+   * the governed stream: it is an endpoint of a CONFIRMED `contradicts` or
+   * `supersedes` memory edge. Surfacing these tells a consumer where the record
+   * set disagrees with itself (active overrides, contradictions) so it can read
+   * those zones with extra care. Deterministic DB inspection; '' on any error.
+   */
+  private deriveConflictZones(brief: RetrievalBrief): string[] {
+    try {
+      const runScope = brief.scopeTier === 'current_run' ? 'AND gs.workflow_run_id = @run' : '';
+      const stmt = this.db.prepare(`
+        SELECT DISTINCT gs.record_type AS rt,
+               json_extract(gs.content, '$.kind') AS kind,
+               json_extract(gs.content, '$.component_id') AS comp
+        FROM memory_edge me
+        JOIN governed_stream gs
+          ON gs.id IN (me.source_record_id, me.target_record_id)
+        WHERE me.edge_type IN ('contradicts', 'supersedes')
+          AND me.status IN ('confirmed', 'system_asserted')
+          ${runScope}
+      `);
+      const rows = (runScope ? stmt.all({ run: brief.workflowRunId }) : stmt.all()) as
+        Array<{ rt: string; kind: string | null; comp: string | null }>;
+      const zones = new Set<string>();
+      for (const r of rows) {
+        const label = r.comp || r.kind || r.rt;
+        if (label) zones.add(String(label));
+      }
+      return [...zones].slice(0, 10);
+    } catch { return []; }
   }
 
   // ── Stage 2: Broad Candidate Harvest ────────────────────────────
@@ -1079,13 +1112,26 @@ export class DeepMemoryResearchAgent {
     // tokens because they match indexed record fields directly. Phase
     // callers pass these in the query when they have upstream artifacts
     // to anchor against.
-    const idTokens = [...query.matchAll(/\b[A-Z][A-Z0-9]+-[A-Z0-9-]+\b/g)].map(m => m[0]);
+    // Uppercase domain ids (FR-1, COMP-API-GATEWAY, TECH-POSTGRES-16).
+    const upperIdRe = /\b[A-Z][A-Z0-9]+-[A-Z0-9-]+\b/g;
+    // Lowercase / mixed-case STRUCTURAL ids (comp-lifecycle-manager,
+    // task-comp-x-delete, us-001, dom-shortening). The per-leaf executor query
+    // anchors on `comp-*`/`task-*` ids, which the uppercase pattern missed — so
+    // they degraded into ordinary word tokens (lost retrieval signal). Matching
+    // is gated on a known id PREFIX so genuine compound words ("single-tenant",
+    // "delete-by-key") are NOT misread as identifiers.
+    const prefixedIdRe = /\b(?:comp|task|leaf|node|us|ac|fr|nfr|dom|uj|wf|ent|int|ic|sr|dm|cc|api|tech|con|qa|rel)-[A-Za-z0-9][A-Za-z0-9-]*\b/gi;
+    const idTokens = [
+      ...[...query.matchAll(upperIdRe)].map(m => m[0]),
+      ...[...query.matchAll(prefixedIdRe)].map(m => m[0]),
+    ];
 
     // Keep quoted phrases intact.
     const quoted = [...query.matchAll(/"([^"]+)"/g)].map(m => m[1]);
     const stripped = query
       .replace(/"[^"]+"/g, ' ')
-      .replace(/\b[A-Z][A-Z0-9]+-[A-Z0-9-]+\b/g, ' '); // remove already-captured IDs
+      .replace(upperIdRe, ' ')
+      .replace(prefixedIdRe, ' '); // remove already-captured IDs
     const stopwords = new Set([
       'the', 'and', 'for', 'with', 'from', 'that', 'this', 'these',
       'those', 'into', 'onto', 'over', 'then', 'than', 'when', 'where',
@@ -1406,6 +1452,20 @@ export class DeepMemoryResearchAgent {
           const body = str(s.action) || str(s.outcome) || str(s.role);
           return id || body ? `${id}: ${body}`.trim() : '';
         }).filter(Boolean).join(' | ');
+      }
+
+      // Cross-run modification — the applied refactoring that supersedes a
+      // prior-run artifact (so the supersession chain says WHAT was applied).
+      if (kind === 'cross_run_modification') {
+        const mod = str(content.modification_type);
+        const changed = str(content.changed_interface_id) || str(content.modified_artifact_id);
+        const status = str(content.applied_status);
+        const parts = [
+          mod && `${mod} change`,
+          changed && `to ${changed}`,
+          status && `(${status})`,
+        ].filter(Boolean);
+        return parts.length ? `cross-run modification: ${parts.join(' ')}` : '';
       }
 
       // Non-functional requirements — id (category): description. The certified

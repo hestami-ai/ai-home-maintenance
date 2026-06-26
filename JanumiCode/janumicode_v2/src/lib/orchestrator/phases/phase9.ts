@@ -163,7 +163,7 @@ export class Phase9Handler implements PhaseHandler {
     // directives ("import X from <canonical>, owned by <component>; do NOT
     // reinvent") — the fix for the divergent-duplicate modules.
     engine.stateMachine.setSubPhase(workflowRun.id, 'module_ownership_planning');
-    const ownershipPlan = runModuleOwnershipPlanningSubPhase({ workflowRun, engine });
+    const ownershipPlan = runModuleOwnershipPlanningSubPhase({ workflowRun, engine }, reconPlan);
 
     // ── 9.0 — Scaffolding (Stage 1+2 inc.2: REPLACE) ──────────────
     // The scaffolding AGENT authors the project skeleton from the recon plan
@@ -186,7 +186,10 @@ export class Phase9Handler implements PhaseHandler {
         workflow_run_id: workflowRun.id, manifests_present: scaffoldingResult.manifestsPresent,
       });
       try {
-        scaffoldManifest = runScaffoldSynthesis({ workflowRun, engine });
+        // Pass recon's stack so the deterministic safety net materializes a
+        // stack-appropriate scaffold (python/etc) instead of always TypeScript.
+        const reconStack = reconPlan?.areas?.[0]?.stack;
+        scaffoldManifest = runScaffoldSynthesis({ workflowRun, engine }, reconStack);
       } catch (err) {
         getLogger().warn('workflow', 'Phase 9.0a scaffold_synthesis safety-net failed (continuing without scaffold)', {
           workflow_run_id: workflowRun.id, error: err instanceof Error ? err.message : String(err),

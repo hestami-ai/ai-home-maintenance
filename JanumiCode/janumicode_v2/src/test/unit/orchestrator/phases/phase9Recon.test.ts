@@ -19,7 +19,73 @@ import {
   applyForcedStack,
   defaultGatesForStack,
   manifestForStack,
+  idiomaticImportSpecifier,
+  normalizeGreenfieldLayout,
 } from '../../../../lib/orchestrator/phases/phase9Recon';
+
+describe('normalizeGreenfieldLayout — deterministic greenfield topology', () => {
+  it('overrides the agent area_id-as-source-dir with canonical src/ layout', () => {
+    // slice-156: agent emitted source_roots:['core-service'] (area id as a dir) +
+    // /src/ protected → project nested under project/core-service/, fragmented.
+    const plan = parseReconPlan({
+      workspace_kind: 'greenfield',
+      areas: [{
+        area_id: 'core-service', stack: 'python', confidence: 'high',
+        source_roots: ['core-service'], test_roots: ['core-service/tests'],
+        protected_paths: ['/src/'], dependency_manifest: 'pyproject.toml',
+        gate_commands: [{ kind: 'test', command: 'pytest', args: [] }],
+      }],
+    }, ws)!;
+    const out = normalizeGreenfieldLayout(plan);
+    expect(out.areas[0].source_roots).toEqual(['src']);
+    expect(out.areas[0].test_roots).toEqual(['src']);
+    expect(out.areas[0].protected_paths).toEqual(['src/shared/', 'pyproject.toml']);
+    expect(out.areas[0].stack).toBe('python'); // semantic decision preserved
+  });
+
+  it('leaves brownfield layout untouched (real existing dirs matter)', () => {
+    const plan = parseReconPlan({
+      workspace_kind: 'brownfield',
+      areas: [{
+        area_id: 'svc', stack: 'python', confidence: 'high',
+        source_roots: ['services/svc/src'], test_roots: ['services/svc/tests'],
+        protected_paths: ['services/svc/src/shared/'], dependency_manifest: 'pyproject.toml',
+        gate_commands: [{ kind: 'test', command: 'pytest', args: [] }],
+      }],
+    }, ws)!;
+    const out = normalizeGreenfieldLayout(plan);
+    expect(out.areas[0].source_roots).toEqual(['services/svc/src']); // unchanged
+  });
+});
+
+describe('idiomaticImportSpecifier — stack-idiomatic import paths', () => {
+  it('strips a leading source root + extension and renders the stack idiom', () => {
+    expect(idiomaticImportSpecifier('src/shared/db.py', 'python')).toBe('shared.db');
+    expect(idiomaticImportSpecifier('src/shared/db.rs', 'rust')).toBe('crate::shared::db');
+    expect(idiomaticImportSpecifier('src/shared/db.go', 'go')).toBe('shared/db');
+    expect(idiomaticImportSpecifier('src/shared/Db.java', 'java')).toBe('shared.Db');
+    expect(idiomaticImportSpecifier('src/shared/db.ts', 'node')).toBe('@/shared/db');
+  });
+
+  it('applyForcedStack retargets canonical-module specifiers to the new stack (not the old TS alias)', () => {
+    const base = {
+      kind: 'phase9_recon_plan' as const, schemaVersion: '1.0' as const,
+      workspace_kind: 'greenfield' as const, source: 'agent' as const,
+      areas: [{
+        area_id: 'workspace', description: '', stack: 'node', confidence: 'high' as const,
+        source_refs: [], conflicts: [], alternatives_rejected: [], source_roots: ['src'], test_roots: ['src'],
+        protected_paths: ['src/shared/'], dependency_manifest: 'package.json',
+        canonical_modules: [{ path: 'src/shared/db.ts', import_specifier: '@shared/db', description: 'db' }],
+        import_aliases: [{ alias: '@shared/*', target: 'src/shared/*' }], gate_commands: [],
+      }],
+      integration_boundaries: [], notes: '',
+    };
+    const py = applyForcedStack(base, 'python');
+    expect(py.areas[0].canonical_modules[0].path).toMatch(/\.py$/);
+    expect(py.areas[0].canonical_modules[0].import_specifier).toBe('shared.db'); // not '@shared/db'
+    expect(py.areas[0].import_aliases).toEqual([]); // python has no aliases
+  });
+});
 import type { PhaseContext } from '../../../../lib/orchestrator/orchestratorEngine';
 
 let ws: string;
@@ -168,6 +234,28 @@ describe('buildReconEnforcementManifest — polyglot enforcement substrate', () 
     expect(m.allowed_extensions_by_area.web).not.toContain('.rs'); // per-area, not global
     expect(m.conventions).toContain('Area web (node)');
     expect(m.conventions).toContain('Area engine (rust)');
+  });
+
+  it('drops over-broad protected paths equal to a source root (the /src/ deadlock)', () => {
+    // The recon AGENT emitted the whole source tree as protected (`/src/`), which
+    // contradicts a per-component write scope underneath it (src/link-management)
+    // and deadlocks the executor. Sanitize: keep src/shared/ + manifest, drop /src/.
+    const plan = parseReconPlan({
+      workspace_kind: 'greenfield',
+      areas: [
+        { area_id: 'core', stack: 'python', confidence: 'low', dependency_manifest: 'pyproject.toml',
+          protected_paths: ['/src/', 'src/shared/'], source_roots: ['src'],
+          gate_commands: [{ kind: 'test', command: 'pytest', args: [] }] },
+      ],
+    }, ws)!;
+    const m = buildReconEnforcementManifest(plan);
+    expect(m.protected_paths).not.toContain('/src/');  // over-broad → dropped
+    expect(m.protected_paths).not.toContain('src');
+    expect(m.protected_paths).toContain('src/shared/'); // proper subdir → kept
+    expect(m.protected_paths).toContain('pyproject.toml');
+    // conventions string must NOT tell the agent "do NOT author /src/"
+    expect(m.conventions).not.toMatch(/do NOT author:[^.]*\/src\//);
+    expect(m.conventions).toContain('src/shared/');
   });
 });
 

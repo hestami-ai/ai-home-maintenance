@@ -54,6 +54,16 @@ describe('buildCompositionRootLeaf', () => {
     const root = buildCompositionRootLeaf(leaves, jsManifest, []);
     expect(root.description).toContain('src/index.js');
   });
+
+  it('python profile: src/main.py entrypoint + pyproject.toml manifest, never src/index.ts or package.json', () => {
+    const pyManifest = { profile: { language: 'python' } } as unknown as ScaffoldManifest;
+    const root = buildCompositionRootLeaf(leaves, pyManifest, []);
+    expect(root.description).toContain('src/main.py');
+    expect(root.description).toContain('pyproject.toml');
+    expect(root.description).not.toContain('src/index.ts');
+    expect(root.description).not.toContain('package.json');
+    expect(root.completion_criteria?.some(c => c.artifact_ref === 'pyproject.toml')).toBe(true);
+  });
 });
 
 describe('extractDeclaredDependencies (generic, structured-only)', () => {

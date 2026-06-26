@@ -85,6 +85,26 @@ describe('verifyCoherence — per-packet assertions', () => {
     expect(failures.some((f) => f.startsWith('P1_NO_USER_STORY'))).toBe(true);
   });
 
+  it('P1: a cross-run refactoring task with no user story is EXEMPT (advisory, not blocking)', () => {
+    // REFACTOR-1 (task_type 'refactoring') traces to a cross_run_modification, not a
+    // user story — blocking it is a false positive the route-restart can't heal.
+    const p = packet({
+      user_stories: [],
+      task: {
+        id: 'REFACTOR-1', node_id: 'node-r', name: 'cross-run refactor', description: 'd',
+        task_type: 'refactoring', backing_tool: 'mimo_cli', estimated_complexity: 'medium',
+        completion_criteria: [], write_directory_paths: ['src/server/foo'],
+        read_directory_paths: [], dependency_task_ids: [],
+      },
+    });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['comp-001', 'resp-1']), atomicTaskIds: new Set(['REFACTOR-1']),
+    });
+    const res = r.byPacketId.get(p.packet_id)!;
+    expect(res.blocking_failures.some((f) => f.startsWith('P1_NO_USER_STORY'))).toBe(false); // NOT blocking
+    expect(res.advisory_findings.some((f) => f.startsWith('P1_NO_USER_STORY'))).toBe(true);  // advisory instead
+  });
+
   it('P2: user story with no AC → fail', () => {
     const p = packet({
       user_stories: [{

@@ -41,12 +41,31 @@ interface ContractForSmoke {
   data_format?: string;
 }
 
+/**
+ * Stack-idiomatic facts for the composition-root prose. Node (ts/js) keeps the
+ * exact prior wording (`src/index.ts`, `package.json`, "the type-check"); other
+ * stacks get their own entrypoint / manifest / gate phrasing so a python (etc.)
+ * run isn't told to wire a `src/index.ts` and inspect `package.json`.
+ */
+function stackBuildFacts(language: ScaffoldManifest['profile']['language'] | undefined): {
+  entry: string; manifest: string; typecheck: string; installNote: string;
+} {
+  switch (language) {
+    case 'python': return { entry: 'src/main.py', manifest: 'pyproject.toml', typecheck: 'the type-check (mypy, when configured)', installNote: 'declare it in pyproject.toml and install it' };
+    case 'go': return { entry: 'cmd/app/main.go', manifest: 'go.mod', typecheck: 'the build (go build ./...)', installNote: 'add it to go.mod' };
+    case 'rust': return { entry: 'src/main.rs', manifest: 'Cargo.toml', typecheck: 'the build (cargo build)', installNote: 'add it to Cargo.toml' };
+    case 'java': return { entry: 'src/main/java/Main.java', manifest: 'pom.xml', typecheck: 'the build', installNote: 'add it to the build manifest' };
+    case 'javascript': return { entry: 'src/index.js', manifest: 'package.json', typecheck: 'the type-check', installNote: 'install it for real' };
+    default: return { entry: 'src/index.ts', manifest: 'package.json', typecheck: 'the type-check', installNote: 'install it for real' };
+  }
+}
+
 export function buildCompositionRootLeaf(
   allLeaves: ReadonlyArray<SchedulerLeaf>,
   manifest: ScaffoldManifest | null,
   contracts: ContractForSmoke[],
 ): SchedulerLeaf {
-  const e = manifest?.profile.language === 'javascript' ? 'js' : 'ts';
+  const { entry, manifest: manifestFile, typecheck, installNote } = stackBuildFacts(manifest?.profile.language);
   const componentIds = [...new Set(allLeaves.map((l) => l.component_id).filter(Boolean))].sort();
 
   const contractLines = contracts
@@ -56,35 +75,35 @@ export function buildCompositionRootLeaf(
   const description = [
     'COMPOSITION ROOT — integrate every implemented component into ONE runnable application. ',
     'All component implementation tasks have already run; their code is in the workspace. Your job is wiring, not feature work. Steps:',
-    '(1) DEPENDENCIES — inspect the source imports across src/. Any package the code imports that is missing from package.json must be installed for real. ' +
+    `(1) DEPENDENCIES — inspect the source imports across src/. Any package the code imports that is missing from ${manifestFile} must ${installNote}. ` +
     'If any component substituted a type shim / stub declaration for a real dependency, install the real dependency and delete the shim.',
-    `(2) ENTRYPOINT — create the application entrypoint at src/index.${e} (or extend it if present): construct the application, ` +
+    `(2) ENTRYPOINT — create the application entrypoint at ${entry} (or extend it if present): construct the application, ` +
     'register every component\'s routes/middleware/services (components: ' + componentIds.join(', ') + '), ' +
     'read configuration from environment variables with sensible defaults, and start listening when run directly.',
     '(3) BOOT VERIFICATION — add an integration test that starts the application in-process and exercises at least one request/interaction per external interface contract:',
     ...(contractLines.length ? contractLines : ['  - (no interface contracts recorded — smoke-test the primary user-facing flow instead)']),
-    '(4) GLOBAL GATE — the whole workspace must hold: the type-check must pass with zero errors and the FULL test suite must pass. ' +
+    `(4) GLOBAL GATE — the whole workspace must hold: ${typecheck} must pass with zero errors and the FULL test suite must pass. ` +
     'Fix integration breakage you find, preferring the canonical shared modules and each component\'s existing public surface; do not rewrite component internals.',
   ].join('\n');
 
   const completion_criteria = [
     {
       criterion_id: 'CC-COMP-001',
-      description: `Application entrypoint exists at src/index.${e}, composes all components, and starts cleanly.`,
+      description: `Application entrypoint exists at ${entry}, composes all components, and starts cleanly.`,
       verification_method: 'test_execution',
-      artifact_ref: `src/index.${e}`,
+      artifact_ref: entry,
     },
     {
       criterion_id: 'CC-COMP-002',
       description: 'All dependencies the source imports are real installed packages (no type shims / stub module declarations remain).',
       verification_method: 'static_analysis',
-      artifact_ref: 'package.json',
+      artifact_ref: manifestFile,
     },
     {
       criterion_id: 'CC-COMP-003',
-      description: 'Workspace type-check passes with zero errors and the FULL test suite passes.',
+      description: `Workspace ${typecheck} passes with zero errors and the FULL test suite passes.`,
       verification_method: 'test_execution',
-      artifact_ref: 'package.json',
+      artifact_ref: manifestFile,
     },
     ...contracts.filter((c) => c.id).map((c, i) => ({
       criterion_id: `CC-COMP-SMOKE-${String(i + 1).padStart(3, '0')}`,

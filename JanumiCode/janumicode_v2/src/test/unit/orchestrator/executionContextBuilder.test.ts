@@ -16,6 +16,7 @@ import {
   ExecutionContextBuilder,
   filterEvalCriteriaForTask,
   findUpstreamFindingsForTask,
+  formatWriteScopeConstraints,
   type ImplementationTask,
   type EvaluationPlans,
   type TestPlan,
@@ -25,6 +26,35 @@ import { createTestDatabase } from '../../../lib/database/init';
 import { TemplateLoader, type PromptTemplate } from '../../../lib/orchestrator/templateLoader';
 import type { GovernedStreamWriter } from '../../../lib/orchestrator/governedStreamWriter';
 import type { GovernedStreamRecord, RecordType } from '../../../lib/types/records';
+
+describe('formatWriteScopeConstraints — write scope is authoritative over the description', () => {
+  it('states the scope WINS over a contradicting directory named in the description', () => {
+    // Regression (ws-156 TUI run): task description said "create … in
+    // src/config/security" while write scope was src/link-management → the model
+    // deadlocked. The scope must explicitly override the description.
+    const task = { id: 'task-x', write_directory_paths: ['src/link-management'] } as unknown as ImplementationTask;
+    const out = formatWriteScopeConstraints(task, ['src/shared/', 'pyproject.toml']);
+    expect(out).toContain('src/link-management');
+    expect(out).toMatch(/AUTHORITATIVE/);
+    expect(out).toMatch(/different directory/i);
+    expect(out).toContain('src/shared/'); // sanitized protected paths still render
+  });
+
+  it('python: normalizes persisted hyphenated write paths to underscore packages', () => {
+    // slice-156: persisted node-shaped write_directory_paths (hyphens) are invalid
+    // python packages → render them as underscore packages so prompt + imports agree.
+    const task = { id: 'task-x', write_directory_paths: ['src/data-governance'] } as unknown as ImplementationTask;
+    const out = formatWriteScopeConstraints(task, ['src/shared/'], 'python');
+    expect(out).toContain('src/data_governance');
+    expect(out).not.toContain('src/data-governance');
+  });
+
+  it('node: leaves hyphenated write paths as-is', () => {
+    const task = { id: 'task-x', write_directory_paths: ['src/data-governance'] } as unknown as ImplementationTask;
+    const out = formatWriteScopeConstraints(task, [], 'node');
+    expect(out).toContain('src/data-governance');
+  });
+});
 import path from 'path';
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..');

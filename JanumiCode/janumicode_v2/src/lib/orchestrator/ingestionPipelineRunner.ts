@@ -798,6 +798,22 @@ export class IngestionPipelineRunner {
       }
     }
 
+    // A cross_run_modification (Phase 9.1) documents that a prior-run artifact
+    // was changed by this run's refactoring — the modification SUPERSEDES that
+    // artifact. Minting the edge here, producer-side on ingest, is what lets DMR
+    // Stage 5 surface the applied cross-run change as a supersession_chain
+    // (Option B: mint at the producer, not infer edgeless supersession in the
+    // consumer). The override that TRIGGERED the refactor already has its own
+    // edge; this records that the change was actually APPLIED to the dependent.
+    if (record.record_type === 'cross_run_modification') {
+      const content = record.content as Record<string, unknown>;
+      const modifiedId = typeof content.modified_artifact_id === 'string' ? content.modified_artifact_id : '';
+      if (modifiedId) {
+        this.persistEdge(this.createEdge('supersedes', record.id, modifiedId, 'system_asserted'));
+      }
+      return;
+    }
+
     // For artifact_produced: check if an existing artifact of the same type
     // in the same sub-phase has been superseded by this one
     if (record.record_type === 'artifact_produced' && record.sub_phase_id) {

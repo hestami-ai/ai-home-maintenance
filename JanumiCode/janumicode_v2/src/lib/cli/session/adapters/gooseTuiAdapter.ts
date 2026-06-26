@@ -27,6 +27,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SessionDriver, type SessionDriverOptions, type SessionLogEvent } from '../sessionDriver';
+import { resolveExecutorIdleTimeoutMs } from '../executorTimeouts';
 import { checkAction } from '../perception/actionGuard';
 import type { Detection } from '../perception/classifier';
 import { GOOSE_MARKERS, type PerceptionMarkers } from '../perception/detectors';
@@ -127,6 +128,14 @@ export class GooseTuiAdapter implements ExecutorAdapter {
   private readonly markers: PerceptionMarkers;
   /** Full task spec for the current run — grounding for the responder. */
   private taskSpec = '';
+  /**
+   * Per-turn stall window for the CURRENT run: a full window with no progress
+   * and no busy state = stall. Driven by the shared executor idle policy
+   * (`req.idleTimeoutSeconds`) so a long-but-active RPI turn is never cut; the
+   * absolute ceiling is `budgetMs` (wall-clock). Distinct from `perTurnTimeoutMs`,
+   * which stays short for STARTUP input-ready detection.
+   */
+  private stallWindowMs = 0;
 
   constructor(
     private readonly spawner: PtySpawner,
@@ -178,9 +187,14 @@ export class GooseTuiAdapter implements ExecutorAdapter {
       // explicit resize after spawn forces a winsize propagation.
       driver.resize(this.cfg.cols, this.cfg.rows);
 
-      // Session budget: research-plan-implement with a local model needs more
-      // than the one-shot cap. Stall detection (not this) is the safety net.
+      // Session budget (wall-clock ceiling) + per-turn stall window (idle) both
+      // come from the shared executor policy via the request, so goose inherits
+      // the same generous backstops as every other executor. Stall detection is
+      // the primary net; budgetMs is the absolute backstop.
       const budgetMs = Math.max((req.timeoutSeconds ?? 600) * 1000, 1_800_000);
+      this.stallWindowMs = req.idleTimeoutSeconds
+        ? req.idleTimeoutSeconds * 1000
+        : resolveExecutorIdleTimeoutMs();
       const deadline = started + budgetMs;
 
       // Ready = the input box is visible.
@@ -266,7 +280,9 @@ export class GooseTuiAdapter implements ExecutorAdapter {
     for (;;) {
       const remaining = deadline - now();
       if (remaining <= 0) return { timedOut: true, detection: null };
-      const windowMs = Math.min(this.cfg.perTurnTimeoutMs, remaining);
+      // Stall window = the shared idle policy (generous), capped by wall-clock
+      // remaining. A full window with no busy state + no content change = stall.
+      const windowMs = Math.min(this.stallWindowMs, remaining);
 
       // A prompt/modal/idle only SETTLES the wait when agent content changed
       // since our last send — the previous question stays on the transcript

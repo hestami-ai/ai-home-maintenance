@@ -24,6 +24,7 @@ import { BloomPruneCoordinator } from './bloomPruneCoordinator';
 import { LoopDetectionMonitor } from './loopDetectionMonitor';
 import { IngestionPipelineRunner } from './ingestionPipelineRunner';
 import { AgentInvoker } from './agentInvoker';
+import { resolveExecutorIdleTimeoutS, resolveExecutorWallclockTimeoutS } from '../cli/session/executorTimeouts';
 import {
   createClaudeCodeParser,
   createCodexCliParser,
@@ -435,10 +436,19 @@ export class OrchestratorEngine {
       });
     }
 
+    // Executor backstops come from the SHARED policy (executorTimeouts), not the
+    // (short) `cli_invocation` config — those local defaults are exactly what let
+    // the 300s undici timeout guillotine long mimo turns. Every executor adapter
+    // inherits the same generous idle (24h) + wall-clock (25h) backstops via the
+    // ExecutorTaskRequest, and self-terminates on its own signal. Env-tunable.
+    const idleTimeoutSeconds = resolveExecutorIdleTimeoutS();
     this.agentInvoker = new AgentInvoker(this.llmCaller, {
-      timeoutSeconds: config.cli_invocation.timeout_seconds,
-      idleTimeoutSeconds: config.cli_invocation.idle_timeout_seconds,
-      noContentTimeoutSeconds: config.cli_invocation.no_content_timeout_seconds,
+      timeoutSeconds: resolveExecutorWallclockTimeoutS(idleTimeoutSeconds),
+      idleTimeoutSeconds,
+      // No-content (alive but never produced output) gets the same generous
+      // budget — a slow-to-first-token agent must not be killed prematurely; a
+      // crashed process exits and is detected via the process-exit path instead.
+      noContentTimeoutSeconds: idleTimeoutSeconds,
       bufferMaxEvents: config.cli_invocation.buffer_max_events,
     });
     this.agentInvoker.setWriter(this.writer, this.versionSha);

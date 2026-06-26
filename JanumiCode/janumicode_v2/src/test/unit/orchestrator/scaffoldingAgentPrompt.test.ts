@@ -44,7 +44,8 @@ describe('buildAreaScaffoldingPrompt — canonical component-dir contract', () =
 
   it('forbids the invented `components/` subtree convention (the only place it may appear)', () => {
     const p = buildAreaScaffoldingPrompt(AREA, '[]', '[]', COMPONENT_DIRS);
-    expect(p).toContain('components/` subtree');
+    expect(p).toMatch(/do NOT invent an alternative layout/);
+    expect(p).toContain('`components/`');
     // `src/components/` must appear ONLY inside the prohibition rule — never as a
     // layout the agent is invited to use.
     const occurrences = (p.match(/src\/components\//g) ?? []).length;
@@ -53,8 +54,8 @@ describe('buildAreaScaffoldingPrompt — canonical component-dir contract', () =
 
   it('directs shared data models + contracts to the shared dir, not per-component', () => {
     const p = buildAreaScaffoldingPrompt(AREA, '[]', '[]', COMPONENT_DIRS);
-    expect(p).toContain('Shared data models — materialize as SHARED types');
-    expect(p).toContain('NOT per-component');
+    expect(p).toContain('Shared data models — define as shared types/records under the shared module dir');
+    expect(p).toMatch(/never duplicate per-component/);
   });
 
   it('omits the component-directories block when no dirs are supplied (back-compat)', () => {

@@ -46,6 +46,7 @@ import { LeafTestRunner, type LeafTestRunnerConfig, type LeafTestRunResult } fro
 import { resolveGateCommands, type GateCommand } from './gateCommands';
 import { runGateCommands } from './gateRunner';
 import type { ReconEnforcement } from './phases/phase9Recon';
+import { normalizeComponentDirForStack } from './phases/layoutContract';
 import { QuarantineLedger } from './quarantineLedger';
 import { WaveGate, type WaveGateOutcome } from './waveGate';
 import { buildPhaseContextPacket } from './phases/dmrContext';
@@ -237,7 +238,10 @@ export class ExecutionScheduler {
       lines.push('Your task DEPENDS ON these shared modules owned elsewhere — IMPORT them; do NOT create your own copy:');
       for (const m of consumes) {
         const owner = m.owner_component_id === 'shared' ? 'the shared scaffold' : m.owner_component_id;
-        lines.push(`- \`${m.basename}\` → \`import { … } from '${m.import_specifier}'\` (owned by ${owner})`);
+        // Stack-neutral: give the specifier + canonical path and let the agent
+        // write the import in its own language's idiom (the specifier is already
+        // stack-idiomatic — python dotted, rust crate::, ts @alias).
+        lines.push(`- \`${m.basename}\` — import the existing shared module \`${m.import_specifier}\` (at \`${m.canonical_path}\`, owned by ${owner}) using your stack's import syntax`);
       }
       lines.push('');
     }
@@ -924,6 +928,7 @@ export class ExecutionScheduler {
             sharedDir: '', // recon is per-area; the conventions carry the aliases/paths
             canonicalFiles: this.reconEnforcement.canonical_modules.map(m => m.path),
             protectedPaths: this.reconEnforcement.protected_paths,
+            language: this.reconEnforcement.primary_stack,
           }
         : this.scaffoldManifest
           ? {
@@ -931,6 +936,7 @@ export class ExecutionScheduler {
               sharedDir: this.scaffoldManifest.profile.shared_dir,
               canonicalFiles: this.scaffoldManifest.canonical_files,
               protectedPaths: this.scaffoldManifest.protected_paths,
+              language: this.scaffoldManifest.profile.language,
             }
           : null,
       packet,
@@ -956,7 +962,15 @@ export class ExecutionScheduler {
     // upfront — workspace root, greenfield/existing flag, and which
     // write-scope paths exist — removes that loop entirely.
     if (packet) {
-      const orientation = buildWorkspaceOrientation(workspacePath, leaf.write_directory_paths ?? []);
+      // Normalize the orientation's write-scope paths to the stack's package
+      // convention (python: hyphen→underscore) so the top-of-prompt orientation
+      // and the "## Write Scope Constraint" section agree — a mismatch re-creates
+      // the directory-contradiction deadlock (slice-156).
+      const stackLang = this.reconEnforcement?.primary_stack ?? this.scaffoldManifest?.profile.language;
+      const orientation = buildWorkspaceOrientation(
+        workspacePath,
+        (leaf.write_directory_paths ?? []).map(p => normalizeComponentDirForStack(p, stackLang)),
+      );
       const packetContext = formatPacketAsExecutorContext(packet);
       const ownership = this.renderOwnershipDirective(leaf.component_id);
       stdinText = collapseLegacySectionsWhenPacketPresent(stdinText);

@@ -7,6 +7,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   canonicalComponentDir,
+  normalizeComponentDirForStack,
   buildProjectLayoutContract,
   detectLayoutViolations,
   renderLayoutConventions,
@@ -25,6 +26,26 @@ describe('canonicalComponentDir', () => {
     ['root', 'src'],
   ])('%s → %s', (id, expected) => {
     expect(canonicalComponentDir(id, 'src', 'src/shared')).toBe(expected);
+  });
+
+  it('python (and rust/go/java) use UNDERSCORE packages, not hyphens (invalid identifiers)', () => {
+    // slice-156: a python run handed `src/data-governance` deadlocked the executor.
+    expect(canonicalComponentDir('comp-data-governance', 'src', 'src/shared', 'python')).toBe('src/data_governance');
+    expect(canonicalComponentDir('comp-link-management', 'src', 'src/shared', 'rust')).toBe('src/link_management');
+    expect(canonicalComponentDir('comp-link-management', 'src', 'src/shared', 'java')).toBe('src/link_management');
+    // node keeps hyphens (TS resolves via aliases; hyphenated dirs are conventional)
+    expect(canonicalComponentDir('comp-data-governance', 'src', 'src/shared', 'node')).toBe('src/data-governance');
+  });
+});
+
+describe('normalizeComponentDirForStack', () => {
+  it('converts hyphens to underscores for python (persisted node-shaped paths)', () => {
+    expect(normalizeComponentDirForStack('src/data-governance', 'python')).toBe('src/data_governance');
+    expect(normalizeComponentDirForStack('src/link-management', 'rust')).toBe('src/link_management');
+  });
+  it('leaves node/unknown paths untouched', () => {
+    expect(normalizeComponentDirForStack('src/data-governance', 'node')).toBe('src/data-governance');
+    expect(normalizeComponentDirForStack('src/data-governance', undefined)).toBe('src/data-governance');
   });
 });
 
@@ -47,6 +68,15 @@ describe('buildProjectLayoutContract', () => {
     expect(c.allowed_source_extensions).toContain('.js');
     expect(c.allowed_source_extensions).not.toContain('.ts');
   });
+
+  it('a python profile uses NO path aliases and allows only .py', () => {
+    const py = { ...profile, language: 'python', module: 'na', test_runner: 'pytest' } as const;
+    const c = buildProjectLayoutContract([{ id: 'comp-x' }], py, 'colocated');
+    expect(c.import_aliases).toEqual([]); // python uses package imports, not @shared aliases
+    expect(c.allowed_source_extensions).toContain('.py');
+    expect(c.allowed_source_extensions).not.toContain('.ts');
+    expect(c.allowed_source_extensions).not.toContain('.js');
+  });
 });
 
 describe('renderLayoutConventions', () => {
@@ -55,6 +85,18 @@ describe('renderLayoutConventions', () => {
     const text = renderLayoutConventions(c, profile);
     expect(text).toContain('@shared/');
     expect(text).toMatch(/co-?locate/i);
+  });
+
+  it('python conventions use package imports + pytest + test_<file>.py, never @shared/npm', () => {
+    const py = { ...profile, language: 'python', module: 'na', test_runner: 'pytest' } as const;
+    const c = buildProjectLayoutContract([{ id: 'comp-x' }], py, 'colocated');
+    const text = renderLayoutConventions(c, py);
+    expect(text).toMatch(/from shared\.models\.Foo import Foo/);
+    expect(text).toMatch(/pytest/);
+    expect(text).toMatch(/test_<file>\.py/);
+    expect(text).not.toContain('@shared/');
+    expect(text).not.toContain('npm test');
+    expect(text).toMatch(/\.py/);
   });
 });
 

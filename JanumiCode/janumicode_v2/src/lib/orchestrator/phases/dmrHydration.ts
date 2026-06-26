@@ -110,6 +110,14 @@ export function renderHydratedPacket(
     out.push('');
   }
 
+  // ── Known conflict zones (subjects with active contradiction/supersession) ──
+  const conflictZones = packet.queryDecomposition?.knownConflictZones ?? [];
+  if (conflictZones.length > 0) {
+    out.push('## Known Conflict Zones (these subjects already disagree — read them with extra care)');
+    out.push(`- ${conflictZones.join(', ')}`);
+    out.push('');
+  }
+
   // ── Material findings (top N, resolved one-liners) ──────────────────
   const sorted = [...packet.materialFindings].sort((a, b) => b.materialityScore - a.materialityScore);
   const provenance = sorted.filter(f => PROVENANCE_TYPES.has(f.recordType) && isPlaceholderSummary(f.summary));

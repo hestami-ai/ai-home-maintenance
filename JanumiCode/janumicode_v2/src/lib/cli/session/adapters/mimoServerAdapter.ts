@@ -16,6 +16,7 @@
 import type { AdapterTier, ExecutorAdapter, ExecutorTaskOutcome, ExecutorTaskRequest } from '../adapter';
 import type { SessionLogEvent } from '../sessionDriver';
 import { MimoServerManager, resolveMimoConfig, type MimoConfig } from '../../mimo/mimoServerManager';
+import { resolveExecutorIdleTimeoutMs, resolveExecutorWallclockTimeoutMs } from '../executorTimeouts';
 import { parseModelRef, type MimoClient, type MimoSseEvent, type PermissionResponse } from '../../mimo/mimoClient';
 import { getLogger } from '../../../logging';
 
@@ -42,6 +43,26 @@ export interface MimoServerAdapterOptions {
    * human-routed resolver here for true supervised approval.
    */
   permissionDecider?: MimoPermissionDecider;
+  /** Idle-watchdog: abort after this much zero-progress (no SSE events). Test override. */
+  idleTimeoutMs?: number;
+  /** Wall-clock backstop: hard absolute max regardless of activity. Test override. */
+  wallclockTimeoutMs?: number;
+  /** How often the watchdog checks idle/wall-clock. Test override. */
+  watchdogTickMs?: number;
+  /** Post-POST-failure grace before declaring a dead connection. Test override. */
+  postFailureGraceMs?: number;
+}
+
+// Executor lifecycle policy (Option 4) lives in the SHARED executorTimeouts
+// module so every adapter inherits the same idle-watchdog + wall-clock backstops.
+const WATCHDOG_TICK_MS_DEFAULT = 30_000;
+// After the turn-blocking POST fails (genuine connection drop), how long to wait
+// for SSE to prove the turn is still alive before declaring the connection dead.
+// Far shorter than the 24h idle window so a dead mimo connection fails fast.
+// Resolved per-run (not module-load) so env/opts overrides take effect.
+function resolvePostFailureGraceMs(): number {
+  const s = Number(process.env.JANUMICODE_EXECUTOR_POST_FAILURE_GRACE_S);
+  return Number.isFinite(s) && s > 0 ? s * 1000 : 120_000;
 }
 
 export class MimoServerAdapter implements ExecutorAdapter {
@@ -64,19 +85,45 @@ export class MimoServerAdapter implements ExecutorAdapter {
     const sessionId = await client.createSession();
     this.opts.onLog?.({ kind: 'spawn', command: this.cfg.binary, args: ['serve', '→', this.cfg.agent, sessionId] });
 
+    // Precedence: explicit adapter opts (tests) > the request's shared-policy
+    // values (set by AgentInvoker from executorTimeouts) > the shared resolver.
+    const idleMs = this.opts.idleTimeoutMs
+      ?? (req.idleTimeoutSeconds ? req.idleTimeoutSeconds * 1000 : undefined)
+      ?? resolveExecutorIdleTimeoutMs();
+    const wallMs = this.opts.wallclockTimeoutMs
+      ?? (req.timeoutSeconds ? req.timeoutSeconds * 1000 : undefined)
+      ?? resolveExecutorWallclockTimeoutMs(idleMs);
+    const tickMs = this.opts.watchdogTickMs ?? WATCHDOG_TICK_MS_DEFAULT;
+    const postFailureGraceMs = this.opts.postFailureGraceMs ?? resolvePostFailureGraceMs();
+
     const sse = new AbortController();
     let finalText = '';
     const rawParts: string[] = [];
     let sawIdle = false;
-    let idleResolve: (() => void) | undefined;
-    const idle = new Promise<void>((r) => { idleResolve = r; });
+    let lastEventAt = Date.now();
+    // >0 once the turn-blocking POST has FAILED. With undici's 300s cap removed,
+    // a POST failure is a GENUINE connection drop (not a spurious timeout). The
+    // turn MIGHT still be alive server-side (SSE keeps streaming) or genuinely
+    // dead — so after a failure we fall back to a short grace: if SSE goes silent
+    // for `POST_FAILURE_GRACE_MS`, the connection is dead → abort promptly rather
+    // than waiting out the 24h idle window (which would hang the phase).
+    let postFailedAt = 0;
+
+    // Single completion latch — the FIRST reason wins.
+    let settleDone!: () => void;
+    const done = new Promise<void>((r) => { settleDone = r; });
+    let completion: 'idle' | 'post' | 'idle_timeout' | 'wallclock' | 'post_failed' | '' = '';
+    const settle = (reason: Exclude<typeof completion, ''>): void => {
+      if (!completion) { completion = reason; settleDone(); }
+    };
 
     // Consume SSE concurrently: forward text → onLog, accumulate final text,
-    // resolve on this session's `session.idle`, route permission asks.
+    // mark progress (reset the idle clock), resolve on `session.idle`, route asks.
     const consume = (async () => {
       try {
         for await (const ev of client.streamEvents(sse.signal)) {
           if (eventSessionId(ev) && eventSessionId(ev) !== sessionId) continue;
+          lastEventAt = Date.now();
           rawParts.push(JSON.stringify(ev));
           if (ev.type === 'message.part.delta') {
             const p = ev.properties as { field?: string; delta?: string };
@@ -86,7 +133,7 @@ export class MimoServerAdapter implements ExecutorAdapter {
             }
           } else if (ev.type === 'session.idle') {
             sawIdle = true;
-            idleResolve?.();
+            settle('idle');
           } else if (isPermissionAsk(ev)) {
             await this.handlePermission(client, sessionId, ev);
           }
@@ -96,35 +143,54 @@ export class MimoServerAdapter implements ExecutorAdapter {
       }
     })();
 
+    // Backstops fire ONLY on pathology — the executor self-terminates normally
+    // via `session.idle` or the POST returning. The idle-watchdog measures
+    // SILENCE (no events), never duration, so a long-but-active turn is safe.
+    const watchdog = setInterval(() => {
+      const now = Date.now();
+      // Post-failure grace: a dead connection produces no further SSE — abort in
+      // minutes, not 24h. A still-alive turn keeps streaming, refreshing lastEventAt.
+      if (postFailedAt > 0 && now - Math.max(lastEventAt, postFailedAt) >= postFailureGraceMs) {
+        settle('post_failed');
+      } else if (now - lastEventAt >= idleMs) settle('idle_timeout');
+      else if (now - started >= wallMs) settle('wallclock');
+    }, tickMs);
+
     const model = parseModelRef(this.cfg.model);
-    const timeoutMs = Math.max((req.timeoutSeconds ?? 1800), 60) * 1000;
-    let timedOut = false;
-    const timeout = new Promise<void>((resolve) => setTimeout(() => { timedOut = true; resolve(); }, timeoutMs));
-
     let finish = '';
-    const send = client
+    // Fire the turn. A SUCCESSFUL POST is a valid completion signal (the server
+    // holds it open until the turn ends). A FAILED POST is logged but MUST NOT
+    // terminate the turn — the SSE stream + watchdog remain authoritative, so a
+    // transient client-side fetch error can't guillotine a healthy turn.
+    void client
       .sendMessage(sessionId, { agent: this.cfg.agent, model, text: req.prompt })
-      .then((r) => { finish = r.finish; })
-      .catch((err) => { getLogger().warn('workflow', 'mimo sendMessage error', { error: err instanceof Error ? err.message : String(err) }); });
+      .then((r) => { finish = r.finish; settle('post'); })
+      .catch((err) => {
+        postFailedAt = Date.now();
+        getLogger().warn('workflow', 'mimo sendMessage error (turn continues via SSE; post-failure grace armed)', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
 
-    // Completion = the message POST returns OR session.idle OR timeout.
-    await Promise.race([send, idle, timeout]);
-    if (timedOut) {
+    await done;
+    clearInterval(watchdog);
+    const aborted = completion === 'idle_timeout' || completion === 'wallclock' || completion === 'post_failed';
+    if (aborted) {
+      getLogger().warn('workflow', 'mimo turn aborted by backstop', { reason: completion, sessionId, idleMs, wallMs });
       await client.abort(sessionId);
-    } else {
-      // settle the POST and let any trailing idle flush briefly
-      await Promise.race([send, delay(2000)]);
-      if (!sawIdle) await Promise.race([idle, delay(1500)]);
+    } else if (!sawIdle) {
+      // Completed via the POST — let any trailing SSE deltas / `session.idle` flush.
+      await delay(1500);
     }
     sse.abort();
     await consume;
 
     return {
       tier: this.tier,
-      exitCode: timedOut ? 1 : (finish === 'stop' || finish === '' ? 0 : 1),
+      exitCode: aborted ? 1 : (finish === 'stop' || finish === '' ? 0 : 1),
       finalText: finalText || (finish ? `(${finish})` : ''),
       rawOutput: rawParts.join('\n'),
-      timedOut,
+      timedOut: aborted,
       durationMs: Date.now() - started,
     };
   }

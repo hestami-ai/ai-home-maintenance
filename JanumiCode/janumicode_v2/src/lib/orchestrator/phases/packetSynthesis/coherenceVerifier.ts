@@ -99,9 +99,17 @@ function verifyPacket(
   const blocking: string[] = [];
   const advisory: string[] = [];
 
-  // P1 — Has at least one user story.
+  // P1 — Has at least one user story. EXEMPTION: a cross-run refactoring task
+  // (task_type 'refactoring', e.g. REFACTOR-1 from Phase 0.5) legitimately has NO
+  // user story — it traces to a cross_run_modification, not a user-facing feature.
+  // Blocking it is a false positive the route-restart can NEVER heal (Phase 6 task
+  // deltas don't mint Phase-1 user stories) → futile cycling. Advisory only.
   if (packet.user_stories.length === 0) {
-    blocking.push(`P1_NO_USER_STORY: packet ${packet.packet_id} (task ${packet.task.id}) has no user stories`);
+    const isRefactoring = packet.task.task_type === 'refactoring';
+    const msg = `P1_NO_USER_STORY: packet ${packet.packet_id} (task ${packet.task.id}) has no user stories`;
+    (isRefactoring ? advisory : blocking).push(
+      isRefactoring ? `${msg} (refactoring task — exempt, traces to a cross-run modification)` : msg,
+    );
   }
 
   // P2 — Every user story has at least one AC.

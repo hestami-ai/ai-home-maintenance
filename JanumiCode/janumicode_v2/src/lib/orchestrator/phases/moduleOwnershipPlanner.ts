@@ -25,6 +25,7 @@
 import { idComparisonKey } from '../idResolver';
 import { canonicalComponentDir } from './layoutContract';
 import { resolveProjectProfile, type ProjectProfile } from './scaffoldSynthesis';
+import { idiomaticImportSpecifier, primaryExtForStack, type Phase9ReconPlan } from './phase9Recon';
 import type { PhaseContext } from '../orchestratorEngine';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveTaskView, buildEffectiveComponentView } from './phaseContext';
@@ -66,6 +67,13 @@ export interface ModuleOwnershipPlannerInput {
   /** Workspace src root + shared dir (from the scaffold profile / layout contract). */
   srcRoot?: string;
   sharedDir?: string;
+  /**
+   * Area tech stack (from recon). Drives the canonical file EXTENSION and the
+   * STACK-IDIOMATIC import specifier: node/unknown keep the TS `@shared/*`/`@/*`
+   * path aliases (unchanged); python/rust/go/java get idiomatic module paths
+   * (e.g. `shared.lib.db`, `crate::shared::lib::db`). Defaults to node.
+   */
+  stack?: string;
 }
 
 // ── Output ──────────────────────────────────────────────────────────
@@ -148,10 +156,12 @@ function entityTokenOf(basename: string): string {
 }
 
 /**
- * Build the import specifier + canonical path for a resolved owner.
- * Component-owned modules live in the owner's dir and import via the
- * `@/*` → `src/*` alias; shared/cross-cutting modules live under the
- * shared dir and import via `@shared/*`.
+ * Build the import specifier + canonical path for a resolved owner, in the
+ * area's stack idiom. node/unknown keep the TS path aliases (`@shared/*` for
+ * shared modules, `@/*` for component-owned) — unchanged. Non-alias stacks
+ * (python/rust/go/java) get the stack's file extension + an idiomatic module
+ * specifier (e.g. `shared.lib.db`, `crate::shared::lib::db`) derived from the
+ * canonical path, so the `import (do NOT reinvent)` directive is stack-correct.
  */
 function placeModule(
   ownerComponentId: string,
@@ -159,25 +169,31 @@ function placeModule(
   basename: string,
   srcRoot: string,
   sharedDir: string,
+  stack: string,
 ): { canonical_path: string; import_specifier: string } {
+  const ext = primaryExtForStack(stack);
+  const aliased = stack === 'node' || !stack;
   if (ownerComponentId === 'shared') {
     const sub = category || 'lib';
-    const canonical_path = `${sharedDir}/${sub}/${basename}.ts`;
-    const sharedLeaf = sharedDir.replace(/\\/g, '/').replace(/\/+$/g, '').split('/').pop() ?? 'shared';
-    // `@shared/*` already aliases the shared dir (layoutContract import_aliases).
-    void sharedLeaf;
-    return { canonical_path, import_specifier: `@shared/${sub}/${basename}` };
+    const canonical_path = `${sharedDir}/${sub}/${basename}${ext}`;
+    return {
+      canonical_path,
+      import_specifier: aliased ? `@shared/${sub}/${basename}` : idiomaticImportSpecifier(canonical_path, stack),
+    };
   }
-  const dir = canonicalComponentDir(ownerComponentId, srcRoot, sharedDir);
-  const canonical_path = `${dir}/${basename}.ts`;
-  // `@/*` → `src/*` alias (emitted by the layout contract for cross-component imports).
+  const dir = canonicalComponentDir(ownerComponentId, srcRoot, sharedDir, stack);
+  const canonical_path = `${dir}/${basename}${ext}`;
   const rel = dir.replace(new RegExp(`^${srcRoot}/?`), '');
-  return { canonical_path, import_specifier: `@/${rel}/${basename}` };
+  return {
+    canonical_path,
+    import_specifier: aliased ? `@/${rel}/${basename}` : idiomaticImportSpecifier(canonical_path, stack),
+  };
 }
 
 export function buildModuleOwnershipPlan(input: ModuleOwnershipPlannerInput): ModuleOwnershipPlan {
   const srcRoot = (input.srcRoot ?? 'src').replace(/\\/g, '/').replace(/\/+$/g, '');
   const sharedDir = (input.sharedDir ?? 'src/shared').replace(/\\/g, '/').replace(/\/+$/g, '');
+  const stack = input.stack || 'node';
 
   // Component lookup + the set of components each component DEPENDS ON. A
   // dependency of any "consumption" kind (sync_call, uses, data_read) signals
@@ -258,7 +274,7 @@ export function buildModuleOwnershipPlan(input: ModuleOwnershipPlannerInput): Mo
       d, consumers, entityOwners, syncTargetsByComponent, componentIds,
       rootIds, leavesByRoot,
     );
-    const { canonical_path, import_specifier } = placeModule(owner, d.category, d.basename, srcRoot, sharedDir);
+    const { canonical_path, import_specifier } = placeModule(owner, d.category, d.basename, srcRoot, sharedDir, stack);
     shared_modules.push({
       module_key: key,
       basename: d.basename,
@@ -410,7 +426,10 @@ function resolveOwner(
  * modules' canonical paths and the scheduler can honor producer-before-consumer
  * ordering. Safe: returns null on any failure (execution proceeds without it).
  */
-export function runModuleOwnershipPlanningSubPhase(ctx: PhaseContext): ModuleOwnershipPlan | null {
+export function runModuleOwnershipPlanningSubPhase(
+  ctx: PhaseContext,
+  reconPlan?: Phase9ReconPlan | null,
+): ModuleOwnershipPlan | null {
   const { workflowRun, engine } = ctx;
   try {
     const allArtifacts = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
@@ -508,7 +527,13 @@ export function runModuleOwnershipPlanningSubPhase(ctx: PhaseContext): ModuleOwn
       if (!leafToRoot[compId]) leafToRoot[compId] = rootId;
     }
 
-    const plan = buildModuleOwnershipPlan({ tasks, components, dataModels, leafToRoot, rootComponents, sharedDir });
+    // Stack drives canonical extensions + idiomatic import specifiers. The
+    // ownership plan is workspace-wide (shared modules cross components), so it
+    // assumes a single primary stack — recon's first area, else node. (Polyglot
+    // per-area shared-module ownership is a separate refinement; cross-language
+    // shared imports aren't expressible anyway.)
+    const stack = reconPlan?.areas?.[0]?.stack || 'node';
+    const plan = buildModuleOwnershipPlan({ tasks, components, dataModels, leafToRoot, rootComponents, sharedDir, stack });
 
     const record = engine.writer.writeRecord({
       record_type: 'artifact_produced',

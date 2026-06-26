@@ -3,7 +3,7 @@
  * + manifest-presence check are exercised in the Phase-9 e2e harness.
  */
 import { describe, it, expect } from 'vitest';
-import { areaWriteScope, areaRoot } from '../../../../lib/orchestrator/phases/scaffoldingAgent';
+import { areaWriteScope, areaRoot, buildAreaScaffoldingPrompt } from '../../../../lib/orchestrator/phases/scaffoldingAgent';
 import type { ReconArea } from '../../../../lib/orchestrator/phases/phase9Recon';
 
 function area(id: string, src: string[], test: string[] = []): ReconArea {
@@ -15,6 +15,39 @@ function area(id: string, src: string[], test: string[] = []): ReconArea {
     gate_commands: [],
   };
 }
+
+describe('buildAreaScaffoldingPrompt — stack genericity', () => {
+  it('python area: no JS jargon (barrel/package.json), uses pyproject.toml + idiomatic specifier, no alias line', () => {
+    const py: ReconArea = {
+      ...area('core', ['src'], ['tests']), stack: 'python', dependency_manifest: 'pyproject.toml',
+      canonical_modules: [{ path: 'src/shared/db.py', import_specifier: 'shared.db', description: 'DB layer' }],
+      import_aliases: [], // python has no path aliases
+    };
+    const prompt = buildAreaScaffoldingPrompt(py, '[]', '[]', [{ id: 'comp-x', dir: 'src/x' }]);
+    expect(prompt).toContain('stack: python');
+    expect(prompt).not.toMatch(/barrel/i);           // no JS/TS jargon
+    expect(prompt).not.toContain('package.json');     // no JS manifest fallback
+    expect(prompt).toContain('pyproject.toml');
+    expect(prompt).toContain('shared.db');            // stack-idiomatic specifier rendered
+    expect(prompt).not.toMatch(/import aliases/);     // empty aliases → no line
+    expect(prompt).toMatch(/__init__\.py/);           // python package-init guidance
+    // skeleton-vs-materialize contradiction resolved
+    expect(prompt).toMatch(/type.*definition.*IS skeleton/i);
+  });
+
+  it('node area WITH aliases: renders the alias line; unset manifest falls back to a stack-neutral hint (not package.json)', () => {
+    const node: ReconArea = {
+      ...area('web', ['src']), import_aliases: [{ alias: '@shared/*', target: 'src/shared/*' }],
+    };
+    expect(buildAreaScaffoldingPrompt(node, '[]', '[]', []))
+      .toContain('import aliases (node): @shared/* → src/shared/*');
+
+    const rustNoManifest: ReconArea = { ...area('svc', ['src']), stack: 'rust', dependency_manifest: '' };
+    const prompt = buildAreaScaffoldingPrompt(rustNoManifest, '[]', '[]', []);
+    expect(prompt).toContain('(the rust standard manifest)');
+    expect(prompt).not.toContain('package.json');
+  });
+});
 
 describe('areaWriteScope', () => {
   it('greenfield area at src → includes the root (manifest) and src', () => {

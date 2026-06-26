@@ -109,15 +109,23 @@ export function buildWorkspaceInventory(workspacePath: string): WorkspaceInvento
 export type ReconConfidence = 'high' | 'medium' | 'low';
 
 export interface ReconCanonicalModule {
-  /** Workspace-relative file path the area produces, e.g. 'src/shared/models/Mapping.ts'. */
+  /** Workspace-relative file path the area produces (stack-appropriate extension),
+   *  e.g. python 'src/shared/models/mapping.py', rust 'src/shared/models/mapping.rs',
+   *  ts 'src/shared/models/Mapping.ts'. */
   path: string;
-  /** Stable specifier consumers import, e.g. '@shared/models/Mapping'. */
+  /** STACK-IDIOMATIC specifier consumers import this module by — how code in THIS
+   *  area's language refers to it: python 'shared.models.mapping', rust
+   *  'crate::shared::models::mapping', ts '@shared/models/Mapping' (or relative),
+   *  java the fully-qualified class/package. NOT a universal alias. */
   import_specifier: string;
   description: string;
 }
 
+/** Path-alias mapping — a stack-SPECIFIC concept (TS tsconfig `paths`, JS bundler
+ *  aliases). Empty for stacks without an aliasing mechanism (python, rust, go, java),
+ *  which use `import_specifier` (idiomatic module paths) directly instead. */
 export interface ReconImportAlias {
-  /** e.g. '@shared/*'. */
+  /** e.g. (TS) '@shared/*'. */
   alias: string;
   /** Workspace-relative target, e.g. 'src/shared/*'. */
   target: string;
@@ -145,7 +153,8 @@ export interface ReconArea {
   dependency_manifest: string;
   /** Canonical shared modules this area exposes ("import, don't reinvent"). */
   canonical_modules: ReconCanonicalModule[];
-  /** Import aliases the area's code uses (e.g. @shared/* → src/shared/*). */
+  /** Path aliases the area's code uses — ONLY for stacks that support aliasing
+   *  (TS/JS, e.g. @shared/* → src/shared/*); EMPTY for python/rust/go/java. */
   import_aliases: ReconImportAlias[];
   /** Per-area verification gates (supersede the generic resolver). */
   gate_commands: GateCommand[];
@@ -195,6 +204,9 @@ export interface ReconEnforcement {
   allowed_extensions_by_area: Record<string, string[]>;
   /** Agent-facing conventions text (per-area stacks, aliases, import rules). */
   conventions: string;
+  /** Primary stack (first area). Drives stack-aware path normalization (e.g.
+   *  python component dirs must be underscore packages, not hyphenated). */
+  primary_stack?: string;
   /** Workspace-relative Engineering Constitution copy (set by the caller; the
    *  side-channel survives the author→enforce cutover off the scaffold manifest). */
   engineering_constitution_path?: string;
@@ -209,12 +221,41 @@ const STACK_EXTENSIONS: Record<string, string[]> = {
   java: ['.java', '.kt'],
 };
 
+/** Normalize a path for comparison: strip leading/trailing slashes. */
+function normPath(p: string): string {
+  return (p ?? '').trim().replace(/^[./]+/, '').replace(/\/+$/, '');
+}
+
+/**
+ * Sanitize a recon area's `protected_paths`. The recon AGENT sometimes emits the
+ * whole source root (e.g. `/src/`) as scaffold-owned — but per-component write
+ * scopes live UNDER the source root (`src/link-management`), so a `do NOT author
+ * /src/` directive directly contradicts the write scope and DEADLOCKS the
+ * executor (it cannot write anywhere). Only PROPER subdirectories (e.g.
+ * `src/shared/`) and manifest files are legitimately protected — drop any path
+ * that equals a source root. The deterministic fallback already uses
+ * `src/shared/`, so this only corrects agent output.
+ */
+function sanitizeProtectedPaths(protectedPaths: string[], sourceRoots: Set<string>): string[] {
+  return protectedPaths.filter(p => {
+    const n = normPath(p);
+    return n.length > 0 && !sourceRoots.has(n);
+  });
+}
+
 export function buildReconEnforcementManifest(plan: Phase9ReconPlan): ReconEnforcement {
   const protectedSet = new Set<string>();
   const modules: ReconCanonicalModule[] = [];
   const extByArea: Record<string, string[]> = {};
+  // Every area's source roots — a protected path equal to any of these is
+  // over-broad (it would swallow the per-component write directories beneath it).
+  const sourceRoots = new Set(plan.areas.flatMap(a => a.source_roots.map(normPath)));
+  // Per-area sanitized protected list (reused for the conventions string).
+  const cleanProtectedByArea: Record<string, string[]> = {};
   for (const a of plan.areas) {
-    for (const p of a.protected_paths) protectedSet.add(p);
+    const clean = sanitizeProtectedPaths(a.protected_paths, sourceRoots);
+    cleanProtectedByArea[a.area_id] = clean;
+    for (const p of clean) protectedSet.add(p);
     if (a.dependency_manifest) protectedSet.add(a.dependency_manifest);
     modules.push(...a.canonical_modules);
     extByArea[a.area_id] = STACK_EXTENSIONS[a.stack] ?? [];
@@ -227,13 +268,14 @@ export function buildReconEnforcementManifest(plan: Phase9ReconPlan): ReconEnfor
       + (a.canonical_modules.length
           ? `import (do NOT reinvent): ${a.canonical_modules.map(m => m.import_specifier).filter(Boolean).join(', ')}; `
           : '')
-      + `do NOT author: ${a.protected_paths.join(', ') || '(none)'}.`;
+      + `do NOT author: ${cleanProtectedByArea[a.area_id].join(', ') || '(none)'}.`;
   }).join('\n');
   return {
     protected_paths: [...protectedSet].sort(),
     canonical_modules: modules,
     allowed_extensions_by_area: extByArea,
     conventions,
+    primary_stack: plan.areas[0]?.stack,
   };
 }
 
@@ -302,9 +344,8 @@ export function deterministicReconFallback(workspacePath: string, inv: Workspace
       alternatives_rejected: [],
       source_roots: ['src'],
       test_roots: ['src'],
-      protected_paths: ['src/shared/', 'package.json', 'tsconfig.json'],
-      dependency_manifest: stack === 'rust' ? 'Cargo.toml' : stack === 'go' ? 'go.mod'
-        : stack === 'python' ? 'pyproject.toml' : stack === 'java' ? 'pom.xml' : 'package.json',
+      protected_paths: ['src/shared/', manifestForStack(stack ?? 'node')],
+      dependency_manifest: manifestForStack(stack ?? 'node'),
       canonical_modules: [],
       import_aliases: stack === 'node' || !stack
         ? [{ alias: '@shared/*', target: 'src/shared/*' }, { alias: '@/*', target: 'src/*' }]
@@ -371,7 +412,7 @@ export function defaultGatesForStack(stack: string): GateCommand[] {
   }
 }
 
-function primaryExtForStack(stack: string): string {
+export function primaryExtForStack(stack: string): string {
   return (STACK_EXTENSIONS[stack] ?? ['.ts'])[0];
 }
 
@@ -379,6 +420,27 @@ function primaryExtForStack(stack: string): string {
 function retargetExtension(p: string, stack: string): string {
   const ext = primaryExtForStack(stack);
   return p.replace(/\.[A-Za-z0-9]+$/, ext);
+}
+
+/**
+ * Best-effort STACK-IDIOMATIC import specifier for a shared-module file path —
+ * used when forcing a stack deterministically (the LLM recon agent emits these
+ * directly in production). Strips a leading conventional source root + extension,
+ * then renders the segments in the stack's import syntax. Heuristic, not a full
+ * resolver: enough to keep `import (do NOT reinvent)` directives stack-correct.
+ */
+export function idiomaticImportSpecifier(filePath: string, stack: string): string {
+  const segs = filePath.replace(/\.[A-Za-z0-9]+$/, '').split('/').filter(Boolean);
+  if (segs[0] === 'src' || segs[0] === 'lib') segs.shift();
+  if (segs.length === 0) return '';
+  switch (stack) {
+    case 'python': return segs.join('.');                 // shared.models.mapping
+    case 'rust':   return 'crate::' + segs.join('::');    // crate::shared::models::mapping
+    case 'java':   return segs.join('.');                 // shared.models.Mapping
+    case 'go':     return segs.join('/');                 // module-relative path
+    case 'node':
+    default:       return '@/' + segs.join('/');          // @/shared/models/Mapping (alias form)
+  }
 }
 
 /**
@@ -404,7 +466,10 @@ export function applyForcedStack(plan: Phase9ReconPlan, stack: string): Phase9Re
       dependency_manifest: manifest,
       gate_commands: defaultGatesForStack(stack),
       protected_paths: [...protectedDirs, manifest],
-      canonical_modules: a.canonical_modules.map(m => ({ ...m, path: retargetExtension(m.path, stack) })),
+      canonical_modules: a.canonical_modules.map(m => {
+        const path = retargetExtension(m.path, stack);
+        return { ...m, path, import_specifier: idiomaticImportSpecifier(path, stack) };
+      }),
       import_aliases: aliases,
       source_refs: [...a.source_refs, `forced-stack:${stack}`],
     };
@@ -414,6 +479,34 @@ export function applyForcedStack(plan: Phase9ReconPlan, stack: string): Phase9Re
     forced_stack: stack,
     areas,
     notes: `${plan.notes} [stack forced to '${stack}' for executor language sweep — topology preserved]`,
+  };
+}
+
+/**
+ * For a GREENFIELD project the directory LAYOUT is deterministic — the recon
+ * agent's job is the STACK + canonical-module decisions, NOT inventing a
+ * topology. Left to itself the agent emits divergent layouts (the area_id as a
+ * source dir — `source_roots: ['core-service']` → a whole project nested under
+ * `project/core-service/`; `/src/` as a protected path) that conflict with the
+ * executor's deterministic `canonicalComponentDir` (always `src/<comp>`),
+ * fragmenting the generated codebase. Override the layout PATHS to the canonical
+ * greenfield values (`src/` root, `src/shared/` + manifest protected), preserving
+ * the agent's semantic output (stack, canonical_modules, import_aliases, gates).
+ * Brownfield/mixed keep the agent's detected layout — real existing dirs matter.
+ * Runs AFTER applyForcedStack so `dependency_manifest` is the resolved one.
+ */
+export function normalizeGreenfieldLayout(plan: Phase9ReconPlan): Phase9ReconPlan {
+  if (plan.workspace_kind !== 'greenfield') return plan;
+  return {
+    ...plan,
+    areas: plan.areas.map(a => ({
+      ...a,
+      source_roots: ['src'],
+      test_roots: ['src'],
+      protected_paths: ['src/shared/', a.dependency_manifest].filter(
+        (p): p is string => typeof p === 'string' && p.length > 0,
+      ),
+    })),
   };
 }
 
@@ -569,6 +662,12 @@ export async function runPhase9ReconSubPhase(ctx: PhaseContext): Promise<Phase9R
     }
   }
 
+  // Greenfield layout is DETERMINISTIC: override the agent's invented topology
+  // (area_id-as-source-dir, /src/ protected) with the canonical src/ layout so
+  // the scaffolding agent, the executor's canonicalComponentDir, and imports all
+  // agree. The agent's stack + canonical modules are preserved. (slice-156)
+  plan = normalizeGreenfieldLayout(plan);
+
   try {
     const record = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -671,7 +770,8 @@ ${components.length ? components.map(c => `- ${c.id}${c.name ? ` (${c.name})` : 
 - An "area" is a coherent slice of the workspace that uses ONE stack (a new feature, or an existing subsystem). Greenfield single-stack ⇒ ONE area. Default to the FEWEST areas the work needs: prefer a single area unless the filesystem shows distinct existing subsystems, or a binding constraint requires separate deployables. Multiple internal concerns inside ONE deployable service are ONE area, not several — do NOT split a single-service intent into per-feature microservices.
 - Choose each area's stack from the BINDING constraints when stated; else from the filesystem; else the most reasonable conventional choice for the intent. Put the evidence in \`source_refs\` and any tension in \`conflicts\`.
 - For each area, author its gate commands: at minimum a \`test\` gate, plus \`typecheck\`/\`build\` where the stack has them. Use real commands for the stack (e.g. node: {"command":"npm","args":["test","--silent"]}; rust: {"command":"cargo","args":["test"]}; python: {"command":"pytest","args":["-q"]}). Set \`cwd\` (area-relative) when the area is not the workspace root.
-- Author each area's ENFORCEMENT MANIFEST: \`dependency_manifest\` (the stack's manifest file), \`protected_paths\` (dirs/files the coding agents must NOT author — the shared module dir + the dependency manifest/config), \`canonical_modules\` (shared types/contracts the area exposes for cross-area import, with their import specifier), and \`import_aliases\` (the canonical import form, e.g. @shared/* → src/shared/*). These REPLACE the deterministic scaffold's substrate, so the kernel enforces against them.
+- Author each area's ENFORCEMENT MANIFEST: \`dependency_manifest\` (the stack's manifest file), \`protected_paths\` (dirs/files the coding agents must NOT author — the shared module dir + the dependency manifest/config), \`canonical_modules\` (shared types/contracts the area exposes for cross-area import), and \`import_aliases\`. These REPLACE the deterministic scaffold's substrate, so the kernel enforces against them.
+- Import conventions are STACK-IDIOMATIC, not universal. Each canonical module's \`import_specifier\` is how code in THIS area's language imports that file: python a dotted module path (\`shared.models.mapping\`), rust a path (\`crate::shared::models::mapping\`), TS an alias or relative path (\`@shared/models/Mapping\`), java the package/class. Use file paths + extensions that match the stack (\`.py\`/\`.rs\`/\`.ts\`/\`.java\`). \`import_aliases\` is a path-alias mechanism that ONLY some stacks have (TS \`tsconfig paths\`, JS bundlers) — emit them for those stacks, and leave \`import_aliases\` an empty \`[]\` for python/rust/go/java (they have no aliasing; consumers use the idiomatic \`import_specifier\` directly).
 
 Return JSON only (no markdown fences):
 {
@@ -689,8 +789,8 @@ Return JSON only (no markdown fences):
       "test_roots": ["<workspace-relative test dir>"],
       "dependency_manifest": "package.json" | "Cargo.toml" | "pyproject.toml" | "go.mod" | "pom.xml",
       "protected_paths": ["<dir/ or file the agents must not author>"],
-      "canonical_modules": [ { "path": "<workspace-relative file>", "import_specifier": "<how consumers import it>", "description": "<one line>" } ],
-      "import_aliases": [ { "alias": "@shared/*", "target": "src/shared/*" } ],
+      "canonical_modules": [ { "path": "<workspace-relative file, stack extension>", "import_specifier": "<stack-idiomatic import: py 'shared.db', rust 'crate::db', ts '@shared/db'>", "description": "<one line>" } ],
+      "import_aliases": [ /* TS/JS only, else []: */ { "alias": "@shared/*", "target": "src/shared/*" } ],
       "gate_commands": [
         { "name": "<area:kind>", "kind": "test"|"typecheck"|"build", "command": "<exe>", "args": ["..."], "cwd": "<area-relative dir or omit>", "timeoutMs": 600000 }
       ]

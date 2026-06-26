@@ -63,14 +63,31 @@ export interface LayoutViolationReport {
 const COMPONENT_PREFIX_RE = /^(comp|component|cmp)[-_]/i;
 
 /**
+ * Stacks whose package/module directory names must be valid IDENTIFIERS — they
+ * cannot contain hyphens. Python (`import data_governance` — a hyphen is a syntax
+ * error), Rust (snake_case modules), Go, Java (package segments). For these the
+ * component slug uses underscores; node/TS keep hyphenated dir names (TS resolves
+ * via path aliases / relative imports, so hyphens are fine and conventional).
+ * Slice-156: a python run handed `src/data-governance` deadlocked the executor
+ * into forking an underscore variant it could actually import → fragmentation.
+ */
+function usesUnderscorePackages(stack?: string): boolean {
+  const s = (stack ?? '').trim().toLowerCase();
+  return s === 'python' || s === 'rust' || s === 'go' || s === 'java';
+}
+
+/**
  * Deterministic component_id → canonical source directory. Strips the
  * conventional component prefix and slugifies; special-cases the shared and
- * root pseudo-components. Mirrors the slug logic in cycleDeltaSynthesizers.
+ * root pseudo-components. The slug separator is stack-aware (underscore for
+ * identifier-based stacks, hyphen for node). Mirrors the slug logic in
+ * cycleDeltaSynthesizers.
  */
 export function canonicalComponentDir(
   componentId: string,
   srcRoot = 'src',
   sharedDir = 'src/shared',
+  stack?: string,
 ): string {
   const raw = (componentId ?? '').trim().toLowerCase();
   if (!raw) return `${srcRoot}/unknown`;
@@ -78,11 +95,25 @@ export function canonicalComponentDir(
     return sharedDir;
   }
   if (raw === 'root' || raw === 'app') return srcRoot;
+  const sep = usesUnderscorePackages(stack) ? '_' : '-';
   const slug = raw
     .replace(COMPONENT_PREFIX_RE, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[^a-z0-9]+/g, sep)
+    .replace(new RegExp(`^\\${sep}+|\\${sep}+$`, 'g'), '');
   return `${srcRoot}/${slug || 'unknown'}`;
+}
+
+/**
+ * Normalize a workspace-relative source path to the stack's package convention.
+ * For identifier-based stacks, hyphens in the per-component dir segment (under
+ * the source root) become underscores — so a PERSISTED hyphenated
+ * write_directory_path (`src/data-governance`, minted by an earlier node-shaped
+ * Phase 6) renders as a valid python package (`src/data_governance`) without
+ * re-running Phase 6. Shared/config files and non-component paths are untouched.
+ */
+export function normalizeComponentDirForStack(p: string, stack?: string): string {
+  if (!usesUnderscorePackages(stack)) return p;
+  return p.replace(/-/g, '_');
 }
 
 // ── Allowed extensions per language ─────────────────────────────────
@@ -95,9 +126,22 @@ function allowedExtensionsFor(language: ProjectProfile['language']): string[] {
   const ts = ['.ts', '.tsx', '.d.ts', '.mts', '.cts'];
   const js = ['.js', '.jsx', '.mjs', '.cjs'];
   // TypeScript projects still legitimately contain .js (config, generated);
-  // JavaScript projects do NOT contain .ts.
-  const lang = language === 'typescript' ? [...ts, ...js] : js;
+  // JavaScript projects do NOT contain .ts. Non-node stacks get their own.
+  let lang: string[];
+  switch (language) {
+    case 'typescript': lang = [...ts, ...js]; break;
+    case 'javascript': lang = js; break;
+    case 'python': lang = ['.py', '.pyi']; break;
+    case 'go': lang = ['.go']; break;
+    case 'rust': lang = ['.rs']; break;
+    case 'java': lang = ['.java']; break;
+  }
   return [...new Set([...lang, ...COMMON_NON_SOURCE_EXT])];
+}
+
+/** The JS family — the only languages that use `@shared/*` path aliases. */
+function usesPathAliases(language: ProjectProfile['language']): boolean {
+  return language === 'typescript' || language === 'javascript';
 }
 
 // ── Contract construction ───────────────────────────────────────────
@@ -116,7 +160,7 @@ export function buildProjectLayoutContract(
   const componentDirMap: Record<string, string> = {};
   for (const c of components) {
     if (typeof c.id === 'string' && c.id.trim()) {
-      componentDirMap[c.id] = canonicalComponentDir(c.id, srcRoot, sharedDir);
+      componentDirMap[c.id] = canonicalComponentDir(c.id, srcRoot, sharedDir, profile.language);
     }
   }
 
@@ -127,10 +171,15 @@ export function buildProjectLayoutContract(
   return {
     kind: 'project_layout_contract',
     component_dir_map: componentDirMap,
-    import_aliases: [
-      { alias: '@shared/*', target: `${sharedDir}/*` },
-      { alias: '@/*', target: `${srcRoot}/*` },
-    ],
+    // Path aliases are a TS/JS (tsconfig `paths`) construct. Python/go/rust/java
+    // use native package imports, so they get NO aliases (an `@shared/*` alias
+    // would be meaningless and mislead the executor prompt).
+    import_aliases: usesPathAliases(profile.language)
+      ? [
+          { alias: '@shared/*', target: `${sharedDir}/*` },
+          { alias: '@/*', target: `${srcRoot}/*` },
+        ]
+      : [],
     test_placement: testPlacement,
     shared_dir: sharedDir,
     allowed_top_level_dirs: allowedTopLevel,
@@ -145,17 +194,43 @@ export function renderLayoutConventions(
   contract: ProjectLayoutContract,
   profile: ProjectProfile,
 ): string {
-  const sharedAlias = contract.import_aliases.find(a => a.alias.startsWith('@shared'))?.alias ?? '@shared/*';
-  const testRule = contract.test_placement === 'colocated'
-    ? 'Co-locate each test as `<file>.test.ts` in the SAME directory as the implementation file.'
-    : 'Place tests in a `tests/` subdirectory inside the component directory.';
+  const sharedAlias = contract.import_aliases.find(a => a.alias.startsWith('@shared'))?.alias;
+  const isNode = profile.language === 'typescript' || profile.language === 'javascript';
+
+  // Stack-idiomatic shared-import + test-file convention. The node path keeps
+  // its exact prior wording (tsconfig `@shared` alias, co-located `.test.ts`,
+  // `npm test`); non-node stacks describe native package imports + their runner.
+  let sharedRule: string;
+  let testRule: string;
+  let runnerRule: string;
+  const sharedLeaf = contract.shared_dir.split('/').slice(1).join('/') || 'shared';
+  if (isNode && sharedAlias) {
+    runnerRule = `Test runner: ${profile.test_runner} (root \`npm test\` → \`${profile.test_runner === 'vitest' ? 'vitest run' : profile.test_runner}\`)`;
+    sharedRule = `Shared modules: ${contract.shared_dir}/ — import via the ${sharedAlias.replace('/*', '/')} alias (e.g. \`import { Foo } from '@shared/models/Foo'\`). Do NOT use relative, bare, or \`${contract.shared_dir}/…\` paths.`;
+    testRule = contract.test_placement === 'colocated'
+      ? 'Co-locate each test as `<file>.test.ts` in the SAME directory as the implementation file.'
+      : 'Place tests in a `tests/` subdirectory inside the component directory.';
+  } else if (profile.language === 'python') {
+    const pkg = sharedLeaf.replace(/\//g, '.');
+    runnerRule = `Test runner: pytest (run from the project root)`;
+    sharedRule = `Shared modules: ${contract.shared_dir}/ — import via the package path (e.g. \`from ${pkg}.models.Foo import Foo\`). Do NOT redefine shared types.`;
+    testRule = contract.test_placement === 'colocated'
+      ? 'Co-locate each test as `test_<file>.py` in the SAME directory as the implementation file.'
+      : 'Place tests in a `tests/` subdirectory inside the component directory.';
+  } else {
+    // go/rust/java: describe generically by the resolved test runner.
+    runnerRule = `Test runner: ${profile.test_runner}`;
+    sharedRule = `Shared modules: ${contract.shared_dir}/ — import using your language's native package/module import. Do NOT redefine shared types.`;
+    testRule = `Place tests per ${profile.language} convention.`;
+  }
+
   return [
     `Language: ${profile.language}`,
     `Module system: ${profile.module}`,
-    `Test runner: ${profile.test_runner} (root \`npm test\` → \`${profile.test_runner === 'vitest' ? 'vitest run' : profile.test_runner}\`)`,
-    `Shared modules: ${contract.shared_dir}/ — import via the ${sharedAlias.replace('/*', '/')} alias (e.g. \`import { Foo } from '@shared/models/Foo'\`). Do NOT use relative, bare, or \`${contract.shared_dir}/…\` paths.`,
+    runnerRule,
+    sharedRule,
     `Tests: ${testRule}`,
-    `Structure rules (hard): write ONLY inside your assigned directory; do NOT create new top-level directories (no root \`shared/\`, \`tests/\`, \`lib/\` — the shared dir is ${contract.shared_dir}/ only); do NOT write build output to \`dist/\`; do NOT create files in any language other than ${profile.language} (allowed extensions: ${contract.allowed_source_extensions.join(' ')}).`,
+    `Structure rules (hard): write ONLY inside your assigned directory; do NOT create new top-level directories (the shared dir is ${contract.shared_dir}/ only); do NOT write build output to \`dist/\`; do NOT create files in any language other than ${profile.language} (allowed extensions: ${contract.allowed_source_extensions.join(' ')}).`,
   ].join('\n');
 }
 

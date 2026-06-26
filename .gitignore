@@ -304,3 +304,4 @@ JanumiCode/janumicode_v2/ground-truth-specs/hestami-ai-os-specs
 JanumiCode/janumicode_v2/.vscode-test
 JanumiCode/janumicode_v2/coverage
 JanumiCode/janumicode_v2/dspy/.judge_cache
+JanumiCode/janumicode_v2/test-and-evaluation

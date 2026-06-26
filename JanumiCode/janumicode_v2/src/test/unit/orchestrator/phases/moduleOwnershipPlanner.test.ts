@@ -60,6 +60,20 @@ describe('buildModuleOwnershipPlan', () => {
     expect(mr!.consumer_component_ids).toContain('comp-redirect-handling');
   });
 
+  it('stack genericity: python → idiomatic dotted specifier + .py; node default unchanged (@ alias + .ts)', () => {
+    const py = buildModuleOwnershipPlan({ ...slice139(), stack: 'python' });
+    const mrPy = py.shared_modules.find((m) => m.module_key.includes('mappingrepository'))!;
+    expect(mrPy.canonical_path).toMatch(/\.py$/);
+    expect(mrPy.import_specifier).not.toContain('@');   // NOT a TS path alias
+    expect(mrPy.import_specifier).toContain('.');         // dotted module path
+    expect(mrPy.import_specifier).toMatch(/mapping.persistence.*mapping_repository/);
+
+    const node = buildModuleOwnershipPlan({ ...slice139(), stack: 'node' });
+    const mrNode = node.shared_modules.find((m) => m.module_key.includes('mappingrepository'))!;
+    expect(mrNode.canonical_path).toBe('src/mapping-persistence/mapping_repository.ts');
+    expect(mrNode.import_specifier).toBe('@/mapping-persistence/mapping_repository');
+  });
+
   it('owns audit_log_repository at the AuditLog data-model owner, not the sink', () => {
     const plan = buildModuleOwnershipPlan(slice139());
     const al = plan.shared_modules.find((m) => m.module_key.includes('auditlog'));

@@ -155,6 +155,33 @@ describe('IngestionPipelineRunner', () => {
       expect(edge.targetRecordId).toBe(prior.id);
     });
 
+    it('Stage IV: cross_run_modification supersedes the modified prior-run artifact (Option B producer-side mint)', () => {
+      const priorArtifact = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc', content: { kind: 'interface_contracts', statement: 'delete-by-key endpoint present' },
+      });
+      const mod = writer.writeRecord({
+        record_type: 'cross_run_modification', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc',
+        content: {
+          kind: 'cross_run_modification',
+          modified_artifact_id: priorArtifact.id,
+          changed_interface_id: 'IC-DELETE-001',
+          modification_type: 'breaking',
+          applied_status: 'applied',
+        },
+      });
+
+      pipeline.ingest(mod);
+
+      const edges = db.prepare(
+        `SELECT source_record_id s, target_record_id t, status FROM memory_edge WHERE edge_type='supersedes'`,
+      ).all() as Array<{ s: string; t: string; status: string }>;
+      const edge = edges.find(e => e.s === mod.id && e.t === priorArtifact.id);
+      expect(edge, 'the applied modification should supersede the modified prior-run artifact').toBeDefined();
+      expect(edge!.status).toBe('system_asserted');
+    });
+
     it('creates no edges for record types without rules', () => {
       const record = writer.writeRecord({
         record_type: 'agent_reasoning_step',

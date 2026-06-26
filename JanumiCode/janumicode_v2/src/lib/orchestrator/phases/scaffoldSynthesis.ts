@@ -45,13 +45,48 @@ import {
 // ── Types ───────────────────────────────────────────────────────────
 
 export interface ProjectProfile {
-  language: 'typescript' | 'javascript';
-  module: 'esm' | 'commonjs';
-  test_runner: 'vitest' | 'jest' | 'node';
+  // `language` is the discriminator. The two JS-family values (typescript /
+  // javascript) drive the original node materializer (package.json + tsconfig +
+  // npm + @shared barrel). Non-node languages each get their own renderer; for
+  // them `module` is 'na' (no JS module system) and the deterministic scaffold
+  // emits a stack-idiomatic manifest, NOT package.json/tsconfig.
+  language: 'typescript' | 'javascript' | 'python' | 'go' | 'rust' | 'java';
+  module: 'esm' | 'commonjs' | 'na';
+  test_runner: 'vitest' | 'jest' | 'node' | 'pytest' | 'cargo' | 'gotest' | 'maven';
   /** Workspace-relative directory owned exclusively by the scaffold step. */
   shared_dir: string;
-  /** Where the profile came from (audit). */
-  source: 'brownfield_detected' | 'adr_override' | 'config_default';
+  /**
+   * Where the profile came from (audit). `recon_stack` = Phase-9.0 recon's
+   * stack decision (the source that fixes the python-emits-TS bug: recon now
+   * outranks the node-oriented `config_default`).
+   */
+  source: 'brownfield_detected' | 'adr_override' | 'recon_stack' | 'config_default';
+}
+
+/** The JS family — the only languages the original node materializer handles. */
+function isNodeLanguage(language: ProjectProfile['language']): boolean {
+  return language === 'typescript' || language === 'javascript';
+}
+
+/**
+ * Map a recon stack id (KNOWN_FORCED_STACKS: node/python/go/rust/java) to a
+ * deterministic profile. Returns null for `node` (keep the config default's
+ * ts/js detail) and for unknown stacks (caller falls through to config_default).
+ * This is the bridge that stops the TS deterministic fallback from materializing
+ * a TypeScript scaffold on a non-node run (the slice-156 python cascade).
+ */
+function profileForReconStack(
+  stack: string | undefined,
+  sharedDir: string,
+): Omit<ProjectProfile, 'source'> | null {
+  switch ((stack ?? '').trim().toLowerCase()) {
+    case 'python': return { language: 'python', module: 'na', test_runner: 'pytest', shared_dir: sharedDir };
+    case 'go':     return { language: 'go',     module: 'na', test_runner: 'gotest', shared_dir: sharedDir };
+    case 'rust':   return { language: 'rust',   module: 'na', test_runner: 'cargo',  shared_dir: sharedDir };
+    case 'java':   return { language: 'java',   module: 'na', test_runner: 'maven',  shared_dir: sharedDir };
+    // 'node' (or absent/unknown) → keep the config default (ts/js).
+    default: return null;
+  }
 }
 
 export interface ScaffoldManifest {
@@ -146,6 +181,10 @@ function testCommand(runner: ProjectProfile['test_runner']): string {
     case 'vitest': return 'vitest run';
     case 'jest': return 'jest';
     case 'node': return 'node --test';
+    case 'pytest': return 'pytest';
+    case 'cargo': return 'cargo test';
+    case 'gotest': return 'go test ./...';
+    case 'maven': return 'mvn test';
   }
 }
 
@@ -157,6 +196,7 @@ export function resolveProjectProfile(
   workspacePath: string,
   adrsContent: Record<string, unknown> | null,
   configProfile: Omit<ProjectProfile, 'source'>,
+  reconStack?: string,
 ): ProjectProfile {
   // 1. Brownfield — adopt an existing root package.json/tsconfig.
   const pkgPath = path.join(workspacePath, 'package.json');
@@ -199,7 +239,15 @@ export function resolveProjectProfile(
     };
   }
 
-  // 3. Config default (greenfield).
+  // 3. Recon stack (greenfield, non-node) — Phase-9.0 recon decided the stack
+  // from the intent. This OUTRANKS the node-oriented config default so a python
+  // (or go/rust/java) run never materializes a TypeScript scaffold.
+  const reconProfile = profileForReconStack(reconStack, configProfile.shared_dir);
+  if (reconProfile) {
+    return { ...reconProfile, source: 'recon_stack' };
+  }
+
+  // 4. Config default (greenfield node).
   return { ...configProfile, source: 'config_default' };
 }
 
@@ -381,6 +429,99 @@ function renderRootPackageJson(
   return JSON.stringify(pkg, null, 2) + '\n';
 }
 
+// ── Python renderers (recon_stack: python) ──────────────────────────
+// Self-contained — the node path above is untouched. Python uses package
+// imports (no path aliases / barrel), pyproject.toml (no package.json/tsconfig),
+// pytest (no npm install), and `.py` dataclass / dict stubs.
+
+/** Map an LLM free-form type to a permissive Python annotation. */
+function toPyType(raw: string | undefined): string {
+  const t = (raw ?? '').toLowerCase();
+  if (!t) return 'object';
+  if (/\b(int|integer|long|bigint)\b/.test(t)) return 'int';
+  if (/\b(float|double|decimal|numeric)\b/.test(t)) return 'float';
+  if (/\b(bool|boolean)\b/.test(t)) return 'bool';
+  if (/\b(date|datetime|timestamp|time)\b/.test(t)) return 'str';
+  if (/\b(array|list|\[\])\b/.test(t)) return 'list';
+  if (/\b(json|object|map|record|dict)\b/.test(t)) return 'dict';
+  if (/\b(uuid|guid|string|text|varchar|char|url|email)\b/.test(t)) return 'str';
+  return 'str';
+}
+
+/** snake_case a free-form id for a Python module/constant name. */
+function pySnake(raw: string): string {
+  return raw.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
+}
+
+function renderPyEntity(entity: DataModelEntity, componentId: string): string {
+  const name = pascalCase(entity.name);
+  const lines: string[] = [];
+  lines.push(`# Generated shared data model — ${entity.name} (component: ${componentId}).`);
+  lines.push(`# Canonical type. Import from the shared package; do NOT redefine.`);
+  lines.push('from dataclasses import dataclass');
+  lines.push('from typing import Optional');
+  lines.push('');
+  lines.push('');
+  lines.push('@dataclass');
+  lines.push(`class ${name}:`);
+  const fields = entity.fields ?? [];
+  if (!fields.length) lines.push('    pass');
+  for (const f of fields) {
+    const pyType = toPyType(f.type);
+    const fieldType = isNullableField(f) ? `Optional[${pyType}]` : pyType;
+    const comment = [f.type, f.constraints].filter(Boolean).join(' — ');
+    lines.push(`    ${f.name}: ${fieldType}${comment ? `  # ${comment}` : ''}`);
+  }
+  if (entity.relationships?.length) {
+    lines.push('');
+    lines.push(`    # Relationships: ${entity.relationships.join(', ')}`);
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+function renderPyContract(c: InterfaceContract): string {
+  const name = pySnake(c.id);
+  const lines: string[] = [];
+  lines.push(`# Generated shared interface contract — ${c.id}.`);
+  lines.push(`# Protocol: ${c.protocol ?? 'n/a'} | Format: ${c.data_format ?? 'n/a'}` +
+    `${c.auth_mechanism ? ` | Auth: ${c.auth_mechanism}` : ''}`);
+  if (c.systems_involved?.length) lines.push(`# Systems: ${c.systems_involved.join(', ')}`);
+  lines.push(`# Canonical contract metadata. Import from the shared package; do NOT redefine.`);
+  lines.push(`${name}_CONTRACT = {`);
+  lines.push(`    "id": ${JSON.stringify(c.id)},`);
+  lines.push(`    "protocol": ${JSON.stringify(c.protocol ?? '')},`);
+  lines.push(`    "data_format": ${JSON.stringify(c.data_format ?? '')},`);
+  lines.push(`    "systems_involved": ${JSON.stringify(c.systems_involved ?? [])},`);
+  lines.push('}');
+  lines.push('');
+  return lines.join('\n');
+}
+
+function renderPyproject(
+  name: string,
+  profile: ProjectProfile,
+  runtimeDeps: Record<string, string> = {},
+): string {
+  // `src` on pythonpath so `from shared.models.X import ...` resolves the
+  // src/shared package; pytest is declared so the per-leaf test gate runs.
+  const srcRoot = profile.shared_dir.replace(/\\/g, '/').split('/')[0] || 'src';
+  const deps = Object.entries(runtimeDeps)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => (v && v !== '*' ? `"${k}${/^[<>=~^]/.test(v) ? '' : '=='}${v}"` : `"${k}"`));
+  const lines: string[] = [];
+  lines.push('[project]');
+  lines.push(`name = "${name}"`);
+  lines.push('version = "0.1.0"');
+  lines.push('requires-python = ">=3.10"');
+  lines.push(`dependencies = [${deps.length ? '\n  ' + deps.join(',\n  ') + ',\n' : ''}]`);
+  lines.push('');
+  lines.push('[tool.pytest.ini_options]');
+  lines.push(`pythonpath = ["${srcRoot}"]`);
+  lines.push('');
+  return lines.join('\n');
+}
+
 function renderTsconfig(profile: ProjectProfile, contract: ProjectLayoutContract): string {
   // Path aliases are the ONE canonical import form. Without them, leaves guess
   // (relative / bare / src/shared) and most imports fail to resolve.
@@ -429,7 +570,61 @@ function writeIfAbsent(
 }
 
 function ext(profile: ProjectProfile): string {
-  return profile.language === 'typescript' ? 'ts' : 'js';
+  switch (profile.language) {
+    case 'typescript': return 'ts';
+    case 'javascript': return 'js';
+    case 'python': return 'py';
+    case 'go': return 'go';
+    case 'rust': return 'rs';
+    case 'java': return 'java';
+  }
+}
+
+/**
+ * Python materializer (recon_stack: python). Emits pyproject.toml + a `__init__.py`
+ * package skeleton + `.py` dataclass/contract stubs under the shared dir. No
+ * package.json / tsconfig / barrel / npm — those are node-only. Skip-if-exists
+ * throughout, same as the node path.
+ */
+function materializePythonScaffold(
+  workspacePath: string,
+  projectName: string,
+  profile: ProjectProfile,
+  dataModels: DataModelsContent | null,
+  contracts: InterfaceContractsContent | null,
+  runtimeDeps: Record<string, string>,
+  result: MaterializeResult,
+): void {
+  const shared = profile.shared_dir.replace(/\\/g, '/').replace(/\/+$/, '');
+  const srcRoot = shared.split('/')[0] || 'src';
+
+  writeIfAbsent(workspacePath, 'pyproject.toml', renderPyproject(projectName, profile, runtimeDeps), result);
+  // Package-init files so `src` is a proper package tree on pythonpath.
+  writeIfAbsent(workspacePath, `${srcRoot}/__init__.py`, '', result);
+  writeIfAbsent(workspacePath, `${shared}/__init__.py`, '', result);
+
+  const seenEntities = new Set<string>();
+  let wroteModel = false;
+  for (const model of dataModels?.models ?? []) {
+    for (const entity of model.entities ?? []) {
+      const key = pascalCase(entity.name);
+      if (seenEntities.has(key)) continue;
+      seenEntities.add(key);
+      writeIfAbsent(workspacePath, `${shared}/models/${key}.py`, renderPyEntity(entity, model.component_id), result);
+      wroteModel = true;
+    }
+  }
+  if (wroteModel) writeIfAbsent(workspacePath, `${shared}/models/__init__.py`, '', result);
+
+  const seenContracts = new Set<string>();
+  let wroteContract = false;
+  for (const c of contracts?.contracts ?? []) {
+    if (!c.id || seenContracts.has(c.id)) continue;
+    seenContracts.add(c.id);
+    writeIfAbsent(workspacePath, `${shared}/contracts/${pascalCase(c.id)}.py`, renderPyContract(c), result);
+    wroteContract = true;
+  }
+  if (wroteContract) writeIfAbsent(workspacePath, `${shared}/contracts/__init__.py`, '', result);
 }
 
 /**
@@ -446,6 +641,22 @@ export function materializeScaffold(
   runtimeDeps: Record<string, string> = {},
 ): MaterializeResult {
   const result: MaterializeResult = { created: [], preExisting: [] };
+
+  // Non-node stacks branch to their own renderer — never the package.json /
+  // tsconfig / barrel machinery below (the slice-156 python-emits-TS bug).
+  if (profile.language === 'python') {
+    materializePythonScaffold(workspacePath, projectName, profile, dataModels, contracts, runtimeDeps, result);
+    return result;
+  }
+  if (!isNodeLanguage(profile.language)) {
+    // go/rust/java: the deterministic scaffold doesn't yet have a full renderer.
+    // Emit NOTHING (the recon scaffolding-agent is the primary path) rather than
+    // poison the project with a TypeScript scaffold. Stack-appropriate renderers
+    // are a follow-up; the manifest comes from recon's dependency_manifest.
+    getLogger().info('workflow', `Phase 9.0 scaffold_synthesis: no deterministic renderer for ${profile.language} — skipping materialization (recon agent owns scaffold)`, {});
+    return result;
+  }
+
   const e = ext(profile);
   const shared = profile.shared_dir.replace(/\\/g, '/').replace(/\/+$/, '');
 
@@ -539,7 +750,7 @@ function installDependencies(workspacePath: string, workflowRunId: string): void
  * data_models, and writes a `scaffold_manifest` artifact. Returns the
  * manifest (also persisted) so the caller can hand it to the scheduler.
  */
-export function runScaffoldSynthesis(ctx: PhaseContext): ScaffoldManifest | null {
+export function runScaffoldSynthesis(ctx: PhaseContext, reconStack?: string): ScaffoldManifest | null {
   const { workflowRun, engine } = ctx;
   const cfg = engine.configManager.get();
   const scaffoldCfg = (cfg as unknown as {
@@ -574,6 +785,7 @@ export function runScaffoldSynthesis(ctx: PhaseContext): ScaffoldManifest | null
     workspacePath,
     (adrsRecord?.content as Record<string, unknown>) ?? null,
     configProfile,
+    reconStack,
   );
 
   // Gather the source artifacts.
@@ -616,14 +828,21 @@ export function runScaffoldSynthesis(ctx: PhaseContext): ScaffoldManifest | null
 
   // Install the declared test runner ONCE so per-leaf `npm test` resolves
   // (otherwise every leaf quarantines on "vitest: command not found").
-  // Skip when node_modules already exists; non-fatal on failure.
-  if (scaffoldCfg?.install_dependencies !== false && fs.existsSync(path.join(workspacePath, 'package.json'))) {
+  // Skip when node_modules already exists; non-fatal on failure. NODE ONLY —
+  // `npm install` is meaningless for python/go/rust/java (their test runner is
+  // provisioned by the environment / the recon gate command).
+  if (isNodeLanguage(profile.language) && scaffoldCfg?.install_dependencies !== false
+      && fs.existsSync(path.join(workspacePath, 'package.json'))) {
     installDependencies(workspacePath, workflowRun.id);
   }
 
   const shared = profile.shared_dir.replace(/\\/g, '/').replace(/\/+$/, '');
   const canonicalFiles = [...materialize.created, ...materialize.preExisting];
-  const protectedPaths = [shared + '/', ...ROOT_CONFIG_FILES];
+  // Protected roots: the shared dir always; node config files only for node
+  // (a python run protects pyproject.toml instead, not package.json/tsconfig).
+  const protectedPaths = isNodeLanguage(profile.language)
+    ? [shared + '/', ...ROOT_CONFIG_FILES]
+    : [shared + '/', ...(profile.language === 'python' ? ['pyproject.toml'] : [])];
 
   // Conventions text is now DERIVED from the contract (states the @shared/
   // import form + co-located test rule), not advisory prose.

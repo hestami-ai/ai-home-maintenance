@@ -187,6 +187,26 @@ describe('DeepMemoryResearchAgent', () => {
       expect(nfrFinding!.summary).toContain('NFR-002');
       expect(nfrFinding!.summary).toMatch(/security|AES-256/);
     });
+
+    it('distills a cross_run_modification (what was applied) instead of `[kind]`', async () => {
+      const mod = writer.writeRecord({
+        record_type: 'cross_run_modification', schema_version: '1.0', workflow_run_id: 'run-1',
+        phase_id: '9', janumicode_version_sha: 'abc',
+        content: {
+          kind: 'cross_run_modification', modification_type: 'breaking',
+          changed_interface_id: 'IC-DELETE-001', applied_status: 'applied',
+          modified_artifact_id: 'abc-123',
+        },
+      });
+      const packet = await agent.research(baseBrief({
+        scopeTier: 'all_runs', query: 'cross-run modification applied',
+        knownRelevantRecordIds: [mod.id],
+      }));
+      const f = packet.materialFindings.find(x => x.id === mod.id);
+      expect(f!.summary).not.toBe('[cross_run_modification]');
+      expect(f!.summary).toMatch(/breaking/);
+      expect(f!.summary).toContain('IC-DELETE-001');
+    });
   });
 
   // ── computeMateriality (legacy sync API) ──────────────────────────
@@ -794,6 +814,47 @@ describe('DeepMemoryResearchAgent', () => {
       expect(packet.queryDecomposition.authorityLevelsIncluded).toEqual([5, 6, 7]);
       // New spec-conformance field.
       expect(packet.queryDecomposition.knownConflictZones).toEqual([]);
+    });
+
+    it('derives knownConflictZones from confirmed contradicts/supersedes edges (empty when none)', async () => {
+      // No conflict edges → empty (the spec-conformance default).
+      const clean = await agent.research(baseBrief({ scopeTier: 'all_runs', query: 'plain query' }));
+      expect(clean.queryDecomposition.knownConflictZones).toEqual([]);
+
+      // A confirmed supersedes edge between two interface_contracts makes that
+      // subject a conflict zone.
+      const prior = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc', authority_level: 5,
+        content: { kind: 'interface_contracts', statement: 'v1' },
+      });
+      const next = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc', authority_level: 6,
+        content: { kind: 'interface_contracts', statement: 'v2' },
+      });
+      db.prepare(`
+        INSERT INTO memory_edge (id, source_record_id, target_record_id, edge_type, asserted_by, asserted_at, authority_level, status)
+        VALUES ('cz-e', ?, ?, 'supersedes', 'system', ?, 6, 'system_asserted')
+      `).run(next.id, prior.id, new Date().toISOString());
+
+      const withConflict = await agent.research(baseBrief({ scopeTier: 'all_runs', query: 'plain query' }));
+      expect(withConflict.queryDecomposition.knownConflictZones).toContain('interface_contracts');
+    });
+
+    it('preserves lowercase STRUCTURAL ids (comp-*/task-*) as high-priority id tokens', async () => {
+      // The per-leaf executor query anchors on lowercase comp-*/task-* ids; the
+      // old uppercase-only regex dropped them to noise tokens. They must now be
+      // captured verbatim AND ranked ahead of prose (id tokens lead the list).
+      const packet = await agent.research(baseBrief({
+        query: 'Implementation of task task-comp-lifecycle-manager-delete on component comp-lifecycle-manager for us-001',
+      }));
+      const te = packet.queryDecomposition.topicEntities;
+      expect(te).toContain('task-comp-lifecycle-manager-delete');
+      expect(te).toContain('comp-lifecycle-manager');
+      expect(te).toContain('us-001');
+      // ID tokens lead, ahead of prose words like "implementation".
+      expect(te.indexOf('comp-lifecycle-manager')).toBeLessThan(te.indexOf('implementation'));
     });
 
     it('Stage 7 enriches narrative with open_questions from LLM synthesis', async () => {

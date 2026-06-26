@@ -40,6 +40,38 @@ export type PermissionResponse = 'once' | 'always' | 'reject';
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
+/**
+ * A `compose` turn (research→plan→implement) can legitimately run for a long
+ * time. Node's global `fetch` (undici) applies a default 300s
+ * `headersTimeout`/`bodyTimeout`, so the blocking `sendMessage` POST — which the
+ * server holds open until the turn finishes — was aborted at ~5 min with a
+ * generic `fetch failed`, guillotining the executor mid-generation. A dedicated
+ * Agent with both timeouts disabled keeps that connection alive; turn duration
+ * is instead governed by the adapter's idle-watchdog + wall-clock backstop.
+ *
+ * CRITICAL: the no-timeout `Agent` MUST be paired with undici's OWN `fetch`, not
+ * Node's BUILT-IN global `fetch`. Node bundles its own (older) undici; attaching
+ * a dispatcher from the standalone `undici` package to global `fetch` throws
+ * `invalid onRequestStart method` ("fetch failed") whenever the two undici
+ * versions differ (observed: pkg 8.x vs Node built-in 7.x) — which silently
+ * broke EVERY long-running turn-submit. Using `undici.fetch` keeps the client
+ * and the dispatcher on the same undici version. Lazily constructed so tests
+ * with an injected `fetchImpl` never load undici.
+ */
+let undiciLongRunning: { fetch: FetchLike; dispatcher: unknown } | null | undefined;
+function getUndiciLongRunningClient(): { fetch: FetchLike; dispatcher: unknown } | null {
+  if (undiciLongRunning === undefined) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const u = require('undici') as { fetch: FetchLike; Agent: new (o: unknown) => unknown };
+      undiciLongRunning = { fetch: u.fetch, dispatcher: new u.Agent({ headersTimeout: 0, bodyTimeout: 0 }) };
+    } catch {
+      undiciLongRunning = null; // undici unavailable → default fetch (300s) applies
+    }
+  }
+  return undiciLongRunning;
+}
+
 export class MimoClient {
   constructor(
     private readonly baseUrl: string,
@@ -48,12 +80,26 @@ export class MimoClient {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
   }
 
-  private async postJson(path: string, body: unknown): Promise<Response> {
-    return this.fetchImpl(`${this.baseUrl}${path}`, {
+  /**
+   * `longRunning` POSTs (the turn-blocking `sendMessage`) use the no-timeout
+   * dispatcher so undici's default 300s body/headers timeout can't abort them.
+   */
+  private async postJson(path: string, body: unknown, longRunning = false): Promise<Response> {
+    const init: RequestInit = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body ?? {}),
-    });
+    };
+    const url = `${this.baseUrl}${path}`;
+    // Long-running POSTs (the turn-blocking `sendMessage`) go through undici's
+    // OWN fetch + no-timeout Agent so the 300s body/headers cap can't abort them.
+    // Only when using the REAL global fetch — a test-injected `fetchImpl` (or a
+    // non-undici runtime) is used verbatim with the default timeout.
+    if (longRunning && this.fetchImpl === fetch) {
+      const u = getUndiciLongRunningClient();
+      if (u) return u.fetch(url, { ...init, dispatcher: u.dispatcher } as RequestInit);
+    }
+    return this.fetchImpl(url, init);
   }
 
   /** Create a session. Binds to the server's launch cwd (POST `directory` is ignored). */
@@ -79,7 +125,7 @@ export class MimoClient {
       agent: opts.agent,
       model: opts.model,
       parts: [{ type: 'text', text: opts.text }],
-    });
+    }, /* longRunning */ true);
     if (!res.ok) throw new Error(`mimo sendMessage failed: ${res.status} ${await safeText(res)}`);
     const json = (await res.json()) as { info?: Record<string, unknown> };
     const info = json.info ?? {};

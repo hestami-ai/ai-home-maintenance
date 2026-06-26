@@ -65,6 +65,77 @@ describe('resolveProjectProfile — precedence', () => {
     const p = resolveProjectProfile(ws, adr, configDefault);
     expect(p.source).toBe('brownfield_detected');
   });
+
+  // recon_stack — the fix for the slice-156 python-emits-TypeScript cascade.
+  it('recon stack=python OUTRANKS the node config default (greenfield)', () => {
+    const p = resolveProjectProfile(ws, null, configDefault, 'python');
+    expect(p.source).toBe('recon_stack');
+    expect(p.language).toBe('python');
+    expect(p.module).toBe('na');
+    expect(p.test_runner).toBe('pytest');
+    expect(p.shared_dir).toBe('src/shared'); // inherits the config shared_dir
+  });
+
+  it('recon stack=node falls through to the config default (ts/js detail preserved)', () => {
+    const p = resolveProjectProfile(ws, null, configDefault, 'node');
+    expect(p.source).toBe('config_default');
+    expect(p.language).toBe('typescript');
+  });
+
+  it('brownfield + ADR still beat recon stack (recon only fills the greenfield gap)', () => {
+    fs.writeFileSync(path.join(ws, 'package.json'), JSON.stringify({ name: 'x', type: 'module' }));
+    expect(resolveProjectProfile(ws, null, configDefault, 'python').source).toBe('brownfield_detected');
+    fs.rmSync(path.join(ws, 'package.json'));
+    const adr = { project_profile: { language: 'javascript' } };
+    expect(resolveProjectProfile(ws, adr, configDefault, 'python').source).toBe('adr_override');
+  });
+});
+
+describe('materializeScaffold — python (recon_stack) emits NO TypeScript', () => {
+  const pyProfile = {
+    language: 'python', module: 'na', test_runner: 'pytest', shared_dir: 'src/shared', source: 'recon_stack',
+  } as const;
+  const contract = buildProjectLayoutContract([{ id: 'comp-url' }], pyProfile, 'colocated');
+  const dataModels = {
+    models: [{ component_id: 'comp-url', entities: [
+      { name: 'ShortLink', fields: [
+        { name: 'id', type: 'uuid' },
+        { name: 'clicks', type: 'integer' },
+        { name: 'deleted_at', type: 'timestamp', constraints: 'nullable' },
+      ] },
+    ] }],
+  };
+  const contracts = { contracts: [{ id: 'IC-001', protocol: 'HTTPS', data_format: 'JSON', systems_involved: ['api', 'db'] }] };
+
+  it('writes pyproject.toml + __init__.py package tree + .py stubs, and NO package.json/tsconfig/.ts', () => {
+    const r = materializeScaffold(ws, 'tinyurl', pyProfile, dataModels, contracts, contract);
+    expect(r.created).toContain('pyproject.toml');
+    expect(r.created).toContain('src/__init__.py');
+    expect(r.created).toContain('src/shared/__init__.py');
+    expect(r.created).toContain('src/shared/models/ShortLink.py');
+    expect(r.created).toContain('src/shared/contracts/IC001.py');
+    // The bug: NO node artifacts on a python run.
+    expect(r.created).not.toContain('package.json');
+    expect(r.created).not.toContain('tsconfig.json');
+    expect(r.created.some(f => f.endsWith('.ts'))).toBe(false);
+    expect(fs.existsSync(path.join(ws, 'package.json'))).toBe(false);
+  });
+
+  it('renders a Python dataclass with Optional[...] for nullable fields', () => {
+    materializeScaffold(ws, 'tinyurl', pyProfile, dataModels, contracts, contract);
+    const body = fs.readFileSync(path.join(ws, 'src/shared/models/ShortLink.py'), 'utf-8');
+    expect(body).toMatch(/@dataclass/);
+    expect(body).toMatch(/class ShortLink:/);
+    expect(body).toMatch(/clicks: int/);
+    expect(body).toMatch(/deleted_at: Optional\[str\]/); // nullable → Optional
+  });
+
+  it('pyproject puts src on pythonpath so shared package imports resolve', () => {
+    materializeScaffold(ws, 'tinyurl', pyProfile, dataModels, contracts, contract);
+    const toml = fs.readFileSync(path.join(ws, 'pyproject.toml'), 'utf-8');
+    expect(toml).toMatch(/\[tool\.pytest\.ini_options\]/);
+    expect(toml).toMatch(/pythonpath = \["src"\]/);
+  });
 });
 
 describe('materializeScaffold — file generation + idempotency', () => {
