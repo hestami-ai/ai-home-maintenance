@@ -13,6 +13,7 @@ import type {
 } from '../llmCaller';
 import { LLMError } from '../llmCaller';
 import { parseJsonWithRecovery } from '../jsonRecovery';
+import { resolveLlmTimeouts } from '../llmTimeouts';
 
 export class OllamaProvider implements LLMProviderAdapter {
   readonly name = 'ollama';
@@ -241,8 +242,13 @@ export class OllamaProvider implements LLMProviderAdapter {
         // legitimately run for minutes, but a stream that hasn't emitted
         // a single frame for STALL_MS is either hung or looping on a
         // silent queue. When it fires we kill the HTTP request; the
-        // retry loop in LLMCaller decides whether to try again.
-        const stallMs = Number.parseInt(process.env.JANUMICODE_LLM_STALL_MS ?? '180000', 10);
+        // retry loop in LLMCaller decides whether to try again. Model-aware:
+        // Ollama is a LOCAL provider, so this is the generous local stall
+        // (900 s) — a ~19 GB dense model's reload + prefill at full context
+        // can legitimately emit nothing for >180 s before the first token
+        // (cal-29). Sits above the llmCaller no-progress timer (600 s) as a
+        // backstop. env JANUMICODE_LLM_STALL_MS overrides. See llmTimeouts.ts.
+        const stallMs = resolveLlmTimeouts('ollama', options.model).stallMs;
         let idleTimer: NodeJS.Timeout | null = null;
         const resetIdleTimer = (): void => {
           if (idleTimer) clearTimeout(idleTimer);

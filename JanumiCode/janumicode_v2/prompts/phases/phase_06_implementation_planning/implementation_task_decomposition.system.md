@@ -30,17 +30,17 @@ GOVERNING CONSTRAINTS (apply without exception):
 
 The concerns above (availability, performance, encryption, observability, compliance, etc.) are **non-functional constraints**, NOT buildable features. They were deliberately partitioned out of the component model. **Do NOT emit standalone tasks, modules, or directory subtrees for them** (no `failover/`, `replication/`, `health-check/`, `monitoring/` task trees). Instead, fold each concern into the functional tasks of the components it `applies_to` — e.g. "encrypt the URL" becomes a constraint on the storage task, not its own task. A task whose only purpose is to satisfy an NFR concern (rather than a functional Component Responsibility) is over-decomposition — drop it.
 
-# Acceptance Criteria Inventory (authoritative — bind your tasks to these)
+# Acceptance Criteria Inventory (reference lookup — bind your tasks to the ones THIS component implements)
 
-The leaf acceptance criteria below are the authoritative, indivisible units of functional behaviour, grouped by the leaf user story that owns them. **Every task you emit MUST cite, in its `traces_to`, the exact leaf AC ids it implements** (copy the ids verbatim — do NOT invent, reformat, or paraphrase). A task may cover several related ACs; an AC may need several tasks. **Every leaf AC below MUST be covered by at least one task.** Do NOT cite an AC id that is not listed here.
+The leaf acceptance criteria below are the authoritative, indivisible units of functional behaviour, grouped by the leaf user story that owns them. The **full** inventory is shown so you can locate the exact ids — but it is a **reference lookup**, NOT a coverage target for this call. **Each task you emit MUST cite, in its `traces_to`, the exact leaf AC ids it implements** (copy the ids verbatim — do NOT invent, reformat, or paraphrase). A task may cover several related ACs; an AC may need several tasks. **Cite only the leaf ACs that the SINGLE component below actually implements** (those whose behaviour its responsibilities deliver). You are NOT responsible for ACs belonging to other components — do NOT try to cover the entire inventory. Do NOT cite an AC id that is not listed here.
 
 {{acceptance_criteria_menu}}
 
 # Your job
 
-Produce one [JC:Implementation Task] per FUNCTIONAL Component Responsibility identified in the Component Model. Each task must be concrete enough that an executor — given no additional context — can open the relevant files, complete the work to the stated completion criteria, run the verification step, and stop.
+You are decomposing **exactly ONE component** — the single component shown in the Component Model Summary below. Produce one [JC:Implementation Task] per FUNCTIONAL Responsibility of THAT component, and nothing else. Each task must be concrete enough that an executor — given no additional context — can open the relevant files, complete the work to the stated completion criteria, run the verification step, and stop.
 
-**Decomposition rule:** One task = one Component + one Component Responsibility. Do not bundle two responsibilities into one task. Do not leave a responsibility uncovered. Do not create tasks for cross-cutting NFR concerns (see above).
+**Decomposition rule:** One task = THIS Component + one of its Component Responsibilities. Do not bundle two responsibilities into one task. Cover every responsibility of this component (none left out). Emit NO tasks for any other component. Do not create tasks for cross-cutting NFR concerns (see above).
 
 ---
 
@@ -201,8 +201,8 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
 3. **`completion_criteria` MUST be an array of objects**, each with `criterion_id`, `description`, and `verification_method`. Plain strings are forbidden.
 4. **`component_responsibility` MUST be verbatim** text from the Component Model (Invariant: IP-002). Do not paraphrase.
 5. **All paths MUST be workspace-relative.** No absolute paths, no drive letters, no leading `./`.
-6. **Every Technical Specification must be covered** by at least one task's `traces_to`.
-6b. **Every leaf acceptance criterion in the Acceptance Criteria Inventory MUST be covered** by at least one task's `traces_to` (cite the `AC-*` id verbatim). Conversely, do NOT cite an `AC-*` id absent from the Inventory.
+6. **Cite every Technical Specification THIS component implements** in some task's `traces_to` (do not attempt to cover specs owned by other components).
+6b. **Cite every leaf acceptance criterion THIS component implements** in some task's `traces_to` (the `AC-*` id verbatim) — NOT only in a criterion's `verifies_acceptance_criteria`. Every `AC-*` id you place in any `verifies_acceptance_criteria` MUST also appear in that task's top-level `traces_to`. Cover the ACs whose behaviour this component's responsibilities deliver — not the whole inventory. Conversely, do NOT cite an `AC-*` id absent from the Inventory. (Global coverage across all components is reconciled by the orchestrator, not by this single call.)
 7. **No circular task dependencies.**
 8. **Tasks with `estimated_complexity: "high"` MUST include `complexity_flag`.**
 9. **`component_id` MUST be byte-for-byte identical to a `components[].id` value in the Component Model.** Never prepend `comp-`. Never modify case, prefix, or suffix. Downstream Phase 9 looks up the component by exact id; a mismatch breaks the component-context, test-case filtering, and eval-criteria filtering for every task on that component. If the Component Model shows `link-mapping-repository`, the task's `component_id` MUST be `link-mapping-repository`.

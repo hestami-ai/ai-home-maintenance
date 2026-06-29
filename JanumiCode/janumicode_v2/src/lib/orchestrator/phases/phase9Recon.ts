@@ -514,6 +514,86 @@ export function normalizeGreenfieldLayout(plan: Phase9ReconPlan): Phase9ReconPla
   };
 }
 
+/**
+ * Collapse a GREENFIELD recon plan's area partition to a DETERMINISTIC function
+ * of the resolved stack(s), removing the LLM's run-to-run topology invention.
+ *
+ * The recon agent emits `area_id`, the area COUNT, and per-area `stack` as free
+ * text, so the same intent yields a different partition every run (ws-156: ONE
+ * run produced `core-service`, `core-service`, `core-backend`). But an "area" is
+ * just the build/stack unit (one manifest + one gate set + one language) — for
+ * single-stack greenfield there is exactly ONE, and per-leaf write scope is
+ * resolved from `component_id`, never `area_id`. So the topology is derivable,
+ * not a judgment call.
+ *
+ * Greenfield → group areas by `stack`:
+ *   - one stack → a single area `area_id:'workspace'`
+ *   - ≥2 stacks → one area per stack `area_id:'area-<stack>'` (sorted) — polyglot
+ * The agent's genuine outputs are PRESERVED as a de-duped union within each group
+ * (canonical_modules, import_aliases, gate_commands, evidence, conflicts). With
+ * `area_id` deterministic, `primary_stack` (= sorted `areas[0].stack`) is too, so
+ * the scaffold session id, the enforcement conventions, the component_dir_map key,
+ * and the on-disk dir separator stop churning run-to-run. Brownfield/mixed are
+ * returned unchanged (their areas are real existing subsystems, not inventions).
+ * Runs BEFORE {@link normalizeGreenfieldLayout} so the latter sets canonical paths
+ * on the collapsed areas.
+ *
+ * NOTE: this makes `area_id` deterministic GIVEN the stack(s). Pinning the STACK
+ * CHOICE itself (binding TECH-* > detected > agent-majority) when the agent
+ * waffles between stacks is a separate additive enhancement; JANUMICODE_FORCE_STACK
+ * already pins it for the executor-language sweep.
+ */
+export function collapseGreenfieldAreas(plan: Phase9ReconPlan): Phase9ReconPlan {
+  if (plan.workspace_kind !== 'greenfield' || plan.areas.length === 0) return plan;
+
+  const byStack = new Map<string, ReconArea[]>();
+  for (const a of plan.areas) {
+    const g = byStack.get(a.stack);
+    if (g) g.push(a); else byStack.set(a.stack, [a]);
+  }
+  const stacks = [...byStack.keys()].sort();
+  const single = stacks.length === 1;
+
+  const uniq = <T>(xs: T[], key: (x: T) => string): T[] => {
+    const seen = new Set<string>();
+    const out: T[] = [];
+    for (const x of xs) { const k = key(x); if (!seen.has(k)) { seen.add(k); out.push(x); } }
+    return out;
+  };
+  const rank: Record<string, number> = { high: 3, medium: 2, low: 1 };
+
+  const idMap = new Map<string, string>(); // old area_id → new area_id
+  const areas: ReconArea[] = stacks.map(stack => {
+    const group = byStack.get(stack)!;
+    const newId = single ? 'workspace' : `area-${stack}`;
+    for (const a of group) idMap.set(a.area_id, newId);
+    return {
+      area_id: newId,
+      description: single ? 'Whole workspace (single greenfield stack).' : `All ${stack} components.`,
+      stack,
+      confidence: group.reduce<ReconArea['confidence']>(
+        (best, a) => ((rank[a.confidence] ?? 0) >= (rank[best] ?? 0) ? a.confidence : best), group[0].confidence),
+      source_refs: uniq(group.flatMap(a => a.source_refs), x => x).sort(),
+      conflicts: uniq(group.flatMap(a => a.conflicts), x => x),
+      alternatives_rejected: uniq(group.flatMap(a => a.alternatives_rejected), x => x),
+      source_roots: ['src'],
+      test_roots: ['src'],
+      protected_paths: uniq(group.flatMap(a => a.protected_paths), x => x),
+      dependency_manifest: group[0].dependency_manifest || manifestForStack(stack),
+      canonical_modules: uniq(group.flatMap(a => a.canonical_modules), m => m.path),
+      import_aliases: uniq(group.flatMap(a => a.import_aliases), al => al.alias),
+      gate_commands: uniq(group.flatMap(a => a.gate_commands), g => g.name),
+    };
+  });
+
+  // Remap integration boundaries onto surviving ids; drop now-self-referential ones.
+  const integration_boundaries = single ? [] : plan.integration_boundaries
+    .map(b => ({ ...b, between: uniq(b.between.map(id => idMap.get(id) ?? id), x => x) }))
+    .filter(b => b.between.length >= 2);
+
+  return { ...plan, areas, integration_boundaries };
+}
+
 /** Coerce an LLM-proposed area object into a validated {@link ReconArea}, or null. */
 function coerceArea(raw: unknown, workspacePath: string): ReconArea | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -666,10 +746,14 @@ export async function runPhase9ReconSubPhase(ctx: PhaseContext): Promise<Phase9R
     }
   }
 
-  // Greenfield layout is DETERMINISTIC: override the agent's invented topology
-  // (area_id-as-source-dir, /src/ protected) with the canonical src/ layout so
-  // the scaffolding agent, the executor's canonicalComponentDir, and imports all
-  // agree. The agent's stack + canonical modules are preserved. (slice-156)
+  // Greenfield TOPOLOGY is DETERMINISTIC. First collapse the agent's invented
+  // area partition to one area per stack (`workspace` for single-stack), so
+  // `area_id`/count/`primary_stack` stop churning run-to-run (ws-156:
+  // core-service↔core-backend within one run) — the agent's stack + canonical
+  // modules + gates are preserved as a union. Then normalize the layout PATHS
+  // (area_id-as-source-dir, /src/ protected → canonical src/) so the scaffolding
+  // agent, the executor's canonicalComponentDir, and imports all agree. (slice-156)
+  plan = collapseGreenfieldAreas(plan);
   plan = normalizeGreenfieldLayout(plan);
 
   try {

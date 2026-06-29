@@ -100,10 +100,24 @@ export async function buildPhaseContextPacket(
 
   if (!packet) return empty;
 
+  // Split BINDING rules from CERTIFIED CONTEXT (the same axis the executor's
+  // hydrated detail file uses) so a reasoning agent isn't told to "apply without
+  // exception" a certified-context artifact (component_model, system_boundary,
+  // the user-story roster, …). Legacy packets without bindingClass default to
+  // binding (prior behavior).
+  const fmtConstraint = (c: typeof packet.activeConstraints[number], i: number): string =>
+    `${i + 1}. ${c.statement} (Authority ${c.authorityLevel}, source: ${c.sourceRecordIds[0] ?? 'unknown'})`;
+  const bindingConstraints = packet.activeConstraints.filter(c => c.bindingClass !== 'certified_context');
+  const contextConstraints = packet.activeConstraints.filter(c => c.bindingClass === 'certified_context');
   const activeConstraintsText = packet.activeConstraints.length > 0
-    ? packet.activeConstraints
-        .map((c, i) => `${i + 1}. ${c.statement} (Authority ${c.authorityLevel}, source: ${c.sourceRecordIds[0] ?? 'unknown'})`)
-        .join('\n')
+    ? [
+        bindingConstraints.length
+          ? `BINDING (apply without exception):\n${bindingConstraints.map(fmtConstraint).join('\n')}`
+          : '',
+        contextConstraints.length
+          ? `CERTIFIED CONTEXT (authoritative reference — build within this; do not contradict):\n${contextConstraints.map(fmtConstraint).join('\n')}`
+          : '',
+      ].filter(Boolean).join('\n\n')
     : '(none)';
 
   // Write the detail file via ContextBuilder for audit + Phase 9 readiness.

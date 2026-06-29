@@ -48,6 +48,8 @@ interface ImplementationTask {
   component_responsibility: string;
   description: string;
   technical_spec_ids?: string[];
+  /** IDs this task implements/satisfies — leaf AC-* (coverage), res-*, TECH-*, SR-*, US-*, NFR-*, comp-*. */
+  traces_to?: string[];
   dependency_task_ids?: string[];
   estimated_complexity: 'low' | 'medium' | 'high';
   complexity_flag?: string;
@@ -172,7 +174,14 @@ export class Phase6Handler implements PhaseHandler {
     const componentIdOracle = new Set(componentIds);
 
     const rawPlan = await this.runTaskDecomposition(
-      ctx, componentSummary, techSpecsSummary, crossCuttingSummary, dmr61, acceptanceCriteriaMenu,
+      ctx,
+      effectiveComponents.components as Array<Record<string, unknown>>,
+      prior.projectTypeDescription,
+      techSpecsSummary,
+      crossCuttingSummary,
+      dmr61,
+      acceptanceCriteriaMenu,
+      leafAcceptanceCriteria,
     );
 
     // Normalize write/read paths to workspace-relative form. cal-21
@@ -604,10 +613,33 @@ export class Phase6Handler implements PhaseHandler {
 
   // ── LLM call helper ───────────────────────────────────────────
 
+  /**
+   * Phase 6.1 task decomposition — PER-COMPONENT chunking + coverage-driven
+   * reconciliation (replaces the single monolithic call).
+   *
+   * The monolithic call asked one LLM response to emit ~100-200 tasks covering
+   * all 300+ leaf ACs across 60+ components. That output size made local dense
+   * models loop / time out, and even the rare 30-min "success" covered only
+   * ~41% of leaf ACs (the model can't reconcile the full component×AC space in
+   * one shot). See project_gemma4_31b_decomposition_divergence.
+   *
+   * Instead: one BOUNDED call per component (its responsibilities + the full AC
+   * menu as a passive lookup → a few tasks each), then the orchestrator owns the
+   * 100%-coverage guarantee — a deterministic check finds leaf ACs no task
+   * covered and routes them back through focused reconciliation passes until the
+   * check is clean (or the budget is spent → an honest, non-fabricated gap).
+   * Responsibility coverage is structural (every component is visited); AC
+   * coverage is closed by the reconciliation loop.
+   */
   private async runTaskDecomposition(
-    ctx: PhaseContext, componentSummary: string, techSpecsSummary: string,
-    crossCuttingSummary: string, dmr: PhaseContextPacketResult,
+    ctx: PhaseContext,
+    components: Array<Record<string, unknown>>,
+    projectTypeDescription: string,
+    techSpecsSummary: string,
+    crossCuttingSummary: string,
+    dmr: PhaseContextPacketResult,
     acceptanceCriteriaMenu: string,
+    leafAcceptanceCriteria: LeafAcceptanceCriteria[],
   ): Promise<ImplementationPlan> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('implementation_planner', 'task_skeleton');
@@ -628,53 +660,142 @@ export class Phase6Handler implements PhaseHandler {
       }],
     };
 
-    if (!template) return fallback;
+    const leafComponents = components.filter(c => typeof c.id === 'string' && (c.id as string).length > 0);
+    if (!template || leafComponents.length === 0) return fallback;
 
+    const allTasks: ImplementationTask[] = [];
+    const seenIds = new Set<string>();
+    const pushUnique = (tasks: ImplementationTask[]): number => {
+      let added = 0;
+      for (const t of tasks) {
+        const id = typeof t.id === 'string' ? t.id : '';
+        if (id && seenIds.has(id)) continue; // dedup across chunks
+        if (id) seenIds.add(id);
+        allTasks.push(t);
+        added++;
+      }
+      return added;
+    };
+
+    // ── Per-component generation: ONE bounded call per leaf component ──
+    for (const component of leafComponents) {
+      const cid = String(component.id);
+      const block = `PROJECT TYPE: ${projectTypeDescription}\n\n${renderComponentBlockForTask(component)}`;
+      const rendered = engine.templateLoader.render(template, {
+        active_constraints: dmr.activeConstraintsText,
+        acceptance_criteria_menu: acceptanceCriteriaMenu,
+        component_model_summary: block,
+        technical_specs_summary: techSpecsSummary,
+        cross_cutting_constraints_summary: crossCuttingSummary,
+        detail_file_path: dmr.detailFilePath,
+        detail_file_content: dmr.detailFileContent,
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+      });
+      if (rendered.missing_variables.length > 0) continue;
+      try {
+        const result = await engine.callForRole('requirements_agent', {
+          prompt: rendered.rendered,
+          responseFormat: 'json',
+          temperature: 0.4,
+          traceContext: {
+            workflowRunId: ctx.workflowRun.id,
+            phaseId: '6',
+            subPhaseId: 'task_skeleton',
+            agentRole: 'implementation_planner',
+            label: `Phase 6.1 — Task Decomposition (${cid})`,
+          },
+        });
+        const tasks = parseImplementationTasks(result.parsed as Record<string, unknown> | null);
+        for (const t of tasks) backfillTracesFromCriteria(t);
+        pushUnique(tasks);
+      } catch (err) {
+        // One component's failure must not sink the whole phase — log and move
+        // on; the reconciliation pass below catches any ACs it would have covered.
+        getLogger().warn('workflow', 'Phase 6.1 per-component generation failed — continuing', {
+          component_id: cid, error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    if (allTasks.length === 0) return fallback;
+
+    // ── Coverage-driven reconciliation: orchestrator owns the 100% guarantee ──
+    const leafAcIdSet = new Set(leafAcceptanceCriteria.flatMap(s => s.acs.map(a => a.id)));
+    const maxReconPasses = Math.max(0, Number.parseInt(process.env.JANUMICODE_P6_RECON_PASSES ?? '2', 10) || 0);
+    for (let pass = 1; pass <= maxReconPasses; pass++) {
+      const uncovered = computeUncoveredAcIds(allTasks, leafAcIdSet);
+      if (uncovered.size === 0) break;
+      getLogger().info('workflow', 'Phase 6.1 reconciliation pass — covering orphan leaf ACs', {
+        pass, uncovered: uncovered.size, total: leafAcIdSet.size,
+      });
+      const reconTasks = await this.reconcileUncoveredAcs(
+        ctx, uncovered, leafAcceptanceCriteria, leafComponents, techSpecsSummary, dmr,
+      );
+      // Only accept recon tasks that actually cover a still-uncovered AC.
+      const useful = reconTasks.filter(t => (t.traces_to ?? []).some(id => uncovered.has(id)));
+      if (pushUnique(useful) === 0) break; // no forward progress → stop (residual logged)
+    }
+
+    const residual = computeUncoveredAcIds(allTasks, leafAcIdSet);
+    if (residual.size > 0) {
+      getLogger().warn('workflow', 'Phase 6.1 residual uncovered leaf ACs after reconciliation (honest gap — not fabricated)', {
+        uncovered: residual.size, total: leafAcIdSet.size, sample: [...residual].slice(0, 20),
+      });
+    } else if (leafAcIdSet.size > 0) {
+      getLogger().info('workflow', 'Phase 6.1 leaf-AC coverage complete (100%)', {
+        total: leafAcIdSet.size, tasks: allTasks.length,
+      });
+    }
+
+    return { tasks: allTasks };
+  }
+
+  /**
+   * Reconciliation pass: emit tasks for the leaf ACs no per-component call
+   * covered. Small/focused — sees only the uncovered ACs + a compact component
+   * menu (routing target), so the model does bounded reasoning, not the
+   * monolithic mapping. Returns [] on failure (caller logs the residual gap).
+   */
+  private async reconcileUncoveredAcs(
+    ctx: PhaseContext,
+    uncovered: Set<string>,
+    leafAcceptanceCriteria: LeafAcceptanceCriteria[],
+    components: Array<Record<string, unknown>>,
+    techSpecsSummary: string,
+    dmr: PhaseContextPacketResult,
+  ): Promise<ImplementationTask[]> {
+    const { engine } = ctx;
+    const template = engine.templateLoader.findTemplate('implementation_planner', 'task_reconciliation');
+    if (!template) return [];
     const rendered = engine.templateLoader.render(template, {
       active_constraints: dmr.activeConstraintsText,
-      acceptance_criteria_menu: acceptanceCriteriaMenu,
-      component_model_summary: componentSummary,
+      uncovered_acceptance_criteria: renderUncoveredAcsMenu(uncovered, leafAcceptanceCriteria),
+      component_menu: renderComponentMenu(components),
       technical_specs_summary: techSpecsSummary,
-      cross_cutting_constraints_summary: crossCuttingSummary,
-      detail_file_path: dmr.detailFilePath,
-      detail_file_content: dmr.detailFileContent,
-      janumicode_version_sha: engine.janumiCodeVersionSha,
     });
-    if (rendered.missing_variables.length > 0) return fallback;
-
-    // LLM throws propagate to engine catch (halts workflow).
-    // Route through requirements_agent routing for llamacpp via
-    // llama-swap. See phase3.ts for the rationale.
-    const result = await engine.callForRole('requirements_agent', {
-      prompt: rendered.rendered,
-      responseFormat: 'json',
-      temperature: 0.4,
-      traceContext: {
-        workflowRunId: ctx.workflowRun.id,
-        phaseId: '6',
-        subPhaseId: 'task_skeleton',
-        agentRole: 'implementation_planner',
-        label: 'Phase 6.1 — Implementation Task Decomposition',
-      },
-    });
-
-    // Defensive parse — see parsedResponseHelpers.ts. cal-21 happened
-    // to use the schema-key envelope here so didn't lose data, but
-    // the model is free to switch to `{ implementation_plan: [...] }`
-    // on retry. Same migration as Phase 3-5.
-    const parsed = result.parsed as Record<string, unknown> | null;
-    // qwen3.5-35b-a3b often nests as { implementation_plan: { tasks: [...] } }
-    // rather than the flatter { implementation_plan: [...] } / { tasks: [...] }
-    // shapes pickItemsArray expects. Unwrap one level when we see the nested
-    // object envelope so the 25-task plan isn't silently dropped to fallback.
-    const ip = parsed && typeof parsed.implementation_plan === 'object' && !Array.isArray(parsed.implementation_plan)
-      ? parsed.implementation_plan as Record<string, unknown>
-      : null;
-    const tasks =
-      pickItemsArray<ImplementationTask>(parsed, ['implementation_plan', 'tasks']) ??
-      (ip ? pickItemsArray<ImplementationTask>(ip, ['tasks', 'implementation_plan']) : null);
-    if (tasks && tasks.length > 0) return { tasks };
-    return fallback;
+    if (rendered.missing_variables.length > 0) return [];
+    try {
+      const result = await engine.callForRole('requirements_agent', {
+        prompt: rendered.rendered,
+        responseFormat: 'json',
+        temperature: 0.4,
+        traceContext: {
+          workflowRunId: ctx.workflowRun.id,
+          phaseId: '6',
+          subPhaseId: 'task_skeleton',
+          agentRole: 'implementation_planner',
+          label: `Phase 6.1 — Coverage Reconciliation (${uncovered.size} orphan ACs)`,
+        },
+      });
+      const tasks = parseImplementationTasks(result.parsed as Record<string, unknown> | null);
+      for (const t of tasks) backfillTracesFromCriteria(t);
+      return tasks;
+    } catch (err) {
+      getLogger().warn('workflow', 'Phase 6.1 reconciliation call failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
   }
 
   /** Deterministic consistency check. */
@@ -926,6 +1047,118 @@ export function renderAcceptanceCriteriaMenu(leaves: LeafAcceptanceCriteria[]): 
     for (const ac of l.acs) lines.push(`  - ${ac.id}${ac.text ? `: ${ac.text}` : ''}`);
   }
   return lines.join('\n');
+}
+
+// ── Phase 6.1 per-component chunking helpers ──────────────────────────
+
+/**
+ * Render ONE component as a Component-Model-Summary block (same shape
+ * buildEffectiveComponentView emits) so a per-component task_skeleton call sees
+ * exactly the single component it is scoped to.
+ */
+export function renderComponentBlockForTask(component: Record<string, unknown>): string {
+  const id = typeof component.id === 'string' ? component.id : '';
+  const name = typeof component.name === 'string' ? component.name : id;
+  const dk = typeof component._leaf_display_key === 'string' ? component._leaf_display_key : id;
+  const tier = component._leaf_tier != null ? String(component._leaf_tier) : '?';
+  const root = typeof component._leaf_root_display_key === 'string' ? component._leaf_root_display_key : '';
+  const release = component._leaf_release_ordinal != null ? `Release ${String(component._leaf_release_ordinal)}` : 'Backlog';
+  const resps = Array.isArray(component.responsibilities)
+    ? (component.responsibilities as Array<Record<string, unknown>>)
+        .map(r => `  - ${typeof r.description === 'string' ? r.description : (typeof r.statement === 'string' ? r.statement : '')}`)
+        .join('\n')
+    : '';
+  const header = root ? `${dk} (Tier ${tier} leaf under ${root}): ${name}` : `${dk}: ${name}`;
+  return `[${release}] ${header}\n${resps}`;
+}
+
+/** Compact component menu (id + responsibilities) — the routing target for reconciliation. */
+export function renderComponentMenu(components: Array<Record<string, unknown>>): string {
+  const lines: string[] = [];
+  for (const c of components) {
+    const id = typeof c.id === 'string' ? c.id : '';
+    if (!id) continue;
+    const name = typeof c.name === 'string' ? c.name : id;
+    lines.push(`- ${id}: ${name}`);
+    if (Array.isArray(c.responsibilities)) {
+      for (const r of c.responsibilities as Array<Record<string, unknown>>) {
+        const txt = typeof r.description === 'string' ? r.description : (typeof r.statement === 'string' ? r.statement : '');
+        if (txt) lines.push(`    - ${txt}`);
+      }
+    }
+  }
+  return lines.length > 0 ? lines.join('\n') : '(no components)';
+}
+
+/**
+ * Promote leaf-AC ids the model placed only in a criterion's
+ * `verifies_acceptance_criteria` up into the task's top-level `traces_to` (the
+ * canonical AC-coverage field downstream binding reads). Smoke-testing the
+ * per-component prompt showed gemma4:31b reliably puts the AC ids in the CC
+ * field ("this criterion verifies AC-X") and the higher-level US / SR ids in
+ * `traces_to` — a reasonable reading, but it leaves `traces_to` without the leaf
+ * ACs. This deterministic bridge makes coverage robust to that variation
+ * instead of relying on the prompt to place ids in an exact field.
+ */
+export function backfillTracesFromCriteria(task: ImplementationTask): void {
+  const fromCc = new Set<string>();
+  for (const cc of task.completion_criteria ?? []) {
+    for (const ac of cc.verifies_acceptance_criteria ?? []) {
+      if (typeof ac === 'string' && ac.startsWith('AC-')) fromCc.add(ac);
+    }
+  }
+  if (fromCc.size === 0) return;
+  const existing = new Set(task.traces_to ?? []);
+  const merged = [...(task.traces_to ?? [])];
+  for (const ac of fromCc) if (!existing.has(ac)) merged.push(ac);
+  task.traces_to = merged;
+}
+
+/**
+ * Leaf AC ids covered by no task — the reconciliation work-list. Counts an AC
+ * as covered if it appears in a task's `traces_to` OR in any criterion's
+ * `verifies_acceptance_criteria` (the two binding fields the model uses
+ * interchangeably).
+ */
+export function computeUncoveredAcIds(
+  tasks: Array<{ traces_to?: string[]; completion_criteria?: Array<{ verifies_acceptance_criteria?: string[] }> }>,
+  leafAcIdSet: Set<string>,
+): Set<string> {
+  const cited = new Set<string>();
+  for (const t of tasks) {
+    for (const id of t.traces_to ?? []) cited.add(id);
+    for (const cc of t.completion_criteria ?? []) for (const ac of cc.verifies_acceptance_criteria ?? []) cited.add(ac);
+  }
+  const out = new Set<string>();
+  for (const ac of leafAcIdSet) if (!cited.has(ac)) out.add(ac);
+  return out;
+}
+
+/** Render only the uncovered ACs (grouped by their owning leaf story) for the reconciliation prompt. */
+export function renderUncoveredAcsMenu(uncovered: Set<string>, leaves: LeafAcceptanceCriteria[]): string {
+  const lines: string[] = [];
+  for (const l of leaves) {
+    const acs = l.acs.filter(a => uncovered.has(a.id));
+    if (acs.length === 0) continue;
+    lines.push(`- ${l.leafStoryId}${l.storyText ? ` — ${l.storyText}` : ''}`);
+    for (const ac of acs) lines.push(`  - ${ac.id}${ac.text ? `: ${ac.text}` : ''}`);
+  }
+  return lines.length > 0 ? lines.join('\n') : '';
+}
+
+/**
+ * Extract the tasks array from an LLM JSON result, tolerating the nested
+ * envelopes Phase 6 has historically seen (`{tasks:[]}`,
+ * `{implementation_plan:[]}`, `{implementation_plan:{tasks:[]}}`).
+ */
+export function parseImplementationTasks(parsed: Record<string, unknown> | null): ImplementationTask[] {
+  const ip = parsed && typeof parsed.implementation_plan === 'object' && !Array.isArray(parsed.implementation_plan)
+    ? parsed.implementation_plan as Record<string, unknown>
+    : null;
+  const tasks =
+    pickItemsArray<ImplementationTask>(parsed, ['implementation_plan', 'tasks']) ??
+    (ip ? pickItemsArray<ImplementationTask>(ip, ['tasks', 'implementation_plan']) : null);
+  return tasks ?? [];
 }
 
 /**

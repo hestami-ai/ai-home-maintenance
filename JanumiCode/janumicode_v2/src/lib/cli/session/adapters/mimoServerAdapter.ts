@@ -174,7 +174,13 @@ export class MimoServerAdapter implements ExecutorAdapter {
 
     await done;
     clearInterval(watchdog);
-    const aborted = completion === 'idle_timeout' || completion === 'wallclock' || completion === 'post_failed';
+    // `completion` is assigned ONLY inside the watchdog + POST closures above,
+    // which TS control-flow analysis can't follow — at this point it still
+    // narrows `completion` to its '' initializer, so a direct `=== 'idle_timeout'`
+    // is (wrongly) flagged TS2367 "no overlap". Read it through a widened string
+    // for the backstop comparison; the runtime value is the reason that settled.
+    const completionReason: string = completion;
+    const aborted = completionReason === 'idle_timeout' || completionReason === 'wallclock' || completionReason === 'post_failed';
     if (aborted) {
       getLogger().warn('workflow', 'mimo turn aborted by backstop', { reason: completion, sessionId, idleMs, wallMs });
       await client.abort(sessionId);

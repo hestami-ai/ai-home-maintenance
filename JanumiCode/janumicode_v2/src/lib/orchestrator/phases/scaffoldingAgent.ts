@@ -46,8 +46,14 @@ export async function runScaffoldingAgentSubPhase(
   const contracts = gatherContracts(engine, workflowRun.id);
   // Canonical component→dir map (= where impl tasks write + Phase 10 enforces).
   // Fed into every area's scaffold prompt so the agent never invents a divergent
-  // per-component layout.
-  const componentDirs = gatherComponentDirs(engine, workflowRun.id);
+  // per-component layout. STACK-AWARE: the per-component dir separator follows the
+  // resolved stack (underscore for python/rust/go/java, hyphen for node) so the
+  // scaffold agent creates the SAME dirs the executor write-scope resolves to —
+  // otherwise the scaffold mints `src/link-management` (hyphen) while the executor
+  // writes `src/link_management` (underscore), producing duplicate dirs (slice-156).
+  // The stack is known at Phase 9 (recon); areas[0].stack is the resolved per-area
+  // stack (applyForcedStack rewrites it for a forced sweep).
+  const componentDirs = gatherComponentDirs(engine, workflowRun.id, plan.areas[0]?.stack);
 
   // ONE session per area — a polyglot workspace must not cram N stacks into a
   // single agent context; each area's session sees only its own stack + the
@@ -134,8 +140,13 @@ function gatherContracts(engine: PhaseContext['engine'], runId: string): string 
 
 /**
  * The CANONICAL component_id → source-directory map, computed the same way the
- * layout contract ({@link canonicalComponentDir}) and the Phase-6 task
- * `write_directory_paths` do (`comp-analytics-ingestion` → `src/analytics-ingestion`).
+ * layout contract ({@link canonicalComponentDir}) and the executor write-scope
+ * resolver do. STACK-AWARE: `comp-analytics-ingestion` → `src/analytics-ingestion`
+ * for node, `src/analytics_ingestion` for python/rust/go/java (identifier-based
+ * package stacks). Passing the resolved stack here keeps the scaffold agent's dirs
+ * identical to the executor's `canonicalComponentDir(..., stack)`; omitting it (the
+ * old bug) emitted hyphen dirs the python executor then forked into underscore
+ * variants → duplicate dirs (slice-156).
  *
  * Feeding this into the scaffolding prompt is what prevents the scaffold agent
  * from inventing a divergent per-component layout (e.g. `src/components/<comp>/`):
@@ -146,9 +157,10 @@ function gatherContracts(engine: PhaseContext['engine'], runId: string): string 
  * cross-cutting / root) collapse onto the shared dir / src root as the contract
  * specifies.
  */
-function gatherComponentDirs(
+export function gatherComponentDirs(
   engine: PhaseContext['engine'],
   runId: string,
+  stack?: string,
 ): Array<{ id: string; dir: string }> {
   const ids = new Set<string>();
   const collect = (kind: string, arrayKeys: string[], idKey = 'id') => {
@@ -170,7 +182,7 @@ function gatherComponentDirs(
   collect('data_models', ['models'], 'component_id');
   return [...ids]
     .sort()
-    .map(id => ({ id, dir: canonicalComponentDir(id) }));
+    .map(id => ({ id, dir: canonicalComponentDir(id, 'src', 'src/shared', stack) }));
 }
 
 export function buildAreaScaffoldingPrompt(
@@ -224,6 +236,9 @@ export function buildAreaScaffoldingPrompt(
     + `## Canonical shared modules to create (exact paths)\n${mods}\n\n`
     + `## Shared data models — define as shared types/records under the shared module dir; components IMPORT them (never duplicate per-component)\n${dataModels}\n\n`
     + `## Interface contracts — define as shared contract types under the shared module dir\n${contracts}\n\n`
+    + `## Documentation (REQUIRED)\n`
+    + `- Every shared type / class / module you create MUST carry a brief doc-comment stating WHAT data shape or contract it materializes and citing the data-model or interface-contract id it comes from (e.g. \`# DM-link-management-linkmapping\`, \`# per IC-DB-PERSISTENCE-001\` in python; \`// DM-...\` in TS/Go/Rust/Java — use this stack's comment syntax).\n`
+    + `- Comment the non-obvious WHY, not the WHAT; prefer self-documenting names over narration; leave no commented-out code.\n\n`
     + `## Rules\n`
     + `- Materialize the shared modules + data-model/contract definitions ONCE at the EXACT listed paths; components import them — never duplicate.\n`
     + `- Use ${stack}-idiomatic constructs throughout (types/records, modules, imports, manifest, test runner). Do not import another language's conventions or filenames.\n`

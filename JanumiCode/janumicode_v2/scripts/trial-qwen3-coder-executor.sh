@@ -29,26 +29,32 @@
 # gemma run), swapping ONLY the executor model. max_cycles is already 0 in the
 # base DB, so it falls straight through to execution.
 #
-# Usage:  scripts/trial-qwen3-coder-executor.sh [-n <slice>] [-s <stack>] [-c <num_ctx>] [-l <max_leaves>]
+# Usage:  scripts/trial-qwen3-coder-executor.sh [-n <slice>] [-s <stack>] [-c <num_ctx>] [-l <max_leaves>] [-m <ollama_model>]
 #   -n  thin-slice number       (default 156)
 #   -s  forced stack            (default python)
 #   -c  context window          (default 90000 — keep == Ollama's loaded num_ctx)
 #   -l  cap executor leaves     (default: uncapped; e.g. 2 for a quick look)
+#   -m  ollama model id         (default qwen3-coder:30b-a3b-q4_K_M — the executor-model
+#                                bake-off lever; e.g. qwen3.6:27b-mtp-q4_K_M). NOTE: a
+#                                THINKING model is fine (Ollama strips think tags from /v1
+#                                content) but spends output budget thinking — keep
+#                                JANUMICODE_MIMO_OPENAI_MAX_OUTPUT generous. A DENSE model
+#                                uses more VRAM at a given num_ctx than an a3b MoE.
 set -euo pipefail
 
-slice=156; stack=python; ctx=90000; cap=""
-while getopts "n:s:c:l:" opt; do
+slice=156; stack=python; ctx=90000; cap=""; model="qwen3-coder:30b-a3b-q4_K_M"
+while getopts "n:s:c:l:m:" opt; do
   case "$opt" in
-    n) slice="$OPTARG" ;; s) stack="$OPTARG" ;; c) ctx="$OPTARG" ;; l) cap="$OPTARG" ;;
-    *) echo "usage: $0 [-n slice] [-s stack] [-c num_ctx] [-l max_leaves]" >&2; exit 2 ;;
+    n) slice="$OPTARG" ;; s) stack="$OPTARG" ;; c) ctx="$OPTARG" ;; l) cap="$OPTARG" ;; m) model="$OPTARG" ;;
+    *) echo "usage: $0 [-n slice] [-s stack] [-c num_ctx] [-l max_leaves] [-m ollama_model]" >&2; exit 2 ;;
   esac
 done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WS="${REPO_ROOT}/test-and-evaluation/thin-slice-workspaces/thin-slice-workspace-${slice}"
 
-echo "[trial-qwen3-coder] slice=${slice} stack=${stack} num_ctx=${ctx} cap=${cap:-none}"
-echo "[trial-qwen3-coder] REMINDER: ensure Ollama loads qwen3-coder at num_ctx=${ctx} (OLLAMA_CONTEXT_LENGTH or Modelfile)."
+echo "[trial-executor] model=${model} slice=${slice} stack=${stack} num_ctx=${ctx} cap=${cap:-none}"
+echo "[trial-executor] REMINDER: ensure Ollama loads ${model} at num_ctx=${ctx} (OLLAMA_CONTEXT_LENGTH / desktop setting)."
 
 # Clean base: drop any stale resume copy so we resume from the original base DB,
 # and empty the generated project tree for a clean comparison.
@@ -60,10 +66,10 @@ rm -rf "${WS}/project"/* "${WS}/project"/.[!.]* 2>/dev/null || true
 mkdir -p "${WS}/project"
 
 export JANUMICODE_EXECUTOR_BACKING_TOOL=mimo_cli
-export JANUMICODE_MIMO_MODEL="ollama-local/qwen3-coder:30b-a3b-q4_K_M"
+export JANUMICODE_MIMO_MODEL="ollama-local/${model}"
 export JANUMICODE_MIMO_OPENAI_CONTEXT="${ctx}"   # mimo limit.context (== Ollama num_ctx)
 export JANUMICODE_FORCE_STACK="${stack}"
 [[ -n "${cap}" ]] && export JANUMICODE_BAKEOFF_MAX_LEAVES="${cap}"
 
-echo "[trial-qwen3-coder] launching resume at Phase 9 (executor=${JANUMICODE_MIMO_MODEL})"
+echo "[trial-executor] launching resume at Phase 9 (executor=${JANUMICODE_MIMO_MODEL})"
 exec bash "${REPO_ROOT}/scripts/resume-thin-slice-run.sh" -n "${slice}" -p 9 -y

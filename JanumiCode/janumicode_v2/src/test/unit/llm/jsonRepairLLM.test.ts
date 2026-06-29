@@ -320,4 +320,48 @@ describe('repairJsonViaLLM', () => {
       });
     }
   });
+
+  describe('reasoning-channel recovery mode (inputIsReasoningChannel)', () => {
+    // The thinking-channel swallow: a model emits its final answer into
+    // its reasoning channel and leaves the response empty. The brokenText
+    // IS the reasoning, and the prompt must ask to EXTRACT rather than
+    // FIX broken syntax. See project_gemma4_31b_decomposition_divergence.
+    const REASONING = [
+      '* Threshold Analysis: the seed says removal within 1 hour.',
+      '* `threshold`: "100% of credential lapses removed within 60 minutes."',
+      '* `measurement_method`: "Continuous audit log correlation."',
+      '* No markdown fences? Yes. Starts with {, ends with }? Yes.',
+    ].join('\n');
+    const RECOVERED = {
+      threshold: '100% of credential lapses removed within 60 minutes.',
+      measurement_method: 'Continuous audit log correlation.',
+    };
+
+    it('uses EXTRACT framing and the reasoning section header (not the broken-JSON one)', async () => {
+      const caller = makeStubCaller([{ parsed: RECOVERED }]);
+      const result = await repairJsonViaLLM(
+        REASONING,
+        ROUTING,
+        { ...GROUNDING, originalThinking: null, inputIsReasoningChannel: true },
+        TRACE,
+        caller,
+      );
+      expect(result.parsed).toEqual(RECOVERED);
+      const sentPrompt = (caller as unknown as { __calls: Array<{ prompt: string }> }).__calls[0].prompt;
+      expect(sentPrompt).toContain('reasoning channel');
+      expect(sentPrompt).toContain('AGENT REASONING CONTAINING THE ANSWER');
+      expect(sentPrompt).toContain('extracted JSON object only');
+      expect(sentPrompt).toContain(REASONING);
+      // Must NOT mislabel the reasoning as broken JSON.
+      expect(sentPrompt).not.toContain('BROKEN JSON OUTPUT');
+    });
+
+    it('default mode keeps the broken-JSON framing', async () => {
+      const caller = makeStubCaller([{ parsed: PATHOLOGY_FIXTURES.validRepair }]);
+      await repairJsonViaLLM(PATHOLOGY_FIXTURES.duplicateKey, ROUTING, GROUNDING, TRACE, caller);
+      const sentPrompt = (caller as unknown as { __calls: Array<{ prompt: string }> }).__calls[0].prompt;
+      expect(sentPrompt).toContain('BROKEN JSON OUTPUT');
+      expect(sentPrompt).not.toContain('AGENT REASONING CONTAINING THE ANSWER');
+    });
+  });
 });

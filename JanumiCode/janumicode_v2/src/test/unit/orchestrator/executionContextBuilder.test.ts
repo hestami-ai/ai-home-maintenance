@@ -16,6 +16,7 @@ import {
   ExecutionContextBuilder,
   filterEvalCriteriaForTask,
   findUpstreamFindingsForTask,
+  taskScopeFromPacket,
   formatWriteScopeConstraints,
   type ImplementationTask,
   type EvaluationPlans,
@@ -81,10 +82,12 @@ function makeTask(overrides: Partial<ImplementationTask> = {}): ImplementationTa
 }
 
 function makeFakeWriter(records: GovernedStreamRecord[]): GovernedStreamWriter {
-  // Minimal duck-typed fake; the builder only uses getRecordsByType.
+  // Minimal duck-typed fake; the builder uses getRecordsByType (current
+  // versions only) + getRecord (by id, any version — for the supersession check).
   return {
     getRecordsByType: (_runId: string, recordType: RecordType) =>
-      records.filter(r => r.record_type === recordType),
+      records.filter(r => r.record_type === recordType && r.is_current_version),
+    getRecord: (id: string) => records.find(r => r.id === id) ?? null,
   } as unknown as GovernedStreamWriter;
 }
 
@@ -93,6 +96,9 @@ function fakeFinding(opts: {
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
   derived: string[];
   summary?: string;
+  validatorId?: string;
+  targetIdentifier?: string;
+  location?: string;
 }): GovernedStreamRecord {
   return {
     id: opts.id,
@@ -108,11 +114,12 @@ function fakeFinding(opts: {
     content: {
       kind: 'reasoning_review_finding',
       harness_id: 'h-1',
-      validator_id: 'v-1',
+      validator_id: opts.validatorId ?? 'grounding_validator',
       severity: opts.severity,
       finding_type: 'demo',
       summary: opts.summary ?? `summary for ${opts.id}`,
-      location: 'somewhere',
+      location: opts.location ?? 'somewhere',
+      target_identifier: opts.targetIdentifier,
       detail: 'detail',
       recommendation: 'fix it',
       duration_ms: 1,
@@ -159,24 +166,35 @@ describe('filterEvalCriteriaForTask', () => {
   });
 });
 
-describe('findUpstreamFindingsForTask', () => {
-  it('surfaces HIGH/MEDIUM findings whose source matches task lineage', () => {
+describe('findUpstreamFindingsForTask (packet-scoped)', () => {
+  const scope = { userStoryIds: ['US-001-D'], acceptanceCriterionIds: ['AC-US-001-D-001'], nfrIds: ['NFR-001'], componentId: 'comp-x' };
+
+  it('surfaces substantive HIGH/MEDIUM findings whose cited ids match the task scope', () => {
     const records = [
-      fakeFinding({ id: 'f1', severity: 'HIGH', derived: ['art-fr-1'], summary: 'fr ambiguity' }),
-      fakeFinding({ id: 'f2', severity: 'LOW', derived: ['art-fr-1'], summary: 'minor nit' }),
-      fakeFinding({ id: 'f3', severity: 'MEDIUM', derived: ['art-other'], summary: 'unrelated' }),
+      fakeFinding({ id: 'f1', severity: 'HIGH', derived: [], validatorId: 'measurement_method_executability', targetIdentifier: 'NFR-001', summary: 'no instrument named' }),
+      fakeFinding({ id: 'f2', severity: 'LOW', derived: [], validatorId: 'grounding_validator', targetIdentifier: 'NFR-001', summary: 'minor nit' }),
+      fakeFinding({ id: 'f3', severity: 'MEDIUM', derived: [], validatorId: 'grounding_validator', targetIdentifier: 'NFR-099', summary: 'unrelated nfr' }),
+      fakeFinding({ id: 'f4', severity: 'HIGH', derived: [], validatorId: 'json_output_discipline_check', targetIdentifier: 'NFR-001', summary: 'trailing prose' }),
     ];
-    const writer = makeFakeWriter(records);
-    const out = findUpstreamFindingsForTask(makeTask(), writer, 'wf-1');
-    expect(out).toContain('fr ambiguity');
-    expect(out).not.toContain('minor nit');     // LOW excluded
-    expect(out).not.toContain('unrelated');     // lineage mismatch
+    const out = findUpstreamFindingsForTask(makeFakeWriter(records), 'wf-1', scope);
+    expect(out).toContain('no instrument named');
+    expect(out).toContain('→ Fix: fix it');     // recommendation rendered
+    expect(out).not.toContain('minor nit');      // LOW excluded
+    expect(out).not.toContain('unrelated nfr');  // scope mismatch
+    expect(out).not.toContain('trailing prose'); // auto-fix validator excluded
+  });
+
+  it('bridges a root-phase AC finding to the leaf packet via the story key', () => {
+    const records = [
+      fakeFinding({ id: 'f1', severity: 'HIGH', derived: [], validatorId: 'assumption_citation_validator', location: 'acceptance_criteria/AC-US001-009', summary: 'fabricated error code' }),
+    ];
+    const out = findUpstreamFindingsForTask(makeFakeWriter(records), 'wf-1', scope);
+    expect(out).toContain('fabricated error code'); // AC-US001-* → US-001 ≡ leaf US-001-D
   });
 
   it('falls back to empty-case message when no findings match', () => {
-    const writer = makeFakeWriter([]);
-    const out = findUpstreamFindingsForTask(makeTask(), writer, 'wf-1');
-    expect(out).toBe('(no HIGH/MEDIUM upstream validator findings against motivating artifacts)');
+    expect(findUpstreamFindingsForTask(makeFakeWriter([]), 'wf-1', scope))
+      .toBe('(no HIGH/MEDIUM upstream validator findings against motivating artifacts)');
   });
 });
 
@@ -291,7 +309,7 @@ describe('ExecutionContextBuilder.buildTaskContext', () => {
     }
   });
 
-  it('sources the detail bundle test_cases + evals from the packet, and renders CC as the gate with covering tests', () => {
+  it('omits the redundant Task Bundle when a packet is present, and renders CC as the gate with covering tests', () => {
     const loader = new TemplateLoader(REPO_ROOT);
     const writer = makeFakeWriter([]);
     const builder = new ExecutionContextBuilder(
@@ -343,16 +361,63 @@ describe('ExecutionContextBuilder.buildTaskContext', () => {
       'wf-1', 'inv-1', artifacts, undefined, null, null, packet,
     );
     const detail = payload.detailFile?.content ?? '';
-    // Detail bundle test_cases come from the packet (TC-DEL present), NOT the
-    // root-suite re-derivation that would mismatch comp-leaf and yield [].
-    expect(detail).toContain('TC-DEL');
-    // Eval bundle is the packet's scoped eval (US-001), not the unrelated US-999.
-    expect(detail).toContain('US-001');
-    expect(detail).not.toContain('US-999');
-    // Completion criteria render as the authoritative gate with covering tests.
+    // Fix #5 (slice-156): with a packet present, the redundant Task Implementation
+    // Bundle JSON is OMITTED from the detail file — the scheduler renders that same
+    // task/component/tests/evals in the human-readable "# Implementation Packet
+    // Context" block at the top of the prompt (formatPacketAsExecutorContext), so
+    // re-serializing it here was pure duplication.
+    expect(detail).not.toContain('Task Implementation Bundle');
+    // Completion criteria still render as the authoritative gate with covering
+    // tests (template-level, sourced from the packet — unaffected by Fix #5).
     expect(payload.stdin.text).toContain('AUTHORITATIVE pass/fail gate');
     expect(payload.stdin.text).toMatch(/Covering test\(s\): TC-DEL/);
     expect(payload.stdin.text).toContain('you MUST author a test'); // CC-2 uncovered
+  });
+
+  it('keeps the Task Bundle for no-packet callers (tests / calibration shims)', () => {
+    const loader = new TemplateLoader(REPO_ROOT);
+    const writer = makeFakeWriter([]);
+    const builder = new ExecutionContextBuilder(
+      {} as never, writer,
+      { stdinMaxTokens: 16000, detailFileMaxBytes: 1_000_000, detailFilePathTemplate: '/tmp/{workflow_run_id}/{sub_phase_id}_{invocation_id}.md', workspacePath: '/tmp', janumiCodeVersionSha: 'sha-test' },
+      loader,
+    );
+    const payload = builder.buildTaskContext(
+      makeTask(), 'wf-1', 'inv-1',
+      { implementationPlan: null, testPlan: null, evaluationPlans: {}, componentModel: null, technicalSpecs: null, adrs: [] },
+      // no packet → the bundle is the only structured task context, so it stays.
+    );
+    expect(payload.detailFile?.content ?? '').toContain('Task Implementation Bundle');
+  });
+
+  it('renders STACK-AWARE common pitfalls (python → pytest discovery, never node --test)', () => {
+    const loader = new TemplateLoader(REPO_ROOT);
+    const writer = makeFakeWriter([]);
+    const builder = new ExecutionContextBuilder(
+      {} as never, writer,
+      { stdinMaxTokens: 16000, detailFileMaxBytes: 1_000_000, detailFilePathTemplate: '/tmp/{workflow_run_id}/{sub_phase_id}_{invocation_id}.md', workspacePath: '/tmp', janumiCodeVersionSha: 'sha-test' },
+      loader,
+    );
+    const scaffold = { conventions: '', sharedDir: 'src/shared', canonicalFiles: [], protectedPaths: [], language: 'python' };
+    const py = builder.buildTaskContext(
+      makeTask(), 'wf-1', 'inv-1',
+      { implementationPlan: null, testPlan: null, evaluationPlans: {}, componentModel: null, technicalSpecs: null, adrs: [] },
+      undefined, null, scaffold,
+    );
+    expect(py.stdin.text).toContain('pytest discovery');
+    expect(py.stdin.text).not.toContain('node --test'); // node-only pitfall gone for python
+    // Universal bullets still present for every stack.
+    expect(py.stdin.text).toContain('Technology drift');
+    expect(py.stdin.text).toContain('`success: true` without evidence');
+
+    // Node (typescript) keeps the original node test-runner guidance.
+    const node = builder.buildTaskContext(
+      makeTask(), 'wf-1', 'inv-1',
+      { implementationPlan: null, testPlan: null, evaluationPlans: {}, componentModel: null, technicalSpecs: null, adrs: [] },
+      undefined, null, { ...scaffold, language: 'typescript' },
+    );
+    expect(node.stdin.text).toContain('node --test');
+    expect(node.stdin.text).not.toContain('pytest discovery');
   });
 
   it('filters ADRs to those governing the task component + global ADRs (structural, via governs_components)', () => {
@@ -650,19 +715,23 @@ describe('traces_to as canonical lineage source — Phase 6 emission alignment',
     expect(result.rendered).toContain('US-002');
   });
 
-  it('findUpstreamFindingsForTask walks traces_to (in addition to derived_from_record_ids)', () => {
-    const records = [
-      fakeFinding({ id: 'f1', severity: 'HIGH', derived: ['SR-009'], summary: 'sr ambiguity for SR-009' }),
-      fakeFinding({ id: 'f2', severity: 'MEDIUM', derived: ['SR-other'], summary: 'unrelated other' }),
-    ];
-    const writer = makeFakeWriter(records);
-    // Phase 6's tasks have traces_to populated, derived_from_record_ids absent.
-    const task = makeTask({
-      derived_from_record_ids: undefined,
-      traces_to: ['SR-009', 'comp-foo'],
-    });
-    const out = findUpstreamFindingsForTask(task, writer, 'wf-1');
-    expect(out).toContain('sr ambiguity for SR-009');
-    expect(out).not.toContain('unrelated other');
+  it('taskScopeFromPacket derives the task scope from the packet (US/AC/NFR/component)', () => {
+    const packet = {
+      user_stories: [{ id: 'US-001-D', acceptance_criteria: [{ id: 'AC-US-001-D-001' }, { id: 'AC-US-001-D-002' }] }],
+      nfrs: [{ id: 'NFR-006' }, { id: 'NFR-002' }],
+      component: { id: 'comp-link-management' },
+    } as never;
+    const scope = taskScopeFromPacket(makeTask({ component_id: 'fallback-comp' }), packet);
+    expect(scope.userStoryIds).toEqual(['US-001-D']);
+    expect(scope.acceptanceCriterionIds).toEqual(['AC-US-001-D-001', 'AC-US-001-D-002']);
+    expect(scope.nfrIds).toEqual(['NFR-006', 'NFR-002']);
+    expect(scope.componentId).toBe('comp-link-management'); // packet wins over task.component_id
+  });
+
+  it('taskScopeFromPacket falls back to task ids when no packet', () => {
+    const scope = taskScopeFromPacket(makeTask({ component_id: 'comp-z', traces_to: ['AC-US007-001'] }), null);
+    expect(scope.componentId).toBe('comp-z');
+    expect(scope.acceptanceCriterionIds).toEqual(['AC-US007-001']);
+    expect(scope.nfrIds).toEqual([]);
   });
 });

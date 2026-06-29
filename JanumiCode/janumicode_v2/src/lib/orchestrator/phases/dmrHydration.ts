@@ -16,7 +16,7 @@
  * testable and has no DB/FS coupling.
  */
 
-import type { ContextPacket } from '../../agents/deepMemoryResearch';
+import type { ActiveConstraint, ContextPacket } from '../../agents/deepMemoryResearch';
 
 /** Minimal shape of a resolved governed-stream record. */
 export interface ResolvedRecord {
@@ -71,18 +71,33 @@ export function renderHydratedPacket(
   );
   out.push('');
 
-  // ── Governing constraints (resolved bodies) ─────────────────────────
-  if (packet.activeConstraints.length > 0) {
-    out.push('## Governing Constraints (Authority ≥ 6 — apply without exception)');
-    for (const c of packet.activeConstraints) {
-      const head = `- **[Auth ${c.authorityLevel}]** ${cleanStatement(c.statement)}`;
-      if (isPlaceholderSummary(c.statement) && c.sourceRecordIds[0]) {
-        const rec = resolve(c.sourceRecordIds[0]);
-        out.push(rec ? `${head}\n${indent(renderRecordExcerpt(rec, opts.excerptCap))}` : head);
-      } else {
-        out.push(head);
-      }
+  // ── Governing records — split BINDING rules from CERTIFIED CONTEXT ──────
+  // Authority>=6 ADMITS a record into the governing set; `bindingClass` decides
+  // whether it is a normative rule ("apply without exception") or authoritative
+  // reference ("build within this; do not contradict"). Previously every
+  // authority-6 record was labeled "apply without exception", mislabeling
+  // certified architecture context — component_model, system_boundary, the
+  // user-story roster, … — as hard rules (ws-156: 12 of 14). Legacy packets with
+  // no `bindingClass` default to binding (exactly the prior behavior).
+  const renderConstraint = (c: ActiveConstraint): string => {
+    const head = `- **[Auth ${c.authorityLevel}]** ${cleanStatement(c.statement)}`;
+    if (isPlaceholderSummary(c.statement) && c.sourceRecordIds[0]) {
+      const rec = resolve(c.sourceRecordIds[0]);
+      return rec ? `${head}\n${indent(renderRecordExcerpt(rec, opts.excerptCap))}` : head;
     }
+    return head;
+  };
+  const binding = packet.activeConstraints.filter(c => c.bindingClass !== 'certified_context');
+  const certifiedContext = packet.activeConstraints.filter(c => c.bindingClass === 'certified_context');
+
+  if (binding.length > 0) {
+    out.push('## Governing Constraints (binding — apply without exception)');
+    for (const c of binding) out.push(renderConstraint(c));
+    out.push('');
+  }
+  if (certifiedContext.length > 0) {
+    out.push('## Certified Architecture Context (authoritative reference — build within this; do not contradict)');
+    for (const c of certifiedContext) out.push(renderConstraint(c));
     out.push('');
   }
 
@@ -119,9 +134,20 @@ export function renderHydratedPacket(
   }
 
   // ── Material findings (top N, resolved one-liners) ──────────────────
+  // Dedup against the governing/context sections above: every record already
+  // shown there is skipped here (ws-156: 14/14 active constraints were ALSO
+  // material findings → the same id rendered 2-3×). Match on the finding id AND
+  // each constraint's source record ids.
+  const renderedAboveIds = new Set<string>();
+  for (const c of packet.activeConstraints) {
+    renderedAboveIds.add(c.id);
+    for (const sid of c.sourceRecordIds) renderedAboveIds.add(sid);
+  }
   const sorted = [...packet.materialFindings].sort((a, b) => b.materialityScore - a.materialityScore);
   const provenance = sorted.filter(f => PROVENANCE_TYPES.has(f.recordType) && isPlaceholderSummary(f.summary));
-  const substantive = sorted.filter(f => !(PROVENANCE_TYPES.has(f.recordType) && isPlaceholderSummary(f.summary)));
+  const substantiveAll = sorted.filter(f => !(PROVENANCE_TYPES.has(f.recordType) && isPlaceholderSummary(f.summary)));
+  const substantive = substantiveAll.filter(f => !renderedAboveIds.has(f.id));
+  const dedupedCount = substantiveAll.length - substantive.length;
   const shown = substantive.slice(0, opts.maxFindings);
 
   if (shown.length > 0) {
@@ -138,6 +164,10 @@ export function renderHydratedPacket(
     }
     const remaining = substantive.length - shown.length;
     if (remaining > 0) out.push(`- _… +${remaining} more material finding(s) (lower materiality)_`);
+    if (dedupedCount > 0) out.push(`- _(${dedupedCount} finding(s) already shown above as governing constraints / certified context — not repeated)_`);
+    out.push('');
+  } else if (dedupedCount > 0) {
+    out.push(`_All material findings are already shown above as governing constraints / certified context (${dedupedCount} de-duplicated)._`);
     out.push('');
   }
 
@@ -193,14 +223,78 @@ export function renderRecordExcerpt(rec: ResolvedRecord, cap = 1200): string {
       body = `changed ${str(c, ['interface_kind']) || 'interface'}; ${str(c, ['modification_type']) || '?'}; ` +
         `${arr(c.affected_artifact_ids).length} affected artifact(s)`;
       break;
+    // ── Curated summaries for the big structured architecture artifacts ──
+    // These were hitting the `default` jsonCap below and dumping ~1.2KB of raw
+    // truncated JSON into the Governing Constraints + Material Findings sections
+    // (slice-156: an authority-6 "apply without exception" firehose). Render a
+    // crisp roster instead — the agent needs the SHAPE, not the serialization.
+    case 'component_model':
+      body = renderList(c.components, idName);
+      break;
+    case 'software_domains':
+      body = renderList(c.domains, idName);
+      break;
+    case 'architectural_decisions':
+      body = renderList(
+        c.decisions ?? c.architectural_decisions,
+        (x) => `${str(x, ['id'])}: ${oneLine(str(x, ['title', 'decision', 'statement']), 100)}`,
+      );
+      break;
+    case 'system_requirements':
+      body = renderList(
+        c.items ?? c.requirements,
+        (x) => `${str(x, ['id'])}: ${oneLine(str(x, ['statement', 'description']), 120)}`,
+        20,
+      );
+      break;
+    case 'system_boundary': {
+      const oos = arr(c.out_of_scope).length;
+      const ext = arr(c.external_systems).length;
+      body = (arr(c.in_scope).length || oos || ext)
+        ? `in scope: ${renderList(c.in_scope, (x) => str(x, ['capability', 'name', 'description']), 12)}`
+          + (oos ? ` | ${oos} out-of-scope` : '')
+          + (ext ? ` | ${ext} external system(s)` : '')
+        : '(no members)'; // minimal/superseded fixture → fall back to statement below
+      break;
+    }
+    case 'error_handling_strategies':
+      body = renderList(c.strategies, (x) => {
+        const types = arr((x as Record<string, unknown>)?.error_types).filter((t): t is string => typeof t === 'string');
+        return `${str(x, ['component_id'])}: ${types.join(', ') || '(unspecified)'}`;
+      });
+      break;
+    case 'configuration_parameters':
+      body = renderList(c.params, (x) => {
+        const comp = str(x, ['component_id']);
+        const name = str(x, ['name']);
+        return comp ? `${comp}.${name}` : name;
+      }, 30);
+      break;
+    case 'implementation_plan':
+      body = `${arr(c.tasks).length} task(s): ` + renderList(c.tasks, (x) => str(x, ['id', 'name']), 12);
+      break;
     default:
       body = str(c, ['statement', 'summary', 'description', 'name']) || jsonCap(c, cap);
+  }
+
+  // A structured renderer that found no members falls back to the record's prose
+  // statement/summary (a minimal or superseded fixture carries only that), then to
+  // capped JSON — never an empty/"(no members)" line.
+  if (body === '' || body === '(no members)') {
+    body = str(c, ['statement', 'summary', 'description', 'name']) || jsonCap(c, cap);
   }
 
   return body.length > cap ? `${body.slice(0, cap)}…` : body;
 }
 
 // ── small helpers ─────────────────────────────────────────────────────
+
+/** Compact "id (Name)" label for roster-style artifacts (components, domains). */
+function idName(x: unknown): string {
+  const id = str(x, ['id']);
+  const name = str(x, ['name']);
+  return id && name ? `${id} (${name})` : (id || name);
+}
 
 function renderList(value: unknown, fmt: (x: unknown) => string, max = 30): string {
   const items = arr(value);

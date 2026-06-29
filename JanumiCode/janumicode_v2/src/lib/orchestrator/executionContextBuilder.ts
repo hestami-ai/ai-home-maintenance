@@ -24,7 +24,11 @@ import type { TemplateLoader } from './templateLoader';
 import { normalizeWorkspacePath } from './phases/phase6';
 import { normalizeComponentDirForStack } from './phases/layoutContract';
 import { getLogger } from '../logging';
-import type { ReasoningReviewFindingRecordContent, ImplementationPacketContent } from '../types/records';
+import type { ImplementationPacketContent } from '../types/records';
+import {
+  selectReasoningFindings, findingInScope, renderFindingLine,
+  type SurfacedFinding, type TaskScope,
+} from '../review/findingSurfacing';
 
 // Re-export types from contextBuilder for convenience
 export type { StdinContent, DetailFileContent, ContextPayload };
@@ -236,6 +240,56 @@ export function formatWriteScopeConstraints(task: ImplementationTask, protectedP
     + 'directory name from the component id or task name.';
   return 'Files may ONLY be created/modified in:\n' +
     normalized.map(p => `- ${p}`).join('\n') + authoritative + denySection;
+}
+
+/**
+ * Stack-aware "Common pitfalls" block for the executor prompt. The test-runner
+ * pitfall is LANGUAGE-SPECIFIC — the hardcoded node `node --test` / `npm test`
+ * guidance is wrong (and actively misleading) on a python/rust/go/java stack
+ * (slice-156: a python executor was handed `node --test` / `package.json` advice).
+ * The technology-drift + no-unverified-success bullets are universal. The signal
+ * is the resolved stack/language (scaffold.language / recon primary_stack); an
+ * unknown stack falls back to the node guidance (the prior behavior, and the
+ * dominant case), with the universal drift bullet covering "clarify if unsure".
+ */
+export function formatCommonPitfalls(language?: string): string {
+  const lang = (language ?? '').trim().toLowerCase();
+  const universal = [
+    '- **Technology drift.** Honor the project\'s declared stack (carried in the active constraints / shared modules above). Do NOT substitute your own preferred language, framework, or test runner even if the task description is vague. If the stack is genuinely unspecified, surface that as a clarification rather than inventing one.',
+    '- **`success: true` without evidence.** Reasoning Review flags `completeness_shortcut` whenever the final summary asserts success without a verifiable trace (compile output, test pass count, build-artifact path). Make verification commands part of your tool-call sequence, even when the result feels obvious.',
+  ];
+  let runner: string[];
+  switch (lang) {
+    case 'python':
+      runner = [
+        '- **pytest discovery.** The orchestrator runs the project\'s declared test command (pytest) during Phase 9.2. pytest only collects files named `test_*.py` / `*_test.py` and functions/classes named `test_*` / `Test*` — a test file that does not match is silently NOT run, so Phase 9.2 reports zero tests and the gate fails. Run `pytest` (or `python -m pytest`) and SEE it collect your tests before claiming success.',
+      ];
+      break;
+    case 'rust':
+      runner = [
+        '- **cargo test.** The orchestrator runs `cargo test` during Phase 9.2. Tests live in `#[cfg(test)]` modules or under `tests/`; a compile error in any of them reports zero passing tests and fails the gate. Run `cargo test` locally and see it pass before claiming success.',
+      ];
+      break;
+    case 'go':
+      runner = [
+        '- **go test.** The orchestrator runs `go test ./...` during Phase 9.2. Test files MUST end in `_test.go` and functions be `func TestXxx(t *testing.T)` — anything else is not collected. Run `go test ./...` locally before claiming success.',
+      ];
+      break;
+    case 'java':
+      runner = [
+        '- **mvn/gradle test.** The orchestrator runs the project\'s build test goal (e.g. `mvn test` / `gradle test`) during Phase 9.2. Tests must be on the test source path with the runner\'s naming/annotations (`@Test`). Run the test goal locally before claiming success.',
+      ];
+      break;
+    default:
+      // node (typescript/javascript) and the unknown-stack fallback: the original
+      // node guidance — unchanged so the node path is byte-for-byte as before.
+      runner = [
+        '- **Node.js `node --test` test script.** `node --test test` is interpreted by Node as a test-NAME pattern, NOT a directory. To run tests in a `test/`/`tests/` directory write `node --test test/` (trailing slash) or a glob `node --test \'test/**/*.test.js\'`. Verify by running the script before declaring success.',
+        '- **Test command from `package.json` `scripts.test`.** The orchestrator runs the workspace\'s declared `test` script during Phase 9.2. If it can\'t actually invoke the tests you wrote, Phase 9.2 reports zero suites and the gate fails. Run `npm test` locally and SEE it pass before the final summary.',
+      ];
+      break;
+  }
+  return [...runner, ...universal].join('\n');
 }
 
 /**
@@ -545,25 +599,51 @@ function lookupComponent(
 // ── Upstream validator findings threading ──────────────────────────
 
 /**
- * Walk task.derived_from_record_ids back to upstream artifacts (FR
- * blooms, NFR blooms, component skeletons, ADRs), then collect
- * HIGH/MEDIUM reasoning_review_finding_record entries whose
- * `derived_from_record_ids` cite those artifacts. Returns a formatted
+ * Derive a task's logical scope from its packet — the US / AC / NFR /
+ * component ids the task implements. Phase-9 packet tasks carry EMPTY
+ * `traces_to`/`derived_from_record_ids`, so the packet is the only source
+ * of the task's logical identity. Falls back to the task's own ids when no
+ * packet is present.
+ */
+export function taskScopeFromPacket(
+  task: ImplementationTask,
+  packet: ImplementationPacketContent | null | undefined,
+): TaskScope {
+  if (packet) {
+    return {
+      userStoryIds: packet.user_stories.map(u => u.id),
+      acceptanceCriterionIds: packet.user_stories.flatMap(u => (u.acceptance_criteria ?? []).map(a => a.id)),
+      nfrIds: packet.nfrs.map(n => n.id),
+      componentId: packet.component?.id ?? task.component_id,
+    };
+  }
+  return {
+    userStoryIds: [],
+    acceptanceCriterionIds: task.traces_to ?? [],
+    nfrIds: [],
+    componentId: task.component_id,
+  };
+}
+
+/**
+ * Surface the substantive, unadjudicated reasoning-review findings scoped to
+ * THIS task's requirements (its packet's US/AC/NFR/component). Excludes the
+ * auto-fix bucket, auto-mitigated findings, superseded findings, and
+ * reasoning-PROCESS validators (see findingSurfacing.ts). Returns a formatted
  * string capped at UPSTREAM_FINDINGS_CAP entries.
+ *
+ * Replaces the prior record-UUID intersection, which never matched: findings
+ * derive from the harness record (not the artifact) and packet tasks carry no
+ * lineage, so the old matcher always returned the empty fallback.
  */
 export function findUpstreamFindingsForTask(
-  task: ImplementationTask,
   writer: GovernedStreamWriter,
   workflowRunId: string,
+  scope: TaskScope,
 ): string {
-  let allFindings: Array<{ id: string; content: ReasoningReviewFindingRecordContent; sourceIds: string[] }>;
+  let selected: SurfacedFinding[];
   try {
-    const records = writer.getRecordsByType(workflowRunId, 'reasoning_review_finding_record');
-    allFindings = records.map(r => ({
-      id: r.id,
-      content: r.content as unknown as ReasoningReviewFindingRecordContent,
-      sourceIds: r.derived_from_record_ids ?? [],
-    }));
+    selected = selectReasoningFindings(writer, workflowRunId, { forExecutor: true });
   } catch (err) {
     getLogger().warn('workflow', 'findUpstreamFindingsForTask: failed to load findings', {
       error: err instanceof Error ? err.message : String(err),
@@ -571,41 +651,14 @@ export function findUpstreamFindingsForTask(
     return EMPTY_UPSTREAM_FINDINGS_FALLBACK;
   }
 
-  if (!allFindings.length) return EMPTY_UPSTREAM_FINDINGS_FALLBACK;
-
-  // Resolve the set of motivating artifact ids by walking the task's
-  // declared lineage one hop. (A multi-hop walk would require iterating
-  // the full governed stream; one hop catches the bloom / spec / ADR
-  // records that Phase 6.1 typically cites.)
-  //
-  // Phase 6's emitted tasks use `traces_to` as the canonical lineage
-  // field; `derived_from_record_ids` is retained for any caller that
-  // populates it explicitly. Union both so we don't miss either.
-  const motivatingIds = new Set<string>([
-    ...(task.traces_to ?? []),
-    ...(task.derived_from_record_ids ?? []),
-  ]);
-
-  const matched = allFindings.filter(f => {
-    const severity = f.content.severity;
-    if (severity !== 'HIGH' && severity !== 'MEDIUM') return false;
-    if (motivatingIds.size === 0) return false;
-    return f.sourceIds.some(sid => motivatingIds.has(sid));
-  });
-
+  const matched = selected.filter(f => findingInScope(f, scope));
   if (!matched.length) return EMPTY_UPSTREAM_FINDINGS_FALLBACK;
 
   const capped = matched.slice(0, UPSTREAM_FINDINGS_CAP);
-  const lines = capped.map(f => {
-    const c = f.content;
-    const sourceCite = f.sourceIds.length ? f.sourceIds[0] : '(unknown)';
-    return `- [${c.severity}] ${c.validator_id} :: ${c.finding_type} — ${c.summary} ` +
-      `(source: ${sourceCite}; location: ${c.location})`;
-  });
   const header = matched.length > UPSTREAM_FINDINGS_CAP
     ? `(showing ${UPSTREAM_FINDINGS_CAP} of ${matched.length} HIGH/MEDIUM findings)\n`
     : '';
-  return header + lines.join('\n');
+  return header + capped.map(renderFindingLine).join('\n');
 }
 
 /**
@@ -704,7 +757,9 @@ export class ExecutionContextBuilder {
       artifacts.evaluationPlans, task, artifacts.componentModel, artifacts.implementationPlan,
     );
     const dependencyTasksStr = formatDependencyTasks(task, artifacts.implementationPlan);
-    const upstreamFindingsStr = findUpstreamFindingsForTask(task, this.writer, workflowRunId);
+    const upstreamFindingsStr = findUpstreamFindingsForTask(
+      this.writer, workflowRunId, taskScopeFromPacket(task, packet),
+    );
 
     // ── 2. Build the detail file first, so we can inline its content
     //       and pass the path to the rendered template. ───────────
@@ -718,23 +773,23 @@ export class ExecutionContextBuilder {
       // The per-task implementation bundle — task + component + tests + eval.
       // Routed through `taskBundle` (not the DMR-labelled `contextPacket`) so
       // the executor file is no longer mis-titled "Deep Memory Research".
-      taskBundle: JSON.stringify({
+      //
+      // OMITTED when a packet is present (slice-156): the scheduler prepends the
+      // human-readable "# Implementation Packet Context" block
+      // (formatPacketAsExecutorContext) carrying the SAME task/component/tests/
+      // evals, so re-serializing them here as ~160 lines of JSON is pure
+      // duplication. The no-packet path (tests / calibration shims) keeps the
+      // bundle — there it is the only structured task context.
+      taskBundle: packet ? undefined : JSON.stringify({
         task,
         component: artifacts.componentModel ? lookupComponent(task.component_id, artifacts.componentModel) : undefined,
-        // Source the task's tests + evals from the PACKET (the single coherent,
-        // task-scoped source) when available; the packet's `test_cases` are
-        // root/leaf-safe (P3 binding) and its `evaluation_criteria` are scoped
-        // to the packet's user-stories/NFRs. Fall back to the raw-artifact
-        // re-derivation only for no-packet callers (tests / calibration shims),
-        // where the naive component_id filter + keep-all eval fallback apply.
-        test_cases: packet
-          ? packet.test_cases
-          : artifacts.testPlan?.test_suites
-              .filter(s => componentIdMatches(s.component_id, task.component_id))
-              .flatMap(s => s.test_cases),
-        evaluation_criteria: packet
-          ? packet.evaluation_criteria
-          : evalFilterResult.keptCriteria,
+        // No-packet re-derivation: the naive component_id filter + keep-all eval
+        // fallback (the packet path is gone above — its tests/evals are root/
+        // leaf-safe and already rendered in the top packet block).
+        test_cases: artifacts.testPlan?.test_suites
+          .filter(s => componentIdMatches(s.component_id, task.component_id))
+          .flatMap(s => s.test_cases),
+        evaluation_criteria: evalFilterResult.keptCriteria,
       }, null, 2),
       technicalSpecs: artifacts.technicalSpecs?.filter(s =>
         task.technical_spec_ids?.includes(s.component_id)
@@ -836,6 +891,10 @@ export class ExecutionContextBuilder {
         ? '(the full curated context is inlined above — there is no separate file to read)'
         : (dmrDetailPath ?? detailFilePath),
       detail_file_content: detailFileContentInline,
+      // Stack-aware "Common pitfalls" — the test-runner pitfall must match the
+      // resolved stack (python pytest / rust cargo / … ), not the hardcoded node
+      // `node --test`/`npm test` advice that misleads a non-node executor.
+      common_pitfalls: formatCommonPitfalls(scaffold?.language),
       janumicode_version_sha: this.options.janumiCodeVersionSha,
     };
 

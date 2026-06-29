@@ -27,6 +27,7 @@ import type { TemplateLoader } from '../orchestrator/templateLoader';
 import type { EmbeddingService } from '../embedding/embeddingService';
 import { cosineSimilarity } from '../embedding/embeddingService';
 import { getLogger } from '../logging';
+import { classifyGoverningKind, type GoverningClass } from './governingClassification';
 import type { DmrPipelineContent, DmrStageEntry } from '../types/records';
 import {
   buildAuthorityElevationIndex,
@@ -208,6 +209,14 @@ export interface ActiveConstraint {
   statement: string;
   authorityLevel: number;
   sourceRecordIds: string[];
+  /**
+   * Whether this certified record is a NORMATIVE rule (`binding`) or
+   * authoritative reference (`certified_context`). Authority >= 6 admits a
+   * record into this set; `bindingClass` is the second axis that decides whether
+   * it is "apply without exception" (binding) vs "build within this, do not
+   * contradict" (context). See {@link classifyGoverningKind}.
+   */
+  bindingClass: GoverningClass;
 }
 
 export interface SupersessionChain {
@@ -919,6 +928,12 @@ export class DeepMemoryResearchAgent {
     // `[kind]`/"" for structured artifacts + decision_traces; re-derive them
     // here via the record-type-aware, component-scoped distiller so the
     // synthesis — and `activeConstraint.statement` below — carry real substance.
+    // Capture each enriched record's KIND (content.kind, else record_type) so
+    // activeConstraints can be classified binding-vs-context below. Every
+    // authority>=6 record passes through this loop (the `continue` only skips
+    // sub-threshold, sub-authority-6 findings), so every activeConstraint's kind
+    // is captured here without an extra DB round-trip.
+    const kindById = new Map<string, string>();
     for (const f of findings) {
       if (f.authorityLevel < 6 && f.materialityScore < this.materialityThreshold) continue;
       try {
@@ -931,11 +946,20 @@ export class DeepMemoryResearchAgent {
             brief.focusComponentId,
           );
           if (enriched) f.summary = enriched;
+          let kind = rec.record_type;
+          try {
+            const parsed = JSON.parse(rec.content) as { kind?: unknown };
+            if (typeof parsed.kind === 'string' && parsed.kind) kind = parsed.kind;
+          } catch { /* content unparseable — keep record_type as the kind */ }
+          kindById.set(f.id, kind);
         }
       } catch { /* keep the harvest-time summary */ }
     }
 
     // Deterministic base — always built. LLM synthesis adds narrative.
+    // Authority>=6 + active is the ADMISSION gate; bindingClass is the second
+    // axis distinguishing normative rules ("apply without exception") from
+    // certified reference context ("build within this; do not contradict").
     const activeConstraints: ActiveConstraint[] = findings
       .filter(f => f.authorityLevel >= 6 && f.governingStatus === 'active')
       .map(f => ({
@@ -943,6 +967,7 @@ export class DeepMemoryResearchAgent {
         statement: f.summary,
         authorityLevel: f.authorityLevel,
         sourceRecordIds: f.sourceRecordIds,
+        bindingClass: classifyGoverningKind(kindById.get(f.id) ?? f.recordType),
       }));
 
     let completenessStatus: CompletenessStatus = 'complete';
@@ -1685,6 +1710,7 @@ export function contextPacketToJson(packet: ContextPacket): Record<string, unkno
       statement: c.statement,
       authority_level: c.authorityLevel,
       source_record_ids: c.sourceRecordIds,
+      binding_class: c.bindingClass,
     })),
     supersession_chains: packet.supersessionChains.map(sc => ({
       subject: sc.subject,

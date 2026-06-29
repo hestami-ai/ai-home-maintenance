@@ -84,7 +84,8 @@
           "id": { "type": "string" },
           "statement": { "type": "string" },
           "authority_level": { "type": "integer", "minimum": 6, "maximum": 7 },
-          "source_record_ids": { "type": "array", "items": { "type": "string" } }
+          "source_record_ids": { "type": "array", "items": { "type": "string" } },
+          "binding_class": { "type": "string", "enum": ["binding", "certified_context"] }
         }
       }
     },

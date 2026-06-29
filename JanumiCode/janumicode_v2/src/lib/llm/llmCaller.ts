@@ -24,6 +24,7 @@ import type { Database } from '../database/init';
 import type { GovernedStreamWriter } from '../orchestrator/governedStreamWriter';
 import type { AgentRole, PhaseId } from '../types/records';
 import { InvocationLogFile } from './invocationLogger';
+import { resolveLlmTimeouts } from './llmTimeouts';
 import {
   emit as aoddEmit,
   maybeSpillText,
@@ -696,6 +697,13 @@ export class LLMCaller {
       const maxLogFileBytes = Number.parseInt(
         process.env.JANUMICODE_LLM_MAX_LOG_FILE_BYTES ?? '1572864', 10);
 
+      // Model/provider-aware timeout budgets. LOCAL providers (ollama/llamacpp)
+      // pay model reload + prompt prefill (time-to-first-token) on every call
+      // after a swap — for a large dense model at full context that exceeds the
+      // old flat 90 s no-progress default and was killing gemma4:31b mid-stream
+      // (cal-29). See llmTimeouts.ts. Per-knob env vars still override.
+      const llmTimeouts = resolveLlmTimeouts(options.provider, options.model);
+
       // Per-call wall-clock timeout — companion to the byte-cap retry.
       // The byte cap catches token-producing loops (log grows fast). It
       // does NOT catch silent hangs where the call produces no tokens
@@ -713,9 +721,9 @@ export class LLMCaller {
       // so a single hung node tied up the whole stall budget and
       // aborted the session — keep total maxCallSeconds × (1 + maxRetries)
       // under the stall ceiling when adjusting either knob.
-      // Set to 0 to disable.
-      const maxCallSeconds = Number.parseInt(
-        process.env.JANUMICODE_LLM_MAX_CALL_SECONDS ?? '600', 10);
+      // Set to 0 to disable. Model-aware (local providers get a larger backstop;
+      // env JANUMICODE_LLM_MAX_CALL_SECONDS overrides) — see llmTimeouts.ts.
+      const maxCallSeconds = llmTimeouts.maxCallSeconds;
 
       // Line-repetition cap — fast-fail for degenerate-loop pathologies
       // (cal-27 NFR saturation: qwen3.5:9b emitted "* `1`: Count/status
@@ -738,11 +746,13 @@ export class LLMCaller {
       // (Phase 1 bloom prompts can stream 200+ KB over 5+ minutes)
       // never trips, while a wedged socket or paused generation does.
       // The total-wall-clock below is kept as an outer last-resort cap.
-      // Default 90 s is generous enough for a model that pauses briefly
-      // while emitting big tool-call payloads or thinking blocks. Set
-      // to 0 to disable.
-      const maxNoProgressSeconds = Number.parseInt(
-        process.env.JANUMICODE_LLM_NO_PROGRESS_SECONDS ?? '90', 10);
+      // Model-aware: cloud/fast → 90 s; LOCAL providers (ollama/llamacpp) →
+      // 600 s, because a model reload + prompt prefill (time-to-first-token)
+      // after a swap legitimately produces no chunk for >90 s on a large dense
+      // model at full context (cal-29 killed gemma4:31b here). The timer
+      // re-arms on every chunk, so once streaming starts the larger budget is
+      // moot. env JANUMICODE_LLM_NO_PROGRESS_SECONDS overrides; 0 disables.
+      const maxNoProgressSeconds = llmTimeouts.noProgressSeconds;
 
       for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
         // Per-attempt abort + stream state so a retry starts with a
@@ -976,6 +986,78 @@ export class LLMCaller {
                 },
               );
             }
+          }
+          // Layer 2c — THINKING-CHANNEL recovery. Some thinking-mode models
+          // (observed: gemma4:31b-it-qat on complex compliance NFRs) emit
+          // their ENTIRE answer — the final JSON values, even a self-check
+          // "starts with {, ends with }" — into the THINKING channel and
+          // leave the response channel EMPTY (no done frame). Layers 2a/2b
+          // above both require result.text to be non-empty, so NEITHER fires:
+          // the answer the model already spent 40-50s producing sits unused
+          // in result.thinking, and the call resolves as a silent empty
+          // success (→ caller sees "incomplete" and a zero-tolerance gate
+          // like Phase-2.2c blocks the whole run). Recover it by handing the
+          // thinking to the SAME json_repair sequence in reasoning-channel
+          // mode (LLM-backed, so it reads the markdown-bullet reasoning and
+          // emits clean JSON), grounded by the original prompt + schema — no
+          // 40-50s re-generation. If the thinking is itself truncated/
+          // incomplete the repair returns _repair_error and result.parsed
+          // stays null, so the caller's existing retry path re-generates
+          // exactly as before. See project_gemma4_31b_decomposition_divergence.
+          if (
+            options.responseFormat === 'json' &&
+            !result.parsed &&
+            (typeof result.text !== 'string' || result.text.trim().length === 0) &&
+            typeof result.thinking === 'string' &&
+            result.thinking.trim().length > 0 &&
+            this.jsonRepairRouting &&
+            options.traceContext?.agentRole !== 'json_repair' &&
+            options.traceContext?.agentRole !== 'reasoning_review'
+          ) {
+            const { repairJsonViaLLM } = await import('./jsonRepairLLM.js');
+            const recovery = await repairJsonViaLLM(
+              result.thinking,
+              this.jsonRepairRouting,
+              {
+                originalPrompt: options.prompt,
+                originalSystem: options.system ?? null,
+                // brokenText already IS the thinking — don't duplicate it
+                // into the grounding "ORIGINAL AGENT REASONING" section.
+                originalThinking: null,
+                originalAgentRole: options.traceContext?.agentRole ?? null,
+                expectedJsonSchema: options.expectedJsonSchema ?? null,
+                inputIsReasoningChannel: true,
+              },
+              {
+                workflowRunId: options.traceContext?.workflowRunId ?? '',
+                phaseId: options.traceContext?.phaseId ?? null,
+                subPhaseId: options.traceContext?.subPhaseId ?? null,
+              },
+              this,
+            );
+            // Reject the repair model's "I couldn't recover" sentinel — never
+            // let it masquerade as the real parsed answer downstream.
+            const recovered =
+              recovery.parsed &&
+              typeof recovery.parsed === 'object' &&
+              !('_repair_error' in recovery.parsed)
+                ? recovery.parsed
+                : null;
+            if (recovered) {
+              result.parsed = recovered;
+            }
+            this.writeJsonRepairRecord(invocationId, options, recovery);
+            aoddEmit(
+              recovered ? 'repair.json_succeeded' : 'repair.json_failed',
+              recovered
+                ? { strategy: 'thinking_channel_recovery', repaired: maybeSpillText(JSON.stringify(recovered)) }
+                : { strategy: 'thinking_channel_recovery', error: { message: 'thinking did not contain a recoverable answer' } },
+              {
+                invocation_id: invocationId ?? undefined,
+                sub_phase_id_override: traceSubPhaseId,
+                agent_role: 'json_repair',
+              },
+            );
           }
           const { agentOutputId } = this.writeOutputRecords(invocationId, options, result, Date.now() - startedAt, null);
           logFile?.writeFinal({

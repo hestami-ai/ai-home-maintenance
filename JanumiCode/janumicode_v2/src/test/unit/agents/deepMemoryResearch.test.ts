@@ -1048,6 +1048,8 @@ describe('DeepMemoryResearchAgent', () => {
       const constraint = packet.activeConstraints.find(c => c.id === artifact.id);
       expect(constraint).toBeDefined();
       expect(constraint!.authorityLevel).toBe(6);
+      // No content.kind → record_type 'artifact_produced' → conservative default.
+      expect(constraint!.bindingClass).toBe('certified_context');
     });
 
     it('constitutional_invariant records appear with authority=7', async () => {
@@ -1076,6 +1078,8 @@ describe('DeepMemoryResearchAgent', () => {
       const constraint = packet.activeConstraints.find(c => c.id === inv.id);
       expect(constraint).toBeDefined();
       expect(constraint!.authorityLevel).toBe(7);
+      // kind 'constitutional_invariant' ∈ BINDING_KINDS → a binding rule.
+      expect(constraint!.bindingClass).toBe('binding');
     });
   });
 });

@@ -20,6 +20,7 @@ import { generateLLMGapSuggestion } from '../test/harness/gapReportEnhancer';
 import { collectHarnessResult } from '../test/harness/collectResults';
 import { rollbackToSubPhase } from '../lib/orchestrator/rollback';
 import { withTraceContext } from '../lib/trace/traceContext';
+import { isLocalProvider, resolveRecordsIdleStallMs } from '../lib/llm/llmTimeouts';
 import {
   emit as aoddEmit,
   startRun as aoddStartRun,
@@ -205,6 +206,23 @@ export async function runPipeline(
     if (!process.env.JANUMICODE_LLM_MAX_CALL_SECONDS) {
       process.env.JANUMICODE_LLM_MAX_CALL_SECONDS = '1800';
     }
+  }
+
+  // Records-idle session-stall generalization (NOT slice-gated). The session
+  // watchdog (waitForQuiescence) must never undercut the per-call wall-clock:
+  // a streaming call produces no governed_stream record until it COMPLETES, so
+  // if the session stall is shorter than a single slow LOCAL call's wall-clock,
+  // the watchdog guillotines a legitimately-progressing call mid-stream. cal-29
+  // P6.1 died exactly this way — a 922 s call killed by the 900 s default while
+  // the per-call wall-clock was 1200 s. Slice modes already raise it to 3600000
+  // above; extend the same model-aware floor to ANY run that routes a role to a
+  // local model. See llmTimeouts.resolveRecordsIdleStallMs.
+  if (!config.thinSlice && !config.fullSlice) {
+    const routes = Object.values(engine.llmRouting ?? {}) as Array<{ primary?: { provider?: string } }>;
+    const usesLocalModels = routes.some(r => isLocalProvider(r?.primary?.provider));
+    engine.configManager.setWorkflowOverrides({
+      records_idle_stall_ms: resolveRecordsIdleStallMs(usesLocalModels),
+    });
   }
 
   // Decomposition caps — thin-slice ONLY. Full-slice decomposes the entire

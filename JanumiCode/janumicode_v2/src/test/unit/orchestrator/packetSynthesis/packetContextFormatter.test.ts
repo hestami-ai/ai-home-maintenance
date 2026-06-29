@@ -130,16 +130,27 @@ describe('formatPacketAsExecutorContext — full packet', () => {
     expect(md).toMatch(/3 upstream id\(s\) trace to ai-proposed/);
   });
 
-  it('suppresses advisory findings from the executor prompt (issue #7)', () => {
-    // Advisories are verifier signals retained on the packet record for
-    // telemetry, not directions the executor can act on. The
-    // formatter must not surface them into the prompt; they would
-    // otherwise leak into the executor as unactionable noise.
+  it('surfaces coherence findings to the executor, split into actionable vs FYI', () => {
+    // Reverses the ts-17 suppression: the packet's coherence findings are
+    // already task-scoped; several are executor-actionable (author a missing
+    // test, don't trust an invented id), the rest are labeled FYI.
     const p = fullPacket();
-    p.coherence.advisory_findings = ['A1_TASK_OUTSIDE_COMPONENT_BOUNDARY: task task-001 writes outside comp-001'];
+    p.coherence.blocking_failures = [
+      'P3_AC_NO_TEST: US-005/AC-US005-001 has no test case',          // actionable
+      'P7_INVENTED_ID_REFERENCE: \'TECH-POSTGRES-1\' not found upstream', // actionable
+      'P4_USER_STORY_NO_EVAL: US-005 has no evaluation criterion',    // FYI
+    ];
+    p.coherence.advisory_findings = [
+      'A3_UNMEASURABLE_EVAL_CRITERION: target NFR-008 lacks measurable predicate', // actionable
+    ];
     const md = formatPacketAsExecutorContext(p);
-    expect(md).not.toMatch(/Advisory findings/);
-    expect(md).not.toMatch(/A1_TASK_OUTSIDE_COMPONENT_BOUNDARY/);
+    expect(md).toMatch(/## Upstream Coherence Findings/);
+    expect(md).toMatch(/Act on these:/);
+    expect(md).toMatch(/P3_AC_NO_TEST.*→ .*author one/i);
+    expect(md).toMatch(/P7_INVENTED_ID_REFERENCE.*→ /);
+    expect(md).toMatch(/A3_UNMEASURABLE_EVAL_CRITERION.*→ /);
+    expect(md).toMatch(/FYI \(upstream gaps/);
+    expect(md).toMatch(/P4_USER_STORY_NO_EVAL/);
   });
 
   it('returns a non-empty string even for a minimal packet', () => {

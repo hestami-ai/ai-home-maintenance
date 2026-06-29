@@ -13,6 +13,7 @@
  */
 
 import type { ImplementationPacketContent } from '../../../types/records';
+import { categorizeCoherence } from '../../../review/findingSurfacing';
 
 export function formatPacketAsExecutorContext(packet: ImplementationPacketContent): string {
   const lines: string[] = [];
@@ -187,16 +188,34 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
     lines.push('');
   }
 
-  // ── Coherence summary (executor-actionable only)
-  // Advisory findings (A1_TASK_OUTSIDE_COMPONENT_BOUNDARY etc.) are
-  // verifier signals for telemetry, not directions the executor can act
-  // on. They remain on the packet record itself for downstream audit;
-  // we suppress them from the executor stdin to keep the prompt tight.
-  // Issue #7 from the ts-17 prompt review.
-  //
-  // ai_proposed root count IS actionable — it tells the executor that
-  // some upstream ids were not user-confirmed, and to honor spec text
-  // when those refs conflict. Keep that note.
+  // ── Upstream coherence findings (un-suppressed; reverses ts-17).
+  // The packet's coherence verifier already scoped these to THIS task. The
+  // executor CAN act on several (author a missing test, don't trust an
+  // invented id, implement an unmeasurable eval to the spec); the rest are
+  // upstream gaps it can't fix but should be aware of. Categorized so the
+  // prompt distinguishes "act on these" from "FYI".
+  const coherenceCodes = [
+    ...packet.coherence.blocking_failures,
+    ...packet.coherence.advisory_findings,
+  ];
+  if (coherenceCodes.length > 0) {
+    const { actionable, fyi } = categorizeCoherence(coherenceCodes);
+    lines.push('## Upstream Coherence Findings (gaps in THIS task\'s inputs)');
+    lines.push('');
+    if (actionable.length > 0) {
+      lines.push('Act on these:');
+      for (const a of actionable) lines.push(`- ${a.line} → ${a.remedy}`);
+      lines.push('');
+    }
+    if (fyi.length > 0) {
+      lines.push('FYI (upstream gaps you can\'t directly fix — anticipate, honor the spec):');
+      for (const f of fyi) lines.push(`- ${f}`);
+      lines.push('');
+    }
+  }
+
+  // ai_proposed root count — some upstream ids were not user-confirmed; honor
+  // spec text when those refs conflict.
   if (packet.coherence.annotations.ai_proposed_root_count > 0) {
     lines.push('## Packet Coherence Notes');
     lines.push('');

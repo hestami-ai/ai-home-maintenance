@@ -40,11 +40,27 @@ export interface MimoConfig {
   permissionMode: MimoPermissionMode;
 }
 
+/**
+ * Custom mimo/OpenCode agent JanumiCode runs the executor as by DEFAULT. mimo's
+ * built-in `compose`/`build` agents compose a base coding prompt (mimo's
+ * `default.txt`) whose "# Code style" section says verbatim **"IMPORTANT: DO NOT
+ * ADD ***ANY*** COMMENTS unless asked"** — a Claude-Code-lineage convention that,
+ * being a SYSTEM instruction, overrides the task-context Engineering Constitution
+ * and produced 0-comment code across every model (gemma4, qwen3.6; mostly
+ * qwen3-coder). This agent's `prompt` ({@link buildExecutorAgentPrompt}) is
+ * baselined off `default.txt` with ONLY that conflicting line removed — so mimo's
+ * coding guidance is preserved and the comments the task context asks for are no
+ * longer suppressed. The Engineering Constitution itself is NOT embedded here; it
+ * stays in the per-leaf task context. Opt back into mimo's built-in (anti-comment)
+ * agent with `JANUMICODE_MIMO_AGENT=compose`.
+ */
+export const EXECUTOR_AGENT_NAME = 'janumicode';
+
 export function resolveMimoConfig(env: NodeJS.ProcessEnv = process.env): MimoConfig {
   return {
     binary: env.JANUMICODE_MIMO_PATH || 'mimo',
     model: env.JANUMICODE_MIMO_MODEL || 'mimo/mimo-auto',
-    agent: env.JANUMICODE_MIMO_AGENT || 'compose',
+    agent: env.JANUMICODE_MIMO_AGENT || EXECUTOR_AGENT_NAME,
     permissionMode: (env.JANUMICODE_MIMO_PERMISSION_MODE as MimoPermissionMode) === 'relay' ? 'relay' : 'static',
   };
 }
@@ -170,12 +186,119 @@ export function buildLocalProvider(
  * rewrites this file on every `ensure()`, the provider MUST be merged here
  * rather than written to a separate file it would clobber.
  */
+/**
+ * System prompt for the {@link EXECUTOR_AGENT_NAME} agent — the executor's base
+ * coding prompt. It is BASELINED OFF mimo's own `default.txt` (its standard
+ * coding agent prompt — Following conventions, Code style, Doing tasks with
+ * lint/typecheck, Tool usage, Code References), so mimo's coding-quality guidance
+ * is preserved. The ONLY change vs mimo's base prompt is REMOVING the single line
+ * that conflicts with how JanumiCode delivers craft requirements —
+ * `IMPORTANT: DO NOT ADD ***ANY*** COMMENTS unless asked` — which, as a SYSTEM
+ * instruction, was overriding the task-context Engineering Constitution and
+ * producing 0-comment code on every model. The interactive-chat-only sections of
+ * default.txt (verbosity examples, one-word answers, proactiveness) are dropped
+ * since the executor runs headless. NOTE: the Engineering Constitution + any
+ * project-specific requirements are delivered in the TASK CONTEXT (per leaf), NOT
+ * embedded here — this prompt stays a generic coding-agent prompt that simply no
+ * longer suppresses the comments the task context asks for.
+ */
+export function buildExecutorAgentPrompt(): string {
+  return [
+    'You are a coding agent implementing ONE precisely-specified software-engineering task inside an',
+    'existing project, driven headlessly (there is no interactive user to converse with). The task —',
+    'its specification, completion criteria, constraints, write scope, and supporting context — is',
+    'delivered in your message context and is authoritative. Work only within the declared write scope.',
+    '',
+    '# Following conventions',
+    "When making changes to files, first understand the file's code conventions. Mimic code style, use",
+    'existing libraries and utilities, and follow existing patterns.',
+    '- NEVER assume that a given library is available, even if it is well known. Whenever you write code',
+    '  that uses a library or framework, first check that this project already uses it (look at',
+    '  neighboring files, or check the manifest — package.json / pyproject.toml / Cargo.toml / go.mod).',
+    '- When you create a new file, first look at existing siblings to see how they are written; then',
+    '  follow their framework choice, naming conventions, and typing.',
+    '- When you edit code, read the surrounding context (especially imports) and make the change in the',
+    '  most idiomatic way.',
+    '- Always follow security best practices. Never introduce code that exposes or logs secrets or keys.',
+    '',
+    '# Code style',
+    '- Do not add features, refactor, or introduce abstractions beyond what the task requires. A',
+    '  one-shot operation does not need a helper; three similar lines is better than a premature',
+    '  abstraction.',
+    '- Do not add error handling, fallbacks, or validation for scenarios that cannot happen. Validate at',
+    '  the system boundaries the task calls for (user input, external APIs).',
+    '- If something is unused, delete it completely — no backwards-compatibility shims or `# removed`',
+    '  markers.',
+    '',
+    '# Doing the task',
+    '- Use the search/read tools to understand the existing code and conventions before writing. Search',
+    '  in parallel where the queries are independent.',
+    '- Implement the solution using the tools available to you.',
+    '- Verify with tests. NEVER assume a specific test framework or script — check the project (README,',
+    '  manifest, existing tests) to determine the testing approach.',
+    '- VERY IMPORTANT: when you have completed the task, RUN the project lint, typecheck, and test',
+    '  commands (e.g. ruff / mypy / pytest, or npm run lint / tsc / npm test) with Bash to confirm your',
+    '  code is correct. Do not report success without having seen the verification pass.',
+    '- Never commit changes.',
+    '',
+    '# Tool usage',
+    '- Use dedicated tools (Read / Edit / Write) for file operations rather than bash cat / sed / echo;',
+    '  reserve bash for real commands (build, test, lint).',
+    '- You can call multiple tools in one response; batch independent calls so they run in parallel.',
+    '- When referencing code locations, use the `file_path:line_number` pattern.',
+    '',
+    '# Executing actions with care',
+    'Prefer editing an existing file over creating a new one, except where the task requires new files',
+    'in its write scope. Report outcomes faithfully: if tests fail, say so with the output. If you find',
+    'unexpected files or state, investigate before overwriting — do not use destructive shortcuts.',
+  ].join('\n');
+}
+
+/**
+ * The `mimocode.json` `agent` block for {@link EXECUTOR_AGENT_NAME}: a `primary`
+ * coding agent whose `prompt` overrides mimo's anti-comment base prompt. Tools
+ * are left to mimo's defaults (governed by the `permission` policy); the model
+ * is inherited from the top-level `model` (the local provider).
+ */
+export function buildExecutorAgent(): Record<string, unknown> {
+  return {
+    [EXECUTOR_AGENT_NAME]: {
+      description: 'JanumiCode Phase-9 executor — mimo default coding agent with the anti-comment rule removed (task context governs craft).',
+      mode: 'primary',
+      prompt: buildExecutorAgentPrompt(),
+    },
+  };
+}
+
 export function buildProjectConfig(cfg: MimoConfig, env: NodeJS.ProcessEnv = process.env): Record<string, unknown> {
   const config: Record<string, unknown> = buildPermissionPolicy(cfg.permissionMode);
   const local = buildLocalProvider(cfg.model, env);
   if (local) {
     config.provider = local.provider;
     config.model = local.model;
+  }
+  // Always define our executor agent so the configured `agent` (default
+  // EXECUTOR_AGENT_NAME) resolves; setting JANUMICODE_MIMO_AGENT=compose opts
+  // back into mimo's built-in (anti-comment) agent.
+  config.agent = buildExecutorAgent();
+  // Disable mimo's automatic conversation COMPACTION (config schema
+  // `compaction.auto`, default true — "Enable automatic compaction when context
+  // is full"). When a leaf's within-session context grows from many tool turns,
+  // auto-compaction calls `tryStartCheckpointWriter`, which forks mimo's native
+  // hidden `checkpoint-writer` subagent; that fork can fail with "missing
+  // forkContext, failing actor" and mimo then RETRIES it ~1/sec forever, wedging
+  // the leaf with zero progress (the orchestrator's idle-watchdog is 24h, so the
+  // whole run hangs — observed 2026-06-27 on slice-156 leaf 15; see memory
+  // project_mimo_checkpoint_writer_wedge). Disabling auto-compaction removes the
+  // trigger entirely. It is also CORRECT for this executor regardless of the bug:
+  // each leaf is a fresh single-task session that declares the model's full
+  // context window (limit.context == loaded num_ctx), so we never want mimo
+  // silently summarizing the binding task spec / Engineering Constitution away
+  // mid-leaf — an over-long leaf should surface as an error (a decomposition
+  // signal), not be papered over with lossy compaction. Opt back in with
+  // JANUMICODE_MIMO_AUTOCOMPACT=1.
+  if (env.JANUMICODE_MIMO_AUTOCOMPACT !== '1') {
+    config.compaction = { auto: false };
   }
   return config;
 }

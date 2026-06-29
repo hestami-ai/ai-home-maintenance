@@ -49,6 +49,52 @@ describe('renderHydratedPacket — resolves references into content', () => {
     expect(md).not.toContain('materialityBreakdown');
   });
 
+  it('splits BINDING constraints from CERTIFIED CONTEXT by bindingClass (slice-156)', () => {
+    const packet = mkPacket({
+      activeConstraints: [
+        { id: 'adr1', statement: 'ADR-002: AES-256 at rest', authorityLevel: 6, sourceRecordIds: ['adr1'], bindingClass: 'binding' },
+        { id: 'cm1', statement: 'comp-link-management responsibilities', authorityLevel: 6, sourceRecordIds: ['cm1'], bindingClass: 'certified_context' },
+      ],
+    });
+    const md = renderHydratedPacket(packet, () => null);
+    expect(md).toContain('## Governing Constraints (binding — apply without exception)');
+    expect(md).toContain('ADR-002');
+    expect(md).toContain('## Certified Architecture Context');
+    expect(md).toContain('comp-link-management responsibilities');
+    // The certified-context item must NOT sit under the binding heading.
+    const bindingSection = md.split('## Certified Architecture Context')[0];
+    expect(bindingSection).not.toContain('comp-link-management responsibilities');
+  });
+
+  it('dedups material findings already shown above as constraints/context (ws-156 triple-render)', () => {
+    const packet = mkPacket({
+      activeConstraints: [
+        { id: 'x1', statement: 'NFR-002 encryption threshold', authorityLevel: 6, sourceRecordIds: ['x1'], bindingClass: 'binding' },
+      ],
+      materialFindings: [
+        { id: 'x1', recordType: 'artifact_produced', authorityLevel: 6, governingStatus: 'active', summary: 'NFR-002 encryption threshold', sourceRecordIds: ['x1'], materialityScore: 0.95 },
+        { id: 'y2', recordType: 'artifact_produced', authorityLevel: 4, governingStatus: 'active', summary: 'Distinct finding', sourceRecordIds: ['y2'], materialityScore: 0.6 },
+      ],
+    });
+    const md = renderHydratedPacket(packet, () => null);
+    expect(md).toContain('Distinct finding');     // genuinely-new finding kept
+    expect(md).toContain('already shown above');   // dedup note present
+    // The constraint's id is NOT repeated as a findings line.
+    const findingsSection = md.includes('Most Material Findings') ? md.split('Most Material Findings')[1] : '';
+    expect(findingsSection).not.toContain('NFR-002 encryption threshold');
+  });
+
+  it('legacy packet without bindingClass renders constraints as binding (no regression)', () => {
+    const packet = mkPacket({
+      activeConstraints: [
+        { id: 'c1', statement: 'legacy constraint', authorityLevel: 6, sourceRecordIds: ['c1'] } as never,
+      ],
+    });
+    const md = renderHydratedPacket(packet, () => null);
+    expect(md).toContain('## Governing Constraints (binding — apply without exception)');
+    expect(md).toContain('legacy constraint');
+  });
+
   it('renders supersession chains with resolved content', () => {
     const packet = mkPacket({
       supersessionChains: [{
@@ -146,5 +192,78 @@ describe('renderRecordExcerpt — kind-aware', () => {
   it('caps overly long excerpts', () => {
     const rec: ResolvedRecord = { record_type: 'narrative_memory', content: { description: 'y'.repeat(5000) } };
     expect(renderRecordExcerpt(rec, 100).length).toBeLessThanOrEqual(101);
+  });
+
+  // Fix #4 (slice-156): the big structured architecture artifacts used to fall
+  // through to the raw-JSON `jsonCap` default — a ~1.2KB firehose per item in the
+  // "apply without exception" Governing Constraints section. They now render a
+  // crisp roster.
+  it('software_domains → id (name) roster, not raw JSON', () => {
+    const rec: ResolvedRecord = { record_type: 'artifact_produced', content: { kind: 'software_domains', domains: [
+      { id: 'domain-link-identity', name: 'Link Identity and Creation', ubiquitous_language: [{ term: 'Slug', definition: '6 chars' }] },
+      { id: 'domain-redirection-engine', name: 'Redirection Engine' },
+    ] } };
+    const s = renderRecordExcerpt(rec);
+    expect(s).toContain('domain-link-identity (Link Identity and Creation)');
+    expect(s).toContain('domain-redirection-engine (Redirection Engine)');
+    expect(s).not.toContain('ubiquitous_language'); // no raw-JSON keys leak
+    expect(s).not.toContain('{');
+  });
+
+  it('system_requirements → "SR-id: statement" lines, capped', () => {
+    const rec: ResolvedRecord = { record_type: 'artifact_produced', content: { kind: 'system_requirements', items: [
+      { id: 'SR-001', statement: 'Generate unique 6-character alphanumeric slugs.' },
+      { id: 'SR-003', statement: 'Encrypt destination URLs at rest using AES-256.' },
+    ] } };
+    const s = renderRecordExcerpt(rec);
+    expect(s).toContain('SR-001: Generate unique 6-character alphanumeric slugs.');
+    expect(s).toContain('SR-003: Encrypt destination URLs at rest using AES-256.');
+    expect(s).not.toContain('"id"');
+  });
+
+  it('system_boundary → in-scope capabilities + out-of-scope/external counts', () => {
+    const rec: ResolvedRecord = { record_type: 'artifact_produced', content: { kind: 'system_boundary',
+      in_scope: [{ capability: 'URL Conversion and Validation' }, { capability: 'Analytics and Metric Retrieval' }],
+      out_of_scope: ['admin UI', 'microservices'],
+      external_systems: [{ id: 'EXT-DB-POSTGRES' }],
+    } };
+    const s = renderRecordExcerpt(rec);
+    expect(s).toContain('URL Conversion and Validation');
+    expect(s).toContain('2 out-of-scope');
+    expect(s).toContain('1 external system');
+    expect(s).not.toContain('{');
+  });
+
+  it('error_handling_strategies → "component: TYPE, TYPE"', () => {
+    const rec: ResolvedRecord = { record_type: 'artifact_produced', content: { kind: 'error_handling_strategies', strategies: [
+      { component_id: 'comp-link-management', error_types: ['HTTP_400', 'HTTP_500'], detection: 'schema validation' },
+    ] } };
+    const s = renderRecordExcerpt(rec);
+    expect(s).toContain('comp-link-management: HTTP_400, HTTP_500');
+    expect(s).not.toContain('detection');
+  });
+
+  it('configuration_parameters → "component.name" list', () => {
+    const rec: ResolvedRecord = { record_type: 'artifact_produced', content: { kind: 'configuration_parameters', params: [
+      { component_id: 'comp-link-management', name: 'database_url', default: null },
+      { component_id: 'comp-link-management', name: 'encryption_key_id' },
+    ] } };
+    const s = renderRecordExcerpt(rec);
+    expect(s).toContain('comp-link-management.database_url');
+    expect(s).toContain('comp-link-management.encryption_key_id');
+    expect(s).not.toContain('default');
+  });
+
+  it('implementation_plan → task count + task ids, not the full task JSON', () => {
+    const rec: ResolvedRecord = { record_type: 'artifact_produced', content: { kind: 'implementation_plan', tasks: [
+      { id: 'task-generate-slugs', write_directory_paths: ['src/services/link-management'], completion_criteria: [{ criterion_id: 'CC-001' }] },
+      { id: 'task-validate-urls' },
+    ] } };
+    const s = renderRecordExcerpt(rec);
+    expect(s).toContain('2 task(s)');
+    expect(s).toContain('task-generate-slugs');
+    // The other-task hyphen write paths that used to leak no longer appear.
+    expect(s).not.toContain('src/services/link-management');
+    expect(s).not.toContain('completion_criteria');
   });
 });

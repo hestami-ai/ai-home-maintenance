@@ -128,6 +128,36 @@ describe('buildProjectConfig', () => {
     expect(() => JSON.parse(json)).not.toThrow();
     expect(json).not.toMatch(/\\\\/); // no backslash escapes that break mimo's JSON parse
   });
+
+  it('defines the janumicode executor agent: mimo default coding prompt, anti-comment line removed, constitution NOT embedded', () => {
+    const config = buildProjectConfig(resolveMimoConfig({}), {});
+    const agent = (config.agent as Record<string, { mode?: string; prompt?: string }>).janumicode;
+    expect(agent).toBeDefined();
+    expect(agent.mode).toBe('primary');
+    // The one conflicting line is removed — the prompt no longer suppresses comments.
+    expect(agent.prompt).not.toMatch(/DO NOT ADD .*COMMENTS|AVOID adding comments/i);
+    // It is baselined off mimo's default coding prompt (its guidance is preserved).
+    expect(agent.prompt).toMatch(/Following conventions/);
+    expect(agent.prompt).toMatch(/lint.*typecheck|typecheck/i);
+    expect(agent.prompt).toMatch(/file_path:line_number/);
+    // The Engineering Constitution stays in the TASK CONTEXT — it is NOT embedded
+    // in the harness agent prompt (per the architecture: generic agent, per-leaf craft).
+    expect(agent.prompt).not.toMatch(/Engineering Constitution/i);
+    expect(agent.prompt).not.toMatch(/CC-001/);
+    expect(agent.prompt).not.toMatch(/doc-comment/i);
+  });
+
+  it('disables mimo auto-compaction by default (prevents the checkpoint-writer fork wedge)', () => {
+    const config = buildProjectConfig(resolveMimoConfig({}), {});
+    // compaction.auto=false stops mimo from forking its native checkpoint-writer
+    // subagent (which fails "missing forkContext" and retry-loops, wedging a leaf).
+    expect(config.compaction).toEqual({ auto: false });
+  });
+
+  it('JANUMICODE_MIMO_AUTOCOMPACT=1 opts back into mimo auto-compaction', () => {
+    const config = buildProjectConfig(resolveMimoConfig({}), { JANUMICODE_MIMO_AUTOCOMPACT: '1' });
+    expect(config.compaction).toBeUndefined();
+  });
 });
 
 describe('parseListeningUrl', () => {
@@ -141,8 +171,8 @@ describe('parseListeningUrl', () => {
 });
 
 describe('resolveMimoConfig', () => {
-  it('defaults: mimo binary, mimo/mimo-auto, compose, static', () => {
-    expect(resolveMimoConfig({})).toEqual({ binary: 'mimo', model: 'mimo/mimo-auto', agent: 'compose', permissionMode: 'static' });
+  it('defaults: mimo binary, mimo/mimo-auto, janumicode agent, static', () => {
+    expect(resolveMimoConfig({})).toEqual({ binary: 'mimo', model: 'mimo/mimo-auto', agent: 'janumicode', permissionMode: 'static' });
   });
   it('honors env overrides', () => {
     const cfg = resolveMimoConfig({ JANUMICODE_MIMO_MODEL: 'mimo/mimo-pro', JANUMICODE_MIMO_AGENT: 'build', JANUMICODE_MIMO_PERMISSION_MODE: 'relay' });

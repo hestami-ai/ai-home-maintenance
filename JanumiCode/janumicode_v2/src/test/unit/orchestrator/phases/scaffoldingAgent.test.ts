@@ -3,8 +3,19 @@
  * + manifest-presence check are exercised in the Phase-9 e2e harness.
  */
 import { describe, it, expect } from 'vitest';
-import { areaWriteScope, areaRoot, buildAreaScaffoldingPrompt } from '../../../../lib/orchestrator/phases/scaffoldingAgent';
+import { areaWriteScope, areaRoot, buildAreaScaffoldingPrompt, gatherComponentDirs } from '../../../../lib/orchestrator/phases/scaffoldingAgent';
+import type { PhaseContext } from '../../../../lib/orchestrator/orchestratorEngine';
 import type { ReconArea } from '../../../../lib/orchestrator/phases/phase9Recon';
+
+/** Minimal engine stub: only `writer.getArtifactByKind(runId, kind)` is used. */
+function stubEngine(artifacts: Record<string, unknown>): PhaseContext['engine'] {
+  return {
+    writer: {
+      getArtifactByKind: (_runId: string, kind: string) =>
+        artifacts[kind] ? ({ content: artifacts[kind] } as never) : null,
+    },
+  } as unknown as PhaseContext['engine'];
+}
 
 function area(id: string, src: string[], test: string[] = []): ReconArea {
   return {
@@ -33,6 +44,19 @@ describe('buildAreaScaffoldingPrompt — stack genericity', () => {
     expect(prompt).toMatch(/__init__\.py/);           // python package-init guidance
     // skeleton-vs-materialize contradiction resolved
     expect(prompt).toMatch(/type.*definition.*IS skeleton/i);
+  });
+
+  it('injects the REQUIRED documentation directive so shared scaffold files cite their DM-/IC- ids', () => {
+    const py: ReconArea = {
+      ...area('core', ['src'], ['tests']), stack: 'python', dependency_manifest: 'pyproject.toml',
+    };
+    const prompt = buildAreaScaffoldingPrompt(py, '[]', '[]', []);
+    expect(prompt).toMatch(/## Documentation \(REQUIRED\)/);
+    expect(prompt).toMatch(/MUST carry a brief doc-comment/);
+    // cites the shared-artifact id types (data model / interface contract), the
+    // scaffold analog of the implementation leaf's CC-/TECH- citations.
+    expect(prompt).toMatch(/DM-/);
+    expect(prompt).toMatch(/IC-/);
   });
 
   it('node area WITH aliases: renders the alias line; unset manifest falls back to a stack-neutral hint (not package.json)', () => {
@@ -69,5 +93,36 @@ describe('areaRoot', () => {
     expect(areaRoot('src')).toBe('.');
     expect(areaRoot('services/billing/src')).toBe('services/billing');
     expect(areaRoot('crates/engine/')).toBe('crates'); // trailing slash trimmed
+  });
+});
+
+describe('gatherComponentDirs — stack-aware dir separator (slice-156 duplicate-dir fix)', () => {
+  it('python: component dirs use underscores so they MATCH the executor write-scope (no hyphen duplicate)', () => {
+    const engine = stubEngine({
+      component_model: { components: [{ id: 'comp-link-management' }, { id: 'comp-data-governance' }] },
+    });
+    const dirs = gatherComponentDirs(engine, 'run-1', 'python');
+    expect(dirs).toContainEqual({ id: 'comp-link-management', dir: 'src/link_management' });
+    expect(dirs).toContainEqual({ id: 'comp-data-governance', dir: 'src/data_governance' });
+    expect(dirs.every(d => !d.dir.includes('-'))).toBe(true); // no hyphen form leaks to the scaffold prompt
+  });
+
+  it('node: keeps hyphenated dirs (conventional for TS path-alias imports)', () => {
+    const engine = stubEngine({ component_model: { components: [{ id: 'comp-link-management' }] } });
+    expect(gatherComponentDirs(engine, 'run-1', 'node'))
+      .toContainEqual({ id: 'comp-link-management', dir: 'src/link-management' });
+  });
+
+  it('undefined stack: defaults to hyphen (the legacy/pre-language behavior is unchanged)', () => {
+    const engine = stubEngine({ component_model: { components: [{ id: 'comp-x' }] } });
+    expect(gatherComponentDirs(engine, 'run-1')).toContainEqual({ id: 'comp-x', dir: 'src/x' });
+  });
+
+  it('also folds data_models component_ids into the roster (stack-aware)', () => {
+    const engine = stubEngine({
+      data_models: { models: [{ component_id: 'comp-analytics-engine' }] },
+    });
+    expect(gatherComponentDirs(engine, 'run-1', 'python'))
+      .toContainEqual({ id: 'comp-analytics-engine', dir: 'src/analytics_engine' });
   });
 });

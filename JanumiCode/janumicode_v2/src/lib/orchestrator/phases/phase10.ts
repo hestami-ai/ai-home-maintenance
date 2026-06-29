@@ -20,6 +20,7 @@ import { detectLayoutViolations, type ProjectLayoutContract } from './layoutCont
 import { buildReconLayoutContract, type Phase9ReconPlan } from './phase9Recon';
 import { runTscNoEmit } from './tscValidator';
 import { detectCraftConformance } from './craftConformance';
+import { runFindingAdjudication } from './phase10/findingAdjudication';
 
 export class Phase10Handler implements PhaseHandler {
   readonly phaseId: PhaseId = '10';
@@ -110,6 +111,47 @@ export class Phase10Handler implements PhaseHandler {
       });
     }
 
+    // Finding adjudication (spec §4 Phase 10.1): render the missing verdict on
+    // the run's unadjudicated validator + coherence findings, judged against the
+    // actual implementation. Advisory by default — never blocks the commit —
+    // and fully guarded so a disabled/unavailable LLM (e.g. review-off runs)
+    // degrades to an empty result instead of failing the phase.
+    const adjCfg = (engine.configManager.get() as unknown as {
+      consistency?: { adjudication_enabled?: boolean; adjudication_severity?: 'block' | 'advisory' };
+    }).consistency;
+    const adjudicationEnabled = adjCfg?.adjudication_enabled ?? true;
+    let adjudication: import('./phase10/findingAdjudication').AdjudicationResult | null = null;
+    if (adjudicationEnabled) {
+      adjudication = await runFindingAdjudication({
+        writer: engine.writer,
+        workflowRunId: workflowRun.id,
+        implementationSummary: this.buildImplementationSummary(ctx),
+        invokeLlm: async (prompt) => {
+          const res = await engine.callForRole('orchestrator', {
+            prompt, responseFormat: 'json', temperature: 0.2,
+            traceContext: { workflowRunId: workflowRun.id, phaseId: '10', subPhaseId: 'pre_commit_consistency_check', agentRole: 'consistency_checker', label: 'Phase 10.1 — Finding Adjudication' },
+          });
+          return res.text;
+        },
+      });
+      // Still-open findings surface as advisory semantic findings; blocking only
+      // when the operator opts in via consistency.adjudication_severity='block'.
+      const stillOpen = adjudication.adjudications.filter(a => a.verdict === 'still_open');
+      for (const a of stillOpen) {
+        internalFindings.push({ kind: 'unresolved_finding', finding_ref: a.finding_ref, rationale: a.rationale });
+      }
+      if (adjCfg?.adjudication_severity === 'block' && stillOpen.length > 0) {
+        blockingFailures.push({
+          kind: 'unresolved_findings',
+          count: stillOpen.length,
+          detail: `${stillOpen.length} upstream finding(s) remain unresolved at pre-commit (adjudication_severity=block).`,
+        });
+      }
+      getLogger().info('workflow', 'Phase 10.1: finding adjudication', {
+        workflow_run_id: workflowRun.id, ...adjudication.summary, note: adjudication.note,
+      });
+    }
+
     const overallPass = blockingFailures.length === 0;
 
     const consistencyRecord = engine.writer.writeRecord({
@@ -137,6 +179,10 @@ export class Phase10Handler implements PhaseHandler {
         craft_documented_ratio: Number(craft.documentedRatio.toFixed(3)),
         craft_files_citing_requirements: craft.filesCitingRequirements,
         craft_uncommented_files: craft.uncommentedFiles,
+        // Phase 10.1 finding adjudication (advisory).
+        finding_adjudications: adjudication?.adjudications ?? [],
+        finding_adjudication_summary: adjudication?.summary ?? null,
+        finding_adjudication_note: adjudication?.note ?? null,
       },
     });
     artifactIds.push(consistencyRecord.id);
@@ -277,6 +323,27 @@ export class Phase10Handler implements PhaseHandler {
    * the refactoring_scope), the ids that produced a cross_run_modification, and
    * the missing set. A non-empty `missing` is a blocking failure.
    */
+  /**
+   * Compact summary of what the implementation produced, fed to the 10.1
+   * adjudicator so it can judge each finding against the real artifacts.
+   * File paths from file_system_write_record (capped) + the execution summary.
+   */
+  private buildImplementationSummary(ctx: PhaseContext): string {
+    const { engine, workflowRun } = ctx;
+    const lines: string[] = [];
+    const writes = engine.writer.getRecordsByType(workflowRun.id, 'file_system_write_record');
+    const paths = [...new Set(writes
+      .map(r => (r.content as Record<string, unknown>).path ?? (r.content as Record<string, unknown>).file_path)
+      .filter((p): p is string => typeof p === 'string'))];
+    lines.push(`Files written (${paths.length}):`);
+    for (const p of paths.slice(0, 80)) lines.push(`- ${p}`);
+    if (paths.length > 80) lines.push(`… and ${paths.length - 80} more`);
+    const execSummary = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced')
+      .find(r => (r.content as Record<string, unknown>).kind === 'execution_summary');
+    if (execSummary) lines.push(`\nExecution summary: ${JSON.stringify(execSummary.content).slice(0, 800)}`);
+    return lines.join('\n');
+  }
+
   private verifyCrossRunModifications(ctx: PhaseContext): {
     expected: string[]; modified: string[]; missing: string[];
   } | null {

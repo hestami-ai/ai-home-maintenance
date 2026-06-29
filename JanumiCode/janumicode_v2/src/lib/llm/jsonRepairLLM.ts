@@ -53,6 +53,15 @@ export interface JsonRepairGroundingContext {
    * expects, rather than inventing fields or dropping unfamiliar ones.
    */
   expectedJsonSchema?: string | null;
+  /**
+   * When true, `brokenText` is NOT malformed JSON — it is the model's
+   * reasoning/thinking channel, into which it emitted its final answer
+   * while leaving the response channel empty (observed: gemma4:31b-it-qat
+   * on complex compliance NFRs — see project_gemma4_31b_decomposition_divergence).
+   * The prompt then asks to EXTRACT the agent's intended final JSON
+   * object from that reasoning rather than fix broken syntax.
+   */
+  inputIsReasoningChannel?: boolean;
 }
 
 export interface JsonRepairTraceContext {
@@ -186,9 +195,17 @@ function buildRepairPrompt(
   brokenText: string,
   grounding: JsonRepairGroundingContext,
 ): string {
+  const recovering = grounding.inputIsReasoningChannel === true;
   const sections: string[] = [];
   sections.push(
-    `You are a JSON repair tool. Your sole job is to output a corrected JSON object that is BOTH syntactically valid AND semantically faithful to what the original agent intended.
+    recovering
+      ? `You are a JSON recovery tool. The agent below emitted its final answer INSIDE its reasoning channel and left its response channel empty. Your sole job is to EXTRACT the agent's intended final JSON object from that reasoning and output it — syntactically valid AND semantically faithful to the values the agent ultimately settled on (use its FINAL stated values, not earlier drafts it revised).
+
+Output ONLY the JSON object. No preamble, no commentary, no markdown fences, no explanations. Just the JSON.
+
+If the reasoning does not actually contain a complete final answer (truncated mid-thought, or it never reached concrete values), output exactly:
+{"_repair_error": "unrepairable", "reason": "<one short sentence>"}`
+      : `You are a JSON repair tool. Your sole job is to output a corrected JSON object that is BOTH syntactically valid AND semantically faithful to what the original agent intended.
 
 Output ONLY the repaired JSON object. No preamble, no commentary, no markdown fences, no explanations. Just the JSON.
 
@@ -223,11 +240,13 @@ If the input is fundamentally unrepairable (truncated mid-object, totally unstru
   }
 
   sections.push(
-    `=== BROKEN JSON OUTPUT (the agent produced this; it does not parse) ===\n${brokenText}\n=== END BROKEN JSON OUTPUT ===`,
+    recovering
+      ? `=== AGENT REASONING CONTAINING THE ANSWER (the agent emitted its final answer here instead of the response channel; extract the final JSON object it settled on) ===\n${brokenText}\n=== END AGENT REASONING ===`
+      : `=== BROKEN JSON OUTPUT (the agent produced this; it does not parse) ===\n${brokenText}\n=== END BROKEN JSON OUTPUT ===`,
   );
 
   sections.push(
-    `Now output the repaired JSON object only:`,
+    recovering ? `Now output the extracted JSON object only:` : `Now output the repaired JSON object only:`,
   );
 
   return sections.join('\n\n');

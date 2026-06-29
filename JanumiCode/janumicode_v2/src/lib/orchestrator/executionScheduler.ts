@@ -1020,10 +1020,14 @@ export class ExecutionScheduler {
     // doc but never acted on it: it was framed purely ADVISORY, buried as the
     // prompt tail, and craft doesn't affect the test/typecheck gate the model
     // optimises for (a probe confirmed the model reads the content fine — the
-    // `<engineering_constitution>` tags don't filter it). So we now (a) LEAD with
-    // a short, specific, actionable craft directive framed as VERIFIED (the
-    // Phase-10 craft-conformance check), to pull it into the model's optimisation
-    // target, then (b) inline the full doc as the detailed reference. Still
+    // `<engineering_constitution>` tags don't filter it). So we (a) LEAD with a
+    // short, specific, actionable craft directive, then (b) inline the full doc as
+    // the detailed reference. This is the SOLE comment instruction the executor
+    // sees — the harness's system-level "DO NOT ADD COMMENTS" rule that used to
+    // override it is gone (the custom `janumicode` mimo agent, see
+    // mimoServerManager), so the directive is framed as REQUIRED (not the old
+    // "soft completion requirement"; an earlier soft framing produced comments but
+    // no CC-/constraint citations once the suppression was lifted). Still
     // SUBORDINATE to the task spec / completion criteria / technical constraints
     // (those always win) to avoid the slice-139 "everything authoritative" mess.
     const constitutionPath = this.reconEnforcement?.engineering_constitution_path
@@ -1054,10 +1058,10 @@ export class ExecutionScheduler {
         truncatedNote = '\n\n[NOTE: engineering constitution truncated to fit the prompt budget.]';
       }
       const craftLead =
-        'Craft requirements for THIS task (subordinate ONLY to its specification, completion criteria, and technical constraints — those always win):\n'
-        + '- Every exported function / class / module carries a brief doc comment stating WHY it exists and citing the completion criterion, acceptance criterion, or constraint it satisfies (e.g. `// CC-001: …`, `// per SR-005`).\n'
+        'Craft requirements for THIS task. They are SUBORDINATE ONLY to the task specification, completion criteria, and technical constraints (those always win) — but otherwise they are REQUIRED, not optional:\n'
+        + '- Every exported function / class / module MUST carry a brief doc comment stating WHY it exists and citing the completion criterion, acceptance criterion, or constraint it satisfies (e.g. `# CC-001: …`, `# per SR-005` in python; `// CC-001: …` in TS/Go/Rust/Java — use this language\'s comment syntax).\n'
         + '- Comment the non-obvious "why", not the "what"; prefer self-documenting names over narration; leave no commented-out code.\n'
-        + '- Apply proportionally to the scope of THIS leaf (no app-wide health checks in an ordinary leaf). These are VERIFIED after the run by a Phase-10 craft-conformance check — treat them as a soft completion requirement.';
+        + '- Apply proportionally to the scope of THIS leaf (no app-wide health checks in an ordinary leaf). These are a REQUIRED completion criterion for this task and are VERIFIED after the run by the Phase-10 craft-conformance check.';
       stdinText += '\n\n## Engineering Constitution (required craft standard — verified at Phase 10)\n';
       if (constitutionBody) {
         stdinText += craftLead + '\n\nFull standard (detailed reference) below:\n'

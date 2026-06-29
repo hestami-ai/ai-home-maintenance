@@ -21,7 +21,9 @@ import {
   manifestForStack,
   idiomaticImportSpecifier,
   normalizeGreenfieldLayout,
+  collapseGreenfieldAreas,
 } from '../../../../lib/orchestrator/phases/phase9Recon';
+import type { ReconArea, Phase9ReconPlan, IntegrationBoundary } from '../../../../lib/orchestrator/phases/phase9Recon';
 
 describe('normalizeGreenfieldLayout — deterministic greenfield topology', () => {
   it('overrides the agent area_id-as-source-dir with canonical src/ layout', () => {
@@ -345,6 +347,80 @@ describe('gatherTechnicalConstraints — Phase-1 → recon contract', () => {
 
   it('returns empty for unrelated artifact kinds', () => {
     expect(gatherTechnicalConstraints(fakeEngine([{ kind: 'component_model', components: [] }]), 'run-1')).toEqual([]);
+  });
+});
+
+describe('collapseGreenfieldAreas — deterministic topology from stack partition (slice-156)', () => {
+  function mkArea(p: Partial<ReconArea> & { area_id: string; stack: string }): ReconArea {
+    return {
+      description: '', confidence: 'high', source_refs: [], conflicts: [], alternatives_rejected: [],
+      source_roots: ['src'], test_roots: ['src'], protected_paths: [], dependency_manifest: '',
+      canonical_modules: [], import_aliases: [], gate_commands: [],
+      ...p,
+    };
+  }
+  function mkPlan(
+    workspace_kind: Phase9ReconPlan['workspace_kind'],
+    areas: ReconArea[],
+    integration_boundaries: IntegrationBoundary[] = [],
+  ): Phase9ReconPlan {
+    return { kind: 'phase9_recon_plan', schemaVersion: '1.0', workspace_kind, source: 'agent', areas, integration_boundaries, notes: '' };
+  }
+  const gate = (name: string, command: string): ReconArea['gate_commands'][number] =>
+    ({ name, kind: 'test', command, args: ['test'], timeoutMs: 60000 });
+
+  it('single-stack greenfield: N invented areas → ONE area "workspace" (the ws-156 case)', () => {
+    // ws-156 emitted core-service / core-service / core-backend, all python.
+    const plan = mkPlan('greenfield', [
+      mkArea({ area_id: 'core-service', stack: 'python', canonical_modules: [{ path: 'src/shared/db.py', import_specifier: 'shared.db', description: 'db' }], gate_commands: [gate('python:test', 'pytest')] }),
+      mkArea({ area_id: 'core-backend', stack: 'python', canonical_modules: [{ path: 'src/shared/api.py', import_specifier: 'shared.api', description: 'api' }], gate_commands: [gate('python:test', 'pytest')] }),
+    ]);
+    const out = collapseGreenfieldAreas(plan);
+    expect(out.areas).toHaveLength(1);
+    expect(out.areas[0].area_id).toBe('workspace');
+    expect(out.areas[0].stack).toBe('python');
+    // The agent's genuine outputs are PRESERVED as a de-duped union.
+    expect(out.areas[0].canonical_modules.map(m => m.path).sort()).toEqual(['src/shared/api.py', 'src/shared/db.py']);
+    expect(out.areas[0].gate_commands).toHaveLength(1); // de-duped by name
+  });
+
+  it('is order-INVARIANT: shuffled input areas → identical area_id + primary_stack signal', () => {
+    const a = mkArea({ area_id: 'core-service', stack: 'python' });
+    const b = mkArea({ area_id: 'core-backend', stack: 'python' });
+    const fwd = collapseGreenfieldAreas(mkPlan('greenfield', [a, b]));
+    const rev = collapseGreenfieldAreas(mkPlan('greenfield', [b, a]));
+    expect(fwd.areas[0].area_id).toBe(rev.areas[0].area_id);
+    expect(fwd.areas[0].stack).toBe(rev.areas[0].stack); // primary_stack = areas[0].stack is stable
+  });
+
+  it('polyglot greenfield: distinct stacks → one "area-<stack>" each, sorted (deterministic)', () => {
+    const out = collapseGreenfieldAreas(mkPlan('greenfield', [
+      mkArea({ area_id: 'frontend', stack: 'node' }),
+      mkArea({ area_id: 'api', stack: 'python' }),
+    ]));
+    expect(out.areas.map(a => a.area_id)).toEqual(['area-node', 'area-python']);
+    expect(out.areas[0].stack).toBe('node'); // sorted → node first → stable primary_stack
+  });
+
+  it('brownfield is returned UNCHANGED (areas are real subsystems, not inventions)', () => {
+    const plan = mkPlan('brownfield', [
+      mkArea({ area_id: 'billing', stack: 'java', source_roots: ['services/billing'] }),
+      mkArea({ area_id: 'share', stack: 'python', source_roots: ['libs/share'] }),
+    ]);
+    expect(collapseGreenfieldAreas(plan)).toBe(plan); // identity — no copy, no mutation
+  });
+
+  it('single-stack collapse drops integration_boundaries; polyglot remaps them to surviving ids', () => {
+    expect(collapseGreenfieldAreas(mkPlan('greenfield',
+      [mkArea({ area_id: 'a', stack: 'python' }), mkArea({ area_id: 'b', stack: 'python' })],
+      [{ description: 'x', between: ['a', 'b'], mechanism: 'REST' }],
+    )).integration_boundaries).toEqual([]);
+
+    const poly = collapseGreenfieldAreas(mkPlan('greenfield',
+      [mkArea({ area_id: 'fe', stack: 'node' }), mkArea({ area_id: 'be', stack: 'python' })],
+      [{ description: 'ui→api', between: ['fe', 'be'], mechanism: 'REST' }],
+    ));
+    expect(poly.integration_boundaries[0].between.sort()).toEqual(['area-node', 'area-python']);
   });
 });
 
