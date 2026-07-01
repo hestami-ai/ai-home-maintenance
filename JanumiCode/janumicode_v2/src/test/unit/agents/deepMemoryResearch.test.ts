@@ -857,6 +857,25 @@ describe('DeepMemoryResearchAgent', () => {
       expect(te.indexOf('comp-lifecycle-manager')).toBeLessThan(te.indexOf('implementation'));
     });
 
+    it('captures DOTTED ids whole and dedups (P7 AUTH-AC truncation regression)', async () => {
+      // P7 test batches query over dotted AC ids (AC-FR-AUTH-C3.2-2.2-1.2.2.1-001).
+      // The old id classes stopped at the first dot, collapsing distinct ids to the
+      // shared prefix "AC-FR-AUTH-C3" and (×N over a batch) crowding the 12-slot
+      // budget — the cal-29 P7 DMR query was "AC-FR-AUTH-C3" ×12.
+      const packet = await agent.research(baseBrief({
+        query: 'Test cases covering ACs AC-FR-AUTH-C3.2-2.2-1.2.2.1-001, AC-FR-AUTH-C3.2-3-001, AC-US-001-3-2-2-2-1-3-2-2-1-001',
+      }));
+      const te = packet.queryDecomposition.topicEntities;
+      // Full dotted ids preserved verbatim, not truncated to the pre-dot prefix.
+      expect(te).toContain('AC-FR-AUTH-C3.2-2.2-1.2.2.1-001');
+      expect(te).toContain('AC-FR-AUTH-C3.2-3-001');
+      expect(te).toContain('AC-US-001-3-2-2-2-1-3-2-2-1-001');
+      // The truncated prefix must NOT appear as its own (degenerate) entity.
+      expect(te).not.toContain('AC-FR-AUTH-C3');
+      // Dedup: the same id captured by both id regexes appears once, not twice.
+      expect(te.length).toBe(new Set(te.map(t => t.toLowerCase())).size);
+    });
+
     it('Stage 7 enriches narrative with open_questions from LLM synthesis', async () => {
       const templateLoader = new TemplateLoader(REPO_ROOT);
       const mockLLM = new MockLLMProvider();

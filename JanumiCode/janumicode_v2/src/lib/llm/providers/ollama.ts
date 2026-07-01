@@ -4,6 +4,7 @@
  */
 
 import * as http from 'node:http';
+import { StringDecoder } from 'node:string_decoder';
 import type {
   LLMCallOptions,
   LLMCallResult,
@@ -14,6 +15,61 @@ import type {
 import { LLMError } from '../llmCaller';
 import { parseJsonWithRecovery } from '../jsonRecovery';
 import { resolveLlmTimeouts } from '../llmTimeouts';
+import { getLogger } from '../../logging/logger';
+
+/**
+ * Stateful NDJSON frame decoder for streaming HTTP bodies. Fixes two boundary
+ * hazards a naive `chunk.toString('utf-8') + split('\n')` mishandles:
+ *
+ *   1. **Multi-byte UTF-8 split across TCP chunks.** `StringDecoder` buffers an
+ *      incomplete trailing byte sequence until the next chunk completes it. A
+ *      raw `Buffer.toString('utf-8')` instead emits U+FFFD and DISCARDS the
+ *      split bytes — corrupting that NDJSON line so `JSON.parse` throws and the
+ *      entire frame is silently lost. For gemma4:31b this dropped the large
+ *      first thinking frame after the 131072-token prefill (em-dash/smart-quote
+ *      heavy, split across many slow TCP reads) → intermittent thinking
+ *      head-truncation (cal-29). e4b's small/fast frames rarely span a boundary,
+ *      so it never truncated.
+ *   2. **NDJSON line split across chunks.** The trailing partial line is buffered
+ *      until the next chunk; `flush()` then processes any final newline-less
+ *      frame at stream end (previously dropped).
+ *
+ * Unparseable lines are surfaced via `onDrop` — never silently swallowed.
+ */
+export class NdjsonStreamDecoder {
+  private readonly decoder = new StringDecoder('utf8');
+  private buffer = '';
+  constructor(private readonly onDrop?: (line: string) => void) {}
+
+  /** Feed a chunk; returns the frames whose lines completed within it. */
+  push(chunk: Buffer): Array<Record<string, unknown>> {
+    this.buffer += this.decoder.write(chunk);
+    const parts = this.buffer.split('\n');
+    this.buffer = parts.pop() ?? ''; // keep the trailing (possibly partial) line
+    return this.parse(parts);
+  }
+
+  /** Flush at stream end — decode buffered bytes and process the final frame. */
+  flush(): Array<Record<string, unknown>> {
+    this.buffer += this.decoder.end();
+    const parts = this.buffer.length > 0 ? this.buffer.split('\n') : [];
+    this.buffer = '';
+    return this.parse(parts);
+  }
+
+  private parse(lines: string[]): Array<Record<string, unknown>> {
+    const out: Array<Record<string, unknown>> = [];
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        out.push(JSON.parse(line) as Record<string, unknown>);
+      } catch {
+        this.onDrop?.(line);
+      }
+    }
+    return out;
+  }
+}
 
 export class OllamaProvider implements LLMProviderAdapter {
   readonly name = 'ollama';
@@ -231,12 +287,21 @@ export class OllamaProvider implements LLMProviderAdapter {
           return;
         }
 
-        let buffer = '';
         let fullResponse = '';
         let fullThinking = '';
         let finalModel = options.model;
         let promptEval: number | null = null;
         let eval_: number | null = null;
+        let droppedFrames = 0;
+        // Stream diagnostics (gemma4:31b thinking head-truncation investigation,
+        // cal-29). Per-call counts + the head of the FIRST thinking frame let us
+        // distinguish a capture-side drop (droppedFrames>0) from genuine model
+        // output (droppedFrames==0 yet thinking starts mid-thought). Emitted at
+        // stream end only when JANUMICODE_OLLAMA_STREAM_DEBUG is set.
+        let frameCount = 0;
+        let thinkingFrameCount = 0;
+        let firstFrameHead: string | null = null;
+        let firstThinkingHead: string | null = null;
 
         // Idle-stall detector (B7). Ollama's thinking-mode streams can
         // legitimately run for minutes, but a stream that hasn't emitted
@@ -264,42 +329,70 @@ export class OllamaProvider implements LLMProviderAdapter {
         };
         resetIdleTimer();
 
+        // Ollama streams ND-JSON — one JSON object per line. The decoder uses a
+        // StringDecoder so multi-byte UTF-8 chars split across TCP chunks are
+        // reassembled (a raw toString('utf-8') replaces the split bytes with
+        // U+FFFD, corrupting the text). Lines that still fail to parse are logged
+        // via onDrop — never silently swallowed (the prior `catch {}` hid them).
+        const ndjson = new NdjsonStreamDecoder((line) => {
+          droppedFrames++;
+          getLogger().warn('llm', 'Ollama stream dropped an unparseable NDJSON frame (possible truncation)', {
+            model: options.model,
+            frame_chars: line.length,
+            has_replacement_char: line.includes('�'),
+            head: line.slice(0, 80),
+          });
+        });
+
+        const handleFrame = (frame: Record<string, unknown>): void => {
+          frameCount++;
+          if (firstFrameHead === null) firstFrameHead = JSON.stringify(frame).slice(0, 160);
+          const response = typeof frame.response === 'string' ? frame.response : '';
+          const thinking = typeof frame.thinking === 'string' ? frame.thinking : '';
+          if (response.length > 0) {
+            fullResponse += response;
+            onChunk({ text: response, channel: 'response' });
+          }
+          if (thinking.length > 0) {
+            if (firstThinkingHead === null) firstThinkingHead = thinking.slice(0, 160);
+            thinkingFrameCount++;
+            fullThinking += thinking;
+            onChunk({ text: thinking, channel: 'thinking' });
+          }
+          if (typeof frame.model === 'string') finalModel = frame.model;
+          if (typeof frame.prompt_eval_count === 'number') promptEval = frame.prompt_eval_count;
+          if (typeof frame.eval_count === 'number') eval_ = frame.eval_count;
+        };
+
         res.on('data', (chunk: Buffer) => {
           resetIdleTimer();
-          buffer += chunk.toString('utf-8');
-          // Ollama streams ND-JSON — one JSON object per line.
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const frame = JSON.parse(line) as {
-                response?: string;
-                thinking?: string;
-                done?: boolean;
-                model?: string;
-                prompt_eval_count?: number;
-                eval_count?: number;
-              };
-              if (typeof frame.response === 'string' && frame.response.length > 0) {
-                fullResponse += frame.response;
-                onChunk({ text: frame.response, channel: 'response' });
-              }
-              if (typeof frame.thinking === 'string' && frame.thinking.length > 0) {
-                fullThinking += frame.thinking;
-                onChunk({ text: frame.thinking, channel: 'thinking' });
-              }
-              if (frame.model) finalModel = frame.model;
-              if (typeof frame.prompt_eval_count === 'number') promptEval = frame.prompt_eval_count;
-              if (typeof frame.eval_count === 'number') eval_ = frame.eval_count;
-            } catch {
-              // Skip malformed frames — Ollama occasionally emits blank lines.
-            }
-          }
+          for (const frame of ndjson.push(chunk)) handleFrame(frame);
         });
 
         res.on('end', () => {
           if (idleTimer) clearTimeout(idleTimer);
+          for (const frame of ndjson.flush()) handleFrame(frame);
+          if (droppedFrames > 0) {
+            getLogger().warn('llm', 'Ollama stream completed with dropped frames', {
+              model: options.model, dropped_frames: droppedFrames,
+            });
+          }
+          if (process.env.JANUMICODE_OLLAMA_STREAM_DEBUG) {
+            // Diagnostic: if a truncated-thinking capture shows dropped_frames=0,
+            // the model genuinely emitted no preamble (not a capture bug). If
+            // dropped_frames>0, a frame was lost on our side. first_thinking_head
+            // shows exactly where the captured thinking begins.
+            getLogger().warn('llm', 'Ollama stream diagnostics', {
+              model: options.model,
+              frames: frameCount,
+              thinking_frames: thinkingFrameCount,
+              thinking_chars: fullThinking.length,
+              response_chars: fullResponse.length,
+              dropped_frames: droppedFrames,
+              first_frame_head: firstFrameHead,
+              first_thinking_head: firstThinkingHead,
+            });
+          }
           const text = fullResponse;
           let parsed: Record<string, unknown> | null = null;
           if (options.responseFormat === 'json') {

@@ -383,6 +383,37 @@ function formatTechnicalConstraints(tcs: TechnicalConstraint[]): string {
   }).join('\n');
 }
 
+/**
+ * Scope the `acceptance_criteria_summary` prompt block to ONLY the ACs the
+ * parent test case validates — not the entire FR/AC catalog. Saturation
+ * partitions the parent's coverage (children may reference only the parent's own
+ * ACs; an unmatched behaviour makes the parent `invalid_parent`, never a new
+ * AC), so injecting hundreds of unrelated ACs is pure prompt bloat. cal-29 spent
+ * 77,093 input tokens saturating a single 1-AC test case because the full
+ * catalog was injected (twice). Renders each parent AC as `id: measurable_condition`
+ * from the canonical index; falls back to the full summary when the parent
+ * carries no AC ids or none resolve (never hand the model an empty AC universe).
+ */
+export function renderScopedAcSummary(
+  acIds: ReadonlyArray<string> | undefined,
+  index: CanonicalAcIndex | undefined,
+  fullSummaryFallback: string,
+): string {
+  if (!index || !acIds || acIds.length === 0) return fullSummaryFallback;
+  const lines: string[] = [];
+  const seen = new Set<string>();
+  for (const rawId of acIds) {
+    const id = typeof rawId === 'string' ? rawId.trim() : '';
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const entry = index.byCanonicalId.get(id);
+    if (!entry) continue; // unknown id — skip (never fabricate); fallback below covers all-miss
+    const text = (entry.measurable_condition ?? entry.description ?? '').trim();
+    lines.push(text ? `${entry.id}: ${text}` : entry.id);
+  }
+  return lines.length > 0 ? lines.join('\n') : fullSummaryFallback;
+}
+
 export async function runTestSaturationLoop(
   ctx: PhaseContext,
   input: TestSaturationInput,
@@ -537,7 +568,14 @@ export async function runTestSaturationLoop(
             ? '(none — sole child under this parent)'
             : siblings.filter(s => s.id !== entry.testCase.id).map(s => `- ${s.id}: ${s.name}`).join('\n'),
           component_context: input.componentSummary,
-          acceptance_criteria_summary: input.acceptanceCriteriaSummary,
+          // Scope the AC block to the parent's OWN validated ACs (saturation
+          // partitions the parent's coverage). Falls back to the full catalog
+          // only when the parent has no resolvable AC ids.
+          acceptance_criteria_summary: renderScopedAcSummary(
+            entry.testCase.acceptance_criterion_ids,
+            input.canonicalAcIndex,
+            input.acceptanceCriteriaSummary,
+          ),
           interface_contracts_summary: input.interfaceContractsSummary,
           existing_assumptions: scopedAssumptions.length === 0
             ? '(none yet)'

@@ -9,7 +9,8 @@ import * as path from 'node:path';
 import { createTestDatabase, type Database } from '../../../../lib/database/init';
 import { ConfigManager } from '../../../../lib/config/configManager';
 import { OrchestratorEngine } from '../../../../lib/orchestrator/orchestratorEngine';
-import { runTestSaturationLoop } from '../../../../lib/orchestrator/phases/phase7_1a';
+import { runTestSaturationLoop, renderScopedAcSummary } from '../../../../lib/orchestrator/phases/phase7_1a';
+import { buildCanonicalAcIndex } from '../../../../lib/orchestrator/phases/phase7/acRefResolver';
 import { MockLLMProvider } from '../../../helpers/mockLLMProvider';
 import type {
   DecompositionTestCase,
@@ -53,6 +54,49 @@ function seedRootNode(
   });
   return { recordId: rec.id, logicalNodeId };
 }
+
+describe('renderScopedAcSummary — scope saturation AC block to the parent (prompt-bloat fix)', () => {
+  const index = buildCanonicalAcIndex([
+    { id: 'US-1', acceptance_criteria: [
+      { id: 'AC-US-001-001', measurable_condition: 'latency < 1ms' },
+      { id: 'AC-US-001-002', description: 'returns 403 on deny' },
+    ] },
+    { id: 'US-2', acceptance_criteria: [
+      { id: 'AC-US-002-001', measurable_condition: 'count === 6' },
+    ] },
+  ]);
+
+  it('renders ONLY the parent\'s validated ACs, not the whole catalog', () => {
+    const out = renderScopedAcSummary(['AC-US-001-002'], index, 'FULL-CATALOG');
+    expect(out).toBe('AC-US-001-002: returns 403 on deny'); // description used when no measurable_condition
+    expect(out).not.toContain('AC-US-001-001');
+    expect(out).not.toContain('AC-US-002-001');
+    expect(out).not.toContain('FULL-CATALOG');
+  });
+
+  it('dedups repeated AC ids', () => {
+    expect(renderScopedAcSummary(['AC-US-001-001', 'AC-US-001-001'], index, 'FULL'))
+      .toBe('AC-US-001-001: latency < 1ms');
+  });
+
+  it('keeps resolvable ids and silently skips unknown ones (never fabricates)', () => {
+    expect(renderScopedAcSummary(['AC-US-001-001', 'AC-UNKNOWN-9'], index, 'FULL'))
+      .toBe('AC-US-001-001: latency < 1ms');
+  });
+
+  it('falls back to the full summary when the parent has no AC ids', () => {
+    expect(renderScopedAcSummary([], index, 'FULL')).toBe('FULL');
+    expect(renderScopedAcSummary(undefined, index, 'FULL')).toBe('FULL');
+  });
+
+  it('falls back when NONE of the parent ids resolve (never an empty AC universe)', () => {
+    expect(renderScopedAcSummary(['AC-UNKNOWN-1', 'AC-UNKNOWN-2'], index, 'FULL')).toBe('FULL');
+  });
+
+  it('falls back when the index is absent', () => {
+    expect(renderScopedAcSummary(['AC-US-001-001'], undefined, 'FULL')).toBe('FULL');
+  });
+});
 
 describe('runTestSaturationLoop — Wave 10 saturation', () => {
   let db: Database;

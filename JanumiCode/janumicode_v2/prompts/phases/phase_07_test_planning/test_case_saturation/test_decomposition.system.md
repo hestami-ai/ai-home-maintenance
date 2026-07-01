@@ -194,9 +194,9 @@ For each child you produce, list any **precondition, fixture-setup choice, oracl
 
 # Acceptance Criterion referencing
 
-`acceptance_criterion_ids[]` on children should reference ACs from
-`{{acceptance_criteria_summary}}` (or, for `atomic_step`, the parent's own
-list). AC ids are workflow-globally unique composites of the form
+`acceptance_criterion_ids[]` on children should reference ACs from the
+**Acceptance criteria summary** block below (or, for `atomic_step`, the
+parent's own list). AC ids are workflow-globally unique composites of the form
 `AC-US{nnn}-{mmm}` — copy them as written. A downstream resolver
 canonicalizes minor near-misses, so concentrate on *which AC each child
 verifies* rather than character-perfect transcription. If no AC covers a

@@ -1137,15 +1137,20 @@ export class DeepMemoryResearchAgent {
     // tokens because they match indexed record fields directly. Phase
     // callers pass these in the query when they have upstream artifacts
     // to anchor against.
-    // Uppercase domain ids (FR-1, COMP-API-GATEWAY, TECH-POSTGRES-16).
-    const upperIdRe = /\b[A-Z][A-Z0-9]+-[A-Z0-9-]+\b/g;
+    // Uppercase domain ids (FR-1, COMP-API-GATEWAY, TECH-POSTGRES-16). The `.`
+    // in the trailing class captures DOTTED ids whole (AC-FR-AUTH-C3.2-2.2-...,
+    // FR-AUTH-C3.2-3) — without it the class stopped at the first dot, collapsing
+    // distinct dotted ACs to a common prefix (e.g. a P7 test batch over 12 dotted
+    // AUTH ACs degraded to "AC-FR-AUTH-C3" ×12). The trailing `\b` backtracks off
+    // a sentence-ending dot, so "see FR-1.2." still yields "FR-1.2".
+    const upperIdRe = /\b[A-Z][A-Z0-9]+-[A-Z0-9.-]+\b/g;
     // Lowercase / mixed-case STRUCTURAL ids (comp-lifecycle-manager,
     // task-comp-x-delete, us-001, dom-shortening). The per-leaf executor query
     // anchors on `comp-*`/`task-*` ids, which the uppercase pattern missed — so
     // they degraded into ordinary word tokens (lost retrieval signal). Matching
     // is gated on a known id PREFIX so genuine compound words ("single-tenant",
-    // "delete-by-key") are NOT misread as identifiers.
-    const prefixedIdRe = /\b(?:comp|task|leaf|node|us|ac|fr|nfr|dom|uj|wf|ent|int|ic|sr|dm|cc|api|tech|con|qa|rel)-[A-Za-z0-9][A-Za-z0-9-]*\b/gi;
+    // "delete-by-key") are NOT misread as identifiers. `.` allowed for dotted ids.
+    const prefixedIdRe = /\b(?:comp|task|leaf|node|us|ac|fr|nfr|dom|uj|wf|ent|int|ic|sr|dm|cc|api|tech|con|qa|rel)-[A-Za-z0-9][A-Za-z0-9.-]*\b/gi;
     const idTokens = [
       ...[...query.matchAll(upperIdRe)].map(m => m[0]),
       ...[...query.matchAll(prefixedIdRe)].map(m => m[0]),
@@ -1166,7 +1171,19 @@ export class DeepMemoryResearchAgent {
       .filter(w => w.length > 3)
       .map(w => w.toLowerCase().replace(/[^a-z0-9_\-./]/g, ''))
       .filter(w => w.length > 0 && !stopwords.has(w));
-    return [...idTokens, ...quoted, ...words].slice(0, 12);
+    // Dedup case-insensitively, preserving first occurrence (ids first, so they
+    // win the 12-slot budget). Without this, an id captured by BOTH upperIdRe and
+    // prefixedIdRe — or the same id repeated across a batch query — fills slots
+    // with duplicates and starves distinct entities.
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const tok of [...idTokens, ...quoted, ...words]) {
+      const key = tok.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(tok);
+    }
+    return deduped.slice(0, 12);
   }
 
   private searchFTS(
@@ -1318,8 +1335,12 @@ export class DeepMemoryResearchAgent {
    * no usable tokens remain.
    */
   private buildFtsQuery(query: string): string | null {
+    // Keep `.` so DOTTED ids (AC-FR-AUTH-C3.2-2.2-1.2.2.1-001) stay ONE token —
+    // a single quoted phrase that FTS5 matches as a unit. Stripping the dot (the
+    // prior `[^\w\s-]`) fragmented the id into `"ac-fr-auth-c3" OR "2-2" OR …`,
+    // an OR of common fragments that drowned the precise record in noise.
     const tokens = query
-      .replace(/[^\w\s-]/g, ' ')
+      .replace(/[^\w\s.-]/g, ' ')
       .split(/\s+/)
       .filter(w => w.length > 2)
       .map(w => w.toLowerCase());

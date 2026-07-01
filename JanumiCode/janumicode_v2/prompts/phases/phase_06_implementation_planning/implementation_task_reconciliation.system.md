@@ -52,7 +52,7 @@ Every task MUST include ALL of these fields (same shape as the first pass):
 | `component_id` | string | **VERBATIM** id from the Component menu. Do NOT prepend `comp-`, change case, or alter it. |
 | `component_responsibility` | string | **Verbatim** responsibility text of that component from the menu. |
 | `estimated_complexity` | `"low"` \| `"medium"` \| `"high"` | high also needs `complexity_flag` (prose). |
-| `completion_criteria` | array of objects | ≥1 object, each `{criterion_id, description, verification_method, verifies_acceptance_criteria?}`. `verification_method` ∈ `test_execution`\|`schema_check`\|`invariant`\|`output_comparison`. Plain strings forbidden. |
+| `completion_criteria` | array of objects | ≥1 object, each `{criterion_id, description, verification_method, verifies_acceptance_criteria?}`. `verification_method` ∈ `test_execution`\|`schema_check`\|`invariant`\|`output_comparison`. Plain strings forbidden. `verifies_acceptance_criteria` is an **array of `AC-*` id strings** (e.g. `["AC-US-001-6-2-001"]`) — NEVER a boolean, number, or bare string. |
 | `write_directory_paths` / `read_directory_paths` | array of strings | Workspace-relative only (no drive letters, no leading `/` or `./`). |
 | `dependency_task_ids` | array of strings | Empty array if none. |
 | `traces_to` | array of strings | **IDs ONLY** — MUST include the uncovered leaf `AC-*` ids this task covers (verbatim), plus any `res-*`/`TECH-*`/`SR-*`/`US-*` ids it satisfies. Never prose. |

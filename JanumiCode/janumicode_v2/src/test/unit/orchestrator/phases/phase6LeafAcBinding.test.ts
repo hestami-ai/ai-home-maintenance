@@ -13,6 +13,9 @@ import {
   renderComponentBlockForTask,
   renderComponentMenu,
   renderUncoveredAcsMenu,
+  chunkUncoveredByStory,
+  taskCoversAny,
+  summarizeResidualDivergence,
   parseImplementationTasks,
 } from '../../../../lib/orchestrator/phases/phase6';
 import type { GovernedStreamRecord } from '../../../../lib/types/records';
@@ -171,6 +174,36 @@ describe('Phase 6.1 per-component chunking helpers', () => {
     expect(t.traces_to).toEqual(['US-x', 'SR-1', 'AC-a', 'AC-b']); // US/SR kept, ACs appended, no dup
   });
 
+  it('backfillTracesFromCriteria tolerates non-array LLM fields (cal-29 verifies_acceptance_criteria:true crash)', () => {
+    // gemma4:31b reconciliation emitted `verifies_acceptance_criteria: true`
+    // (boolean shorthand) which crashed every batch via `for..of true`.
+    const t = {
+      id: 'task-x', task_type: 'standard', component_id: 'comp-y', component_responsibility: 'r',
+      description: 'd', estimated_complexity: 'low',
+      traces_to: ['AC-US-001-6-2-001', 'SR-VAULT-02'],
+      completion_criteria: [
+        { criterion_id: 'CC-1', description: 'c', verification_method: 'output_comparison', verifies_acceptance_criteria: true },
+      ],
+    } as unknown as Parameters<typeof backfillTracesFromCriteria>[0];
+    expect(() => backfillTracesFromCriteria(t)).not.toThrow();
+    // The AC in traces_to survives; the boolean CC field is simply ignored.
+    expect(t.traces_to).toEqual(['AC-US-001-6-2-001', 'SR-VAULT-02']);
+  });
+
+  it('computeUncoveredAcIds / taskCoversAny tolerate boolean/non-array fields without throwing', () => {
+    const tasks = [
+      { traces_to: ['AC-a'], completion_criteria: [{ verifies_acceptance_criteria: true }] },
+      { traces_to: true, completion_criteria: [{ verifies_acceptance_criteria: ['AC-b'] }] },
+      { traces_to: ['AC-c'], completion_criteria: true },
+    ] as unknown as Parameters<typeof computeUncoveredAcIds>[0];
+    // AC-a (traces_to) + AC-b (CC array) + AC-c (traces_to) are credited; booleans ignored, no throw.
+    const u = computeUncoveredAcIds(tasks, leafAcIdSet);
+    expect(u.size).toBe(0);
+    expect(taskCoversAny(tasks[0], new Set(['AC-a']))).toBe(true);
+    expect(taskCoversAny(tasks[1], new Set(['AC-b']))).toBe(true);   // traces_to:true ignored, CC array read
+    expect(taskCoversAny(tasks[2], new Set(['AC-c']))).toBe(true);   // completion_criteria:true ignored, traces_to read
+  });
+
   it('backfillTracesFromCriteria is a no-op when no CC carries AC ids', () => {
     const t = {
       id: 'task-x', task_type: 'standard', component_id: 'comp-y', component_responsibility: 'r',
@@ -219,6 +252,59 @@ describe('Phase 6.1 per-component chunking helpers', () => {
     expect(menu).toContain('US-002-D1');
     expect(menu).toContain('AC-c');
     expect(menu).not.toContain('AC-a'); // covered → excluded
+  });
+
+  it('chunkUncoveredByStory keeps a story together and respects the per-batch AC budget', () => {
+    // Three stories: A(2), B(1), C(2) ACs. Budget 3 → [A+B], [C].
+    const wide = collectLeafAcceptanceCriteria([
+      leafNode('US-A', ['AC-a1', 'AC-a2']),
+      leafNode('US-B', ['AC-b1']),
+      leafNode('US-C', ['AC-c1', 'AC-c2']),
+    ]);
+    const uncovered = new Set(['AC-a1', 'AC-a2', 'AC-b1', 'AC-c1', 'AC-c2']);
+    const batches = chunkUncoveredByStory(uncovered, wide, 3);
+    expect(batches.length).toBe(2);
+    expect([...batches[0]].sort()).toEqual(['AC-a1', 'AC-a2', 'AC-b1']);
+    expect([...batches[1]].sort()).toEqual(['AC-c1', 'AC-c2']);
+    // Every uncovered id lands in exactly one batch (no loss, no dup).
+    expect(batches.flatMap(b => [...b]).sort()).toEqual([...uncovered].sort());
+  });
+
+  it('chunkUncoveredByStory does NOT split a single story that alone exceeds the budget', () => {
+    const big = collectLeafAcceptanceCriteria([leafNode('US-BIG', ['AC-1', 'AC-2', 'AC-3', 'AC-4'])]);
+    const batches = chunkUncoveredByStory(new Set(['AC-1', 'AC-2', 'AC-3', 'AC-4']), big, 2);
+    expect(batches.length).toBe(1); // unsplit, over-budget batch
+    expect(batches[0].size).toBe(4);
+  });
+
+  it('chunkUncoveredByStory only includes still-uncovered ACs', () => {
+    const batches = chunkUncoveredByStory(new Set(['AC-b']), leaves, 25);
+    expect(batches.length).toBe(1);
+    expect([...batches[0]]).toEqual(['AC-b']);
+  });
+
+  it('taskCoversAny reads traces_to ∪ completion_criteria.verifies_acceptance_criteria', () => {
+    const batch = new Set(['AC-x']);
+    expect(taskCoversAny({ traces_to: ['AC-x'] }, batch)).toBe(true);
+    expect(taskCoversAny({ completion_criteria: [{ verifies_acceptance_criteria: ['AC-x'] }] }, batch)).toBe(true);
+    expect(taskCoversAny({ traces_to: ['AC-y'], completion_criteria: [{ verifies_acceptance_criteria: ['AC-z'] }] }, batch)).toBe(false);
+    expect(taskCoversAny({}, batch)).toBe(false);
+  });
+
+  it('summarizeResidualDivergence groups orphan ACs by story, largest gap first, with coverage %', () => {
+    const wide = collectLeafAcceptanceCriteria([
+      leafNode('US-A', ['AC-a1', 'AC-a2']),
+      leafNode('US-B', ['AC-b1']),
+    ]);
+    // total 3 ACs; 2 remain uncovered (US-A both) → coverage 33.3%
+    const s = summarizeResidualDivergence(new Set(['AC-a1', 'AC-a2']), wide, 3);
+    expect(s.uncovered).toBe(2);
+    expect(s.total).toBe(3);
+    expect(s.coverage_pct).toBe(33.3);
+    expect(s.orphan_story_count).toBe(1);
+    expect(s.stories[0].leaf_story_id).toBe('US-A');
+    expect(s.stories[0].orphan_ac_count).toBe(2);
+    expect(s.stories[0].ac_ids.sort()).toEqual(['AC-a1', 'AC-a2']);
   });
 
   it('parseImplementationTasks tolerates {tasks}, {implementation_plan:[]}, nested, and null', () => {

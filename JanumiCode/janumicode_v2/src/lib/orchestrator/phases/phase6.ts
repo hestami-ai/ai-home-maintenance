@@ -720,27 +720,41 @@ export class Phase6Handler implements PhaseHandler {
     if (allTasks.length === 0) return fallback;
 
     // ── Coverage-driven reconciliation: orchestrator owns the 100% guarantee ──
+    // Each pass partitions the still-uncovered ACs into BOUNDED batches (one
+    // call per batch) so the model never reasons over the whole orphan set at
+    // once — the same "chunk the reasoning" insight as per-component generation.
     const leafAcIdSet = new Set(leafAcceptanceCriteria.flatMap(s => s.acs.map(a => a.id)));
     const maxReconPasses = Math.max(0, Number.parseInt(process.env.JANUMICODE_P6_RECON_PASSES ?? '2', 10) || 0);
+    const maxAcsPerBatch = Math.max(1, Number.parseInt(process.env.JANUMICODE_P6_RECON_BATCH_AC ?? '25', 10) || 25);
     for (let pass = 1; pass <= maxReconPasses; pass++) {
       const uncovered = computeUncoveredAcIds(allTasks, leafAcIdSet);
       if (uncovered.size === 0) break;
-      getLogger().info('workflow', 'Phase 6.1 reconciliation pass — covering orphan leaf ACs', {
-        pass, uncovered: uncovered.size, total: leafAcIdSet.size,
+      const batches = chunkUncoveredByStory(uncovered, leafAcceptanceCriteria, maxAcsPerBatch);
+      getLogger().info('workflow', 'Phase 6.1 reconciliation pass — covering orphan leaf ACs in bounded batches', {
+        pass, uncovered: uncovered.size, total: leafAcIdSet.size, batches: batches.length, max_acs_per_batch: maxAcsPerBatch,
       });
-      const reconTasks = await this.reconcileUncoveredAcs(
-        ctx, uncovered, leafAcceptanceCriteria, leafComponents, techSpecsSummary, dmr,
-      );
-      // Only accept recon tasks that actually cover a still-uncovered AC.
-      const useful = reconTasks.filter(t => (t.traces_to ?? []).some(id => uncovered.has(id)));
-      if (pushUnique(useful) === 0) break; // no forward progress → stop (residual logged)
+      let addedThisPass = 0;
+      for (let b = 0; b < batches.length; b++) {
+        const batch = batches[b];
+        const reconTasks = await this.reconcileUncoveredAcs(
+          ctx, batch, leafAcceptanceCriteria, leafComponents, techSpecsSummary, dmr,
+          { pass, batchIndex: b + 1, batchCount: batches.length },
+        );
+        // Robust crediting: accept a recon task only if it covers a
+        // still-uncovered AC in THIS batch via traces_to ∪ CC verifies.
+        const useful = reconTasks.filter(t => taskCoversAny(t, batch));
+        addedThisPass += pushUnique(useful);
+      }
+      if (addedThisPass === 0) break; // whole pass made no forward progress → stop (residual logged)
     }
 
     const residual = computeUncoveredAcIds(allTasks, leafAcIdSet);
     if (residual.size > 0) {
-      getLogger().warn('workflow', 'Phase 6.1 residual uncovered leaf ACs after reconciliation (honest gap — not fabricated)', {
-        uncovered: residual.size, total: leafAcIdSet.size, sample: [...residual].slice(0, 20),
-      });
+      getLogger().warn(
+        'workflow',
+        'Phase 6.1 residual uncovered leaf ACs after reconciliation (honest gap — upstream component/FR divergence, not fabricated)',
+        summarizeResidualDivergence(residual, leafAcceptanceCriteria, leafAcIdSet.size),
+      );
     } else if (leafAcIdSet.size > 0) {
       getLogger().info('workflow', 'Phase 6.1 leaf-AC coverage complete (100%)', {
         total: leafAcIdSet.size, tasks: allTasks.length,
@@ -763,6 +777,7 @@ export class Phase6Handler implements PhaseHandler {
     components: Array<Record<string, unknown>>,
     techSpecsSummary: string,
     dmr: PhaseContextPacketResult,
+    batchInfo?: { pass: number; batchIndex: number; batchCount: number },
   ): Promise<ImplementationTask[]> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('implementation_planner', 'task_reconciliation');
@@ -774,6 +789,9 @@ export class Phase6Handler implements PhaseHandler {
       technical_specs_summary: techSpecsSummary,
     });
     if (rendered.missing_variables.length > 0) return [];
+    const label = batchInfo
+      ? `Phase 6.1 — Coverage Reconciliation (pass ${batchInfo.pass}, batch ${batchInfo.batchIndex}/${batchInfo.batchCount}, ${uncovered.size} ACs)`
+      : `Phase 6.1 — Coverage Reconciliation (${uncovered.size} orphan ACs)`;
     try {
       const result = await engine.callForRole('requirements_agent', {
         prompt: rendered.rendered,
@@ -784,15 +802,25 @@ export class Phase6Handler implements PhaseHandler {
           phaseId: '6',
           subPhaseId: 'task_skeleton',
           agentRole: 'implementation_planner',
-          label: `Phase 6.1 — Coverage Reconciliation (${uncovered.size} orphan ACs)`,
+          label,
         },
       });
-      const tasks = parseImplementationTasks(result.parsed as Record<string, unknown> | null);
+      // Confirm the parse: distinguish a parse failure (parsed == null, even
+      // after json_repair) from a model that returned a well-formed-but-empty
+      // task list — a silently-dropped batch reads as "covered" when it wasn't.
+      const parsed = result.parsed as Record<string, unknown> | null;
+      const tasks = parseImplementationTasks(parsed);
+      if (tasks.length === 0) {
+        getLogger().warn('workflow', 'Phase 6.1 reconciliation batch yielded no usable tasks', {
+          label, parse_failed: parsed == null, ac_count: uncovered.size,
+        });
+        return [];
+      }
       for (const t of tasks) backfillTracesFromCriteria(t);
       return tasks;
     } catch (err) {
       getLogger().warn('workflow', 'Phase 6.1 reconciliation call failed', {
-        error: err instanceof Error ? err.message : String(err),
+        label, error: err instanceof Error ? err.message : String(err),
       });
       return [];
     }
@@ -1020,7 +1048,7 @@ export function computeTaskAcCoverage(
   leaves: LeafAcceptanceCriteria[],
 ): TaskAcCoverageReport {
   const cited = new Set<string>();
-  for (const t of tasks) for (const id of t.traces_to ?? []) cited.add(id);
+  for (const t of tasks) for (const id of asStringArray(t.traces_to)) cited.add(id);
   const gaps: Array<{ acceptance_criterion_id: string; leaf_story_id: string }> = [];
   let total = 0;
   for (const l of leaves) {
@@ -1091,6 +1119,25 @@ export function renderComponentMenu(components: Array<Record<string, unknown>>):
 }
 
 /**
+ * Coerce an LLM-emitted field to a string[] at the deterministic boundary.
+ * Tolerates the model emitting a non-array where the schema wants a list of ids:
+ * cal-29 P6.1 reconciliation emitted `verifies_acceptance_criteria: true`
+ * (a boolean shorthand for "yes, this verifies the AC"), and `for..of true`
+ * threw "boolean true is not iterable", crashing every reconciliation batch.
+ * Non-arrays → []; non-string members are dropped.
+ */
+function asStringArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+}
+
+/** Coerce an LLM-emitted field (e.g. `completion_criteria`) to an array of objects, tolerating non-arrays. */
+function asRecordArray(v: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(v)
+    ? v.filter((x): x is Record<string, unknown> => typeof x === 'object' && x !== null)
+    : [];
+}
+
+/**
  * Promote leaf-AC ids the model placed only in a criterion's
  * `verifies_acceptance_criteria` up into the task's top-level `traces_to` (the
  * canonical AC-coverage field downstream binding reads). Smoke-testing the
@@ -1098,18 +1145,20 @@ export function renderComponentMenu(components: Array<Record<string, unknown>>):
  * field ("this criterion verifies AC-X") and the higher-level US / SR ids in
  * `traces_to` — a reasonable reading, but it leaves `traces_to` without the leaf
  * ACs. This deterministic bridge makes coverage robust to that variation
- * instead of relying on the prompt to place ids in an exact field.
+ * instead of relying on the prompt to place ids in an exact field. Reads every
+ * field through asStringArray/asRecordArray so a non-array LLM value can never
+ * crash the pass (the cal-29 `verifies_acceptance_criteria: true` failure).
  */
 export function backfillTracesFromCriteria(task: ImplementationTask): void {
   const fromCc = new Set<string>();
-  for (const cc of task.completion_criteria ?? []) {
-    for (const ac of cc.verifies_acceptance_criteria ?? []) {
-      if (typeof ac === 'string' && ac.startsWith('AC-')) fromCc.add(ac);
+  for (const cc of asRecordArray(task.completion_criteria)) {
+    for (const ac of asStringArray(cc.verifies_acceptance_criteria)) {
+      if (ac.startsWith('AC-')) fromCc.add(ac);
     }
   }
   if (fromCc.size === 0) return;
-  const existing = new Set(task.traces_to ?? []);
-  const merged = [...(task.traces_to ?? [])];
+  const existing = new Set(asStringArray(task.traces_to));
+  const merged = [...asStringArray(task.traces_to)];
   for (const ac of fromCc) if (!existing.has(ac)) merged.push(ac);
   task.traces_to = merged;
 }
@@ -1126,8 +1175,8 @@ export function computeUncoveredAcIds(
 ): Set<string> {
   const cited = new Set<string>();
   for (const t of tasks) {
-    for (const id of t.traces_to ?? []) cited.add(id);
-    for (const cc of t.completion_criteria ?? []) for (const ac of cc.verifies_acceptance_criteria ?? []) cited.add(ac);
+    for (const id of asStringArray(t.traces_to)) cited.add(id);
+    for (const cc of asRecordArray(t.completion_criteria)) for (const ac of asStringArray(cc.verifies_acceptance_criteria)) cited.add(ac);
   }
   const out = new Set<string>();
   for (const ac of leafAcIdSet) if (!cited.has(ac)) out.add(ac);
@@ -1144,6 +1193,107 @@ export function renderUncoveredAcsMenu(uncovered: Set<string>, leaves: LeafAccep
     for (const ac of acs) lines.push(`  - ${ac.id}${ac.text ? `: ${ac.text}` : ''}`);
   }
   return lines.length > 0 ? lines.join('\n') : '';
+}
+
+/**
+ * Partition the uncovered leaf ACs into BOUNDED batches so each reconciliation
+ * call does small, focused routing instead of the monolithic single call.
+ *
+ * Why this exists: the first reconciliation design handed ALL orphan ACs to one
+ * call. On cal-29 that was 170 orphans → a ~16-minute, 25,826-output-token
+ * response that parsed slowly and whose tasks were dropped (coverage stuck at
+ * 44%). That is the SAME monolithic-scale failure the per-component generation
+ * chunking was designed to avoid — applied here too: cap each call to
+ * `maxAcsPerBatch` orphan ACs (bounded output → reliable parse + credit).
+ *
+ * ACs are grouped by their owning leaf story and kept together (a story is the
+ * cohesive routing unit — its ACs share one behaviour). Stories are packed
+ * greedily up to the budget; a single story whose orphan-AC count alone exceeds
+ * the budget becomes its own (over-budget) batch rather than being split across
+ * calls. Every uncovered id lands in exactly one batch (the uncovered set is
+ * derived from these same leaves, so there are no story-less orphans).
+ */
+export function chunkUncoveredByStory(
+  uncovered: Set<string>,
+  leaves: LeafAcceptanceCriteria[],
+  maxAcsPerBatch: number,
+): Set<string>[] {
+  const budget = Math.max(1, maxAcsPerBatch);
+  const batches: Set<string>[] = [];
+  let current = new Set<string>();
+  for (const l of leaves) {
+    const acIds = l.acs.filter(a => uncovered.has(a.id)).map(a => a.id);
+    if (acIds.length === 0) continue;
+    // Flush before adding a story that would overflow a non-empty batch — keeps
+    // each story's ACs in a single batch.
+    if (current.size > 0 && current.size + acIds.length > budget) {
+      batches.push(current);
+      current = new Set<string>();
+    }
+    for (const id of acIds) current.add(id);
+    // A story that fills (or, alone, overflows) the budget closes the batch.
+    if (current.size >= budget) {
+      batches.push(current);
+      current = new Set<string>();
+    }
+  }
+  if (current.size > 0) batches.push(current);
+  return batches;
+}
+
+/**
+ * Robust coverage test: does this task cover ANY id in `idSet` via its
+ * top-level `traces_to` OR any criterion's `verifies_acceptance_criteria`? The
+ * model uses the two fields interchangeably (see backfillTracesFromCriteria), so
+ * crediting must read both rather than relying on the canonical field alone.
+ */
+export function taskCoversAny(
+  task: { traces_to?: string[]; completion_criteria?: Array<{ verifies_acceptance_criteria?: string[] }> },
+  idSet: Set<string>,
+): boolean {
+  for (const id of asStringArray(task.traces_to)) if (idSet.has(id)) return true;
+  for (const cc of asRecordArray(task.completion_criteria)) {
+    for (const id of asStringArray(cc.verifies_acceptance_criteria)) if (idSet.has(id)) return true;
+  }
+  return false;
+}
+
+/**
+ * Precisely characterize the residual uncovered leaf ACs as upstream
+ * component/FR divergence. After per-component generation AND bounded
+ * reconciliation routing, any AC still uncovered belongs to a leaf user story
+ * that NO component claimed — i.e. the component model is too coarse to deliver
+ * that requirement. Grouping the residual by owning leaf story (largest gaps
+ * first) turns a bare count into an actionable map of WHICH stories diverge, so
+ * the deferred upstream-coarseness issue is precisely quantified, not just
+ * flagged.
+ */
+export function summarizeResidualDivergence(
+  residual: Set<string>,
+  leaves: LeafAcceptanceCriteria[],
+  totalAcs: number,
+): {
+  uncovered: number;
+  total: number;
+  coverage_pct: number;
+  orphan_story_count: number;
+  stories: Array<{ leaf_story_id: string; story_text?: string; orphan_ac_count: number; ac_ids: string[] }>;
+} {
+  const stories: Array<{ leaf_story_id: string; story_text?: string; orphan_ac_count: number; ac_ids: string[] }> = [];
+  for (const l of leaves) {
+    const acIds = l.acs.filter(a => residual.has(a.id)).map(a => a.id);
+    if (acIds.length === 0) continue;
+    stories.push({ leaf_story_id: l.leafStoryId, story_text: l.storyText, orphan_ac_count: acIds.length, ac_ids: acIds });
+  }
+  stories.sort((a, b) => b.orphan_ac_count - a.orphan_ac_count);
+  const covered = totalAcs - residual.size;
+  return {
+    uncovered: residual.size,
+    total: totalAcs,
+    coverage_pct: totalAcs > 0 ? Math.round((covered / totalAcs) * 1000) / 10 : 100,
+    orphan_story_count: stories.length,
+    stories,
+  };
 }
 
 /**

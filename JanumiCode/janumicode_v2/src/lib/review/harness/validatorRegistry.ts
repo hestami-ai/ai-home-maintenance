@@ -634,6 +634,26 @@ const DISPATCH_BUNDLES: ReadonlyMap<string, readonly string[]> = new Map([
     ],
   ],
 
+  // ── Phase 6.1 — implementation_planner / task_skeleton ────────────
+  // Per-component chunking + reconciliation (see project_phase6_per_component_chunking).
+  // Both the per-component generation calls and the reconciliation call carry
+  // agentRole=implementation_planner, sub_phase=task_skeleton. The template
+  // DECLARED reasoning_review_triggers (completeness_shortcut /
+  // implementability_violation) but no DISPATCH bundle wired them, so the audit
+  // never ran. Wire the reasoning-review family (faithfulness + quality + final
+  // synthesis) onto each bounded per-component task-generation call so the
+  // generation is audited, not just deterministically checked downstream.
+  [
+    bundleKey('implementation_planner', 'task_skeleton'),
+    [
+      'json_output_discipline_check',
+      'grounding_validator',
+      'reasoning_to_response_faithfulness',
+      'reasoning_quality_validator',
+      'final_synthesis',
+    ],
+  ],
+
   // ── Stage 1B additions: systems_agent Phase 3 sub-phases ──────────
   // S15 — systems_agent / system_boundary (3.1)
   [
