@@ -136,11 +136,16 @@ const DOMAIN_WIRE_MAP: Record<string, string> = {
  * expected by BusinessDomain TS record consumers.
  */
 export function normalizeDomainFromWire(raw: Record<string, unknown>): Record<string, unknown> {
-  return traceNormalize(
-    'phase1.normalizeDomainFromWire',
-    raw,
-    snakeToCamel(raw, DOMAIN_WIRE_MAP),
-  );
+  const d = snakeToCamel(raw, DOMAIN_WIRE_MAP);
+  // Canonicalize the domain's OWN id producer-side. gpt-oss emits partial-
+  // underscore ids like `DOM-AI_CONCIERGE-INTERACTION` while journey
+  // businessDomainIds are hyphen-normalized (normalizeJourneyFromWire) to
+  // `DOM-AI-CONCIERGE-INTERACTION` — a mismatch the Phase 1.3c
+  // referential_integrity_journey_domain verifier hard-fails on (cal-33). This
+  // is the source-side sibling of the journey-ref fix: normalize both sides to
+  // canonical all-hyphens so the join holds regardless of which side drifts.
+  if (typeof d.id === 'string') d.id = normalizeIdHyphens(d.id);
+  return traceNormalize('phase1.normalizeDomainFromWire', raw, d);
 }
 
 const PERSONA_WIRE_MAP: Record<string, string> = {
@@ -234,8 +239,11 @@ export function normalizeWorkflowV2(w: Record<string, unknown>): WorkflowV2 {
 
   const businessDomainId = pickKey(w, 'business_domain_id', 'businessDomainId');
   const normalized: WorkflowV2 = {
-    id: typeof w.id === 'string' ? w.id : '',
-    businessDomainId: typeof businessDomainId === 'string' ? businessDomainId : '',
+    id: typeof w.id === 'string' ? normalizeIdHyphens(w.id) : '',
+    // Hyphen-normalize the domain ref so it joins to the now-canonical domain
+    // id (see normalizeDomainFromWire) — hardens the 1.3c domain_workflow_coverage
+    // check against the same gpt-oss underscore drift.
+    businessDomainId: typeof businessDomainId === 'string' ? normalizeIdHyphens(businessDomainId) : '',
     name: typeof w.name === 'string' ? w.name : '',
     description: typeof w.description === 'string' ? w.description : '',
     steps,

@@ -28,27 +28,27 @@ You are the [JC:Requirements Agent] performing the product-lens Functional Requi
 GOVERNING CONSTRAINTS (apply without exception):
 {{active_constraints}}
 
-# What's different: Pass 1 of 3
+# What's different: Pass 1 of 3, fanned out ONE journey at a time
 
-Phase 2.1 under Wave 8 is split into three internal passes to match small-model capacity:
+Phase 2.1 under Wave 8 is split into three internal passes to match small-model capacity, and Pass 1 is itself **fanned out by the orchestrator one accepted journey at a time**:
 
-1. **Pass 1 (this prompt)** — produce **skeleton FRs**: `id / role / action / outcome / priority / traces_to` + exactly ONE seed acceptance criterion per FR.
+1. **Pass 1 (this prompt)** — produce **skeleton FRs for the SINGLE user journey shown** in *Accepted User Journey* below: `id / role / action / outcome / priority / traces_to` + exactly ONE seed acceptance criterion per FR. The orchestrator calls this prompt once per journey and merges the results, so do NOT try to cover the whole product — only the one journey in front of you.
 2. **Pass 2 (ac-enrichment)** — a separate LLM call per skeleton produces the full acceptance-criteria list with measurable conditions.
-3. **Pass 3 (deterministic verifier)** — structurally checks coverage (every accepted journey traces to ≥1 FR) and referential integrity.
+3. **Pass 3 (deterministic verifier)** — structurally checks coverage (every accepted journey traces to ≥1 FR across all fanned-out calls) and referential integrity.
 
-Your job in Pass 1 is narrow: **produce skeletons, not finished stories.** Don't burn your attention budget on AC-writing; that's Pass 2's job. Focus entirely on:
-- Covering every accepted journey (hard contract — see below)
+Your job in Pass 1 is narrow: **produce skeletons for THIS journey — not finished stories, and not other journeys.** Don't burn your attention budget on AC-writing (that's Pass 2's job) or on journeys that aren't shown. Focus entirely on:
+- Fully covering the ONE journey shown (hard contract — see below)
 - Producing a good `role / action / outcome` triple per FR
 - Assigning priority accurately
 - Tracing each FR to its upstream handoff items
 
 # Coverage contract — MUST, not SHOULD
 
-**Every accepted user journey MUST be the seed of at least one FR.** The verifier (Pass 3) rejects outputs where this is violated.
+**The ONE accepted user journey shown below MUST be the seed of at least one FR.** After the orchestrator merges every per-journey call, the verifier (Pass 3) rejects the result when an accepted journey is neither traced by an FR nor explicitly deferred.
 
-If you genuinely cannot turn a journey into an FR — e.g. it describes a UI affordance that is already covered by a sibling journey, or it is a pure-navigation step with no behavioral content — you MUST explicitly list it in `unreached_journeys[]` with a reason. Silent omission is a verifier failure.
+If you genuinely cannot turn the shown journey into an FR — e.g. it describes a UI affordance already covered by a sibling journey, or it is a pure-navigation step with no behavioral content — you MUST explicitly list it in `unreached_journeys[]` with a reason. Silent omission is a verifier failure. Only the journey shown may appear in `unreached_journeys[]`; other journeys are out of scope for this call.
 
-In addition, you MAY produce FRs seeded primarily from **compliance items**, **entities**, or **workflows** that don't trace to a specific user journey (e.g. "system MUST purge archived records after 90 days per COMP-RETENTION-7YR" — no journey, but a real functional requirement). These are allowed but supplemental; the journey-derived FRs are the spine.
+In addition, you MAY produce supplemental FRs seeded from the **compliance items**, **entities**, or **workflows** shown that this journey exercises but that don't trace to it directly (e.g. "system MUST purge archived records after 90 days per COMP-RETENTION-7YR"). These are allowed but supplemental; the journey-derived FR is the spine of this call.
 
 ## Non-transactional journeys are FIRST-CLASS
 
@@ -130,7 +130,7 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are rejecte
 
 # Rules
 
-- **Every accepted journey → ≥1 FR OR explicit `unreached_journeys[]` entry with reason.** Silent drops fail the verifier.
+- **The shown journey → ≥1 FR OR an explicit `unreached_journeys[]` entry with reason.** Silent drops fail the verifier. Do not author FRs for, or declare unreached, any journey other than the one shown.
 - **Traces_to MUST reference only ids from the handoff lists below.** The self-heal filter drops invalid refs with a WARN.
 - **Use canonical vocabulary verbatim** — if the glossary says "assessment", don't say "dues" or "charge".
 - **Do NOT include Non-Functional Requirements** (those are Sub-Phase 2.2). This covers not only thresholds but any story whose CORE PURPOSE is a quality/operational concern — monitoring or verifying uptime, alerting on failure, ensuring latency/availability/reliability, health-checking, publishing metrics, log aggregation, encryption-as-a-property. A "Uptime monitor verifies monthly uptime and alerts below threshold" is an NFR, NOT a functional user story. These belong to the NFR roster (2.2) and become cross-cutting constraints on the functional components — do not author functional stories for them.
@@ -155,7 +155,7 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are rejecte
 # Intent Statement Summary
 {{intent_statement_summary}}
 
-# Accepted User Journeys (primary functional-requirement seed — MUST be fully covered)
+# Accepted User Journey (the ONE journey to cover in THIS call — MUST be fully covered)
 {{accepted_journeys}}
 
 # Accepted Entities (data the product operates on)

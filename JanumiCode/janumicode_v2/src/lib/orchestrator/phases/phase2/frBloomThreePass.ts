@@ -34,6 +34,7 @@ import {
   type UserStorySkeleton,
 } from './verifyFrCoverage';
 import { autoFlagDroppedJourneys } from './autoFlagDroppedJourneys';
+import { chunkedCoverageBloom } from '../chunkedCoverageBloom';
 
 export interface FrBloomThreePassResult {
   userStories: FullUserStory[];
@@ -182,58 +183,232 @@ function parseEnrichmentResponse(
 }
 
 /**
- * Run Pass 1 — skeleton bloom. Uses the product-lens
- * `02_1_functional_requirements` template (now schema_version 2.0 with
- * narrow output contract).
+ * Run Pass 1 — skeleton bloom, fanned out PER JOURNEY (SD-5).
+ *
+ * The former monolithic single-call skeleton (one JSON enumerating every user
+ * story across every accepted journey) overran gpt-oss:20b in cal-34: a
+ * ~7K-char array truncated mid-stream, json_repair exhausted (qwen3.5 + gemma
+ * both failed on the malformed 7K JSON), and the artifact fell back to an empty
+ * roster — starving the whole functional pipeline. We now issue ONE focused
+ * `fr_bloom_skeleton` call per accepted journey (a small, parseable US JSON
+ * each) and let the shared `chunkedCoverageBloom` orchestrator own the
+ * completeness guarantee: a journey that got neither a US nor a self-declared
+ * `unreached` is reconciled in bounded per-journey retries, and any honest
+ * residual is left to the downstream `autoFlagDroppedJourneys` backstop.
+ *
+ * Story ids are carried alongside a per-(journey, position) dedup KEY in
+ * flight (so the helper's `idOf` dedup can't collapse a distinct story that
+ * reused `US-001`), and the story's own `id` is left untouched. On merge, if
+ * two journeys surfaced the SAME raw id, ALL stories are deterministically
+ * renumbered to a global sequential `US-###`; when ids are already unique they
+ * are preserved verbatim (matching the pre-SD-5 single-call behaviour that
+ * downstream decomposition keys on). Renumbering happens BEFORE enrichment, so
+ * the composite AC ids (`AC-US{nnn}-{mmm}`) mint off the final US id.
+ * `traces_to` references journeys/entities/workflows (never other US ids), so
+ * renumbering is safe. Returns the SAME `{ stories, unreached }` shape as the
+ * old monolith, so `runFrBloomThreePass` and everything after it is unchanged.
  */
-async function runSkeletonPass(deps: FrBloomDeps): Promise<{
+export async function runSkeletonPass(deps: FrBloomDeps): Promise<{
   stories: UserStorySkeleton[];
   unreached: UnreachedJourneyDeclaration[];
 }> {
   const { ctx, handoff, dmr, intentSummary } = deps;
+  const log = getLogger();
   const template = ctx.engine.templateLoader.findTemplate(
     'requirements_agent',
     'fr_bloom_skeleton',
     'product',
   );
   if (!template) {
-    getLogger().warn('workflow', 'Phase 2.1: skeleton template not found', {});
+    log.warn('workflow', 'Phase 2.1: skeleton template not found', {});
     return { stories: [], unreached: [] };
   }
-  const variables: Record<string, string> = {
-    active_constraints: dmr.activeConstraintsText,
-    intent_statement_summary: intentSummary,
-    product_vision: handoff.productVision ?? '',
-    accepted_journeys: deps.format.formatJourneys(handoff.userJourneys ?? []),
-    accepted_entities: deps.format.formatEntities(handoff.entityProposals ?? []),
-    accepted_workflows: deps.format.formatWorkflows(handoff.workflowProposals ?? []),
-    compliance_extracted_items: deps.format.formatExtractedItems(handoff.complianceExtractedItems ?? []),
-    canonical_vocabulary: deps.format.formatVocabulary(handoff.canonicalVocabulary ?? []),
-    open_questions: deps.format.formatExtractedItems(handoff.openQuestions ?? []),
-    detail_file_path: dmr.detailFilePath,
-    detail_file_content: dmr.detailFileContent,
-    janumicode_version_sha: ctx.engine.janumiCodeVersionSha,
-  };
-  const rendered = ctx.engine.templateLoader.render(template, variables);
-  if (rendered.missing_variables.length > 0) {
-    getLogger().warn('workflow', 'Phase 2.1 skeleton: missing template variables', {
-      missing: rendered.missing_variables,
+
+  const journeys = handoff.userJourneys ?? [];
+  // The journey spine drives the fan-out. With zero accepted journeys there is
+  // nothing to chunk — return empty honestly (the verifier then sees no journeys
+  // to cover and no gaps); never fabricate.
+  if (journeys.length === 0) return { stories: [], unreached: [] };
+
+  const journeyById = new Map(journeys.map(j => [j.id, j]));
+
+  // targetCoverageSet starts as every accepted journey id. A journey a
+  // per-journey call self-declares `unreached` is a legitimate deferral, NOT an
+  // uncovered gap — it is removed from this set in-flight. Fan-out is sequential
+  // and completes before the helper reads this set for reconciliation/residual,
+  // so mutating the shared reference during generation is consistent.
+  const targetCoverageSet = new Set<string>(journeys.map(j => j.id));
+
+  // Shared accumulator for every per-journey `unreached_journeys[]` declaration.
+  const unreachedAll: UnreachedJourneyDeclaration[] = [];
+
+  // One focused skeleton call scoped to a specific set of journeys. Renders the
+  // shared template with `accepted_journeys` = ONLY the scoped journeys, parses
+  // via parseSkeletonResponse, records any self-declared unreached, and returns
+  // the parsed stories UN-namespaced (callers namespace by chunk).
+  const callForJourneys = async (
+    scoped: UserJourney[],
+    label: string,
+    reconciliationNote = '',
+  ): Promise<{ stories: UserStorySkeleton[]; unreached: UnreachedJourneyDeclaration[] } | null> => {
+    const variables: Record<string, string> = {
+      active_constraints: dmr.activeConstraintsText,
+      intent_statement_summary: intentSummary,
+      product_vision: handoff.productVision ?? '',
+      accepted_journeys: deps.format.formatJourneys(scoped),
+      accepted_entities: deps.format.formatEntities(handoff.entityProposals ?? []),
+      accepted_workflows: deps.format.formatWorkflows(handoff.workflowProposals ?? []),
+      compliance_extracted_items: deps.format.formatExtractedItems(handoff.complianceExtractedItems ?? []),
+      canonical_vocabulary: deps.format.formatVocabulary(handoff.canonicalVocabulary ?? []),
+      open_questions: deps.format.formatExtractedItems(handoff.openQuestions ?? []),
+      detail_file_path: dmr.detailFilePath,
+      detail_file_content: dmr.detailFileContent,
+      janumicode_version_sha: ctx.engine.janumiCodeVersionSha,
+    };
+    const rendered = ctx.engine.templateLoader.render(template, variables);
+    if (rendered.missing_variables.length > 0) {
+      log.warn('workflow', 'Phase 2.1 skeleton: missing template variables', {
+        missing: rendered.missing_variables, scope: scoped.map(j => j.id),
+      });
+      return null;
+    }
+    // A reconciliation retry MUST differ from the generation prompt for the same
+    // journey — otherwise the llmCaller prompt-cache returns the identical (empty)
+    // result and the retry is a no-op. The focused directive both busts the cache
+    // and re-orients the model on the specific coverage miss.
+    const prompt = reconciliationNote
+      ? `${reconciliationNote}\n\n${rendered.rendered}`
+      : rendered.rendered;
+    const result = await ctx.engine.callForRole('requirements_agent', {
+      prompt,
+      responseFormat: 'json',
+      temperature: 0.5,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '2',
+        subPhaseId: 'fr_bloom_skeleton',
+        agentRole: 'requirements_agent',
+        label,
+      },
     });
-    return { stories: [], unreached: [] };
-  }
-  const result = await ctx.engine.callForRole('requirements_agent', {
-    prompt: rendered.rendered,
-    responseFormat: 'json',
-    temperature: 0.5,
-    traceContext: {
-      workflowRunId: ctx.workflowRun.id,
-      phaseId: '2',
-      subPhaseId: 'fr_bloom_skeleton',
-      agentRole: 'requirements_agent',
-      label: 'Phase 2.1 — FR Skeleton Bloom (Pass 1 of 3)',
+    const parsed = parseSkeletonResponse(result.parsed as Record<string, unknown> | null);
+    for (const u of parsed.unreached) {
+      unreachedAll.push(u);
+      targetCoverageSet.delete(u.journey_id); // legitimate deferral — not a gap
+    }
+    return parsed;
+  };
+
+  const maxReconPasses = Math.max(
+    0,
+    Number.parseInt(process.env.JANUMICODE_P2_FR_RECON_PASSES ?? '1', 10) || 0,
+  );
+
+  const rawId = (s: UserStorySkeleton): string => (typeof s.id === 'string' ? s.id : '');
+
+  // The helper dedups on `idOf`. Two journeys each restart their US numbering at
+  // US-001, so we carry a per-(scope, position) dedup KEY distinct from the
+  // story's own id — otherwise the helper would drop the second US-001 as a
+  // duplicate. The story id itself is preserved for the merge-time renumber.
+  interface ProducedStory { story: UserStorySkeleton; key: string }
+
+  const generateForChunk = async (journey: UserJourney, index: number): Promise<ProducedStory[]> => {
+    try {
+      const parsed = await callForJourneys(
+        [journey],
+        `Phase 2.1 — FR Skeleton Bloom (journey ${journey.id}, ${index + 1}/${journeys.length})`,
+      );
+      if (!parsed) return [];
+      return parsed.stories.map((story, k) => ({ story, key: `c${index}:${k}:${rawId(story)}` }));
+    } catch (err) {
+      log.warn('workflow', 'Phase 2.1 per-journey skeleton generation failed — continuing', {
+        journey_id: journey.id, error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
+  };
+
+  // One journey per reconciliation call — keeps each retry JSON small (the whole
+  // point of per-journey chunking); never a monolithic recon response.
+  const chunkUncovered = (uncovered: Set<string>): Array<Set<string>> =>
+    [...uncovered].sort().map(id => new Set<string>([id]));
+
+  const reconcileBatch = async (
+    batch: Set<string>,
+    passInfo: { pass: number; batchIndex: number; batchCount: number },
+  ): Promise<ProducedStory[]> => {
+    const scoped = [...batch].sort()
+      .map(id => journeyById.get(id))
+      .filter((j): j is UserJourney => !!j);
+    if (scoped.length === 0) return [];
+    const reconciliationNote =
+      'COVERAGE RECONCILIATION — FOCUS: A prior pass produced NO functional requirement for the '
+      + 'user journey shown below and did NOT declare it unreached. Produce at least one FR that seeds '
+      + 'it now (role/action/outcome + traces_to including its UJ- id + one seed acceptance criterion), '
+      + 'OR, if it is genuinely covered by a sibling journey or has no behavioural content, declare it in '
+      + 'unreached_journeys[] with a reason. Do not restate any other journey.';
+    try {
+      const parsed = await callForJourneys(
+        scoped,
+        `Phase 2.1 — FR Skeleton Reconciliation (pass ${passInfo.pass}, batch ${passInfo.batchIndex}/${passInfo.batchCount})`,
+        reconciliationNote,
+      );
+      if (!parsed) return [];
+      return parsed.stories.map((story, k) => ({
+        story, key: `r${passInfo.pass}:${passInfo.batchIndex}:${k}:${rawId(story)}`,
+      }));
+    } catch (err) {
+      log.warn('workflow', 'Phase 2.1 skeleton reconciliation batch failed — continuing', {
+        pass: passInfo.pass, batch_index: passInfo.batchIndex,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
+  };
+
+  const bloom = await chunkedCoverageBloom<UserJourney, ProducedStory>({
+    chunks: journeys,
+    generateForChunk,
+    idOf: (p) => p.key,
+    targetCoverageSet,
+    coveredBy: (p) => (p.story.traces_to ?? []).filter(t => typeof t === 'string' && t.startsWith('UJ-')),
+    chunkUncovered,
+    reconcileBatch,
+    maxReconPasses,
+    onResidual: (residual) => {
+      log.warn(
+        'workflow',
+        'Phase 2.1 residual uncovered journeys after skeleton reconciliation (honest gap — downstream autoFlagDroppedJourneys declares these unreached)',
+        { residual: residual.size, sample: [...residual].sort().slice(0, 20) },
+      );
     },
+    logLabel: 'Phase 2.1',
   });
-  return parseSkeletonResponse(result.parsed as Record<string, unknown> | null);
+
+  const merged = bloom.produced.map(p => p.story);
+
+  // Guarantee globally-unique US ids. Two journeys each restart at US-001, so a
+  // raw-id collision across the merged set is the norm in real runs — when it
+  // happens, deterministically renumber ALL stories to sequential US-###. When
+  // the merged ids are already unique, preserve them verbatim (keeps single-call
+  // / single-journey ids stable for downstream decomposition). traces_to is
+  // untouched (references UJ-/ENT-/WF-/COMP-/…, never US ids).
+  const rawIds = merged.map(rawId);
+  const hasCollision = new Set(rawIds).size !== rawIds.length;
+  const stories: UserStorySkeleton[] = hasCollision
+    ? merged.map((s, i) => ({ ...s, id: `US-${String(i + 1).padStart(3, '0')}` }))
+    : merged;
+
+  // Dedup unreached declarations by journey_id (keep the first reason).
+  const seenUnreached = new Set<string>();
+  const unreached: UnreachedJourneyDeclaration[] = [];
+  for (const u of unreachedAll) {
+    if (seenUnreached.has(u.journey_id)) continue;
+    seenUnreached.add(u.journey_id);
+    unreached.push(u);
+  }
+
+  return { stories, unreached };
 }
 
 /** Run Pass 2 — per-FR AC enrichment. Runs sequentially to respect model concurrency. */
