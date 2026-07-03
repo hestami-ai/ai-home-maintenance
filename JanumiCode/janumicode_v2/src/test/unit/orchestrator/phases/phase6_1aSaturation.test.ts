@@ -166,6 +166,58 @@ describe('runTaskSaturationLoop — Wave 8 saturation', () => {
     expect(snap.delta_from_previous_pass).toBe(2);
   });
 
+  it('PA-1 — task_saturation prompt is scoped: own-component context, id-only depth-0, same-component root siblings', async () => {
+    const mock = new MockLLMProvider();
+    // Atomic response for every root → one call each, branch terminates; we assert on the captured prompts.
+    mock.setFixture('atomic', {
+      match: 'task-',
+      parsedJson: {
+        parent_branch_classification: 'atomic_unit',
+        parent_tier_assessment: { tier: 'D', agrees_with_hint: true, rationale: 'atomic' },
+        children: [],
+        surfaced_assumptions: [],
+      },
+    });
+    configureMock(mock);
+
+    const { run } = engine.startWorkflowRun('ws', 'test');
+    const rootA: DecompositionTask = { ...tinyTask('task-a-root'), component_id: 'comp-a' };
+    const rootB: DecompositionTask = { ...tinyTask('task-b-root'), component_id: 'comp-b' };
+    const sa = seedRootNode(engine, run.id, rootA);
+    const sb = seedRootNode(engine, run.id, rootB);
+
+    await runTaskSaturationLoop(
+      { engine, workflowRun: { id: run.id } as Parameters<typeof runTaskSaturationLoop>[0]['workflowRun'] },
+      {
+        technicalConstraints: [],
+        componentSummary: 'FULL-MODEL-SUMMARY (comp-a and comp-b together)',
+        componentSummaryById: {
+          'comp-a': 'SCOPED-COMPONENT-A-ONLY',
+          'comp-b': 'SCOPED-COMPONENT-B-ONLY',
+        },
+        rootTasks: [rootA, rootB],
+        rootNodeRecordIds: [sa.recordId, sb.recordId],
+        rootLogicalIds: [sa.logicalNodeId, sb.logicalNodeId],
+      },
+    );
+
+    const prompts = mock.getCallLog().map(c => c.options.prompt ?? '');
+    const promptA = prompts.find(p => p.includes('SCOPED-COMPONENT-A-ONLY'));
+    expect(promptA, 'a task_saturation prompt scoped to comp-a should exist').toBeDefined();
+
+    // (1) component_context is scoped to the task's OWN component — not the other component, not the full model.
+    expect(promptA!).not.toContain('SCOPED-COMPONENT-B-ONLY');
+    expect(promptA!).not.toContain('FULL-MODEL-SUMMARY');
+
+    // (2) depth_zero_tasks is a compact id-only comma list (not `- id: name` bullets / ~33KB roster).
+    expect(promptA!).toContain('task-a-root, task-b-root');
+
+    // (3) root-node sibling_context is scoped to the same component → comp-a root has no same-component siblings,
+    //     and the cross-component root must NOT be injected as a sibling bullet.
+    expect(promptA!).toContain('(none — sole child under this parent)');
+    expect(promptA!).not.toContain('- task-b-root: task-b-root');
+  });
+
   it('Tier-B children fire mirror gate; auto-accept queues for Tier-C decomposition', async () => {
     const mock = new MockLLMProvider();
     mock.setFixture('decompose-root', {

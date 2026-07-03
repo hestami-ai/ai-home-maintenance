@@ -111,8 +111,14 @@ export class OllamaProvider implements LLMProviderAdapter {
     // thinking-mode model. Treat like gpt-oss for json-format handling.
     // Practical context ceiling on the RTX 4090 is 50K.
     const isApriel = modelLc.includes('apriel');
+    // ornith (e.g. `ornith:35b-q4_K_M`) is a qwen3.5-based thinking model
+    // evaluated as an alternative harness backing model. Operator-specified
+    // sampling profile: num_ctx 131072, temperature 0.6, top_k 20, top_p 0.95,
+    // stop `<|im_end|>`. Treated like qwen for the json-format carve-out (it
+    // merges the response into `thinking` when `format: json` is set).
+    const isOrnith = modelLc.startsWith('ornith');
     const supportsThinking = !isGranite;
-    const skipJsonFormat = isQwen || isGemma || isGptOss || isApriel;
+    const skipJsonFormat = isQwen || isGemma || isGptOss || isApriel || isOrnith;
     const onChunk = (options as LLMStreamingCallOptions).onChunk;
 
     // Model-family temperature overrides. Qwen thinking models loop at
@@ -127,6 +133,7 @@ export class OllamaProvider implements LLMProviderAdapter {
     let temperature: number;
     if (isQwen) temperature = 1;
     else if (isGemma) temperature = 1;
+    else if (isOrnith) temperature = 0.6;
     else temperature = options.temperature ?? 0.7;
 
     // Token cap (`num_predict`) — off by default to match the
@@ -165,9 +172,10 @@ export class OllamaProvider implements LLMProviderAdapter {
         // Ollama would otherwise truncate silently), gpt-oss → 131072
         // (also native max; same rounding fix as gemma), apriel → 50K
         // (RTX 4090 ceiling for apriel-1.6:15b), default (qwen) → 262K.
-        num_ctx: isGemmaLarge ? 262144 : isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : 262141,
+        num_ctx: isGemmaLarge ? 262144 : isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : isOrnith ? 131072 : 262141,
         ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95, min_p: 0, repeat_penalty: 1 } : {}),
         ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
+        ...(isOrnith ? { top_k: 20, top_p: 0.95, stop: ['<|im_end|>'] } : {}),
         ...(numPredict > 0 ? { num_predict: numPredict } : {}),
       },
     };
@@ -460,6 +468,7 @@ export class OllamaProvider implements LLMProviderAdapter {
     const isGptOss = modelLc.startsWith('gpt-oss');
     const isGranite = modelLc.startsWith('granite');
     const isApriel = modelLc.startsWith('apriel');
+    const isOrnith = modelLc.startsWith('ornith');
     const messages: Array<Record<string, unknown>> = [];
     if (options.system) messages.push({ role: 'system', content: options.system });
     messages.push({ role: 'user', content: options.prompt });
@@ -467,13 +476,14 @@ export class OllamaProvider implements LLMProviderAdapter {
     let temperature: number;
     if (isQwen) temperature = 1;
     else if (isGemma) temperature = 1;
+    else if (isOrnith) temperature = 0.6;
     else temperature = options.temperature ?? 0.7;
 
     const body: Record<string, unknown> = {
       model: options.model,
       messages,
       stream: false,
-      ...(isQwen || isGemma ? { think: true } : {}),
+      ...(isQwen || isGemma || isOrnith ? { think: true } : {}),
       tools: options.tools!.map(t => ({
         type: 'function',
         function: {
@@ -487,9 +497,10 @@ export class OllamaProvider implements LLMProviderAdapter {
         // Mirrors the per-family num_ctx in callGenerate (single source of
         // truth would be cleaner but the two paths take different option
         // shapes). Keep these in sync when adjusting.
-        num_ctx: isGemmaLarge ? 262144 : isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : 262141,
+        num_ctx: isGemmaLarge ? 262144 : isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : isOrnith ? 131072 : 262141,
         ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95, min_p: 0, repeat_penalty: 1 } : {}),
         ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
+        ...(isOrnith ? { top_k: 20, top_p: 0.95, stop: ['<|im_end|>'] } : {}),
         ...(options.maxTokens ? { num_predict: options.maxTokens } : {}),
       },
     };

@@ -62,9 +62,16 @@ export const PHASE0_CONTRACT: PhaseContract = {
 export const PHASE0_5_CONTRACT: PhaseContract = {
   phase: '0.5',
   required_artifacts: [
-    art('cross_run_impact_report', 'impact_enumeration',
-      'Phase 0.5 consistency-checker output; drives the cascade threshold menu.',
-      { produced_by_agent_role: 'consistency_checker' }),
+    // Phase 0.5 writes record_type 'cross_run_impact_report' DIRECTLY (no
+    // content.kind), so match it as a literal record_type — art() matches
+    // artifact_produced + content_kind and therefore NEVER matched (a permanent
+    // false gap whenever Phase 0.5 ran).
+    {
+      record_type: 'cross_run_impact_report',
+      sub_phase_id: 'impact_enumeration',
+      produced_by_agent_role: 'consistency_checker',
+      reason: 'Phase 0.5 consistency-checker output; drives the cascade threshold menu.',
+    },
   ],
   invariants: [],
   authority_rules: [],

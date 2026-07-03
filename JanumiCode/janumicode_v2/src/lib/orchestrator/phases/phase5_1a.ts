@@ -15,6 +15,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { displayEntityRelationship } from './summaryFormat';
 import type { PhaseContext } from '../orchestratorEngine';
 import type {
   GovernedStreamRecord,
@@ -65,6 +66,12 @@ const DEFAULT_CONFIG: DataModelSaturationConfig = {
 export interface DataModelSaturationInput {
   technicalConstraints: TechnicalConstraint[];
   componentSummary: string;
+  /**
+   * Per-component scoped context blocks (component_id → that component's block).
+   * PA-4: a single-entity saturation call sees only its OWN component, not the
+   * whole component backlog. Falls back to `componentSummary`.
+   */
+  componentSummaryById?: Record<string, string>;
   rootEntities: DecompositionEntity[];
   rootNodeRecordIds: string[];
   rootLogicalIds: string[];
@@ -252,7 +259,7 @@ function formatEntityForPrompt(e: DecompositionEntity): string {
   ).join('\n');
   const rels = (e.relationships ?? []).length === 0
     ? '(none)'
-    : (e.relationships ?? []).map(r => `  - ${r.target_entity_id} (${r.kind}${r.ownership ? `, ${r.ownership}` : ''})`).join('\n');
+    : (e.relationships ?? []).map(r => `  - ${displayEntityRelationship(r)}`).join('\n');
   return [
     `Entity id: ${e.id}`,
     `Name: ${e.name}`,
@@ -443,10 +450,21 @@ export async function runDataModelSaturationLoop(
           active_constraints: activeConstraintsForPrompt,
           parent_entity: formatEntityForPrompt(entry.entity),
           parent_tier_hint: entry.tierHint,
-          sibling_context: siblings.length <= 1
-            ? '(none — sole child under this parent)'
-            : siblings.filter(s => s.id !== entry.entity.id).map(s => `- ${s.id}: ${s.name}`).join('\n'),
-          component_context: input.componentSummary,
+          sibling_context: (() => {
+            // Scope root-node siblings to the same component (PA-4): at depth 0
+            // `siblingsByParent.get(null)` is EVERY root entity across all
+            // components, duplicating depth_zero_entities and bloating the prompt.
+            const isRoot = entry.parentNodeId == null;
+            const sibs = siblings
+              .filter(s => s.id !== entry.entity.id)
+              .filter(s => !isRoot || s.component_id === entry.entity.component_id);
+            return sibs.length === 0
+              ? '(none — sole child under this parent)'
+              : sibs.map(s => `- ${s.id}: ${s.name}`).join('\n');
+          })(),
+          // Scope component_context to the entity's OWN component (PA-4), not the
+          // whole component backlog. Fallback to the full summary when unresolved.
+          component_context: (entry.entity.component_id ? input.componentSummaryById?.[entry.entity.component_id] : undefined) ?? input.componentSummary,
           system_requirements_summary: input.systemRequirementsSummary,
           ancestor_chain: ancestorChainText,
           depth_zero_entities: depthZeroText,
@@ -1019,7 +1037,7 @@ function emitTierBGateBundles(
         entity_id: c.entity.id,
         kind: c.entity.kind,
         field_count: c.entity.fields.length,
-        relationships: (c.entity.relationships ?? []).map(r => `${r.target_entity_id} (${r.kind})`),
+        relationships: (c.entity.relationships ?? []).map(displayEntityRelationship),
         active_constraints: c.entity.active_constraints ?? [],
       },
     }));

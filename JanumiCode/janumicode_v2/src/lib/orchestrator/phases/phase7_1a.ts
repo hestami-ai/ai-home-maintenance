@@ -78,6 +78,12 @@ export interface TestSaturationInput {
   technicalConstraints: TechnicalConstraint[];
   componentSummary: string;
   /**
+   * Per-component scoped context blocks (component_id → that component's block).
+   * PA-2: a single-test-case saturation call sees only its OWN component(s), not
+   * the whole ~17-component model. Falls back to `componentSummary`.
+   */
+  componentSummaryById?: Record<string, string>;
+  /**
    * Leaf-aware FR/AC summary (from `buildEffectiveFrView`). The
    * saturation prompt asks each child to attach `acceptance_criterion_ids`,
    * and the parent test case's existing AC ids were minted from Phase
@@ -564,10 +570,32 @@ export async function runTestSaturationLoop(
           active_constraints: activeConstraintsForPrompt,
           parent_test_case: formatTestCaseForPrompt(entry.testCase),
           parent_tier_hint: entry.tierHint,
-          sibling_context: siblings.length <= 1
-            ? '(none — sole child under this parent)'
-            : siblings.filter(s => s.id !== entry.testCase.id).map(s => `- ${s.id}: ${s.name}`).join('\n'),
-          component_context: input.componentSummary,
+          sibling_context: (() => {
+            // Scope root-node siblings to component-overlapping test cases (PA-2):
+            // at depth 0 `siblingsByParent.get(null)` is EVERY root test case
+            // across all areas, bloating the prompt with cross-area TCs. When the
+            // test case carries no resolvable component (parentComps empty), the
+            // overlap predicate would exclude ALL siblings and falsely render the
+            // node as a sole child — so fall back to the full same-parent roster
+            // in that case (mirrors component_context's empty fallback below).
+            const isRoot = entry.parentNodeId == null;
+            const parentComps = new Set(entry.testCase.component_ids ?? []);
+            const sibs = siblings
+              .filter(s => s.id !== entry.testCase.id)
+              .filter(s => !isRoot || parentComps.size === 0 || (s.component_ids ?? []).some(c => parentComps.has(c)));
+            return sibs.length === 0
+              ? '(none — sole child under this parent)'
+              : sibs.map(s => `- ${s.id}: ${s.name}`).join('\n');
+          })(),
+          // Scope component_context to the component(s) THIS test case exercises
+          // (PA-2), not the whole ~17-component model. Fallback to the full
+          // summary when the test carries no resolvable component_ids.
+          component_context: (() => {
+            const scoped = (entry.testCase.component_ids ?? [])
+              .map(cid => input.componentSummaryById?.[cid])
+              .filter((b): b is string => !!b);
+            return scoped.length > 0 ? scoped.join('\n\n') : input.componentSummary;
+          })(),
           // Scope the AC block to the parent's OWN validated ACs (saturation
           // partitions the parent's coverage). Falls back to the full catalog
           // only when the parent has no resolvable AC ids.

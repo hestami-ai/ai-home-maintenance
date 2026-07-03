@@ -13,9 +13,11 @@
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
 import type { GovernedStreamRecord, PhaseId } from '../../types/records';
 import { getLogger } from '../../logging';
-import { extractPriorPhaseContext, buildEffectiveFrView } from './phaseContext';
+import { extractPriorPhaseContext, buildEffectiveFrView, getFrozenFrLeaves } from './phaseContext';
+import { displayCapability } from './summaryFormat';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray, pickEnvelope } from '../parsedResponseHelpers';
+import { chunkedCoverageBloom } from './chunkedCoverageBloom';
 import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
@@ -44,6 +46,35 @@ interface SystemBoundary {
    */
   open_questions: string[];
   external_systems: ExternalSystem[];
+}
+
+/**
+ * Format the system-boundary artifact into the `system_boundary_summary` prompt
+ * variable fed to Phase 3.2 (system requirements) and Phase 3.3 (interface
+ * contracts).
+ *
+ * PA-8: `in_scope`/`out_of_scope` are DECLARED `string[]` but the LLM emits scope
+ * items as objects (`{capability, description, satisfies_fr}` — the boundary
+ * template requires objects and forbids strings). A raw `join()` therefore renders
+ * `[object Object]; [object Object]`, starving the downstream systems_agent of the
+ * actual scope. `displayCapability` extracts a label whether the item is a string
+ * or an object, so this can never regress to `[object Object]`.
+ */
+export function formatSystemBoundarySummary(
+  boundary: SystemBoundary,
+  projectTypeDescription: string,
+): string {
+  return [
+    `PROJECT TYPE: ${projectTypeDescription}`,
+    ``,
+    `System Boundary:`,
+    `In scope: ${boundary.in_scope.map(displayCapability).join('; ')}`,
+    `Out of scope: ${boundary.out_of_scope.map(displayCapability).join('; ') || 'none'}`,
+    boundary.open_questions.length > 0
+      ? `Open questions (unresolved Phase 1 items): ${boundary.open_questions.join('; ')}`
+      : ``,
+    `External systems: ${boundary.external_systems.map(e => `${e.id}: ${e.name} (${e.interface_type})`).join('; ') || 'none'}`,
+  ].filter(Boolean).join('\n');
 }
 
 interface SystemRequirementItem {
@@ -111,6 +142,22 @@ export class Phase3Handler implements PhaseHandler {
     const frIds = frStories.map(s => s.id as string).filter(Boolean);
     const nfrIdList = ((prior.nonFunctionalRequirements?.content.requirements as Array<Record<string, unknown>>) ?? [])
       .map(n => n.id as string).filter(Boolean);
+
+    // SD-1: per-release cohorts for chunked SR derivation. The monolithic 3.2
+    // call asked one gpt-oss:20b response to cover the full FR∪NFR id set
+    // (~255 leaf ids at scale → a 13-id coverage miss incl NFRs). We instead
+    // chunk generation per release-ordinal (+ one cross-cutting NFR cohort)
+    // and let the orchestrator close 100% coverage via reconciliation.
+    // Leaf FR ids carry their release_ordinal on the decomposition node; the
+    // user_story records returned by buildEffectiveFrView do not, so read the
+    // frozen leaves directly to attach the ordinal (empty → root-FR fallback,
+    // a single Backlog cohort).
+    const frLeaves = getFrozenFrLeaves(decompositionNodes);
+    const srFrStories = buildSrFrStories(frLeaves, frStories);
+    const srNfrs = buildSrNfrs(prior.nonFunctionalRequirements?.content.requirements);
+    const srFrIds = srFrStories.map(s => s.id);
+    const srNfrIds = srNfrs.map(n => n.id);
+
     const dmr31Seeds = [
       ...(prior.intentStatement ? [prior.intentStatement.recordId] : []),
       ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
@@ -177,17 +224,7 @@ export class Phase3Handler implements PhaseHandler {
     // ── 3.2 — System Requirements Derivation ──────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'system_requirements');
 
-    const boundarySummary = [
-      `PROJECT TYPE: ${prior.projectTypeDescription}`,
-      ``,
-      `System Boundary:`,
-      `In scope: ${boundaryContent.in_scope.join('; ')}`,
-      `Out of scope: ${boundaryContent.out_of_scope.join('; ') || 'none'}`,
-      boundaryContent.open_questions.length > 0
-        ? `Open questions (unresolved Phase 1 items): ${boundaryContent.open_questions.join('; ')}`
-        : ``,
-      `External systems: ${boundaryContent.external_systems.map(e => `${e.id}: ${e.name} (${e.interface_type})`).join('; ') || 'none'}`,
-    ].filter(Boolean).join('\n');
+    const boundarySummary = formatSystemBoundarySummary(boundaryContent, prior.projectTypeDescription);
 
     const externalSystemIds = boundaryContent.external_systems.map(e => e.id).filter(Boolean);
     const dmr32Seeds = [
@@ -204,9 +241,14 @@ export class Phase3Handler implements PhaseHandler {
       requiredOutputSpec: 'system_requirements JSON — items array with id, statement, source_requirement_ids',
     });
 
-    const sysReqContent = await this.runSystemRequirementsDerivation(
-      ctx, boundarySummary, frSummary, nfrSummary, dmr32,
-    );
+    const srResult = await deriveSystemRequirementsChunked(ctx, {
+      boundarySummary,
+      activeConstraintsText: dmr32.activeConstraintsText,
+      janumicodeVersionSha: engine.janumiCodeVersionSha,
+      frStories: srFrStories,
+      nfrs: srNfrs,
+    });
+    const sysReqContent = srResult.requirements;
 
     const sysReqRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -324,7 +366,7 @@ export class Phase3Handler implements PhaseHandler {
     engine.stateMachine.setSubPhase(workflowRun.id, 'system_spec_gate');
 
     const consistencyReport = this.runConsistencyCheck(
-      boundaryContent, sysReqContent, contractsContent, frStories,
+      boundaryContent, sysReqContent, contractsContent, srFrIds, srNfrIds,
     );
 
     const consistencyRecord = engine.writer.writeRecord({
@@ -443,75 +485,6 @@ export class Phase3Handler implements PhaseHandler {
     return fallback;
   }
 
-  private async runSystemRequirementsDerivation(
-    ctx: PhaseContext,
-    boundarySummary: string,
-    frSummary: string,
-    nfrSummary: string,
-    dmr: PhaseContextPacketResult,
-  ): Promise<SystemRequirements> {
-    const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('systems_agent', 'system_requirements');
-
-    const fallback: SystemRequirements = {
-      items: [{
-        id: 'SR-001',
-        statement: 'System shall implement core functionality as specified in functional requirements',
-        source_requirement_ids: ['US-001'],
-        priority: 'high',
-      }],
-    };
-
-    if (!template) return fallback;
-
-    const rendered = engine.templateLoader.render(template, {
-      active_constraints: dmr.activeConstraintsText,
-      system_boundary_summary: boundarySummary,
-      functional_requirements_summary: frSummary,
-      non_functional_requirements_summary: nfrSummary,
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-    });
-    if (rendered.missing_variables.length > 0) return fallback;
-
-    // LLM throws propagate to engine catch (halts workflow).
-    // Route through requirements_agent routing so cal-22+ can target
-    // llamacpp via llama-swap. Falls back to ollama+qwen3.5:9b dev
-    // defaults when no workspace-config override is set. callForRole
-    // forwards provider/model/base_url from llm_routing.requirements_agent.
-    const result = await engine.callForRole('requirements_agent', {
-      prompt: rendered.rendered,
-      responseFormat: 'json',
-      temperature: 0.4,
-      traceContext: {
-        workflowRunId: ctx.workflowRun.id,
-        phaseId: '3',
-        subPhaseId: 'system_requirements',
-        agentRole: 'systems_agent',
-        label: 'Phase 3.2 — System Requirements Derivation',
-      },
-    });
-
-    // Parse defensively — the model can emit any of:
-    //   1. { items: [...] }                              (flat)
-    //   2. { system_requirements: [...] }                (envelope=array)
-    //   3. { system_requirements: { items: [...] } }     (double envelope)
-    //
-    // ts-107 seq=20 hit shape #3 — gpt-oss:20b produced a perfectly
-    // good 10+ SR list nested under `system_requirements.items` but
-    // the previous single-level `pickItemsArray` lookup couldn't see
-    // through the wrapper and silently fell back to the boilerplate
-    // SR-001 "System shall implement core functionality..." This is
-    // the same parser bug that broke interface_contracts at ts-103
-    // (already fixed for that sub-phase). Same fix pattern here.
-    const parsed = result.parsed as Record<string, unknown> | null;
-    const unwrapped = pickEnvelope<Record<string, unknown>>(parsed, ['system_requirements']);
-    const items =
-      pickItemsArray<SystemRequirementItem>(parsed, ['system_requirements', 'items']) ??
-      pickItemsArray<SystemRequirementItem>(unwrapped, ['items']);
-    if (items && items.length > 0) return { items };
-    return fallback;
-  }
-
   private async runInterfaceContractSpecification(
     ctx: PhaseContext,
     boundarySummary: string,
@@ -589,28 +562,25 @@ export class Phase3Handler implements PhaseHandler {
     boundary: SystemBoundary,
     sysReq: SystemRequirements,
     contracts: InterfaceContracts,
-    frStories: Array<Record<string, unknown>>,
+    frIds: string[],
+    nfrIds: string[],
   ): { overall_pass: boolean; traceability_results: unknown[]; semantic_findings: unknown[]; blocking_failures: string[]; warnings: string[] } {
     const blockingFailures: string[] = [];
     const warnings: string[] = [];
     const traceability: unknown[] = [];
 
-    // Invariant: Every FR maps to at least one System Requirement
-    const coveredFrIds = new Set<string>();
-    for (const item of sysReq.items) {
-      for (const srcId of item.source_requirement_ids) {
-        coveredFrIds.add(srcId);
-      }
-    }
-    const uncoveredFr = frStories
-      .map(s => s.id as string)
-      .filter(id => id && !coveredFrIds.has(id));
-    if (uncoveredFr.length > 0) {
-      warnings.push('uncovered-functional-requirements');
+    // Invariant: Every FR AND NFR maps to at least one System Requirement.
+    // SD-1 (cal-32, gpt-oss:20b): the monolithic pass dropped NFR-005 and the
+    // old check only looked at FRs, so an uncovered NFR passed silently.
+    // Generalized to FR∪NFR — the chunked bloom is the real closer; this stays
+    // a WARNING surfacing any residual gap it could not fill.
+    const uncovered = computeUncoveredRequirements(sysReq.items, [...frIds, ...nfrIds]);
+    if (uncovered.length > 0) {
+      warnings.push('uncovered-source-requirements');
       traceability.push({
-        assertion: 'Every FR maps to at least one System Requirement',
+        assertion: 'Every FR and NFR maps to at least one System Requirement',
         pass: false,
-        failures: uncoveredFr.map(id => ({ item_id: id, explanation: `FR ${id} has no System Requirement` })),
+        failures: uncovered.map(id => ({ item_id: id, explanation: `Requirement ${id} has no System Requirement` })),
       });
     }
 
@@ -654,6 +624,368 @@ export class Phase3Handler implements PhaseHandler {
       warnings,
     };
   }
+}
+
+// ── SD-1: chunked System Requirements derivation (Phase 3.2) ────────
+//
+// Replaces the single monolithic system_requirements call — which asked one
+// gpt-oss:20b response to cover the full FR∪NFR id set in one shot (a 13-id
+// coverage miss incl NFRs at scale) — with per-release-cohort generation plus
+// an orchestrator-owned coverage-reconciliation loop (shared chunkedCoverageBloom
+// helper, the P6.1 exemplar). Each cohort call reasons over a bounded slice; the
+// orchestrator owns the 100%-coverage guarantee and reports an honest residual.
+
+/** Array-safe string coercion (no regex; mirrors phase6's asStringArray). */
+function srAsStringArray(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is string => typeof x === 'string' && x.length > 0);
+}
+
+/** One-line, length-capped coercion for menu/label text. */
+function srOneLine(v: unknown, cap = 160): string {
+  const t = typeof v === 'string' ? v : v == null ? '' : String(v);
+  const firstLine = t.split('\n')[0]?.trim() ?? '';
+  return firstLine.length > cap ? `${firstLine.slice(0, cap - 1)}…` : firstLine;
+}
+
+export interface SrFrStory { id: string; release_ordinal: number | null; label: string }
+export interface SrNfr { id: string; label: string }
+
+/**
+ * Build the per-story cohort input for SR derivation. Prefers the frozen leaf
+ * tree (each leaf carries a release_ordinal on its decomposition node); falls
+ * back to the root user-story list (no ordinals → a single Backlog cohort).
+ * Ids are the same ids `frStories.map(s => s.id)` yields upstream, so the
+ * coverage oracle and `source_requirement_ids` share one id-space.
+ */
+export function buildSrFrStories(
+  leaves: ReadonlyArray<{
+    release_ordinal: number | null;
+    display_key: string;
+    user_story: { id: string; role?: string; action?: string; outcome?: string; priority?: string };
+  }>,
+  rootStories: ReadonlyArray<Record<string, unknown>>,
+): SrFrStory[] {
+  const out: SrFrStory[] = [];
+  const seen = new Set<string>();
+  if (leaves.length > 0) {
+    for (const l of leaves) {
+      const us = l.user_story ?? { id: '' };
+      const id = typeof us.id === 'string' ? us.id : '';
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const label = `${l.display_key || id} [${srOneLine(us.priority, 20) || 'priority?'}]: As a ${srOneLine(us.role, 40)}, I want to ${srOneLine(us.action, 80)}, so that ${srOneLine(us.outcome, 80)}.`;
+      out.push({ id, release_ordinal: l.release_ordinal ?? null, label });
+    }
+    return out;
+  }
+  for (const s of rootStories) {
+    const id = typeof s.id === 'string' ? s.id : '';
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const ro = typeof s.release_ordinal === 'number' ? s.release_ordinal : null;
+    const label = `${id} [${srOneLine(s.priority, 20) || 'priority?'}]: As a ${srOneLine(s.role, 40)}, I want to ${srOneLine(s.action, 80)}, so that ${srOneLine(s.outcome, 80)}.`;
+    out.push({ id, release_ordinal: ro, label });
+  }
+  return out;
+}
+
+/** Build the NFR input (id + one-line label) from the NFR requirements array. */
+export function buildSrNfrs(requirements: unknown): SrNfr[] {
+  const arr = Array.isArray(requirements) ? (requirements as Array<Record<string, unknown>>) : [];
+  const out: SrNfr[] = [];
+  const seen = new Set<string>();
+  for (const n of arr) {
+    const id = typeof n.id === 'string' ? n.id : '';
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const text = srOneLine(n.statement ?? n.description ?? n.text ?? n.requirement, 160);
+    out.push({ id, label: text ? `${id}: ${text}` : id });
+  }
+  return out;
+}
+
+/**
+ * The deterministic coverage oracle, generalized to FR∪NFR (SD-1). Returns the
+ * requirement ids that no System Requirement cites via `source_requirement_ids`.
+ * Reads through `srAsStringArray` so a non-array/boolean LLM value never throws.
+ */
+export function computeUncoveredRequirements(
+  items: ReadonlyArray<{ source_requirement_ids?: unknown }>,
+  requirementIds: ReadonlyArray<string>,
+): string[] {
+  const covered = new Set<string>();
+  for (const it of items) for (const id of srAsStringArray(it.source_requirement_ids)) covered.add(id);
+  return requirementIds.filter(id => id && !covered.has(id));
+}
+
+interface SrCohort {
+  /** Stable, cohort-unique key used to namespace SR ids pre-merge. */
+  key: string;
+  label: string;
+  kind: 'release' | 'nfr';
+  coverIds: string[];
+  cohortRequirements: string;
+  crossCuttingReference: string;
+}
+
+/**
+ * Partition the requirement set into bounded generation cohorts: one per
+ * release-ordinal over the FR stories (null ordinal → Backlog), plus a single
+ * dedicated cross-cutting NFR cohort. NFRs ride into every release cohort as
+ * reference (multi-axis SRs cite the bound) but are the coverage target only in
+ * the NFR cohort — so no single generation prompt enumerates the whole FR set.
+ */
+function buildSrCohorts(frStories: SrFrStory[], nfrs: SrNfr[]): SrCohort[] {
+  const cohorts: SrCohort[] = [];
+  const byRelease = new Map<number | null, SrFrStory[]>();
+  for (const s of frStories) {
+    if (!byRelease.has(s.release_ordinal)) byRelease.set(s.release_ordinal, []);
+    byRelease.get(s.release_ordinal)!.push(s);
+  }
+  const ordinals = [...byRelease.keys()].sort((a, b) =>
+    (a ?? Number.MAX_SAFE_INTEGER) - (b ?? Number.MAX_SAFE_INTEGER));
+  const allNfrLines = nfrs.map(n => `- ${n.label}`).join('\n');
+  for (const ord of ordinals) {
+    const stories = byRelease.get(ord)!;
+    cohorts.push({
+      key: ord != null ? `rel-${ord}` : 'backlog',
+      label: ord != null ? `Release ${ord}` : 'Backlog',
+      kind: 'release',
+      coverIds: stories.map(s => s.id),
+      cohortRequirements: stories.map(s => `- ${s.label}`).join('\n') || '(no functional requirements in this cohort)',
+      crossCuttingReference: nfrs.length > 0
+        ? `Cross-cutting Non-Functional Requirements (cite an NFR id in an SR's source_requirement_ids only when that SR allocates the NFR's quality bound; global NFR coverage is closed by a dedicated cohort + the orchestrator):\n${allNfrLines}`
+        : 'No non-functional requirements were identified upstream.',
+    });
+  }
+  if (nfrs.length > 0) {
+    cohorts.push({
+      key: 'nfr',
+      label: 'Cross-cutting NFRs',
+      kind: 'nfr',
+      coverIds: nfrs.map(n => n.id),
+      cohortRequirements: allNfrLines,
+      crossCuttingReference: 'Functional behaviour is derived by the sibling release cohorts. Your sole job here is to ensure EVERY Non-Functional Requirement above is allocated to at least one System Requirement as a measurable quality bound.',
+    });
+  }
+  return cohorts;
+}
+
+/** Envelope-tolerant SR parse (shapes #1/#2/#3 — see parsedResponseHelpers). */
+function parseSystemRequirements(parsed: Record<string, unknown> | null): SystemRequirementItem[] {
+  const unwrapped = pickEnvelope<Record<string, unknown>>(parsed, ['system_requirements']);
+  const items =
+    pickItemsArray<SystemRequirementItem>(parsed, ['system_requirements', 'items']) ??
+    pickItemsArray<SystemRequirementItem>(unwrapped, ['items']);
+  if (!items) return [];
+  return items.map(it => {
+    const rec = it as unknown as Record<string, unknown>;
+    return {
+      ...it,
+      statement: typeof rec.statement === 'string' ? rec.statement : String(rec.statement ?? ''),
+      source_requirement_ids: srAsStringArray(rec.source_requirement_ids),
+      priority: (rec.priority as SystemRequirementItem['priority']) ?? 'medium',
+    };
+  });
+}
+
+function summarizeSrResidual(
+  residual: Set<string>,
+  labelById: Map<string, string>,
+  total: number,
+): { uncovered: number; total: number; coverage_pct: number; ids: Array<{ id: string; label: string }> } {
+  const ids = [...residual].sort().map(id => ({ id, label: srOneLine(labelById.get(id) ?? id, 80) }));
+  const covered = total - residual.size;
+  return {
+    uncovered: residual.size,
+    total,
+    coverage_pct: total > 0 ? Math.round((covered / total) * 1000) / 10 : 100,
+    ids,
+  };
+}
+
+export interface SrDerivationInput {
+  boundarySummary: string;
+  activeConstraintsText: string;
+  janumicodeVersionSha: string;
+  /** FR stories (leaf ids + release_ordinal + one-line label) grouped into
+   *  per-release cohorts. The full FR roster is intentionally NOT a single
+   *  injected blob — each cohort carries only its own ids. */
+  frStories: SrFrStory[];
+  /** NFR ids + labels — the cross-cutting cohort's coverage target and every
+   *  release cohort's reference. */
+  nfrs: SrNfr[];
+}
+
+export interface SrDerivationResult {
+  requirements: SystemRequirements;
+  coveragePct: number;
+  residual: string[];
+}
+
+type SrDerivationCtx = Pick<PhaseContext, 'engine' | 'workflowRun'>;
+
+/**
+ * Derive System Requirements via per-cohort generation + coverage
+ * reconciliation. Returns the merged, globally re-numbered SRs plus an honest
+ * coverage/residual report. Per-cohort generators return [] on failure (never a
+ * fabricated SR); the single SR-001 fallback is kept ONLY when the whole bloom
+ * yields zero SRs. SR ids are namespaced per cohort in-flight (so idOf dedup
+ * can't drop a distinct SR that reused SR-001) then re-numbered SR-### on merge.
+ */
+export async function deriveSystemRequirementsChunked(
+  ctx: SrDerivationCtx,
+  input: SrDerivationInput,
+): Promise<SrDerivationResult> {
+  const { engine } = ctx;
+  const log = getLogger();
+
+  const targetCoverageSet = new Set<string>([
+    ...input.frStories.map(s => s.id),
+    ...input.nfrs.map(n => n.id),
+  ]);
+
+  const fallback: SystemRequirements = {
+    items: [{
+      id: 'SR-001',
+      statement: 'System shall implement core functionality as specified in functional requirements',
+      source_requirement_ids: [input.frStories[0]?.id ?? 'US-001'],
+      priority: 'high',
+    }],
+  };
+
+  const genTemplate = engine.templateLoader.findTemplate('systems_agent', 'system_requirements');
+  const reconTemplate = engine.templateLoader.findTemplate('systems_agent', 'system_requirements_reconciliation');
+  if (!genTemplate) {
+    return { requirements: fallback, coveragePct: 0, residual: [...targetCoverageSet] };
+  }
+
+  const cohorts = buildSrCohorts(input.frStories, input.nfrs);
+  const labelById = new Map<string, string>();
+  for (const s of input.frStories) labelById.set(s.id, s.label);
+  for (const n of input.nfrs) labelById.set(n.id, n.label);
+
+  const maxReconPasses = Math.max(0, Number.parseInt(process.env.JANUMICODE_P3_RECON_PASSES ?? '2', 10) || 0);
+  const maxIdsPerBatch = Math.max(1, Number.parseInt(process.env.JANUMICODE_P3_RECON_BATCH_IDS ?? '25', 10) || 25);
+
+  const generateForChunk = async (cohort: SrCohort): Promise<SystemRequirementItem[]> => {
+    const rendered = engine.templateLoader.render(genTemplate, {
+      active_constraints: input.activeConstraintsText,
+      system_boundary_summary: input.boundarySummary,
+      cohort_label: cohort.label,
+      cohort_requirements: cohort.cohortRequirements,
+      cross_cutting_reference: cohort.crossCuttingReference,
+      janumicode_version_sha: input.janumicodeVersionSha,
+    });
+    if (rendered.missing_variables.length > 0) return [];
+    try {
+      const result = await engine.callForRole('requirements_agent', {
+        prompt: rendered.rendered,
+        responseFormat: 'json',
+        temperature: 0.4,
+        traceContext: {
+          workflowRunId: ctx.workflowRun.id,
+          phaseId: '3',
+          subPhaseId: 'system_requirements',
+          agentRole: 'systems_agent',
+          label: `Phase 3.2 — System Requirements Derivation (${cohort.label})`,
+        },
+      });
+      const items = parseSystemRequirements(result.parsed as Record<string, unknown> | null);
+      // Namespace ids per cohort so two cohorts can't both surface SR-001 and
+      // get collapsed by idOf dedup. Cleaned to a global SR-### on merge.
+      return items.map((it, i) => ({ ...it, id: `SR-${cohort.key}-${i + 1}` }));
+    } catch (err) {
+      log.warn('workflow', 'Phase 3.2 per-cohort SR generation failed — continuing', {
+        cohort: cohort.key, error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
+  };
+
+  const chunkUncovered = (uncovered: Set<string>): Array<Set<string>> => {
+    const ids = [...uncovered].sort();
+    const batches: Array<Set<string>> = [];
+    for (let i = 0; i < ids.length; i += maxIdsPerBatch) {
+      batches.push(new Set(ids.slice(i, i + maxIdsPerBatch)));
+    }
+    return batches;
+  };
+
+  const reconcileBatch = async (
+    batch: Set<string>,
+    passInfo: { pass: number; batchIndex: number; batchCount: number },
+  ): Promise<SystemRequirementItem[]> => {
+    if (!reconTemplate) return [];
+    const menu = [...batch].sort().map(id => `- ${labelById.get(id) ?? id}`).join('\n');
+    const rendered = engine.templateLoader.render(reconTemplate, {
+      active_constraints: input.activeConstraintsText,
+      uncovered_requirements: menu,
+      system_boundary_summary: input.boundarySummary,
+    });
+    if (rendered.missing_variables.length > 0) return [];
+    try {
+      const result = await engine.callForRole('requirements_agent', {
+        prompt: rendered.rendered,
+        responseFormat: 'json',
+        temperature: 0.4,
+        traceContext: {
+          workflowRunId: ctx.workflowRun.id,
+          phaseId: '3',
+          subPhaseId: 'system_requirements',
+          agentRole: 'systems_agent',
+          label: `Phase 3.2 — Coverage Reconciliation (pass ${passInfo.pass}, batch ${passInfo.batchIndex}/${passInfo.batchCount}, ${batch.size} ids)`,
+        },
+      });
+      const items = parseSystemRequirements(result.parsed as Record<string, unknown> | null);
+      return items.map((it, i) => ({ ...it, id: `SR-recon-${passInfo.pass}-${passInfo.batchIndex}-${i + 1}` }));
+    } catch (err) {
+      log.warn('workflow', 'Phase 3.2 SR reconciliation batch failed — continuing', {
+        pass: passInfo.pass, batch_index: passInfo.batchIndex,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
+  };
+
+  const bloom = await chunkedCoverageBloom<SrCohort, SystemRequirementItem>({
+    chunks: cohorts,
+    generateForChunk,
+    idOf: (sr) => (typeof sr.id === 'string' ? sr.id : ''),
+    targetCoverageSet,
+    coveredBy: (sr) => srAsStringArray(sr.source_requirement_ids),
+    chunkUncovered,
+    reconcileBatch,
+    maxReconPasses,
+    onResidual: (residual) => {
+      log.warn(
+        'workflow',
+        'Phase 3.2 residual uncovered FR/NFR ids after reconciliation (honest gap — not fabricated)',
+        summarizeSrResidual(residual, labelById, targetCoverageSet.size),
+      );
+    },
+    logLabel: 'Phase 3.2',
+  });
+
+  if (bloom.produced.length === 0) {
+    // Whole bloom produced nothing — keep exactly ONE final fallback so the
+    // downstream record isn't empty (never a per-cohort fabrication).
+    return { requirements: fallback, coveragePct: 0, residual: [...bloom.residual] };
+  }
+
+  // Deterministic global re-id: two cohorts must not both surface SR-001.
+  const renumbered: SystemRequirementItem[] = bloom.produced.map((sr, i) => ({
+    ...sr,
+    id: `SR-${String(i + 1).padStart(3, '0')}`,
+    source_requirement_ids: srAsStringArray(sr.source_requirement_ids),
+  }));
+
+  return {
+    requirements: { items: renumbered },
+    coveragePct: bloom.coveragePct,
+    residual: [...bloom.residual],
+  };
 }
 
 // ── Phase 3.1 helpers ────────────────────────────────────────────

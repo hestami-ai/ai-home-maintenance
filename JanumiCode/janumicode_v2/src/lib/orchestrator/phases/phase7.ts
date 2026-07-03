@@ -23,6 +23,7 @@ import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveFrView } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { runTestSaturationLoop } from './phase7_1a';
+import { renderComponentBlockForTask } from './phase6';
 import { runPhase7CycleDelta } from './runCycleDelta';
 import { emit as aoddEmit } from '../../aodd';
 import { buildCanonicalAcIndex, resolveAcReferences, type CanonicalAcIndex } from './phase7/acRefResolver';
@@ -92,6 +93,13 @@ export class Phase7Handler implements PhaseHandler {
     const frSummary = frView.summary;
     const planSummary = prior.implementationPlan?.summary ?? 'No implementation plan available';
     const componentSummary = prior.componentModel?.summary ?? 'No component model available';
+    // PA-2: per-component scoped context so a single-test-case saturation call
+    // sees only its own component(s), not the whole ~17-component model.
+    const componentSummaryById: Record<string, string> = {};
+    for (const c of (prior.componentModel?.content.components as Array<Record<string, unknown>> | undefined) ?? []) {
+      const cid = typeof c.id === 'string' ? c.id : '';
+      if (cid) componentSummaryById[cid] = renderComponentBlockForTask(c);
+    }
 
     // Collect all acceptance criterion IDs for coverage analysis
     const allAcIds: string[] = [];
@@ -220,7 +228,14 @@ export class Phase7Handler implements PhaseHandler {
           id: tc.test_case_id,
           name: tc.expected_outcome ?? tc.test_case_id,
           test_type: tc.type,
-          component_ids: tc.component_ids ?? [],
+          // PA-2 fix: the 7.1 skeleton binds components at the SUITE level, so a
+          // root test case usually has no component_ids of its own. Inherit the
+          // suite's component_id so 7.1a sibling_context/component_context scoping
+          // has a real id to key on (otherwise parentComps is empty and every root
+          // renders as "sole child", starving the cross-sibling roster).
+          component_ids: (tc.component_ids && tc.component_ids.length > 0)
+            ? tc.component_ids
+            : (s.component_id ? [s.component_id] : []),
           acceptance_criterion_ids: tc.acceptance_criterion_ids,
           preconditions: tc.preconditions,
           steps: (tc.execution_steps && tc.execution_steps.length > 0)
@@ -275,6 +290,7 @@ export class Phase7Handler implements PhaseHandler {
       await runTestSaturationLoop(ctx, {
         technicalConstraints,
         componentSummary: prior.componentModel?.summary ?? 'No component model available',
+        componentSummaryById,
         // Use the leaf-aware FR view so AC ids minted from Phase 2.1a
         // leaves are visible to the saturation prompt. Previously this
         // fell back to `prior.functionalRequirements?.summary` (root

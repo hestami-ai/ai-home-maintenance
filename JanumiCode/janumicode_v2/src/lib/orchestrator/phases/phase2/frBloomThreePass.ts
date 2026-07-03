@@ -33,6 +33,7 @@ import {
   type UnreachedJourneyDeclaration,
   type UserStorySkeleton,
 } from './verifyFrCoverage';
+import { autoFlagDroppedJourneys } from './autoFlagDroppedJourneys';
 
 export interface FrBloomThreePassResult {
   userStories: FullUserStory[];
@@ -338,6 +339,20 @@ export async function runFrBloomThreePass(
   }
   // Pass 2 — per-FR AC enrichment.
   const enriched = await runEnrichmentPass(deps, skeletons);
+  // Enumeration-discipline backstop: auto-declare any accepted journey the FR
+  // bloom neither traced nor declared unreached (mirrors autoFlagDroppedSeeds
+  // for the NFR side). Small models (gpt-oss:20b) drop a journey from coverage
+  // without declaring it, which hard-fails journey_fr_coverage at 2.1c.
+  const journeyFlag = autoFlagDroppedJourneys({
+    journeys: deps.handoff.userJourneys ?? [],
+    userStories: enriched,
+    unreachedJourneys: unreached,
+  });
+  if (journeyFlag.autoFlagged.length > 0) {
+    getLogger().warn('workflow', `Phase 2.1: auto-flagged ${journeyFlag.autoFlagged.length} journey(s) the FR bloom neither traced nor declared unreached`, {
+      journeys: journeyFlag.autoFlagged.map(u => u.journey_id),
+    });
+  }
   // Pass 3 — deterministic verifier.
   const coverageGaps = verifyFrCoverage({
     journeys: deps.handoff.userJourneys ?? [],
@@ -347,11 +362,11 @@ export async function runFrBloomThreePass(
     vocabulary: deps.handoff.canonicalVocabulary ?? [],
     openQuestionIds: (deps.handoff.openQuestions ?? []).map(q => q.id),
     userStories: enriched,
-    unreachedJourneys: unreached,
+    unreachedJourneys: journeyFlag.unreachedJourneys,
   });
   return {
     userStories: enriched,
-    unreachedJourneys: unreached,
+    unreachedJourneys: journeyFlag.unreachedJourneys,
     coverageGaps,
     selfHealDrops: drops,
   };

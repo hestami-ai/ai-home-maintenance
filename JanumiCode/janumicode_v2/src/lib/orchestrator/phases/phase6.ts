@@ -113,6 +113,13 @@ export class Phase6Handler implements PhaseHandler {
       });
     }
     const componentSummary = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${effectiveComponents.summary || (prior.componentModel?.summary ?? 'No component model available')}`;
+    // PA-1: per-component scoped context so a single-task decomposition sees ITS
+    // component, not the whole ~46-component backlog (which drove wrong-node
+    // decomposition — the model latched onto a foreign component in the corpus).
+    const componentSummaryById = buildComponentSummaryById(
+      effectiveComponents.components as Array<Record<string, unknown>>,
+      prior.projectTypeDescription,
+    );
     // Cross-cutting NFR concerns (Lever 1a) — delivered so the planner does NOT
     // emit standalone tasks/subtrees for them (the analytics/failover sprawl).
     const crossCuttingSummary = prior.crossCuttingConstraints?.summary
@@ -439,6 +446,7 @@ export class Phase6Handler implements PhaseHandler {
       await runTaskSaturationLoop(ctx, {
         technicalConstraints,
         componentSummary,
+        componentSummaryById,
         rootTasks,
         rootNodeRecordIds,
         rootLogicalIds,
@@ -1098,6 +1106,34 @@ export function renderComponentBlockForTask(component: Record<string, unknown>):
     : '';
   const header = root ? `${dk} (Tier ${tier} leaf under ${root}): ${name}` : `${dk}: ${name}`;
   return `[${release}] ${header}\n${resps}`;
+}
+
+/**
+ * Build the per-component scoped-context map used to scope `component_context`
+ * in task decomposition/saturation to ONE component instead of the whole
+ * catalog.
+ *
+ * PA-1 completion (component leaf id-form binding): a task references its
+ * component by the LEAF `display_key` (Phase 4.2a decomposes roots into leaves),
+ * but `buildEffectiveComponentView` keys each leaf record by `component.id` — a
+ * DIFFERENT id form under collision-suffixing. Keying only by `id` meant ~50% of
+ * live task_saturation calls (cal-31) missed and fell back to the full 53-component
+ * catalog. So key the SAME leaf block by every id form a task might carry: the
+ * component `id`, the leaf `display_key`, and the leaf `node_id`. Root-source
+ * components (no `_leaf_*` fields) simply key by `id` — unchanged behaviour.
+ */
+export function buildComponentSummaryById(
+  components: Array<Record<string, unknown>>,
+  projectTypeDescription: string,
+): Record<string, string> {
+  const byId: Record<string, string> = {};
+  for (const c of components) {
+    const summary = `PROJECT TYPE: ${projectTypeDescription}\n\n${renderComponentBlockForTask(c)}`;
+    for (const k of [c.id, c._leaf_display_key, c._leaf_node_id]) {
+      if (typeof k === 'string' && k) byId[k] = summary;
+    }
+  }
+  return byId;
 }
 
 /** Compact component menu (id + responsibilities) — the routing target for reconciliation. */

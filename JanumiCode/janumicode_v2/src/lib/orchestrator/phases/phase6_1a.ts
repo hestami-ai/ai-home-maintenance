@@ -84,6 +84,12 @@ export interface TaskSaturationInput {
   technicalConstraints: TechnicalConstraint[];
   /** Component summary text (Phase 4.2a leaves preferred, else 4.2 roots). */
   componentSummary: string;
+  /**
+   * Per-component scoped context blocks (component_id → PROJECT TYPE + that
+   * component's own block). PA-1: a single-task decomposition sees ITS component,
+   * not the whole ~46-component backlog. Falls back to `componentSummary`.
+   */
+  componentSummaryById?: Record<string, string>;
   /** Root tasks written by Phase 6.1 (one DecompositionTask per root). */
   rootTasks: DecompositionTask[];
   /** Governed-stream record IDs for the depth-0 root nodes. Pairs 1:1 with rootTasks. */
@@ -554,20 +560,31 @@ export async function runTaskSaturationLoop(
         // same-parent siblings, so without this roster the model
         // either omits valid cross-branch deps or fabricates ids.
         // Mirrors the `depth_zero_entities` pattern used in Phase 5.1a.
+        // Compact id-only roster (PA-1): the model needs the valid cross-branch
+        // dependency-target id namespace, not 186 `id: name` lines (~33KB) that
+        // duplicated sibling_context and buried the 14-line parent block.
         const depthZeroTasksText = input.rootTasks.length === 0
           ? '(none)'
-          : input.rootTasks.map(t => `- ${t.id}: ${t.name}`).join('\n');
+          : input.rootTasks.map(t => t.id).join(', ');
 
         const variables: Record<string, string> = {
           active_constraints: activeConstraintsForPrompt,
           parent_task: formatRootTaskForPrompt(entry.task),
           parent_tier_hint: entry.tierHint,
-          sibling_context: siblings.length <= 1
-            ? '(none — sole child under this parent)'
-            : siblings
-                .filter(s => s.id !== entry.task.id)
-                .map(s => `- ${s.id}: ${s.name}`).join('\n'),
-          component_context: input.componentSummary,
+          sibling_context: (() => {
+            // Scope root-node siblings to the same component (PA-1): at depth 0
+            // `siblingsByParent.get(null)` is EVERY root task across ALL
+            // components (~186), which duplicated depth_zero_tasks and buried
+            // the parent block, driving wrong-node decomposition.
+            const isRoot = entry.parentNodeId == null;
+            const sibs = siblings
+              .filter(s => s.id !== entry.task.id)
+              .filter(s => !isRoot || s.component_id === entry.task.component_id);
+            return sibs.length === 0
+              ? '(none — sole child under this parent)'
+              : sibs.map(s => `- ${s.id}: ${s.name}`).join('\n');
+          })(),
+          component_context: input.componentSummaryById?.[entry.task.component_id] ?? input.componentSummary,
           depth_zero_tasks: depthZeroTasksText,
           existing_assumptions: scopedAssumptions.length === 0
             ? '(none yet)'

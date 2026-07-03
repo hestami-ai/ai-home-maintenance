@@ -17,6 +17,7 @@
 
 import type { TechnicalConstraint, SourceRef, WorkflowV2, WorkflowStep, WorkflowTrigger } from '../../types/records';
 import { traceNormalize } from '../../trace/traceNormalize';
+import { normalizeIdHyphens } from '../idNormalization';
 
 /**
  * Wire-format → record-type adapter: maps snake_case agent JSON keys to the
@@ -64,6 +65,17 @@ export function normalizeJourneyFromWire(raw: Record<string, unknown>): Record<s
       }
       return s;
     });
+  }
+  // Normalize domain-ref id drift: gpt-oss emits `DOM-REALTIME_STATUS_UPDATES`
+  // (underscores) while the accepted domain id is `DOM-REALTIME-STATUS-UPDATES`
+  // (hyphens) — a mismatch the Phase 1.3c referential_integrity_journey_domain
+  // verifier hard-fails on. These ids live in a bare-string array, which
+  // `normalizeIdsInTree` can't reach (it only transforms string values AT a key),
+  // so hyphen-normalize each entry here, producer-side.
+  if (Array.isArray(j.businessDomainIds)) {
+    j.businessDomainIds = (j.businessDomainIds as unknown[]).map(
+      (d) => (typeof d === 'string' ? normalizeIdHyphens(d) : d),
+    );
   }
   return traceNormalize('phase1.normalizeJourneyFromWire', raw, j);
 }

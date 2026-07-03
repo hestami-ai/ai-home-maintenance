@@ -14,7 +14,6 @@
 import { randomUUID } from 'node:crypto';
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
 import type {
-  GovernedStreamRecord,
   PhaseId,
   TechnicalConstraint,
   DecompositionEntity,
@@ -26,7 +25,10 @@ import { normalizeIdsInTree, normalizeComponentIdRef } from '../idNormalization'
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
 import { runDataModelSaturationLoop } from './phase5_1a';
+import { renderComponentBlockForTask } from './phase6';
 import { mintEntityIds, mintEndpointIds } from './phase5/dataModelIdMinter';
+import { chunkedCoverageBloom } from './chunkedCoverageBloom';
+import type { PromptTemplate } from '../templateLoader';
 import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
@@ -81,6 +83,120 @@ interface ConfigurationParameters {
   }>;
 }
 
+/** One `models[]` entry (a single component's data model). */
+type DataModelEntry = DataModels['models'][number];
+
+// ── Phase 5.1 per-component chunking helpers (SD-3) ──────────────────
+//
+// The monolithic data_model_skeleton call asked ONE response to cover every
+// input component_id (~46 leaf components). gpt-oss:20b drifts mid-response at
+// that cardinality (dropped `type` keys → invalid JSON / DM-001). The remedy
+// mirrors the P6.1 task_skeleton fix: one BOUNDED call per component, then the
+// orchestrator owns the 100%-coverage guarantee via chunkedCoverageBloom — a
+// deterministic component-coverage oracle finds components no model covered and
+// routes them through focused reconciliation passes until covered (or the budget
+// is spent → an honest, non-fabricated residual). Coverage keys on
+// `component_id` (a direct field) rather than a traces_to walk.
+
+/**
+ * Canonical component id a data model covers. The oracle keys on this, so the
+ * SAME normalization the merged tree gets (normalizeComponentIdRef,
+ * `COMP-001`→`comp-001`) is applied here BEFORE coverage is computed — else a
+ * case-drifted model would read as covering nothing. Missing id ⇒ ''.
+ */
+export function dataModelComponentRef(model: { component_id?: unknown }): string {
+  return typeof model.component_id === 'string' ? normalizeComponentIdRef(model.component_id) : '';
+}
+
+/**
+ * Deterministic coverage oracle: the input component ids that no produced model
+ * covers. A pure mirror of the set difference chunkedCoverageBloom computes via
+ * `coveredBy` — exported so the contract is unit-testable in isolation.
+ */
+export function computeUncoveredComponentIds(
+  models: Array<{ component_id?: unknown }>,
+  targetCoverageSet: Set<string>,
+): Set<string> {
+  const covered = new Set<string>();
+  for (const m of models) {
+    const ref = dataModelComponentRef(m);
+    if (ref) covered.add(ref);
+  }
+  const out = new Set<string>();
+  for (const cid of targetCoverageSet) if (!covered.has(cid)) out.add(cid);
+  return out;
+}
+
+/** Partition uncovered component ids into BOUNDED batches (one reconciliation call each). */
+export function chunkComponentIds(ids: string[], maxPerBatch: number): Array<Set<string>> {
+  const size = Math.max(1, maxPerBatch);
+  const batches: Array<Set<string>> = [];
+  for (let i = 0; i < ids.length; i += size) {
+    batches.push(new Set(ids.slice(i, i + size)));
+  }
+  return batches;
+}
+
+/**
+ * Collapse a per-component generation call's `models[]` into ONE model for the
+ * scoped component. The call is scoped to exactly `cid`, so every entity it
+ * designs belongs to `cid` — force the attribution (a deterministic producer
+ * bridge, house rule) so coverage is robust to the model echoing a display_key
+ * or wrong-case id, and merge all entities (dedup by name) into one entry.
+ * Returns null when the call produced no named entities (→ honest [], never a
+ * fabricated placeholder).
+ */
+export function consolidateEntitiesForComponent(
+  models: Array<{ entities?: unknown }>,
+  cid: string,
+): DataModelEntry | null {
+  const entities: DataModelEntry['entities'] = [];
+  const seenNames = new Set<string>();
+  for (const m of models) {
+    const ents = Array.isArray(m.entities) ? (m.entities as DataModelEntry['entities']) : [];
+    for (const e of ents) {
+      const name = e && typeof e.name === 'string' ? e.name : '';
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seenNames.has(key)) continue;
+      seenNames.add(key);
+      entities.push(e);
+    }
+  }
+  if (entities.length === 0) return null;
+  return { component_id: cid, entities };
+}
+
+/**
+ * Render the reconciliation routing menu: each uncovered component's canonical
+ * id + its responsibilities, so the reconciliation call can design that
+ * component's data models. `component_id` MUST be emitted verbatim as the id
+ * shown here (the oracle re-checks coverage on it).
+ */
+export function renderUncoveredComponentsMenu(
+  uncovered: Set<string>,
+  componentByNormId: Map<string, Record<string, unknown>>,
+): string {
+  const lines: string[] = [];
+  for (const normId of uncovered) {
+    const c = componentByNormId.get(normId);
+    if (!c) {
+      lines.push(`- ${normId}`);
+      continue;
+    }
+    lines.push(`- ${normId}: ${typeof c.name === 'string' ? c.name : normId}`);
+    if (Array.isArray(c.responsibilities)) {
+      for (const r of c.responsibilities as Array<Record<string, unknown>>) {
+        const txt = typeof r.description === 'string'
+          ? r.description
+          : (typeof r.statement === 'string' ? r.statement : '');
+        if (txt) lines.push(`    - ${txt}`);
+      }
+    }
+  }
+  return lines.length > 0 ? lines.join('\n') : '';
+}
+
 // ── Handler ────────────────────────────────────────────────────────
 
 export class Phase5Handler implements PhaseHandler {
@@ -108,6 +224,13 @@ export class Phase5Handler implements PhaseHandler {
       });
     }
     const componentSummary = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${effectiveComponents.summary || (prior.componentModel?.summary ?? 'No component model available')}`;
+    // PA-4: per-component scoped context so a single-entity saturation call sees
+    // only its OWN component, not the whole component backlog.
+    const componentSummaryById: Record<string, string> = {};
+    for (const c of effectiveComponents.components as Array<Record<string, unknown>>) {
+      const cid = typeof c.id === 'string' ? c.id : '';
+      if (cid) componentSummaryById[cid] = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${renderComponentBlockForTask(c)}`;
+    }
     const domainsSummary = prior.softwareDomains?.summary ?? 'No domains available';
     const contractsSummary = prior.interfaceContracts?.summary ?? 'No interface contracts available';
     // Phase 3.2 SR layer threaded into every Phase 5 sub-phase:
@@ -175,7 +298,11 @@ export class Phase5Handler implements PhaseHandler {
     });
 
     const dataModelsContent = await this.runDataModelSpecification(
-      ctx, componentSummary, domainsSummary, sysReqSummary, technicalConstraintsSummary, dmr51,
+      ctx,
+      effectiveComponents.components as Array<Record<string, unknown>>,
+      componentIds,
+      componentSummaryById,
+      domainsSummary, sysReqSummary, technicalConstraintsSummary, dmr51,
     );
 
     // Normalize component_id refs to the canonical lowercase `comp-`
@@ -288,6 +415,7 @@ export class Phase5Handler implements PhaseHandler {
       await runDataModelSaturationLoop(ctx, {
         technicalConstraints,
         componentSummary,
+        componentSummaryById,
         rootEntities,
         rootNodeRecordIds: rootDataModelRecordIds,
         rootLogicalIds: rootDataModelLogicalIds,
@@ -526,8 +654,23 @@ export class Phase5Handler implements PhaseHandler {
 
   // ── LLM call helpers ──────────────────────────────────────────
 
+  /**
+   * Phase 5.1 data-model specification — PER-COMPONENT chunking + coverage-driven
+   * reconciliation (SD-3), replacing the single monolithic call that asked one
+   * response to cover all ~46 leaf components (→ mid-response format drift). One
+   * bounded call per component (its scoped block only), then chunkedCoverageBloom
+   * owns the 100% component-coverage guarantee. NEVER fabricates (ts-117): a
+   * per-component generator returns [] on failure and the whole method returns an
+   * honest empty `{models:[]}` if nothing was produced — the residual is logged,
+   * never invented. The returned `{models}` shape is byte-identical to before, so
+   * the per-entity depth-0 seeding + saturation loop downstream are untouched.
+   */
   private async runDataModelSpecification(
-    ctx: PhaseContext, componentSummary: string, domainsSummary: string,
+    ctx: PhaseContext,
+    components: Array<Record<string, unknown>>,
+    componentIds: string[],
+    componentSummaryById: Record<string, string>,
+    domainsSummary: string,
     sysReqSummary: string, technicalConstraintsSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<DataModels> {
     const { engine } = ctx;
@@ -539,32 +682,142 @@ export class Phase5Handler implements PhaseHandler {
     const fallback: DataModels = { models: [] };
     if (!template) return fallback;
 
+    const reconTemplate = engine.templateLoader.findTemplate('technical_spec_agent', 'data_model_reconciliation');
+
+    // Coverage oracle (NEW — none existed): every input component_id must be
+    // covered by >=1 model. Normalize the target set to the SAME canonical form
+    // `coveredBy` uses so case drift can't cause a phantom miss.
+    const targetCoverageSet = new Set(componentIds.map(normalizeComponentIdRef));
+    const componentByNormId = new Map<string, Record<string, unknown>>();
+    for (const c of components) {
+      const cid = typeof c.id === 'string' ? c.id : '';
+      if (cid) componentByNormId.set(normalizeComponentIdRef(cid), c);
+    }
+
+    const maxReconPasses = Math.max(0, Number.parseInt(process.env.JANUMICODE_P5_RECON_PASSES ?? '2', 10) || 0);
+    const maxComponentsPerBatch = Math.max(1, Number.parseInt(process.env.JANUMICODE_P5_RECON_BATCH_COMPONENTS ?? '10', 10) || 10);
+
+    const { produced } = await chunkedCoverageBloom<string, DataModelEntry>({
+      chunks: componentIds,
+      // ── Per-component generation: ONE bounded call per component ──
+      generateForChunk: async (cid) => {
+        const scoped = componentSummaryById[cid];
+        if (!scoped) return [];
+        const rendered = engine.templateLoader.render(template, {
+          active_constraints: dmr.activeConstraintsText, component_model_summary: scoped,
+          software_domains_summary: domainsSummary,
+          system_requirements_summary: sysReqSummary,
+          technical_constraints_summary: technicalConstraintsSummary,
+          detail_file_path: dmr.detailFilePath,
+          detail_file_content: dmr.detailFileContent,
+          janumicode_version_sha: engine.janumiCodeVersionSha,
+        });
+        if (rendered.missing_variables.length > 0) return [];
+        try {
+          // LLM throws are caught here so one component never sinks the phase —
+          // the reconciliation pass recovers any component it would have covered.
+          // Route through requirements_agent routing for llamacpp via llama-swap.
+          const result = await engine.callForRole('requirements_agent', {
+            prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
+            traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: 'data_model_skeleton', agentRole: 'technical_spec_agent', label: `Phase 5.1 — Data Model Specification (${cid})` },
+          });
+          // Defensive parse — cal-21 lost 6 of 7 data models to the SR-loss bug
+          // pattern (kind-name envelope vs schema property name).
+          const parsed = result.parsed as Record<string, unknown> | null;
+          const models = pickItemsArray<DataModelEntry>(parsed, ['data_models', 'models']);
+          if (!models || models.length === 0) {
+            this.logPhase5ParseFailure(ctx, 'data_model_skeleton', result.text);
+            return [];
+          }
+          const merged = consolidateEntitiesForComponent(models, cid);
+          return merged ? [merged] : [];
+        } catch (err) {
+          getLogger().warn('workflow', 'Phase 5.1 per-component data-model generation failed — continuing', {
+            component_id: cid, error: err instanceof Error ? err.message : String(err),
+          });
+          return [];
+        }
+      },
+      idOf: (m) => dataModelComponentRef(m),
+      targetCoverageSet,
+      coveredBy: (m) => {
+        const ref = dataModelComponentRef(m);
+        return ref ? [ref] : [];
+      },
+      chunkUncovered: (uncovered) => chunkComponentIds([...uncovered], maxComponentsPerBatch),
+      reconcileBatch: reconTemplate
+        ? (batch, info) => this.reconcileUncoveredDataModels(
+            ctx, reconTemplate, batch, componentByNormId, sysReqSummary, technicalConstraintsSummary, dmr, info,
+          )
+        : undefined,
+      maxReconPasses,
+      onResidual: (residual) => {
+        getLogger().warn('workflow', 'Phase 5.1 residual uncovered components after reconciliation (honest gap — upstream component divergence, not fabricated)', {
+          residual: residual.size, total: targetCoverageSet.size, component_ids: [...residual],
+        });
+      },
+      logLabel: 'Phase 5.1',
+    });
+
+    if (produced.length === 0) {
+      // Honest empty — the residual log above already fired; never fabricate.
+      this.logPhase5ParseFailure(ctx, 'data_model_skeleton', undefined);
+      return fallback;
+    }
+    return { models: produced };
+  }
+
+  /**
+   * Reconciliation pass: design data models for the components no per-component
+   * call covered. Small/focused — sees only the uncovered components (id +
+   * responsibilities) as routing targets. Returns [] on failure (caller logs the
+   * residual gap; NO fabrication). Crediting robustness (accept only models whose
+   * `component_id` is a still-uncovered target in THIS batch) is enforced by the
+   * shared bloom helper.
+   */
+  private async reconcileUncoveredDataModels(
+    ctx: PhaseContext,
+    template: PromptTemplate,
+    uncovered: Set<string>,
+    componentByNormId: Map<string, Record<string, unknown>>,
+    sysReqSummary: string,
+    technicalConstraintsSummary: string,
+    dmr: PhaseContextPacketResult,
+    batchInfo?: { pass: number; batchIndex: number; batchCount: number },
+  ): Promise<DataModelEntry[]> {
+    const { engine } = ctx;
+    const menu = renderUncoveredComponentsMenu(uncovered, componentByNormId);
+    if (!menu) return [];
     const rendered = engine.templateLoader.render(template, {
-      active_constraints: dmr.activeConstraintsText, component_model_summary: componentSummary,
-      software_domains_summary: domainsSummary,
+      active_constraints: dmr.activeConstraintsText,
+      uncovered_components: menu,
       system_requirements_summary: sysReqSummary,
       technical_constraints_summary: technicalConstraintsSummary,
-      detail_file_path: dmr.detailFilePath,
-      detail_file_content: dmr.detailFileContent,
-      janumicode_version_sha: engine.janumiCodeVersionSha,
     });
-    if (rendered.missing_variables.length > 0) return fallback;
-
-    // LLM throws propagate to engine catch (halts workflow).
-    // Route through requirements_agent routing for llamacpp via
-    // llama-swap. See phase3.ts for the rationale.
-    const result = await engine.callForRole('requirements_agent', {
-      prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
-      traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: 'data_model_skeleton', agentRole: 'technical_spec_agent', label: 'Phase 5.1 — Data Model Specification' },
-    });
-    // Defensive parse — cal-21 lost 6 of 7 data models to the
-    // SR-loss bug pattern (kind-name envelope vs schema property
-    // name). See parsedResponseHelpers.ts.
-    const parsed = result.parsed as Record<string, unknown> | null;
-    const models = pickItemsArray<DataModels['models'][number]>(parsed, ['data_models', 'models']);
-    if (models && models.length > 0) return { models };
-    this.logPhase5ParseFailure(ctx, 'data_model_skeleton', result.text);
-    return fallback;
+    if (rendered.missing_variables.length > 0) return [];
+    const label = batchInfo
+      ? `Phase 5.1 — Coverage Reconciliation (pass ${batchInfo.pass}, batch ${batchInfo.batchIndex}/${batchInfo.batchCount}, ${uncovered.size} components)`
+      : `Phase 5.1 — Coverage Reconciliation (${uncovered.size} orphan components)`;
+    try {
+      const result = await engine.callForRole('requirements_agent', {
+        prompt: rendered.rendered, responseFormat: 'json', temperature: 0.4,
+        traceContext: { workflowRunId: ctx.workflowRun.id, phaseId: '5', subPhaseId: 'data_model_skeleton', agentRole: 'technical_spec_agent', label },
+      });
+      const parsed = result.parsed as Record<string, unknown> | null;
+      const models = pickItemsArray<DataModelEntry>(parsed, ['data_models', 'models']);
+      if (!models || models.length === 0) {
+        getLogger().warn('workflow', 'Phase 5.1 reconciliation batch yielded no usable data models', {
+          label, parse_failed: parsed == null, component_count: uncovered.size,
+        });
+        return [];
+      }
+      return models;
+    } catch (err) {
+      getLogger().warn('workflow', 'Phase 5.1 reconciliation call failed', {
+        label, error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
   }
 
   /**

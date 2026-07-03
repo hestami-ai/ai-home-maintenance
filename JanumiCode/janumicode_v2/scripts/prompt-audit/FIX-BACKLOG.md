@@ -1,0 +1,189 @@
+# Prompt-Materialization Fix Backlog
+
+Derived from the P1–8 audit (`audit-out/audit-report.md`, 828 calls / 2800 findings / 188 high). This is the **hand-maintained, resumable** tracker (unlike `audit-report.md`, which `report.js` regenerates). The 2800 findings collapse into the root-cause fixes below.
+
+**Working protocol (one item at a time):**
+1. Pick the top OPEN item. Pin its exact code location (the "candidate" below is a starting guess).
+2. Implement the fix.
+3. Add/strengthen **unit tests** (Vitest, `src/test/unit/orchestrator/phases/*.test.ts`) — assert the rendered prompt now carries the scoped/correct content and the defect cannot recur.
+4. Add the **regression case to the extended GPU fixture harness** (the "issues added to the harness" from this audit).
+5. Validate live on the GPU where applicable.
+6. Flip status to `DONE` here with a one-line result + the commit; leave evidence pointers.
+
+**Status legend:** `[ ]` OPEN · `[~]` IN-PROGRESS · `[x]` DONE · `[-]` WON'T-FIX/OBSOLETE.
+Re-verify anytime: re-run the audit extract on a fresh run and diff the D5/A1 rates per sub_phase.
+
+| # | Pri | Title | sub_phase(s) | high | status |
+|---|---|---|---|--:|---|
+| PA-1 | P0 | task_saturation context scoping (wrong-node) | task_saturation | 91 | [x] |
+| PA-2 | P0 | test_case_saturation AC-summary scope + de-dup | test_case_saturation | 74 | [x] |
+| PA-3 | P0 | task_skeleton AC-inventory + tech-specs scoping | task_skeleton | 13 | [ ] |
+| PA-7 | P0 | parent-slot keying (label ≠ injected parent) | data_model/task_sat/task_skel | 6 | [ ] |
+| PA-4 | P1 | data_model_saturation context scoping | data_model_saturation | 5 | [x] |
+| PA-8 | P1 | object/relationship serializer bugs | many | — | [x] |
+| PA-10 | P1 | parent blocks lack active_constraints (TECH-* narrow) | task_sat/task_skel | 5 | [ ] |
+| PA-9 | P1 | id-namespace unification (TECH-*, ent/DM, leaf/root) | many | 5 | [ ] |
+| PA-5 | P1 | fr/nfr_saturation handoff-corpus scoping | fr/nfr_saturation | 2 | [ ] |
+| PA-6 | P1 | component_saturation domain-context scoping | component_saturation | 0 | [ ] |
+| PA-11 | P2 | contradictory branch/category literals | fr_sat/nfr/data_model | — | [~] |
+| PA-13 | P2 | duplicate catalog injection (sibling==depth-0, gov-const 2x) | task_sat/skel | — | [ ] |
+| PA-12 | P2 | JSON-fence self-contradiction | fr_sat/task_skel | — | [ ] |
+| PA-14 | P2 | compliance_context hardcoded empty | evaluation_design | — | [ ] |
+| PA-15 | P2 | monolithic test_case_skeleton + coverage shortfall | test_case_skeleton | 1 | [ ] |
+
+> **Related class — Skeleton Decomposition (SD-1..SD-4):** the gpt-oss:20b-envelope generalization of the P6.1 chunk-and-reconcile pattern to the monolithic *skeleton* passes (P3 SR, P4 ADR, P5 data-model, P7 test-case=PA-15). See **`## SKELETON DECOMPOSITION WORKLIST`** below.
+
+---
+
+## LIVE HARVEST — run 09c28e81 (full Hestami spec, lean profile, 2026-07-02)
+Reached P5-complete + P6-start (P1:20 P2:167 P3:6 P4:38 P5:70 P6:4 core calls) before the 8h Mocha timeout; ext host torn down cleanly. Harvested before DB wipe:
+- **PA-11 nfr — CONFIRMED**: 40 nfr_saturation prompts, canonical-5 categories 40/40, drift 0/40, D2 0, `[object Object]` 0.
+- **PA-8 — CONFIRMED live (P4+P5)**: 0 `[object Object]` across 31 component_saturation + 62 data_model_saturation prompts. The critical `Relationships: [object Object]` bug that erased the data-model decomposition signal reads clean 0/62 → `displayEntityRelationship` fix works live.
+- **PA-4 — looks good**: data_model_saturation prompts ~28K median (scoped, not the full-catalog firehose); D2/D3/objObj all clean.
+- **PA-5-A1 — CONFIRMED** (see PA-5): handoff context = 62% of fr_saturation prompt, full catalog, repeated per call.
+- **PA-3 — CONFIRMED still-open, with numbers**: task_skeleton = 89,717 ch for ONE component; `# Acceptance Criteria Inventory` = 41,044 ch (46%) + `# Technical Specifications Summary` = 23,519 ch (26%) = 72% per-component reference catalogs. Fix (root→leaf AC scoping) still needed; live data now available to design it.
+- **NOT reached**: task_saturation (PA-1, P6 got only to task_skeleton) → PA-1/PA-2/PA-14 need the trimmed run.
+- **Probe note**: naive D3 "undefined"/": null" substring check false-positives on legit content (AC text "omit null or undefined…", JSON `"default": null` examples, assumption "…is undefined"). Scope D3 to slot-values, not whole-prompt, in any harness regression check.
+
+---
+
+## STATIC REVIEW PASS — adversarial review of the DONE diff (wf_ab32c077, 2026-07-02)
+5 concern-reviewers → per-finding adversarial verify → completeness critic on the PA-1/2/4/8/11 diff. Outcome: **PA-1 clean (0 findings), PA-4 finding REFUTED, PA-11 fr/nfr clean.** 3 real defects found + FIXED same-pass (396 phase tests green, tsc + eslint clean):
+1. **PA-2 regression (CONFIRMED 0.9)** — `phase7_1a.ts:581` root `sibling_context` scoping collapsed to EMPTY: roots carry empty `component_ids` (7.1 skeleton binds components at SUITE level), so `parentComps` was empty → overlap predicate dropped ALL siblings → every root falsely rendered "(none — sole child)", starving the cross-sibling roster. **Fix:** propagate `suite.component_id` into root `component_ids` at `phase7.ts` root conversion (scoping now works) + empty-`parentComps` bypass in `phase7_1a.ts` (defense-in-depth). Test: PA-2 empty-`component_ids` regression case. **LIVE-VALIDATED (cal-31 P7, 6 test_case_saturation prompts): "(none — sole child)" 0/6 (regression gone), component_context 6/6 scoped, acceptance_criteria_summary 6/6 scoped, `[object Object]`/D2 = 0.** PA-2 does NOT hit PA-1's leaf-vs-root fallback because tests bind to ROOT components (via suite.component_id) → `componentSummaryById[root]` always resolves. PA-2 = DONE + live-clean.
+2. **PA-8 missed site (HIGH, critic)** — `phase3.ts:184` `boundaryContent.in_scope.join('; ')` still rendered `[object Object]` (in_scope is objects, typed `string[]` — a type lie) into `system_boundary_summary` feeding Phase 3.2 system_requirements + 3.3 interface_contracts. **Fix:** extracted testable `formatSystemBoundarySummary` using `displayCapability`. Tests: `phase3BoundarySummary.test.ts` (object + string shapes). **LIVE-VALIDATED (ornith run fbe7369c, 2026-07-02):** P3.2 system_requirements + P3.3 interface_contracts prompts = 0 `[object Object]`; `In scope:` renders real capability labels (AI-Assisted Service Call Intake; Provider Discovery, Vetting & Matching; …).
+3. **PA-11 residual (LOW, critic) → completes PA-11 data_model** — `data_model_saturation` template "category discipline" taught `constraint`/`scope` (FR/NFR terms) not in its own 7-value enum. **Fix:** rewrote to the data-model enum (identity/ownership/cardinality/lifecycle/consistency/storage_choice/open_question). Test: `dataModelSaturationCategoryConsistency.test.ts`. **LIVE-VALIDATED (cal-30 P5, 82 data_model_saturation prompts): all 7 enum categories present 82/82, `constraint`/`scope` drift 0/82.** (Same run re-confirmed PA-4 + PA-8: 0 `[object Object]` / 82, scoped ~48K prompts.)
+
+## NEW LIVE FINDING — PA-1 (and PA-2) only ~half-effective: scoped-with-fallback reverts on LEAF ids (cal-31, 2026-07-03)
+cal-31 (raw intent → healthy 12-component model) is the first run to exercise task_saturation on real decomposed data. **PA-1 component_context falls back to the FULL catalog on ~50% of calls**: of 8 task_saturation prompts, 4 scoped (≤3 comps, ~2.4K) but **4 reverted to a 24.6K/53-component context**. Root cause CONFIRMED: tasks carry LEAF/decomposed component_ids (`comp-credential-blocking-rule-enforcement`, `comp-credential-expiration-scan-orchestrator`) that are NOT among the 12 roots (`comp-credential-verification`), so `componentSummaryById[leaf-id]` misses → the intentional full-summary fallback fires. The static review couldn't see this (the fallback is correct code); only real leaf ids reveal the FREQUENCY. **This is the SAME leaf-vs-root gap PA-2's own follow-up note anticipated for `renderScopedAcSummary`, and that PA-9/PA-3's `lineage.canonicalize` addresses — but on the COMPONENT decomposition tree.** → **PA-1 completion fix — IMPLEMENTED (2026-07-03, uncommitted):** the deeper diagnosis showed it's an id-FORM mismatch, not a root/leaf hierarchy gap — `buildEffectiveComponentView` keys each leaf by `component.id` while tasks reference the leaf `display_key` (34/41 task.component_ids match a leaf display_key; 0 match a root; `root_component_id` is a UUID). Fix = new exported `buildComponentSummaryById` (phase6.ts) keys each leaf's scoped block by EVERY id form — `id`, `_leaf_display_key`, `_leaf_node_id` — so a task resolves to its own LEAF block regardless of id form (more precise than root-canonicalize). Replaces the inline `id`-only loop. Test: `phase6ComponentSummaryById.test.ts` (3 cases); 399 phase tests green, tsc + eslint clean. Expected: fallback ~50% → ~17% (orphan/hallucinated ids only). **Under live V&V: cal-32 (gpt-oss:20b P1-8, ornith P9).** (7/41 orphan task ids remain a separate id-hygiene concern, overlaps PA-9.) PA-3 confirmed still-open live: the P6.1 reconciliation task_skeleton is 92% catalogs (Component menu 34% + Tech Specs 58% of 61K). **PA-14 confirmed still-open live (cal-31 P8):** evaluation_design prompt renders `Compliance: No compliance regimes` WHILE listing 5 `[compliance]` NFRs (NFR-005/006/024/027/031) in the same prompt + instructing "Compliance-related NFRs from compliance_context must have evaluation criteria" — self-contradictory; the hardcoded literal masks the real compliance signal. Fix per specs: read the Phase-1.0d compliance_retention_discovery artifact into the slot.
+
+## STOP-AND-FIX LOG — gpt-oss:20b P1-8 V&V (2026-07-03)
+Protocol (operator): stop → investigate → fix → V&V, one at a time, don't accumulate. Routing now gpt-oss:20b for P1-8 core + ornith:35b for P9. Each fix below is producer-side and benefits all models.
+1. **PA-1 leaf id-form** — `phase6.ts buildComponentSummaryById` (see the finding above). Test `phase6ComponentSummaryById.test.ts` (3).
+2. **gpt-oss QA object-shape crash** — `phase1.ts coerceQualityAttribute`. gpt-oss emits Phase-1.5 quality attributes as OBJECTS not strings; `buildQaItems` did `q.slice` → "q.slice is not a function" halted P1. Coerce each QA item (string|object, incl. snake_case key) to a string producer-side (parser `runIntegrationsQaBloom`). Test `phase1QualityAttributeCoercion.test.ts` (5).
+3. **gpt-oss journey→domain id underscore drift** — `phase1Normalizers.ts normalizeJourneyFromWire`. gpt-oss emits `DOM-REALTIME_STATUS_UPDATES` (underscore) vs accepted `DOM-REALTIME-STATUS-UPDATES` (hyphen) → P1.3c `referential_integrity_journey_domain` blocking gap. `businessDomainIds` is a bare-string array `normalizeIdsInTree` can't reach (only transforms strings AT a key), so hyphen-normalize each entry via `normalizeIdHyphens`. Test `phase1JourneyDomainNormalization.test.ts` (4). NOTE: same array-of-id drift may recur on other fields (workflow/persona/entity-rel refs) — generalize `normalizeIdsInTree` to handle string-arrays at idKeys if it does.
+4. **gpt-oss dropped-journey FR coverage** — `phase2/autoFlagDroppedJourneys.ts` (new) wired into `frBloomThreePass.ts`. gpt-oss created 12 journeys but neither traced an FR to `UJ-SCHEDULE-APPOINTMENT` nor declared it unreached → P2.1c `journey_fr_coverage` blocking gap. The FR/journey analog of the existing `autoFlagDroppedSeeds` (NFR side): auto-declare any journey the bloom neither traced nor declared as system-inferred `unreached_journeys[]`. Enumeration discipline = deterministic concern. Test `autoFlagDroppedJourneys.test.ts` (4).
+Cumulative: 4 stop-and-fix cycles, all tested (tsc + eslint clean). Live V&V: cal-32 (relaunches per fix). Note: gpt-oss:20b is fast (~13min P1) but surfaces output-drift/coverage gaps the strict verifiers catch — each fix hardens the pipeline for ALL models. NOT yet reached P6 (the PA-1 fallback-rate goal).
+
+## V&V COMPLETE — cal-31 full P1–P8 (2026-07-03)
+| Fix | Live verdict |
+|---|---|
+| PA-2 (review-found sibling regression) | ✅ DONE + live-clean (0 false sole-child; component_context + AC-summary 6/6 scoped) |
+| PA-4, PA-8 (+phase3), PA-11 (+data_model), PA-6 | ✅ validated (fixes work; 0 `[object Object]` across 200+ prompts) |
+| PA-1 (91-high) | ⚠️ DONE-BUT-PARTIAL — ~50% fallback on LEAF task component_ids; needs component root→leaf `lineage.canonicalize` binding |
+| PA-3, PA-14 | confirmed OPEN live (unfixed; footprints/defects reproduced) |
+**Highest-leverage next fix (evidence-backed):** the component/AC root→leaf `lineage.canonicalize` binding (design specs PA-9/PA-3) — it COMPLETES PA-1's fallback, is the core of PA-3, and PA-2 already proves keying-by-root works. V&V vehicle = calibration CLI + RAW intent (ornith:35b). See FIX-BACKLOG-SPECS.md for execution-ready specs.
+
+---
+
+## SKELETON DECOMPOSITION WORKLIST (SD-1..SD-4) — gpt-oss:20b envelope, 2026-07-03
+
+**Reframe (operator, 2026-07-03):** gpt-oss:20b is competent for its size but is easily exceeded by an over-complex *materialized prompt*. Triage rule now precedes every gpt-oss fix: **is this call a monolithic SKELETON asking one 20B response to cover N independent items?** (enumeration-under-load). If yes → **decompose** into sub-sub-steps (deterministic fan-out + iterate-until-covered loop + deterministic roll-up, driving a small per-chunk sub-prompt template) — NOT another backstop. If it's format/id drift on an already-scoped call → normalize (STOP-AND-FIX #2/#3). See memory `feedback_small_model_decompose_skeletons`.
+
+**Evidence (audit re-mined, `audit-out`, 828 calls):** the over-envelope calls are almost all the monolithic **skeleton** passes — the "cover every item once" call that runs *before* the already-chunked saturation loop. Saturation loops (fr ×192 / nfr ×62 / task ×233 / data_model ×75 / test_case ×78) are already per-item chunked → leave them. Tier-1 A3 (auditor-flagged "monolithic ask", fix literally = "as done for P6.1 task_skeleton"):
+
+| # | Skeleton pass | Code | Monolithic ask | Chunk key | Links |
+|---|---|---|---|--:|---|
+| # | Skeleton pass | Code | Monolithic ask | Chunk key | status |
+|---|---|---|---|--:|---|
+| **SD-0** | P6 `task_skeleton` | `phase6.ts` | 187-id prune / all-component tasks | per-component | ✅ SHIPPED exemplar (P6.1) |
+| **SD-1** | P3 `system_requirements` | `phase3.ts` | every FR+NFR id (255) → `source_requirement_ids[]` in one call | per-release-ordinal (+NFR cohort) | `[x]` DELIVERED (unit) |
+| **SD-2** | P4 `adr_capture` | `phase4.ts` | capture every choice across 53 components; under-covers thresholds | per-domain | `[x]` DELIVERED (unit) |
+| **SD-3** | P5 `data_model_skeleton` | `phase5.ts` | every component_id (46) covered by `models[]` | per-component | `[x]` DELIVERED (unit) |
+| **SD-4** | P7 `test_case_skeleton` | `phase7.ts` | every AC → ≥1 test over 17 comps (105K tok, ~28% cov/pass) | per-component/US-subtree | `[ ]` OPEN (= PA-15; deps PA-3/PA-9) |
+
+**Shared remedy = one reusable pattern, not 4 bespoke fixes.** Step 0 = assess whether P6.1's chunk + orchestrator-owned iterate-until-covered loop is extractable into a reusable helper (`chunkedCoverageBloom`-style) each pass applies over its own chunk key; the existing deterministic backstops (`autoFlagDroppedSeeds`, `autoFlagDroppedJourneys`, etc.) become the loop's **completeness/termination oracle** — they STAY, not thrown away. FR bloom is NOT in scope (never A3-flagged; the #4 backstop is genuinely adequate for it).
+
+### DELIVERED 2026-07-03 (SD-0 helper + SD-1/2/3; unit-tested, integration-clean; PENDING live cal validation)
+- **Step 0 — `src/lib/orchestrator/phases/chunkedCoverageBloom.ts`** (new): the P6.1 loop generalized (sequential per-chunk fan-out + `coveredBy`-driven oracle + bounded batch-reconciliation + honest residual, all injectable callbacks). EMPTY `targetCoverageSet` ⇒ pure fan-out. `chunkedCoverageBloom.test.ts` (9).
+- **SD-1** `phase3.ts` — `deriveSystemRequirementsChunked`: chunk per release-ordinal + a cross-cutting NFR cohort; `targetCoverageSet` = FR∪NFR **leaf** ids (id-space-consistent with `coveredBy=sr.source_requirement_ids`); generalized `runConsistencyCheck` FR→FR∪NFR (`computeUncoveredRequirements`). **SR ids namespaced per-cohort in-flight then re-`SR-###` on merge** (dedup can't drop a distinct SR that reused `SR-001`). Per-cohort prompt carries only its slice + NFRs (stronger anti-monolith than P6.1's full menu). Templates: per-cohort `system_requirements` variant + new `system_requirements_reconciliation`. Env `JANUMICODE_P3_RECON_PASSES`/`_BATCH_IDS`. `phase3SystemRequirementsChunking.test.ts` (8).
+- **SD-2** `phase4.ts` — `runAdrCaptureBloom`: **pure fan-out per `domain_id`** (empty coverage set, `maxReconPasses:0`). ADR ids per-chunk-namespaced then re-`ADR-###` on merge (else domains' `ADR-001` collide → data loss — found+fixed). `governs_components` oracle resolution runs ONCE post-merge over the full component set; TECH-* roster passed whole per domain (constraints carry no `domain_id`; text-slicing would break no-regex). Template: per-domain `adr_capture` variant. `phase4AdrCaptureChunking.test.ts` (5).
+- **SD-3** `phase5.ts` — per-component `chunkedCoverageBloom` + NEW oracle (`targetCoverageSet=new Set(componentIds)`, `coveredBy=[normalizeComponentIdRef(model.component_id)]`). Produced unit = one model/component (entities nested) ⇒ id-collision-free by construction. Per-component generator FORCES `component_id` to the scoped chunk id (deterministic attribution bridge, since `renderComponentBlockForTask` surfaces display_key). `normalizeIdsInTree`+`mintEntityIds` run ONCE post-merge; depth-0 seeding + `runDataModelSaturationLoop` untouched (regression `phase5_1aDataModelScope.test.ts` green). Templates: per-component `data_model_skeleton` + new `data_model_reconciliation`. Env `JANUMICODE_P5_RECON_PASSES`/`_BATCH_COMPONENTS`. `phase5DataModelChunking.test.ts` (13).
+- **Integration gate:** whole-project `tsc` 0 err; `eslint` 0 warn (leftover unused imports cleaned); **447/447 orchestrator-phase unit tests pass** (all new + all existing phase3/4/5). Design doc: `SKELETON-DECOMPOSITION-DESIGN.md`.
+- **cal-32 live baselines (monolithic, gpt-oss:20b — confirm each defect):** SD-1 dropped `NFR-005` (+ SR cite LEAF ids → oracle must be leaf-id-space); SD-2 4/7 components ungoverned by any ADR; SD-3 1/7 components (`comp-service-call-management`, same one SD-2 dropped) got no data model. At the audit's 46–255-item scale these drop rates are far worse.
+- **NEXT:** user commits → fresh cal run (gpt-oss:20b P1-8) live-validates SD-1/2/3 close coverage. Then SD-4 (after PA-3/PA-9).
+
+---
+
+## P0 — correctness (kills wrong-node decomposition)
+
+### PA-1 [x] DONE task_saturation context scoping
+**Result (2026-07-01, uncommitted):** 3 scoping fixes in `phase6_1a.ts` (+ `phase6.ts` builds a per-component `componentSummaryById` via the existing `renderComponentBlockForTask`): `component_context` → the task's OWN component only (fallback to full summary if unresolved); `depth_zero_tasks` → compact id-only comma roster (was ~186 `id: name` lines / ~33KB that duplicated sibling_context); `sibling_context` at root → same-component only (was every root task across all components). Un-buries the parent block that drove wrong-node decomposition. Tests: new PA-1 case in `phase6_1aSaturation.test.ts` (asserts own-component context + id-only depth-0 + root-sibling scoping); 387 phase unit tests green; tsc + eslint clean. Live GPU fixture ("decomposed node id == queued parent id") deferred to the harness-revival track.
+**Root cause:** the single-task decomposition prompt injects the whole-plan catalog — `# Sibling context` lists ~186 project-wide tasks, `# Depth-0 tasks` re-lists the same ~186 (100% overlap), `# Component context` dumps ~46 `[Backlog] comp-*`. The real ~14-line parent block is buried → **model decomposes a sibling/distractor task from the catalog** (C3 42 high), fabricates its CCs/ACs, binds children to the wrong component. D5 unused_ratio ~0.98.
+**Findings:** A1 33h/193m, C3 42h/9m, B1 5h, D5 2h, B3 4h, + A4/A5/D4 dedup (see PA-13).
+**Evidence:** `p6_task_saturation_07346b4e` (parent translate-actions → decomposed assemble-payload), `13dc5dea`, `4bc6622b`.
+**Candidate code:** `src/lib/orchestrator/phases/phase6_1a.ts` — the task_saturation prompt renderers (sibling_context, depth_zero_tasks, component_context).
+**Fix:** scope `sibling_context` to the parent's *actual* siblings (same parent/grandparent); `component_context` to the parent's own component only; move the whole-plan task ids to a compact **id-only dependency appendix** (referenced, not re-enumerated); anchor the parent block prominently (e.g. last, restate target id in the output instruction).
+**Tests:** unit — for a queued parent P under component C, assert rendered prompt sibling list ⊆ P's siblings, component block == C only, no full 186-task catalog; regression — synthetic parent buried among distractors ⇒ builder output scoped. Harness — add a GPU fixture asserting the decomposed node id == the queued parent id.
+
+### PA-2 [x] DONE test_case_saturation AC-summary scope + de-dup
+**Result (2026-07-01, uncommitted):** The audit's 74-high (full-catalog AC summary + double injection) reflected cal-29's *pre-fix* run — the CURRENT code already scopes the AC summary via `renderScopedAcSummary` (`phase7_1a.ts:574`, 6 existing unit tests) and injects the AC catalog **once** (the `# Acceptance Criterion referencing` block at template line 195 is now instructions pointing at the single `{{acceptance_criteria_summary}}`). **New this pass:** scoped `component_context` to the test's own `component_ids` (`phase7.ts` builds `componentSummaryById` from `prior.componentModel.content.components` via `renderComponentBlockForTask`) — was the full ~17-component model; and scoped root `sibling_context` to component-overlapping test cases — was every root TC across all areas. Tests: new PA-2 case in `phase7_1aSaturation.test.ts` (own-component context + root-sibling scoping); 388 phase unit tests green; tsc + eslint clean.
+**Follow-up (needs live validation):** `renderScopedAcSummary` still falls back to the FULL FR/AC catalog when the parent's `acceptance_criterion_ids` don't resolve in `canonicalAcIndex` (leaf-vs-root id drift — overlaps PA-9/B4). If a live run shows the fallback firing, bound it to the parent's FR-family/component instead of the whole catalog.
+**Root cause:** the `# Acceptance criteria summary the parent validates (the only legitimate source...)` slot is filled with the **entire 303-AC catalog**, not the parent's own ACs — and the *same* ~115K catalog is injected a **second** time under `# Acceptance Criterion referencing` (261K-char prompts). `renderScopedAcSummary` (`phase7_1a.ts:397`) is not taking effect here. Component context also lists all 17 components.
+**Findings:** A1 51h/38m, D4 15h, A5 5h, B3, D5 3h.
+**Evidence:** `p7_test_case_saturation_0049a032`, `09005e1d`, `1a801092`.
+**Candidate code:** `src/lib/orchestrator/phases/phase7_1a.ts` (`renderScopedAcSummary` + the two AC blocks + component_context render).
+**Fix:** make the "parent validates" block actually parent-scoped (find why renderScopedAcSummary falls back to full — likely the parent's `acceptance_criterion_ids` don't resolve against the index); inject the AC set **once** (the "referencing" block names the summary section, doesn't re-embed); scope component_context to the parent test's component(s).
+**Tests:** unit — parent validating [AC-X] ⇒ rendered summary = AC-X only, appears once, component_context = parent's component. Harness fixture.
+
+### PA-3 [ ] task_skeleton AC-inventory + tech-specs scoping
+**DEFERRED to harness track (per user, 2026-07-01):** the full AC inventory (~83K chars, 57% of prompt) IS injected per-component (`phase6.ts:695`), but the clean fix needs the root→leaf lineage binding — `LeafAcceptanceCriteria` carries `leafStoryId` (Phase-2.1a leaf) while components trace to ROOT user stories. Coverage-critical (a wrong binding drops ACs; reconciliation loop backstops but wants live validation). Interim option logged: compact `renderAcceptanceCriteriaMenu` id-only for a zero-risk bloat cut.
+**Root cause:** per-single-component call injects the **full AC inventory** ("The full inventory is shown", 303 ACs / ~83K chars = 57% of prompt, 789/804 unused) + `104 System Requirements` + `46 Data Models` for all components. Model latches onto a foreign component in the corpus (C3 13h).
+**Findings:** A1 many, C3 13h, A2, B1, B3.
+**Candidate code:** `src/lib/orchestrator/phases/phase6.ts` — `renderAcceptanceCriteriaMenu`, `technical_specs_summary`, `renderComponentBlockForTask`.
+**Fix:** inject only THIS component's candidate leaf AC-* ids (orchestrator already owns the component→leaf-AC map via leaf-AC binding) + a compact id-only index for the rest; scope `technical_specs_summary` to the component's own SR/data-model/API slice.
+**Tests:** unit — rendered task_skeleton for comp-X carries only comp-X's AC/SR slice; the "every leaf AC MUST be covered" global mandate removed (see PA-11). Harness fixture.
+
+### PA-7 [ ] parent-slot keying (label ≠ injected parent)
+**Note:** needs code investigation first (mechanism unconfirmed) — good candidate for the live harness (assert queued node id == injected parent id == label id).
+**Root cause:** the `# Parent entity/task being decomposed` / `# Component Model Summary` slot is materialized from a **different node than the call's own label targets** — `data_model_saturation`: label `ent-ai-prompt-anatomy` but injected parent `ent-ai-prompt-budget`; `task_skeleton`: label `comp-eligibility-read-service` but summary shows `[Backlog] comp-eligibility-state-manager`. Label and prompt are from the same record, so this is a genuine builder/keying bug (or the target's own block is missing and only a backlog stub shows).
+**Findings:** B3 high across data_model_saturation / task_saturation / task_skeleton.
+**Evidence:** `p5_data_model_saturation_99521c1d`, `p6_task_skeleton_12bbe1a8`, `p6_task_saturation_1decaff4`.
+**Candidate code:** the per-node saturation/skeleton loop that emits the parent block vs the label — `phase5_1a.ts`, `phase6_1a.ts`, `phase6.ts`. **Needs code investigation to confirm mechanism** (off-by-one iteration? shared mutable? target block simply not rendered so only backlog remains?).
+**Fix:** single-source the target id; render the parent block from the exact queued node; assert `meta.label` id == injected parent id.
+**Tests:** unit — queued node N ⇒ parent block id == N == label id. Harness fixture.
+
+## P1 — high-value
+
+### PA-4 [x] DONE data_model_saturation context scoping
+**Result (2026-07-01, uncommitted):** scoped `component_context` to the entity's own component (`phase5.ts` builds `componentSummaryById` from `effectiveComponents.components` via `renderComponentBlockForTask`; nullable `component_id` guarded) and scoped root `sibling_context` to same-component entities (was every root entity across all components — the A1/A5 bloat that duplicated depth_zero_entities). Test: new `phase5_1aDataModelScope.test.ts`; 389 phase unit tests green; tsc clean. NOT this pass: stripping the nested `traces to:[FR/US]` arrays from the injected SR list (A2) — smaller follow-up.
+`# Component context` dumps ~50 `[Backlog] comp-*` + 42-entity sibling + 45 depth-0; `104 System Requirements` with nested `traces to: [FR/US]` arrays (data-model role never emits FR/US ids). Evidence `af0cecf8`, `04cc385b`. Code `phase5_1a.ts`. Fix: scope component_context to own component; strip nested FR/US trace arrays; scope SR list to reachable SRs.
+
+### PA-8 [x] DONE object/relationship serializer bugs
+`Capabilities: [object Object]` (×21, task_saturation/data_model/task_skeleton), **`Relationships: [object Object] (references)`** (data_model — destroys the primary decomposition signal), `Dependencies: undefined (sync_call)`, `In scope: [object Object]` (interface_contracts boundary). Root: `String(obj)`/`Array.join` on objects. Evidence `p5_data_model_saturation_04cc385b`, `p6_task_saturation_30f4f913`. Candidate: shared component-model/entity/boundary formatters. Fix: serialize name/description/target-id.
+**Result (2026-07-01, uncommitted):** new shared helper `src/lib/orchestrator/phases/summaryFormat.ts` (`displayCapability` / `displayComponentDependency` / `displayEntityRelationship` — never emit `[object Object]` or bare `undefined`; tolerant of the `component_id`/`target_component_id` + `kind`/`dependency_type` drift; `in_scope` objects render `.capability`). Wired into all 7 P1-8 render sites: `phaseContext.ts` (buildProjectTypeDescription in/out-scope, summarizeSystemBoundary in/out-scope, summarizeComponentModel deps, leaf-entity relationships), `phase4.ts` (adr component deps), `phase4_2a.ts` (formatRootComponentForPrompt deps + summary deps), `phase5_1a.ts` (formatEntityForPrompt relationships + summary relationships). Tests: `summaryFormat.test.ts` (14, pass); 386 phase unit tests green; tsc + eslint clean.
+**Follow-ups:** (a) harness regression fixture deferred to the harness-revival track; (b) `packetSynthesis/packetContextFormatter.ts:78` (P9, out of P1-8 scope) has the same `${d.component_id} (${d.kind})` pattern in markdown backticks — fix with the helper when touching P9.
+
+### PA-10 [ ] parent blocks lack active_constraints (TECH-* narrowing)
+Pre-findings #5/#6. parent_task/parent_entity blocks carry no `active_constraints`; only the global 25-TECH `GOVERNING CONSTRAINTS` menu (some `(none captured in Phase 1.0c)`). Model must reconstruct narrowing from instructional examples. Evidence `p6_task_saturation_279511cf`, `01179b91`. Code `phase6_1a.ts` (+ `phase6.ts` component narrowing not carried, `phase5`). Fix: inject the node's actual inherited `active_constraints` array into its block.
+
+### PA-9 [ ] id-namespace unification
+`TECH-BUN` (GOVERNING CONSTRAINTS) vs `TECH-BUN-1` (schema example/instruction) → emitted `active_constraints` don't join the registry; `ent-*` vs `DM-*` for entities across sibling/parent/depth blocks; leaf-vs-root US/AC. Evidence `p6_task_saturation_937d5261`, `p5_data_model_saturation_720fae0a`. Fix: align the injected catalog ids with the exact canonical ids the schema/example demands (one form); unify entity id namespace. Tests: unit — injected TECH ids == schema-example ids.
+
+### PA-5 [~] PARTIAL fr/nfr_saturation handoff-corpus scoping
+**B5 done via [[PA-11]] (2026-07-01):** the dominant fr/nfr_saturation finding was the contradictory category enum — fixed. **A1 handoff-scoping DEFERRED to harness track:** `handoff_context: handoffSummary` (phase2.ts:1435) injects the full Phase-1 corpus (`formatHandoffForDecomposition`, unused_ratio ~0.99); scoping it to the node's traced items is fuzzy + *quality-adjacent* (the model needs grounding to decompose well) — validate live like PA-3. Safe interim option: compact `formatHandoffForDecomposition` (id + short label, drop verbose descriptions; dedup repeated decision_trace rows) for a no-item-loss bloat cut.
+**LIVE-CONFIRMED (run 09c28e81, 2026-07-02):** on the Hestami spec the `# Handoff context` section = **22,714 chars = 62% of the 36.4K fr_saturation prompt**; every OTHER section is <2.3K. It is the full grounding catalog (all UJ-* journeys w/ acceptance text, 26 ENT-*, 21 TECH-*) injected IDENTICALLY into all 54+ fr_saturation calls (~1.2M chars of repeat), independent of which parent node is decomposed. **Deferral was correct** (a depth-4/5 FR node has no clean lineage to its relevant journeys/entities → scoping is genuinely fuzzy), but the economy case is now decisive. Two tractable, low-risk levers that don't require the fuzzy per-node slice: (1) compact each handoff item to `id + one-line label` (drop the multi-line Acceptance/description bodies — the bulk of the 22.7K); (2) since the block is byte-identical across all calls, hoist it to a cached/shared prefix (provider prompt-cache or a single system-scope block) instead of re-materializing per call. Promote to an actionable P1 item.
+Whole Phase-1 handoff corpus (15 UJ + 29 ENT + 16 WF + 21 TECH + …) injected into every single-node decomposition (unused_ratio ~0.99). Evidence `p2_fr_saturation_00d935da`, `a4d88b83`. Code: phase2 saturation renderer. Fix: slice handoff trace-pool to the node's domain/lineage.
+
+### PA-6 [ ] component_saturation domain-context scoping
+All 18 domains + 104 SR dumped for a single-component decomposition. Code `phase4_2a.ts`. Fix: inject parent's own domain + thin sibling-domain index.
+
+## P2 — hygiene / contradictions
+
+### PA-11 [~] IN-PROGRESS contradictory branch/category literals
+**Done (2026-07-01, uncommitted):** FR + NFR saturation surfaced-assumption `category` enum — the "category discipline" reminder had drifted to TASK categories (dropped `domain_regime`/`compliance`, invented `implementation_choice`, which is `TaskAssumptionCategory` not `AssumptionCategory`). Both templates unified to the canonical 5-value `AssumptionCategory`. Regression guard `frNfrSaturationCategoryConsistency.test.ts` (2 tests); 391 phase tests green.
+**LIVE-VALIDATED (fr_saturation, run 09c28e81, 2026-07-01):** 3 fr_saturation prompts (~38.5K chars each) — canonical-5 categories present 3/3, drift categories (implementation_choice/sequencing/dependency) 0/3, D2 unsubstituted-`{{}}` 0/3, `[object Object]` 0/3, D3 sentinels none. Visual: template L76 renders `` `category`: one of `domain_regime`|`constraint`|`compliance`|`scope`|`open_question` `` + full per-category definitions + L141 restatement. (nfr_saturation validation pending — upcoming in P2.)
+**data_model category — DONE (STATIC REVIEW PASS, 2026-07-02):** the data_model_saturation "category discipline" drift (`constraint`/`scope` not in its 7-value enum) is fixed + guarded by `dataModelSaturationCategoryConsistency.test.ts`.
+**Remaining:** data_model_saturation branch literal (`atomic_value` menu vs `atomic_leaf` fanout) + the nfr "skeleton-without-thresholds" mismatch — same class, template-only.
+fr_saturation category enum (`domain_regime|constraint|compliance|scope` vs `constraint|scope|implementation_choice`); data_model branch literal (`atomic_value` menu vs `atomic_leaf` fanout); nfr "skeleton without thresholds" that carries thresholds. B5 (588 weighted — the 2nd-largest dimension). Evidence `p2_fr_saturation_04b1ee27`, `p5_data_model_saturation_17baff5d`. Code: the prompt templates. Fix: one authoritative literal per concept across the template; align the downstream normalizer/enum.
+
+### PA-13 [ ] duplicate catalog injection
+`# Sibling context` == `# Depth-0 tasks` at root (~33K chars twice); governing constraints injected twice (top BINDING + DMR file); DMR "Most Material Findings" repeats. A5/D4. Code `phase6_1a.ts` + DMR assembly. Fix: inject once, reference; at root siblings==depth-0 ⇒ single block. (Overlaps PA-1.)
+
+### PA-12 [ ] JSON-fence self-contradiction
+`No markdown fences. Response starts with {` while the in-prompt Required-output example is itself ```json-fenced ⇒ model emits fences. C4. Code: the templates' Required-output example. Fix: strip fences from the example; ensure normalizer strips fences.
+
+### PA-14 [ ] compliance_context hardcoded empty
+`phase8.ts:302` passes literal `'No compliance regimes'` regardless of upstream. Fix: read `compliance_retention_discovery` artifact; if genuinely empty drop the dangling rule.
+
+### PA-15 [ ] monolithic test_case_skeleton + coverage shortfall
+One all-component call; ~28% AC coverage in a pass. A3/C2. Code `phase7.ts`. Fix: chunk per-component + orchestrator-owned coverage loop (mirror P6.1).

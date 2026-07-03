@@ -140,12 +140,15 @@ For each child you produce, list any **identity choice, ownership decision, card
 
 **Surfaced-assumption novelty + category discipline:**
 - Every `surfaced_assumptions[]` entry MUST be NOT already present (by id or paraphrase) in `existing_assumptions`. Do not re-surface assumptions already on the list.
-- The `category` value MUST match content semantics:
+- The `category` value MUST be one of the seven defined in "Surfacing assumptions" above (`identity` | `ownership` | `cardinality` | `lifecycle` | `consistency` | `storage_choice` | `open_question`) and match content semantics:
+  - `identity` — primary-key / natural-key / uniqueness choice
+  - `ownership` — which entity owns/aggregates another (composition vs reference)
+  - `cardinality` — one-to-one / one-to-many / many-to-many assumption
   - `lifecycle` — append-only / mutability / state-transition discipline grounded in upstream
-  - `constraint` — system-internal/architectural restriction grounded in source or upstream tier
-  - `scope` — bounding the deliverable
+  - `consistency` — transaction-boundary / eventual-vs-strong consistency posture
+  - `storage_choice` — persistence-engine / column-type / partitioning decision grounded in source or upstream tier
   - `open_question` — UNGROUNDED numeric / temporal / regulatory claim that the human must resolve
-- An ungrounded numeric or temporal commitment MUST be `open_question`, NOT `lifecycle` or `constraint`. Enforced by `surfaced_assumption_novelty` (catalog §5.4).
+- An ungrounded numeric or temporal commitment MUST be `open_question`, NOT `lifecycle` or `consistency`. Enforced by `surfaced_assumption_novelty` (catalog §5.4).
 
 **Parent-branch classification + fanout discipline:**
 - `parent_branch_classification` MUST be consistent with the structural test:

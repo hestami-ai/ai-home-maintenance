@@ -62,13 +62,13 @@ export default defineConfig({
     ...(process.env.JANUMICODE_CLAUDE_MODEL && {
       JANUMICODE_CLAUDE_MODEL: process.env.JANUMICODE_CLAUDE_MODEL,
     }),
-    // Orchestrator routing overrides. When set, the in-host harness
-    // calls `janumicode._test.setOrchestratorRouting` with these
-    // values. Typical production-mirroring run:
-    //   JANUMICODE_HARNESS_ORCHESTRATOR_BACKING=gemini_cli
-    // Typical CLI-path harness run (via claude-code-router proxy):
-    //   JANUMICODE_HARNESS_ORCHESTRATOR_BACKING=claude_code_cli
-    //   JANUMICODE_HARNESS_ORCHESTRATOR_MODEL=qwen3.5:9b
+    // Orchestrator routing override (OPTIONAL — the test-workspace
+    // .janumicode/config.json already pins orchestrator/domain_interpreter/
+    // requirements_agent to gemma4:31b-it-qat @ 131072). When set, the in-host
+    // harness ALSO calls `janumicode._test.setOrchestratorRouting`:
+    //   JANUMICODE_HARNESS_ORCHESTRATOR_BACKING=direct_llm_api
+    //   JANUMICODE_HARNESS_ORCHESTRATOR_MODEL=gemma4:31b-it-qat
+    //   JANUMICODE_HARNESS_ORCHESTRATOR_PROVIDER=ollama
     ...(process.env.JANUMICODE_HARNESS_ORCHESTRATOR_BACKING && {
       JANUMICODE_HARNESS_ORCHESTRATOR_BACKING: process.env.JANUMICODE_HARNESS_ORCHESTRATOR_BACKING,
     }),
@@ -77,6 +77,47 @@ export default defineConfig({
     }),
     ...(process.env.JANUMICODE_HARNESS_ORCHESTRATOR_PROVIDER && {
       JANUMICODE_HARNESS_ORCHESTRATOR_PROVIDER: process.env.JANUMICODE_HARNESS_ORCHESTRATOR_PROVIDER,
+    }),
+    // Executor / mimo pass-through (Phase 9 real-mode, JANUMICODE_HARNESS_REAL_PHASE9=1).
+    // Without these the Extension Development Host defaults mimo to its cloud model +
+    // no context declaration. The Ollama server must run at OLLAMA_CONTEXT_LENGTH=131072
+    // (mimo does not forward num_ctx).
+    ...(process.env.JANUMICODE_EXECUTOR_BACKING_TOOL && {
+      JANUMICODE_EXECUTOR_BACKING_TOOL: process.env.JANUMICODE_EXECUTOR_BACKING_TOOL,
+    }),
+    ...(process.env.JANUMICODE_MIMO_MODEL && {
+      JANUMICODE_MIMO_MODEL: process.env.JANUMICODE_MIMO_MODEL,
+    }),
+    ...(process.env.JANUMICODE_MIMO_OPENAI_CONTEXT && {
+      JANUMICODE_MIMO_OPENAI_CONTEXT: process.env.JANUMICODE_MIMO_OPENAI_CONTEXT,
+    }),
+    ...(process.env.JANUMICODE_MIMO_OPENAI_MAX_OUTPUT && {
+      JANUMICODE_MIMO_OPENAI_MAX_OUTPUT: process.env.JANUMICODE_MIMO_OPENAI_MAX_OUTPUT,
+    }),
+    ...(process.env.JANUMICODE_EXECUTOR_IDLE_TIMEOUT_S && {
+      JANUMICODE_EXECUTOR_IDLE_TIMEOUT_S: process.env.JANUMICODE_EXECUTOR_IDLE_TIMEOUT_S,
+    }),
+    // Harness profile knobs (mirror scripts/run-harness.sh:117-118). On slow
+    // local models these two layers dominate wall-clock: the reasoning_review
+    // harness hook fires on EVERY agent_output, and Stage III ingestion issues
+    // a per-record LLM call — both on a different model than the core role, so
+    // each forces a gemma4:31b <-> validator model swap (no keep-alive; Ollama
+    // serves one model at a time). Neither affects CORE prompt materialization,
+    // so a prompt-audit validation run sets both off:
+    //   JANUMICODE_REVIEW_ENABLED=false JANUMICODE_INGESTION_STAGE3_OFF=1
+    ...(process.env.JANUMICODE_REVIEW_ENABLED && {
+      JANUMICODE_REVIEW_ENABLED: process.env.JANUMICODE_REVIEW_ENABLED,
+    }),
+    ...(process.env.JANUMICODE_INGESTION_STAGE3_OFF && {
+      JANUMICODE_INGESTION_STAGE3_OFF: process.env.JANUMICODE_INGESTION_STAGE3_OFF,
+    }),
+    // Downgrade Phase-1.8 release-manifest blocking gaps to advisory. The P1.8
+    // release_exact_coverage_* gates require the LLM release plan to place every
+    // journey/workflow/entity in exactly one release; a dense model at temp=1.0
+    // omits some stochastically → hard-fail with no retry, blocking a run whose
+    // purpose is validating Phases 3-8. Opt-in; gaps stay logged + persisted.
+    ...(process.env.JANUMICODE_RELEASE_MANIFEST_ADVISORY && {
+      JANUMICODE_RELEASE_MANIFEST_ADVISORY: process.env.JANUMICODE_RELEASE_MANIFEST_ADVISORY,
     }),
   },
 });

@@ -27,6 +27,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { displayComponentDependency } from './summaryFormat';
 import type { PhaseContext } from '../orchestratorEngine';
 import type {
   GovernedStreamRecord,
@@ -326,7 +327,7 @@ function formatRootComponentForPrompt(c: DecompositionComponent): string {
   const resps = c.responsibilities.map(r => `  - [${r.id}] ${r.description}`).join('\n');
   const deps = c.dependencies.length === 0
     ? '(none)'
-    : c.dependencies.map(d => `  - ${d.component_id} (${d.kind})`).join('\n');
+    : c.dependencies.map(d => `  - ${displayComponentDependency(d)}`).join('\n');
   return [
     `Component id: ${c.id}`,
     `Name: ${c.name}`,
@@ -1279,7 +1280,7 @@ function emitTierBGateBundles(
       details: {
         component_id: c.component.id,
         responsibilities: c.component.responsibilities.length,
-        dependencies: c.component.dependencies.map(d => `${d.component_id} (${d.kind})`),
+        dependencies: c.component.dependencies.map(displayComponentDependency),
         active_constraints: c.component.active_constraints ?? [],
       },
     }));

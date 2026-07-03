@@ -153,10 +153,11 @@ For each child, list assumptions / constraints / compliance citations / open que
 
 **Surfaced-assumption novelty + category discipline** (prevents assumption re-surfacing and category drift):
 - Every entry in `surfaced_assumptions[]` MUST be genuinely novel — not already present in `existing_assumptions[]` by identity or paraphrase. Do not re-surface assumptions already on the list.
-- The `category` value MUST match content semantics:
+- The `category` value MUST be one of the five defined in "Surfacing assumptions" above (`domain_regime` | `constraint` | `compliance` | `scope` | `open_question`) and match content semantics:
+  - `domain_regime` — a named external standard, law, or domain invariant (see the definitions above)
+  - `compliance` — a regulatory retention, audit, reporting, or legal-record obligation
   - `constraint` — system-internal/architectural restriction grounded in source or upstream tier
   - `scope` — bounding the deliverable
-  - `implementation_choice` — concrete how-to decision
   - `open_question` — UNGROUNDED numeric / temporal / regulatory claim that the human must resolve
 - An ungrounded numeric threshold or temporal commitment MUST be `open_question`, NOT `constraint` or `scope`. Promoting a guess to `constraint` passes false assurance to downstream phases.
 

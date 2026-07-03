@@ -206,6 +206,100 @@ describe('runTestSaturationLoop — Wave 10 saturation', () => {
     expect(snap.assumptions).toHaveLength(1);
   });
 
+  it('PA-2 — test_case_saturation prompt is scoped: own-component context, same-component root siblings', async () => {
+    const mock = new MockLLMProvider();
+    // Atomic response for every root → one call each; assert on the captured prompts.
+    mock.setFixture('atomic', {
+      match: 'test-',
+      parsedJson: {
+        parent_branch_classification: 'atomic_step',
+        parent_tier_assessment: { tier: 'D', agrees_with_hint: true, rationale: 'atomic' },
+        children: [],
+        surfaced_assumptions: [],
+      },
+    });
+    configureMock(mock);
+
+    const { run } = engine.startWorkflowRun('ws', 'test');
+    const rootA: DecompositionTestCase = { ...tinyTest('test-a-root'), component_ids: ['comp-a'] };
+    const rootB: DecompositionTestCase = { ...tinyTest('test-b-root'), component_ids: ['comp-b'] };
+    const sa = seedRootNode(engine, run.id, rootA);
+    const sb = seedRootNode(engine, run.id, rootB);
+
+    await runTestSaturationLoop(
+      { engine, workflowRun: { id: run.id } as Parameters<typeof runTestSaturationLoop>[0]['workflowRun'] },
+      {
+        technicalConstraints: [],
+        componentSummary: 'FULL-MODEL-SUMMARY (comp-a and comp-b)',
+        componentSummaryById: { 'comp-a': 'SCOPED-COMPONENT-A-ONLY', 'comp-b': 'SCOPED-COMPONENT-B-ONLY' },
+        acceptanceCriteriaSummary: 'AC-001, AC-002',
+        interfaceContractsSummary: 'IC-001',
+        rootTestCases: [rootA, rootB],
+        rootNodeRecordIds: [sa.recordId, sb.recordId],
+        rootLogicalIds: [sa.logicalNodeId, sb.logicalNodeId],
+      },
+    );
+
+    const prompts = mock.getCallLog().map(c => c.options.prompt ?? '');
+    const promptA = prompts.find(p => p.includes('SCOPED-COMPONENT-A-ONLY'));
+    expect(promptA, 'a test_case_saturation prompt scoped to comp-a should exist').toBeDefined();
+
+    // (1) component_context scoped to the test's OWN component — not the other, not the full model.
+    expect(promptA!).not.toContain('SCOPED-COMPONENT-B-ONLY');
+    expect(promptA!).not.toContain('FULL-MODEL-SUMMARY');
+
+    // (2) root sibling_context scoped to component-overlapping test cases → comp-a root has no
+    //     same-component siblings, and the cross-component root is NOT injected as a sibling bullet.
+    expect(promptA!).toContain('(none — sole child under this parent)');
+    expect(promptA!).not.toContain('- test-b-root: test-b-root');
+  });
+
+  it('PA-2 regression — roots with EMPTY component_ids still list siblings (no false "sole child")', async () => {
+    const mock = new MockLLMProvider();
+    mock.setFixture('atomic', {
+      match: 'test-',
+      parsedJson: {
+        parent_branch_classification: 'atomic_step',
+        parent_tier_assessment: { tier: 'D', agrees_with_hint: true, rationale: 'atomic' },
+        children: [],
+        surfaced_assumptions: [],
+      },
+    });
+    configureMock(mock);
+
+    const { run } = engine.startWorkflowRun('ws', 'test');
+    // The 7.1 skeleton binds components at the SUITE level, so a root test case
+    // often has NO component_ids of its own. Pre-fix, parentComps was empty and
+    // the overlap predicate dropped every sibling → each root falsely rendered as
+    // the sole child, starving the cross-sibling dedup roster. The empty-parentComps
+    // bypass must restore the full same-parent roster.
+    const rootA: DecompositionTestCase = { ...tinyTest('test-a-root'), component_ids: [] };
+    const rootB: DecompositionTestCase = { ...tinyTest('test-b-root'), component_ids: [] };
+    const sa = seedRootNode(engine, run.id, rootA);
+    const sb = seedRootNode(engine, run.id, rootB);
+
+    await runTestSaturationLoop(
+      { engine, workflowRun: { id: run.id } as Parameters<typeof runTestSaturationLoop>[0]['workflowRun'] },
+      {
+        technicalConstraints: [],
+        componentSummary: 'FULL-MODEL',
+        acceptanceCriteriaSummary: 'AC-001',
+        interfaceContractsSummary: 'IC-001',
+        rootTestCases: [rootA, rootB],
+        rootNodeRecordIds: [sa.recordId, sb.recordId],
+        rootLogicalIds: [sa.logicalNodeId, sb.logicalNodeId],
+      },
+    );
+
+    const prompts = mock.getCallLog().map(c => c.options.prompt ?? '');
+    expect(prompts).toHaveLength(2);
+    // Neither root is falsely told it is the sole child.
+    expect(prompts.some(p => p.includes('(none — sole child under this parent)'))).toBe(false);
+    // Each root sees the OTHER root as a sibling bullet (roster preserved).
+    expect(prompts.some(p => p.includes('- test-b-root: test-b-root'))).toBe(true);
+    expect(prompts.some(p => p.includes('- test-a-root: test-a-root'))).toBe(true);
+  });
+
   it('carries a property child (test_type=property + property_spec) through the loop; synthesizes an assert step when none given', async () => {
     const mock = new MockLLMProvider();
     mock.setFixture('decompose-root', {

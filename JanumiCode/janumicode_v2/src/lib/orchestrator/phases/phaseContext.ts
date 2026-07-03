@@ -13,6 +13,7 @@
  */
 
 import type { GovernedStreamRecord } from '../../types/records';
+import { displayCapability, displayComponentDependency, displayEntityRelationship } from './summaryFormat';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -308,12 +309,12 @@ function summarizeNonFunctionalRequirements(c: Record<string, unknown>): string 
 }
 
 function summarizeSystemBoundary(c: Record<string, unknown>): string {
-  const inScope = (c.in_scope as string[]) ?? [];
-  const outScope = (c.out_of_scope as string[]) ?? [];
+  const inScope = (c.in_scope as unknown[]) ?? [];
+  const outScope = (c.out_of_scope as unknown[]) ?? [];
   const external = (c.external_systems as Array<Record<string, unknown>>) ?? [];
   return [
-    `In scope: ${inScope.join('; ')}`,
-    `Out of scope: ${outScope.join('; ')}`,
+    `In scope: ${inScope.map(displayCapability).join('; ')}`,
+    `Out of scope: ${outScope.map(displayCapability).join('; ')}`,
     `External systems: ${external.map(e => `${e.id}: ${e.name} (${e.interface_type})`).join('; ') || 'none'}`,
   ].join('\n');
 }
@@ -351,7 +352,7 @@ function summarizeComponentModel(c: Record<string, unknown>): string {
     const resps = (comp.responsibilities as Array<Record<string, unknown>>) ?? [];
     const respList = resps.map(r => `    ${r.id}: ${r.statement}`).join('\n');
     const deps = (comp.dependencies as Array<Record<string, unknown>>) ?? [];
-    const depList = deps.map(d => `${d.target_component_id} (${d.dependency_type})`).join(', ');
+    const depList = deps.map(displayComponentDependency).join(', ');
     return `  ${comp.id}: ${comp.name} (domain: ${comp.domain_id ?? 'unassigned'})\n    Responsibilities:\n${respList}\n    Dependencies: ${depList || 'none'}`;
   });
   return `${components.length} Components:\n${lines.join('\n')}`;
@@ -437,10 +438,10 @@ function buildProjectTypeDescription(ctx: PriorPhaseContext): string {
   }
 
   if (ctx.systemBoundary) {
-    const inScope = (ctx.systemBoundary.content.in_scope as string[]) ?? [];
-    const outScope = (ctx.systemBoundary.content.out_of_scope as string[]) ?? [];
-    if (inScope.length > 0) parts.push(`Capabilities: ${inScope.join('; ')}`);
-    if (outScope.length > 0) parts.push(`Excluded: ${outScope.join('; ')}`);
+    const inScope = (ctx.systemBoundary.content.in_scope as unknown[]) ?? [];
+    const outScope = (ctx.systemBoundary.content.out_of_scope as unknown[]) ?? [];
+    if (inScope.length > 0) parts.push(`Capabilities: ${inScope.map(displayCapability).join('; ')}`);
+    if (outScope.length > 0) parts.push(`Excluded: ${outScope.map(displayCapability).join('; ')}`);
   }
 
   return parts.join('\n') || 'No project type information available';
@@ -1135,7 +1136,7 @@ export function buildEffectiveDataModelView(
           type: f.type,
           constraints: f.constraints,
         })),
-        relationships: (l.entity.relationships ?? []).map(r => `${r.target_entity_id} (${r.kind})`),
+        relationships: (l.entity.relationships ?? []).map(displayEntityRelationship),
       });
     }
     const summaryLines = sorted.map(l => {

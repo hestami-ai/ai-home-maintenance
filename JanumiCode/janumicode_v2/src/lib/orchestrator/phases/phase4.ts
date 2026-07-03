@@ -11,9 +11,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { displayComponentDependency } from './summaryFormat';
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
 import type {
-  GovernedStreamRecord,
   PhaseId,
   ProductDescriptionHandoffContent,
   TechnicalConstraint,
@@ -25,6 +25,7 @@ import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseCo
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
 import { resolveAgainstOracle } from '../idResolver';
+import { chunkedCoverageBloom } from './chunkedCoverageBloom';
 import { runComponentSaturationLoop } from './phase4_2a';
 import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
 import { buildRequirementLineage } from './packetSynthesis/idResolution';
@@ -232,6 +233,190 @@ export function deterministicComponentDrops(
     }
   }
   return [...drops.entries()].map(([id, reason]) => ({ id, reason }));
+}
+
+// ── SD-2 — per-domain ADR capture (chunked pure fan-out) ────────────
+
+/**
+ * Component shape consumed by the per-domain ADR fan-out. Structurally
+ * compatible with BOTH the leaf-projected shape (buildEffectiveComponentView
+ * 'leaves') and the flat `component_model` fallback (`Component`).
+ */
+interface AdrCaptureComponent {
+  id: string;
+  name: string;
+  domain_id?: string;
+  responsibilities: Array<{ id: string; statement: string }>;
+  dependencies?: Array<{ target_component_id: string; dependency_type: string }>;
+}
+
+/** One per-domain ADR chunk — its components + the software-domain key. */
+interface AdrDomainChunk {
+  domainId: string;
+  components: AdrCaptureComponent[];
+}
+
+/**
+ * Render a component roster block for an ADR prompt (id, domain,
+ * responsibilities, dependencies). Same convention as the pre-SD-2 monolithic
+ * `componentSummary`, now applied to a SINGLE domain's slice per call.
+ */
+function renderAdrComponentBlock(components: AdrCaptureComponent[]): string {
+  return components.map(c => {
+    const resps = c.responsibilities.map(r => `  ${r.id}: ${r.statement}`).join('\n');
+    const deps = (c.dependencies ?? []).map(displayComponentDependency).join(', ');
+    return `${c.id}: ${c.name} (domain: ${c.domain_id ?? 'unassigned'})\n  Responsibilities:\n${resps}\n  Dependencies: ${deps || 'none'}`;
+  }).join('\n');
+}
+
+/**
+ * Group leaf components by their `domain_id` (Phase 4.1 SOFTWARE domain),
+ * preserving first-seen order. Components with no domain fall into an
+ * 'unassigned' chunk. Pure — no id resolution.
+ */
+function groupComponentsByDomain(components: AdrCaptureComponent[]): AdrDomainChunk[] {
+  const byDomain = new Map<string, AdrCaptureComponent[]>();
+  const order: string[] = [];
+  for (const c of components) {
+    const key = c.domain_id && c.domain_id.length > 0 ? c.domain_id : 'unassigned';
+    if (!byDomain.has(key)) {
+      byDomain.set(key, []);
+      order.push(key);
+    }
+    byDomain.get(key)!.push(c);
+  }
+  return order.map(domainId => ({ domainId, components: byDomain.get(domainId)! }));
+}
+
+export interface AdrCaptureBloomArgs {
+  /** Leaf components (each carrying a `domain_id`) the ADRs govern. */
+  adrComponents: AdrCaptureComponent[];
+  /** Full software-domain roster — passed to every chunk as reference-only. */
+  domainsSummary: string;
+  /**
+   * Canonical TECH-* roster (Phase 1.0c). Passed verbatim to EVERY domain
+   * chunk: TECH-* constraints are global binding commitments (e.g. "no
+   * microservices" applies to all domains), and the whole point of the block
+   * is the model's non-contradiction self-check, so the full roster is the
+   * correct per-chunk scope. A finer per-domain TECH slice awaits a TECH→domain
+   * mapping (PA-6); there is none today, and regex-matching TECH text to a
+   * domain would violate the no-regex-id-resolution house rule.
+   */
+  technicalConstraintsSummary: string;
+  /** DMR packet — supplies `active_constraints`. */
+  dmr: PhaseContextPacketResult;
+}
+
+/**
+ * SD-2 — capture Architectural Decision Records via PER-SOFTWARE-DOMAIN
+ * chunked fan-out (replaces the monolithic "every significant choice across
+ * all ~53 components in one call" ask that under-covered component-model
+ * thresholds).
+ *
+ * PURE FAN-OUT (empty coverage set, 0 reconciliation passes): ADRs are not a
+ * clean enumerable coverage set — "significant architectural choices" can't be
+ * listed up front — so there is no coverage oracle. Cardinality is the disease;
+ * one focused ADR call per software domain (its components + the TECH-* roster)
+ * is the whole cure. See `chunkedCoverageBloom` and
+ * SKELETON-DECOMPOSITION-DESIGN §SD-2.
+ *
+ * House rules preserved:
+ *  - NO fabrication — a failing domain chunk returns []; the single ADR-001
+ *    fallback survives ONLY when the WHOLE bloom yields zero ADRs.
+ *  - ADR ids are globally unique across domain chunks — deterministically
+ *    re-id'd (`ADR-###`) AFTER merge (each domain independently emits ADR-001;
+ *    a per-chunk id namespace prevents the helper's idOf-dedup from silently
+ *    dropping a second domain's ADR-001 as a "duplicate").
+ *  - `governs_components` oracle resolution is NOT done here — the caller runs
+ *    it ONCE post-merge over the FULL component oracle (a domain-A ADR may
+ *    validly govern a domain-B component id).
+ */
+export async function runAdrCaptureBloom(
+  ctx: PhaseContext,
+  args: AdrCaptureBloomArgs,
+): Promise<ArchitecturalDecisions> {
+  const { engine } = ctx;
+  const template = engine.templateLoader.findTemplate('architecture_agent', 'adr_capture');
+
+  const fallback: ArchitecturalDecisions = {
+    adrs: [{
+      id: 'ADR-001',
+      title: 'Primary technology stack',
+      status: 'proposed',
+      context: 'Technology selection for initial implementation',
+      decision: 'Use the technology stack implied by the requirements',
+      alternatives: ['Alternative stack'],
+      rationale: 'Best fit for the described requirements and constraints',
+      consequences: ['Team must have expertise in chosen stack'],
+    }],
+  };
+
+  const domainChunks = groupComponentsByDomain(args.adrComponents);
+  if (!template || domainChunks.length === 0) return fallback;
+
+  const { produced } = await chunkedCoverageBloom<AdrDomainChunk, ADR>({
+    chunks: domainChunks,
+    generateForChunk: async (chunk, index) => {
+      const rendered = engine.templateLoader.render(template, {
+        active_constraints: args.dmr.activeConstraintsText,
+        active_software_domain: `${chunk.domainId} (${chunk.components.length} component(s): ${chunk.components.map(c => c.id).join(', ')})`,
+        component_model_summary: renderAdrComponentBlock(chunk.components),
+        software_domains_summary: args.domainsSummary,
+        technical_constraints_summary: args.technicalConstraintsSummary,
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+      });
+      if (rendered.missing_variables.length > 0) return [];
+      try {
+        // LLM throws are caught here (a single domain must not sink the bloom).
+        // Route through requirements_agent routing for llamacpp via llama-swap.
+        const result = await engine.callForRole('requirements_agent', {
+          prompt: rendered.rendered,
+          responseFormat: 'json',
+          temperature: 0.4,
+          traceContext: {
+            workflowRunId: ctx.workflowRun.id,
+            phaseId: '4',
+            subPhaseId: 'adr_capture',
+            agentRole: 'architecture_agent',
+            label: `Phase 4.3 — Architectural Decision Capture (${chunk.domainId})`,
+          },
+        });
+        // Envelope-tolerant parse — same cal-21 SR-loss pattern the monolithic
+        // call guarded against (`{ architectural_decisions: [...] }` vs `{ adrs }`).
+        const parsed = result.parsed as Record<string, unknown> | null;
+        const adrs = pickItemsArray<ADR>(parsed, ['architectural_decisions', 'adrs']) ?? [];
+        // Namespace each id with the chunk index BEFORE dedup so two domains
+        // both emitting `ADR-001` are NOT collapsed by the helper's idOf-dedup
+        // (they are distinct decisions, not duplicates). Genuine within-chunk
+        // repeats still collapse. Clean sequential re-id happens post-merge.
+        return adrs.map((adr, j) => ({
+          ...adr,
+          id: `d${index}-${typeof adr.id === 'string' && adr.id.length > 0 ? adr.id : `ADR-${j + 1}`}`,
+        }));
+      } catch (err) {
+        getLogger().warn('workflow', 'Phase 4.3 per-domain ADR generation failed — continuing', {
+          domain_id: chunk.domainId, error: err instanceof Error ? err.message : String(err),
+        });
+        return [];
+      }
+    },
+    idOf: (adr) => (typeof adr.id === 'string' ? adr.id : ''),
+    // Pure fan-out: ADR "significant choices" are not a clean enumerable set,
+    // so there is NO coverage oracle and NO reconciliation. `coveredBy` is
+    // dedup/context only (unused while the target set is empty).
+    targetCoverageSet: new Set<string>(),
+    coveredBy: (adr) => (Array.isArray(adr.governs_components) ? adr.governs_components : []),
+    maxReconPasses: 0,
+    logLabel: 'Phase 4.3',
+  });
+
+  if (produced.length === 0) return fallback;
+
+  // Deterministic global re-id AFTER merge — strip the per-chunk namespace and
+  // assign unique sequential `ADR-###` ids. Does NOT touch governs_components
+  // (component ids), so the caller's post-merge oracle resolution is unaffected.
+  const adrs = produced.map((adr, i) => ({ ...adr, id: `ADR-${String(i + 1).padStart(3, '0')}` }));
+  return { adrs };
 }
 
 // ── Handler ────────────────────────────────────────────────────────
@@ -731,11 +916,6 @@ export class Phase4Handler implements PhaseHandler {
             })),
         }))
       : componentContent.components;
-    const componentSummary = adrComponentsSource.map(c => {
-      const resps = c.responsibilities.map(r => `  ${r.id}: ${r.statement}`).join('\n');
-      const deps = (c.dependencies ?? []).map(d => `${d.target_component_id} (${d.dependency_type})`).join(', ');
-      return `${c.id}: ${c.name} (domain: ${c.domain_id ?? 'unassigned'})\n  Responsibilities:\n${resps}\n  Dependencies: ${deps || 'none'}`;
-    }).join('\n');
 
     const adrComponentIds = adrComponentsSource.map(c => c.id).filter(Boolean);
     const dmr43Seeds = [
@@ -772,9 +952,16 @@ export class Phase4Handler implements PhaseHandler {
           .filter(Boolean)
           .join('\n');
 
-    const adrsContent = await this.runADRCapture(
-      ctx, componentSummary, domainsSummary, technicalConstraintsSummary, dmr43,
-    );
+    // SD-2 — capture ADRs via PER-DOMAIN chunked fan-out (one focused call per
+    // software domain) instead of a single all-components roll-up. Pure fan-out:
+    // no coverage oracle (ADR "significant choices" aren't enumerable). ADR ids
+    // are globally re-id'd post-merge inside the bloom.
+    const adrsContent = await runAdrCaptureBloom(ctx, {
+      adrComponents: adrComponentsSource,
+      domainsSummary,
+      technicalConstraintsSummary,
+      dmr: dmr43,
+    });
 
     // Resolve drifted component ids in each ADR's governs_components against the
     // real component-id oracle, so the downstream per-task ADR filter
@@ -1034,74 +1221,13 @@ export class Phase4Handler implements PhaseHandler {
     return fallback;
   }
 
-  private async runADRCapture(
-    ctx: PhaseContext,
-    componentSummary: string,
-    domainsSummary: string,
-    technicalConstraintsSummary: string,
-    dmr: PhaseContextPacketResult,
-  ): Promise<ArchitecturalDecisions> {
-    const { engine } = ctx;
-    const template = engine.templateLoader.findTemplate('architecture_agent', 'adr_capture');
-
-    const fallback: ArchitecturalDecisions = {
-      adrs: [{
-        id: 'ADR-001',
-        title: 'Primary technology stack',
-        status: 'proposed',
-        context: 'Technology selection for initial implementation',
-        decision: 'Use the technology stack implied by the requirements',
-        alternatives: ['Alternative stack'],
-        rationale: 'Best fit for the described requirements and constraints',
-        consequences: ['Team must have expertise in chosen stack'],
-      }],
-    };
-
-    if (!template) return fallback;
-
-    const rendered = engine.templateLoader.render(template, {
-      active_constraints: dmr.activeConstraintsText,
-      component_model_summary: componentSummary,
-      software_domains_summary: domainsSummary,
-      technical_constraints_summary: technicalConstraintsSummary,
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-    });
-    if (rendered.missing_variables.length > 0) return fallback;
-
-    // LLM throws propagate to engine catch (halts workflow).
-    // Route through requirements_agent routing for llamacpp via
-    // llama-swap. See phase3.ts for the rationale.
-    const result = await engine.callForRole('requirements_agent', {
-      prompt: rendered.rendered,
-      responseFormat: 'json',
-      temperature: 0.4,
-      traceContext: {
-        workflowRunId: ctx.workflowRun.id,
-        phaseId: '4',
-        subPhaseId: 'adr_capture',
-        agentRole: 'architecture_agent',
-        label: 'Phase 4.3 — Architectural Decision Capture',
-      },
-    });
-
-    // cal-21 lost 6 of 7 ADRs to this exact spot before the migration:
-    // model emitted `{ architectural_decisions: [adr1..adr7] }`, the
-    // old parser took adr1 as a single ADR, looked for `.adrs` inside
-    // it (doesn't exist), fell back to the placeholder. Same pattern
-    // as the SR-loss bug — see parsedResponseHelpers.ts.
-    const parsed = result.parsed as Record<string, unknown> | null;
-    const adrs = pickItemsArray<ADR>(parsed, ['architectural_decisions', 'adrs']);
-    if (adrs && adrs.length > 0) return { adrs };
-    return fallback;
-  }
-
   /**
    * Deterministic consistency check across Phase 4 artifacts.
    */
   private runConsistencyCheck(
     components: ComponentModel,
     adrs: ArchitecturalDecisions,
-    sysReqItems: Array<Record<string, unknown>>,
+    _sysReqItems: Array<Record<string, unknown>>,
   ): { overall_pass: boolean; traceability_results: unknown[]; semantic_findings: unknown[]; blocking_failures: string[]; warnings: string[] } {
     const blockingFailures: string[] = [];
     const warnings: string[] = [];

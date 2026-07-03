@@ -120,6 +120,26 @@ interface AdjudicatedAssumptionSet {
   deferred: Array<{ id: string; text: string; rationale?: string; source_candidate_ids: string[] }>;
 }
 
+/**
+ * Coerce a quality-attribute bloom item to a display string. Some models
+ * (gpt-oss:20b) emit each QA as an OBJECT (`{attribute|name|description|...}`)
+ * rather than a bare string; the downstream `buildQaItems` does `q.slice(...)`
+ * and threw `q.slice is not a function` on gpt-oss (cal-32 P1.5). Normalize
+ * producer-side so every consumer stays on `string[]`.
+ */
+export function coerceQualityAttribute(x: unknown): string {
+  if (typeof x === 'string') return x;
+  if (x && typeof x === 'object') {
+    const o = x as Record<string, unknown>;
+    for (const k of ['attribute', 'quality_attribute', 'statement', 'description', 'name', 'text', 'value', 'label']) {
+      const v = o[k];
+      if (typeof v === 'string' && v.length > 0) return v;
+    }
+    return JSON.stringify(o);
+  }
+  return x == null ? '' : String(x);
+}
+
 export class Phase1Handler implements PhaseHandler {
   readonly phaseId: PhaseId = '1';
 
@@ -1821,7 +1841,24 @@ fabricates a new threshold is unsupported.`,
         });
       }
     }
-    const blockingManifestGaps = manifestGaps.filter(g => g.severity === 'blocking');
+    let blockingManifestGaps = manifestGaps.filter(g => g.severity === 'blocking');
+    // Harness-scoped opt-in (default OFF → production behaviour unchanged): a
+    // validation run exercising Phases 3-8 (virtuousCycle.harness) should not
+    // hard-fail on a Phase-1.8 release-plan coverage miss caused by LLM sampling
+    // variance (temp=1.0 dense models omit journeys from the release `contains`
+    // blocks stochastically). Downgrade blocking manifest gaps to advisory — they
+    // are still persisted as coverage_gap records and WARN-logged, so the
+    // fragility stays observable; the run just proceeds. Mirrors
+    // JANUMICODE_REVIEW_ENABLED / JANUMICODE_SCOPE_GATEKEEPER harness relaxations.
+    if (blockingManifestGaps.length > 0
+        && (process.env.JANUMICODE_RELEASE_MANIFEST_ADVISORY ?? '') === '1') {
+      getLogger().warn('workflow', 'Phase 1.8 verifier: blocking manifest gaps DOWNGRADED to advisory (JANUMICODE_RELEASE_MANIFEST_ADVISORY=1)', {
+        workflow_run_id: workflowRun.id,
+        downgraded: blockingManifestGaps.map(g => g.check),
+      });
+      for (const g of blockingManifestGaps) g.severity = 'advisory';
+      blockingManifestGaps = [];
+    }
     if (blockingManifestGaps.length > 0) {
       const gapRecIds = this.persistCoverageGaps(ctx, manifestGaps, [round18.record.id]);
       getLogger().warn('workflow', 'Phase 1.8 verifier: blocking coverage/coherence gaps detected', {
@@ -2711,9 +2748,15 @@ fabricates a new threshold is unsupported.`,
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('Integrations/QA bloom returned unparseable JSON');
+    // Normalize qualityAttributes to string[]: some models (gpt-oss:20b) emit each
+    // QA as an OBJECT and/or use the snake_case key. Coerce producer-side so all
+    // consumers (buildQaItems' q.slice, .filter, safeQAs) get strings.
+    const rawQas = (parsed.qualityAttributes ?? parsed.quality_attributes) as unknown;
     return {
       integrations: (parsed.integrations as Integration[] | undefined) ?? [],
-      qualityAttributes: Array.isArray(parsed.qualityAttributes) ? parsed.qualityAttributes as string[] : [],
+      qualityAttributes: Array.isArray(rawQas)
+        ? rawQas.map(coerceQualityAttribute).filter(s => s.length > 0)
+        : [],
     };
   }
 
