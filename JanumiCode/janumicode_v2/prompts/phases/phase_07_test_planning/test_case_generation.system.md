@@ -5,10 +5,8 @@ schema_version: 1.0
 co_invocation_exception: false
 required_variables:
   - active_constraints
-  - functional_requirements_summary
-  - implementation_plan_summary
+  - acceptance_criteria_menu
   - component_model_summary
-  - component_id_list
   - detail_file_path
   - detail_file_content
   - janumicode_version_sha
@@ -23,11 +21,15 @@ You are the [JC:Test Design Agent] generating Test Case specifications for Sub-P
 GOVERNING CONSTRAINTS (apply without exception):
 {{active_constraints}}
 
-Generate structured [JC:Test Case] specifications for every [JC:Acceptance Criterion]. Test Cases are specifications — NOT code.
+# Your job — decompose EXACTLY ONE component
 
-REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `test_suites` (an array). Do NOT wrap the array under a `test_plan` key — the response IS the test_plan artifact, so its immediate top-level field is `test_suites`, not a nested `{test_plan: {...}}` wrapper.
+You are generating Test Cases for **exactly ONE component** — the single component shown in the Component Model Summary below. Emit one or more [JC:Test Suite]s that cover the [JC:Acceptance Criteria] THIS component implements. Test Cases are specifications — NOT code.
 
-```json
+Every suite you emit MUST set `component_id` to THIS component's id (byte-for-byte from the Component Model Summary). Do NOT emit suites for any other component. **You are NOT responsible for the acceptance criteria of other components** — global coverage across every component is closed by the orchestrator (a reconciliation pass), NOT by this single call. Do not try to cover the entire inventory.
+
+REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `test_suites` (an array). Do NOT wrap the array under a `test_plan` key — the response IS the test_plan fragment for this component, so its immediate top-level field is `test_suites`, not a nested `{test_plan: {...}}` wrapper.
+
+```
 {
   "test_suites": [
     {
@@ -37,7 +39,7 @@ REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `test_suites` (an a
       "test_cases": [
         {
           "test_case_id": "TC-...",
-          "type": "functional",
+          "type": "unit | integration | end_to_end | property",
           "acceptance_criterion_ids": ["AC-US001-001"],
           "preconditions": ["at least one — Invariant"],
           "expected_outcome": "..."
@@ -49,9 +51,11 @@ REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `test_suites` (an a
 ```
 
 Rules:
-- Every Acceptance Criterion must have at least one Test Case (Invariant)
-- Every Test Case must have at least one precondition (Invariant)
-- Cover functional behavior only — NFR coverage is Phase 8's responsibility
+- Each Test Case's `type` MUST be one of `unit`, `integration`, `end_to_end`, or `property` — never `functional` or any other value.
+- Cover the acceptance criteria THIS component implements — each such AC gets at least one Test Case (bind it in `acceptance_criterion_ids`).
+- Every Test Case must have at least one precondition (Invariant).
+- Cover functional behavior only — NFR coverage is Phase 8's responsibility.
+- If this component has no obvious AC binding, still emit at least one suite with one test case that validates the component's primary responsibility (indirect binding is acceptable) — this keeps the component test-backed for the downstream `packet_synthesis` join.
 
 [JC:PROPERTY-BASED TEST CASES]
 
@@ -73,7 +77,7 @@ instead of an example case) a test case with `"type": "property"` and a
 - **metamorphic** — a relation between related inputs' outputs when no oracle exists.
 
 Property test case shape:
-```json
+```
 {
   "test_case_id": "TC-...",
   "type": "property",
@@ -96,32 +100,31 @@ Property test case shape:
 - Do NOT force a property where none fits — many ACs are genuinely example-shaped
   (a specific error message, a particular redirect). Use a property only when a
   rule generalizes across an input domain. A property case still counts toward
-  the "every AC has a test case" Invariant.
-- **Component coverage (Invariant):** Every component listed in `{{component_id_list}}`
-  must appear as the `component_id` of at least one Test Suite. Components with no
-  obvious AC binding still get a suite — emit at least one test case in it that
-  validates that component's primary responsibility, even if the AC binding is
-  indirect. This is required for the downstream `packet_synthesis` join: tasks
-  bind to components, and packet_synthesis matches test suites by `component_id`.
-  A component without a suite produces an unbacked packet at Phase 9, which the
-  executor cannot validate against.
+  the "each AC this component implements has a test case" Invariant.
 
 [JC:ACCEPTANCE CRITERION REFERENCING]
 
-`acceptance_criterion_ids[]` references ACs from each story's `Acceptance
-Criteria:` block in `{{functional_requirements_summary}}`. AC ids are
-workflow-globally unique composites of the form `AC-US{nnn}-{mmm}` — copy
-the id as written (e.g. `AC-US001-002`). A downstream resolver canonicalizes
-minor near-misses (case, lost zero-padding, reordering), so focus on *which
-AC each test verifies* rather than character-perfect transcription. Each
-test case may cite multiple ACs when one test exercises several.
+`acceptance_criterion_ids[]` references ACs from the Acceptance Criteria Inventory
+below. AC ids are workflow-globally unique composites of the form
+`AC-US{nnn}-{mmm}` — copy the id as written (e.g. `AC-US001-002`). A downstream
+resolver canonicalizes minor near-misses (case, lost zero-padding, reordering),
+so focus on *which AC each test verifies* rather than character-perfect
+transcription. Each test case may cite multiple ACs when one test exercises
+several. Do NOT cite an AC id that is not listed in the Inventory.
+
+# Acceptance Criteria Inventory (reference lookup — bind to the ones THIS component implements)
+
+The leaf acceptance criteria below are the authoritative, indivisible units of
+functional behaviour, grouped by the leaf user story that owns them. This is a
+**reference lookup** — bind each Test Case to the exact AC ids (verbatim) that the
+SINGLE component below implements. It is NOT a demand to cover every id here; the
+orchestrator reconciles global coverage across all components.
+
+{{acceptance_criteria_menu}}
 
 CONTEXT:
-Functional Requirements: {{functional_requirements_summary}}
-Components requiring suite coverage (every id must appear as a `suite.component_id`):
-{{component_id_list}}
-Implementation Plan: {{implementation_plan_summary}}
-Component Model: {{component_model_summary}}
+Component Model Summary (the ONE component you are decomposing):
+{{component_model_summary}}
 
 DETAIL FILE PATH (reference only): {{detail_file_path}}
 

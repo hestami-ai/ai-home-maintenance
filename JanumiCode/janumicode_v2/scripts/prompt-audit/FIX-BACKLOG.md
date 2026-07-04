@@ -17,19 +17,19 @@ Re-verify anytime: re-run the audit extract on a fresh run and diff the D5/A1 ra
 |---|---|---|---|--:|---|
 | PA-1 | P0 | task_saturation context scoping (wrong-node) | task_saturation | 91 | [x] |
 | PA-2 | P0 | test_case_saturation AC-summary scope + de-dup | test_case_saturation | 74 | [x] |
-| PA-3 | P0 | task_skeleton AC-inventory + tech-specs scoping | task_skeleton | 13 | [ ] |
+| PA-3 | P0 | task_skeleton AC-inventory + tech-specs scoping | task_skeleton | 13 | [x] |
 | PA-7 | P0 | parent-slot keying (label ≠ injected parent) | data_model/task_sat/task_skel | 6 | [ ] |
 | PA-4 | P1 | data_model_saturation context scoping | data_model_saturation | 5 | [x] |
 | PA-8 | P1 | object/relationship serializer bugs | many | — | [x] |
 | PA-10 | P1 | parent blocks lack active_constraints (TECH-* narrow) | task_sat/task_skel | 5 | [ ] |
-| PA-9 | P1 | id-namespace unification (TECH-*, ent/DM, leaf/root) | many | 5 | [ ] |
+| PA-9 | P1 | id-namespace unification (TECH-*, ent/DM, leaf/root) | many | 5 | [x] |
 | PA-5 | P1 | fr/nfr_saturation handoff-corpus scoping | fr/nfr_saturation | 2 | [ ] |
 | PA-6 | P1 | component_saturation domain-context scoping | component_saturation | 0 | [ ] |
 | PA-11 | P2 | contradictory branch/category literals | fr_sat/nfr/data_model | — | [~] |
 | PA-13 | P2 | duplicate catalog injection (sibling==depth-0, gov-const 2x) | task_sat/skel | — | [ ] |
 | PA-12 | P2 | JSON-fence self-contradiction | fr_sat/task_skel | — | [ ] |
 | PA-14 | P2 | compliance_context hardcoded empty | evaluation_design | — | [ ] |
-| PA-15 | P2 | monolithic test_case_skeleton + coverage shortfall | test_case_skeleton | 1 | [ ] |
+| PA-15 | P2 | monolithic test_case_skeleton + coverage shortfall (= SD-4) | test_case_skeleton | 1 | [x] |
 
 > **Related class — Skeleton Decomposition (SD-1..SD-4):** the gpt-oss:20b-envelope generalization of the P6.1 chunk-and-reconcile pattern to the monolithic *skeleton* passes (P3 SR, P4 ADR, P5 data-model, P7 test-case=PA-15). See **`## SKELETON DECOMPOSITION WORKLIST`** below.
 
@@ -63,7 +63,8 @@ Protocol (operator): stop → investigate → fix → V&V, one at a time, don't 
 3. **gpt-oss journey→domain id underscore drift** — `phase1Normalizers.ts normalizeJourneyFromWire`. gpt-oss emits `DOM-REALTIME_STATUS_UPDATES` (underscore) vs accepted `DOM-REALTIME-STATUS-UPDATES` (hyphen) → P1.3c `referential_integrity_journey_domain` blocking gap. `businessDomainIds` is a bare-string array `normalizeIdsInTree` can't reach (only transforms strings AT a key), so hyphen-normalize each entry via `normalizeIdHyphens`. Test `phase1JourneyDomainNormalization.test.ts` (4). NOTE: same array-of-id drift may recur on other fields (workflow/persona/entity-rel refs) — generalize `normalizeIdsInTree` to handle string-arrays at idKeys if it does.
 4. **gpt-oss dropped-journey FR coverage** — `phase2/autoFlagDroppedJourneys.ts` (new) wired into `frBloomThreePass.ts`. gpt-oss created 12 journeys but neither traced an FR to `UJ-SCHEDULE-APPOINTMENT` nor declared it unreached → P2.1c `journey_fr_coverage` blocking gap. The FR/journey analog of the existing `autoFlagDroppedSeeds` (NFR side): auto-declare any journey the bloom neither traced nor declared as system-inferred `unreached_journeys[]`. Enumeration discipline = deterministic concern. Test `autoFlagDroppedJourneys.test.ts` (4).
 5. **gpt-oss domain-id underscore drift (SOURCE side of the journey↔domain join)** — `phase1Normalizers.ts normalizeDomainFromWire` (+ `normalizeWorkflowV2`). cal-33 P1.3c `referential_integrity_journey_domain` hard-failed: accepted domain id `DOM-AI_CONCIERGE-INTERACTION` (internal underscore) vs journey ref `DOM-AI-CONCIERGE-INTERACTION` (hyphenated by fix #3). Fix #3 normalized the journey SIDE only; the domain's OWN id was never canonicalized. Now normalize the domain `id` (and workflow `id`/`businessDomainId`) with `normalizeIdHyphens` producer-side → both join sides canonical all-hyphens. Test `phase1JourneyDomainNormalization.test.ts` (+5 → 9).
-Cumulative: 5 stop-and-fix cycles, all tested (tsc + eslint clean). Live V&V: cal-32 baselines captured for SD-1/2/3; SD-0..SD-3 landed + committed; cal-33 (SD validation) failed P1.3c on this NEW underscore-drift variant → fix #5 → cal-34 relaunched. Note: gpt-oss:20b non-determinism surfaces a fresh drift variant of the SAME class each run; each producer-side normalization hardens the pipeline for ALL models.
+6. **gpt-oss journey→domain SEMANTIC drift (plural) — generalized fix #5 to an ORACLE RESOLVER** — `phase1.ts resolveJourneyDomainRefs` (new exported helper). cal-36 P1.3c hard-failed AGAIN (3rd P1.3c incident): journeys ref `DOM-USERS-AUTHENTICATION` (plural) vs accepted `DOM-USER-AUTHENTICATION` (singular) — a semantic token drift fix #5's hyphen-normalize structurally CANNOT reach. Per-variant normalizers = whack-a-mole. Fix: deterministic producer-side resolution of each journey's `businessDomainIds` (and workflow `businessDomainId`) against the accepted-domain oracle via the SANCTIONED `resolveAgainstOracle` (idResolver.ts — oracle-anchored, regex-free Levenshtein ≥0.90+margin, returns null on ambiguity; NOT prohibited fuzzy-matching). Resolves the plural (0.947) AND SUBSUMES fix #5's underscore case (normalized-key path); unresolvable refs KEPT verbatim so the verifier flags genuine errors. Placed in the bloom proposer (before the journeys record is persisted) so the persisted record + P2 handoff both carry canonical refs. Test `phase1JourneyDomainResolution.test.ts` (8; +9 normalization = 17).
+Cumulative: 6 stop-and-fix cycles, all tested (tsc + eslint clean). Live V&V arc: SD-0..SD-3 committed + cal-35-validated; PA-3/PA-9/SD-4 unit-validated (563/563); cal-33→fix#5, cal-36→fix#6 (both P1.3c journey-domain variants). Note: gpt-oss:20b non-determinism surfaces a fresh drift variant each run — fix #6 replaces per-variant normalizers with an oracle resolver that handles the whole class. cal-37 relaunched for the P6(PA-3)/P7(SD-4) validation.
 
 ## V&V COMPLETE — cal-31 full P1–P8 (2026-07-03)
 | Fix | Live verdict |
@@ -104,7 +105,16 @@ Cumulative: 5 stop-and-fix cycles, all tested (tsc + eslint clean). Live V&V: ca
 - **SD-3** `phase5.ts` — per-component `chunkedCoverageBloom` + NEW oracle (`targetCoverageSet=new Set(componentIds)`, `coveredBy=[normalizeComponentIdRef(model.component_id)]`). Produced unit = one model/component (entities nested) ⇒ id-collision-free by construction. Per-component generator FORCES `component_id` to the scoped chunk id (deterministic attribution bridge, since `renderComponentBlockForTask` surfaces display_key). `normalizeIdsInTree`+`mintEntityIds` run ONCE post-merge; depth-0 seeding + `runDataModelSaturationLoop` untouched (regression `phase5_1aDataModelScope.test.ts` green). Templates: per-component `data_model_skeleton` + new `data_model_reconciliation`. Env `JANUMICODE_P5_RECON_PASSES`/`_BATCH_COMPONENTS`. `phase5DataModelChunking.test.ts` (13).
 - **Integration gate:** whole-project `tsc` 0 err; `eslint` 0 warn (leftover unused imports cleaned); **447/447 orchestrator-phase unit tests pass** (all new + all existing phase3/4/5). Design doc: `SKELETON-DECOMPOSITION-DESIGN.md`.
 - **cal-32 live baselines (monolithic, gpt-oss:20b — confirm each defect):** SD-1 dropped `NFR-005` (+ SR cite LEAF ids → oracle must be leaf-id-space); SD-2 4/7 components ungoverned by any ADR; SD-3 1/7 components (`comp-service-call-management`, same one SD-2 dropped) got no data model. At the audit's 46–255-item scale these drop rates are far worse.
-- **NEXT:** user commits → fresh cal run (gpt-oss:20b P1-8) live-validates SD-1/2/3 close coverage. Then SD-4 (after PA-3/PA-9).
+- **LIVE-VALIDATED — cal-35 (gpt-oss:20b P1-8, committed dist), 2026-07-03:** every decomposition closed coverage to 100% on healthy data, plus 2 stop-and-fixes en route (cal-33 fix#5 journey↔domain, cal-34 discovered SD-5):
+  - **SD-5** fr_bloom: **0 FRs → 34 FRs** (12/12 journeys 100%, `json_repair` NOT exhausted vs cal-34's exhausted→0). Per-journey fan-out = 15 calls vs 1.
+  - **SD-1** system_requirements: **100% over 43 real FR∪NFR ids** (FR-cohort path; cal-34 mechanism-check captured NFR-005 = the exact cal-32 monolith drop, clean unique SR-###).
+  - **SD-2** adr_capture: **10 per-domain calls, 55 ADRs, no id collision** (vs monolithic 1/14/4-of-7-ungoverned).
+  - **SD-3** data_model_skeleton: **20/20 components modeled, 100%**.
+  - Integration: tsc 0, eslint 0, **527/527** unit. fix#5 + SD-5 committed by operator.
+- **PROGRAM COMPLETE — SD-4 + PA-3 + PA-9 landed + cal-37 live-validated (2026-07-04):** all 5 skeletons decomposed.
+  - **PA-9** (5 templates, `TECH-BUN-1`→`TECH-BUN` / `ent-*`→`DM-*`) + **PA-3** (`phase6.ts` component→leaf-AC lineage via `buildRequirementLineage.canonicalize`; scoped AC menu + DM/API slice; SR-slice deferred) + **SD-4** (`phase7.ts` per-component test_case via `chunkedCoverageBloom`, reusing PA-3's exports). Gates: tsc 0, eslint 0, 563/563 (SD-4), 571/571 (with fix#6).
+  - **cal-37 full P1→P7 (gpt-oss:20b):** **PA-3** P6.1 = 98.8% task coverage (165/167; 2 honest-residual ACs = upstream divergence, NOT a scoping regression → scoping coverage-safe confirmed); **SD-4** P7.1 = **167 leaf ACs → 100%** (baseline ~28%). En route re-confirmed SD-5 (35 FRs/15 journeys), SD-1 (100%/60 ids), SD-3 (15/15). fix#6 (see log) cleared the recurring P1.3c.
+- **COMMIT STATE:** SD-1/2/3/5 + fix#5 committed; **SD-4, PA-3, PA-9, fix#6 commit-ready** (unit + cal-37 validated, uncommitted). PA-3 SR-reachability slice remains deferred (still full-fallback; no live gap observed).
 
 ---
 

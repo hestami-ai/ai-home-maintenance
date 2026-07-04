@@ -85,7 +85,7 @@ You have `parent_tier_hint`. Use it as the caller's expectation, but your `paren
 
 ## Honoring active_constraints
 
-The `active_constraints` block carries Phase 1.0c technical constraints (e.g. SvelteKit, Bun, PostgreSQL, DBOS). Children inherit applicable constraints from the parent's `active_constraints`, narrowed to those that genuinely apply at this level. A frontend-shell child inherits `TECH-SVELTEKIT-1`; a backend-data-store child inherits `TECH-POSTGRES-1` and `TECH-BUN-1`. Do NOT invent technologies the source documents didn't already commit to.
+The `active_constraints` block carries Phase 1.0c technical constraints (e.g. SvelteKit, Bun, PostgreSQL, DBOS). Children inherit applicable constraints from the parent's `active_constraints`, narrowed to those that genuinely apply at this level. A frontend-shell child inherits `TECH-SVELTEKIT`; a backend-data-store child inherits `TECH-POSTGRES` and `TECH-BUN`. Do NOT invent technologies the source documents didn't already commit to.
 
 **Per-task narrowing is required, not optional.** Each leaf task's `active_constraints` MUST contain ONLY the constraints whose subject matter genuinely touches this task's implementation surface:
 
@@ -184,13 +184,13 @@ For each child you produce, list any **implementation choice, sequencing constra
       "write_directory_paths": ["src/server/work-order/assignment"],
       "read_directory_paths": ["src/server/vendor/credential"],
       "dependency_task_ids": ["task-vendor-credential-schema"],
-      "active_constraints": ["TECH-BUN-1", "TECH-POSTGRES-1", "TECH-DBOS-1"],
+      "active_constraints": ["TECH-BUN", "TECH-POSTGRES", "TECH-DBOS"],
       "traces_to": ["resp-woa-002"],
       "decomposition_rationale": "The validation behaviour is a single coherent unit of code touching one service module, with two verifiable completion criteria — sized for one executor session."
     }
   ],
   "surfaced_assumptions": [
-    { "text": "VendorCredential.expires_at is treated as inclusive — equal-to-now is rejected, not accepted.", "category": "implementation_choice", "citations": ["TECH-POSTGRES-1"] }
+    { "text": "VendorCredential.expires_at is treated as inclusive — equal-to-now is rejected, not accepted.", "category": "implementation_choice", "citations": ["TECH-POSTGRES"] }
   ]
 }
 ```

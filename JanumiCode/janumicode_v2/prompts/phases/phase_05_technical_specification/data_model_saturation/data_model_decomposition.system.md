@@ -101,7 +101,7 @@ For each child you produce, list any **identity choice, ownership decision, card
   },
   "children": [
     {
-      "id": "ent-work-order-state",
+      "id": "DM-work-order-state",
       "tier": "B",
       "name": "WorkOrderState",
       "kind": "entity",
@@ -113,15 +113,15 @@ For each child you produce, list any **identity choice, ownership decision, card
         { "name": "transitioned_at", "type": "timestamptz" }
       ],
       "relationships": [
-        { "target_entity_id": "ent-work-order", "kind": "many_to_one", "ownership": "references" }
+        { "target_entity_id": "DM-work-order", "kind": "many_to_one", "ownership": "references" }
       ],
-      "active_constraints": ["TECH-POSTGRES-1"],
+      "active_constraints": ["TECH-POSTGRES"],
       "traces_to": ["resp-wol-002"],
       "decomposition_rationale": "State transitions have their own audit lifecycle independent of the work order's profile fields."
     }
   ],
   "surfaced_assumptions": [
-    { "text": "Work-order state transitions are append-only — no UPDATE on this row, only INSERT.", "category": "lifecycle", "citations": ["TECH-POSTGRES-1"] }
+    { "text": "Work-order state transitions are append-only — no UPDATE on this row, only INSERT.", "category": "lifecycle", "citations": ["TECH-POSTGRES"] }
   ]
 }
 ```

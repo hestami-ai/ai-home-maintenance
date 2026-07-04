@@ -172,13 +172,13 @@ For each child you produce, list any **precondition, fixture-setup choice, oracl
       "expected_outcome": "Expired credentials never produce a successful assignment.",
       "edge_cases": ["expires_at exactly now() — boundary"],
       "test_file_path": "tests/integration/work-order/assignment.expired-credential.test.ts",
-      "active_constraints": ["TECH-BUN-1", "TECH-POSTGRES-1"],
+      "active_constraints": ["TECH-BUN", "TECH-POSTGRES"],
       "traces_to": ["resp-woa-002"],
       "decomposition_rationale": "Single-flow integration test with three independently verifiable assertions — sized for one test method."
     }
   ],
   "surfaced_assumptions": [
-    { "text": "Use a real Postgres in integration tests (not in-memory) so partial-index expiration semantics match production.", "category": "oracle_choice", "citations": ["TECH-POSTGRES-1"] }
+    { "text": "Use a real Postgres in integration tests (not in-memory) so partial-index expiration semantics match production.", "category": "oracle_choice", "citations": ["TECH-POSTGRES"] }
   ]
 }
 ```

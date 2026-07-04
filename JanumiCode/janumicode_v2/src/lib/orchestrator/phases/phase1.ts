@@ -58,6 +58,7 @@ import {
   normalizeWorkflowV2 as normalizeWorkflowV2Pure,
   normalizeWorkflowTrigger as normalizeWorkflowTriggerPure,
 } from './phase1Normalizers';
+import { resolveAgainstOracle } from '../idResolver';
 import { randomUUID } from 'node:crypto';
 import type {
   DecisionBundleContent,
@@ -138,6 +139,64 @@ export function coerceQualityAttribute(x: unknown): string {
     return JSON.stringify(o);
   }
   return x == null ? '' : String(x);
+}
+
+/** A single journey→domain reference the oracle-resolution pass rewrote. */
+export interface JourneyDomainRemap {
+  /** The journey whose businessDomainIds entry changed. */
+  journey: string;
+  /** The drifted ref the LLM emitted. */
+  from: string;
+  /** The canonical accepted-domain id it resolved to. */
+  to: string;
+}
+
+/**
+ * Deterministic oracle-resolution for journey → business-domain references.
+ *
+ * gpt-oss:20b keeps drifting a journey's `businessDomainIds` entries from the
+ * accepted business-domain id in a NEW way each run: cal-33 emitted an
+ * underscore variant (`DOM-AI_CONCIERGE-INTERACTION` vs the accepted
+ * `DOM-AI-CONCIERGE-INTERACTION`); cal-36 emitted a plural/singular token
+ * variant (`DOM-USERS-AUTHENTICATION` vs `DOM-USER-AUTHENTICATION`). The
+ * per-variant hyphen-normalizer (`normalizeJourneyFromWire`) can only reach the
+ * SEPARATOR drift, so the Phase 1.3c `referential_integrity_journey_domain`
+ * verifier keeps hard-failing on each fresh near-miss — whack-a-mole.
+ *
+ * This pass re-anchors every ref to the ACCEPTED-domain ORACLE using the
+ * sanctioned {@link resolveAgainstOracle} (exact → normalized-key [separator/
+ * case] → high-confidence Levenshtein ≥ 0.90 with a 0.05 margin; oracle-bounded,
+ * regex-free, returns `null` on ambiguity). A ref that resolves is rewritten to
+ * the canonical accepted id; a ref that does NOT resolve is KEPT verbatim so
+ * the 1.3c verifier flags a GENUINE reference error — no fabrication, no silent
+ * drop. This subsumes fix #5's underscore case (via the normalized-key path)
+ * and permanently handles plural/token drift and future near-misses.
+ *
+ * Pure: returns fresh journey objects (with a rebuilt `businessDomainIds`
+ * array) plus a remap log; does not mutate its inputs.
+ */
+export function resolveJourneyDomainRefs<J extends { id?: unknown; businessDomainIds?: unknown }>(
+  journeys: readonly J[],
+  acceptedDomainIds: readonly string[],
+): { journeys: J[]; remapped: JourneyDomainRemap[] } {
+  const oracle = [...acceptedDomainIds];
+  const remapped: JourneyDomainRemap[] = [];
+  const out = journeys.map((j) => {
+    const refs = j.businessDomainIds;
+    if (!Array.isArray(refs)) return j;
+    const journeyId = typeof j.id === 'string' ? j.id : '';
+    const nextRefs = refs.map((ref) => {
+      if (typeof ref !== 'string') return ref;
+      const resolved = resolveAgainstOracle(ref, oracle);
+      if (resolved && resolved !== ref) {
+        remapped.push({ journey: journeyId, from: ref, to: resolved });
+        return resolved;
+      }
+      return ref;
+    });
+    return { ...j, businessDomainIds: nextRefs } as J;
+  });
+  return { journeys: out, remapped };
 }
 
 export class Phase1Handler implements PhaseHandler {
@@ -1143,6 +1202,23 @@ grounding judgements for the persona shape specifically.`,
           integrations: integrationInputs,
         }, feedback);
         bloom13aMeta = { unreachedPersonas: r.unreachedPersonas, unreachedDomains: r.unreachedDomains };
+        // Deterministic oracle-resolution of journey→domain refs, applied
+        // BEFORE the bloom is persisted (writeBloomRecord below) or flows into
+        // safeJourneys / the P2 handoff — so the persisted user_journey_bloom
+        // record AND every downstream consumer carry canonical accepted-domain
+        // ids. gpt-oss drifts businessDomainIds a new way each run (cal-33
+        // underscore, cal-36 plural); the hyphen normalizer can't reach a token
+        // drift, so 1.3c referential_integrity_journey_domain keeps failing.
+        // resolveJourneyDomainRefs re-anchors each ref to safeDomains and KEEPS
+        // any that don't resolve (1.3c then flags a genuine error).
+        const journeyResolution = resolveJourneyDomainRefs(r.userJourneys, safeDomains.map(d => d.id));
+        if (journeyResolution.remapped.length > 0) {
+          r.userJourneys = journeyResolution.journeys;
+          getLogger().info('workflow', `Phase 1.3a: oracle-resolved ${journeyResolution.remapped.length} journey→domain ref(s) to the accepted-domain set`, {
+            workflow_run_id: workflowRun.id,
+            remapped: journeyResolution.remapped,
+          });
+        }
         return r;
       },
       writeBloomRecord: (bloom, derivedFrom) => {
@@ -1219,15 +1295,40 @@ grounding for the journey shape.`,
       humanDecisions,
       artifactIds,
       priorRecordIds: [journeysRecord.id],
-      runProposer: (feedback) => this.runWorkflowBloom13b(ctx, {
-        acceptedJourneys: safeJourneys,
-        acceptedPersonas: safePersonas,
-        acceptedDomains: safeDomains,
-        complianceItems: complianceInputs,
-        retentionRules: retentionInputs,
-        vvRequirements: vvInputs,
-        integrations: integrationInputs,
-      }, feedback),
+      runProposer: async (feedback) => {
+        const r = await this.runWorkflowBloom13b(ctx, {
+          acceptedJourneys: safeJourneys,
+          acceptedPersonas: safePersonas,
+          acceptedDomains: safeDomains,
+          complianceItems: complianceInputs,
+          retentionRules: retentionInputs,
+          vvRequirements: vvInputs,
+          integrations: integrationInputs,
+        }, feedback);
+        // Same oracle-resolution for a workflow's single businessDomainId ref —
+        // applied before the workflow bloom is persisted / flows into
+        // safeWorkflowsV2, so the 1.3c domain_workflow_coverage advisory (and
+        // the persisted record) survive the same gpt-oss token drift that hits
+        // journeys. Unresolvable refs are KEPT so 1.3c still flags them.
+        const acceptedDomainIds = safeDomains.map(d => d.id);
+        const wfRemapped: Array<{ workflow: string; from: string; to: string }> = [];
+        for (const w of r.workflows) {
+          if (typeof w.businessDomainId === 'string' && w.businessDomainId) {
+            const resolved = resolveAgainstOracle(w.businessDomainId, acceptedDomainIds);
+            if (resolved && resolved !== w.businessDomainId) {
+              wfRemapped.push({ workflow: w.id, from: w.businessDomainId, to: resolved });
+              w.businessDomainId = resolved;
+            }
+          }
+        }
+        if (wfRemapped.length > 0) {
+          getLogger().info('workflow', `Phase 1.3b: oracle-resolved ${wfRemapped.length} workflow→domain ref(s) to the accepted-domain set`, {
+            workflow_run_id: workflowRun.id,
+            remapped: wfRemapped,
+          });
+        }
+        return r;
+      },
       writeBloomRecord: (bloom, derivedFrom) => {
         const rec = engine.writer.writeRecord({
           record_type: 'artifact_produced',

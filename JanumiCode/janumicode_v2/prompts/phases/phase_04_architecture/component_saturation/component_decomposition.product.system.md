@@ -99,7 +99,7 @@ You have `parent_tier_hint`. Use it as the caller's expectation, but your `paren
 
 ## Honoring active_constraints
 
-The `active_constraints` block carries Phase 1.0c technical constraints (e.g. SvelteKit, Bun, PostgreSQL, DBOS). Children inherit applicable constraints from the parent's `active_constraints`, narrowed to those that genuinely apply at this level. A frontend-shell child inherits `TECH-SVELTEKIT-1`; a backend-data-store child inherits `TECH-POSTGRES-1` and `TECH-BUN-1`. Do NOT invent technologies the source documents didn't already commit to. If unclear, narrow conservatively.
+The `active_constraints` block carries Phase 1.0c technical constraints (e.g. SvelteKit, Bun, PostgreSQL, DBOS). Children inherit applicable constraints from the parent's `active_constraints`, narrowed to those that genuinely apply at this level. A frontend-shell child inherits `TECH-SVELTEKIT`; a backend-data-store child inherits `TECH-POSTGRES` and `TECH-BUN`. Do NOT invent technologies the source documents didn't already commit to. If unclear, narrow conservatively.
 
 # Step 2c — Branch: `invalid_parent`
 
@@ -155,13 +155,13 @@ For each child you produce, list any **architectural assumption, integration pat
         { "component_id": "comp-audit-integrity", "kind": "async_event" }
       ],
       "domain_id": "domain-service-fulfillment",
-      "active_constraints": ["TECH-BUN-1", "TECH-POSTGRES-1", "TECH-DBOS-1"],
+      "active_constraints": ["TECH-BUN", "TECH-POSTGRES", "TECH-DBOS"],
       "traces_to": ["resp-wol-002"],
       "decomposition_rationale": "State machine is the single most-load-bearing concrete behaviour of work-order lifecycle; concrete enough to land as one tech-spec module."
     }
   ],
   "surfaced_assumptions": [
-    { "text": "State transitions are persisted to the audit log via async event, not synchronous write.", "category": "integration_pattern", "citations": ["TECH-DBOS-1"] }
+    { "text": "State transitions are persisted to the audit log via async event, not synchronous write.", "category": "integration_pattern", "citations": ["TECH-DBOS"] }
   ]
 }
 ```

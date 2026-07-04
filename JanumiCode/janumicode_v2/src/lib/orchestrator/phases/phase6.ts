@@ -19,7 +19,7 @@ import type {
   GovernedStreamRecord,
 } from '../../types/records';
 import { getLogger } from '../../logging';
-import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseContext';
+import { extractPriorPhaseContext, buildEffectiveComponentView, type PriorPhaseContext } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
 import { runTaskSaturationLoop } from './phase6_1a';
@@ -27,6 +27,7 @@ import { runPhase6CycleDelta } from './runCycleDelta';
 import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
 import { canonicalComponentDir } from './layoutContract';
 import { resolveAgainstOracle } from '../idResolver';
+import { buildRequirementLineage } from './packetSynthesis/idResolution';
 import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
@@ -174,11 +175,24 @@ export class Phase6Handler implements PhaseHandler {
     // is the structural membership oracle for traces_to validation at exit.
     const requirementDecompositionNodes = engine.writer.getRecordsByType(workflowRun.id, 'requirement_decomposition_node');
     const leafAcceptanceCriteria = collectLeafAcceptanceCriteria(requirementDecompositionNodes);
-    const acceptanceCriteriaMenu = renderAcceptanceCriteriaMenu(leafAcceptanceCriteria);
     const leafAcIdSet = new Set(leafAcceptanceCriteria.flatMap((s) => s.acs.map((a) => a.id)));
     // Oracles for bounded id-drift resolution (Fix 1): the real component +
     // technical-constraint id sets a task may reference.
     const componentIdOracle = new Set(componentIds);
+
+    // PA-3: root→leaf AC lineage binding. buildRequirementLineage(...).canonicalize
+    // is a STRUCTURAL leaf→root tree-walk (no regex — hard project rule). Both a
+    // component's US traces and each leaf-AC group's owning story canonicalize to
+    // the root display_key, giving a deterministic component→leaf-AC map so each
+    // per-component task_skeleton call sees ONLY its own component's ACs in full
+    // (others id-only). Coverage stays safe by construction: the model still SEES
+    // every AC id, and the reconciliation loop over the FULL leafAcIdSet below is
+    // the hard backstop that closes any AC a scoped menu omitted.
+    const reqLineage = buildRequirementLineage([...allArtifacts, ...requirementDecompositionNodes]);
+    // PA-3 (secondary axis): per-component technical-specs slice (data_models +
+    // api_definitions by component_id). SR-reachability slice deferred pending
+    // live validation (tech-specs have no reconciliation backstop).
+    const techSpecsSummaryById = buildTechSpecsSummaryById(componentIds, prior);
 
     const rawPlan = await this.runTaskDecomposition(
       ctx,
@@ -187,8 +201,9 @@ export class Phase6Handler implements PhaseHandler {
       techSpecsSummary,
       crossCuttingSummary,
       dmr61,
-      acceptanceCriteriaMenu,
       leafAcceptanceCriteria,
+      reqLineage.canonicalize,
+      techSpecsSummaryById,
     );
 
     // Normalize write/read paths to workspace-relative form. cal-21
@@ -646,8 +661,11 @@ export class Phase6Handler implements PhaseHandler {
     techSpecsSummary: string,
     crossCuttingSummary: string,
     dmr: PhaseContextPacketResult,
-    acceptanceCriteriaMenu: string,
     leafAcceptanceCriteria: LeafAcceptanceCriteria[],
+    // PA-3: STRUCTURAL leaf→root tree-walk (buildRequirementLineage.canonicalize).
+    canonicalize: (id: string) => string,
+    // PA-3: per-component tech-specs slice; empty map ⇒ full-summary fallback.
+    techSpecsSummaryById: Record<string, string> = {},
   ): Promise<ImplementationPlan> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('implementation_planner', 'task_skeleton');
@@ -689,11 +707,20 @@ export class Phase6Handler implements PhaseHandler {
     for (const component of leafComponents) {
       const cid = String(component.id);
       const block = `PROJECT TYPE: ${projectTypeDescription}\n\n${renderComponentBlockForTask(component)}`;
+      // PA-3: scope the AC menu to THIS component's own leaf ACs (owned = full
+      // text; others = id-only appendix so they stay citable). Falls back to the
+      // full menu when no owned ACs resolve (unresolved traces / namespace drift)
+      // so coverage can never regress below the pre-scoping baseline.
+      const scopedAcMenu = renderScopedAcceptanceCriteriaMenu(
+        leafAcceptanceCriteria,
+        componentRootStorySet(component, canonicalize),
+        canonicalize,
+      );
       const rendered = engine.templateLoader.render(template, {
         active_constraints: dmr.activeConstraintsText,
-        acceptance_criteria_menu: acceptanceCriteriaMenu,
+        acceptance_criteria_menu: scopedAcMenu,
         component_model_summary: block,
-        technical_specs_summary: techSpecsSummary,
+        technical_specs_summary: techSpecsSummaryById[cid] ?? techSpecsSummary,
         cross_cutting_constraints_summary: crossCuttingSummary,
         detail_file_path: dmr.detailFilePath,
         detail_file_content: dmr.detailFileContent,
@@ -998,6 +1025,13 @@ export function normalizeWorkspacePath(p: string): string {
 export interface LeafAcceptanceCriteria {
   leafStoryId: string;
   storyText: string;
+  /**
+   * PA-3: the leaf decomposition node's `content.display_key` — the id form the
+   * lineage tree-walk (canonicalize) keys on. Falls back to `leafStoryId` when
+   * absent. Captured so a collision-suffixed leaf whose display_key differs from
+   * `user_story.id` still binds to its root component correctly.
+   */
+  leafDisplayKey?: string;
   acs: Array<{ id: string; text: string }>;
 }
 
@@ -1023,7 +1057,8 @@ export function collectLeafAcceptanceCriteria(records: GovernedStreamRecord[]): 
   }
   const out: LeafAcceptanceCriteria[] = [];
   for (const r of latestByNodeId.values()) {
-    const story = (r.content as Record<string, unknown>).user_story as Record<string, unknown> | undefined;
+    const content = r.content as Record<string, unknown>;
+    const story = content.user_story as Record<string, unknown> | undefined;
     if (!story || typeof story.id !== 'string') continue;
     const acsRaw = Array.isArray(story.acceptance_criteria) ? story.acceptance_criteria : [];
     const acs = (acsRaw as Array<Record<string, unknown>>)
@@ -1033,7 +1068,11 @@ export function collectLeafAcceptanceCriteria(records: GovernedStreamRecord[]): 
     const storyText = [story.role, story.action, story.outcome]
       .filter((x): x is string => typeof x === 'string' && x.length > 0).join(' / ')
       || (typeof story.description === 'string' ? story.description : '');
-    out.push({ leafStoryId: story.id, storyText, acs });
+    // PA-3: capture the leaf node's own display_key for canonicalize() — the
+    // structural id the tree-walk keys on (collision-safe when it diverges from
+    // user_story.id under suffixing).
+    const leafDisplayKey = typeof content.display_key === 'string' ? content.display_key : undefined;
+    out.push({ leafStoryId: story.id, storyText, leafDisplayKey, acs });
   }
   return out;
 }
@@ -1085,6 +1124,64 @@ export function renderAcceptanceCriteriaMenu(leaves: LeafAcceptanceCriteria[]): 
   return lines.join('\n');
 }
 
+/**
+ * PA-3: the set of ROOT user-story ids a component serves. Reads the component's
+ * US traces — `traces_to` (root view) or `satisfies_requirement_ids` (the leaf
+ * view renames it, phaseContext.ts) — and maps each id through the STRUCTURAL
+ * leaf→root tree-walk `canonicalize` (never regex). Empty when a component has
+ * no resolvable US traces, which drives the full-menu fallback below.
+ */
+export function componentRootStorySet(
+  component: Record<string, unknown>,
+  canonicalize: (id: string) => string,
+): Set<string> {
+  const raw = component.traces_to ?? component.satisfies_requirement_ids ?? [];
+  const ids = Array.isArray(raw)
+    ? raw.filter((x): x is string => typeof x === 'string' && x.length > 0)
+    : [];
+  const roots = new Set<string>();
+  for (const id of ids) roots.add(canonicalize(id));
+  return roots;
+}
+
+/**
+ * PA-3: render the leaf-AC menu SCOPED to one component. Partition leaves into
+ * OWNED (canonicalize(leafDisplayKey ?? leafStoryId) ∈ componentRoots) vs OTHER.
+ * OWNED render in full (grouped format, with descriptive text) so the model
+ * binds tasks to its own component's ACs; OTHER collapse to a compact id-only
+ * appendix so every AC id stays citable (kills the foreign-component text bloat
+ * without hiding any id).
+ *
+ * FALLBACK: when OWNED is empty (unresolved traces / id-namespace drift) return
+ * the FULL menu — identical to the pre-scoping behaviour, so AC coverage can
+ * never regress below baseline. Mirrors the established *ById + full-summary
+ * fallback pattern (PA-1/2/4).
+ */
+export function renderScopedAcceptanceCriteriaMenu(
+  leaves: LeafAcceptanceCriteria[],
+  componentRoots: Set<string>,
+  canonicalize: (id: string) => string,
+): string {
+  if (leaves.length === 0) return renderAcceptanceCriteriaMenu(leaves);
+  const owned: LeafAcceptanceCriteria[] = [];
+  const other: LeafAcceptanceCriteria[] = [];
+  for (const l of leaves) {
+    const root = canonicalize(l.leafDisplayKey ?? l.leafStoryId);
+    if (componentRoots.has(root)) owned.push(l);
+    else other.push(l);
+  }
+  // No owned leaves resolved → coverage-safe full-menu fallback.
+  if (owned.length === 0) return renderAcceptanceCriteriaMenu(leaves);
+  const sections: string[] = [renderAcceptanceCriteriaMenu(owned)];
+  const otherIds = [...new Set(other.flatMap((l) => l.acs.map((a) => a.id)))];
+  if (otherIds.length > 0) {
+    sections.push('');
+    sections.push('# Other-component acceptance-criteria ids (reference lookup only, NOT this call coverage target):');
+    sections.push(otherIds.map((id) => `- ${id}`).join('\n'));
+  }
+  return sections.join('\n');
+}
+
 // ── Phase 6.1 per-component chunking helpers ──────────────────────────
 
 /**
@@ -1134,6 +1231,69 @@ export function buildComponentSummaryById(
     }
   }
   return byId;
+}
+
+/**
+ * PA-3 (secondary axis): per-component technical-specs summary. Slices
+ * `data_models` + `api_definitions` by `component_id` (both carry it) so a
+ * per-component task_skeleton call sees ITS specs, not the all-component
+ * roll-up. SR / IC / error / config blocks stay FULL — the
+ * system_requirements-by-source-reachability slice is DEFERRED pending live
+ * validation (tech-specs have no reconciliation backstop, unlike ACs).
+ *
+ * A component whose DM + API slice is BOTH empty gets NO entry; the per-component
+ * loop then falls back to the full `techSpecsSummary` (`?? techSpecsSummary`), so
+ * spec visibility never regresses.
+ */
+export function buildTechSpecsSummaryById(
+  componentIds: string[],
+  prior: PriorPhaseContext,
+): Record<string, string> {
+  const rawModels = prior.dataModels?.content.models;
+  const models = Array.isArray(rawModels) ? rawModels as Array<Record<string, unknown>> : [];
+  const rawDefs = prior.apiDefinitions?.content.definitions;
+  const defs = Array.isArray(rawDefs) ? rawDefs as Array<Record<string, unknown>> : [];
+  const byId: Record<string, string> = {};
+  for (const cid of componentIds) {
+    const myModels = models.filter((m) => m.component_id === cid);
+    const myDefs = defs.filter((d) => d.component_id === cid);
+    // PA-3: SR-reachability slice deferred pending live validation (no recon backstop)
+    if (myModels.length === 0 && myDefs.length === 0) continue; // → full-summary fallback at call site
+    byId[cid] = [
+      prior.systemRequirements?.summary ?? '',
+      prior.interfaceContracts?.summary ?? '',
+      renderDataModelsSlice(myModels),
+      renderApiDefinitionsSlice(myDefs),
+      prior.errorHandlingStrategies?.summary ?? '',
+      prior.configurationParameters?.summary ?? '',
+    ].filter(Boolean).join('\n\n');
+  }
+  return byId;
+}
+
+/** Render a component-scoped slice of data_models (same shape as summarizeDataModels). */
+function renderDataModelsSlice(models: Array<Record<string, unknown>>): string {
+  if (models.length === 0) return '';
+  const lines = models.map((m) => {
+    const entities = Array.isArray(m.entities) ? m.entities as Array<Record<string, unknown>> : [];
+    const entList = entities.map((e) => {
+      const fields = Array.isArray(e.fields) ? e.fields as Array<Record<string, unknown>> : [];
+      return `    ${e.name}: ${fields.map((f) => `${f.name}:${f.type}`).join(', ')}`;
+    }).join('\n');
+    return `  Component ${m.component_id}:\n${entList}`;
+  });
+  return `${models.length} Data Models:\n${lines.join('\n')}`;
+}
+
+/** Render a component-scoped slice of api_definitions (same shape as summarizeApiDefinitions). */
+function renderApiDefinitionsSlice(defs: Array<Record<string, unknown>>): string {
+  if (defs.length === 0) return '';
+  const lines = defs.map((d) => {
+    const endpoints = Array.isArray(d.endpoints) ? d.endpoints as Array<Record<string, unknown>> : [];
+    const epList = endpoints.map((e) => `    ${e.method} ${e.path} (auth: ${e.auth_requirement ?? 'none'})`).join('\n');
+    return `  Component ${d.component_id}:\n${epList}`;
+  });
+  return `${defs.length} API Definitions:\n${lines.join('\n')}`;
 }
 
 /** Compact component menu (id + responsibilities) — the routing target for reconciliation. */

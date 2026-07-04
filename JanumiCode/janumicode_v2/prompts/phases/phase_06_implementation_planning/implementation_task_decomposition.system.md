@@ -159,7 +159,7 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
       "write_directory_paths": ["src/server/auth/middleware"],
       "read_directory_paths": ["src/lib/auth", "src/lib/types"],
       "dependency_task_ids": [],
-      "traces_to": ["resp-auth-001", "TECH-BETTER-AUTH-1"]
+      "traces_to": ["resp-auth-001", "TECH-BETTER-AUTH"]
     },
     {
       "id": "task-vendor-credential-schema-migration",
@@ -186,7 +186,7 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
       "write_directory_paths": ["database/migrations"],
       "read_directory_paths": ["database/schema"],
       "dependency_task_ids": [],
-      "traces_to": ["resp-vendor-data-001", "TECH-POSTGRES-1"]
+      "traces_to": ["resp-vendor-data-001", "TECH-POSTGRES"]
     }
   ]
 }
