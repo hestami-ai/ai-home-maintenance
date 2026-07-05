@@ -253,18 +253,23 @@ function sanitizeChildEntity(
   };
 }
 
-function formatEntityForPrompt(e: DecompositionEntity): string {
+export function formatEntityForPrompt(e: DecompositionEntity): string {
   const fields = e.fields.map(f =>
     `  - ${f.name}: ${f.type}${f.is_identity ? ' [PK]' : ''}${f.constraints ? ` (${f.constraints})` : ''}`,
   ).join('\n');
   const rels = (e.relationships ?? []).length === 0
     ? '(none)'
     : (e.relationships ?? []).map(r => `  - ${displayEntityRelationship(r)}`).join('\n');
+  // PA-10: surface the node's OWN inherited active_constraints (narrowed TECH-*
+  // storage/constraint ids) in the parent block so children honor the right
+  // constraints instead of reconstructing them from the global menu.
+  const activeConstraints = (e.active_constraints ?? []).join(', ') || '(none inherited)';
   return [
     `Entity id: ${e.id}`,
     `Name: ${e.name}`,
     e.kind ? `Kind: ${e.kind}` : null,
     e.component_id ? `Component: ${e.component_id}` : null,
+    `Active constraints (inherited by this entity — children MUST honor these TECH-* ids): ${activeConstraints}`,
     'Fields:',
     fields,
     'Relationships:',

@@ -91,7 +91,7 @@ For each child you produce, list any **identity choice, ownership decision, card
 
 # Required output (strict schema)
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 {
   "parent_branch_classification": "decomposable",
   "parent_tier_assessment": {
@@ -124,7 +124,6 @@ For each child you produce, list any **identity choice, ownership decision, card
     { "text": "Work-order state transitions are append-only — no UPDATE on this row, only INSERT.", "category": "lifecycle", "citations": ["TECH-POSTGRES"] }
   ]
 }
-```
 
 # Hard rules
 
@@ -152,8 +151,8 @@ For each child you produce, list any **identity choice, ownership decision, card
 
 **Parent-branch classification + fanout discipline:**
 - `parent_branch_classification` MUST be consistent with the structural test:
-  - `atomic_leaf` — emit EXACTLY one Tier-D mirror child whose name/fields/relationships mirror the parent.
-  - `decomposable` — emit 1 to 8 children. 0 children means you should have picked atomic_leaf; >8 children means the parent is a quality area that needs an intermediate Tier-A bloom rather than a flat list.
+  - `atomic_value` — emit EXACTLY one Tier-D mirror child whose name/fields/relationships mirror the parent.
+  - `decomposable` — emit 1 to 8 children. 0 children means you should have picked atomic_value; >8 children means the parent is a quality area that needs an intermediate Tier-A bloom rather than a flat list.
   - `invalid_parent` — emit zero children with structured `rationale`.
 - Each child's `tier` MUST be consistent with its `kind` and field count per the catalog tier rubric. Enforced by `decomposition_fanout_discipline` and `tier_assignment_audit` (catalog §5.4).
 

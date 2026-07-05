@@ -179,8 +179,11 @@ describe('Release prioritization — Phase 1.8 → Phase 2 propagation', () => {
     });
     // Wave 7 Path C — narrow 1.8 shape: LLM places journeys in releases;
     // workflows/entities derive deterministically from triggers + domains.
-    // UJ-1 → REL-1, UJ-2 → REL-2. FR roots tracing to UJ-1/UJ-2 resolve
-    // through the manifest; roots tracing to UJ-999 remain backlog.
+    // UJ-1 → REL-1, UJ-2 → REL-2. Exact-coverage (verifyReleaseManifest)
+    // REQUIRES every accepted artifact to be placed, and assignReleaseToRoot
+    // matches an FR's traces_to against ALL placed artifact types — so backlog
+    // is reached only by an FR left with NO accepted trace (see FR-BACKLOG in
+    // seedPhase2Fixtures).
     mock.setFixture('release-plan', {
       match: 'RELEASE PLANNER',
       parsedJson: {
@@ -199,13 +202,54 @@ describe('Release prioritization — Phase 1.8 → Phase 2 propagation', () => {
   }
 
   /**
-   * Seed Phase 2 fixtures that bloom ONE FR per journey (so roots' traces_to
-   * map cleanly to the ReleasePlan journeys), produce a Tier-D atomic child,
-   * and skip NFR decomposition for brevity.
+   * Seed Phase 2 fixtures for the SD-5 per-journey FR bloom.
+   *
+   * Under SD-5 the Pass-1 skeleton is fanned out ONE accepted journey at a time
+   * (chunkedCoverageBloom), so a single monolithic fixture matched on the shared
+   * template header would fire on EVERY per-journey call → the same FR ids
+   * surface once per journey → a raw-id collision across the merged set →
+   * frBloomThreePass deterministically renumbers ALL stories to sequential
+   * `US-###`, destroying the verbatim `FR-*` display keys the release assertions
+   * look up. We therefore register ONE fixture per journey, matched on a
+   * substring that anchors the FR-skeleton template's per-journey header directly
+   * to the scoped journey id: `fully covered)\n- UJ-1 [`. The phrase "MUST be
+   * fully covered)" is unique to the fr_bloom_skeleton template (the NFR bloom
+   * uses a different "Accepted User Journeys ..." header; the 1.8 release planner
+   * has neither) and renders immediately before `{{accepted_journeys}}`, which in
+   * a per-journey call holds ONLY the scoped journey — so the match fires on
+   * exactly that journey's skeleton call and nothing else. (Matching on the
+   * journey id alone fails: `formatWorkflows` leaks `journey_step(UJ-1#1)` into
+   * every call; matching on a scenario/title token leaks into any call that
+   * renders the full journey roster — most damagingly the 1.8 release planner,
+   * whose call such a fixture would hijack, emptying the plan → "no releases
+   * remain".)
+   *
+   *   - UJ-1's call → FR-ONBOARD (traces UJ-1) + FR-BACKLOG, which the model
+   *     mis-traces to a NON-accepted journey (UJ-999). assignReleaseToRoot does a
+   *     WIDENED lookup — an FR that traces ANY accepted artifact (journey,
+   *     workflow, entity, compliance, integration, vocabulary, or a cross_cutting
+   *     item) resolves to that artifact's release — and exact-coverage guarantees
+   *     every accepted artifact IS placed. So the ONLY route to backlog is an FR
+   *     with no accepted trace: Pass-1 self-heal strips the unresolvable UJ-999,
+   *     leaving traces_to empty → assignReleaseToRoot returns null. This is
+   *     exactly the hallucinated-trace case self-heal exists to absorb.
+   *   - UJ-2's call → FR-ORDER (traces UJ-2).
+   *
+   * Distinct FR ids across journeys ⇒ no id collision ⇒ the merge preserves the
+   * verbatim `FR-*` ids (renumber doesn't fire). Decomposition + the monolithic
+   * NFR bloom are unchanged by SD-5.
+   *
+   * The header anchor isolates the per-journey bloom fixtures, so registration
+   * order isn't load-bearing here; the remaining fixtures match on disjoint keys
+   * (nfr-bloom on its own header, the decompose fixtures on unique AC
+   * descriptions), so they can't collide with each other or with the anchors.
    */
   function seedPhase2Fixtures(mock: MockLLMProvider): void {
-    mock.setFixture('fr-bloom', {
-      match: 'product-lens Functional Requirements Bloom',
+    // Per-journey skeleton fixtures — anchored to the fr_bloom_skeleton header
+    // immediately preceding the scoped journey, so each fires on exactly one
+    // per-journey call.
+    mock.setFixture('fr-bloom-uj1', {
+      match: 'fully covered)\n- UJ-1 [',
       parsedJson: {
         user_stories: [
           {
@@ -214,18 +258,42 @@ describe('Release prioritization — Phase 1.8 → Phase 2 propagation', () => {
             priority: 'critical', traces_to: ['UJ-1'],
           },
           {
-            id: 'FR-ORDER', role: 'customer', action: 'place order', outcome: 'order persisted',
-            acceptance_criteria: [{ id: 'AC-001', description: 'order-saved-uniq-order', measurable_condition: 'row exists' }],
-            priority: 'high', traces_to: ['UJ-2'],
-          },
-          {
-            id: 'FR-UNASSIGNED', role: 'admin', action: 'future work', outcome: 'future outcome',
-            acceptance_criteria: [{ id: 'AC-001', description: 'future-uniq-unassigned', measurable_condition: 'n/a' }],
+            // Mis-traced FR: cites a NON-accepted journey (UJ-999). Pass-1
+            // self-heal strips it → empty traces_to → backlog (see docstring).
+            id: 'FR-BACKLOG', role: 'admin', action: 'future work', outcome: 'future outcome',
+            acceptance_criteria: [{ id: 'AC-001', description: 'backlog-uniq', measurable_condition: 'n/a' }],
             priority: 'low', traces_to: ['UJ-999'],
           },
         ],
       },
     });
+    mock.setFixture('fr-bloom-uj2', {
+      match: 'fully covered)\n- UJ-2 [',
+      parsedJson: {
+        user_stories: [
+          {
+            id: 'FR-ORDER', role: 'customer', action: 'place order', outcome: 'order persisted',
+            acceptance_criteria: [{ id: 'AC-001', description: 'order-saved-uniq-order', measurable_condition: 'row exists' }],
+            priority: 'high', traces_to: ['UJ-2'],
+          },
+        ],
+      },
+    });
+    // Monolithic NFR bloom (SD-5 is FR-only) — matched on its own distinct
+    // header, which the FR-skeleton anchor never collides with.
+    mock.setFixture('nfr-bloom', {
+      match: 'product-lens Non-Functional Requirements Bloom',
+      parsedJson: {
+        requirements: [
+          {
+            id: 'NFR-AUDIT', category: 'security', description: 'audit trail is immutable',
+            threshold: 'every write is append-only', measurement_method: 'schema check', traces_to: ['UJ-1'],
+          },
+        ],
+      },
+    });
+    // Decomposition fixtures — matched on each root's unique AC description
+    // (disjoint from every other fixture's key).
     mock.setFixture('fr-decompose', {
       match: 'auth-works-uniq-onboard',
       parsedJson: {
@@ -235,6 +303,20 @@ describe('Release prioritization — Phase 1.8 → Phase 2 propagation', () => {
             id: 'FR-ONBOARD-1', tier: 'D', role: 'operator', action: 'click verify link', outcome: 'email confirmed',
             acceptance_criteria: [{ id: 'AC-001', description: 'link works', measurable_condition: 'redirects' }],
             priority: 'critical', traces_to: ['UJ-1'],
+          },
+        ],
+        surfaced_assumptions: [],
+      },
+    });
+    mock.setFixture('fr-decompose-backlog', {
+      match: 'backlog-uniq',
+      parsedJson: {
+        parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
+        children: [
+          {
+            id: 'FR-BACKLOG-1', tier: 'D', role: 'admin', action: 'future atomic', outcome: 'future',
+            acceptance_criteria: [{ id: 'AC-001', description: 'future', measurable_condition: 'future' }],
+            priority: 'low', traces_to: ['UJ-999'],
           },
         ],
         surfaced_assumptions: [],
@@ -252,31 +334,6 @@ describe('Release prioritization — Phase 1.8 → Phase 2 propagation', () => {
           },
         ],
         surfaced_assumptions: [],
-      },
-    });
-    mock.setFixture('fr-decompose-unassigned', {
-      match: 'future-uniq-unassigned',
-      parsedJson: {
-        parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'root' },
-        children: [
-          {
-            id: 'FR-UNASSIGNED-1', tier: 'D', role: 'admin', action: 'future atomic', outcome: 'future',
-            acceptance_criteria: [{ id: 'AC-001', description: 'future', measurable_condition: 'future' }],
-            priority: 'low', traces_to: ['UJ-999'],
-          },
-        ],
-        surfaced_assumptions: [],
-      },
-    });
-    mock.setFixture('nfr-bloom', {
-      match: 'product-lens Non-Functional Requirements Bloom',
-      parsedJson: {
-        requirements: [
-          {
-            id: 'NFR-AUDIT', category: 'security', description: 'audit trail is immutable',
-            threshold: 'every write is append-only', measurement_method: 'schema check', traces_to: ['UJ-1'],
-          },
-        ],
       },
     });
     mock.setFixture('nfr-decompose', {
@@ -350,13 +407,19 @@ describe('Release prioritization — Phase 1.8 → Phase 2 propagation', () => {
       const c = r.content as { display_key: string };
       byDisplay.set(c.display_key, r.content as Record<string, unknown>);
     }
+    // SD-5 invariant: exactly the three bloomed FR roots survive (UJ-1 →
+    // FR-ONBOARD + mis-traced FR-BACKLOG, UJ-2 → FR-ORDER). A regression to the
+    // pre-SD-5 monolithic path would surface each FR once per journey, collide,
+    // and renumber to US-### — so both the count and the verbatim display keys
+    // below pin the per-journey fan-out.
+    expect(roots).toHaveLength(3);
     expect(byDisplay.get('FR-ONBOARD')?.release_id).toBe(r1.release_id);
     expect(byDisplay.get('FR-ONBOARD')?.release_ordinal).toBe(1);
     expect(byDisplay.get('FR-ORDER')?.release_id).toBe(r2.release_id);
     expect(byDisplay.get('FR-ORDER')?.release_ordinal).toBe(2);
-    // Unassigned root → backlog.
-    expect(byDisplay.get('FR-UNASSIGNED')?.release_id).toBeNull();
-    expect(byDisplay.get('FR-UNASSIGNED')?.release_ordinal).toBeNull();
+    // FR whose only trace (UJ-999) was self-healed away → no accepted trace → backlog.
+    expect(byDisplay.get('FR-BACKLOG')?.release_id).toBeNull();
+    expect(byDisplay.get('FR-BACKLOG')?.release_ordinal).toBeNull();
 
     // Depth-1 atomic children inherit their parent's release.
     const children = nodes.filter(n => {
@@ -372,8 +435,9 @@ describe('Release prioritization — Phase 1.8 → Phase 2 propagation', () => {
     expect(childByDisplay.get('FR-ONBOARD-1')?.release_ordinal).toBe(1);
     expect(childByDisplay.get('FR-ORDER-1')?.release_id).toBe(r2.release_id);
     expect(childByDisplay.get('FR-ORDER-1')?.release_ordinal).toBe(2);
-    expect(childByDisplay.get('FR-UNASSIGNED-1')?.release_id).toBeNull();
-    expect(childByDisplay.get('FR-UNASSIGNED-1')?.release_ordinal).toBeNull();
+    // Child of the backlog root inherits backlog (null), not a journey lookup.
+    expect(childByDisplay.get('FR-BACKLOG-1')?.release_id).toBeNull();
+    expect(childByDisplay.get('FR-BACKLOG-1')?.release_ordinal).toBeNull();
 
     // NFR root that traces to UJ-1 also gets Release 1.
     const nfrRoots = nodes.filter(n => {

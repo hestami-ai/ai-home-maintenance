@@ -40,6 +40,14 @@ export interface PhaseContextPacketOptions {
   /** Component to scope structured-artifact distillation to (e.g. a per-leaf
    *  executor DMR passes the leaf's component_id). Forwarded to the DMR brief. */
   focusComponentId?: string;
+  /**
+   * PA-13(2b): when true, the INLINED `detailFileContent` omits the governing
+   * "Governing Constraints" + "Certified Architecture Context" sections — the
+   * caller already injects `active_constraints` inline at the top of the prompt,
+   * so re-rendering them in the detail file is a 2-3× duplicate. The on-DISK
+   * detail file stays FULL (the Phase-9 executor reads it). Default false.
+   */
+  inlineOmitsGoverning?: boolean;
 }
 
 export interface PhaseContextPacketResult {
@@ -125,6 +133,12 @@ export async function buildPhaseContextPacket(
   // no filesystem access) can inline it into their prompts via the
   // `detail_file_content` template variable.
   let detailFile: { path: string; content: string } | null = null;
+  // PA-13(2b): reusable resolver so the on-disk (full) render and the inlined
+  // (optionally omit-governing) render share record resolution.
+  const resolve = (id: string) => {
+    const rec = engine.writer.getRecord(id);
+    return rec ? { record_type: rec.record_type, content: rec.content } : null;
+  };
   try {
     const invocationId = `${options.detailFileLabel ?? options.subPhaseId.replace(/\./g, '_')}-${workflowRun.id.slice(0, 8)}`;
     const payload = engine.contextBuilder.buildContextPayload(
@@ -140,10 +154,7 @@ export async function buildPhaseContextPacket(
         // Curated, resolved DMR reference (record-id references hydrated into
         // actual content excerpts) — replaces the old raw JSON dump. The raw
         // packet is still recoverable behind JANUMICODE_DMR_RAW_DETAIL=1.
-        hydratedPacket: renderHydratedPacket(packet, (id) => {
-          const rec = engine.writer.getRecord(id);
-          return rec ? { record_type: rec.record_type, content: rec.content } : null;
-        }),
+        hydratedPacket: renderHydratedPacket(packet, resolve),
         ...(process.env.JANUMICODE_DMR_RAW_DETAIL === '1'
           ? { contextPacket: JSON.stringify(packet, null, 2) }
           : {}),
@@ -181,7 +192,14 @@ export async function buildPhaseContextPacket(
     packet,
     activeConstraintsText,
     detailFilePath: detailFile?.path ?? '(not available)',
-    detailFileContent: detailFile?.content ?? '(no DMR detail content available)',
+    // PA-13(2b): the DISK file (detailFile.content) is always full for P9; the
+    // INLINED copy drops governing sections when the caller injects them at the
+    // top of the prompt (opt-in via inlineOmitsGoverning).
+    detailFileContent: detailFile
+      ? (options.inlineOmitsGoverning
+          ? renderHydratedPacket(packet, resolve, { omitGoverningSections: true })
+          : detailFile.content)
+      : '(no DMR detail content available)',
     derivedFromRecordIds,
   };
 }

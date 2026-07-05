@@ -114,7 +114,7 @@ For each child you produce, list any **assumption, constraint, compliance citati
 
 # Required output (strict schema)
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 {
   "parent_branch_classification": "decomposable",
   "parent_tier_assessment": {
@@ -141,7 +141,6 @@ For each child you produce, list any **assumption, constraint, compliance citati
     { "text": "Journal entry validation happens at commit time, not on read.", "category": "scope", "citations": [] }
   ]
 }
-```
 
 # Hard rules (apply to every branch)
 

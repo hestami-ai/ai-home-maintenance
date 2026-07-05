@@ -337,7 +337,7 @@ function sanitizeChildTask(
 
 // ── Prompt formatting ──────────────────────────────────────────────
 
-function formatRootTaskForPrompt(t: DecompositionTask): string {
+export function formatRootTaskForPrompt(t: DecompositionTask): string {
   const ccs = t.completion_criteria.map(r => `  - [${r.criterion_id}] ${r.description}`).join('\n');
   const writes = (t.write_directory_paths ?? []).join(', ') || '(none)';
   const reads = (t.read_directory_paths ?? []).join(', ') || '(none)';
@@ -346,12 +346,18 @@ function formatRootTaskForPrompt(t: DecompositionTask): string {
   // responsibility / Tech-Spec ids in their own traces_to[]. Without
   // this the model has no anchor and either omits or fabricates.
   const traces = ((t as unknown as Record<string, unknown>).traces_to as string[] | undefined)?.join(', ') || '(none)';
+  // PA-10: surface the node's OWN inherited active_constraints (narrowed TECH-*
+  // ids) in the parent block. Without this the model sees only the global
+  // GOVERNING CONSTRAINTS menu and has to reconstruct which constraints apply to
+  // THIS task from instructional examples → wrong/omitted TECH-* on children.
+  const activeConstraints = (t.active_constraints ?? []).join(', ') || '(none inherited)';
   return [
     `Task id: ${t.id}`,
     `Name: ${t.name}`,
     `Description: ${t.description}`,
     `Component: ${t.component_id}`,
     `Component responsibility: ${t.component_responsibility}`,
+    `Active constraints (inherited by this task — children MUST honor these TECH-* ids): ${activeConstraints}`,
     t.estimated_complexity ? `Complexity: ${t.estimated_complexity}` : null,
     'Completion criteria:',
     ccs,

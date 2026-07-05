@@ -44,3 +44,21 @@ describe('PA-11 — data_model_saturation category discipline matches its own en
     }
   });
 });
+
+/**
+ * PA-11 (data_model branch literal) — the data_model_saturation parent-branch
+ * enum is `atomic_value | decomposable | invalid_parent` (contractSchemaValidator
+ * S(data_model) + parentBranchClassificationCheck). The template's Step-1 branch
+ * uses `atomic_value`, but the fanout-discipline section had drifted to the
+ * FR/NFR/component literal `atomic_leaf` — a self-contradiction the model
+ * classifies against. This pins the whole template to its own `atomic_value`.
+ */
+describe('PA-11 — data_model_saturation branch literal is atomic_value (not atomic_leaf)', () => {
+  const body = fs.readFileSync(path.join(repoRoot, rel), 'utf-8');
+
+  it('uses the canonical `atomic_value` and never the foreign `atomic_leaf`', () => {
+    expect(body).toContain('atomic_value');
+    expect(body, 'data_model template must not use the FR/NFR/component literal `atomic_leaf`')
+      .not.toContain('atomic_leaf');
+  });
+});

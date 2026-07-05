@@ -167,6 +167,10 @@ export class Phase6Handler implements PhaseHandler {
       knownRelevantRecordIds: dmr61Seeds,
       detailFileLabel: 'p6_1_tasks',
       requiredOutputSpec: 'implementation_plan JSON — tasks with component_id, dependencies, completion_criteria',
+      // PA-13(2b): task_skeleton injects active_constraints at the top of the
+      // prompt (GOVERNING CONSTRAINTS), so the inlined detail file must NOT
+      // re-render the same governing statements. Disk file stays full for P9.
+      inlineOmitsGoverning: true,
     });
 
     // Wave 8 — feed the FR-saturation LEAF acceptance criteria into task

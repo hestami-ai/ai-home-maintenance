@@ -479,10 +479,17 @@ export class Phase4Handler implements PhaseHandler {
     // ── 4.2 — Component Decomposition ─────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'component_skeleton');
 
-    const domainsSummary = domainsContent.domains.map(d => {
+    // PA-6: build the per-domain block once, keyed by id, so component_saturation
+    // can scope each node to its own domain (domainContextById) + a thin index
+    // (domainIndex). domainsSummary stays byte-identical (same order/format) as
+    // the full-catalog fallback.
+    const domainContextById: Record<string, string> = {};
+    for (const d of domainsContent.domains) {
       const terms = d.ubiquitous_language.map(t => `${t.term}: ${t.definition}`).join('; ');
-      return `${d.id}: ${d.name} (reqs: ${(d.system_requirement_ids ?? []).join(', ')})\n  Terms: ${terms}`;
-    }).join('\n');
+      domainContextById[d.id] = `${d.id}: ${d.name} (reqs: ${(d.system_requirement_ids ?? []).join(', ')})\n  Terms: ${terms}`;
+    }
+    const domainsSummary = domainsContent.domains.map(d => domainContextById[d.id]).join('\n');
+    const domainIndex = domainsContent.domains.map(d => `${d.id}: ${d.name}`).join('\n');
 
     const domainIds = domainsContent.domains.map(d => d.id).filter(Boolean);
     const dmr42Seeds = [
@@ -885,6 +892,8 @@ export class Phase4Handler implements PhaseHandler {
         handoff,
         technicalConstraints,
         domainsSummary,
+        domainContextById, // PA-6: per-domain scoping (full fallback via domainsSummary)
+        domainIndex,
         rootComponents,
         rootNodeRecordIds,
         rootLogicalIds,

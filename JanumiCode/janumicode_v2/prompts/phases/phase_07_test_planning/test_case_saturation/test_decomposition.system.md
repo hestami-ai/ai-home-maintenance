@@ -108,7 +108,7 @@ them it degrades to an example test. Do NOT force a property where the AC is
 genuinely example-shaped (a specific error message, a particular redirect).
 
 A property child adds a `property_spec` to the standard child shape:
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 {
   "id": "TC-SLUG-RT-001",
   "tier": "D",
@@ -130,7 +130,6 @@ A property child adds a `property_spec` to the standard child shape:
   },
   "decomposition_rationale": "Round-trip invariant generalizes across the whole URL input domain — a property, not a single example."
 }
-```
 `property_kind` is one of: round_trip, idempotence, commutativity, invariant,
 conservation, ordering, oracle, metamorphic. When the parent already carries a
 `property_spec` and is atomic, the `atomic_step` branch echoes it on the single
@@ -147,7 +146,7 @@ For each child you produce, list any **precondition, fixture-setup choice, oracl
 
 # Required output (strict schema)
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 {
   "parent_branch_classification": "decomposable",
   "parent_tier_assessment": {
@@ -181,7 +180,6 @@ For each child you produce, list any **precondition, fixture-setup choice, oracl
     { "text": "Use a real Postgres in integration tests (not in-memory) so partial-index expiration semantics match production.", "category": "oracle_choice", "citations": ["TECH-POSTGRES"] }
   ]
 }
-```
 
 # Hard rules
 

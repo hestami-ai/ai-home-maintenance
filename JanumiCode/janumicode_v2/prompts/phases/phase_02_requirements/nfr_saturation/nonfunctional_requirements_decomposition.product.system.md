@@ -108,7 +108,7 @@ For each child, list assumptions / constraints / compliance citations / open que
 
 # Required output (strict schema)
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 {
   "parent_branch_classification": "decomposable",
   "parent_tier_assessment": {
@@ -135,7 +135,6 @@ For each child, list assumptions / constraints / compliance citations / open que
     { "text": "IRS §6001 is the binding authority for the 7-year retention window.", "category": "compliance", "citations": ["COMP-AUDIT-7YR"] }
   ]
 }
-```
 
 # Hard rules (every branch)
 

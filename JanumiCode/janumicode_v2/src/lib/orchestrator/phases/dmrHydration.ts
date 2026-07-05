@@ -33,12 +33,22 @@ export interface HydrateOptions {
   excerptCap?: number;
   /** Overall output character cap (defensive; the detail-file writer also caps). */
   totalCap?: number;
+  /**
+   * PA-13(2b): skip the "Governing Constraints (binding)" + "Certified
+   * Architecture Context" section blocks. Used when the caller already injects
+   * `active_constraints` inline at the top of the prompt (e.g. task_skeleton),
+   * so the detail file doesn't re-render the SAME governing statements a second
+   * time. Supersession chains, contradictions, known-conflict-zones and
+   * material findings (+ the constraint-id findings dedup) all still render.
+   */
+  omitGoverningSections?: boolean;
 }
 
 const DEFAULTS: Required<HydrateOptions> = {
   maxFindings: 12,
   excerptCap: 1200,
   totalCap: 40_000,
+  omitGoverningSections: false,
 };
 
 /** Record types that are provenance-only (no body worth inlining for an agent). */
@@ -90,12 +100,12 @@ export function renderHydratedPacket(
   const binding = packet.activeConstraints.filter(c => c.bindingClass !== 'certified_context');
   const certifiedContext = packet.activeConstraints.filter(c => c.bindingClass === 'certified_context');
 
-  if (binding.length > 0) {
+  if (!opts.omitGoverningSections && binding.length > 0) {
     out.push('## Governing Constraints (binding — apply without exception)');
     for (const c of binding) out.push(renderConstraint(c));
     out.push('');
   }
-  if (certifiedContext.length > 0) {
+  if (!opts.omitGoverningSections && certifiedContext.length > 0) {
     out.push('## Certified Architecture Context (authoritative reference — build within this; do not contradict)');
     for (const c of certifiedContext) out.push(renderConstraint(c));
     out.push('');

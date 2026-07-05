@@ -66,6 +66,49 @@ describe('renderHydratedPacket — resolves references into content', () => {
     expect(bindingSection).not.toContain('comp-link-management responsibilities');
   });
 
+  it('PA-13(2b): omitGoverningSections drops governing/certified but keeps findings + dedup', () => {
+    const packet = mkPacket({
+      activeConstraints: [
+        { id: 'adr1', statement: 'ADR-002: AES-256 at rest', authorityLevel: 6, sourceRecordIds: ['adr1'], bindingClass: 'binding' },
+        { id: 'cm1', statement: 'comp-link certified context', authorityLevel: 6, sourceRecordIds: ['cm1'], bindingClass: 'certified_context' },
+      ],
+      supersessionChains: [{
+        subject: 'system_boundary',
+        chain: [
+          { recordId: 'old', position: 'superseded', timestamp: '2026-01-01' },
+          { recordId: 'new', position: 'superseding', timestamp: '2026-02-01' },
+        ],
+      }],
+      contradictions: [{ recordIds: ['a', 'b'], explanation: 'A says X, B says not-X', resolutionStatus: 'unresolved' }],
+      materialFindings: [
+        { id: 'adr1', recordType: 'artifact_produced', authorityLevel: 6, governingStatus: 'active', summary: 'ADR-002: AES-256 at rest', sourceRecordIds: ['adr1'], materialityScore: 0.95 },
+        { id: 'z9', recordType: 'artifact_produced', authorityLevel: 4, governingStatus: 'active', summary: 'A distinct downstream finding', sourceRecordIds: ['z9'], materialityScore: 0.6 },
+      ],
+    });
+    const md = renderHydratedPacket(packet, () => null, { omitGoverningSections: true });
+    // Governing/certified section blocks are omitted (the caller injects them at the top).
+    expect(md).not.toContain('## Governing Constraints');
+    expect(md).not.toContain('## Certified Architecture Context');
+    expect(md).not.toContain('AES-256 at rest'); // the constraint statement is not re-rendered
+    // Everything else still renders.
+    expect(md).toContain('Supersession Chains');
+    expect(md).toContain('Contradictions');
+    expect(md).toContain('A distinct downstream finding');
+    // The constraint-id findings dedup is independent of section rendering.
+    expect(md).toContain('already shown above');
+  });
+
+  it('PA-13(2b): default (no option) still renders the governing sections (no regression)', () => {
+    const packet = mkPacket({
+      activeConstraints: [
+        { id: 'adr1', statement: 'ADR-002: AES-256 at rest', authorityLevel: 6, sourceRecordIds: ['adr1'], bindingClass: 'binding' },
+      ],
+    });
+    const md = renderHydratedPacket(packet, () => null);
+    expect(md).toContain('## Governing Constraints (binding — apply without exception)');
+    expect(md).toContain('AES-256 at rest');
+  });
+
   it('dedups material findings already shown above as constraints/context (ws-156 triple-render)', () => {
     const packet = mkPacket({
       activeConstraints: [

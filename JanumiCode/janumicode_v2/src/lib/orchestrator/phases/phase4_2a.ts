@@ -96,9 +96,19 @@ export interface ComponentSaturationInput {
   technicalConstraints: TechnicalConstraint[];
   /**
    * Domain summary text for prompt context — Phase 4.1 software_domains
-   * formatted as a brief natural-language paragraph.
+   * formatted as a brief natural-language paragraph. Fallback when a node's
+   * own domain can't be resolved (PA-6).
    */
   domainsSummary: string;
+  /**
+   * PA-6: per-domain full block keyed by domain_id, so each per-component
+   * saturation call sees only its PARENT's software domain (not all ~18).
+   * Optional + back-compat: absent ⇒ formatScopedDomainContext falls back to
+   * the full domainsSummary. Mirrors PA-4's componentSummaryById.
+   */
+  domainContextById?: Record<string, string>;
+  /** PA-6: thin `id: name`-only roster of all domains, appended as an index. */
+  domainIndex?: string;
   /** Root components written by Phase 4.2 (one DecompositionComponent per root). */
   rootComponents: DecompositionComponent[];
   /** Governed-stream record IDs for the depth-0 root nodes. Pairs 1:1 with rootComponents. */
@@ -323,15 +333,19 @@ function sanitizeChildComponent(
 
 // ── Prompt formatting ──────────────────────────────────────────────
 
-function formatRootComponentForPrompt(c: DecompositionComponent): string {
+export function formatRootComponentForPrompt(c: DecompositionComponent): string {
   const resps = c.responsibilities.map(r => `  - [${r.id}] ${r.description}`).join('\n');
   const deps = c.dependencies.length === 0
     ? '(none)'
     : c.dependencies.map(d => `  - ${displayComponentDependency(d)}`).join('\n');
+  // PA-10: surface the node's OWN inherited active_constraints (narrowed TECH-*
+  // ids) so child components honor the right constraints, not the global menu.
+  const activeConstraints = (c.active_constraints ?? []).join(', ') || '(none inherited)';
   return [
     `Component id: ${c.id}`,
     `Name: ${c.name}`,
     c.domain_id ? `Domain: ${c.domain_id}` : null,
+    `Active constraints (inherited by this component — children MUST honor these TECH-* ids): ${activeConstraints}`,
     'Responsibilities:',
     resps,
     'Dependencies:',
@@ -377,6 +391,28 @@ function formatTechnicalConstraints(tcs: TechnicalConstraint[]): string {
  *     resume.
  *   - workflow_runs.component_decomposition_* telemetry columns updated.
  */
+/**
+ * PA-6: scope the `domain_context` slot to the parent node's OWN software
+ * domain, plus a thin index of the others — instead of dumping all ~18 domains
+ * (each transitively carrying every SR id) into every single-component call.
+ * The orchestrator owns the deterministic axis (which domain block each node
+ * sees, keyed by its own domain_id); the LLM owns the decomposition judgment.
+ * No regex / no lineage walk — domain_id is a direct exact key.
+ *
+ * FALLBACK (no coverage regression): when domainId is null/undefined/unresolved
+ * or the map is absent, return the full domainsSummary (today's behavior).
+ */
+export function formatScopedDomainContext(
+  domainId: string | null | undefined,
+  input: Pick<ComponentSaturationInput, 'domainContextById' | 'domainIndex' | 'domainsSummary'>,
+): string {
+  const own = domainId && input.domainContextById ? input.domainContextById[domainId] : undefined;
+  if (!own) return input.domainsSummary;
+  return input.domainIndex
+    ? `${own}\n\nOther software domains (index only):\n${input.domainIndex}`
+    : own;
+}
+
 export async function runComponentSaturationLoop(
   ctx: PhaseContext,
   input: ComponentSaturationInput,
@@ -580,7 +616,7 @@ export async function runComponentSaturationLoop(
             : siblings
                 .filter(s => s.id !== entry.component.id)
                 .map(s => `- ${s.id}: ${s.name}`).join('\n'),
-          domain_context: input.domainsSummary,
+          domain_context: formatScopedDomainContext(entry.component.domain_id, input),
           existing_assumptions: scopedAssumptions.length === 0
             ? '(none yet)'
             : scopedAssumptions.map(a => `- [${a.id}] (${a.category}) ${a.text}`).join('\n'),

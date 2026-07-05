@@ -131,7 +131,7 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
 
 ## Complete example (two tasks — all field shapes shown)
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 {
   "tasks": [
     {
@@ -190,7 +190,6 @@ Produce a single JSON object with one top-level key `tasks` whose value is an ar
     }
   ]
 }
-```
 
 ---
 
@@ -228,7 +227,7 @@ You are the Implementation Planner. The `component_model_summary` and `technical
 [INPUT]
 
 # Active constraints
-{{active_constraints}}
+(Governing constraints are stated once at the top under GOVERNING CONSTRAINTS — apply without exception; not repeated here.)
 
 # Component Model Summary
 {{component_model_summary}}

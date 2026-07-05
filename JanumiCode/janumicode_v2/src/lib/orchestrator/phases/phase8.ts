@@ -22,6 +22,38 @@ import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrCon
 import { runPhase8CycleDelta } from './runCycleDelta';
 import { emit as aoddEmit } from '../../aodd';
 
+/**
+ * PA-14: deterministic bridge for the Phase-8 `compliance_context_summary` slot.
+ * The orchestrator owns WHICH compliance items exist (from the Phase-1.0d
+ * `compliance_retention_discovery` artifact); the LLM owns how to evaluate them.
+ * Mirrors the frSummary/nfrSummary/testPlanSummary id-preserving summarizers.
+ *
+ * Items present  → compact one-line-per-item block `- COMP-* [TYPE]: text`.
+ * None/empty     → a self-describing NEUTRAL sentinel that ALSO neutralizes the
+ *                  template's dangling "compliance NFRs must have eval criteria"
+ *                  rule (replaces the misleading bare 'No compliance regimes').
+ * Malformed items (missing/non-string text) are skipped — no throw, no
+ * '[object Object]'/'undefined' leakage.
+ */
+export function formatComplianceContextSummary(items: unknown): string {
+  const arr = Array.isArray(items) ? items : [];
+  const lines: string[] = [];
+  for (const it of arr) {
+    if (!it || typeof it !== 'object') continue;
+    const o = it as Record<string, unknown>;
+    const text = typeof o.text === 'string' ? o.text.trim() : '';
+    if (!text) continue;
+    const id = typeof o.id === 'string' && o.id ? o.id : 'COMP-?';
+    const type = typeof o.type === 'string' && o.type ? o.type : 'ITEM';
+    lines.push(`- ${id} [${type}]: ${text}`);
+  }
+  if (lines.length === 0) {
+    return 'No compliance or data-retention regimes were identified upstream (Phase 1.0d). '
+      + 'Emit no compliance-specific evaluation criteria — their absence is expected here, not a coverage gap.';
+  }
+  return lines.join('\n');
+}
+
 // ── Artifact shape interfaces ──────────────────────────────────────
 
 interface FunctionalEvalCriterion {
@@ -82,6 +114,18 @@ export class Phase8Handler implements PhaseHandler {
       : 'No test plan available';
     const derivedFromIds = prior.allRecordIds;
 
+    // PA-14: bridge the Phase-1.0d compliance artifact into the eval prompt.
+    // getRecordsByType returns all versions → filter is_current_version (as
+    // downstreamGatekeeper does). Absent artifact ⇒ helper emits the neutral
+    // sentinel that neutralizes the template's compliance rule.
+    const complianceRecord = allArtifacts.find(
+      r => r.is_current_version
+        && (r.content as Record<string, unknown> | undefined)?.kind === 'compliance_retention_discovery',
+    );
+    const complianceSummary = formatComplianceContextSummary(
+      (complianceRecord?.content as Record<string, unknown> | undefined)?.complianceExtractedItems,
+    );
+
     // ── 8.1–8.3 — Evaluation Design (single LLM call) ────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'evaluation_design');
 
@@ -105,7 +149,7 @@ export class Phase8Handler implements PhaseHandler {
       requiredOutputSpec: 'functional_evaluation_plan, quality_evaluation_plan, reasoning_evaluation_plan',
     });
 
-    const evalResult = await this.runEvaluationDesign(ctx, testPlanSummary, frSummary, nfrSummary, dmr81);
+    const evalResult = await this.runEvaluationDesign(ctx, testPlanSummary, frSummary, nfrSummary, complianceSummary, dmr81);
 
     // ── Deterministic eval-target canonicalization (structural, no regex) ──
     // runEvaluationDesign (a single LLM call) emits `functional_requirement_id`s
@@ -281,7 +325,7 @@ export class Phase8Handler implements PhaseHandler {
 
   private async runEvaluationDesign(
     ctx: PhaseContext, testPlanSummary: string, frSummary: string, nfrSummary: string,
-    dmr: PhaseContextPacketResult,
+    complianceSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<EvalDesignResult> {
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('eval_design_agent', 'evaluation_design');
@@ -299,7 +343,7 @@ export class Phase8Handler implements PhaseHandler {
       test_plan_summary: testPlanSummary,
       functional_requirements_summary: frSummary,
       non_functional_requirements_summary: nfrSummary,
-      compliance_context_summary: 'No compliance regimes',
+      compliance_context_summary: complianceSummary,
       janumicode_version_sha: engine.janumiCodeVersionSha,
     });
     if (rendered.missing_variables.length > 0) return fallback;

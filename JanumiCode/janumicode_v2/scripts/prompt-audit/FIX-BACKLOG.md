@@ -18,20 +18,30 @@ Re-verify anytime: re-run the audit extract on a fresh run and diff the D5/A1 ra
 | PA-1 | P0 | task_saturation context scoping (wrong-node) | task_saturation | 91 | [x] |
 | PA-2 | P0 | test_case_saturation AC-summary scope + de-dup | test_case_saturation | 74 | [x] |
 | PA-3 | P0 | task_skeleton AC-inventory + tech-specs scoping | task_skeleton | 13 | [x] |
-| PA-7 | P0 | parent-slot keying (label ≠ injected parent) | data_model/task_sat/task_skel | 6 | [ ] |
+| PA-7 | P0 | parent-slot keying (label ≠ injected parent) — REFUTED, verify-locked | data_model/task_sat/task_skel | 6 | [x] |
 | PA-4 | P1 | data_model_saturation context scoping | data_model_saturation | 5 | [x] |
 | PA-8 | P1 | object/relationship serializer bugs | many | — | [x] |
-| PA-10 | P1 | parent blocks lack active_constraints (TECH-* narrow) | task_sat/task_skel | 5 | [ ] |
+| PA-10 | P1 | parent blocks lack active_constraints (TECH-* narrow) | task_sat/task_skel | 5 | [x] |
 | PA-9 | P1 | id-namespace unification (TECH-*, ent/DM, leaf/root) | many | 5 | [x] |
-| PA-5 | P1 | fr/nfr_saturation handoff-corpus scoping | fr/nfr_saturation | 2 | [ ] |
-| PA-6 | P1 | component_saturation domain-context scoping | component_saturation | 0 | [ ] |
-| PA-11 | P2 | contradictory branch/category literals | fr_sat/nfr/data_model | — | [~] |
-| PA-13 | P2 | duplicate catalog injection (sibling==depth-0, gov-const 2x) | task_sat/skel | — | [ ] |
-| PA-12 | P2 | JSON-fence self-contradiction | fr_sat/task_skel | — | [ ] |
-| PA-14 | P2 | compliance_context hardcoded empty | evaluation_design | — | [ ] |
+| PA-5 | P1 | fr/nfr_saturation handoff-corpus scoping (B5 via PA-11; A1→DEF-2) | fr/nfr_saturation | 2 | [x] |
+| PA-6 | P1 | component_saturation domain-context scoping | component_saturation | 0 | [x] |
+| PA-11 | P2 | contradictory branch/category literals | fr_sat/nfr/data_model | — | [x] |
+| PA-13 | P2 | duplicate catalog injection (sibling==depth-0, gov-const 2x) | task_sat/skel | — | [x] |
+| PA-12 | P2 | JSON-fence self-contradiction | fr_sat/task_skel | — | [x] |
+| PA-14 | P2 | compliance_context hardcoded empty | evaluation_design | — | [x] |
 | PA-15 | P2 | monolithic test_case_skeleton + coverage shortfall (= SD-4) | test_case_skeleton | 1 | [x] |
 
 > **Related class — Skeleton Decomposition (SD-1..SD-4):** the gpt-oss:20b-envelope generalization of the P6.1 chunk-and-reconcile pattern to the monolithic *skeleton* passes (P3 SR, P4 ADR, P5 data-model, P7 test-case=PA-15). See **`## SKELETON DECOMPOSITION WORKLIST`** below.
+
+---
+
+## DEFERRED SUB-ITEMS (intentional scope cuts — NOT loose ends)
+Sub-items deliberately shipped WITHOUT their parent's last increment, with the reason and the concrete trigger to revisit. Tracked here so a conscious cut is never mistaken for an oversight. (Distinct from `[ ]` OPEN items above, which are whole fixes not yet started.)
+
+| id | parent | deferred sub-item | reason | revisit trigger |
+|---|---|---|---|---|
+| DEF-1 | PA-3 | SR-by-source-reachability tech-spec slice (`phase6.ts` `buildTechSpecsSummaryById`; SRs stay in the full `techSpecsSummary` fallback) | Tech-spec coverage has **no reconciliation backstop** (only a downstream validator that each spec id appears in some task's `traces_to`), unlike the AC axis. An over-aggressive per-component SR slice could silently drop SR context a task needs. The DM/API-by-`component_id` slice DID ship (direct-field key, clean). Code carries an inline `// PA-3: SR-reachability slice deferred pending live validation (no recon backstop)` marker at the insertion point. | cal-37 (full P1→P7) showed **no gap** from the full-`techSpecsSummary` fallback → not urgent. Revisit only if a live run shows P6 tech-spec bloat measurably degrading task quality AND a per-task SR-reachability coverage check exists to gate the slice (so it can't silently under-cover). |
+| DEF-2 | PA-5 | fr/nfr_saturation handoff-corpus **A1 compaction** — `formatHandoffForDecomposition` (`phase2.ts:2818`) is 62% of the fr_saturation prompt (~22.7K chars, byte-identical across all 54+ calls). Lever (a): compact each handoff item to `id + one-line label`, dropping the multi-line journey-acceptance / entity-description bodies. Lever (b, larger): hoist the byte-identical block to a provider prompt-cache prefix. | The dropped bodies are the **grounding** the FR/NFR decomposer uses; compaction is deterministic + no-item-loss but **grounding-adjacent (medium-risk)**, and the shared per-type formatters (`formatJourneys`/`formatEntities`/…) are reused across phases — a global change. PA-5's category-enum part (B5) already shipped via PA-11. | A live cal run measuring fr/nfr decomposition **quality** (leaf coverage + tier distribution) with the compacted handoff vs the full one — confirm no quality regression before committing. Lever (b) prompt-cache hoist is a separate larger effort. |
 
 ---
 
@@ -196,8 +206,10 @@ fr_saturation category enum (`domain_regime|constraint|compliance|scope` vs `con
 ### PA-12 [ ] JSON-fence self-contradiction
 `No markdown fences. Response starts with {` while the in-prompt Required-output example is itself ```json-fenced ⇒ model emits fences. C4. Code: the templates' Required-output example. Fix: strip fences from the example; ensure normalizer strips fences.
 
-### PA-14 [ ] compliance_context hardcoded empty
-`phase8.ts:302` passes literal `'No compliance regimes'` regardless of upstream. Fix: read `compliance_retention_discovery` artifact; if genuinely empty drop the dangling rule.
+### PA-14 [x] DONE compliance_context hardcoded empty
+**Result (2026-07-04, uncommitted):** new exported `formatComplianceContextSummary(items)` (`phase8.ts`) renders the Phase-1.0d `compliance_retention_discovery` record's `complianceExtractedItems` as an id-preserving `- COMP-* [TYPE]: text` block (skips items with no string text; never leaks `[object Object]`/`undefined`); neutral sentinel only when genuinely empty. `runEvaluationDesign` gained a `complianceSummary` param; the literal `'No compliance regimes'` at the render site is replaced. Test: `phase8ComplianceContext.test.ts` (5).
+**Root cause (audit #4):** `phase8.ts:302` passed literal `'No compliance regimes'` regardless of upstream — self-contradictory with the "Compliance-related NFRs from compliance_context must have evaluation criteria" rule + any real `[compliance]` NFRs in the same prompt.
+**LIVE-VALIDATED — cal-38 P8 (invocation `c6c838df`, `artifact_count:1`), 2026-07-04:** compliance slot rendered the 4 real items — `COMP-LICENSE-VERIFICATION` / `COMP-PERMITS-AWARENESS` / `COMP-DATA-RETENTION-LEDGER` / `COMP-PII-ACCESS-CONTROL` `[CONSTRAINT]` — vs the audit's `Compliance: No compliance regimes`. **Consumed downstream:** the eval-design output tagged `NFR-001` + `NFR-002` `"category":"Compliance"` with full evaluation criteria (thinking cites "NFR-001 compliance: verify provider licenses… Category 'Compliance'") → the line-63 rule is now satisfiable. (2nd P8 log `ddbd4f41` is a degenerate loop-pass, `artifact_count:0`, empty — not authoritative.)
 
 ### PA-15 [ ] monolithic test_case_skeleton + coverage shortfall
 One all-component call; ~28% AC coverage in a pass. A3/C2. Code `phase7.ts`. Fix: chunk per-component + orchestrator-owned coverage loop (mirror P6.1).

@@ -159,7 +159,7 @@ For each child you produce, list any **implementation choice, sequencing constra
 
 # Required output (strict schema)
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 {
   "parent_branch_classification": "decomposable",
   "parent_tier_assessment": {
@@ -193,7 +193,6 @@ For each child you produce, list any **implementation choice, sequencing constra
     { "text": "VendorCredential.expires_at is treated as inclusive — equal-to-now is rejected, not accepted.", "category": "implementation_choice", "citations": ["TECH-POSTGRES"] }
   ]
 }
-```
 
 # Hard rules (apply to every branch)
 
