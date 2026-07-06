@@ -110,6 +110,17 @@ describe('SD-3 oracle — component coverage (pure)', () => {
     expect(consolidateEntitiesForComponent([{}], 'comp-x')).toBeNull();
   });
 
+  it('consolidateEntitiesForComponent PRESERVES the whole entity incl. traces_to (PD-7 linkage survives the chunk merge)', () => {
+    const merged = consolidateEntitiesForComponent(
+      [{ entities: [{ name: 'Decision', fields: [], traces_to: ['SR-003', 'AC-US001-002'] }] }],
+      'comp-board',
+    );
+    expect(merged).not.toBeNull();
+    // The entity object is pushed whole (not reconstructed field-by-field), so the
+    // Phase-5-minted requirement linkage reaches the packet builder's task scoping.
+    expect(merged!.entities[0].traces_to).toEqual(['SR-003', 'AC-US001-002']);
+  });
+
   it('renderUncoveredComponentsMenu lists canonical id + responsibilities', () => {
     const byId = new Map<string, Record<string, unknown>>([
       ['comp-c', comp('comp-c', 'Charlie', 'store the charlie state')],

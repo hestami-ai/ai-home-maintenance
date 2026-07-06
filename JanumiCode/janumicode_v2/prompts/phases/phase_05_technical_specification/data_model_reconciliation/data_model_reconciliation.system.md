@@ -30,12 +30,13 @@ Each component below received NO data model in the first pass. For **each** one,
 A single JSON object matching the `data_models` schema:
 - models: array — one entry per uncovered component above, each with:
   - component_id — verbatim id from the list above
-  - entities: array of {name, fields: [{name, type, constraints}], relationships}
+  - entities: array of {name, fields: [{name, type, constraints}], relationships, traces_to}
 
 Rules:
 - No entity field may lack a specified type (Invariant: DM-001).
 - Use concrete types (string, integer, boolean, timestamp, uuid) — not vague types.
 - Data Models must be consistent with each component's responsibilities shown above.
+- Every entity MUST include `traces_to`: the id(s) of the System Requirement(s) (`SR-*`) it supports, taken VERBATIM from the System Requirements block below (add specific `AC-*` ids too when the requirement names them). This binds each entity to the task(s) that read/write it. Emit `[]` only if no listed requirement applies (do not invent ids).
 
 # Hard rules — non-contradiction with technical constraints
 

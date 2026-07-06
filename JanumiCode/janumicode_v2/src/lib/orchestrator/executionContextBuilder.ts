@@ -26,7 +26,7 @@ import { normalizeComponentDirForStack } from './phases/layoutContract';
 import { getLogger } from '../logging';
 import type { ImplementationPacketContent } from '../types/records';
 import {
-  selectReasoningFindings, findingInScope, renderFindingLine,
+  selectReasoningFindings, findingInScope, renderFindingLine, dedupSurfacedFindings,
   type SurfacedFinding, type TaskScope,
 } from '../review/findingSurfacing';
 
@@ -324,6 +324,51 @@ interface ExtractedADR { id: string; title: string; decision: string; governs_co
 function formatADRs(adrs: ExtractedADR[]): string {
   if (!adrs.length) return '(no architectural decisions recorded)';
   return adrs.map(adr => `### ${adr.id}: ${adr.title}\n${adr.decision}`).join('\n\n');
+}
+
+/** Generous cap on the DMR context inlined into a leaf prompt (chars). */
+const DMR_INLINE_BUDGET = 12000;
+
+/**
+ * PD-6 (P9 prompt audit): the per-task DMR context is inlined into every leaf
+ * prompt (the sandbox cannot read the on-disk copy — slice-151), but with
+ * `scopeTier:'all_runs'` a large cross-run / whole-catalog dump can dominate the
+ * prompt as dead context (the A1/A4/A2 "raw cross-component Deep-Memory JSON"
+ * finding). The DMR's findings are MATERIALITY-RANKED (the task's own artifacts
+ * are seeded known-relevant at 1.0 and rank first), so a budgeted TAIL-drop at
+ * blank-line section boundaries sheds the LEAST-material context while never
+ * clipping mid-structure. Generous budget: only oversized dumps are trimmed;
+ * ordinary task-scoped DMR passes through untouched. The full curated context
+ * remains on disk at the detail-file path (audit / non-sandboxed runs).
+ */
+/**
+ * PD-11: the base ContextBuilder titles the detail-file body
+ * `# JanumiCode Context Detail File`, but the executor template already renders a
+ * `# DETAIL FILE` header above the inlined body — two competing detail-file H1s
+ * back-to-back. Drop the redundant inner title so there is exactly ONE header.
+ * No-op when the title is absent (e.g. the "(detail file unavailable)" fallback).
+ */
+export function stripRedundantDetailHeader(content: string): string {
+  if (typeof content !== 'string') return content;
+  return content.replace(/^# JanumiCode Context Detail File[^\n]*\n+/, '');
+}
+
+export function capInlinedDmrContext(text: string, budget: number = DMR_INLINE_BUDGET): string {
+  if (typeof text !== 'string' || text.length <= budget) return text;
+  const blocks = text.split('\n\n');
+  const kept: string[] = [];
+  let used = 0;
+  let dropped = 0;
+  for (const b of blocks) {
+    if (used + b.length + 2 > budget && kept.length > 0) { dropped++; continue; }
+    kept.push(b);
+    used += b.length + 2;
+  }
+  let out = kept.join('\n\n');
+  if (dropped > 0) {
+    out += `\n\n… (${dropped} lower-materiality Deep-Memory section(s) elided for prompt economy — the full curated context is on disk at the detail-file path)`;
+  }
+  return out;
 }
 
 /**
@@ -654,9 +699,16 @@ export function findUpstreamFindingsForTask(
   const matched = selected.filter(f => findingInScope(f, scope));
   if (!matched.length) return EMPTY_UPSTREAM_FINDINGS_FALLBACK;
 
-  const capped = matched.slice(0, UPSTREAM_FINDINGS_CAP);
-  const header = matched.length > UPSTREAM_FINDINGS_CAP
-    ? `(showing ${UPSTREAM_FINDINGS_CAP} of ${matched.length} HIGH/MEDIUM findings)\n`
+  // PD-8 (P9 prompt audit): the same upstream issue is often emitted across many
+  // validator records (per-AC / per-artifact) with distinct recordIds but IDENTICAL
+  // rendered content, so the same finding line was injected repeatedly (~16×) —
+  // noise that crowded distinct findings out from under the cap. Collapse by
+  // rendered line so the executor sees each finding ONCE and the cap counts distinct.
+  const deduped = dedupSurfacedFindings(matched);
+
+  const capped = deduped.slice(0, UPSTREAM_FINDINGS_CAP);
+  const header = deduped.length > UPSTREAM_FINDINGS_CAP
+    ? `(showing ${UPSTREAM_FINDINGS_CAP} of ${deduped.length} HIGH/MEDIUM findings)\n`
     : '';
   return header + capped.map(renderFindingLine).join('\n');
 }
@@ -815,7 +867,9 @@ export class ExecutionContextBuilder {
     );
 
     const detailFilePath = payload.detailFile?.path ?? this.formatDetailFilePath(subPhaseId, invocationId, workflowRunId);
-    const taskDetailFileContent = payload.detailFile?.content ?? '(detail file unavailable)';
+    // PD-11: strip the body's own `# JanumiCode Context Detail File` H1 — the
+    // template renders a `# DETAIL FILE` header above it, so keeping both duplicates.
+    const taskDetailFileContent = stripRedundantDetailHeader(payload.detailFile?.content ?? '(detail file unavailable)');
 
     // When a per-task DMR packet was supplied, prefer its active
     // constraints (DMR-retrieved + authority-attributed) over the
@@ -860,7 +914,9 @@ export class ExecutionContextBuilder {
     const dmrDetailPath = dmrPacket?.detailFilePath;
     const detailFileContentInline = dmrPacket?.detailFileContent
       ? (inlineDmr
-        ? `${taskDetailFileContent}\n\n---\n\n${dmrPacket.detailFileContent}`
+        // PD-6: budget-cap the inlined DMR (materiality-ordered tail-drop, never
+        // clip) so a cross-run whole-catalog dump can't dominate the leaf prompt.
+        ? `${taskDetailFileContent}\n\n---\n\n${capInlinedDmrContext(dmrPacket.detailFileContent)}`
         : `${taskDetailFileContent}\n\n---\n\n_A curated Deep Memory Research context reference (governing constraints, supersession chains, contradictions, material findings — with record references resolved to actual content) is on disk${dmrDetailPath ? `:\n\n    ${dmrDetailPath}` : ''}\n\nRead it selectively if you need supporting governing context beyond what is inlined above._`)
       : taskDetailFileContent;
 

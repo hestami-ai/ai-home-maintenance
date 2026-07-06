@@ -30,7 +30,7 @@ REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `definitions` (an a
     {
       "component_id": "comp-shortening-service",
       "endpoints": [
-        { "path": "/shorten", "method": "POST", "inputs": { "long_url": "string" }, "outputs": { "slug": "string", "short_url": "string" }, "error_codes": ["400", "409", "500"], "auth_requirement": "None" }
+        { "path": "/shorten", "method": "POST", "inputs": { "long_url": "string" }, "outputs": { "slug": "string", "short_url": "string" }, "error_codes": ["400", "409", "500"], "auth_requirement": "None", "traces_to": ["SR-003"] }
       ]
     }
   ]
@@ -40,6 +40,7 @@ Rules:
 - Every endpoint must have an explicit authentication requirement (Invariant: API-001)
 - API Definitions must be consistent with Interface Contracts from Phase 3
 - Include error codes for all failure scenarios
+- Every endpoint MUST include `traces_to`: the id(s) of the System Requirement(s) (`SR-*`) it implements, taken VERBATIM from the System Requirements block below (add specific acceptance-criteria `AC-*` ids too when the requirement text names them). This binds the endpoint to the single task that implements it, so a task authoring one endpoint is not handed every endpoint of its component. Emit `[]` only if no listed requirement applies (do not invent ids).
 - `inputs` and `outputs` are FLAT one-level maps of `field_name -> type-string` (e.g. `{ "long_url": "string", "expires_at": "timestamp" }`). Do NOT emit nested JSON Schema (`{ "type": "object", "properties": {...}, "required": [...] }`) — deep nesting causes malformed JSON. Keep every object SHALLOW; a value is either a type-string or a flat map of type-strings, never deeper.
 
 # Hard rules — JSON output discipline

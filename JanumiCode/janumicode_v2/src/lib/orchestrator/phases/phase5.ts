@@ -42,6 +42,8 @@ interface DataModels {
       name: string;
       fields: Array<{ name: string; type: string; constraints?: string }>;
       relationships?: string[];
+      /** PD-7: the SR-/AC- ids this entity serves (task→DM scoping). */
+      traces_to?: string[];
     }>;
   }>;
 }
@@ -58,6 +60,8 @@ interface ApiDefinitions {
       outputs?: Record<string, unknown>;
       error_codes?: Array<Record<string, unknown>>;
       auth_requirement?: string;
+      /** PD-7: the SR-/AC- ids this endpoint implements (task→API scoping). */
+      traces_to?: string[];
     }>;
   }>;
 }

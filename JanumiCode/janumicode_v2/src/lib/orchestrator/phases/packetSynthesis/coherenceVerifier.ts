@@ -68,6 +68,71 @@ export interface VerifierResult {
   };
 }
 
+// ── HTTP status-code contradiction (PD-4) ──────────────────────────
+
+/** Text cues that signal an HTTP status code is being discussed (precision guard). */
+const HTTP_STATUS_CUE = /\bhttp\b|\bstatus\b|\bcode\b|\bresponds?\b|\breturns?\b|\berror\b|\breject/i;
+
+/**
+ * Extract HTTP status codes (1xx–5xx) cited in `text`, but ONLY when the text
+ * carries an HTTP-status cue — so a bare "500 items" / "200ms" is not mistaken
+ * for a status code. Numbers immediately followed by a unit are also skipped.
+ * Precision over recall: this feeds a CONTRADICTION claim, so a false hit would
+ * wrongly flag a coherent criterion.
+ */
+export function extractHttpStatusCodes(text: string): Set<string> {
+  const out = new Set<string>();
+  if (!text || !HTTP_STATUS_CUE.test(text)) return out;
+  for (const m of text.matchAll(/\b([1-5]\d{2})\b/g)) {
+    const idx = (m.index ?? 0) + m[0].length;
+    const after = text.slice(idx, idx + 8).toLowerCase();
+    if (/^\s*(ms|s\b|sec|%|mb|gb|kb|k\b|items|rows|records|users|reqs?|bytes|chars)/.test(after)) continue;
+    out.add(m[1]);
+  }
+  return out;
+}
+
+/** True when both sets are non-empty and share NO element (a genuine conflict). */
+function disjointNonEmpty(a: Set<string>, b: Set<string>): boolean {
+  if (a.size === 0 || b.size === 0) return false;
+  for (const x of a) if (b.has(x)) return false;
+  return true;
+}
+
+/**
+ * PD-4: HTTP-status contradictions between a completion criterion and the
+ * acceptance criterion it maps to (`verifies_acceptance_criteria`). The CC says
+ * "respond 400" while its AC mandates "409" → unsatisfiable as written; the
+ * executor cannot honor both. Fires only when the CC explicitly maps to an AC
+ * present in the packet and BOTH cite a status code with no overlap. Returns
+ * advisory lines (blocking would futilely cycle on an LLM text mismatch; routing
+ * to Phase 6 could heal it — surfaced for the executor + telemetry).
+ */
+export function ccAcContradictions(packet: ImplementationPacketContent): string[] {
+  const out: string[] = [];
+  const acTextById = new Map<string, string>();
+  for (const us of packet.user_stories) {
+    for (const ac of us.acceptance_criteria) {
+      acTextById.set(ac.id, `${ac.description} ${ac.measurable_condition ?? ''}`);
+    }
+  }
+  for (const cc of packet.task.completion_criteria) {
+    const ccCodes = extractHttpStatusCodes(cc.description ?? '');
+    if (ccCodes.size === 0) continue;
+    for (const acId of cc.verifies_acceptance_criteria ?? []) {
+      const acText = acTextById.get(acId);
+      if (acText === undefined) continue; // invented/absent AC handled by P7
+      const acCodes = extractHttpStatusCodes(acText);
+      if (disjointNonEmpty(ccCodes, acCodes)) {
+        out.push(
+          `P9_CC_AC_CONTRADICTION: completion criterion ${cc.criterion_id} cites HTTP ${[...ccCodes].join('/')} but the acceptance criterion it verifies (${acId}) mandates ${[...acCodes].join('/')}`,
+        );
+      }
+    }
+  }
+  return out;
+}
+
 // ── Per-packet assertions ──────────────────────────────────────────
 
 function collectReferencedIds(packet: ImplementationPacketContent): string[] {
@@ -192,6 +257,16 @@ function verifyPacket(
     }
   }
 
+  // A4 (PD-7) — more than one COMPONENT API reached this packet. The
+  // component-scoped join can't say which endpoint THIS task implements, so the
+  // executor may pick the wrong contract (the `POST /board-decisions` vs
+  // `/decisions/{id}/approve` symptom). Advisory: surfaced for telemetry and
+  // reinforced by the prompt's hedged header. Step-D task-scoping narrows most
+  // packets to a single endpoint; this counts the residual it couldn't scope.
+  if (packet.api_definitions.length > 1) {
+    advisory.push(`A4_UNSCOPED_MULTI_API: packet ${packet.packet_id} carries ${packet.api_definitions.length} component API endpoints; the executor must implement only the one(s) its completion criteria require`);
+  }
+
   // P8 — Each test_execution completion criterion should be covered by a test
   // case (advisory). The criterion is the executor's authoritative deliverable;
   // packetBuilder binds covering tests via the criterion's verified ACs (or the
@@ -205,6 +280,9 @@ function verifyPacket(
       advisory.push(`P8_CC_NO_TEST: completion criterion ${cc.criterion_id} (task ${packet.task.id}) has no covering test case — executor must author one`);
     }
   }
+
+  // P9 (PD-4) — completion-criterion ↔ acceptance-criterion contradictions.
+  advisory.push(...ccAcContradictions(packet));
 
   // A2 — No two test cases share identical AC refs + expected_outcome.
   const seenTests = new Map<string, string>();

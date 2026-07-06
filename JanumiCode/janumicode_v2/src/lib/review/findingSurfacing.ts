@@ -210,6 +210,23 @@ export function renderFindingLine(f: SurfacedFinding): string {
   return `- [${f.severity}] ${f.validatorId} :: ${f.findingType} — ${f.summary}${fix}`;
 }
 
+/**
+ * Collapse findings that render to an IDENTICAL line (PD-8). A single upstream
+ * issue is often emitted across many validator records (per-AC / per-artifact)
+ * with distinct recordIds but identical rendered content, so the same line would
+ * otherwise be injected many times (~16×) — noise that crowds distinct findings
+ * out from under the display cap. Order-preserving; keeps the first occurrence.
+ */
+export function dedupSurfacedFindings(findings: SurfacedFinding[]): SurfacedFinding[] {
+  const seen = new Set<string>();
+  const out: SurfacedFinding[] = [];
+  for (const f of findings) {
+    const key = renderFindingLine(f);
+    if (!seen.has(key)) { seen.add(key); out.push(f); }
+  }
+  return out;
+}
+
 /** Split a packet's coherence strings into the actionable vs FYI buckets. */
 export function categorizeCoherence(codes: readonly string[]): {
   actionable: { code: string; line: string; remedy: string }[];

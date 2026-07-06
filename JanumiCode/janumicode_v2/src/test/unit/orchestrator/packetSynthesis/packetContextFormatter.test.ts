@@ -153,6 +153,51 @@ describe('formatPacketAsExecutorContext — full packet', () => {
     expect(md).toMatch(/P4_USER_STORY_NO_EVAL/);
   });
 
+  // PD-7 — a component-scoped API join can bind >1 endpoint to a task's packet;
+  // the executor was observed implementing the wrong one. Hedge the header on count.
+  it('keeps the direct header when exactly one endpoint is present', () => {
+    const md = formatPacketAsExecutorContext(fullPacket()); // one api_definition
+    expect(md).toMatch(/## API Endpoints You Implement/);
+    expect(md).not.toMatch(/## Component API Endpoints \(context/); // not the hedged form
+  });
+
+  it('hedges the header when MORE than one endpoint is present', () => {
+    const p = fullPacket();
+    p.api_definitions = [
+      { id: 'api-001', method: 'POST', path: '/board-decisions', description: 'create' },
+      { id: 'api-002', method: 'POST', path: '/decisions/{id}/approve', description: 'approve' },
+    ];
+    const md = formatPacketAsExecutorContext(p);
+    expect(md).toMatch(/## Component API Endpoints \(context/);
+    expect(md).toMatch(/implement ONLY the one\(s\) your task/);
+    expect(md).not.toMatch(/## API Endpoints You Implement/);
+  });
+
+  // PD-11 — an unresolved constraint ref is carried as an empty-body placeholder so
+  // the coherence verifier flags it; it must NOT be presented to the executor as a
+  // binding "apply without exception" rule with no content.
+  it('splits unresolved (empty-body) constraint refs out of the binding list (PD-11)', () => {
+    const p = fullPacket();
+    p.active_constraints = [
+      { id: 'TECH-PG-16', category: 'database', text: 'PostgreSQL 16+', technology: 'PostgreSQL' },
+      { id: 'TECH-BUN', category: '', text: '' }, // unresolved placeholder
+    ];
+    const md = formatPacketAsExecutorContext(p);
+    expect(md).toMatch(/## Technical Constraints \(apply without exception\)/);
+    expect(md).toMatch(/TECH-PG-16/);
+    expect(md).not.toMatch(/\*\*TECH-BUN\*\*.*\(\):/); // not a binding empty rule
+    expect(md).toMatch(/## Unresolved constraint references/);
+    expect(md).toMatch(/`TECH-BUN`/);
+  });
+
+  it('omits the binding-constraints header entirely when every constraint ref is unresolved', () => {
+    const p = fullPacket();
+    p.active_constraints = [{ id: 'TECH-X', category: '', text: '' }];
+    const md = formatPacketAsExecutorContext(p);
+    expect(md).not.toMatch(/## Technical Constraints \(apply without exception\)/);
+    expect(md).toMatch(/## Unresolved constraint references/);
+  });
+
   it('returns a non-empty string even for a minimal packet', () => {
     const p = fullPacket();
     p.user_stories = [];

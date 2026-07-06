@@ -2,7 +2,7 @@
  * Unit tests for the coherence verifier.
  */
 import { describe, it, expect } from 'vitest';
-import { verifyCoherence } from '../../../../lib/orchestrator/phases/packetSynthesis/coherenceVerifier';
+import { verifyCoherence, extractHttpStatusCodes, ccAcContradictions } from '../../../../lib/orchestrator/phases/packetSynthesis/coherenceVerifier';
 import type { ImplementationPacketContent } from '../../../../lib/types/records';
 import type { UpstreamIndex } from '../../../../lib/orchestrator/phases/packetSynthesis/upstreamIndex';
 
@@ -70,6 +70,82 @@ describe('verifyCoherence — happy path', () => {
     expect(result.passed).toBe(true);
     expect(result.blocking_failures).toHaveLength(0);
     expect(r.crossPacket.size).toBe(0);
+  });
+});
+
+// ── PD-4: CC↔AC HTTP-status contradiction (P9) ─────────────────────
+
+describe('extractHttpStatusCodes (PD-4)', () => {
+  it('extracts codes when an HTTP-status cue is present', () => {
+    expect([...extractHttpStatusCodes('respond with HTTP 409 Conflict')]).toEqual(['409']);
+    expect([...extractHttpStatusCodes('returns status 400 and 404')].sort()).toEqual(['400', '404']);
+  });
+  it('does NOT extract a bare number with no status cue', () => {
+    expect(extractHttpStatusCodes('process 500 items in the batch').size).toBe(0);
+  });
+  it('skips numbers that are actually units (200ms / 500 rows)', () => {
+    expect(extractHttpStatusCodes('the endpoint returns 200ms latency').size).toBe(0);
+    expect(extractHttpStatusCodes('the error path returns 500 rows').size).toBe(0);
+  });
+});
+
+describe('verifyCoherence — P9 CC↔AC contradiction (PD-4)', () => {
+  const withCc = (ccDesc: string, acCond: string) => packet({
+    task: {
+      id: 'task-001', node_id: 'node-001', name: 't', description: 'd',
+      task_type: 'standard', backing_tool: 'claude_code_cli', estimated_complexity: 'low',
+      completion_criteria: [{
+        criterion_id: 'CC-001', description: ccDesc,
+        verification_method: 'test_execution', verifies_acceptance_criteria: ['AC-001'],
+      }],
+      write_directory_paths: ['src/server/foo'], read_directory_paths: [], dependency_task_ids: [],
+    },
+    user_stories: [{
+      id: 'US-001', role: 'r', action: 'a', outcome: 'o', priority: 'critical',
+      acceptance_criteria: [{ id: 'AC-001', description: 'on duplicate', measurable_condition: acCond }],
+    }],
+    test_cases: [{ test_case_id: 'TC-001', type: 'functional', acceptance_criterion_ids: ['AC-001'], preconditions: [], expected_outcome: 'ok' }],
+    evaluation_criteria: [{ kind: 'functional', target_id: 'US-001', evaluation_method: 'm', success_condition: 'HTTP 409' }],
+  });
+
+  it('flags a CC whose status code contradicts the AC it verifies (advisory, not blocking)', () => {
+    const p = withCc('reject the request with HTTP 400', 'the API responds HTTP 409 Conflict');
+    const r = verifyCoherence({ packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']), atomicTaskIds: new Set(['task-001']) });
+    const res = r.byPacketId.get(p.packet_id)!;
+    expect(res.advisory_findings.some((f) => f.startsWith('P9_CC_AC_CONTRADICTION'))).toBe(true);
+    expect(res.blocking_failures.some((f) => f.startsWith('P9'))).toBe(false); // advisory only
+  });
+
+  it('does NOT flag when the codes agree', () => {
+    const p = withCc('respond HTTP 409 on duplicate', 'the API responds HTTP 409 Conflict');
+    const r = verifyCoherence({ packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001']), atomicTaskIds: new Set(['task-001']) });
+    expect(r.byPacketId.get(p.packet_id)!.advisory_findings.some((f) => f.startsWith('P9'))).toBe(false);
+  });
+
+  it('does NOT flag when only one side cites a status code', () => {
+    const p = withCc('persist the record and return the created entity', 'the API responds HTTP 409 Conflict');
+    expect(ccAcContradictions(p)).toEqual([]);
+  });
+});
+
+describe('verifyCoherence — A4 unscoped multi-API (PD-7)', () => {
+  it('flags (advisory) a packet carrying more than one component API endpoint', () => {
+    const p = packet({
+      api_definitions: [
+        { id: 'api-001', method: 'POST', path: '/board-decisions' },
+        { id: 'api-002', method: 'POST', path: '/decisions/{id}/approve' },
+      ],
+    });
+    const r = verifyCoherence({ packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001', 'api-001', 'api-002']), atomicTaskIds: new Set(['task-001']) });
+    const res = r.byPacketId.get(p.packet_id)!;
+    expect(res.advisory_findings.some((f) => f.startsWith('A4_UNSCOPED_MULTI_API'))).toBe(true);
+    expect(res.blocking_failures.some((f) => f.startsWith('A4'))).toBe(false);
+  });
+
+  it('does NOT flag a packet with a single endpoint', () => {
+    const p = packet({ api_definitions: [{ id: 'api-001', method: 'POST', path: '/shorten' }] });
+    const r = verifyCoherence({ packets: [p], upstreamIndex: idxWithAll(['US-001', 'AC-001', 'comp-001', 'resp-1', 'TC-001', 'api-001']), atomicTaskIds: new Set(['task-001']) });
+    expect(r.byPacketId.get(p.packet_id)!.advisory_findings.some((f) => f.startsWith('A4'))).toBe(false);
   });
 });
 

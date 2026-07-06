@@ -119,6 +119,29 @@ export interface ExecutionScheduleResult {
   stabilizationResidual: StabilizationResidual | null;
 }
 
+// PD-1 (P9 prompt audit): the actionable 5-bullet core of the Engineering
+// Constitution (three topics: source-comment discipline ×2, observability,
+// testing) that LEADS the craft section in place of the ~27.5K verbatim doc
+// dump. Module-level + exported so the "no inline dump, all three topics
+// present" invariant is unit-testable and the dump cannot silently return.
+export const EXECUTOR_CRAFT_LEAD =
+  'Craft requirements for THIS task. They are SUBORDINATE ONLY to the task specification, completion criteria, and technical constraints (those always win) — but otherwise they are REQUIRED, not optional:\n'
+  + '- Every exported function / class / module MUST carry a brief doc comment stating WHY it exists and citing the completion criterion, acceptance criterion, or constraint it satisfies (e.g. `# CC-001: …`, `# per SR-005` in python; `// CC-001: …` in TS/Go/Rust/Java — use this language\'s comment syntax).\n'
+  + '- Comment the non-obvious "why", not the "what"; prefer self-documenting names over narration; leave no commented-out code.\n'
+  + '- Add observability at the boundaries where information changes trust level or ownership: log external/LLM/agent calls and error paths with structured, greppable context (ids, not prose) — proportional to THIS leaf, not app-wide telemetry scaffolding.\n'
+  + '- Ship the task with tests at the layer it warrants: unit tests for pure logic and an integration test at each real I/O boundary it introduces, each asserting a specific completion/acceptance criterion — do NOT build the full testing pyramid for a single slice.\n'
+  + '- Apply proportionally to the scope of THIS leaf (no app-wide health checks in an ordinary leaf). These are a REQUIRED completion criterion for this task and are VERIFIED after the run by the Phase-10 craft-conformance check.';
+
+// PD-10 (P9 prompt audit): headless executors were observed asking "which
+// area/component?" and crawling the workspace tree to "discover" structure despite
+// the context being marked authoritative — the prompt never stated it runs
+// non-interactively. A short, high-visibility directive at the TOP of the prompt
+// removes that starvation/probe loop. Exported so the "prompt leads with a headless
+// directive" invariant is unit-testable.
+export const HEADLESS_EXECUTION_DIRECTIVE =
+  '## Execution Mode — HEADLESS / NON-INTERACTIVE\n'
+  + 'You are running autonomously with NO human available to answer questions. Do NOT ask which area / component / file to work on, do NOT pause for confirmation, and do NOT wait for input — the task, write scope, and completion criteria below are AUTHORITATIVE and complete. Do NOT crawl or probe the workspace tree to "discover" structure: the Write Scope and Layout below state exactly where to write. If a detail is genuinely underspecified, choose the most reasonable option consistent with the completion criteria and proceed. Finish by producing the code and its tests; stop when the completion criteria are satisfied.';
+
 // ── Scheduler ──────────────────────────────────────────────────────
 
 export class ExecutionScheduler {
@@ -1040,45 +1063,27 @@ export class ExecutionScheduler {
       // silently fall back to an unreadable path-reference for exactly this
       // reason. The orchestrator reads the control plane directly (the agent
       // never needs filesystem access to it).
-      const constitutionAbs = path.isAbsolute(constitutionPath)
-        ? constitutionPath
-        : path.join(this.engine.workspacePath, constitutionPath);
-      const CONSTITUTION_MAX_CHARS = 80_000;
-      let constitutionBody = '';
-      try {
-        constitutionBody = fs.readFileSync(constitutionAbs, 'utf8').trim();
-      } catch (err) {
-        getLogger().warn('workflow', 'executionScheduler: could not read engineering constitution to inline; falling back to path reference', {
-          path: constitutionAbs, error: err instanceof Error ? err.message : String(err),
-        });
-      }
-      let truncatedNote = '';
-      if (constitutionBody.length > CONSTITUTION_MAX_CHARS) {
-        constitutionBody = constitutionBody.slice(0, CONSTITUTION_MAX_CHARS);
-        truncatedNote = '\n\n[NOTE: engineering constitution truncated to fit the prompt budget.]';
-      }
-      const craftLead =
-        'Craft requirements for THIS task. They are SUBORDINATE ONLY to the task specification, completion criteria, and technical constraints (those always win) — but otherwise they are REQUIRED, not optional:\n'
-        + '- Every exported function / class / module MUST carry a brief doc comment stating WHY it exists and citing the completion criterion, acceptance criterion, or constraint it satisfies (e.g. `# CC-001: …`, `# per SR-005` in python; `// CC-001: …` in TS/Go/Rust/Java — use this language\'s comment syntax).\n'
-        + '- Comment the non-obvious "why", not the "what"; prefer self-documenting names over narration; leave no commented-out code.\n'
-        + '- Apply proportionally to the scope of THIS leaf (no app-wide health checks in an ordinary leaf). These are a REQUIRED completion criterion for this task and are VERIFIED after the run by the Phase-10 craft-conformance check.';
-      stdinText += '\n\n## Engineering Constitution (required craft standard — verified at Phase 10)\n';
-      if (constitutionBody) {
-        stdinText += craftLead + '\n\nFull standard (detailed reference) below:\n'
-          + '<engineering_constitution>\n'
-          + constitutionBody
-          + '\n</engineering_constitution>'
-          + truncatedNote;
-      } else {
-        // Read failed (file genuinely missing) — keep the actionable craft lead;
-        // it stands on its own without the full doc.
-        stdinText += craftLead + `\n\n(Full standard at \`${constitutionAbs}\` was unavailable to inline.)`;
-      }
+      // PD-1 (P9 prompt audit, cal-40): the full <engineering_constitution> doc was
+      // inlined verbatim here (~27.5K chars = 45-66% of every leaf prompt) and
+      // DROWNED the leading write-scope/task directives (audit A5/A4) without
+      // changing behavior — it is advisory craft, VERIFIED at Phase 10 regardless.
+      // Replace the inline dump with the actionable 5-bullet core (its three topics:
+      // commenting, observability, testing) + a provenance note. The full standard
+      // is a control-plane doc (`<ws>/.janumicode/engineering-constitution.md`,
+      // copied by scaffoldSynthesis) enforced at P10; the executor's sandbox cannot
+      // read it in-band (slice-151), so there is no dead file pointer to chase.
+      stdinText += '\n\n## Engineering Constitution (required craft standard — verified at Phase 10)\n'
+        + EXECUTOR_CRAFT_LEAD
+        + '\n\n(These five bullets are the actionable core — for THIS leaf — of the full engineering-constitution craft standard: source-comment discipline, debugging/observability, and testing. The full standard is enforced at the Phase-10 craft-conformance check.)';
     }
 
     if (augmentedContext) {
       stdinText = `${stdinText}\n\n## RETRY CONTEXT\n\n${augmentedContext}`;
     }
+
+    // PD-10: lead with the headless / non-interactive directive so it is the first
+    // thing the executor reads (before it can start a "which area?" / tree-probe loop).
+    stdinText = `${HEADLESS_EXECUTION_DIRECTIVE}\n\n${stdinText}`;
 
     const execTask: ExecutionTask = {
       id: leaf.id,

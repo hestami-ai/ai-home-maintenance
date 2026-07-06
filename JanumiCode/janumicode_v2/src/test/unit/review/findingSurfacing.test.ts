@@ -4,6 +4,7 @@ import {
   AUTO_FIX_VALIDATORS,
   baseScopeKey,
   categorizeCoherence,
+  dedupSurfacedFindings,
   extractCitedIds,
   findingInScope,
   renderFindingLine,
@@ -57,6 +58,33 @@ describe('baseScopeKey — root↔leaf bridging', () => {
     expect(baseScopeKey('AC-US-001-D-001')).toBe('US-001'); // leaf AC → root story
     expect(baseScopeKey('US-001-D')).toBe('US-001');        // leaf US → root
     expect(baseScopeKey('NFR-001')).toBe('NFR-001');        // NFR stable
+  });
+});
+
+describe('dedupSurfacedFindings (PD-8)', () => {
+  const sf = (over: Partial<SurfacedFinding> = {}): SurfacedFinding => ({
+    recordId: 'r', validatorId: 'V1', severity: 'HIGH', findingType: 'FT', summary: 'same issue', location: 'loc', recommendation: 'do X', citedIds: [], ...over,
+  });
+
+  it('collapses findings that render identically (distinct recordId/location)', () => {
+    // The same issue emitted across 16 records — different recordId + location,
+    // identical rendered line. Should collapse to ONE.
+    const dups = Array.from({ length: 16 }, (_, i) => sf({ recordId: `r${i}`, location: `AC-${i}` }));
+    const out = dedupSurfacedFindings(dups);
+    expect(out).toHaveLength(1);
+    expect(renderFindingLine(out[0])).toBe(renderFindingLine(dups[0]));
+  });
+
+  it('keeps DISTINCT findings and preserves order', () => {
+    const a = sf({ summary: 'alpha' });
+    const b = sf({ summary: 'beta' });
+    const c = sf({ summary: 'gamma' });
+    const out = dedupSurfacedFindings([a, b, a, c, b]);
+    expect(out.map((f) => f.summary)).toEqual(['alpha', 'beta', 'gamma']);
+  });
+
+  it('returns [] for an empty list', () => {
+    expect(dedupSurfacedFindings([])).toEqual([]);
   });
 });
 

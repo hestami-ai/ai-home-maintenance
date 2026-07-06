@@ -121,6 +121,8 @@ export interface BuilderDataModel {
   name?: string;
   component_id?: string;
   fields?: Array<{ name?: string; type?: string; constraints?: string }>;
+  /** PD-7: SR-/AC- ids this entity serves (Phase-5 minted; task→DM scoping). */
+  traces_to?: string[];
 }
 
 export interface BuilderApiDef {
@@ -132,6 +134,8 @@ export interface BuilderApiDef {
   request_shape?: unknown;
   response_shape?: unknown;
   error_codes?: string[];
+  /** PD-7: SR-/AC- ids this endpoint implements (Phase-5 minted; task→API scoping). */
+  traces_to?: string[];
 }
 
 export interface BuilderTestSuite {
@@ -460,33 +464,83 @@ function toPacketComponent(comp: BuilderComponent): PacketComponent {
   };
 }
 
-function findDataModelsForComponent(componentId: string, dataModels: BuilderDataModel[]): PacketDataModel[] {
-  return dataModels
-    .filter((dm) => dm.component_id === componentId)
-    .map((dm) => ({
-      id: dm.id,
-      name: dm.name ?? '',
-      component_id: dm.component_id ?? '',
-      fields: (dm.fields ?? []).map((f) => ({
-        name: f.name ?? '',
-        type: f.type ?? '',
-        constraints: f.constraints,
-      })),
-    }));
+function toPacketDataModel(dm: BuilderDataModel): PacketDataModel {
+  return {
+    id: dm.id,
+    name: dm.name ?? '',
+    component_id: dm.component_id ?? '',
+    fields: (dm.fields ?? []).map((f) => ({
+      name: f.name ?? '',
+      type: f.type ?? '',
+      constraints: f.constraints,
+    })),
+    ...(dm.traces_to && dm.traces_to.length > 0 ? { traces_to: dm.traces_to } : {}),
+  };
 }
 
-function findApisForComponent(componentId: string, apis: BuilderApiDef[]): PacketApiDefinition[] {
-  return apis
-    .filter((api) => api.component_id === componentId)
-    .map((api) => ({
-      id: api.id,
-      method: api.method ?? '',
-      path: api.path ?? '',
-      description: api.description ?? '',
-      request_shape: api.request_shape,
-      response_shape: api.response_shape,
-      error_codes: api.error_codes,
-    }));
+function toPacketApi(api: BuilderApiDef): PacketApiDefinition {
+  return {
+    id: api.id,
+    method: api.method ?? '',
+    path: api.path ?? '',
+    description: api.description ?? '',
+    request_shape: api.request_shape,
+    response_shape: api.response_shape,
+    error_codes: api.error_codes,
+    ...(api.traces_to && api.traces_to.length > 0 ? { traces_to: api.traces_to } : {}),
+  };
+}
+
+/**
+ * PD-7: bind API endpoints to a task, not just its component. `api_definitions`
+ * are component-scoped (an endpoint's only structural key is `component_id`), so
+ * a task got EVERY endpoint of its component and the executor could implement the
+ * wrong contract. When Phase 5 minted `traces_to` (SR-/AC- ids) on the endpoints,
+ * we keep only those whose traces intersect the task's requirement footprint
+ * (`taskReqIds` = the task's SR/AC traces + the packet's US/AC/NFR ids). Endpoints
+ * with NO linkage stay in (can't scope them — coverage-safe), and if NO endpoint
+ * of the component is linked at all (pre-linkage run) we fall back to the whole
+ * component set — so this never regresses an unlinked run, only narrows a linked one.
+ */
+function findApisForTask(
+  componentId: string,
+  apis: BuilderApiDef[],
+  taskReqIds: Set<string>,
+): PacketApiDefinition[] {
+  const componentApis = apis.filter((api) => api.component_id === componentId);
+  const anyLinked = componentApis.some((api) => (api.traces_to ?? []).length > 0);
+  if (!anyLinked) return componentApis.map(toPacketApi); // pre-linkage run — no regression
+  const scoped = componentApis.filter((api) => {
+    const traces = api.traces_to ?? [];
+    if (traces.length === 0) return true; // unlinked endpoint — keep (can't scope)
+    return traces.some((t) => taskReqIds.has(t)); // linked — keep only if task-relevant
+  });
+  return scoped.map(toPacketApi);
+}
+
+/**
+ * PD-7: the task's own component data models PLUS any cross-component entity the
+ * task's requirement footprint reaches (the "missing write-target DM" symptom — a
+ * DM a task writes that lives in another component). Component DMs are always
+ * included (never lose the task's own entities); linked cross-component DMs are
+ * ADDED only when their `traces_to` intersect `taskReqIds`. De-duped by id.
+ */
+function findDataModelsForTask(
+  componentId: string,
+  dataModels: BuilderDataModel[],
+  taskReqIds: Set<string>,
+): PacketDataModel[] {
+  const out: PacketDataModel[] = [];
+  const seen = new Set<string>();
+  for (const dm of dataModels) {
+    const own = dm.component_id === componentId;
+    const linkedToTask = (dm.traces_to ?? []).some((t) => taskReqIds.has(t));
+    if (!own && !linkedToTask) continue;
+    if (seen.has(dm.id)) continue;
+    seen.add(dm.id);
+    out.push(toPacketDataModel(dm));
+  }
+  return out;
 }
 
 export function findTestCasesForAcs(
@@ -791,8 +845,16 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
           active_constraints: [],
         };
 
-    const dataModels = findDataModelsForComponent(componentId, input.dataModels);
-    const apis = findApisForComponent(componentId, input.apiDefinitions);
+    // PD-7 — the task's requirement footprint: the SR/AC ids the task traces, plus
+    // the packet's resolved US/AC/NFR ids. API/DM endpoints minted with `traces_to`
+    // are scoped to a task by intersecting against this set (see findApisForTask /
+    // findDataModelsForTask); unlinked artifacts fall back to component scope.
+    const taskReqIds = new Set<string>([
+      ...(task.traces_to ?? []),
+      ...acIds, ...usIds, ...nfrIds,
+    ]);
+    const dataModels = findDataModelsForTask(componentId, input.dataModels, taskReqIds);
+    const apis = findApisForTask(componentId, input.apiDefinitions, taskReqIds);
     const testCases = findTestCasesForAcs(acIds, usIds, input.testSuites, componentId);
     const evals = findEvalsForUserStoriesAndNfrs(usIds, nfrIds, input.evaluationCriteria);
 

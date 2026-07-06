@@ -157,6 +157,66 @@ describe('buildPackets — happy path', () => {
     expect(packets[0].test_cases[0].test_case_id).toBe('TC-001');
   });
 
+  // ── PD-7: task-scoped API / DM binding ────────────────────────────
+  describe('PD-7 — task-scoped API/DM binding', () => {
+    const base = (extra: Partial<BuilderInput>): BuilderInput => ({
+      ...emptyInput(),
+      atomicTasks: [atomicTask({ traces_to: ['US-001', 'SR-A'], component_id: 'comp-001' })],
+      userStories: [{ id: 'US-001', action: 'a', acceptance_criteria: [{ id: 'AC-001', description: 'd' }] }],
+      componentsById: new Map([['comp-001', { id: 'comp-001', responsibilities: [{ id: 'resp-1', description: 'd' }] } as BuilderComponent]]),
+      ...extra,
+    });
+
+    it('binds ONLY the endpoint whose traces_to intersects the task (not every component endpoint)', () => {
+      const packets = buildPackets(base({
+        apiDefinitions: [
+          { id: 'API-create', component_id: 'comp-001', method: 'POST', path: '/board-decisions', traces_to: ['SR-B'] },
+          { id: 'API-approve', component_id: 'comp-001', method: 'POST', path: '/decisions/{id}/approve', traces_to: ['SR-A'] },
+        ] as BuilderApiDef[],
+      }));
+      expect(packets[0].api_definitions.map((a) => a.id)).toEqual(['API-approve']);
+    });
+
+    it('falls back to ALL component endpoints when NONE are linked (pre-linkage run — no regression)', () => {
+      const packets = buildPackets(base({
+        apiDefinitions: [
+          { id: 'API-1', component_id: 'comp-001', method: 'GET', path: '/a' },
+          { id: 'API-2', component_id: 'comp-001', method: 'GET', path: '/b' },
+        ] as BuilderApiDef[],
+      }));
+      expect(packets[0].api_definitions.map((a) => a.id).sort()).toEqual(['API-1', 'API-2']);
+    });
+
+    it('keeps an UNLINKED endpoint alongside the linked-relevant one (coverage-safe)', () => {
+      const packets = buildPackets(base({
+        apiDefinitions: [
+          { id: 'API-approve', component_id: 'comp-001', method: 'POST', path: '/approve', traces_to: ['SR-A'] },
+          { id: 'API-legacy', component_id: 'comp-001', method: 'GET', path: '/legacy' }, // unlinked
+          { id: 'API-other', component_id: 'comp-001', method: 'POST', path: '/other', traces_to: ['SR-Z'] },
+        ] as BuilderApiDef[],
+      }));
+      expect(packets[0].api_definitions.map((a) => a.id).sort()).toEqual(['API-approve', 'API-legacy']);
+    });
+
+    it('includes the task-relevant CROSS-COMPONENT data model (the missing write-target), plus own', () => {
+      const packets = buildPackets(base({
+        dataModels: [
+          { id: 'DM-own', component_id: 'comp-001', name: 'Own' },
+          { id: 'DM-cross-rel', component_id: 'comp-002', name: 'CrossRel', traces_to: ['SR-A'] },
+          { id: 'DM-cross-irrel', component_id: 'comp-002', name: 'CrossIrrel', traces_to: ['SR-Z'] },
+        ] as BuilderDataModel[],
+      }));
+      expect(packets[0].data_models.map((d) => d.id).sort()).toEqual(['DM-cross-rel', 'DM-own']);
+    });
+
+    it('carries traces_to onto the packet endpoint for downstream use', () => {
+      const packets = buildPackets(base({
+        apiDefinitions: [{ id: 'API-approve', component_id: 'comp-001', method: 'POST', path: '/approve', traces_to: ['SR-A'] }] as BuilderApiDef[],
+      }));
+      expect(packets[0].api_definitions[0].traces_to).toEqual(['SR-A']);
+    });
+  });
+
   it('Pass 4: resolves user_stories via composite AC parent extraction from component-matched test cases (ts-109 fix)', () => {
     // ts-109 audit: tasks bind to components only (traces_to: [comp-X]),
     // components have empty traces_to, NFRs don't link this task → the

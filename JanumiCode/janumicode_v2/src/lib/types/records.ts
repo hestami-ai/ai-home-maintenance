@@ -1344,6 +1344,10 @@ export interface PacketDataModel {
   name: string;
   component_id: string;
   fields: PacketDataModelField[];
+  /** PD-7 (Phase 5-minted): the SR-/AC- ids this entity serves — lets the packet
+   *  builder task-scope data models (and pull cross-component write targets)
+   *  instead of binding every component entity. Absent on pre-linkage runs. */
+  traces_to?: string[];
 }
 
 export interface PacketApiDefinition {
@@ -1354,6 +1358,10 @@ export interface PacketApiDefinition {
   request_shape?: unknown;
   response_shape?: unknown;
   error_codes?: string[];
+  /** PD-7 (Phase 5-minted): the SR-/AC- ids this endpoint implements — lets the
+   *  packet builder bind ONLY the endpoint(s) a task actually implements instead
+   *  of every endpoint of the component. Absent on pre-linkage runs. */
+  traces_to?: string[];
 }
 
 export interface PacketTestCase {

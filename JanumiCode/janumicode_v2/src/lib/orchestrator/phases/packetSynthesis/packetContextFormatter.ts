@@ -99,8 +99,16 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
   }
 
   // ── API endpoints ──────────────────────────────────────────────
+  // PD-7: this list is the COMPONENT's endpoints (component-scoped join), which
+  // may exceed the one(s) THIS task implements — the executor was observed picking
+  // the wrong contract (e.g. `POST /board-decisions` when the task was
+  // `/decisions/{id}/approve`). Frame it as scoped context and hedge on count:
+  // when more than one endpoint is present, tell the executor to implement only
+  // the one(s) its task + completion criteria call for (mirrors the test-case hedge).
   if (packet.api_definitions.length > 0) {
-    lines.push('## API Endpoints You Implement');
+    lines.push(packet.api_definitions.length > 1
+      ? '## Component API Endpoints (context — implement ONLY the one(s) your task + completion criteria require; the rest belong to sibling tasks)'
+      : '## API Endpoints You Implement');
     lines.push('');
     for (const api of packet.api_definitions) {
       lines.push(`### ${api.id} — \`${api.method} ${api.path}\``);
@@ -166,15 +174,31 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
   }
 
   // ── Active technical constraints ───────────────────────────────
+  // PD-11: an unresolved constraint reference is carried as a placeholder with an
+  // EMPTY body (buildActiveConstraints, so the coherence verifier's P7 flags it) —
+  // but rendering `- **TECH-BUN** (): ` under "apply without exception" tells the
+  // executor to honor a rule with no content (dangling/ungrounded id). Split them:
+  // present only RESOLVED constraints as binding; list unresolved ids separately as
+  // an upstream gap the executor must NOT invent a rule for.
   if (packet.active_constraints.length > 0) {
-    lines.push('## Technical Constraints (apply without exception)');
-    lines.push('');
-    for (const c of packet.active_constraints) {
-      const tech = c.technology ? ` [${c.technology}]` : '';
-      lines.push(`- **${c.id}**${tech} (${c.category}): ${c.text}`);
-      if (c.rationale) lines.push(`  Rationale: ${c.rationale}`);
+    const resolved = packet.active_constraints.filter((c) => typeof c.text === 'string' && c.text.trim().length > 0);
+    const unresolved = packet.active_constraints.filter((c) => !(typeof c.text === 'string' && c.text.trim().length > 0));
+    if (resolved.length > 0) {
+      lines.push('## Technical Constraints (apply without exception)');
+      lines.push('');
+      for (const c of resolved) {
+        const tech = c.technology ? ` [${c.technology}]` : '';
+        lines.push(`- **${c.id}**${tech} (${c.category}): ${c.text}`);
+        if (c.rationale) lines.push(`  Rationale: ${c.rationale}`);
+      }
+      lines.push('');
     }
-    lines.push('');
+    if (unresolved.length > 0) {
+      lines.push('## Unresolved constraint references (upstream gap — do NOT invent a rule for these; flagged for maintainers)');
+      lines.push('');
+      lines.push(unresolved.map((c) => `\`${c.id}\``).join(', '));
+      lines.push('');
+    }
   }
 
   // ── Compliance / V&V / Quality items ──────────────────────────

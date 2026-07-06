@@ -196,6 +196,21 @@ function collectComponents(records: GovernedStreamRecord[]): Map<string, Builder
   return byId;
 }
 
+/**
+ * PD-7: coerce an LLM-emitted requirement-trace field to a clean string id list.
+ * Accepts the first non-empty of several synonyms (`traces_to` / `verifies` /
+ * `source_requirement_ids` / `serves`) — the dual-key normalizer principle, since
+ * the Phase-5 producer may name the field differently run-to-run.
+ */
+function asTraceIds(...vals: unknown[]): string[] {
+  for (const v of vals) {
+    if (!Array.isArray(v)) continue;
+    const ids = v.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim());
+    if (ids.length > 0) return ids;
+  }
+  return [];
+}
+
 function collectDataModels(records: GovernedStreamRecord[]): BuilderDataModel[] {
   // Phase 5.1 emits `data_models` with shape:
   //   { kind: 'data_models', models: [{ component_id, entities: [{ id, name, fields[] }] }] }
@@ -227,7 +242,10 @@ function collectDataModels(records: GovernedStreamRecord[]): BuilderDataModel[] 
                 : Array.isArray(f.constraints) ? f.constraints.join(', ') : undefined,
             }))
           : [];
-        if (!out.find((x) => x.id === id)) out.push({ id, name, component_id: componentId, fields });
+        const dmTraces = asTraceIds(e.traces_to, e.verifies, e.source_requirement_ids, e.serves);
+        if (!out.find((x) => x.id === id)) {
+          out.push({ id, name, component_id: componentId, fields, ...(dmTraces.length ? { traces_to: dmTraces } : {}) });
+        }
       }
     }
   }
@@ -255,6 +273,7 @@ function collectApiDefs(records: GovernedStreamRecord[]): BuilderApiDef[] {
         if (!method && !path) continue;
         const id = typeof ep.id === 'string' ? ep.id : mintEndpointId(componentId, method, path);
         if (out.find((x) => x.id === id)) continue;
+        const apiTraces = asTraceIds(ep.traces_to, ep.verifies, ep.source_requirement_ids, ep.serves);
         out.push({
           id,
           method,
@@ -264,6 +283,7 @@ function collectApiDefs(records: GovernedStreamRecord[]): BuilderApiDef[] {
           request_shape: ep.inputs ?? ep.request_shape,
           response_shape: ep.outputs ?? ep.response_shape,
           error_codes: Array.isArray(ep.error_codes) ? ep.error_codes as string[] : undefined,
+          ...(apiTraces.length ? { traces_to: apiTraces } : {}),
         });
       }
     }

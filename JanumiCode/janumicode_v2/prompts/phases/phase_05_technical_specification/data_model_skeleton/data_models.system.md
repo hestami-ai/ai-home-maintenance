@@ -32,13 +32,14 @@ Produce one `models[]` entry for the single component shown, whose `entities[]` 
 REQUIRED OUTPUT: A JSON object matching the `data_models` schema:
 - models: array (normally ONE entry — the single component below), each with:
   - component_id — the id of the single component shown in the Component Model
-  - entities: array of {name, fields: [{name, type, constraints}], relationships}
+  - entities: array of {name, fields: [{name, type, constraints}], relationships, traces_to}
 
 Rules:
 - Emit models ONLY for the single component shown below — never for other components.
 - No entity field may lack a specified type (Invariant: DM-001)
 - Data Models must be consistent with THIS component's Responsibilities
 - Use concrete types (string, integer, boolean, timestamp, uuid) not vague types
+- Every entity MUST include `traces_to`: the id(s) of the System Requirement(s) (`SR-*`) it supports, taken VERBATIM from the System Requirements block below (add specific `AC-*` ids too when the requirement names them). This binds each entity to the task(s) that read/write it, so a task can be handed the exact write-target entities it needs — including one owned by another component. Emit `[]` only if no listed requirement applies (do not invent ids).
 
 # Hard rules — JSON output discipline
 
