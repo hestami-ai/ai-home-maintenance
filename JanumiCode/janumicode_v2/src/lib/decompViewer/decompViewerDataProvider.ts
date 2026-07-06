@@ -12,6 +12,8 @@
 
 import type { Database } from '../database/init';
 import { collectGovernedStream } from '../database/iterateGovernedStream';
+import { loadRealization } from './realizationLoader';
+import { loadFindings } from './findingsLoader';
 import * as crypto from 'node:crypto';
 import type {
   Phase1AnchorKind,
@@ -21,8 +23,12 @@ import type {
   ViewerIntentSummary,
   ViewerNfrApplication,
   ViewerPhase1Anchor,
+  ViewerFinding,
+  ViewerFindingsSummary,
   ViewerPipelinePass,
   ViewerPipelineSummary,
+  ViewerRealizationDrift,
+  ViewerRealizationNode,
   ViewerRelease,
   ViewerRootKind,
   ViewerRootSummary,
@@ -33,6 +39,23 @@ import type {
 } from './types';
 
 /**
+ * Cheap content fingerprint for a realization node — the fields the
+ * drill-down renders + joins on. Two nodes with the same fingerprint are
+ * render-identical, so the editor can skip re-sending them. A plain string
+ * (not a crypto hash) is enough: it's only ever compared for equality.
+ */
+function fingerprintRealizationNode(n: ViewerRealizationNode): string {
+  return [
+    n.status, n.layer, n.title, n.display_key,
+    n.component_key ?? '',
+    n.realizes_ac_ids.join(','),
+    n.serves_us_ids.join(','),
+    n.release_id ?? '', n.release_ordinal ?? '',
+    n.entity_kind ?? '',
+  ].join('|');
+}
+
+/**
  * Read-only queries against the governed_stream SQLite table.
  * Designed to run every ~3 seconds from a polling loop.
  */
@@ -40,11 +63,78 @@ export class DecompViewerDataProvider {
   constructor(private readonly db: Database) {}
 
   /**
-   * Build a full ViewerSnapshot for a given workflow run. Uses
-   * is_current_version=1 filtering throughout so supersession works
-   * transparently (pruned/downgraded nodes reflect their latest state).
+   * Build a full ViewerSnapshot (base + realization) for a run. Kept as the
+   * one-call API for tests and any consumer that wants everything at once;
+   * the editor's polling loop instead splits base ({@link getBaseSnapshot})
+   * from the high-fan-out realization set ({@link getRealizationPayload}) so
+   * the wire payload stays bounded.
    */
   getSnapshot(workflowRunId: string): ViewerSnapshot {
+    const snapshot = this.buildBaseSnapshot(workflowRunId);
+    const { nodes, drift } = loadRealization(this.db, workflowRunId);
+    snapshot.realization_nodes = nodes;
+    snapshot.realization_drift = drift;
+    snapshot.revision = this.computeRevision(snapshot); // full (base + realization)
+    return snapshot;
+  }
+
+  /**
+   * Base snapshot WITHOUT the realization layers — `realization_nodes` empty,
+   * `realization_drift` empty, and `revision` computed over base fields only.
+   * This is what `init` / `snapshot_update` carry on the wire; realization is
+   * delivered separately as deltas.
+   */
+  getBaseSnapshot(workflowRunId: string): ViewerSnapshot {
+    return this.buildBaseSnapshot(workflowRunId);
+  }
+
+  /**
+   * The realization set for a run plus a per-record content fingerprint map
+   * (record_id → cheap hash) and a realization-only revision token. The
+   * editor diffs `hashes` against the previously-sent map to emit a minimal
+   * `realization_delta`.
+   */
+  getRealizationPayload(workflowRunId: string): {
+    nodes: ViewerRealizationNode[];
+    drift: ViewerRealizationDrift;
+    hashes: Map<string, string>;
+    revision: string;
+  } {
+    const { nodes, drift } = loadRealization(this.db, workflowRunId);
+    const hashes = new Map<string, string>();
+    for (const n of nodes) hashes.set(n.record_id, fingerprintRealizationNode(n));
+    const h = crypto.createHash('sha256');
+    this.hashRealization(h, nodes, drift);
+    return { nodes, drift, hashes, revision: h.digest('hex').slice(0, 16) };
+  }
+
+  /**
+   * Validator findings bound to items, plus a per-record hash map (findings are
+   * immutable, so the hash is just presence) and a findings revision token. The
+   * editor diffs `hashes` to ship a minimal `findings_delta`.
+   */
+  getFindingsPayload(workflowRunId: string): {
+    findings: ViewerFinding[];
+    summary: ViewerFindingsSummary;
+    hashes: Map<string, string>;
+    revision: string;
+  } {
+    const { findings, summary } = loadFindings(this.db, workflowRunId);
+    const hashes = new Map<string, string>();
+    for (const f of findings) hashes.set(f.record_id, f.severity);
+    const h = crypto.createHash('sha256');
+    h.update(`findings:${findings.length}:${summary.surfaced}:${summary.bound}|`);
+    for (const f of findings) h.update(`${f.record_id}|`);
+    return { findings, summary, hashes, revision: h.digest('hex').slice(0, 16) };
+  }
+
+  /**
+   * Build the base ViewerSnapshot (everything except the realization layers)
+   * for a given workflow run. Uses is_current_version=1 filtering throughout
+   * so supersession works transparently (pruned/downgraded nodes reflect
+   * their latest state).
+   */
+  private buildBaseSnapshot(workflowRunId: string): ViewerSnapshot {
     const runRow = this.db
       .prepare(
         `SELECT current_phase_id, current_sub_phase_id, status
@@ -88,6 +178,10 @@ export class DecompViewerDataProvider {
       nfr_applications: nfrApplications,
       intent_summary: intentSummary,
       system_requirements: systemRequirements,
+      // Realization layers are delivered separately as deltas (lazy) — see
+      // getRealizationPayload / the editor's load_realization handler.
+      realization_nodes: [],
+      realization_drift: { unresolved_ac_ids: [], unresolved_component_ids: [] },
       totals: {
         nodes: nodes.length,
         atomic: byStatus['atomic'] ?? 0,
@@ -100,18 +194,37 @@ export class DecompViewerDataProvider {
         duplicate_assumptions: duplicateAssumptions,
       },
     };
-    snapshot.revision = this.computeRevision(snapshot);
+    snapshot.revision = this.computeBaseRevision(snapshot);
     return snapshot;
   }
 
   /**
-   * Compute a cheap hash over the snapshot's load-bearing fields. Used
-   * by the editor's polling loop to skip posting no-op updates to the
-   * webview. Timestamps are excluded so two identical polls produce the
-   * same revision even a minute apart.
+   * Full revision over base + realization — used by `getSnapshot` (the
+   * one-call API). The editor uses `computeBaseRevision` +
+   * `getRealizationPayload().revision` instead so the two change
+   * independently on the wire.
    */
   private computeRevision(s: ViewerSnapshot): string {
     const h = crypto.createHash('sha256');
+    this.hashBase(h, s);
+    this.hashRealization(h, s.realization_nodes, s.realization_drift);
+    return h.digest('hex').slice(0, 16);
+  }
+
+  /**
+   * Revision over the base (non-realization) fields only. Used by the
+   * editor's polling loop to skip posting no-op base updates. Timestamps
+   * are excluded so two identical polls produce the same revision even a
+   * minute apart.
+   */
+  private computeBaseRevision(s: ViewerSnapshot): string {
+    const h = crypto.createHash('sha256');
+    this.hashBase(h, s);
+    return h.digest('hex').slice(0, 16);
+  }
+
+  /** Fold every base (non-realization) field into `h`. */
+  private hashBase(h: crypto.Hash, s: ViewerSnapshot): void {
     h.update(`phase:${s.phase_id}/${s.sub_phase_id}|status:${s.run_status}|`);
     h.update(`nodes:${s.nodes.length}|`);
     for (const n of s.nodes) {
@@ -142,7 +255,22 @@ export class DecompViewerDataProvider {
     for (const sr of s.system_requirements) {
       h.update(`${sr.id}:${sr.source_requirement_ids.length}|`);
     }
-    return h.digest('hex').slice(0, 16);
+  }
+
+  /**
+   * Fold the realization set + drift into `h`. Uses the full per-record
+   * fingerprint (not just a few fields) so the realization revision flips
+   * on any content change the drill-down renders — matching what the delta
+   * diff detects.
+   */
+  private hashRealization(
+    h: crypto.Hash,
+    nodes: ViewerRealizationNode[],
+    drift: ViewerRealizationDrift,
+  ): void {
+    h.update(`realization:${nodes.length}|`);
+    for (const n of nodes) h.update(`${n.record_id}:${fingerprintRealizationNode(n)}|`);
+    h.update(`drift:${drift.unresolved_ac_ids.length}:${drift.unresolved_component_ids.length}|`);
   }
 
   // ── Decomposition nodes ──────────────────────────────────────────
@@ -620,6 +748,30 @@ export class DecompViewerDataProvider {
       }
     }
     return out;
+  }
+
+  /**
+   * Fetch one record's full content by id, scoped to the run (so a stale
+   * click after a DB swap can't read across runs). Returns null when the
+   * record is gone or superseded — the caller surfaces a "no longer
+   * available" note rather than a fabricated panel.
+   */
+  getNodeDetail(
+    workflowRunId: string,
+    recordId: string,
+  ): { record_type: string; content: Record<string, unknown> } | null {
+    const row = this.db
+      .prepare(
+        `SELECT record_type, content FROM governed_stream
+          WHERE id = ? AND workflow_run_id = ? AND is_current_version = 1`,
+      )
+      .get(recordId, workflowRunId) as { record_type: string; content: string } | undefined;
+    if (!row) return null;
+    try {
+      return { record_type: row.record_type, content: JSON.parse(row.content) as Record<string, unknown> };
+    } catch {
+      return { record_type: row.record_type, content: {} };
+    }
   }
 
   /**

@@ -127,6 +127,100 @@ export class DecompViewerEditorProvider
     let lastResolvedRunId: string | null = null;
     const post = (msg: DecompViewerOutboundMessage) => webviewPanel.webview.postMessage(msg);
 
+    // ── Realization (lazy, delta-shipped) state ──────────────────────
+    // The base snapshot no longer carries the high-fan-out realization
+    // layers. The webview requests them once it enters the drill-down
+    // (`load_realization`); thereafter each poll ships only per-record
+    // changes, diffed against the fingerprint map we last sent.
+    let realizationRequested = false;
+    let realizationRunId: string | null = null;
+    let lastRealizationHashes = new Map<string, string>();
+    let lastRealizationDriftKey = '';
+
+    const postRealizationIfChanged = (forceFull: boolean): void => {
+      if (!realizationRequested) return; // stay lazy until the webview asks
+      const runId = lastResolvedRunId;
+      if (!runId) return;
+      const full = forceFull || runId !== realizationRunId;
+      try {
+        const payload = this.dataProvider.getRealizationPayload(runId);
+        const prev = full ? new Map<string, string>() : lastRealizationHashes;
+        const upserts = payload.nodes.filter(
+          (n) => prev.get(n.record_id) !== payload.hashes.get(n.record_id),
+        );
+        const removed: string[] = [];
+        for (const id of prev.keys()) if (!payload.hashes.has(id)) removed.push(id);
+        const driftKey = `${payload.drift.unresolved_ac_ids.length}:${payload.drift.unresolved_component_ids.length}`;
+        const driftChanged = driftKey !== lastRealizationDriftKey;
+
+        lastRealizationHashes = payload.hashes;
+        lastRealizationDriftKey = driftKey;
+        realizationRunId = runId;
+
+        if (full || upserts.length > 0 || removed.length > 0 || driftChanged) {
+          post({
+            type: 'realization_delta',
+            delta: {
+              revision: payload.revision,
+              reset: full,
+              upserts,
+              removed,
+              drift: payload.drift,
+            },
+          });
+          log.info('ui', 'realization_delta posted', {
+            workflowRunId: runId,
+            reset: full,
+            upserts: upserts.length,
+            removed: removed.length,
+            total: payload.nodes.length,
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error('ui', 'realization payload failed', { error: message });
+      }
+    };
+
+    // ── Validator findings (lazy, delta-shipped) state ───────────────
+    let findingsRequested = false;
+    let findingsRunId: string | null = null;
+    let lastFindingsHashes = new Map<string, string>();
+    let lastFindingsSummaryKey = '';
+
+    const postFindingsIfChanged = (forceFull: boolean): void => {
+      if (!findingsRequested) return;
+      const runId = lastResolvedRunId;
+      if (!runId) return;
+      const full = forceFull || runId !== findingsRunId;
+      try {
+        const payload = this.dataProvider.getFindingsPayload(runId);
+        const prev = full ? new Map<string, string>() : lastFindingsHashes;
+        const upserts = payload.findings.filter(
+          (f) => prev.get(f.record_id) !== payload.hashes.get(f.record_id),
+        );
+        const removed: string[] = [];
+        for (const id of prev.keys()) if (!payload.hashes.has(id)) removed.push(id);
+        const summaryKey = `${payload.summary.surfaced}:${payload.summary.bound}:${payload.summary.unbound}`;
+        const summaryChanged = summaryKey !== lastFindingsSummaryKey;
+
+        lastFindingsHashes = payload.hashes;
+        lastFindingsSummaryKey = summaryKey;
+        findingsRunId = runId;
+
+        if (full || upserts.length > 0 || removed.length > 0 || summaryChanged) {
+          post({ type: 'findings_delta', delta: { revision: payload.revision, reset: full, upserts, removed, summary: payload.summary } });
+          log.info('ui', 'findings_delta posted', {
+            workflowRunId: runId, reset: full, upserts: upserts.length, removed: removed.length,
+            bound: payload.summary.bound, surfaced: payload.summary.surfaced,
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error('ui', 'findings payload failed', { error: message });
+      }
+    };
+
     /**
      * Resolve which workflow_run_id this snapshot tick should query:
      *  - pinned URI (`/workflow/<id>`) → that exact id; if it no longer
@@ -173,7 +267,7 @@ export class DecompViewerEditorProvider
         // If the resolver flipped to a different run since last poll
         // (e.g. a new workflow started), force a fresh init-style post.
         const runChanged = resolved.id !== lastResolvedRunId;
-        const snapshot = this.dataProvider.getSnapshot(resolved.id);
+        const snapshot = this.dataProvider.getBaseSnapshot(resolved.id);
 
         if (initial || runChanged) {
           lastResolvedRunId = resolved.id;
@@ -206,18 +300,51 @@ export class DecompViewerEditorProvider
       }
     };
 
-    // Message handling — v1 only `ready` and `refresh_requested` do work.
+    // One poll tick: refresh the base snapshot, then (if the webview has
+    // entered the drill-down) ship any realization changes. Base is posted
+    // first so an `init` on run-change lands before its realization reset.
+    const tick = (initial: boolean): void => {
+      postSnapshotIfChanged(initial);
+      postRealizationIfChanged(false);
+      postFindingsIfChanged(false);
+    };
+
+    // Message handling — `ready`/`refresh_requested` drive the base snapshot;
+    // `load_realization` opts this connection into realization deltas.
     const messageDisposable = webviewPanel.webview.onDidReceiveMessage(
       (raw: unknown) => {
         const msg = raw as DecompViewerInboundMessage;
         log.info('ui', 'inbound message from webview', { type: msg.type });
         switch (msg.type) {
           case 'ready':
-            postSnapshotIfChanged(true);
+            tick(true);
             break;
           case 'refresh_requested':
-            postSnapshotIfChanged(false);
+            tick(false);
             break;
+          case 'load_realization':
+            // Enter drill-down: force a full (reset) realization send, and
+            // keep shipping deltas on subsequent ticks.
+            realizationRequested = true;
+            postRealizationIfChanged(true);
+            break;
+          case 'load_findings':
+            findingsRequested = true;
+            postFindingsIfChanged(true);
+            break;
+          case 'load_node_detail': {
+            // On-demand single-record fetch for the inspector drawer.
+            const runId = lastResolvedRunId;
+            const recordId = (msg as { recordId?: string }).recordId;
+            if (!runId || !recordId) break;
+            const detail = this.dataProvider.getNodeDetail(runId, recordId);
+            if (detail) {
+              post({ type: 'node_detail', detail: { record_id: recordId, record_type: detail.record_type, content: detail.content } });
+            } else {
+              post({ type: 'node_detail_missing', record_id: recordId });
+            }
+            break;
+          }
           case 'mmp_accept':
           case 'mmp_reject':
           case 'mmp_defer':
@@ -238,13 +365,13 @@ export class DecompViewerEditorProvider
       vscode.workspace.getConfiguration('janumicode.decompViewer')
         .get<number>('pollIntervalMs', DEFAULT_POLL_INTERVAL_MS)
       ?? DEFAULT_POLL_INTERVAL_MS;
-    const timer = setInterval(() => postSnapshotIfChanged(false), pollIntervalMs);
+    const timer = setInterval(() => tick(false), pollIntervalMs);
     log.info('ui', 'polling loop started', { interval_ms: pollIntervalMs });
 
     // Post initial snapshot eagerly (before the webview sends 'ready')
     // so the first paint is fast. The 'ready' re-post is cheap since
-    // the revision will match.
-    postSnapshotIfChanged(true);
+    // the revision will match. Realization stays lazy until requested.
+    tick(true);
 
     const disposeAll = () => {
       clearInterval(timer);

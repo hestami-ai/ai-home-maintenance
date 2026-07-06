@@ -9,7 +9,14 @@
 
 import { mount } from 'svelte';
 import App from './App.svelte';
-import { setVsCodeApi, applySnapshot, showError } from './stores/snapshot';
+import {
+  setVsCodeApi, applySnapshot, showError,
+  applyRealizationDelta, resetRealization,
+  applyNodeDetail, markNodeDetailMissing,
+  applyFindingsDelta, resetFindings,
+  type ViewerRealizationDelta, type ViewerFindingsDelta,
+} from './stores/snapshot';
+import type { NodeDetailPayload } from './stores/nodeDetailView';
 
 declare const acquireVsCodeApi: () => {
   postMessage: (message: unknown) => void;
@@ -36,11 +43,37 @@ try {
   setVsCodeApi(vscode);
 
   window.addEventListener('message', (event) => {
-    const msg = event.data as { type: string; snapshot?: unknown; message?: string };
+    const msg = event.data as {
+      type: string;
+      snapshot?: unknown;
+      message?: string;
+      delta?: ViewerRealizationDelta | ViewerFindingsDelta;
+      detail?: NodeDetailPayload;
+      record_id?: string;
+    };
     switch (msg.type) {
       case 'init':
+        // A fresh run (or first paint): drop any realization + findings from a
+        // prior run before applying the base snapshot. The host re-ships full
+        // deltas once we re-request via load_realization / load_findings.
+        resetRealization();
+        resetFindings();
+        if (msg.snapshot) applySnapshot(msg.snapshot);
+        break;
       case 'snapshot_update':
         if (msg.snapshot) applySnapshot(msg.snapshot);
+        break;
+      case 'realization_delta':
+        if (msg.delta) applyRealizationDelta(msg.delta as ViewerRealizationDelta);
+        break;
+      case 'findings_delta':
+        if (msg.delta) applyFindingsDelta(msg.delta as ViewerFindingsDelta);
+        break;
+      case 'node_detail':
+        if (msg.detail) applyNodeDetail(msg.detail);
+        break;
+      case 'node_detail_missing':
+        if (typeof msg.record_id === 'string') markNodeDetailMissing(msg.record_id);
         break;
       case 'error':
         if (typeof msg.message === 'string') showError(msg.message);

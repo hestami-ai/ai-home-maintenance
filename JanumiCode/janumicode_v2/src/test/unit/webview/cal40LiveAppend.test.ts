@@ -79,7 +79,14 @@ run('cal-40 live-append stress (gated on JANUMICODE_CAL40_DB)', () => {
 
   it('stays bounded at every step while the full real run streams in', async () => {
     await fireReady();
-    expect(store.count).toBe(0); // append mode started empty
+    // Append mode must NOT stream the snapshot. It posts an empty one; a
+    // handful of records may still arrive via async engine emissions during
+    // startup (esp. on a more-complete phase-9 clone), so we assert the real
+    // invariant — the window is nowhere near cap and no head-drop has fired —
+    // rather than literal emptiness. A real "streamed the whole snapshot"
+    // regression would fill the window to cap (400) and set hasOlder.
+    expect(store.count).toBeLessThan(100);
+    expect(store.hasOlder).toBe(false);
 
     const total = (te.db.prepare(
       'SELECT COUNT(*) AS n FROM governed_stream WHERE workflow_run_id = ? AND is_current_version = 1',

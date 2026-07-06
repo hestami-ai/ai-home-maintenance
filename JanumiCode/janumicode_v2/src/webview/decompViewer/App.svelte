@@ -3,6 +3,7 @@
     snapshot, errorMessage, clearError,
     activeTab, type ViewerTab,
     treeViewMode, type TreeViewMode,
+    realizationCount,
     sendMessage,
   } from './stores/snapshot';
   import FilterBar from './components/FilterBar.svelte';
@@ -11,6 +12,7 @@
   import TreeView from './components/TreeView.svelte';
   import IndentedTreeView from './components/IndentedTreeView.svelte';
   import DagTreeView from './components/DagTreeView.svelte';
+  import DrilldownView from './components/DrilldownView.svelte';
   import AssumptionsPanel from './components/AssumptionsPanel.svelte';
   import DetailDrawer from './components/DetailDrawer.svelte';
 
@@ -24,6 +26,18 @@
     const select = e.currentTarget as HTMLSelectElement;
     treeViewMode.set(select.value as TreeViewMode);
   }
+
+  // Lazy-load the high-fan-out realization layers only once the drill-down
+  // is actually being viewed. Fires once; on a run change the host re-ships
+  // a full realization delta proactively, so no re-request is needed.
+  let realizationRequested = false;
+  $effect(() => {
+    if ($activeTab === 'tree' && $treeViewMode === 'drilldown' && !realizationRequested) {
+      realizationRequested = true;
+      sendMessage({ type: 'load_realization' });
+      sendMessage({ type: 'load_findings' });
+    }
+  });
 </script>
 
 <div class="viewer-root">
@@ -39,12 +53,10 @@
       <h1>Decomposition Viewer</h1>
       {#if $snapshot}
         <span class="subtitle">
-          Phase {$snapshot.phase_id ?? '?'}/{$snapshot.sub_phase_id ?? '?'}
+          run at Phase {$snapshot.phase_id ?? '?'}/{$snapshot.sub_phase_id ?? '?'}
           · {$snapshot.run_status}
-          · {$snapshot.totals.nodes} nodes
-          · {$snapshot.totals.roots} roots
-          · {$snapshot.totals.atomic} atomic
-          · {$snapshot.totals.pending} pending
+          · {$snapshot.totals.roots} stories
+          · {$realizationCount} realization nodes
           · {$snapshot.totals.assumptions} assumptions
         </span>
       {:else}
@@ -61,6 +73,7 @@
         <label class="view-mode-control" title="Choose tree layout (Option 7 = Multi-Level Accordion; Option 1 = Indented Tree)">
           <span class="vm-label">View:</span>
           <select class="vm-select" value={$treeViewMode} onchange={onTreeModeChange}>
+            <option value="drilldown">Unified Drill-down (Phase 1→8)</option>
             <option value="accordion">Accordion (Option 7)</option>
             <option value="indented">Indented Tree (Option 1)</option>
             <option value="dag">DAG Tree (Phase 1 → Phase 2)</option>
@@ -76,7 +89,9 @@
       <FilterBar />
       <main class="viewer-body">
         <ReleaseRail />
-        {#if $treeViewMode === 'indented'}
+        {#if $treeViewMode === 'drilldown'}
+          <DrilldownView />
+        {:else if $treeViewMode === 'indented'}
           <IndentedTreeView />
         {:else if $treeViewMode === 'dag'}
           <DagTreeView />

@@ -85,6 +85,59 @@ export interface ViewerDecompositionNode {
   children_display_keys: string[];
 }
 
+// ── Realization layers (unified drill-down: component / task / data_model / test) ──
+
+/** Which decomposition family a node belongs to. */
+export type DecompLayer = 'requirement' | 'component' | 'data_model' | 'task' | 'test';
+
+/**
+ * A node from one of the downstream decomposition families (Phase 4/5/6/7),
+ * flattened to the fields the unified drill-down needs and pre-joined to the
+ * requirement spine. The requirement tree keeps using {@link ViewerDecompositionNode};
+ * these hang under a requirement leaf's acceptance criteria.
+ */
+export interface ViewerRealizationNode {
+  /** Governed-stream row id (stable key). */
+  record_id: string;
+  /** Logical UUID (content.node_id). */
+  node_id: string;
+  /** component | data_model | task | test. */
+  layer: DecompLayer;
+  /** Business/display id (task-…, comp-…, DM-…, TC-…). */
+  display_key: string;
+  /** Human title (task.name / component.name / entity.name / test_case.name). */
+  title: string;
+  status: ViewerStatus;
+  tier: ViewerTier;
+  depth: number;
+  parent_node_id: string | null;
+  /** Root grouping id (root_task_id / root_component_id / root_entity_id / root_test_id). */
+  root_id: string;
+  release_id: string | null;
+  release_ordinal: number | null;
+  /**
+   * Component this node belongs to, resolved to a component node key
+   * (task.component_id / entity.component_id / test component_ids[0]). Null when
+   * the node carries no component ref or the ref resolved to nothing.
+   */
+  component_key: string | null;
+  /** Leaf AC ids this node realizes (tasks/tests), filtered to VALID leaf ACs. */
+  realizes_ac_ids: string[];
+  /** Canonical US ids this node serves (resolved via the requirement lineage). */
+  serves_us_ids: string[];
+  /** Data-model entity kind (aggregate/entity/value_type/relation), when layer==='data_model'. */
+  entity_kind?: string;
+  produced_at: string;
+}
+
+/** Referenced ids that resolved to nothing — surfaced (not hidden) as diagnostics. */
+export interface ViewerRealizationDrift {
+  /** AC ids cited by tasks/tests that match no requirement leaf (malformed/dropped). */
+  unresolved_ac_ids: string[];
+  /** component_id values cited by tasks/data-models that match no component node. */
+  unresolved_component_ids: string[];
+}
+
 // ── Assumptions ───────────────────────────────────────────────────
 
 export interface ViewerAssumption {
@@ -298,6 +351,15 @@ export interface ViewerSnapshot {
    * Phase 3.2 hasn't run.
    */
   system_requirements: ViewerSystemRequirement[];
+  /**
+   * Realization layers (component/task/data_model/test) pre-joined to the
+   * requirement spine for the unified drill-down. Empty on runs that haven't
+   * reached Phase 4+. Ships in full today; the high-fan-out layers become
+   * lazy-loaded later (see `load_realization` message).
+   */
+  realization_nodes: ViewerRealizationNode[];
+  /** Referenced ids that resolved to nothing (diagnostic surface). */
+  realization_drift: ViewerRealizationDrift;
   /** Top-line counts for the summary strip. */
   totals: {
     nodes: number;
@@ -312,13 +374,111 @@ export interface ViewerSnapshot {
   };
 }
 
+// ── Realization delta (lazy-loaded high-fan-out layers) ───────────
+
+/**
+ * Incremental update to the realization set (component/task/data_model/test).
+ * The base snapshot no longer carries these high-fan-out nodes; the webview
+ * requests them once (`load_realization`) and thereafter the host ships only
+ * per-record changes, keyed by a cheap content fingerprint. This keeps the
+ * wire payload bounded even as a run grows to thousands of downstream nodes
+ * (the same unbounded-snapshot shape the governed stream had).
+ */
+export interface ViewerRealizationDelta {
+  /** Realization revision token (changes when any realization node/drift does). */
+  revision: string;
+  /**
+   * True when this is a full (re)send — the webview must clear its
+   * realization store before applying `upserts`. Sent on first load, run
+   * change, or an explicit re-request. False for incremental polls.
+   */
+  reset: boolean;
+  /** Nodes added or changed since the last delta (full set when `reset`). */
+  upserts: ViewerRealizationNode[];
+  /** record_ids of nodes that are gone (superseded/pruned) since the last delta. */
+  removed: string[];
+  /** Current drift (cheap; always sent with a delta). */
+  drift: ViewerRealizationDrift;
+}
+
+// ── Validator findings (reasoning-review, bound to items) ─────────
+
+export type ViewerFindingSeverity = 'HIGH' | 'MEDIUM';
+
+/**
+ * One substantive validator finding, bound to the item(s) it cites. Selected
+ * via the same rules the executor/adjudicator use (drop auto-fix noise +
+ * superseded + LOW), then attached to items by the logical ids it cites
+ * (AC/US/NFR/component). Findings that cite no known item are counted in the
+ * summary but not shipped (there's nowhere to hang them).
+ */
+export interface ViewerFinding {
+  record_id: string;
+  validator_id: string;
+  severity: ViewerFindingSeverity;
+  finding_type: string;
+  summary: string;
+  detail: string;
+  recommendation: string;
+  /** 'process' = critiques upstream agent cognition; 'artifact' = about the produced content. */
+  category: 'artifact' | 'process';
+  cited_ids: string[];
+  /** Leaf AC ids this finding bound to. */
+  ac_ids: string[];
+  /** US / NFR / component display keys this finding bound to. */
+  display_keys: string[];
+}
+
+/** Run-level finding accounting (shown in the findings header). */
+export interface ViewerFindingsSummary {
+  /** All current reasoning_review_finding records. */
+  total: number;
+  /** HIGH/MEDIUM, not auto-fix, not superseded. */
+  surfaced: number;
+  /** Surfaced findings that bound to ≥1 item (shipped). */
+  bound: number;
+  /** Surfaced but unbound (no citable item id) — surfaced-not-shipped. */
+  unbound: number;
+  by_severity: { HIGH: number; MEDIUM: number };
+}
+
+/** Incremental findings update (immutable records, so a delta is add-only in practice). */
+export interface ViewerFindingsDelta {
+  revision: string;
+  reset: boolean;
+  upserts: ViewerFinding[];
+  removed: string[];
+  summary: ViewerFindingsSummary;
+}
+
 // ── Messages (extension host ↔ webview) ───────────────────────────
 
+/**
+ * Full content of a single decomposition record, fetched on demand when the
+ * operator clicks a drill-down row. Kept off the snapshot/delta path — only
+ * the clicked node's raw content travels, so the inspector is rich without
+ * bloating the streamed payloads.
+ */
+export interface ViewerNodeDetail {
+  record_id: string;
+  record_type: string;
+  /** Raw parsed governed_stream content (renderer picks the fields per type). */
+  content: Record<string, unknown>;
+}
+
 export type DecompViewerOutboundMessage =
-  /** Initial payload — sent once after webview loads. */
+  /** Initial payload — sent once after webview loads. Realization nodes empty (lazy). */
   | { type: 'init'; snapshot: ViewerSnapshot }
-  /** Delta / replacement when polling detects any change. */
+  /** Delta / replacement when polling detects any change (base fields only). */
   | { type: 'snapshot_update'; snapshot: ViewerSnapshot }
+  /** Incremental realization update — only after the webview requests it. */
+  | { type: 'realization_delta'; delta: ViewerRealizationDelta }
+  /** Full content of one record, in reply to `load_node_detail`. */
+  | { type: 'node_detail'; detail: ViewerNodeDetail }
+  /** Node-detail fetch found no such record (stale click after supersession). */
+  | { type: 'node_detail_missing'; record_id: string }
+  /** Incremental validator-findings update — only after the webview requests it. */
+  | { type: 'findings_delta'; delta: ViewerFindingsDelta }
   /** Non-fatal error surfaced to the user (toast in the webview). */
   | { type: 'error'; message: string };
 
@@ -327,6 +487,23 @@ export type DecompViewerInboundMessage =
   | { type: 'ready' }
   /** User requested a fresh refresh (bypass polling cadence). */
   | { type: 'refresh_requested' }
+  /**
+   * Webview entered a view that needs the realization layers (drill-down).
+   * Host replies with a full `realization_delta` (reset) and thereafter
+   * ships incremental deltas on each poll. Idempotent — re-requesting forces
+   * a fresh full send.
+   */
+  | { type: 'load_realization' }
+  /**
+   * Operator clicked a drill-down row — fetch that one record's full content.
+   * Host replies with `node_detail` (or `node_detail_missing` if it's gone).
+   */
+  | { type: 'load_node_detail'; recordId: string }
+  /**
+   * Webview wants validator findings (drill-down entered). Host replies with a
+   * full `findings_delta` (reset) and ships incremental deltas thereafter.
+   */
+  | { type: 'load_findings' }
   /**
    * MMP-decision placeholders for v2 — buttons disabled in v1 so these
    * aren't actually sent yet. Shape pinned here so v2 wiring is a

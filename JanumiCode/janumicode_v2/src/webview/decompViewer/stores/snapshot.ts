@@ -8,6 +8,8 @@
  */
 
 import { writable, derived, get } from 'svelte/store';
+import type { NodeDetailPayload } from './nodeDetailView';
+import { buildCoverageModel } from './coverage';
 
 // Local structural types — duplicated minimally from ../lib/decompViewer/types.ts
 // so the webview bundle doesn't need to import from src/lib.
@@ -52,6 +54,35 @@ export interface ViewerDecompositionNode {
   pruning_reason?: string;
   downgrade_reason?: string;
   children_display_keys: string[];
+}
+
+// ── Realization layers (unified drill-down) — mirror of lib/decompViewer/types.ts ──
+
+export type DecompLayer = 'requirement' | 'component' | 'data_model' | 'task' | 'test';
+
+export interface ViewerRealizationNode {
+  record_id: string;
+  node_id: string;
+  layer: DecompLayer;
+  display_key: string;
+  title: string;
+  status: string;
+  tier: ViewerTier;
+  depth: number;
+  parent_node_id: string | null;
+  root_id: string;
+  release_id: string | null;
+  release_ordinal: number | null;
+  component_key: string | null;
+  realizes_ac_ids: string[];
+  serves_us_ids: string[];
+  entity_kind?: string;
+  produced_at: string;
+}
+
+export interface ViewerRealizationDrift {
+  unresolved_ac_ids: string[];
+  unresolved_component_ids: string[];
 }
 
 export interface ViewerPipelinePass {
@@ -171,6 +202,8 @@ export interface ViewerSnapshot {
   nfr_applications: ViewerNfrApplication[];
   intent_summary: ViewerIntentSummary;
   system_requirements: ViewerSystemRequirement[];
+  realization_nodes: ViewerRealizationNode[];
+  realization_drift: ViewerRealizationDrift;
   totals: {
     nodes: number;
     atomic: number;
@@ -229,8 +262,8 @@ export const activeTab = writable<ViewerTab>('tree');
  *     keyboard-driven traversal of a known subtree path.
  * Both share the same FilterBar, ReleaseRail, and DetailDrawer.
  */
-export type TreeViewMode = 'accordion' | 'indented' | 'dag';
-export const treeViewMode = writable<TreeViewMode>('accordion');
+export type TreeViewMode = 'drilldown' | 'accordion' | 'indented' | 'dag';
+export const treeViewMode = writable<TreeViewMode>('drilldown');
 
 /**
  * Per-node expand state for the Indented view (parallel to the
@@ -337,6 +370,222 @@ export const releasesById = derived(snapshot, ($s) => {
   return m;
 });
 
+// ── Realization (drill-down) store — lazy-loaded, delta-shipped ─────
+
+const EMPTY_DRIFT: ViewerRealizationDrift = { unresolved_ac_ids: [], unresolved_component_ids: [] };
+
+/** Realization delta payload (mirror of lib/decompViewer/types.ts). */
+export interface ViewerRealizationDelta {
+  revision: string;
+  reset: boolean;
+  upserts: ViewerRealizationNode[];
+  removed: string[];
+  drift: ViewerRealizationDrift;
+}
+
+interface RealizationState {
+  /** record_id → node. Grows via upserts, shrinks via removed — never a wholesale re-ship. */
+  byId: Map<string, ViewerRealizationNode>;
+  drift: ViewerRealizationDrift;
+  /** False until the first delta lands (drives the "loading realization…" hint). */
+  loaded: boolean;
+}
+
+/**
+ * The realization set, fed by `realization_delta` messages rather than the
+ * base snapshot. Keeping it separate means (a) views that don't need it
+ * (accordion/indented/dag) never pay for it, and (b) polls ship only the
+ * handful of nodes that actually changed instead of all ~500+ every 3s.
+ */
+export const realizationStore = writable<RealizationState>({
+  byId: new Map(),
+  drift: EMPTY_DRIFT,
+  loaded: false,
+});
+
+/** Merge one host delta into the store (reset ⇒ start from empty). */
+export function applyRealizationDelta(delta: ViewerRealizationDelta): void {
+  realizationStore.update((s) => {
+    const byId = delta.reset ? new Map<string, ViewerRealizationNode>() : new Map(s.byId);
+    for (const n of delta.upserts) byId.set(n.record_id, n);
+    for (const id of delta.removed) byId.delete(id);
+    return { byId, drift: delta.drift, loaded: true };
+  });
+}
+
+/** Clear realization state — called on `init` (new/changed run). */
+export function resetRealization(): void {
+  realizationStore.set({ byId: new Map(), drift: EMPTY_DRIFT, loaded: false });
+  // A run change invalidates any open node-detail selection.
+  selectedRealizationRecordId.set(null);
+  nodeDetail.set(null);
+  nodeDetailLoading.set(false);
+  nodeDetailMissing.set(null);
+}
+
+// ── Realization (drill-down) indexes ────────────────────────────────
+
+/** component key (display_key) → the component realization node. */
+export const componentNodeByKey = derived(realizationStore, ($r) => {
+  const m = new Map<string, ViewerRealizationNode>();
+  for (const n of $r.byId.values()) if (n.layer === 'component') m.set(n.display_key, n);
+  return m;
+});
+
+/** leaf AC id → task/test nodes that realize it. */
+export const realizationByAc = derived(realizationStore, ($r) => {
+  const m = new Map<string, ViewerRealizationNode[]>();
+  for (const n of $r.byId.values()) {
+    if (n.layer !== 'task' && n.layer !== 'test') continue;
+    for (const ac of n.realizes_ac_ids) pushToMapList(m, ac, n);
+  }
+  return m;
+});
+
+/** requirement root id (US-/NFR-) → realization nodes serving it. */
+export const realizationByUs = derived(realizationStore, ($r) => {
+  const m = new Map<string, ViewerRealizationNode[]>();
+  for (const n of $r.byId.values()) for (const us of n.serves_us_ids) pushToMapList(m, us, n);
+  return m;
+});
+
+/** component key → realization nodes (tasks + data models + tests) belonging to it. */
+export const realizationByComponent = derived(realizationStore, ($r) => {
+  const m = new Map<string, ViewerRealizationNode[]>();
+  for (const n of $r.byId.values()) if (n.component_key) pushToMapList(m, n.component_key, n);
+  return m;
+});
+
+/** Referenced ids that resolved to nothing (diagnostic surface). */
+export const realizationDrift = derived(realizationStore, ($r) => $r.drift);
+
+/** Count of realization nodes currently loaded (header). */
+export const realizationCount = derived(realizationStore, ($r) => $r.byId.size);
+
+/** Whether the realization set has been requested + delivered at least once. */
+export const realizationLoaded = derived(realizationStore, ($r) => $r.loaded);
+
+// ── Layer filter (drill-down) — which realization layers to render ──
+
+export type RealizationLayerFilter = 'component' | 'task' | 'data_model' | 'test';
+export const ALL_LAYER_FILTERS: RealizationLayerFilter[] = ['component', 'task', 'data_model', 'test'];
+
+/**
+ * Which realization layers the drill-down renders under an expanded AC.
+ * The requirement/AC spine always shows (it's the navigation); these chips
+ * declutter the leaf rows. All on by default.
+ */
+export const filterLayers = writable<Set<RealizationLayerFilter>>(new Set(ALL_LAYER_FILTERS));
+
+export function toggleLayer(layer: RealizationLayerFilter): void {
+  filterLayers.update((s) => {
+    const next = new Set(s);
+    if (next.has(layer)) next.delete(layer);
+    else next.add(layer);
+    return next;
+  });
+}
+
+/** Gaps-only mode: prune the drill-down to paths leading to an untested AC. */
+export const filterGapsOnly = writable<boolean>(false);
+export function toggleGapsOnly(): void {
+  filterGapsOnly.update((v) => !v);
+}
+
+// ── Coverage model (per-AC + per-root roll-ups, gap propagation) ─────
+
+/**
+ * Test-coverage roll-up derived from the requirement spine + the AC→
+ * realization index. Re-derives when either changes. Powers the AC coverage
+ * chips, the per-US / per-journey summaries, and the gaps-only filter.
+ */
+export const coverageModel = derived(
+  [snapshot, realizationByAc],
+  ([$s, $rz]) => buildCoverageModel($s?.nodes ?? [], $rz),
+);
+
+/** leaf AC id → the requirement leaf's record_id (cross-nav from a verified AC). */
+export const leafRecordIdByAc = derived(snapshot, ($s) => {
+  const m = new Map<string, string>();
+  if ($s) for (const n of $s.nodes) for (const ac of n.acceptance_criteria) if (!m.has(ac.id)) m.set(ac.id, n.record_id);
+  return m;
+});
+
+// ── Validator findings (lazy-loaded, delta-shipped) ─────────────────
+
+export type ViewerFindingSeverity = 'HIGH' | 'MEDIUM';
+
+export interface ViewerFinding {
+  record_id: string;
+  validator_id: string;
+  severity: ViewerFindingSeverity;
+  finding_type: string;
+  summary: string;
+  detail: string;
+  recommendation: string;
+  category: 'artifact' | 'process';
+  cited_ids: string[];
+  ac_ids: string[];
+  display_keys: string[];
+}
+
+export interface ViewerFindingsSummary {
+  total: number;
+  surfaced: number;
+  bound: number;
+  unbound: number;
+  by_severity: { HIGH: number; MEDIUM: number };
+}
+
+export interface ViewerFindingsDelta {
+  revision: string;
+  reset: boolean;
+  upserts: ViewerFinding[];
+  removed: string[];
+  summary: ViewerFindingsSummary;
+}
+
+const EMPTY_FINDINGS_SUMMARY: ViewerFindingsSummary = { total: 0, surfaced: 0, bound: 0, unbound: 0, by_severity: { HIGH: 0, MEDIUM: 0 } };
+
+interface FindingsState {
+  byId: Map<string, ViewerFinding>;
+  summary: ViewerFindingsSummary;
+  loaded: boolean;
+}
+
+/** Bound validator findings, fed by `findings_delta` (separate from the base snapshot). */
+export const findingsStore = writable<FindingsState>({ byId: new Map(), summary: EMPTY_FINDINGS_SUMMARY, loaded: false });
+
+export function applyFindingsDelta(delta: ViewerFindingsDelta): void {
+  findingsStore.update((s) => {
+    const byId = delta.reset ? new Map<string, ViewerFinding>() : new Map(s.byId);
+    for (const f of delta.upserts) byId.set(f.record_id, f);
+    for (const id of delta.removed) byId.delete(id);
+    return { byId, summary: delta.summary, loaded: true };
+  });
+}
+
+export function resetFindings(): void {
+  findingsStore.set({ byId: new Map(), summary: EMPTY_FINDINGS_SUMMARY, loaded: false });
+}
+
+/** leaf AC id → findings citing it. */
+export const findingsByAc = derived(findingsStore, ($f) => {
+  const m = new Map<string, ViewerFinding[]>();
+  for (const f of $f.byId.values()) for (const ac of f.ac_ids) pushToMapList(m, ac, f);
+  return m;
+});
+
+/** US / NFR / component display key → findings citing it. */
+export const findingsByKey = derived(findingsStore, ($f) => {
+  const m = new Map<string, ViewerFinding[]>();
+  for (const f of $f.byId.values()) for (const k of f.display_keys) pushToMapList(m, k, f);
+  return m;
+});
+
+export const findingsSummary = derived(findingsStore, ($f) => $f.summary);
+export const findingsLoaded = derived(findingsStore, ($f) => $f.loaded);
+
 // ── Filtered views ──────────────────────────────────────────────────
 
 /**
@@ -404,6 +653,52 @@ export function toggleTierBand(
 
 export function selectNode(recordId: string | null): void {
   selectedNodeRecordId.set(recordId);
+  // Requirement + realization selection are mutually exclusive — the drawer
+  // shows one at a time.
+  if (recordId !== null) selectedRealizationRecordId.set(null);
+}
+
+// ── Node-detail inspector (lazy single-record fetch) ────────────────
+
+/** record_id of the realization row currently open in the drawer (null = none). */
+export const selectedRealizationRecordId = writable<string | null>(null);
+/** Last fetched detail payload; null until a fetch lands. */
+export const nodeDetail = writable<NodeDetailPayload | null>(null);
+/** True between requesting a detail and its arrival (drives a spinner). */
+export const nodeDetailLoading = writable<boolean>(false);
+/** Set to the record_id when a fetch came back missing (stale click). */
+export const nodeDetailMissing = writable<string | null>(null);
+
+/**
+ * Select a realization node (component/task/test/data-model) and lazily
+ * request its full content. Clears any requirement selection so the drawer
+ * shows this node. Idempotent per record_id.
+ */
+export function selectRealization(recordId: string): void {
+  selectedNodeRecordId.set(null);
+  selectedRealizationRecordId.set(recordId);
+  nodeDetailMissing.set(null);
+  const cached = get(nodeDetail);
+  if (cached?.record_id === recordId) {
+    nodeDetailLoading.set(false); // already have it
+  } else {
+    nodeDetail.set(null);
+    nodeDetailLoading.set(true);
+    sendMessage({ type: 'load_node_detail', recordId });
+  }
+}
+
+/** Apply a `node_detail` message from the host. */
+export function applyNodeDetail(payload: NodeDetailPayload): void {
+  nodeDetail.set(payload);
+  nodeDetailLoading.set(false);
+  nodeDetailMissing.set(null);
+}
+
+/** Handle a `node_detail_missing` message (record gone/superseded). */
+export function markNodeDetailMissing(recordId: string): void {
+  nodeDetailLoading.set(false);
+  nodeDetailMissing.set(recordId);
 }
 
 // ── DAG model (Phase 1 → Phase 2 traceability) ─────────────────────

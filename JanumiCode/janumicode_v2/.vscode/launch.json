@@ -145,7 +145,7 @@
       "env": {
         "JANUMICODE_AUTOSHOW_LOGS": "0",
         "JANUMICODE_REPLAY_MODE": "1",
-        "JANUMICODE_REPLAY_DB": "${workspaceFolder}/test-and-evaluation/replay-fixtures/cal-40/clone.db"
+        "JANUMICODE_REPLAY_DB": "${workspaceFolder}/test-and-evaluation/replay-fixtures/cal-40/clone-p9.db"
       }
     },
     {
@@ -166,7 +166,7 @@
       "env": {
         "JANUMICODE_AUTOSHOW_LOGS": "0",
         "JANUMICODE_REPLAY_MODE": "1",
-        "JANUMICODE_REPLAY_DB": "${workspaceFolder}/test-and-evaluation/replay-fixtures/cal-40/clone.db",
+        "JANUMICODE_REPLAY_DB": "${workspaceFolder}/test-and-evaluation/replay-fixtures/cal-40/clone-p9.db",
         "JANUMICODE_REPLAY_APPEND": "1",
         "JANUMICODE_REPLAY_APPEND_INTERVAL_MS": "12",
         "JANUMICODE_REPLAY_APPEND_BATCH": "3"
