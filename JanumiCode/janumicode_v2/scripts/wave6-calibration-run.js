@@ -196,6 +196,12 @@ const ARG_HANDLERS = {
   '--llama-swap-port':           { consumesValue: true,  apply: (out, v) => { out.llamaSwapPort = Number.parseInt(v, 10); } },
   '--llamacpp-decomposer-model': { consumesValue: true,  apply: (out, v) => { out.decomposerModel = v; } },
   '--llamacpp-reviewer-model':   { consumesValue: true,  apply: (out, v) => { out.reviewerModel = v; } },
+  // Resume passthrough → CLI `run --resume-from-db …`. Lets a stop-and-fix cycle
+  // re-run only the affected deterministic step + downstream against an existing
+  // workspace DB (LLM calls replay from the primed cache) instead of a cold run.
+  '--resume-from-db':            { consumesValue: true,  apply: (out, v) => { out.resumeFromDb = v; } },
+  '--resume-at-phase':           { consumesValue: true,  apply: (out, v) => { out.resumeAtPhase = v; } },
+  '--resume-at-sub-phase':       { consumesValue: true,  apply: (out, v) => { out.resumeAtSubPhase = v; } },
   '--help':                      { consumesValue: false, apply: ()       => { printHelpAndExit(); } },
   '-h':                          { consumesValue: false, apply: ()       => { printHelpAndExit(); } },
 };
@@ -375,10 +381,21 @@ function invokeCli(intent, workspace, llamacppBaseUrl) {
   // proof, and reasoning_review (correctly) flagged it as
   // `completeness_shortcut`.
   childEnv.JANUMICODE_EXECUTOR_UNATTENDED = '1';
+  const cliArgs = [cliPath, 'run', '--intent', intentArg, '--workspace', workspace, '--llm-mode', 'real', '--auto-approve'];
+  // Resume: re-run from an existing DB at a phase/sub-phase (the CLI rolls back
+  // stale records at-or-after the cutoff and re-executes their deterministic
+  // pipeline; cached LLM calls replay). Sub-phase takes precedence over phase.
+  if (args.resumeFromDb) {
+    cliArgs.push('--resume-from-db', args.resumeFromDb);
+    if (args.resumeAtSubPhase) cliArgs.push('--resume-at-sub-phase', args.resumeAtSubPhase);
+    else if (args.resumeAtPhase) cliArgs.push('--resume-at-phase', args.resumeAtPhase);
+    const resumeTarget = args.resumeAtSubPhase ? `sub-phase ${args.resumeAtSubPhase}` : `phase ${args.resumeAtPhase}`;
+    console.error(`[calibration] RESUMING from ${args.resumeFromDb} at ${resumeTarget}`);
+  }
   console.error(`[calibration] invoking CLI  workspace=${workspace}  intent=${intentArg.slice(0, 80).replace(/\n/g, ' ')}…`);
   const result = spawnSync(
     process.execPath,
-    [cliPath, 'run', '--intent', intentArg, '--workspace', workspace, '--llm-mode', 'real', '--auto-approve'],
+    cliArgs,
     { stdio: 'inherit', env: childEnv },
   );
   if (result.status !== 0) {

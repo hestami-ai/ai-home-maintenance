@@ -62,3 +62,39 @@ export function displayEntityRelationship(r: unknown): string {
   const ownership = pickString(o, ['ownership']);
   return ownership ? `${target} (${kind}, ${ownership})` : `${target} (${kind})`;
 }
+
+/**
+ * Render a data-model field's TYPE safely. The typed contract says `string`, but
+ * LLM output drifts: `type` can arrive as a nested object (e.g. `{ name, sql_type }`)
+ * or be missing entirely. Never emit `[object Object]` or a bare `undefined` into
+ * the "Fields:" prompt block. (Audit fix PA-8b.)
+ */
+export function displayFieldType(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    return pickString(o, ['type', 'name', 'sql_type', 'data_type', 'kind']) ?? JSON.stringify(o);
+  }
+  return String(v);
+}
+
+/**
+ * Render a data-model field's CONSTRAINT(S) safely. May be a string
+ * (`"unique,not_null"`), an array (`["not_null","unique"]`), or an object
+ * (`{ max_length: 255 }`). Returns '' when genuinely absent (caller omits the
+ * trailing `(...)`), and never emits `[object Object]`. (Audit fix PA-8b.)
+ */
+export function displayFieldConstraint(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) {
+    return v.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).filter(Boolean).join(', ');
+  }
+  if (typeof v === 'object') {
+    return Object.entries(v as Record<string, unknown>)
+      .map(([k, val]) => `${k}=${typeof val === 'object' ? JSON.stringify(val) : String(val)}`)
+      .join(', ');
+  }
+  return String(v);
+}

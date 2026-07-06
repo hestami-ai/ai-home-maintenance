@@ -134,7 +134,8 @@ For each child you produce, list any **architectural assumption, integration pat
 
 # Required output (strict schema)
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "parent_branch_classification": "decomposable",
   "parent_tier_assessment": {
@@ -164,7 +165,6 @@ For each child you produce, list any **architectural assumption, integration pat
     { "text": "State transitions are persisted to the audit log via async event, not synchronous write.", "category": "integration_pattern", "citations": ["TECH-DBOS"] }
   ]
 }
-```
 
 # Hard rules (apply to every branch)
 

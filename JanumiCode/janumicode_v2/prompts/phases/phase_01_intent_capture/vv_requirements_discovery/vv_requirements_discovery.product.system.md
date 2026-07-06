@@ -50,7 +50,8 @@ Every V&V requirement MUST carry a `source_ref` with a verbatim `excerpt`. No pa
 
 # Response Format
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "kind": "vv_requirements_discovery",
   "vvRequirements": [
@@ -68,7 +69,6 @@ Every V&V requirement MUST carry a `source_ref` with a verbatim `excerpt`. No pa
     }
   ]
 }
-```
 
 `id`: a semantic slug of the form `VV-<UPPER-SLUG>` — evocative of the requirement itself, NOT a running number. Use the target/measurement concept uppercased with hyphens (e.g. `VV-API-LATENCY`, `VV-INTEGRITY-CHAIN`, `VV-UPTIME-SLO`, `VV-ANOMALY-DETECTION`). Slug MUST match `^VV-[A-Z0-9_-]+$`. If two requirements would slug identically, suffix the second with `-2`, the third with `-3`, etc.
 `category`: `performance`, `availability`, `reliability`, `security`, `compliance`, `accessibility`, `observability`, `scale`, `durability`, `auditability`, or source-specific.

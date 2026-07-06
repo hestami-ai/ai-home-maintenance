@@ -29,8 +29,8 @@ REQUIRED OUTPUT: A JSON object whose **top-level keys are exactly** `in_scope`, 
 - `out_of_scope`: array of **objects**, each with fields `capability` (string) and `rationale` (string). NOT an array of strings.
 - `external_systems`: array of objects, each with fields `id`, `name`, `purpose`, `interface_type`.
 
-Valid skeleton:
-```json
+Emit your ENTIRE response as a single raw JSON object — start at `{`, end at `}`, with NO surrounding markdown code fences. Valid skeleton:
+```
 {
   "in_scope": [
     { "capability": "...", "description": "...", "satisfies_fr": ["FR-001"] }
@@ -43,8 +43,8 @@ Valid skeleton:
   ]
 }
 ```
-Invalid (do NOT do any of these):
-```json
+Invalid — do NOT do any of these:
+```
 { "system_boundary": { "in_scope": [...], ... } }
 { "in_scope": ["a string instead of an object"] }
 ```

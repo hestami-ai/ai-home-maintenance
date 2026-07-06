@@ -37,14 +37,12 @@ COVERAGE ASSESSMENT:
 YOUR REQUIRED OUTPUT (JSON) — narrative synthesis only. The active
 constraints, supersession chains, and contradictions are computed
 deterministically by the agent and are provided ABOVE for you to reference;
-do NOT re-emit them. Produce exactly these three fields:
-```json
+do NOT re-emit them. Emit your ENTIRE response as a single raw JSON object of exactly these three fields — start at `{`, end at `}`, with NO surrounding markdown code fences:
 {
   "decision_context_summary": "narrative summary of the governing decisions, supersessions, and contradictions above — every claim cites a source_record_id",
   "open_questions": [{"question": "...", "still_unresolved": true, "source_record_id": "..."}],
   "completeness_narrative": "what was found and what is missing"
 }
-```
 
 Rules:
 - Every claim in decision_context_summary must cite a source_record_id

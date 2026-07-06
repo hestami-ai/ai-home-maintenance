@@ -116,7 +116,8 @@ Response is a single valid JSON object. No markdown fences, no prose outside the
 
 # Response Format
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "kind": "system_workflow_bloom",
   "workflows": [
@@ -153,7 +154,6 @@ Response is a single valid JSON object. No markdown fences, no prose outside the
     { "journey_id": "UJ-SUBMIT-CLAIM", "step_number": 4, "workflow_ids": ["WF-AUTH-VALIDATE", "WF-NOTIFY-USER"] }
   ]
 }
-```
 
 Notes:
 - **`step_backing_map`** is an explicit cross-reference: for every `automatable: true` step in every accepted journey, list the workflow(s) that claim it. 1.3c's coverage verifier uses this as the primary check. An automatable step with an empty `workflow_ids[]` must appear in the map — this surfaces the gap explicitly rather than silently omitting it.

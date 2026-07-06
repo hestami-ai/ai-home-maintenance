@@ -56,9 +56,8 @@ Your response MUST be a single valid JSON object. Strict rules:
 - **Straight ASCII double quotes** (`"`) for all JSON strings. Not curly/smart/typographic quotes.
 
 # Response Format
-Your ENTIRE response must be a single JSON object. No prose, no markdown fences.
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 
-```json
 {
   "kind": "business_domains_bloom",
   "domains": [
@@ -83,7 +82,6 @@ Your ENTIRE response must be a single JSON object. No prose, no markdown fences.
     }
   ]
 }
-```
 
 # Expected coverage
 For a product intent of moderate ambition the output is typically **6–20 domains** and **3–10 personas**. Thinner outputs are acceptable only for narrow products; err on the side of over-proposing — the user is the pruner.

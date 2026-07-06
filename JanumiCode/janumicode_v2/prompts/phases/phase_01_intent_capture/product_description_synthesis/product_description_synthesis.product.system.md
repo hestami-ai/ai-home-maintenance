@@ -45,7 +45,8 @@ Your response MUST be a single valid JSON object. Strict rules:
 
 # Response Format
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "product_vision": "1–2 sentence north-star statement",
   "product_description": "Self-contained paragraph mentioning the final product pillars",
@@ -54,7 +55,6 @@ Your response MUST be a single valid JSON object. Strict rules:
     { "category": "deferred_decision|missing_info|unresolved_risk|followup", "description": "...", "priority": "high|medium|low" }
   ]
 }
-```
 
 [PRODUCT SCOPE]
 

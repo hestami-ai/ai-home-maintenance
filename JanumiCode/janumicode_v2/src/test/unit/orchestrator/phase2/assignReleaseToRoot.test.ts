@@ -71,6 +71,54 @@ describe('assignReleaseToRoot — release-specific (Pass 1)', () => {
   });
 });
 
+describe('assignReleaseToRoot — journey-precedence (Pass 0, cal-38 US-014)', () => {
+  it('a journey trace in a LATER release wins over a shared entity in an EARLIER release', () => {
+    // US-014: the FR traces its journey + workflow + 2 entities (all Release 2) plus
+    // ENT-SERVICE-CALL, a shared foundational entity that ships in Release 1. The old
+    // widened scan matched ENT-SERVICE-CALL first (lowest ordinal) and pulled the FR
+    // into Release 1 — where its appointment entity + booking workflow don't exist yet
+    // (undeliverable). Journey-precedence anchors it to Release 2.
+    const p = plan({
+      releases: [
+        { release_id: 'rel-1', ordinal: 1, name: 'R1', description: 'd', rationale: 'r',
+          contains: { ...emptyContains(), entities: ['ENT-SERVICE-CALL'] } },
+        { release_id: 'rel-2', ordinal: 2, name: 'R2', description: 'd', rationale: 'r',
+          contains: { ...emptyContains(), journeys: ['UJ-SCHEDULING-BOOKING'], workflows: ['WF-BOOKING-FINALIZE'], entities: ['ENT-APPOINTMENT', 'ENT-AUDIT-LOG'] } },
+      ],
+    });
+    const r = assignReleaseToRoot(
+      { traces_to: ['UJ-SCHEDULING-BOOKING', 'WF-BOOKING-FINALIZE', 'ENT-APPOINTMENT', 'ENT-AUDIT-LOG', 'ENT-SERVICE-CALL'] },
+      p,
+    );
+    expect(r).toEqual({ release_id: 'rel-2', release_ordinal: 2 });
+  });
+
+  it('with journey traces across multiple releases, the lowest-ordinal journey release wins', () => {
+    const p = plan({
+      releases: [
+        { release_id: 'rel-1', ordinal: 1, name: 'R1', description: 'd', rationale: 'r',
+          contains: { ...emptyContains(), journeys: ['UJ-EARLY'] } },
+        { release_id: 'rel-2', ordinal: 2, name: 'R2', description: 'd', rationale: 'r',
+          contains: { ...emptyContains(), journeys: ['UJ-LATE'] } },
+      ],
+    });
+    expect(assignReleaseToRoot({ traces_to: ['UJ-LATE', 'UJ-EARLY'] }, p))
+      .toEqual({ release_id: 'rel-1', release_ordinal: 1 });
+  });
+
+  it('a root with NO journey trace still uses the widened any-artifact match (NFR / entity-only unchanged)', () => {
+    const p = plan({
+      releases: [
+        { release_id: 'rel-1', ordinal: 1, name: 'R1', description: 'd', rationale: 'r',
+          contains: { ...emptyContains(), entities: ['ENT-FOO'] } },
+        { release_id: 'rel-2', ordinal: 2, name: 'R2', description: 'd', rationale: 'r', contains: emptyContains() },
+      ],
+    });
+    expect(assignReleaseToRoot({ traces_to: ['ENT-FOO'] }, p))
+      .toEqual({ release_id: 'rel-1', release_ordinal: 1 });
+  });
+});
+
 describe('assignReleaseToRoot — cross-cutting fallback to Release 1 (Pass 2, ts-13 fix)', () => {
   it('anchors a VV-only root to Release 1 when VV id is in cross_cutting', () => {
     const p = plan({

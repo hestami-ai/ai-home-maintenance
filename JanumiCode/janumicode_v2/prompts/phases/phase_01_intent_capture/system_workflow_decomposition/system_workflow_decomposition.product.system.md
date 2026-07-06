@@ -56,7 +56,8 @@ Response is a single valid JSON object. No markdown fences, no prose outside the
 
 # Response Format
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "kind": "system_workflow_decomposition",
   "parent_workflow_id": "WF-PARENT-SLUG",
@@ -93,7 +94,6 @@ Response is a single valid JSON object. No markdown fences, no prose outside the
   ],
   "trigger_routing_note": "Explicitly note which parent triggers went to which children, or which were dropped and why."
 }
-```
 
 Notes:
 - **`already_atomic: true`** with empty `children[]` is a valid response. Use it when the parent is genuinely cohesive.

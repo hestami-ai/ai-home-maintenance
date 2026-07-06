@@ -56,7 +56,7 @@ Your response MUST be a single valid JSON object. Strict rules:
 - **Straight ASCII double quotes** (`"`) for all JSON strings. Not curly/smart/typographic quotes.
 
 # Response Format
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 {
   "kind": "integrations_qa_bloom",
   "integrations": [
@@ -75,7 +75,6 @@ Your response MUST be a single valid JSON object. Strict rules:
     "Specific testable NFR or constraint (one per array element)"
   ]
 }
-```
 
 # Expected coverage
 Typically **5–25 integrations** and **8–25 quality attributes**. Err on over-proposing.

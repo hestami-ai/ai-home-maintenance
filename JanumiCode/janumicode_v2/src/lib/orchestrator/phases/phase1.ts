@@ -58,7 +58,7 @@ import {
   normalizeWorkflowV2 as normalizeWorkflowV2Pure,
   normalizeWorkflowTrigger as normalizeWorkflowTriggerPure,
 } from './phase1Normalizers';
-import { resolveAgainstOracle } from '../idResolver';
+import { resolveAgainstOracle, resolveByTokenSubset } from '../idResolver';
 import { randomUUID } from 'node:crypto';
 import type {
   DecisionBundleContent,
@@ -187,7 +187,10 @@ export function resolveJourneyDomainRefs<J extends { id?: unknown; businessDomai
     const journeyId = typeof j.id === 'string' ? j.id : '';
     const nextRefs = refs.map((ref) => {
       if (typeof ref !== 'string') return ref;
-      const resolved = resolveAgainstOracle(ref, oracle);
+      // resolveAgainstOracle handles separator/case/near-miss drift; the
+      // token-subset fallback handles TRUNCATION (`DOM-COMMUNICATION` for the
+      // accepted `DOM-COMMUNITY-COMMUNICATION`, cal-39) that similarity can't reach.
+      const resolved = resolveAgainstOracle(ref, oracle) ?? resolveByTokenSubset(ref, oracle);
       if (resolved && resolved !== ref) {
         remapped.push({ journey: journeyId, from: ref, to: resolved });
         return resolved;
@@ -1314,7 +1317,8 @@ grounding for the journey shape.`,
         const wfRemapped: Array<{ workflow: string; from: string; to: string }> = [];
         for (const w of r.workflows) {
           if (typeof w.businessDomainId === 'string' && w.businessDomainId) {
-            const resolved = resolveAgainstOracle(w.businessDomainId, acceptedDomainIds);
+            const resolved = resolveAgainstOracle(w.businessDomainId, acceptedDomainIds)
+              ?? resolveByTokenSubset(w.businessDomainId, acceptedDomainIds);
             if (resolved && resolved !== w.businessDomainId) {
               wfRemapped.push({ workflow: w.id, from: w.businessDomainId, to: resolved });
               w.businessDomainId = resolved;

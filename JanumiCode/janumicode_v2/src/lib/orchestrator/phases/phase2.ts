@@ -187,6 +187,21 @@ export function assignReleaseToRoot(
   //   Otherwise — backlog (release_id: null).
   const sortedReleases = [...plan.releases].sort((a, b) => a.ordinal - b.ordinal);
   const traceSet = new Set(traces);
+  // Pass 0 (journey-precedence, cal-38 US-014) — a functional root's PRIMARY intent
+  // is the user journey it delivers. A shared foundational entity/workflow that ships
+  // in an EARLIER release must not drag the root forward: US-014 traced journey
+  // UJ-SCHEDULING-BOOKING + workflow WF-BOOKING-FINALIZE + 2 entities (all Release 2),
+  // but ENT-SERVICE-CALL (Release 1) matched first in the widened scan below and
+  // pulled the whole FR into Release 1 — where its appointment entity and booking
+  // workflow don't yet exist (undeliverable). So if the root traces any accepted
+  // journey, the lowest-ordinal release containing one of those journeys wins
+  // outright, before the widened any-artifact match. Roots with no journey trace
+  // (NFRs, entity/workflow-only FRs) fall through to the widened match unchanged.
+  for (const r of sortedReleases) {
+    if (r.contains.journeys.some((id: string) => traceSet.has(id))) {
+      return { release_id: r.release_id, release_ordinal: r.ordinal };
+    }
+  }
   for (const r of sortedReleases) {
     const c = r.contains;
     const anyMatch =

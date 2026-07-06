@@ -25,9 +25,8 @@ Design evaluation criteria for quality attributes NOT already covered by the Tes
 
 # REQUIRED OUTPUT — single JSON object with three keys
 
-Emit ONE JSON object whose top level has exactly these three keys (NOT three separate JSON objects, NOT a JSON array, NOT prose):
+Emit ONE JSON object whose top level has exactly these three keys (NOT three separate JSON objects, NOT a JSON array, NOT prose) — emit it as a single raw JSON object, start at `{`, end at `}`, with NO surrounding markdown code fences:
 
-```json
 {
   "functional_evaluation_plan": {
     "criteria": [
@@ -72,8 +71,9 @@ all of them, and shrinks any violation to a minimal counterexample. This turns a
 vague `measurement_method` into an executable, generative measurement.
 
 Add `property_spec` to a quality criterion ONLY when the threshold generalizes
-across an input domain:
-```json
+across an input domain (illustration only — your own response stays a single raw
+JSON object with NO surrounding markdown code fences):
+```
 {
   "nfr_id": "NFR-007",
   "category": "Reliability",

@@ -42,6 +42,7 @@ import type { MirrorItemDecision } from '../../types/decisionBundle';
 import { getLogger } from '../../logging';
 import { createEmbeddingClient, findNearestAbove, type EmbeddingClient } from '../../llm/embeddings';
 import { canonicalComponentDir } from './layoutContract';
+import { resolveTechConstraintIds, resolveComponentId } from '../idResolver';
 
 // ── Shared helpers ─────────────────────────────────────────────────
 
@@ -240,6 +241,8 @@ export function rebuildTaskSaturationStateFromStream(
 function sanitizeChildTask(
   c: Record<string, unknown>,
   logContext: { rootId: string; childIndex: number },
+  techOracle: ReadonlySet<string>,
+  techConstraints: readonly TechnicalConstraint[],
 ): DecompositionTask | null {
   const id = typeof c.id === 'string' && c.id.length > 0 ? c.id : null;
   const name = typeof c.name === 'string' && c.name.length > 0 ? c.name : null;
@@ -314,6 +317,20 @@ function sanitizeChildTask(
       ? (raw as unknown[]).filter((x): x is string => typeof x === 'string')
       : undefined;
   };
+  // PA-9: snap LLM-drifted TECH-* constraint ids (missing "-1" suffix, drifted
+  // separator, close typo) back to the canonical registry so a saturation
+  // child's active_constraints / traces_to actually join it. Unresolvable
+  // residuals (semantic aliases, noise) pass through unchanged and are logged.
+  const rawConstraints = stringArr('active_constraints');
+  const rawTraces = stringArr('traces_to');
+  const resolvedC = rawConstraints ? resolveTechConstraintIds(rawConstraints, techOracle, techConstraints) : null;
+  const resolvedT = rawTraces ? resolveTechConstraintIds(rawTraces, techOracle, techConstraints) : null;
+  const techRewrites = [...(resolvedC?.rewrites ?? []), ...(resolvedT?.rewrites ?? [])];
+  if (techRewrites.length > 0) {
+    getLogger().warn('workflow', 'Phase 6.1a: resolved drifted TECH-* constraint ids to registry', {
+      ...logContext, childId: id, rewrites: techRewrites,
+    });
+  }
   return {
     id,
     name,
@@ -330,8 +347,8 @@ function sanitizeChildTask(
     write_directory_paths: [canonicalComponentDir(componentId || 'unknown', 'src')],
     read_directory_paths: stringArr('read_directory_paths'),
     dependency_task_ids: stringArr('dependency_task_ids'),
-    active_constraints: stringArr('active_constraints'),
-    traces_to: stringArr('traces_to'),
+    active_constraints: resolvedC?.ids,
+    traces_to: resolvedT?.ids,
   };
 }
 
@@ -400,6 +417,12 @@ export async function runTaskSaturationLoop(
 
   const constraintsText = formatTechnicalConstraints(input.technicalConstraints);
   void constraintsText;
+  // PA-9: canonical TECH-* registry oracle — saturation children routinely drift
+  // these ids; each child is snapped back to a registry member (or kept + logged).
+  const techIdOracle = new Set(input.technicalConstraints.map(t => t.id));
+  // PA-1: component oracle (every id-form keyed in the scoped map) — resolve a
+  // drifted/composite task component_id before component_context falls open.
+  const componentOracle = Object.keys(input.componentSummaryById ?? {});
 
   const pipelineId = `task-decomp-pipe-${workflowRun.id.slice(0, 8)}`;
 
@@ -502,6 +525,13 @@ export async function runTaskSaturationLoop(
     }
   }
 
+  // PA-1 fail-safe visibility: component_context silently falls open to the FULL
+  // summary when a task's component_id isn't a key in componentSummaryById (leaf /
+  // mid-tier id drift — same class as PA-4). Track unique missed ids and WARN once
+  // each so a high fall-open rate surfaces instead of shipping silently.
+  const fellOpenCompIds = new Set<string>();
+  const resolvedCompIds = new Set<string>();
+
   while (queue.length > 0) {
     passNumber++;
     const passStartedAt = new Date().toISOString();
@@ -573,6 +603,32 @@ export async function runTaskSaturationLoop(
           ? '(none)'
           : input.rootTasks.map(t => t.id).join(', ');
 
+        // PA-1: scope component_context to the task's OWN component. On a direct
+        // miss, resolve the id (separator/case drift OR a fabricated composite
+        // `comp-<component>-<entity>`) against the component oracle before falling
+        // open to the full catalog. Only a genuine residual logs.
+        const citedCompId = entry.task.component_id;
+        let scopedComponentCtx = input.componentSummaryById?.[citedCompId];
+        if (citedCompId && scopedComponentCtx === undefined && componentOracle.length > 0) {
+          const resolved = resolveComponentId(citedCompId, componentOracle);
+          if (resolved && resolved !== citedCompId) {
+            scopedComponentCtx = input.componentSummaryById?.[resolved];
+            if (!resolvedCompIds.has(citedCompId)) {
+              resolvedCompIds.add(citedCompId);
+              getLogger().warn('workflow', 'Phase 6.1a task_saturation: resolved drifted/composite component_id to its scoped component (PA-1)', {
+                workflow_run_id: workflowRun.id, component_id: citedCompId, resolved_to: resolved,
+              });
+            }
+          }
+        }
+        if (citedCompId && scopedComponentCtx === undefined
+            && !fellOpenCompIds.has(citedCompId)) {
+          fellOpenCompIds.add(citedCompId);
+          getLogger().warn('workflow', 'Phase 6.1a task_saturation: component_context fell open to the FULL summary — component id unresolvable against the component oracle (PA-1 residual)', {
+            workflow_run_id: workflowRun.id, component_id: citedCompId,
+          });
+        }
+
         const variables: Record<string, string> = {
           active_constraints: activeConstraintsForPrompt,
           parent_task: formatRootTaskForPrompt(entry.task),
@@ -590,7 +646,7 @@ export async function runTaskSaturationLoop(
               ? '(none — sole child under this parent)'
               : sibs.map(s => `- ${s.id}: ${s.name}`).join('\n');
           })(),
-          component_context: input.componentSummaryById?.[entry.task.component_id] ?? input.componentSummary,
+          component_context: scopedComponentCtx ?? input.componentSummary,
           depth_zero_tasks: depthZeroTasksText,
           existing_assumptions: scopedAssumptions.length === 0
             ? '(none yet)'
@@ -676,7 +732,7 @@ export async function runTaskSaturationLoop(
             });
             break;
           }
-          const child = sanitizeChildTask(c, { rootId: entry.displayKey, childIndex: fanoutCount });
+          const child = sanitizeChildTask(c, { rootId: entry.displayKey, childIndex: fanoutCount }, techIdOracle, input.technicalConstraints);
           if (!child) continue;
           const tier = normalizeTier(c.tier);
           const rationale = typeof c.decomposition_rationale === 'string'

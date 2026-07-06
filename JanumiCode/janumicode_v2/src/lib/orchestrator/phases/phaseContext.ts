@@ -13,7 +13,7 @@
  */
 
 import type { GovernedStreamRecord } from '../../types/records';
-import { displayCapability, displayComponentDependency, displayEntityRelationship } from './summaryFormat';
+import { displayCapability, displayComponentDependency, displayEntityRelationship, displayFieldType } from './summaryFormat';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -767,6 +767,22 @@ export function buildEffectiveComponentView(
       const rd = a.root_display_key.localeCompare(b.root_display_key);
       return rd !== 0 ? rd : a.display_key.localeCompare(b.display_key);
     });
+    // PA-3 fix (2026-07-05): the leaf component's own `traces_to` are RESPONSIBILITY
+    // ids (`res-*`/`resp-*`), NOT requirement ids — seeding `satisfies_requirement_ids`
+    // from them mislabels the field AND made phase6's per-component AC-menu scoping
+    // fall open to the full inventory on 100% of calls (componentRoots were `res-*`,
+    // leaf-AC roots are `US-*` → never intersect). The real component→US linkage lives
+    // on the ROOT component_model (`traces_to` = `US-*`); resolve it via the leaf's
+    // `root_display_key` so this field carries real requirement ids (also corrects the
+    // component→requirement `satisfies` edge in ingestionPipelineRunner).
+    const rootTracesByRootKey = new Map<string, string[]>(
+      rootComponents.map(rc => {
+        const raw = Array.isArray(rc.traces_to)
+          ? rc.traces_to
+          : (Array.isArray(rc.satisfies_requirement_ids) ? rc.satisfies_requirement_ids : []);
+        return [String(rc.id), (raw as unknown[]).filter((x): x is string => typeof x === 'string')];
+      }),
+    );
     const componentRecords = sorted.map(l => ({
       id: l.component.id,
       name: l.component.name,
@@ -785,7 +801,9 @@ export function buildEffectiveComponentView(
         kind: d.kind,
       })),
       active_constraints: l.component.active_constraints ?? [],
-      satisfies_requirement_ids: l.component.traces_to,
+      // PA-3: real requirement (US-*) ids from the ROOT component_model, joined via
+      // root_display_key — NOT the leaf's own `res-*` responsibility ids (see above).
+      satisfies_requirement_ids: rootTracesByRootKey.get(l.root_display_key) ?? [],
       // Preserve leaf-derived metadata for downstream phases that want it.
       _leaf_node_id: l.node_id,
       _leaf_display_key: l.display_key,
@@ -1141,7 +1159,7 @@ export function buildEffectiveDataModelView(
     }
     const summaryLines = sorted.map(l => {
       const release = l.release_ordinal != null ? `Release ${l.release_ordinal}` : 'Backlog';
-      const fieldStr = l.entity.fields.map(f => `${f.name}:${f.type}`).join(', ');
+      const fieldStr = l.entity.fields.map(f => `${f.name}:${displayFieldType(f.type)}`).join(', ');
       return `[${release}] ${l.display_key} (Tier ${l.tier ?? '?'} leaf under ${l.root_display_key}): ${l.entity.name}\n  Fields: ${fieldStr}`;
     });
     return {

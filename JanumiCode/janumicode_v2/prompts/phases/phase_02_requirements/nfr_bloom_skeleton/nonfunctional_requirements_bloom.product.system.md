@@ -69,7 +69,8 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are dropped
 
 # Output format (strict)
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "requirements": [
     {
@@ -95,7 +96,6 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are dropped
     { "seed_id": "VV-12", "absorbed_into": "NFR-007", "reason": "Rolled into broader availability NFR covering all user-facing APIs." }
   ]
 }
-```
 
 ## Pass-1 per-NFR contract
 

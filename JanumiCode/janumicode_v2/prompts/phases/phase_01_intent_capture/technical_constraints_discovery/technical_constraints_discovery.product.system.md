@@ -76,7 +76,8 @@ Before emitting, scan your draft list: if any two records carry the same `source
 
 # Response Format
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "kind": "technical_constraints_discovery",
   "technicalConstraints": [
@@ -94,7 +95,6 @@ Before emitting, scan your draft list: if any two records carry the same `source
     }
   ]
 }
-```
 
 `id`: a semantic slug of the form `TECH-<UPPER-SLUG>` — evocative of the constraint itself, NOT a running number. Use the technology/concept name uppercased with hyphens (e.g. `TECH-REACT-19`, `TECH-POSTGRES-16`, `TECH-SOC2`, `TECH-REDIS-STREAMS`). Slug MUST match `^TECH-[A-Z0-9_-]+$`. If two constraints would slug identically, suffix the second with `-2`, the third with `-3`, etc. for deterministic disambiguation.
 `category`: open-ended — `frontend`, `backend`, `database`, `infrastructure`, `security`, `deployment`, `cdn`, `workflow_engine`, `mobile`, `identity`, `monitoring`, `integration_protocol`, `build_ci`, or a source-specific category when none of those fit.

@@ -12,6 +12,8 @@ import {
   displayCapability,
   displayComponentDependency,
   displayEntityRelationship,
+  displayFieldType,
+  displayFieldConstraint,
 } from '../../../../lib/orchestrator/phases/summaryFormat';
 
 const NO_OBJECT_LITERAL = /\[object Object\]/;
@@ -85,6 +87,45 @@ describe('summaryFormat (PA-8 serializer fix)', () => {
       const out = displayEntityRelationship({ foo: 'bar' });
       expect(out).toBe('(unspecified) (references)');
       expect(out).not.toMatch(NO_OBJECT_LITERAL);
+    });
+  });
+
+  // PA-8b — the data-model "Fields:" per-field type/constraint annotation was a
+  // distinct serializer path PA-8 didn't cover (cal-38: `role: string ([object
+  // Object])`, `uuid: undefined` in ~14/900 phase-05 prompts).
+  describe('displayFieldType', () => {
+    it('passes a string type through', () => {
+      expect(displayFieldType('uuid')).toBe('uuid');
+    });
+    it('extracts a nested object type without leaking [object Object]', () => {
+      const out = displayFieldType({ type: 'varchar', sql_type: 'VARCHAR(255)' });
+      expect(out).toBe('varchar');
+      expect(out).not.toMatch(NO_OBJECT_LITERAL);
+    });
+    it('renders "" (not the literal "undefined") for a missing type', () => {
+      expect(displayFieldType(undefined)).toBe('');
+      expect(displayFieldType(null)).toBe('');
+    });
+    it('never leaks for a fully-unknown object shape', () => {
+      expect(displayFieldType({ weird: 1 })).not.toMatch(NO_OBJECT_LITERAL);
+    });
+  });
+
+  describe('displayFieldConstraint', () => {
+    it('passes a string constraint through', () => {
+      expect(displayFieldConstraint('unique,not_null')).toBe('unique,not_null');
+    });
+    it('joins an array constraint', () => {
+      expect(displayFieldConstraint(['not_null', 'unique'])).toBe('not_null, unique');
+    });
+    it('renders an object constraint as k=v pairs — never [object Object]', () => {
+      const out = displayFieldConstraint({ max_length: 255, unique: true });
+      expect(out).toBe('max_length=255, unique=true');
+      expect(out).not.toMatch(NO_OBJECT_LITERAL);
+    });
+    it('returns "" for an absent constraint (caller omits the trailing "(...)")', () => {
+      expect(displayFieldConstraint(undefined)).toBe('');
+      expect(displayFieldConstraint(null)).toBe('');
     });
   });
 });

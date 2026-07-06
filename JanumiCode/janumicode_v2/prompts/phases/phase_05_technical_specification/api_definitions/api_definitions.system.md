@@ -23,9 +23,8 @@ GOVERNING CONSTRAINTS (apply without exception):
 
 Produce [JC:API Definitions] for each Component's externally callable interfaces.
 
-REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `definitions` (an array). Do NOT wrap the array under an `api_definitions` key — the response IS the api_definitions artifact, so its immediate top-level field is `definitions`, not a nested `{api_definitions: {...}}` wrapper.
+REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `definitions` (an array). Do NOT wrap the array under an `api_definitions` key — the response IS the api_definitions artifact, so its immediate top-level field is `definitions`, not a nested `{api_definitions: {...}}` wrapper. Emit it as raw JSON — start at `{`, end at `}`, with no surrounding code fences:
 
-```json
 {
   "definitions": [
     {
@@ -36,7 +35,6 @@ REQUIRED OUTPUT: emit ONE JSON object whose top-level key is `definitions` (an a
     }
   ]
 }
-```
 
 Rules:
 - Every endpoint must have an explicit authentication requirement (Invariant: API-001)

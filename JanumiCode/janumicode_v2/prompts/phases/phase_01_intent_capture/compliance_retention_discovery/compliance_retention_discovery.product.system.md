@@ -76,7 +76,8 @@ Before emitting, scan your draft list: if any two records carry the same `source
 
 # Response Format
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "kind": "compliance_retention_discovery",
   "compliance_extracted_items": [
@@ -93,7 +94,6 @@ Before emitting, scan your draft list: if any two records carry the same `source
     }
   ]
 }
-```
 
 `id`: a semantic slug of the form `COMP-<UPPER-SLUG>` — evocative of the regime/obligation itself, NOT a running number. Use the regime name uppercased with hyphens (e.g. `COMP-GDPR-RTBF`, `COMP-HIPAA-AUDIT`, `COMP-SOC2-TYPE2`, `COMP-RETENTION-7YR`, `COMP-PCI-DSS`). Slug MUST match `^COMP-[A-Z0-9_-]+$`. If two items would slug identically, suffix the second with `-2`, the third with `-3`, etc. for deterministic disambiguation. (Distinct prefix from product decisions' `DEC-n`.)
 `timestamp`: ISO 8601 in UTC; if unsure, use the current date at 00:00:00Z.

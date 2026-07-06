@@ -475,11 +475,25 @@ export class Phase7Handler implements PhaseHandler {
     // global uniqueness on the merged list below (SD-5 renumber-on-collision).
     interface ProducedSuite { suite: TestSuite; key: string }
 
+    // PA-15 fail-safe visibility: renderScopedAcMenu falls open to the FULL AC
+    // inventory when a component is absent from componentAcMap (no AC-bearing task).
+    // Track unique fell-open components and WARN once each (mirrors PA-3).
+    const fellOpenAcComponents = new Set<string>();
+
     const { produced } = await chunkedCoverageBloom<Record<string, unknown>, ProducedSuite>({
       chunks,
       // ── Per-component generation: ONE bounded call per component ──
       generateForChunk: async (component, index) => {
         const cid = String(component.id);
+        // PA-15: renderScopedAcMenu falls open to the FULL menu when this component
+        // is absent from componentAcMap — log the first occurrence of each.
+        const ownedAcs = componentAcMap.get(cid);
+        if ((!ownedAcs || ownedAcs.size === 0) && !fellOpenAcComponents.has(cid)) {
+          fellOpenAcComponents.add(cid);
+          getLogger().warn('workflow', 'Phase 7.1 test_case_skeleton: AC menu fell open to the FULL inventory — component absent from componentAcMap (no AC-bearing task bound; PA-15 fallback)', {
+            workflow_run_id: ctx.workflowRun.id, component_id: cid,
+          });
+        }
         const scopedAcMenu = renderScopedAcMenu(cid, componentAcMap, leafAcceptanceCriteria);
         const rendered = engine.templateLoader.render(template, {
           active_constraints: dmr.activeConstraintsText,

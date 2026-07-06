@@ -98,9 +98,8 @@ Your response MUST be a single valid JSON object. Strict rules:
 
 # Response Format
 
-Your ENTIRE response must be a single JSON object. No prose, no markdown fences. Every item in `requirements` / `decisions` / `constraints` / `open_questions` MUST be an object with `id`, `type`, `text` fields (NOT a plain string).
+Every item in `requirements` / `decisions` / `constraints` / `open_questions` MUST be an object with `id`, `type`, `text` fields (NOT a plain string). Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 
-```json
 {
   "kind": "intent_discovery",
   "analysis_summary": "2-5 paragraph product discovery summary. Lead with vision + who it serves. Describe key user groups and their core journeys. Highlight what source documents cover well and where product decisions remain needed.",
@@ -129,7 +128,6 @@ Your ENTIRE response must be a single JSON object. No prose, no markdown fences.
   "constraints":  [{ "id": "CON-1", "type": "CONSTRAINT",  "text": "Business, regulatory, or scope constraint" }],
   "open_questions":[{ "id": "Q-1",   "type": "OPEN_QUESTION","text": "Product/business question only the user can answer" }]
 }
-```
 
 # Discovery Quality
 Your output should read like a brief from a product manager who deeply understands the user's vision. It should:

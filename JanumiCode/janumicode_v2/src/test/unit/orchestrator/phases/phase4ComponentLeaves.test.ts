@@ -218,4 +218,65 @@ describe('buildEffectiveComponentView', () => {
     expect(deps[0].dependency_type).toBe('sync_call');
     expect(deps[0].kind).toBe('sync_call');
   });
+
+  // PA-3 regression (2026-07-05): the pre-fix producer seeded the leaf view's
+  // `satisfies_requirement_ids` from the leaf's OWN `traces_to`, which are `res-*`
+  // RESPONSIBILITY ids, not requirement ids. That made phase6's per-component AC-menu
+  // scoping intersect `{res-*}` against `US-*` leaf-AC roots → 0 overlap → 100%
+  // fail-open (cal-38: 30/30 unscoped, undetected). The real US linkage lives on the
+  // ROOT component_model; the view must surface THAT, joined via root_display_key.
+  it('PA-3: leaf satisfies_requirement_ids resolves to the ROOT US traces, not the leaf res-* responsibilities', () => {
+    const records = [
+      rec(compNode({ id: 'comp-x', rootId: 'comp-x', depth: 0, status: 'decomposed' })),
+      rec({
+        ...compNode({ id: 'leaf-x', rootId: 'comp-x', parent: 'comp-x', depth: 1, status: 'atomic', tier: 'D' }),
+        component: {
+          id: 'leaf-x',
+          name: 'Leaf X',
+          responsibilities: [{ id: 'res-x-1', description: 'do x' }],
+          dependencies: [],
+          // The pre-fix mis-seed: leaf carries responsibility-id traces.
+          traces_to: ['res-x-1'],
+        },
+      }),
+    ];
+    const prior = emptyPrior();
+    prior.componentModel = {
+      recordId: 'cm-1',
+      content: { components: [{ id: 'comp-x', traces_to: ['US-001', 'US-010'] }] },
+      summary: 'root component summary',
+    };
+    const view = buildEffectiveComponentView(records, prior);
+    const c = view.components.find(x => x.id === 'leaf-x');
+    expect(c).toBeDefined();
+    expect(c?.satisfies_requirement_ids).toEqual(['US-001', 'US-010']);
+    // Never the responsibility ids (the pre-fix bug).
+    expect(c?.satisfies_requirement_ids).not.toContain('res-x-1');
+  });
+
+  it('PA-3: falls back to [] (never res-*) when the root component has no US traces', () => {
+    const records = [
+      rec(compNode({ id: 'comp-y', rootId: 'comp-y', depth: 0, status: 'decomposed' })),
+      rec({
+        ...compNode({ id: 'leaf-y', rootId: 'comp-y', parent: 'comp-y', depth: 1, status: 'atomic', tier: 'D' }),
+        component: {
+          id: 'leaf-y',
+          name: 'Leaf Y',
+          responsibilities: [{ id: 'res-y-1', description: 'do y' }],
+          dependencies: [],
+          traces_to: ['res-y-1'],
+        },
+      }),
+    ];
+    const prior = emptyPrior();
+    prior.componentModel = {
+      recordId: 'cm-2',
+      content: { components: [{ id: 'comp-y' }] }, // no traces_to on the root
+      summary: 'root component summary',
+    };
+    const view = buildEffectiveComponentView(records, prior);
+    const c = view.components.find(x => x.id === 'leaf-y');
+    expect(c).toBeDefined();
+    expect(c?.satisfies_requirement_ids).toEqual([]);
+  });
 });

@@ -59,7 +59,8 @@ Response must be a single valid JSON object:
 
 # Response Format
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "kind": "user_journey_decomposition",
   "parent_journey_id": "UJ-PARENT-SLUG",
@@ -96,7 +97,6 @@ Response must be a single valid JSON object:
     }
   ]
 }
-```
 
 Notes:
 - **`already_atomic: true`** with empty `children[]` is a valid response — use it when the parent is genuinely cohesive and decomposition would fragment it.

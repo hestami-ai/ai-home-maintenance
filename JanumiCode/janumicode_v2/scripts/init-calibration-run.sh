@@ -7,10 +7,14 @@
 # .janumicode/config.json (it no longer seeds from a prior cal workspace — the legacy
 # cal-* runs require no backwards-compat and will be deleted).
 #
-# Usage:
+# Usage (fresh run):
 #   scripts/init-calibration-run.sh [-n <N>] [-s <spec-path>] [-m <model>]
 #                                   [-x <executor-model-ref>] [-c <ctx>] [-X <executor-backing>]
 #                                   [-y] [--dry-run] [-- <extra-args-for-wave6>]
+#
+# Usage (resume after a stop-and-fix — re-run cal-N from a phase/sub-phase):
+#   scripts/init-calibration-run.sh -R <N> (-S <sub-phase> | -P <phase>) [-x <exec>] [-y]
+#   e.g.  scripts/init-calibration-run.sh -R 39 -S user_journey_bloom -y
 #
 # Options:
 #   -n <N>           Calibration number (e.g. 29 → cal-29). Defaults to
@@ -23,6 +27,13 @@
 #   -x <ref>         Phase-9 executor (mimo) model ref. Default: ollama-local/<-m model>.
 #   -c <ctx>         Executor context window (== Ollama's loaded num_ctx). Default 131072.
 #   -X <backing>     Executor backing tool. Default mimo_cli.
+#   -R <N>           RESUME cal-N (reuses its workspace/config/intent + latest DB)
+#                    instead of a fresh run. Requires -S or -P. Only valid when the
+#                    fix does NOT change how upstream artifacts are GENERATED (the
+#                    CLI rolls back records at-or-after the cutoff + re-executes
+#                    their deterministic pipeline; cached LLM calls replay).
+#   -S <sub-phase>   Resume at this sub-phase (e.g. user_journey_bloom); precedence over -P.
+#   -P <phase>       Resume at this phase (e.g. 1).
 #   -y               Skip confirmation prompt.
 #   --dry-run        Print actions without creating files or launching.
 #
@@ -57,6 +68,13 @@ planning_model="gemma4:31b-it-qat"
 executor_backing="mimo_cli"
 executor_model=""
 executor_context="131072"
+# Resume mode (stop-and-fix): re-run an existing cal-N from a phase/sub-phase
+# instead of a cold start. Only valid when the fix does NOT change how upstream
+# artifacts are GENERATED (post-processing/validation fixes only) — cached LLM
+# calls replay; the affected deterministic step + downstream re-execute.
+resume_cal=""
+resume_phase=""
+resume_sub_phase=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -66,13 +84,73 @@ while [[ $# -gt 0 ]]; do
     -x) executor_model="$2"; shift 2 ;;
     -c) executor_context="$2"; shift 2 ;;
     -X) executor_backing="$2"; shift 2 ;;
+    -R) resume_cal="$2"; shift 2 ;;
+    -P) resume_phase="$2"; shift 2 ;;
+    -S) resume_sub_phase="$2"; shift 2 ;;
     -y) skip_confirm=1; shift ;;
     --dry-run) dry_run=1; shift ;;
     --) shift; forwarded_args=("$@"); break ;;
-    -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,47p' "$0"; exit 0 ;;
     *) echo "[init-cal] unknown option: $1" >&2; exit 2 ;;
   esac
 done
+
+# ── Resume mode ─────────────────────────────────────────────────────
+# Resume an existing cal-N after a stop-and-fix, re-running only the affected
+# deterministic step + downstream against the existing workspace DB (cached LLM
+# calls replay). Reuses cal-N's workspace / config.json / intent.md verbatim —
+# so the fix must NOT change how UPSTREAM artifacts are GENERATED.
+if [[ -n "${resume_cal}" ]]; then
+  if [[ -z "${resume_phase}" && -z "${resume_sub_phase}" ]]; then
+    echo "[init-cal] resume (-R <N>) requires -P <phase> or -S <sub-phase>" >&2; exit 2
+  fi
+  resume_ws="${CAL_ROOT}/calibration-workspace-cal-${resume_cal}"
+  [[ -d "${resume_ws}" ]] || { echo "[init-cal] resume workspace not found: ${resume_ws}" >&2; exit 1; }
+  resume_db="$(ls -t "${resume_ws}/.janumicode/test-harness/"*.db 2>/dev/null | head -n1 || true)"
+  [[ -n "${resume_db}" ]] || { echo "[init-cal] no run DB under ${resume_ws}/.janumicode/test-harness/" >&2; exit 1; }
+  resume_intent="${resume_ws}/.janumicode/intent.md"
+  resume_config="${resume_ws}/.janumicode/config.json"
+  # Executor model: -x wins; else read it from the run's own config.json so the
+  # resumed executor matches the original (awk finds the model on the executor line).
+  if [[ -z "${executor_model}" ]]; then
+    executor_model="$(awk '/"executor"/{f=1} f&&/"model"/{sub(/.*"model"[[:space:]]*:[[:space:]]*"/,"");sub(/".*/,"");print;exit}' "${resume_config}" 2>/dev/null || true)"
+  fi
+  executor_model="${executor_model:-ollama-local/${planning_model}}"
+  resume_args=(--resume-from-db "${resume_db}")
+  if [[ -n "${resume_sub_phase}" ]]; then
+    resume_args+=(--resume-at-sub-phase "${resume_sub_phase}")
+    resume_target="sub-phase ${resume_sub_phase}"
+  else
+    resume_args+=(--resume-at-phase "${resume_phase}")
+    resume_target="phase ${resume_phase}"
+  fi
+  echo "[init-cal] RESUME cal-${resume_cal}"
+  echo "[init-cal] workspace   : ${resume_ws}"
+  echo "[init-cal] resume DB   : ${resume_db}"
+  echo "[init-cal] resume at   : ${resume_target}"
+  echo "[init-cal] executor    : ${executor_backing}  model=${executor_model}  ctx=${executor_context}"
+  if (( dry_run )); then echo "[init-cal] --dry-run set; would resume as above. No changes made."; exit 0; fi
+  if (( ! skip_confirm )); then
+    read -r -p "[init-cal] Proceed with resume? [y/N] " confirm
+    case "${confirm}" in y|Y|yes|YES) ;; *) echo "[init-cal] aborted."; exit 0 ;; esac
+  fi
+  export JANUMICODE_EXECUTOR_BACKING_TOOL="${executor_backing}"
+  export JANUMICODE_MIMO_MODEL="${executor_model}"
+  export JANUMICODE_MIMO_OPENAI_CONTEXT="${executor_context}"
+  export JANUMICODE_MIMO_OPENAI_MAX_OUTPUT="${JANUMICODE_MIMO_OPENAI_MAX_OUTPUT:-32768}"
+  export JANUMICODE_EXECUTOR_IDLE_TIMEOUT_S="${JANUMICODE_EXECUTOR_IDLE_TIMEOUT_S:-3600}"
+  if [[ ! -f "${REPO_ROOT}/dist/cli/janumicode.js" ]]; then
+    echo "[init-cal] dist/cli/janumicode.js not found; building first..."
+    ( cd "${REPO_ROOT}" && pnpm build )
+  fi
+  echo "[init-cal] launching wave6-calibration-run.js (resume)..."
+  exec node "${SCRIPT_DIR}/wave6-calibration-run.js" \
+    --intent "${resume_intent}" \
+    --workspace "${resume_ws}" \
+    "${resume_args[@]}" \
+    "${forwarded_args[@]}"
+fi
+
 # Executor model defaults to the planning model via the local provider.
 executor_model="${executor_model:-ollama-local/${planning_model}}"
 

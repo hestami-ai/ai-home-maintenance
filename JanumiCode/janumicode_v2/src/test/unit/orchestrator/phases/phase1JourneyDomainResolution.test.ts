@@ -5,6 +5,10 @@
  *   - cal-33: underscore drift `DOM-AI_CONCIERGE-INTERACTION` (fix #5, hyphen normalize)
  *   - cal-36: plural drift `DOM-USERS-AUTHENTICATION` vs `DOM-USER-AUTHENTICATION`
  *     — a semantic/token drift the hyphen normalizer CANNOT reach.
+ *   - cal-39: TRUNCATION `DOM-COMMUNICATION` vs `DOM-COMMUNITY-COMMUNICATION`
+ *     — a dropped whole token, ~0.6 similarity, below any safe Levenshtein
+ *     threshold. Handled by the `resolveByTokenSubset` fallback (unique
+ *     strict-token-superset host).
  *
  * `resolveJourneyDomainRefs` generalizes the per-variant normalizers into a
  * deterministic oracle-resolution pass: each ref is re-anchored to the
@@ -21,6 +25,7 @@ const ORACLE = [
   'DOM-AI-CONCIERGE-INTERACTION',
   'DOM-PAYMENT-PROCESSING',
   'DOM-PROVIDER-DISCOVERY',
+  'DOM-COMMUNITY-COMMUNICATION',
 ];
 
 describe('resolveJourneyDomainRefs — journey→domain oracle resolution', () => {
@@ -39,6 +44,15 @@ describe('resolveJourneyDomainRefs — journey→domain oracle resolution', () =
     expect(out[0].businessDomainIds).toEqual(['DOM-AI-CONCIERGE-INTERACTION']);
     expect(remapped).toEqual([
       { journey: 'UJ-2', from: 'DOM-AI_CONCIERGE-INTERACTION', to: 'DOM-AI-CONCIERGE-INTERACTION' },
+    ]);
+  });
+
+  it('(2b) resolves a TRUNCATION (dropped token) via token-subset (the cal-39 defect)', () => {
+    const journeys = [{ id: 'UJ-2b', businessDomainIds: ['DOM-COMMUNICATION'] }];
+    const { journeys: out, remapped } = resolveJourneyDomainRefs(journeys, ORACLE);
+    expect(out[0].businessDomainIds).toEqual(['DOM-COMMUNITY-COMMUNICATION']);
+    expect(remapped).toEqual([
+      { journey: 'UJ-2b', from: 'DOM-COMMUNICATION', to: 'DOM-COMMUNITY-COMMUNICATION' },
     ]);
   });
 

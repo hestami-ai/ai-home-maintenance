@@ -37,7 +37,7 @@ Do not penalize ACs for being specific (that's good) or for citing a named stand
 
 # Required output
 
-```json
+Emit a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 {
   "findings": [
     {
@@ -53,7 +53,6 @@ Do not penalize ACs for being specific (that's good) or for citing a named stand
   ],
   "summary": "1 of 2 children have policy-shaped acceptance criteria, suggesting their Tier-B parent may still hide commitment-level scope."
 }
-```
 
 # Rules
 

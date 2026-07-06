@@ -115,7 +115,8 @@ Your response MUST be a single valid JSON object. Strict rules:
 
 # Response Format
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "kind": "user_journey_bloom",
   "user_journeys": [
@@ -162,7 +163,6 @@ Your response MUST be a single valid JSON object. Strict rules:
     { "domain_id": "DOM-n", "reason": "Why no journey exists in this domain." }
   ]
 }
-```
 
 Field notes:
 - **`umbrella: true`** marks a journey that is too broad to be atomic and should be further decomposed by 1.3a's decomposition step. Use sparingly — only when the journey spans multiple distinct sub-flows that each deserve their own title and acceptance criteria.

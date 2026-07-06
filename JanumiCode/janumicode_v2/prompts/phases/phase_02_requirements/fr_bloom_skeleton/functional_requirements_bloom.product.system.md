@@ -62,7 +62,7 @@ Small models have a well-known bias toward *create/submit/update* FRs and tend t
 
 Concrete example of what a GOVERNANCE FR looks like — don't skip these:
 
-```json
+```
 {
   "id": "US-XXX",
   "role": "Board Member",
@@ -96,7 +96,8 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are rejecte
 
 # Output format (strict)
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "user_stories": [
     {
@@ -119,7 +120,6 @@ Use ONLY ids that appear in the handoff sections below. Invented ids are rejecte
     { "journey_id": "UJ-XYZ", "reason": "Covered by US-NNN under a shared scope; see merge rationale" }
   ]
 }
-```
 
 ## Pass-1 per-FR contract
 

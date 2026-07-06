@@ -15,7 +15,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { displayEntityRelationship } from './summaryFormat';
+import { displayEntityRelationship, displayFieldType, displayFieldConstraint } from './summaryFormat';
 import type { PhaseContext } from '../orchestratorEngine';
 import type {
   GovernedStreamRecord,
@@ -36,6 +36,7 @@ import type {
 import type { MirrorItemDecision } from '../../types/decisionBundle';
 import { getLogger } from '../../logging';
 import { createEmbeddingClient, findNearestAbove, type EmbeddingClient } from '../../llm/embeddings';
+import { resolveTechConstraintIds, resolveComponentId } from '../idResolver';
 
 function mintLogicalNodeId(): string { return randomUUID(); }
 function collisionSafeDisplayKey(rawId: string, sib: Set<string>, nid: string): string {
@@ -199,6 +200,8 @@ export function rebuildDataModelSaturationStateFromStream(
 function sanitizeChildEntity(
   c: Record<string, unknown>,
   ctx: { rootId: string; childIndex: number },
+  techOracle: ReadonlySet<string>,
+  techConstraints: readonly TechnicalConstraint[],
 ): DecompositionEntity | null {
   const id = typeof c.id === 'string' && c.id.length > 0 ? c.id : null;
   const name = typeof c.name === 'string' && c.name.length > 0 ? c.name : null;
@@ -242,21 +245,40 @@ function sanitizeChildEntity(
       ? (raw as unknown[]).filter((x): x is string => typeof x === 'string')
       : undefined;
   };
+  // PA-9: snap LLM-drifted TECH-* constraint ids (missing "-1" suffix, drifted
+  // separator, close typo) back to the canonical registry so a saturation
+  // child's active_constraints / traces_to actually join it. Unresolvable
+  // residuals (semantic aliases, noise) pass through unchanged and are logged.
+  const rawConstraints = stringArr('active_constraints');
+  const rawTraces = stringArr('traces_to');
+  const resolvedC = rawConstraints ? resolveTechConstraintIds(rawConstraints, techOracle, techConstraints) : null;
+  const resolvedT = rawTraces ? resolveTechConstraintIds(rawTraces, techOracle, techConstraints) : null;
+  const techRewrites = [...(resolvedC?.rewrites ?? []), ...(resolvedT?.rewrites ?? [])];
+  if (techRewrites.length > 0) {
+    getLogger().warn('workflow', 'Phase 5.1a: resolved drifted TECH-* constraint ids to registry', {
+      ...ctx, childId: id, rewrites: techRewrites,
+    });
+  }
   return {
     id, name,
     kind: entityKind,
     component_id: typeof c.component_id === 'string' ? c.component_id : null,
     fields,
     relationships,
-    active_constraints: stringArr('active_constraints'),
-    traces_to: stringArr('traces_to'),
+    active_constraints: resolvedC?.ids,
+    traces_to: resolvedT?.ids,
   };
 }
 
 export function formatEntityForPrompt(e: DecompositionEntity): string {
-  const fields = e.fields.map(f =>
-    `  - ${f.name}: ${f.type}${f.is_identity ? ' [PK]' : ''}${f.constraints ? ` (${f.constraints})` : ''}`,
-  ).join('\n');
+  // PA-8b: coerce type/constraints defensively — the typed contract says `string`
+  // but LLM output drifts to objects/undefined, which naive interpolation renders
+  // as `[object Object]` / `undefined` into the Fields block.
+  const fields = e.fields.map(f => {
+    const type = displayFieldType(f.type);
+    const constraint = displayFieldConstraint(f.constraints);
+    return `  - ${f.name}: ${type}${f.is_identity ? ' [PK]' : ''}${constraint ? ` (${constraint})` : ''}`;
+  }).join('\n');
   const rels = (e.relationships ?? []).length === 0
     ? '(none)'
     : (e.relationships ?? []).map(r => `  - ${displayEntityRelationship(r)}`).join('\n');
@@ -292,6 +314,12 @@ export async function runDataModelSaturationLoop(
 ): Promise<void> {
   const { engine, workflowRun } = ctx;
   const caps = engine.configManager.get().decomposition;
+  // PA-9: canonical TECH-* registry oracle — saturation children routinely drift
+  // these ids; each child is snapped back to a registry member (or kept + logged).
+  const techIdOracle = new Set(input.technicalConstraints.map(t => t.id));
+  // PA-4: component oracle (every id-form keyed in the scoped map) — used to
+  // resolve a drifted/composite component_id before component_context falls open.
+  const componentOracle = Object.keys(input.componentSummaryById ?? {});
 
   const template = engine.templateLoader.findTemplate('technical_spec_agent', config.templateSubPhase);
   if (!template) {
@@ -384,6 +412,13 @@ export async function runDataModelSaturationLoop(
     parentChain.set(c.node_id, c.parent_node_id);
   }
 
+  // PA-4 fail-safe visibility: component_context silently falls open to the FULL
+  // summary when a node's component_id isn't a key in componentSummaryById (leaf /
+  // mid-tier id drift). Track unique missed ids and WARN once each, so a high
+  // fall-open rate is visible rather than silent (mirrors the PA-3 stop-and-fix).
+  const fellOpenCompIds = new Set<string>();
+  const resolvedCompIds = new Set<string>();
+
   while (queue.length > 0) {
     passNumber++;
     const passStartedAt = new Date().toISOString();
@@ -451,6 +486,35 @@ export async function runDataModelSaturationLoop(
           ? '(none)'
           : input.rootEntities.map(e => `- ${e.id}: ${e.name}`).join('\n');
 
+        // PA-4: scope component_context to the entity's OWN component. On a direct
+        // miss, resolve the id — separator/case drift OR a fabricated composite
+        // `comp-<component>-<entity>` (data-model saturation invents these, e.g.
+        // `comp-appointment-core-auditlogentry`) — against the component oracle
+        // before falling open to the full catalog. Only a genuine residual logs.
+        const citedCompId = entry.entity.component_id;
+        let scopedComponentCtx = citedCompId
+          ? input.componentSummaryById?.[citedCompId]
+          : undefined;
+        if (citedCompId && scopedComponentCtx === undefined && componentOracle.length > 0) {
+          const resolved = resolveComponentId(citedCompId, componentOracle);
+          if (resolved && resolved !== citedCompId) {
+            scopedComponentCtx = input.componentSummaryById?.[resolved];
+            if (!resolvedCompIds.has(citedCompId)) {
+              resolvedCompIds.add(citedCompId);
+              getLogger().warn('workflow', 'Phase 5.1a data_model_saturation: resolved drifted/composite component_id to its scoped component (PA-4)', {
+                workflow_run_id: workflowRun.id, component_id: citedCompId, resolved_to: resolved,
+              });
+            }
+          }
+        }
+        if (citedCompId && scopedComponentCtx === undefined
+            && !fellOpenCompIds.has(citedCompId)) {
+          fellOpenCompIds.add(citedCompId);
+          getLogger().warn('workflow', 'Phase 5.1a data_model_saturation: component_context fell open to the FULL summary — component id unresolvable against the component oracle (PA-4 residual)', {
+            workflow_run_id: workflowRun.id, component_id: citedCompId,
+          });
+        }
+
         const variables: Record<string, string> = {
           active_constraints: activeConstraintsForPrompt,
           parent_entity: formatEntityForPrompt(entry.entity),
@@ -468,8 +532,8 @@ export async function runDataModelSaturationLoop(
               : sibs.map(s => `- ${s.id}: ${s.name}`).join('\n');
           })(),
           // Scope component_context to the entity's OWN component (PA-4), not the
-          // whole component backlog. Fallback to the full summary when unresolved.
-          component_context: (entry.entity.component_id ? input.componentSummaryById?.[entry.entity.component_id] : undefined) ?? input.componentSummary,
+          // whole component backlog; fall open to the full summary on a miss (logged above).
+          component_context: scopedComponentCtx ?? input.componentSummary,
           system_requirements_summary: input.systemRequirementsSummary,
           ancestor_chain: ancestorChainText,
           depth_zero_entities: depthZeroText,
@@ -540,7 +604,7 @@ export async function runDataModelSaturationLoop(
         let fanoutCount = 0;
         for (const c of childrenRaw) {
           if (++fanoutCount > caps.data_model_fanout_cap) break;
-          const child = sanitizeChildEntity(c, { rootId: entry.displayKey, childIndex: fanoutCount });
+          const child = sanitizeChildEntity(c, { rootId: entry.displayKey, childIndex: fanoutCount }, techIdOracle, input.technicalConstraints);
           if (!child) continue;
           const tier = normalizeTier(c.tier);
           const rationale = typeof c.decomposition_rationale === 'string' ? c.decomposition_rationale : undefined;
@@ -1037,7 +1101,7 @@ function emitTierBGateBundles(
     const items = childItems.map(c => ({
       item_id: c.itemId,
       title: `${c.entity.name} (${c.displayKey})`,
-      description: c.entity.fields.map(f => `• ${f.name}: ${f.type}`).join('\n'),
+      description: c.entity.fields.map(f => `• ${f.name}: ${displayFieldType(f.type)}`).join('\n'),
       details: {
         entity_id: c.entity.id,
         kind: c.entity.kind,

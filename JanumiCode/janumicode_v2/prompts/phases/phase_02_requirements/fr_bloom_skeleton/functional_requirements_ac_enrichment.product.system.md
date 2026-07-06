@@ -76,7 +76,8 @@ Use the canonical vocabulary verbatim. If the glossary says `assessment`, do not
 
 Return ONLY the enriched FR as a JSON object — SAME shape as the skeleton, but with the `acceptance_criteria` array now fully populated. Echo back all other fields unchanged.
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "id": "US-001",
   "role": "Homeowner",
@@ -102,7 +103,6 @@ Return ONLY the enriched FR as a JSON object — SAME shape as the skeleton, but
     }
   ]
 }
-```
 
 # Rules
 

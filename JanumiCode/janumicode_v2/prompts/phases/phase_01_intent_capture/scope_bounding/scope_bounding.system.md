@@ -22,8 +22,7 @@ Step 2 — Dependency Closure: If breadth is multi_product, identify concepts an
 
 Step 3 — Compliance Context: Identify domain-specific compliance regimes (accounting standards, legal regulations, industry standards, accessibility requirements, data privacy laws).
 
-REQUIRED OUTPUT FORMAT (JSON):
-```json
+REQUIRED OUTPUT FORMAT — emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
 {
   "scope_classification": {
     "breadth": "single_feature|single_product|multi_product_ecosystem",
@@ -34,7 +33,6 @@ REQUIRED OUTPUT FORMAT (JSON):
     "regimes": [{"name": "...", "description": "...", "applicable_phases": ["..."], "relevant_artifacts": ["..."]}]
   }
 }
-```
 
 [PRODUCT SCOPE]
 Raw Intent:

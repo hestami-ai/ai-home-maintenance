@@ -26,7 +26,7 @@ import { runTaskSaturationLoop } from './phase6_1a';
 import { runPhase6CycleDelta } from './runCycleDelta';
 import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
 import { canonicalComponentDir } from './layoutContract';
-import { resolveAgainstOracle } from '../idResolver';
+import { resolveAgainstOracle, resolveTechId } from '../idResolver';
 import { buildRequirementLineage } from './packetSynthesis/idResolution';
 import { emit as aoddEmit } from '../../aodd';
 
@@ -708,6 +708,7 @@ export class Phase6Handler implements PhaseHandler {
     };
 
     // ── Per-component generation: ONE bounded call per leaf component ──
+    const fellOpenComponents: string[] = [];
     for (const component of leafComponents) {
       const cid = String(component.id);
       const block = `PROJECT TYPE: ${projectTypeDescription}\n\n${renderComponentBlockForTask(component)}`;
@@ -715,9 +716,17 @@ export class Phase6Handler implements PhaseHandler {
       // text; others = id-only appendix so they stay citable). Falls back to the
       // full menu when no owned ACs resolve (unresolved traces / namespace drift)
       // so coverage can never regress below the pre-scoping baseline.
+      const componentRoots = componentRootStorySet(component, canonicalize);
+      // Fail-safe VISIBILITY (PA-3 stop-and-fix): the fallback below is SILENT, so a
+      // component→requirement id-namespace break (cal-38: 30/30 fell open, undetected)
+      // reads as success. Track fall-opens and log the rate after the loop.
+      const anyOwned = leafAcceptanceCriteria.some(
+        (l) => componentRoots.has(canonicalize(l.leafDisplayKey ?? l.leafStoryId)),
+      );
+      if (!anyOwned) fellOpenComponents.push(cid);
       const scopedAcMenu = renderScopedAcceptanceCriteriaMenu(
         leafAcceptanceCriteria,
-        componentRootStorySet(component, canonicalize),
+        componentRoots,
         canonicalize,
       );
       const rendered = engine.templateLoader.render(template, {
@@ -753,6 +762,18 @@ export class Phase6Handler implements PhaseHandler {
         getLogger().warn('workflow', 'Phase 6.1 per-component generation failed — continuing', {
           component_id: cid, error: err instanceof Error ? err.message : String(err),
         });
+      }
+    }
+
+    if (fellOpenComponents.length > 0) {
+      const rate = fellOpenComponents.length / Math.max(1, leafComponents.length);
+      const msg = `Phase 6.1 AC-menu scoping fell open to the FULL inventory for `
+        + `${fellOpenComponents.length}/${leafComponents.length} components (${Math.round(rate * 100)}%)`;
+      const meta = { workflow_run_id: ctx.workflowRun.id, sample: fellOpenComponents.slice(0, 10), rate };
+      if (rate >= 1) {
+        getLogger().error('workflow', `${msg} — 100% fallback = component→requirement id-namespace break (structural defect, not per-component no-trace)`, meta);
+      } else {
+        getLogger().warn('workflow', msg, meta);
       }
     }
 
@@ -1131,9 +1152,11 @@ export function renderAcceptanceCriteriaMenu(leaves: LeafAcceptanceCriteria[]): 
 /**
  * PA-3: the set of ROOT user-story ids a component serves. Reads the component's
  * US traces — `traces_to` (root view) or `satisfies_requirement_ids` (the leaf
- * view renames it, phaseContext.ts) — and maps each id through the STRUCTURAL
- * leaf→root tree-walk `canonicalize` (never regex). Empty when a component has
- * no resolvable US traces, which drives the full-menu fallback below.
+ * view carries the ROOT component_model's `US-*` traces here; the 2026-07-05 fix
+ * at phaseContext.ts stopped it from mis-seeding this field with `res-*`
+ * responsibility ids) — and maps each id through the STRUCTURAL leaf→root
+ * tree-walk `canonicalize` (never regex). Empty when a component genuinely has
+ * no resolvable US traces, which drives the (now-logged) full-menu fallback.
  */
 export function componentRootStorySet(
   component: Record<string, unknown>,
@@ -1660,7 +1683,9 @@ export function normalizeRootTaskShape(
   if (componentOracle || techOracle) {
     traces_to = traces_to.map((id) => {
       if (componentOracle && id.startsWith('comp')) return resolveAgainstOracle(id, componentOracle) ?? id;
-      if (techOracle && id.startsWith('TECH-')) return resolveAgainstOracle(id, techOracle) ?? id;
+      // PA-9: suffix/separator-aware TECH resolution (the generic resolver misses
+      // the canonical "-1" enumeration suffix, e.g. TECH-CERBOS → TECH-CERBOS-1).
+      if (techOracle && id.startsWith('TECH-')) return resolveTechId(id, techOracle) ?? id;
       return id;
     });
   }

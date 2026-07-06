@@ -35,12 +35,12 @@ REQUIRED OUTPUT: A JSON object whose **single top-level key is `adrs`** (do NOT 
   - `id`, `title`, `status` (`proposed`|`accepted`), `context`, `decision`, `alternatives`, `rationale`, `consequences`
   - `governs_components`: array of the component ids (from the Component Model below) this decision actually governs. Copy ids **verbatim** from the Component Model. For a genuinely project-wide/cross-cutting decision (e.g. HTTPS-only, logging format) emit an **empty array** `[]` — that marks it global. A component-specific decision (e.g. "PDF rendering library", "encryption-audit schedule") MUST list only the component(s) it applies to, so downstream task prompts don't carry irrelevant ADRs. Do NOT list every component by default.
 
-Valid skeleton:
-```json
+Emit your ENTIRE response as a single raw JSON object — start at `{`, end at `}`, with NO surrounding markdown code fences. Valid skeleton (top-level key `adrs`):
+```
 { "adrs": [ { "id": "ADR-001", ... } ] }
 ```
-Invalid (do NOT do this):
-```json
+Invalid — do NOT do this (wrong top-level key):
+```
 { "architectural_decisions": [ ... ] }
 ```
 

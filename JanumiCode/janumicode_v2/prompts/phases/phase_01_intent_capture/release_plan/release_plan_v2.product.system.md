@@ -82,9 +82,8 @@ You do not need to reproduce these rules. Focus solely on releases + journey pla
 
 # Output Format
 
-Respond with a single JSON object matching this shape (no prose before or after the JSON, no markdown fences, no trailing commas, straight ASCII double quotes, no unescaped double quotes inside string values):
+Respond with a single raw JSON object matching this shape — start at `{`, end at `}`, with NO surrounding markdown code fences (no prose before or after the JSON, no trailing commas, straight ASCII double quotes, no unescaped double quotes inside string values):
 
-```json
 {
   "kind": "release_plan",
   "schemaVersion": "2.0",
@@ -107,7 +106,6 @@ Respond with a single JSON object matching this shape (no prose before or after 
     }
   ]
 }
-```
 
 Emit ONLY the JSON object.
 

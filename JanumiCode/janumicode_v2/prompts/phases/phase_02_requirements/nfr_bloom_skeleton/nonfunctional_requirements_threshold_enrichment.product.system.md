@@ -69,7 +69,8 @@ Unacceptable: vague phrases like "testing" or "monitoring" without naming the in
 
 Return ONLY the enriched NFR as a JSON object — SAME shape as the skeleton, but with `threshold` and `measurement_method` populated. Echo back all other fields unchanged. Drop `seed_threshold`.
 
-```json
+Emit your ENTIRE response as a single raw JSON object of exactly this shape — start at `{`, end at `}`, with NO surrounding markdown code fences:
+
 {
   "id": "NFR-001",
   "category": "security",
@@ -80,7 +81,6 @@ Return ONLY the enriched NFR as a JSON object — SAME shape as the skeleton, bu
   "threshold": "Zero cross-tenant read leaks across the continuous penetration-test suite; any single incident fails the NFR.",
   "measurement_method": "Automated tenant-isolation test harness runs on every deploy; quarterly internal pen-test + annual third-party review."
 }
-```
 
 # Rules
 
