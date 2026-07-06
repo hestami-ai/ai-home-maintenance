@@ -321,9 +321,22 @@ function formatSharedModuleConstraints(scaffold?: {
 
 interface ExtractedADR { id: string; title: string; decision: string; governs_components?: string[] }
 
-function formatADRs(adrs: ExtractedADR[]): string {
-  if (!adrs.length) return '(no architectural decisions recorded)';
-  return adrs.map(adr => `### ${adr.id}: ${adr.title}\n${adr.decision}`).join('\n\n');
+/** PD-6: cap on project-wide (global) ADRs shown to a single code leaf. Component-
+ *  governing ADRs are NEVER capped — only the global catalog (deploy/CI/ops
+ *  cross-cutting decisions) that otherwise floods every leaf as dead context. */
+const MAX_GLOBAL_ADRS_PER_TASK = 10;
+
+export function formatADRs(adrs: ExtractedADR[], globalElided = 0): string {
+  const note = globalElided > 0
+    ? `(+ ${globalElided} more project-wide ADR(s) omitted for brevity — consult the ADR artifact if a cross-cutting decision affects this task)`
+    : '';
+  if (!adrs.length) {
+    return globalElided > 0
+      ? `(no component-specific architectural decisions; ${globalElided} project-wide ADR(s) omitted — consult the ADR artifact if one affects this task)`
+      : '(no architectural decisions recorded)';
+  }
+  const body = adrs.map(adr => `### ${adr.id}: ${adr.title}\n${adr.decision}`).join('\n\n');
+  return note ? `${body}\n\n${note}` : body;
 }
 
 /** Generous cap on the DMR context inlined into a leaf prompt (chars). */
@@ -378,11 +391,24 @@ export function capInlinedDmrContext(text: string, budget: number = DMR_INLINE_B
  * 2-line AES task received all ~10 ADRs incl. "PDF Report Generation" as
  * "apply without exception" (Phase-9 prompt review).
  */
-function filterADRsForTask(adrs: ExtractedADR[], componentId: string | undefined): ExtractedADR[] {
-  if (!componentId) return adrs;
-  return adrs.filter((adr) =>
-    !adr.governs_components || adr.governs_components.length === 0 || adr.governs_components.includes(componentId),
-  );
+export function filterADRsForTask(
+  adrs: ExtractedADR[],
+  componentId: string | undefined,
+  maxGlobal: number = MAX_GLOBAL_ADRS_PER_TASK,
+): { adrs: ExtractedADR[]; globalElided: number } {
+  if (!componentId) return { adrs, globalElided: 0 };
+  const governing: ExtractedADR[] = [];
+  const global: ExtractedADR[] = [];
+  for (const adr of adrs) {
+    const g = adr.governs_components;
+    if (!g || g.length === 0) global.push(adr);             // project-wide / cross-cutting
+    else if (g.includes(componentId)) governing.push(adr);  // governs THIS component
+    // else: governs OTHER components only → excluded (unchanged)
+  }
+  // PD-6: never cap component-governing ADRs (the relevant ones); cap only the
+  // global catalog that otherwise floods every leaf. Component-governing first.
+  const keptGlobal = global.slice(0, Math.max(0, maxGlobal));
+  return { adrs: [...governing, ...keptGlobal], globalElided: global.length - keptGlobal.length };
 }
 
 function formatRefactoringConstraints(task: ImplementationTask): string {
@@ -802,7 +828,8 @@ export class ExecutionContextBuilder {
     const completionCriteriaStr = formatCompletionCriteria(completionCriteriaForRender);
     const writeScopeStr = formatWriteScopeConstraints(task, scaffold?.protectedPaths, scaffold?.language);
     const sharedModulesStr = formatSharedModuleConstraints(scaffold);
-    const governingADRsStr = formatADRs(filterADRsForTask(artifacts.adrs, task.component_id));
+    const adrFilter = filterADRsForTask(artifacts.adrs, task.component_id);
+    const governingADRsStr = formatADRs(adrFilter.adrs, adrFilter.globalElided);
     const refactoringConstraintsStr = formatRefactoringConstraints(task);
     const testCasesStr = formatTestCasesForComponent(artifacts.testPlan, task.component_id);
     const evalFilterResult = filterEvalCriteriaForTask(

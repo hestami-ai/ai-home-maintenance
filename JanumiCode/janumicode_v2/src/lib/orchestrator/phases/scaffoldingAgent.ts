@@ -495,7 +495,7 @@ export function buildAreaScaffoldingPrompt(
     + `## Shared data models — define as shared types/records under the shared module dir; components IMPORT them (never duplicate per-component)\n${dataModels}\n\n`
     + `## Interface contracts — define as shared contract types under the shared module dir\n${contracts}\n\n`
     + `## Documentation (REQUIRED)\n`
-    + `- Every shared type / class / module you create MUST carry a brief doc-comment stating WHAT data shape or contract it materializes and citing the data-model or interface-contract id it comes from (e.g. \`# DM-link-management-linkmapping\`, \`# per IC-DB-PERSISTENCE-001\` in python; \`// DM-...\` in TS/Go/Rust/Java — use this stack's comment syntax).\n`
+    + `- Every shared type / class / module you create MUST carry a brief doc-comment stating WHAT data shape or contract it materializes and citing the ACTUAL data-model or interface-contract id it comes from — cite the id verbatim from the "Shared data models" / "Interface contracts" blocks above (format: \`# <DM-id>\` or \`# per <IC-id>\` in python; \`// <DM-id>\` in TS/Go/Rust/Java). Do NOT invent an id that is not in those blocks.\n`
     + `- Comment the non-obvious WHY, not the WHAT; prefer self-documenting names over narration; leave no commented-out code.\n\n`
     + `## Rules\n`
     + `- Materialize the shared modules + data-model/contract definitions ONCE at the EXACT listed paths; components import them — never duplicate.\n`

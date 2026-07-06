@@ -7,7 +7,7 @@
  * keeping the most-material (head) sections. These tests pin those invariants.
  */
 import { describe, it, expect } from 'vitest';
-import { capInlinedDmrContext, stripRedundantDetailHeader } from '../../../lib/orchestrator/executionContextBuilder';
+import { capInlinedDmrContext, stripRedundantDetailHeader, filterADRsForTask, formatADRs } from '../../../lib/orchestrator/executionContextBuilder';
 
 // Build N blank-line-separated sections; each ~120 chars so the budget bites.
 const sections = (n: number) =>
@@ -64,5 +64,36 @@ describe('stripRedundantDetailHeader (PD-11)', () => {
     const body = '## Task Implementation Bundle\n\ncontent';
     expect(stripRedundantDetailHeader(body)).toBe(body);
     expect(stripRedundantDetailHeader('(detail file unavailable)')).toBe('(detail file unavailable)');
+  });
+});
+
+describe('filterADRsForTask — global-ADR cap (PD-6)', () => {
+  const adr = (id: string, governs?: string[]) => ({ id, title: id, decision: 'decision text', governs_components: governs });
+
+  it('keeps EVERY component-governing ADR and caps only the global catalog', () => {
+    const adrs = [
+      adr('ADR-own-1', ['comp-a']),
+      adr('ADR-own-2', ['comp-a', 'comp-b']),
+      adr('ADR-other', ['comp-z']),                                   // other component only → excluded
+      ...Array.from({ length: 15 }, (_, i) => adr(`ADR-glob-${i}`, [])), // 15 project-wide
+    ];
+    const { adrs: kept, globalElided } = filterADRsForTask(adrs, 'comp-a', 10);
+    expect(kept.filter((a) => a.id.startsWith('ADR-own')).length).toBe(2); // both governing kept
+    expect(kept.some((a) => a.id === 'ADR-other')).toBe(false);            // other-only excluded
+    expect(kept.filter((a) => a.id.startsWith('ADR-glob')).length).toBe(10); // global capped
+    expect(globalElided).toBe(5);
+    // component-governing ADRs are rendered FIRST
+    expect(kept[0].id.startsWith('ADR-own')).toBe(true);
+  });
+
+  it('never caps when there is no componentId (returns all, no elision)', () => {
+    const adrs = [adr('ADR-1'), adr('ADR-2', [])];
+    expect(filterADRsForTask(adrs, undefined)).toEqual({ adrs, globalElided: 0 });
+  });
+
+  it('formatADRs appends the elision note only when some global ADRs were dropped', () => {
+    expect(formatADRs([{ id: 'ADR-1', title: 't', decision: 'd' }], 5)).toMatch(/5 more project-wide ADR\(s\) omitted/);
+    expect(formatADRs([{ id: 'ADR-1', title: 't', decision: 'd' }])).not.toContain('omitted');
+    expect(formatADRs([], 3)).toMatch(/3 project-wide ADR\(s\) omitted/);
   });
 });

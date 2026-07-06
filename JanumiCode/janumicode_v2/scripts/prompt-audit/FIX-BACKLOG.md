@@ -95,7 +95,13 @@ Batch gate: tsc 0, eslint 0, packetSynthesis 115 + orchestrator/review 1727 unit
 
 Gate (PD-5+PD-11+traces_to): tsc 0, eslint 0, orchestrator+review 1734 unit pass, 0 regressions.
 
-**Remaining OPEN = PD-6-ADR** (upstream `governs_components` population in Phase 4 — no keyword-matching by design) **+ PD-7 live-validation** (cal-run to confirm `traces_to` emission) **+ PD-11 example-id nit** (LOW cosmetic). All P9 audit defect CLASSES PD-1..PD-11 now have a landed fix except the ADR-governs_components upstream lever.
+**PD-6-ADR — ✅ DONE 2026-07-06 (completes PD-6):** investigation corrected the earlier "governs_components not populated" framing — the mechanism ALREADY works end-to-end (adr_capture prompt mints `governs_components`, `executionContextBuilder` collector reads it, phase4 resolves id-drift). The real residual: genuinely-GLOBAL infra/deploy ADRs (correctly empty `governs_components`) flood every code leaf (the 25-ADR deploy catalog). Fix (mirrors the DMR cap): `filterADRsForTask` now returns `{ adrs, globalElided }` — keeps EVERY component-governing ADR (never capped; the relevant ones, rendered first) and caps only the GLOBAL catalog to `MAX_GLOBAL_ADRS_PER_TASK=10`; `formatADRs` appends an honest elision note (consult the ADR artifact). Deterministic, no LLM-emission risk, no keyword-matching. Test: +3 in `executionContextBuilderDmrCap.test.ts`.
+
+**PD-11 example-id — ✅ DONE 2026-07-06 (completes PD-11):** the scaffold prompt's doc-comment instruction used concrete-looking example ids (`# DM-link-management-linkmapping`, `# per IC-DB-PERSISTENCE-001`) the executor could mistake for real injected ids. Replaced with obvious placeholders (`# <DM-id>` / `# per <IC-id>`) + "cite the id verbatim from the blocks above; do NOT invent an id not in those blocks". (The executor leaf template itself carries no literal example ids — all `{{variables}}`.)
+
+Gate (PD-6-ADR+PD-11-example): tsc 0, eslint 0, orchestrator+review 1737 unit pass, 0 regressions.
+
+**ALL P9 audit defect classes PD-1…PD-11 now have a landed, gated fix.** Only remaining is **PD-7 live-validation** — a cal-run to confirm the LLM actually emits `traces_to` on API/DM (schema+join+mint are unit-proven; the all-component fallback guarantees no regression until then). SRD-1 (semantic-drift audit) remains a separate parked review type, not a PD fix.
 
 ---
 
