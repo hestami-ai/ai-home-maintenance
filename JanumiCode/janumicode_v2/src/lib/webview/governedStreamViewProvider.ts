@@ -20,7 +20,6 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { Database } from '../database/init';
-import { iterateGovernedStream } from '../database/iterateGovernedStream';
 import type { OrchestratorEngine } from '../orchestrator/orchestratorEngine';
 import type { DecisionRouter, InboundDecision } from '../orchestrator/decisionRouter';
 import type { ClientLiaisonAgent } from '../agents/clientLiaisonAgent';
@@ -49,6 +48,11 @@ interface InboundMessage {
 }
 
 export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
+  /** Rendered-window size for the initial snapshot — mirrors RecordsStore's cap.
+   *  Only the newest N current-version rows are sent; older history loads on
+   *  demand via loadOlder. */
+  private static readonly SNAPSHOT_WINDOW = 400;
+
   private webview: vscode.Webview | null = null;
   private readonly disposers: Array<() => void> = [];
   /**
@@ -58,6 +62,30 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
    * write). Reset on workflow:started.
    */
   private lastPostedSubPhaseId: string | null = null;
+
+  /**
+   * Phase-indicator caches. getCompletedPhases / getSkippedSubPhases each scan
+   * the run for RARE records (phase_gate_approved / workspace_classification),
+   * yet the webview asks for them on EVERY sub-phase transition (hundreds per
+   * run). They change only when such a record arrives, so we cache them and
+   * invalidate on the specific record types below — turning O(transitions ×
+   * run-scan) into O(actual-changes). Null = needs recompute. Reset per run.
+   */
+  private completedPhasesCache: PhaseId[] | null = null;
+  private skippedSubPhasesCache: string[] | null = null;
+
+  /**
+   * Replay-mode hook, invoked once at the end of handleWebviewReady. In
+   * live-append replay (JANUMICODE_REPLAY_APPEND=1) bootstrap wires this to
+   * start the ReplayDriver, guaranteeing the webview has mounted + subscribed
+   * before any record:added event flows. Null in production.
+   */
+  private replayOnReady: (() => void) | null = null;
+
+  /** Register the replay live-append starter (see {@link replayOnReady}). */
+  setReplayOnReady(cb: () => void): void {
+    this.replayOnReady = cb;
+  }
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -136,16 +164,25 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     // re-post the phaseUpdate when the sub-phase actually changes.
     const off1 = this.engine.eventBus.on('record:added', (p) => {
       this.post({ type: 'addRecord', record: p.record });
-      const newSubPhase = (p.record as { sub_phase_id?: string | null }).sub_phase_id ?? null;
+      const rec = p.record as { sub_phase_id?: string | null; record_type?: string; phase_id?: string | null };
+      // Invalidate the phase-indicator caches only when a record that could
+      // change them arrives (rare), instead of rescanning every transition.
+      if (rec.record_type === 'phase_gate_approved') this.completedPhasesCache = null;
+      if (rec.record_type === 'workspace_classification' || rec.phase_id === '0.5') {
+        this.skippedSubPhasesCache = null;
+      }
+      const newSubPhase = rec.sub_phase_id ?? null;
       if (
         this.session.currentRunId &&
         newSubPhase &&
         newSubPhase !== this.lastPostedSubPhaseId
       ) {
         this.lastPostedSubPhaseId = newSubPhase;
-        const completedPhases = this.getCompletedPhases(this.session.currentRunId);
+        this.completedPhasesCache ??= this.getCompletedPhases(this.session.currentRunId);
+        this.skippedSubPhasesCache ??= this.getSkippedSubPhases(this.session.currentRunId);
+        const completedPhases = this.completedPhasesCache;
         const completedSubPhases = this.getCompletedSubPhases(this.session.currentRunId);
-        const skippedSubPhases = this.getSkippedSubPhases(this.session.currentRunId);
+        const skippedSubPhases = this.skippedSubPhasesCache;
         const run = this.engine.stateMachine.getWorkflowRun(this.session.currentRunId);
         this.post({
           type: 'phaseUpdate',
@@ -168,6 +205,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     const off0 = this.engine.eventBus.on('workflow:started', (p) => {
       this.session.currentRunId = p.workflowRunId;
       this.lastPostedSubPhaseId = null;
+      this.completedPhasesCache = null;
+      this.skippedSubPhasesCache = null;
       this.post({
         type: 'phaseUpdate',
         event: 'workflow:started',
@@ -269,6 +308,9 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
       case 'webviewReady':
         await this.handleWebviewReady();
         return;
+      case 'loadOlder':
+        this.handleLoadOlder(msg as unknown as { beforeProducedAt?: string; beforeId?: string; limit?: number });
+        return;
       case 'submitIntent':
         await this.handleSubmitIntent(msg as unknown as { text: string; attachments?: string[]; references?: never[] });
         return;
@@ -311,6 +353,9 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleWebviewReady(): Promise<void> {
+    // Fresh resolution/reload — drop any stale phase-indicator caches.
+    this.completedPhasesCache = null;
+    this.skippedSubPhasesCache = null;
     // DB-as-truth recovery — covers three scenarios:
     //   1. Webview reload mid-run (session was alive; recover same run).
     //   2. Fresh extension activation against a workspace whose DB has
@@ -332,7 +377,12 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     // can produce a single response payload bigger than the SharedArrayBuffer
     // can carry, which surfaces as the "RPC error: offset is out of bounds"
     // the user reported on extension restart.
-    if (this.session.currentRunId) {
+    // Live-append replay starts the view EMPTY and feeds records over time via
+    // the ReplayDriver, so each re-emitted record is a fresh delta that
+    // exercises the store's per-record add() path. Otherwise stream the full
+    // snapshot as normal.
+    const replayAppend = process.env.JANUMICODE_REPLAY_APPEND === '1';
+    if (this.session.currentRunId && !replayAppend) {
       this.streamSnapshot(this.session.currentRunId);
     } else {
       this.post({ type: 'snapshot', records: [] });
@@ -374,6 +424,10 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
         }
       }
     }
+
+    // Replay live-append: the webview is now mounted + subscribed, so let
+    // bootstrap begin feeding recorded records (no-op in production).
+    this.replayOnReady?.();
   }
 
   private async handleSubmitIntent(msg: {
@@ -545,30 +599,85 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Stream a workflow's records to the webview in pages so neither the RPC
-   * bridge (capped by SharedArrayBuffer size) nor the postMessage channel
-   * has to carry the full snapshot in one shot. Sends:
-   *   - one `snapshotStart` so the webview can clear/reset stores
-   *   - N × `snapshotChunk` with batches of records
-   *   - one `snapshotComplete` so the webview can finalize (scroll, unlock
-   *     composer, etc.) once the last batch is in.
-   * Page size is generous (500 rows) but small enough that even rich
-   * agent_invocation rows with multi-KB prompts stay well under the 32MB
-   * RPC ceiling.
+   * Stream the LATEST WINDOW of a run's records to the webview, plus the run's
+   * total record count so the UI can show how much history exists and fetch
+   * older pages on demand (loadOlder). Sends:
+   *   - one `snapshotStart { totalCount, windowSize }` so the webview resets
+   *   - N × `snapshotChunk` with batches of the window (usually 1 chunk)
+   *   - one `snapshotComplete` so the webview finalizes (scroll, unlock, …)
+   *
+   * Only the newest `windowSize` rows are sent — the webview no longer holds
+   * the whole run in memory. Chunk size (500) keeps each RPC/postMessage well
+   * under the 32MB SharedArrayBuffer ceiling.
    */
   private streamSnapshot(runId: string): void {
-    this.post({ type: 'snapshotStart' });
-    const stmt = this.db.prepare(
-      `SELECT * FROM governed_stream
-        WHERE workflow_run_id = ? AND is_current_version = 1
-        ORDER BY produced_at ASC
-        LIMIT ? OFFSET ?`,
-    );
-    for (const rows of iterateGovernedStream<Record<string, unknown>>(stmt, [runId], { pageSize: 500 })) {
-      const records = rows.map((r) => this.serialize(this.rowToRecord(r)));
-      this.post({ type: 'snapshotChunk', records });
+    const windowSize = GovernedStreamViewProvider.SNAPSHOT_WINDOW;
+    const totalCount = this.countCurrentVersion(runId);
+    this.post({ type: 'snapshotStart', totalCount, windowSize });
+    // Newest `windowSize` rows via a reverse scan on gs_snapshot_window, then
+    // reversed to ascending for the webview.
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM governed_stream
+          WHERE workflow_run_id = ? AND is_current_version = 1
+          ORDER BY produced_at DESC, id DESC
+          LIMIT ?`,
+      )
+      .all(runId, windowSize) as Array<Record<string, unknown>>;
+    rows.reverse();
+    const records = rows.map((r) => this.serialize(this.rowToRecord(r)));
+    const CHUNK = 500;
+    for (let i = 0; i < records.length; i += CHUNK) {
+      this.post({ type: 'snapshotChunk', records: records.slice(i, i + CHUNK) });
     }
     this.post({ type: 'snapshotComplete' });
+  }
+
+  /** Count current-version records for a run (the "of M" in the window UI). */
+  private countCurrentVersion(runId: string): number {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM governed_stream
+          WHERE workflow_run_id = ? AND is_current_version = 1`,
+      )
+      .get(runId) as { n: number } | undefined;
+    return row?.n ?? 0;
+  }
+
+  /**
+   * Serve one older page for the webview's upward-scroll "load older". Uses
+   * KEYSET pagination on (produced_at, id) — NOT LIMIT/OFFSET — so it is
+   * O(log n) on gs_snapshot_window, stable under concurrent tail inserts, and
+   * correct despite duplicate produced_at values (OFFSET would drift and
+   * re-scan). Replies `olderRecords { records, hasMore }`.
+   */
+  private streamOlder(runId: string, beforeProducedAt: string, beforeId: string, limit: number): void {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM governed_stream
+          WHERE workflow_run_id = ? AND is_current_version = 1
+            AND (produced_at < ? OR (produced_at = ? AND id < ?))
+          ORDER BY produced_at DESC, id DESC
+          LIMIT ?`,
+      )
+      .all(runId, beforeProducedAt, beforeProducedAt, beforeId, limit) as Array<Record<string, unknown>>;
+    const hasMore = rows.length === limit;
+    rows.reverse();
+    const records = rows.map((r) => this.serialize(this.rowToRecord(r)));
+    this.post({ type: 'olderRecords', records, hasMore });
+  }
+
+  private handleLoadOlder(msg: { beforeProducedAt?: string; beforeId?: string; limit?: number }): void {
+    if (!this.session.currentRunId || !msg.beforeProducedAt || !msg.beforeId) {
+      this.post({ type: 'olderRecords', records: [], hasMore: false });
+      return;
+    }
+    this.streamOlder(
+      this.session.currentRunId,
+      msg.beforeProducedAt,
+      msg.beforeId,
+      Math.min(Math.max(msg.limit ?? 200, 1), 500),
+    );
   }
 
   /**

@@ -116,6 +116,17 @@ CREATE INDEX IF NOT EXISTS gs_phase ON governed_stream(phase_id);
 CREATE INDEX IF NOT EXISTS gs_produced_at ON governed_stream(produced_at);
 CREATE INDEX IF NOT EXISTS gs_authority ON governed_stream(authority_level);
 CREATE INDEX IF NOT EXISTS gs_quarantined ON governed_stream(quarantined) WHERE quarantined = 1;
+-- Backs the governed-stream webview snapshot/window queries: filter by
+-- (workflow_run_id, is_current_version) then order/seek by produced_at. Without
+-- it the "latest window" + keyset "load older" queries fall back to a temp
+-- b-tree filesort over every current-version row for the run.
+CREATE INDEX IF NOT EXISTS gs_snapshot_window
+  ON governed_stream(workflow_run_id, is_current_version, produced_at);
+-- Covering index for the phase-indicator's completed-sub-phase DISTINCT scan
+-- (webview forwards a phaseUpdate on each sub-phase transition). Without it
+-- that scan reads every current-version row for the run on every transition.
+CREATE INDEX IF NOT EXISTS gs_subphase
+  ON governed_stream(workflow_run_id, is_current_version, sub_phase_id);
 
 -- ── Phase Gate completion registry ──────────────────────────────────
 

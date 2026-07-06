@@ -52,6 +52,9 @@ import { CanvasEditorProvider } from './lib/canvas/canvasEditorProvider';
 import { DecompViewerEditorProvider } from './lib/decompViewer/decompViewerEditorProvider';
 import { registerTestHookCommands } from './testHooks';
 import { loadDotenv } from './lib/config/dotenv';
+import { isReplayMode, isEngineReplayMode } from './lib/replay/gpuGuard';
+import { buildReplayInstall } from './lib/replay/installReplay';
+import { ReplayDriver } from './lib/replay/replayDriver';
 
 let provider: GovernedStreamViewProvider | null = null;
 let liaison: ClientLiaisonAgent | null = null;
@@ -103,6 +106,22 @@ async function bootstrap(
   await fs.promises.mkdir(workspacePath, { recursive: true });
   log.info('activation', 'Bootstrap step 3/14: workspacePath resolved', { workspacePath });
 
+  // 3b. Replay mode — GPU-free UI/UX development against recorded calibration
+  //     data. When active, NO live LLM/GPU/CLI call is made: providers are
+  //     replaced with fail-loud/replay adapters, embeddings are not started,
+  //     and (Tier-2) the engine is re-driven from recorded outputs. See
+  //     src/lib/replay/gpuGuard.ts. Production leaves JANUMICODE_REPLAY_MODE
+  //     unset, so every branch below is a no-op.
+  const replayMode = isReplayMode();
+  const engineReplay = isEngineReplayMode();
+  if (replayMode) {
+    log.warn('activation', 'REPLAY MODE — no GPU/LLM/CLI calls will be made', {
+      replayDb: process.env.JANUMICODE_REPLAY_DB ?? '(config default)',
+      engineReplay,
+      liveAppend: process.env.JANUMICODE_REPLAY_APPEND === '1',
+    });
+  }
+
   // 4. ConfigManager
   const configManager = new ConfigManager(workspacePath);
   log.info('activation', 'Bootstrap step 4/14: ConfigManager constructed');
@@ -110,9 +129,15 @@ async function bootstrap(
   // 5. Database
   //    The 'auto' detector picks 'sidecar' under Electron and 'direct' under
   //    plain Node, deterministically (no try-then-fall-back).
-  const dbPath = path.isAbsolute(configManager.get().governed_stream.sqlite_path)
+  //    In replay mode, JANUMICODE_REPLAY_DB (absolute path to a prepared
+  //    cal-40 clone) overrides the configured path so we don't have to copy
+  //    the clone into the workspace's .janumicode/.
+  const configuredDbPath = path.isAbsolute(configManager.get().governed_stream.sqlite_path)
     ? configManager.get().governed_stream.sqlite_path
     : path.join(workspacePath, configManager.get().governed_stream.sqlite_path);
+  const dbPath = replayMode && process.env.JANUMICODE_REPLAY_DB
+    ? path.resolve(process.env.JANUMICODE_REPLAY_DB)
+    : configuredDbPath;
   await fs.promises.mkdir(path.dirname(dbPath), { recursive: true });
   log.info('activation', 'Bootstrap step 5/14: opening database', {
     dbPath,
@@ -151,8 +176,16 @@ async function bootstrap(
     baseUrl: process.env.JANUMICODE_EMBED_BASE_URL,
     maxParallel: 1,
   });
-  embedding.start();
-  log.info('activation', 'Bootstrap step 6/14: EmbeddingService started');
+  // Replay mode: construct the service (the liaison config references it) but
+  // never start the background worker — no Ollama embedding traffic. DMR
+  // degrades to FTS5 + authority-weighted harvest, exactly as the mock test
+  // engine does (createTestEngine.ts).
+  if (replayMode) {
+    log.info('activation', 'Bootstrap step 6/14: EmbeddingService NOT started (replay mode)');
+  } else {
+    embedding.start();
+    log.info('activation', 'Bootstrap step 6/14: EmbeddingService started');
+  }
 
   // 7. OrchestratorEngine
   //    Schemas, invariants, and prompt templates ship with the extension
@@ -161,7 +194,7 @@ async function bootstrap(
   //    files, and config overrides.
   const extensionPath = context.extensionUri.fsPath;
   const engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
-  engine.setEmbeddingService(embedding);
+  if (!replayMode) engine.setEmbeddingService(embedding);
   log.info('activation', 'Bootstrap step 7/14: OrchestratorEngine constructed', {
     workspacePath,
     extensionPath,
@@ -169,14 +202,29 @@ async function bootstrap(
   });
 
   // Connect the writer to the embedding service so writes enqueue background embedding.
-  engine.writer.setEmbeddingService(embedding);
+  if (!replayMode) engine.writer.setEmbeddingService(embedding);
+
+  // Replay wiring: Tier-1 = fail-loud providers; Tier-2 (JANUMICODE_REPLAY_ENGINE=1)
+  // = recorded-output ReplayLLMProvider (Seam A) + CLI replay resolver (Seam B).
+  const replayInstall = replayMode
+    ? buildReplayInstall(engineReplay, process.env.JANUMICODE_REPLAY_STRICT === '1')
+    : null;
 
   // Register LLM provider adapters on the engine's caller.
-  engine.llmCaller.registerProvider(new OllamaProvider());
-  engine.llmCaller.registerProvider(new AnthropicProvider());
-  engine.llmCaller.registerProvider(new GoogleProvider());
-  engine.llmCaller.registerProvider(new LlamaCppProvider());
-  log.info('activation', 'Bootstrap step 8/14: LLM provider adapters registered');
+  if (replayInstall) {
+    for (const p of replayInstall.llmProviders) engine.llmCaller.registerProvider(p);
+    if (replayInstall.cliResolver) engine.agentInvoker.setReplayResolver(replayInstall.cliResolver);
+    log.info('activation', 'Bootstrap step 8/14: replay providers registered', {
+      tier: replayInstall.map ? 2 : 1,
+      fixtureStats: replayInstall.map?.stats,
+    });
+  } else {
+    engine.llmCaller.registerProvider(new OllamaProvider());
+    engine.llmCaller.registerProvider(new AnthropicProvider());
+    engine.llmCaller.registerProvider(new GoogleProvider());
+    engine.llmCaller.registerProvider(new LlamaCppProvider());
+    log.info('activation', 'Bootstrap step 8/14: LLM provider adapters registered');
+  }
 
   // Register builtin CLI output parsers BEFORE validateLLMRouting so
   // any llm_routing entry with a CLI backing (default orchestrator
@@ -220,9 +268,13 @@ async function bootstrap(
   );
 
   // Mirror provider registrations into the Liaison's internal PriorityLLMCaller.
-  liaison.registerProviders(new OllamaProvider());
-  liaison.registerProviders(new AnthropicProvider());
-  liaison.registerProviders(new GoogleProvider());
+  if (replayInstall) {
+    for (const p of replayInstall.llmProviders) liaison.registerProviders(p);
+  } else {
+    liaison.registerProviders(new OllamaProvider());
+    liaison.registerProviders(new AnthropicProvider());
+    liaison.registerProviders(new GoogleProvider());
+  }
   liaison.setEventBus(engine.eventBus);
   log.info('activation', 'Bootstrap step 10/14: ClientLiaisonAgent constructed');
 
@@ -252,6 +304,22 @@ async function bootstrap(
     }),
   );
   log.info('activation', 'Bootstrap step 13/14: webview view provider registered');
+
+  // 13a. Replay live-append driver (JANUMICODE_REPLAY_APPEND=1). Feeds the
+  //      recorded run's records to the (empty) view over time so the store's
+  //      per-record add() path is exercised as it would be on a live run.
+  //      Started on webviewReady so the provider is subscribed first.
+  if (replayMode && process.env.JANUMICODE_REPLAY_APPEND === '1') {
+    const activeRun = liaison.getDB().getActiveWorkflowRun();
+    if (activeRun) {
+      const driver = new ReplayDriver({ db, eventBus: engine.eventBus, runId: activeRun.id });
+      provider.setReplayOnReady(() => driver.start());
+      context.subscriptions.push({ dispose: () => driver.stop() });
+      log.info('activation', 'Bootstrap 13a: replay live-append driver armed', { runId: activeRun.id });
+    } else {
+      log.warn('activation', 'Bootstrap 13a: JANUMICODE_REPLAY_APPEND set but no active run in DB — driver not started');
+    }
+  }
 
   // 13b. Architecture Canvas custom editor
   context.subscriptions.push(CanvasEditorProvider.register(context, db, liaison.getDB()));

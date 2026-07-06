@@ -19,7 +19,9 @@
  * Env-var contract (all optional except `JANUMICODE_E2E`):
  *   JANUMICODE_E2E=1                   — required; gates test-hook commands
  *   JANUMICODE_HARNESS_INTENT=<text>   — intent to submit (default: todo CLI)
- *   JANUMICODE_HARNESS_FIXTURE_DIR=<p> — mock fixture corpus (real Ollama if unset)
+ *   (JANUMICODE_HARNESS_FIXTURE_DIR is REMOVED — it was a no-op; this harness
+ *    always uses live providers. For hermetic, GPU-free runs use the replay
+ *    harness instead: `pnpm replay:e2e` / .vscode-test.replay.mjs.)
  *   JANUMICODE_HARNESS_GAP_PATH=<p>    — gap report destination (default: ws/.janumicode/harness-gap.json)
  *   JANUMICODE_HARNESS_REAL_PHASE9=1   — register CLI parsers so Phase 9 spawns claude
  *   JANUMICODE_HARNESS_TIMEOUT_MS=<n>  — waitForCompletion timeout (default: 600000)

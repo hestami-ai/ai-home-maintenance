@@ -10,11 +10,13 @@ import type {
   ToolCall,
 } from '../llmCaller';
 import { LLMError } from '../llmCaller';
+import { assertNotReplayMode } from '../../replay/gpuGuard';
 
 export class AnthropicProvider implements LLMProviderAdapter {
   readonly name = 'anthropic';
 
   async call(options: LLMCallOptions): Promise<LLMCallResult> {
+    assertNotReplayMode(`AnthropicProvider.call model=${options.model}`);
     // Dynamic import to avoid requiring the SDK at module load time
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
 

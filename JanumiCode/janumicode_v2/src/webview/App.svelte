@@ -39,6 +39,12 @@
   // setSnapshot call (so conversationalSort runs once, not per page).
   let snapshotBuffer: SerializedRecord[] = [];
   let snapshotInProgress = false;
+  // Run-total record count reported by snapshotStart, threaded into setSnapshot
+  // so the store knows how much history exists beyond the loaded window.
+  let snapshotTotalCount = 0;
+  // Single in-flight guard for the upward-scroll "load older" fetch.
+  // $state because it's read in the template (button label + disabled).
+  let loadingOlder = $state(false);
 
   // ── Message Handler ─────────────────────────────────────────
   function handleMessage(event: MessageEvent) {
@@ -71,11 +77,15 @@
       case 'snapshotStart':
         // Begin a paginated snapshot. Reset stores and accumulate batches
         // into a buffer; finalize on snapshotComplete to keep the in-store
-        // resort cost (conversationalSort) to a single pass.
+        // resort cost (conversationalSort) to a single pass. Only the latest
+        // window arrives here; `totalCount` tells the store how much older
+        // history exists (fetched on demand via loadOlder).
         recordsStore.clear();
         streamingStore.reset();
         snapshotBuffer = [];
         snapshotInProgress = true;
+        snapshotTotalCount = (message.totalCount as number) ?? 0;
+        loadingOlder = false;
         break;
       case 'snapshotChunk':
         if (snapshotInProgress) {
@@ -84,7 +94,7 @@
         break;
       case 'snapshotComplete':
         if (snapshotInProgress) {
-          recordsStore.setSnapshot(snapshotBuffer);
+          recordsStore.setSnapshot(snapshotBuffer, snapshotTotalCount);
           snapshotBuffer = [];
           snapshotInProgress = false;
           composerStore.endSubmit();
@@ -92,6 +102,21 @@
           if (autoScroll) scrollToBottom();
         }
         break;
+      case 'olderRecords': {
+        // Upward-scroll history page. Anchor the viewport so prepending older
+        // rows doesn't jump the user's scroll position.
+        const older = (message.records as SerializedRecord[]) ?? [];
+        const hasMore = !!message.hasMore;
+        const el = containerEl;
+        const prevHeight = el?.scrollHeight ?? 0;
+        const prevTop = el?.scrollTop ?? 0;
+        recordsStore.prependOlder(older, hasMore);
+        loadingOlder = false;
+        requestAnimationFrame(() => {
+          if (el) el.scrollTop = prevTop + (el.scrollHeight - prevHeight);
+        });
+        break;
+      }
       case 'streamChunk': {
         const payload = message.payload as {
           invocationId: string;
@@ -191,10 +216,28 @@
     if (!containerEl) return;
     const { scrollTop, scrollHeight, clientHeight } = containerEl;
     autoScroll = scrollHeight - scrollTop - clientHeight < 50;
+    // Mirror stick-to-bottom into the store so it only head-drops (bounds the
+    // window) while the user is at the tail — never while reading history.
+    recordsStore.setStickToBottom(autoScroll);
+    // Near the top with older history available → fetch one older page.
+    if (scrollTop < 200 && recordsStore.hasOlder && !loadingOlder) {
+      requestOlder();
+    }
+  }
+
+  function requestOlder() {
+    const oldest = recordsStore.oldest;
+    if (!oldest || loadingOlder || !recordsStore.hasOlder) return;
+    loadingOlder = true;
+    post({ type: 'loadOlder', beforeProducedAt: oldest.produced_at, beforeId: oldest.id, limit: 200 });
   }
 
   function jumpToLatest() {
     autoScroll = true;
+    recordsStore.setStickToBottom(true);
+    // Re-bound the window to the latest cap (discard any older pages loaded
+    // while scrolled up) so memory returns to the tail-window baseline.
+    recordsStore.trimToCap();
     scrollToBottom();
   }
 
@@ -244,6 +287,11 @@
         <p class="hint">Type your intent below to start a new workflow.</p>
       </div>
     {:else}
+      {#if recordsStore.hasOlder}
+        <button class="load-older" onclick={requestOlder} disabled={loadingOlder}>
+          {loadingOlder ? 'Loading…' : '↑ Load earlier records'}
+        </button>
+      {/if}
       {#each recordsStore.records as record (record.id)}
         <Card {record} ondecision={handleDecision} {vscode} />
       {/each}
@@ -329,5 +377,28 @@
   }
   .jump-to-latest:hover {
     background: var(--jc-surface-bright);
+  }
+
+  .load-older {
+    align-self: center;
+    padding: var(--jc-space-sm) var(--jc-space-xl);
+    border-radius: var(--jc-radius-sm);
+    border: var(--jc-ghost-border);
+    background: var(--jc-surface-container-highest);
+    color: var(--jc-primary);
+    cursor: pointer;
+    font-family: var(--jc-font-body);
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: background var(--jc-transition-base);
+  }
+  .load-older:hover:not(:disabled) {
+    background: var(--jc-surface-bright);
+  }
+  .load-older:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
 </style>

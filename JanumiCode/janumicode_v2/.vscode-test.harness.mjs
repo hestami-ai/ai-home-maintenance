@@ -46,10 +46,11 @@ export default defineConfig({
       ?? 'Build a simple CLI todo app with add, list, and complete commands, and JSON file persistence.',
     JANUMICODE_HARNESS_GAP_PATH: process.env.JANUMICODE_HARNESS_GAP_PATH
       ?? path.join(rootDir, 'test-and-evaluation', 'test-workspace', '.janumicode', 'harness-gap.json'),
-    // Pass through the optional knobs so terminal callers can steer:
-    ...(process.env.JANUMICODE_HARNESS_FIXTURE_DIR && {
-      JANUMICODE_HARNESS_FIXTURE_DIR: process.env.JANUMICODE_HARNESS_FIXTURE_DIR,
-    }),
+    // Pass through the optional knobs so terminal callers can steer.
+    // (JANUMICODE_HARNESS_FIXTURE_DIR was removed — it was a no-op: the
+    //  extension host always registers live providers, so the harness path has
+    //  no fixture/mock LLM seam. Use the GPU-free replay harness — `pnpm
+    //  replay:e2e` / .vscode-test.replay.mjs — for hermetic runs instead.)
     ...(process.env.JANUMICODE_HARNESS_REAL_PHASE9 && {
       JANUMICODE_HARNESS_REAL_PHASE9: process.env.JANUMICODE_HARNESS_REAL_PHASE9,
     }),

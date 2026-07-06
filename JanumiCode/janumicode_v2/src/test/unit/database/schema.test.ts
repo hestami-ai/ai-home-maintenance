@@ -70,6 +70,11 @@ describe('Governed Stream Database Schema', () => {
     expect(indexNames).toContain('gs_workflow');
     expect(indexNames).toContain('gs_record_type');
     expect(indexNames).toContain('gs_phase');
+    // Composite index backing the governed-stream webview snapshot/window +
+    // keyset "load older" queries (avoids a temp-b-tree filesort per run).
+    expect(indexNames).toContain('gs_snapshot_window');
+    // Covering index for the phase-indicator completed-sub-phase scan.
+    expect(indexNames).toContain('gs_subphase');
     expect(indexNames).toContain('me_source');
     expect(indexNames).toContain('me_target');
     expect(indexNames).toContain('me_type');

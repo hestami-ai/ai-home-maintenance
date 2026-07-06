@@ -122,6 +122,55 @@
         "JANUMICODE_HARNESS_TIMEOUT_MS": "3600000",
         "JANUMICODE_CLAUDE_SKIP_PERMISSIONS": "1"
       }
+    },
+    {
+      // GPU-FREE REPLAY (snapshot path). Opens the extension against a prepared
+      // cal-40 clone and streams the whole run into the webview — reproduces
+      // (pre-fix) / validates (post-fix) the governed-stream memory behaviour on
+      // the snapshot load. NO GPU/LLM/CLI calls are made (fail-loud providers +
+      // gpuGuard). Prepare the clone first:
+      //   node scripts/replay/prep-replay-db.mjs \
+      //     --src <cal-40 test-harness/*.db> \
+      //     --dest test-and-evaluation/replay-fixtures/cal-40/clone.db
+      "name": "Run Extension (Replay cal-40 — snapshot)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "${workspaceFolder}/test-and-evaluation/test-workspace",
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "build",
+      "sourceMaps": true,
+      "env": {
+        "JANUMICODE_AUTOSHOW_LOGS": "0",
+        "JANUMICODE_REPLAY_MODE": "1",
+        "JANUMICODE_REPLAY_DB": "${workspaceFolder}/test-and-evaluation/replay-fixtures/cal-40/clone.db"
+      }
+    },
+    {
+      // GPU-FREE REPLAY (live-append path). Starts the view EMPTY and feeds the
+      // recorded run's records over time via the ReplayDriver — exercises the
+      // store's per-record add() hot path exactly as a live run would, the real
+      // O(n^2) trigger the pagination fix targets. Same prepared clone as above.
+      "name": "Run Extension (Replay cal-40 — live append)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "${workspaceFolder}/test-and-evaluation/test-workspace",
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "build",
+      "sourceMaps": true,
+      "env": {
+        "JANUMICODE_AUTOSHOW_LOGS": "0",
+        "JANUMICODE_REPLAY_MODE": "1",
+        "JANUMICODE_REPLAY_DB": "${workspaceFolder}/test-and-evaluation/replay-fixtures/cal-40/clone.db",
+        "JANUMICODE_REPLAY_APPEND": "1",
+        "JANUMICODE_REPLAY_APPEND_INTERVAL_MS": "12",
+        "JANUMICODE_REPLAY_APPEND_BATCH": "3"
+      }
     }
   ]
 }

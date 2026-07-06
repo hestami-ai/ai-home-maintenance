@@ -41,6 +41,7 @@ import type {
 } from '../llmCaller';
 import { LLMError } from '../llmCaller';
 import { parseJsonWithRecovery } from '../jsonRecovery';
+import { assertNotReplayMode } from '../../replay/gpuGuard';
 
 /** Per-instance config captured at construction time. */
 export interface LlamaCppProviderOptions {
@@ -127,6 +128,7 @@ export class LlamaCppProvider implements LLMProviderAdapter {
   }
 
   async call(options: LLMCallOptions): Promise<LLMCallResult> {
+    assertNotReplayMode(`LlamaCppProvider.call model=${options.model}`);
     const onChunk = (options as LLMStreamingCallOptions).onChunk;
     const modelLc = options.model.toLowerCase();
     const fam = familyDefaults(modelLc);

@@ -167,6 +167,7 @@ export class AgentInvoker {
   private eventBus: import('../events/eventBus').EventBus | null = null;
   private liveLogDir: string | null = null;
   private sessionResponderRoute: SessionResponderRoute | null = null;
+  private replayResolver: ((options: AgentInvocationOptions) => AgentInvocationResult | null) | null = null;
 
   constructor(
     private readonly llmCaller: LLMCaller,
@@ -198,6 +199,18 @@ export class AgentInvoker {
    */
   setEventBus(eventBus: import('../events/eventBus').EventBus): void {
     this.eventBus = eventBus;
+  }
+
+  /**
+   * Tier-2 engine replay (Seam B): install a resolver that can short-circuit
+   * an invocation with a recorded result. Called at the top of invoke(); a
+   * non-null return is used verbatim, BEFORE any subprocess/HTTP is touched.
+   * The resolver returns null for calls it doesn't cover (e.g. direct_llm_api,
+   * which is replayed at Seam A via the LLMCaller's replay provider). Unset in
+   * production.
+   */
+  setReplayResolver(fn: ((options: AgentInvocationOptions) => AgentInvocationResult | null) | null): void {
+    this.replayResolver = fn;
   }
 
   /**
@@ -291,6 +304,13 @@ export class AgentInvoker {
    * Invoke an agent.
    */
   async invoke(options: AgentInvocationOptions): Promise<AgentInvocationResult> {
+    // Tier-2 replay: a recorded result short-circuits the invocation before any
+    // subprocess/HTTP. The resolver returns null for direct_llm_api (replayed
+    // at Seam A) and for uncovered CLI calls.
+    if (this.replayResolver) {
+      const replayed = this.replayResolver(options);
+      if (replayed) return replayed;
+    }
     if (options.backingTool === 'direct_llm_api') {
       return this.invokeLLM(options);
     }

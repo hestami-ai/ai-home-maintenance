@@ -258,6 +258,43 @@ export class LLMError extends Error {
   }
 }
 
+// ── Cache key ───────────────────────────────────────────────────────
+
+export interface LLMCacheKeyInput {
+  provider: string;
+  model: string;
+  responseFormat: string;
+  temperature: number | null;
+  maxTokens: number | null;
+  system: string | null;
+  prompt: string;
+  tools: ToolDefinition[];
+  toolChoice: LLMCallOptions['toolChoice'] | null;
+}
+
+/**
+ * Canonical SHA-256 key for an LLM call, over the same fields
+ * `writeInvocationRecord()` persists on the `agent_invocation` record. Shared
+ * by the resume cache (`loadCacheFromDb`), the `call()` short-circuit, and the
+ * DB-backed replay provider so all three agree on identity. Field order MUST
+ * stay stable across releases — changing it invalidates every cached/replayed
+ * entry.
+ */
+export function computeLLMCacheKey(opts: LLMCacheKeyInput): string {
+  const canonical = JSON.stringify({
+    p: opts.provider,
+    m: opts.model,
+    rf: opts.responseFormat,
+    t: opts.temperature,
+    mt: opts.maxTokens,
+    s: opts.system ?? '',
+    pr: opts.prompt,
+    tl: opts.tools ?? [],
+    tc: opts.toolChoice ?? null,
+  });
+  return createHash('sha256').update(canonical).digest('hex');
+}
+
 // ── LLMCaller ───────────────────────────────────────────────────────
 
 export class LLMCaller {
@@ -305,29 +342,8 @@ export class LLMCaller {
    * writeInvocationRecord() so loadCacheFromDb() can reconstruct the
    * exact same key from history.
    */
-  private computeCacheKey(opts: {
-    provider: string;
-    model: string;
-    responseFormat: string;
-    temperature: number | null;
-    maxTokens: number | null;
-    system: string | null;
-    prompt: string;
-    tools: ToolDefinition[];
-    toolChoice: LLMCallOptions['toolChoice'] | null;
-  }): string {
-    const canonical = JSON.stringify({
-      p: opts.provider,
-      m: opts.model,
-      rf: opts.responseFormat,
-      t: opts.temperature,
-      mt: opts.maxTokens,
-      s: opts.system ?? '',
-      pr: opts.prompt,
-      tl: opts.tools ?? [],
-      tc: opts.toolChoice ?? null,
-    });
-    return createHash('sha256').update(canonical).digest('hex');
+  private computeCacheKey(opts: LLMCacheKeyInput): string {
+    return computeLLMCacheKey(opts);
   }
 
   /**

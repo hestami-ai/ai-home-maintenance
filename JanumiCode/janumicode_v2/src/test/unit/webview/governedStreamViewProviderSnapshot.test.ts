@@ -133,7 +133,7 @@ describe('GovernedStreamViewProvider — paginated snapshot', () => {
     te.cleanup();
   });
 
-  it('emits snapshotStart → snapshotChunk × N → snapshotComplete in order', async () => {
+  it('emits snapshotStart → snapshotChunk × N → snapshotComplete in order, with window metadata', async () => {
     await fake.fire({ type: 'webviewReady' });
 
     const snapshotMessages = fake.posted.filter(
@@ -143,31 +143,52 @@ describe('GovernedStreamViewProvider — paginated snapshot', () => {
 
     expect(types[0]).toBe('snapshotStart');
     expect(types[types.length - 1]).toBe('snapshotComplete');
-    // Every middle message is a chunk.
     const middle = types.slice(1, -1);
     expect(middle.every(t => t === 'snapshotChunk')).toBe(true);
+
+    // snapshotStart now advertises the run's full count + the delivered window
+    // size so the webview can offer "load older" without holding everything.
+    const start = snapshotMessages[0];
+    expect(start.totalCount).toBe(1300);
+    expect(start.windowSize).toBe(400);
   });
 
-  it('paginates at the page-size boundary (500 rows per chunk)', async () => {
+  it('delivers only the latest window, not the full run', async () => {
     await fake.fire({ type: 'webviewReady' });
 
     const chunks = fake.posted.filter(m => m.type === 'snapshotChunk');
-    // 1300 rows / 500 per page = 3 pages (500, 500, 300).
-    expect(chunks.length).toBe(3);
-    expect((chunks[0].records as unknown[]).length).toBe(500);
-    expect((chunks[1].records as unknown[]).length).toBe(500);
-    expect((chunks[2].records as unknown[]).length).toBe(300);
+    const total = chunks.reduce((n, m) => n + (m.records as unknown[]).length, 0);
+    // Window is 400; CHUNK is 500, so it fits in a single chunk.
+    expect(total).toBe(400);
+    expect(chunks.length).toBe(1);
   });
 
-  it('the union of chunked records equals the full row count for the run', async () => {
+  it('loadOlder returns an older keyset page disjoint from the window', async () => {
     await fake.fire({ type: 'webviewReady' });
+    const window = fake.posted
+      .filter(m => m.type === 'snapshotChunk')
+      .flatMap(m => m.records as Array<{ id: string; produced_at: string }>);
+    expect(window.length).toBe(400);
+    const oldest = window[0]; // ascending order → first is the oldest in the window
 
-    const chunks = fake.posted.filter(m => m.type === 'snapshotChunk');
-    const total = chunks.reduce(
-      (n, m) => n + (m.records as unknown[]).length,
-      0,
-    );
-    expect(total).toBe(1300);
+    fake.posted.length = 0;
+    await fake.fire({
+      type: 'loadOlder',
+      beforeProducedAt: oldest.produced_at,
+      beforeId: oldest.id,
+      limit: 200,
+    });
+
+    const older = fake.posted.find(m => m.type === 'olderRecords') as
+      | { records: Array<{ id: string }>; hasMore: boolean }
+      | undefined;
+    expect(older).toBeDefined();
+    // 1300 total − 400 window = 900 older remain → a full 200 page, more to come.
+    expect(older!.records.length).toBe(200);
+    expect(older!.hasMore).toBe(true);
+    // Disjoint from the loaded window (keyset, not offset — no overlap/drift).
+    const windowIds = new Set(window.map(r => r.id));
+    expect(older!.records.every(r => !windowIds.has(r.id))).toBe(true);
   });
 
   it('does not post a single legacy "snapshot" message anymore', async () => {

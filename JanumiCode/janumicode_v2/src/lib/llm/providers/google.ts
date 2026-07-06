@@ -11,11 +11,13 @@ import type {
   ToolCall,
 } from '../llmCaller';
 import { LLMError } from '../llmCaller';
+import { assertNotReplayMode } from '../../replay/gpuGuard';
 
 export class GoogleProvider implements LLMProviderAdapter {
   readonly name = 'google';
 
   async call(options: LLMCallOptions): Promise<LLMCallResult> {
+    assertNotReplayMode(`GoogleProvider.call model=${options.model}`);
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new LLMError('GEMINI_API_KEY not set', 'auth_error');

@@ -26,6 +26,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { getLogger } from '../../logging';
+import { assertNotReplayMode } from '../../replay/gpuGuard';
 import { MimoClient, parseModelRef } from './mimoClient';
 
 export type MimoPermissionMode = 'static' | 'relay';
@@ -362,6 +363,7 @@ class MimoServerManagerImpl {
   }
 
   private spawnServer(projectRoot: string, cfg: MimoConfig): Promise<RunningServer> {
+    assertNotReplayMode(`MimoServerManager.spawnServer binary=${cfg.binary}`);
     const proc = spawn(cfg.binary, ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
       cwd: projectRoot,
       env: buildServerEnv(),

@@ -12,6 +12,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getLogger } from '../../logging';
+import { assertNotReplayMode } from '../../replay/gpuGuard';
 import type { PtyProcess, PtySpawner, PtySpawnOptions } from './types';
 
 interface NodePtyModule {
@@ -86,6 +87,7 @@ export function resolveCommandForPty(command: string, env: NodeJS.ProcessEnv = p
 
 export class NodePtySpawner implements PtySpawner {
   spawn(opts: PtySpawnOptions): PtyProcess {
+    assertNotReplayMode(`NodePtySpawner.spawn command=${opts.command}`);
     const pty = loadNodePty();
     if (!pty) {
       throw new Error(

@@ -145,36 +145,16 @@ jobs:
           name: build-output
           path: dist/
 
-      - name: Run test harness
-        run: |
-          node dist/cli/janumicode.js test-harness \
-            --phases=${{ github.event.inputs.phases || 'all' }} \
-            --mock-llm=${{ github.event.inputs.mock_llm || 'true' }} \
-            --output=json \
-            --output-file=harness-results.json
+      # Mock-LLM CLI harness (CI-safe, no GPU/Ollama). Replaces the old
+      # `node dist/cli/janumicode.js test-harness …` invocation, which called a
+      # subcommand that never existed. `pnpm test:harness` drives a full
+      # Phase 0→10 run against committed fixtures and exits non-zero on failure,
+      # so the step itself gates the job.
+      - name: Run test harness (mock)
+        run: pnpm test:harness
         env:
-          JANUMICODE_LLM_PROVIDER: mock
-          JANUMICODE_BUDGET_USD: 1
           JANUMICODE_MAX_DURATION_MS: 300000
-          JANUMICODE_MAX_COST_USD: 1
           JANUMICODE_FAILSAFE_ACTION: abort
-
-      - name: Upload harness results
-        uses: actions/upload-artifact@v4
-        with:
-          name: harness-results
-          path: harness-results.json
-          retention-days: 30
-
-      - name: Check for failures
-        run: |
-          if [ -f harness-results.json ]; then
-            failures=$(jq '.failures // 0' harness-results.json)
-            if [ "$failures" -gt 0 ]; then
-              echo "::error::Test harness reported $failures failures"
-              exit 1
-            fi
-          fi
 
   coverage-trend:
     runs-on: ubuntu-latest
@@ -190,12 +170,6 @@ jobs:
         with:
           name: coverage-report
           path: coverage/
-
-      - name: Download harness results
-        uses: actions/download-artifact@v4
-        with:
-          name: harness-results
-          path: .
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

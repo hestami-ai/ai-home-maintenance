@@ -16,6 +16,7 @@ import { LLMError } from '../llmCaller';
 import { parseJsonWithRecovery } from '../jsonRecovery';
 import { resolveLlmTimeouts } from '../llmTimeouts';
 import { getLogger } from '../../logging/logger';
+import { assertNotReplayMode } from '../../replay/gpuGuard';
 
 /**
  * Stateful NDJSON frame decoder for streaming HTTP bodies. Fixes two boundary
@@ -80,6 +81,7 @@ export class OllamaProvider implements LLMProviderAdapter {
   }
 
   async call(options: LLMCallOptions): Promise<LLMCallResult> {
+    assertNotReplayMode(`OllamaProvider.call model=${options.model}`);
     // When tools are present, route through the chat endpoint which supports
     // function-calling. Without tools, keep the legacy /api/generate path so
     // existing callers (Phase 1, Reasoning Review, etc.) are unchanged.
