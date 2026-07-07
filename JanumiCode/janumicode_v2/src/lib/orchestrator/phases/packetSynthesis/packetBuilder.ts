@@ -515,7 +515,11 @@ function findApisForTask(
     if (traces.length === 0) return true; // unlinked endpoint — keep (can't scope)
     return traces.some((t) => taskReqIds.has(t)); // linked — keep only if task-relevant
   });
-  return scoped.map(toPacketApi);
+  // Own-component floor: if NOTHING matched the task footprint (e.g. the task→AC/US
+  // join collapsed to just the task's SR traces and no endpoint cites the same SR),
+  // fall back to the whole component set rather than hand the executor ZERO contract
+  // for its own component — never worse than the pre-linkage behavior.
+  return (scoped.length > 0 ? scoped : componentApis).map(toPacketApi);
 }
 
 /**

@@ -211,7 +211,7 @@ function asTraceIds(...vals: unknown[]): string[] {
   return [];
 }
 
-function collectDataModels(records: GovernedStreamRecord[]): BuilderDataModel[] {
+export function collectDataModels(records: GovernedStreamRecord[]): BuilderDataModel[] {
   // Phase 5.1 emits `data_models` with shape:
   //   { kind: 'data_models', models: [{ component_id, entities: [{ id, name, fields[] }] }] }
   // Entity `id` is producer-minted (Pillar A, dataModelIdMinter: DM-<comp>-<name>)
@@ -243,8 +243,14 @@ function collectDataModels(records: GovernedStreamRecord[]): BuilderDataModel[] 
             }))
           : [];
         const dmTraces = asTraceIds(e.traces_to, e.verifies, e.source_requirement_ids, e.serves);
-        if (!out.find((x) => x.id === id)) {
+        const existingDm = out.find((x) => x.id === id);
+        if (!existingDm) {
           out.push({ id, name, component_id: componentId, fields, ...(dmTraces.length ? { traces_to: dmTraces } : {}) });
+        } else if (dmTraces.length > 0 && !(existingDm.traces_to && existingDm.traces_to.length > 0)) {
+          // PD-7: the same entity emitted across chunks/records — a LATER occurrence
+          // carries the requirement linkage the first-wins winner lacked. Merge it on
+          // rather than discarding it (first-wins dedup otherwise silently loses it).
+          existingDm.traces_to = dmTraces;
         }
       }
     }
@@ -252,7 +258,7 @@ function collectDataModels(records: GovernedStreamRecord[]): BuilderDataModel[] 
   return out;
 }
 
-function collectApiDefs(records: GovernedStreamRecord[]): BuilderApiDef[] {
+export function collectApiDefs(records: GovernedStreamRecord[]): BuilderApiDef[] {
   // Phase 5.2 emits `api_definitions` with shape:
   //   { kind: 'api_definitions', definitions: [{ component_id, endpoints: [{ id, path, method, ... }] }] }
   // Endpoint `id` is producer-minted (Pillar A: API-<comp>-<method>-<path>).
@@ -272,8 +278,13 @@ function collectApiDefs(records: GovernedStreamRecord[]): BuilderApiDef[] {
         const path = typeof ep.path === 'string' ? ep.path : '';
         if (!method && !path) continue;
         const id = typeof ep.id === 'string' ? ep.id : mintEndpointId(componentId, method, path);
-        if (out.find((x) => x.id === id)) continue;
         const apiTraces = asTraceIds(ep.traces_to, ep.verifies, ep.source_requirement_ids, ep.serves);
+        const existingApi = out.find((x) => x.id === id);
+        if (existingApi) {
+          // PD-7: merge a later occurrence's linkage onto the first-wins winner (see collectDataModels).
+          if (apiTraces.length > 0 && !(existingApi.traces_to && existingApi.traces_to.length > 0)) existingApi.traces_to = apiTraces;
+          continue;
+        }
         out.push({
           id,
           method,

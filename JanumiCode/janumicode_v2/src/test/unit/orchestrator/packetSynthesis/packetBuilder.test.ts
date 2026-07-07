@@ -187,6 +187,19 @@ describe('buildPackets — happy path', () => {
       expect(packets[0].api_definitions.map((a) => a.id).sort()).toEqual(['API-1', 'API-2']);
     });
 
+    it('own-component floor: linked endpoints exist but NONE match the task → returns ALL component endpoints (no zero-contract regression)', () => {
+      // Review finding #1: with anyLinked=true but no endpoint intersecting the task
+      // footprint (the AC/US join collapsed to just the task's SR trace), the naive
+      // scope returned [] — stripping the executor's own-component contract.
+      const packets = buildPackets(base({
+        apiDefinitions: [
+          { id: 'API-a', component_id: 'comp-001', method: 'POST', path: '/a', traces_to: ['SR-99'] },
+          { id: 'API-b', component_id: 'comp-001', method: 'GET', path: '/b', traces_to: ['SR-98'] },
+        ] as BuilderApiDef[],
+      }));
+      expect(packets[0].api_definitions.map((a) => a.id).sort()).toEqual(['API-a', 'API-b']);
+    });
+
     it('keeps an UNLINKED endpoint alongside the linked-relevant one (coverage-safe)', () => {
       const packets = buildPackets(base({
         apiDefinitions: [

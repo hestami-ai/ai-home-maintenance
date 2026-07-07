@@ -40,6 +40,17 @@ describe('capInlinedDmrContext (PD-6)', () => {
     }
   });
 
+  it('is a TRUE tail-drop — never greedily keeps a smaller lower-materiality block after dropping a larger one (review fix #4)', () => {
+    // materiality-descending: A (near budget), then smaller B, C. A greedy best-fit
+    // would drop B (overflow) but keep C — inverting the ordering. Tail-drop drops both.
+    const blocks = ['A'.repeat(11800), 'B'.repeat(300), 'C'.repeat(100)].join('\n\n');
+    const out = capInlinedDmrContext(blocks, 12000);
+    expect(out).toContain('A'.repeat(11800));      // most-material head kept
+    expect(out).not.toContain('B'.repeat(300));     // the overflowing block dropped
+    expect(out).not.toContain('C'.repeat(100));     // AND everything after it (the tail)
+    expect(out).toMatch(/2 lower-materiality Deep-Memory section\(s\) elided/);
+  });
+
   it('keeps a single over-budget section whole (never drops everything)', () => {
     const one = `### Only\n${'y'.repeat(20000)}`;
     const out = capInlinedDmrContext(one, 600);

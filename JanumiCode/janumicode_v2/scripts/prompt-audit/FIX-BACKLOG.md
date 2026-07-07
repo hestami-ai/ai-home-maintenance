@@ -103,6 +103,13 @@ Gate (PD-6-ADR+PD-11-example): tsc 0, eslint 0, orchestrator+review 1737 unit pa
 
 **ALL P9 audit defect classes PD-1…PD-11 now have a landed, gated fix.** Only remaining is **PD-7 live-validation** — a cal-run to confirm the LLM actually emits `traces_to` on API/DM (schema+join+mint are unit-proven; the all-component fallback guarantees no regression until then). SRD-1 (semantic-drift audit) remains a separate parked review type, not a PD fix.
 
+## ADVERSARIAL REVIEW of the whole batch (2026-07-06, Workflow wf_98478163)
+10 review units (per changed file) × find→adversarially-verify→synthesize over the committed batch (`13e391b`~1..worktree). 6 raw findings, **4 CONFIRMED, 2 REFUTED** (refuted: reconcileAreaLayout "forces src root" = pre-existing greenfield authority, not a new regression; ccAcContradictions "success-path CC false-positive" = only fires on an explicit `verifies_acceptance_criteria` map). All 4 confirmed FIXED + tested (+6 tests); re-gate tsc 0, eslint 0, orchestrator+review **1743** pass, 0 regressions:
+- **#1 (MED, regression) — `packetBuilder.findApisForTask`:** when a component's endpoints were ALL linked but NONE matched the task footprint, it returned `[]` (stripping the executor's own-component contract — the AC/US join chronically collapses to just the task's SR trace). Added an **own-component floor**: `scoped.length>0 ? scoped : componentApis` (never worse than pre-linkage).
+- **#2 (MED, edge-case) — `packetSynthesis.collectDataModels`/`collectApiDefs`:** the new `traces_to` attachment was bound to the first-wins dedup winner, so a duplicate id whose FIRST occurrence lacked traces shipped trace-less even when a LATER occurrence carried them (chunked P5 + reconciliation emit the same id across records; collectors don't filter `is_current_version`). Now MERGE a later occurrence's linkage onto the kept item. (Collectors exported for the test.)
+- **#3 (LOW, correctness) — `coherenceVerifier.extractHttpStatusCodes`:** the HTTP cue was tested against the WHOLE text + an incomplete unit blocklist, so `300 concurrent connections` became "status 300" whenever a cue word (`error`/`reject`) co-occurred anywhere → spurious `P9_CC_AC_CONTRADICTION`. Now require the cue in the number's LOCAL neighborhood (±window) + extended magnitude-unit list.
+- **#4 (LOW, intent-gap) — `executionContextBuilder.capInlinedDmrContext`:** used greedy `continue`, so it could drop a larger higher-materiality block yet keep a smaller lower-materiality later one (inverting the documented materiality tail-drop + mislabeling the elision). Changed to `break` = true suffix/tail-drop.
+
 ---
 
 ## REVIEW TYPE — Semantic Reference Drift (SRD-1) audit  `[ ]` OPEN

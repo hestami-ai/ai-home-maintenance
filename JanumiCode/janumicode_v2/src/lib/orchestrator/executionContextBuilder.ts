@@ -372,8 +372,16 @@ export function capInlinedDmrContext(text: string, budget: number = DMR_INLINE_B
   const kept: string[] = [];
   let used = 0;
   let dropped = 0;
-  for (const b of blocks) {
-    if (used + b.length + 2 > budget && kept.length > 0) { dropped++; continue; }
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    if (used + b.length + 2 > budget && kept.length > 0) {
+      // True materiality-ordered TAIL-drop: once a block overflows the budget, drop
+      // it AND every block after it (all lower-materiality). A greedy `continue`
+      // here could keep a smaller, LOWER-materiality later block while shedding a
+      // larger higher-materiality earlier one — inverting the documented ordering.
+      dropped = blocks.length - i;
+      break;
+    }
     kept.push(b);
     used += b.length + 2;
   }

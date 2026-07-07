@@ -82,11 +82,18 @@ const HTTP_STATUS_CUE = /\bhttp\b|\bstatus\b|\bcode\b|\bresponds?\b|\breturns?\b
  */
 export function extractHttpStatusCodes(text: string): Set<string> {
   const out = new Set<string>();
-  if (!text || !HTTP_STATUS_CUE.test(text)) return out;
+  if (!text) return out;
   for (const m of text.matchAll(/\b([1-5]\d{2})\b/g)) {
-    const idx = (m.index ?? 0) + m[0].length;
-    const after = text.slice(idx, idx + 8).toLowerCase();
-    if (/^\s*(ms|s\b|sec|%|mb|gb|kb|k\b|items|rows|records|users|reqs?|bytes|chars)/.test(after)) continue;
+    const start = m.index ?? 0;
+    const end = start + m[0].length;
+    const after = text.slice(end, end + 12).toLowerCase();
+    // A number trailed by a unit is a magnitude (300 concurrent, 200ms), not a status.
+    if (/^\s*(ms|s\b|sec|%|mb|gb|tb|kb|k\b|ns|items|rows|records|users|reqs?|bytes|chars|conn|connections?|concurrent|tenants?|sessions?|threads?|nodes?)/.test(after)) continue;
+    // Require an HTTP-status cue in THIS number's LOCAL neighborhood — not merely
+    // somewhere in the text — so a bare "300 concurrent" whose sentence happens to
+    // contain "error"/"reject" elsewhere is not mistaken for a status code.
+    const window = text.slice(Math.max(0, start - 24), end + 16);
+    if (!HTTP_STATUS_CUE.test(window)) continue;
     out.add(m[1]);
   }
   return out;

@@ -87,6 +87,14 @@ describe('extractHttpStatusCodes (PD-4)', () => {
     expect(extractHttpStatusCodes('the endpoint returns 200ms latency').size).toBe(0);
     expect(extractHttpStatusCodes('the error path returns 500 rows').size).toBe(0);
   });
+
+  it('does NOT extract a magnitude just because a cue word appears elsewhere in the text (review fix #3)', () => {
+    // "300 concurrent connections" is a magnitude; the sentence's "reject"/"error"
+    // are FAR from the number, so the local-neighborhood cue check must reject it.
+    expect(extractHttpStatusCodes('User can create up to 300 concurrent connections; reject excess requests with an error').size).toBe(0);
+    // but a status code local to a cue is still caught
+    expect([...extractHttpStatusCodes('on overflow the API returns 429')]).toEqual(['429']);
+  });
 });
 
 describe('verifyCoherence — P9 CC↔AC contradiction (PD-4)', () => {
