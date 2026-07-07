@@ -6,20 +6,22 @@
  * (see ClientLiaisonAgent.registerAllCapabilities — it injects a closure).
  */
 
-import type { Capability, CapabilityRegistry } from '../index';
+import type { Capability, CapabilityRegistry, ReadCtx } from '../index';
 
-export const getVersion: Capability<Record<string, never>, { version: string }> = {
+export const getVersion: Capability<Record<string, never>, { version: string }, ReadCtx> = {
   name: 'getVersion',
   category: 'system',
+  tier: 'read',
   description: 'Return the JanumiCode version SHA pinned to the current workflow.',
   parameters: { type: 'object', properties: {} },
   execute: async (_p, ctx) => ({ version: ctx.orchestrator.janumiCodeVersionSha }),
   formatResponse: (r) => `JanumiCode version: \`${r.version}\``,
 };
 
-export const getSettings: Capability<Record<string, never>, { settings: string }> = {
+export const getSettings: Capability<Record<string, never>, { settings: string }, ReadCtx> = {
   name: 'getSettings',
   category: 'system',
+  tier: 'read',
   description: 'Return the current JanumiCode configuration as JSON.',
   parameters: { type: 'object', properties: {} },
   execute: async (_p, _ctx) => {
@@ -38,10 +40,11 @@ export const getSettings: Capability<Record<string, never>, { settings: string }
  * for `formatHelp()`. Use `makeHelpCapability(registry)` from
  * ClientLiaisonAgent.
  */
-export function makeHelpCapability(registry: CapabilityRegistry): Capability<Record<string, never>, string> {
+export function makeHelpCapability(registry: CapabilityRegistry): Capability<Record<string, never>, string, ReadCtx> {
   return {
     name: 'help',
     category: 'system',
+    tier: 'read',
     description:
       'List all Client Liaison capabilities by category. Use when the user asks "what can you do?".',
     parameters: { type: 'object', properties: {} },

@@ -2,7 +2,7 @@
  * Artifact Interaction capabilities — show, explain, list.
  */
 
-import type { Capability } from '../index';
+import type { Capability, ReadCtx } from '../index';
 import type { GovernedStreamRecord, RecordType } from '../../../../types/records';
 
 interface ShowParams {
@@ -11,9 +11,10 @@ interface ShowParams {
   phaseId?: string;
 }
 
-export const showArtifact: Capability<ShowParams, GovernedStreamRecord[]> = {
+export const showArtifact: Capability<ShowParams, GovernedStreamRecord[], ReadCtx> = {
   name: 'showArtifact',
   category: 'artifact_interaction',
+  tier: 'read',
   description:
     'Show a specific artifact by record id, OR look up artifacts of a given type/phase.',
   parameters: {
@@ -52,9 +53,10 @@ export const explainArtifact: Capability<ExplainParams, {
   artifact: GovernedStreamRecord | null;
   derivedFrom: GovernedStreamRecord[];
   decisions: GovernedStreamRecord[];
-}> = {
+}, ReadCtx> = {
   name: 'explainArtifact',
   category: 'artifact_interaction',
+  tier: 'read',
   description:
     'Explain an artifact by fetching it together with the records it derives from and any decision_traces that touch it.',
   parameters: {
@@ -93,9 +95,10 @@ export const explainArtifact: Capability<ExplainParams, {
   },
 };
 
-export const listArtifacts: Capability<{ phaseId?: string; recordType?: RecordType }, GovernedStreamRecord[]> = {
+export const listArtifacts: Capability<{ phaseId?: string; recordType?: RecordType }, GovernedStreamRecord[], ReadCtx> = {
   name: 'listArtifacts',
   category: 'artifact_interaction',
+  tier: 'read',
   description: 'List artifacts on the current run, optionally filtered by phase or type.',
   parameters: {
     type: 'object',

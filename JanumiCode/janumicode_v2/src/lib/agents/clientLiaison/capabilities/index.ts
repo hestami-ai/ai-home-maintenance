@@ -41,15 +41,49 @@ export interface CapabilityContext {
   references?: Reference[];
 }
 
+/**
+ * Capability effect tier — determines the context object the CapabilityBroker
+ * hands to execute(), which physically bounds what the capability can reach.
+ *   - read    → ReadCtx (no writer, no engine mutators)
+ *   - propose → mints inert governed records at ≤ HumanEdited authority
+ *   - govern  → routes through the orchestrator/gate lane; confirmation-gated
+ */
+export type CapabilityTier = 'read' | 'propose' | 'govern';
+
+/**
+ * READ-tier context — a structural subset of CapabilityContext with NO
+ * `writer`, NO `eventBus`, and `orchestrator` narrowed to the two read-safe
+ * members (DMR research + version sha). A capability typed to ReadCtx cannot
+ * even reference `ctx.orchestrator.writer` / `advanceToNextPhase` /
+ * `certifyPhaseGate` (compile error), and the broker hands it a facade that
+ * omits them at runtime too. This is the object-capability safety spine:
+ * a hallucinating model that calls a READ tool wrongly can change nothing.
+ */
+export interface ReadCtx {
+  workspaceId: string;
+  workspaceRoot: string;
+  activeRun: WorkflowRun | null;
+  currentPhase: PhaseId | null;
+  currentSubPhase: string | null;
+  runStatus: WorkflowRunStatus | null;
+  db: ClientLiaisonDB;
+  orchestrator: Pick<OrchestratorEngine, 'deepMemoryResearch' | 'janumiCodeVersionSha'>;
+  embedding: EmbeddingService;
+  attachments?: Attachment[];
+  references?: Reference[];
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export interface Capability<P = any, R = any> {
+export interface Capability<P = any, R = any, C = CapabilityContext> {
   name: string;
   category: CapabilityCategory;
+  /** Effect tier — governs which context object the broker hands execute(). */
+  tier: CapabilityTier;
   description: string;
   parameters: Record<string, unknown>;
-  preconditions?: (ctx: CapabilityContext) => true | string;
-  execute: (params: P, ctx: CapabilityContext) => Promise<R>;
+  preconditions?: (ctx: C) => true | string;
+  execute: (params: P, ctx: C) => Promise<R>;
   formatResponse: (result: R) => string;
   /**
    * Destructive capabilities (cancel, rollback, replace) must declare a
@@ -67,9 +101,17 @@ export interface Capability<P = any, R = any> {
    */
   confirmation?: {
     /** Natural-language summary of what will happen, rendered to the user. */
-    prompt: (params: P, ctx: CapabilityContext) => string;
+    prompt: (params: P, ctx: C) => string;
   };
 }
+
+/**
+ * A capability with its parameter/result/context types erased — used where
+ * the registry and broker must hold read/propose/govern caps together in one
+ * collection. The CapabilityBroker re-narrows the context per tier at
+ * dispatch time, so the erasure is contained to storage/routing.
+ */
+export type AnyCapability = Capability<any, any, any>;
 
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -90,25 +132,28 @@ export class CapabilityConfirmationRequired extends Error {
 }
 
 export class CapabilityRegistry {
-  private readonly map = new Map<string, Capability>();
+  // Stored with an unconstrained context type so read-tier caps (ctx: ReadCtx)
+  // and govern-tier caps (ctx: CapabilityContext) coexist in one map. The
+  // CapabilityBroker re-narrows the context per tier at dispatch time.
+  private readonly map = new Map<string, AnyCapability>();
 
-  register(c: Capability): void {
+  register(c: AnyCapability): void {
     this.map.set(c.name, c);
   }
 
-  registerAll(caps: Capability[]): void {
+  registerAll(caps: AnyCapability[]): void {
     for (const c of caps) this.register(c);
   }
 
-  get(name: string): Capability | undefined {
+  get(name: string): AnyCapability | undefined {
     return this.map.get(name);
   }
 
-  all(): Capability[] {
+  all(): AnyCapability[] {
     return [...this.map.values()];
   }
 
-  byCategory(category: CapabilityCategory): Capability[] {
+  byCategory(category: CapabilityCategory): AnyCapability[] {
     return this.all().filter(c => c.category === category);
   }
 

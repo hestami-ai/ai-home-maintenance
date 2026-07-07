@@ -315,7 +315,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
         await this.handleSubmitIntent(msg as unknown as { text: string; attachments?: string[]; references?: never[] });
         return;
       case 'submitOpenQuery':
-        await this.handleSubmitOpenQuery(msg as unknown as { text: string; references?: never[]; forceCapability?: string });
+        await this.handleSubmitOpenQuery(msg as unknown as { text: string; references?: never[]; forceCapability?: string; slashCommand?: string });
         return;
       case 'pickFile':
         await this.handlePickFile(msg as unknown as { requestId: string; multiple?: boolean });
@@ -474,6 +474,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
   private async handleSubmitOpenQuery(msg: {
     text: string;
     forceCapability?: string;
+    slashCommand?: string;
   }): Promise<void> {
     if (!this.session.currentRunId) {
       this.post({
@@ -483,12 +484,19 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     const activeRun = this.engine.stateMachine.getWorkflowRun(this.session.currentRunId);
+    // Server-side slash resolution — slash = capability. A resolved command
+    // fast-paths to a deterministic capability; an unresolved slash (or plain
+    // text) falls through to the natural-language ReAct loop with `text` as
+    // the query. This replaces the old hardcoded client-side switch.
+    const forceCapability =
+      msg.forceCapability ??
+      (msg.slashCommand ? this.liaison.resolveSlashCommand(msg.slashCommand) ?? undefined : undefined);
     const input = makeUserInput({
       text: msg.text,
       inputMode: 'open_query',
       workflowRunId: this.session.currentRunId,
       currentPhaseId: activeRun?.current_phase_id ?? null,
-      forceCapability: msg.forceCapability,
+      forceCapability,
     });
     const ctx = this.buildCapabilityContext(activeRun);
     await this.liaison.handleUserInput(input, ctx);

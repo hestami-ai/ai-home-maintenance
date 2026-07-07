@@ -2,7 +2,7 @@
  * Context Management capabilities — attachFile, addConstraint, listConstraints.
  */
 
-import type { Capability } from '../index';
+import type { Capability, ReadCtx } from '../index';
 import type { GovernedStreamRecord } from '../../../../types/records';
 import { AuthorityLevel } from '../../../../types/records';
 
@@ -11,6 +11,7 @@ interface AttachFileParams { uri: string; description?: string }
 export const attachFile: Capability<AttachFileParams, { recordId: string; uri: string }> = {
   name: 'attachFile',
   category: 'context_management',
+  tier: 'propose',
   description: 'Attach a file URI as workflow context (e.g. a reference doc).',
   parameters: {
     type: 'object',
@@ -43,6 +44,7 @@ interface AddConstraintParams { statement: string; source?: string }
 export const addConstraint: Capability<AddConstraintParams, { recordId: string; statement: string }> = {
   name: 'addConstraint',
   category: 'context_management',
+  tier: 'propose',
   description: 'Add a constraint that future phases must respect.',
   parameters: {
     type: 'object',
@@ -71,9 +73,10 @@ export const addConstraint: Capability<AddConstraintParams, { recordId: string; 
   formatResponse: (r) => `Constraint added [ref:${r.recordId}]: ${r.statement}`,
 };
 
-export const listConstraints: Capability<Record<string, never>, GovernedStreamRecord[]> = {
+export const listConstraints: Capability<Record<string, never>, GovernedStreamRecord[], ReadCtx> = {
   name: 'listConstraints',
   category: 'context_management',
+  tier: 'read',
   description: 'List all active constraints on the current workflow run.',
   parameters: { type: 'object', properties: {} },
   execute: async (_params, ctx) => {

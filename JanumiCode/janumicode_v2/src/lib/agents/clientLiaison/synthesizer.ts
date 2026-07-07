@@ -26,6 +26,7 @@ import type {
 } from './types';
 import type { ConversationTurn } from './db';
 import type { CapabilityRegistry, CapabilityContext } from './capabilities/index';
+import { CapabilityBroker } from './capabilities/broker';
 import { getLogger } from '../../logging';
 
 const TEMPLATE_KEY = 'cross_cutting/client_liaison_synthesis.system';
@@ -36,18 +37,31 @@ const PENDING_TYPES = new Set([
   'phase_gate_evaluation',
 ]);
 
+/**
+ * Maximum ReAct loop iterations per user turn. The common case (a status
+ * report or a single ASK) resolves in one iteration = today's cost; extra
+ * iterations occur only when the model genuinely needs to chain tool calls.
+ * The final iteration is always a forced, tool-free turn (toolChoice:'none')
+ * so the turn can never dead-end without a coherent answer.
+ */
+const MAX_LOOP_ITERATIONS = 4;
+
 export interface SynthesizerConfig {
   provider: string;
   model: string;
 }
 
 export class Synthesizer {
+  private readonly broker: CapabilityBroker;
+
   constructor(
     private readonly llm: PriorityLLMCaller,
     private readonly templates: TemplateLoader,
     private readonly registry: CapabilityRegistry,
     private readonly config: SynthesizerConfig,
-  ) {}
+  ) {
+    this.broker = new CapabilityBroker(registry);
+  }
 
   async synthesize(
     query: OpenQuery,
@@ -94,134 +108,159 @@ export class Synthesizer {
       return this.fallbackResponse(query, retrieval);
     }
 
-    let result: LLMCallResult;
-    try {
-      result = await this.llm.call(
-        {
-          provider: this.config.provider,
-          model: this.config.model,
-          prompt: renderedPrompt,
-          tools: this.registry.asToolDefinitions(),
-          toolChoice: 'auto',
-          temperature: 0.3,
-        },
-        { priority: 'user_query' },
-      );
-    } catch (err) {
-      getLogger().warn('agent', 'Synthesizer LLM call failed', { error: String(err) });
+    const traceContext = ctx.activeRun
+      ? {
+          workflowRunId: ctx.activeRun.id,
+          phaseId: ctx.currentPhase ?? query.currentPhaseId ?? null,
+          agentRole: 'client_liaison' as const,
+          label: 'Client Liaison — response',
+        }
+      : undefined;
+    const toolDefs = this.registry.asToolDefinitions();
+
+    // ── Bounded ReAct loop ──────────────────────────────────────────
+    // The model calls tools; the CapabilityBroker executes each under a
+    // tier-scoped context and returns an observation that is fed back into
+    // the prompt; the model iterates until it writes a final answer or the
+    // iteration budget forces a final, tool-free turn. Every failure is an
+    // observation, not a user-facing error — so the model self-repairs. On
+    // budget exhaustion the forced final turn (toolChoice:'none') guarantees
+    // a coherent natural-language answer: a turn can never dead-end.
+    const transcript: string[] = [];
+    const provenance = new Set<string>();
+    const capabilityCalls: CapabilityCallResult[] = [];
+    const seenCalls = new Set<string>();
+
+    const finalize = (text: string): SynthesisResult => {
+      const clean =
+        text && text.trim().length > 0
+          ? text
+          : this.bestEffortFromTranscript(transcript, retrieval);
+      const prov = new Set(provenance);
+      for (const id of this.extractProvenanceFromText(clean, retrieval.records)) {
+        prov.add(id);
+      }
       return {
-        responseText: `Client Liaison call failed: ${String(err)}`,
-        provenanceRecordIds: [],
-        capabilityCalls: [],
-        escalatedToOrchestrator: false,
+        responseText: clean,
+        provenanceRecordIds: [...prov],
+        capabilityCalls,
+        escalatedToOrchestrator: capabilityCalls.some(
+          c => c.name === 'escalateInconsistency' && !c.error,
+        ),
       };
-    }
-
-    if (result.toolCalls && result.toolCalls.length > 0) {
-      return await this.handleToolCalls(result.toolCalls, ctx, retrieval);
-    }
-
-    if (result.text && result.text.trim().length > 0) {
-      return {
-        responseText: result.text,
-        provenanceRecordIds: this.extractProvenanceFromText(result.text, retrieval.records),
-        capabilityCalls: [],
-        escalatedToOrchestrator: false,
-      };
-    }
-
-    // Neither text nor tool calls — surface the failure visibly.
-    return {
-      responseText:
-        'The local model returned neither text nor a valid tool call. ' +
-        'Try rephrasing your question, or use a slash command (e.g. `/status`, `/help`).',
-      provenanceRecordIds: [],
-      capabilityCalls: [],
-      escalatedToOrchestrator: false,
     };
+
+    let forcedFinal = false;
+    for (let i = 0; i < MAX_LOOP_ITERATIONS; i++) {
+      const isLast = forcedFinal || i === MAX_LOOP_ITERATIONS - 1;
+      const prompt =
+        transcript.length === 0
+          ? renderedPrompt
+          : `${renderedPrompt}\n\n## Tool results so far (this turn)\n${transcript.join('\n\n')}\n\n` +
+            'Using the results above, either call another tool if you still need ' +
+            'information, or write your final answer to the user now.';
+
+      let result: LLMCallResult;
+      try {
+        result = await this.llm.call(
+          {
+            provider: this.config.provider,
+            model: this.config.model,
+            prompt,
+            // The forced final turn offers no tools so the model must answer.
+            tools: isLast ? undefined : toolDefs,
+            toolChoice: isLast ? 'none' : 'auto',
+            temperature: 0.3,
+            // Trace context turns on invocation instrumentation + live token
+            // streaming (llm:stream_chunk). Guarded on an active run so we
+            // never pass an empty workflow_run_id (FK).
+            traceContext,
+          },
+          { priority: 'user_query' },
+        );
+      } catch (err) {
+        getLogger().warn('agent', 'Synthesizer LLM call failed', { error: String(err) });
+        // Fall back to what we already gathered rather than dead-ending.
+        return finalize(this.bestEffortFromTranscript(transcript, retrieval));
+      }
+
+      const toolCalls = result.toolCalls ?? [];
+
+      if (!isLast && toolCalls.length > 0) {
+        for (const call of toolCalls) {
+          const key = `${call.name}:${JSON.stringify(call.params ?? {})}`;
+          if (seenCalls.has(key)) {
+            // No-progress / duplicate-call guard — stops weak-model thrash.
+            transcript.push(
+              `### ${call.name} (repeat)\n(You already ran this exact call. ` +
+                'Use the earlier result, or write your final answer now.)',
+            );
+            continue;
+          }
+          seenCalls.add(key);
+          const obs = await this.broker.dispatch(call, ctx);
+          capabilityCalls.push(obs);
+          for (const id of obs.recordIds ?? []) provenance.add(id);
+          transcript.push(
+            `### ${call.name}(${this.summarizeParams(call.params)})\n${obs.formatted}`,
+          );
+          // A GOVERN confirmation is a terminal turn: surface the prompt as
+          // the answer and end; the user confirms on the next turn.
+          if (obs.needsConfirmation) {
+            return finalize(obs.formatted);
+          }
+        }
+        continue; // observe → next turn
+      }
+
+      if (result.text && result.text.trim().length > 0) {
+        return finalize(result.text);
+      }
+
+      // Neither text nor tool calls. On a non-final turn, force a final,
+      // tool-free turn next iteration rather than burning the budget.
+      if (!isLast) {
+        forcedFinal = true;
+        transcript.push(
+          '(No tool call or answer was produced. Write your final answer to the user now.)',
+        );
+        continue;
+      }
+
+      // Last turn still empty → assemble a best-effort answer from the
+      // observations so the turn never dead-ends.
+      return finalize(this.bestEffortFromTranscript(transcript, retrieval));
+    }
+
+    // Unreachable in practice (the last iteration always returns), but keeps
+    // the control flow total for the type checker.
+    return finalize(this.bestEffortFromTranscript(transcript, retrieval));
   }
 
-  private async handleToolCalls(
-    calls: NonNullable<LLMCallResult['toolCalls']>,
-    ctx: CapabilityContext,
-    retrieval: RetrievalResult,
-  ): Promise<SynthesisResult> {
-    const results: CapabilityCallResult[] = [];
-
-    for (const call of calls) {
-      const cap = this.registry.get(call.name);
-      if (!cap) {
-        results.push({
-          name: call.name,
-          error: `Unknown capability "${call.name}" — the model hallucinated a tool name.`,
-          formatted: `**Error:** Unknown capability \`${call.name}\``,
-        });
-        continue;
-      }
-
-      const precond = cap.preconditions?.(ctx);
-      if (precond !== true && precond !== undefined) {
-        results.push({
-          name: call.name,
-          error: precond,
-          formatted: `**Cannot run \`${call.name}\`:** ${precond}`,
-        });
-        continue;
-      }
-
-      // Destructive-capability confirmation ritual. On the first
-      // invocation (confirmed absent or false), return the prompt to the
-      // user and do NOT execute. The LLM must re-invoke with
-      // `confirmed: true` after the user agrees.
-      if (cap.confirmation) {
-        const paramsRec = call.params;
-        const confirmed = paramsRec.confirmed === true;
-        if (!confirmed) {
-          const prompt = cap.confirmation.prompt(call.params, ctx);
-          results.push({
-            name: call.name,
-            formatted:
-              `**Confirmation required for \`${call.name}\`:** ${prompt}\n\n` +
-              `Re-invoke \`${call.name}\` with \`confirmed: true\` once the user agrees.`,
-          });
-          continue;
-        }
-      }
-
-      try {
-        const out = await cap.execute(call.params, ctx);
-        results.push({
-          name: call.name,
-          result: out,
-          formatted: cap.formatResponse(out),
-          recordIds: this.extractRecordIdsFromResult(out),
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        results.push({
-          name: call.name,
-          error: msg,
-          formatted: `**Error in \`${call.name}\`:** ${msg}`,
-        });
-      }
+  /**
+   * Assemble a readable answer from the accumulated tool observations when
+   * the model failed to produce final prose even on the forced final turn.
+   * Guarantees the user sees the gathered results rather than a dead-end.
+   */
+  private bestEffortFromTranscript(transcript: string[], retrieval: RetrievalResult): string {
+    if (transcript.length > 0) {
+      return transcript.join('\n\n');
     }
-
-    const aggregated = results.map(r => r.formatted).join('\n\n');
-    const provenance = new Set<string>();
-    for (const r of results) {
-      for (const id of r.recordIds ?? []) provenance.add(id);
+    if (retrieval.records.length > 0) {
+      return (
+        'I could not compose a narrative answer, but here is what I retrieved:\n\n' +
+        this.summarizeRecords(retrieval.records)
+      );
     }
-    // Also harvest [ref:...] markers from the aggregated text.
-    for (const id of this.extractProvenanceFromText(aggregated, retrieval.records)) {
-      provenance.add(id);
-    }
+    return (
+      "I wasn't able to produce an answer. Try rephrasing your question, " +
+      'or use a slash command (e.g. `/status`, `/help`).'
+    );
+  }
 
-    return {
-      responseText: aggregated || '_(no response)_',
-      provenanceRecordIds: [...provenance],
-      capabilityCalls: results,
-      escalatedToOrchestrator: results.some(r => r.name === 'escalateInconsistency'),
-    };
+  private summarizeParams(params: Record<string, unknown> | undefined): string {
+    if (!params || Object.keys(params).length === 0) return '';
+    return JSON.stringify(params).slice(0, 120);
   }
 
   private fallbackResponse(query: OpenQuery, retrieval: RetrievalResult): SynthesisResult {
@@ -383,25 +422,6 @@ export class Synthesizer {
     while ((m = refRegex.exec(text)) !== null) {
       if (validIds.has(m[1])) ids.add(m[1]);
     }
-    return [...ids];
-  }
-
-  private extractRecordIdsFromResult(result: unknown): string[] {
-    if (!result || typeof result !== 'object') return [];
-    const ids = new Set<string>();
-    const visit = (v: unknown) => {
-      if (!v) return;
-      if (Array.isArray(v)) {
-        for (const item of v) visit(item);
-        return;
-      }
-      if (typeof v === 'object') {
-        const obj = v as Record<string, unknown>;
-        if (typeof obj.id === 'string' && obj.record_type) ids.add(obj.id);
-        for (const key of Object.keys(obj)) visit(obj[key]);
-      }
-    };
-    visit(result);
     return [...ids];
   }
 }

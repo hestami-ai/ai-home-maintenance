@@ -140,51 +140,32 @@
   }
 
   function handleSlash(text: string) {
-    const [cmd, ...rest] = text.slice(1).split(/\s+/);
+    const body = text.slice(1);
+    const [cmd, ...rest] = body.split(/\s+/);
     const arg = rest.join(' ');
     switch (cmd) {
       case 'clear':
+        // Pure client-side view action — not a capability.
         composerStore.clear();
         recordsStore.clear();
-        break;
-      case 'help':
-        post({
-          type: 'submitOpenQuery',
-          text: 'help',
-          forceCapability: 'help',
-        });
-        composerStore.clear();
-        break;
-      case 'status':
-        post({
-          type: 'submitOpenQuery',
-          text: 'status',
-          forceCapability: 'getStatus',
-        });
-        composerStore.clear();
         break;
       case 'attach':
         triggerPickFile();
         break;
       case 'start':
+        // Switch to a fresh-intent submission.
         composerStore.setText(arg);
         void submit();
         break;
       default:
-        // Unknown — append a synthetic info card.
-        recordsStore.add({
-          id: `local-${Date.now()}`,
-          record_type: 'system_info',
-          phase_id: null,
-          sub_phase_id: null,
-          produced_by_agent_role: null,
-          produced_at: new Date().toISOString(),
-          authority_level: 1,
-          quarantined: false,
-          derived_from_record_ids: [],
-          content: { text: `Unknown slash command: /${cmd}` },
-        });
-        composerStore.setText('');
+        // Everything else is capability sugar, resolved SERVER-SIDE
+        // (slash-name = capability-name, plus a small alias table). A
+        // resolved command fast-paths a deterministic capability; an unknown
+        // slash falls through to the natural-language ReAct loop with the
+        // full text (minus the leading slash) as the query — no more
+        // client-side hardcoded switch or "unknown command" dead-end.
+        post({ type: 'submitOpenQuery', text: body, slashCommand: cmd });
+        composerStore.clear();
     }
   }
 

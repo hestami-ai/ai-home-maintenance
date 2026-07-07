@@ -254,13 +254,17 @@ export class ClientLiaisonDBImpl implements ClientLiaisonDB {
     while (frontier.length > 0 && currentDepth < depth) {
       const next: string[] = [];
       for (const id of frontier) {
+        // The memory_edge columns are source_record_id / target_record_id
+        // (schema.ts) — aliased here to the MemoryEdge field names so the
+        // traversal code below is unchanged. (Prior code queried source_id /
+        // target_id, which do not exist on memory_edge and threw at runtime.)
         const sql = edgeType
-          ? `SELECT id, source_id, target_id, edge_type, status
+          ? `SELECT id, source_record_id AS source_id, target_record_id AS target_id, edge_type, status
                FROM memory_edge
-              WHERE source_id = ? AND edge_type = ? AND status != 'rejected'`
-          : `SELECT id, source_id, target_id, edge_type, status
+              WHERE source_record_id = ? AND edge_type = ? AND status != 'rejected'`
+          : `SELECT id, source_record_id AS source_id, target_record_id AS target_id, edge_type, status
                FROM memory_edge
-              WHERE source_id = ? AND status != 'rejected'`;
+              WHERE source_record_id = ? AND status != 'rejected'`;
         const rows = (
           edgeType
             ? this.db.prepare(sql).all(id, edgeType)
@@ -296,8 +300,8 @@ export class ClientLiaisonDBImpl implements ClientLiaisonDB {
           .prepare(
             `SELECT DISTINCT gs.*
                FROM memory_edge me
-               JOIN governed_stream gs ON gs.id = me.source_id
-              WHERE me.target_id = ?
+               JOIN governed_stream gs ON gs.id = me.source_record_id
+              WHERE me.target_record_id = ?
                 AND me.edge_type IN ('derives_from', 'implements', 'validates')
                 AND me.status != 'rejected'
                 AND gs.is_current_version = 1`,

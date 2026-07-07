@@ -31,7 +31,6 @@ import { Synthesizer } from './clientLiaison/synthesizer';
 import { MentionResolver, type MentionExtensionHost } from './clientLiaison/mentionResolver';
 import {
   CapabilityRegistry,
-  type Capability,
   type CapabilityContext,
 } from './clientLiaison/capabilities/index';
 import { workflowControlCapabilities } from './clientLiaison/capabilities/workflowControl/index';
@@ -63,6 +62,22 @@ export interface ClientLiaisonConfig {
   model: string;
 }
 
+/**
+ * Friendly slash aliases → capability names. The default convention is
+ * slash-name = capability-name; this table only covers the established short
+ * names. Only zero-argument capabilities are eligible as slash sugar
+ * (enforced in resolveSlashCommand) — everything else routes through the loop.
+ */
+const SLASH_ALIASES: Record<string, string> = {
+  status: 'getStatus',
+  activity: 'getRecentActivity',
+  history: 'getPhaseHistory',
+  artifacts: 'listArtifacts',
+  decisions: 'listDecisions',
+  constraints: 'listConstraints',
+  version: 'getVersion',
+};
+
 // ── Agent ───────────────────────────────────────────────────────────
 
 export class ClientLiaisonAgent {
@@ -92,6 +107,17 @@ export class ClientLiaisonAgent {
     // (LLMCaller does not currently expose its provider map; the bootstrap
     // is responsible for registering the same providers on PriorityLLMCaller
     // via setLLMCaller below if needed.)
+
+    // Instrument liaison LLM calls so the user_query lane writes
+    // agent_invocation/agent_output records and — crucially — emits
+    // `llm:stream_chunk` events for live token streaming in the webview.
+    // Without a writer the LLMCaller mints no invocationId and streaming is
+    // silently disabled (writeOutputChunk early-returns). We deliberately do
+    // NOT attach the reasoning-review harness hook here, so ordinary chat
+    // turns never spawn validator calls.
+    if (engine.writer) {
+      this.priorityLLM.setWriter(engine.writer, engine.janumiCodeVersionSha);
+    }
 
     this.cdb = new ClientLiaisonDBImpl(db, config.embeddingService);
     this.registerAllCapabilities();
@@ -337,6 +363,30 @@ export class ClientLiaisonAgent {
   /** Expose the registry for the help slash command and for tool generation. */
   getRegistry(): CapabilityRegistry {
     return this.registry;
+  }
+
+  /**
+   * Resolve a slash command to a capability name, server-side (no hardcoded
+   * client switch). The convention is slash-name = capability-name, with a
+   * small alias table for the established friendly names. Only deterministic
+   * ZERO-required-argument capabilities qualify as slash sugar — anything
+   * that needs arguments returns null and is routed through the natural-
+   * language ReAct loop instead (which supplies the arguments). Unknown
+   * commands also return null → the loop treats them as an ordinary query.
+   */
+  resolveSlashCommand(command: string): string | null {
+    const cmd = command.trim().toLowerCase().replace(/^\//, '');
+    if (!cmd) return null;
+    const aliased = SLASH_ALIASES[cmd] ?? cmd;
+    const cap =
+      this.registry.get(aliased) ??
+      this.registry.all().find(c => c.name.toLowerCase() === aliased);
+    if (!cap) return null;
+    const required = Array.isArray((cap.parameters as { required?: unknown }).required)
+      ? ((cap.parameters as { required: unknown[] }).required)
+      : [];
+    if (required.length > 0) return null;
+    return cap.name;
   }
 
   /** Expose the DB layer for the provider's snapshot/recovery code. */

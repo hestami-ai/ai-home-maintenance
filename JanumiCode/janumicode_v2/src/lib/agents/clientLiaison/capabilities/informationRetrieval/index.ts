@@ -2,14 +2,15 @@
  * Information Retrieval capabilities — getStatus, getPhaseHistory, searchRecords, getRecentActivity.
  */
 
-import type { Capability } from '../index';
+import type { Capability, ReadCtx } from '../index';
 import type { GovernedStreamRecord, PhaseId, RecordType } from '../../../../types/records';
 import { PHASE_NAMES } from '../../../../types/records';
 import type { WorkflowStatus } from '../../types';
 
-export const getStatus: Capability<Record<string, never>, WorkflowStatus> = {
+export const getStatus: Capability<Record<string, never>, WorkflowStatus, ReadCtx> = {
   name: 'getStatus',
   category: 'information_retrieval',
+  tier: 'read',
   description:
     'Return the current workflow run status: phase, sub-phase, and recent activity.',
   parameters: { type: 'object', properties: {} },
@@ -45,9 +46,10 @@ export const getStatus: Capability<Record<string, never>, WorkflowStatus> = {
   },
 };
 
-export const getPhaseHistory: Capability<{ phaseId?: PhaseId }, GovernedStreamRecord[]> = {
+export const getPhaseHistory: Capability<{ phaseId?: PhaseId }, GovernedStreamRecord[], ReadCtx> = {
   name: 'getPhaseHistory',
   category: 'information_retrieval',
+  tier: 'read',
   description: 'Return phase gate approval records, optionally filtered to a specific phase.',
   parameters: {
     type: 'object',
@@ -73,9 +75,10 @@ interface SearchParams {
   limit?: number;
 }
 
-export const searchRecords: Capability<SearchParams, GovernedStreamRecord[]> = {
+export const searchRecords: Capability<SearchParams, GovernedStreamRecord[], ReadCtx> = {
   name: 'searchRecords',
   category: 'information_retrieval',
+  tier: 'read',
   description: 'Full-text search across the Governed Stream. Optionally filter by record type or phase.',
   parameters: {
     type: 'object',
@@ -103,9 +106,10 @@ export const searchRecords: Capability<SearchParams, GovernedStreamRecord[]> = {
   },
 };
 
-export const getRecentActivity: Capability<{ limit?: number }, GovernedStreamRecord[]> = {
+export const getRecentActivity: Capability<{ limit?: number }, GovernedStreamRecord[], ReadCtx> = {
   name: 'getRecentActivity',
   category: 'information_retrieval',
+  tier: 'read',
   description: 'Return the N most recent records on the active workflow run.',
   parameters: {
     type: 'object',
@@ -170,9 +174,10 @@ interface DryRunResearchResult {
  * the governing state before committing to a decision that depends on
  * it (rollback, escalation, scope change).
  */
-export const dryRunResearch: Capability<DryRunResearchParams, DryRunResearchResult> = {
+export const dryRunResearch: Capability<DryRunResearchParams, DryRunResearchResult, ReadCtx> = {
   name: 'dryRunResearch',
   category: 'information_retrieval',
+  tier: 'read',
   description:
     'Run a Deep Memory Research query and return a summary of what the agent would find — material findings, active constraints, supersessions, contradictions, gaps. Read-only; no side effects. Use when the user wants to verify what the system knows about a topic before acting on it.',
   parameters: {

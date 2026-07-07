@@ -21,6 +21,7 @@ interface StartWorkflowResult {
 export const startWorkflow: Capability<StartWorkflowParams, StartWorkflowResult> = {
   name: 'startWorkflow',
   category: 'workflow_control',
+  tier: 'govern',
   description:
     'Start a new workflow run to build something. Use when the user expresses intent to create or build a new project.',
   parameters: {
@@ -107,6 +108,7 @@ function resolveRun(ctx: CapabilityContext, runId?: string): WorkflowRun | null 
 export const pauseWorkflow: Capability<RunIdParams, { runId: string; note: string }> = {
   name: 'pauseWorkflow',
   category: 'workflow_control',
+  tier: 'propose',
   description:
     'Acknowledge a user request to pause the active workflow. Writes a control record; phase handlers naturally pause at the next human-in-loop surface.',
   parameters: {
@@ -134,6 +136,7 @@ export const pauseWorkflow: Capability<RunIdParams, { runId: string; note: strin
 export const resumeWorkflow: Capability<RunIdParams, { runId: string; note: string }> = {
   name: 'resumeWorkflow',
   category: 'workflow_control',
+  tier: 'govern',
   description:
     'Resume a previously paused workflow run by re-invoking the current phase handler.',
   parameters: {
@@ -156,6 +159,7 @@ interface CancelParams extends RunIdParams { confirmed?: boolean }
 export const cancelWorkflow: Capability<CancelParams, { runId: string; status: string }> = {
   name: 'cancelWorkflow',
   category: 'workflow_control',
+  tier: 'govern',
   description:
     'Cancel the active workflow run. DESTRUCTIVE. The framework will ask the user to confirm before executing; re-invoke with `confirmed: true` once the user agrees.',
   parameters: {

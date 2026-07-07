@@ -101,6 +101,14 @@ export interface CapabilityCallResult {
   formatted: string;
   /** Record ids referenced by this capability call (for provenance). */
   recordIds?: string[];
+  /**
+   * True when a GOVERN/destructive capability was called without
+   * `confirmed: true`. The broker returns the confirmation prompt as
+   * `formatted` and does NOT execute; the ReAct loop treats this as a
+   * terminal turn — it surfaces the prompt to the user and ends, awaiting
+   * a confirming re-invocation on the next turn.
+   */
+  needsConfirmation?: boolean;
 }
 
 export interface SynthesisResult {

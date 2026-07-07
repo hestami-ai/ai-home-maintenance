@@ -2,7 +2,7 @@
  * Decision History capabilities — explainDecision, listDecisions, getAlternatives.
  */
 
-import type { Capability } from '../index';
+import type { Capability, ReadCtx } from '../index';
 import type { GovernedStreamRecord } from '../../../../types/records';
 
 interface ExplainParams { decisionId: string }
@@ -10,9 +10,10 @@ interface ExplainParams { decisionId: string }
 export const explainDecision: Capability<ExplainParams, {
   decision: GovernedStreamRecord | null;
   surface: GovernedStreamRecord | null;
-}> = {
+}, ReadCtx> = {
   name: 'explainDecision',
   category: 'decision_history',
+  tier: 'read',
   description:
     'Explain a decision by fetching its decision_trace record together with the originating mirror or menu it resolved.',
   parameters: {
@@ -44,9 +45,10 @@ export const explainDecision: Capability<ExplainParams, {
   },
 };
 
-export const listDecisions: Capability<{ phaseId?: string }, GovernedStreamRecord[]> = {
+export const listDecisions: Capability<{ phaseId?: string }, GovernedStreamRecord[], ReadCtx> = {
   name: 'listDecisions',
   category: 'decision_history',
+  tier: 'read',
   description: 'List decision_trace records for the current run, optionally filtered to a phase.',
   parameters: {
     type: 'object',
@@ -69,9 +71,10 @@ export const listDecisions: Capability<{ phaseId?: string }, GovernedStreamRecor
 
 interface AltParams { decisionId: string }
 
-export const getAlternatives: Capability<AltParams, GovernedStreamRecord | null> = {
+export const getAlternatives: Capability<AltParams, GovernedStreamRecord | null, ReadCtx> = {
   name: 'getAlternatives',
   category: 'decision_history',
+  tier: 'read',
   description: 'Return the menu options that were offered alongside a particular decision.',
   parameters: {
     type: 'object',
@@ -125,6 +128,7 @@ export const escalateInconsistency: Capability<EscalateParams, {
 }> = {
   name: 'escalateInconsistency',
   category: 'decision_history',
+  tier: 'govern',
   description:
     'Escalate a confirmed inconsistency to the Orchestrator. Use this ONLY when the user has identified a real contradiction between records and the retrieval evidence supports their claim. The Orchestrator handles resolution via bloom-and-prune; you cannot roll back directly.',
   parameters: {
