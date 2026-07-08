@@ -36,6 +36,31 @@ export interface ResponderInput {
 /** Returns the reply to type into the session, or null to use the canned fallback. */
 export type SessionResponder = (input: ResponderInput) => Promise<string | null>;
 
+/**
+ * A genuinely-blocking clarification the voice-of-intent responder could NOT
+ * resolve from the spec, raised to a human for a decision. Distinct from
+ * {@link ResponderInput} (which the responder answers autonomously): escalation
+ * is the fall-through when spec-grounded answering is not enough.
+ */
+export interface EscalationInput {
+  /** The blocking question, verbatim from the coding agent. */
+  question: string;
+  /** Recent agent output (tail) — what led to the block. */
+  agentContext: string;
+  /** The task specification the session is executing (may be excerpted). */
+  taskSpec: string;
+}
+
+/**
+ * Escalate a blocking question to a human and await their answer, or null when
+ * no human is reachable / the channel is absent, slow, or errors — callers then
+ * fall back to spec-grounded best judgment, NEVER a deadlock. Wired only in
+ * ATTENDED sessions; headless runs (calibration/CI) leave it undefined so the
+ * executor self-resolves per the execution-mode directive. The `null`-degrades-
+ * gracefully contract mirrors {@link SessionResponder}.
+ */
+export type ExecutorEscalation = (input: EscalationInput) => Promise<string | null>;
+
 /** Hard cap on a single typed line — TUI inputs are not a place for essays. */
 export const MAX_RESPONDER_REPLY_CHARS = 1200;
 

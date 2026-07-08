@@ -57,10 +57,10 @@ export interface NfrCoverageVerifierInputs {
 
 export type NfrCoverageVerifierResult = CoverageGapContent[];
 
-const SUB_PHASE: 'nfr_bloom_verifier' = 'nfr_bloom_verifier';
+const SUB_PHASE = 'nfr_bloom_verifier' as const;
 
 function uniqSorted(xs: string[]): string[] {
-  return Array.from(new Set(xs)).sort();
+  return Array.from(new Set(xs)).sort((a, b) => a.localeCompare(b));
 }
 
 function mkGap(params: {

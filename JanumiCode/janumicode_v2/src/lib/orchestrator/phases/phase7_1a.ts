@@ -283,18 +283,22 @@ function sanitizeChildTestCase(
       ? (raw as unknown[]).filter((x): x is string => typeof x === 'string')
       : undefined;
   };
+  // The LLM sometimes emits expected_outcome as an array of outcome strings;
+  // join (don't drop to undefined, which silently loses the assertion text).
+  let expected_outcome: string | undefined;
+  if (typeof c.expected_outcome === 'string') {
+    expected_outcome = c.expected_outcome;
+  } else if (Array.isArray(c.expected_outcome)) {
+    expected_outcome = (c.expected_outcome as unknown[]).filter((x): x is string => typeof x === 'string').join('; ') || undefined;
+  } else {
+    expected_outcome = undefined;
+  }
   return {
     id, name, test_type, steps,
     component_ids: stringArr('component_ids'),
     acceptance_criterion_ids: stringArr('acceptance_criterion_ids'),
     preconditions: stringArr('preconditions'),
-    // The LLM sometimes emits expected_outcome as an array of outcome strings;
-    // join (don't drop to undefined, which silently loses the assertion text).
-    expected_outcome: typeof c.expected_outcome === 'string'
-      ? c.expected_outcome
-      : (Array.isArray(c.expected_outcome)
-          ? (c.expected_outcome as unknown[]).filter((x): x is string => typeof x === 'string').join('; ') || undefined
-          : undefined),
+    expected_outcome,
     edge_cases: stringArr('edge_cases'),
     test_file_path: typeof c.test_file_path === 'string' ? c.test_file_path : undefined,
     active_constraints: stringArr('active_constraints'),
@@ -359,6 +363,16 @@ function formatTestCaseForPrompt(t: DecompositionTestCase): string {
   }).join('\n');
   const pre = (t.preconditions ?? []).length === 0 ? '(none)'
     : (t.preconditions ?? []).map(p => `  - ${p}`).join('\n');
+  const ps = t.property_spec;
+  let propertyLine: string | null = null;
+  if (ps) {
+    const oracle = ps.oracle ? `\n  oracle: ${ps.oracle}` : '';
+    const relation = ps.metamorphic_relation ? `\n  relation: ${ps.metamorphic_relation}` : '';
+    propertyLine = `Property: [${ps.property_kind}] ${ps.invariant}`
+      + `\n  over inputs: ${ps.input_domain}`
+      + oracle
+      + relation;
+  }
   return [
     `Test id: ${t.id}`,
     `Name: ${t.name}`,
@@ -372,19 +386,15 @@ function formatTestCaseForPrompt(t: DecompositionTestCase): string {
     steps,
     t.expected_outcome ? `Expected outcome: ${t.expected_outcome}` : null,
     t.edge_cases && t.edge_cases.length > 0 ? `Edge cases: ${t.edge_cases.join('; ')}` : null,
-    t.property_spec
-      ? `Property: [${t.property_spec.property_kind}] ${t.property_spec.invariant}`
-        + `\n  over inputs: ${t.property_spec.input_domain}`
-        + (t.property_spec.oracle ? `\n  oracle: ${t.property_spec.oracle}` : '')
-        + (t.property_spec.metamorphic_relation ? `\n  relation: ${t.property_spec.metamorphic_relation}` : '')
-      : null,
+    propertyLine,
   ].filter(Boolean).join('\n');
 }
 
 function formatTechnicalConstraints(tcs: TechnicalConstraint[]): string {
   if (tcs.length === 0) return '(none captured in Phase 1.0c)';
   return tcs.map(t => {
-    const tech = t.technology ? ` [${t.technology}${t.version ? ` ${t.version}` : ''}]` : '';
+    const version = t.version ? ` ${t.version}` : '';
+    const tech = t.technology ? ` [${t.technology}${version}]` : '';
     return `- ${t.id}${tech} (${t.category}): ${t.text}`;
   }).join('\n');
 }
@@ -757,8 +767,7 @@ export async function runTestSaturationLoop(
 
         let parentDowngraded = false;
         if (entry.tierHint === 'B') {
-          const explicitDisagreement = tierAssessment
-            && tierAssessment.agrees_with_hint === false
+          const explicitDisagreement = tierAssessment?.agrees_with_hint === false
             && typeof tierAssessment.tier === 'string'
             && (tierAssessment.tier === 'A' || tierAssessment.tier === 'B');
           const producedTierBChildren = (pendingGateByParent.get(entry.nodeId)?.length ?? 0) > 0;
@@ -972,7 +981,7 @@ export async function runTestSaturationLoop(
       consecutiveDedupOfflinePasses = 0;
     }
 
-    const priorPass = pipelinePasses.length >= 2 ? pipelinePasses[pipelinePasses.length - 2] : null;
+    const priorPass = pipelinePasses.length >= 2 ? pipelinePasses.at(-2) : null;
     const growthObserved = priorPass
       && priorPass.nodes_produced > 0
       && nodesProducedThisPass > priorPass.nodes_produced * divergeGrowthRatio;

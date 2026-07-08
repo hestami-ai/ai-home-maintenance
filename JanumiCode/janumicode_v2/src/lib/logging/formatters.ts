@@ -58,10 +58,9 @@ export class HumanReadableFormatter implements LogFormatter {
 
     // Level with padding
     const level = entry.level.padEnd(5);
-    parts.push(level);
 
     // Trace ID
-    parts.push(`[${entry.trace_id}]`);
+    parts.push(level, `[${entry.trace_id}]`);
 
     // Context (phase/sub-phase/agent)
     const context = this.formatContext(entry);
@@ -69,11 +68,8 @@ export class HumanReadableFormatter implements LogFormatter {
       parts.push(`(${context})`);
     }
 
-    // Category
-    parts.push(`${entry.category}:`);
-
-    // Message
-    parts.push(entry.message);
+    // Category + Message
+    parts.push(`${entry.category}:`, entry.message);
 
     // Duration
     if (entry.duration_ms !== null) {

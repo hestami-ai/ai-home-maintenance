@@ -28,14 +28,12 @@
 
 import type { TransformationFieldDiff } from '../types/records';
 
-type Json = unknown;
-
 /**
  * Compute a field-diff between an input value and an output value.
  * Both should be objects (records). Non-object inputs yield an empty
  * diff (no signal to emit).
  */
-export function computeFieldDiff(input: Json, output: Json): TransformationFieldDiff {
+export function computeFieldDiff(input: unknown, output: unknown): TransformationFieldDiff {
   const diff: TransformationFieldDiff = {};
 
   if (!isPlainObject(input) || !isPlainObject(output)) {

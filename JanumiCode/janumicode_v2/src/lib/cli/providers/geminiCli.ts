@@ -2,7 +2,7 @@
  * Gemini CLI provider — command construction and detection.
  */
 
-import { execSync } from 'child_process';
+import { execSync } from 'node:child_process';
 
 export interface GeminiCliConfig {
   command?: string;

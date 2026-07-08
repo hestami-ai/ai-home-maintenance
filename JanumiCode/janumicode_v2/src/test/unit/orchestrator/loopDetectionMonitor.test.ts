@@ -142,4 +142,57 @@ describe('LoopDetectionMonitor', () => {
       expect(result.loopStatus).toBe('CONVERGING');
     });
   });
+
+  describe('tool-call loop detection (alternating)', () => {
+    const assessWith = (toolCalls: { name: string; params: string }[]) =>
+      monitor.assess({
+        retryCount: 2,
+        flawHistory: [
+          { attemptNumber: 1, flaws: [{ type: 'circular_logic', severity: 'HIGH' }] },
+          { attemptNumber: 2, flaws: [{ type: 'circular_logic', severity: 'HIGH' }] },
+        ],
+        toolCallHistory: [
+          { attemptNumber: 1, toolCalls: [] },
+          { attemptNumber: 2, toolCalls },
+        ],
+        availableTools: ['Read', 'Write', 'Search', 'Grep'],
+      });
+
+    const A = { name: 'Read', params: 'a' };
+    const B = { name: 'Write', params: 'b' };
+
+    it('detects A,B,A,B,A,B alternation (3 cycles)', () => {
+      expect(assessWith([A, B, A, B, A, B]).toolCallLoopDetected).toBe(true);
+    });
+
+    it('does NOT flag A,X,A,Y,A,Z,A where only the even calls repeat (regression: S1764 self-comparison)', () => {
+      const calls = [
+        { name: 'Read', params: 'a' },
+        { name: 'Write', params: 'x' },
+        { name: 'Read', params: 'a' },
+        { name: 'Search', params: 'y' },
+        { name: 'Read', params: 'a' },
+        { name: 'Grep', params: 'z' },
+        { name: 'Read', params: 'a' },
+      ];
+      expect(assessWith(calls).toolCallLoopDetected).toBe(false);
+    });
+
+    it('does NOT flag a short A,B,A,B (only 2 cycles)', () => {
+      expect(assessWith([A, B, A, B]).toolCallLoopDetected).toBe(false);
+    });
+
+    it('detects identical consecutive calls', () => {
+      expect(assessWith([A, A]).toolCallLoopDetected).toBe(true);
+    });
+
+    it('does NOT flag a non-repeating sequence', () => {
+      const calls = [
+        { name: 'Read', params: 'a' },
+        { name: 'Write', params: 'b' },
+        { name: 'Search', params: 'c' },
+      ];
+      expect(assessWith(calls).toolCallLoopDetected).toBe(false);
+    });
+  });
 });

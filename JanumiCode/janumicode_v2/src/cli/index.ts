@@ -167,6 +167,7 @@ program
   .option('--resume-from-db <path>', 'Resume from a prior run DB (skip bootstrapIntent)')
   .option('--resume-at-phase <phase>', 'Phase to resume at (requires --resume-from-db)')
   .option('--resume-at-sub-phase <sub-phase>', 'Sub-phase to resume at (requires --resume-from-db; takes precedence over --resume-at-phase). Triggers rollback of stale records at-or-after this sub-phase before re-execution.')
+  .option('--resume-reset-cycles', 'On resume, zero the run\'s cycle counter so Phase 6/7/8 run their FULL execute() path (full regeneration + gatekeepers) instead of the incremental cycle-delta path. Use when a fix must be exercised through the main generator, not just failure-seed orphans (e.g. a Phase-7 gatekeeper change).', false)
   .option('--thin-slice', 'Constrain decomposition (depth=2, fanout=1, ~2 roots per kind, all reasoning_review on) so every prompt template fires end-to-end in hours, not days. Used for prompt-template validation.', false)
   .option('--full-slice', 'Implement the ENTIRE intent (no decomposition caps) but KEEP the headless operational rails the thin-slice mode uses: 60-min records-idle stall window, forced goose_cli executor, 30-min per-call cap. For a real end-to-end build rather than template iteration.', false)
   .option('--simulate-human-decisions', 'In headless auto-approve runs, certify each phase gate through the real approval path (phase_gate_approved + validates edges → Authority-6 elevation) so the Deep Memory Research agent\'s active_constraints accumulation is exercised instead of staying dormant.', false)
@@ -176,7 +177,7 @@ program
   .option('--llm-gap-enhance', 'Call an LLM to produce a grounded suggested_fix on the gap report. Opt-in: adds one LLM call per failed run.', false)
   .option('--llm-gap-provider <provider>', 'Provider for --llm-gap-enhance. When omitted, the runner uses the workspace orchestrator routing.')
   .option('--llm-gap-model <model>', 'Model for --llm-gap-enhance. When omitted, the runner uses the workspace orchestrator routing.')
-  .action(async (options: { intent: string; workspace: string; llmMode: string; autoApprove: boolean; phaseLimit?: string; fixtureDir?: string; gapReport?: string; decisionOverrides?: string; captureFixtures?: boolean; captureOutputDir?: string; resumeFromDb?: string; resumeAtPhase?: string; resumeAtSubPhase?: string; thinSlice?: boolean; fullSlice?: boolean; simulateHumanDecisions?: boolean; injectOverrides?: string; dbPath?: string; json?: boolean; llmGapEnhance?: boolean; llmGapProvider?: string; llmGapModel?: string }) => {
+  .action(async (options: { intent: string; workspace: string; llmMode: string; autoApprove: boolean; phaseLimit?: string; fixtureDir?: string; gapReport?: string; decisionOverrides?: string; captureFixtures?: boolean; captureOutputDir?: string; resumeFromDb?: string; resumeAtPhase?: string; resumeAtSubPhase?: string; resumeResetCycles?: boolean; thinSlice?: boolean; fullSlice?: boolean; simulateHumanDecisions?: boolean; injectOverrides?: string; dbPath?: string; json?: boolean; llmGapEnhance?: boolean; llmGapProvider?: string; llmGapModel?: string }) => {
     // When JSON output is requested, redirect INFO/DEBUG logs to stderr
     // via the logging handler's env-controlled switch. Otherwise stdout
     // would carry both JSON and logger lines, and nothing downstream
@@ -242,6 +243,7 @@ program
       resumeFromDb: options.resumeFromDb ? path.resolve(options.resumeFromDb) : undefined,
       resumeAtPhase: options.resumeAtPhase,
       resumeAtSubPhase: options.resumeAtSubPhase,
+      resumeResetCycles: options.resumeResetCycles,
       thinSlice: options.thinSlice,
       fullSlice: options.fullSlice,
       llmGapEnhance: options.llmGapEnhance

@@ -16,7 +16,7 @@
  */
 export function formatTimestamp(iso: string): string {
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso; // pass through malformed timestamps
+  if (Number.isNaN(d.getTime())) return iso; // pass through malformed timestamps
 
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -32,6 +32,6 @@ export function formatTimestamp(iso: string): string {
  */
 export function formatTimeOnly(iso: string): string {
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
+  if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleTimeString();
 }

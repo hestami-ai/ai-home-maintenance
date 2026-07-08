@@ -105,7 +105,7 @@ export function buildRequirementLineage(records: GovernedStreamRecord[]): Requir
     if (node.depth === 0) return node.display_key ?? id;
     let cur: DecompNode | undefined = node;
     const guard = new Set<string>();
-    while (cur && cur.parent_node_id && !guard.has(cur.parent_node_id)) {
+    while (cur?.parent_node_id && !guard.has(cur.parent_node_id)) {
       guard.add(cur.parent_node_id);
       const next = byNodeId.get(cur.parent_node_id);
       if (!next) break;

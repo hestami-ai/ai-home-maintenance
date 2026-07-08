@@ -30,11 +30,10 @@ export class AnthropicProvider implements LLMProviderAdapter {
       input_schema: t.input_schema as Record<string, unknown> & { type: 'object' },
     }));
 
+    const defaultToolChoice = tools && tools.length > 0 ? { type: 'auto' as const } : undefined;
     const toolChoice = options.toolChoice
       ? this.mapToolChoice(options.toolChoice)
-      : tools && tools.length > 0
-        ? { type: 'auto' as const }
-        : undefined;
+      : defaultToolChoice;
 
     try {
       const response = await client.messages.create({

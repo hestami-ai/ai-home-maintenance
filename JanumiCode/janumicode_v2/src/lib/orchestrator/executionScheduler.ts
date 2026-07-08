@@ -22,25 +22,23 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getLogger } from '../logging';
-import type { OrchestratorEngine } from './orchestratorEngine';
+import type { OrchestratorEngine, PhaseContext } from './orchestratorEngine';
 import type { GovernedStreamWriter } from './governedStreamWriter';
-import type { GovernedStreamRecord, ImplementationPacketContent } from '../types/records';
 import type {
+  ImplementationPacketContent,
   ExecutionWaveCompletedContent,
   ExecutionWaveStartedContent,
   ExecutionWaveKind,
   QuarantineAttemptEntry,
   TaskQuarantineContent,
+  ReasoningReviewFindingRecordContent,
 } from '../types/records';
 import { formatPacketAsExecutorContext } from './phases/packetSynthesis/packetContextFormatter';
 import type { ExecutionContextBuilder, ImplementationTask as CtxTask } from './executionContextBuilder';
 import type { ExecutorAgent, ExecutionTask, ExecutionResult } from '../agents/executorAgent';
-import type { ReasoningReviewFindingRecordContent } from '../types/records';
 import {
   captureWaveSnapshot,
   diffWaveSnapshots,
-  type FileSnapshot,
-  type WaveDiffSummary,
 } from './workspaceSnapshot';
 import { LeafTestRunner, type LeafTestRunnerConfig, type LeafTestRunResult } from './leafTestRunner';
 import { resolveGateCommands, type GateCommand } from './gateCommands';
@@ -50,7 +48,6 @@ import { normalizeComponentDirForStack, resolveWriteScopeForComponent } from './
 import { QuarantineLedger } from './quarantineLedger';
 import { WaveGate, type WaveGateOutcome } from './waveGate';
 import { buildPhaseContextPacket } from './phases/dmrContext';
-import type { PhaseContext } from './orchestratorEngine';
 import type { ScaffoldManifest } from './phases/scaffoldSynthesis';
 import type { ModuleOwnershipPlan } from './phases/moduleOwnershipPlanner';
 
@@ -84,6 +81,14 @@ export interface ExecutionSchedulerConfig {
   testsPerLeaf: LeafTestRunnerConfig;
   /** Max repair sessions in the Stage-0.5 stabilization loop (default 2). */
   stabilizationBudget?: number;
+  /**
+   * Whether a human is in the loop for THIS run (= !unattendedSkipPermissions).
+   * Selects the mode-aware tail of {@link buildExecutionModeDirective}: attended
+   * escalates unanswerable clarifications to a human; headless (calibration/CI)
+   * instructs the executor to make a spec-consistent best judgment and proceed.
+   * Default false — calibration/CI is the safe default.
+   */
+  attended?: boolean;
 }
 
 /** Stage 0.5 — what the global gates still complain about after the closing
@@ -134,13 +139,39 @@ export const EXECUTOR_CRAFT_LEAD =
 
 // PD-10 (P9 prompt audit): headless executors were observed asking "which
 // area/component?" and crawling the workspace tree to "discover" structure despite
-// the context being marked authoritative — the prompt never stated it runs
-// non-interactively. A short, high-visibility directive at the TOP of the prompt
-// removes that starvation/probe loop. Exported so the "prompt leads with a headless
-// directive" invariant is unit-testable.
-export const HEADLESS_EXECUTION_DIRECTIVE =
-  '## Execution Mode — HEADLESS / NON-INTERACTIVE\n'
-  + 'You are running autonomously with NO human available to answer questions. Do NOT ask which area / component / file to work on, do NOT pause for confirmation, and do NOT wait for input — the task, write scope, and completion criteria below are AUTHORITATIVE and complete. Do NOT crawl or probe the workspace tree to "discover" structure: the Write Scope and Layout below state exactly where to write. If a detail is genuinely underspecified, choose the most reasonable option consistent with the completion criteria and proceed. Finish by producing the code and its tests; stop when the completion criteria are satisfied.';
+// the context being marked authoritative — the prompt never stated how it is
+// governed. A short, high-visibility directive at the TOP of the prompt removes
+// that starvation/probe loop.
+//
+// Supersedes the former PD-10 "headless / no-crawl" framing (which wrongly BANNED
+// the codebase reconnaissance that Research-Plan-Implement requires). A governed
+// voice-of-intent SessionResponder (grounded in the spec) answers the executor's
+// clarifications where the adapter supports interaction; because blocked-prompt
+// DETECTION is per-adapter + best-effort (human-oriented TUIs) AND some adapters
+// are non-conversational (mimo's compose HTTP API carries only approve/deny, no
+// text answer), the directive forbids deadlocking on a possibly-missed prompt and
+// mandates Research-Plan-Implement (read the codebase to reconcile the task with
+// reality).
+//
+// The tail is MODE-AWARE (attended = !unattendedSkipPermissions): in an ATTENDED
+// session an unanswerable clarification escalates to a human; in a HEADLESS run
+// (calibration / thin-slice / CI) there is NO human to escalate to, so the
+// directive instructs the agent to make the best spec-consistent judgment (no
+// shortcuts) and proceed. Prepended to EVERY Phase-9 executor prompt (all
+// CLIs/TUIs). Exported (as a builder) so both branches are unit-testable and the
+// "no-crawl ban is gone" invariant cannot silently regress.
+export function buildExecutionModeDirective(attended: boolean): string {
+  const governance = attended
+    ? 'You run under a governed session: a voice-of-intent reviewer, grounded in the authoritative spec, answers your clarifying questions where your CLI/TUI supports it and escalates to a human when it cannot. Blocked-prompt detection is best-effort, so NEVER stall waiting for a reply — resolve what you can from the task, spec, and codebase and keep moving.\n'
+    : 'You run HEADLESS: there is NO human to escalate to. A spec-grounded voice-of-intent reviewer answers some clarifications where your CLI/TUI supports it, but when it cannot and the task, spec, and codebase still leave a choice open, make the best spec-consistent judgment that delivers a COMPLETE and CORRECT implementation and takes NO shortcuts — note the assumption and proceed. NEVER stall waiting for a reply.\n';
+  return '## Execution Mode — Research → Plan → Implement (governed autonomy)\n'
+    + governance
+    + '- RESEARCH first: read the existing workspace to reconcile this task with reality; when task and code conflict, investigate before writing. You MAY read beyond the write scope.\n'
+    + '- The Write Scope, Layout, and completion criteria below are AUTHORITATIVE for where you write and what "done" means — honor them; do not invent an alternative layout.\n'
+    + '- Resolve underspecification from the task/spec/codebase; surface a clarification only when truly blocked, then proceed with the best spec-consistent choice rather than pausing.\n'
+    + '- Honor the declared stack and constraints; do not substitute your own language, framework, or test runner.\n'
+    + 'Finish by producing the code and its tests; stop when the completion criteria are satisfied.';
+}
 
 // ── Scheduler ──────────────────────────────────────────────────────
 
@@ -848,12 +879,15 @@ export class ExecutionScheduler {
         successfulLeafIds.add(leaf.id);
       } else {
         quarantinedLeafIds.add(leaf.id);
-        const lastAttempt = attempts[attempts.length - 1];
-        const reason = lastAttempt?.outcome === 'reasoning_review_failed'
-          ? `reasoning_review_failed (${(lastAttempt.reasoning_review_flaws ?? []).map(f => f.flaw_type).join(', ') || 'unspecified'})`
-          : lastAttempt?.outcome === 'tests_failed'
-            ? `tests_failed (${(lastAttempt.test_failures ?? []).slice(0, 3).join(', ') || 'unspecified'})`
-            : `execution_failed (${lastAttempt?.error_message ?? 'unspecified'})`;
+        const lastAttempt = attempts.at(-1);
+        let reason: string;
+        if (lastAttempt?.outcome === 'reasoning_review_failed') {
+          reason = `reasoning_review_failed (${(lastAttempt.reasoning_review_flaws ?? []).map(f => f.flaw_type).join(', ') || 'unspecified'})`;
+        } else if (lastAttempt?.outcome === 'tests_failed') {
+          reason = `tests_failed (${(lastAttempt.test_failures ?? []).slice(0, 3).join(', ') || 'unspecified'})`;
+        } else {
+          reason = `execution_failed (${lastAttempt?.error_message ?? 'unspecified'})`;
+        }
         // For deferred-batch waves, the existing quarantine entry is
         // updated with rescue_status by the outer caller — don't enqueue
         // a new one. For release waves, this is the first quarantine.
@@ -976,6 +1010,33 @@ export class ExecutionScheduler {
     // detail file stays consistent with the prepended packet block below.
     const packet = this.packetByTaskId?.get(leaf.id);
 
+    let layoutScaffold: {
+      conventions: string;
+      sharedDir: string;
+      canonicalFiles: string[];
+      protectedPaths: string[];
+      language?: string;
+    } | null;
+    if (this.reconEnforcement) {
+      layoutScaffold = {
+        conventions: this.reconEnforcement.conventions,
+        sharedDir: '', // recon is per-area; the conventions carry the aliases/paths
+        canonicalFiles: this.reconEnforcement.canonical_modules.map(m => m.path),
+        protectedPaths: this.reconEnforcement.protected_paths,
+        language: this.reconEnforcement.primary_stack,
+      };
+    } else if (this.scaffoldManifest) {
+      layoutScaffold = {
+        conventions: this.scaffoldManifest.conventions,
+        sharedDir: this.scaffoldManifest.profile.shared_dir,
+        canonicalFiles: this.scaffoldManifest.canonical_files,
+        protectedPaths: this.scaffoldManifest.protected_paths,
+        language: this.scaffoldManifest.profile.language,
+      };
+    } else {
+      layoutScaffold = null;
+    }
+
     let stdinText = this.executionContextBuilder.buildTaskContext(
       leaf as unknown as CtxTask,
       workflowRunId,
@@ -983,23 +1044,7 @@ export class ExecutionScheduler {
       this.artifacts,
       undefined,
       dmrPacket,
-      this.reconEnforcement
-        ? {
-            conventions: this.reconEnforcement.conventions,
-            sharedDir: '', // recon is per-area; the conventions carry the aliases/paths
-            canonicalFiles: this.reconEnforcement.canonical_modules.map(m => m.path),
-            protectedPaths: this.reconEnforcement.protected_paths,
-            language: this.reconEnforcement.primary_stack,
-          }
-        : this.scaffoldManifest
-          ? {
-              conventions: this.scaffoldManifest.conventions,
-              sharedDir: this.scaffoldManifest.profile.shared_dir,
-              canonicalFiles: this.scaffoldManifest.canonical_files,
-              protectedPaths: this.scaffoldManifest.protected_paths,
-              language: this.scaffoldManifest.profile.language,
-            }
-          : null,
+      layoutScaffold,
       packet,
     ).stdin.text;
 
@@ -1081,9 +1126,12 @@ export class ExecutionScheduler {
       stdinText = `${stdinText}\n\n## RETRY CONTEXT\n\n${augmentedContext}`;
     }
 
-    // PD-10: lead with the headless / non-interactive directive so it is the first
-    // thing the executor reads (before it can start a "which area?" / tree-probe loop).
-    stdinText = `${HEADLESS_EXECUTION_DIRECTIVE}\n\n${stdinText}`;
+    // Lead with the execution-mode directive (governed RPI autonomy) so it is the
+    // first thing the executor reads — it frames the voice-of-intent reviewer, permits
+    // codebase research, and forbids deadlocking on a possibly-missed blocked prompt.
+    // The tail is mode-aware: headless (calibration/CI, the default) tells the agent
+    // to self-resolve since there is no human to escalate to.
+    stdinText = `${buildExecutionModeDirective(this.config.attended === true)}\n\n${stdinText}`;
 
     const execTask: ExecutionTask = {
       id: leaf.id,
@@ -1490,7 +1538,7 @@ interface WaveSlice {
  *  vitest/jest/pytest/go/rust): `*.test.*` / `*.spec.*` / `*_test.*` /
  *  `test_*` basenames, or a path under a `__tests__` / `tests` directory. */
 export function isTestFilePath(rel: string): boolean {
-  const p = rel.replace(/\\/g, '/').toLowerCase();
+  const p = rel.replaceAll('\\', '/').toLowerCase();
   const base = p.split('/').pop() ?? p;
   if (/\.(test|spec)\.[a-z0-9]+$/.test(base)) return true;
   if (/(^|[._-])test[._-]/.test(base) || /_test\.[a-z0-9]+$/.test(base)) return true;
@@ -1656,8 +1704,7 @@ export function detectSandboxEscapes(
 
 export function buildWorkspaceOrientation(workspacePath: string, writeDirectoryPaths: string[]): string {
   const lines: string[] = [];
-  lines.push('# Workspace Orientation');
-  lines.push('');
+  lines.push('# Workspace Orientation', '');
   // Steer the agent to RELATIVE paths. We deliberately do NOT print the
   // absolute workspace root: it is the longest literal string the agent
   // echoes, and weak models mangle it into out-of-sandbox absolute paths
@@ -1665,9 +1712,11 @@ export function buildWorkspaceOrientation(workspacePath: string, writeDirectoryP
   // The agent's current working directory IS the project root, so relative
   // paths suffice — and a mistyped RELATIVE path still stays inside the
   // sandbox, whereas a mistyped ABSOLUTE path does not.
-  lines.push('You are running INSIDE the project root — it is your current working directory (`.`).');
-  lines.push('Write every file using a path RELATIVE to it (e.g. `src/foo.ts`, `internal/x/y.go`).');
-  lines.push('NEVER use an absolute path and never `cd` out of this directory — writes outside it are rejected.');
+  lines.push(
+    'You are running INSIDE the project root — it is your current working directory (`.`).',
+    'Write every file using a path RELATIVE to it (e.g. `src/foo.ts`, `internal/x/y.go`).',
+    'NEVER use an absolute path and never `cd` out of this directory — writes outside it are rejected.',
+  );
 
   let workspaceExists = false;
   let workspaceEntryCount = 0;
@@ -1689,8 +1738,7 @@ export function buildWorkspaceOrientation(workspacePath: string, writeDirectoryP
   }
 
   if (writeDirectoryPaths.length > 0) {
-    lines.push('');
-    lines.push('Write-scope paths (you may create or modify ONLY these):');
+    lines.push('', 'Write-scope paths (you may create or modify ONLY these):');
     for (const rel of writeDirectoryPaths) {
       const abs = path.isAbsolute(rel) ? rel : path.join(workspacePath, rel);
       let exists = false;
@@ -1700,8 +1748,7 @@ export function buildWorkspaceOrientation(workspacePath: string, writeDirectoryP
     }
   }
 
-  lines.push('');
-  lines.push('_Do not spend tool calls probing the workspace structure — the information above is authoritative._');
+  lines.push('', '_Do not spend tool calls probing the workspace structure — the information above is authoritative._');
   return lines.join('\n');
 }
 
@@ -1840,5 +1887,5 @@ function emptyScheduleResult(): ExecutionScheduleResult {
 
 // Force-exported types referenced from outside that TS would otherwise
 // elide if no value is exported alongside them.
-export type { FileSnapshot, WaveDiffSummary };
-export type { GovernedStreamRecord };
+export type { FileSnapshot, WaveDiffSummary } from './workspaceSnapshot';
+export type { GovernedStreamRecord } from '../types/records';

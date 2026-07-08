@@ -17,21 +17,24 @@ import { categorizeCoherence } from '../../../review/findingSurfacing';
 
 export function formatPacketAsExecutorContext(packet: ImplementationPacketContent): string {
   const lines: string[] = [];
-  lines.push('# Implementation Packet Context');
-  lines.push('');
-  lines.push('Your authoritative deliverable is the **Implementation Task** and its **Completion Criteria** (in the GOVERNING CONSTRAINTS section below) — that is exactly what you must build and what you will be judged on.');
-  lines.push('');
-  lines.push('The sections below are the surrounding **component context**: the user stories, test cases, and evaluation methods for the *whole component* this task belongs to. Your task implements ONE slice of this component, not all of it. Use this context to stay consistent with the component — do NOT attempt to satisfy every story, test, or evaluation listed here in this single task, and do NOT invent ACs, tests, components, APIs, or constraints beyond what is given.');
-  lines.push('');
+  lines.push(
+    '# Implementation Packet Context',
+    '',
+    'Your authoritative deliverable is the **Implementation Task** and its **Completion Criteria** (in the GOVERNING CONSTRAINTS section below) — that is exactly what you must build and what you will be judged on.',
+    '',
+    'The sections below are the surrounding **component context**: the user stories, test cases, and evaluation methods for the *whole component* this task belongs to. Your task implements ONE slice of this component, not all of it. Use this context to stay consistent with the component — do NOT attempt to satisfy every story, test, or evaluation listed here in this single task, and do NOT invent ACs, tests, components, APIs, or constraints beyond what is given.',
+    '',
+  );
 
   // ── User Stories ────────────────────────────────────────────────
   if (packet.user_stories.length > 0) {
-    lines.push('## Component Context — User Stories');
-    lines.push('');
+    lines.push('## Component Context — User Stories', '');
     for (const us of packet.user_stories) {
-      lines.push(`### ${us.id} — As a ${us.role || '(no role)'}, I want to ${us.action || '(no action)'}, so that ${us.outcome || '(no outcome)'}.`);
-      lines.push(`Priority: ${us.priority || 'medium'}`);
-      lines.push('');
+      lines.push(
+        `### ${us.id} — As a ${us.role || '(no role)'}, I want to ${us.action || '(no action)'}, so that ${us.outcome || '(no outcome)'}.`,
+        `Priority: ${us.priority || 'medium'}`,
+        '',
+      );
       if (us.acceptance_criteria.length > 0) {
         lines.push('**Acceptance criteria for this story (component-level — your task may satisfy only the subset within its scope):**');
         for (const ac of us.acceptance_criteria) {
@@ -47,8 +50,7 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
 
   // ── NFRs ────────────────────────────────────────────────────────
   if (packet.nfrs.length > 0) {
-    lines.push('## Non-Functional Requirements That Apply');
-    lines.push('');
+    lines.push('## Non-Functional Requirements That Apply', '');
     for (const n of packet.nfrs) {
       lines.push(`- **${n.id}** (${n.category}): ${n.description}`);
       if (n.threshold) lines.push(`  Threshold: ${n.threshold}`);
@@ -60,20 +62,20 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
 
   // ── Component contract ─────────────────────────────────────────
   if (packet.component.id) {
-    lines.push('## Component Contract');
-    lines.push('');
-    lines.push(`Component: \`${packet.component.id}\` — ${packet.component.name || '(no name)'}`);
+    lines.push(
+      '## Component Contract',
+      '',
+      `Component: \`${packet.component.id}\` — ${packet.component.name || '(no name)'}`,
+    );
     if (packet.component.domain_id) lines.push(`Domain: \`${packet.component.domain_id}\``);
     if (packet.component.responsibilities.length > 0) {
-      lines.push('');
-      lines.push('Responsibilities:');
+      lines.push('', 'Responsibilities:');
       for (const r of packet.component.responsibilities) {
         lines.push(`- ${r.id ? `\`${r.id}\`: ` : ''}${r.description || r.statement || ''}`);
       }
     }
     if (packet.component.dependencies.length > 0) {
-      lines.push('');
-      lines.push('Component dependencies:');
+      lines.push('', 'Component dependencies:');
       for (const d of packet.component.dependencies) {
         lines.push(`- \`${d.component_id}\` (${d.kind})`);
       }
@@ -83,8 +85,7 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
 
   // ── Data models ────────────────────────────────────────────────
   if (packet.data_models.length > 0) {
-    lines.push('## Data Models You May Read/Write');
-    lines.push('');
+    lines.push('## Data Models You May Read/Write', '');
     for (const dm of packet.data_models) {
       lines.push(`### ${dm.id} — ${dm.name || '(no name)'}`);
       if (dm.fields.length > 0) {
@@ -106,24 +107,30 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
   // when more than one endpoint is present, tell the executor to implement only
   // the one(s) its task + completion criteria call for (mirrors the test-case hedge).
   if (packet.api_definitions.length > 0) {
-    lines.push(packet.api_definitions.length > 1
-      ? '## Component API Endpoints (context — implement ONLY the one(s) your task + completion criteria require; the rest belong to sibling tasks)'
-      : '## API Endpoints You Implement');
-    lines.push('');
+    lines.push(
+      packet.api_definitions.length > 1
+        ? '## Component API Endpoints (context — implement ONLY the one(s) your task + completion criteria require; the rest belong to sibling tasks)'
+        : '## API Endpoints You Implement',
+      '',
+    );
     for (const api of packet.api_definitions) {
       lines.push(`### ${api.id} — \`${api.method} ${api.path}\``);
       if (api.description) lines.push(api.description);
       if (api.request_shape) {
-        lines.push('Request shape:');
-        lines.push('```json');
-        lines.push(JSON.stringify(api.request_shape, null, 2));
-        lines.push('```');
+        lines.push(
+          'Request shape:',
+          '```json',
+          JSON.stringify(api.request_shape, null, 2),
+          '```',
+        );
       }
       if (api.response_shape) {
-        lines.push('Response shape:');
-        lines.push('```json');
-        lines.push(JSON.stringify(api.response_shape, null, 2));
-        lines.push('```');
+        lines.push(
+          'Response shape:',
+          '```json',
+          JSON.stringify(api.response_shape, null, 2),
+          '```',
+        );
       }
       if (api.error_codes && api.error_codes.length > 0) {
         lines.push(`Error codes: ${api.error_codes.join(', ')}`);
@@ -134,8 +141,7 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
 
   // ── Test cases ──────────────────────────────────────────────────
   if (packet.test_cases.length > 0) {
-    lines.push('## Component Test Cases (context — may belong to sibling tasks; your gate is the Completion Criteria, not these)');
-    lines.push('');
+    lines.push('## Component Test Cases (context — may belong to sibling tasks; your gate is the Completion Criteria, not these)', '');
     for (const tc of packet.test_cases) {
       const refs = tc.acceptance_criterion_ids.join(', ');
       lines.push(`### ${tc.test_case_id} (${tc.type}) — verifies ${refs}`);
@@ -146,9 +152,11 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
       lines.push(`Expected outcome: ${tc.expected_outcome}`);
       if (tc.property_spec) {
         const ps = tc.property_spec;
-        lines.push(`PROPERTY TEST (${ps.property_kind}) — implement with the stack's property-based-testing library (fast-check / Hypothesis / proptest / gopter), not a single example:`);
-        lines.push(`  Invariant (must hold for ALL inputs): ${ps.invariant}`);
-        lines.push(`  Input domain to generate over: ${ps.input_domain}`);
+        lines.push(
+          `PROPERTY TEST (${ps.property_kind}) — implement with the stack's property-based-testing library (fast-check / Hypothesis / proptest / gopter), not a single example:`,
+          `  Invariant (must hold for ALL inputs): ${ps.invariant}`,
+          `  Input domain to generate over: ${ps.input_domain}`,
+        );
         if (ps.generators && ps.generators.length > 0) lines.push(`  Suggested generators: ${ps.generators.join(', ')}`);
         if (ps.oracle) lines.push(`  Oracle: ${ps.oracle}`);
         if (ps.metamorphic_relation) lines.push(`  Metamorphic relation: ${ps.metamorphic_relation}`);
@@ -159,12 +167,13 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
 
   // ── Evaluation criteria ────────────────────────────────────────
   if (packet.evaluation_criteria.length > 0) {
-    lines.push('## How This Component Is Evaluated (context — these are component/system-level methods, not your task\'s unit of work)');
-    lines.push('');
+    lines.push('## How This Component Is Evaluated (context — these are component/system-level methods, not your task\'s unit of work)', '');
     for (const ec of packet.evaluation_criteria) {
-      lines.push(`- Target \`${ec.target_id}\` (${ec.kind})`);
-      lines.push(`  Method: ${ec.evaluation_method}`);
-      lines.push(`  Success: ${ec.success_condition}`);
+      lines.push(
+        `- Target \`${ec.target_id}\` (${ec.kind})`,
+        `  Method: ${ec.evaluation_method}`,
+        `  Success: ${ec.success_condition}`,
+      );
       if (ec.property_spec) {
         const ps = ec.property_spec;
         lines.push(`  PROPERTY (${ps.property_kind}) — verify generatively with the stack's PBT library: assert "${ps.invariant}" for all inputs in {${ps.input_domain}}${ps.oracle ? ` (oracle: ${ps.oracle})` : ''}.`);
@@ -184,8 +193,7 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
     const resolved = packet.active_constraints.filter((c) => typeof c.text === 'string' && c.text.trim().length > 0);
     const unresolved = packet.active_constraints.filter((c) => !(typeof c.text === 'string' && c.text.trim().length > 0));
     if (resolved.length > 0) {
-      lines.push('## Technical Constraints (apply without exception)');
-      lines.push('');
+      lines.push('## Technical Constraints (apply without exception)', '');
       for (const c of resolved) {
         const tech = c.technology ? ` [${c.technology}]` : '';
         lines.push(`- **${c.id}**${tech} (${c.category}): ${c.text}`);
@@ -194,17 +202,18 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
       lines.push('');
     }
     if (unresolved.length > 0) {
-      lines.push('## Unresolved constraint references (upstream gap — do NOT invent a rule for these; flagged for maintainers)');
-      lines.push('');
-      lines.push(unresolved.map((c) => `\`${c.id}\``).join(', '));
-      lines.push('');
+      lines.push(
+        '## Unresolved constraint references (upstream gap — do NOT invent a rule for these; flagged for maintainers)',
+        '',
+        unresolved.map((c) => `\`${c.id}\``).join(', '),
+        '',
+      );
     }
   }
 
   // ── Compliance / V&V / Quality items ──────────────────────────
   if (packet.compliance_items.length > 0) {
-    lines.push('## Compliance / V&V / Quality Items That Apply');
-    lines.push('');
+    lines.push('## Compliance / V&V / Quality Items That Apply', '');
     for (const c of packet.compliance_items) {
       lines.push(`- **${c.id}** (${c.kind}): ${c.description}`);
       if (c.measurable_condition) lines.push(`  Measurable: ${c.measurable_condition}`);
@@ -224,8 +233,7 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
   ];
   if (coherenceCodes.length > 0) {
     const { actionable, fyi } = categorizeCoherence(coherenceCodes);
-    lines.push('## Upstream Coherence Findings (gaps in THIS task\'s inputs)');
-    lines.push('');
+    lines.push('## Upstream Coherence Findings (gaps in THIS task\'s inputs)', '');
     if (actionable.length > 0) {
       lines.push('Act on these:');
       for (const a of actionable) lines.push(`- ${a.line} → ${a.remedy}`);
@@ -241,10 +249,12 @@ export function formatPacketAsExecutorContext(packet: ImplementationPacketConten
   // ai_proposed root count — some upstream ids were not user-confirmed; honor
   // spec text when those refs conflict.
   if (packet.coherence.annotations.ai_proposed_root_count > 0) {
-    lines.push('## Packet Coherence Notes');
-    lines.push('');
-    lines.push(`_${packet.coherence.annotations.ai_proposed_root_count} upstream id(s) trace to ai-proposed Phase 1 items. Honor the spec text where it conflicts with these._`);
-    lines.push('');
+    lines.push(
+      '## Packet Coherence Notes',
+      '',
+      `_${packet.coherence.annotations.ai_proposed_root_count} upstream id(s) trace to ai-proposed Phase 1 items. Honor the spec text where it conflicts with these._`,
+      '',
+    );
   }
 
   return lines.join('\n');

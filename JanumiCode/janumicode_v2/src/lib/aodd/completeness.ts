@@ -75,23 +75,23 @@ export function loadManifest(manifestPath: string): FixtureManifest {
   }
   const m = parsed as Partial<FixtureManifest>;
   if (typeof m.scenario !== 'string') {
-    throw new Error(`${manifestPath}: missing "scenario"`);
+    throw new TypeError(`${manifestPath}: missing "scenario"`);
   }
   if (typeof m.description !== 'string') {
-    throw new Error(`${manifestPath}: missing "description"`);
+    throw new TypeError(`${manifestPath}: missing "description"`);
   }
   if (typeof m.schema_version !== 'number') {
-    throw new Error(`${manifestPath}: missing "schema_version"`);
+    throw new TypeError(`${manifestPath}: missing "schema_version"`);
   }
   if (!Array.isArray(m.expected_sub_phases) || m.expected_sub_phases.length === 0) {
     throw new Error(`${manifestPath}: "expected_sub_phases" must be a non-empty array`);
   }
   for (const [i, sub] of m.expected_sub_phases.entries()) {
     if (typeof sub.phase_id !== 'string') {
-      throw new Error(`${manifestPath} expected_sub_phases[${i}]: phase_id required`);
+      throw new TypeError(`${manifestPath} expected_sub_phases[${i}]: phase_id required`);
     }
     if (typeof sub.sub_phase_id !== 'string') {
-      throw new Error(`${manifestPath} expected_sub_phases[${i}]: sub_phase_id required`);
+      throw new TypeError(`${manifestPath} expected_sub_phases[${i}]: sub_phase_id required`);
     }
     if (sub.must_answer_5wh !== true) {
       throw new Error(

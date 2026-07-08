@@ -1,0 +1,2367 @@
+[
+  {
+    "id": "4cc04a90-2b97-442f-8d47-79b4c2368930",
+    "content": {
+      "kind": "implementation_packet",
+      "schemaVersion": "1.0",
+      "packet_id": "c0e785c2-7271-4021-a101-ec5c6a52b9cf",
+      "task": {
+        "id": "task-comp-statutory-deadline-verifier-verify-timestamp",
+        "node_id": "6046b4b7-4203-4b39-9f7e-71b675040d45",
+        "name": "Implement statutory deadline timestamp verification",
+        "description": "Add logic to the comp-statutory-deadline-verifier that checks a work order's completion timestamp against its statutory deadline, flags overdue status, and emits an event if exceeded.",
+        "task_type": "standard",
+        "estimated_complexity": "medium",
+        "completion_criteria": [
+          {
+            "criterion_id": "CC-001",
+            "description": "The verifier correctly identifies when a work order’s completion timestamp meets the statutory deadline and emits an alert if exceeded.",
+            "verification_method": "test_execution",
+            "covered_by_test_ids": []
+          }
+        ],
+        "write_directory_paths": [
+          "src/statutory-deadline-verifier"
+        ],
+        "read_directory_paths": [
+          "src/models/work_order",
+          "src/events/event_bus",
+          "src/utils/date_utils"
+        ],
+        "dependency_task_ids": []
+      },
+      "user_stories": [
+        {
+          "id": "US-010-D1",
+          "role": "deadline_compliance_module",
+          "action": "ensure statutory deadline compliance for job completion reporting",
+          "outcome": "Job status updated to indicate whether the completion timestamp meets the statutory deadline; if exceeded, a DEADLINE_EXCEEDED event is emitted and a notification is sent to the HOA board when applicable. An audit log entry is created for each verification.",
+          "priority": "medium",
+          "acceptance_criteria": [
+            {
+              "id": "AC-US-010-D1-001",
+              "description": "Job completion timestamp is within the statutory deadline.",
+              "measurable_condition": "if (completion_timestamp - work_order_creation_timestamp) <= statutory_deadline_days then status == 'deadline_met' and no alert event generated"
+            },
+            {
+              "id": "AC-US-010-D1-002",
+              "description": "Happy path – job completed before or on the statutory deadline.",
+              "measurable_condition": "if (completion_timestamp - work_order_creation_timestamp) <= statutory_deadline_days then status == 'completed_within_deadline' and DEADLINE_EXCEEDED alert not emitted"
+            },
+            {
+              "id": "AC-US-010-D1-003",
+              "description": "Deadline exceeded triggers an alert and HOA notification if applicable.",
+              "measurable_condition": "if (completion_timestamp - work_order_creation_timestamp) > statutory_deadline_days then DEADLINE_EXCEEDED event emitted and notification sent to HOA board when property is under HOA jurisdiction"
+            },
+            {
+              "id": "AC-US-010-D1-004",
+              "description": "Missing completion timestamp results in an error during verification.",
+              "measurable_condition": "if completion_timestamp is null then system returns HTTP 400 with JSON {\"error_code\": \"MISSING_COMPLETION_TIMESTAMP\"}"
+            },
+            {
+              "id": "AC-US-010-D1-005",
+              "description": "Audit log entry created for each deadline verification.",
+              "measurable_condition": "for every verification performed a new audit_log record is written containing job_id, work_order_creation_timestamp, completion_timestamp, statutory_deadline_days, and outcome ('deadline_met' or 'deadline_exceeded')"
+            }
+          ]
+        }
+      ],
+      "nfrs": [
+        {
+          "id": "NFR-002",
+          "category": "compliance",
+          "description": "Job completion timestamps must be verified against statutory deadline days.",
+          "threshold": "All job completion timestamps must be within the statutory deadline period defined by COMP-STATUTORY-DEADLINES; any timestamp outside this period violates the NFR.",
+          "measurement_method": "Automated compliance checker runs nightly against job completion logs, comparing each timestamp to the statutory deadline days and flagging any violations for immediate remediation."
+        }
+      ],
+      "component": {
+        "id": "comp-statutory-deadline-verifier",
+        "name": "Statutory Deadline Verification Service",
+        "domain_id": "domain-compliance-tracking",
+        "responsibilities": [
+          {
+            "id": "resp-sdv-001",
+            "description": "Retrieve completed job records from Work Order Service."
+          },
+          {
+            "id": "resp-sdv-002",
+            "description": "Compare completion timestamps against statutory deadlines and flag overdue jobs within five minutes."
+          }
+        ],
+        "dependencies": [
+          {
+            "component_id": "comp-workorder-service",
+            "kind": "sync_call"
+          },
+          {
+            "component_id": "comp-audit-log-service",
+            "kind": "async_event"
+          }
+        ],
+        "active_constraints": [
+          "TECH-CLOUDFLARE-1",
+          "TECH-SVELTKIT-1",
+          "TECH-NATIVE-1",
+          "TECH-NODEJS-1",
+          "TECH-PGSQL-1",
+          "TECH-DBOS-1",
+          "TECH-ORPC-1",
+          "TECH-CERBOS-1",
+          "TECH-BETTERAUTH-1",
+          "TECH-DOCKERCOMPOSE-1",
+          "TECH-OPENTELEMETRY-1",
+          "TECH-SEAWEEDFS-1",
+          "TECH-TUSD-1",
+          "TECH-CLAMAV-1",
+          "TECH-FFMPEG-1",
+          "TECH-LIBCIDS-1",
+          "TECH-EXIFTOOL-1",
+          "TECH-TRAFFIC-1"
+        ]
+      },
+      "data_models": [
+        {
+          "id": "DM-compliance-status-updater-compliancestatus",
+          "name": "ComplianceStatus",
+          "component_id": "comp-compliance-status-updater",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid"
+            },
+            {
+              "name": "compliance_status",
+              "type": "enum",
+              "constraints": "Compliant, Non-Compliant"
+            },
+            {
+              "name": "verified_at",
+              "type": "timestamp"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid"
+            }
+          ],
+          "traces_to": [
+            "SR-008",
+            "SR-015"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-propertyrecord",
+          "name": "PropertyRecord",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references Tenant(id)"
+            },
+            {
+              "name": "address",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "updated_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-001"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-propertyphoto",
+          "name": "PropertyPhoto",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "property_record_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references PropertyRecord(id)"
+            },
+            {
+              "name": "photo_url",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "captured_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-001"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-workorder",
+          "name": "WorkOrder",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references Tenant(id)"
+            },
+            {
+              "name": "property_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references PropertyRecord(id)"
+            },
+            {
+              "name": "homeowner_user_id",
+              "type": "uuid",
+              "constraints": "foreign key references User(id)"
+            },
+            {
+              "name": "contractor_user_id",
+              "type": "uuid",
+              "constraints": "foreign key references User(id)"
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "updated_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "completed_at",
+              "type": "timestamp",
+              "constraints": "nullable"
+            },
+            {
+              "name": "compliance_status",
+              "type": "string",
+              "constraints": "nullable"
+            }
+          ],
+          "traces_to": [
+            "SR-002",
+            "SR-006",
+            "SR-007"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-jobexecutionlog",
+          "name": "JobExecutionLog",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references WorkOrder(id)"
+            },
+            {
+              "name": "execution_timestamp",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "details",
+              "type": "string",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-003"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-jobphotoevidence",
+          "name": "JobPhotoEvidence",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references WorkOrder(id)"
+            },
+            {
+              "name": "photo_url",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "captured_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-004"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-invoice",
+          "name": "Invoice",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references WorkOrder(id)"
+            },
+            {
+              "name": "amount",
+              "type": "numeric",
+              "constraints": "not null"
+            },
+            {
+              "name": "issued_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "paid_at",
+              "type": "timestamp",
+              "constraints": "nullable"
+            }
+          ],
+          "traces_to": [
+            "SR-005"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-ledgerentryaudit",
+          "name": "LedgerEntryAudit",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "invoice_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references Invoice(id)"
+            },
+            {
+              "name": "amount",
+              "type": "numeric",
+              "constraints": "not null"
+            },
+            {
+              "name": "transaction_timestamp",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "hash",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "previous_hash",
+              "type": "string",
+              "constraints": "nullable"
+            }
+          ],
+          "traces_to": [
+            "SR-014"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-tenant",
+          "name": "Tenant",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-009",
+            "SR-010"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-tenantconfiguration",
+          "name": "TenantConfiguration",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "tenant_id",
+              "type": "uuid",
+              "constraints": "primary key, foreign key references Tenant(id)"
+            },
+            {
+              "name": "config_string",
+              "type": "string",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-010"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-user",
+          "name": "User",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references Tenant(id)"
+            },
+            {
+              "name": "email",
+              "type": "string",
+              "constraints": "not null, unique"
+            },
+            {
+              "name": "password_hash",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-011",
+            "SR-012"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-role",
+          "name": "Role",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "constraints": "not null, unique"
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "constraints": "nullable"
+            }
+          ],
+          "traces_to": [
+            "SR-013"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-permission",
+          "name": "Permission",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "constraints": "not null, unique"
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "constraints": "nullable"
+            }
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-roleassignment",
+          "name": "RoleAssignment",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references User(id)"
+            },
+            {
+              "name": "role_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references Role(id)"
+            }
+          ],
+          "traces_to": [
+            "SR-013"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-deadlinecompliance",
+          "name": "DeadlineCompliance",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references WorkOrder(id)"
+            },
+            {
+              "name": "deadline_date",
+              "type": "date",
+              "constraints": "not null"
+            },
+            {
+              "name": "completion_timestamp",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "flagged_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-008",
+            "SR-015"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-voteaudit",
+          "name": "VoteAudit",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references User(id)"
+            },
+            {
+              "name": "target_type",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "target_id",
+              "type": "uuid",
+              "constraints": "not null"
+            },
+            {
+              "name": "choice",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "timestamp",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "hash",
+              "type": "string",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-016"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-emailqueue",
+          "name": "EmailQueue",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references User(id)"
+            },
+            {
+              "name": "subject",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "body",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-012"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-workorderaudit",
+          "name": "WorkOrderAudit",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references WorkOrder(id)"
+            },
+            {
+              "name": "event_type",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "timestamp",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "hash",
+              "type": "string",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-007"
+          ]
+        },
+        {
+          "id": "DM-invoice-service-compliancelog",
+          "name": "ComplianceLog",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "job_execution_id",
+              "type": "uuid"
+            },
+            {
+              "name": "deadline_date",
+              "type": "date"
+            },
+            {
+              "name": "compliance_status",
+              "type": "string"
+            },
+            {
+              "name": "flagged_at",
+              "type": "timestamp"
+            }
+          ],
+          "traces_to": [
+            "SR-008",
+            "SR-015"
+          ]
+        }
+      ],
+      "api_definitions": [],
+      "test_cases": [],
+      "evaluation_criteria": [
+        {
+          "kind": "quality",
+          "target_id": "NFR-002",
+          "evaluation_method": "Generate a set of random job completions with realistic timestamps, compute the difference between completion_timestamp and work_order_creation_timestamp, and assert that each difference is less than or equal to the statutory deadline days. Verify the invariant for all generated instances.",
+          "success_condition": "All job completion timestamps must be within the statutory deadline period defined by COMP-STATUTORY-DEADLINES; any timestamp outside this period violates the NFR.",
+          "property_spec": {
+            "invariant": "for every job completion event, the difference between completion_timestamp and work_order_creation_timestamp <= statutory_deadline_days defined by COMP-STATUTORY-DEADLINES",
+            "property_kind": "invariant",
+            "input_domain": "job completions with random timestamps within realistic ranges",
+            "generators": [
+              "randomJobCompletion"
+            ],
+            "oracle": "(completion_ts - creation_ts) <= deadline"
+          }
+        }
+      ],
+      "active_constraints": [
+        {
+          "id": "TECH-NODEJS-1",
+          "category": "backend",
+          "text": "Node.js (Bun) | Bun for high-performance API execution.",
+          "technology": "Node.js (Bun)"
+        },
+        {
+          "id": "TECH-ORPC-1",
+          "category": "integration_protocol",
+          "text": "oRPC | A function-based API layer using Zod for strict type safety and automatic OpenAPI/SDK generation.",
+          "technology": "oRPC"
+        }
+      ],
+      "compliance_items": [
+        {
+          "id": "COMP-STATUTORY-DEADLINES",
+          "kind": "compliance",
+          "description": "Statutory deadlines."
+        }
+      ],
+      "depends_on_packets": [],
+      "coherence": {
+        "passed": false,
+        "blocking_failures": [
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-001 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-002 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-003 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-004 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-010-D1 has no evaluation criterion"
+        ],
+        "advisory_findings": [
+          "P8_CC_NO_TEST: completion criterion CC-001 (task task-comp-statutory-deadline-verifier-verify-timestamp) has no covering test case — executor must author one"
+        ],
+        "annotations": {
+          "ai_proposed_root_count": 0,
+          "ai_proposed_root_ids": []
+        }
+      },
+      "release_id": null,
+      "release_ordinal": null
+    }
+  },
+  {
+    "id": "969f7e8d-94af-44b3-a43b-b865068ab838",
+    "content": {
+      "kind": "implementation_packet",
+      "schemaVersion": "1.0",
+      "packet_id": "3cde6e2e-3e4d-4d25-8b51-90ec1fcc6f35",
+      "task": {
+        "id": "task-statutory-deadline-verifier-retrieve-jobs",
+        "node_id": "e4994c8e-1117-42b2-9206-1173df15b393",
+        "name": "Retrieve completed job records for deadline verification",
+        "description": "Open the repository layer, query WorkOrderService for jobs with status 'Completed', and return the list of job IDs and completion timestamps.",
+        "task_type": "standard",
+        "estimated_complexity": "medium",
+        "completion_criteria": [
+          {
+            "criterion_id": "CC-001",
+            "description": "Service retrieves all completed work orders with status 'Completed' and includes their completion timestamps.",
+            "verification_method": "test_execution",
+            "covered_by_test_ids": []
+          }
+        ],
+        "write_directory_paths": [
+          "src/statutory-deadline-verifier"
+        ],
+        "read_directory_paths": [
+          "src/repositories/workorder_repository"
+        ],
+        "dependency_task_ids": []
+      },
+      "user_stories": [
+        {
+          "id": "US-010-D1",
+          "role": "deadline_compliance_module",
+          "action": "ensure statutory deadline compliance for job completion reporting",
+          "outcome": "Job status updated to indicate whether the completion timestamp meets the statutory deadline; if exceeded, a DEADLINE_EXCEEDED event is emitted and a notification is sent to the HOA board when applicable. An audit log entry is created for each verification.",
+          "priority": "medium",
+          "acceptance_criteria": [
+            {
+              "id": "AC-US-010-D1-001",
+              "description": "Job completion timestamp is within the statutory deadline.",
+              "measurable_condition": "if (completion_timestamp - work_order_creation_timestamp) <= statutory_deadline_days then status == 'deadline_met' and no alert event generated"
+            },
+            {
+              "id": "AC-US-010-D1-002",
+              "description": "Happy path – job completed before or on the statutory deadline.",
+              "measurable_condition": "if (completion_timestamp - work_order_creation_timestamp) <= statutory_deadline_days then status == 'completed_within_deadline' and DEADLINE_EXCEEDED alert not emitted"
+            },
+            {
+              "id": "AC-US-010-D1-003",
+              "description": "Deadline exceeded triggers an alert and HOA notification if applicable.",
+              "measurable_condition": "if (completion_timestamp - work_order_creation_timestamp) > statutory_deadline_days then DEADLINE_EXCEEDED event emitted and notification sent to HOA board when property is under HOA jurisdiction"
+            },
+            {
+              "id": "AC-US-010-D1-004",
+              "description": "Missing completion timestamp results in an error during verification.",
+              "measurable_condition": "if completion_timestamp is null then system returns HTTP 400 with JSON {\"error_code\": \"MISSING_COMPLETION_TIMESTAMP\"}"
+            },
+            {
+              "id": "AC-US-010-D1-005",
+              "description": "Audit log entry created for each deadline verification.",
+              "measurable_condition": "for every verification performed a new audit_log record is written containing job_id, work_order_creation_timestamp, completion_timestamp, statutory_deadline_days, and outcome ('deadline_met' or 'deadline_exceeded')"
+            }
+          ]
+        }
+      ],
+      "nfrs": [
+        {
+          "id": "NFR-002",
+          "category": "compliance",
+          "description": "Job completion timestamps must be verified against statutory deadline days.",
+          "threshold": "All job completion timestamps must be within the statutory deadline period defined by COMP-STATUTORY-DEADLINES; any timestamp outside this period violates the NFR.",
+          "measurement_method": "Automated compliance checker runs nightly against job completion logs, comparing each timestamp to the statutory deadline days and flagging any violations for immediate remediation."
+        }
+      ],
+      "component": {
+        "id": "comp-statutory-deadline-verifier",
+        "name": "Statutory Deadline Verification Service",
+        "domain_id": "domain-compliance-tracking",
+        "responsibilities": [
+          {
+            "id": "resp-sdv-001",
+            "description": "Retrieve completed job records from Work Order Service."
+          },
+          {
+            "id": "resp-sdv-002",
+            "description": "Compare completion timestamps against statutory deadlines and flag overdue jobs within five minutes."
+          }
+        ],
+        "dependencies": [
+          {
+            "component_id": "comp-workorder-service",
+            "kind": "sync_call"
+          },
+          {
+            "component_id": "comp-audit-log-service",
+            "kind": "async_event"
+          }
+        ],
+        "active_constraints": [
+          "TECH-CLOUDFLARE-1",
+          "TECH-SVELTKIT-1",
+          "TECH-NATIVE-1",
+          "TECH-NODEJS-1",
+          "TECH-PGSQL-1",
+          "TECH-DBOS-1",
+          "TECH-ORPC-1",
+          "TECH-CERBOS-1",
+          "TECH-BETTERAUTH-1",
+          "TECH-DOCKERCOMPOSE-1",
+          "TECH-OPENTELEMETRY-1",
+          "TECH-SEAWEEDFS-1",
+          "TECH-TUSD-1",
+          "TECH-CLAMAV-1",
+          "TECH-FFMPEG-1",
+          "TECH-LIBCIDS-1",
+          "TECH-EXIFTOOL-1",
+          "TECH-TRAFFIC-1"
+        ]
+      },
+      "data_models": [
+        {
+          "id": "DM-compliance-status-updater-compliancestatus",
+          "name": "ComplianceStatus",
+          "component_id": "comp-compliance-status-updater",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid"
+            },
+            {
+              "name": "compliance_status",
+              "type": "enum",
+              "constraints": "Compliant, Non-Compliant"
+            },
+            {
+              "name": "verified_at",
+              "type": "timestamp"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid"
+            }
+          ],
+          "traces_to": [
+            "SR-008",
+            "SR-015"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-propertyrecord",
+          "name": "PropertyRecord",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references Tenant(id)"
+            },
+            {
+              "name": "address",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "updated_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-001"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-propertyphoto",
+          "name": "PropertyPhoto",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "property_record_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references PropertyRecord(id)"
+            },
+            {
+              "name": "photo_url",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "captured_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-001"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-workorder",
+          "name": "WorkOrder",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references Tenant(id)"
+            },
+            {
+              "name": "property_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references PropertyRecord(id)"
+            },
+            {
+              "name": "homeowner_user_id",
+              "type": "uuid",
+              "constraints": "foreign key references User(id)"
+            },
+            {
+              "name": "contractor_user_id",
+              "type": "uuid",
+              "constraints": "foreign key references User(id)"
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "updated_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "completed_at",
+              "type": "timestamp",
+              "constraints": "nullable"
+            },
+            {
+              "name": "compliance_status",
+              "type": "string",
+              "constraints": "nullable"
+            }
+          ],
+          "traces_to": [
+            "SR-002",
+            "SR-006",
+            "SR-007"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-jobexecutionlog",
+          "name": "JobExecutionLog",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references WorkOrder(id)"
+            },
+            {
+              "name": "execution_timestamp",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "details",
+              "type": "string",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-003"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-jobphotoevidence",
+          "name": "JobPhotoEvidence",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references WorkOrder(id)"
+            },
+            {
+              "name": "photo_url",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "captured_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-004"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-invoice",
+          "name": "Invoice",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references WorkOrder(id)"
+            },
+            {
+              "name": "amount",
+              "type": "numeric",
+              "constraints": "not null"
+            },
+            {
+              "name": "issued_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "paid_at",
+              "type": "timestamp",
+              "constraints": "nullable"
+            }
+          ],
+          "traces_to": [
+            "SR-005"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-ledgerentryaudit",
+          "name": "LedgerEntryAudit",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "invoice_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references Invoice(id)"
+            },
+            {
+              "name": "amount",
+              "type": "numeric",
+              "constraints": "not null"
+            },
+            {
+              "name": "transaction_timestamp",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "hash",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "previous_hash",
+              "type": "string",
+              "constraints": "nullable"
+            }
+          ],
+          "traces_to": [
+            "SR-014"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-tenant",
+          "name": "Tenant",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-009",
+            "SR-010"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-tenantconfiguration",
+          "name": "TenantConfiguration",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "tenant_id",
+              "type": "uuid",
+              "constraints": "primary key, foreign key references Tenant(id)"
+            },
+            {
+              "name": "config_string",
+              "type": "string",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-010"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-user",
+          "name": "User",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references Tenant(id)"
+            },
+            {
+              "name": "email",
+              "type": "string",
+              "constraints": "not null, unique"
+            },
+            {
+              "name": "password_hash",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-011",
+            "SR-012"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-role",
+          "name": "Role",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "constraints": "not null, unique"
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "constraints": "nullable"
+            }
+          ],
+          "traces_to": [
+            "SR-013"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-permission",
+          "name": "Permission",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "constraints": "not null, unique"
+            },
+            {
+              "name": "description",
+              "type": "string",
+              "constraints": "nullable"
+            }
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-roleassignment",
+          "name": "RoleAssignment",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references User(id)"
+            },
+            {
+              "name": "role_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references Role(id)"
+            }
+          ],
+          "traces_to": [
+            "SR-013"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-deadlinecompliance",
+          "name": "DeadlineCompliance",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references WorkOrder(id)"
+            },
+            {
+              "name": "deadline_date",
+              "type": "date",
+              "constraints": "not null"
+            },
+            {
+              "name": "completion_timestamp",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "flagged_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-008",
+            "SR-015"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-voteaudit",
+          "name": "VoteAudit",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references User(id)"
+            },
+            {
+              "name": "target_type",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "target_id",
+              "type": "uuid",
+              "constraints": "not null"
+            },
+            {
+              "name": "choice",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "timestamp",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "hash",
+              "type": "string",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-016"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-emailqueue",
+          "name": "EmailQueue",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "user_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references User(id)"
+            },
+            {
+              "name": "subject",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "body",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "status",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-012"
+          ]
+        },
+        {
+          "id": "DM-statutory-deadline-verifier-workorderaudit",
+          "name": "WorkOrderAudit",
+          "component_id": "comp-statutory-deadline-verifier",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid",
+              "constraints": "primary key"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid",
+              "constraints": "not null, foreign key references WorkOrder(id)"
+            },
+            {
+              "name": "event_type",
+              "type": "string",
+              "constraints": "not null"
+            },
+            {
+              "name": "timestamp",
+              "type": "timestamp",
+              "constraints": "not null"
+            },
+            {
+              "name": "hash",
+              "type": "string",
+              "constraints": "not null"
+            }
+          ],
+          "traces_to": [
+            "SR-007"
+          ]
+        },
+        {
+          "id": "DM-invoice-service-compliancelog",
+          "name": "ComplianceLog",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "job_execution_id",
+              "type": "uuid"
+            },
+            {
+              "name": "deadline_date",
+              "type": "date"
+            },
+            {
+              "name": "compliance_status",
+              "type": "string"
+            },
+            {
+              "name": "flagged_at",
+              "type": "timestamp"
+            }
+          ],
+          "traces_to": [
+            "SR-008",
+            "SR-015"
+          ]
+        }
+      ],
+      "api_definitions": [],
+      "test_cases": [],
+      "evaluation_criteria": [
+        {
+          "kind": "quality",
+          "target_id": "NFR-002",
+          "evaluation_method": "Generate a set of random job completions with realistic timestamps, compute the difference between completion_timestamp and work_order_creation_timestamp, and assert that each difference is less than or equal to the statutory deadline days. Verify the invariant for all generated instances.",
+          "success_condition": "All job completion timestamps must be within the statutory deadline period defined by COMP-STATUTORY-DEADLINES; any timestamp outside this period violates the NFR.",
+          "property_spec": {
+            "invariant": "for every job completion event, the difference between completion_timestamp and work_order_creation_timestamp <= statutory_deadline_days defined by COMP-STATUTORY-DEADLINES",
+            "property_kind": "invariant",
+            "input_domain": "job completions with random timestamps within realistic ranges",
+            "generators": [
+              "randomJobCompletion"
+            ],
+            "oracle": "(completion_ts - creation_ts) <= deadline"
+          }
+        }
+      ],
+      "active_constraints": [
+        {
+          "id": "TECH-NODEJS-1",
+          "category": "backend",
+          "text": "Node.js (Bun) | Bun for high-performance API execution.",
+          "technology": "Node.js (Bun)"
+        },
+        {
+          "id": "TECH-PGSQL-1",
+          "category": "database",
+          "text": "PostgreSQL | The primary storage engine, utilizing Row-Level Security (RLS) to enforce strict multi-tenant isolation at the database level.",
+          "technology": "PostgreSQL"
+        },
+        {
+          "id": "TECH-DBOS-1",
+          "category": "workflow_engine",
+          "text": "DBOS | The engine for durable, versioned workflows that ensures idempotency and monotonic state transitions for multi-step processes.",
+          "technology": "DBOS"
+        }
+      ],
+      "compliance_items": [
+        {
+          "id": "COMP-STATUTORY-DEADLINES",
+          "kind": "compliance",
+          "description": "Statutory deadlines."
+        }
+      ],
+      "depends_on_packets": [],
+      "coherence": {
+        "passed": false,
+        "blocking_failures": [
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-001 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-002 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-003 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-004 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-010-D1 has no evaluation criterion"
+        ],
+        "advisory_findings": [
+          "P8_CC_NO_TEST: completion criterion CC-001 (task task-statutory-deadline-verifier-retrieve-jobs) has no covering test case — executor must author one"
+        ],
+        "annotations": {
+          "ai_proposed_root_count": 0,
+          "ai_proposed_root_ids": []
+        }
+      },
+      "release_id": null,
+      "release_ordinal": null
+    }
+  },
+  {
+    "id": "979eb971-3ed6-4731-8c75-abd8255139c4",
+    "content": {
+      "kind": "implementation_packet",
+      "schemaVersion": "1.0",
+      "packet_id": "c4d22685-de88-493b-b819-2f988e739c6a",
+      "task": {
+        "id": "task-comp-invoice-service-enforce-job-completion",
+        "node_id": "1644b323-f93f-4440-89c6-b503ac55bb21",
+        "name": "Enforce job completion before invoice creation",
+        "description": "Add a check to the POST /invoices endpoint that queries the referenced work order status; if it is not 'completed', reject the request with HTTP 409 and do not create an invoice or ledger entry.",
+        "task_type": "standard",
+        "estimated_complexity": "medium",
+        "completion_criteria": [
+          {
+            "criterion_id": "CC-004",
+            "description": "Invoice submission fails with HTTP 409 when referenced work order status is not 'completed'.",
+            "verification_method": "test_execution",
+            "covered_by_test_ids": [
+              "TC-INV-001",
+              "TC-INV-002",
+              "TC-INV-003",
+              "TC-INV-004",
+              "TC-INV-005"
+            ]
+          }
+        ],
+        "write_directory_paths": [
+          "src/invoice-service"
+        ],
+        "read_directory_paths": [
+          "src/models",
+          "src/database"
+        ],
+        "dependency_task_ids": []
+      },
+      "user_stories": [
+        {
+          "id": "US-007-1",
+          "role": "invoice operator",
+          "action": "submit invoice for completed job",
+          "outcome": "Invoice recorded and linked to work order",
+          "priority": "medium",
+          "acceptance_criteria": [
+            {
+              "id": "AC-US-007-1-001",
+              "description": "Invoice must be linked to an existing work order (POST /invoices with a valid work_order_id returns 201 and GET /work_orders/{id} within 1 second returns the work order record that includes this invoice id in its invoices collection)",
+              "measurable_condition": "POST /invoices with valid work_order_id returns HTTP 201; subsequent GET /work_orders/{id} within 1000 ms returns a JSON object whose invoices array contains the new invoice id"
+            },
+            {
+              "id": "AC-US-007-1-002",
+              "description": "Invoice creation requires mandatory fields (POST /invoices missing any required field (amount, vendor_id, due_date) returns HTTP 400 with error code MISSING_REQUIRED_FIELD and no record is persisted)",
+              "measurable_condition": "POST /invoices without amount/vendor_id/due_date returns HTTP status 400; response body contains error_code 'MISSING_REQUIRED_FIELD'; database query for the new invoice id returns zero rows"
+            },
+            {
+              "id": "AC-US-007-1-003",
+              "description": "Invoice stored successfully (POST /invoices returns 201 and GET /invoices/{id} returns the same data within 1 second)",
+              "measurable_condition": "POST /invoices returns HTTP 201; subsequent GET /invoices/{new_id} within 1000 ms returns a JSON object identical to the payload sent in POST"
+            },
+            {
+              "id": "AC-US-007-1-004",
+              "description": "Invoice cannot be submitted if the associated job is not marked complete (Attempting POST /invoices when the referenced work order status is not 'completed' returns HTTP 409 with error code JOB_NOT_COMPLETE and no invoice record is created)",
+              "measurable_condition": "POST /invoices to a work_order whose status != 'completed' returns HTTP 409; response body contains error_code 'JOB_NOT_COMPLETE'; database query for the new invoice id returns zero rows"
+            },
+            {
+              "id": "AC-US-007-1-005",
+              "description": "Audit trail entry is created upon successful invoice submission (After POST /invoices succeeds, an audit log entry exists with actor_id equal to the service provider id, action='invoice.create', reference_id matching the new invoice id, and timestamp within 2 seconds of request completion)",
+              "measurable_condition": "Immediately after a POST /invoices returns HTTP 201, query audit_log where reference_id = new_invoice_id AND action = 'invoice.create' AND actor_id = service_provider_id; ensure record exists and timestamp <= now() + interval '2 second'"
+            }
+          ]
+        }
+      ],
+      "nfrs": [],
+      "component": {
+        "id": "comp-invoice-service",
+        "name": "Invoice Service",
+        "domain_id": "domain-financial-accounting",
+        "responsibilities": [
+          {
+            "id": "res-007",
+            "description": "Record invoice information in ledger"
+          },
+          {
+            "id": "res-008",
+            "description": "Link invoices to corresponding work orders"
+          }
+        ],
+        "dependencies": [
+          {
+            "component_id": "comp-workorder-service",
+            "kind": "sync_call"
+          },
+          {
+            "component_id": "comp-audit-log-service",
+            "kind": "sync_call"
+          }
+        ],
+        "active_constraints": [
+          "TECH-CLOUDFLARE-1",
+          "TECH-SVELTKIT-1",
+          "TECH-NATIVE-1",
+          "TECH-NODEJS-1",
+          "TECH-PGSQL-1",
+          "TECH-DBOS-1",
+          "TECH-ORPC-1",
+          "TECH-CERBOS-1",
+          "TECH-BETTERAUTH-1",
+          "TECH-DOCKERCOMPOSE-1",
+          "TECH-OPENTELEMETRY-1",
+          "TECH-SEAWEEDFS-1",
+          "TECH-TUSD-1",
+          "TECH-CLAMAV-1",
+          "TECH-FFMPEG-1",
+          "TECH-LIBCIDS-1",
+          "TECH-EXIFTOOL-1",
+          "TECH-TRAFFIC-1"
+        ]
+      },
+      "data_models": [
+        {
+          "id": "DM-invoice-service-tenant",
+          "name": "Tenant",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "config",
+              "type": "jsonb"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp"
+            }
+          ],
+          "traces_to": [
+            "SR-009",
+            "SR-010",
+            "SR-017"
+          ]
+        },
+        {
+          "id": "DM-invoice-service-propertyrecord",
+          "name": "PropertyRecord",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid"
+            },
+            {
+              "name": "address_line1",
+              "type": "string"
+            },
+            {
+              "name": "address_line2",
+              "type": "string"
+            },
+            {
+              "name": "city",
+              "type": "string"
+            },
+            {
+              "name": "state",
+              "type": "string"
+            },
+            {
+              "name": "zip_code",
+              "type": "string"
+            },
+            {
+              "name": "key_photo_urls",
+              "type": "jsonb"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp"
+            },
+            {
+              "name": "updated_at",
+              "type": "timestamp"
+            }
+          ],
+          "traces_to": [
+            "SR-001"
+          ]
+        },
+        {
+          "id": "DM-invoice-service-workorder",
+          "name": "WorkOrder",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid"
+            },
+            {
+              "name": "property_record_id",
+              "type": "uuid"
+            },
+            {
+              "name": "homeowner_user_id",
+              "type": "uuid"
+            },
+            {
+              "name": "contractor_user_id",
+              "type": "uuid"
+            },
+            {
+              "name": "description",
+              "type": "text"
+            },
+            {
+              "name": "status",
+              "type": "string"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp"
+            },
+            {
+              "name": "updated_at",
+              "type": "timestamp"
+            }
+          ],
+          "traces_to": [
+            "SR-002",
+            "SR-006",
+            "SR-007"
+          ]
+        },
+        {
+          "id": "DM-invoice-service-jobexecution",
+          "name": "JobExecution",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid"
+            },
+            {
+              "name": "job_type",
+              "type": "string"
+            },
+            {
+              "name": "start_time",
+              "type": "timestamp"
+            },
+            {
+              "name": "end_time",
+              "type": "timestamp"
+            },
+            {
+              "name": "status",
+              "type": "string"
+            },
+            {
+              "name": "notes",
+              "type": "text"
+            }
+          ],
+          "traces_to": [
+            "SR-003"
+          ]
+        },
+        {
+          "id": "DM-invoice-service-photoevidence",
+          "name": "PhotoEvidence",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "job_execution_id",
+              "type": "uuid"
+            },
+            {
+              "name": "photo_url",
+              "type": "string"
+            },
+            {
+              "name": "captured_at",
+              "type": "timestamp"
+            },
+            {
+              "name": "metadata",
+              "type": "jsonb"
+            }
+          ],
+          "traces_to": [
+            "SR-004"
+          ]
+        },
+        {
+          "id": "DM-invoice-service-invoice",
+          "name": "Invoice",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid"
+            },
+            {
+              "name": "work_order_id",
+              "type": "uuid"
+            },
+            {
+              "name": "status",
+              "type": "string"
+            },
+            {
+              "name": "amount",
+              "type": "numeric"
+            },
+            {
+              "name": "currency",
+              "type": "string"
+            },
+            {
+              "name": "due_date",
+              "type": "date"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp"
+            }
+          ],
+          "traces_to": [
+            "SR-005"
+          ]
+        },
+        {
+          "id": "DM-invoice-service-ledgerentry",
+          "name": "LedgerEntry",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid"
+            },
+            {
+              "name": "invoice_id",
+              "type": "uuid"
+            },
+            {
+              "name": "amount",
+              "type": "numeric"
+            },
+            {
+              "name": "currency",
+              "type": "string"
+            },
+            {
+              "name": "transaction_type",
+              "type": "string"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp"
+            }
+          ],
+          "traces_to": [
+            "SR-014"
+          ]
+        },
+        {
+          "id": "DM-invoice-service-user",
+          "name": "User",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid"
+            },
+            {
+              "name": "email",
+              "type": "string"
+            },
+            {
+              "name": "first_name",
+              "type": "string"
+            },
+            {
+              "name": "last_name",
+              "type": "string"
+            },
+            {
+              "name": "role_id",
+              "type": "uuid"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp"
+            },
+            {
+              "name": "updated_at",
+              "type": "timestamp"
+            }
+          ],
+          "traces_to": [
+            "SR-011",
+            "SR-012",
+            "SR-013"
+          ]
+        },
+        {
+          "id": "DM-invoice-service-role",
+          "name": "Role",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "description",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "id": "DM-invoice-service-permission",
+          "name": "Permission",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "role_id",
+              "type": "uuid"
+            },
+            {
+              "name": "action",
+              "type": "string"
+            },
+            {
+              "name": "resource",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "id": "DM-invoice-service-board",
+          "name": "Board",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid"
+            },
+            {
+              "name": "board_name",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "id": "DM-invoice-service-boardvotingaudittrail",
+          "name": "BoardVotingAuditTrail",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "tenant_id",
+              "type": "uuid"
+            },
+            {
+              "name": "board_id",
+              "type": "uuid"
+            },
+            {
+              "name": "voter_user_id",
+              "type": "uuid"
+            },
+            {
+              "name": "choice",
+              "type": "string"
+            },
+            {
+              "name": "created_at",
+              "type": "timestamp"
+            }
+          ],
+          "traces_to": [
+            "SR-016"
+          ]
+        },
+        {
+          "id": "DM-invoice-service-compliancelog",
+          "name": "ComplianceLog",
+          "component_id": "comp-invoice-service",
+          "fields": [
+            {
+              "name": "id",
+              "type": "uuid"
+            },
+            {
+              "name": "job_execution_id",
+              "type": "uuid"
+            },
+            {
+              "name": "deadline_date",
+              "type": "date"
+            },
+            {
+              "name": "compliance_status",
+              "type": "string"
+            },
+            {
+              "name": "flagged_at",
+              "type": "timestamp"
+            }
+          ],
+          "traces_to": [
+            "SR-008",
+            "SR-015"
+          ]
+        }
+      ],
+      "api_definitions": [
+        {
+          "id": "API-invoice-service-post-invoices",
+          "method": "POST",
+          "path": "/invoices",
+          "description": "",
+          "request_shape": {
+            "job_id": "string",
+            "amount": "number",
+            "details": "json"
+          },
+          "response_shape": {
+            "invoice_id": "string"
+          },
+          "error_codes": [
+            "400",
+            "404"
+          ],
+          "traces_to": [
+            "SR-005"
+          ]
+        }
+      ],
+      "test_cases": [
+        {
+          "test_case_id": "TC-INV-001",
+          "type": "unit",
+          "acceptance_criterion_ids": [
+            "AC-US-007-1-001",
+            "AC-US-007-1-003"
+          ],
+          "preconditions": [
+            "A work order with ID 42 exists and its status is 'completed'.",
+            "The user has permission to create invoices for the given work order."
+          ],
+          "expected_outcome": "POST /invoices returns HTTP 201, the returned JSON contains an invoice_id that matches the one stored in the database. A subsequent GET /invoices/{invoice_id} returns exactly the same payload as sent."
+        },
+        {
+          "test_case_id": "TC-INV-002",
+          "type": "unit",
+          "acceptance_criterion_ids": [
+            "AC-US-007-1-002"
+          ],
+          "preconditions": [
+            "A work order with ID 42 exists and its status is 'completed'."
+          ],
+          "expected_outcome": "POST /invoices with any required field omitted (amount, vendor_id or due_date) returns HTTP 400. The response body contains error code MISSING_REQUIRED_FIELD and no invoice record is persisted."
+        },
+        {
+          "test_case_id": "TC-INV-003",
+          "type": "unit",
+          "acceptance_criterion_ids": [
+            "AC-US-007-1-004"
+          ],
+          "preconditions": [
+            "A work order with ID 42 exists but its status is 'in_progress'."
+          ],
+          "expected_outcome": "POST /invoices attempts to create an invoice for a non-completed job and returns HTTP 409. The response body contains error code JOB_NOT_COMPLETE, and no invoice record is created."
+        },
+        {
+          "test_case_id": "TC-INV-004",
+          "type": "unit",
+          "acceptance_criterion_ids": [
+            "AC-US-007-1-005"
+          ],
+          "preconditions": [
+            "A work order with ID 42 exists and its status is 'completed'.",
+            "The actor performing the request has a valid service provider ID."
+          ],
+          "expected_outcome": "After a successful POST /invoices, an audit log entry is persisted within 2 seconds. The entry contains actor_id equal to the service provider’s ID, action='invoice.create', reference_id matching the new invoice id, and a timestamp that falls within two seconds of request completion."
+        },
+        {
+          "test_case_id": "TC-INV-005",
+          "type": "property",
+          "acceptance_criterion_ids": [
+            "AC-US-007-1-001",
+            "AC-US-007-1-003"
+          ],
+          "preconditions": [
+            "A work order with ID 42 exists and its status is 'completed'."
+          ],
+          "expected_outcome": "Property holds for every generated input: creating an invoice and subsequently retrieving it yields the same data.",
+          "property_spec": {
+            "invariant": "retrieved_invoice == original_payload",
+            "property_kind": "round_trip",
+            "input_domain": "syntactically valid JSON payloads containing required fields (amount, vendor_id, due_date) with arbitrary numeric and string values within reasonable ranges.",
+            "generators": [
+              "validInvoicePayload"
+            ],
+            "oracle": "identity of the original input payload"
+          }
+        }
+      ],
+      "evaluation_criteria": [],
+      "active_constraints": [
+        {
+          "id": "TECH-NODEJS-1",
+          "category": "backend",
+          "text": "Node.js (Bun) | Bun for high-performance API execution.",
+          "technology": "Node.js (Bun)"
+        },
+        {
+          "id": "TECH-PGSQL-1",
+          "category": "database",
+          "text": "PostgreSQL | The primary storage engine, utilizing Row-Level Security (RLS) to enforce strict multi-tenant isolation at the database level.",
+          "technology": "PostgreSQL"
+        },
+        {
+          "id": "TECH-ORPC-1",
+          "category": "integration_protocol",
+          "text": "oRPC | A function-based API layer using Zod for strict type safety and automatic OpenAPI/SDK generation.",
+          "technology": "oRPC"
+        },
+        {
+          "id": "comp-immutable-audit-log",
+          "category": "cross_cutting_nfr",
+          "text": "NFR concern (Immutable Audit Log Constraint): Ensure audit logs are immutable and cryptographically chained"
+        },
+        {
+          "id": "comp-row-level-security",
+          "category": "cross_cutting_nfr",
+          "text": "NFR concern (Row‑Level Security Constraint): Enforce row‑level security policies across all tenant data queries"
+        }
+      ],
+      "compliance_items": [],
+      "depends_on_packets": [],
+      "coherence": {
+        "passed": false,
+        "blocking_failures": [
+          "P4_USER_STORY_NO_EVAL: US-007-1 has no evaluation criterion"
+        ],
+        "advisory_findings": [],
+        "annotations": {
+          "ai_proposed_root_count": 0,
+          "ai_proposed_root_ids": []
+        }
+      },
+      "release_id": null,
+      "release_ordinal": null
+    }
+  }
+]

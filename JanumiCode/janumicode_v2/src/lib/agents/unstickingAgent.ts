@@ -80,7 +80,6 @@ export class UnstickingAgent {
     if (input.toolResultMisinterpretationSuspected && input.toolResults) {
       const toolReview = await this.reviewToolResults(input);
       if (toolReview.misinterpretationConfirmed) {
-        toolResultMisinterpretationConfirmed = true;
         return {
           resolved: true,
           resolution: toolReview.correction,

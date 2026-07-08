@@ -61,5 +61,5 @@ export function phaseIdToFilenameSegment(
  * anything outside [A-Za-z0-9_] with `_`. Idempotent.
  */
 export function subPhaseIdToFilenameSegment(id: string): string {
-  return id.replace(/[^A-Za-z0-9_]/g, '_');
+  return id.replace(/\W/g, '_');
 }

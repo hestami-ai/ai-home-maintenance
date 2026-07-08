@@ -6,9 +6,9 @@
  * to the sidecar, and writes responses back.
  */
 
-import { parentPort, workerData } from 'worker_threads';
-import { spawn, type ChildProcess } from 'child_process';
-import { createInterface } from 'readline';
+import { parentPort, workerData } from 'node:worker_threads';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { createInterface } from 'node:readline';
 
 const CTRL_OFFSET = 0;
 const LEN_OFFSET = 1;

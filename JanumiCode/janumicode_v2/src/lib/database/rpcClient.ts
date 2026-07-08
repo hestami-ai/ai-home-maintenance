@@ -16,7 +16,7 @@
  * Ported from v1 pattern. Implements the Database interface from init.ts.
  */
 
-import { Worker } from 'worker_threads';
+import { Worker } from 'node:worker_threads';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import type { Database, Statement, RunResult } from './init';
@@ -58,10 +58,10 @@ export interface RpcClientOptions {
 }
 
 export class DatabaseRPCClient implements Database {
-  private sab: SharedArrayBuffer;
-  private ctrl: Int32Array;
-  private data: Uint8Array;
-  private worker: Worker;
+  private readonly sab: SharedArrayBuffer;
+  private readonly ctrl: Int32Array;
+  private readonly data: Uint8Array;
+  private readonly worker: Worker;
   private closed = false;
 
   constructor(options: RpcClientOptions) {
@@ -176,8 +176,8 @@ export class DatabaseRPCClient implements Database {
 
 class RpcStatement implements Statement {
   constructor(
-    private client: DatabaseRPCClient,
-    private sql: string,
+    private readonly client: DatabaseRPCClient,
+    private readonly sql: string,
   ) {}
 
   run(...params: unknown[]): RunResult {

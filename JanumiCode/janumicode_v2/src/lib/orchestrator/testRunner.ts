@@ -392,9 +392,9 @@ export class TestRunner {
       const failMatch = /(\d+) failed/.exec(output) ?? /[ℹi]\s*fail(?:ed)?\s+(\d+)/i.exec(output);
       const skipMatch = /(\d+) skipped/.exec(output) ?? /[ℹi]\s*skipped\s+(\d+)/i.exec(output);
 
-      passed = passMatch ? parseInt(passMatch[1], 10) : 0;
-      failed = failMatch ? parseInt(failMatch[1], 10) : 0;
-      skipped = skipMatch ? parseInt(skipMatch[1], 10) : 0;
+      passed = passMatch ? Number.parseInt(passMatch[1], 10) : 0;
+      failed = failMatch ? Number.parseInt(failMatch[1], 10) : 0;
+      skipped = skipMatch ? Number.parseInt(skipMatch[1], 10) : 0;
 
       // Create synthetic test cases from summary
       for (let i = 0; i < passed; i++) {

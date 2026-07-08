@@ -305,6 +305,20 @@ async function bootstrap(
   );
   log.info('activation', 'Bootstrap step 13/14: webview view provider registered');
 
+  // 13b. Executor-escalation sink (attended Phase-9). Register the governed-
+  //      stream provider as the human answerer for a coding agent's blocking
+  //      clarification the spec-grounded responder couldn't resolve. This is the
+  //      FIRST (and only) caller of AgentInvoker.setExecutorEscalationSink, and
+  //      it runs ONLY in the VS Code extension host — the headless CLI builds its
+  //      engine via createTestEngine and never reaches this file, so escalation
+  //      is attended-only by construction (belt-and-suspenders with agentInvoker's
+  //      `attended` gate on onEscalate). The provider degrades to null when no run
+  //      or webview is active, so the executor never deadlocks.
+  if (provider) {
+    const gsProvider = provider;
+    engine.agentInvoker.setExecutorEscalationSink((input) => gsProvider.escalateExecutorQuestion(input));
+  }
+
   // 13a. Replay live-append driver (JANUMICODE_REPLAY_APPEND=1). Feeds the
   //      recorded run's records to the (empty) view over time so the store's
   //      per-record add() path is exercised as it would be on a live run.
@@ -339,10 +353,9 @@ async function bootstrap(
   decompStatusBarItem.tooltip = 'Open Decomposition Viewer';
   decompStatusBarItem.command = 'janumicode.openDecompViewer';
   decompStatusBarItem.show();
-  context.subscriptions.push(decompStatusBarItem);
-
   // 13. Commands
   context.subscriptions.push(
+    decompStatusBarItem,
     vscode.commands.registerCommand('janumicode.startWorkflowRun', async () => {
       await provider?.focusComposer();
     }),
@@ -538,18 +551,19 @@ async function bootstrap(
     dbPath,
     workspacePath,
   });
-  context.subscriptions.push(...testHookDisposables);
-
   // 14. Cleanup — checkpoint the WAL before closing so the .db file on
   // disk is self-contained. See closeWithCheckpoint() for the rationale.
-  context.subscriptions.push({
-    dispose: () => {
-      embedding.stop();
-      try {
-        closeWithCheckpoint(db);
-      } catch { /* ignore */ }
+  context.subscriptions.push(
+    ...testHookDisposables,
+    {
+      dispose: () => {
+        embedding.stop();
+        try {
+          closeWithCheckpoint(db);
+        } catch { /* ignore */ }
+      },
     },
-  });
+  );
   log.info('activation', 'Bootstrap step 14/14: commands + cleanup registered');
 }
 

@@ -21,9 +21,7 @@ import type { Adjudicator, AdjudicationRequest, AdjudicationVerdict } from './en
 
 const VERDICTS = new Set<EntityOwnershipVerdict>(['owned_aggregate', 'shared_value_object', 'separate']);
 
-export interface AdjudicatorCall {
-  (opts: { prompt: string; responseFormat: 'json'; temperature: number; traceContext: Record<string, unknown> }): Promise<{ parsed: unknown; text: string }>;
-}
+export type AdjudicatorCall = (opts: { prompt: string; responseFormat: 'json'; temperature: number; traceContext: Record<string, unknown> }) => Promise<{ parsed: unknown; text: string }>;
 
 /** Build the classification prompt. `componentContext` is an optional per-component
  *  "id — responsibility [domain]" block that helps the model reason about ownership. */
@@ -53,11 +51,14 @@ Return ONLY raw JSON (no markdown fences), shape:
  *  Tolerates {verdicts:[...]} or a bare array. Invalid/unknown entries are dropped
  *  (the bridge then falls back to its deterministic default — no fabrication). */
 export function parseAdjudicationVerdicts(parsed: unknown, validKeys: Set<string>): AdjudicationVerdict[] {
-  const arr = Array.isArray(parsed)
-    ? parsed
-    : (parsed && typeof parsed === 'object' && Array.isArray((parsed as Record<string, unknown>).verdicts))
-      ? (parsed as { verdicts: unknown[] }).verdicts
-      : [];
+  let arr: unknown[];
+  if (Array.isArray(parsed)) {
+    arr = parsed;
+  } else if (parsed && typeof parsed === 'object' && Array.isArray((parsed as Record<string, unknown>).verdicts)) {
+    arr = (parsed as { verdicts: unknown[] }).verdicts;
+  } else {
+    arr = [];
+  }
   const out: AdjudicationVerdict[] = [];
   const seen = new Set<string>();
   for (const raw of arr) {

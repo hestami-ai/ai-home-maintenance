@@ -12,13 +12,19 @@
  * Design:
  *   - Rollback is by SUB-PHASE granularity. Operator names the sub-phase
  *     they want to start from; we use the FIRST occurrence (smallest
- *     produced_at) of that sub_phase_id as the cutoff timestamp.
- *   - Every record with produced_at >= cutoff AND is_current_version=1
- *     gets marked is_current_version=0 (superseded). Exceptions:
- *        agent_invocation, agent_output, agent_output_chunk
- *     These are immutable history (what happened, not state). Keeping
- *     them current preserves the audit trail of what was attempted
- *     even after rollback.
+ *     produced_at) of that sub_phase_id as the cutoff, plus the PHASE that
+ *     sub-phase belongs to.
+ *   - Invalidation is scoped by PIPELINE POSITION, not raw timestamp: a record
+ *     is superseded iff it is in a phase AFTER the target phase (any timestamp),
+ *     or in the target phase (or phase-less) AND produced_at >= cutoff. UPSTREAM
+ *     phases are NEVER touched. This is load-bearing on multiply-resumed DBs,
+ *     where sub-phase timestamps interleave out of dependency order and a naive
+ *     `produced_at >= cutoff` sweep would tombstone still-valid upstream heads
+ *     that the partial re-run never regenerates (see the phase-scope note below).
+ *   - Exceptions: agent_invocation, agent_output, agent_output_chunk (and the
+ *     other IMMUTABLE_HISTORY_TYPES). These are immutable history (what happened,
+ *     not state). Keeping them current preserves the audit trail of what was
+ *     attempted even after rollback.
  *   - The function is a pure DB mutation. The caller is responsible
  *     for advancing the state machine and emitting the
  *     workflow.resumed lifecycle event.
@@ -80,17 +86,18 @@ export function rollbackToSubPhase(
   workflow_run_id: string,
   target_sub_phase_id: string,
 ): RollbackResult {
-  // Find the cutoff: earliest produced_at where the target sub-phase
-  // had a current-version record. This works even if the sub-phase
-  // ran multiple times (re-runs / saturation loops): the FIRST entry
-  // is the boundary we want to roll back to.
+  // Find the cutoff: earliest produced_at where the target sub-phase had a
+  // current-version record, plus the PHASE that sub-phase belongs to. This works
+  // even if the sub-phase ran multiple times (re-runs / saturation loops): the
+  // FIRST entry is the boundary. SQLite returns the bare `phase_id` from the row
+  // that owns the MIN(produced_at).
   const cutoffRow = db.prepare(`
-    SELECT MIN(produced_at) AS cutoff
+    SELECT phase_id, MIN(produced_at) AS cutoff
       FROM governed_stream
      WHERE workflow_run_id = ?
        AND sub_phase_id = ?
        AND is_current_version = 1
-  `).get(workflow_run_id, target_sub_phase_id) as { cutoff: string | null } | undefined;
+  `).get(workflow_run_id, target_sub_phase_id) as { phase_id: string | null; cutoff: string | null } | undefined;
 
   const cutoff = cutoffRow?.cutoff ?? null;
   if (!cutoff) {
@@ -102,16 +109,37 @@ export function rollbackToSubPhase(
     };
   }
 
-  // Pre-count what we're about to roll back (for the result envelope
-  // + lifecycle event payload). Same WHERE as the UPDATE below.
+  // PHASE-SCOPED invalidation (fixes the multiply-resumed over-sweep). A naive
+  // `produced_at >= cutoff` sweep is UNSOUND once a DB has been resumed several
+  // times: sub-phase timestamps interleave out of dependency order, so an UPSTREAM
+  // phase's current head can carry a LATER wall-clock time than the (downstream)
+  // target sub-phase and get wrongly tombstoned — then the partial re-run never
+  // regenerates it (cal-41: resuming into Phase-9 `reconnaissance` @10:12 tombstoned
+  // the Phase-7 test plan @11:49 + Phase-8 eval plan @10:54, so every packet lost
+  // its tests/eval). Fix: invalidate strictly by PIPELINE POSITION —
+  //   • records in a phase AFTER the target phase → always (any timestamp);
+  //   • records in the target phase (or with no phase) → only at-or-after `cutoff`;
+  //   • records in an UPSTREAM phase → NEVER, regardless of timestamp.
+  // phase_id is numeric-castable across the whole pipeline ('0','0.5','1'…'10'), so
+  // CAST(phase_id AS REAL) is a total order. If the target's phase_id is missing/
+  // non-numeric we degrade to the old global-timestamp rule (never worse).
+  const targetOrdinal = Number.parseFloat(cutoffRow?.phase_id ?? '');
+  const usePhaseScope = Number.isFinite(targetOrdinal);
+  const scopeSql = usePhaseScope
+    ? "( CAST(phase_id AS REAL) > ? OR ((phase_id IS NULL OR phase_id = '' OR CAST(phase_id AS REAL) = ?) AND produced_at >= ?) )"
+    : 'produced_at >= ?';
+  const scopeParams: Array<string | number> = usePhaseScope ? [targetOrdinal, targetOrdinal, cutoff] : [cutoff];
+
+  // Pre-count what we're about to roll back (for the result envelope + lifecycle
+  // event payload). Same scope as the UPDATE below.
   const breakdown = db.prepare(`
     SELECT record_type, COUNT(*) AS n
       FROM governed_stream
      WHERE workflow_run_id = ?
-       AND produced_at >= ?
        AND is_current_version = 1
+       AND ${scopeSql}
   GROUP BY record_type
-  `).all(workflow_run_id, cutoff) as Array<{ record_type: string; n: number }>;
+  `).all(workflow_run_id, ...scopeParams) as Array<{ record_type: string; n: number }>;
 
   const rolledByType: Record<string, number> = {};
   const preservedByType: Record<string, number> = {};
@@ -145,11 +173,11 @@ export function rollbackToSubPhase(
        SET is_current_version = 0,
            superseded_at      = ?
      WHERE workflow_run_id   = ?
-       AND produced_at       >= ?
        AND is_current_version = 1
        AND record_type IN (${placeholders})
+       AND ${scopeSql}
   `);
-  const info = update.run(now, workflow_run_id, cutoff, ...stateful);
+  const info = update.run(now, workflow_run_id, ...stateful, ...scopeParams);
 
   return {
     cutoff_produced_at: cutoff,
@@ -163,4 +191,27 @@ function sumValues(o: Record<string, number>): number {
   let total = 0;
   for (const v of Object.values(o)) total += v;
   return total;
+}
+
+/**
+ * Zero a resumed run's cycle counter so Phase 6/7/8 execute their FULL
+ * generate-and-gatekeep path on the next forward pass instead of the
+ * `runPhaseNCycleDelta` incremental path (which they take whenever
+ * `current_cycle_number > 0`, i.e. after the run went through packet-synthesis-
+ * failure route-and-restart cycles). The delta path only heals failure-seed
+ * orphans and never re-runs the generator, so a fix living in the main path
+ * (e.g. a Phase-7 test-plan gatekeeper change) would be silently skipped on a
+ * cycle-mode resume. Pairs with {@link rollbackToSubPhase} — rollback moves the
+ * artifacts back, this moves the run out of cycle mode. Returns the prior cycle
+ * number (for logging); a no-op returns 0 if the run was already at 0/unset.
+ */
+export function resetRunCycleCounter(db: Database, workflow_run_id: string): number {
+  const row = db.prepare(
+    `SELECT current_cycle_number AS n FROM workflow_runs WHERE id = ?`,
+  ).get(workflow_run_id) as { n: number | null } | undefined;
+  const prior = row?.n ?? 0;
+  db.prepare(
+    `UPDATE workflow_runs SET current_cycle_number = 0 WHERE id = ?`,
+  ).run(workflow_run_id);
+  return prior;
 }

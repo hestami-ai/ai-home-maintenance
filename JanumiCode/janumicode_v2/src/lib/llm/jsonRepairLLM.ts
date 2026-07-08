@@ -243,9 +243,6 @@ If the input is fundamentally unrepairable (truncated mid-object, totally unstru
     recovering
       ? `=== AGENT REASONING CONTAINING THE ANSWER (the agent emitted its final answer here instead of the response channel; extract the final JSON object it settled on) ===\n${brokenText}\n=== END AGENT REASONING ===`
       : `=== BROKEN JSON OUTPUT (the agent produced this; it does not parse) ===\n${brokenText}\n=== END BROKEN JSON OUTPUT ===`,
-  );
-
-  sections.push(
     recovering ? `Now output the extracted JSON object only:` : `Now output the repaired JSON object only:`,
   );
 

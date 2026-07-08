@@ -128,10 +128,10 @@ export class QuarantineLedger {
     lines.push(
       `This task was quarantined after ${prior.attempts.length} ` +
       `attempt${prior.attempts.length === 1 ? '' : 's'} in wave ${prior.wave_number}.`,
+      `Quarantine reason: ${prior.quarantine_reason}`,
+      '',
+      'Prior attempts:',
     );
-    lines.push(`Quarantine reason: ${prior.quarantine_reason}`);
-    lines.push('');
-    lines.push('Prior attempts:');
     for (const a of prior.attempts) {
       lines.push(`  Attempt ${a.attempt_number} — ${a.outcome}`);
       if (a.reasoning_review_flaws && a.reasoning_review_flaws.length > 0) {
@@ -146,8 +146,8 @@ export class QuarantineLedger {
         lines.push(`    Error: ${a.error_message}`);
       }
     }
-    lines.push('');
     lines.push(
+      '',
       'Use this prior trace to avoid the same flaws on this retry. ' +
       'Specifically address each flaw above by adjusting your approach, ' +
       'not by retrying the same path.',

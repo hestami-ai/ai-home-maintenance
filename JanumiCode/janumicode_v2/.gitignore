@@ -20,3 +20,6 @@ test-and-evaluation/
 
 # integration test debug captures
 src/test/integration/harness/_debug/
+
+# SonarQube headless remediation tooling + tracker (durable, local-only)
+.sonar-remediation/

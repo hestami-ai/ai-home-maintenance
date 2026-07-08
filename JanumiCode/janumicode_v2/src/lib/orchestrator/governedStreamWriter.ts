@@ -255,12 +255,13 @@ export class GovernedStreamWriter {
     // `agent_invocation` records the record's own id IS the invocation
     // id. For records descended from an invocation, `produced_by_record_id`
     // points back at the parent `agent_invocation`.
+    const invocationBoundId = INVOCATION_BOUND_RECORD_TYPES.has(
+      record.record_type,
+    )
+      ? record.produced_by_record_id ?? undefined
+      : undefined;
     const recordInvocationId =
-      record.record_type === 'agent_invocation'
-        ? record.id
-        : INVOCATION_BOUND_RECORD_TYPES.has(record.record_type)
-          ? record.produced_by_record_id ?? undefined
-          : undefined;
+      record.record_type === 'agent_invocation' ? record.id : invocationBoundId;
     // Compute a per-record-type structural summary so trace consumers
     // can see shape-level diagnostics (field counts, status flags,
     // blocking-failure rollups) without opening the DB. Run 108's
@@ -674,7 +675,7 @@ export class GovernedStreamWriter {
         FROM governed_stream WHERE id = ?
       `).get(parentId) as { derived_from_system_proposal: number; authority_level: number } | undefined;
 
-      if (parent && parent.derived_from_system_proposal === 1 && parent.authority_level < 5) {
+      if (parent?.derived_from_system_proposal === 1 && parent.authority_level < 5) {
         return true;
       }
     }

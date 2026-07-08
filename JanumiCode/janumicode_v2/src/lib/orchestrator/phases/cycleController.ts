@@ -104,7 +104,7 @@ export function decideRestartTarget(
   // Take the most-recent failure record — the synthesizer writes one
   // per pass, and a coherent later pass would have left this stream
   // empty for the current cycle.
-  const latest = failures[failures.length - 1].content as unknown as PacketSynthesisFailureContent;
+  const latest = failures.at(-1)!.content as unknown as PacketSynthesisFailureContent;
   if (!latest || latest.total_blocking_failures === 0) return null;
 
   // Tally failure codes across all packets.
@@ -209,7 +209,7 @@ export async function runCycleControllerSubPhase(
 
   const target = decideRestartTarget(ctx);
   if (!target) {
-    termination = 'frontier_empty';
+    // No restart target — terminate as 'frontier_empty' (initial value).
   } else if (cycleNumber + 1 > maxCycles) {
     // Ceiling would be hit. Surface to operator (or auto-resolve in
     // auto-approve mode). See implementation-packet-synthesis design §5.
@@ -226,7 +226,7 @@ export async function runCycleControllerSubPhase(
         new_max: newMax,
         target_phase: target.target,
       });
-      termination = 'frontier_empty';      // placeholder for the ongoing loop
+      // termination stays 'frontier_empty' (initial value) — placeholder for the ongoing loop
       cycleRestartTo = target.target;
     } else if (decision.outcome === 'abort') {
       termination = 'phase_failure';
@@ -259,8 +259,8 @@ export async function runCycleControllerSubPhase(
     // use 'frontier_empty' as a placeholder (the iteration is "complete
     // as far as this controller is concerned"; the NEXT cycle's
     // controller will write its own record). The cycleRestartTo field
-    // is what actually drives the loop.
-    termination = 'frontier_empty';
+    // is what actually drives the loop. termination stays 'frontier_empty'
+    // (initial value).
     cycleRestartTo = target.target;
     logger.info('workflow', 'cycle_controller: looping', {
       workflow_run_id: workflowRun.id,

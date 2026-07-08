@@ -34,7 +34,7 @@ export function findInCards(
   const cards = container.querySelectorAll('[data-record-id]');
 
   for (const card of cards) {
-    const cardId = card.getAttribute('data-record-id');
+    const cardId = (card as HTMLElement).dataset.recordId;
     if (!cardId) continue;
 
     const text = card.textContent?.toLowerCase() ?? '';

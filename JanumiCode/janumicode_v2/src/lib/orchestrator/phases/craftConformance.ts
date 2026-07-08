@@ -43,7 +43,7 @@ function collectSourceFiles(root: string): string[] {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) { walk(full); continue; }
       if (!/\.(ts|tsx|js|jsx|mts|cts)$/.test(e.name)) continue;
-      if (/\.(test|spec)\./.test(e.name) || /\.d\.ts$/.test(e.name)) continue;
+      if (/\.(test|spec)\./.test(e.name) || e.name.endsWith('.d.ts')) continue;
       out.push(full);
     }
   };

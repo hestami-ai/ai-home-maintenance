@@ -34,7 +34,7 @@ function resolveTscCommand(workspacePath: string): { cmd: string; args: string[]
 /** Parse the `Found N error(s)` line tsc prints; fall back to 0. */
 function parseErrorCount(out: string): number {
   const m = out.match(/Found (\d+) errors?/);
-  if (m) return parseInt(m[1], 10);
+  if (m) return Number.parseInt(m[1], 10);
   // No summary line — count "error TSxxxx" occurrences.
   const matches = out.match(/error TS\d+/g);
   return matches ? matches.length : 0;

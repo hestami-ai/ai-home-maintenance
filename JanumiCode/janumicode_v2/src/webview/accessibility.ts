@@ -60,8 +60,8 @@ export function cardAriaLabel(recordType: string, phaseId: string | null, role: 
   const parts: string[] = [];
 
   if (phaseId) parts.push(`Phase ${phaseId}`);
-  if (role) parts.push(role.replace(/_/g, ' '));
-  parts.push(recordType.replace(/_/g, ' '));
+  if (role) parts.push(role.replaceAll('_', ' '));
+  parts.push(recordType.replaceAll('_', ' '));
 
   return parts.join(' — ');
 }

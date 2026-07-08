@@ -1088,7 +1088,12 @@ export function collectLeafAcceptanceCriteria(records: GovernedStreamRecord[]): 
     const acsRaw = Array.isArray(story.acceptance_criteria) ? story.acceptance_criteria : [];
     const acs = (acsRaw as Array<Record<string, unknown>>)
       .filter((a) => a && typeof a.id === 'string' && (a.id as string).length > 0)
-      .map((a) => ({ id: a.id as string, text: typeof a.description === 'string' ? a.description : (typeof a.text === 'string' ? a.text : '') }));
+      .map((a) => {
+        let text = '';
+        if (typeof a.description === 'string') text = a.description;
+        else if (typeof a.text === 'string') text = a.text;
+        return { id: a.id as string, text };
+      });
     if (acs.length === 0) continue;
     const storyText = [story.role, story.action, story.outcome]
       .filter((x): x is string => typeof x === 'string' && x.length > 0).join(' / ')
@@ -1202,9 +1207,11 @@ export function renderScopedAcceptanceCriteriaMenu(
   const sections: string[] = [renderAcceptanceCriteriaMenu(owned)];
   const otherIds = [...new Set(other.flatMap((l) => l.acs.map((a) => a.id)))];
   if (otherIds.length > 0) {
-    sections.push('');
-    sections.push('# Other-component acceptance-criteria ids (reference lookup only, NOT this call coverage target):');
-    sections.push(otherIds.map((id) => `- ${id}`).join('\n'));
+    sections.push(
+      '',
+      '# Other-component acceptance-criteria ids (reference lookup only, NOT this call coverage target):',
+      otherIds.map((id) => `- ${id}`).join('\n'),
+    );
   }
   return sections.join('\n');
 }
@@ -1225,7 +1232,12 @@ export function renderComponentBlockForTask(component: Record<string, unknown>):
   const release = component._leaf_release_ordinal != null ? `Release ${String(component._leaf_release_ordinal)}` : 'Backlog';
   const resps = Array.isArray(component.responsibilities)
     ? (component.responsibilities as Array<Record<string, unknown>>)
-        .map(r => `  - ${typeof r.description === 'string' ? r.description : (typeof r.statement === 'string' ? r.statement : '')}`)
+        .map(r => {
+          let txt = '';
+          if (typeof r.description === 'string') txt = r.description;
+          else if (typeof r.statement === 'string') txt = r.statement;
+          return `  - ${txt}`;
+        })
         .join('\n')
     : '';
   const header = root ? `${dk} (Tier ${tier} leaf under ${root}): ${name}` : `${dk}: ${name}`;
@@ -1333,7 +1345,9 @@ export function renderComponentMenu(components: Array<Record<string, unknown>>):
     lines.push(`- ${id}: ${name}`);
     if (Array.isArray(c.responsibilities)) {
       for (const r of c.responsibilities as Array<Record<string, unknown>>) {
-        const txt = typeof r.description === 'string' ? r.description : (typeof r.statement === 'string' ? r.statement : '');
+        let txt = '';
+        if (typeof r.description === 'string') txt = r.description;
+        else if (typeof r.statement === 'string') txt = r.statement;
         if (txt) lines.push(`    - ${txt}`);
       }
     }
@@ -1612,9 +1626,10 @@ export function normalizeRootTaskShape(
       const criterion_id = typeof cobj.criterion_id === 'string'
         ? cobj.criterion_id
         : `CC-${String(idx + 1).padStart(3, '0')}`;
-      const description = typeof cobj.description === 'string'
-        ? cobj.description
-        : (typeof cobj.text === 'string' ? cobj.text : '(missing description)');
+      let description: string;
+      if (typeof cobj.description === 'string') description = cobj.description;
+      else if (typeof cobj.text === 'string') description = cobj.text;
+      else description = '(missing description)';
       if (typeof cobj.criterion_id !== 'string') drifts.push('completion_criteria_missing_id');
       if (typeof cobj.description !== 'string') drifts.push('completion_criteria_missing_description');
       const verification_method = typeof cobj.verification_method === 'string'
@@ -1667,9 +1682,14 @@ export function normalizeRootTaskShape(
   // prefixed id (namespace classification, not a regex reduction) must be an
   // exact member of the leaf-AC set; non-members are LLM-invented refs and are
   // dropped (logged as drift). Non-AC ids (res-*/TECH-*/SR-*/comp-*) pass through.
-  const rawTraces = Array.isArray((t as Record<string, unknown>).technical_spec_ids)
-    ? ((t as Record<string, unknown>).technical_spec_ids as unknown[]).filter((p): p is string => typeof p === 'string')
-    : (Array.isArray(t.traces_to) ? t.traces_to.filter((p): p is string => typeof p === 'string') : []);
+  let rawTraces: string[];
+  if (Array.isArray((t as Record<string, unknown>).technical_spec_ids)) {
+    rawTraces = ((t as Record<string, unknown>).technical_spec_ids as unknown[]).filter((p): p is string => typeof p === 'string');
+  } else if (Array.isArray(t.traces_to)) {
+    rawTraces = t.traces_to.filter((p): p is string => typeof p === 'string');
+  } else {
+    rawTraces = [];
+  }
   let traces_to = rawTraces;
   if (leafAcIds) {
     const droppedAcRefs = rawTraces.filter((id) => id.startsWith('AC-') && !leafAcIds.has(id));

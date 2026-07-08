@@ -145,28 +145,29 @@ export class LoopDetectionMonitor {
     const current = toolCallHistory.find(t => t.attemptNumber === currentAttempt);
     if (!current || current.toolCalls.length < 2) return false;
 
-    // Check for alternating between same two tools >= 3 times
+    // Check for alternating between the same two tools (A,B,A,B,...) for >= 3
+    // full cycles. True period-2 alternation means every call equals the one
+    // two positions back — for BOTH parities in the window. The prior check
+    // `calls[i - 1].name === calls[i - 1].name` compared a value to itself
+    // (always true), so the odd (interleaved) calls were never verified and a
+    // non-loop like A,X,A,Y,A,Z,A would false-trip the detector.
     const calls = current.toolCalls;
-    for (let i = 2; i < calls.length; i++) {
-      if (calls[i].name === calls[i - 2].name &&
-          calls[i].params === calls[i - 2].params &&
-          calls[i - 1].name === calls[i - 1].name) {
-        // Check if this is the third alternation
-        let alternations = 0;
-        for (let j = i; j >= 2; j -= 2) {
-          if (calls[j].name === calls[j - 2].name && calls[j].params === calls[j - 2].params) {
-            alternations++;
-          } else break;
-        }
-        if (alternations >= 3) return true;
+    const sameCall = (a: number, b: number): boolean =>
+      calls[a].name === calls[b].name && calls[a].params === calls[b].params;
+    for (let i = 3; i < calls.length; i++) {
+      let run = 0;
+      for (let j = i; j >= 2; j--) {
+        if (sameCall(j, j - 2)) run++;
+        else break;
       }
+      // run = consecutive positions (both parities) matching their -2 neighbour;
+      // A,B,A,B,A,B (6 calls) → positions 2..5 → run 4 = 3 alternation cycles.
+      if (run >= 4) return true;
     }
 
     // Check for identical consecutive tool invocations
     for (let i = 1; i < calls.length; i++) {
-      if (calls[i].name === calls[i - 1].name && calls[i].params === calls[i - 1].params) {
-        return true;
-      }
+      if (sameCall(i, i - 1)) return true;
     }
 
     return false;

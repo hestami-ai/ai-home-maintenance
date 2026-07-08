@@ -99,7 +99,7 @@ export class Phase0Handler implements PhaseHandler {
     for (const id of resolvedRefs.ingestedRecordIds) artifactIds.push(id);
 
     // ── Sub-Phase 0.2 — Artifact Ingestion (brownfield only) ────
-    let ingestedIndex: { recordIds: string[]; totalFiles: number } = { recordIds: [], totalFiles: 0 };
+    let ingestedIndex: { recordIds: string[]; totalFiles: number };
     if (workspaceType === 'brownfield') {
       engine.stateMachine.setSubPhase(workflowRun.id, 'artifact_ingestion');
       ingestedIndex = await this.runArtifactIngestion(ctx, workspacePath, resolvedRefs.resolvedPaths);

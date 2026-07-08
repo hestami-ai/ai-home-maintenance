@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   buildPermissionPolicy,
+  buildExecutorAgentPrompt,
   parseListeningUrl,
   addTrustedPath,
   resolveMimoConfig,
@@ -61,7 +62,19 @@ describe('buildPermissionPolicy', () => {
     expect((perm.bash as Record<string, string>)['*']).toBe('ask');
     expect((perm.external_directory as Record<string, string>)['*']).toBe('ask');
     expect(perm.edit).toBe('allow');
-    expect(perm.question).toBe('deny'); // never ask the (non-conversational) executor's user
+    // `question` is governed by the SEPARATE attended axis, not by relay: default
+    // (headless) denies it even in relay (there is no human + mimo can't inject an
+    // answer over the compose API).
+    expect(perm.question).toBe('deny');
+  });
+
+  it('question tool is denied HEADLESS (attended=false) and asked ATTENDED (attended=true), in either mode', () => {
+    const q = (mode: 'static' | 'relay', attended: boolean) =>
+      ((buildPermissionPolicy(mode, attended) as { permission: Record<string, unknown> }).permission).question;
+    expect(q('static', false)).toBe('deny');
+    expect(q('relay', false)).toBe('deny');
+    expect(q('static', true)).toBe('ask'); // surfaced to the responder/human by the adapter
+    expect(q('relay', true)).toBe('ask');
   });
 });
 
@@ -160,6 +173,41 @@ describe('buildProjectConfig', () => {
   });
 });
 
+describe('buildExecutorAgentPrompt (mode-aware framing)', () => {
+  const headless = buildExecutorAgentPrompt(false);
+  const attended = buildExecutorAgentPrompt(true);
+
+  it('preserves mimo\'s coding guidance and the anti-comment removal in BOTH modes', () => {
+    for (const p of [headless, attended]) {
+      expect(p).toMatch(/Following conventions/);
+      expect(p).toMatch(/file_path:line_number/);
+      expect(p).not.toMatch(/DO NOT ADD .*COMMENTS/i);
+      // Craft standard stays in the per-leaf task context, never embedded here.
+      expect(p).not.toMatch(/Engineering Constitution/i);
+    }
+  });
+  it('HEADLESS states there is no interactive user + tells the agent to self-resolve', () => {
+    expect(headless).toMatch(/headlessly/i);
+    expect(headless).toMatch(/no interactive user/i);
+    expect(headless).toMatch(/best spec-consistent choice|make the best/i);
+    expect(headless).not.toMatch(/voice-of-intent/i);
+  });
+  it('ATTENDED frames the voice-of-intent reviewer + escalation, but still forbids stalling', () => {
+    expect(attended).toMatch(/voice-of-intent/i);
+    expect(attended).toMatch(/escalates to a human/i);
+    expect(attended).toMatch(/never stall/i);
+    expect(attended).not.toMatch(/no interactive user/i);
+  });
+  it('buildProjectConfig renders the attended framing when cfg.attended is set', () => {
+    const cfg = { ...resolveMimoConfig({}), attended: true };
+    const config = buildProjectConfig(cfg, {});
+    const agent = (config.agent as Record<string, { prompt?: string }>).janumicode;
+    expect(agent.prompt).toMatch(/voice-of-intent/i);
+    // and the question tool is asked (surfaced), not denied, when attended
+    expect(((config.permission as Record<string, unknown>).question)).toBe('ask');
+  });
+});
+
 describe('parseListeningUrl', () => {
   it('extracts the base URL from the serve log line', () => {
     expect(parseListeningUrl('Warning: ...\nmimocode server listening on http://127.0.0.1:4096\n'))
@@ -171,12 +219,12 @@ describe('parseListeningUrl', () => {
 });
 
 describe('resolveMimoConfig', () => {
-  it('defaults: mimo binary, mimo/mimo-auto, janumicode agent, static', () => {
-    expect(resolveMimoConfig({})).toEqual({ binary: 'mimo', model: 'mimo/mimo-auto', agent: 'janumicode', permissionMode: 'static' });
+  it('defaults: mimo binary, mimo/mimo-auto, janumicode agent, static, headless (attended=false)', () => {
+    expect(resolveMimoConfig({})).toEqual({ binary: 'mimo', model: 'mimo/mimo-auto', agent: 'janumicode', permissionMode: 'static', attended: false });
   });
-  it('honors env overrides', () => {
-    const cfg = resolveMimoConfig({ JANUMICODE_MIMO_MODEL: 'mimo/mimo-pro', JANUMICODE_MIMO_AGENT: 'build', JANUMICODE_MIMO_PERMISSION_MODE: 'relay' });
-    expect(cfg).toMatchObject({ model: 'mimo/mimo-pro', agent: 'build', permissionMode: 'relay' });
+  it('honors env overrides (incl. JANUMICODE_MIMO_ATTENDED=1)', () => {
+    const cfg = resolveMimoConfig({ JANUMICODE_MIMO_MODEL: 'mimo/mimo-pro', JANUMICODE_MIMO_AGENT: 'build', JANUMICODE_MIMO_PERMISSION_MODE: 'relay', JANUMICODE_MIMO_ATTENDED: '1' });
+    expect(cfg).toMatchObject({ model: 'mimo/mimo-pro', agent: 'build', permissionMode: 'relay', attended: true });
   });
 });
 

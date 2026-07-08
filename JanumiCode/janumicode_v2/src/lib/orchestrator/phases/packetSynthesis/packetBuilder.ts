@@ -611,10 +611,18 @@ function findEvalsForUserStoriesAndNfrs(
   usIds: Set<string>,
   nfrIds: Set<string>,
   criteria: BuilderEvaluationCriterion[],
+  canonicalize: (id: string) => string,
 ): PacketEvaluationCriterion[] {
   const out: PacketEvaluationCriterion[] = [];
   for (const c of criteria) {
-    if (usIds.has(c.target_id) || nfrIds.has(c.target_id)) {
+    // A functional eval may target a RAW decomposition leaf (US-012-02-D) that
+    // Phase 8 never collapsed to root. `usIds` already carries the packet's
+    // canonical root (US-012, added at build time), so match the eval target's
+    // root too — else a sibling-leaf-targeted eval never binds to a leaf packet
+    // under the same story (cal-41 US-012-01-* carried zero evals though the
+    // story had root coverage). NFR targets aren't decomposed and canonicalize
+    // to identity, so this never cross-binds an NFR onto a story slice.
+    if (usIds.has(c.target_id) || nfrIds.has(c.target_id) || usIds.has(canonicalize(c.target_id))) {
       out.push({
         kind: c.kind,
         target_id: c.target_id,
@@ -703,6 +711,9 @@ function toPacketTask(t: BuilderAtomicTask): PacketTask {
     write_directory_paths: task.write_directory_paths ?? [],
     read_directory_paths: task.read_directory_paths ?? [],
     dependency_task_ids: task.dependency_task_ids ?? [],
+    // Carry the requirement footprint so the coherence verifier can tell a
+    // structurally-storyless technical leaf from a real story-join failure (P1).
+    traces_to: task.traces_to ?? [],
   };
 }
 
@@ -751,13 +762,26 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
   const packets: ImplementationPacketContent[] = [];
   const packetIdByTaskId = new Map<string, string>();
 
+  // D10 (C1 implement-once): dedupe atomic tasks by task.id. The same atomic task
+  // can arrive more than once (task saturation / area fan-out); building one packet
+  // per entry would place that task in ≥2 packets (C1_TASK_IN_MULTIPLE_PACKETS) — a
+  // finding the re-synthesis loop can never heal, so it persisted to the fixpoint.
+  // Keep the FIRST occurrence; each atomic task now maps to exactly one packet.
+  const seenTaskIds = new Set<string>();
+  const atomicTasks = input.atomicTasks.filter((t) => {
+    const id = t.content.task.id;
+    if (seenTaskIds.has(id)) return false;
+    seenTaskIds.add(id);
+    return true;
+  });
+
   // Pre-allocate packet ids so depends_on_packets resolution works
   // regardless of build order.
-  for (const t of input.atomicTasks) {
+  for (const t of atomicTasks) {
     packetIdByTaskId.set(t.content.task.id, randomUUID());
   }
 
-  for (const t of input.atomicTasks) {
+  for (const t of atomicTasks) {
     const task = t.content.task;
     const componentId = task.component_id ?? '';
     // Provisional test-case match using only the suite.component_id
@@ -860,7 +884,7 @@ export function buildPackets(input: BuilderInput): ImplementationPacketContent[]
     const dataModels = findDataModelsForTask(componentId, input.dataModels, taskReqIds);
     const apis = findApisForTask(componentId, input.apiDefinitions, taskReqIds);
     const testCases = findTestCasesForAcs(acIds, usIds, input.testSuites, componentId);
-    const evals = findEvalsForUserStoriesAndNfrs(usIds, nfrIds, input.evaluationCriteria);
+    const evals = findEvalsForUserStoriesAndNfrs(usIds, nfrIds, input.evaluationCriteria, input.lineage.canonicalize);
 
     // Active constraints inherited from the atomic task's saturation node.
     const activeConstraintIds = task.active_constraints ?? [];

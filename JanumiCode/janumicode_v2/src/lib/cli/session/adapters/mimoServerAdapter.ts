@@ -18,6 +18,7 @@ import type { SessionLogEvent } from '../sessionDriver';
 import { MimoServerManager, resolveMimoConfig, type MimoConfig } from '../../mimo/mimoServerManager';
 import { resolveExecutorIdleTimeoutMs, resolveExecutorWallclockTimeoutMs } from '../executorTimeouts';
 import { parseModelRef, type MimoClient, type MimoSseEvent, type PermissionResponse } from '../../mimo/mimoClient';
+import { sanitizeResponderReply, type ExecutorEscalation, type SessionResponder } from '../responder';
 import { getLogger } from '../../../logging';
 
 /** A permission `ask` surfaced by mimo's SSE `permission.asked` event. */
@@ -36,6 +37,28 @@ export type MimoPermissionDecider = (ask: MimoPermissionAsk) => Promise<Permissi
 export interface MimoServerAdapterOptions {
   onLog?: (e: SessionLogEvent) => void;
   config?: MimoConfig;
+  /**
+   * Whether a human is in the loop (= !unattendedSkipPermissions). Overrides the
+   * resolved config's `attended` so the written mimocode.json `question` policy +
+   * agent-prompt framing match this run. Attended sets `question:'ask'`, routing
+   * a clarification to {@link responder}/{@link onEscalate}; headless keeps it
+   * denied. Default (undefined) leaves the resolved config's value untouched.
+   */
+  attended?: boolean;
+  /**
+   * Spec-grounded voice-of-intent answerer. mimo's compose API is
+   * non-conversational (a permission carries only approve/deny, no text answer),
+   * so unlike the goose PTY the reply CANNOT be typed back into the turn — the
+   * adapter uses the responder to COMPOSE + surface the answer for the audit
+   * trail before rejecting the question so the agent self-resolves.
+   */
+  responder?: SessionResponder;
+  /**
+   * Human-escalation sink for a blocking clarification the responder can't
+   * resolve (attended sessions). Surfaced for the audit trail; also cannot be
+   * injected mid-turn. Absent headless.
+   */
+  onEscalate?: ExecutorEscalation;
   /**
    * Relay-mode permission resolver. When `permissionMode === 'relay'` and this
    * is absent, a default resolver surfaces each ask (via `onLog`) and answers
@@ -70,9 +93,16 @@ export class MimoServerAdapter implements ExecutorAdapter {
   private readonly cfg: MimoConfig;
 
   private readonly decider?: MimoPermissionDecider;
+  private readonly responder?: SessionResponder;
+  private readonly onEscalate?: ExecutorEscalation;
 
   constructor(private readonly opts: MimoServerAdapterOptions = {}) {
-    this.cfg = opts.config ?? resolveMimoConfig();
+    const base = opts.config ?? resolveMimoConfig();
+    // The invocation's attended flag (from the build context) wins over the
+    // resolved default so the written policy + agent framing match this run's mode.
+    this.cfg = opts.attended === undefined ? base : { ...base, attended: opts.attended };
+    this.responder = opts.responder;
+    this.onEscalate = opts.onEscalate;
     // Relay mode without an injected resolver gets a default that surfaces each
     // ask and answers per JANUMICODE_MIMO_PERMISSION_DEFAULT (default `once`).
     this.decider = opts.permissionDecider
@@ -135,7 +165,9 @@ export class MimoServerAdapter implements ExecutorAdapter {
             sawIdle = true;
             settle('idle');
           } else if (isPermissionAsk(ev)) {
-            await this.handlePermission(client, sessionId, ev);
+            // Pass the task spec + the agent's recent output tail so a `question`
+            // ask can be routed to the spec-grounded responder with real context.
+            await this.handlePermission(client, sessionId, ev, req.prompt, finalText.slice(-2000));
           }
         }
       } catch {
@@ -191,9 +223,18 @@ export class MimoServerAdapter implements ExecutorAdapter {
     sse.abort();
     await consume;
 
+    let exitCode: number;
+    if (aborted) {
+      exitCode = 1;
+    } else if (finish === 'stop' || finish === '') {
+      exitCode = 0;
+    } else {
+      exitCode = 1;
+    }
+
     return {
       tier: this.tier,
-      exitCode: aborted ? 1 : (finish === 'stop' || finish === '' ? 0 : 1),
+      exitCode,
       finalText: finalText || (finish ? `(${finish})` : ''),
       rawOutput: rawParts.join('\n'),
       timedOut: aborted,
@@ -201,9 +242,22 @@ export class MimoServerAdapter implements ExecutorAdapter {
     };
   }
 
-  private async handlePermission(client: MimoClient, sessionId: string, ev: MimoSseEvent): Promise<void> {
+  private async handlePermission(
+    client: MimoClient,
+    sessionId: string,
+    ev: MimoSseEvent,
+    taskSpec: string,
+    agentTail: string,
+  ): Promise<void> {
     const ask = permissionAsk(ev);
     if (!ask) return;
+    // The clarify-with-the-user `question` tool (attended → policy `ask`) routes to
+    // the voice-of-intent reviewer + human escalation instead of the file/shell
+    // decider — a distinct handler because it produces an ANSWER, not an approval.
+    if (ask.tool === 'question') {
+      await this.handleQuestion(client, sessionId, ask, taskSpec, agentTail);
+      return;
+    }
     // Static mode has no decider: deny any unexpected ask (safe — the static
     // policy should never produce one).
     let response: PermissionResponse = 'reject';
@@ -212,6 +266,48 @@ export class MimoServerAdapter implements ExecutorAdapter {
       catch { response = 'reject'; }
     }
     await client.respondPermission(sessionId, ask.permissionId, response);
+  }
+
+  /**
+   * Route a `question` ask to the spec-grounded responder (and, if it can't
+   * answer, the human-escalation sink), surface the Q+A for the audit trail, then
+   * REJECT. mimo's compose API is non-conversational — a permission response is
+   * approve/deny only, with NO channel to hand a text answer to the paused tool
+   * call — so we cannot inject the reply the way the goose PTY types it. Rejecting
+   * returns control to the agent, which self-resolves per the execution-mode
+   * directive; the surfaced answer/human decision is recorded for review. This is
+   * the concrete per-adapter idiosyncrasy: goose answers-and-injects; mimo
+   * observes-and-escalates. Never leaves the permission unanswered (would stall).
+   */
+  private async handleQuestion(
+    client: MimoClient,
+    sessionId: string,
+    ask: MimoPermissionAsk,
+    taskSpec: string,
+    agentTail: string,
+  ): Promise<void> {
+    const question = questionText(ask.raw);
+    let answer: string | null = null;
+    if (this.responder) {
+      try {
+        answer = sanitizeResponderReply(
+          await this.responder({ kind: 'question', question, agentContext: agentTail, taskSpec }),
+        );
+      } catch { answer = null; }
+    }
+    if (!answer && this.onEscalate) {
+      try { answer = await this.onEscalate({ question, agentContext: agentTail, taskSpec }); }
+      catch { answer = null; }
+    }
+    this.opts.onLog?.({
+      kind: 'data',
+      chunk: `\n[executor question] ${question}\n[voice-of-intent] ${answer ?? '(unanswered — proceed with spec-grounded best judgment)'}\n`,
+    });
+    getLogger().info('workflow', 'mimo executor question surfaced (compose API cannot inject the reply; agent self-resolves)', {
+      sessionId, answered: answer != null, question: question.slice(0, 300),
+    });
+    // Reject so the paused tool call returns control to the agent (see above).
+    await client.respondPermission(sessionId, ask.permissionId, 'reject');
   }
 }
 
@@ -242,6 +338,26 @@ export function eventSessionId(ev: MimoSseEvent): string | undefined {
  */
 export function isPermissionAsk(ev: MimoSseEvent): boolean {
   return ev.type === 'permission.asked';
+}
+
+/**
+ * Best-effort extraction of the question text from a `question` permission ask.
+ * mimo's `/doc` is a 2-path stub, so the exact `question`-tool metadata shape is
+ * not contractually pinned — probe the common carrier fields (metadata.question/
+ * prompt/message/text/query, then top-level title/description) and fall back to a
+ * generic prompt so the responder still receives a well-formed ResponderInput
+ * even if the field name drifts. Exported for unit tests.
+ */
+export function questionText(ev: MimoSseEvent): string {
+  const p = ev.properties as { metadata?: Record<string, unknown>; title?: unknown; description?: unknown };
+  const md = p.metadata ?? {};
+  for (const k of ['question', 'prompt', 'message', 'text', 'query']) {
+    const v = md[k];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  if (typeof p.title === 'string' && p.title.trim()) return p.title.trim();
+  if (typeof p.description === 'string' && p.description.trim()) return p.description.trim();
+  return 'The agent requested clarification (question text unavailable).';
 }
 
 export function permissionAsk(ev: MimoSseEvent): MimoPermissionAsk | null {

@@ -18,6 +18,7 @@ import type {
   TechnicalConstraint,
   DecompositionEntity,
   DataModelDecompositionNodeContent,
+  EntityOwnershipRole,
 } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseContext';
@@ -32,7 +33,6 @@ import {
   type BridgeModel,
 } from './phase5/entityOwnershipBridge';
 import { makeEntityOwnershipAdjudicator } from './phase5/entityOwnershipAdjudicator';
-import type { EntityOwnershipRole } from '../../types/records';
 import { chunkedCoverageBloom } from './chunkedCoverageBloom';
 import type { PromptTemplate } from '../templateLoader';
 import { emit as aoddEmit } from '../../aodd';
@@ -197,9 +197,12 @@ export function renderUncoveredComponentsMenu(
     lines.push(`- ${normId}: ${typeof c.name === 'string' ? c.name : normId}`);
     if (Array.isArray(c.responsibilities)) {
       for (const r of c.responsibilities as Array<Record<string, unknown>>) {
-        const txt = typeof r.description === 'string'
-          ? r.description
-          : (typeof r.statement === 'string' ? r.statement : '');
+        let txt = '';
+        if (typeof r.description === 'string') {
+          txt = r.description;
+        } else if (typeof r.statement === 'string') {
+          txt = r.statement;
+        }
         if (txt) lines.push(`    - ${txt}`);
       }
     }

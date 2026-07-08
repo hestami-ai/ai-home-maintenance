@@ -284,9 +284,12 @@ function sanitizeChildTask(
       const citedVacs = Array.isArray(rawVacs)
         ? (rawVacs as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0)
         : [];
+      const scopedVacs = childAcSet.size > 0
+        ? citedVacs.filter(ac => childAcSet.has(ac))
+        : citedVacs;
       const verifies_acceptance_criteria = citedVacs.length === 0
         ? undefined
-        : (childAcSet.size > 0 ? citedVacs.filter(ac => childAcSet.has(ac)) : citedVacs);
+        : scopedVacs;
       return {
         criterion_id: cid,
         description: desc,
@@ -388,7 +391,8 @@ export function formatRootTaskForPrompt(t: DecompositionTask): string {
 function formatTechnicalConstraints(tcs: TechnicalConstraint[]): string {
   if (tcs.length === 0) return '(none captured in Phase 1.0c)';
   return tcs.map(t => {
-    const tech = t.technology ? ` [${t.technology}${t.version ? ` ${t.version}` : ''}]` : '';
+    const versionSuffix = t.version ? ` ${t.version}` : '';
+    const tech = t.technology ? ` [${t.technology}${versionSuffix}]` : '';
     return `- ${t.id}${tech} (${t.category}): ${t.text}`;
   }).join('\n');
 }
@@ -683,7 +687,7 @@ export async function runTaskSaturationLoop(
         const surfacedRaw = Array.isArray(parsed?.surfaced_assumptions)
           ? parsed.surfaced_assumptions as Array<Record<string, unknown>> : [];
         const tierAssessment = parsed?.parent_tier_assessment as Record<string, unknown> | undefined;
-        if (tierAssessment && tierAssessment.agrees_with_hint === false) {
+        if (tierAssessment?.agrees_with_hint === false) {
           getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: decomposer disagrees with tier hint`, {
             nodeId: entry.nodeId, displayKey: entry.displayKey, hint: entry.tierHint,
             assessed: tierAssessment.tier, rationale: tierAssessment.rationale,
@@ -827,8 +831,7 @@ export async function runTaskSaturationLoop(
 
         let parentDowngraded = false;
         if (entry.tierHint === 'B') {
-          const explicitDisagreement = tierAssessment
-            && tierAssessment.agrees_with_hint === false
+          const explicitDisagreement = tierAssessment?.agrees_with_hint === false
             && typeof tierAssessment.tier === 'string'
             && (tierAssessment.tier === 'A' || tierAssessment.tier === 'B');
           const producedTierBChildren = (pendingGateByParent.get(entry.nodeId)?.length ?? 0) > 0;
@@ -1079,7 +1082,7 @@ export async function runTaskSaturationLoop(
     }
 
     const priorPass = pipelinePasses.length >= 2
-      ? pipelinePasses[pipelinePasses.length - 2]
+      ? pipelinePasses.at(-2)
       : null;
     const growthObserved = priorPass
       && priorPass.nodes_produced > 0

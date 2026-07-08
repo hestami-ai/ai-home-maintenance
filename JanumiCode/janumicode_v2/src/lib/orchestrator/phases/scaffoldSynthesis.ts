@@ -209,11 +209,11 @@ export function resolveProjectProfile(
         ...(pkg.devDependencies as Record<string, string> | undefined),
         ...(pkg.dependencies as Record<string, string> | undefined),
       };
-      const runner: ProjectProfile['test_runner'] =
-        testScript.includes('vitest') || devDeps?.vitest ? 'vitest'
-          : testScript.includes('jest') || devDeps?.jest ? 'jest'
-            : testScript.includes('node --test') || testScript.includes('node:test') ? 'node'
-              : configProfile.test_runner;
+      let runner: ProjectProfile['test_runner'];
+      if (testScript.includes('vitest') || devDeps?.vitest) runner = 'vitest';
+      else if (testScript.includes('jest') || devDeps?.jest) runner = 'jest';
+      else if (testScript.includes('node --test') || testScript.includes('node:test')) runner = 'node';
+      else runner = configProfile.test_runner;
       // Node semantics: absent "type" field ⇒ CommonJS.
       return {
         language: hasTsconfig || devDeps?.typescript ? 'typescript' : 'javascript',
@@ -362,9 +362,11 @@ function isNullableField(f: { type?: string; constraints?: string }): boolean {
 function renderEntityModule(entity: DataModelEntity, componentId: string): string {
   const name = pascalCase(entity.name);
   const lines: string[] = [];
-  lines.push(`// Generated shared data model — ${entity.name} (component: ${componentId}).`);
-  lines.push(`// Canonical type. Import from the shared barrel; do NOT redefine.`);
-  lines.push(`export interface ${name} {`);
+  lines.push(
+    `// Generated shared data model — ${entity.name} (component: ${componentId}).`,
+    `// Canonical type. Import from the shared barrel; do NOT redefine.`,
+    `export interface ${name} {`,
+  );
   for (const f of entity.fields ?? []) {
     const tsType = toTsType(f.type);
     const fieldType = isNullableField(f) ? `${tsType} | null` : tsType;
@@ -373,8 +375,7 @@ function renderEntityModule(entity: DataModelEntity, componentId: string): strin
   }
   lines.push(`}`);
   if (entity.relationships?.length) {
-    lines.push('');
-    lines.push(`// Relationships: ${entity.relationships.join(', ')}`);
+    lines.push('', `// Relationships: ${entity.relationships.join(', ')}`);
   }
   lines.push('');
   return lines.join('\n');
@@ -383,18 +384,22 @@ function renderEntityModule(entity: DataModelEntity, componentId: string): strin
 function renderContractModule(c: InterfaceContract): string {
   const name = pascalCase(c.id);
   const lines: string[] = [];
-  lines.push(`// Generated shared interface contract — ${c.id}.`);
-  lines.push(`// Protocol: ${c.protocol ?? 'n/a'} | Format: ${c.data_format ?? 'n/a'}` +
-    `${c.auth_mechanism ? ` | Auth: ${c.auth_mechanism}` : ''}`);
+  lines.push(
+    `// Generated shared interface contract — ${c.id}.`,
+    `// Protocol: ${c.protocol ?? 'n/a'} | Format: ${c.data_format ?? 'n/a'}` +
+    `${c.auth_mechanism ? ` | Auth: ${c.auth_mechanism}` : ''}`,
+  );
   if (c.systems_involved?.length) lines.push(`// Systems: ${c.systems_involved.join(', ')}`);
-  lines.push(`// Canonical contract metadata. Import from the shared barrel; do NOT redefine.`);
-  lines.push(`export const ${name}Contract = {`);
-  lines.push(`  id: ${JSON.stringify(c.id)},`);
-  lines.push(`  protocol: ${JSON.stringify(c.protocol ?? '')},`);
-  lines.push(`  dataFormat: ${JSON.stringify(c.data_format ?? '')},`);
-  lines.push(`  systemsInvolved: ${JSON.stringify(c.systems_involved ?? [])},`);
-  lines.push(`} as const;`);
-  lines.push('');
+  lines.push(
+    `// Canonical contract metadata. Import from the shared barrel; do NOT redefine.`,
+    `export const ${name}Contract = {`,
+    `  id: ${JSON.stringify(c.id)},`,
+    `  protocol: ${JSON.stringify(c.protocol ?? '')},`,
+    `  dataFormat: ${JSON.stringify(c.data_format ?? '')},`,
+    `  systemsInvolved: ${JSON.stringify(c.systems_involved ?? [])},`,
+    `} as const;`,
+    '',
+  );
   return lines.join('\n');
 }
 
@@ -456,14 +461,16 @@ function pySnake(raw: string): string {
 function renderPyEntity(entity: DataModelEntity, componentId: string): string {
   const name = pascalCase(entity.name);
   const lines: string[] = [];
-  lines.push(`# Generated shared data model — ${entity.name} (component: ${componentId}).`);
-  lines.push(`# Canonical type. Import from the shared package; do NOT redefine.`);
-  lines.push('from dataclasses import dataclass');
-  lines.push('from typing import Optional');
-  lines.push('');
-  lines.push('');
-  lines.push('@dataclass');
-  lines.push(`class ${name}:`);
+  lines.push(
+    `# Generated shared data model — ${entity.name} (component: ${componentId}).`,
+    `# Canonical type. Import from the shared package; do NOT redefine.`,
+    'from dataclasses import dataclass',
+    'from typing import Optional',
+    '',
+    '',
+    '@dataclass',
+    `class ${name}:`,
+  );
   const fields = entity.fields ?? [];
   if (!fields.length) lines.push('    pass');
   for (const f of fields) {
@@ -473,8 +480,7 @@ function renderPyEntity(entity: DataModelEntity, componentId: string): string {
     lines.push(`    ${f.name}: ${fieldType}${comment ? `  # ${comment}` : ''}`);
   }
   if (entity.relationships?.length) {
-    lines.push('');
-    lines.push(`    # Relationships: ${entity.relationships.join(', ')}`);
+    lines.push('', `    # Relationships: ${entity.relationships.join(', ')}`);
   }
   lines.push('');
   return lines.join('\n');
@@ -483,18 +489,22 @@ function renderPyEntity(entity: DataModelEntity, componentId: string): string {
 function renderPyContract(c: InterfaceContract): string {
   const name = pySnake(c.id);
   const lines: string[] = [];
-  lines.push(`# Generated shared interface contract — ${c.id}.`);
-  lines.push(`# Protocol: ${c.protocol ?? 'n/a'} | Format: ${c.data_format ?? 'n/a'}` +
-    `${c.auth_mechanism ? ` | Auth: ${c.auth_mechanism}` : ''}`);
+  lines.push(
+    `# Generated shared interface contract — ${c.id}.`,
+    `# Protocol: ${c.protocol ?? 'n/a'} | Format: ${c.data_format ?? 'n/a'}` +
+    `${c.auth_mechanism ? ` | Auth: ${c.auth_mechanism}` : ''}`,
+  );
   if (c.systems_involved?.length) lines.push(`# Systems: ${c.systems_involved.join(', ')}`);
-  lines.push(`# Canonical contract metadata. Import from the shared package; do NOT redefine.`);
-  lines.push(`${name}_CONTRACT = {`);
-  lines.push(`    "id": ${JSON.stringify(c.id)},`);
-  lines.push(`    "protocol": ${JSON.stringify(c.protocol ?? '')},`);
-  lines.push(`    "data_format": ${JSON.stringify(c.data_format ?? '')},`);
-  lines.push(`    "systems_involved": ${JSON.stringify(c.systems_involved ?? [])},`);
-  lines.push('}');
-  lines.push('');
+  lines.push(
+    `# Canonical contract metadata. Import from the shared package; do NOT redefine.`,
+    `${name}_CONTRACT = {`,
+    `    "id": ${JSON.stringify(c.id)},`,
+    `    "protocol": ${JSON.stringify(c.protocol ?? '')},`,
+    `    "data_format": ${JSON.stringify(c.data_format ?? '')},`,
+    `    "systems_involved": ${JSON.stringify(c.systems_involved ?? [])},`,
+    '}',
+    '',
+  );
   return lines.join('\n');
 }
 
@@ -505,20 +515,28 @@ function renderPyproject(
 ): string {
   // `src` on pythonpath so `from shared.models.X import ...` resolves the
   // src/shared package; pytest is declared so the per-leaf test gate runs.
-  const srcRoot = profile.shared_dir.replace(/\\/g, '/').split('/')[0] || 'src';
+  const srcRoot = profile.shared_dir.replaceAll('\\', '/').split('/')[0] || 'src';
   const deps = Object.entries(runtimeDeps)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => (v && v !== '*' ? `"${k}${/^[<>=~^]/.test(v) ? '' : '=='}${v}"` : `"${k}"`));
+    .map(([k, v]) => {
+      if (v && v !== '*') {
+        const op = /^[<>=~^]/.test(v) ? '' : '==';
+        return `"${k}${op}${v}"`;
+      }
+      return `"${k}"`;
+    });
   const lines: string[] = [];
-  lines.push('[project]');
-  lines.push(`name = "${name}"`);
-  lines.push('version = "0.1.0"');
-  lines.push('requires-python = ">=3.10"');
-  lines.push(`dependencies = [${deps.length ? '\n  ' + deps.join(',\n  ') + ',\n' : ''}]`);
-  lines.push('');
-  lines.push('[tool.pytest.ini_options]');
-  lines.push(`pythonpath = ["${srcRoot}"]`);
-  lines.push('');
+  lines.push(
+    '[project]',
+    `name = "${name}"`,
+    'version = "0.1.0"',
+    'requires-python = ">=3.10"',
+    `dependencies = [${deps.length ? '\n  ' + deps.join(',\n  ') + ',\n' : ''}]`,
+    '',
+    '[tool.pytest.ini_options]',
+    `pythonpath = ["${srcRoot}"]`,
+    '',
+  );
   return lines.join('\n');
 }
 
@@ -595,7 +613,7 @@ function materializePythonScaffold(
   runtimeDeps: Record<string, string>,
   result: MaterializeResult,
 ): void {
-  const shared = profile.shared_dir.replace(/\\/g, '/').replace(/\/+$/, '');
+  const shared = profile.shared_dir.replaceAll('\\', '/').replace(/\/+$/, '');
   const srcRoot = shared.split('/')[0] || 'src';
 
   writeIfAbsent(workspacePath, 'pyproject.toml', renderPyproject(projectName, profile, runtimeDeps), result);
@@ -658,7 +676,7 @@ export function materializeScaffold(
   }
 
   const e = ext(profile);
-  const shared = profile.shared_dir.replace(/\\/g, '/').replace(/\/+$/, '');
+  const shared = profile.shared_dir.replaceAll('\\', '/').replace(/\/+$/, '');
 
   // Root project config. (Brownfield package.json wins — skip-if-exists —
   // so declared deps only land on greenfield scaffolds.)
@@ -836,7 +854,7 @@ export function runScaffoldSynthesis(ctx: PhaseContext, reconStack?: string): Sc
     installDependencies(workspacePath, workflowRun.id);
   }
 
-  const shared = profile.shared_dir.replace(/\\/g, '/').replace(/\/+$/, '');
+  const shared = profile.shared_dir.replaceAll('\\', '/').replace(/\/+$/, '');
   const canonicalFiles = [...materialize.created, ...materialize.preExisting];
   // Protected roots: the shared dir always; node config files only for node
   // (a python run protects pyproject.toml instead, not package.json/tsconfig).

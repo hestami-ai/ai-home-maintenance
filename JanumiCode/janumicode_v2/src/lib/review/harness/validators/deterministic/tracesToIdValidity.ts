@@ -170,10 +170,14 @@ export function validateTracesToIdValidity(
   const config = CONFIGS[`${agentRole}:${subPhaseId}`];
   if (!config) return [];
 
-  const depth =
-    typeof outputContent.depth === 'number' ? outputContent.depth
-    : typeof outputContent.saturation_depth === 'number' ? outputContent.saturation_depth
-    : null;
+  let depth: number | null;
+  if (typeof outputContent.depth === 'number') {
+    depth = outputContent.depth;
+  } else if (typeof outputContent.saturation_depth === 'number') {
+    depth = outputContent.saturation_depth;
+  } else {
+    depth = null;
+  }
 
   // Severity: HIGH at depth ≥ 2; LOW at depth 0–1; MEDIUM when unknown
   const getSeverity = (): ValidatorFinding['severity'] => {
@@ -192,11 +196,16 @@ export function validateTracesToIdValidity(
   items.forEach((item, idx) => {
     if (!item || typeof item !== 'object') return;
     const rec = item as Record<string, unknown>;
-    const itemId =
-      typeof rec.id === 'string' ? rec.id
-      : typeof rec.component_id === 'string' ? rec.component_id
-      : typeof rec.entity_id === 'string' ? rec.entity_id
-      : `[${idx}]`;
+    let itemId: string;
+    if (typeof rec.id === 'string') {
+      itemId = rec.id;
+    } else if (typeof rec.component_id === 'string') {
+      itemId = rec.component_id;
+    } else if (typeof rec.entity_id === 'string') {
+      itemId = rec.entity_id;
+    } else {
+      itemId = `[${idx}]`;
+    }
 
     const refs = extractRefs(rec, config);
     for (const ref of refs) {

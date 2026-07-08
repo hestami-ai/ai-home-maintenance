@@ -18,7 +18,7 @@ import { createTestEngine } from '../test/helpers/createTestEngine';
 import type { PhaseId } from '../lib/types/records';
 import { generateLLMGapSuggestion } from '../test/harness/gapReportEnhancer';
 import { collectHarnessResult } from '../test/harness/collectResults';
-import { rollbackToSubPhase } from '../lib/orchestrator/rollback';
+import { rollbackToSubPhase, resetRunCycleCounter } from '../lib/orchestrator/rollback';
 import { withTraceContext } from '../lib/trace/traceContext';
 import { isLocalProvider, resolveRecordsIdleStallMs } from '../lib/llm/llmTimeouts';
 import {
@@ -69,7 +69,9 @@ function writePidFile(workspacePath: string): void {
   const signalHandler = (sig: NodeJS.Signals): void => {
     cleanup();
     // Re-raise the default behavior by calling exit with conventional 128+signo
-    const code = sig === 'SIGINT' ? 130 : sig === 'SIGTERM' ? 143 : 1;
+    let code = 1;
+    if (sig === 'SIGINT') code = 130;
+    else if (sig === 'SIGTERM') code = 143;
     process.exit(code);
   };
   process.once('SIGINT', signalHandler);
@@ -122,9 +124,8 @@ export async function runPipeline(
     resolvedDbPath = path.join(dbDir, `${Date.now()}.db`);
   }
 
-  const llmMode = config.llmMode === 'real'
-    ? (config.captureFixtures ? 'capture' : 'real')
-    : 'mock';
+  const realOrCapture = config.captureFixtures ? 'capture' : 'real';
+  const llmMode = config.llmMode === 'real' ? realOrCapture : 'mock';
 
   const te = await createTestEngine({
     dbPath: resolvedDbPath,
@@ -377,6 +378,18 @@ export async function runPipeline(
           `(preserved ${rollbackResult.preserved_count} immutable history). ` +
           `Cutoff: ${rollbackResult.cutoff_produced_at}`,
         );
+      }
+
+      // Optionally clear the cycle counter so resumed phases run their FULL
+      // execute() path (full regeneration + gatekeepers) instead of the
+      // packet-synthesis-failure cycle-delta path. Phase 6/7/8 branch to
+      // runPhaseNCycleDelta whenever current_cycle_number > 0 (phase7.ts:91);
+      // that delta path only heals failure-seed orphans and never re-runs the
+      // generator, so a fix living in the main path (e.g. a Phase-7 gatekeeper
+      // change) would be silently skipped on a cycle-mode resume.
+      if (config.resumeResetCycles) {
+        const priorCycle = resetRunCycleCounter(db, workflowRunId);
+        console.log(`[resume] Reset current_cycle_number ${priorCycle}→0 (phases run full re-execution, not cycle-delta)`);
       }
       console.log(`Resuming run ${workflowRunId} at Phase ${targetPhase}${targetSubPhase ? ` (sub-phase: ${targetSubPhase})` : ''}`);
 
@@ -656,7 +669,7 @@ function attachLiveMonitor(
     if (channel === 'thinking') state.thinkingChars += text.length;
     else if (channel === 'response') state.responseChars += text.length;
     // Keep last ~80 chars of this channel for the tail line.
-    const buf = state.recentTail + text.replace(/\n/g, '·');
+    const buf = state.recentTail + text.replaceAll('\n', '·');
     state.recentTail = buf.slice(-80);
     // Fire a tail line immediately on each chunk so the user sees
     // progress. Throttled implicitly because providers emit in token

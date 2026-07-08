@@ -202,6 +202,7 @@ const ARG_HANDLERS = {
   '--resume-from-db':            { consumesValue: true,  apply: (out, v) => { out.resumeFromDb = v; } },
   '--resume-at-phase':           { consumesValue: true,  apply: (out, v) => { out.resumeAtPhase = v; } },
   '--resume-at-sub-phase':       { consumesValue: true,  apply: (out, v) => { out.resumeAtSubPhase = v; } },
+  '--resume-reset-cycles':       { consumesValue: false, apply: (out)    => { out.resumeResetCycles = true; } },
   '--help':                      { consumesValue: false, apply: ()       => { printHelpAndExit(); } },
   '-h':                          { consumesValue: false, apply: ()       => { printHelpAndExit(); } },
 };
@@ -308,6 +309,10 @@ function patchConfigFlag(workspace) {
       temperature: 1,
       trace_max_tokens: 8000,
     };
+    // Phase-9 reconnaissance is architectural JUDGMENT, not a trace review — route
+    // it to the CAPABLE decomposer, never the small reviewer (which over-decomposes
+    // greenfield into microservices). Its own role so the reviewer pin can't drag it.
+    cfg.llm_routing.reconnaissance = { primary: decomposerRouting, temperature: 0.2 };
   } else {
     // Legacy default for non-llama-swap calibration: reasoning_review
     // pinned to ollama gemma4:e4b. Production defaults in defaults.ts
@@ -316,6 +321,13 @@ function patchConfigFlag(workspace) {
       primary: { provider: 'ollama', model: 'gemma4:e4b' },
       temperature: 1,
       trace_max_tokens: 8000,
+    };
+    // Recon → capable planning model (from init-calibration-run.sh's config), NOT
+    // the 4B reviewer. Preserve an explicit init value if present; else derive it
+    // from the planning model already routed to domain_interpreter.
+    cfg.llm_routing.reconnaissance = cfg.llm_routing.reconnaissance ?? {
+      primary: { provider: 'ollama', model: cfg.llm_routing.domain_interpreter?.primary?.model ?? 'gemma4:31b-it-qat' },
+      temperature: 0.2,
     };
   }
 
@@ -389,8 +401,9 @@ function invokeCli(intent, workspace, llamacppBaseUrl) {
     cliArgs.push('--resume-from-db', args.resumeFromDb);
     if (args.resumeAtSubPhase) cliArgs.push('--resume-at-sub-phase', args.resumeAtSubPhase);
     else if (args.resumeAtPhase) cliArgs.push('--resume-at-phase', args.resumeAtPhase);
+    if (args.resumeResetCycles) cliArgs.push('--resume-reset-cycles');
     const resumeTarget = args.resumeAtSubPhase ? `sub-phase ${args.resumeAtSubPhase}` : `phase ${args.resumeAtPhase}`;
-    console.error(`[calibration] RESUMING from ${args.resumeFromDb} at ${resumeTarget}`);
+    console.error(`[calibration] RESUMING from ${args.resumeFromDb} at ${resumeTarget}${args.resumeResetCycles ? ' (reset-cycles: full re-execution)' : ''}`);
   }
   console.error(`[calibration] invoking CLI  workspace=${workspace}  intent=${intentArg.slice(0, 80).replace(/\n/g, ' ')}…`);
   const result = spawnSync(

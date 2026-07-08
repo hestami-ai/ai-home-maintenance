@@ -47,6 +47,13 @@ export interface PlannerComponent {
 export interface PlannerDataModel {
   entity_name: string;
   component_id: string;
+  /** P5.1b entity_ownership_reconciliation verdict on this per-component copy. */
+  ownership_role?: 'owned' | 'referenced' | 'shared_value_object';
+  /** When ownership_role='referenced': the component that owns the aggregate. */
+  owner_component_id?: string;
+  /** The elected owner's canonical DM entity id (an owned copy's own id, or a
+   *  referenced copy's owner_entity_id). */
+  owner_entity_id?: string;
 }
 
 export interface ModuleOwnershipPlannerInput {
@@ -91,6 +98,9 @@ export interface SharedModule {
   owner_component_id: string;
   /** How the owner was resolved. */
   owner_source: OwnerSource;
+  /** When the module is data-model-backed: the P5.1b elected owner's canonical DM
+   *  entity id (D13) — lets downstream join the code module to the owned entity. */
+  owner_entity_id?: string;
   /** Workspace-relative canonical file path the owner produces, e.g. `src/mapping-persistence/mapping_repository.ts`. */
   canonical_path: string;
   /** Stable import specifier consumers use, e.g. `@/mapping-persistence/mapping_repository` or `@shared/utils/encryption`. */
@@ -124,6 +134,10 @@ const SHARED_ROOT_CATEGORIES = new Set(['repositories', 'services', 'utils', 'co
 const ENTITY_SUFFIXES = ['_repository', '_repo', '_dao', '_store', '_service', '_model', '_table', '_mapper'];
 /** Cross-cutting categories that default to the shared dir rather than a component owner. */
 const SHARED_DIR_CATEGORIES = new Set(['utils', 'config', 'lib', 'helpers']);
+/** D12: bare generic barrels (no shared-root category) are PER-COMPONENT files
+ *  each component owns — not a cross-component shared module. Collapsing them to a
+ *  single owner mislabels every other component's barrel as a foreign import. */
+const GENERIC_BARREL_BASENAMES = new Set(['models', 'db', 'migrations', 'schema', 'index', 'entities']);
 
 interface Demand {
   basename: string;
@@ -134,9 +148,9 @@ interface Demand {
 
 /** Split a workspace-relative read path into { category, basename }. */
 function splitReadPath(p: string): { category: string; basename: string } {
-  const clean = p.replace(/\\/g, '/').replace(/\.[a-z0-9]+$/i, '').replace(/\/+$/g, '');
+  const clean = p.replaceAll('\\', '/').replace(/\.[a-z0-9]+$/i, '').replace(/\/+$/g, '');
   const segs = clean.split('/').filter(Boolean);
-  const basename = segs[segs.length - 1] ?? clean;
+  const basename = segs.at(-1) ?? clean;
   // category = the parent segment when it is a recognized shared root.
   const parent = segs.length >= 2 ? segs[segs.length - 2] : '';
   const category = SHARED_ROOT_CATEGORIES.has(parent.toLowerCase()) ? parent.toLowerCase() : '';
@@ -191,8 +205,8 @@ function placeModule(
 }
 
 export function buildModuleOwnershipPlan(input: ModuleOwnershipPlannerInput): ModuleOwnershipPlan {
-  const srcRoot = (input.srcRoot ?? 'src').replace(/\\/g, '/').replace(/\/+$/g, '');
-  const sharedDir = (input.sharedDir ?? 'src/shared').replace(/\\/g, '/').replace(/\/+$/g, '');
+  const srcRoot = (input.srcRoot ?? 'src').replaceAll('\\', '/').replace(/\/+$/g, '');
+  const sharedDir = (input.sharedDir ?? 'src/shared').replaceAll('\\', '/').replace(/\/+$/g, '');
   const stack = input.stack || 'node';
 
   // Component lookup + the set of components each component DEPENDS ON. A
@@ -233,7 +247,7 @@ export function buildModuleOwnershipPlan(input: ModuleOwnershipPlannerInput): Mo
     arr.push(leaf);
     leavesByRoot.set(root, arr);
   }
-  for (const arr of leavesByRoot.values()) arr.sort();
+  for (const arr of leavesByRoot.values()) arr.sort((a, b) => a.localeCompare(b));
 
   // data-model entity token -> owning component ids.
   const entityOwners = new Map<string, string[]>();
@@ -243,6 +257,28 @@ export function buildModuleOwnershipPlan(input: ModuleOwnershipPlannerInput): Mo
     const arr = entityOwners.get(key) ?? [];
     if (!arr.includes(dm.component_id)) arr.push(dm.component_id);
     entityOwners.set(key, arr);
+  }
+
+  // P5.1b elected-owner index (D5/D13): entity token → the single reconciled
+  // owning component + its canonical DM entity id. When present, this is
+  // AUTHORITATIVE — it overrides the sync-sink/first-seen heuristic that would
+  // otherwise be able to elect a REFERENCED copy's component as the module owner.
+  // An 'owned' tag always wins; a 'referenced' tag contributes its owner pointer.
+  const electedOwnerByEntityKey = new Map<string, { owner: string; entityId: string }>();
+  for (const dm of input.dataModels) {
+    if (!dm.entity_name) continue;
+    const key = idComparisonKey(dm.entity_name);
+    if (dm.ownership_role === 'owned') {
+      electedOwnerByEntityKey.set(key, {
+        owner: dm.component_id,
+        entityId: dm.owner_entity_id ?? `DM-${dm.component_id}-${dm.entity_name.toLowerCase()}`,
+      });
+    } else if (dm.ownership_role === 'referenced' && dm.owner_component_id && !electedOwnerByEntityKey.has(key)) {
+      electedOwnerByEntityKey.set(key, {
+        owner: dm.owner_component_id,
+        entityId: dm.owner_entity_id ?? `DM-${dm.owner_component_id}-${dm.entity_name.toLowerCase()}`,
+      });
+    }
   }
 
   // ── 1. Inventory: collapse drifted demand paths by normalized module key. ──
@@ -267,12 +303,16 @@ export function buildModuleOwnershipPlan(input: ModuleOwnershipPlannerInput): Mo
   const shared_modules: SharedModule[] = [];
   for (const [key, d] of demandByKey) {
     const consumers = [...d.consumers].filter((c) => c !== ''); // any task component
+    // D12: a bare generic barrel (models/db/migrations/… with no shared-root
+    // category) is a per-component file, not a shared module — skip it. The truly
+    // shared data-model TYPES are materialized by the scaffold at src/shared.
+    if (d.category === '' && GENERIC_BARREL_BASENAMES.has(idComparisonKey(d.basename))) continue;
     const isShared = d.consumers.size >= 2 || (d.category !== '' && SHARED_ROOT_CATEGORIES.has(d.category));
     if (!isShared) continue;
 
-    const { owner, source } = resolveOwner(
+    const { owner, source, owner_entity_id } = resolveOwner(
       d, consumers, entityOwners, syncTargetsByComponent, componentIds,
-      rootIds, leavesByRoot,
+      rootIds, leavesByRoot, electedOwnerByEntityKey,
     );
     const { canonical_path, import_specifier } = placeModule(owner, d.category, d.basename, srcRoot, sharedDir, stack);
     shared_modules.push({
@@ -281,10 +321,11 @@ export function buildModuleOwnershipPlan(input: ModuleOwnershipPlannerInput): Mo
       category: d.category,
       owner_component_id: owner,
       owner_source: source,
+      owner_entity_id,
       canonical_path,
       import_specifier,
-      consumer_component_ids: consumers.sort(),
-      demand_paths: [...d.demandPaths].sort(),
+      consumer_component_ids: consumers.sort((a, b) => a.localeCompare(b)),
+      demand_paths: [...d.demandPaths].sort((a, b) => a.localeCompare(b)),
     });
   }
   shared_modules.sort((a, b) => b.consumer_component_ids.length - a.consumer_component_ids.length
@@ -331,7 +372,8 @@ function resolveOwner(
   componentIds: Set<string>,
   rootIds: Set<string>,
   leavesByRoot: Map<string, string[]>,
-): { owner: string; source: OwnerSource } {
+  electedOwnerByEntityKey: Map<string, { owner: string; entityId: string }>,
+): { owner: string; source: OwnerSource; owner_entity_id?: string } {
   // Tally how often each component is a dependency target across the consumers
   // (leaf edges + the folded-in root edges).
   const sinkTally = new Map<string, number>();
@@ -372,8 +414,20 @@ function resolveOwner(
     return best === null ? null : resolveToLeaf(best);
   };
 
-  // 1. data-model entity ownership (exact key, else containment).
+  // 1. data-model entity ownership. PREFER the P5.1b elected owner (D5): when the
+  // module's entity was reconciled to a single owning context, that owner is
+  // authoritative (+ carries owner_entity_id for the downstream join, D13). Fall
+  // back to the sink/first-seen heuristic only when no reconciliation tag exists.
   const token = entityTokenOf(d.basename);
+  let elected = electedOwnerByEntityKey.get(token);
+  if (!elected) {
+    for (const [ek, v] of electedOwnerByEntityKey) {
+      if (ek.includes(token) || token.includes(ek)) { elected = v; break; }
+    }
+  }
+  if (elected && !SHARED_DIR_CATEGORIES.has(d.category)) {
+    return { owner: elected.owner, source: 'data_model_owner', owner_entity_id: elected.entityId };
+  }
   let entityComps: string[] = entityOwners.get(token) ?? [];
   if (entityComps.length === 0) {
     for (const [ek, comps] of entityOwners) {
@@ -404,7 +458,7 @@ function resolveOwner(
   // shared module needs a PRODUCING component; with no hub, the first
   // consumer is the natural producer (its OWNS directive + ordering edges
   // make it exist before the other consumers run).
-  const firstConsumer = [...consumers].sort()[0];
+  const firstConsumer = [...consumers].sort((a, b) => a.localeCompare(b))[0];
   if (firstConsumer) return { owner: firstConsumer, source: 'consumer_fallback' };
 
   // 4. No consumers with a component id at all → shared dir. Harmless:
@@ -451,12 +505,13 @@ export function runModuleOwnershipPlanningSubPhase(
     const components: PlannerComponent[] = (compView.components as Array<Record<string, unknown>>).map((c) => ({
       id: typeof c.id === 'string' ? c.id : '',
       dependencies: Array.isArray(c.dependencies)
-        ? (c.dependencies as Array<Record<string, unknown>>).map((d) => ({
-            component_id: typeof d.component_id === 'string'
-              ? d.component_id
-              : (typeof d.target_component_id === 'string' ? d.target_component_id : ''),
-            kind: typeof d.kind === 'string' ? d.kind : (typeof d.dependency_type === 'string' ? d.dependency_type : ''),
-          }))
+        ? (c.dependencies as Array<Record<string, unknown>>).map((d) => {
+            const targetId = typeof d.target_component_id === 'string' ? d.target_component_id : '';
+            const component_id = typeof d.component_id === 'string' ? d.component_id : targetId;
+            const depType = typeof d.dependency_type === 'string' ? d.dependency_type : '';
+            const kind = typeof d.kind === 'string' ? d.kind : depType;
+            return { component_id, kind };
+          })
         : [],
     }));
 
@@ -466,7 +521,18 @@ export function runModuleOwnershipPlanningSubPhase(
       const compId = typeof m.component_id === 'string' ? m.component_id : '';
       for (const e of (m.entities as Array<Record<string, unknown>> | undefined) ?? []) {
         const name = typeof e.name === 'string' ? e.name : '';
-        if (name && compId) dataModels.push({ entity_name: name, component_id: compId });
+        if (!name || !compId) continue;
+        const role = e.ownership_role;
+        const fallbackEntityId = typeof e.id === 'string' ? e.id : undefined;
+        dataModels.push({
+          entity_name: name,
+          component_id: compId,
+          ownership_role: role === 'owned' || role === 'referenced' || role === 'shared_value_object' ? role : undefined,
+          owner_component_id: typeof e.owner_component_id === 'string' ? e.owner_component_id : undefined,
+          // For an 'owned' copy the canonical id IS its own id; a 'referenced' copy
+          // carries the owner's id in owner_entity_id.
+          owner_entity_id: typeof e.owner_entity_id === 'string' ? e.owner_entity_id : fallbackEntityId,
+        });
       }
     }
 
@@ -500,12 +566,13 @@ export function runModuleOwnershipPlanningSubPhase(
     const rootComponents: PlannerComponent[] = [];
     const seenRoots = new Set<string>();
     const mapDeps = (comp: Record<string, unknown>): PlannerComponent['dependencies'] =>
-      (Array.isArray(comp.dependencies) ? comp.dependencies as Array<Record<string, unknown>> : []).map((dep) => ({
-        component_id: typeof dep.component_id === 'string'
-          ? dep.component_id
-          : (typeof dep.target_component_id === 'string' ? dep.target_component_id : ''),
-        kind: typeof dep.kind === 'string' ? dep.kind : (typeof dep.dependency_type === 'string' ? dep.dependency_type : ''),
-      }));
+      (Array.isArray(comp.dependencies) ? comp.dependencies as Array<Record<string, unknown>> : []).map((dep) => {
+        const targetId = typeof dep.target_component_id === 'string' ? dep.target_component_id : '';
+        const component_id = typeof dep.component_id === 'string' ? dep.component_id : targetId;
+        const depType = typeof dep.dependency_type === 'string' ? dep.dependency_type : '';
+        const kind = typeof dep.kind === 'string' ? dep.kind : depType;
+        return { component_id, kind };
+      });
     for (const r of compNodes) {
       const c = r.content as Record<string, unknown>;
       const comp = c.component as Record<string, unknown> | undefined;

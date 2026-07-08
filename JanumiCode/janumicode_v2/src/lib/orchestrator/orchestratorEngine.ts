@@ -46,7 +46,7 @@ import {
   startRun as aoddStartRun,
   type RetentionConfig,
 } from '../aodd';
-import { parseJsonWithRecovery } from '../llm/jsonRecovery';
+import { tryParseJson } from '../llm/jsonRecovery';
 import { EventBus } from '../events/eventBus';
 import { DecisionTraceGenerator } from '../memory/decisionTraceGenerator';
 import { NarrativeMemoryGenerator } from '../memory/narrativeMemoryGenerator';
@@ -376,11 +376,14 @@ export class OrchestratorEngine {
     // production runs (e.g. operator triage); =true forces it on in
     // tests if a future test needs it.
     const reviewEnabledFlag = process.env.JANUMICODE_REVIEW_ENABLED;
-    const reviewEnabled = reviewEnabledFlag === 'true'
-      ? true
-      : reviewEnabledFlag === 'false'
-        ? false
-        : process.env.VITEST !== 'true' && process.env.NODE_ENV !== 'test';
+    let reviewEnabled: boolean;
+    if (reviewEnabledFlag === 'true') {
+      reviewEnabled = true;
+    } else if (reviewEnabledFlag === 'false') {
+      reviewEnabled = false;
+    } else {
+      reviewEnabled = process.env.VITEST !== 'true' && process.env.NODE_ENV !== 'test';
+    }
     if (reviewEnabled) {
       // Harness LLM validators route through the same provider/model the
       // legacy reasoning_review step used (Track D Commit 10). Falling
@@ -1072,7 +1075,7 @@ export class OrchestratorEngine {
    * Each fires at most once.
    */
   private overrideInjections: OverrideInjectionSpec[] = [];
-  private firedOverrideInjections = new Set<OverrideInjectionSpec>();
+  private readonly firedOverrideInjections = new Set<OverrideInjectionSpec>();
   setOverrideInjections(specs: OverrideInjectionSpec[]): void {
     this.overrideInjections = specs;
     this.firedOverrideInjections.clear();
@@ -1463,14 +1466,22 @@ export class OrchestratorEngine {
     // the FULL product would; the prior "senior engineer minimizing scope"
     // framing made it prune like a cost-cutter, dropping on-scope items and
     // killing the run (and the DMR test) at coverage gates.
-    const allowed = surfaceType === 'phase_gate' ? "'approve'"
-      : surfaceType === 'mirror' ? "'approve' or 'reject'"
-      : "the option_id of a specific item to DROP, or 'approve' to keep the whole proposed set";
-    const posture = surfaceType === 'phase_gate'
-      ? 'This is a phase-gate approval. Approve unless the surface shows a BLOCKING inconsistency a reviewer would actually halt the build for. Default: approve.'
-      : surfaceType === 'mirror'
-        ? 'This is a review mirror. If it presents a complete, coherent artifact, APPROVE it. Reject ONLY for a substantive defect in what is shown — never because you would have scoped it more narrowly. Default: approve.'
-        : 'This surface proposes a set of items expansively ("keep what belongs to the product, reject what does not"). Because you are building the FULL product, ENDORSE the whole proposed set with "approve"; reject only a specific item that is genuinely OUTSIDE this product. Dropping items that belong leaves journeys/workflows/components uncovered and blocks the build. Default: approve (keep all).';
+    let allowed: string;
+    if (surfaceType === 'phase_gate') {
+      allowed = "'approve'";
+    } else if (surfaceType === 'mirror') {
+      allowed = "'approve' or 'reject'";
+    } else {
+      allowed = "the option_id of a specific item to DROP, or 'approve' to keep the whole proposed set";
+    }
+    let posture: string;
+    if (surfaceType === 'phase_gate') {
+      posture = 'This is a phase-gate approval. Approve unless the surface shows a BLOCKING inconsistency a reviewer would actually halt the build for. Default: approve.';
+    } else if (surfaceType === 'mirror') {
+      posture = 'This is a review mirror. If it presents a complete, coherent artifact, APPROVE it. Reject ONLY for a substantive defect in what is shown — never because you would have scoped it more narrowly. Default: approve.';
+    } else {
+      posture = 'This surface proposes a set of items expansively ("keep what belongs to the product, reject what does not"). Because you are building the FULL product, ENDORSE the whole proposed set with "approve"; reject only a specific item that is genuinely OUTSIDE this product. Dropping items that belong leaves journeys/workflows/components uncovered and blocks the build. Default: approve (keep all).';
+    }
     const prompt =
       'You stand in for the HUMAN STAKEHOLDER reviewing ONE decision surface in an automated build. '
       + 'You are committed to building the FULL product described by the intent — NOT a reduced MVP — and you '
@@ -1918,7 +1929,7 @@ export class OrchestratorEngine {
       // Bare JSON.parse lost a Phase 1.2 bloom worth 9KB of real
       // content to a single trailing comma at position 7217 — the
       // Orchestrator's 1.0 IQC is just as vulnerable.
-      const recovered = parseJsonWithRecovery(text);
+      const recovered = tryParseJson(text);
       parsed = recovered.parsed;
     }
     return {
@@ -2033,11 +2044,16 @@ export function extractReasoningText(
     // Reasoning / message text. The CLI parser normalizes thinking
     // payloads into `text` / `content` so we read either.
     const data = e.data as { text?: unknown; content?: unknown; thinking?: unknown };
-    const text = typeof data.text === 'string'
-      ? data.text
-      : (typeof data.content === 'string'
-        ? data.content
-        : (typeof data.thinking === 'string' ? data.thinking : ''));
+    let text: string;
+    if (typeof data.text === 'string') {
+      text = data.text;
+    } else if (typeof data.content === 'string') {
+      text = data.content;
+    } else if (typeof data.thinking === 'string') {
+      text = data.thinking;
+    } else {
+      text = '';
+    }
     if (text.trim().length > 0) parts.push(text);
   }
   return parts.join('\n');

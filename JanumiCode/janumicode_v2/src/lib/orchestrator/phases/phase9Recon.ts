@@ -98,7 +98,7 @@ export function buildWorkspaceInventory(workspacePath: string): WorkspaceInvento
   return {
     is_empty: total === 0 || files.every(f => f.type !== 'source'),
     total_files: total,
-    root_manifests: [...new Set(rootManifests)].sort(),
+    root_manifests: [...new Set(rootManifests)].sort((a, b) => a.localeCompare(b)),
     dir_signals: [...byDir.values()].sort((a, b) => a.dir.localeCompare(b.dir)),
     detected_root_stack: detectWorkspaceStack(workspacePath)?.id ?? null,
   };
@@ -274,7 +274,7 @@ export function buildReconEnforcementManifest(plan: Phase9ReconPlan): ReconEnfor
       + `do NOT author: ${cleanProtectedByArea[a.area_id].join(', ') || '(none)'}.`;
   }).join('\n');
   return {
-    protected_paths: [...protectedSet].sort(),
+    protected_paths: [...protectedSet].sort((a, b) => a.localeCompare(b)),
     canonical_modules: modules,
     allowed_extensions_by_area: extByArea,
     conventions,
@@ -304,7 +304,7 @@ export function buildReconLayoutContract(plan: Phase9ReconPlan): ProjectLayoutCo
   for (const a of plan.areas) {
     for (const e of STACK_EXTENSIONS[a.stack] ?? []) exts.add(e);
     for (const r of [...a.source_roots, ...a.test_roots]) {
-      const top = r.replace(/\\/g, '/').split('/')[0];
+      const top = r.replaceAll('\\', '/').split('/')[0];
       if (top && top !== '.') topLevel.add(top);
     }
     if (a.source_roots[0]) componentDirMap[a.area_id] = a.source_roots[0];
@@ -318,8 +318,8 @@ export function buildReconLayoutContract(plan: Phase9ReconPlan): ProjectLayoutCo
     import_aliases: [...aliases].map(([alias, target]) => ({ alias, target })),
     test_placement: 'colocated',
     shared_dir: sharedDir,
-    allowed_top_level_dirs: [...topLevel].sort(),
-    allowed_source_extensions: [...exts].sort(),
+    allowed_top_level_dirs: [...topLevel].sort((a, b) => a.localeCompare(b)),
+    allowed_source_extensions: [...exts].sort((a, b) => a.localeCompare(b)),
   };
 }
 
@@ -551,7 +551,7 @@ export function collapseGreenfieldAreas(plan: Phase9ReconPlan): Phase9ReconPlan 
     const g = byStack.get(a.stack);
     if (g) g.push(a); else byStack.set(a.stack, [a]);
   }
-  const stacks = [...byStack.keys()].sort();
+  const stacks = [...byStack.keys()].sort((a, b) => a.localeCompare(b));
   const single = stacks.length === 1;
 
   const uniq = <T>(xs: T[], key: (x: T) => string): T[] => {
@@ -573,7 +573,7 @@ export function collapseGreenfieldAreas(plan: Phase9ReconPlan): Phase9ReconPlan 
       stack,
       confidence: group.reduce<ReconArea['confidence']>(
         (best, a) => ((rank[a.confidence] ?? 0) >= (rank[best] ?? 0) ? a.confidence : best), group[0].confidence),
-      source_refs: uniq(group.flatMap(a => a.source_refs), x => x).sort(),
+      source_refs: uniq(group.flatMap(a => a.source_refs), x => x).sort((a, b) => a.localeCompare(b)),
       conflicts: uniq(group.flatMap(a => a.conflicts), x => x),
       alternatives_rejected: uniq(group.flatMap(a => a.alternatives_rejected), x => x),
       source_roots: ['src'],
@@ -592,6 +592,95 @@ export function collapseGreenfieldAreas(plan: Phase9ReconPlan): Phase9ReconPlan 
     .filter(b => b.between.length >= 2);
 
   return { ...plan, areas, integration_boundaries };
+}
+
+/** Distinctive keyword → canonical stack id (no ambiguous short tokens like bare
+ *  'go'/'java'; node is listed first so 'javascript' resolves to node). */
+const STACK_KEYWORDS: Array<[string, string[]]> = [
+  ['node', ['typescript', 'javascript', 'nodejs', 'node.js', 'sveltekit', 'svelte', 'nestjs', 'next.js', 'nextjs', 'express', 'deno', ' bun ', 'vite', 'better-auth', 'drizzle', 'prisma', 'react']],
+  ['python', ['python', 'django', 'flask', 'fastapi', 'pydantic', 'sqlalchemy']],
+  ['rust', ['rust', 'cargo', 'actix', 'axum', 'tokio']],
+  ['go', ['golang', 'go module']],
+  ['java', ['kotlin', 'spring boot', 'springboot', 'gradle', 'maven']],
+];
+function stackIdFromText(s: string): string | null {
+  const t = ` ${s.toLowerCase()} `;
+  for (const [stack, kws] of STACK_KEYWORDS) for (const kw of kws) if (t.includes(kw)) return stack;
+  return null;
+}
+
+/**
+ * Derive the prescribed workspace stack from the binding P1–P4 technical
+ * constraints (the architecture decision), else null. Tally keyword hits across
+ * all constraints and return the plurality stack (deterministic lexicographic
+ * tiebreak). This is the "binding TECH-*" signal that stops recon free-inventing
+ * python/native for a TypeScript-prescribed spec.
+ */
+export function prescribedStackFromConstraints(techConstraints: string[]): string | null {
+  const tally = new Map<string, number>();
+  for (const c of techConstraints ?? []) {
+    const s = stackIdFromText(c);
+    if (s) tally.set(s, (tally.get(s) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  let bestN = 0;
+  for (const [s, n] of [...tally].sort((a, b) => a[0].localeCompare(b[0]))) if (n > bestN) { bestN = n; best = s; }
+  return best;
+}
+
+/**
+ * An empty project root IS greenfield regardless of the recon LLM's `workspace_kind`
+ * claim. The greenfield determinism (collapse / pin / normalize) gates on that
+ * field, so a model that mislabels an empty project 'mixed' (cal-41) silently
+ * suppresses the stack-pin + area collapse. `is_empty` (deterministic filesystem
+ * fact) is authoritative; override the claim. No-op for a non-empty (real
+ * brownfield) workspace — its areas are genuine existing subsystems.
+ */
+export function overrideWorkspaceKindIfEmpty(plan: Phase9ReconPlan, isEmpty: boolean): Phase9ReconPlan {
+  if (isEmpty && plan.workspace_kind !== 'greenfield') {
+    return { ...plan, workspace_kind: 'greenfield' };
+  }
+  return plan;
+}
+
+/**
+ * When a GREENFIELD recon plan proposes ≥2 stacks (the agent waffled — the exact
+ * failure {@link collapseGreenfieldAreas}'s note calls out), pin the WHOLE plan to
+ * ONE stack so it collapses to a single coherent `workspace` area instead of N
+ * stack-areas that each re-scaffold the full component set at the same `src/` root
+ * (the 8× collision + python-for-a-TS-spec observed in cal-41). Precedence:
+ * detected-on-disk > prescribed TECH-* > the agent's plurality stack. No-op when
+ * single-stack, brownfield, or JANUMICODE_FORCE_STACK already pinned it. Reuses the
+ * topology-preserving {@link applyForcedStack} rewrite (then clears the sweep
+ * marker, since this is an automatic pin, not the experiment lever).
+ */
+export function pinGreenfieldStack(
+  plan: Phase9ReconPlan,
+  opts: { detectedStack?: string | null; prescribedStack?: string | null },
+): { plan: Phase9ReconPlan; pinnedTo: string | null; proposed: string[] } {
+  const isKnown = (s: string | null | undefined): s is string =>
+    !!s && (KNOWN_FORCED_STACKS as readonly string[]).includes(s);
+  const proposed = [...new Set(plan.areas.map(a => a.stack))];
+  if (plan.forced_stack || plan.workspace_kind !== 'greenfield' || proposed.length <= 1) {
+    return { plan, pinnedTo: null, proposed };
+  }
+  const tally = new Map<string, number>();
+  for (const a of plan.areas) tally.set(a.stack, (tally.get(a.stack) ?? 0) + 1);
+  let plurality: string | null = null;
+  let bestN = 0;
+  for (const [s, n] of [...tally].sort((a, b) => a[0].localeCompare(b[0]))) if (n > bestN) { bestN = n; plurality = s; }
+  const winner = [opts.detectedStack, opts.prescribedStack, plurality].find(isKnown) ?? null;
+  if (!winner) return { plan, pinnedTo: null, proposed };
+  const rewritten = applyForcedStack(plan, winner);
+  return {
+    plan: {
+      ...rewritten,
+      forced_stack: undefined,
+      notes: `${plan.notes} [greenfield stack pinned to '${winner}' (agent proposed ${proposed.join('/')}) — one coherent area, no cross-stack src/ collision]`,
+    },
+    pinnedTo: winner,
+    proposed,
+  };
 }
 
 /** Coerce an LLM-proposed area object into a validated {@link ReconArea}, or null. */
@@ -700,12 +789,20 @@ export async function runPhase9ReconSubPhase(ctx: PhaseContext): Promise<Phase9R
   // live), not the control-plane workspace root.
   const workspacePath = engine.projectRoot;
   const inv = buildWorkspaceInventory(workspacePath);
+  const techConstraints = gatherTechnicalConstraints(engine, workflowRun.id);
+  const components = gatherComponents(engine, workflowRun.id);
 
   let plan: Phase9ReconPlan;
   try {
-    const techConstraints = gatherTechnicalConstraints(engine, workflowRun.id);
-    const components = gatherComponents(engine, workflowRun.id);
-    const routing = engine.configManager.getLLMRouting().reasoning_review;
+    // Recon gets its OWN routing role; fall back to reasoning_review when unset so
+    // production (gemini-2.5-flash) is byte-unchanged. A calibration/CI config that
+    // pins reasoning_review to a tiny reviewer model must set `reconnaissance` to a
+    // capable model so this architectural judgment isn't done by a 4B model.
+    // NB: `agentRole` below STAYS 'reasoning_review' — it is load-bearing in
+    // llmCaller (skips deterministic JSON recovery / LLM json-repair / the review
+    // hook); only the routing lookup changes.
+    const llmRouting = engine.configManager.getLLMRouting();
+    const routing = llmRouting.reconnaissance ?? llmRouting.reasoning_review;
     const result = await engine.llmCaller.call({
       provider: routing.primary.provider,
       model: routing.primary.model,
@@ -729,6 +826,21 @@ export async function runPhase9ReconSubPhase(ctx: PhaseContext): Promise<Phase9R
     plan = deterministicReconFallback(workspacePath, inv);
   }
 
+  // The greenfield transforms (collapseGreenfieldAreas / pinGreenfieldStack /
+  // normalizeGreenfieldLayout) all gate on `workspace_kind`, but that field is set
+  // by the LLM — and in cal-41 the recon agent returned 'mixed' for an EMPTY
+  // project root, which silently suppressed the stack-pin + area collapse (letting
+  // the python-for-a-TS-spec + N-area partition through). `inv.is_empty` is the
+  // deterministic truth: an empty project root IS greenfield, whatever the model
+  // claims. Override it so the greenfield determinism actually fires.
+  const kindOverridden = overrideWorkspaceKindIfEmpty(plan, inv.is_empty);
+  if (kindOverridden !== plan) {
+    getLogger().info('workflow', 'Phase 9.0 recon: workspace_kind → greenfield (project root is empty; model claimed otherwise)', {
+      workflow_run_id: workflowRun.id, model_claimed: plan.workspace_kind,
+    });
+    plan = kindOverridden;
+  }
+
   // Experiment lever: pin the whole plan to one stack (executor language sweep).
   // Topology stays as recon decided; only the language changes. Deterministic,
   // so a cached/fallback recon plan is overridden identically.
@@ -744,6 +856,22 @@ export async function runPhase9ReconSubPhase(ctx: PhaseContext): Promise<Phase9R
         workflow_run_id: workflowRun.id, forced_stack: forced, known: KNOWN_FORCED_STACKS,
       });
     }
+  }
+
+  // Auto-pin the greenfield stack BEFORE collapse when the agent waffled between
+  // stacks (D6/D3 — cal-41 proposed native/node/sveltekit/python/other, each
+  // becoming its own area that re-scaffolds the WHOLE component set at src/ → the
+  // 8× collision + python-for-a-TS-spec). Precedence: detected-on-disk >
+  // prescribed TECH-* > agent plurality. Then collapse sees ONE stack → ONE
+  // `workspace` area. No-op for single-stack / brownfield / forced-stack plans.
+  const prescribedStack = prescribedStackFromConstraints(techConstraints);
+  const pin = pinGreenfieldStack(plan, { detectedStack: inv.detected_root_stack, prescribedStack });
+  if (pin.pinnedTo) {
+    plan = pin.plan;
+    getLogger().info('workflow', 'Phase 9.0 recon: greenfield stack auto-pinned (agent waffled between stacks)', {
+      workflow_run_id: workflowRun.id, pinned_to: pin.pinnedTo, agent_proposed: pin.proposed,
+      detected: inv.detected_root_stack, prescribed: prescribedStack,
+    });
   }
 
   // Greenfield TOPOLOGY is DETERMINISTIC. First collapse the agent's invented
@@ -805,9 +933,11 @@ export function gatherTechnicalConstraints(engine: PhaseContext['engine'], runId
         const id = typeof tc.id === 'string' ? tc.id : '';
         // `TechnicalConstraint.text` is the real field (records.ts); keep the
         // other names as fallbacks for differently-shaped sources.
-        const text = typeof tc.text === 'string' ? tc.text
-          : (typeof tc.constraint === 'string' ? tc.constraint
-            : (typeof tc.statement === 'string' ? tc.statement : (typeof tc.description === 'string' ? tc.description : '')));
+        let text = '';
+        if (typeof tc.text === 'string') text = tc.text;
+        else if (typeof tc.constraint === 'string') text = tc.constraint;
+        else if (typeof tc.statement === 'string') text = tc.statement;
+        else if (typeof tc.description === 'string') text = tc.description;
         if (text) out.push(`${id ? id + ': ' : ''}${text}`);
       }
     }
@@ -825,6 +955,43 @@ function gatherComponents(engine: PhaseContext['engine'], runId: string): Array<
       domain: typeof c.domain_id === 'string' ? c.domain_id : '',
     })).filter(c => c.id).slice(0, 80);
   } catch { return []; }
+}
+
+/**
+ * TECH-* substrings that make a constraint DECISIVE for the area/stack partition:
+ * a language/framework choice, or a deployment-TOPOLOGY cue. Runtime libraries and
+ * infrastructure services (Postgres, Docker, Cloudflare, oRPC, DBOS, …) do NOT
+ * change how many services/areas exist — the ONE chosen stack simply consumes
+ * them — so recon must NOT weigh them when partitioning. Deliberately NARROWER
+ * than STACK_KEYWORDS (which also matches libs like better-auth/prisma/react) so a
+ * library mention can't masquerade as a stack/topology signal. (cal-41: dumping
+ * all 18 TECH-* undifferentiated led a small model to cite Cloudflare/Traefik/DBOS
+ * as justification for 8 microservice areas — over-decomposition the greenfield
+ * collapse then had to undo.)
+ */
+const RECON_DECISIVE_CUES = [
+  'typescript', 'javascript', 'node.js', 'nodejs', ' node ', 'sveltekit', 'svelte', 'deno', ' bun ', 'nestjs', 'next.js', 'nextjs', 'express',
+  'python', 'django', 'flask', 'fastapi', 'rust', 'cargo', 'golang', 'go module', 'java', 'kotlin', 'spring',
+  'single service', 'one service', 'single deployable', 'one deployable', 'single container', 'single process',
+  'modular monolith', 'monolith', 'monorepo', 'microservice', 'no microservice', 'separate service', 'separate deployable',
+  'only public entry point', 'public entry point', 'single application', 'one application',
+];
+
+/** Whether a `TECH-id: text` constraint is a stack/topology decision driver (vs. a
+ *  runtime library the chosen stack merely uses). Exported for unit testing. */
+export function isDecisiveForArea(c: string): boolean {
+  const t = ` ${c.toLowerCase()} `;
+  return RECON_DECISIVE_CUES.some(k => t.includes(k));
+}
+
+/** Collapse a non-decisive runtime-library constraint to a short one-liner
+ *  (id + first few words) — enough context for the executor-facing notes without
+ *  the full-text bloat that mis-weights the area partition. */
+function summarizeLibConstraint(c: string): string {
+  const i = c.indexOf(':');
+  const id = i >= 0 ? c.slice(0, i).trim() : '';
+  const text = (i >= 0 ? c.slice(i + 1) : c).trim().split(/\s+/).slice(0, 8).join(' ');
+  return id ? `${id} (${text})` : text;
 }
 
 function buildReconPrompt(
@@ -848,10 +1015,22 @@ function buildReconPrompt(
 ## Filesystem facts (deterministic scan)
 ${invStr}
 
-## Stated technical constraints (BINDING — "apply without exception"; obey unless filesystem reality makes a constraint infeasible or contradictory, in which case surface it in \`conflicts\`)
-${techConstraints.length ? techConstraints.map(t => `- ${t}`).join('\n') : '(none stated)'}
+## Stated technical constraints
+### Stack & topology (BINDING — these decide the stack AND how many deployables/areas exist; obey unless the filesystem makes one infeasible, then surface it in \`conflicts\`)
+${(() => {
+    const decisive = techConstraints.filter(isDecisiveForArea);
+    return decisive.length
+      ? decisive.map(t => `- ${t}`).join('\n')
+      : '(none stated — infer the stack from the filesystem/intent; default to ONE area)';
+  })()}
+### Runtime dependencies & infrastructure (context only — libraries/services the ONE chosen stack consumes; they do NOT create separate areas or deployables)
+${(() => {
+    const runtime = techConstraints.filter(c => !isDecisiveForArea(c));
+    return runtime.length ? runtime.map(c => `- ${summarizeLibConstraint(c)}`).join('\n') : '(none)';
+  })()}
 
-## Components / domains (from upstream decomposition, advisory)
+## Candidate modules (internal building blocks of the service — NOT a service list)
+Treat these as modules WITHIN ONE deployable service (one area) unless a BINDING stack/topology constraint above explicitly mandates a separate deployable for one. Do NOT create one area/service per component — that 1:1 mapping is the over-decomposition this phase exists to prevent.
 ${components.length ? components.map(c => `- ${c.id}${c.name ? ` (${c.name})` : ''}${c.domain ? ` [domain ${c.domain}]` : ''}`).join('\n') : '(none)'}
 
 ## Rules

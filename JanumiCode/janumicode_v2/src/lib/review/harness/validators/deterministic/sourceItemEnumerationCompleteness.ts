@@ -62,7 +62,7 @@ const CONFIGS: Record<string, SubPhaseConfig> = {
   'systems_agent:system_requirements': {
     mode: 'id_match',
     // Match FR-xxx or NFR-xxx or US-xxx in the prompt
-    sourceIdPattern: /\b(FR-[A-Z0-9-]+|NFR-[A-Z0-9-]+|US-[0-9]+)\b/g,
+    sourceIdPattern: /\b(FR-[A-Z0-9-]+|NFR-[A-Z0-9-]+|US-\d+)\b/g,
     outputFieldPath: 'system_requirements',
     itemRefField: 'source_requirement_ids',
   },

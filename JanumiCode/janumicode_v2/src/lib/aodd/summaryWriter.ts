@@ -125,17 +125,19 @@ export function deriveAndWriteOneSubPhaseSummary(
  */
 export function renderSubPhaseSummaryMd(s: SubPhaseSummary): string {
   const lines: string[] = [];
-  lines.push(`# Sub-phase summary: phase ${s.phase_id} / ${s.sub_phase_id}`);
-  lines.push('');
-  lines.push(`- **Run**: \`${s.run_id}\``);
-  lines.push(`- **Started**: ${s.started_at}`);
-  lines.push(`- **Completed**: ${s.completed_at}`);
-  lines.push(`- **Duration**: ${s.duration_ms} ms`);
-  lines.push(`- **Status**: ${s.how.status}`);
-  lines.push('');
-  lines.push('## Who');
-  lines.push(`- **Agent role**: ${s.who.agent_role ?? '(none)'}`);
-  lines.push(`- **Model**: ${s.who.model}`);
+  lines.push(
+    `# Sub-phase summary: phase ${s.phase_id} / ${s.sub_phase_id}`,
+    '',
+    `- **Run**: \`${s.run_id}\``,
+    `- **Started**: ${s.started_at}`,
+    `- **Completed**: ${s.completed_at}`,
+    `- **Duration**: ${s.duration_ms} ms`,
+    `- **Status**: ${s.how.status}`,
+    '',
+    '## Who',
+    `- **Agent role**: ${s.who.agent_role ?? '(none)'}`,
+    `- **Model**: ${s.who.model}`,
+  );
   if (Object.keys(s.who.model_parameters).length > 0) {
     lines.push('- **Model parameters**:');
     for (const [k, v] of Object.entries(s.who.model_parameters)) {
@@ -148,28 +150,34 @@ export function renderSubPhaseSummaryMd(s: SubPhaseSummary): string {
       lines.push(`  - ${inv.invocation_id} (depth ${inv.depth})`);
     }
   }
-  lines.push('');
-  lines.push('## What');
-  lines.push(`- **Inputs consumed**: ${s.what.inputs_consumed.length}`);
-  lines.push(`- **Outputs produced**: ${s.what.outputs_produced.length}`);
-  lines.push(`- **Decisions**: ${s.what.decisions.length}`);
+  lines.push(
+    '',
+    '## What',
+    `- **Inputs consumed**: ${s.what.inputs_consumed.length}`,
+    `- **Outputs produced**: ${s.what.outputs_produced.length}`,
+    `- **Decisions**: ${s.what.decisions.length}`,
+  );
   for (const d of s.what.decisions) {
     lines.push(`  - [${d.kind}] ${d.brief}  \`${d.ref_event_id}\``);
   }
-  lines.push('');
-  lines.push('## Why');
-  lines.push(`- **Template**: \`${s.why.template_key}\``);
-  lines.push(`- **Template SHA**: \`${s.why.template_source_sha}\``);
-  lines.push(`- **Rendered prompt ref**: \`${s.why.rendered_prompt_ref}\``);
+  lines.push(
+    '',
+    '## Why',
+    `- **Template**: \`${s.why.template_key}\``,
+    `- **Template SHA**: \`${s.why.template_source_sha}\``,
+    `- **Rendered prompt ref**: \`${s.why.rendered_prompt_ref}\``,
+  );
   if (s.why.governing_constraints.length > 0) {
     lines.push('- **Governing constraints**:');
     for (const c of s.why.governing_constraints) lines.push(`  - ${c}`);
   }
-  lines.push('');
-  lines.push('## How');
-  lines.push(`- **Retries**: ${s.how.retries}`);
-  lines.push(`- **JSON repairs**: ${s.how.repairs}`);
-  lines.push(`- **Escalations**: ${s.how.escalations}`);
+  lines.push(
+    '',
+    '## How',
+    `- **Retries**: ${s.how.retries}`,
+    `- **JSON repairs**: ${s.how.repairs}`,
+    `- **Escalations**: ${s.how.escalations}`,
+  );
   if (s.how.fallbacks.length > 0) {
     lines.push('- **Fallbacks**:');
     for (const f of s.how.fallbacks) {
@@ -179,11 +187,13 @@ export function renderSubPhaseSummaryMd(s: SubPhaseSummary): string {
   if (s.how.error) {
     lines.push(`- **Error**: ${s.how.error.message}  \`${s.how.error.event_id}\``);
   }
-  lines.push('');
-  lines.push('## Events');
-  lines.push(`- **First**: \`${s.events.first_event_id}\``);
-  lines.push(`- **Last**: \`${s.events.last_event_id}\``);
-  lines.push(`- **Count**: ${s.events.count}`);
-  lines.push('');
+  lines.push(
+    '',
+    '## Events',
+    `- **First**: \`${s.events.first_event_id}\``,
+    `- **Last**: \`${s.events.last_event_id}\``,
+    `- **Count**: ${s.events.count}`,
+    '',
+  );
   return lines.join('\n');
 }

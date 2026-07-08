@@ -346,7 +346,7 @@ export class DecompViewerDataProvider {
       }
     }
     for (const n of parsed) {
-      n.children_display_keys = (byParent.get(n.node_id) ?? []).sort();
+      n.children_display_keys = (byParent.get(n.node_id) ?? []).sort((a, b) => a.localeCompare(b));
     }
     return parsed;
   }

@@ -94,7 +94,7 @@ function emptyContains(): ReleaseContents {
 }
 
 function uniqSorted(xs: string[]): string[] {
-  return Array.from(new Set(xs)).sort();
+  return Array.from(new Set(xs)).sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -333,7 +333,7 @@ export function buildReleaseManifest(input: BuildManifestInputs): BuildManifestR
       quality_attributes:    uniqSorted(crossCuttingQa),
       technical_constraints: uniqSorted(crossCuttingTech),
     },
-    unplacedJourneys: unplacedJourneys.sort(),
-    orphanEntities: orphanEntities.sort(),
+    unplacedJourneys: unplacedJourneys.sort((a, b) => a.localeCompare(b)),
+    orphanEntities: orphanEntities.sort((a, b) => a.localeCompare(b)),
   };
 }

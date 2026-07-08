@@ -49,7 +49,7 @@ export function projectRootOf(workspacePath: string): string {
  * mixed-separator paths (`E:\…\ws/.janumicode/…`) that some tools mis-parse.
  */
 export function toPosixPath(p: string): string {
-  return p.replace(/\\/g, '/');
+  return p.replaceAll('\\', '/');
 }
 
 /**

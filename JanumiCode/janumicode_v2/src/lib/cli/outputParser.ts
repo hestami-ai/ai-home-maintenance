@@ -50,7 +50,7 @@ export interface OutputParserConfig {
 export class OutputParser {
   private sequenceCounter = 0;
   private recentToolCalls: { name: string; target?: string }[] = [];
-  private config: OutputParserConfig;
+  private readonly config: OutputParserConfig;
 
   constructor(config: OutputParserConfig) {
     this.config = config;
@@ -178,7 +178,7 @@ export class OutputParser {
 
       // Pattern: two consecutive tool_use targeting the same file
       if (this.recentToolCalls.length > 0) {
-        const last = this.recentToolCalls[this.recentToolCalls.length - 1];
+        const last = this.recentToolCalls.at(-1)!;
         if (last.name === toolName && last.target === target && target) {
           this.recentToolCalls.push({ name: toolName, target });
           return true;

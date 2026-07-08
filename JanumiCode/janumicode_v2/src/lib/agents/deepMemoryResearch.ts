@@ -981,6 +981,11 @@ export class DeepMemoryResearchAgent {
 
     const filteredFindings = findings.filter(f => f.materialityScore >= this.materialityThreshold);
 
+    let coverageConfidence = 0.4;
+    if (completenessStatus === 'complete') coverageConfidence = 1.0;
+    else if (completenessStatus === 'partial_low') coverageConfidence = 0.85;
+    else if (completenessStatus === 'partial_medium') coverageConfidence = 0.65;
+
     const basePacket: ContextPacket = {
       queryDecomposition: decomposition,
       completenessStatus,
@@ -998,10 +1003,7 @@ export class DeepMemoryResearchAgent {
         sourcesQueried: decomposition.sourcesInScope,
         sourcesUnavailable: unavailableSources.map(s => s.source),
         knownGaps,
-        confidence: completenessStatus === 'complete' ? 1.0
-                   : completenessStatus === 'partial_low' ? 0.85
-                   : completenessStatus === 'partial_medium' ? 0.65
-                   : 0.4,
+        confidence: coverageConfidence,
       },
     };
 
@@ -1422,12 +1424,14 @@ export class DeepMemoryResearchAgent {
           menu.length ? `${menu.length} menu selection(s)` : '',
           mirror.length ? `${mirror.length} mirror decision(s)` : '',
         ].filter(Boolean).join(', ');
+        const autoBySuffix = autoBy ? ` by ${autoBy}` : '';
+        const attributionLabel = attribution === 'auto_approve'
+          ? `auto-approved${autoBySuffix}`
+          : attribution;
         const parts = [
           sel && `chose: ${sel}`,
           rat && `rationale: ${rat}`,
-          !sel && !rat && attribution && (attribution === 'auto_approve'
-            ? `auto-approved${autoBy ? ` by ${autoBy}` : ''}`
-            : attribution),
+          !sel && !rat && attribution && attributionLabel,
           bundle,
           !sel && !rat && !attribution && ctxP && `context: ${ctxP.slice(0, 200)}`,
         ].filter(Boolean);
@@ -1521,7 +1525,8 @@ export class DeepMemoryResearchAgent {
           const id = str(n.id);
           const cat = str(n.category);
           const desc = str(n.description) || str(n.statement) || str(n.threshold);
-          return id || desc ? `${id}${cat ? ` (${cat})` : ''}: ${desc}`.trim() : '';
+          const catSuffix = cat ? ` (${cat})` : '';
+          return id || desc ? `${id}${catSuffix}: ${desc}`.trim() : '';
         }).filter(Boolean).join(' | ');
       }
 

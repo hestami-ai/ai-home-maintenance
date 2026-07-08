@@ -53,16 +53,25 @@ export function validateResponsibilityAtomicity(
   components.forEach((comp, idx) => {
     if (!comp || typeof comp !== 'object') return;
     const c = comp as Record<string, unknown>;
-    const compId =
-      typeof c.id === 'string' ? c.id
-      : typeof c.component_id === 'string' ? c.component_id
-      : `index ${idx}`;
+    let compId: string;
+    if (typeof c.id === 'string') {
+      compId = c.id;
+    } else if (typeof c.component_id === 'string') {
+      compId = c.component_id;
+    } else {
+      compId = `index ${idx}`;
+    }
 
-    const responsibilities: unknown[] =
-      Array.isArray(c.responsibilities) ? c.responsibilities
-      : Array.isArray(c.responsibility) ? c.responsibility
-      : typeof c.responsibility_statement === 'string' ? [c.responsibility_statement]
-      : [];
+    let responsibilities: unknown[];
+    if (Array.isArray(c.responsibilities)) {
+      responsibilities = c.responsibilities;
+    } else if (Array.isArray(c.responsibility)) {
+      responsibilities = c.responsibility;
+    } else if (typeof c.responsibility_statement === 'string') {
+      responsibilities = [c.responsibility_statement];
+    } else {
+      responsibilities = [];
+    }
 
     responsibilities.forEach((resp, rIdx) => {
       const text = typeof resp === 'string' ? resp : (resp as Record<string, unknown>)?.statement as string ?? '';

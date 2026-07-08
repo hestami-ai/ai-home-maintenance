@@ -162,6 +162,42 @@ function collectReferencedIds(packet: ImplementationPacketContent): string[] {
   return ids;
 }
 
+/** Task types that legitimately have NO user story — a cross-run refactoring, or
+ *  an INFRA / NFR / operational / technical task that traces to a non-user-facing
+ *  concern rather than a feature. Blocking P1_NO_USER_STORY for these is a false
+ *  positive the route-restart can never heal (Phase 6 task deltas don't mint
+ *  Phase-1 user stories) → futile cycling to the fixpoint. Advisory only. (D11) */
+const STORYLESS_EXEMPT_TASK_TYPES = new Set([
+  'refactoring', 'infrastructure', 'infra', 'nfr', 'operational', 'technical',
+  'migration', 'devops', 'ci_cd', 'chore', 'scaffolding', 'tooling', 'setup',
+]);
+
+/** FR-anchor prefixes an atomic task can trace to a real requirement through. A
+ *  component id (`comp-…`) or an invented completion-criterion id (`CC-…`) is NOT
+ *  an FR anchor. */
+const FR_ANCHOR_PREFIX = /^(AC-|US-|SR-|NFR-)/;
+
+/**
+ * Whether a task's requirement footprint (`traces_to`) contains at least one FR
+ * id that ACTUALLY EXISTS upstream. This is the resolvability gate for the P1
+ * exemption: a structurally-storyless technical decomposition leaf traces only
+ * to its own component id, an invented `CC-…` completion-criterion, or nothing —
+ * so NO packetBuilder join pass could ever have found it a user story, and
+ * blocking P1 is a false positive the route-restart cycles on futilely (the same
+ * rationale as the D11 task-type exemption). But a task that DOES cite a real
+ * upstream `AC-/US-/SR-/NFR-` and still resolved to zero stories is a genuine
+ * join defect that MUST stay blocking — surfaced, not silenced. gpt-oss cal-41:
+ * the 5 `comp-audit-log-retriever` leaves trace only to `comp-…`/`CC-AH-…` (no
+ * upstream story exists) → exempt; a task tracing a real `AC-US-012-05-001`
+ * that missed the leaf→root join stays blocking.
+ */
+function hasUpstreamStoryAnchor(traces: string[] | undefined, upstreamIndex: UpstreamIndex): boolean {
+  for (const t of traces ?? []) {
+    if (FR_ANCHOR_PREFIX.test(t) && upstreamIndex.allUpstreamIds.has(t)) return true;
+  }
+  return false;
+}
+
 function verifyPacket(
   packet: ImplementationPacketContent,
   upstreamIndex: UpstreamIndex,
@@ -177,10 +213,20 @@ function verifyPacket(
   // Blocking it is a false positive the route-restart can NEVER heal (Phase 6 task
   // deltas don't mint Phase-1 user stories) → futile cycling. Advisory only.
   if (packet.user_stories.length === 0) {
-    const isRefactoring = packet.task.task_type === 'refactoring';
+    const exemptType = STORYLESS_EXEMPT_TASK_TYPES.has((packet.task.task_type ?? '').toLowerCase());
+    // Resolvability gate: a task whose footprint has NO resolvable upstream FR
+    // anchor is STRUCTURALLY storyless (a technical leaf that traces only to a
+    // component id / invented CC id / nothing) — no join can heal it, so blocking
+    // is a false positive the route-restart cycles on futilely (same as the D11
+    // task-type exemption). A task citing a REAL upstream AC/US/SR/NFR that still
+    // got zero stories is a genuine join defect → stays BLOCKING (surfaced).
+    const structurallyStoryless = !hasUpstreamStoryAnchor(packet.task.traces_to, upstreamIndex);
+    const exempt = exemptType || structurallyStoryless;
     const msg = `P1_NO_USER_STORY: packet ${packet.packet_id} (task ${packet.task.id}) has no user stories`;
-    (isRefactoring ? advisory : blocking).push(
-      isRefactoring ? `${msg} (refactoring task — exempt, traces to a cross-run modification)` : msg,
+    (exempt ? advisory : blocking).push(
+      exempt
+        ? `${msg} (${exemptType ? `${packet.task.task_type} task` : 'no resolvable upstream FR anchor'} — exempt, non-user-facing / no joinable story)`
+        : msg,
     );
   }
 
@@ -209,9 +255,20 @@ function verifyPacket(
   // P4 — Every user story has at least one functional evaluation criterion.
   // A leaf story (US-001-01-1) is satisfied by an eval targeting its canonical
   // root (US-001): Phase-8 evals are root-grained, packets carry leaf slices.
+  // Canonicalize BOTH sides: on the resume/cycle-delta path Phase-8 may persist
+  // a functional eval against a RAW decomposition leaf (US-012-02-D) it never
+  // collapsed to the root (US-012). Functional eval is root/story-level by
+  // design, so a SIBLING-leaf-targeted eval under the same root satisfies every
+  // leaf slice of that story (cal-41 US-012-01-* branch: the only eval coverage
+  // was on sibling leaves -02-D/-03-1/… that all canonicalize to US-012). The
+  // half-implemented bridge previously canonicalized only the query us.id, so a
+  // raw-leaf-targeted eval never matched. NFR/P5 stays exact (NFRs aren't
+  // decomposed and canonicalize to identity).
   const evalTargets = new Set(packet.evaluation_criteria.map((e) => e.target_id));
+  const evalTargetRoots = new Set(packet.evaluation_criteria.map((e) => canonicalize(e.target_id)));
   for (const us of packet.user_stories) {
-    if (!evalTargets.has(us.id) && !evalTargets.has(canonicalize(us.id))) {
+    const root = canonicalize(us.id);
+    if (!evalTargets.has(us.id) && !evalTargets.has(root) && !evalTargetRoots.has(root)) {
       blocking.push(`P4_USER_STORY_NO_EVAL: ${us.id} has no evaluation criterion`);
     }
   }
@@ -296,12 +353,15 @@ function verifyPacket(
   for (const tc of packet.test_cases) {
     // expected_outcome is normalised to a string by the packet builder, but
     // never assume — a stray array/undefined here would crash the whole phase.
-    const outcome = typeof tc.expected_outcome === 'string'
-      ? tc.expected_outcome.trim()
-      : Array.isArray(tc.expected_outcome)
-        ? (tc.expected_outcome as unknown[]).filter((x) => typeof x === 'string').join('; ')
-        : String(tc.expected_outcome ?? '');
-    const key = `${[...tc.acceptance_criterion_ids].sort().join(',')}::${outcome}`;
+    let outcome: string;
+    if (typeof tc.expected_outcome === 'string') {
+      outcome = tc.expected_outcome.trim();
+    } else if (Array.isArray(tc.expected_outcome)) {
+      outcome = (tc.expected_outcome as unknown[]).filter((x) => typeof x === 'string').join('; ');
+    } else {
+      outcome = String(tc.expected_outcome ?? '');
+    }
+    const key = `${[...tc.acceptance_criterion_ids].sort((a, b) => a.localeCompare(b)).join(',')}::${outcome}`;
     if (seenTests.has(key)) {
       advisory.push(`A2_DUPLICATE_TEST_CASE: ${tc.test_case_id} duplicates ${seenTests.get(key)}`);
     } else {

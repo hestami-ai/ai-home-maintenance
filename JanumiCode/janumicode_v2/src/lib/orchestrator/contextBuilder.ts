@@ -10,8 +10,8 @@
  * Also constructs Trace Selections for Reasoning Review (§7.3).
  */
 
-import { writeFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { emit as aoddEmit } from '../aodd';
 
 // ── Types ───────────────────────────────────────────────────────────

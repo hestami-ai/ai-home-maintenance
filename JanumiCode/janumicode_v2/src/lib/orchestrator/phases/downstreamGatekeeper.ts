@@ -186,11 +186,16 @@ export function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext, su
     acceptedDomains: asIdNameArray(bdb?.domains),
     acceptedPersonas: asIdNameArray(bdb?.personas),
     acceptedJourneys: Array.isArray(ujb?.userJourneys)
-      ? (ujb.userJourneys as Array<Record<string, unknown>>).map(j => ({
-          id: String(j.id),
-          title: String(j.title ?? j.name ?? ''),
-          personaId: typeof j.personaId === 'string' ? j.personaId : (typeof j.persona_id === 'string' ? j.persona_id : undefined),
-        }))
+      ? (ujb.userJourneys as Array<Record<string, unknown>>).map(j => {
+          let personaId: string | undefined;
+          if (typeof j.personaId === 'string') personaId = j.personaId;
+          else if (typeof j.persona_id === 'string') personaId = j.persona_id;
+          return {
+            id: String(j.id),
+            title: String(j.title ?? j.name ?? ''),
+            personaId,
+          };
+        })
       : undefined,
     acceptedWorkflows: asIdNameDomainArray(swb?.workflows),
     acceptedEntities: asIdNameDomainArray(eb?.entities),
@@ -223,15 +228,23 @@ export function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext, su
         engine.writer.getRecordsByType(workflowRun.id, 'component_decomposition_node'),
         extractPriorPhaseContext(all),
       );
+      const fallbackComponents = Array.isArray(cm?.components)
+        ? (cm.components as Array<Record<string, unknown>>)
+        : [];
       const src = effective.components.length > 0
         ? effective.components
-        : (Array.isArray(cm?.components) ? (cm.components as Array<Record<string, unknown>>) : []);
+        : fallbackComponents;
       if (src.length === 0) return undefined;
-      return src.map(c => ({
-        id: String(c.id),
-        name: String(c.name ?? ''),
-        domain_id: typeof c.domain_id === 'string' ? c.domain_id : (typeof c.domainId === 'string' ? c.domainId : undefined),
-      }));
+      return src.map(c => {
+        let domain_id: string | undefined;
+        if (typeof c.domain_id === 'string') domain_id = c.domain_id;
+        else if (typeof c.domainId === 'string') domain_id = c.domainId;
+        return {
+          id: String(c.id),
+          name: String(c.name ?? ''),
+          domain_id,
+        };
+      });
     })(),
     // Phase 4.1 software domains — the namespace Phase 4.2 components'
     // `domain_id` actually references (e.g. domain-shortening). The
@@ -247,11 +260,17 @@ export function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext, su
 
 function asTextArray(v: unknown): Array<{ id?: string; text: string; type?: string }> | undefined {
   if (!Array.isArray(v)) return undefined;
-  return (v as Array<Record<string, unknown>>).map(it => ({
-    id: typeof it.id === 'string' ? it.id : undefined,
-    text: typeof it.text === 'string' ? it.text : (typeof it.description === 'string' ? it.description : ''),
-    type: typeof it.type === 'string' ? it.type : undefined,
-  }));
+  return (v as Array<Record<string, unknown>>).map(it => {
+    let text: string;
+    if (typeof it.text === 'string') text = it.text;
+    else if (typeof it.description === 'string') text = it.description;
+    else text = '';
+    return {
+      id: typeof it.id === 'string' ? it.id : undefined,
+      text,
+      type: typeof it.type === 'string' ? it.type : undefined,
+    };
+  });
 }
 
 function asIdNameArray(v: unknown): Array<{ id: string; name: string; description?: string }> | undefined {

@@ -231,8 +231,10 @@ function sanitizeChildEntity(
       const kind: DataModelRelationshipKind = (RELATIONSHIP_KINDS as readonly string[]).includes(rk)
         ? rk as DataModelRelationshipKind : 'references';
       const own = r.ownership;
-      const ownership: 'owns' | 'references' | undefined =
-        own === 'owns' ? 'owns' : own === 'references' ? 'references' : undefined;
+      let ownership: 'owns' | 'references' | undefined;
+      if (own === 'owns') ownership = 'owns';
+      else if (own === 'references') ownership = 'references';
+      else ownership = undefined;
       return { target_entity_id: target, kind, ownership };
     })
     .filter(r => r.target_entity_id.length > 0);
@@ -302,7 +304,8 @@ export function formatEntityForPrompt(e: DecompositionEntity): string {
 function formatTechnicalConstraints(tcs: TechnicalConstraint[]): string {
   if (tcs.length === 0) return '(none captured in Phase 1.0c)';
   return tcs.map(t => {
-    const tech = t.technology ? ` [${t.technology}${t.version ? ` ${t.version}` : ''}]` : '';
+    const version = t.version ? ` ${t.version}` : '';
+    const tech = t.technology ? ` [${t.technology}${version}]` : '';
     return `- ${t.id}${tech} (${t.category}): ${t.text}`;
   }).join('\n');
 }
@@ -358,7 +361,6 @@ export async function runDataModelSaturationLoop(
   let passNumber = resumed?.passNumber ?? 0;
 
   const divergeGrowthRatio = Number.parseFloat(process.env.JANUMICODE_DIVERGE_GROWTH_RATIO ?? '1.2');
-  const divergeWarnPasses = Number.parseInt(process.env.JANUMICODE_DIVERGE_WARN_PASSES ?? '3', 10);
   const divergeTerminatePasses = Number.parseInt(process.env.JANUMICODE_DIVERGE_TERMINATE_PASSES ?? '4', 10);
   const dedupOfflineWarnPasses = Number.parseInt(process.env.JANUMICODE_DEDUP_OFFLINE_WARN_PASSES ?? '3', 10);
   let consecutiveGrowthPasses = 0;
@@ -676,8 +678,7 @@ export async function runDataModelSaturationLoop(
 
         let parentDowngraded = false;
         if (entry.tierHint === 'B') {
-          const explicitDisagreement = tierAssessment
-            && tierAssessment.agrees_with_hint === false
+          const explicitDisagreement = tierAssessment?.agrees_with_hint === false
             && typeof tierAssessment.tier === 'string'
             && (tierAssessment.tier === 'A' || tierAssessment.tier === 'B');
           const producedTierBChildren = (pendingGateByParent.get(entry.nodeId)?.length ?? 0) > 0;
@@ -891,7 +892,7 @@ export async function runDataModelSaturationLoop(
       consecutiveDedupOfflinePasses = 0;
     }
 
-    const priorPass = pipelinePasses.length >= 2 ? pipelinePasses[pipelinePasses.length - 2] : null;
+    const priorPass = pipelinePasses.length >= 2 ? (pipelinePasses.at(-2) ?? null) : null;
     const growthObserved = priorPass
       && priorPass.nodes_produced > 0
       && nodesProducedThisPass > priorPass.nodes_produced * divergeGrowthRatio;

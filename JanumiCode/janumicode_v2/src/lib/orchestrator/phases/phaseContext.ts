@@ -60,6 +60,15 @@ export interface ArtifactContext {
   summary: string;
 }
 
+/** Decomposition tier of a frozen leaf (null = untiered). */
+export type LeafTier = 'A' | 'B' | 'C' | 'D' | null;
+
+/** Which source populated an "effective view": frozen leaves, root artifact, or neither. */
+export type EffectiveViewSource = 'leaves' | 'roots' | 'none';
+
+/** Test granularity used across the effective test-plan view. */
+export type TestType = 'unit' | 'integration' | 'end_to_end';
+
 // ── Extractor ──────────────────────────────────────────────────────
 
 /**
@@ -499,7 +508,7 @@ export interface FrozenFrLeaf {
   /** Root's human label, if resolvable from the stream. Falls back to root_fr_id (UUID). */
   root_display_key: string;
   depth: number;
-  tier: 'A' | 'B' | 'C' | 'D' | null;
+  tier: LeafTier;
   /** Release assigned to this leaf (null = backlog). Inherited from the root. */
   release_id: string | null;
   /** Cached release ordinal for sort convenience (null = backlog). */
@@ -546,7 +555,7 @@ export interface FrozenFrLeaf {
 export interface EffectiveFrView {
   stories: Array<Record<string, unknown>>;
   summary: string;
-  source: 'leaves' | 'roots' | 'none';
+  source: EffectiveViewSource;
   leafCount: number;
   rootCount: number;
 }
@@ -666,7 +675,7 @@ export interface FrozenComponentLeaf {
   display_key: string;
   root_display_key: string;
   depth: number;
-  tier: 'A' | 'B' | 'C' | 'D' | null;
+  tier: LeafTier;
   release_id: string | null;
   release_ordinal: number | null;
   component: {
@@ -741,7 +750,7 @@ export function getFrozenComponentLeaves(
 export interface EffectiveComponentView {
   components: Array<Record<string, unknown>>;
   summary: string;
-  source: 'leaves' | 'roots' | 'none';
+  source: EffectiveViewSource;
   leafCount: number;
   rootCount: number;
 }
@@ -777,9 +786,14 @@ export function buildEffectiveComponentView(
     // component→requirement `satisfies` edge in ingestionPipelineRunner).
     const rootTracesByRootKey = new Map<string, string[]>(
       rootComponents.map(rc => {
-        const raw = Array.isArray(rc.traces_to)
-          ? rc.traces_to
-          : (Array.isArray(rc.satisfies_requirement_ids) ? rc.satisfies_requirement_ids : []);
+        let raw: unknown[];
+        if (Array.isArray(rc.traces_to)) {
+          raw = rc.traces_to;
+        } else if (Array.isArray(rc.satisfies_requirement_ids)) {
+          raw = rc.satisfies_requirement_ids;
+        } else {
+          raw = [];
+        }
         return [String(rc.id), (raw as unknown[]).filter((x): x is string => typeof x === 'string')];
       }),
     );
@@ -850,7 +864,7 @@ export interface FrozenTaskLeaf {
   display_key: string;
   root_display_key: string;
   depth: number;
-  tier: 'A' | 'B' | 'C' | 'D' | null;
+  tier: LeafTier;
   release_id: string | null;
   release_ordinal: number | null;
   task: {
@@ -949,7 +963,7 @@ export interface EffectiveTaskView {
    */
   tasks: Array<Record<string, unknown>>;
   summary: string;
-  source: 'leaves' | 'roots' | 'none';
+  source: EffectiveViewSource;
   leafCount: number;
   rootCount: number;
 }
@@ -1037,7 +1051,7 @@ export interface FrozenDataModelLeaf {
   display_key: string;
   root_display_key: string;
   depth: number;
-  tier: 'A' | 'B' | 'C' | 'D' | null;
+  tier: LeafTier;
   release_id: string | null;
   release_ordinal: number | null;
   entity: {
@@ -1120,7 +1134,7 @@ export interface EffectiveDataModelView {
     }>;
   }>;
   summary: string;
-  source: 'leaves' | 'roots' | 'none';
+  source: EffectiveViewSource;
   leafCount: number;
   rootCount: number;
 }
@@ -1196,7 +1210,7 @@ export interface FrozenTestLeaf {
   display_key: string;
   root_display_key: string;
   depth: number;
-  tier: 'A' | 'B' | 'C' | 'D' | null;
+  tier: LeafTier;
   release_id: string | null;
   release_ordinal: number | null;
   test_case: {
@@ -1271,10 +1285,10 @@ export interface EffectiveTestPlanView {
   test_suites: Array<{
     suite_id: string;
     component_id: string;
-    test_type: 'unit' | 'integration' | 'end_to_end';
+    test_type: TestType;
     test_cases: Array<{
       test_case_id: string;
-      type: 'unit' | 'integration' | 'end_to_end';
+      type: TestType;
       acceptance_criterion_ids: string[];
       component_ids?: string[];
       preconditions: string[];
@@ -1285,7 +1299,7 @@ export interface EffectiveTestPlanView {
     }>;
   }>;
   summary: string;
-  source: 'leaves' | 'roots' | 'none';
+  source: EffectiveViewSource;
   leafCount: number;
   rootCount: number;
 }
@@ -1306,7 +1320,7 @@ export function buildEffectiveTestPlanView(
     });
     const suitesByType = new Map<string, EffectiveTestPlanView['test_suites'][number]>();
     for (const l of sorted) {
-      const tt = l.test_case.test_type as 'unit' | 'integration' | 'end_to_end';
+      const tt = l.test_case.test_type as TestType;
       const compId = (l.test_case.component_ids ?? [])[0] ?? 'unassigned';
       const suiteKey = `${tt}::${compId}`;
       let bucket = suitesByType.get(suiteKey);

@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { cleanupStrayDashPDirs } from '../../../lib/agents/executorAgent';
+import { cleanupStrayDashPDirs, warnStrayTopLevelDirs } from '../../../lib/agents/executorAgent';
 
 describe('cleanupStrayDashPDirs', () => {
   let workspace: string;
@@ -96,5 +96,29 @@ describe('cleanupStrayDashPDirs', () => {
   it('does not throw when workspace does not exist', () => {
     const missing = path.join(workspace, 'does-not-exist');
     expect(() => cleanupStrayDashPDirs(missing)).not.toThrow();
+  });
+});
+
+describe('warnStrayTopLevelDirs (F4 — stray path surfacing)', () => {
+  let workspace: string;
+  beforeEach(() => { workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'jc-stray-test-')); });
+  afterEach(() => { if (fs.existsSync(workspace)) fs.rmSync(workspace, { recursive: true, force: true }); });
+
+  it('surfaces mangled/garbage top-level dirs but not canonical roots, dotdirs, or files', () => {
+    for (const d of ['src', 'node_modules', 'tests', 'brationworkspace_cal_34', 'ibration']) {
+      fs.mkdirSync(path.join(workspace, d));
+    }
+    fs.mkdirSync(path.join(workspace, '.git'));                       // dotdir — ignored
+    fs.writeFileSync(path.join(workspace, 'package.json'), '{}');     // file — ignored
+    expect(warnStrayTopLevelDirs(workspace).sort()).toEqual(['brationworkspace_cal_34', 'ibration']);
+  });
+
+  it('returns empty when only canonical roots + dotdirs are present', () => {
+    for (const d of ['src', 'dist', 'node_modules', '.janumicode']) fs.mkdirSync(path.join(workspace, d));
+    expect(warnStrayTopLevelDirs(workspace)).toEqual([]);
+  });
+
+  it('does not throw when the workspace is missing', () => {
+    expect(() => warnStrayTopLevelDirs(path.join(workspace, 'nope'))).not.toThrow();
   });
 });

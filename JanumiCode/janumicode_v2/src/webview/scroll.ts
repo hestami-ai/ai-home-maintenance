@@ -47,8 +47,8 @@ export function getPhaseAnchors(container: HTMLElement): { phaseId: string; labe
   const elements = container.querySelectorAll('[data-phase-id]');
 
   for (const el of elements) {
-    const phaseId = el.getAttribute('data-phase-id');
-    const label = el.getAttribute('data-phase-label') ?? `Phase ${phaseId}`;
+    const phaseId = (el as HTMLElement).dataset.phaseId;
+    const label = (el as HTMLElement).dataset.phaseLabel ?? `Phase ${phaseId}`;
     if (phaseId) {
       anchors.push({ phaseId, label, top: (el as HTMLElement).offsetTop });
     }

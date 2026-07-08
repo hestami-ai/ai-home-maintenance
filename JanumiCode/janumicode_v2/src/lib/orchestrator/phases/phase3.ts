@@ -643,7 +643,14 @@ function srAsStringArray(v: unknown): string[] {
 
 /** One-line, length-capped coercion for menu/label text. */
 function srOneLine(v: unknown, cap = 160): string {
-  const t = typeof v === 'string' ? v : v == null ? '' : String(v);
+  let t: string;
+  if (typeof v === 'string') {
+    t = v;
+  } else if (v == null) {
+    t = '';
+  } else {
+    t = String(v);
+  }
   const firstLine = t.split('\n')[0]?.trim() ?? '';
   return firstLine.length > cap ? `${firstLine.slice(0, cap - 1)}…` : firstLine;
 }
@@ -795,7 +802,7 @@ function summarizeSrResidual(
   labelById: Map<string, string>,
   total: number,
 ): { uncovered: number; total: number; coverage_pct: number; ids: Array<{ id: string; label: string }> } {
-  const ids = [...residual].sort().map(id => ({ id, label: srOneLine(labelById.get(id) ?? id, 80) }));
+  const ids = [...residual].sort((a, b) => a.localeCompare(b)).map(id => ({ id, label: srOneLine(labelById.get(id) ?? id, 80) }));
   const covered = total - residual.size;
   return {
     uncovered: residual.size,
@@ -905,7 +912,7 @@ export async function deriveSystemRequirementsChunked(
   };
 
   const chunkUncovered = (uncovered: Set<string>): Array<Set<string>> => {
-    const ids = [...uncovered].sort();
+    const ids = [...uncovered].sort((a, b) => a.localeCompare(b));
     const batches: Array<Set<string>> = [];
     for (let i = 0; i < ids.length; i += maxIdsPerBatch) {
       batches.push(new Set(ids.slice(i, i + maxIdsPerBatch)));
@@ -918,7 +925,7 @@ export async function deriveSystemRequirementsChunked(
     passInfo: { pass: number; batchIndex: number; batchCount: number },
   ): Promise<SystemRequirementItem[]> => {
     if (!reconTemplate) return [];
-    const menu = [...batch].sort().map(id => `- ${labelById.get(id) ?? id}`).join('\n');
+    const menu = [...batch].sort((a, b) => a.localeCompare(b)).map(id => `- ${labelById.get(id) ?? id}`).join('\n');
     const rendered = engine.templateLoader.render(reconTemplate, {
       active_constraints: input.activeConstraintsText,
       uncovered_requirements: menu,

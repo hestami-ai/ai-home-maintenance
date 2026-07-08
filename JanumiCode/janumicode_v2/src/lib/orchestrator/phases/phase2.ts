@@ -11,10 +11,10 @@
  */
 
 import type { PhaseHandler, PhaseContext, PhaseResult } from '../orchestratorEngine';
-import type { PhaseId } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, findProductDescriptionHandoff } from './phaseContext';
 import type {
+  PhaseId,
   ProductDescriptionHandoffContent,
   UserJourney,
   Entity,
@@ -38,7 +38,7 @@ import type {
   ReleasePlanContentV2,
   CoverageGapContent,
 } from '../../types/records';
-import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
+import { buildPhaseContextPacket } from './dmrContext';
 import { runFrBloomThreePass } from './phase2/frBloomThreePass';
 import { runNfrBloomThreePass } from './phase2/nfrBloomThreePass';
 import { mintCompositeAcIds, type AcStoryLike } from './phase2/acIdNormalizer';
@@ -162,7 +162,7 @@ export function assignReleaseToRoot(
   rootStory: DecompositionUserStory | { traces_to?: string[] },
   plan: ReleasePlanContentV2 | null,
 ): { release_id: string | null; release_ordinal: number | null } {
-  if (!plan || !plan.approved) return { release_id: null, release_ordinal: null };
+  if (!plan?.approved) return { release_id: null, release_ordinal: null };
   const traces = rootStory.traces_to ?? [];
   if (traces.length === 0) return { release_id: null, release_ordinal: null };
   // Widened manifest lookup: an FR root's `traces_to[]` can cite any
@@ -269,13 +269,15 @@ interface AcceptanceCriterion {
   measurable_condition: string;
 }
 
+type UserStoryPriority = 'critical' | 'high' | 'medium' | 'low';
+
 interface UserStory {
   id: string;
   role: string;
   action: string;
   outcome: string;
   acceptance_criteria: AcceptanceCriterion[];
-  priority: 'critical' | 'high' | 'medium' | 'low';
+  priority: UserStoryPriority;
   /**
    * Traceability spine (wave 5) — ids of handoff items this user story
    * derives from. Under the product lens these will typically be
@@ -313,7 +315,7 @@ interface NonFunctionalRequirement {
    * final artifact so downstream consumers (NFR decomposition, eval
    * threshold weighting) can rank NFRs.
    */
-  priority: 'critical' | 'high' | 'medium' | 'low';
+  priority: UserStoryPriority;
   threshold: string;
   measurement_method?: string;
   /**
@@ -679,7 +681,7 @@ export class Phase2Handler implements PhaseHandler {
             // shape (the adapter dropped it pre-priority). Default to
             // 'medium' rather than fail; saturation only uses id +
             // user_story.
-            priority: (s as { priority?: 'critical' | 'high' | 'medium' | 'low' }).priority ?? 'medium',
+            priority: (s as { priority?: UserStoryPriority }).priority ?? 'medium',
             threshold: s.outcome,
             measurement_method: s.acceptance_criteria[0]?.measurable_condition,
             traces_to: s.traces_to ?? [],
@@ -1496,7 +1498,7 @@ export class Phase2Handler implements PhaseHandler {
           const surfacedRaw = Array.isArray(parsed?.surfaced_assumptions)
             ? parsed.surfaced_assumptions as Array<Record<string, unknown>> : [];
           const tierAssessment = parsed?.parent_tier_assessment as Record<string, unknown> | undefined;
-          if (tierAssessment && tierAssessment.agrees_with_hint === false) {
+          if (tierAssessment?.agrees_with_hint === false) {
             // Log disagreement for Step 4b; no action in 4a.
             getLogger().warn('workflow', 'Phase 2.1a: decomposer disagrees with tier hint', {
               nodeId: entry.nodeId, displayKey: entry.displayKey, hint: entry.tierHint,
@@ -1646,8 +1648,7 @@ export class Phase2Handler implements PhaseHandler {
           //      deeper than the human saw at the original gate.
           let parentDowngraded = false;
           if (entry.tierHint === 'B') {
-            const explicitDisagreement = tierAssessment
-              && tierAssessment.agrees_with_hint === false
+            const explicitDisagreement = tierAssessment?.agrees_with_hint === false
               && typeof tierAssessment.tier === 'string'
               && (tierAssessment.tier === 'A' || tierAssessment.tier === 'B');
             const producedTierBChildren = (pendingGateByParent.get(entry.nodeId)?.length ?? 0) > 0;
@@ -1952,7 +1953,7 @@ export class Phase2Handler implements PhaseHandler {
       // growth passes WARN; at N+1 (divergeTerminatePasses) hard
       // terminate with a named reason and defer the queue.
       const priorPass = pipelinePasses.length >= 2
-        ? pipelinePasses[pipelinePasses.length - 2]
+        ? pipelinePasses.at(-2)
         : null;
       const growthObserved = priorPass
         && priorPass.nodes_produced > 0
@@ -2158,8 +2159,7 @@ export class Phase2Handler implements PhaseHandler {
       // gate is not mistaken for a duplicate of the original one.
       const downgradeNote = downgradeNotesByParent.get(parentNodeId);
       if (downgradeNote) {
-        summaryLines.push(`[Scope expansion] ${downgradeNote}`);
-        summaryLines.push('');
+        summaryLines.push(`[Scope expansion] ${downgradeNote}`, '');
       }
       if (parentAssumptions.length > 0) {
         summaryLines.push('Assumptions this decomposition surfaces:');
@@ -2590,7 +2590,8 @@ function formatVVRequirements(vvs: VVRequirement[]): string {
 function formatTechnicalConstraints(tcs: TechnicalConstraint[]): string {
   if (!tcs.length) return '(none)';
   return tcs.map(t => {
-    const tech = t.technology ? ` [${t.technology}${t.version ? '@' + t.version : ''}]` : '';
+    const versionSuffix = t.version ? '@' + t.version : '';
+    const tech = t.technology ? ` [${t.technology}${versionSuffix}]` : '';
     return `- ${t.id} (${t.category})${tech} ${t.text}`;
   }).join('\n');
 }
@@ -2756,7 +2757,7 @@ export function rebuildSaturationStateFromStream(
   let assumptionSeq = 0;
   for (const a of allAssumptions) {
     const m = /^A-(\d+)$/.exec(a.id);
-    if (m) assumptionSeq = Math.max(assumptionSeq, parseInt(m[1], 10));
+    if (m) assumptionSeq = Math.max(assumptionSeq, Number.parseInt(m[1], 10));
   }
 
   // Rebuild pipeline container state: find the latest current-version record
@@ -2903,7 +2904,7 @@ function sanitizeChildStory(
     return null;
   }
   const priority = (['critical', 'high', 'medium', 'low'] as const).includes(c.priority as 'critical')
-    ? c.priority as 'critical' | 'high' | 'medium' | 'low'
+    ? c.priority as UserStoryPriority
     : 'medium';
   const traces = Array.isArray(c.traces_to)
     ? (c.traces_to as unknown[]).filter((x): x is string => typeof x === 'string')

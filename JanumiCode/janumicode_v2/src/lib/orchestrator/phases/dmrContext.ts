@@ -140,7 +140,7 @@ export async function buildPhaseContextPacket(
     return rec ? { record_type: rec.record_type, content: rec.content } : null;
   };
   try {
-    const invocationId = `${options.detailFileLabel ?? options.subPhaseId.replace(/\./g, '_')}-${workflowRun.id.slice(0, 8)}`;
+    const invocationId = `${options.detailFileLabel ?? options.subPhaseId.replaceAll('.', '_')}-${workflowRun.id.slice(0, 8)}`;
     const payload = engine.contextBuilder.buildContextPayload(
       options.subPhaseId,
       invocationId,
@@ -188,18 +188,23 @@ export async function buildPhaseContextPacket(
   // caught "Phase 8.5 never read user_stories from Phase 2" on ts-18.
   aoddEmit('context.assembled', { input_record_ids: derivedFromRecordIds });
 
+  // PA-13(2b): the DISK file (detailFile.content) is always full for P9; the
+  // INLINED copy drops governing sections when the caller injects them at the
+  // top of the prompt (opt-in via inlineOmitsGoverning).
+  let detailFileContent: string;
+  if (!detailFile) {
+    detailFileContent = '(no DMR detail content available)';
+  } else if (options.inlineOmitsGoverning) {
+    detailFileContent = renderHydratedPacket(packet, resolve, { omitGoverningSections: true });
+  } else {
+    detailFileContent = detailFile.content;
+  }
+
   return {
     packet,
     activeConstraintsText,
     detailFilePath: detailFile?.path ?? '(not available)',
-    // PA-13(2b): the DISK file (detailFile.content) is always full for P9; the
-    // INLINED copy drops governing sections when the caller injects them at the
-    // top of the prompt (opt-in via inlineOmitsGoverning).
-    detailFileContent: detailFile
-      ? (options.inlineOmitsGoverning
-          ? renderHydratedPacket(packet, resolve, { omitGoverningSections: true })
-          : detailFile.content)
-      : '(no DMR detail content available)',
+    detailFileContent,
     derivedFromRecordIds,
   };
 }

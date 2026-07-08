@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { eventSessionId, isPermissionAsk, permissionAsk, defaultRelayDecider, MimoServerAdapter } from '../../../../lib/cli/session/adapters/mimoServerAdapter';
+import { eventSessionId, isPermissionAsk, permissionAsk, questionText, defaultRelayDecider, MimoServerAdapter } from '../../../../lib/cli/session/adapters/mimoServerAdapter';
 import type { MimoSseEvent } from '../../../../lib/cli/mimo/mimoClient';
 import type { ExecutorTaskRequest } from '../../../../lib/cli/session/adapter';
+import type { ResponderInput } from '../../../../lib/cli/session/responder';
 
 const ev = (type: string, properties: Record<string, unknown>): MimoSseEvent => ({ type, properties });
 
@@ -19,6 +20,7 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 interface FakeOpts { send: 'resolve' | 'reject' | 'hang'; finish?: string }
 class FakeClient {
   aborted = false;
+  permissionResponses: Array<{ permissionId: string; response: string }> = [];
   constructor(private readonly events: MimoSseEvent[], private readonly o: FakeOpts) {}
   async createSession() { return 'ses_1'; }
   async *streamEvents(signal: AbortSignal): AsyncGenerator<MimoSseEvent> {
@@ -36,10 +38,12 @@ class FakeClient {
     return { finish: this.o.finish ?? 'stop', info: {} };
   }
   async abort() { this.aborted = true; }
-  async respondPermission() { /* noop */ }
+  async respondPermission(_sessionId: string, permissionId: string, response: string) {
+    this.permissionResponses.push({ permissionId, response });
+  }
 }
 
-const cfg = { binary: 'mimo', model: 'mimo/mimo-auto', agent: 'compose', permissionMode: 'static' as const };
+const cfg = { binary: 'mimo', model: 'mimo/mimo-auto', agent: 'compose', permissionMode: 'static' as const, attended: false };
 const reqFor = (extra: Partial<ExecutorTaskRequest> = {}): ExecutorTaskRequest =>
   ({ cwd: '/proj', prompt: 'implement it', ...extra } as unknown as ExecutorTaskRequest);
 
@@ -131,7 +135,85 @@ describe('MimoServerAdapter event helpers', () => {
   });
 
   it('constructs without side effects (server starts lazily in run)', () => {
-    const adapter = new MimoServerAdapter({ config: { binary: 'mimo', model: 'mimo/mimo-auto', agent: 'compose', permissionMode: 'static' } });
+    const adapter = new MimoServerAdapter({ config: { binary: 'mimo', model: 'mimo/mimo-auto', agent: 'compose', permissionMode: 'static', attended: false } });
     expect(adapter.tier).toBe('agentic_server');
+  });
+
+  it('questionText probes carrier fields then falls back to a generic prompt', () => {
+    expect(questionText(ev('permission.asked', { metadata: { question: 'Q1?' } }))).toBe('Q1?');
+    expect(questionText(ev('permission.asked', { metadata: { prompt: 'Q2?' } }))).toBe('Q2?');
+    expect(questionText(ev('permission.asked', { title: 'Q3?' }))).toBe('Q3?');
+    expect(questionText(ev('permission.asked', {}))).toMatch(/requested clarification/i);
+  });
+});
+
+describe('MimoServerAdapter — `question` ask routing (observe + escalate, cannot inject)', () => {
+  it('routes a `question` ask to the responder + rejects (compose API cannot inject the reply)', async () => {
+    const seen: ResponderInput[] = [];
+    const responder = async (input: ResponderInput) => { seen.push(input); return 'Bind to port 8080 per the spec.'; };
+    const client = new FakeClient(
+      [
+        ev('permission.asked', { id: 'per_q', sessionID: 'ses_1', permission: 'question', metadata: { question: 'Which port should it bind to?' } }),
+        ev('session.idle', { sessionID: 'ses_1' }),
+      ],
+      { send: 'hang' },
+    );
+    currentClient = client;
+    const logs: string[] = [];
+    const adapter = new MimoServerAdapter({
+      config: cfg, attended: true, responder,
+      onLog: (e) => { if (e.kind === 'data') logs.push(e.chunk); },
+      idleTimeoutMs: 5000, wallclockTimeoutMs: 6000, watchdogTickMs: 10,
+    });
+    await adapter.run(reqFor({ prompt: 'TASK SPEC: the service binds to 8080' }));
+    // the responder was consulted with the question + the task spec as grounding
+    expect(seen).toHaveLength(1);
+    expect(seen[0].kind).toBe('question');
+    expect(seen[0].question).toMatch(/Which port/);
+    expect(seen[0].taskSpec).toMatch(/8080/);
+    // the answer is surfaced for the audit trail…
+    expect(logs.join('')).toMatch(/executor question/);
+    expect(logs.join('')).toMatch(/8080/);
+    // …but the permission is REJECTED (never approved) — mimo can't take the text back
+    expect(client.permissionResponses).toEqual([{ permissionId: 'per_q', response: 'reject' }]);
+  });
+
+  it('a `question` ask with no responder still gets rejected (never leaves it unanswered → no stall)', async () => {
+    const client = new FakeClient(
+      [
+        ev('permission.asked', { id: 'per_q2', sessionID: 'ses_1', permission: 'question', metadata: {} }),
+        ev('session.idle', { sessionID: 'ses_1' }),
+      ],
+      { send: 'hang' },
+    );
+    currentClient = client;
+    const adapter = new MimoServerAdapter({ config: cfg, idleTimeoutMs: 5000, wallclockTimeoutMs: 6000, watchdogTickMs: 10 });
+    await adapter.run(reqFor());
+    expect(client.permissionResponses).toEqual([{ permissionId: 'per_q2', response: 'reject' }]);
+  });
+
+  it('falls through to the escalation sink when the responder cannot answer', async () => {
+    const escalations: string[] = [];
+    const onEscalate = async (input: { question: string }) => { escalations.push(input.question); return 'Human says: use 9090.'; };
+    const client = new FakeClient(
+      [
+        ev('permission.asked', { id: 'per_q3', sessionID: 'ses_1', permission: 'question', metadata: { question: 'Port?' } }),
+        ev('session.idle', { sessionID: 'ses_1' }),
+      ],
+      { send: 'hang' },
+    );
+    currentClient = client;
+    const logs: string[] = [];
+    const adapter = new MimoServerAdapter({
+      config: cfg, attended: true,
+      responder: async () => null, // responder cannot resolve it
+      onEscalate,
+      onLog: (e) => { if (e.kind === 'data') logs.push(e.chunk); },
+      idleTimeoutMs: 5000, wallclockTimeoutMs: 6000, watchdogTickMs: 10,
+    });
+    await adapter.run(reqFor());
+    expect(escalations).toEqual(['Port?']);
+    expect(logs.join('')).toMatch(/9090/);
+    expect(client.permissionResponses).toEqual([{ permissionId: 'per_q3', response: 'reject' }]);
   });
 });

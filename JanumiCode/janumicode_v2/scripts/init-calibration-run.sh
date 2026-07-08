@@ -28,12 +28,18 @@
 #   -c <ctx>         Executor context window (== Ollama's loaded num_ctx). Default 131072.
 #   -X <backing>     Executor backing tool. Default mimo_cli.
 #   -R <N>           RESUME cal-N (reuses its workspace/config/intent + latest DB)
-#                    instead of a fresh run. Requires -S or -P. Only valid when the
-#                    fix does NOT change how upstream artifacts are GENERATED (the
-#                    CLI rolls back records at-or-after the cutoff + re-executes
-#                    their deterministic pipeline; cached LLM calls replay).
+#                    instead of a fresh run. Requires -S or -P. The CLI rolls back
+#                    records at-or-after the cutoff + re-executes their pipeline
+#                    (cached LLM calls replay). By default Phase 6/7/8 re-run their
+#                    INCREMENTAL cycle-delta path once the run has cycled; add -F to
+#                    force full regeneration when a fix lives in the main generator.
 #   -S <sub-phase>   Resume at this sub-phase (e.g. user_journey_bloom); precedence over -P.
 #   -P <phase>       Resume at this phase (e.g. 1).
+#   -F               Force full re-execution on resume: zero the cycle counter so
+#                    Phase 6/7/8 run their full execute() path (generation +
+#                    gatekeepers), not the cycle-delta orphan path. Use when the fix
+#                    must be exercised through the main generator (e.g. a Phase-7
+#                    test-plan gatekeeper change).
 #   -y               Skip confirmation prompt.
 #   --dry-run        Print actions without creating files or launching.
 #
@@ -75,6 +81,7 @@ executor_context="131072"
 resume_cal=""
 resume_phase=""
 resume_sub_phase=""
+resume_reset_cycles=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -87,10 +94,11 @@ while [[ $# -gt 0 ]]; do
     -R) resume_cal="$2"; shift 2 ;;
     -P) resume_phase="$2"; shift 2 ;;
     -S) resume_sub_phase="$2"; shift 2 ;;
+    -F) resume_reset_cycles=1; shift ;;
     -y) skip_confirm=1; shift ;;
     --dry-run) dry_run=1; shift ;;
     --) shift; forwarded_args=("$@"); break ;;
-    -h|--help) sed -n '2,47p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,53p' "$0"; exit 0 ;;
     *) echo "[init-cal] unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -123,6 +131,10 @@ if [[ -n "${resume_cal}" ]]; then
   else
     resume_args+=(--resume-at-phase "${resume_phase}")
     resume_target="phase ${resume_phase}"
+  fi
+  if (( resume_reset_cycles )); then
+    resume_args+=(--resume-reset-cycles)
+    resume_target="${resume_target} (full re-execution: cycle counter reset)"
   fi
   echo "[init-cal] RESUME cal-${resume_cal}"
   echo "[init-cal] workspace   : ${resume_ws}"
@@ -250,8 +262,11 @@ intent_string="${intent_file}"
 # ECONNREFUSED. The 3 planning roles use -m via direct_llm_api/ollama; aux roles are
 # fixed (reasoning_review=gemma4:e4b — wave6 re-asserts this; json_repair=qwen3.5:9b,
 # kept non-gemma because the ollama provider pins all gemma calls to temp 1, which
-# would break json_repair's required temp-0 determinism). The executor backing is
-# documentary here — the env vars exported below are authoritative for mimo.
+# would break json_repair's required temp-0 determinism). reconnaissance is its OWN
+# role (Phase-9 stack/topology judgment) routed to the CAPABLE planning model, not
+# the 4B reasoning_review reviewer — else recon over-decomposes greenfield into
+# microservices. The executor backing is documentary here — the env vars exported
+# below are authoritative for mimo.
 mkdir -p "${workspace}/.janumicode"
 cat > "${workspace}/.janumicode/config.json" <<JSON
 {
@@ -279,6 +294,7 @@ cat > "${workspace}/.janumicode/config.json" <<JSON
     "domain_interpreter": { "primary": { "backing_tool": "direct_llm_api", "provider": "ollama", "model": "${planning_model}" }, "temperature": 1 },
     "requirements_agent": { "primary": { "backing_tool": "direct_llm_api", "provider": "ollama", "model": "${planning_model}" }, "temperature": 1 },
     "reasoning_review":   { "primary": { "provider": "ollama", "model": "gemma4:e4b" }, "temperature": 1, "trace_max_tokens": 8000 },
+    "reconnaissance":     { "primary": { "provider": "ollama", "model": "${planning_model}" }, "temperature": 0.2 },
     "json_repair":        { "primary": { "provider": "ollama", "model": "qwen3.5:9b" }, "fallback": { "provider": "ollama", "model": "gemma4:e4b" }, "temperature": 0, "fallback_temperature": 0 },
     "executor":           { "primary": { "backing_tool": "${executor_backing}", "model": "${executor_model}" }, "temperature": 1 }
   }

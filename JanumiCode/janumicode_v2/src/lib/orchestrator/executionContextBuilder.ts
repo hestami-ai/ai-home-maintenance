@@ -214,7 +214,7 @@ export function formatWriteScopeConstraints(task: ImplementationTask, protectedP
   // here — otherwise the executor writes to `src/data-governance` while every
   // import + the layout map use `src/data_governance` → fragmentation (slice-156).
   const pkg = (p: string): string => normalizeComponentDirForStack(p, language);
-  const denySection = (protectedPaths && protectedPaths.length)
+  const denySection = protectedPaths?.length
     ? '\n\nNEVER create or modify these scaffold-owned paths (import from them instead — '
       + 'writing here is rejected and the task is retried):\n'
       + protectedPaths.map(p => `- ${pkg(p)}`).join('\n')
@@ -305,16 +305,12 @@ function formatSharedModuleConstraints(scaffold?: {
 } | null): string {
   if (!scaffold) return '(no shared scaffold for this run)';
   const lines: string[] = [];
-  lines.push('A canonical project scaffold already exists. CONFORM to it:');
-  lines.push('');
-  lines.push(scaffold.conventions);
+  lines.push('A canonical project scaffold already exists. CONFORM to it:', '', scaffold.conventions);
   if (scaffold.canonicalFiles.length) {
-    lines.push('');
-    lines.push('Canonical shared files (import these — do NOT redefine types, models, contracts, or config):');
+    lines.push('', 'Canonical shared files (import these — do NOT redefine types, models, contracts, or config):');
     for (const f of scaffold.canonicalFiles) lines.push(`- ${f}`);
   }
-  lines.push('');
-  lines.push('Do NOT create another package.json/lockfile, your own copy of a shared '
+  lines.push('', 'Do NOT create another package.json/lockfile, your own copy of a shared '
     + 'module, or a divergent module system. Reuse the shared modules above.');
   return lines.join('\n');
 }
@@ -947,13 +943,16 @@ export class ExecutionContextBuilder {
     // actually read `.janumicode/` (e.g. a non-sandboxed run).
     const inlineDmr = process.env.JANUMICODE_INLINE_DMR !== '0';
     const dmrDetailPath = dmrPacket?.detailFilePath;
-    const detailFileContentInline = dmrPacket?.detailFileContent
-      ? (inlineDmr
-        // PD-6: budget-cap the inlined DMR (materiality-ordered tail-drop, never
-        // clip) so a cross-run whole-catalog dump can't dominate the leaf prompt.
-        ? `${taskDetailFileContent}\n\n---\n\n${capInlinedDmrContext(dmrPacket.detailFileContent)}`
-        : `${taskDetailFileContent}\n\n---\n\n_A curated Deep Memory Research context reference (governing constraints, supersession chains, contradictions, material findings — with record references resolved to actual content) is on disk${dmrDetailPath ? `:\n\n    ${dmrDetailPath}` : ''}\n\nRead it selectively if you need supporting governing context beyond what is inlined above._`)
-      : taskDetailFileContent;
+    let detailFileContentInline: string;
+    if (!dmrPacket?.detailFileContent) {
+      detailFileContentInline = taskDetailFileContent;
+    } else if (inlineDmr) {
+      // PD-6: budget-cap the inlined DMR (materiality-ordered tail-drop, never
+      // clip) so a cross-run whole-catalog dump can't dominate the leaf prompt.
+      detailFileContentInline = `${taskDetailFileContent}\n\n---\n\n${capInlinedDmrContext(dmrPacket.detailFileContent)}`;
+    } else {
+      detailFileContentInline = `${taskDetailFileContent}\n\n---\n\n_A curated Deep Memory Research context reference (governing constraints, supersession chains, contradictions, material findings — with record references resolved to actual content) is on disk${dmrDetailPath ? `:\n\n    ${dmrDetailPath}` : ''}\n\nRead it selectively if you need supporting governing context beyond what is inlined above._`;
+    }
 
     // ── 3. Render the template (when loader is available) ─────────
     const variables: Record<string, string> = {

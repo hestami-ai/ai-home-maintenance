@@ -23,8 +23,8 @@
  *   ...
  */
 
-import { readFileSync, readdirSync, existsSync, statSync } from 'fs';
-import { join, relative } from 'path';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { getLogger } from '../logging';
 import { emitTemplateRendered } from '../trace/templateRendered';
 
@@ -65,8 +65,8 @@ export interface TemplateRenderResult {
 // ── TemplateLoader ──────────────────────────────────────────────────
 
 export class TemplateLoader {
-  private templates = new Map<string, PromptTemplate>();
-  private promptsRoot: string;
+  private readonly templates = new Map<string, PromptTemplate>();
+  private readonly promptsRoot: string;
 
   /**
    * @param sourceRoot Repo / extension root (NOT a per-workspace dir).
@@ -174,7 +174,7 @@ export class TemplateLoader {
 
       // Array item
       if (trimmed.startsWith('- ') && currentKey) {
-        if (!currentArray) currentArray = [];
+        currentArray ??= [];
         currentArray.push(trimmed.slice(2).trim());
         continue;
       }
@@ -288,7 +288,7 @@ export class TemplateLoader {
     let rendered = template.body;
     for (const [key, value] of Object.entries(variables)) {
       rendered = rendered.replace(
-        new RegExp(`\\{\\{${key}\\}\\}`, 'g'),
+        new RegExp(String.raw`\{\{${key}\}\}`, 'g'),
         value,
       );
     }
@@ -334,7 +334,7 @@ export class TemplateLoader {
 
   private templateKey(filePath: string): string {
     return relative(this.promptsRoot, filePath)
-      .replace(/\\/g, '/')
+      .replaceAll('\\', '/')
       .replace(/\.md$/, '');
   }
 }

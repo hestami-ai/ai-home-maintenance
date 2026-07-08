@@ -35,7 +35,7 @@ describe('renderSharedDataModels (PD-2)', () => {
     expect(headers).toBe(fieldsMarkers);
     expect(headers).toBeGreaterThan(0);
     expect(headers).toBeLessThan(60); // some were dropped
-    expect(out).toMatch(/… \(\d+ more shared entit(y|ies) elided/);
+    expect(out).toMatch(/… \(\d+ more shared entit(y|ies) omitted/);
     // the last non-note content is a complete field line, not a severed object.
     expect(out).not.toMatch(/[:{[]\s*$/); // does not end mid-structure
   });
@@ -95,6 +95,101 @@ describe('renderSharedDataModels (PD-2)', () => {
     expect(renderSharedDataModels([], 8000)).toBe('(none)');
     expect(renderSharedDataModels(null, 8000)).toBe('(none)');
     expect(renderSharedDataModels('not an array', 8000)).toBe('(none)');
+  });
+});
+
+// D1/D2 (P9 materialization audit) — the data_models entities carry P5.1b
+// ownership tags (ownership_role / owner_entity_id / owner_component_id). Render
+// each concept per its DDD verdict instead of field-unioning every copy: the OWNER
+// materializes once; non-owners are import references, NOT re-materialized.
+describe('renderSharedDataModels — ownership-aware (P5.1b, D1/D2)', () => {
+  const owned = (comp: string, name: string, fields: Array<{ name: string; type: string }>) => ({
+    id: `DM-${comp}-${name.toLowerCase()}`, name, ownership_role: 'owned', fields,
+  });
+  const referenced = (comp: string, name: string, ownerComp: string, fields: Array<{ name: string; type: string }>) => ({
+    id: `DM-${comp}-${name.toLowerCase()}`, name, ownership_role: 'referenced',
+    owner_component_id: ownerComp, owner_entity_id: `DM-${ownerComp}-${name.toLowerCase()}`, fields,
+  });
+
+  it('materializes an owned aggregate ONCE under the elected owner id — not first-seen', () => {
+    const models = [
+      // first-seen is the REFERENCED copy (audit-log-retriever); owner is property-service
+      { component_id: 'comp-audit-log-retriever', entities: [referenced('comp-audit-log-retriever', 'PropertyRecord', 'comp-property-service', [
+        { name: 'id', type: 'uuid' }, { name: 'audit_note', type: 'string' },
+      ]) ] },
+      { component_id: 'comp-property-service', entities: [owned('comp-property-service', 'PropertyRecord', [
+        { name: 'id', type: 'uuid' }, { name: 'address', type: 'string' },
+      ]) ] },
+    ];
+    const out = renderSharedDataModels(models, 8000);
+    // rendered ONCE, keyed to the OWNER id (not the first-seen audit-log-retriever id)
+    expect((out.match(/— PropertyRecord/g) || []).length).toBe(1);
+    expect(out).toContain('### DM-comp-property-service-propertyrecord — PropertyRecord');
+    expect(out).not.toContain('DM-comp-audit-log-retriever-propertyrecord —');
+    // OWNER fields only — the referenced copy's divergent field is NOT unioned in
+    expect(out).toContain('- address: string');
+    expect(out).not.toContain('audit_note');
+    expect(out).not.toContain('reconcile to ONE canonical shape'); // no shared-kernel merge
+    // the reference is surfaced as an IMPORT, not a re-definition
+    expect(out).toMatch(/owned by comp-property-service; referenced by comp-audit-log-retriever/);
+    expect(out).toContain('IMPORT this type');
+  });
+
+  it('renders a shared value object as copied-by-value (no owner/reference)', () => {
+    const models = [
+      { component_id: 'comp-a', entities: [{ id: 'DM-comp-a-money', name: 'Money', ownership_role: 'shared_value_object', fields: [{ name: 'amount', type: 'int' }] }] },
+      { component_id: 'comp-b', entities: [{ id: 'DM-comp-b-money', name: 'Money', ownership_role: 'shared_value_object', fields: [{ name: 'amount', type: 'int' }] }] },
+    ];
+    const out = renderSharedDataModels(models, 8000);
+    expect((out.match(/— Money/g) || []).length).toBe(1);
+    expect(out).toMatch(/value object — copied by value into: comp-a, comp-b/);
+  });
+
+  it('keeps SEPARATE (coincidental-name) concepts as distinct per-component types', () => {
+    const models = [
+      { component_id: 'comp-a', entities: [owned('comp-a', 'Status', [{ name: 'code', type: 'int' }])] },
+      { component_id: 'comp-b', entities: [owned('comp-b', 'Status', [{ name: 'label', type: 'string' }])] },
+    ];
+    const out = renderSharedDataModels(models, 8000);
+    // two owned members of the same name → two distinct blocks (not merged/unioned)
+    expect((out.match(/— Status/g) || []).length).toBe(2);
+    expect(out).toContain('### DM-comp-a-status — Status (component: comp-a)');
+    expect(out).toContain('### DM-comp-b-status — Status (component: comp-b)');
+    expect(out).not.toContain('divergent');
+  });
+});
+
+// D8 (P9 materialization audit) — relationship targets live under target_entity /
+// references / entity, and kinds under type / relationship_type; the old renderer
+// read only target_entity_id/target so `{type, references}` rendered as `→ ?`.
+describe('renderSharedDataModels — relationship key resolution (D8)', () => {
+  it('resolves the target from `references` (FK "Entity.field") and kind from `type`', () => {
+    const models = [{ component_id: 'comp-a', entities: [{
+      name: 'WorkOrderAudit', ownership_role: 'owned', fields: [{ name: 'id', type: 'uuid' }],
+      relationships: [{ name: 'work_order', type: 'many_to_one', foreign_key: 'work_order_id', references: 'WorkOrder.id' }],
+    }] }];
+    const out = renderSharedDataModels(models, 8000);
+    expect(out).toContain('→ WorkOrder (many_to_one)');
+    expect(out).not.toContain('→ ?');
+  });
+
+  it('resolves the target from `target_entity` / `entity` too', () => {
+    const models = [{ component_id: 'comp-a', entities: [{
+      name: 'X', ownership_role: 'owned', fields: [{ name: 'id', type: 'uuid' }],
+      relationships: [{ target_entity: 'Tenant', relationship_type: 'references' }, { entity: 'User', kind: 'many_to_one' }],
+    }] }];
+    const out = renderSharedDataModels(models, 8000);
+    expect(out).toContain('→ Tenant (references)');
+    expect(out).toContain('→ User (many_to_one)');
+  });
+
+  it('renders array-valued `constraints`', () => {
+    const models = [{ component_id: 'comp-a', entities: [{
+      name: 'Y', ownership_role: 'owned',
+      fields: [{ name: 'id', type: 'uuid', constraints: ['primary_key', 'required'] }],
+    }] }];
+    const out = renderSharedDataModels(models, 8000);
+    expect(out).toContain('- id: uuid (primary_key, required)');
   });
 });
 

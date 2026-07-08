@@ -277,7 +277,7 @@ export function detectDivergentDuplicates(
 
   const normPrefixes = protectedPrefixes
     .filter(p => p.endsWith('/'))
-    .map(p => p.replace(/\\/g, '/'));
+    .map(p => p.replaceAll('\\', '/'));
 
   const byBase = new Map<string, Array<{ path: string; hash: string }>>();
   for (const abs of files) {

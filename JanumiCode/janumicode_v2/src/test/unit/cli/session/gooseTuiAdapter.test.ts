@@ -296,6 +296,74 @@ describe('GooseTuiAdapter — LLM session responder (spec-grounded answers)', ()
     expect(nudge).toContain('end your final message with the exact line: TASK COMPLETE');
   });
 
+  it('escalates to the human when the responder cannot answer, and TYPES the human reply (PTY injection)', async () => {
+    const cwd = tmpWs();
+    const spawner = new FakePtySpawner({
+      initial: [READY],
+      rules: [
+        { onInput: 'complete task specification', emit: [`Which database engine should I use?\n${INPUT_BOX}\n`] },
+        { onInput: 'Use Postgres 16 with the pgvector extension', emit: [`Implemented.\nTASK COMPLETE\n${INPUT_BOX}\n`] },
+      ],
+    });
+    const escalations: Array<{ question: string; taskSpec: string }> = [];
+    const adapter = new GooseTuiAdapter(spawner, {
+      ...syncScreen,
+      responder: async () => null, // spec-grounded responder can't resolve it
+      onEscalate: async (input) => {
+        escalations.push({ question: input.question, taskSpec: input.taskSpec });
+        return 'Use Postgres 16 with the pgvector extension.';
+      },
+    });
+    const outcome = await adapter.run({ command: 'goose', args: [], cwd, prompt: 'SPEC: db choice is deferred to the operator' });
+
+    expect(outcome.timedOut).toBe(false);
+    const writes = spawner.lastProcess!.writes.join('');
+    expect(writes).toContain('Use Postgres 16 with the pgvector extension.'); // human answer INJECTED
+    expect(writes).not.toContain('Proceed with the most reasonable'); // canned NOT used
+    expect(escalations).toHaveLength(1);
+    expect(escalations[0].question).toContain('Which database engine');
+    expect(escalations[0].taskSpec).toContain('db choice is deferred');
+  });
+
+  it('does NOT escalate when the spec-grounded responder already answers', async () => {
+    const cwd = tmpWs();
+    const spawner = new FakePtySpawner({
+      initial: [READY],
+      rules: [
+        { onInput: 'complete task specification', emit: [`Which slug length?\n${INPUT_BOX}\n`] },
+        { onInput: 'Use 7-character base62 slugs', emit: [`Done.\nTASK COMPLETE\n${INPUT_BOX}\n`] },
+      ],
+    });
+    let escalated = false;
+    const adapter = new GooseTuiAdapter(spawner, {
+      ...syncScreen,
+      responder: async () => 'Use 7-character base62 slugs per the spec.',
+      onEscalate: async () => { escalated = true; return 'human answer'; },
+    });
+    const outcome = await adapter.run({ command: 'goose', args: [], cwd, prompt: 'p' });
+    expect(outcome.timedOut).toBe(false);
+    expect(escalated).toBe(false); // responder won; escalation never consulted
+  });
+
+  it('falls back to the canned response when BOTH responder and escalation return null', async () => {
+    const cwd = tmpWs();
+    const spawner = new FakePtySpawner({
+      initial: [READY],
+      rules: [
+        { onInput: 'complete task specification', emit: [`Which framework?\n${INPUT_BOX}\n`] },
+        { onInput: 'Proceed with the most reasonable', emit: [`Done.\nTASK COMPLETE\n${INPUT_BOX}\n`] },
+      ],
+    });
+    const adapter = new GooseTuiAdapter(spawner, {
+      ...syncScreen,
+      responder: async () => null,
+      onEscalate: async () => null, // no human answer either
+    });
+    const outcome = await adapter.run({ command: 'goose', args: [], cwd, prompt: 'p' });
+    expect(outcome.timedOut).toBe(false);
+    expect(spawner.lastProcess!.writes.join('')).toContain('Proceed with the most reasonable');
+  });
+
   it('protocol prompts (act-on-plan / clear-history) never consult the responder', async () => {
     const cwd = tmpWs();
     const spawner = new FakePtySpawner({

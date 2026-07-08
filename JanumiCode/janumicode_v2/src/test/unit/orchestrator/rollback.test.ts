@@ -12,7 +12,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDatabase, initializeDatabase, type Database } from '../../../lib/database/init';
-import { rollbackToSubPhase } from '../../../lib/orchestrator/rollback';
+import { rollbackToSubPhase, resetRunCycleCounter } from '../../../lib/orchestrator/rollback';
 
 const RUN_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -24,6 +24,9 @@ function seed(
     sub_phase_id: string;
     produced_at: string;
     is_current_version?: number;
+    /** Pipeline phase id ('0'..'10', '0.5'). Defaults '0' (keeps single-phase
+     *  tests unchanged); set it to exercise the cross-phase scoping. */
+    phase_id?: string;
   }>,
 ): void {
   const stmt = db.prepare(`
@@ -37,7 +40,7 @@ function seed(
       quarantined, sanitized, sanitized_fields, content
     ) VALUES (
       ?, ?, '1.0', ?,
-      '0', ?, NULL, NULL,
+      ?, ?, NULL, NULL,
       ?, ?, 'test', 2,
       0, ?,
       NULL, NULL, NULL,
@@ -48,7 +51,7 @@ function seed(
   for (const r of rows) {
     stmt.run(
       r.id, r.record_type, RUN_ID,
-      r.sub_phase_id,
+      r.phase_id ?? '0', r.sub_phase_id,
       r.produced_at, r.produced_at,
       r.is_current_version ?? 1,
       RUN_ID,
@@ -137,6 +140,36 @@ describe('rollbackToSubPhase', () => {
     expect(result.rolled_back_count).toBe(1);
   });
 
+  it('preserves UPSTREAM-phase heads even when their timestamp is LATER than the target cutoff (multiply-resumed DB)', () => {
+    // The cal-41 over-sweep bug: after several resumes, a Phase-9 sub-phase
+    // (reconnaissance @10:12) has an EARLIER wall-clock time than the current
+    // Phase-7 test plan (@11:49) and Phase-8 eval plan (@10:54) — those were
+    // produced during a LATER resume. A naive `produced_at >= cutoff` sweep
+    // tombstones the upstream Phase-7/8 heads, and the partial Phase-9 re-run
+    // never regenerates them → every downstream packet loses its tests/eval.
+    // Phase-scoped invalidation must keep upstream phases current regardless of
+    // timestamp, while still invalidating the target phase + everything after it.
+    seed(db, [
+      { id: 'p7',  record_type: 'artifact_produced', phase_id: '7',  sub_phase_id: 'test_case_skeleton', produced_at: '2026-07-08T11:49:00Z' },
+      { id: 'p8',  record_type: 'artifact_produced', phase_id: '8',  sub_phase_id: 'evaluation_design',  produced_at: '2026-07-08T10:54:00Z' },
+      { id: 'p9r', record_type: 'artifact_produced', phase_id: '9',  sub_phase_id: 'reconnaissance',     produced_at: '2026-07-08T10:12:00Z' },
+      { id: 'p9p', record_type: 'artifact_produced', phase_id: '9',  sub_phase_id: 'packet_synthesis',   produced_at: '2026-07-08T10:54:30Z' },
+      // Downstream Phase-10 head with an EARLIER timestamp than the cutoff (from an
+      // even earlier resume): must STILL be invalidated (pipeline position, not time).
+      { id: 'p10', record_type: 'artifact_produced', phase_id: '10', sub_phase_id: 'commit',             produced_at: '2026-07-08T09:00:00Z' },
+    ]);
+    const result = rollbackToSubPhase(db, RUN_ID, 'reconnaissance');
+    expect(result.cutoff_produced_at).toBe('2026-07-08T10:12:00Z');
+    // Upstream Phase-7/8 heads PRESERVED despite later timestamps.
+    expect(currentVersionCount(db, 'test_case_skeleton')).toBe(1);
+    expect(currentVersionCount(db, 'evaluation_design')).toBe(1);
+    // Target phase + later sub-phase + downstream phase invalidated.
+    expect(currentVersionCount(db, 'reconnaissance')).toBe(0);
+    expect(currentVersionCount(db, 'packet_synthesis')).toBe(0);
+    expect(currentVersionCount(db, 'commit')).toBe(0);
+    expect(result.rolled_back_count).toBe(3); // p9r, p9p, p10
+  });
+
   it('cuts off correctly when the target sub-phase ran multiple times', () => {
     // Earlier attempt was previously rolled back, then re-ran.
     seed(db, [
@@ -150,5 +183,38 @@ describe('rollbackToSubPhase', () => {
     expect(result.cutoff_produced_at).toBe('2026-05-21T17:00:01Z');
     expect(result.rolled_back_count).toBe(2);
     expect(currentVersionCount(db)).toBe(0);
+  });
+});
+
+describe('resetRunCycleCounter', () => {
+  let db: Database;
+
+  beforeEach(() => {
+    db = createTestDatabase();
+    initializeDatabase(db);
+    db.prepare(`
+      INSERT INTO workflow_runs (
+        id, status, intent_lens, current_phase_id, workspace_id,
+        janumicode_version_sha, initiated_at
+      ) VALUES (?, 'running', 'product', '7', 'test-ws', 'test-sha', '2026-05-21T16:00:00Z')
+    `).run(RUN_ID);
+  });
+
+  const cycleOf = (): number =>
+    (db.prepare(`SELECT current_cycle_number AS n FROM workflow_runs WHERE id = ?`).get(RUN_ID) as { n: number }).n;
+
+  it('zeroes a run that is in cycle mode and returns the prior count', () => {
+    db.prepare(`UPDATE workflow_runs SET current_cycle_number = 3 WHERE id = ?`).run(RUN_ID);
+    expect(cycleOf()).toBe(3);
+    const prior = resetRunCycleCounter(db, RUN_ID);
+    expect(prior).toBe(3);
+    expect(cycleOf()).toBe(0);
+  });
+
+  it('is a no-op (returns 0) when the run is already at 0', () => {
+    expect(cycleOf()).toBe(0);
+    const prior = resetRunCycleCounter(db, RUN_ID);
+    expect(prior).toBe(0);
+    expect(cycleOf()).toBe(0);
   });
 });

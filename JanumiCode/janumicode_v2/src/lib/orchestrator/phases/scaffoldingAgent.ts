@@ -128,7 +128,7 @@ export function areaWriteScope(area: Phase9ReconPlan['areas'][number]): string[]
 
 export function areaRoot(sourceRoot: string): string {
   // 'services/billing/src' → 'services/billing'; 'src' → '.'
-  const norm = sourceRoot.replace(/\\/g, '/').replace(/\/+$/g, '');
+  const norm = sourceRoot.replaceAll('\\', '/').replace(/\/+$/g, '');
   const segs = norm.split('/');
   return segs.length <= 1 ? '.' : segs.slice(0, -1).join('/');
 }
@@ -142,7 +142,13 @@ export function areaRoot(sourceRoot: string): string {
 // whole items at the ITEM boundary when over budget (never clip mid-object → the
 // block is always coherent), and dedup entities by name (each materialized once,
 // a partial PD-5 mitigation).
-const SCAFFOLD_DM_BUDGET = 8000;
+// D7 (P9 audit): the shared-data-model block is the executor's ONLY source for
+// the shape of every shared type it must materialize ONCE. Dropping types — and
+// pointing at "the data_models artifact", which the headless executor session
+// (cwd=<ws>/project) cannot open — left them unmaterialized. The ownership rewrite
+// already shrinks this block (referenced copies collapse to one-line import
+// stubs), so a generous budget keeps the whole set inline without real bloat.
+const SCAFFOLD_DM_BUDGET = 40000;
 const SCAFFOLD_CONTRACT_BUDGET = 5000;
 
 // The canonical source root + shared dir the component-dir map is built on (mirrors
@@ -151,99 +157,188 @@ const SCAFFOLD_CONTRACT_BUDGET = 5000;
 const SCAFFOLD_SRC_ROOT = 'src';
 const SCAFFOLD_SHARED_DIR = 'src/shared';
 
-/** One field of a merged shared entity: the first-seen rendering + every distinct
- *  variant seen for the SAME field name across components (PD-5 divergence). */
-interface MergedField { primary: string; variants: Set<string>; }
-interface MergedEntity {
-  id: string;
-  name: string;
-  comps: string[];                 // ordered-unique component ids that defined it
-  fields: Map<string, MergedField>; // by field name — union across variants
-  rels: string[];                  // deduped relationship lines
-  relSeen: Set<string>;
+/** Narrow a value to a trimmed non-empty string, else undefined. */
+function asStr(v: unknown): string | undefined {
+  return typeof v === 'string' && v.trim() ? v : undefined;
 }
 
-/** Render one field object to a `type (constraints)` display string. */
+/** Render one field object to a `type (constraints)` display string. Handles both
+ *  a string `constraints` and a string[] `constraints` (the producer emits either). */
 function fieldDisplay(fo: Record<string, unknown>): { name: string; text: string } {
-  const fname = typeof fo.name === 'string' ? fo.name : '?';
-  const ftype = typeof fo.type === 'string' ? fo.type : (typeof fo.data_type === 'string' ? fo.data_type : '?');
+  const fname = asStr(fo.name) ?? '?';
+  const ftype = asStr(fo.type) ?? asStr(fo.data_type) ?? '?';
   const cons: string[] = [];
   if (fo.required === true || fo.is_identity === true) cons.push('required');
   if (typeof fo.constraints === 'string' && fo.constraints) cons.push(fo.constraints);
-  if (typeof fo.foreign_key === 'string' && fo.foreign_key) cons.push(`fk:${fo.foreign_key}`);
+  else if (Array.isArray(fo.constraints)) for (const c of fo.constraints) { if (typeof c === 'string' && c) cons.push(c); }
+  if (asStr(fo.foreign_key)) cons.push(`fk:${fo.foreign_key as string}`);
   return { name: fname, text: `${ftype}${cons.length ? ` (${cons.join(', ')})` : ''}` };
 }
 
-export function renderSharedDataModels(models: unknown, budget: number): string {
-  const list = Array.isArray(models) ? models : [];
+/**
+ * Render one relationship object to a `  → <target> (<kind>[, <ownership>])` line.
+ * D8 (P9 materialization audit): the producer emits the target under ANY of
+ * target_entity_id / target_entity / target / entity / references (an FK ref like
+ * `"WorkOrder.id"` → `WorkOrder`), and the kind under kind / type /
+ * relationship_type. The old renderer read only target_entity_id/target + kind, so
+ * the common `{type, references}` shape rendered as `→ ? (references)` — a
+ * materialization bug misread earlier as an upstream data gap.
+ */
+function relationshipLine(ro: Record<string, unknown>): string {
+  const rawTarget = asStr(ro.target_entity_id) ?? asStr(ro.target_entity) ?? asStr(ro.target)
+    ?? asStr(ro.entity) ?? asStr(ro.references);
+  const target = rawTarget ? rawTarget.split('.')[0] : '?';
+  const kind = asStr(ro.kind) ?? asStr(ro.type) ?? asStr(ro.relationship_type) ?? 'references';
+  const own = asStr(ro.ownership);
+  return `  → ${target} (${kind}${own ? `, ${own}` : ''})`;
+}
 
-  // PD-5 — the scaffold mandate is "materialize each shared type ONCE", but the
-  // producer emits the SAME entity name in several components with DIVERGENT shapes
-  // (e.g. ContractorMatchRecord 3× with different enums/fields). PD-2's keep-first
-  // dedup silently dropped the variants' fields → the model invented its own union.
-  // Instead MERGE same-named entities: UNION their fields (nothing lost), dedup
-  // relationships, and where the SAME field diverges across components keep the
-  // first but ANNOTATE the divergence inline so "materialize once" is satisfiable
-  // deterministically and the genuine conflict is surfaced, not hidden.
-  const byName = new Map<string, MergedEntity>();
+/** A raw per-component member of a same-named entity group. */
+interface EntityMember { compId?: string; e: Record<string, unknown>; }
+
+/** Group the models' entities by name, preserving first-seen order. */
+function groupEntitiesByName(list: unknown[]): { order: string[]; groups: Map<string, EntityMember[]> } {
+  const groups = new Map<string, EntityMember[]>();
   const order: string[] = [];
   for (const m of list) {
     if (typeof m !== 'object' || m === null) continue;
     const mo = m as Record<string, unknown>;
-    const compId = typeof mo.component_id === 'string' ? mo.component_id : undefined;
+    const compId = asStr(mo.component_id);
     const entities = Array.isArray(mo.entities) ? mo.entities : [mo]; // element may itself be an entity
     for (const e of entities) {
       if (typeof e !== 'object' || e === null) continue;
       const eo = e as Record<string, unknown>;
-      const name = typeof eo.name === 'string' ? eo.name : (typeof eo.id === 'string' ? eo.id : '');
+      const name = asStr(eo.name) ?? asStr(eo.id);
       if (!name) continue;
-      let ent = byName.get(name);
-      if (!ent) {
-        const id = typeof eo.id === 'string' ? eo.id : (compId ? `DM-${compId}-${name.toLowerCase()}` : name);
-        ent = { id, name, comps: [], fields: new Map(), rels: [], relSeen: new Set() };
-        byName.set(name, ent);
-        order.push(name);
-      }
-      if (compId && !ent.comps.includes(compId)) ent.comps.push(compId);
-      for (const f of Array.isArray(eo.fields) ? eo.fields : []) {
-        if (typeof f !== 'object' || f === null) continue;
-        const { name: fname, text } = fieldDisplay(f as Record<string, unknown>);
-        const mf = ent.fields.get(fname);
-        if (!mf) ent.fields.set(fname, { primary: text, variants: new Set([text]) });
-        else mf.variants.add(text);
-      }
-      for (const r of Array.isArray(eo.relationships) ? eo.relationships : []) {
-        if (typeof r !== 'object' || r === null) continue;
-        const ro = r as Record<string, unknown>;
-        const t = typeof ro.target_entity_id === 'string' ? ro.target_entity_id : (typeof ro.target === 'string' ? ro.target : '?');
-        const relLine = `  → ${t} (${typeof ro.kind === 'string' ? ro.kind : 'references'}${typeof ro.ownership === 'string' ? `, ${ro.ownership}` : ''})`;
-        if (!ent.relSeen.has(relLine)) { ent.relSeen.add(relLine); ent.rels.push(relLine); }
-      }
+      if (!groups.has(name)) { groups.set(name, []); order.push(name); }
+      groups.get(name)!.push({ compId, e: eo });
     }
   }
+  return { order, groups };
+}
+
+function memberId(m: EntityMember, name: string): string {
+  return asStr(m.e.id) ?? (m.compId ? `DM-${m.compId}-${name.toLowerCase()}` : name);
+}
+function memberComp(m: EntityMember): string {
+  return m.compId ?? asStr(m.e.owner_component_id) ?? '?';
+}
+
+/** Render a single entity block — its OWN fields + relationships (NO cross-component
+ *  field union) under the given header label. */
+function renderEntityBlock(m: EntityMember, name: string, label: string): string {
+  const lines = [`### ${memberId(m, name)} — ${name}${label}`, 'Fields:'];
+  for (const f of Array.isArray(m.e.fields) ? m.e.fields : []) {
+    if (typeof f !== 'object' || f === null) continue;
+    const { name: fn, text } = fieldDisplay(f as Record<string, unknown>);
+    lines.push(`  - ${fn}: ${text}`);
+  }
+  for (const r of Array.isArray(m.e.relationships) ? m.e.relationships : []) {
+    if (typeof r === 'object' && r !== null) lines.push(relationshipLine(r as Record<string, unknown>));
+  }
+  return lines.join('\n');
+}
+
+/** LEGACY (untagged) path — pre-P5.1b behavior: MERGE same-named entities, UNION
+ *  their fields (annotating divergence), dedup relationships. Retained for
+ *  data_models artifacts that predate entity_ownership_reconciliation. */
+function renderLegacyMergedGroup(name: string, members: EntityMember[]): string {
+  const comps: string[] = [];
+  const fields = new Map<string, { primary: string; variants: Set<string> }>();
+  const rels: string[] = [];
+  const relSeen = new Set<string>();
+  let id = '';
+  for (const m of members) {
+    if (!id) id = memberId(m, name);
+    if (m.compId && !comps.includes(m.compId)) comps.push(m.compId);
+    for (const f of Array.isArray(m.e.fields) ? m.e.fields : []) {
+      if (typeof f !== 'object' || f === null) continue;
+      const { name: fn, text } = fieldDisplay(f as Record<string, unknown>);
+      const mf = fields.get(fn);
+      if (!mf) fields.set(fn, { primary: text, variants: new Set([text]) });
+      else mf.variants.add(text);
+    }
+    for (const r of Array.isArray(m.e.relationships) ? m.e.relationships : []) {
+      if (typeof r !== 'object' || r === null) continue;
+      const line = relationshipLine(r as Record<string, unknown>);
+      if (!relSeen.has(line)) { relSeen.add(line); rels.push(line); }
+    }
+  }
+  let compLabel: string;
+  if (comps.length === 0) compLabel = '';
+  else if (comps.length === 1) compLabel = ` (component: ${comps[0]})`;
+  else compLabel = ` (shared across components: ${comps.join(', ')} — materialize ONCE)`;
+  const lines = [`### ${id} — ${name}${compLabel}`, 'Fields:'];
+  for (const [fn, mf] of fields) {
+    const alts = [...mf.variants].filter((v) => v !== mf.primary);
+    lines.push(`  - ${fn}: ${mf.primary}${alts.length ? ` [divergent — also defined as: ${alts.join(' | ')} — reconcile to ONE canonical shape]` : ''}`);
+  }
+  lines.push(...rels);
+  return lines.join('\n');
+}
+
+/**
+ * OWNERSHIP-AWARE (P5.1b) path — the data_models entities carry ownership_role /
+ * owner_entity_id / owner_component_id from entity_ownership_reconciliation. Render
+ * each concept per its DDD verdict rather than field-unioning every copy (D1/D2):
+ *  - owned aggregate → the OWNER's shape ONCE (owner's id + owner's fields); the
+ *    non-owner copies are references that IMPORT it, never re-materialized — this
+ *    kills the shared-kernel field-union AND the wrong first-seen id.
+ *  - shared value object → copied by value once (no owner, no reference).
+ *  - separate (coincidental name collision) → each component's type distinctly.
+ */
+function renderOwnershipGroup(name: string, members: EntityMember[]): string[] {
+  const owned = members.filter((m) => m.e.ownership_role === 'owned');
+  const refd = members.filter((m) => m.e.ownership_role === 'referenced');
+  const vos = members.filter((m) => m.e.ownership_role === 'shared_value_object');
+
+  if (vos.length && owned.length === 0) {
+    const comps = [...new Set(members.map(memberComp).filter((c) => c !== '?'))];
+    const label = comps.length > 1 ? ` (value object — copied by value into: ${comps.join(', ')})` : '';
+    return [renderEntityBlock(vos[0], name, label)];
+  }
+  if (owned.length === 1) {
+    const refComps = [...new Set(refd.map(memberComp))];
+    const label = refComps.length
+      ? ` (owned by ${memberComp(owned[0])}; referenced by ${refComps.join(', ')} — those components IMPORT this type, they do NOT redefine it)`
+      : ` (component: ${memberComp(owned[0])})`;
+    return [renderEntityBlock(owned[0], name, label)];
+  }
+  if (owned.length > 1) {
+    // 'separate' verdict — genuinely different concepts that share a name; keep
+    // each distinct per-component type (never merged).
+    return owned.map((m) => renderEntityBlock(m, name, ` (component: ${memberComp(m)})`));
+  }
+  // Only referenced copies present (the owner is materialized elsewhere) — emit an
+  // import stub so the executor references the owned type rather than re-defining it.
+  const r = refd[0] ?? members[0];
+  const ownerId = asStr(r.e.owner_entity_id) ?? memberId(r, name);
+  const ownerComp = asStr(r.e.owner_component_id) ?? '?';
+  return [`### ${ownerId} — ${name} (referenced — owned by ${ownerComp}; IMPORT this type, do NOT redefine)`];
+}
+
+export function renderSharedDataModels(models: unknown, budget: number): string {
+  const list = Array.isArray(models) ? models : [];
+  const { order, groups } = groupEntitiesByName(list);
 
   const blocks: string[] = [];
   let used = 0;
   let dropped = 0;
   for (const name of order) {
-    const ent = byName.get(name)!;
-    const compLabel = ent.comps.length === 0 ? ''
-      : ent.comps.length === 1 ? ` (component: ${ent.comps[0]})`
-      : ` (shared across components: ${ent.comps.join(', ')} — materialize ONCE)`;
-    const lines = [`### ${ent.id} — ${ent.name}${compLabel}`, 'Fields:'];
-    for (const [fname, mf] of ent.fields) {
-      const alts = [...mf.variants].filter((v) => v !== mf.primary);
-      lines.push(`  - ${fname}: ${mf.primary}${alts.length ? ` [divergent — also defined as: ${alts.join(' | ')} — reconcile to ONE canonical shape]` : ''}`);
+    const members = groups.get(name)!;
+    // Ownership mode when ANY copy carries a P5.1b tag; legacy union otherwise
+    // (backward-compatible for pre-reconciliation data_models artifacts).
+    const tagged = members.some((m) => typeof m.e.ownership_role === 'string');
+    const rendered = tagged ? renderOwnershipGroup(name, members) : [renderLegacyMergedGroup(name, members)];
+    for (const block of rendered) {
+      if (used + block.length + 2 > budget && blocks.length > 0) { dropped++; continue; }
+      blocks.push(block);
+      used += block.length + 2;
     }
-    lines.push(...ent.rels);
-    const block = lines.join('\n');
-    if (used + block.length + 2 > budget && blocks.length > 0) { dropped++; continue; }
-    blocks.push(block);
-    used += block.length + 2;
   }
   if (blocks.length === 0) return '(none)';
   let out = blocks.join('\n\n');
-  if (dropped > 0) out += `\n\n… (${dropped} more shared entit${dropped === 1 ? 'y' : 'ies'} elided to fit budget — materialize the remainder from the data_models artifact)`;
+  if (dropped > 0) out += `\n\n… (${dropped} more shared entit${dropped === 1 ? 'y' : 'ies'} omitted for length — define ${dropped === 1 ? 'it' : 'them'} following the same owned-vs-reference pattern shown above)`;
   return out;
 }
 
@@ -347,7 +442,7 @@ export function gatherComponentDirs(
   collect('component_model', ['components', 'component_model']);
   collect('data_models', ['models'], 'component_id');
   return [...ids]
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .map(id => ({ id, dir: canonicalComponentDir(id, SCAFFOLD_SRC_ROOT, SCAFFOLD_SHARED_DIR, stack) }));
 }
 
@@ -378,7 +473,7 @@ export interface CoherentAreaLayout {
 }
 
 function normLayoutPath(p: string): string {
-  const s = (p ?? '').trim().replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/g, '');
+  const s = (p ?? '').trim().replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/+$/g, '');
   return s === '.' ? '' : s; // a bare '.' is the repo root — the empty-string sentinel
 }
 
@@ -431,7 +526,10 @@ export function reconcileAreaLayout(
     .filter(t => isPathAncestor(root, t) || isPathAncestor(t, root));
   // When the source root was overridden the tests follow it; otherwise keep the
   // area's (tree-consistent) test roots, defaulting to the root for colocated tests.
-  const testRoots = reconciledFrom.length ? [root] : (filteredTests.length ? filteredTests : [root]);
+  let testRoots: string[];
+  if (reconciledFrom.length) testRoots = [root];
+  else if (filteredTests.length) testRoots = filteredTests;
+  else testRoots = [root];
   const aliases = (area.import_aliases ?? []).map(al => {
     if (al.alias.startsWith('@shared')) return { alias: al.alias, target: `${shared}/*` };
     if (al.alias === '@/*' || al.alias === '@') return { alias: al.alias, target: `${root}/*` };
@@ -470,6 +568,17 @@ export function buildAreaScaffoldingPrompt(
       + componentDirs.map(c => `  - ${c.id} → ${c.dir}/`).join('\n')
       + `\nCreate these directories EMPTY — plus the ${stack} package/namespace init file ONLY if the stack requires one (e.g. \`__init__.py\`, \`mod.rs\`). Do NOT put feature files here (the implementation tasks own them), and do NOT invent an alternative layout (no \`components/\` or \`src/components/\` tree).\n\n`
     : '';
+  // D14: the area's prescribed TECH-* ids (evidence the stack/library decision
+  // rests on) and its verification gates were dropped from the prompt — so the
+  // agent couldn't honor the specific runtime/library or author a skeleton that
+  // passes the gates it will be checked against. Render both.
+  const techRefs = area.source_refs.filter(r => r.toUpperCase().startsWith('TECH-'));
+  const techRefsBlock = techRefs.length
+    ? `## Prescribed technologies (honor these — do NOT substitute a different runtime/library)\n${techRefs.map(r => `  - ${r}`).join('\n')}\n\n`
+    : '';
+  const gatesBlock = area.gate_commands.length
+    ? `## Verification gates — the authored skeleton MUST pass these once complete\n${area.gate_commands.map(g => `  - ${g.kind}: \`${g.command}${Array.isArray(g.args) && g.args.length ? ' ' + g.args.join(' ') : ''}\``).join('\n')}\n\n`
+    : '';
   const manifest = area.dependency_manifest || `(the ${stack} standard manifest)`;
   return `# Project Scaffolding — area "${area.area_id}" (stack: ${stack})\n\n`
     + `You are scaffolding the **${stack}** skeleton for this area. Produce IDIOMATIC ${stack} — `
@@ -491,12 +600,14 @@ export function buildAreaScaffoldingPrompt(
     + `- dependency manifest: ${manifest}\n`
     + aliasLine + `\n`
     + componentDirsBlock
+    + techRefsBlock
     + `## Canonical shared modules to create (exact paths)\n${mods}\n\n`
     + `## Shared data models — define as shared types/records under the shared module dir; components IMPORT them (never duplicate per-component)\n${dataModels}\n\n`
     + `## Interface contracts — define as shared contract types under the shared module dir\n${contracts}\n\n`
     + `## Documentation (REQUIRED)\n`
     + `- Every shared type / class / module you create MUST carry a brief doc-comment stating WHAT data shape or contract it materializes and citing the ACTUAL data-model or interface-contract id it comes from — cite the id verbatim from the "Shared data models" / "Interface contracts" blocks above (format: \`# <DM-id>\` or \`# per <IC-id>\` in python; \`// <DM-id>\` in TS/Go/Rust/Java). Do NOT invent an id that is not in those blocks.\n`
     + `- Comment the non-obvious WHY, not the WHAT; prefer self-documenting names over narration; leave no commented-out code.\n\n`
+    + gatesBlock
     + `## Rules\n`
     + `- Materialize the shared modules + data-model/contract definitions ONCE at the EXACT listed paths; components import them — never duplicate.\n`
     + `- Use ${stack}-idiomatic constructs throughout (types/records, modules, imports, manifest, test runner). Do not import another language's conventions or filenames.\n`

@@ -163,13 +163,17 @@ export class WaveGate {
   private buildMirrorFields(input: WaveGateInput): Record<string, unknown> {
     const s = input.completedSummary;
     const d = input.diffSummary;
-    const releaseLabel = input.releaseName
-      ? `${input.releaseName}${input.releaseOrdinal != null ? ` (ordinal ${input.releaseOrdinal})` : ''}`
-      : input.waveKind === 'deferred_batch'
-        ? 'Deferred-batch retry'
-        : input.waveKind === 'single'
-          ? 'Single-wave run (no release plan)'
-          : `Wave ${input.waveNumber}`;
+    let releaseLabel: string;
+    if (input.releaseName) {
+      const ordinalSuffix = input.releaseOrdinal != null ? ` (ordinal ${input.releaseOrdinal})` : '';
+      releaseLabel = `${input.releaseName}${ordinalSuffix}`;
+    } else if (input.waveKind === 'deferred_batch') {
+      releaseLabel = 'Deferred-batch retry';
+    } else if (input.waveKind === 'single') {
+      releaseLabel = 'Single-wave run (no release plan)';
+    } else {
+      releaseLabel = `Wave ${input.waveNumber}`;
+    }
     return {
       wave_number: input.waveNumber,
       wave_kind: input.waveKind,

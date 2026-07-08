@@ -128,10 +128,8 @@ export class PhaseGateEvaluator {
     // 5. Domain attestation (only required for Phase 2)
     if (options?.skipDomainAttestation) {
       skipCriterion('domain_attestation', 'Not required for this phase');
-    } else {
-      if (!evalCriterion(providers.checkDomainAttestation())) {
-        return this.buildResult(phaseId, criteria, failedAt, verificationEnsembleUsed);
-      }
+    } else if (!evalCriterion(providers.checkDomainAttestation())) {
+      return this.buildResult(phaseId, criteria, failedAt, verificationEnsembleUsed);
     }
 
     // 6. Verification Ensemble (LLM — async)
@@ -148,10 +146,8 @@ export class PhaseGateEvaluator {
     // 7. Human approval
     if (options?.skipHumanApproval) {
       skipCriterion('human_approval', 'Automated testing mode');
-    } else {
-      if (!evalCriterion(providers.checkHumanApproval())) {
-        return this.buildResult(phaseId, criteria, failedAt, verificationEnsembleUsed);
-      }
+    } else if (!evalCriterion(providers.checkHumanApproval())) {
+      return this.buildResult(phaseId, criteria, failedAt, verificationEnsembleUsed);
     }
 
     return this.buildResult(phaseId, criteria, failedAt, verificationEnsembleUsed);

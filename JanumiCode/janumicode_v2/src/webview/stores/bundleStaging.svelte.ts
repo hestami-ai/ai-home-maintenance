@@ -91,7 +91,7 @@ class BundleStagingStore {
     const draft = this.state[recordId] ?? { mirror: {}, menu: [] };
     let next: MenuOptionSelection[];
     if (multiSelect) {
-      const present = draft.menu.find(s => s.option_id === optionId);
+      const present = draft.menu.some(s => s.option_id === optionId);
       next = present
         ? draft.menu.filter(s => s.option_id !== optionId)
         : [...draft.menu, { option_id: optionId, ...(freeText !== undefined ? { free_text: freeText } : {}) }];

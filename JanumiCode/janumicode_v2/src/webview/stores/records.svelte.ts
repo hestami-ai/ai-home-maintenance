@@ -103,16 +103,16 @@ export class RecordsStore {
   }
 
   // ── incremental indexes (reactive — read during render) ──────────
-  private byId = new SvelteMap<string, SerializedRecord>();
-  private childrenByParent = new SvelteMap<string, string[]>();
+  private readonly byId = new SvelteMap<string, SerializedRecord>();
+  private readonly childrenByParent = new SvelteMap<string, string[]>();
   /** agent_output id → latest reasoning_review_record id. */
-  private reviewByOutput = new SvelteMap<string, string>();
+  private readonly reviewByOutput = new SvelteMap<string, string>();
   /** record ids referenced by a dmr_pipeline (suppressed at top level). */
-  private dmrDetailIds = new SvelteSet<string>();
+  private readonly dmrDetailIds = new SvelteSet<string>();
   // ── internal-only index (not read during render → plain Map) ──────
   /** record id → its top-level group ancestor id (so head-drop never splits
    *  an agent_invocation from its agent_output / tool_call children). */
-  private groupRootOf = new Map<string, string>();
+  private readonly groupRootOf = new Map<string, string>();
 
   /** Whether the window head-drops on overflow (App mirrors its autoScroll). */
   setStickToBottom(v: boolean): void {
@@ -353,7 +353,7 @@ export class RecordsStore {
     if (record.derived_from_record_ids.length === 0) return false;
     for (const pid of record.derived_from_record_ids) {
       const parent = this.byId.get(pid);
-      if (parent && parent.record_type === 'agent_invocation') return true;
+      if (parent?.record_type === 'agent_invocation') return true;
     }
     // reasoning_review_record points at agent_output, not at agent_invocation
     // directly — walk one hop up the derivation chain so it nests inside
@@ -361,7 +361,7 @@ export class RecordsStore {
     if (record.record_type === 'reasoning_review_record') {
       for (const pid of record.derived_from_record_ids) {
         const parent = this.byId.get(pid);
-        if (parent && parent.record_type === 'agent_output' && this.isChildOfInvocation(parent)) {
+        if (parent?.record_type === 'agent_output' && this.isChildOfInvocation(parent)) {
           return true;
         }
       }

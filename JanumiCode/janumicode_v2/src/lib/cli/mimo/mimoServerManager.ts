@@ -39,6 +39,17 @@ export interface MimoConfig {
   /** Primary agent (default `compose`). */
   agent: string;
   permissionMode: MimoPermissionMode;
+  /**
+   * Whether a human is in the loop (= !unattendedSkipPermissions). Governs the
+   * clarify-with-the-user (`question`) tool and the executor agent-prompt
+   * framing: headless denies `question` (there is no human AND the compose HTTP
+   * API cannot carry a text answer back) and tells the agent it runs headless;
+   * attended sets `question:'ask'` so the adapter can surface the question to the
+   * voice-of-intent reviewer + human before the agent self-resolves. Set by the
+   * adapter from its build context (per-invocation); env `JANUMICODE_MIMO_ATTENDED=1`
+   * is a standalone override. Default false — calibration/CI is the safe default.
+   */
+  attended: boolean;
 }
 
 /**
@@ -63,6 +74,9 @@ export function resolveMimoConfig(env: NodeJS.ProcessEnv = process.env): MimoCon
     model: env.JANUMICODE_MIMO_MODEL || 'mimo/mimo-auto',
     agent: env.JANUMICODE_MIMO_AGENT || EXECUTOR_AGENT_NAME,
     permissionMode: (env.JANUMICODE_MIMO_PERMISSION_MODE as MimoPermissionMode) === 'relay' ? 'relay' : 'static',
+    // Default headless (calibration/CI); the executor adapter overrides this from
+    // its per-invocation build context (= !unattendedSkipPermissions).
+    attended: env.JANUMICODE_MIMO_ATTENDED === '1',
   };
 }
 
@@ -86,16 +100,24 @@ export function buildServerEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.Pro
  * Build the project-root `mimocode.json` permission policy.
  * `static`: deny-by-default, no `ask` (headless). `relay`: sensitive tools
  * (shell/network/out-of-dir) become `ask` so a human approves via the relay.
+ * `attended` (a SEPARATE axis from `mode` — a human is in the loop this run)
+ * governs only the clarify-with-the-user `question` tool.
  */
-export function buildPermissionPolicy(mode: MimoPermissionMode): Record<string, unknown> {
+export function buildPermissionPolicy(mode: MimoPermissionMode, attended = false): Record<string, unknown> {
   const sensitive = mode === 'relay' ? 'ask' : 'deny';
   return {
     $schema: 'https://mimo.xiaomi.com//config.json',
     permission: {
       read: 'allow', edit: 'allow', glob: 'allow', grep: 'allow', lsp: 'allow', task: 'allow', skill: 'allow',
       webfetch: sensitive, websearch: sensitive, codesearch: sensitive,
-      // `question` stays denied even in relay: the executor is non-conversational.
-      question: 'deny',
+      // The clarify-with-the-user `question` tool. HEADLESS → `deny`: there is no
+      // human, AND mimo's compose HTTP API is non-conversational — a permission
+      // answer carries only approve/deny (never a text reply), so a question can't
+      // be answered in-band (the agent self-resolves per the execution directive).
+      // ATTENDED → `ask`: the ask SURFACES as a `permission.asked` the adapter
+      // routes to the voice-of-intent reviewer + human (mimoServerAdapter) before
+      // the agent proceeds. NOT tied to `mode`: relay==static for `question`.
+      question: attended ? 'ask' : 'deny',
       doom_loop: mode === 'relay' ? 'ask' : 'deny',
       bash: {
         '*': sensitive,
@@ -203,12 +225,32 @@ export function buildLocalProvider(
  * embedded here — this prompt stays a generic coding-agent prompt that simply no
  * longer suppresses the comments the task context asks for.
  */
-export function buildExecutorAgentPrompt(): string {
+export function buildExecutorAgentPrompt(attended = false): string {
+  // Framing is MODE-AWARE. Headless: state plainly there is no human to converse
+  // with (so the agent self-resolves rather than asking into a void). Attended: a
+  // spec-grounded voice-of-intent reviewer answers where possible and escalates to
+  // a human when it can't — but the agent still resolves what it can itself and
+  // never stalls (mimo's compose API is non-conversational; see buildPermissionPolicy).
+  // Both frame Research-Plan-Implement (read to reconcile the task with reality);
+  // NEITHER bans reading — the old "no-crawl" absolutism blocked RPI.
+  const framing = attended
+    ? [
+        'You are a coding agent implementing ONE precisely-specified software-engineering task inside an',
+        'existing project under a governed session: a voice-of-intent reviewer, grounded in the spec, answers',
+        'clarifying questions where this session supports it and escalates to a human when it cannot — but',
+        'resolve what you can yourself from the task, spec, and codebase, and never stall waiting for a reply.',
+        'The task — its specification, completion criteria, constraints, write scope, and supporting context —',
+        'is delivered in your message context and is authoritative. Work only within the declared write scope.',
+      ]
+    : [
+        'You are a coding agent implementing ONE precisely-specified software-engineering task inside an',
+        'existing project, driven headlessly (there is no interactive user to converse with — resolve any',
+        'ambiguity from the task, spec, and codebase, make the best spec-consistent choice, and proceed). The',
+        'task — its specification, completion criteria, constraints, write scope, and supporting context — is',
+        'delivered in your message context and is authoritative. Work only within the declared write scope.',
+      ];
   return [
-    'You are a coding agent implementing ONE precisely-specified software-engineering task inside an',
-    'existing project, driven headlessly (there is no interactive user to converse with). The task —',
-    'its specification, completion criteria, constraints, write scope, and supporting context — is',
-    'delivered in your message context and is authoritative. Work only within the declared write scope.',
+    ...framing,
     '',
     '# Following conventions',
     "When making changes to files, first understand the file's code conventions. Mimic code style, use",
@@ -261,18 +303,18 @@ export function buildExecutorAgentPrompt(): string {
  * are left to mimo's defaults (governed by the `permission` policy); the model
  * is inherited from the top-level `model` (the local provider).
  */
-export function buildExecutorAgent(): Record<string, unknown> {
+export function buildExecutorAgent(attended = false): Record<string, unknown> {
   return {
     [EXECUTOR_AGENT_NAME]: {
       description: 'JanumiCode Phase-9 executor — mimo default coding agent with the anti-comment rule removed (task context governs craft).',
       mode: 'primary',
-      prompt: buildExecutorAgentPrompt(),
+      prompt: buildExecutorAgentPrompt(attended),
     },
   };
 }
 
 export function buildProjectConfig(cfg: MimoConfig, env: NodeJS.ProcessEnv = process.env): Record<string, unknown> {
-  const config: Record<string, unknown> = buildPermissionPolicy(cfg.permissionMode);
+  const config: Record<string, unknown> = buildPermissionPolicy(cfg.permissionMode, cfg.attended === true);
   const local = buildLocalProvider(cfg.model, env);
   if (local) {
     config.provider = local.provider;
@@ -280,8 +322,9 @@ export function buildProjectConfig(cfg: MimoConfig, env: NodeJS.ProcessEnv = pro
   }
   // Always define our executor agent so the configured `agent` (default
   // EXECUTOR_AGENT_NAME) resolves; setting JANUMICODE_MIMO_AGENT=compose opts
-  // back into mimo's built-in (anti-comment) agent.
-  config.agent = buildExecutorAgent();
+  // back into mimo's built-in (anti-comment) agent. The agent prompt framing is
+  // mode-aware (attended vs headless), consistent with the `question` policy.
+  config.agent = buildExecutorAgent(cfg.attended === true);
   // Disable mimo's automatic conversation COMPACTION (config schema
   // `compaction.auto`, default true — "Enable automatic compaction when context
   // is full"). When a leaf's within-session context grows from many tool turns,
@@ -343,7 +386,7 @@ class MimoServerManagerImpl {
   async ensure(projectRoot: string, cfg: MimoConfig = resolveMimoConfig()): Promise<RunningServer> {
     const key = path.resolve(projectRoot);
     const existing = this.servers.get(key);
-    if (existing && existing.proc.exitCode === null) return existing;
+    if (existing?.proc.exitCode === null) return existing;
 
     this.writePolicyAndTrust(key, cfg);
     const server = await this.spawnServer(key, cfg);

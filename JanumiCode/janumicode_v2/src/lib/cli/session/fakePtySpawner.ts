@@ -23,8 +23,8 @@ export interface FakePtyScript {
 }
 
 export class FakePtyProcess implements PtyProcess {
-  private dataListeners: Array<(c: string) => void> = [];
-  private exitListeners: Array<(e: { exitCode: number; signal?: number }) => void> = [];
+  private readonly dataListeners: Array<(c: string) => void> = [];
+  private readonly exitListeners: Array<(e: { exitCode: number; signal?: number }) => void> = [];
   readonly writes: string[] = [];
   readonly resizes: Array<{ cols: number; rows: number }> = [];
   killed = false;
@@ -54,9 +54,9 @@ export class FakePtyProcess implements PtyProcess {
   kill(): void { this.killed = true; this.exit(0); }
 
   /** Test helper: push a raw frame. */
-  emit(chunk: string): void { for (const l of [...this.dataListeners]) l(chunk); }
+  emit(chunk: string): void { for (const l of this.dataListeners) l(chunk); }
   /** Test helper: end the process. */
-  exit(exitCode: number): void { for (const l of [...this.exitListeners]) l({ exitCode }); }
+  exit(exitCode: number): void { for (const l of this.exitListeners) l({ exitCode }); }
 }
 
 export class FakePtySpawner implements PtySpawner {

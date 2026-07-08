@@ -21,6 +21,9 @@ import { emit as aoddEmit } from '../aodd';
 
 // ── Types ───────────────────────────────────────────────────────────
 
+/** Filesystem write operation recorded for an executed task. */
+export type FileOperation = 'create' | 'modify' | 'delete';
+
 export interface ExecutionTask {
   id: string;
   taskType: 'standard' | 'refactoring';
@@ -56,7 +59,7 @@ export interface ExecutionResult {
 
 export interface FileWriteRecord {
   filePath: string;
-  operation: 'create' | 'modify' | 'delete';
+  operation: FileOperation;
   sha256Before: string | null;
   sha256After: string | null;
   /**
@@ -265,6 +268,12 @@ export class ExecutorAgent {
     if (process.platform === 'win32') {
       cleanupStrayDashPDirs(cwd);
     }
+    // Path hygiene (F4, P9 audit): surface stray non-canonical top-level dirs the
+    // executor created — e.g. a weak local model mangling the absolute workspace
+    // path in its context into `brationworkspace_cal_34/` (cal-41). Log-only:
+    // deleting an autonomous executor's output is unsafe, so this makes the
+    // previously-silent garbage VISIBLE for review instead.
+    warnStrayTopLevelDirs(cwd);
 
     // Record execution trace events
     if (result.cliResult) {
@@ -449,13 +458,13 @@ export class ExecutorAgent {
     after: Map<string, string>,
   ): Array<{
     filePath: string;
-    operation: 'create' | 'modify' | 'delete';
+    operation: FileOperation;
     sha256Before: string | null;
     sha256After: string | null;
   }> {
     const writes: Array<{
       filePath: string;
-      operation: 'create' | 'modify' | 'delete';
+      operation: FileOperation;
       sha256Before: string | null;
       sha256After: string | null;
     }> = [];
@@ -483,12 +492,12 @@ export class ExecutorAgent {
   private extractFileWritesFromEvents(
     events: Array<{ recordType: string; data: Record<string, unknown> }>,
     cwd: string,
-  ): Array<{ filePath: string; operation: 'create' | 'modify' | 'delete'; toolName: string }> {
+  ): Array<{ filePath: string; operation: FileOperation; toolName: string }> {
     const writeTools = new Set(['Write', 'Edit', 'MultiEdit', 'write_file', 'edit_file']);
     const deleteTools = new Set(['Delete', 'delete_file']);
     const results: Array<{
       filePath: string;
-      operation: 'create' | 'modify' | 'delete';
+      operation: FileOperation;
       toolName: string;
     }> = [];
     for (const event of events) {
@@ -522,19 +531,19 @@ export class ExecutorAgent {
   private mergeDetections(
     snapshot: Array<{
       filePath: string;
-      operation: 'create' | 'modify' | 'delete';
+      operation: FileOperation;
       sha256Before: string | null;
       sha256After: string | null;
     }>,
     toolEvent: Array<{
       filePath: string;
-      operation: 'create' | 'modify' | 'delete';
+      operation: FileOperation;
       toolName: string;
     }>,
     preSnapshot: Map<string, string>,
     postSnapshot: Map<string, string>,
   ): FileWriteRecord[] {
-    const toolEventByPath = new Map<string, { toolName: string; operation: 'create' | 'modify' | 'delete' }>();
+    const toolEventByPath = new Map<string, { toolName: string; operation: FileOperation }>();
     for (const te of toolEvent) {
       // If the same path was touched by multiple tool calls, keep the
       // last one's tool name — it's usually the one that actually
@@ -724,7 +733,7 @@ export class ExecutorAgent {
           return 'FILE_NOT_FOUND';
         }
       })
-      .sort(); // Sort for deterministic ordering
+      .sort((a, b) => a.localeCompare(b)); // Sort for deterministic ordering
     
     return ExecutorAgent.computeFileHash(hashes.join('|'));
   }
@@ -795,6 +804,45 @@ export function cleanupStrayDashPDirs(workspacePath: string): void {
       error: err instanceof Error ? err.message : String(err),
     });
   }
+}
+
+/** Top-level entries that legitimately appear in a scaffolded project root
+ *  (across the stacks P9 targets). Anything else at the root is likely a stray
+ *  write to surface. */
+const CANONICAL_PROJECT_ROOTS = new Set([
+  'src', 'tests', 'test', '__tests__', 'spec', 'node_modules', 'dist', 'build',
+  'out', 'target', 'bin', 'obj', 'public', 'static', 'assets', 'docs', 'doc',
+  'scripts', 'config', 'migrations', 'prisma', 'drizzle', 'packages', 'apps',
+  'lib', 'libs', 'cmd', 'internal', 'pkg', 'crates', 'gradle', 'venv', '.venv',
+]);
+
+/**
+ * Surface (LOG, do NOT delete) top-level directories the executor created that are
+ * not canonical project roots — e.g. the mangled `brationworkspace_cal_34/` /
+ * `ibration/` dirs a weak local model hallucinated from the absolute workspace path
+ * in its context (cal-41). Previously silent; deleting an autonomous executor's
+ * output is unsafe, so this makes stray writes visible for review. Dotdirs and the
+ * canonical roots are ignored. Returns the stray names (for tests / callers).
+ */
+export function warnStrayTopLevelDirs(workspacePath: string): string[] {
+  const stray: string[] = [];
+  try {
+    for (const entry of fs.readdirSync(workspacePath, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      if (CANONICAL_PROJECT_ROOTS.has(entry.name.toLowerCase())) continue;
+      stray.push(entry.name);
+    }
+    if (stray.length > 0) {
+      getLogger().warn('workflow', 'Phase 9 executor: stray non-canonical top-level dirs (possible path hallucination — surfaced for review, not auto-deleted)', {
+        workspacePath, stray_dirs: stray,
+      });
+    }
+  } catch (err) {
+    getLogger().debug('workflow', 'warnStrayTopLevelDirs failed (non-fatal)', {
+      workspacePath, error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  return stray;
 }
 
 function sweepDashP(dirPath: string): void {

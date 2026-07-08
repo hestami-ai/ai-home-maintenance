@@ -209,7 +209,7 @@ export class InvocationLogFile {
     // accurate. The "would-have-written" line length is computed
     // once and used both for the counter bump and (optionally) for
     // the actual append.
-    const preview = params.text.replaceAll('\n', '\\n').slice(0, 120);
+    const preview = params.text.replaceAll('\n', String.raw`\n`).slice(0, 120);
     const line = `[${params.channel.padEnd(9)}] +${params.msSinceStart
       .toString()
       .padStart(6)}ms  chars=${params.cumulativeChars

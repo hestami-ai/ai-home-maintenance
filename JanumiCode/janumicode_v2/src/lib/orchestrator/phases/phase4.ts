@@ -153,7 +153,7 @@ export function deterministicDomainScopeDrops(
   // join would silently drop every component on a hyphen/underscore/case
   // mismatch — the same catastrophic 0-component failure this filter
   // exists to prevent. Canonicalize both sides before intersecting.
-  const norm = (s: string): string => s.trim().toUpperCase().replace(/_/g, '-');
+  const norm = (s: string): string => s.trim().toUpperCase().replaceAll('_', '-');
   const acceptedNorm = new Set([...acceptedBusinessDomainIds].map(norm));
   const swMaps = new Map<string, string[]>(
     softwareDomains.map(d => [norm(d.id), d.maps_to_business_domains ?? []]),

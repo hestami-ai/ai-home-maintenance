@@ -1,0 +1,388 @@
+LABEL: Phase 9.1 — task-scaffolding-core-api
+ID: 2649a250-efcc-4ba0-95c9-2dc966a2482d
+
+===== SYSTEM (0 chars) =====
+(none)
+
+===== PROMPT (15366 chars) =====
+# Project Scaffolding — area "core-api" (stack: node)
+
+You are scaffolding the **node** skeleton for this area. Produce IDIOMATIC node — you know its conventions (manifest, module/package layout, import syntax, test runner, and the language's type/record constructs). Author ONLY the skeleton below; the implementation tasks add feature behavior on top.
+
+## Produce exactly these artifacts
+1. The dependency manifest (package.json) with the dependencies this area needs and a runnable test command.
+2. Any build / language configuration the node stack requires.
+3. The canonical shared modules listed below, at their EXACT paths.
+4. The shared data-model and interface-contract type/record DEFINITIONS (the data shapes below), materialized ONCE under the shared module dir.
+5. The component directories listed below — created EMPTY.
+Then verify it builds / type-checks / parses.
+
+## What "skeleton" means here
+Skeleton = directory + module structure, the dependency manifest/config, and the shared TYPE / CONTRACT DEFINITIONS (data shapes, signatures). It does NOT include feature behavior or algorithms — those belong to the implementation tasks. A type or record definition IS skeleton; business logic is not.
+
+## Layout — ONE coherent source tree; EVERY path below is rooted at `src/`. Do NOT create a second source root or a nested `components/` tree.
+- source root: src/
+- shared module dir: src/shared/ — materialize the shared types/contracts here ONCE; components import them (never duplicate).
+- test roots: src
+- dependency manifest: package.json
+- import aliases (node): @shared → src/shared/*
+
+## Component directories (canonical — implementation tasks write to these EXACT paths)
+  - comp-audit-log-retriever → src/audit-log-retriever/
+  - comp-audit-log-service → src/audit-log-service/
+  - comp-audit-log-writer → src/audit-log-writer/
+  - comp-compliance-status-updater → src/compliance-status-updater/
+  - comp-compliance-tracking-service → src/compliance-tracking-service/
+  - comp-invoice-service → src/invoice-service/
+  - comp-job-exec-logger → src/job-exec-logger/
+  - comp-job-execution-service → src/job-execution-service/
+  - comp-job-photo-linker → src/job-photo-linker/
+  - comp-photo-upload-service → src/photo-upload-service/
+  - comp-property-service → src/property-service/
+  - comp-statutory-deadline-verifier → src/statutory-deadline-verifier/
+  - comp-tenant-config-service → src/tenant-config-service/
+  - comp-tenant-schema-service → src/tenant-schema-service/
+  - comp-tenant-service → src/tenant-service/
+  - comp-user-account-service → src/user-account-service/
+  - comp-workorder-service → src/workorder-service/
+Create these directories EMPTY — plus the node package/namespace init file ONLY if the stack requires one (e.g. `__init__.py`, `mod.rs`). Do NOT put feature files here (the implementation tasks own them), and do NOT invent an alternative layout (no `components/` or `src/components/` tree).
+
+## Canonical shared modules to create (exact paths)
+  - shared/auth  — importable as (per node): @shared/auth  — Shared authentication contracts and utilities.
+
+## Shared data models — define as shared types/records under the shared module dir; components IMPORT them (never duplicate per-component)
+### DM-audit-log-retriever-propertyrecord — PropertyRecord (shared across components: comp-audit-log-retriever, comp-compliance-status-updater, comp-statutory-deadline-verifier, comp-invoice-service, comp-job-exec-logger, comp-property-service, comp-tenant-schema-service — materialize ONCE)
+Fields:
+  - id: uuid
+  - tenant_id: uuid
+  - address_street: string
+  - address_city: string
+  - address_state: string
+  - address_zip: string
+  - created_at: timestamp
+  - updated_at: timestamp
+  - key_photo_urls: string[] [divergent — also defined as: jsonb — reconcile to ONE canonical shape]
+  - address: string
+  - key_photos: array<string> [divergent — also defined as: jsonb | string — reconcile to ONE canonical shape]
+  - address_line1: string
+  - address_line2: string
+  - city: string
+  - state: string
+  - zip_code: string
+  - property_id: uuid
+  - key_photos_jsonb: jsonb
+  → ? (references)
+  → ? (one_to_many)
+  → Tenant (references)
+
+### DM-audit-log-retriever-propertyphoto — PropertyPhoto (shared across components: comp-audit-log-retriever, comp-statutory-deadline-verifier — materialize ONCE)
+Fields:
+  - id: uuid
+  - property_record_id: uuid
+  - photo_url: string
+  - created_at: timestamp
+  - captured_at: timestamp
+  → ? (references)
+  → ? (many_to_one)
+
+### DM-audit-log-writer-auditlogentry — AuditLogEntry (shared across components: comp-audit-log-writer, comp-property-service — materialize ONCE)
+Fields:
+  - id: uuid
+  - event_type: string
+  - timestamp: timestamp
+  - user_id: uuid
+  - target_entity_id: uuid
+  - payload: jsonb
+  - hash: string
+  - previous_hash: string
+  - audit_log_id: uuid
+  - entity_type: string
+  - entity_id: uuid
+  - performed_by_user_id: uuid
+  - performed_at: timestamp
+  - details: jsonb
+  → ? (references)
+
+### DM-compliance-status-updater-tenant — Tenant (shared across components: comp-compliance-status-updater, comp-statutory-deadline-verifier, comp-invoice-service, comp-job-exec-logger — materialize ONCE)
+Fields:
+  - id: uuid
+  - name: string
+  - created_at: timestamp
+  - updated_at: timestamp
+  - config: jsonb
+  - tenant_id: uuid
+  - schema_name: string
+  → ? (one_to_many)
+
+### DM-compliance-status-updater-workorder — WorkOrder (shared across components: comp-compliance-status-updater, comp-statutory-deadline-verifier, comp-invoice-service, comp-job-exec-logger, comp-property-service, comp-tenant-schema-service, comp-workorder-service — materialize ONCE)
+Fields:
+  - id: uuid
+  - property_id: uuid
+  - homeowner_user_id: uuid
+  - contractor_user_id: uuid
+  - title: string
+  - description: text [divergent — also defined as: string — reconcile to ONE canonical shape]
+  - status: enum [divergent — also defined as: string — reconcile to ONE canonical shape]
+  - created_at: timestamp
+  - updated_at: timestamp
+  - completed_at: timestamp
+  - tenant_id: uuid
+  - compliance_status: string
+  - property_record_id: uuid
+  - work_order_id: uuid
+  - completion_reason: string
+  - due_date: timestamp
+  - priority: integer
+  - evidence_required_count: integer
+  - evidence_submitted_count: integer
+  → ? (references)
+  → ? (one_to_many)
+  → ? (one_to_one)
+  → ? (many_to_one)
+  → Tenant (references)
+  → PropertyRecord (references)
+  → User (references)
+
+### DM-compliance-status-updater-jobexecutionlog — JobExecutionLog (shared across components: comp-compliance-status-updater, comp-statutory-deadline-verifier, comp-job-exec-logger — materialize ONCE)
+Fields:
+  - id: uuid
+  - work_order_id: uuid
+  - user_id: uuid
+  - action: text
+  - timestamp: timestamp
+  - created_at: timestamp
+  - execution_timestamp: timestamp
+  - details: string [divergent — also defined as: jsonb — reconcile to ONE canonical shape]
+  - log_id: uuid
+  - job_id: uuid
+  - event_type: string
+  → ? (references)
+  → ? (many_to_one)
+
+### DM-compliance-status-updater-photoevidence — PhotoEvidence (shared across components: comp-compliance-status-updater, comp-invoice-service, comp-job-exec-logger, comp-property-service — materialize ONCE)
+Fields:
+  - id: uuid
+  - work_order_id: uuid
+  - photo_url: string
+  - uploaded_at: timestamp
+  - tenant_id: uuid
+  - job_execution_id: uuid
+  - captured_at: timestamp
+  - metadata: jsonb
+  - evidence_id: uuid
+  - job_id: uuid
+  - photo_id: uuid
+  → ? (references)
+  → JobExecution (references)
+
+### DM-compliance-status-updater-ledgerentry — LedgerEntry (shared across components: comp-compliance-status-updater, comp-invoice-service, comp-job-exec-logger, comp-property-service, comp-tenant-schema-service — materialize ONCE)
+Fields:
+  - id: uuid
+  - work_order_id: uuid
+  - amount: numeric [divergent — also defined as: decimal | string — reconcile to ONE canonical shape]
+  - currency: string
+  - entry_date: timestamp
+  - created_by_user_id: uuid
+  - created_at: timestamp
+  - tenant_id: uuid
+  - invoice_id: uuid
+  - transaction_type: string
+  - ledger_entry_id: uuid
+  - amount_cents: integer
+  - posted_at: timestamp
+  - hash: string
+  → ? (references)
+  → Tenant (references)
+  → Invoice (references)
+
+### DM-compliance-status-updater-invoice — Invoice (shared across components: comp-compliance-status-updater, comp-statutory-deadline-verifier, comp-invoice-service, comp-job-exec-logger, comp-property-service, comp-tenant-schema-service — materialize ONCE)
+Fields:
+  - id: uuid
+  - work_order_id: uuid
+  - invoice_number: string
+  - total_amount: numeric
+  - due_date: date [divergent — also defined as: timestamp — reconcile to ONE canonical shape]
+  - status: enum [divergent — also defined as: string — reconcile to ONE canonical shape]
+  - created_at: timestamp
+  - updated_at: timestamp
+  - amount: numeric [divergent — also defined as: decimal | string — reconcile to ONE canonical shape]
+  - issued_at: timestamp
+  - paid_at: timestamp
+  - tenant_id: uuid
+  - currency: string
+  - invoice_id: uuid
+  - amount_cents: integer
+  → ? (references)
+  → ? (many_to_one)
+  → Tenant (references)
+  → WorkOrder (references)
+
+### DM-compliance-status-updater-workorderaudit — WorkOrderAudit (shared across components: comp-compliance-status-updater, comp-statutory-deadline-verifier — materialize ONCE)
+Fields:
+  - id: uuid
+  - work_order_id: uuid
+  - previous_status: string
+  - new_status: string
+  - changed_by_user_id: uuid
+  - changed_at: timestamp
+  - hash: string
+  - event_type: string
+  - timestamp: timestamp
+  → ? (references)
+  → ? (many_to_one)
+
+### DM-compliance-status-updater-compliancestatus — ComplianceStatus (component: comp-compliance-status-updater)
+Fields:
+  - id: uuid
+  - work_order_id: uuid
+  - compliance_status: enum
+  - verified_at: timestamp
+  - tenant_id: uuid
+  → ? (references)
+
+### DM-compliance-status-updater-ledgerauditlog — LedgerAuditLog (component: comp-compliance-status-updater)
+Fields:
+  - id: uuid
+  - ledger_entry_id: uuid
+  - original_data: jsonb
+  - hash: string
+  - previous_hash: string
+  - created_at: timestamp
+  → ? (references)
+
+### DM-compliance-status-updater-user — User (shared across components: comp-compliance-status-updater, comp-statutory-deadline-verifier, comp-invoice-service, comp-user-account-service — materialize ONCE)
+Fields:
+  - id: uuid
+  - email: string
+  - password_hash: string
+  - role_id: uuid
+  - name: string
+  - created_at: timestamp
+  - updated_at: timestamp
+  - tenant_id: uuid
+  - first_name: string
+  - last_name: string
+  - is_active: boolean
+  → ? (references)
+  → ? (many_to_one)
+  → ? (one_to_many)
+  → Tenant (references)
+  → Role (references)
+
+### DM-compliance-status-updater-role — Role (shared across components: comp-compliance-status-updater, comp-statutory-deadline-verifier, comp-invoice-service, comp-job-exec-logger, comp-property-service, comp-tenant-schema-service, comp-user-account-service — materialize ONCE)
+Fields:
+  - id: uuid
+  - name: string
+  - permissions: jsonb [divergent — also defined as: string — reconcile to ONE canonical shape]
+  - description: string
+  - tenant_id: uuid
+  - role_id: uuid
+  - created_at: timestamp
+  - updated_at: timestamp
+  → ? (one_to_many)
+  → Tenant (references)
+
+… (25 more shared entities elided to fit budget — materialize the remainder from the data_models artifact)
+
+## Interface contracts — define as shared contract types under the shared module dir
+{
+ "id": "CLOUD-1",
+ "systems_involved": [
+  "Client",
+  "TECH-CLOUDFLARE-1"
+ ],
+ "protocol": "HTTPS (HTTP/2) via Cloudflare CDN",
+ "data_format": "JSON payloads for RESTful endpoints; binary streams for file uploads",
+ "auth_mechanism": "None – TLS termination handled by Cloudflare"
+}
+{
+ "id": "DBOS-PGSQL-1",
+ "systems_involved": [
+  "TECH-DBOS-1",
+  "TECH-PGSQL-1"
+ ],
+ "protocol": "PostgreSQL binary wire protocol (RLS enabled)",
+ "data_format": "Relational tables with JSON columns for flexible attributes",
+ "auth_mechanism": "Database credentials (username/password) stored in a secure secrets manager"
+}
+{
+ "id": "AI-PGSQL-1",
+ "systems_involved": [
+  "INT-AI-VENDOR-MATCHING",
+  "TECH-PGSQL-1"
+ ],
+ "protocol": "oRPC over HTTPS (JSON payloads)",
+ "data_format": "Structured JSON for vendor data and match results",
+ "auth_mechanism": "Token‑based authentication issued by Better‑Auth"
+}
+{
+ "id": "AUTH-CLIENT-1",
+ "systems_involved": [
+  "Client",
+  "TECH-BETTERAUTH-1"
+ ],
+ "protocol": "OAuth2.0 over HTTPS (JSON Web Token exchange)",
+ "data_format": "JWT‑encoded claims in JSON format",
+ "auth_mechanism": "Bearer token issued by Better‑Auth (OpenID Connect compliant)"
+}
+{
+ "id": "DBOS-SEAWED-1",
+ "systems_involved": [
+  "TECH-DBOS-1",
+  "TECH-SEAWEEDFS-1"
+ ],
+ "protocol": "HTTPS (HTTP/2) with TUS resumable upload support",
+ "data_format": "Binary blobs for media assets; JSON metadata stored in DBOS",
+ "auth_mechanism": "API key or token issued by the application’s secrets manager"
+}
+{
+ "id": "SEAWED-TUS-1",
+ "systems_involved": [
+  "TECH-SEAWEEDFS-1",
+  "TECH-TUSD-1"
+ ],
+ "protocol": "TUS protocol over HTTPS (multipart upload with resume support)",
+ "data_format": "Binary file data; JSON for metadata in the TUS headers",
+ "auth_mechanism": "API key or token validated by SeaweedFS and tusd services"
+}
+{
+ "id": "AI-SENDGRID-1",
+ "systems_involved": [
+  "INT-AI-VENDOR-MATCHING",
+  "EXT-001"
+ ],
+ "protocol": "RESTful HTTPS API (SendGrid)",
+ "data_format": "JSON payloads for email templates and recipient lists",
+ "auth_mechanism": "API key provided by SendGrid, transmitted in the Authorization header"
+}
+{
+ "id": "CLIENT-STRIPE-1",
+ "systems_involved": [
+  "Client",
+  "EXT-002"
+ ],
+ "protocol": "HTTPS (RESTful API) to Stripe",
+ "data_format": "JSON payloads for payment intents, invoices, and webhooks",
+ "auth_mechanism": "Bearer token or secret key provided by Stripe, transmitted in the Authorization header"
+}
+{
+ "id": "AI-AWS3-1",
+ "systems_involved": [
+  "INT-AI-VENDOR-MATCHING",
+  "EXT-003"
+ ],
+ "protocol": "AWS S3 REST API (HTTPS) for object storage",
+ "data_format": "Binary files; JSON metadata via custom headers or separate objects",
+ "auth_mechanism": "API key or access‑secret credential pair authenticated by the application’s secrets manager"
+}
+
+## Documentation (REQUIRED)
+- Every shared type / class / module you create MUST carry a brief doc-comment stating WHAT data shape or contract it materializes and citing the ACTUAL data-model or interface-contract id it comes from — cite the id verbatim from the "Shared data models" / "Interface contracts" blocks above (format: `# <DM-id>` or `# per <IC-id>` in python; `// <DM-id>` in TS/Go/Rust/Java). Do NOT invent an id that is not in those blocks.
+- Comment the non-obvious WHY, not the WHAT; prefer self-documenting names over narration; leave no commented-out code.
+
+## Rules
+- Materialize the shared modules + data-model/contract definitions ONCE at the EXACT listed paths; components import them — never duplicate.
+- Use node-idiomatic constructs throughout (types/records, modules, imports, manifest, test runner). Do not import another language's conventions or filenames.
+- Component code lives ONLY in the canonical per-component directories above (the same paths the implementation tasks write to).
+- Honor the node stack; do not introduce another language.
+- Verify the skeleton builds / type-checks / parses before finishing.

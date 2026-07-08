@@ -49,7 +49,9 @@ function runDeterministicDedup(
   for (const ea of existing) {
     if (!ea || typeof ea !== 'object') continue;
     const e = ea as Record<string, unknown>;
-    const id = typeof e.id === 'string' ? e.id : typeof e.assumption_id === 'string' ? e.assumption_id : '';
+    let id = '';
+    if (typeof e.id === 'string') id = e.id;
+    else if (typeof e.assumption_id === 'string') id = e.assumption_id;
     if (id) existingIds.add(id);
   }
 
@@ -57,7 +59,9 @@ function runDeterministicDedup(
     const sa = surfaced[i];
     if (!sa || typeof sa !== 'object') continue;
     const s = sa as Record<string, unknown>;
-    const id = typeof s.id === 'string' ? s.id : typeof s.assumption_id === 'string' ? s.assumption_id : '';
+    let id = '';
+    if (typeof s.id === 'string') id = s.id;
+    else if (typeof s.assumption_id === 'string') id = s.assumption_id;
     if (id && existingIds.has(id)) {
       findings.push({
         validatorId: 'surfaced_assumption_novelty',

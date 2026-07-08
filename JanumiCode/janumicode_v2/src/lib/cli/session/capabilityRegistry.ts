@@ -16,7 +16,7 @@ import { GooseTuiAdapter, type GooseTuiConfig } from './adapters/gooseTuiAdapter
 import { MimoServerAdapter } from './adapters/mimoServerAdapter';
 import type { ExecutorAdapter } from './adapter';
 import type { SessionLogEvent } from './sessionDriver';
-import type { SessionResponder } from './responder';
+import type { ExecutorEscalation, SessionResponder } from './responder';
 
 export interface AdapterBuildContext {
   cwd: string;
@@ -29,6 +29,19 @@ export interface AdapterBuildContext {
    * Optional: adapters fall back to canned responses without it.
    */
   responder?: SessionResponder;
+  /**
+   * Whether a human is in the loop this run (= !unattendedSkipPermissions).
+   * Governs the mimo `question` policy + agent-prompt framing so the adapter's
+   * runtime behavior matches the execution-mode directive. Default false.
+   */
+  attended?: boolean;
+  /**
+   * Human-escalation sink for a genuinely-blocking clarification the responder
+   * could not resolve. Present only in ATTENDED sessions; absent headless (the
+   * executor self-resolves). Adapters degrade to spec-grounded best judgment
+   * when it is absent or returns null — never a deadlock.
+   */
+  onEscalate?: ExecutorEscalation;
 }
 
 /** A CLI's interactive capability — null `makeInteractive` ⇒ structured-only. */
@@ -50,7 +63,17 @@ const REGISTRY: Record<string, CliCapability> = {
     backingTool: 'mimo_cli',
     // HTTP/SSE — no PTY substrate required.
     requiresPty: false,
-    makeInteractive: (ctx) => new MimoServerAdapter({ onLog: ctx.onLog }),
+    // Thread the responder + attended flag + escalation sink (previously DROPPED
+    // here — mimo silently ran with no voice-of-intent). mimo's compose API is
+    // non-conversational, so the responder can't type an answer back the way
+    // goose's PTY does; the adapter uses these to SURFACE + escalate a question
+    // (attended) rather than answer-and-inject. See mimoServerAdapter.
+    makeInteractive: (ctx) => new MimoServerAdapter({
+      onLog: ctx.onLog,
+      responder: ctx.responder,
+      attended: ctx.attended,
+      onEscalate: ctx.onEscalate,
+    }),
   },
   goose_cli: {
     backingTool: 'goose_cli',
@@ -59,6 +82,9 @@ const REGISTRY: Record<string, CliCapability> = {
       new GooseTuiAdapter(new NodePtySpawner(), {
         onLog: ctx.onLog,
         responder: ctx.responder,
+        // The PTY can TYPE the human's answer back — so goose gets the escalation
+        // sink for genuine answer-injection (mimo only surfaces + records it).
+        onEscalate: ctx.onEscalate,
         config: GOOSE_INTERACTIVE_CONFIG,
       }),
   },
@@ -92,7 +118,7 @@ export function selectExecutorAdapter(
   ptyAvailableOverride?: boolean,
 ): ExecutorAdapterSelection {
   const cap = REGISTRY[backingTool];
-  if (!cap || !cap.makeInteractive) {
+  if (!cap?.makeInteractive) {
     return { adapter: null, fallbackReason: 'no_interactive_adapter' };
   }
   // PTY adapters (goose) need the node-pty substrate; HTTP/SSE adapters (mimo) don't.

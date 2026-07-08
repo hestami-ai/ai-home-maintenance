@@ -25,6 +25,7 @@
   import ExecutionWaveCard from './ExecutionWaveCard.svelte';
   import QuarantineLedgerCard from './QuarantineLedgerCard.svelte';
   import ReasoningReviewCard from './ReasoningReviewCard.svelte';
+  import ExecutorQuestionCard from './ExecutorQuestionCard.svelte';
   import CardSubChat from './CardSubChat.svelte';
 
   interface Props {
@@ -317,6 +318,10 @@
 {:else if record.record_type === 'phase_gate_evaluation'}
   <div data-record-id={record.id}>
     <PhaseGateCard {record} {ondecision} />
+  </div>
+{:else if record.record_type === 'executor_question_presented'}
+  <div data-record-id={record.id}>
+    <ExecutorQuestionCard {record} {vscode} />
   </div>
 {:else}
   <!-- Generic card with category styling -->

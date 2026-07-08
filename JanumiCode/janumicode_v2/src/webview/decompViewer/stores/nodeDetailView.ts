@@ -173,7 +173,8 @@ function buildDataModel(p: NodeDetailPayload): NodeDetailView {
     arr(e.relationships).map((raw) => {
       const r = obj(raw);
       const kind = str(r.kind);
-      return plain(typeof raw === 'string' ? raw : `${str(r.target_entity_id)}${kind ? ` (${kind})` : ''}`);
+      const kindSuffix = kind ? ` (${kind})` : '';
+      return plain(typeof raw === 'string' ? raw : `${str(r.target_entity_id)}${kindSuffix}`);
     }).filter((ch) => ch.text),
   );
   pushSection(sections, 'Traces to', 'chips', strArr(e.traces_to).map(plain));

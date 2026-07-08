@@ -166,7 +166,7 @@ type EventHandler<T extends EventType> = (payload: EventPayload[T]) => void;
 // ── EventBus ────────────────────────────────────────────────────────
 
 export class EventBus {
-  private handlers = new Map<EventType, Set<EventHandler<EventType>>>();
+  private readonly handlers = new Map<EventType, Set<EventHandler<EventType>>>();
 
   /**
    * Subscribe to an event type.

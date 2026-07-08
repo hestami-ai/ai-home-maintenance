@@ -225,7 +225,7 @@ export class StateMachine {
 
     // Check if transition is valid
     const validTargets = FORWARD_TRANSITIONS[currentPhase];
-    if (!validTargets || !validTargets.includes(targetPhase)) {
+    if (!validTargets?.includes(targetPhase)) {
       return {
         success: false,
         error: `Invalid transition: ${currentPhase} → ${targetPhase}. Valid targets: [${validTargets?.join(', ') ?? 'none'}]`,

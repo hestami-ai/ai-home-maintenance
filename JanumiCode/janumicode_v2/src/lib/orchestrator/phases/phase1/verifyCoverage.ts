@@ -83,7 +83,7 @@ function difference(a: string[], b: string[]): string[] {
 }
 
 function uniqSorted(xs: string[]): string[] {
-  return Array.from(new Set(xs)).sort();
+  return Array.from(new Set(xs)).sort((a, b) => a.localeCompare(b));
 }
 
 function mkGap(params: {
@@ -527,8 +527,8 @@ function triggerIsInvalid(
   if (t.kind === 'journey_step') {
     const j = ctx.journeyByIdAndStep.get(t.journey_id);
     if (!j) return `journey_step:${t.journey_id}#${t.step_number}:journey-not-accepted`;
-    const step = j.steps.find(s => s.stepNumber === t.step_number);
-    if (!step) return `journey_step:${t.journey_id}#${t.step_number}:step-missing`;
+    const stepExists = j.steps.some(s => s.stepNumber === t.step_number);
+    if (!stepExists) return `journey_step:${t.journey_id}#${t.step_number}:step-missing`;
     // Note: we do NOT require step.automatable === true here. Automatable
     // is emergent — when a workflow backs a step, that step IS automatable
     // by definition, regardless of whether 1.3a flagged it. This matches

@@ -65,44 +65,47 @@ export function deriveAndWriteRunSummary(
 
 export function renderRunSummaryMd(s: RunSummary): string {
   const lines: string[] = [];
-  lines.push(`# Run summary: ${s.run_id}`);
-  lines.push('');
+  lines.push(`# Run summary: ${s.run_id}`, '');
   if (s.intent_brief) lines.push(`> ${s.intent_brief}`);
-  lines.push('');
-  lines.push(`- **Workspace**: \`${s.workspace}\``);
-  lines.push(`- **janumicode version**: \`${s.janumicode_version_sha}\``);
-  lines.push(`- **Started**: ${s.started_at}`);
-  lines.push(`- **Completed**: ${s.completed_at ?? '(in progress)'}`);
+  lines.push(
+    '',
+    `- **Workspace**: \`${s.workspace}\``,
+    `- **janumicode version**: \`${s.janumicode_version_sha}\``,
+    `- **Started**: ${s.started_at}`,
+    `- **Completed**: ${s.completed_at ?? '(in progress)'}`,
+  );
   if (s.duration_ms !== null) {
     lines.push(`- **Duration**: ${s.duration_ms} ms`);
   }
-  lines.push(`- **Status**: ${s.status}`);
-  lines.push('');
-  lines.push('## Phases');
+  lines.push(`- **Status**: ${s.status}`, '', '## Phases');
   if (s.phases.length === 0) {
     lines.push('_(no phases recorded)_');
   } else {
-    lines.push('| phase | status | sub-phases | duration (ms) |');
-    lines.push('|---|---|---|---|');
+    lines.push(
+      '| phase | status | sub-phases | duration (ms) |',
+      '|---|---|---|---|',
+    );
     for (const p of s.phases) {
       lines.push(
         `| ${p.phase_id} | ${p.status} | ${p.sub_phase_count} | ${p.duration_ms} |`,
       );
     }
   }
-  lines.push('');
-  lines.push('## Totals');
-  lines.push(`- **Sub-phases**: ${s.totals.sub_phases}`);
-  lines.push(`- **LLM invocations**: ${s.totals.llm_invocations}`);
-  lines.push(`- **Retries**: ${s.totals.retries}`);
-  lines.push(`- **JSON repairs**: ${s.totals.repairs}`);
-  lines.push(`- **Escalations**: ${s.totals.escalations}`);
-  lines.push(`- **Events**: ${s.totals.events}`);
-  lines.push('');
-  lines.push('## Events');
-  lines.push(`- **First**: \`${s.events.first_event_id}\``);
-  lines.push(`- **Last**: \`${s.events.last_event_id}\``);
-  lines.push(`- **Count**: ${s.events.count}`);
-  lines.push('');
+  lines.push(
+    '',
+    '## Totals',
+    `- **Sub-phases**: ${s.totals.sub_phases}`,
+    `- **LLM invocations**: ${s.totals.llm_invocations}`,
+    `- **Retries**: ${s.totals.retries}`,
+    `- **JSON repairs**: ${s.totals.repairs}`,
+    `- **Escalations**: ${s.totals.escalations}`,
+    `- **Events**: ${s.totals.events}`,
+    '',
+    '## Events',
+    `- **First**: \`${s.events.first_event_id}\``,
+    `- **Last**: \`${s.events.last_event_id}\``,
+    `- **Count**: ${s.events.count}`,
+    '',
+  );
   return lines.join('\n');
 }

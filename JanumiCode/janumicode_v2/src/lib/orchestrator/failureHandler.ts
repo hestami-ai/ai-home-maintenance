@@ -314,13 +314,12 @@ export class FailureHandler {
   private buildReasoningReviewSummary(context: FailureContext): string {
     const parts: string[] = [];
 
-    parts.push(`Failure Type: ${context.failureType}`);
-    parts.push(`Error: ${context.errorMessage}`);
+    parts.push(`Failure Type: ${context.failureType}`, `Error: ${context.errorMessage}`);
 
     if (context.previousAttempts.length > 0) {
       parts.push(`Previous Attempts: ${context.previousAttempts.length}`);
-      const lastAttempt = context.previousAttempts[context.previousAttempts.length - 1];
-      if (lastAttempt.error) {
+      const lastAttempt = context.previousAttempts.at(-1);
+      if (lastAttempt?.error) {
         parts.push(`Last Error: ${lastAttempt.error}`);
       }
     }

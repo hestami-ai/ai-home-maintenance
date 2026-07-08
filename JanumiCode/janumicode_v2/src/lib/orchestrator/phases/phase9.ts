@@ -19,6 +19,7 @@ import type {
   ReleasePlanContentV2,
   WaveGateDecisionContent,
   TaskQuarantineContent,
+  ImplementationPacketContent,
 } from '../../types/records';
 import { getLogger } from '../../logging';
 import { ensureProjectRoot, toPosixPath } from '../workspaceLayout';
@@ -32,12 +33,11 @@ import { extractPriorPhaseContext, buildEffectiveTaskView, buildEffectiveTestPla
 import { runPacketSynthesisSubPhase } from './packetSynthesis';
 import { runScaffoldSynthesis, copyEngineeringConstitution, type ScaffoldManifest } from './scaffoldSynthesis';
 import { runScaffoldingAgentSubPhase } from './scaffoldingAgent';
-import { runModuleOwnershipPlanningSubPhase, type ModuleOwnershipPlan } from './moduleOwnershipPlanner';
+import { runModuleOwnershipPlanningSubPhase } from './moduleOwnershipPlanner';
 import { buildCompositionRootLeaf } from './compositionRoot';
 import { runPhase9ReconSubPhase, reconGlobalGates, buildReconEnforcementManifest } from './phase9Recon';
 import { runCycleControllerSubPhase, decideRestartTarget } from './cycleController';
 import { randomUUID } from 'node:crypto';
-import type { ImplementationPacketContent } from '../../types/records';
 import { emit as aoddEmit } from '../../aodd';
 
 export class Phase9Handler implements PhaseHandler {
@@ -346,6 +346,11 @@ export class Phase9Handler implements PhaseHandler {
         },
         stabilizationBudget: (cfg as unknown as { execution?: { stabilization_budget?: number } })
           .execution?.stabilization_budget ?? 2,
+        // A human is in the loop iff this is NOT an unattended (calibration/CI)
+        // run — selects the mode-aware execution-mode directive tail (attended
+        // escalates; headless self-resolves). Same signal that governs the mimo
+        // `question` policy + agent-prompt framing, so the three stay consistent.
+        attended: !unattendedSkipPermissions,
       },
       generateId,
     );
@@ -936,7 +941,7 @@ export class Phase9Handler implements PhaseHandler {
         type: type as 'unit' | 'integration' | 'end_to_end',
         testFilePaths: cases
           .map(c => (c.test_file_path ?? c.filePath ?? '') as string)
-          .filter(p => p),
+          .filter(Boolean),
         validatesTaskIds: cases
           .flatMap(c => (c.validates_task_ids ?? []) as string[]),
         coversCriteriaIds: cases
@@ -1018,8 +1023,9 @@ export class Phase9Handler implements PhaseHandler {
       const frId = (c.functional_requirement_id as string) ?? '';
       const method = (c.evaluation_method as string) ?? '';
       const condition = (c.success_condition as string) ?? '';
+      const methodSuffix = method ? ` (${method})` : '';
       const name = frId
-        ? `Functional ${frId}${method ? ` (${method})` : ''}`
+        ? `Functional ${frId}${methodSuffix}`
         : (method || 'Functional criterion');
       return {
         id: (c.id as string) ?? generateId(),
@@ -1043,8 +1049,9 @@ export class Phase9Handler implements PhaseHandler {
       const tool = (c.evaluation_tool as string) ?? '';
       const threshold = (c.threshold as string) ?? '';
       const measurement = (c.measurement_method as string) ?? '';
+      const categorySuffix = category ? ` — ${category}` : '';
       const name = nfrId
-        ? `Quality ${nfrId}${category ? ` — ${category}` : ''}`
+        ? `Quality ${nfrId}${categorySuffix}`
         : (category || 'Quality criterion');
       const description = [threshold, measurement].filter(Boolean).join(' — ');
       return {

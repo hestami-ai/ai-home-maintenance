@@ -1,0 +1,425 @@
+[
+  {
+    "id": "117d0845-0f4e-4e30-b634-5461cd140e3b",
+    "content": {
+      "kind": "packet_synthesis_failure",
+      "schemaVersion": "1.0",
+      "failures_by_packet": {
+        "c0e785c2-7271-4021-a101-ec5c6a52b9cf": [
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-001 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-002 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-003 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-004 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-010-D1 has no evaluation criterion"
+        ],
+        "3cde6e2e-3e4d-4d25-8b51-90ec1fcc6f35": [
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-001 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-002 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-003 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-004 has no test case",
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-010-D1 has no evaluation criterion"
+        ],
+        "c4d22685-de88-493b-b819-2f988e739c6a": [
+          "P4_USER_STORY_NO_EVAL: US-007-1 has no evaluation criterion"
+        ],
+        "871eddea-3a61-4668-a8cb-2cb077f3d83b": [
+          "P3_AC_NO_TEST: US-014-D1/AC-US-014-D1-002 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-014-D1 has no evaluation criterion"
+        ],
+        "82594ec1-2d3d-4446-808a-1032d5dcd9a2": [
+          "P3_AC_NO_TEST: US-012-02-D/AC-US-012-02-D-001 has no test case",
+          "P3_AC_NO_TEST: US-012-03-1/AC-US-012-03-1-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-012-02-D has no evaluation criterion",
+          "P4_USER_STORY_NO_EVAL: US-012-03-1 has no evaluation criterion"
+        ],
+        "9366c18f-5dc7-4d44-a92f-c6fd7d30c547": [
+          "P3_AC_NO_TEST: US-008-1/AC-US-008-1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-002-TD has no evaluation criterion",
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ],
+        "8be5da98-aeda-4f1a-aaeb-6ba172fece5c": [
+          "P3_AC_NO_TEST: US-008-1/AC-US-008-1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ],
+        "d9aea2aa-0118-408d-a54b-f049eb2e2554": [
+          "P4_USER_STORY_NO_EVAL: FR-US-013-WELCOME-EMAIL has no evaluation criterion"
+        ],
+        "687db596-59c5-4a71-8009-854578d8058f": [
+          "P1_NO_USER_STORY: packet 687db596-59c5-4a71-8009-854578d8058f (task task-comp-audit-log-retriever-get-route-handler) has no user stories"
+        ],
+        "e6fd95a0-dc3e-43e7-8a78-50bb2ef24436": [
+          "P1_NO_USER_STORY: packet e6fd95a0-dc3e-43e7-8a78-50bb2ef24436 (task task-comp-audit-log-retriever-add-auth-middleware) has no user stories"
+        ],
+        "3d1f398a-94b8-4af9-8709-1056cdf628a4": [
+          "P1_NO_USER_STORY: packet 3d1f398a-94b8-4af9-8709-1056cdf628a4 (task task-comp-audit-log-retriever-db-query) has no user stories"
+        ],
+        "e4ca61b5-51b0-4dc7-ab0e-ad28099566f4": [
+          "P1_NO_USER_STORY: packet e4ca61b5-51b0-4dc7-ab0e-ad28099566f4 (task task-comp-audit-log-retriever-pagination) has no user stories"
+        ],
+        "e1525c00-eb01-4c30-8c4c-446eb4c6efbe": [
+          "P1_NO_USER_STORY: packet e1525c00-eb01-4c30-8c4c-446eb4c6efbe (task task-comp-audit-log-retriever-error-handling) has no user stories"
+        ],
+        "767d17c8-4f57-4fd5-902b-dd3f8fb923c4": [
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-010-D1 has no evaluation criterion"
+        ],
+        "375601e3-d381-44f9-8494-51af77a13bc4": [
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-010-D1 has no evaluation criterion"
+        ],
+        "14ccad28-78ee-47c7-9af2-f4ce94b0471c": [
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-003 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-010-D1 has no evaluation criterion"
+        ],
+        "0cb774f6-c30d-4493-b9be-1977b7b29755": [
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-010-D1 has no evaluation criterion"
+        ],
+        "c88939d6-7ab9-426a-aa15-debd1f94ee71": [
+          "P4_USER_STORY_NO_EVAL: US-007-1 has no evaluation criterion"
+        ],
+        "e74e5dc7-d5ed-4e18-8055-7b8bdec771de": [
+          "P4_USER_STORY_NO_EVAL: US-007-1 has no evaluation criterion"
+        ],
+        "e222806e-e899-4256-bfd0-01d5170f6d30": [
+          "P3_AC_NO_TEST: US-005-C1/AC-US-005-C1-002 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-005-C1 has no evaluation criterion"
+        ],
+        "e5a7dfb3-3a69-421e-9981-4c6891bd345e": [
+          "P3_AC_NO_TEST: US-005-C1/AC-US-005-C1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-005-C1 has no evaluation criterion"
+        ],
+        "4ac2ad1e-5d59-4fd9-9a63-08e8f8bcef71": [
+          "P3_AC_NO_TEST: US-005-C1/AC-US-005-C1-006 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-005-C1 has no evaluation criterion"
+        ],
+        "503674b3-e6e5-4854-ab56-dfbfe5050b63": [
+          "P3_AC_NO_TEST: US-005-C1/AC-US-005-C1-003 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-005-C1 has no evaluation criterion"
+        ],
+        "b4916125-3533-4a69-84e1-8285aadb238a": [
+          "P3_AC_NO_TEST: US-005-C1/AC-US-005-C1-004 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-005-C1 has no evaluation criterion"
+        ],
+        "cd63256f-1c2e-41fd-b008-55616bf8f3e4": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "81bf2a9f-b6f8-4564-a0a9-76b9500a2e30": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-002 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "a6148125-f3c0-4f0f-b819-89693f35bc95": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-002 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "3ac2122f-5abd-4ee6-a26c-8dc8facfde51": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-001 has no test case",
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-002 has no test case",
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-003 has no test case",
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-004 has no test case",
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "ec798cf5-47ed-4cc5-859f-15d80fc75b34": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "9941e52e-ba3f-4780-9565-795d0141732a": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-002 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "457c7b47-4de9-4f5f-acf9-cba9dbae08dd": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-003 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "fb653605-67b6-4ef3-bd81-60b47f8142d4": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-004 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "71116c4d-838c-4264-a317-94f4214233b7": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "739edeb4-5608-4933-b06f-da26b59f4e7f": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-003 has no test case",
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-004 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "ef408fed-cc57-4378-90cd-19d341beaf68": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-002 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "c5524b0f-0a2b-474e-b86c-ddb00e296f92": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-002 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "350ffdb9-8337-4456-add1-dac2d85ffcf1": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "d2efcfd3-ea56-4e0d-a93b-46c68a81fe71": [
+          "P3_AC_NO_TEST: US-001-D1/AC-US-001-D1-002 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-001-D1 has no evaluation criterion"
+        ],
+        "2252c691-b299-4881-90d8-153a79c3cbc7": [
+          "P3_AC_NO_TEST: US-001-D1/AC-US-001-D1-003 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-001-D1 has no evaluation criterion"
+        ],
+        "e3244bed-0fad-4231-b462-1582cd862342": [
+          "P3_AC_NO_TEST: US-001-D1/AC-US-001-D1-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-001-D1 has no evaluation criterion"
+        ],
+        "4f488eab-ea58-4403-b92c-b7c325fa8203": [
+          "P3_AC_NO_TEST: US-001-D1/AC-US-001-D1-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-001-D1 has no evaluation criterion"
+        ],
+        "1f201f0a-c7af-41f4-8d8e-4b623d393917": [
+          "P1_NO_USER_STORY: packet 1f201f0a-c7af-41f4-8d8e-4b623d393917 (task task-property-search-endpoint) has no user stories"
+        ],
+        "3fb23a2b-def4-4769-bc33-569e1a771052": [
+          "P1_NO_USER_STORY: packet 3fb23a2b-def4-4769-bc33-569e1a771052 (task task-property-search-query-atomic) has no user stories"
+        ],
+        "2ae15ae2-d00f-4413-8040-87336e9636d7": [
+          "P1_NO_USER_STORY: packet 2ae15ae2-d00f-4413-8040-87336e9636d7 (task task-property-search-index) has no user stories"
+        ],
+        "3f7cea9f-b79f-4195-9024-9b5aff3396dd": [
+          "P1_NO_USER_STORY: packet 3f7cea9f-b79f-4195-9024-9b5aff3396dd (task task-property-search-performance) has no user stories"
+        ],
+        "177e0166-e516-474c-b75c-0800c74949b2": [
+          "P3_AC_NO_TEST: US-012-02-D/AC-US-012-02-D-001 has no test case",
+          "P3_AC_NO_TEST: US-012-03-1/AC-US-012-03-1-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-012-02-D has no evaluation criterion",
+          "P4_USER_STORY_NO_EVAL: US-012-03-1 has no evaluation criterion"
+        ],
+        "30eee4ee-5d12-48ce-b9a0-9703b35772af": [
+          "P3_AC_NO_TEST: US-012-02-D/AC-US-012-02-D-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-012-02-D has no evaluation criterion"
+        ],
+        "f40f6547-5de0-4369-af8b-57ddfde2b97a": [
+          "P3_AC_NO_TEST: US-012-02-D/AC-US-012-02-D-001 has no test case",
+          "P3_AC_NO_TEST: US-012-03-1/AC-US-012-03-1-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-012-02-D has no evaluation criterion",
+          "P4_USER_STORY_NO_EVAL: US-012-03-1 has no evaluation criterion"
+        ],
+        "aca1443f-4f80-430e-8c38-4dac06ce37e2": [
+          "P3_AC_NO_TEST: US-012-05-D/AC-US-012-05-D-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-012-05-D has no evaluation criterion"
+        ],
+        "93aab060-764d-4deb-b710-be48889b39e7": [
+          "P3_AC_NO_TEST: US-012-05-D/AC-US-012-05-D-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-012-05-D has no evaluation criterion"
+        ],
+        "734b2fd7-9650-4b91-bad8-dcfa20b5be7b": [
+          "P3_AC_NO_TEST: US-012-05-D/AC-US-012-05-D-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-012-05-D has no evaluation criterion"
+        ],
+        "b0323b82-8aea-48bf-be2a-28a19d8aec4e": [
+          "P4_USER_STORY_NO_EVAL: FR-US-013-CREATE-ACCOUNT has no evaluation criterion",
+          "P4_USER_STORY_NO_EVAL: FR-US-013-DUPLICATE-E-MAIL has no evaluation criterion"
+        ],
+        "c2d2cb2f-4982-4bfa-abca-c99facbf5a12": [
+          "P4_USER_STORY_NO_EVAL: FR-US-013-CREATE-ACCOUNT has no evaluation criterion",
+          "P4_USER_STORY_NO_EVAL: US-013-ROLE-VALUE-D has no evaluation criterion"
+        ],
+        "caa55882-fa74-426b-ba01-85a06e78ec2d": [
+          "P4_USER_STORY_NO_EVAL: FR-US-013-CREATE-ACCOUNT has no evaluation criterion"
+        ],
+        "6e3a88ad-a128-407c-999c-7258d5f18f51": [
+          "P4_USER_STORY_NO_EVAL: FR-US-013-CREATE-ACCOUNT has no evaluation criterion"
+        ],
+        "b697c3c5-922d-43f7-a973-cd02df3b987e": [
+          "P4_USER_STORY_NO_EVAL: US-011-1 has no evaluation criterion"
+        ],
+        "5abf4ace-9b5d-4308-87ac-78050f16cf72": [
+          "P4_USER_STORY_NO_EVAL: US-011-1 has no evaluation criterion"
+        ],
+        "5d990e53-23bb-4821-a21b-fae7a7b52257": [
+          "P4_USER_STORY_NO_EVAL: US-011-1 has no evaluation criterion"
+        ],
+        "46bd6b38-6f85-49ab-bfaf-8583dcf66e0b": [
+          "P4_USER_STORY_NO_EVAL: US-011-1 has no evaluation criterion"
+        ],
+        "1e08d7ba-5384-4e76-8bdb-547cd5619dec": [
+          "P4_USER_STORY_NO_EVAL: US-011-1 has no evaluation criterion"
+        ],
+        "3be5c8ea-abdf-42c6-b773-5eb9a582265d": [
+          "P4_USER_STORY_NO_EVAL: US-002-TD has no evaluation criterion"
+        ],
+        "5c4de74b-c919-4dd9-b477-c387a494f480": [
+          "P4_USER_STORY_NO_EVAL: US-002-TD has no evaluation criterion"
+        ],
+        "fd51a571-b8a0-4d84-9f0c-342f6feb5cd0": [
+          "P4_USER_STORY_NO_EVAL: US-002-TD has no evaluation criterion"
+        ],
+        "b37b1552-6a67-4cd1-8876-ee206f75ea3c": [
+          "P4_USER_STORY_NO_EVAL: US-002-TD has no evaluation criterion"
+        ],
+        "d441eb95-0f32-42b3-9b0b-4b2d36f4977c": [
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ],
+        "011502ff-32a9-4028-8fea-e1b47c489dc0": [
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ],
+        "a915b744-6756-4db9-91b7-a6bddf6d34e9": [
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ],
+        "103eff32-0f42-4e28-b891-15930ae6ce39": [
+          "P3_AC_NO_TEST: US-014-D1/AC-US-014-D1-003 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-014-D1 has no evaluation criterion"
+        ],
+        "d102fbf6-6b40-4e5a-9553-3c9a9392276e": [
+          "P3_AC_NO_TEST: US-014-D1/AC-US-014-D1-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-014-D1 has no evaluation criterion"
+        ],
+        "331f70c4-376f-4d00-84dc-2acefe2b8e3f": [
+          "P3_AC_NO_TEST: US-014-D1/AC-US-014-D1-004 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-014-D1 has no evaluation criterion"
+        ],
+        "c09d9f6e-50c1-4be2-9f2b-993be023b062": [
+          "P3_AC_NO_TEST: US-014-D1/AC-US-014-D1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-014-D1 has no evaluation criterion"
+        ],
+        "5cca183b-f8fb-4172-8bf6-f3b170dd7df3": [
+          "P3_AC_NO_TEST: US-014-D1/AC-US-014-D1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-014-D1 has no evaluation criterion"
+        ],
+        "d1d73944-98f7-4795-8715-3a07f66e78b2": [
+          "P3_AC_NO_TEST: US-014-D1/AC-US-014-D1-001 has no test case",
+          "P3_AC_NO_TEST: US-014-D1/AC-US-014-D1-004 has no test case",
+          "P3_AC_NO_TEST: US-014-D1/AC-US-014-D1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-014-D1 has no evaluation criterion"
+        ],
+        "cc712ab5-1ceb-4fce-8859-a4568f3c0d0d": [
+          "P3_AC_NO_TEST: US-012-02-D/AC-US-012-02-D-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-012-02-D has no evaluation criterion"
+        ],
+        "24335893-ae3c-4bdd-afa3-3d20ae784ee8": [
+          "P3_AC_NO_TEST: US-012-04-D1/AC-US-012-04-D1-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-012-04-D1 has no evaluation criterion"
+        ],
+        "99c816ff-7795-4999-a3bd-9754abeddc83": [
+          "P3_AC_NO_TEST: US-010-D1/AC-US-010-D1-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-010-D1 has no evaluation criterion"
+        ],
+        "4c9ca9e6-5497-4957-b0ec-00ec8c94380f": [
+          "P4_USER_STORY_NO_EVAL: US-007-1 has no evaluation criterion"
+        ],
+        "0997dcad-7df0-49f6-b17f-82fa10ecad31": [
+          "P3_AC_NO_TEST: US-005-C1/AC-US-005-C1-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-005-C1 has no evaluation criterion"
+        ],
+        "53bf7fac-3bab-46dd-a79c-9fd4f14c521b": [
+          "P3_AC_NO_TEST: US-005-C1/AC-US-005-C1-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-005-C1 has no evaluation criterion"
+        ],
+        "60331e64-6d2b-4064-a53c-048f2b703a8d": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-003 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "dbc1aaeb-a6f1-46ea-aefb-839e87babd60": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "a72bdb0a-a585-4d74-a579-d2aad9d5c79f": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "839e06d6-b27e-4473-8443-205d42bdf98b": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "72e6fdd8-6f3d-4880-ace6-8d5ff5984c4f": [
+          "P3_AC_NO_TEST: US-001-D1/AC-US-001-D1-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-001-D1 has no evaluation criterion"
+        ],
+        "3cd14c59-187d-4b05-8f21-83c9dd3d8f72": [
+          "P3_AC_NO_TEST: US-001-D1/AC-US-001-D1-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-001-D1 has no evaluation criterion"
+        ],
+        "ecd05dba-d767-4735-99e5-a7e067ed274f": [
+          "P1_NO_USER_STORY: packet ecd05dba-d767-4735-99e5-a7e067ed274f (task task-comp-tenant-config-service-write-audit-log-on-failure) has no user stories"
+        ],
+        "77858873-5fb5-4d4a-bb45-ce8836f6adfc": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-004 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "44640cb0-f0ee-4f6b-886f-ce456fe76b62": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-005 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "33d3668b-9bb7-4985-9133-26499284096e": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-004 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "8ac77ae7-9839-4d82-89e6-8c21bd7cb8da": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-004 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "0a26317f-0bac-460f-9783-2dc5ef79b551": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "f8a20c5e-901a-4a46-9e69-2e4d31552749": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "60d28f89-0f50-4a64-a2a3-20341d9d1aaf": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "6761e1b6-439c-4f33-9363-8c6c00074cab": [
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ],
+        "82dff0af-8556-4254-bbde-320567de3046": [
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ],
+        "f0d38cca-0498-4218-8792-cd12cec90037": [
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ],
+        "5027de13-e054-4a7c-8fc0-954b8cb05644": [
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ],
+        "105a02d9-e26b-4afe-a208-38728a2e42cc": [
+          "P3_AC_NO_TEST: US-012-05-D/AC-US-012-05-D-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-012-05-D has no evaluation criterion"
+        ],
+        "3a379a48-6071-407f-a5ca-c4cfad5d3e88": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "73bc6d7b-6f12-4e71-aa53-2693458109d8": [
+          "P3_AC_NO_TEST: US-006-01/AC-US-006-01-001 has no test case",
+          "P4_USER_STORY_NO_EVAL: US-006-01 has no evaluation criterion"
+        ],
+        "e2bbc9b3-635d-4484-b80e-e73a2aab4d43": [
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ],
+        "51a1cc4e-fb62-4c0d-b8db-44b3f1d42a3f": [
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ],
+        "24b970c2-b165-4d38-8e08-a41c08a96596": [
+          "P4_USER_STORY_NO_EVAL: US-008-1 has no evaluation criterion"
+        ]
+      },
+      "cross_packet_failures": {
+        "C1_TASK_IN_MULTIPLE_PACKETS": [
+          "task task-tenant-config-service-validate appears in 2 packets",
+          "task task-comp-tenant-schema-service-validate-isolation-params appears in 2 packets",
+          "task task-statutory-deadline-verifier-emit-event appears in 2 packets",
+          "task task-statutory-deadline-verifier-create-audit-log appears in 2 packets",
+          "task task-statutory-deadline-verifier-timestamp-comparison appears in 2 packets",
+          "task task-validation-photo-format-size appears in 2 packets",
+          "task task-storage-photo-seaweedfs-tus appears in 2 packets"
+        ]
+      },
+      "total_packets": 110,
+      "failed_packets": 110,
+      "total_blocking_failures": 220,
+      "total_advisory_findings": 141,
+      "total_ai_proposed_root_count": 0
+    }
+  }
+]

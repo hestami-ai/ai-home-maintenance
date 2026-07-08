@@ -12,7 +12,7 @@
  * Ported from v1 pattern at JanumiCode/janumicode/src/sidecar/dbServer.ts
  */
 
-import { createInterface } from 'readline';
+import { createInterface } from 'node:readline';
 import { SCHEMA_DDL, VECTOR_SEARCH_DDL } from '../lib/database/schema';
 import { closeWithCheckpoint } from '../lib/database/init';
 import {

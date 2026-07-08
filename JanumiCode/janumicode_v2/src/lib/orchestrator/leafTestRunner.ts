@@ -169,7 +169,7 @@ export class LeafTestRunner {
           const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as {
             scripts?: Record<string, string>;
           };
-          if (pkg.scripts && pkg.scripts.test) {
+          if (pkg.scripts?.test) {
             const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
             // SCOPE the run to positional filters after `--` (vitest/jest/
             // node:test all accept them). PREFER the leaf's OWN test files
@@ -180,7 +180,7 @@ export class LeafTestRunner {
             // workspace-global gate). Leaves with neither (e.g. the
             // composition root) run the full suite — that global gate is the
             // composition root's / stabilization loop's job.
-            const norm = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/g, '');
+            const norm = (p: string): string => p.replaceAll('\\', '/').replace(/\/+$/g, '');
             const exists = (p: string): boolean => fs.existsSync(path.join(input.workspacePath, p));
             const ownFiles = (input.ownTestFiles ?? []).map(norm).filter((p) => p && exists(p));
             const scopeDirs = (input.writeDirectoryPaths ?? []).map(norm).filter((p) => p && exists(p));

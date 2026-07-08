@@ -75,9 +75,7 @@ let elkInstance: InstanceType<typeof ELK> | null = null;
  * Get or create the ELK instance.
  */
 async function getElk(): Promise<InstanceType<typeof ELK>> {
-  if (!elkInstance) {
-    elkInstance = new ELK();
-  }
+  elkInstance ??= new ELK();
   return elkInstance;
 }
 

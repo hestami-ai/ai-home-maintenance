@@ -193,7 +193,7 @@ export class CapabilityRegistry {
     const sections: string[] = [];
     for (const [cat, caps] of grouped.entries()) {
       sections.push(
-        `## ${cat.replace(/_/g, ' ')}\n` +
+        `## ${cat.replaceAll('_', ' ')}\n` +
           caps.map(c => `- **${c.name}**: ${c.description}`).join('\n'),
       );
     }

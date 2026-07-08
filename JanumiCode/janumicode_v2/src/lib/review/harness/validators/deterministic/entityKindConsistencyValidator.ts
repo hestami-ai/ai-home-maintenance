@@ -41,11 +41,14 @@ export function validateEntityKindConsistency(
     if (kind !== 'value_type') return;
 
     const isIdentity = c.is_identity === true;
-    const name =
-      typeof c.name === 'string' ? c.name
-      : typeof c.entity_name === 'string' ? c.entity_name
-      : typeof c.id === 'string' ? c.id
-      : '';
+    let name = '';
+    if (typeof c.name === 'string') {
+      name = c.name;
+    } else if (typeof c.entity_name === 'string') {
+      name = c.entity_name;
+    } else if (typeof c.id === 'string') {
+      name = c.id;
+    }
 
     const nameMatchesIdentity = IDENTITY_NAME_RE.test(name);
 

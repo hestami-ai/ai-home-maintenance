@@ -97,19 +97,21 @@ export function renderAdjudicationPrompt(
   implementationSummary: string,
 ): string {
   const lines: string[] = [];
-  lines.push('You are the Consistency Checker performing the final pre-commit adjudication (Sub-Phase 10.1).');
-  lines.push('For each upstream validator/coherence finding below, judge — AGAINST THE ACTUAL IMPLEMENTATION — whether it is:');
-  lines.push('  - "resolved_by_implementation": the implementation already satisfies/avoids the concern;');
-  lines.push('  - "still_open": the concern remains a real defect in the committed artifacts;');
-  lines.push('  - "waived": the concern is not applicable / acceptable (explain why).');
-  lines.push('');
-  lines.push('Return ONLY a JSON object: {"finding_adjudications":[{"finding_ref":"...","verdict":"resolved_by_implementation|still_open|waived","rationale":"..."}]}.');
-  lines.push('Echo each finding_ref EXACTLY. Do not invent refs.');
-  lines.push('');
-  lines.push('## Implementation summary');
-  lines.push(implementationSummary || '(none provided)');
-  lines.push('');
-  lines.push('## Findings to adjudicate');
+  lines.push(
+    'You are the Consistency Checker performing the final pre-commit adjudication (Sub-Phase 10.1).',
+    'For each upstream validator/coherence finding below, judge — AGAINST THE ACTUAL IMPLEMENTATION — whether it is:',
+    '  - "resolved_by_implementation": the implementation already satisfies/avoids the concern;',
+    '  - "still_open": the concern remains a real defect in the committed artifacts;',
+    '  - "waived": the concern is not applicable / acceptable (explain why).',
+    '',
+    'Return ONLY a JSON object: {"finding_adjudications":[{"finding_ref":"...","verdict":"resolved_by_implementation|still_open|waived","rationale":"..."}]}.',
+    'Echo each finding_ref EXACTLY. Do not invent refs.',
+    '',
+    '## Implementation summary',
+    implementationSummary || '(none provided)',
+    '',
+    '## Findings to adjudicate',
+  );
   for (const f of findings) {
     const rec = f.recommendation ? ` | recommendation: ${f.recommendation}` : '';
     lines.push(`- ${f.ref} [${f.source}/${f.severity}] ${f.label}: ${f.summary}${rec}`);

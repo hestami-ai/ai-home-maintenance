@@ -22,6 +22,10 @@ import {
   idiomaticImportSpecifier,
   normalizeGreenfieldLayout,
   collapseGreenfieldAreas,
+  pinGreenfieldStack,
+  prescribedStackFromConstraints,
+  overrideWorkspaceKindIfEmpty,
+  isDecisiveForArea,
 } from '../../../../lib/orchestrator/phases/phase9Recon';
 import type { ReconArea, Phase9ReconPlan, IntegrationBoundary } from '../../../../lib/orchestrator/phases/phase9Recon';
 
@@ -350,6 +354,45 @@ describe('gatherTechnicalConstraints — Phase-1 → recon contract', () => {
   });
 });
 
+describe('isDecisiveForArea — TECH-* constraint classification for the recon prompt split', () => {
+  it('treats language/framework choices as DECISIVE (they set the stack)', () => {
+    for (const c of [
+      'TECH-SVELTKIT-1: SvelteKit | web portals',
+      'TECH-NODEJS-1: Node.js (Bun) for high-performance API execution',
+      'TECH-PY-1: Python + FastAPI backend',
+      'TECH-RS-1: Rust services with cargo',
+    ]) {
+      expect(isDecisiveForArea(c)).toBe(true);
+    }
+  });
+  it('treats topology cues as DECISIVE (they set how many deployables/areas exist)', () => {
+    for (const c of [
+      'TECH-1: a single containerised service; no microservices',
+      'TECH-CLOUDFLARE-1: Cloudflare CDN is the only public entry point',
+      'TECH-2: modular monolith, one deployable',
+    ]) {
+      expect(isDecisiveForArea(c)).toBe(true);
+    }
+  });
+  it('treats runtime libraries / infra as NON-decisive (the chosen stack merely consumes them)', () => {
+    // These are exactly the constraints that mis-steered cal-41 recon into 8
+    // microservice areas when dumped as binding stack signals.
+    for (const c of [
+      'TECH-PGSQL-1: PostgreSQL with Row-Level Security',
+      'TECH-DBOS-1: DBOS durable workflows',
+      'TECH-ORPC-1: oRPC function-based API layer',
+      'TECH-CERBOS-1: Cerbos authorization engine',
+      'TECH-DOCKERCOMPOSE-1: Docker Compose',
+      'TECH-SEAWEEDFS-1: SeaweedFS',
+      'TECH-CLAMAV-1: ClamAV',
+      'TECH-FFMPEG-1: ffmpeg',
+      'TECH-TRAFFIC-1: Traefik | TLS termination, SNI routing',
+    ]) {
+      expect(isDecisiveForArea(c)).toBe(false);
+    }
+  });
+});
+
 describe('collapseGreenfieldAreas — deterministic topology from stack partition (slice-156)', () => {
   function mkArea(p: Partial<ReconArea> & { area_id: string; stack: string }): ReconArea {
     return {
@@ -443,5 +486,60 @@ describe('buildReconLayoutContract — Phase-10 layout check under the recon pat
     expect(c.allowed_top_level_dirs).toContain('src');
     expect(c.shared_dir).toBe('crates/shared'); // from the dir-prefix protected path
     expect(c.import_aliases.find(a => a.alias === '@shared/*')?.target).toBe('src/shared/*');
+  });
+});
+
+// D6/D3 (P9 materialization audit) — the recon agent WAFFLES between stacks in
+// greenfield (cal-41 proposed native/node/sveltekit/python/other), and each
+// distinct stack becomes its own area that re-scaffolds the FULL component set at
+// the same src/ root (the 8× collision + python-for-a-TS-spec). Pin the stack.
+describe('pinGreenfieldStack + prescribedStackFromConstraints (D6/D3 — stack waffle)', () => {
+  const area = (id: string, stack: string) => ({
+    area_id: id, stack, confidence: 'medium', source_roots: ['src'], test_roots: ['src'],
+    dependency_manifest: '', protected_paths: [], canonical_modules: [], import_aliases: [], gate_commands: [],
+  });
+  const waffled = () => parseReconPlan({
+    workspace_kind: 'greenfield',
+    areas: [area('a-native', 'native'), area('a-node', 'node'), area('a-svelte', 'sveltekit'), area('a-py', 'python')],
+  }, '/ws')!;
+
+  it('derives the prescribed stack from TECH constraints (TS/SvelteKit → node; Django → python)', () => {
+    expect(prescribedStackFromConstraints(['TECH-1: SvelteKit frontend', 'TECH-2: Node.js + TypeScript backend', 'TECH-3: PostgreSQL'])).toBe('node');
+    expect(prescribedStackFromConstraints(['TECH-1: Django REST', 'TECH-2: Python 3.12'])).toBe('python');
+    expect(prescribedStackFromConstraints(['TECH-1: PostgreSQL only'])).toBeNull();
+  });
+
+  it('pins a waffled greenfield plan to the prescribed stack → ONE workspace area (no python, no collision)', () => {
+    const { plan, pinnedTo, proposed } = pinGreenfieldStack(waffled(), { detectedStack: null, prescribedStack: 'node' });
+    expect(pinnedTo).toBe('node');
+    expect(proposed.length).toBeGreaterThanOrEqual(3);
+    expect([...new Set(plan.areas.map(a => a.stack))]).toEqual(['node']); // all one stack
+    expect(plan.forced_stack).toBeUndefined();                            // auto-pin, not the sweep lever
+    const collapsed = collapseGreenfieldAreas(plan);
+    expect(collapsed.areas).toHaveLength(1);                              // ONE area, not N
+    expect(collapsed.areas[0].area_id).toBe('workspace');
+  });
+
+  it('precedence: detected-on-disk beats prescribed', () => {
+    expect(pinGreenfieldStack(waffled(), { detectedStack: 'python', prescribedStack: 'node' }).pinnedTo).toBe('python');
+  });
+
+  it('overrideWorkspaceKindIfEmpty: an empty project mislabelled "mixed" is corrected to greenfield → pin then fires', () => {
+    const mislabelled = { ...waffled(), workspace_kind: 'mixed' as const };
+    // as-is, the pin is suppressed (mixed is not greenfield)
+    expect(pinGreenfieldStack(mislabelled, { prescribedStack: 'node' }).pinnedTo).toBeNull();
+    // corrected because the project root is empty (deterministic fact)
+    const fixed = overrideWorkspaceKindIfEmpty(mislabelled, true);
+    expect(fixed.workspace_kind).toBe('greenfield');
+    expect(pinGreenfieldStack(fixed, { prescribedStack: 'node' }).pinnedTo).toBe('node');
+    // a genuinely non-empty (brownfield) workspace is left untouched
+    expect(overrideWorkspaceKindIfEmpty(mislabelled, false).workspace_kind).toBe('mixed');
+  });
+
+  it('is a no-op for single-stack, brownfield, or already-forced plans', () => {
+    const single = parseReconPlan({ workspace_kind: 'greenfield', areas: [area('w', 'node')] }, '/ws')!;
+    expect(pinGreenfieldStack(single, { prescribedStack: 'python' }).pinnedTo).toBeNull();
+    expect(pinGreenfieldStack({ ...waffled(), workspace_kind: 'brownfield' }, { prescribedStack: 'node' }).pinnedTo).toBeNull();
+    expect(pinGreenfieldStack({ ...waffled(), forced_stack: 'go' }, { prescribedStack: 'node' }).pinnedTo).toBeNull();
   });
 });

@@ -554,12 +554,14 @@ function writeFindingRecord(args: {
   // AODD paired emit: validator.finding events let an agent see what a
   // validator surfaced without joining DB tables. Map the validator
   // framework's HIGH/MEDIUM/LOW to the AODD-canonical error/warning/info.
-  const aoddSeverity: 'error' | 'warning' | 'info' =
-    args.finding.severity === 'HIGH'
-      ? 'error'
-      : args.finding.severity === 'MEDIUM'
-        ? 'warning'
-        : 'info';
+  let aoddSeverity: 'error' | 'warning' | 'info';
+  if (args.finding.severity === 'HIGH') {
+    aoddSeverity = 'error';
+  } else if (args.finding.severity === 'MEDIUM') {
+    aoddSeverity = 'warning';
+  } else {
+    aoddSeverity = 'info';
+  }
   aoddEmit('validator.finding', {
     validator_name: args.finding.validatorId,
     target_record_id: args.finding.targetIdentifier ?? args.harnessRecordId,

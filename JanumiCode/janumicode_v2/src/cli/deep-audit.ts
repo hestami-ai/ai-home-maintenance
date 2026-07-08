@@ -130,7 +130,7 @@ function parseArgs(argv: string[]): Args {
     db: out.db,
     intent: out.intent,
     out: out.out,
-    categories: new Set(cats.replace(/,/g, '').split('')),
+    categories: new Set(cats.replaceAll(',', '').split('')),
   };
 }
 
@@ -148,7 +148,7 @@ function resolveDbPath(workspace: string, override?: string): string {
   // Fall back to most-recent mtime if none match the numeric pattern.
   const numeric = files
     .filter((f) => /^\d+\.db$/.test(f))
-    .map((f) => ({ f, ts: parseInt(f.replace('.db', ''), 10) }))
+    .map((f) => ({ f, ts: Number.parseInt(f.replace('.db', ''), 10) }))
     .sort((a, b) => b.ts - a.ts);
   if (numeric.length > 0) return path.join(dbDir, numeric[0].f);
   return path.join(
@@ -517,7 +517,7 @@ function categoryE_xref(artifacts: DbArtifact[]): Finding[] {
       // Skip the SELF id field on this record — that's a definition,
       // not a reference. Other id-shaped strings in any field ARE
       // references and need to resolve.
-      if (path[path.length - 1] === 'id') return;
+      if (path.at(-1) === 'id') return;
       const match = matchIdPattern(node);
       if (!match) return;
       if (knownIds.has(node)) return;
@@ -852,7 +852,6 @@ function categoryJ_persistence(artifacts: DbArtifact[], steps: TransformStep[]):
       }
     }
     const trueDropped = dropped.filter((k) => !renamedFrom.has(k));
-    const trueSurplus = surplus.filter((k) => !renamedTo.has(k));
 
     if (trueDropped.length > 0) {
       findings.push({

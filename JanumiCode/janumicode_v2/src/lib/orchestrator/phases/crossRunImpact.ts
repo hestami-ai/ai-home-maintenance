@@ -170,11 +170,11 @@ function typeSurface(blob: unknown): string {
         return `${name}:${type}`;
       })
       .filter(Boolean)
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .join(',');
   }
   if (blob && typeof blob === 'object') {
-    return Object.keys(blob as Record<string, unknown>).sort().join(',');
+    return Object.keys(blob as Record<string, unknown>).sort((a, b) => a.localeCompare(b)).join(',');
   }
   return typeof blob === 'string' ? blob : '';
 }

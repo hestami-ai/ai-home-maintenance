@@ -227,3 +227,61 @@ describe('buildModuleOwnershipPlan', () => {
     expect(afters.has('comp-mapping-persistence')).toBe(false);
   });
 });
+
+// D5/D13 (P9 materialization audit) — when the data_models carry P5.1b ownership
+// tags, the code-module owner must honor the ELECTED entity owner, overriding the
+// sync-sink/first-seen heuristic that could otherwise pick a referenced copy's
+// component; and it must carry owner_entity_id so the module joins to the DM.
+describe('buildModuleOwnershipPlan — P5.1b elected-owner override (D5/D13)', () => {
+  it('owns a data-model-backed module at the ELECTED owner, not the sync-call sink', () => {
+    const plan = buildModuleOwnershipPlan({
+      components: [
+        { id: 'comp-writer', dependencies: [] },
+        { id: 'comp-reader-a', dependencies: [{ component_id: 'comp-hub', kind: 'sync_call' }] },
+        { id: 'comp-reader-b', dependencies: [{ component_id: 'comp-hub', kind: 'sync_call' }] },
+        { id: 'comp-hub', dependencies: [] },
+      ],
+      dataModels: [
+        // AuditLog reconciled to comp-writer; comp-reader-a holds a reference.
+        { entity_name: 'AuditLog', component_id: 'comp-writer', ownership_role: 'owned', owner_entity_id: 'DM-comp-writer-auditlog' },
+        { entity_name: 'AuditLog', component_id: 'comp-reader-a', ownership_role: 'referenced', owner_component_id: 'comp-writer', owner_entity_id: 'DM-comp-writer-auditlog' },
+      ],
+      tasks: [
+        { id: 't1', component_id: 'comp-reader-a', read_directory_paths: ['src/repositories/audit_log_repository'] },
+        { id: 't2', component_id: 'comp-reader-b', read_directory_paths: ['src/repositories/audit_log_repository'] },
+      ],
+    });
+    const m = plan.shared_modules.find((x) => x.module_key.includes('auditlog'))!;
+    expect(m).toBeDefined();
+    // Elected owner wins over the sync-sink (comp-hub) and the first consumer.
+    expect(m.owner_component_id).toBe('comp-writer');
+    expect(m.owner_source).toBe('data_model_owner');
+    expect(m.owner_entity_id).toBe('DM-comp-writer-auditlog'); // D13 join to the owned entity
+  });
+
+  it('falls back to the sink heuristic when NO ownership tags are present (backward-compatible)', () => {
+    const plan = buildModuleOwnershipPlan(slice139()); // untagged dataModels
+    const mr = plan.shared_modules.find((m) => m.module_key.includes('mappingrepository'))!;
+    expect(mr.owner_component_id).toBe('comp-mapping-persistence');
+    expect(mr.owner_entity_id).toBeUndefined();
+  });
+});
+
+// D12 — a bare generic barrel (models/db/… with no shared-root category) is a
+// per-component file, not a shared module; it must NOT be collapsed to one owner.
+describe('buildModuleOwnershipPlan — generic-barrel exclusion (D12)', () => {
+  it('does not emit a bare `src/models` barrel as a shared module, but keeps real shared repos', () => {
+    const plan = buildModuleOwnershipPlan({
+      components: [{ id: 'comp-a', dependencies: [] }, { id: 'comp-b', dependencies: [] }],
+      dataModels: [],
+      tasks: [
+        { id: 't1', component_id: 'comp-a', read_directory_paths: ['src/models'] },
+        { id: 't2', component_id: 'comp-b', read_directory_paths: ['src/models'] },
+        { id: 't3', component_id: 'comp-a', read_directory_paths: ['src/repositories/user_repository'] },
+        { id: 't4', component_id: 'comp-b', read_directory_paths: ['src/repositories/user_repository'] },
+      ],
+    });
+    expect(plan.shared_modules.some((m) => m.basename === 'models')).toBe(false);
+    expect(plan.shared_modules.some((m) => m.basename === 'user_repository')).toBe(true);
+  });
+});

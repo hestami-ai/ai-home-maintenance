@@ -34,6 +34,36 @@ import {
   type PhaseSevenTestSuite,
   type PhaseEightCriterion,
 } from './cycleDeltaSynthesizers';
+import { buildRequirementLineage } from './packetSynthesis/idResolution';
+
+/**
+ * Collapse each functional criterion's `functional_requirement_id` to its
+ * decomposition-tree root and dedupe by (root, evaluation_method). Mirrors
+ * phase8.ts's canonicalizeFunctionalEvalTargets over the PhaseEightCriterion
+ * shape (optional id fields) used on the cycle-delta path — which previously
+ * skipped this normalization and persisted raw-leaf targets (US-012-02-D) the
+ * P4 join could not bridge to a sibling-leaf packet (cal-41 US-012-01-*).
+ * Structural walk via the requirement lineage — never a regex.
+ */
+function canonicalizeCycleDeltaFunctionalTargets(
+  criteria: PhaseEightCriterion[],
+  canonicalize: (id: string) => string,
+): PhaseEightCriterion[] {
+  const seen = new Set<string>();
+  const out: PhaseEightCriterion[] = [];
+  for (const c of criteria) {
+    if (!c.functional_requirement_id) {
+      out.push(c);
+      continue;
+    }
+    const target = canonicalize(c.functional_requirement_id);
+    const key = `${target}::${c.evaluation_method}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...c, functional_requirement_id: target });
+  }
+  return out;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -277,9 +307,21 @@ export function runPhase8CycleDelta(ctx: PhaseContext): PhaseResult {
   const artifactIds: string[] = [];
 
   if (synth.newFunctional.length > 0) {
+    // Producer-side normalization (mirrors phase8.ts:166): collapse every
+    // functional eval target to its decomposition-tree root so a packet
+    // carrying a DIFFERENT leaf of the same story is satisfied at root. The
+    // cycle-delta path previously merged raw-leaf targets straight through,
+    // persisting US-012-02-D-style ids the P4 join could not bridge to
+    // sibling-leaf packets (cal-41 US-012-01-*). Idempotent on already-root ids.
+    const canonicalize = buildRequirementLineage(
+      engine.writer.getRecordsByType(workflowRun.id, 'requirement_decomposition_node'),
+    ).canonicalize;
     const merged = {
       kind: 'functional_evaluation_plan' as const,
-      criteria: [...(existingFn?.content.criteria ?? []), ...synth.newFunctional],
+      criteria: canonicalizeCycleDeltaFunctionalTargets(
+        [...(existingFn?.content.criteria ?? []), ...synth.newFunctional],
+        canonicalize,
+      ),
     };
     const rec = engine.writer.writeRecord({
       record_type: 'artifact_produced',

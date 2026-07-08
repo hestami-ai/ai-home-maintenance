@@ -33,7 +33,7 @@ function mentionsCompetingLens(text: string, chosen: string | null): boolean {
   if (!text) return false;
   const lower = text.toLowerCase();
   return LENS_VOCABULARY.some(
-    (lens) => lens !== chosen && new RegExp(`\\b${lens}\\b`).test(lower),
+    (lens) => lens !== chosen && new RegExp(String.raw`\b${lens}\b`).test(lower),
   );
 }
 

@@ -108,7 +108,6 @@ function accumulatePacketFailures(
     const p5 = parseP5Target(f);
     if (p5) {
       seed.orphanEvaluationTargets.add(p5);
-      continue;
     }
     // P2 / P6 / P7 / A* / Cn failures are not directly fillable by
     // a phase delta. They're left for the operator to triage (or for

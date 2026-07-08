@@ -304,7 +304,7 @@ export class ClientLiaisonAgent {
           activeRunAfter.id,
         );
         if (rawIntents.length > 0) {
-          anchorId = rawIntents[rawIntents.length - 1].id;
+          anchorId = rawIntents.at(-1)!.id;
         }
       }
 

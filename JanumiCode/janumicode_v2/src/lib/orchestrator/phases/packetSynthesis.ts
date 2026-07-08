@@ -234,13 +234,19 @@ export function collectDataModels(records: GovernedStreamRecord[]): BuilderDataM
         const id = typeof e.id === 'string' ? e.id : mintEntityId(componentId, name);
         if (!name) continue;
         const fields = Array.isArray(e.fields)
-          ? (e.fields as Array<Record<string, unknown>>).map((f) => ({
-              name: typeof f.name === 'string' ? f.name : '',
-              type: typeof f.type === 'string' ? f.type : '',
-              constraints: typeof f.constraints === 'string'
-                ? f.constraints
-                : Array.isArray(f.constraints) ? f.constraints.join(', ') : undefined,
-            }))
+          ? (e.fields as Array<Record<string, unknown>>).map((f) => {
+              let constraints: string | undefined;
+              if (typeof f.constraints === 'string') {
+                constraints = f.constraints;
+              } else if (Array.isArray(f.constraints)) {
+                constraints = f.constraints.join(', ');
+              }
+              return {
+                name: typeof f.name === 'string' ? f.name : '',
+                type: typeof f.type === 'string' ? f.type : '',
+                constraints,
+              };
+            })
           : [];
         const dmTraces = asTraceIds(e.traces_to, e.verifies, e.source_requirement_ids, e.serves);
         const existingDm = out.find((x) => x.id === id);
@@ -339,12 +345,18 @@ function extractCriteriaArray(
         ?? obj.nfr_id
         ?? obj.fr_id) as string | undefined;
       if (!targetId) continue;
-      const evaluation_method = typeof obj.evaluation_method === 'string'
-        ? obj.evaluation_method
-        : (typeof obj.measurement_method === 'string' ? obj.measurement_method : '');
-      const success_condition = typeof obj.success_condition === 'string'
-        ? obj.success_condition
-        : (typeof obj.threshold === 'string' ? obj.threshold : '');
+      let evaluation_method = '';
+      if (typeof obj.evaluation_method === 'string') {
+        evaluation_method = obj.evaluation_method;
+      } else if (typeof obj.measurement_method === 'string') {
+        evaluation_method = obj.measurement_method;
+      }
+      let success_condition = '';
+      if (typeof obj.success_condition === 'string') {
+        success_condition = obj.success_condition;
+      } else if (typeof obj.threshold === 'string') {
+        success_condition = obj.threshold;
+      }
       // A quality criterion may carry a generative property_spec (Phase 8).
       // Validate the minimal shape here so a malformed spec never reaches the
       // executor as a property with no rule to check.
@@ -440,11 +452,16 @@ export function collectComplianceItems(records: GovernedStreamRecord[]): Map<str
       for (const item of arr as Array<Record<string, unknown>>) {
         const id = item.id;
         if (typeof id !== 'string' || id.length === 0) continue;
+        let description = '';
+        if (typeof item.text === 'string') {
+          description = item.text;
+        } else if (typeof item.target === 'string') {
+          description = item.target;
+        }
         byId.set(id, {
           id,
           kind,
-          description: typeof item.text === 'string' ? item.text :
-                       typeof item.target === 'string' ? item.target : '',
+          description,
           measurable_condition: typeof item.threshold === 'string' ? item.threshold : undefined,
         });
       }
@@ -531,6 +548,24 @@ export function runPacketSynthesisSubPhase(
   }
 
   const lineage = buildRequirementLineage(allRecords);
+
+  // Coverage inputs from Phase 7 (test plan) + Phase 8 (eval plan). If EITHER is
+  // empty, every packet will fail P3_AC_NO_TEST / P4_USER_STORY_NO_EVAL — but the
+  // ROOT cause is a missing current upstream head, not the packet builder. The
+  // usual culprit is a resume that rolled back past Phase 7/8 without regenerating
+  // them (the multiply-resumed over-sweep fixed in rollback.ts). Surface it LOUD +
+  // attributed here so it reads as "missing upstream", not "103 incoherent packets".
+  const testSuites = collectTestSuites(allRecords);
+  const evaluationCriteria = collectEvaluationCriteria(allRecords);
+  if (testSuites.length === 0 || evaluationCriteria.length === 0) {
+    logger.warn('workflow', 'packet_synthesis: MISSING UPSTREAM coverage inputs — packets will fail P3/P4 coherence', {
+      workflow_run_id: workflowRun.id,
+      test_suites: testSuites.length,
+      evaluation_criteria: evaluationCriteria.length,
+      hint: 'need a CURRENT test_case_skeleton (Phase 7) + functional_evaluation_plan (Phase 8); a resume that invalidated them without re-running Phase 7/8 is the usual cause',
+    });
+  }
+
   const packets = buildPackets({
     atomicTasks,
     userStories: collectUserStories(allRecords),
@@ -538,8 +573,8 @@ export function runPacketSynthesisSubPhase(
     componentsById: collectComponents(allRecords),
     dataModels: collectDataModels(allRecords),
     apiDefinitions: collectApiDefs(allRecords),
-    testSuites: collectTestSuites(allRecords),
-    evaluationCriteria: collectEvaluationCriteria(allRecords),
+    testSuites,
+    evaluationCriteria,
     technicalConstraintsById: collectTechnicalConstraints(allRecords),
     complianceItemsById: collectComplianceItems(allRecords),
     crossCuttingConstraints: collectCrossCuttingConstraints(allRecords),

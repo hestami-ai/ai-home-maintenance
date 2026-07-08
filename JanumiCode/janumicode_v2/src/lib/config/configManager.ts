@@ -6,8 +6,8 @@
  * Falls back to hardcoded defaults for all values.
  */
 
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { getLogger } from '../logging';
 
 // ── Configuration Types ─────────────────────────────────────────────
@@ -423,6 +423,20 @@ export interface JanumiCodeConfig {
       };
     };
     /**
+     * Phase 9.0 Reconnaissance — the LLM JUDGMENT that decides the per-area
+     * execution ground (stack / topology / gates). Its OWN role so recon is not a
+     * side-effect of the review lane: calibration pins `reasoning_review` to a tiny
+     * (4B) model for trace audits, which is the wrong tool for stack/topology
+     * reasoning and led recon to over-decompose a greenfield single service into 8
+     * microservice areas. Shape mirrors `reasoning_review`. OPTIONAL: when unset,
+     * `phase9Recon` falls back to `reasoning_review` (production default =
+     * gemini-2.5-flash, capable), so leaving it out is a no-op in production.
+     */
+    reconnaissance?: {
+      primary: { provider: string; model: string; base_url?: string };
+      temperature: number;
+    };
+    /**
      * Dedicated LLM-based JSON repair fallback. Fires when an agent
      * call requested `responseFormat: 'json'` and the response can't
      * be parsed. Two attempts run sequentially:
@@ -805,7 +819,7 @@ export class ConfigManager {
   } {
     const routing = this.config.llm_routing[role];
     const primary = (routing as { primary?: { backing_tool: string; provider?: string; model?: string; base_url?: string } } | undefined)?.primary;
-    if (!primary || primary.backing_tool !== 'direct_llm_api' || !primary.provider || !primary.model) {
+    if (primary?.backing_tool !== 'direct_llm_api' || !primary?.provider || !primary?.model) {
       throw new Error(
         `llm_routing.${role}.primary must be a direct_llm_api routing with provider+model set. ` +
         `Got: ${JSON.stringify(primary)}. Fix in .janumicode/config.json or DEFAULT_CONFIG.`,
@@ -945,7 +959,7 @@ export class ConfigManager {
     if (rr?.primary && !registeredProviders.has(rr.primary.provider)) {
       errors.push(
         `llm_routing.reasoning_review.primary references provider '${rr.primary.provider}' ` +
-        `which is not registered. Registered providers: ${Array.from(registeredProviders).sort().join(', ')}. ` +
+        `which is not registered. Registered providers: ${Array.from(registeredProviders).sort((a, b) => a.localeCompare(b)).join(', ')}. ` +
         `Fix: either register the '${rr.primary.provider}' provider adapter at startup, ` +
         `or override llm_routing.reasoning_review.primary.provider in .janumicode/config.json.`,
       );
@@ -953,7 +967,7 @@ export class ConfigManager {
     if (rr?.fallback && !registeredProviders.has(rr.fallback.provider)) {
       errors.push(
         `llm_routing.reasoning_review.fallback references provider '${rr.fallback.provider}' ` +
-        `which is not registered. Registered: ${Array.from(registeredProviders).sort().join(', ')}.`,
+        `which is not registered. Registered: ${Array.from(registeredProviders).sort((a, b) => a.localeCompare(b)).join(', ')}.`,
       );
     }
     if (rr?.ensemble?.enabled && !registeredProviders.has(rr.ensemble.secondary.provider)) {

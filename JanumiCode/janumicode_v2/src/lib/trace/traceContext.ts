@@ -77,7 +77,7 @@ export function currentTraceContext(): TraceCtx | null {
 export function currentParentStep(): string | null {
   const ctx = als.getStore();
   if (!ctx || ctx.step_chain.length === 0) return null;
-  return ctx.step_chain[ctx.step_chain.length - 1];
+  return ctx.step_chain.at(-1) ?? null;
 }
 
 /** Push a step_id onto the chain (call before doing work). */

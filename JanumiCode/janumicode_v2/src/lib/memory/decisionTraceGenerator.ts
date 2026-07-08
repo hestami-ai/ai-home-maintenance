@@ -7,7 +7,7 @@
  */
 
 import type { Database } from '../database/init';
-import type { GovernedStreamRecord, DecisionType } from '../types/records';
+import type { DecisionType } from '../types/records';
 
 // ── Types ───────────────────────────────────────────────────────────
 

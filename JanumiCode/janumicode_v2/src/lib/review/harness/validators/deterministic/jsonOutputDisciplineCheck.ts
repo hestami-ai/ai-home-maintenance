@@ -66,7 +66,7 @@ export function validateJsonOutputDiscipline(
       type: 'leading_prose',
       summary: 'Agent response has leading prose before the JSON object',
       location: '$',
-      detail: `Response starts with '${text.slice(0, 40).replace(/\n/g, '\\n')}...' instead of { or [.`,
+      detail: `Response starts with '${text.slice(0, 40).replaceAll('\n', '\\n')}...' instead of { or [.`,
       recommendation:
         'Remove all commentary before the opening { or [. Output starts immediately with the JSON.',
     });

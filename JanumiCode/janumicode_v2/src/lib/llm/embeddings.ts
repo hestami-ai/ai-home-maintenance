@@ -177,7 +177,7 @@ export class LlamacppEmbeddingClient implements EmbeddingClient {
         const json = await res.json() as { data?: Array<{ embedding?: number[] }> };
         const emb = json.data?.[0]?.embedding;
         if (!Array.isArray(emb)) {
-          throw new Error('llamacpp embedding response missing data[0].embedding');
+          throw new TypeError('llamacpp embedding response missing data[0].embedding');
         }
         out.push(emb);
       } finally {

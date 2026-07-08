@@ -31,7 +31,7 @@ import { resolveExecutorIdleTimeoutMs } from '../executorTimeouts';
 import { checkAction } from '../perception/actionGuard';
 import type { Detection } from '../perception/classifier';
 import { GOOSE_MARKERS, type PerceptionMarkers } from '../perception/detectors';
-import { sanitizeResponderReply, type SessionResponder } from '../responder';
+import { sanitizeResponderReply, type ExecutorEscalation, type SessionResponder } from '../responder';
 import type { PtySpawner, ScreenModel } from '../types';
 import type { AdapterTier, ExecutorAdapter, ExecutorTaskOutcome, ExecutorTaskRequest } from '../adapter';
 
@@ -111,12 +111,20 @@ export interface GooseTuiAdapterOptions {
    * the ActionGuard.
    */
   responder?: SessionResponder;
+  /**
+   * Human-escalation sink for a clarifying question the spec-grounded responder
+   * could NOT answer (attended runs only). Unlike mimo's compose API, the goose
+   * PTY can inject the human's reply — it is typed straight into the session.
+   * Absent headless; on null/throw the adapter falls back to the canned
+   * clarification response, so it never deadlocks.
+   */
+  onEscalate?: ExecutorEscalation;
   /** Screen-model factory (tests inject the synchronous TerminalScreen). */
   screenFactory?: () => ScreenModel;
   /** Injected clock (testability); defaults to Date.now in runtime. */
   nowFn?: () => number;
-  setTimeoutFn?: SessionDriverOptions['setTimeoutFn'];
-  clearTimeoutFn?: SessionDriverOptions['clearTimeoutFn'];
+  setTimeoutFn?: NonNullable<SessionDriverOptions['setTimeoutFn']>;
+  clearTimeoutFn?: NonNullable<SessionDriverOptions['clearTimeoutFn']>;
 }
 
 export class GooseTuiAdapter implements ExecutorAdapter {
@@ -353,9 +361,20 @@ export class GooseTuiAdapter implements ExecutorAdapter {
       // line — numbered clarification questions span several lines and the
       // detected prompt line is only the final one.
       const questionBlock = d.agentContentSig.split('\n').slice(-8).join('\n') || q;
-      const answer = this.cfg.planActionPattern.test(q) ? this.cfg.planActionResponse
-        : this.cfg.clearHistoryPattern.test(q) ? this.cfg.clearHistoryResponse
-        : (await this.respondVia('question', questionBlock, d.agentContentSig)) ?? this.cfg.clarificationResponse;
+      // Protocol prompts (yes/no /plan rails) stay canned. A real clarifying
+      // question goes to the spec-grounded responder FIRST; if it can't answer,
+      // escalate to the human (attended) and type THEIR reply — the PTY can
+      // inject it, unlike mimo's compose API; canned deflection is the last resort.
+      let answer: string;
+      if (this.cfg.planActionPattern.test(q)) {
+        answer = this.cfg.planActionResponse;
+      } else if (this.cfg.clearHistoryPattern.test(q)) {
+        answer = this.cfg.clearHistoryResponse;
+      } else {
+        answer = (await this.respondVia('question', questionBlock, d.agentContentSig))
+          ?? (await this.escalateVia(questionBlock, d.agentContentSig))
+          ?? this.cfg.clarificationResponse;
+      }
       this.guardedSendLine(driver, answer, 'clarification-answer');
       sigAtSend = driver.classify(this.markers).agentContentSig;
       lastSig = sigAtSend;
@@ -424,6 +443,29 @@ export class GooseTuiAdapter implements ExecutorAdapter {
         question,
         // Tail only: enough to carry the numbered questions / last thought,
         // without shipping the whole transcript to a small fast model.
+        agentContext: agentContext.slice(-4000),
+        taskSpec: this.taskSpec,
+      });
+      return sanitizeResponderReply(raw, this.cfg.completionMarker);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Escalate a clarifying question the spec-grounded responder could NOT answer
+   * to the human (attended runs only; the sink is wired only when attended). The
+   * human's reply is typed straight into the PTY — the injection the mimo
+   * compose API cannot do. Null on any failure path (no sink, no/blank answer,
+   * threw) so the caller falls back to the canned clarification response. The
+   * reply is sanitized to one guarded TUI-safe line, same as {@link respondVia}.
+   */
+  private async escalateVia(question: string, agentContext: string): Promise<string | null> {
+    const onEscalate = this.opts.onEscalate;
+    if (!onEscalate) return null;
+    try {
+      const raw = await onEscalate({
+        question,
         agentContext: agentContext.slice(-4000),
         taskSpec: this.taskSpec,
       });

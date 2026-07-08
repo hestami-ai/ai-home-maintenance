@@ -163,12 +163,12 @@ function extractFromSaturationNode(
     return ids;
   }
 
-  const entityKey =
-    nodeRecordType === 'component_decomposition_node' ? 'component'
-    : nodeRecordType === 'data_model_decomposition_node' ? 'entity'
-    : nodeRecordType === 'task_decomposition_node' ? 'task'
-    : nodeRecordType === 'test_decomposition_node' ? 'test_case'
-    : null;
+  let entityKey: 'component' | 'entity' | 'task' | 'test_case' | null;
+  if (nodeRecordType === 'component_decomposition_node') entityKey = 'component';
+  else if (nodeRecordType === 'data_model_decomposition_node') entityKey = 'entity';
+  else if (nodeRecordType === 'task_decomposition_node') entityKey = 'task';
+  else if (nodeRecordType === 'test_decomposition_node') entityKey = 'test_case';
+  else entityKey = null;
   if (!entityKey) return ids;
   const entity = content[entityKey];
   if (entity && typeof entity === 'object') {
@@ -220,13 +220,19 @@ export function indexArtifacts(input: IndexInput): UpstreamIndex {
       // first-seen.
       if (!artifactsById.has(id)) {
         // For saturation, the underlying entity is the most useful copy.
-        const entityKey =
-          node.recordType === 'component_decomposition_node' ? 'component'
-          : node.recordType === 'data_model_decomposition_node' ? 'data_model'
-          : node.recordType === 'task_decomposition_node' ? 'task'
-          : node.recordType === 'test_decomposition_node' ? 'test_case'
-          : node.recordType === 'requirement_decomposition_node' ? 'user_story'
-          : null;
+        let entityKey:
+          | 'component'
+          | 'data_model'
+          | 'task'
+          | 'test_case'
+          | 'user_story'
+          | null;
+        if (node.recordType === 'component_decomposition_node') entityKey = 'component';
+        else if (node.recordType === 'data_model_decomposition_node') entityKey = 'data_model';
+        else if (node.recordType === 'task_decomposition_node') entityKey = 'task';
+        else if (node.recordType === 'test_decomposition_node') entityKey = 'test_case';
+        else if (node.recordType === 'requirement_decomposition_node') entityKey = 'user_story';
+        else entityKey = null;
         const entity = entityKey ? node.content[entityKey] : node.content;
         artifactsById.set(id, entity ?? node.content);
       }

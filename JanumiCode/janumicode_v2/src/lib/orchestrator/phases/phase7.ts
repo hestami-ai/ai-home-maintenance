@@ -244,18 +244,23 @@ export class Phase7Handler implements PhaseHandler {
       // test_suites[].test_cases[] entry becomes one depth-0 root.
       const constraintIds = technicalConstraints.map(t => t.id);
       rootTestCases = testPlanContent.test_suites.flatMap(s =>
-        s.test_cases.map(tc => ({
-          id: tc.test_case_id,
-          name: tc.expected_outcome ?? tc.test_case_id,
-          test_type: tc.type,
+        s.test_cases.map(tc => {
           // PA-2 fix: the 7.1 skeleton binds components at the SUITE level, so a
           // root test case usually has no component_ids of its own. Inherit the
           // suite's component_id so 7.1a sibling_context/component_context scoping
           // has a real id to key on (otherwise parentComps is empty and every root
           // renders as "sole child", starving the cross-sibling roster).
-          component_ids: (tc.component_ids && tc.component_ids.length > 0)
-            ? tc.component_ids
-            : (s.component_id ? [s.component_id] : []),
+          let componentIds: string[];
+          if (tc.component_ids && tc.component_ids.length > 0) {
+            componentIds = tc.component_ids;
+          } else {
+            componentIds = s.component_id ? [s.component_id] : [];
+          }
+          return {
+          id: tc.test_case_id,
+          name: tc.expected_outcome ?? tc.test_case_id,
+          test_type: tc.type,
+          component_ids: componentIds,
           acceptance_criterion_ids: tc.acceptance_criterion_ids,
           preconditions: tc.preconditions,
           steps: (tc.execution_steps && tc.execution_steps.length > 0)
@@ -270,7 +275,8 @@ export class Phase7Handler implements PhaseHandler {
           // Carry a skeleton-minted property into the saturation tree so the
           // decomposition pass can refine/fan it out rather than re-derive it.
           property_spec: tc.property_spec,
-        })),
+          };
+        }),
       );
       rootTestRecordIds = [];
       rootTestLogicalIds = [];
@@ -849,6 +855,42 @@ function backfillMissingComponentSuites(
 }
 
 /**
+ * Root-vs-leaf coverage guard for the Phase-7 scope gatekeeper. The gatekeeper
+ * drops suites whose `component_id` is not in the Accepted Components set, but
+ * Phase 7 keys its suites to the COARSE ROOT component (comp-tenant-service)
+ * while the accepted set is the SATURATED LEAF components (comp-tenant-config-
+ * service, comp-tenant-schema-service). A root-keyed suite that holds the SOLE
+ * test for a leaf AC is therefore dropped, silently deleting that AC's only
+ * coverage (cal-41: the US-012-01 branch's tests lived only in dropped tenant
+ * suites → downstream P3_AC_NO_TEST). Downstream binding (findTestCasesForAcs)
+ * is AC-driven and ignores component_id, so re-key any dropped suite that
+ * carries an AC no kept suite covers. Deterministic (stable suite order); never
+ * shrinks the kept set. Returns the augmented kept-id set.
+ */
+export function retainAcCoverageOnPrune(
+  suites: TestSuite[],
+  keptIds: Set<string>,
+): Set<string> {
+  const kept = new Set(keptIds);
+  const acsOf = (s: TestSuite): string[] =>
+    (s.test_cases ?? [])
+      .flatMap((tc) => tc.acceptance_criterion_ids ?? [])
+      .filter((ac): ac is string => typeof ac === 'string' && ac.length > 0);
+  const coveredByKept = new Set<string>();
+  for (const s of suites) {
+    if (kept.has(s.suite_id)) for (const ac of acsOf(s)) coveredByKept.add(ac);
+  }
+  for (const s of suites) {
+    if (kept.has(s.suite_id)) continue;
+    if (acsOf(s).some((ac) => !coveredByKept.has(ac))) {
+      kept.add(s.suite_id);
+      for (const ac of acsOf(s)) coveredByKept.add(ac);
+    }
+  }
+  return kept;
+}
+
+/**
  * Phase 7.1 scope-gatekeeper pass on the emitted test plan. Runs the
  * downstream gatekeeper, supersedes the original artifact with a pruned
  * copy when items were dropped, and returns the new content+record
@@ -874,7 +916,16 @@ async function applyTestPlanGatekeeper(
     overlay: 'DROP test suites whose `component_id` is NOT in Accepted Components. KEEP suites whose component is accepted, even if individual test cases reference removed ACs — the resolver will canonicalize references at 7.1a saturation.',
   });
   if (prune.skipped || prune.dropped.length === 0) return null;
-  const keptSet = new Set(prune.kept_ids);
+  // Coverage guard: re-key any dropped suite that carries the SOLE test for a
+  // leaf AC (root-vs-leaf component-namespace mismatch — see
+  // retainAcCoverageOnPrune). Without this, the component-axis prune silently
+  // deletes real AC coverage the AC-driven downstream binder would have used.
+  const keptSet = retainAcCoverageOnPrune(testPlanContent.test_suites, new Set(prune.kept_ids));
+  if (testPlanContent.test_suites.every(s => keptSet.has(s.suite_id))) {
+    // Every dropped suite was rescued for its unique AC coverage — nothing is
+    // net-removed, so leave the original artifact in place.
+    return null;
+  }
   const prunedSuites = testPlanContent.test_suites.filter(s => keptSet.has(s.suite_id));
   const prunedContent: TestPlan = { test_suites: prunedSuites };
   const { engine, workflowRun } = ctx;

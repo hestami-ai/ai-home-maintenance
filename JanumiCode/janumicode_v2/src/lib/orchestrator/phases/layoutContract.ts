@@ -113,7 +113,7 @@ export function canonicalComponentDir(
  */
 export function normalizeComponentDirForStack(p: string, stack?: string): string {
   if (!usesUnderscorePackages(stack)) return p;
-  return p.replace(/-/g, '_');
+  return p.replaceAll('-', '_');
 }
 
 /**
@@ -131,11 +131,14 @@ export function resolveWriteScopeForComponent(opts: {
   workspaceKind?: string;
   scaffoldSource?: string;
 }): string[] | null {
-  const greenfield = opts.workspaceKind !== undefined
-    ? opts.workspaceKind === 'greenfield'
-    : opts.scaffoldSource !== undefined
-      ? opts.scaffoldSource !== 'brownfield_detected'
-      : false;
+  let greenfield: boolean;
+  if (opts.workspaceKind !== undefined) {
+    greenfield = opts.workspaceKind === 'greenfield';
+  } else if (opts.scaffoldSource !== undefined) {
+    greenfield = opts.scaffoldSource !== 'brownfield_detected';
+  } else {
+    greenfield = false;
+  }
   if (!greenfield) return null;
   if (opts.isCompositionRoot) return ['src']; // owns the whole tree — never slug
   const id = (opts.componentId ?? '').trim();
@@ -184,7 +187,7 @@ export function buildProjectLayoutContract(
   extraAllowedTopLevel: string[] = [],
 ): ProjectLayoutContract {
   const srcRoot = 'src';
-  const sharedDir = profile.shared_dir.replace(/\\/g, '/').replace(/\/+$/, '');
+  const sharedDir = profile.shared_dir.replaceAll('\\', '/').replace(/\/+$/, '');
 
   const componentDirMap: Record<string, string> = {};
   for (const c of components) {
@@ -240,7 +243,7 @@ export function renderLayoutConventions(
       ? 'Co-locate each test as `<file>.test.ts` in the SAME directory as the implementation file.'
       : 'Place tests in a `tests/` subdirectory inside the component directory.';
   } else if (profile.language === 'python') {
-    const pkg = sharedLeaf.replace(/\//g, '.');
+    const pkg = sharedLeaf.replaceAll('/', '.');
     runnerRule = `Test runner: pytest (run from the project root)`;
     sharedRule = `Shared modules: ${contract.shared_dir}/ — import via the package path (e.g. \`from ${pkg}.models.Foo import Foo\`). Do NOT redefine shared types.`;
     testRule = contract.test_placement === 'colocated'

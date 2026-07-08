@@ -408,6 +408,18 @@ export interface PipelineRunnerConfig {
    */
   resumeAtSubPhase?: string;
   /**
+   * Resume-time reset of the run's cycle counter. Phase 6/7/8 branch to their
+   * incremental `runPhaseNCycleDelta` path whenever `current_cycle_number > 0`
+   * (i.e. the run went through packet-synthesis-failure route-and-restart
+   * cycles). That delta path only processes failure-seed orphans — it does NOT
+   * re-run the full generator or its gatekeepers. When a fix must be exercised
+   * through the MAIN `execute()` path (e.g. a Phase-7 test-plan gatekeeper
+   * change), resuming in cycle mode would no-op the delta and silently skip the
+   * fix. Setting this zeroes `current_cycle_number` after rollback so resumed
+   * phases run full re-execution. Only meaningful alongside a resume flag.
+   */
+  resumeResetCycles?: boolean;
+  /**
    * Thin-slice mode: constrain the decomposition tree (depth=2,
    * fanout=1, ~2 root FRs/NFRs, all reasoning_review on) so every
    * sub-phase prompt template fires at least once end-to-end. Used

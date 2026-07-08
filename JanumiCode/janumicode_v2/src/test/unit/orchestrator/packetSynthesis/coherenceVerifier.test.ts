@@ -160,13 +160,46 @@ describe('verifyCoherence — A4 unscoped multi-API (PD-7)', () => {
 // ── P1..P7 per-packet assertions ──────────────────────────────────
 
 describe('verifyCoherence — per-packet assertions', () => {
-  it('P1: no user story → fail', () => {
-    const p = packet({ user_stories: [] });
+  it('P1: no user story but the task cites a REAL upstream AC/US that failed to join → still BLOCKS (genuine join defect)', () => {
+    // A standard feature task whose traces_to carries a real upstream FR id is NOT
+    // structurally storyless — a zero-story result is a real join bug to surface.
+    const p = packet({
+      user_stories: [],
+      task: {
+        id: 'task-001', node_id: 'node-001', name: 't', description: 'd',
+        task_type: 'standard', backing_tool: 'claude_code_cli', estimated_complexity: 'low',
+        completion_criteria: [], write_directory_paths: ['src/server/foo'],
+        read_directory_paths: [], dependency_task_ids: [],
+        traces_to: ['AC-US-005-001'],
+      },
+    });
     const r = verifyCoherence({
-      packets: [p], upstreamIndex: idxWithAll(['comp-001', 'resp-1']), atomicTaskIds: new Set(['task-001']),
+      packets: [p], upstreamIndex: idxWithAll(['comp-001', 'resp-1', 'AC-US-005-001']), atomicTaskIds: new Set(['task-001']),
     });
     const failures = r.byPacketId.get(p.packet_id)!.blocking_failures;
     expect(failures.some((f) => f.startsWith('P1_NO_USER_STORY'))).toBe(true);
+  });
+
+  it('P1: a STRUCTURALLY-storyless technical leaf (traces only to a comp-id / invented CC, no upstream FR anchor) is EXEMPT (advisory)', () => {
+    // cal-41: comp-audit-log-retriever leaves trace only to their own component id
+    // or invented completion criteria — no upstream user story exists to join to,
+    // so blocking is a false positive the route-restart can never heal.
+    const p = packet({
+      user_stories: [],
+      task: {
+        id: 'task-comp-audit-log-retriever-db-query', node_id: 'node-a', name: 'db query', description: 'd',
+        task_type: 'standard', backing_tool: 'mimo_cli', estimated_complexity: 'medium',
+        completion_criteria: [], write_directory_paths: ['src/audit/'],
+        read_directory_paths: [], dependency_task_ids: [],
+        traces_to: ['comp-audit-log-retriever', 'CC-AH-005'],
+      },
+    });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['comp-001', 'resp-1']), atomicTaskIds: new Set(['task-comp-audit-log-retriever-db-query']),
+    });
+    const res = r.byPacketId.get(p.packet_id)!;
+    expect(res.blocking_failures.some((f) => f.startsWith('P1_NO_USER_STORY'))).toBe(false); // NOT blocking
+    expect(res.advisory_findings.some((f) => f.startsWith('P1_NO_USER_STORY'))).toBe(true);  // advisory instead
   });
 
   it('P1: a cross-run refactoring task with no user story is EXEMPT (advisory, not blocking)', () => {
@@ -187,6 +220,27 @@ describe('verifyCoherence — per-packet assertions', () => {
     const res = r.byPacketId.get(p.packet_id)!;
     expect(res.blocking_failures.some((f) => f.startsWith('P1_NO_USER_STORY'))).toBe(false); // NOT blocking
     expect(res.advisory_findings.some((f) => f.startsWith('P1_NO_USER_STORY'))).toBe(true);  // advisory instead
+  });
+
+  // D11 — an INFRA/NFR task legitimately has no user story (traces to an
+  // operational concern, not a feature); blocking it is a false positive that
+  // persists to the fixpoint. Exempt it the same as refactoring.
+  it('P1: an infrastructure task with no user story is EXEMPT (advisory, not blocking) — D11', () => {
+    const p = packet({
+      user_stories: [],
+      task: {
+        id: 'INFRA-1', node_id: 'node-i', name: 'provision db', description: 'd',
+        task_type: 'infrastructure', backing_tool: 'mimo_cli', estimated_complexity: 'medium',
+        completion_criteria: [], write_directory_paths: ['infra/'],
+        read_directory_paths: [], dependency_task_ids: [],
+      },
+    });
+    const r = verifyCoherence({
+      packets: [p], upstreamIndex: idxWithAll(['comp-001', 'resp-1']), atomicTaskIds: new Set(['INFRA-1']),
+    });
+    const res = r.byPacketId.get(p.packet_id)!;
+    expect(res.blocking_failures.some((f) => f.startsWith('P1_NO_USER_STORY'))).toBe(false);
+    expect(res.advisory_findings.some((f) => f.startsWith('P1_NO_USER_STORY'))).toBe(true);
   });
 
   it('P2: user story with no AC → fail', () => {
@@ -450,8 +504,8 @@ describe('verifyCoherence — totals', () => {
   it('aggregates correctly across multiple packets', () => {
     const good = packet({ packet_id: 'pkt-G', task: { ...packet().task, id: 'task-G' } });
     const bad = packet({
-      packet_id: 'pkt-B', task: { ...packet().task, id: 'task-B' },
-      user_stories: [],   // P1 fail
+      packet_id: 'pkt-B', task: { ...packet().task, id: 'task-B', traces_to: ['AC-001'] },
+      user_stories: [],   // P1 fail — cites a real upstream AC, so NOT storyless-exempt
     });
     const r = verifyCoherence({
       packets: [good, bad],
@@ -541,5 +595,39 @@ describe('verifyCoherence — P4 leaf story satisfied by root-targeted eval', ()
       canonicalize: (id) => (id === 'US-001-01-1' ? 'US-001' : id),
     });
     expect(r.byPacketId.get('pkt-1')!.blocking_failures.some((f) => f.startsWith('P4_USER_STORY_NO_EVAL'))).toBe(true);
+  });
+
+  // cal-41 US-012-01-* regression: Phase-8 (on the resume/cycle path) persisted
+  // functional evals against RAW sibling leaves (US-012-02-D) that it never
+  // collapsed to the root US-012. The packet story is a DIFFERENT leaf of the
+  // same root (US-012-01-1-D) with NO eval of its own or the root. P4 must
+  // canonicalize BOTH sides so the sibling-leaf eval (→US-012) satisfies the
+  // packet leaf (→US-012). Prior half-implemented bridge (query-side only) fired.
+  it('passes P4 when a SIBLING-leaf eval shares the packet leaf\'s canonical root', () => {
+    const siblingCanon = (id: string) =>
+      (id === 'US-012-01-1-D' || id === 'US-012-02-D') ? 'US-012' : id;
+    const p = packet({
+      user_stories: [{
+        id: 'US-012-01-1-D', role: 'r', action: 'a', outcome: 'o', priority: 'critical',
+        acceptance_criteria: [{ id: 'AC-US-012-01-1-D-001', description: 'ac', measurable_condition: 'valid' }],
+      }],
+      test_cases: [{
+        test_case_id: 'TC-012', type: 'functional',
+        acceptance_criterion_ids: ['AC-US-012-01-1-D-001'], preconditions: [], expected_outcome: 'valid',
+      }],
+      evaluation_criteria: [{
+        kind: 'functional', target_id: 'US-012-02-D', // SIBLING leaf, not the packet's leaf nor the root
+        evaluation_method: 'API test', success_condition: 'works',
+      }],
+    });
+    const r = verifyCoherence({
+      packets: [p],
+      upstreamIndex: idxWithAll(['US-012-01-1-D', 'AC-US-012-01-1-D-001', 'comp-001', 'resp-1', 'TC-012', 'US-012-02-D']),
+      atomicTaskIds: new Set(['task-001']),
+      canonicalize: siblingCanon,
+    });
+    const res = r.byPacketId.get('pkt-1')!;
+    expect(res.blocking_failures.filter((f) => f.startsWith('P4'))).toHaveLength(0);
+    expect(res.blocking_failures.filter((f) => f.startsWith('P3'))).toHaveLength(0);
   });
 });

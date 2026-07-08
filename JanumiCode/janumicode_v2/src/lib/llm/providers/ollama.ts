@@ -13,7 +13,7 @@ import type {
   ToolCall,
 } from '../llmCaller';
 import { LLMError } from '../llmCaller';
-import { parseJsonWithRecovery } from '../jsonRecovery';
+import { tryParseJson } from '../jsonRecovery';
 import { resolveLlmTimeouts } from '../llmTimeouts';
 import { getLogger } from '../../logging/logger';
 import { assertNotReplayMode } from '../../replay/gpuGuard';
@@ -150,6 +150,16 @@ export class OllamaProvider implements LLMProviderAdapter {
     const numPredict = options.maxTokens
       ?? Number.parseInt(process.env.JANUMICODE_LLM_NUM_PREDICT ?? '0', 10);
 
+    // Per-family context windows (see num_ctx comment in the options block).
+    let numCtx: number;
+    if (isGemmaLarge) numCtx = 262144;
+    else if (isGemma) numCtx = 131072;
+    else if (isGranite) numCtx = 11000;
+    else if (isGptOss) numCtx = 131072;
+    else if (isApriel) numCtx = 50000;
+    else if (isOrnith) numCtx = 131072;
+    else numCtx = 262141;
+
     const body: Record<string, unknown> = {
       model: options.model,
       prompt: options.prompt,
@@ -174,7 +184,7 @@ export class OllamaProvider implements LLMProviderAdapter {
         // Ollama would otherwise truncate silently), gpt-oss → 131072
         // (also native max; same rounding fix as gemma), apriel → 50K
         // (RTX 4090 ceiling for apriel-1.6:15b), default (qwen) → 262K.
-        num_ctx: isGemmaLarge ? 262144 : isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : isOrnith ? 131072 : 262141,
+        num_ctx: numCtx,
         ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95, min_p: 0, repeat_penalty: 1 } : {}),
         ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
         ...(isOrnith ? { top_k: 20, top_p: 0.95, stop: ['<|im_end|>'] } : {}),
@@ -234,7 +244,7 @@ export class OllamaProvider implements LLMProviderAdapter {
 
             let parsed: Record<string, unknown> | null = null;
             if (options.responseFormat === 'json') {
-              parsed = parseJsonWithRecovery(text).parsed;
+              parsed = tryParseJson(text).parsed;
             }
 
             resolve({
@@ -356,7 +366,7 @@ export class OllamaProvider implements LLMProviderAdapter {
 
         const handleFrame = (frame: Record<string, unknown>): void => {
           frameCount++;
-          if (firstFrameHead === null) firstFrameHead = JSON.stringify(frame).slice(0, 160);
+          firstFrameHead ??= JSON.stringify(frame).slice(0, 160);
           const response = typeof frame.response === 'string' ? frame.response : '';
           const thinking = typeof frame.thinking === 'string' ? frame.thinking : '';
           if (response.length > 0) {
@@ -364,7 +374,7 @@ export class OllamaProvider implements LLMProviderAdapter {
             onChunk({ text: response, channel: 'response' });
           }
           if (thinking.length > 0) {
-            if (firstThinkingHead === null) firstThinkingHead = thinking.slice(0, 160);
+            firstThinkingHead ??= thinking.slice(0, 160);
             thinkingFrameCount++;
             fullThinking += thinking;
             onChunk({ text: thinking, channel: 'thinking' });
@@ -406,7 +416,7 @@ export class OllamaProvider implements LLMProviderAdapter {
           const text = fullResponse;
           let parsed: Record<string, unknown> | null = null;
           if (options.responseFormat === 'json') {
-            parsed = parseJsonWithRecovery(text).parsed;
+            parsed = tryParseJson(text).parsed;
           }
           resolve({
             text,
@@ -481,6 +491,16 @@ export class OllamaProvider implements LLMProviderAdapter {
     else if (isOrnith) temperature = 0.6;
     else temperature = options.temperature ?? 0.7;
 
+    // Mirrors the per-family num_ctx in call() (see the options block below).
+    let numCtx: number;
+    if (isGemmaLarge) numCtx = 262144;
+    else if (isGemma) numCtx = 131072;
+    else if (isGranite) numCtx = 11000;
+    else if (isGptOss) numCtx = 131072;
+    else if (isApriel) numCtx = 50000;
+    else if (isOrnith) numCtx = 131072;
+    else numCtx = 262141;
+
     const body: Record<string, unknown> = {
       model: options.model,
       messages,
@@ -499,7 +519,7 @@ export class OllamaProvider implements LLMProviderAdapter {
         // Mirrors the per-family num_ctx in callGenerate (single source of
         // truth would be cleaner but the two paths take different option
         // shapes). Keep these in sync when adjusting.
-        num_ctx: isGemmaLarge ? 262144 : isGemma ? 131072 : isGranite ? 11000 : isGptOss ? 131072 : isApriel ? 50000 : isOrnith ? 131072 : 262141,
+        num_ctx: numCtx,
         ...(isQwen ? { presence_penalty: 1.5, top_k: 20, top_p: 0.95, min_p: 0, repeat_penalty: 1 } : {}),
         ...(isGemma ? { top_k: 64, top_p: 0.95 } : {}),
         ...(isOrnith ? { top_k: 20, top_p: 0.95, stop: ['<|im_end|>'] } : {}),

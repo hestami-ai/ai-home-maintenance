@@ -249,9 +249,7 @@ let globalLogger: Logger | null = null;
  * Get the global logger instance.
  */
 export function getLogger(): Logger {
-  if (!globalLogger) {
-    globalLogger = new Logger();
-  }
+  globalLogger ??= new Logger();
   return globalLogger;
 }
 

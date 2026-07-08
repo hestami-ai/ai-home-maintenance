@@ -61,6 +61,20 @@ function emptyInput(): BuilderInput {
   };
 }
 
+describe('buildPackets — implement-once dedupe (C1, D10)', () => {
+  it('builds exactly one packet per task.id even when an atomic task arrives twice', () => {
+    const input = {
+      ...emptyInput(),
+      atomicTasks: [atomicTask({ id: 'dup-1' }), atomicTask({ id: 'dup-1' }), atomicTask({ id: 'other' })],
+    };
+    const packets = buildPackets(input);
+    expect(packets.filter((p) => p.task.id === 'dup-1')).toHaveLength(1);
+    expect(packets).toHaveLength(2); // dup-1 (once) + other
+    const taskIds = packets.map((p) => p.task.id);
+    expect(new Set(taskIds).size).toBe(taskIds.length); // no task in ≥2 packets
+  });
+});
+
 describe('buildPackets — cross-cutting NFR constraint routing (Lever 1a)', () => {
   it('attaches a concern only to packets whose component is in applies_to_components', () => {
     const input: BuilderInput = {
@@ -616,6 +630,57 @@ describe('buildPackets — task→leaf-AC binding scopes user_stories to the tas
     // No AC ids → AC pass is skipped; no SR/component match here → empty stories (the
     // fallback passes run, just don't match this minimal fixture). Asserts no throw + AC pass not over-reaching.
     expect(() => buildPackets(input)).not.toThrow();
+  });
+});
+
+describe('buildPackets — functional eval binds via canonical root (cal-41 US-012-01-*)', () => {
+  // Decomposition tree: US-012 (root) → {US-012-01 → US-012-01-1 → US-012-01-1-D}
+  // and {US-012-02 → US-012-02-D}. Both leaves canonicalize to US-012. Phase 8
+  // (resume/cycle path) persisted a functional eval targeting the RAW SIBLING
+  // leaf US-012-02-D, never collapsed to root. The packet's story is a DIFFERENT
+  // leaf (US-012-01-1-D) with no eval of its own — the binder must match the
+  // eval target's canonical root against the packet's usIds.
+  const treeRecords = [
+    { id: 'rroot', record_type: 'requirement_decomposition_node', produced_at: '2026-01-01T00:00:00Z',
+      content: { kind: 'requirement_decomposition_node', node_id: 'root12', depth: 0, display_key: 'US-012' } },
+    { id: 'r01', record_type: 'requirement_decomposition_node', produced_at: '2026-01-01T00:00:00Z',
+      content: { kind: 'requirement_decomposition_node', node_id: 'n01', parent_node_id: 'root12', display_key: 'US-012-01' } },
+    { id: 'r011', record_type: 'requirement_decomposition_node', produced_at: '2026-01-01T00:00:00Z',
+      content: { kind: 'requirement_decomposition_node', node_id: 'n011', parent_node_id: 'n01', display_key: 'US-012-01-1' } },
+    { id: 'r011D', record_type: 'requirement_decomposition_node', produced_at: '2026-01-01T00:00:00Z',
+      content: { kind: 'requirement_decomposition_node', node_id: 'n011D', parent_node_id: 'n011', status: 'atomic', display_key: 'US-012-01-1-D',
+        user_story: { id: 'US-012-01-1-D', acceptance_criteria: [{ id: 'AC-US-012-01-1-D-001' }] } } },
+    { id: 'r02', record_type: 'requirement_decomposition_node', produced_at: '2026-01-01T00:00:00Z',
+      content: { kind: 'requirement_decomposition_node', node_id: 'n02', parent_node_id: 'root12', display_key: 'US-012-02' } },
+    { id: 'r02D', record_type: 'requirement_decomposition_node', produced_at: '2026-01-01T00:00:00Z',
+      content: { kind: 'requirement_decomposition_node', node_id: 'n02D', parent_node_id: 'n02', status: 'atomic', display_key: 'US-012-02-D',
+        user_story: { id: 'US-012-02-D', acceptance_criteria: [{ id: 'AC-US-012-02-D-001' }] } } },
+  ] as unknown as Parameters<typeof buildRequirementLineage>[0];
+
+  const baseInput = (evals: BuilderEvaluationCriterion[]): BuilderInput => ({
+    ...emptyInput(),
+    atomicTasks: [atomicTask({ traces_to: ['AC-US-012-01-1-D-001'], component_id: 'comp-001' })],
+    userStories: [
+      { id: 'US-012-01-1-D', role: 'r', action: 'a', outcome: 'o', priority: 'high', acceptance_criteria: [{ id: 'AC-US-012-01-1-D-001', description: 'validate' }] },
+    ] as unknown as BuilderUserStory[],
+    componentsById: new Map([['comp-001', { id: 'comp-001', name: 'C', responsibilities: [], dependencies: [], active_constraints: [] } as unknown as BuilderComponent]]),
+    lineage: buildRequirementLineage(treeRecords),
+    evaluationCriteria: evals,
+  });
+
+  it('binds a sibling-leaf-targeted functional eval to the deep-leaf packet', () => {
+    const packets = buildPackets(baseInput([
+      { kind: 'functional', target_id: 'US-012-02-D', evaluation_method: 'API test', success_condition: 'works' },
+    ]));
+    expect(packets).toHaveLength(1);
+    expect(packets[0].evaluation_criteria.map((e) => e.target_id)).toContain('US-012-02-D');
+  });
+
+  it('does NOT bind an eval targeting an unrelated story root (no over-bind)', () => {
+    const packets = buildPackets(baseInput([
+      { kind: 'functional', target_id: 'US-999-1', evaluation_method: 'x', success_condition: 'y' },
+    ]));
+    expect(packets[0].evaluation_criteria).toHaveLength(0);
   });
 });
 

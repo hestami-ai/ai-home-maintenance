@@ -20,7 +20,6 @@
  */
 
 import { createHash } from 'node:crypto';
-import type { Database } from '../database/init';
 import type { GovernedStreamWriter } from '../orchestrator/governedStreamWriter';
 import type { AgentRole, PhaseId } from '../types/records';
 import { InvocationLogFile } from './invocationLogger';
@@ -298,7 +297,7 @@ export function computeLLMCacheKey(opts: LLMCacheKeyInput): string {
 // ── LLMCaller ───────────────────────────────────────────────────────
 
 export class LLMCaller {
-  private providers = new Map<string, LLMProviderAdapter>();
+  private readonly providers = new Map<string, LLMProviderAdapter>();
   private writer: GovernedStreamWriter | null = null;
   private versionSha = 'dev';
   private _inFlightCount = 0;
@@ -330,7 +329,7 @@ export class LLMCaller {
    *    cache hits (with metadata.cache_hit=true) so the audit trail
    *    of the resumed session stays complete.
    */
-  private llmCache = new Map<string, CachedLLMOutput>();
+  private readonly llmCache = new Map<string, CachedLLMOutput>();
 
   constructor(private readonly config: LLMCallerConfig) {}
 
@@ -1156,9 +1155,12 @@ export class LLMCaller {
               reason.includes('invocation wall-clock exceeded') ||
               reason.includes('degenerate loop detected') ||
               reason.includes('no-progress timeout');
+            const abortErrorType: LLMErrorType = isRunawayThinking
+              ? 'runaway_thinking'
+              : 'context_exceeded';
             const errorType: LLMErrorType = sessionAborted
               ? 'unknown'
-              : (isRunawayThinking ? 'runaway_thinking' : 'context_exceeded');
+              : abortErrorType;
             lastError = new LLMError(
               `LLM stream aborted: ${abortReason}`,
               errorType,

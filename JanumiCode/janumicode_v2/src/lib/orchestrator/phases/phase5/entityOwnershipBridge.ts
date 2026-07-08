@@ -87,6 +87,13 @@ export interface ReconcileResult {
 
 // ── Context construction (pure; caller supplies the raw upstream arrays) ──
 
+/** The business-domain id(s) a software domain maps to (either upstream key). */
+function pickBusinessDomains(d: { maps_to_business_domains?: string[]; business_domain_ids?: string[] }): string[] {
+  if (Array.isArray(d.maps_to_business_domains)) return d.maps_to_business_domains;
+  if (Array.isArray(d.business_domain_ids)) return d.business_domain_ids;
+  return [];
+}
+
 /**
  * Build the {@link OwnershipContext} from raw upstream artifact arrays — the P1
  * entity catalog (concept → single owning business domain), the P4 software
@@ -107,9 +114,7 @@ export function buildOwnershipContext(input: {
   const domainBusinessDomains = new Map<string, string[]>();
   for (const d of input.softwareDomains ?? []) {
     if (typeof d.id === 'string' && d.id) {
-      const biz = Array.isArray(d.maps_to_business_domains) ? d.maps_to_business_domains
-        : Array.isArray(d.business_domain_ids) ? d.business_domain_ids : [];
-      domainBusinessDomains.set(d.id, biz);
+      domainBusinessDomains.set(d.id, pickBusinessDomains(d));
     }
   }
   const componentDomain = new Map<string, string>();
@@ -125,7 +130,12 @@ export function buildComponentContextLines(
 ): string {
   return (components ?? [])
     .filter((c) => typeof c.id === 'string' && c.id)
-    .map((c) => `- ${c.id}${c.name ? ` (${c.name})` : ''}${c.responsibility ? ` — ${c.responsibility}` : c.description ? ` — ${c.description}` : ''}${c.domain_id ? ` [${c.domain_id}]` : ''}`)
+    .map((c) => {
+      let detail = '';
+      if (c.responsibility) detail = ` — ${c.responsibility}`;
+      else if (c.description) detail = ` — ${c.description}`;
+      return `- ${c.id}${c.name ? ` (${c.name})` : ''}${detail}${c.domain_id ? ` [${c.domain_id}]` : ''}`;
+    })
     .join('\n');
 }
 
@@ -176,7 +186,13 @@ function electOwner(
   // richest field set (fullest aggregate), then lexicographically-smallest id.
   const pool = domainMatched.length > 0 ? domainMatched : candidates;
   const byMember = new Map(members.map((m) => [m.component_id, m.fieldCount]));
-  const owner = [...pool].sort((a, b) => (byMember.get(b) ?? 0) - (byMember.get(a) ?? 0) || (a < b ? -1 : a > b ? 1 : 0))[0];
+  const owner = [...pool].sort((a, b) => {
+    const byFields = (byMember.get(b) ?? 0) - (byMember.get(a) ?? 0);
+    if (byFields) return byFields;
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  })[0];
   return { owner, source: 'deterministic' };
 }
 
@@ -276,9 +292,14 @@ export async function reconcileEntityOwnership(
   for (const key of [...separateKeys, ...needsVerdict]) {
     const members = groups.get(key)!;
     const v = verdictByKey.get(key);
-    const verdict: EntityOwnershipVerdict = separateKeys.has(key)
-      ? 'separate'
-      : (v?.verdict === 'shared_value_object' || v?.verdict === 'separate' || v?.verdict === 'owned_aggregate' ? v.verdict : 'owned_aggregate');
+    let verdict: EntityOwnershipVerdict;
+    if (separateKeys.has(key)) {
+      verdict = 'separate';
+    } else if (v?.verdict === 'shared_value_object' || v?.verdict === 'separate' || v?.verdict === 'owned_aggregate') {
+      verdict = v.verdict;
+    } else {
+      verdict = 'owned_aggregate';
+    }
 
     if (verdict === 'separate') {
       for (const { entity } of members) { entity.ownership_role = 'owned'; stats.owned++; }

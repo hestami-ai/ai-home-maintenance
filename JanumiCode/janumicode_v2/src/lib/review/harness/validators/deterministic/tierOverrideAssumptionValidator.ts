@@ -38,10 +38,14 @@ export function validateTierOverrideAssumption(
       Array.isArray(surfacedAssumptions) && surfacedAssumptions.length > 0;
 
     if (!hasOverrideRationale) {
-      const name =
-        typeof c.name === 'string' ? c.name
-        : typeof c.id === 'string' ? c.id
-        : `child[${idx}]`;
+      let name: string;
+      if (typeof c.name === 'string') {
+        name = c.name;
+      } else if (typeof c.id === 'string') {
+        name = c.id;
+      } else {
+        name = `child[${idx}]`;
+      }
       const overrideTier = typeof c.tier === 'string' ? c.tier : '?';
 
       findings.push({

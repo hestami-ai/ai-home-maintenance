@@ -42,7 +42,7 @@ export function normalizeIdHyphens(id: string): string {
   if (!m) return id;
   const [, prefix, body] = m;
   if (!body.includes('_')) return id;
-  return `${prefix}-${body.replace(/_/g, '-')}`;
+  return `${prefix}-${body.replaceAll('_', '-')}`;
 }
 
 /**
@@ -68,11 +68,10 @@ export function normalizeComponentIdRef(id: string): string {
   // just match the prefix-case to what the producer emits.
   const m = /^(comp)-(.+)$/i.exec(id);
   if (!m) return id;
-  const [, _prefix, body] = m;
+  const [, , body] = m;
   // Also apply hyphen normalization to the body — `COMP-ANALYTICS_CLICK`
   // should become `comp-ANALYTICS-CLICK` in one pass.
-  const cleanedBody = body.replace(/_/g, '-');
-  void _prefix;
+  const cleanedBody = body.replaceAll('_', '-');
   return `comp-${cleanedBody}`;
 }
 

@@ -65,7 +65,7 @@ const SUB_PHASE = 'release_plan';
 // ── Helpers ────────────────────────────────────────────────────────
 
 function uniqSorted(xs: string[]): string[] {
-  return Array.from(new Set(xs)).sort();
+  return Array.from(new Set(xs)).sort((a, b) => a.localeCompare(b));
 }
 
 function mkGap(params: {
@@ -272,7 +272,7 @@ function checkTraceCoherence(
       if (typeof o === 'number') ordsBacked.add(o);
     }
     if (ordsBacked.size > 1) {
-      findings.push(`${w.id}(REL-ord=${wfOrd}) backs journeys in multiple releases (${[...ordsBacked].sort().join(',')}) — consider promoting to cross_cutting.`);
+      findings.push(`${w.id}(REL-ord=${wfOrd}) backs journeys in multiple releases (${[...ordsBacked].sort((a, b) => a - b).join(',')}) — consider promoting to cross_cutting.`);
     }
   }
   if (findings.length === 0) return [];
@@ -304,48 +304,50 @@ export function verifyReleaseManifest(i: ReleaseManifestVerifierInputs): Release
     return m;
   };
 
-  gaps.push(...checkExactCoverage({
-    check: 'release_exact_coverage_journeys',
-    assertion: 'Every accepted journey must appear in exactly one release. Journeys are not eligible for cross_cutting.',
-    expected: i.journeys.map(j => j.id),
-    perRelease: byTypeForRelease('journeys'),
-    crossCutting: [],
-  }));
-  gaps.push(...checkExactCoverage({
-    check: 'release_exact_coverage_workflows',
-    assertion: 'Every accepted workflow must appear in exactly one release OR in cross_cutting.workflows.',
-    expected: i.workflows.map(w => w.id),
-    perRelease: byTypeForRelease('workflows'),
-    crossCutting: plan.cross_cutting.workflows,
-  }));
-  gaps.push(...checkExactCoverage({
-    check: 'release_exact_coverage_entities',
-    assertion: 'Every accepted entity must appear in exactly one release. Entities are not eligible for cross_cutting.',
-    expected: i.entityIds,
-    perRelease: byTypeForRelease('entities'),
-    crossCutting: [],
-  }));
-  gaps.push(...checkExactCoverage({
-    check: 'release_exact_coverage_compliance',
-    assertion: 'Every accepted compliance item must appear in exactly one release OR in cross_cutting.compliance.',
-    expected: i.complianceIds,
-    perRelease: byTypeForRelease('compliance'),
-    crossCutting: plan.cross_cutting.compliance,
-  }));
-  gaps.push(...checkExactCoverage({
-    check: 'release_exact_coverage_integrations',
-    assertion: 'Every accepted integration must appear in exactly one release OR in cross_cutting.integrations.',
-    expected: i.integrations.map(it => it.id),
-    perRelease: byTypeForRelease('integrations'),
-    crossCutting: plan.cross_cutting.integrations,
-  }));
-  gaps.push(...checkExactCoverage({
-    check: 'release_exact_coverage_vocabulary',
-    assertion: 'Every accepted vocabulary term must appear in exactly one release OR in cross_cutting.vocabulary.',
-    expected: i.vocabulary.map(v => v.id),
-    perRelease: byTypeForRelease('vocabulary'),
-    crossCutting: plan.cross_cutting.vocabulary,
-  }));
+  gaps.push(
+    ...checkExactCoverage({
+      check: 'release_exact_coverage_journeys',
+      assertion: 'Every accepted journey must appear in exactly one release. Journeys are not eligible for cross_cutting.',
+      expected: i.journeys.map(j => j.id),
+      perRelease: byTypeForRelease('journeys'),
+      crossCutting: [],
+    }),
+    ...checkExactCoverage({
+      check: 'release_exact_coverage_workflows',
+      assertion: 'Every accepted workflow must appear in exactly one release OR in cross_cutting.workflows.',
+      expected: i.workflows.map(w => w.id),
+      perRelease: byTypeForRelease('workflows'),
+      crossCutting: plan.cross_cutting.workflows,
+    }),
+    ...checkExactCoverage({
+      check: 'release_exact_coverage_entities',
+      assertion: 'Every accepted entity must appear in exactly one release. Entities are not eligible for cross_cutting.',
+      expected: i.entityIds,
+      perRelease: byTypeForRelease('entities'),
+      crossCutting: [],
+    }),
+    ...checkExactCoverage({
+      check: 'release_exact_coverage_compliance',
+      assertion: 'Every accepted compliance item must appear in exactly one release OR in cross_cutting.compliance.',
+      expected: i.complianceIds,
+      perRelease: byTypeForRelease('compliance'),
+      crossCutting: plan.cross_cutting.compliance,
+    }),
+    ...checkExactCoverage({
+      check: 'release_exact_coverage_integrations',
+      assertion: 'Every accepted integration must appear in exactly one release OR in cross_cutting.integrations.',
+      expected: i.integrations.map(it => it.id),
+      perRelease: byTypeForRelease('integrations'),
+      crossCutting: plan.cross_cutting.integrations,
+    }),
+    ...checkExactCoverage({
+      check: 'release_exact_coverage_vocabulary',
+      assertion: 'Every accepted vocabulary term must appear in exactly one release OR in cross_cutting.vocabulary.',
+      expected: i.vocabulary.map(v => v.id),
+      perRelease: byTypeForRelease('vocabulary'),
+      crossCutting: plan.cross_cutting.vocabulary,
+    }),
+  );
   if (i.vvRequirementIds) {
     gaps.push(...checkExactCoverage({
       check: 'release_exact_coverage_vv_requirements',
@@ -374,8 +376,10 @@ export function verifyReleaseManifest(i: ReleaseManifestVerifierInputs): Release
     }));
   }
 
-  gaps.push(...checkBackwardDependencies(plan, i.workflows));
-  gaps.push(...checkTraceCoherence(plan, i.workflows));
+  gaps.push(
+    ...checkBackwardDependencies(plan, i.workflows),
+    ...checkTraceCoherence(plan, i.workflows),
+  );
 
   // Unused imports guard — ExtractedItem is referenced via type-only in
   // the input type signatures; reference it here to satisfy strict

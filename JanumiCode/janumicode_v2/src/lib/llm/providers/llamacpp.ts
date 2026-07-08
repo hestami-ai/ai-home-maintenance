@@ -40,7 +40,7 @@ import type {
   LLMStreamingCallOptions,
 } from '../llmCaller';
 import { LLMError } from '../llmCaller';
-import { parseJsonWithRecovery } from '../jsonRecovery';
+import { tryParseJson } from '../jsonRecovery';
 import { assertNotReplayMode } from '../../replay/gpuGuard';
 
 /** Per-instance config captured at construction time. */
@@ -210,7 +210,7 @@ export class LlamaCppProvider implements LLMProviderAdapter {
             const thinking: string | undefined = msg.reasoning_content || undefined;
             let parsed: Record<string, unknown> | null = null;
             if (options.responseFormat === 'json') {
-              parsed = parseJsonWithRecovery(text).parsed;
+              parsed = tryParseJson(text).parsed;
             }
             resolve({
               text, parsed, thinking,
@@ -307,7 +307,7 @@ export class LlamaCppProvider implements LLMProviderAdapter {
           if (idleTimer) clearTimeout(idleTimer);
           let parsed: Record<string, unknown> | null = null;
           if (options.responseFormat === 'json') {
-            parsed = parseJsonWithRecovery(acc.fullResponse).parsed;
+            parsed = tryParseJson(acc.fullResponse).parsed;
           }
           resolve({
             text: acc.fullResponse,

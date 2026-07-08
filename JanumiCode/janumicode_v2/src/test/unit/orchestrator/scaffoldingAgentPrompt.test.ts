@@ -62,4 +62,23 @@ describe('buildAreaScaffoldingPrompt — canonical component-dir contract', () =
     const p = buildAreaScaffoldingPrompt(AREA, '[]', '[]', []);
     expect(p).not.toContain('## Component directories');
   });
+
+  it('renders prescribed TECH-* refs and verification gates (D14)', () => {
+    const area = {
+      ...(AREA as unknown as Record<string, unknown>),
+      source_refs: ['TECH-DBOS-1', 'TECH-PGSQL-1', 'src/foo.ts (evidence excerpt)'],
+      gate_commands: [
+        { kind: 'typecheck', command: 'tsc', args: ['--noEmit'] },
+        { kind: 'test', command: 'npm', args: ['test'] },
+      ],
+    } as never;
+    const p = buildAreaScaffoldingPrompt(area, '[]', '[]', COMPONENT_DIRS);
+    expect(p).toContain('## Prescribed technologies');
+    expect(p).toContain('TECH-DBOS-1');
+    expect(p).toContain('TECH-PGSQL-1');
+    expect(p).not.toContain('src/foo.ts');           // non-TECH source_ref not rendered as a technology
+    expect(p).toContain('## Verification gates');
+    expect(p).toContain('typecheck: `tsc --noEmit`');
+    expect(p).toContain('test: `npm test`');
+  });
 });

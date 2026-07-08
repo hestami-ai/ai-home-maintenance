@@ -284,12 +284,16 @@ export function normalizeTechnicalConstraints(raw: unknown[]): TechnicalConstrai
   const mapped = raw.map((r, i) => {
     const o = (r ?? {}) as Record<string, unknown>;
     const sourceRef = normalizeSourceRef(o.source_ref);
-    const text =
-      typeof o.text === 'string' && o.text.length > 0 ? o.text
-      : typeof o.rationale === 'string' && o.rationale.length > 0 ? o.rationale
-      : sourceRef?.excerpt && sourceRef.excerpt.length > 0 ? sourceRef.excerpt
-      : typeof o.technology === 'string' && o.technology.length > 0 ? o.technology
-      : '';
+    let text = '';
+    if (typeof o.text === 'string' && o.text.length > 0) {
+      text = o.text;
+    } else if (typeof o.rationale === 'string' && o.rationale.length > 0) {
+      text = o.rationale;
+    } else if (sourceRef?.excerpt && sourceRef.excerpt.length > 0) {
+      text = sourceRef.excerpt;
+    } else if (typeof o.technology === 'string' && o.technology.length > 0) {
+      text = o.technology;
+    }
     return {
       id: typeof o.id === 'string' && o.id.length > 0 ? o.id : `TECH-${i + 1}`,
       category: typeof o.category === 'string' ? o.category : 'uncategorized',

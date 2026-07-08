@@ -270,6 +270,11 @@ export type RecordType =
   | 'phase_gate_evaluation'
   | 'phase_gate_approved'
   | 'phase_gate_rejected'
+  // Phase-9 executor escalation (attended runs): a coding agent's blocking
+  // clarification the spec-grounded responder could not answer, surfaced to the
+  // human in the governed-stream UI, and the human's free-text answer.
+  | 'executor_question_presented'
+  | 'executor_question_answered'
   | 'rollback_authorized'
   | 'complexity_flag_resolution'
   | 'cascade_threshold_decision'
@@ -1427,6 +1432,15 @@ export interface PacketTask {
   write_directory_paths: string[];
   read_directory_paths: string[];
   dependency_task_ids: string[];
+  /**
+   * The atomic task's requirement footprint (the SR-/US-/NFR-/AC-/comp- ids it
+   * traces to). Carried so the coherence verifier can distinguish a structurally-
+   * storyless technical leaf (traces only to a component id / invented completion
+   * criterion / nothing — no join can give it a user story) from a real feature
+   * whose story-join genuinely failed (cites a real upstream AC/US that must
+   * still resolve). Optional: absent ⇒ treated as no anchor.
+   */
+  traces_to?: string[];
 }
 
 export interface PacketCoherenceAnnotations {

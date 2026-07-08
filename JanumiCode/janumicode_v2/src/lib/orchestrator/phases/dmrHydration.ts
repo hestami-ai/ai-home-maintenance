@@ -73,13 +73,13 @@ export function renderHydratedPacket(
   const opts = { ...DEFAULTS, ...options };
   const out: string[] = [];
 
-  out.push('# Deep Memory Research — Context Reference');
   out.push(
+    '# Deep Memory Research — Context Reference',
     `_Completeness: ${packet.completenessStatus}. ${oneLine(packet.completenessNarrative)}_\n\n` +
     `_This is a curated reference — read the section relevant to your current step. ` +
     `Authoritative task content is delivered inline in the prompt; this file supplies supporting governing context._`,
+    '',
   );
-  out.push('');
 
   // ── Governing records — split BINDING rules from CERTIFIED CONTEXT ──────
   // Authority>=6 ADMITS a record into the governing set; `bindingClass` decides
@@ -138,9 +138,11 @@ export function renderHydratedPacket(
   // ── Known conflict zones (subjects with active contradiction/supersession) ──
   const conflictZones = packet.queryDecomposition?.knownConflictZones ?? [];
   if (conflictZones.length > 0) {
-    out.push('## Known Conflict Zones (these subjects already disagree — read them with extra care)');
-    out.push(`- ${conflictZones.join(', ')}`);
-    out.push('');
+    out.push(
+      '## Known Conflict Zones (these subjects already disagree — read them with extra care)',
+      `- ${conflictZones.join(', ')}`,
+      '',
+    );
   }
 
   // ── Material findings (top N, resolved one-liners) ──────────────────
@@ -177,8 +179,10 @@ export function renderHydratedPacket(
     if (dedupedCount > 0) out.push(`- _(${dedupedCount} finding(s) already shown above as governing constraints / certified context — not repeated)_`);
     out.push('');
   } else if (dedupedCount > 0) {
-    out.push(`_All material findings are already shown above as governing constraints / certified context (${dedupedCount} de-duplicated)._`);
-    out.push('');
+    out.push(
+      `_All material findings are already shown above as governing constraints / certified context (${dedupedCount} de-duplicated)._`,
+      '',
+    );
   }
 
   if (provenance.length > 0) {
@@ -260,10 +264,11 @@ export function renderRecordExcerpt(rec: ResolvedRecord, cap = 1200): string {
     case 'system_boundary': {
       const oos = arr(c.out_of_scope).length;
       const ext = arr(c.external_systems).length;
+      const oosSuffix = oos ? ` | ${oos} out-of-scope` : '';
+      const extSuffix = ext ? ` | ${ext} external system(s)` : '';
       body = (arr(c.in_scope).length || oos || ext)
         ? `in scope: ${renderList(c.in_scope, (x) => str(x, ['capability', 'name', 'description']), 12)}`
-          + (oos ? ` | ${oos} out-of-scope` : '')
-          + (ext ? ` | ${ext} external system(s)` : '')
+          + oosSuffix + extSuffix
         : '(no members)'; // minimal/superseded fixture → fall back to statement below
       break;
     }
@@ -339,7 +344,7 @@ function jsonCap(v: unknown, cap: number): string {
 }
 
 function cleanStatement(s: string): string {
-  return /^\[[^\]]+\]$/.test(s.trim()) ? s.trim().replace(/^\[|\]$/g, '').replace(/_/g, ' ') : s;
+  return /^\[[^\]]+\]$/.test(s.trim()) ? s.trim().replaceAll(/^\[|\]$/g, '').replaceAll('_', ' ') : s;
 }
 
 function oneLine(s: string, cap = 400): string {

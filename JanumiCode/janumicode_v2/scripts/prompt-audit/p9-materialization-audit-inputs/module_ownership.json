@@ -1,0 +1,728 @@
+[
+  {
+    "id": "703985e0-0293-44c9-b66d-d91e95056eed",
+    "content": {
+      "kind": "module_ownership_plan",
+      "schemaVersion": "1.0",
+      "shared_modules": [
+        {
+          "module_key": "models",
+          "basename": "models",
+          "category": "",
+          "owner_component_id": "comp-audit-log-retriever",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/audit-log-retriever/models.ts",
+          "import_specifier": "@/audit-log-retriever/models",
+          "consumer_component_ids": [
+            "comp-invoice-service",
+            "comp-job-exec-logger",
+            "comp-job-photo-linker",
+            "comp-user-account-service",
+            "comp-workorder-service"
+          ],
+          "demand_paths": [
+            "src/db/models",
+            "src/models"
+          ]
+        },
+        {
+          "module_key": "db",
+          "basename": "db",
+          "category": "lib",
+          "owner_component_id": "comp-audit-log-retriever",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/audit-log-retriever/db.ts",
+          "import_specifier": "@/audit-log-retriever/db",
+          "consumer_component_ids": [
+            "comp-job-exec-logger",
+            "comp-tenant-config-service"
+          ],
+          "demand_paths": [
+            "src/job-exec-logger/db",
+            "src/lib/db"
+          ]
+        },
+        {
+          "module_key": "migrations",
+          "basename": "migrations",
+          "category": "",
+          "owner_component_id": "comp-audit-log-retriever",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/audit-log-retriever/migrations.ts",
+          "import_specifier": "@/audit-log-retriever/migrations",
+          "consumer_component_ids": [
+            "comp-job-photo-linker",
+            "comp-workorder-service"
+          ],
+          "demand_paths": [
+            "src/database/migrations",
+            "src/workorder-service/db/migrations"
+          ]
+        },
+        {
+          "module_key": "schema",
+          "basename": "schema",
+          "category": "",
+          "owner_component_id": "comp-tenant-schema-service",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/tenant-schema-service/schema.ts",
+          "import_specifier": "@/tenant-schema-service/schema",
+          "consumer_component_ids": [
+            "comp-tenant-config-service",
+            "comp-tenant-schema-service"
+          ],
+          "demand_paths": [
+            "src/tenant-config-service/schema",
+            "src/tenant-schema-service/schema"
+          ]
+        },
+        {
+          "module_key": "auditlogmodel",
+          "basename": "audit_log_model",
+          "category": "models",
+          "owner_component_id": "comp-job-exec-logger",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/job-exec-logger/audit_log_model.ts",
+          "import_specifier": "@/job-exec-logger/audit_log_model",
+          "consumer_component_ids": [
+            "comp-tenant-schema-service"
+          ],
+          "demand_paths": [
+            "src/models/audit_log_model"
+          ]
+        },
+        {
+          "module_key": "clock",
+          "basename": "clock",
+          "category": "utils",
+          "owner_component_id": "comp-workorder-service",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/workorder-service/clock.ts",
+          "import_specifier": "@/workorder-service/clock",
+          "consumer_component_ids": [
+            "comp-statutory-deadline-verifier"
+          ],
+          "demand_paths": [
+            "src/utils/clock"
+          ]
+        },
+        {
+          "module_key": "dateutils",
+          "basename": "date_utils",
+          "category": "utils",
+          "owner_component_id": "comp-workorder-service",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/workorder-service/date_utils.ts",
+          "import_specifier": "@/workorder-service/date_utils",
+          "consumer_component_ids": [
+            "comp-statutory-deadline-verifier"
+          ],
+          "demand_paths": [
+            "src/utils/date_utils"
+          ]
+        },
+        {
+          "module_key": "job",
+          "basename": "job",
+          "category": "models",
+          "owner_component_id": "comp-workorder-service",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/workorder-service/job.ts",
+          "import_specifier": "@/workorder-service/job",
+          "consumer_component_ids": [
+            "comp-job-exec-logger"
+          ],
+          "demand_paths": [
+            "src/db/models/job"
+          ]
+        },
+        {
+          "module_key": "jobexecutionlog",
+          "basename": "job_execution_log",
+          "category": "models",
+          "owner_component_id": "comp-compliance-status-updater",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/compliance-status-updater/job_execution_log.ts",
+          "import_specifier": "@/compliance-status-updater/job_execution_log",
+          "consumer_component_ids": [
+            "comp-job-exec-logger"
+          ],
+          "demand_paths": [
+            "src/db/models/job_execution_log"
+          ]
+        },
+        {
+          "module_key": "photouploadrecord",
+          "basename": "PhotoUploadRecord",
+          "category": "models",
+          "owner_component_id": "comp-photo-upload-service",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/photo-upload-service/PhotoUploadRecord.ts",
+          "import_specifier": "@/photo-upload-service/PhotoUploadRecord",
+          "consumer_component_ids": [
+            "comp-photo-upload-service"
+          ],
+          "demand_paths": [
+            "src/models/PhotoUploadRecord.ts"
+          ]
+        },
+        {
+          "module_key": "property",
+          "basename": "property",
+          "category": "models",
+          "owner_component_id": "comp-audit-log-retriever",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/audit-log-retriever/property.ts",
+          "import_specifier": "@/audit-log-retriever/property",
+          "consumer_component_ids": [
+            "comp-property-service"
+          ],
+          "demand_paths": [
+            "src/models/property.js",
+            "src/routes/api/property.js"
+          ]
+        },
+        {
+          "module_key": "schemavalidation",
+          "basename": "schema-validation",
+          "category": "lib",
+          "owner_component_id": "comp-tenant-schema-service",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/tenant-schema-service/schema-validation.ts",
+          "import_specifier": "@/tenant-schema-service/schema-validation",
+          "consumer_component_ids": [
+            "comp-tenant-config-service"
+          ],
+          "demand_paths": [
+            "src/lib/schema-validation"
+          ]
+        },
+        {
+          "module_key": "seaweedfs",
+          "basename": "seaweedfs",
+          "category": "config",
+          "owner_component_id": "comp-audit-log-retriever",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/audit-log-retriever/seaweedfs.ts",
+          "import_specifier": "@/audit-log-retriever/seaweedfs",
+          "consumer_component_ids": [
+            "comp-job-exec-logger"
+          ],
+          "demand_paths": [
+            "src/config/seaweedfs"
+          ]
+        },
+        {
+          "module_key": "seaweedfsclient",
+          "basename": "seaweedfsClient",
+          "category": "utils",
+          "owner_component_id": "comp-tenant-schema-service",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/tenant-schema-service/seaweedfsClient.ts",
+          "import_specifier": "@/tenant-schema-service/seaweedfsClient",
+          "consumer_component_ids": [
+            "comp-property-service"
+          ],
+          "demand_paths": [
+            "src/utils/seaweedfsClient.js"
+          ]
+        },
+        {
+          "module_key": "tenantschemamodel",
+          "basename": "tenant_schema_model",
+          "category": "models",
+          "owner_component_id": "comp-compliance-status-updater",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/compliance-status-updater/tenant_schema_model.ts",
+          "import_specifier": "@/compliance-status-updater/tenant_schema_model",
+          "consumer_component_ids": [
+            "comp-tenant-schema-service"
+          ],
+          "demand_paths": [
+            "src/models/tenant_schema_model"
+          ]
+        },
+        {
+          "module_key": "validationhelpers",
+          "basename": "validation_helpers",
+          "category": "utils",
+          "owner_component_id": "comp-tenant-schema-service",
+          "owner_source": "consumer_fallback",
+          "canonical_path": "src/tenant-schema-service/validation_helpers.ts",
+          "import_specifier": "@/tenant-schema-service/validation_helpers",
+          "consumer_component_ids": [
+            "comp-tenant-schema-service"
+          ],
+          "demand_paths": [
+            "src/utils/validation_helpers"
+          ]
+        },
+        {
+          "module_key": "workorder",
+          "basename": "work_order",
+          "category": "models",
+          "owner_component_id": "comp-workorder-service",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/workorder-service/work_order.ts",
+          "import_specifier": "@/workorder-service/work_order",
+          "consumer_component_ids": [
+            "comp-statutory-deadline-verifier"
+          ],
+          "demand_paths": [
+            "src/models/work_order"
+          ]
+        },
+        {
+          "module_key": "workorderrepository",
+          "basename": "workorder_repository",
+          "category": "repositories",
+          "owner_component_id": "comp-workorder-service",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/workorder-service/workorder_repository.ts",
+          "import_specifier": "@/workorder-service/workorder_repository",
+          "consumer_component_ids": [
+            "comp-statutory-deadline-verifier"
+          ],
+          "demand_paths": [
+            "src/repositories/workorder_repository"
+          ]
+        }
+      ],
+      "ordering_edges": [
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-invoice-service",
+          "module_key": "models"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-job-exec-logger",
+          "module_key": "models"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-job-photo-linker",
+          "module_key": "models"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-user-account-service",
+          "module_key": "models"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-workorder-service",
+          "module_key": "models"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-tenant-config-service",
+          "module_key": "db"
+        },
+        {
+          "before_component_id": "comp-tenant-schema-service",
+          "after_component_id": "comp-tenant-config-service",
+          "module_key": "schema"
+        },
+        {
+          "before_component_id": "comp-job-exec-logger",
+          "after_component_id": "comp-tenant-schema-service",
+          "module_key": "auditlogmodel"
+        },
+        {
+          "before_component_id": "comp-workorder-service",
+          "after_component_id": "comp-statutory-deadline-verifier",
+          "module_key": "clock"
+        },
+        {
+          "before_component_id": "comp-workorder-service",
+          "after_component_id": "comp-job-exec-logger",
+          "module_key": "job"
+        },
+        {
+          "before_component_id": "comp-compliance-status-updater",
+          "after_component_id": "comp-job-exec-logger",
+          "module_key": "jobexecutionlog"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-property-service",
+          "module_key": "property"
+        },
+        {
+          "before_component_id": "comp-tenant-schema-service",
+          "after_component_id": "comp-property-service",
+          "module_key": "seaweedfsclient"
+        },
+        {
+          "before_component_id": "comp-compliance-status-updater",
+          "after_component_id": "comp-tenant-schema-service",
+          "module_key": "tenantschemamodel"
+        }
+      ]
+    }
+  },
+  {
+    "id": "e63dcc2e-c948-4f98-86db-757fbe297fd1",
+    "content": {
+      "kind": "module_ownership_plan",
+      "schemaVersion": "1.0",
+      "shared_modules": [
+        {
+          "module_key": "models",
+          "basename": "models",
+          "category": "",
+          "owner_component_id": "comp-audit-log-retriever",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/audit-log-retriever/models.ts",
+          "import_specifier": "@/audit-log-retriever/models",
+          "consumer_component_ids": [
+            "comp-invoice-service",
+            "comp-job-exec-logger",
+            "comp-job-photo-linker",
+            "comp-user-account-service",
+            "comp-workorder-service"
+          ],
+          "demand_paths": [
+            "src/db/models",
+            "src/models"
+          ]
+        },
+        {
+          "module_key": "db",
+          "basename": "db",
+          "category": "lib",
+          "owner_component_id": "comp-audit-log-retriever",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/audit-log-retriever/db.ts",
+          "import_specifier": "@/audit-log-retriever/db",
+          "consumer_component_ids": [
+            "comp-job-exec-logger",
+            "comp-tenant-config-service"
+          ],
+          "demand_paths": [
+            "src/job-exec-logger/db",
+            "src/lib/db"
+          ]
+        },
+        {
+          "module_key": "migrations",
+          "basename": "migrations",
+          "category": "",
+          "owner_component_id": "comp-audit-log-retriever",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/audit-log-retriever/migrations.ts",
+          "import_specifier": "@/audit-log-retriever/migrations",
+          "consumer_component_ids": [
+            "comp-job-photo-linker",
+            "comp-workorder-service"
+          ],
+          "demand_paths": [
+            "src/database/migrations",
+            "src/workorder-service/db/migrations"
+          ]
+        },
+        {
+          "module_key": "schema",
+          "basename": "schema",
+          "category": "",
+          "owner_component_id": "comp-tenant-schema-service",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/tenant-schema-service/schema.ts",
+          "import_specifier": "@/tenant-schema-service/schema",
+          "consumer_component_ids": [
+            "comp-tenant-config-service",
+            "comp-tenant-schema-service"
+          ],
+          "demand_paths": [
+            "src/tenant-config-service/schema",
+            "src/tenant-schema-service/schema"
+          ]
+        },
+        {
+          "module_key": "auditlogmodel",
+          "basename": "audit_log_model",
+          "category": "models",
+          "owner_component_id": "comp-job-exec-logger",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/job-exec-logger/audit_log_model.ts",
+          "import_specifier": "@/job-exec-logger/audit_log_model",
+          "consumer_component_ids": [
+            "comp-tenant-schema-service"
+          ],
+          "demand_paths": [
+            "src/models/audit_log_model"
+          ]
+        },
+        {
+          "module_key": "clock",
+          "basename": "clock",
+          "category": "utils",
+          "owner_component_id": "comp-workorder-service",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/workorder-service/clock.ts",
+          "import_specifier": "@/workorder-service/clock",
+          "consumer_component_ids": [
+            "comp-statutory-deadline-verifier"
+          ],
+          "demand_paths": [
+            "src/utils/clock"
+          ]
+        },
+        {
+          "module_key": "dateutils",
+          "basename": "date_utils",
+          "category": "utils",
+          "owner_component_id": "comp-workorder-service",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/workorder-service/date_utils.ts",
+          "import_specifier": "@/workorder-service/date_utils",
+          "consumer_component_ids": [
+            "comp-statutory-deadline-verifier"
+          ],
+          "demand_paths": [
+            "src/utils/date_utils"
+          ]
+        },
+        {
+          "module_key": "job",
+          "basename": "job",
+          "category": "models",
+          "owner_component_id": "comp-workorder-service",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/workorder-service/job.ts",
+          "import_specifier": "@/workorder-service/job",
+          "consumer_component_ids": [
+            "comp-job-exec-logger"
+          ],
+          "demand_paths": [
+            "src/db/models/job"
+          ]
+        },
+        {
+          "module_key": "jobexecutionlog",
+          "basename": "job_execution_log",
+          "category": "models",
+          "owner_component_id": "comp-compliance-status-updater",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/compliance-status-updater/job_execution_log.ts",
+          "import_specifier": "@/compliance-status-updater/job_execution_log",
+          "consumer_component_ids": [
+            "comp-job-exec-logger"
+          ],
+          "demand_paths": [
+            "src/db/models/job_execution_log"
+          ]
+        },
+        {
+          "module_key": "photouploadrecord",
+          "basename": "PhotoUploadRecord",
+          "category": "models",
+          "owner_component_id": "comp-photo-upload-service",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/photo-upload-service/PhotoUploadRecord.ts",
+          "import_specifier": "@/photo-upload-service/PhotoUploadRecord",
+          "consumer_component_ids": [
+            "comp-photo-upload-service"
+          ],
+          "demand_paths": [
+            "src/models/PhotoUploadRecord.ts"
+          ]
+        },
+        {
+          "module_key": "property",
+          "basename": "property",
+          "category": "models",
+          "owner_component_id": "comp-audit-log-retriever",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/audit-log-retriever/property.ts",
+          "import_specifier": "@/audit-log-retriever/property",
+          "consumer_component_ids": [
+            "comp-property-service"
+          ],
+          "demand_paths": [
+            "src/models/property.js",
+            "src/routes/api/property.js"
+          ]
+        },
+        {
+          "module_key": "schemavalidation",
+          "basename": "schema-validation",
+          "category": "lib",
+          "owner_component_id": "comp-tenant-schema-service",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/tenant-schema-service/schema-validation.ts",
+          "import_specifier": "@/tenant-schema-service/schema-validation",
+          "consumer_component_ids": [
+            "comp-tenant-config-service"
+          ],
+          "demand_paths": [
+            "src/lib/schema-validation"
+          ]
+        },
+        {
+          "module_key": "seaweedfs",
+          "basename": "seaweedfs",
+          "category": "config",
+          "owner_component_id": "comp-audit-log-retriever",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/audit-log-retriever/seaweedfs.ts",
+          "import_specifier": "@/audit-log-retriever/seaweedfs",
+          "consumer_component_ids": [
+            "comp-job-exec-logger"
+          ],
+          "demand_paths": [
+            "src/config/seaweedfs"
+          ]
+        },
+        {
+          "module_key": "seaweedfsclient",
+          "basename": "seaweedfsClient",
+          "category": "utils",
+          "owner_component_id": "comp-tenant-schema-service",
+          "owner_source": "sync_call_sink",
+          "canonical_path": "src/tenant-schema-service/seaweedfsClient.ts",
+          "import_specifier": "@/tenant-schema-service/seaweedfsClient",
+          "consumer_component_ids": [
+            "comp-property-service"
+          ],
+          "demand_paths": [
+            "src/utils/seaweedfsClient.js"
+          ]
+        },
+        {
+          "module_key": "tenantschemamodel",
+          "basename": "tenant_schema_model",
+          "category": "models",
+          "owner_component_id": "comp-compliance-status-updater",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/compliance-status-updater/tenant_schema_model.ts",
+          "import_specifier": "@/compliance-status-updater/tenant_schema_model",
+          "consumer_component_ids": [
+            "comp-tenant-schema-service"
+          ],
+          "demand_paths": [
+            "src/models/tenant_schema_model"
+          ]
+        },
+        {
+          "module_key": "validationhelpers",
+          "basename": "validation_helpers",
+          "category": "utils",
+          "owner_component_id": "comp-tenant-schema-service",
+          "owner_source": "consumer_fallback",
+          "canonical_path": "src/tenant-schema-service/validation_helpers.ts",
+          "import_specifier": "@/tenant-schema-service/validation_helpers",
+          "consumer_component_ids": [
+            "comp-tenant-schema-service"
+          ],
+          "demand_paths": [
+            "src/utils/validation_helpers"
+          ]
+        },
+        {
+          "module_key": "workorder",
+          "basename": "work_order",
+          "category": "models",
+          "owner_component_id": "comp-workorder-service",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/workorder-service/work_order.ts",
+          "import_specifier": "@/workorder-service/work_order",
+          "consumer_component_ids": [
+            "comp-statutory-deadline-verifier"
+          ],
+          "demand_paths": [
+            "src/models/work_order"
+          ]
+        },
+        {
+          "module_key": "workorderrepository",
+          "basename": "workorder_repository",
+          "category": "repositories",
+          "owner_component_id": "comp-workorder-service",
+          "owner_source": "data_model_owner",
+          "canonical_path": "src/workorder-service/workorder_repository.ts",
+          "import_specifier": "@/workorder-service/workorder_repository",
+          "consumer_component_ids": [
+            "comp-statutory-deadline-verifier"
+          ],
+          "demand_paths": [
+            "src/repositories/workorder_repository"
+          ]
+        }
+      ],
+      "ordering_edges": [
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-invoice-service",
+          "module_key": "models"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-job-exec-logger",
+          "module_key": "models"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-job-photo-linker",
+          "module_key": "models"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-user-account-service",
+          "module_key": "models"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-workorder-service",
+          "module_key": "models"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-tenant-config-service",
+          "module_key": "db"
+        },
+        {
+          "before_component_id": "comp-tenant-schema-service",
+          "after_component_id": "comp-tenant-config-service",
+          "module_key": "schema"
+        },
+        {
+          "before_component_id": "comp-job-exec-logger",
+          "after_component_id": "comp-tenant-schema-service",
+          "module_key": "auditlogmodel"
+        },
+        {
+          "before_component_id": "comp-workorder-service",
+          "after_component_id": "comp-statutory-deadline-verifier",
+          "module_key": "clock"
+        },
+        {
+          "before_component_id": "comp-workorder-service",
+          "after_component_id": "comp-job-exec-logger",
+          "module_key": "job"
+        },
+        {
+          "before_component_id": "comp-compliance-status-updater",
+          "after_component_id": "comp-job-exec-logger",
+          "module_key": "jobexecutionlog"
+        },
+        {
+          "before_component_id": "comp-audit-log-retriever",
+          "after_component_id": "comp-property-service",
+          "module_key": "property"
+        },
+        {
+          "before_component_id": "comp-tenant-schema-service",
+          "after_component_id": "comp-property-service",
+          "module_key": "seaweedfsclient"
+        },
+        {
+          "before_component_id": "comp-compliance-status-updater",
+          "after_component_id": "comp-tenant-schema-service",
+          "module_key": "tenantschemamodel"
+        }
+      ]
+    }
+  }
+]

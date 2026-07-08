@@ -31,19 +31,18 @@ import type {
   BusinessDomain,
   Entity,
   WorkflowV2,
-  WorkflowStep,
   WorkflowTrigger,
   Integration,
   ExtractedItem,
   HumanDecisionSummary,
   OpenLoop,
   ReleaseV2,
-  ReleaseContents,
   ReleasePlanContentV2,
   SourceRef,
   TechnicalConstraint,
   VVRequirement,
   VocabularyTerm,
+  ScopePruneDecisionContent,
 } from '../../types/records';
 import { verifyCoverage } from './phase1/verifyCoverage';
 import { verifyReleaseManifest } from './phase1/verifyReleaseManifest';
@@ -75,9 +74,7 @@ import {
   stripSelfProducedAcceptedSets,
   type GatekeeperUpstreamContext,
 } from '../scopeGatekeeper';
-import type { ScopePruneDecisionContent } from '../../types/records';
-import { parseJsonWithRecovery } from '../../llm/jsonRecovery';
-import { buildInterpretationMirror } from './phase1/buildInterpretationMirror';
+import { tryParseJson } from '../../llm/jsonRecovery';
 import { renderHydratedPacket } from './dmrHydration';
 import { normalizeIdsInTree, normalizeIdHyphens } from '../idNormalization';
 import { MitigationEngine } from '../../review/mitigation/mitigationEngine';
@@ -658,7 +655,7 @@ export class Phase1Handler implements PhaseHandler {
     });
     let parsed = result.parsed as Record<string, unknown> | null;
     if (!parsed && typeof result.text === 'string' && result.text.trim().length > 0) {
-      const recovered = parseJsonWithRecovery(result.text);
+      const recovered = tryParseJson(result.text);
       parsed = recovered.parsed;
       // `recovered.parsed` is non-null only when extraction + parse succeeded
       // against the raw text (i.e. the LLM caller's normal parse path missed
@@ -753,7 +750,7 @@ export class Phase1Handler implements PhaseHandler {
     };
     for (const assumption of surfacedAssumptions) {
       const decision = decisions.find((d) => d.itemId === assumption.id);
-      if (!decision || !decision.action || decision.action === 'deferred') {
+      if (!decision?.action || decision.action === 'deferred') {
         result.deferred.push({ ...assumption });
         continue;
       }
@@ -1924,7 +1921,7 @@ fabricates a new threshold is unsupported.`,
     // workflow forward to the latest release that contains any of its
     // trigger targets. Re-verify; only fall through to the hard-fail
     // path if violations remain.
-    const backwardGap = manifestGaps.find(g => g.check === 'release_backward_dependency' && g.severity === 'blocking');
+    const backwardGap = manifestGaps.some(g => g.check === 'release_backward_dependency' && g.severity === 'blocking');
     if (backwardGap) {
       const fixesApplied = autoFixBackwardDependencies(draftPlan, acceptedWorkflowsForPlan, safeJourneys);
       if (fixesApplied.length > 0) {
@@ -2218,7 +2215,7 @@ fabricates a new threshold is unsupported.`,
          * (e.g., release_plan). For ordinary shape-specific tweaks,
          * prefer `overlay` so the universal procedure stays canonical.
          */
-        customPromptBuilder?: import('../scopeGatekeeper').GatekeeperConfig['customPromptBuilder'];
+        customPromptBuilder?: NonNullable<import('../scopeGatekeeper').GatekeeperConfig['customPromptBuilder']>;
       };
     },
   ): Promise<
@@ -2227,7 +2224,6 @@ fabricates a new threshold is unsupported.`,
   > {
     const MAX_FEEDBACK_ITERATIONS = 3;
     let accumulatedFeedback = '';
-    let lastBloom: T | null = null;
     let lastRecord: GovernedStreamRecord | null = null;
 
     for (let iter = 1; iter <= MAX_FEEDBACK_ITERATIONS + 1; iter++) {
@@ -2283,7 +2279,6 @@ fabricates a new threshold is unsupported.`,
         }
       }
 
-      lastBloom = bloom;
       lastRecord = record;
 
       const gate = await this.presentProductBloomGate(ctx, {
@@ -2340,7 +2335,7 @@ fabricates a new threshold is unsupported.`,
     originalArtifactId: string,
     options?: {
       overlay?: string;
-      customPromptBuilder?: import('../scopeGatekeeper').GatekeeperConfig['customPromptBuilder'];
+      customPromptBuilder?: NonNullable<import('../scopeGatekeeper').GatekeeperConfig['customPromptBuilder']>;
     },
   ): Promise<{ kept_ids: string[]; dropped: Array<{ id: string; reason: string }>; rationale_summary: string; error?: string }> {
     const { engine, workflowRun } = ctx;
@@ -2586,9 +2581,10 @@ fabricates a new threshold is unsupported.`,
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('Compliance & Retention Discovery returned unparseable JSON');
     // Accept snake_case (canonical) with camelCase fallback for backward compat.
+    const complianceRawCamel = Array.isArray(parsed.complianceExtractedItems) ? parsed.complianceExtractedItems : [];
     const raw = Array.isArray(parsed.compliance_extracted_items)
       ? parsed.compliance_extracted_items
-      : Array.isArray(parsed.complianceExtractedItems) ? parsed.complianceExtractedItems : [];
+      : complianceRawCamel;
     // Preserve any source_ref on each item during normalization.
     return this.normalizeExtractedItemsWithProvenance(raw, 'COMP');
   }
@@ -3299,7 +3295,7 @@ fabricates a new threshold is unsupported.`,
       return result.parsed as Record<string, unknown>;
     }
     if (typeof result.text === 'string' && result.text.trim().length > 0) {
-      const recovered = parseJsonWithRecovery(result.text);
+      const recovered = tryParseJson(result.text);
       if (recovered.parsed && typeof recovered.parsed === 'object' && !Array.isArray(recovered.parsed)) {
         return recovered.parsed as Record<string, unknown>;
       }
@@ -3409,7 +3405,7 @@ fabricates a new threshold is unsupported.`,
           : [];
         const kept: string[] = [];
         for (const x of xs) {
-          if (accepted.has(x) || (mergeAccepted && mergeAccepted.has(x))) kept.push(x);
+          if (accepted.has(x) || mergeAccepted?.has(x)) kept.push(x);
           else droppedBySurfaceType[key].push(x);
         }
         (s as Record<string, string[]>)[key] = kept;
@@ -3775,7 +3771,7 @@ Re-emit this single journey as a JSON object that matches the original schema (i
           : [];
         const kept: string[] = [];
         for (const x of xs) {
-          if (accepted.has(x) || (mergeAccepted && mergeAccepted.has(x))) kept.push(x);
+          if (accepted.has(x) || mergeAccepted?.has(x)) kept.push(x);
           else droppedSurfaces.push(`${w.id}:${key}:${x}`);
         }
         return kept;

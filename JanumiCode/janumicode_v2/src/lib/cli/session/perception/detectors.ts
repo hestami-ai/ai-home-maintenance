@@ -127,7 +127,7 @@ export function agentContentLines(
     // agent content the moment the echo renders → instant false completion.
     // Prefixed agent renderings ("◆ TASK COMPLETE") need no exemption: their
     // normalized text isn't a substring of any send, so they're kept anyway.
-    const exempt = (m.echoExempt ?? []).some((e) => t === e);
+    const exempt = (m.echoExempt ?? []).includes(t);
     const lineNorm = t.replace(/\s+/g, '');
     if (!exempt && lineNorm.length > 8 && sentNorm.some((sn) => sn.includes(lineNorm))) continue; // echo fragment
     out.push(t);
@@ -170,7 +170,7 @@ export function detectPrompt(
     }
   }
   // Explicit answer-request phrasings without a trailing '?'.
-  const last = tail[tail.length - 1];
+  const last = tail.at(-1)!;
   if (/\b(reply with|please (confirm|answer|choose|select)|let me know)\b/i.test(last)) {
     return { prompt: true, line: last, score: 0.7 };
   }
@@ -187,7 +187,7 @@ export function detectActions(text: string): string[] {
     for (const match of text.matchAll(pattern)) actions.push(match[1].trim().toLowerCase());
   }
   for (const word of ACTION_WORDS) {
-    if (new RegExp(`\\b${word}\\b`, 'i').test(text)) actions.push(word);
+    if (new RegExp(String.raw`\b${word}\b`, 'i').test(text)) actions.push(word);
   }
   return [...new Set(actions)];
 }

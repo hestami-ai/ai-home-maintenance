@@ -8,8 +8,8 @@
 
 import Ajv, { type ValidateFunction, type ErrorObject } from 'ajv';
 import addFormats from 'ajv-formats';
-import { readFileSync, readdirSync, existsSync } from 'fs';
-import { join, basename } from 'path';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join, basename } from 'node:path';
 import { getLogger } from '../logging';
 
 export interface ValidationResult {
@@ -27,8 +27,8 @@ export interface SchemaValidationError {
 }
 
 export class SchemaValidator {
-  private ajv: Ajv;
-  private validators = new Map<string, ValidateFunction>();
+  private readonly ajv: Ajv;
+  private readonly validators = new Map<string, ValidateFunction>();
   private readonly schemaDirs: string[];
 
   /**

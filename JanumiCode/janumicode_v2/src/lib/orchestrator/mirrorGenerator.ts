@@ -173,7 +173,7 @@ export class MirrorGenerator {
    */
   private formatFieldLabel(key: string): string {
     return key
-      .replace(/_/g, ' ')
+      .replaceAll('_', ' ')
       .replace(/\b\w/g, c => c.toUpperCase());
   }
 

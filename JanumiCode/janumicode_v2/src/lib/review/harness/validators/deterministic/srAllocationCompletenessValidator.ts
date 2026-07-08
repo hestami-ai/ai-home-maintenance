@@ -84,10 +84,14 @@ export function validateSrAllocationCompleteness(
   components.forEach((comp, idx) => {
     if (!comp || typeof comp !== 'object') return;
     const c = comp as Record<string, unknown>;
-    const compId =
-      typeof c.id === 'string' ? c.id
-      : typeof c.component_id === 'string' ? c.component_id
-      : `component[${idx}]`;
+    let compId: string;
+    if (typeof c.id === 'string') {
+      compId = c.id;
+    } else if (typeof c.component_id === 'string') {
+      compId = c.component_id;
+    } else {
+      compId = `component[${idx}]`;
+    }
 
     const refs = getComponentSrRefs(c);
     crossCutsPerComponent.set(compId, getComponentCrossCuts(c));

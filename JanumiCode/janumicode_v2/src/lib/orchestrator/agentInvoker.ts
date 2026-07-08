@@ -9,7 +9,7 @@
 import { CLIInvoker, type CLIInvocationResult } from '../cli/cliInvoker';
 import { selectExecutorAdapter } from '../cli/session/capabilityRegistry';
 import type { ExecutorTaskOutcome } from '../cli/session/adapter';
-import type { ResponderInput, SessionResponder } from '../cli/session/responder';
+import type { ExecutorEscalation, ResponderInput, SessionResponder } from '../cli/session/responder';
 import { type OutputParser } from '../cli/outputParser';
 import { LLMCaller, type LLMCallOptions, type LLMCallResult } from '../llm/llmCaller';
 import { InvocationLogFile } from '../llm/invocationLogger';
@@ -167,6 +167,7 @@ export class AgentInvoker {
   private eventBus: import('../events/eventBus').EventBus | null = null;
   private liveLogDir: string | null = null;
   private sessionResponderRoute: SessionResponderRoute | null = null;
+  private executorEscalationSink: ExecutorEscalation | null = null;
   private replayResolver: ((options: AgentInvocationOptions) => AgentInvocationResult | null) | null = null;
 
   constructor(
@@ -235,6 +236,19 @@ export class AgentInvoker {
    */
   setSessionResponderRoute(route: SessionResponderRoute | null): void {
     this.sessionResponderRoute = route;
+  }
+
+  /**
+   * Register the human-escalation sink for genuinely-blocking executor
+   * clarifications the spec-grounded responder cannot resolve. Wired by an
+   * ATTENDED host (the VS Code extension routes it to the decision-pause UI);
+   * left unset for headless runs (calibration/CI), where the executor
+   * self-resolves per the execution-mode directive. Only ever consulted when
+   * the invocation is attended (`!unattendedSkipPermissions`), so a stray
+   * registration cannot leak a human prompt into a calibration run.
+   */
+  setExecutorEscalationSink(sink: ExecutorEscalation | null): void {
+    this.executorEscalationSink = sink;
   }
 
   /**
@@ -366,8 +380,6 @@ export class AgentInvoker {
     // Earlier this layer fired duplicate lifecycle events; with the
     // legacy lifecycle stream retired, the upstream pair is the
     // canonical surface.)
-    const traceSubPhaseId = options.traceContext?.subPhaseId ?? undefined;
-    const traceAgentRole = options.traceContext?.agentRole ?? null;
 
     // Open the per-invocation live log (parity with LLMCaller). Writes
     // a header carrying the full stdin upfront, appends chunks as they
@@ -420,11 +432,19 @@ export class AgentInvoker {
     // (below) is the fallback when the CLI has no interactive adapter or the
     // PTY substrate (node-pty) is unavailable. Live chunks from the session are
     // forwarded into the same output-chunk + live-log plumbing.
+    // A human is in the loop iff this is NOT an unattended (calibration/CI) run.
+    // Governs the mimo `question` policy + agent-prompt framing + the escalation
+    // sink, all consistent with the mode-aware execution-mode directive. The
+    // escalation sink is passed ONLY when attended AND registered, so a headless
+    // run can never surface a human prompt (it self-resolves instead).
+    const attended = !options.unattendedSkipPermissions;
     const interactiveSel = options.agentRole === 'executor_agent'
       ? selectExecutorAdapter(options.backingTool, {
           cwd: options.cwd,
           env: options.env,
           responder: this.buildSessionResponder(options),
+          attended,
+          onEscalate: attended ? (this.executorEscalationSink ?? undefined) : undefined,
           onLog: (e) => {
             if (e.kind !== 'data') return;
             cumulativeChars += e.chunk.length;
@@ -827,8 +847,8 @@ export class AgentInvoker {
    */
   private quoteArg(arg: string): string {
     if (arg === '') return '""';
-    if (/^[A-Za-z0-9._\-\/=]+$/.test(arg)) return arg;
-    return `"${arg.replace(/"/g, '\\"')}"`;
+    if (/^[A-Za-z0-9._\-/=]+$/.test(arg)) return arg;
+    return `"${arg.replaceAll('"', '\\"')}"`;
   }
 
   private async invokeLLM(options: AgentInvocationOptions): Promise<AgentInvocationResult> {

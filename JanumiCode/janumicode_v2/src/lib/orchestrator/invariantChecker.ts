@@ -9,8 +9,8 @@
  * Discovers .janumicode/schemas/invariants/*.invariants.json at startup.
  */
 
-import { readFileSync, readdirSync, existsSync } from 'fs';
-import { join, basename } from 'path';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join, basename } from 'node:path';
 import { getLogger } from '../logging';
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export interface InvariantViolation {
 // ── InvariantChecker ────────────────────────────────────────────────
 
 export class InvariantChecker {
-  private rules = new Map<string, InvariantRule[]>();
+  private readonly rules = new Map<string, InvariantRule[]>();
 
   constructor(invariantsPath?: string) {
     if (invariantsPath) {
@@ -360,8 +360,7 @@ export class InvariantChecker {
 
     for (const part of parts) {
       if (part.endsWith('[*]')) {
-        result.push(part.slice(0, -3)); // field name
-        result.push('[*]');             // array wildcard
+        result.push(part.slice(0, -3), '[*]'); // field name + array wildcard
       } else {
         result.push(part);
       }

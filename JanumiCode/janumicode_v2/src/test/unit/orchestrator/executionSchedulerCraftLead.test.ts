@@ -7,7 +7,7 @@
  * pin the shape so the dump cannot silently return and all three topics survive.
  */
 import { describe, it, expect } from 'vitest';
-import { EXECUTOR_CRAFT_LEAD, HEADLESS_EXECUTION_DIRECTIVE } from '../../../lib/orchestrator/executionScheduler';
+import { EXECUTOR_CRAFT_LEAD, buildExecutionModeDirective } from '../../../lib/orchestrator/executionScheduler';
 
 describe('EXECUTOR_CRAFT_LEAD (PD-1)', () => {
   it('has exactly 5 actionable bullets', () => {
@@ -28,18 +28,38 @@ describe('EXECUTOR_CRAFT_LEAD (PD-1)', () => {
   });
 });
 
-describe('HEADLESS_EXECUTION_DIRECTIVE (PD-10)', () => {
-  it('states the run is headless / non-interactive', () => {
-    expect(HEADLESS_EXECUTION_DIRECTIVE).toMatch(/headless|non-interactive/i);
+describe('buildExecutionModeDirective (governed RPI autonomy — supersedes PD-10 headless)', () => {
+  const attended = buildExecutionModeDirective(true);
+  const headless = buildExecutionModeDirective(false);
+
+  it('BOTH modes mandate Research-Plan-Implement — reading the codebase is ALLOWED (no headless no-crawl)', () => {
+    for (const d of [attended, headless]) {
+      expect(d).toMatch(/research/i);
+      expect(d).toMatch(/read the existing workspace|read beyond|investigate/i);
+      expect(d).not.toMatch(/do NOT (crawl|probe)/i); // the old headless ban is gone in both
+    }
   });
-  it('forbids asking questions and probing the tree', () => {
-    expect(HEADLESS_EXECUTION_DIRECTIVE).toMatch(/do NOT ask/i);
-    expect(HEADLESS_EXECUTION_DIRECTIVE).toMatch(/probe|crawl/i);
+  it('BOTH affirm the write scope / layout is authoritative and forbid deadlocking', () => {
+    for (const d of [attended, headless]) {
+      expect(d).toMatch(/authoritative/i);
+      expect(d).toMatch(/never stall|keep moving|rather than pausing/i);
+    }
   });
-  it('affirms the given context is authoritative', () => {
-    expect(HEADLESS_EXECUTION_DIRECTIVE).toMatch(/authoritative/i);
+  it('ATTENDED frames a voice-of-intent reviewer that escalates a clarification to a HUMAN', () => {
+    expect(attended).toMatch(/voice-of-intent|reviewer/i);
+    expect(attended).toMatch(/clarif/i);
+    expect(attended).toMatch(/escalates to a human/i);
   });
-  it('is compact (a lead directive, not a wall of text)', () => {
-    expect(HEADLESS_EXECUTION_DIRECTIVE.length).toBeLessThan(1200);
+  it('HEADLESS states there is NO human and mandates spec-consistent best judgment, no shortcuts', () => {
+    expect(headless).toMatch(/headless/i);
+    expect(headless).toMatch(/no human/i);
+    expect(headless).toMatch(/best spec-consistent|best.*judgment/i);
+    expect(headless).toMatch(/no shortcuts/i);
+    // must NOT promise a human will answer (there is none in a calibration/CI run)
+    expect(headless).not.toMatch(/escalates to a human/i);
+  });
+  it('both are compact (a lead directive, not a wall of text)', () => {
+    expect(attended.length).toBeLessThan(1300);
+    expect(headless.length).toBeLessThan(1300);
   });
 });

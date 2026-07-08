@@ -6,7 +6,7 @@
  * handles process lifecycle (timeout, idle timeout, SIGTERM/SIGKILL).
  */
 
-import { spawn, spawnSync, type ChildProcess } from 'child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { type OutputParser, type ParsedEvent } from './outputParser';
 
 // ── Types ───────────────────────────────────────────────────────────

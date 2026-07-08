@@ -331,13 +331,13 @@ export async function runSkeletonPass(deps: FrBloomDeps): Promise<{
   // One journey per reconciliation call — keeps each retry JSON small (the whole
   // point of per-journey chunking); never a monolithic recon response.
   const chunkUncovered = (uncovered: Set<string>): Array<Set<string>> =>
-    [...uncovered].sort().map(id => new Set<string>([id]));
+    [...uncovered].sort((a, b) => a.localeCompare(b)).map(id => new Set<string>([id]));
 
   const reconcileBatch = async (
     batch: Set<string>,
     passInfo: { pass: number; batchIndex: number; batchCount: number },
   ): Promise<ProducedStory[]> => {
-    const scoped = [...batch].sort()
+    const scoped = [...batch].sort((a, b) => a.localeCompare(b))
       .map(id => journeyById.get(id))
       .filter((j): j is UserJourney => !!j);
     if (scoped.length === 0) return [];
@@ -379,7 +379,7 @@ export async function runSkeletonPass(deps: FrBloomDeps): Promise<{
       log.warn(
         'workflow',
         'Phase 2.1 residual uncovered journeys after skeleton reconciliation (honest gap — downstream autoFlagDroppedJourneys declares these unreached)',
-        { residual: residual.size, sample: [...residual].sort().slice(0, 20) },
+        { residual: residual.size, sample: [...residual].sort((a, b) => a.localeCompare(b)).slice(0, 20) },
       );
     },
     logLabel: 'Phase 2.1',

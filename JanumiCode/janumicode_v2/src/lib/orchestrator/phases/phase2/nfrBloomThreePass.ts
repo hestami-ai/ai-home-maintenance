@@ -99,8 +99,8 @@ function applyTracesSelfHeal(
     const keptTraces: string[] = [];
     for (const t of n.traces_to ?? []) {
       let ok = false;
-      if (t.startsWith('US-')) ok = false;  // FR leakage — drop
-      else if (t.startsWith('VV-')) ok = vvIds.has(t);
+      // US- prefix = FR leakage — dropped (ok stays false)
+      if (t.startsWith('VV-')) ok = vvIds.has(t);
       else if (t.startsWith('TECH-')) ok = techIds.has(t);
       else if (t.startsWith('COMP-')) ok = compIds.has(t);
       else if (t.startsWith('UJ-')) ok = journeyIds.has(t);

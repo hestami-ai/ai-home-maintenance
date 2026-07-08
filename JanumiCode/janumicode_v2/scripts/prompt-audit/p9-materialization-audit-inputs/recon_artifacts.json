@@ -1,0 +1,556 @@
+[
+  {
+    "id": "aa5fa532-f456-4777-99e2-0780fdc9dec3",
+    "content": {
+      "kind": "phase9_recon_plan",
+      "schemaVersion": "1.0",
+      "workspace_kind": "greenfield",
+      "source": "agent",
+      "areas": [
+        {
+          "area_id": "area-native",
+          "description": "All native components.",
+          "stack": "native",
+          "confidence": "high",
+          "source_refs": [
+            "Dedicated clients for homeowners and technicians",
+            "TECH-NATIVE-1"
+          ],
+          "conflicts": [],
+          "alternatives_rejected": [
+            "Cross-platform web view: The constraint specifies native deployment (iOS/Android) for optimal offline experience."
+          ],
+          "source_roots": [
+            "src"
+          ],
+          "test_roots": [
+            "src"
+          ],
+          "protected_paths": [
+            "src/shared/",
+            "N/A (CocoaPods/Gradle)"
+          ],
+          "dependency_manifest": "N/A (CocoaPods/Gradle)",
+          "canonical_modules": [],
+          "import_aliases": [],
+          "gate_commands": []
+        },
+        {
+          "area_id": "area-node",
+          "description": "All node components.",
+          "stack": "node",
+          "confidence": "high",
+          "source_refs": [
+            "TECH-BETTERAUTH-1",
+            "TECH-CERBOS-1",
+            "TECH-DBOS-1",
+            "TECH-NATIVE-1",
+            "TECH-ORPC-1",
+            "TECH-PGSQL-1",
+            "comp-audit-log-service",
+            "comp-compliance-tracking-service",
+            "comp-invoice-service",
+            "comp-job-execution-service",
+            "comp-property-service",
+            "comp-tenant-service",
+            "comp-user-account-service",
+            "comp-workorder-service",
+            "domain-financial-accounting",
+            "domain-mobile-job-execution",
+            "domain-work-order-lifecycle",
+            "tech-multi-tenant-architecture"
+          ],
+          "conflicts": [],
+          "alternatives_rejected": [
+            "Rust: Overkill for standard API endpoints, Bun/Node.js is sufficient and mandated by constraints.",
+            "Dedicated database layer: RLS in Postgres is explicitly called out as the primary mechanism, keeping this a service/logic area.",
+            "Message Queue: While workflows might use MQ, the binding constraint dictates DBOS for state management, making it a durable service layer."
+          ],
+          "source_roots": [
+            "src"
+          ],
+          "test_roots": [
+            "src"
+          ],
+          "protected_paths": [
+            "src/shared/",
+            "package.json"
+          ],
+          "dependency_manifest": "package.json",
+          "canonical_modules": [
+            {
+              "path": "shared/user",
+              "import_specifier": "import { User } from '@shared/user'",
+              "description": "Standardized user and role models."
+            },
+            {
+              "path": "shared/context",
+              "import_specifier": "import { TenantContext } from '@shared/context'",
+              "description": "The required context object for all API calls, ensuring RLS policy execution."
+            },
+            {
+              "path": "shared/property",
+              "import_specifier": "import { PropertyModel } from '@shared/property'",
+              "description": "Models for property units and assets."
+            },
+            {
+              "path": "shared/workflow",
+              "import_specifier": "import { WorkflowEngine } from '@shared/workflow'",
+              "description": "Interface for interacting with the DBOS durable workflow engine."
+            },
+            {
+              "path": "shared/job-task",
+              "import_specifier": "import { TaskPayload } from '@shared/job-task'",
+              "description": "Schema for job assignment and task data."
+            },
+            {
+              "path": "shared/finance",
+              "import_specifier": "import { Invoice } from '@shared/finance'",
+              "description": "Models for billing and financial transactions."
+            },
+            {
+              "path": "shared/log",
+              "import_specifier": "import { AuditEvent } from '@shared/log'",
+              "description": "Standardized event structure for logging."
+            }
+          ],
+          "import_aliases": [
+            {
+              "alias": "@shared/*",
+              "target": "src/shared/*"
+            }
+          ],
+          "gate_commands": [
+            {
+              "name": "user-auth:test",
+              "kind": "test",
+              "command": "npm",
+              "args": [
+                "run",
+                "test:unit"
+              ],
+              "cwd": "services/user-auth",
+              "timeoutMs": 600000
+            },
+            {
+              "name": "user-auth:build",
+              "kind": "build",
+              "command": "bun",
+              "args": [
+                "build"
+              ],
+              "cwd": "services/user-auth",
+              "timeoutMs": 600000
+            },
+            {
+              "name": "tenant-core:test",
+              "kind": "test",
+              "command": "npm",
+              "args": [
+                "run",
+                "test:unit"
+              ],
+              "cwd": "services/tenant-core",
+              "timeoutMs": 600000
+            },
+            {
+              "name": "property-mgmt:test",
+              "kind": "test",
+              "command": "npm",
+              "args": [
+                "run",
+                "test:unit"
+              ],
+              "cwd": "services/property-mgmt",
+              "timeoutMs": 600000
+            },
+            {
+              "name": "workorder-lifecycle:test",
+              "kind": "test",
+              "command": "npm",
+              "args": [
+                "run",
+                "test:workflow"
+              ],
+              "cwd": "services/workorder-lifecycle",
+              "timeoutMs": 600000
+            },
+            {
+              "name": "job-executor-api:test",
+              "kind": "test",
+              "command": "npm",
+              "args": [
+                "run",
+                "test:api"
+              ],
+              "cwd": "services/job-executor-api",
+              "timeoutMs": 600000
+            },
+            {
+              "name": "financial-billing:test",
+              "kind": "test",
+              "command": "npm",
+              "args": [
+                "run",
+                "test:calculate"
+              ],
+              "cwd": "services/financial-billing",
+              "timeoutMs": 600000
+            },
+            {
+              "name": "compliance-audit:test",
+              "kind": "test",
+              "command": "npm",
+              "args": [
+                "run",
+                "test:policy"
+              ],
+              "cwd": "services/compliance-audit",
+              "timeoutMs": 600000
+            }
+          ]
+        },
+        {
+          "area_id": "area-sveltekit",
+          "description": "All sveltekit components.",
+          "stack": "sveltekit",
+          "confidence": "high",
+          "source_refs": [
+            "TECH-SVELTKIT-1",
+            "Web portals (staff, owner, management)"
+          ],
+          "conflicts": [],
+          "alternatives_rejected": [
+            "React/Vue: SvelteKit is explicitly required for its performance and reactivity in dense data displays."
+          ],
+          "source_roots": [
+            "src"
+          ],
+          "test_roots": [
+            "src"
+          ],
+          "protected_paths": [
+            "src/shared/",
+            "svelte.config.js"
+          ],
+          "dependency_manifest": "svelte.config.js",
+          "canonical_modules": [],
+          "import_aliases": [
+            {
+              "alias": "@shared/*",
+              "target": "src/shared/*"
+            }
+          ],
+          "gate_commands": [
+            {
+              "name": "web-admin:test",
+              "kind": "test",
+              "command": "npm",
+              "args": [
+                "run",
+                "dev:test"
+              ],
+              "cwd": "apps/admin-portal",
+              "timeoutMs": 600000
+            }
+          ]
+        }
+      ],
+      "integration_boundaries": [
+        {
+          "description": "API gateway: All external and internal services are routed through Cloudflare/Traefik.",
+          "between": [
+            "area-sveltekit",
+            "area-node"
+          ],
+          "mechanism": "REST"
+        },
+        {
+          "description": "Core API Gateway: Provides standardized, typed function calls to all backend microservices.",
+          "between": [
+            "area-sveltekit",
+            "area-node"
+          ],
+          "mechanism": "REST"
+        }
+      ],
+      "notes": "This architecture adopts a Microservices approach within an API Gateway layer, where all backend services are built using Node.js/Bun for execution efficiency and oRPC for strict contract definition. The Tenant Service is critically positioned to enforce the primary security boundary (RLS) across all other areas that access the PostgreSQL database.\n\nThe frontend utilizes SvelteKit (Web Admin) and dedicated Native clients (Mobile).\n\nCrucially, the 'shared' canonical modules represent the shared contracts (DTOs/Schemas/Enums) defined by TypeScript or equivalent data structures used across all services to ensure type safety via oRPC layer, preventing accidental inter-service contract breakage."
+    }
+  },
+  {
+    "id": "c971fab0-5b0f-480e-ad16-65d3a4a18f12",
+    "content": {
+      "kind": "phase9_recon_plan",
+      "schemaVersion": "1.0",
+      "workspace_kind": "mixed",
+      "source": "agent",
+      "areas": [
+        {
+          "area_id": "core-api",
+          "description": "The central API layer handling request routing, authentication, and core business logic execution.",
+          "stack": "node",
+          "confidence": "high",
+          "source_refs": [
+            "TECH-NODEJS-1: Node.js (Bun) for high-performance API execution.",
+            "TECH-ORPC-1: oRPC | A function-based API layer...",
+            "TECH-CERBOS-1: Cerbos | policy-based authorization engine",
+            "comp-user-account-service (User Account Service)"
+          ],
+          "conflicts": [
+            "The technical constraints require an API execution stack (Node.js/Bun), but the physical filesystem structure does not provide a dedicated directory for `core-api` functionality, implying this must be implemented within existing directories or as a new root module."
+          ],
+          "alternatives_rejected": [
+            "Python: Rejected because core business logic and high-performance API execution (TECH-NODEJS-1) mandate Node.js/Bun for optimal performance per constraints.",
+            "Go: Possible, but Node.js is specified for the API layer."
+          ],
+          "source_roots": [
+            "./src/shared",
+            "./src/user-accounts"
+          ],
+          "test_roots": [],
+          "protected_paths": [
+            "src/core-api/config/*",
+            "src/core-api/**"
+          ],
+          "dependency_manifest": "package.json",
+          "canonical_modules": [
+            {
+              "path": "shared/auth",
+              "import_specifier": "@shared/auth",
+              "description": "Shared authentication contracts and utilities."
+            }
+          ],
+          "import_aliases": [
+            {
+              "alias": "@shared",
+              "target": "src/shared/"
+            }
+          ],
+          "gate_commands": [
+            {
+              "name": "core-api:test",
+              "kind": "test",
+              "command": "npm",
+              "args": [
+                "test",
+                "--silent"
+              ],
+              "cwd": "./src/core-api",
+              "timeoutMs": 600000
+            }
+          ]
+        },
+        {
+          "area_id": "web-frontend",
+          "description": "The web-based portal for staff, properties, and owners using SvelteKit.",
+          "stack": "node",
+          "confidence": "high",
+          "source_refs": [
+            "TECH-SVELTKIT-1: SvelteKit | Used for the web-based admin, staff, property owners...",
+            "root manifests: package.json"
+          ],
+          "conflicts": [],
+          "alternatives_rejected": [
+            "React/NextJS: Rejected because TECH-SVELTKIT-1 explicitly mandates SvelteKit for performance and reactive displays."
+          ],
+          "source_roots": [
+            "./src/web-admin-portal"
+          ],
+          "test_roots": [],
+          "protected_paths": [
+            "src/web-admin-portal/**"
+          ],
+          "dependency_manifest": "package.json",
+          "canonical_modules": [
+            {
+              "path": "client/types",
+              "import_specifier": "@shared/client/types",
+              "description": "Shared TypeScript interfaces for the frontend."
+            }
+          ],
+          "import_aliases": [
+            {
+              "alias": "@shared",
+              "target": "src/shared/"
+            }
+          ],
+          "gate_commands": [
+            {
+              "name": "web-frontend:build",
+              "kind": "build",
+              "command": "npm",
+              "args": [
+                "build"
+              ],
+              "cwd": "./src/web-admin-portal",
+              "timeoutMs": 600000
+            }
+          ]
+        },
+        {
+          "area_id": "native-clients",
+          "description": "Mobile clients for homeowners and technicians focusing on offline, task-centric workflows.",
+          "stack": "other",
+          "confidence": "high",
+          "source_refs": [
+            "TECH-NATIVE-1: Native iOS and Android | Dedicated clients for homeowners and technicians...",
+            "comp-job-execution-service (Job Execution Service)"
+          ],
+          "conflicts": [],
+          "alternatives_rejected": [
+            "PWA/Hybrid: Rejected because TECH-NATIVE-1 mandates native development focusing on offline capabilities."
+          ],
+          "source_roots": [
+            "./src/mobile-client"
+          ],
+          "test_roots": [],
+          "protected_paths": [
+            "src/mobile-client/**"
+          ],
+          "dependency_manifest": "n/a (Native build system)",
+          "canonical_modules": [],
+          "import_aliases": [],
+          "gate_commands": [
+            {
+              "name": "native-clients:test",
+              "kind": "test",
+              "command": "./scripts/run_unit_tests.sh",
+              "args": [],
+              "cwd": "./src/mobile-client",
+              "timeoutMs": 600000
+            }
+          ]
+        },
+        {
+          "area_id": "backend-services",
+          "description": "Core backend business logic services (Work Order, Invoice, Compliance) implemented in Python for specialized data processing.",
+          "stack": "python",
+          "confidence": "high",
+          "source_refs": [
+            "src/ — languages: typescript×56, python×3",
+            "comp-workorder-service (Work Order Service)",
+            "comp-invoice-service (Invoice Service)",
+            "comp-compliance-tracking-service (Compliance Tracking Service)"
+          ],
+          "conflicts": [
+            "The filesystem shows both TypeScript and Python in `src/`. I am grouping the core backend services into a single python area because complex, non-API data processing domains like invoicing and compliance often benefit from specific language models (e.g., Python's ecosystem for financial modeling or ML). The API layer (`core-api`) handles request execution."
+          ],
+          "alternatives_rejected": [
+            "Splitting: Rejected because these services are all 'backend logic' interacting with the same core data model and should be grouped into one deployment unit, minimizing overhead and maximizing shared code use (Domain cohesion principle)."
+          ],
+          "source_roots": [
+            "./src/work-order",
+            "./src/invoicing",
+            "./src/compliance"
+          ],
+          "test_roots": [],
+          "protected_paths": [
+            "src/python_packages/*.whl"
+          ],
+          "dependency_manifest": "pyproject.toml",
+          "canonical_modules": [
+            {
+              "path": "shared.models",
+              "import_specifier": "shared.models",
+              "description": "Data models for serialization and validation."
+            }
+          ],
+          "import_aliases": [],
+          "gate_commands": [
+            {
+              "name": "backend-services:test",
+              "kind": "test",
+              "command": "pytest",
+              "args": [
+                "-q"
+              ],
+              "cwd": "./src/work-order",
+              "timeoutMs": 600000
+            }
+          ]
+        },
+        {
+          "area_id": "infrastructure",
+          "description": "Cross-cutting concerns: Auth, API Gateway, Database connection layer, Observability.",
+          "stack": "node",
+          "confidence": "high",
+          "source_refs": [
+            "TECH-TRAFFIC-1: Traefik | TLS termination, SNI routing...",
+            "TECH-BETTERAUTH-1: Better-Auth",
+            "TECH-PGSQL-1: PostgreSQL",
+            "comp-audit-log-service (Audit Log Service)"
+          ],
+          "conflicts": [],
+          "alternatives_rejected": [
+            "Decoupling Auth/API Gateway: Rejected. While technically ideal to separate these, the constraint structure and complexity mandate grouping high-level operational components that rely on shared infrastructure artifacts (middleware, tracing setup) into one deployment area for manageable ownership."
+          ],
+          "source_roots": [
+            "./src/infra",
+            "./shared/db"
+          ],
+          "test_roots": [],
+          "protected_paths": [
+            "src/infra/middleware/*",
+            "src/schema/*.sql"
+          ],
+          "dependency_manifest": "package.json",
+          "canonical_modules": [
+            {
+              "path": "db/models",
+              "import_specifier": "@shared/db/models",
+              "description": "Database connection and ORM models."
+            }
+          ],
+          "import_aliases": [
+            {
+              "alias": "@shared",
+              "target": "src/shared/"
+            }
+          ],
+          "gate_commands": [
+            {
+              "name": "infrastructure:build",
+              "kind": "build",
+              "command": "npm",
+              "args": [
+                "compile:infra"
+              ],
+              "cwd": "./src/infra",
+              "timeoutMs": 600000
+            }
+          ]
+        }
+      ],
+      "integration_boundaries": [
+        {
+          "description": "External web clients connect through the API Gateway to access core functions.",
+          "between": [
+            "web-frontend",
+            "core-api"
+          ],
+          "mechanism": "REST"
+        },
+        {
+          "description": "Mobile apps communicate directly with the Core API layer, bypassing the web frontend if required for specialized job execution flows.",
+          "between": [
+            "native-clients",
+            "core-api"
+          ],
+          "mechanism": "REST"
+        },
+        {
+          "description": "All areas interact with persistent storage and enforce multi-tenant rules via the DBOS/PGSQL layer, managed by the Infrastructure area.",
+          "between": [
+            "web-frontend",
+            "backend-services",
+            "core-api",
+            "native-clients",
+            "infrastructure"
+          ],
+          "mechanism": "shared database"
+        }
+      ],
+      "notes": "The architecture defines four operational areas: Core API (Node/Bun), Web Frontend (SvelteKit), Native Clients (Mobile SDKs), and Backend Services (Python). Infrastructure handles cross-cutting concerns like DB access, Auth, and Gateways. The filesystem constraints suggest a mixed technological stack, necessitating distinct language domains (Node vs. Python) to meet performance goals for the API layer versus domain modeling needs for financial/compliance services.\n\nKey Decisions:\n1. **API Gateway/Auth:** These critical cross-cutting concerns are grouped into `infrastructure` because they manage shared middleware and tooling required across multiple diverse clients, minimizing complex dependency management at the root level.\n2. **Backend Services Stack:** Python was chosen for grouping backend logic (`work-order`, `invoicing`, `compliance`) due to the filesystem evidence showing active Python usage in the source directory structure, aligning with its strength in data processing tasks necessary for these domains, while keeping the high-throughput API routing purely in Node.js/Bun.\n3. **Mobile Clients:** Since this requires platform SDKs (iOS/Android) and is non-web, it receives a dedicated area definition but no standard package manager manifest or source root specific to the provided filesystem scan details."
+    }
+  }
+]

@@ -22,9 +22,7 @@ import { randomUUID } from 'node:crypto';
 import type { Database } from '../database/init';
 import type { OrchestratorEngine } from '../orchestrator/orchestratorEngine';
 import type { DecisionRouter, InboundDecision } from '../orchestrator/decisionRouter';
-import type { ClientLiaisonAgent } from '../agents/clientLiaisonAgent';
-import { makeUserInput } from '../agents/clientLiaisonAgent';
-import type { LiaisonAnchor } from '../agents/clientLiaisonAgent';
+import { type ClientLiaisonAgent, makeUserInput, type LiaisonAnchor } from '../agents/clientLiaisonAgent';
 import type { CapabilityContext } from '../agents/clientLiaison/capabilities/index';
 import type {
   GovernedStreamRecord,
@@ -32,11 +30,11 @@ import type {
   WorkflowRun,
   AuthorityLevel,
   AgentRole,
-  WorkflowRunStatus,
 } from '../types/records';
 import type { MentionExtensionHost } from '../agents/clientLiaison/mentionResolver';
 import type { MentionCandidate } from '../agents/clientLiaison/types';
 import type { SerializedRecord } from '../events/eventBus';
+import type { EscalationInput } from '../cli/session/responder';
 import { getLogger } from '../logging';
 
 export interface WorkflowSession {
@@ -63,6 +61,16 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
    * write). Reset on workflow:started.
    */
   private lastPostedSubPhaseId: string | null = null;
+
+  /**
+   * In-flight Phase-9 executor escalations (attended runs), keyed by the
+   * `executor_question_presented` governed_stream record id the webview renders
+   * and posts back. The resolver fulfills the `ExecutorEscalation` promise the
+   * coding-agent adapter is awaiting. The provider instance outlives webview
+   * reloads (only `webview` + disposers are nulled on dispose), so an in-flight
+   * question survives a reload and re-renders from its persisted surface record.
+   */
+  private readonly pendingExecutorQuestions = new Map<string, { resolve: (answer: string | null) => void }>();
 
   /**
    * Phase-indicator caches. getCompletedPhases / getSkippedSubPhases each scan
@@ -341,6 +349,9 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
           menu_selections: Array<{ option_id: string; free_text?: string }>;
         });
         return;
+      case 'executorQuestion:answer':
+        this.handleExecutorQuestionAnswer(msg as unknown as { recordId: string; answer: string | null });
+        return;
       case 'focusComposer':
         // Best-effort nudge emitted by DecisionBundleCard when the user
         // hits "Ask more" — the webview focuses its own textarea, but
@@ -585,6 +596,74 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
       })),
       menuSelections: msg.menu_selections,
     });
+  }
+
+  // ── Executor escalation (attended Phase-9) ────────────────────
+
+  /**
+   * `ExecutorEscalation` sink (attended runs only): surface a coding agent's
+   * blocking clarification — one the spec-grounded SessionResponder could not
+   * answer — to the human as a governed-stream card, and resolve with their
+   * free-text answer. Returns `null` (the executor then self-resolves per the
+   * execution-mode directive) when no run or webview is active, so a headless or
+   * detached session never deadlocks. Registered from the extension host
+   * (extension.ts); the headless CLI never constructs this provider, so
+   * escalation is attended-only by construction.
+   *
+   * The question is persisted as an `executor_question_presented` record which
+   * rides `record:added → addRecord` to the webview (ExecutorQuestionCard renders
+   * it); the record id is the key the webview posts back and this map resolves on.
+   */
+  escalateExecutorQuestion(input: EscalationInput): Promise<string | null> {
+    const runId = this.session.currentRunId;
+    if (!runId || !this.webview) return Promise.resolve(null);
+    const run = this.engine.stateMachine.getWorkflowRun(runId);
+    const record = this.engine.writer.writeRecord({
+      record_type: 'executor_question_presented',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      phase_id: run?.current_phase_id ?? '9',
+      janumicode_version_sha: this.engine.janumiCodeVersionSha,
+      content: {
+        question: input.question,
+        agent_context: clipEscalationText(input.agentContext, 2000),
+        task_spec: clipEscalationText(input.taskSpec, 4000),
+      },
+    });
+    return new Promise<string | null>((resolve) => {
+      this.pendingExecutorQuestions.set(record.id, { resolve });
+    });
+  }
+
+  /**
+   * Inbound: the human's typed answer to an executor question. Resolves the
+   * awaiting adapter promise with the trimmed answer (or null for an empty
+   * answer → self-resolve) and persists an `executor_question_answered`
+   * follow-up for the audit trail + reload answered-state. An unknown/expired id
+   * (answer raced a run change or reload) is a warn + no-op, not an error card.
+   */
+  private handleExecutorQuestionAnswer(msg: { recordId: string; answer: string | null }): void {
+    const entry = this.pendingExecutorQuestions.get(msg.recordId);
+    if (!entry) {
+      getLogger().warn('ui', 'executor question answer for unknown/expired id', { recordId: msg.recordId });
+      return;
+    }
+    this.pendingExecutorQuestions.delete(msg.recordId);
+    const answer = typeof msg.answer === 'string' && msg.answer.trim() ? msg.answer.trim() : null;
+    const runId = this.session.currentRunId;
+    if (runId && answer !== null) {
+      const run = this.engine.stateMachine.getWorkflowRun(runId);
+      this.engine.writer.writeRecord({
+        record_type: 'executor_question_answered',
+        schema_version: '1.0',
+        workflow_run_id: runId,
+        phase_id: run?.current_phase_id ?? '9',
+        janumicode_version_sha: this.engine.janumiCodeVersionSha,
+        derived_from_record_ids: [msg.recordId],
+        content: { target_record_id: msg.recordId, answer },
+      });
+    }
+    entry.resolve(answer);
   }
 
   // ── Helpers ───────────────────────────────────────────────────
@@ -933,7 +1012,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
   }
 
   private generateNonce(): string {
-    return randomUUID().replace(/-/g, '');
+    return randomUUID().replaceAll('-', '');
   }
 
   /**
@@ -967,6 +1046,13 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     if (!this.webview) return;
     void this.webview.postMessage(message);
   }
+}
+
+/** Clip an executor-escalation context field for its surface record (the full
+ *  spec/output tail is large; the card only needs enough to orient the human). */
+function clipEscalationText(text: string, maxChars: number): string {
+  if (typeof text !== 'string' || text.length <= maxChars) return text ?? '';
+  return text.slice(0, maxChars) + `\n…[${text.length - maxChars} more chars]…`;
 }
 
 /** Default extension-host implementation of the MentionResolver's host adapter. */
@@ -1006,4 +1092,4 @@ export function buildExtensionHost(): MentionExtensionHost {
 }
 
 // Re-export so the workflow status check works regardless of import path.
-export type { WorkflowRunStatus };
+export type { WorkflowRunStatus } from '../types/records';

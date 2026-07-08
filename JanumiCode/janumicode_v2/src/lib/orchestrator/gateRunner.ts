@@ -11,7 +11,6 @@
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import type { GateCommand } from './gateCommands';
-import { parseTestCounts } from './leafTestRunner';
 
 export interface GateResult {
   gate: GateCommand;

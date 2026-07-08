@@ -66,11 +66,15 @@ export function buildCompositionRootLeaf(
   contracts: ContractForSmoke[],
 ): SchedulerLeaf {
   const { entry, manifest: manifestFile, typecheck, installNote } = stackBuildFacts(manifest?.profile.language);
-  const componentIds = [...new Set(allLeaves.map((l) => l.component_id).filter(Boolean))].sort();
+  const componentIds = [...new Set(allLeaves.map((l) => l.component_id).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
   const contractLines = contracts
     .filter((c) => c.id)
-    .map((c) => `  - ${c.id}${c.protocol ? ` (${c.protocol}${c.data_format ? `, ${c.data_format}` : ''})` : ''}`);
+    .map((c) => {
+      const dataFormatPart = c.data_format ? `, ${c.data_format}` : '';
+      const protocolPart = c.protocol ? ` (${c.protocol}${dataFormatPart})` : '';
+      return `  - ${c.id}${protocolPart}`;
+    });
 
   const description = [
     'COMPOSITION ROOT — integrate every implemented component into ONE runnable application. ',

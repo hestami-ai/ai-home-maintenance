@@ -24,6 +24,7 @@ import {
   caseCoversAny,
   renderScopedAcMenu,
   dedupeTestSuiteIds,
+  retainAcCoverageOnPrune,
 } from '../../../../lib/orchestrator/phases/phase7';
 import type { LeafAcceptanceCriteria } from '../../../../lib/orchestrator/phases/phase6';
 import type { PhaseContextPacketResult } from '../../../../lib/orchestrator/phases/dmrContext';
@@ -57,6 +58,56 @@ function components(): Array<Record<string, unknown>> {
 }
 
 // ── Pure helper tests ──────────────────────────────────────────────
+
+describe('retainAcCoverageOnPrune — root-vs-leaf coverage guard', () => {
+  type Suite = Parameters<typeof retainAcCoverageOnPrune>[0][number];
+  const suite = (suite_id: string, acsByCase: string[][]): Suite => ({
+    suite_id,
+    component_id: 'c',
+    test_type: 'unit',
+    test_cases: acsByCase.map((acs, i) => ({
+      test_case_id: `${suite_id}-tc${i}`,
+      acceptance_criterion_ids: acs,
+    })),
+  }) as unknown as Suite;
+
+  it('re-keeps a dropped suite that holds the SOLE test for a leaf AC', () => {
+    // cal-41 shape: kept suites cover AC-02..AC-05; the dropped tenant suite is
+    // the ONLY cover for the deep-leaf AC-01a/AC-01b.
+    const suites = [
+      suite('kept-persist', [['AC-02'], ['AC-03']]),
+      suite('dropped-tenant', [['AC-01a', 'AC-01b']]),
+    ];
+    const kept = retainAcCoverageOnPrune(suites, new Set(['kept-persist']));
+    expect(kept.has('dropped-tenant')).toBe(true);
+  });
+
+  it('leaves a dropped suite dropped when all its ACs are already covered by kept suites', () => {
+    const suites = [
+      suite('kept', [['AC-01'], ['AC-02']]),
+      suite('dropped-dup', [['AC-01'], ['AC-02']]), // fully duplicated
+    ];
+    const kept = retainAcCoverageOnPrune(suites, new Set(['kept']));
+    expect(kept.has('dropped-dup')).toBe(false);
+  });
+
+  it('never shrinks the kept set and is idempotent', () => {
+    const suites = [suite('a', [['AC-1']]), suite('b', [['AC-2']])];
+    const once = retainAcCoverageOnPrune(suites, new Set(['a']));
+    const twice = retainAcCoverageOnPrune(suites, once);
+    expect([...twice].sort()).toEqual(['a', 'b']); // b rescued for unique AC-2
+    expect(once.has('a')).toBe(true);
+  });
+
+  it('ignores empty/blank AC ids when deciding uniqueness', () => {
+    const suites = [
+      suite('kept', [['AC-1']]),
+      suite('dropped-blank', [['', undefined as unknown as string]]),
+    ];
+    const kept = retainAcCoverageOnPrune(suites, new Set(['kept']));
+    expect(kept.has('dropped-blank')).toBe(false); // no real AC → not rescued
+  });
+});
 
 describe('buildComponentAcMap', () => {
   it('maps component_id → AC ids from tasks (AC-prefixed only)', () => {

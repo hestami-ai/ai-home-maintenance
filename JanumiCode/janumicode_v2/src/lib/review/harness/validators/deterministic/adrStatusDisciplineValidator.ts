@@ -59,10 +59,14 @@ export function validateAdrStatusDiscipline(
 
     if (!hasRationale(a)) {
       acceptedWithoutRationale++;
-      const title =
-        typeof a.title === 'string' ? a.title
-        : typeof a.id === 'string' ? a.id
-        : `ADR[${idx}]`;
+      let title: string;
+      if (typeof a.title === 'string') {
+        title = a.title;
+      } else if (typeof a.id === 'string') {
+        title = a.id;
+      } else {
+        title = `ADR[${idx}]`;
+      }
 
       findings.push({
         validatorId: 'adr_status_discipline_validator',

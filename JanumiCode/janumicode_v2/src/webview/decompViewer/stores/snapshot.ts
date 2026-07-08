@@ -15,6 +15,8 @@ import { buildCoverageModel } from './coverage';
 // so the webview bundle doesn't need to import from src/lib.
 export type ViewerTier = 'A' | 'B' | 'C' | 'D' | null;
 export type ViewerRootKind = 'fr' | 'nfr' | null;
+/** Tier band key used by filters/expand state — the null tier is keyed as the string 'null'. */
+export type TierBand = 'A' | 'B' | 'C' | 'D' | 'null';
 
 export interface ViewerAssumption {
   id: string;
@@ -291,14 +293,14 @@ export function collapseAllIndented(): void {
 
 // Filter state — applied to the tree view.
 export const filterReleaseIds = writable<Set<string> | null>(null); // null = all
-export const filterTiers = writable<Set<'A' | 'B' | 'C' | 'D' | 'null'>>(new Set());
+export const filterTiers = writable<Set<TierBand>>(new Set());
 export const filterStatuses = writable<Set<string>>(new Set());
 export const filterPriorities = writable<Set<string>>(new Set());
 export const filterText = writable<string>('');
 
 /** Expanded-state tracking: which root accordions are open, and which tier bands inside them. */
 export const expandedRoots = writable<Set<string>>(new Set());
-export const expandedTierBands = writable<Record<string, Set<'A' | 'B' | 'C' | 'D' | 'null'>>>({});
+export const expandedTierBands = writable<Record<string, Set<TierBand>>>({});
 
 /** Selected node (for the detail drawer). */
 export const selectedNodeRecordId = writable<string | null>(null);
@@ -597,7 +599,7 @@ export function isNodeVisibleUnderFilters(
   n: ViewerDecompositionNode,
   f: {
     releases: Set<string> | null;
-    tiers: Set<'A' | 'B' | 'C' | 'D' | 'null'>;
+    tiers: Set<TierBand>;
     statuses: Set<string>;
     priorities: Set<string>;
     text: string;
@@ -605,7 +607,7 @@ export function isNodeVisibleUnderFilters(
 ): boolean {
   if (f.releases && n.release_id !== null && !f.releases.has(n.release_id)) return false;
   if (f.tiers.size > 0) {
-    const t = (n.tier ?? 'null') as 'A' | 'B' | 'C' | 'D' | 'null';
+    const t = (n.tier ?? 'null') as TierBand;
     if (!f.tiers.has(t)) return false;
   }
   if (f.statuses.size > 0 && !f.statuses.has(n.status)) return false;
@@ -641,7 +643,7 @@ export function toggleRoot(rootFrId: string): void {
 
 export function toggleTierBand(
   rootFrId: string,
-  tier: 'A' | 'B' | 'C' | 'D' | 'null',
+  tier: TierBand,
 ): void {
   const cur = { ...get(expandedTierBands) };
   const s = new Set(cur[rootFrId] ?? []);
@@ -913,7 +915,7 @@ function buildSatisfiedByMap(
     if (!node) return sourceId;  // unknown id — return as-is so drift is visible
     if (node.depth === 0) return node.display_key;
     let cur: ViewerDecompositionNode | undefined = node;
-    while (cur && cur.parent_node_id) {
+    while (cur?.parent_node_id) {
       const next: ViewerDecompositionNode | undefined = byNodeId.get(cur.parent_node_id);
       if (!next) break;
       cur = next;

@@ -69,7 +69,7 @@ export class SessionDriver {
   private pty: PtyProcess | null = null;
   private exitInfo: { exitCode: number } | null = null;
   /** Subscribers re-evaluated on each data chunk / exit (waitFor watchers). */
-  private watchers = new Set<() => void>();
+  private readonly watchers = new Set<() => void>();
   /** Serializes (possibly async) screen writes so snapshots and watcher
    *  notifications always observe fully-parsed state, in arrival order. */
   private writeChain: Promise<void> = Promise.resolve();

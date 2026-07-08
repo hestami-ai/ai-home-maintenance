@@ -85,33 +85,24 @@ export function registerTestHookCommands(
         return { workflowRunId: run.id };
       },
     ),
-  );
-
-  // Flip auto-approve on the engine so pauseForDecision synthesizes
-  // resolutions instead of blocking on the webview. Mirrors what
-  // HeadlessLiaisonAdapter does for the CLI.
-  disposables.push(
+    // Flip auto-approve on the engine so pauseForDecision synthesizes
+    // resolutions instead of blocking on the webview. Mirrors what
+    // HeadlessLiaisonAdapter does for the CLI.
     vscode.commands.registerCommand('janumicode._test.enableAutoApprove', () => {
       ctx.engine.setAutoApproveDecisions(true);
     }),
-  );
-
-  // Opt into CLI parser registration for real Phase 9 execution. Mock
-  // mode skips this — Phase 9 task executions then fail fast with
-  // "No output parser registered" which is the expected virtuous-cycle
-  // gap signal when Claude Code isn't configured.
-  disposables.push(
+    // Opt into CLI parser registration for real Phase 9 execution. Mock
+    // mode skips this — Phase 9 task executions then fail fast with
+    // "No output parser registered" which is the expected virtuous-cycle
+    // gap signal when Claude Code isn't configured.
     vscode.commands.registerCommand('janumicode._test.registerCliParsers', () => {
       ctx.engine.registerBuiltinCLIParsers();
     }),
-  );
-
-  // Steer the Orchestrator role (Phase 1.0 Intent Quality Check, etc.)
-  // to a specific backing tool + model. Harness test harness real-mode
-  // wires this to `claude_code_cli` + `qwen3.5:9b` so the CLI path is
-  // exercised end-to-end; mock runs leave the createTestEngine default
-  // in place.
-  disposables.push(
+    // Steer the Orchestrator role (Phase 1.0 Intent Quality Check, etc.)
+    // to a specific backing tool + model. Harness test harness real-mode
+    // wires this to `claude_code_cli` + `qwen3.5:9b` so the CLI path is
+    // exercised end-to-end; mock runs leave the createTestEngine default
+    // in place.
     vscode.commands.registerCommand(
       'janumicode._test.setOrchestratorRouting',
       (backingTool: string, model?: string, provider?: string) => {
@@ -124,14 +115,11 @@ export function registerTestHookCommands(
         }
       },
     ),
-  );
-
-  // Block until the workflow run enters a terminal state (completed /
-  // failed / rolled_back) OR the timeout hits. Polls the state
-  // machine every 100ms — the eventBus `workflow:completed` event
-  // arrives too early for mock runs because Phase 10 can still be
-  // writing its trailing records.
-  disposables.push(
+    // Block until the workflow run enters a terminal state (completed /
+    // failed / rolled_back) OR the timeout hits. Polls the state
+    // machine every 100ms — the eventBus `workflow:completed` event
+    // arrives too early for mock runs because Phase 10 can still be
+    // writing its trailing records.
     vscode.commands.registerCommand(
       'janumicode._test.waitForCompletion',
       async (
@@ -150,12 +138,9 @@ export function registerTestHookCommands(
         return { status: run?.status ?? 'unknown', timedOut: true };
       },
     ),
-  );
-
-  // Produce the canonical HarnessResult for a run by driving the
-  // oracle over its governed_stream. Identical JSON shape to what
-  // `node dist/cli/janumicode.js run --json` emits.
-  disposables.push(
+    // Produce the canonical HarnessResult for a run by driving the
+    // oracle over its governed_stream. Identical JSON shape to what
+    // `node dist/cli/janumicode.js run --json` emits.
     vscode.commands.registerCommand(
       'janumicode._test.getHarnessResult',
       (workflowRunId: string): HarnessResult => {
@@ -166,14 +151,11 @@ export function registerTestHookCommands(
         });
       },
     ),
-  );
-
-  // Persist the HarnessResult's gap report to disk so the launching
-  // process (vscode-test runner → terminal) can read it back without
-  // a return-value round-trip. When no gap report exists (status ===
-  // success), writes a stub `{ status: "success" }` file so the
-  // caller can still assert on file presence.
-  disposables.push(
+    // Persist the HarnessResult's gap report to disk so the launching
+    // process (vscode-test runner → terminal) can read it back without
+    // a return-value round-trip. When no gap report exists (status ===
+    // success), writes a stub `{ status: "success" }` file so the
+    // caller can still assert on file presence.
     vscode.commands.registerCommand(
       'janumicode._test.writeGapReport',
       (workflowRunId: string, outputPath: string): { written: boolean } => {
@@ -181,9 +163,7 @@ export function registerTestHookCommands(
           dbPath: ctx.dbPath,
           startTimeMs: startTimes.get(workflowRunId) ?? Date.now(),
         });
-        const payload = result.gapReport
-          ? result.gapReport
-          : { status: result.status, phasesCompleted: result.phasesCompleted };
+        const payload = result.gapReport ?? { status: result.status, phasesCompleted: result.phasesCompleted };
         fs.writeFileSync(outputPath, JSON.stringify(payload, null, 2));
         return { written: true };
       },
