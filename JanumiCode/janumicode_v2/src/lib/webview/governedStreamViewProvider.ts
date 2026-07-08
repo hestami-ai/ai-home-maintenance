@@ -24,6 +24,7 @@ import type { OrchestratorEngine } from '../orchestrator/orchestratorEngine';
 import type { DecisionRouter, InboundDecision } from '../orchestrator/decisionRouter';
 import type { ClientLiaisonAgent } from '../agents/clientLiaisonAgent';
 import { makeUserInput } from '../agents/clientLiaisonAgent';
+import type { LiaisonAnchor } from '../agents/clientLiaisonAgent';
 import type { CapabilityContext } from '../agents/clientLiaison/capabilities/index';
 import type {
   GovernedStreamRecord,
@@ -315,7 +316,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
         await this.handleSubmitIntent(msg as unknown as { text: string; attachments?: string[]; references?: never[] });
         return;
       case 'submitOpenQuery':
-        await this.handleSubmitOpenQuery(msg as unknown as { text: string; references?: never[]; forceCapability?: string; slashCommand?: string });
+        await this.handleSubmitOpenQuery(msg as unknown as { text: string; references?: never[]; forceCapability?: string; slashCommand?: string; threadId?: string; anchor?: LiaisonAnchor });
         return;
       case 'pickFile':
         await this.handlePickFile(msg as unknown as { requestId: string; multiple?: boolean });
@@ -475,6 +476,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
     text: string;
     forceCapability?: string;
     slashCommand?: string;
+    threadId?: string;
+    anchor?: LiaisonAnchor;
   }): Promise<void> {
     if (!this.session.currentRunId) {
       this.post({
@@ -497,6 +500,10 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
       workflowRunId: this.session.currentRunId,
       currentPhaseId: activeRun?.current_phase_id ?? null,
       forceCapability,
+      // Card sub-chat: a per-item thread + anchor, so the turn renders inside
+      // the card and its history stays scoped to that item.
+      threadId: msg.threadId,
+      anchor: msg.anchor,
     });
     const ctx = this.buildCapabilityContext(activeRun);
     await this.liaison.handleUserInput(input, ctx);

@@ -1,0 +1,1 @@
+// DM-compliance-status-updater-propertyrecord — PropertyRecord is a tenant-scoped immutable record of a physical property. It captures the full address, key photo references, timestamps for creation and updates, and carries foreign keys to the owning Tenant. // #DM-audit-log-retriever-propertyrecord

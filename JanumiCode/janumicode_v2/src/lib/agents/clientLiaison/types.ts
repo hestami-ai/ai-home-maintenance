@@ -38,6 +38,23 @@ export interface Attachment {
   size?: number;
 }
 
+/**
+ * A card/item anchor for a scoped sub-thread (Card ASK / feedback / author).
+ * The main chat has no anchor; a card sub-chat is anchored to one item.
+ */
+export interface LiaisonAnchor {
+  /** The governed_stream record id (UUID) of the anchored item, when known. */
+  recordId?: string;
+  /** The semantic/display id of the item (e.g. "US-003", "comp-media-storage"). */
+  itemId?: string;
+  /**
+   * Discriminator for the semantic id — semantic ids collide across
+   * namespaces (user_journey, requirement_node, acceptance_criterion,
+   * component, data_model, task, …), so the kind is required to disambiguate.
+   */
+  kind?: string;
+}
+
 export interface UserInput {
   id: string;
   text: string;
@@ -48,6 +65,14 @@ export interface UserInput {
   currentPhaseId: PhaseId | null;
   /** Composer hint to skip classification and route directly to a capability. */
   forceCapability?: string;
+  /**
+   * Conversation thread id. The root chat uses "main"; a card sub-thread
+   * uses e.g. "card:<recordId>". Turns in the same thread are paired for
+   * multi-turn history; a card sub-chat therefore only sees its own turns.
+   */
+  threadId?: string;
+  /** Item anchor when this input originates from a card sub-chat. */
+  anchor?: LiaisonAnchor;
 }
 
 // ── Classification ──────────────────────────────────────────────────
@@ -58,6 +83,8 @@ export interface OpenQuery {
   workflowRunId: string;
   currentPhaseId: string;
   references?: Reference[];
+  /** Item anchor when the query originates from a card sub-chat (Card ASK). */
+  anchor?: LiaisonAnchor;
 }
 
 export interface QueryClassification {

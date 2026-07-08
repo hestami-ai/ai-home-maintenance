@@ -34,12 +34,15 @@ describe('capability effect tiers (Increment 2)', () => {
     }
   });
 
-  it('tier counts match the design (15 read / 3 propose / 4 govern)', () => {
+  it('tier counts match the design (15 read / 5 propose / 5 govern)', () => {
+    // 5 propose = attachFile, addConstraint, pauseWorkflow, authorItem (AUTHOR),
+    // submitItemFeedback (REFINE). 5 govern = startWorkflow, resumeWorkflow,
+    // cancelWorkflow, escalateInconsistency, regenerateCollection (REGENERATE).
     const count = (t: string) => all.filter((c) => c.tier === t).length;
-    expect(all).toHaveLength(22);
+    expect(all).toHaveLength(25);
     expect(count('read')).toBe(15);
-    expect(count('propose')).toBe(3);
-    expect(count('govern')).toBe(4);
+    expect(count('propose')).toBe(5);
+    expect(count('govern')).toBe(5);
   });
 
   it('every GOVERN capability that mutates the workflow is either confirmation-gated or the escalation path', () => {

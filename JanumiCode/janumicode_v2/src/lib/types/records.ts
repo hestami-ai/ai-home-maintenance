@@ -90,6 +90,7 @@ export type AgentRole =
   | 'deep_memory_research'
   | 'unsticking_agent'
   | 'client_liaison'
+  | 'human_author'
   | 'orchestrator'
   | 'loop_detection_monitor'
   | 'reasoning_review'
@@ -332,6 +333,13 @@ export type RecordType =
   | 'query_classification_record'
   | 'client_liaison_response'
   | 'consistency_challenge_escalation'
+  // Human item feedback (Card sub-chat REFINE mode) — inert, anchored to the
+  // item it critiques; picked up when the item's collection is next revised.
+  | 'human_item_feedback'
+  // A user request to regenerate ("generate more") a collection — the
+  // governed, auditable record of the ask; the re-bloom either wakes an
+  // open bloom gate or is applied at the next revision.
+  | 'collection_regeneration_requested'
   // Unsticking Records (§6.5)
   | 'loop_detection_record'
   | 'unsticking_session_open'
@@ -1531,6 +1539,20 @@ export interface DataModelRelationship {
   ownership?: 'owns' | 'references';
 }
 
+/**
+ * Cross-CONTEXT role of an entity within its bounded context (DDD, P5.1b
+ * entity_ownership_reconciliation). Orthogonal to `kind` (which is the structural
+ * tier aggregate/entity/value_type/relation):
+ *  - 'owned'              — this component is the source of truth; deep-decompose it.
+ *  - 'referenced'         — another context owns the aggregate; this is a reference
+ *                           stub (correlation id + this context's own local fields);
+ *                           NEVER deep-decomposed. Carries owner_entity_id/owner_component_id.
+ *  - 'shared_value_object'— an immutable value type copied BY VALUE into each context
+ *                           (no single owner, no reference); not deep-decomposed.
+ * Absent ⇒ treated as 'owned' (pre-reconciliation / no-regression default).
+ */
+export type EntityOwnershipRole = 'owned' | 'referenced' | 'shared_value_object';
+
 export interface DecompositionEntity {
   id: string;
   name: string;
@@ -1540,6 +1562,12 @@ export interface DecompositionEntity {
   relationships?: DataModelRelationship[];
   active_constraints?: string[];
   traces_to?: string[];
+  /** DDD cross-context role (P5.1b). Absent ⇒ 'owned'. */
+  ownership_role?: EntityOwnershipRole;
+  /** When ownership_role='referenced': the owning context's canonical entity id it points at. */
+  owner_entity_id?: string;
+  /** When ownership_role='referenced': the component that owns the aggregate. */
+  owner_component_id?: string;
 }
 
 export interface DataModelAtomicCriteria {
@@ -1566,6 +1594,34 @@ export interface DataModelDecompositionNodeContent {
   pruning_reason?: string;
   release_id: string | null;
   release_ordinal: number | null;
+}
+
+/** DDD ownership verdict for one cross-component concept (P5.1b reconciliation). */
+export type EntityOwnershipVerdict = 'owned_aggregate' | 'shared_value_object' | 'separate';
+
+export interface EntityOwnershipDecision {
+  /** Structural concept key (slug of the entity name) the copies were grouped by. */
+  concept_key: string;
+  concept_name: string;
+  verdict: EntityOwnershipVerdict;
+  /** For 'owned_aggregate': the elected owning component + its canonical entity id. */
+  owner_component_id?: string;
+  owner_entity_id?: string;
+  /** Every component that declared a copy of this concept. */
+  member_component_ids: string[];
+  /** How the verdict/owner was decided — auditable. */
+  source: 'deterministic' | 'adjudicator' | 'fail_open';
+  rationale?: string;
+}
+
+/** The P5.1b entity_ownership_reconciliation artifact: which context owns each
+ *  cross-component concept, so saturation deep-decomposes owned aggregates ONCE
+ *  and non-owners keep thin reference stubs / value-object copies. */
+export interface EntityOwnershipMapContent {
+  kind: 'entity_ownership_map';
+  decisions: EntityOwnershipDecision[];
+  /** Concepts left all-owned because ownership could not be resolved — surfaced, not guessed. */
+  unresolved: string[];
 }
 
 export type DataModelAssumptionCategory =

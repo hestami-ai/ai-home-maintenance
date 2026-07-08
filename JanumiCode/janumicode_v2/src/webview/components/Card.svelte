@@ -25,6 +25,7 @@
   import ExecutionWaveCard from './ExecutionWaveCard.svelte';
   import QuarantineLedgerCard from './QuarantineLedgerCard.svelte';
   import ReasoningReviewCard from './ReasoningReviewCard.svelte';
+  import CardSubChat from './CardSubChat.svelte';
 
   interface Props {
     record: SerializedRecord;
@@ -122,6 +123,15 @@
     'warning_batch_acknowledged',
   ]);
   const isHumanRecord = $derived(humanRecordTypes.has(record.record_type));
+  // A turn belonging to a card sub-thread — suppressed at top level and
+  // rendered inside its anchored card's CardSubChat instead.
+  const isCardThreadRecord = $derived(recordsStore.isCardThread(record));
+  // Only artifact-ish cards host an item sub-chat — not the conversational,
+  // system, or warning cards.
+  const showSubChat = $derived(
+    !isHumanRecord &&
+      !['liaison_response', 'user_input', 'system_event', 'warning'].includes(category),
+  );
   const contentPreview = $derived(getContentPreview(record.content));
   const provenanceIds = $derived(
     Array.isArray((record.content as { provenance_record_ids?: string[] }).provenance_record_ids)
@@ -180,6 +190,9 @@
 <!-- Agent child records: skip at top level (rendered nested by AgentInvocationCard) -->
 {#if isAgentChild}
   <!-- deliberately empty — rendered by parent AgentInvocationCard -->
+<!-- Card sub-thread turns: skip at top level (rendered inside the anchored card's CardSubChat) -->
+{:else if isCardThreadRecord}
+  <!-- deliberately empty — rendered inside CardSubChat for its anchor item -->
 <!-- DMR detail records: skip at top level (rendered inline by DmrPipelineCard) -->
 {:else if isDmrDetailChild}
   <!-- deliberately empty — rendered by DmrPipelineCard -->
@@ -200,12 +213,12 @@
 <!-- Wave 6 follow-up: decomposition pipeline composite (latest per pipeline_id) -->
 {:else if record.record_type === 'requirement_decomposition_pipeline'}
   <div data-record-id={record.id} data-phase-id={record.phase_id}>
-    <DecompositionPipelineCard {record} />
+    <DecompositionPipelineCard {record} {vscode} />
   </div>
 <!-- Wave 6: decomposition root (depth-0) when no pipeline card exists -->
 {:else if record.record_type === 'requirement_decomposition_node'}
   <div data-record-id={record.id} data-phase-id={record.phase_id}>
-    <DecompositionNodeCard {record} />
+    <DecompositionNodeCard {record} {vscode} />
   </div>
 <!-- Wave 6: assumption snapshot per saturation pass when no pipeline card exists -->
 {:else if record.record_type === 'assumption_set_snapshot'}
@@ -352,6 +365,11 @@
         </div>
       </div>
     {/if}
+    {#if showSubChat && vscode}
+      <div class="card-subchat-wrap">
+        <CardSubChat recordId={record.id} anchorKind={record.record_type} {vscode} />
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -453,6 +471,9 @@
 
   .card-content {
     padding: var(--jc-space-lg) var(--jc-space-xl);
+  }
+  .card-subchat-wrap {
+    padding: 0 var(--jc-space-xl) var(--jc-space-lg);
   }
   .content-preview {
     margin-bottom: var(--jc-space-lg);

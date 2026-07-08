@@ -27,6 +27,12 @@ import { pickItemsArray } from '../parsedResponseHelpers';
 import { runDataModelSaturationLoop } from './phase5_1a';
 import { renderComponentBlockForTask } from './phase6';
 import { mintEntityIds, mintEndpointIds } from './phase5/dataModelIdMinter';
+import {
+  reconcileEntityOwnership, buildOwnershipContext, buildComponentContextLines,
+  type BridgeModel,
+} from './phase5/entityOwnershipBridge';
+import { makeEntityOwnershipAdjudicator } from './phase5/entityOwnershipAdjudicator';
+import type { EntityOwnershipRole } from '../../types/records';
 import { chunkedCoverageBloom } from './chunkedCoverageBloom';
 import type { PromptTemplate } from '../templateLoader';
 import { emit as aoddEmit } from '../../aodd';
@@ -320,6 +326,55 @@ export class Phase5Handler implements PhaseHandler {
     // Producer-side stable entity ids (Pillar A) — deterministic + idempotent,
     // so the packet collector + coherence index reference the same real id.
     mintEntityIds(dmContent as Parameters<typeof mintEntityIds>[0]);
+
+    // ── 5.1b — Entity Ownership Reconciliation (DDD owned-vs-referenced) ──
+    // The per-component skeleton independently re-models every concept a context
+    // TOUCHES, so a shared aggregate (WorkOrder) is re-declared + deep-decomposed
+    // in 7-9 components. Elect ONE owning context per concept; non-owners become
+    // thin reference-by-id stubs (or value-object copies) that saturation never
+    // deep-decomposes. No shared kernel; per-context fields preserved; reference-by-id
+    // is the seam that survives a microservice split. Deterministic core + a scoped,
+    // env-gated LLM adjudicator for the semantic aggregate/value-object/owner calls.
+    engine.stateMachine.setSubPhase(workflowRun.id, 'entity_ownership_reconciliation');
+    const p1EntitiesRec = allArtifacts.find(r => r.sub_phase_id === 'entities_bloom');
+    const swDomainsRec = allArtifacts.find(r => r.sub_phase_id === 'software_domains');
+    const p1Entities = ((p1EntitiesRec?.content as Record<string, unknown> | undefined)?.entities as Array<{ name?: string; businessDomainId?: string }>) ?? [];
+    const swDomContent = (swDomainsRec?.content as Record<string, unknown> | undefined) ?? {};
+    const softwareDomains = ((swDomContent.software_domains ?? swDomContent.domains) as Array<{ id?: string; maps_to_business_domains?: string[] }>) ?? [];
+    const ownershipComponents = effectiveComponents.components as Array<{ id?: string; domain_id?: string | null; name?: string; responsibility?: string; description?: string }>;
+    const ownershipCtx = buildOwnershipContext({ p1Entities, softwareDomains, components: ownershipComponents });
+    const adjudicatorOn = process.env.JANUMICODE_ENTITY_ADJUDICATOR !== '0';
+    const ownershipAdjudicator = adjudicatorOn
+      ? makeEntityOwnershipAdjudicator({
+          // The adjudicator builds a full trace context (workflowRunId + phase ids);
+          // cast to the caller's param type (traceContext is typed loosely upstream).
+          call: (opts) => engine.callForRole('requirements_agent', opts as unknown as Parameters<typeof engine.callForRole>[1]),
+          workflowRunId: workflowRun.id,
+          componentContext: buildComponentContextLines(ownershipComponents),
+        })
+      : undefined;
+    const { ownershipMap, stats: ownershipStats } = await reconcileEntityOwnership(
+      ((dmContent as { models?: BridgeModel[] }).models) ?? [],
+      ownershipCtx,
+      ownershipAdjudicator,
+    );
+    const ownershipRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '5',
+      sub_phase_id: 'entity_ownership_reconciliation',
+      produced_by_agent_role: 'technical_spec_agent',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: derivedFromIds,
+      content: ownershipMap as unknown as Record<string, unknown>,
+    });
+    artifactIds.push(ownershipRecord.id);
+    engine.ingestionPipeline.ingest(ownershipRecord);
+    getLogger().info('workflow', 'Phase 5.1b entity ownership reconciled', {
+      workflow_run_id: workflowRun.id, adjudicator: adjudicatorOn, ...ownershipStats,
+    });
+
     const dataModelsRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
       schema_version: '1.0',
@@ -344,46 +399,43 @@ export class Phase5Handler implements PhaseHandler {
       ? (((techConstraintsRecord.content as Record<string, unknown>).technicalConstraints) as TechnicalConstraint[] ?? [])
       : [];
 
-    // Resume guard — skip seeding when depth-0 nodes already exist.
-    const existingDataModelRoots = engine.writer.getRecordsByType(workflowRun.id, 'data_model_decomposition_node')
+    // Resume guard — skip seeding when depth-0 nodes already exist. OWNERSHIP-AWARE
+    // (P5.1b): roots that predate the ownership reconciliation (no `ownership_role`
+    // on their entity) are a STALE generation — ignore them so seeding regenerates
+    // the owned/referenced split. A prior 5.1b run's roots ARE tagged → reuse them.
+    const allExistingDataModelRoots = engine.writer.getRecordsByType(workflowRun.id, 'data_model_decomposition_node')
       .filter(r => (r.content as unknown as DataModelDecompositionNodeContent).depth === 0);
+    const existingDataModelRoots = allExistingDataModelRoots.filter(r =>
+      (r.content as unknown as DataModelDecompositionNodeContent).entity?.ownership_role !== undefined);
+    if (allExistingDataModelRoots.length > 0 && existingDataModelRoots.length === 0) {
+      getLogger().info('workflow', 'Phase 5.1a: existing depth-0 roots predate ownership reconciliation — re-seeding owned/referenced split', {
+        staleRoots: allExistingDataModelRoots.length,
+      });
+    }
     let rootEntities: DecompositionEntity[];
     let rootDataModelRecordIds: string[];
     let rootDataModelLogicalIds: string[];
     if (existingDataModelRoots.length > 0) {
-      getLogger().info('workflow', 'Phase 5.1a RESUME: depth-0 entity nodes already present', {
-        existingRoots: existingDataModelRoots.length,
+      // Only OWNED roots (status 'pending') re-enter the loop; referenced /
+      // value-object roots are terminal ('pruned') and the loop skips them anyway.
+      const ownedExisting = existingDataModelRoots.filter(r =>
+        (r.content as unknown as DataModelDecompositionNodeContent).status === 'pending');
+      getLogger().info('workflow', 'Phase 5.1a RESUME: reconciled depth-0 entity nodes already present', {
+        existingRoots: existingDataModelRoots.length, ownedRoots: ownedExisting.length,
       });
-      rootEntities = existingDataModelRoots.map(r => (r.content as unknown as DataModelDecompositionNodeContent).entity);
-      rootDataModelRecordIds = existingDataModelRoots.map(r => r.id);
-      rootDataModelLogicalIds = existingDataModelRoots.map(r => (r.content as unknown as DataModelDecompositionNodeContent).node_id);
+      rootEntities = ownedExisting.map(r => (r.content as unknown as DataModelDecompositionNodeContent).entity);
+      rootDataModelRecordIds = ownedExisting.map(r => r.id);
+      rootDataModelLogicalIds = ownedExisting.map(r => (r.content as unknown as DataModelDecompositionNodeContent).node_id);
     } else {
-      // Convert Phase 5.1's data_models entries into per-entity roots.
-      // Each `models[].entities[]` element becomes one depth-0 root.
+      // Convert Phase 5.1's data_models entries into per-entity roots, split by the
+      // 5.1b ownership verdict: OWNED aggregates seed 'pending' (deep-decomposed);
+      // referenced / shared-value-object copies seed TERMINAL 'pruned' — recorded for
+      // the packet/DMR contract but NEVER enqueued (saturation gates on 'pending').
       const constraintIds = technicalConstraints.map(t => t.id);
-      rootEntities = dataModelsContent.models.flatMap(m =>
-        m.entities.map(e => ({
-          // Use the producer-minted stable id (Pillar A) so the saturation
-          // tree references the same DM-* id as the skeleton + packets.
-          id: e.id ?? e.name,
-          name: e.name,
-          kind: 'aggregate' as const,
-          component_id: m.component_id,
-          fields: e.fields.map(f => ({
-            name: f.name,
-            type: f.type,
-            constraints: f.constraints,
-          })),
-          relationships: (e.relationships ?? []).map(rel => ({
-            target_entity_id: rel,
-            kind: 'references' as const,
-          })),
-          active_constraints: constraintIds,
-        })),
-      );
+      rootEntities = [];
       rootDataModelRecordIds = [];
       rootDataModelLogicalIds = [];
-      for (const entity of rootEntities) {
+      const seedRoot = (entity: DecompositionEntity, status: 'pending' | 'pruned', pruningReason?: string): { recId: string; nodeId: string } => {
         const logicalNodeId = randomUUID();
         const rec = engine.writer.writeRecord({
           record_type: 'data_model_decomposition_node',
@@ -402,16 +454,45 @@ export class Phase5Handler implements PhaseHandler {
             root_entity_id: logicalNodeId,
             depth: 0,
             pass_number: 0,
-            status: 'pending',
+            status,
+            tier: status === 'pruned' ? 'D' : undefined,
             entity,
             surfaced_assumption_ids: [],
+            pruning_reason: pruningReason,
             release_id: null,
             release_ordinal: null,
           } satisfies DataModelDecompositionNodeContent,
         });
-        rootDataModelRecordIds.push(rec.id);
-        rootDataModelLogicalIds.push(logicalNodeId);
         artifactIds.push(rec.id);
+        return { recId: rec.id, nodeId: logicalNodeId };
+      };
+      for (const m of dataModelsContent.models) {
+        for (const e of m.entities) {
+          const role = (e as { ownership_role?: EntityOwnershipRole }).ownership_role;
+          const isValueObject = role === 'shared_value_object';
+          const isReferenced = role === 'referenced';
+          const entity: DecompositionEntity = {
+            // Producer-minted stable id (Pillar A) so the tree references the same DM-* id.
+            id: e.id ?? e.name,
+            name: e.name,
+            kind: isValueObject ? 'value_type' : 'aggregate',
+            component_id: m.component_id,
+            fields: e.fields.map(f => ({ name: f.name, type: f.type, constraints: f.constraints })),
+            relationships: (e.relationships ?? []).map(rel => ({ target_entity_id: rel, kind: 'references' as const })),
+            active_constraints: constraintIds,
+            ownership_role: role,
+            owner_entity_id: (e as { owner_entity_id?: string }).owner_entity_id,
+            owner_component_id: (e as { owner_component_id?: string }).owner_component_id,
+          };
+          if (isReferenced || isValueObject) {
+            seedRoot(entity, 'pruned', isReferenced ? 'foreign_context_reference' : 'shared_value_object');
+          } else {
+            rootEntities.push(entity);
+            const { recId, nodeId } = seedRoot(entity, 'pending');
+            rootDataModelRecordIds.push(recId);
+            rootDataModelLogicalIds.push(nodeId);
+          }
+        }
       }
     }
 

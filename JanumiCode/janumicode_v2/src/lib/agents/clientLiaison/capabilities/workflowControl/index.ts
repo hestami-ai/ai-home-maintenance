@@ -4,6 +4,7 @@
 
 import type { Capability, CapabilityContext } from '../index';
 import type { PhaseId, WorkflowRun } from '../../../../types/records';
+import { AuthorityLevel } from '../../../../types/records';
 import { endRun as aoddEndRun } from '../../../../aodd';
 
 interface StartWorkflowParams {
@@ -200,9 +201,132 @@ export const cancelWorkflow: Capability<CancelParams, { runId: string; status: s
   formatResponse: (r) => `Workflow ${r.runId} cancelled.`,
 };
 
+interface RegenerateCollectionParams {
+  /** e.g. 'user_journeys', 'requirements', 'components'. */
+  collectionKind: string;
+  /** Free-text guidance, e.g. "generate more journeys for the admin persona". */
+  guidance: string;
+  /** Optional phase id of the collection (defaults to the current phase). */
+  phaseId?: string;
+  confirmed?: boolean;
+}
+
+interface RegenerateCollectionResult {
+  requestId: string;
+  mode: 'rebloom_pending_gate' | 'recorded_pending_revision';
+  decisionId?: string;
+  collectionKind: string;
+}
+
+/**
+ * REGENERATE mode ("generate more") — ask the workflow to produce ADDITIONAL
+ * items for a collection (e.g. the user-journey bloom under-generated), never
+ * a direct artifact edit. DESTRUCTIVE-ish (re-runs a bloom) → confirmation
+ * required. Routing:
+ *
+ *   Case A — a bloom gate is OPEN for this run: resolve it with the guidance
+ *     as `free_text_feedback`, which wakes the existing
+ *     `runBloomRoundWithFeedbackLoop` (it re-runs the proposer with the
+ *     guidance). This reuses proven machinery and is the low-risk path.
+ *
+ *   Case B — the collection is PAST its gate: the governed request record is
+ *     recorded and surfaced; the scoped re-bloom of a CERTIFIED collection
+ *     (delta-only re-certification that preserves the accepted core, plus the
+ *     scope-gatekeeper human-authored exclusion) is deferred to work that must
+ *     be validated on a live cal run before it mutates a certified gate.
+ *
+ * A `collection_regeneration_requested` record is always written so the ask
+ * is governed and auditable regardless of which path runs.
+ */
+export const regenerateCollection: Capability<RegenerateCollectionParams, RegenerateCollectionResult> = {
+  name: 'regenerateCollection',
+  category: 'workflow_control',
+  tier: 'govern',
+  description:
+    'Ask the workflow to GENERATE MORE items for a collection (e.g. "generate more user journeys"), preserving items already accepted. Re-runs a bloom — the framework asks the user to confirm first; re-invoke with `confirmed: true` once they agree.',
+  parameters: {
+    type: 'object',
+    properties: {
+      collectionKind: {
+        type: 'string',
+        description: 'The collection to expand, e.g. user_journeys, requirements, components.',
+      },
+      guidance: {
+        type: 'string',
+        description: 'What more to generate, e.g. "more journeys for the admin and auditor personas".',
+      },
+      phaseId: { type: 'string', description: 'Optional phase id of the collection.' },
+      confirmed: {
+        type: 'boolean',
+        description: 'Must be true on the second invocation, after the user has agreed.',
+      },
+    },
+    required: ['collectionKind', 'guidance'],
+  },
+  preconditions: (ctx) => (ctx.activeRun ? true : 'No active workflow run.'),
+  confirmation: {
+    prompt: (params) =>
+      `This will re-run the ${params.collectionKind} bloom with your guidance ("${params.guidance}") to generate additional items, preserving what is already accepted. Confirm?`,
+  },
+  execute: async (params, ctx) => {
+    const engine = ctx.orchestrator;
+    const runId = ctx.activeRun!.id;
+
+    // 1. Always write the governed, auditable request record.
+    const request = engine.writer.writeRecord({
+      record_type: 'collection_regeneration_requested',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      phase_id: params.phaseId ?? ctx.currentPhase ?? null,
+      produced_by_agent_role: 'human_author',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      authority_level: AuthorityLevel.HumanEdited,
+      content: {
+        kind: 'collection_regeneration_requested',
+        collection_kind: params.collectionKind,
+        guidance: params.guidance,
+        preserve_accepted: true,
+        provenance: 'human_authored',
+      },
+    });
+
+    // 2. Case A — an open bloom gate: resolve it with the guidance as
+    //    free_text_feedback, waking runBloomRoundWithFeedbackLoop.
+    const pendingBundles = engine
+      .pendingDecisionSurfaces(runId)
+      .filter((p) => p.surfaceType === 'decision_bundle');
+    for (const p of pendingBundles) {
+      const woke = engine.resolveDecision(p.decisionId, {
+        type: 'decision_bundle_resolution',
+        payload: { free_text_feedback: params.guidance },
+      });
+      if (woke) {
+        return {
+          requestId: request.id,
+          mode: 'rebloom_pending_gate',
+          decisionId: p.decisionId,
+          collectionKind: params.collectionKind,
+        };
+      }
+    }
+
+    // 3. Case B — no open gate: the request stands for the next revision.
+    return {
+      requestId: request.id,
+      mode: 'recorded_pending_revision',
+      collectionKind: params.collectionKind,
+    };
+  },
+  formatResponse: (r) =>
+    r.mode === 'rebloom_pending_gate'
+      ? `Re-running the ${r.collectionKind} bloom now with your guidance to generate additional items [ref:${r.requestId}].`
+      : `Recorded your request to generate more ${r.collectionKind} [ref:${r.requestId}]. It will be applied when this collection is next revised at its gate.`,
+};
+
 export const workflowControlCapabilities = [
   startWorkflow,
   pauseWorkflow,
   resumeWorkflow,
   cancelWorkflow,
+  regenerateCollection,
 ];

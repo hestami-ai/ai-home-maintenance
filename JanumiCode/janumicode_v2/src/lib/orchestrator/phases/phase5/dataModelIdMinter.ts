@@ -14,7 +14,10 @@
  * so minting is fully deterministic and idempotent — safe to re-run on resume.
  */
 
-function slug(raw: string): string {
+/** Natural-key slug used by the DM- / API- id scheme. Exported so P5.1b's
+ *  entity_ownership_reconciliation groups cross-component copies of a concept on
+ *  the SAME key the producer already mints ids from (structural, not id-resolution). */
+export function slug(raw: string): string {
   return (raw ?? '')
     .toString()
     .trim()

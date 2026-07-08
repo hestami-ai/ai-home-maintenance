@@ -19,9 +19,10 @@
 
   interface Props {
     record: SerializedRecord;
+    vscode?: { postMessage(message: unknown): void };
   }
 
-  const { record }: Props = $props();
+  const { record, vscode }: Props = $props();
 
   interface PassEntry {
     pass_number: number;
@@ -144,7 +145,7 @@
         <section class="roots-section">
           <div class="section-label">Decomposition trees ({rootNodes.length} root{rootNodes.length === 1 ? '' : 's'})</div>
           {#each rootNodes as rn (rn.id)}
-            <DecompositionNodeCard record={rn} />
+            <DecompositionNodeCard record={rn} {vscode} />
           {/each}
         </section>
       {/if}

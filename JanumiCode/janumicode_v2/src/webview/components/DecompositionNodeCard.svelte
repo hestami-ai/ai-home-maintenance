@@ -12,12 +12,14 @@
 <script lang="ts">
   import type { SerializedRecord } from '../stores/records.svelte';
   import { recordsStore } from '../stores/records.svelte';
+  import CardSubChat from './CardSubChat.svelte';
 
   interface Props {
     record: SerializedRecord;
+    vscode?: { postMessage(message: unknown): void };
   }
 
-  const { record }: Props = $props();
+  const { record, vscode }: Props = $props();
 
   interface NodeContent {
     /** Logical UUID — stable across revisions, used only for tree joins. */
@@ -168,6 +170,11 @@
         </details>
       {/if}
 
+      <!-- Per-line-item sub-chat: ask about or give feedback on THIS story. -->
+      {#if vscode}
+        <CardSubChat recordId={record.id} anchorKind="requirement_node" {vscode} />
+      {/if}
+
       {#if uniqueChildNodeIds.length > 0}
         <div class="children">
           <div class="children-label">Children ({uniqueChildNodeIds.length})</div>
@@ -178,7 +185,7 @@
                    doesn't produce a bundleable function name; the
                    bundle-integrity test flags it. Retaining svelte:self
                    until an upstream fix lands. -->
-              <svelte:self record={childRec} />
+              <svelte:self record={childRec} {vscode} />
             {/if}
           {/each}
         </div>

@@ -1660,6 +1660,21 @@ export class OrchestratorEngine {
   }
 
   /**
+   * Surface ids of the decisions currently AWAITING a human decision for a
+   * run. Lets the Client Liaison resolve an open bloom gate programmatically
+   * — e.g. a "generate more" regeneration that injects free-text feedback
+   * into the bloom loop (`runBloomRoundWithFeedbackLoop`). Returns [] when
+   * nothing is pending (the collection is past its gate).
+   */
+  pendingDecisionSurfaces(runId: string): Array<{ decisionId: string; surfaceType: DecisionSurfaceType }> {
+    const out: Array<{ decisionId: string; surfaceType: DecisionSurfaceType }> = [];
+    for (const p of this.pendingDecisions.values()) {
+      if (p.runId === runId) out.push({ decisionId: p.decisionId, surfaceType: p.surfaceType });
+    }
+    return out;
+  }
+
+  /**
    * On webview reload, in-memory pending decisions are lost. The provider
    * scans for unresolved surface records and re-creates pending entries
    * so the user's next click can drive the phase handler forward.

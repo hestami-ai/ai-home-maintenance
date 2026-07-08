@@ -119,6 +119,17 @@ export class RecordsStore {
     this.stickToBottom = v;
   }
 
+  /**
+   * A record belonging to a card sub-thread (its `content.thread_id` is
+   * `card:<recordId>`). Such turn records are suppressed from the top-level
+   * stream and rendered inside the anchored card's CardSubChat instead —
+   * mirroring the existing agent-child / dmr-detail suppression pattern.
+   */
+  isCardThread(record: SerializedRecord): boolean {
+    const t = (record.content as { thread_id?: unknown }).thread_id;
+    return typeof t === 'string' && t.startsWith('card:');
+  }
+
   /** Oldest record currently in the window — the keyset cursor for load-older. */
   get oldest(): SerializedRecord | undefined {
     return this.records[0];

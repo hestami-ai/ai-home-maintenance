@@ -1,0 +1,20 @@
+# Test command: python -m pytest --tb=short
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "core-engine"
+version = "0.1.0"
+description = "Core engine Python-native scaffold for hestami-ai (calibration workspace cal-41 area core)."
+requires-python = ">=3.12"
+dependencies = []
+classifiers = [
+    "Framework :: Pydantic :: 2",
+    "Programming Language :: Python :: 3",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

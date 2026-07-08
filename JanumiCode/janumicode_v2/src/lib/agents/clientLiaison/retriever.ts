@@ -24,6 +24,7 @@ import type { OrchestratorEngine } from '../../orchestrator/orchestratorEngine';
 import type { ContextPacket, RetrievalBrief, ScopeTier } from '../deepMemoryResearch';
 import type { ClientLiaisonDB } from './db';
 import type { OpenQuery, Reference, RetrievalResult, QueryType } from './types';
+import { resolveAnchorSeed } from './focusResolver';
 import { getLogger } from '../../logging';
 
 /** Query types that benefit from DMR's structured research. */
@@ -64,7 +65,12 @@ export class Retriever {
     // option the user clicked. The inline item_id stays in the raw
     // prompt text for the synthesizer to interpret.
     const bundleRecordIds = extractBundleRecordIds(query.text);
-    const allReferencedIds = [...new Set([...referencedIds, ...bundleRecordIds])];
+    // Card ASK: seed the anchored item's record so DMR's neighborhood
+    // expansion biases toward the item the sub-chat is scoped to.
+    const anchorSeedIds = resolveAnchorSeed(query.anchor, this.db, query.workflowRunId);
+    const allReferencedIds = [
+      ...new Set([...referencedIds, ...bundleRecordIds, ...anchorSeedIds]),
+    ];
     const referencedRecords =
       allReferencedIds.length > 0 ? this.db.getRecordsByIds(allReferencedIds) : [];
 

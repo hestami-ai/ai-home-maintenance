@@ -83,7 +83,7 @@ export interface ClientLiaisonDB {
    * Pairs are oldest-first in the returned array. Unpaired queries
    * (still in flight) are omitted.
    */
-  getRecentConversationTurns(runId: string, limit?: number): ConversationTurn[];
+  getRecentConversationTurns(runId: string, limit?: number, threadId?: string): ConversationTurn[];
 }
 
 export interface ConversationTurn {
@@ -211,20 +211,23 @@ export class ClientLiaisonDBImpl implements ClientLiaisonDB {
     return rows.map(r => this.rowToRecord(r));
   }
 
-  getRecentConversationTurns(runId: string, limit = 5): ConversationTurn[] {
+  getRecentConversationTurns(runId: string, limit = 5, threadId?: string): ConversationTurn[] {
     // Pair each client_liaison_response with the raw_intent_received /
     // open_query_received record it derived from. Ordered oldest-first so
-    // the prompt reads chronologically.
+    // the prompt reads chronologically. When a threadId is given, scope to
+    // that conversation thread (a card sub-chat sees only its own turns).
+    const threadFilter = threadId ? `AND json_extract(content, '$.thread_id') = ?` : '';
     const responseRows = this.db
       .prepare(
         `SELECT * FROM governed_stream
           WHERE workflow_run_id = ?
             AND record_type = 'client_liaison_response'
             AND is_current_version = 1
+            ${threadFilter}
           ORDER BY produced_at DESC
           LIMIT ?`,
       )
-      .all(runId, limit) as Record<string, unknown>[];
+      .all(...(threadId ? [runId, threadId, limit] : [runId, limit])) as Record<string, unknown>[];
 
     const turns: ConversationTurn[] = [];
     for (const row of responseRows) {

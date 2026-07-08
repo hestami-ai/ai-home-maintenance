@@ -53,7 +53,7 @@ import { getLogger } from '../logging';
 
 // ── Public Type Re-exports ──────────────────────────────────────────
 
-export type { QueryType, OpenQuery, QueryClassification, LiaisonResponse, UserInput, Reference } from './clientLiaison/types';
+export type { QueryType, OpenQuery, QueryClassification, LiaisonResponse, UserInput, Reference, LiaisonAnchor } from './clientLiaison/types';
 export type { ClientLiaisonDB } from './clientLiaison/db';
 export type { CapabilityContext } from './clientLiaison/capabilities/index';
 
@@ -161,6 +161,18 @@ export class ClientLiaisonAgent {
     const writer = this.engine.writer;
     const versionSha = this.engine.janumiCodeVersionSha;
 
+    // Conversation thread + optional item anchor. The root chat is "main";
+    // a card sub-chat is its own thread anchored to one item. These are
+    // stamped onto every turn record (content-only — no DDL) so the webview
+    // can render a card's sub-thread separately and history stays scoped.
+    const threadId = input.threadId ?? 'main';
+    const anchorContent: Record<string, unknown> = input.anchor
+      ? {
+          anchor_item_id: input.anchor.itemId ?? input.anchor.recordId,
+          anchor_kind: input.anchor.kind,
+        }
+      : {};
+
     // 1. Write the user input record up front when we already have an active
     //    workflow run (open_query mode). For raw_intent mode the run doesn't
     //    exist yet — writing a record now would violate the workflow_run_id
@@ -180,6 +192,8 @@ export class ClientLiaisonAgent {
           text: input.text,
           attachments: input.attachments,
           references: input.references,
+          thread_id: threadId,
+          ...anchorContent,
         },
       });
     }
@@ -195,6 +209,7 @@ export class ClientLiaisonAgent {
       workflowRunId: ctx.activeRun?.id ?? '',
       currentPhaseId: ctx.currentPhase ?? '0',
       references: input.references,
+      anchor: input.anchor,
     };
 
     // 3. Classify (or honor forceCapability hint).
@@ -229,6 +244,7 @@ export class ClientLiaisonAgent {
           confidence: classification.confidence,
           should_queue: classification.shouldQueue,
           suggested_capability: classification.suggestedCapability,
+          thread_id: threadId,
         },
       });
     }
@@ -244,7 +260,7 @@ export class ClientLiaisonAgent {
     //    meaningful when there is an active run; for raw_intent mode this
     //    returns empty because the run hasn't started yet.
     const conversationHistory = ctx.activeRun
-      ? this.cdb.getRecentConversationTurns(ctx.activeRun.id, 5)
+      ? this.cdb.getRecentConversationTurns(ctx.activeRun.id, 5, threadId)
       : [];
 
     // 6. Either short-circuit to a forced capability OR run the synthesizer.
@@ -312,6 +328,8 @@ export class ClientLiaisonAgent {
             name: c.name,
             error: c.error,
           })),
+          thread_id: threadId,
+          ...anchorContent,
         },
       });
     }
@@ -527,6 +545,8 @@ export function makeUserInput(opts: {
   workflowRunId: string | null;
   currentPhaseId: import('../types/records').PhaseId | null;
   forceCapability?: string;
+  threadId?: string;
+  anchor?: import('./clientLiaison/types').LiaisonAnchor;
 }): UserInput {
   return {
     id: randomUUID(),
@@ -542,6 +562,8 @@ export function makeUserInput(opts: {
     workflowRunId: opts.workflowRunId,
     currentPhaseId: opts.currentPhaseId,
     forceCapability: opts.forceCapability,
+    threadId: opts.threadId,
+    anchor: opts.anchor,
   };
 }
 
