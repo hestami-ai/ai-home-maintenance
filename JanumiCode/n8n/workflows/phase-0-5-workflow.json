@@ -1,0 +1,200 @@
+{
+  "id": "phase-0-5-workflow-001",
+  "name": "Phase 0.5 - Cross-Run Impact Analysis",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "override-check",
+              "leftValue": "={{ $json.prior_decision_override }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-1",
+      "name": "Check Prior Decision Override",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "cross_run_impact_report",
+        "content": "={\n  \"changed_interface_id\": \"{{ $json.prior_decision_override }}\",\n  \"affected_artifact_ids\": [],\n  \"affected_file_paths\": [],\n  \"estimated_refactoring_task_count\": 5,\n  \"estimated_file_count\": 3,\n  \"dependency_chain\": [],\n  \"modification_type\": \"non_breaking\"\n}",
+        "authorityLevel": 5,
+        "phaseId": "0.5",
+        "subPhaseId": "impact_enumeration"
+      },
+      "id": "governed-stream-1",
+      "name": "Write Impact Enumeration",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cascade-check",
+              "leftValue": "={{ $json.estimated_refactoring_task_count }}",
+              "rightValue": 100,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "id": "if-2",
+      "name": "Cascade Threshold Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "content": "Cascade threshold exceeded. Estimated refactoring tasks: {{ $json.estimated_refactoring_task_count }}, Estimated files: {{ $json.estimated_file_count }}. Options: Proceed, Revise the override, Accept divergence",
+        "options": {}
+      },
+      "id": "chat-1",
+      "name": "Refactoring Decision",
+      "type": "n8n-nodes-base.chat",
+      "typeVersion": 1,
+      "position": [1050, 100]
+    },
+    {
+      "parameters": {
+        "phaseId": "0.5",
+        "artifactIds": "={{ $json.recordId }}",
+        "schemaValid": true,
+        "invariantsPassed": true,
+        "reasoningReviewPassed": true,
+        "consistencyPassed": true,
+        "domainAttested": true,
+        "verificationEnsemblePassed": true,
+        "humanApproved": false
+      },
+      "id": "phase-gate-evaluator-1",
+      "name": "Phase 0.5 Gate",
+      "type": "n8n-nodes-base.phaseGateEvaluator",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "content": "Phase 0.5 complete. Please approve to proceed to Phase 2.",
+        "options": {}
+      },
+      "id": "chat-2",
+      "name": "Human Approval Gate",
+      "type": "n8n-nodes-base.chat",
+      "typeVersion": 1,
+      "position": [1450, 200]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Check Prior Decision Override",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Prior Decision Override": {
+      "main": [
+        [
+          {
+            "node": "Write Impact Enumeration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Impact Enumeration": {
+      "main": [
+        [
+          {
+            "node": "Cascade Threshold Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cascade Threshold Check": {
+      "main": [
+        [
+          {
+            "node": "Refactoring Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refactoring Decision": {
+      "main": [
+        [
+          {
+            "node": "Phase 0.5 Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 0.5 Gate": {
+      "main": [
+        [
+          {
+            "node": "Human Approval Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}

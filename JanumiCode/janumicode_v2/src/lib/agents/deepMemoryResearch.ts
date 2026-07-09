@@ -1068,13 +1068,20 @@ export class DeepMemoryResearchAgent {
       const unwrapped = (parsed.context_packet ?? parsed.packet ?? parsed) as Record<string, unknown>;
 
       // Enrich base packet with LLM narrative and open questions.
+      // Coerce LLM-supplied unknown fields to strings; JSON-encode any object
+      // value so it surfaces real content instead of "[object Object]".
+      const asField = (v: unknown, fallback: string): string => {
+        if (typeof v === 'string') return v;
+        if (v == null) return fallback;
+        return JSON.stringify(v);
+      };
       const openQuestionsRaw = unwrapped.open_questions;
       const openQuestions: OpenQuestion[] = Array.isArray(openQuestionsRaw)
         ? (openQuestionsRaw as Array<Record<string, unknown>>).map(oq => ({
-            question: String(oq.question ?? ''),
-            firstRaised: String(oq.first_raised ?? new Date().toISOString()),
+            question: asField(oq.question, ''),
+            firstRaised: asField(oq.first_raised, new Date().toISOString()),
             stillUnresolved: oq.still_unresolved !== false,
-            sourceRecordId: String(oq.source_record_id ?? ''),
+            sourceRecordId: asField(oq.source_record_id, ''),
           }))
         : [];
 
@@ -1152,7 +1159,7 @@ export class DeepMemoryResearchAgent {
     // they degraded into ordinary word tokens (lost retrieval signal). Matching
     // is gated on a known id PREFIX so genuine compound words ("single-tenant",
     // "delete-by-key") are NOT misread as identifiers. `.` allowed for dotted ids.
-    const prefixedIdRe = /\b(?:comp|task|leaf|node|us|ac|fr|nfr|dom|uj|wf|ent|int|ic|sr|dm|cc|api|tech|con|qa|rel)-[A-Za-z0-9][A-Za-z0-9.-]*\b/gi;
+    const prefixedIdRe = /\b(?:comp|task|leaf|node|us|ac|fr|nfr|dom|uj|wf|ent|int|ic|sr|dm|cc|api|tech|con|qa|rel)-[a-z0-9][a-z0-9.-]*\b/gi;
     const idTokens = [
       ...[...query.matchAll(upperIdRe)].map(m => m[0]),
       ...[...query.matchAll(prefixedIdRe)].map(m => m[0]),

@@ -1,0 +1,29 @@
+[
+  {
+    "invariant_id": "CM-001",
+    "artifact_type": "component_model",
+    "description": "No Component Responsibility statement contains conjunctions connecting distinct concerns",
+    "check_type": "forbidden_pattern",
+    "specification": {
+      "field_path": "components[*].responsibilities[*].statement",
+      "pattern": "\\b(and|or)\\b",
+      "forbidden": true,
+      "message": "Component Responsibility statement contains a conjunction — split into separate responsibilities"
+    },
+    "severity": "blocking",
+    "phase_applies_to": ["4"]
+  },
+  {
+    "invariant_id": "CM-002",
+    "artifact_type": "component_model",
+    "description": "Every Component has at least one Responsibility",
+    "check_type": "count_minimum",
+    "specification": {
+      "field_path": "components[*].responsibilities[*]",
+      "minimum": 1,
+      "message": "Component must have at least one Responsibility"
+    },
+    "severity": "blocking",
+    "phase_applies_to": ["4"]
+  }
+]

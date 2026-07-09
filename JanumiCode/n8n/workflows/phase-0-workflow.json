@@ -1,0 +1,230 @@
+{
+  "id": "phase-0-workflow-001",
+  "name": "Phase 0 - Workspace Initialization",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "chat-trigger-1",
+      "name": "Chat Trigger",
+      "type": "n8n-nodes-base.chatTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "workflow-run-id",
+              "name": "workflowRunId",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "current-phase",
+              "name": "currentPhase",
+              "value": "0",
+              "type": "string"
+            },
+            {
+              "id": "janumicode-sha",
+              "name": "janumicodeVersionSha",
+              "value": "poc-sha-placeholder",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-1",
+      "name": "Initialize Workflow Run",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "workspace_classification",
+        "content": "={\n  \"workspace_type\": \"greenfield\",\n  \"janumicode_version_sha\": \"poc-sha-placeholder\"\n}",
+        "authorityLevel": 5,
+        "phaseId": "0",
+        "subPhaseId": "workspace_classification"
+      },
+      "id": "governed-stream-1",
+      "name": "Write Workspace Classification",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "brownfield-check",
+              "leftValue": "={{ $json.workspace_type }}",
+              "rightValue": "brownfield",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-1",
+      "name": "Check Brownfield",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "collision_risk_report",
+        "content": "={\n  \"collision_risk\": \"none\",\n  \"aliases_confirmed\": true\n}",
+        "authorityLevel": 5,
+        "phaseId": "0",
+        "subPhaseId": "vocabulary_collision_check"
+      },
+      "id": "governed-stream-2",
+      "name": "Write Vocabulary Collision Check",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "artifactType": "workspace_classification",
+        "artifactContent": "={{ $json.content }}",
+        "phaseId": "0"
+      },
+      "id": "invariant-checker-1",
+      "name": "Validate Workspace Classification",
+      "type": "n8n-nodes-base.invariantChecker",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "phaseId": "0",
+        "artifactIds": "={{ $json.recordId }}",
+        "schemaValid": true,
+        "invariantsPassed": true,
+        "reasoningReviewPassed": true,
+        "consistencyPassed": true,
+        "domainAttested": true,
+        "verificationEnsemblePassed": true,
+        "humanApproved": false
+      },
+      "id": "phase-gate-evaluator-1",
+      "name": "Phase 0 Gate",
+      "type": "n8n-nodes-base.phaseGateEvaluator",
+      "typeVersion": 1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "content": "Phase 0 complete. Please review and approve to proceed to Phase 1.",
+        "options": {}
+      },
+      "id": "chat-1",
+      "name": "Human Approval Gate",
+      "type": "n8n-nodes-base.chat",
+      "typeVersion": 1,
+      "position": [1650, 200]
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Initialize Workflow Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Workflow Run": {
+      "main": [
+        [
+          {
+            "node": "Write Workspace Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Workspace Classification": {
+      "main": [
+        [
+          {
+            "node": "Check Brownfield",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Brownfield": {
+      "main": [
+        [
+          {
+            "node": "Write Vocabulary Collision Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Vocabulary Collision Check": {
+      "main": [
+        [
+          {
+            "node": "Validate Workspace Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Workspace Classification": {
+      "main": [
+        [
+          {
+            "node": "Phase 0 Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 0 Gate": {
+      "main": [
+        [
+          {
+            "node": "Human Approval Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}

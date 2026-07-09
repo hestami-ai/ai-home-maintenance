@@ -76,7 +76,7 @@ export const MAX_RESPONDER_REPLY_CHARS = 1200;
  */
 export function sanitizeResponderReply(raw: string | null, completionMarker?: string): string | null {
   if (!raw) return null;
-  let text = raw.replace(/\s*\r?\n\s*/g, ' ').trim();
+  let text = raw.replace(/\s+/g, (run) => (run.includes('\n') ? ' ' : run)).trim();
   if (completionMarker) {
     text = text.split(completionMarker).join(' ').replace(/\s{2,}/g, ' ').trim();
   }

@@ -24,7 +24,7 @@ export function slug(raw: string): string {
     .toLowerCase()
     .replace(/^(comp|component|cmp)[-_]/, '')
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'x';
+    .replace(/^-|-$/g, '') || 'x';
 }
 
 /** Stable id for a data-model entity. Natural key: component_id + entity name. */

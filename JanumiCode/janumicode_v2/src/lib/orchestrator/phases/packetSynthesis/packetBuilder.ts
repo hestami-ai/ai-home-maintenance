@@ -168,7 +168,8 @@ export function coerceOutcomeString(raw: unknown): string {
     return raw.filter((x): x is string => typeof x === 'string').map((x) => x.trim()).filter(Boolean).join('; ');
   }
   if (raw == null) return '';
-  return String(raw).trim();
+  if (typeof raw === 'object') return JSON.stringify(raw).trim();
+  return String(raw as string | number | boolean).trim();
 }
 
 export interface BuilderEvaluationCriterion {

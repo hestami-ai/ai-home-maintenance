@@ -323,6 +323,16 @@ export function extractDeclaredDependencies(
 
 // ── Code generation helpers ─────────────────────────────────────────
 
+/**
+ * Strip trailing '/' characters in linear time. Replaces the ReDoS-prone
+ * `.replace(/\/+$/, '')` (S8786); 47 is the char code for '/'.
+ */
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.codePointAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 function pascalCase(raw: string): string {
   const parts = raw.replace(/[^A-Za-z0-9]+/g, ' ').trim().split(/\s+/);
   if (parts.length === 0) return 'Unnamed';
@@ -330,7 +340,7 @@ function pascalCase(raw: string): string {
 }
 
 function slugify(raw: string): string {
-  return raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'app';
+  return raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'app';
 }
 
 /** Map an LLM-emitted free-form type to a permissive TS type (general). */
@@ -455,7 +465,7 @@ function toPyType(raw: string | undefined): string {
 
 /** snake_case a free-form id for a Python module/constant name. */
 function pySnake(raw: string): string {
-  return raw.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
+  return raw.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toUpperCase();
 }
 
 function renderPyEntity(entity: DataModelEntity, componentId: string): string {
@@ -613,7 +623,7 @@ function materializePythonScaffold(
   runtimeDeps: Record<string, string>,
   result: MaterializeResult,
 ): void {
-  const shared = profile.shared_dir.replaceAll('\\', '/').replace(/\/+$/, '');
+  const shared = stripTrailingSlashes(profile.shared_dir.replaceAll('\\', '/'));
   const srcRoot = shared.split('/')[0] || 'src';
 
   writeIfAbsent(workspacePath, 'pyproject.toml', renderPyproject(projectName, profile, runtimeDeps), result);
@@ -676,7 +686,7 @@ export function materializeScaffold(
   }
 
   const e = ext(profile);
-  const shared = profile.shared_dir.replaceAll('\\', '/').replace(/\/+$/, '');
+  const shared = stripTrailingSlashes(profile.shared_dir.replaceAll('\\', '/'));
 
   // Root project config. (Brownfield package.json wins — skip-if-exists —
   // so declared deps only land on greenfield scaffolds.)
@@ -722,6 +732,21 @@ export function materializeScaffold(
 // ── Dependency install ──────────────────────────────────────────────
 
 /**
+ * Resolve npm's JS CLI entry (`npm-cli.js`) so it can be run with the current
+ * node binary and shell:false — avoids resolving a bare `npm` off PATH through
+ * a shell (S4036). Prefers `npm_execpath` (set when this process was launched
+ * by npm), then the npm bundled alongside the node binary. Returns null when
+ * neither exists, so the caller can skip the (non-fatal) install.
+ */
+function resolveNpmCli(): string | null {
+  const execPath = process.env.npm_execpath;
+  if (execPath && execPath.endsWith('.js') && fs.existsSync(execPath)) return execPath;
+  const bundled = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  if (fs.existsSync(bundled)) return bundled;
+  return null;
+}
+
+/**
  * Run `npm install` once at the workspace root so the declared test runner
  * resolves for per-leaf `npm test`. No-op when node_modules already exists.
  * Non-fatal: on failure the run continues (tests may fail, but execution is
@@ -734,11 +759,20 @@ function installDependencies(workspacePath: string, workflowRunId: string): void
     });
     return;
   }
+  // Resolve npm's JS CLI and run it with the current node binary (shell:false)
+  // instead of a bare `npm` off PATH through a shell (S4036). If it can't be
+  // located, skip the install — non-fatal, same posture as a failed run.
+  const npmCli = resolveNpmCli();
+  if (!npmCli) {
+    getLogger().warn('workflow', 'Phase 9.0a: npm CLI not found — skipping npm install (non-fatal)', {
+      workflow_run_id: workflowRunId,
+    });
+    return;
+  }
   const started = Date.now();
   try {
-    const res = spawnSync('npm', ['install', '--no-audit', '--no-fund'], {
+    const res = spawnSync(process.execPath, [npmCli, 'install', '--no-audit', '--no-fund'], {
       cwd: workspacePath,
-      shell: process.platform === 'win32',
       windowsHide: true,
       timeout: 300_000,
       encoding: 'utf-8',
@@ -854,7 +888,7 @@ export function runScaffoldSynthesis(ctx: PhaseContext, reconStack?: string): Sc
     installDependencies(workspacePath, workflowRun.id);
   }
 
-  const shared = profile.shared_dir.replaceAll('\\', '/').replace(/\/+$/, '');
+  const shared = stripTrailingSlashes(profile.shared_dir.replaceAll('\\', '/'));
   const canonicalFiles = [...materialize.created, ...materialize.preExisting];
   // Protected roots: the shared dir always; node config files only for node
   // (a python run protects pyproject.toml instead, not package.json/tsconfig).

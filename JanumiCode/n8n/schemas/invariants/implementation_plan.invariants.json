@@ -1,0 +1,27 @@
+[
+  {
+    "invariant_id": "IP-001",
+    "artifact_type": "implementation_plan",
+    "description": "Every Implementation Task has a non-empty completion_criteria",
+    "check_type": "count_minimum",
+    "specification": {
+      "field_path": "tasks[*].completion_criteria[*]",
+      "minimum": 1,
+      "message": "Implementation Task must have at least one completion criterion"
+    },
+    "severity": "blocking",
+    "phase_applies_to": ["6"]
+  },
+  {
+    "invariant_id": "IP-002",
+    "artifact_type": "implementation_plan",
+    "description": "Every Implementation Task has a component_responsibility field",
+    "check_type": "field_presence",
+    "specification": {
+      "field_path": "tasks[*].component_responsibility",
+      "message": "Implementation Task must have a component_responsibility (verbatim from component_model)"
+    },
+    "severity": "blocking",
+    "phase_applies_to": ["6"]
+  }
+]

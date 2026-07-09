@@ -1,0 +1,26 @@
+[
+  {
+    "invariant_id": "ADR-001",
+    "artifact_type": "architectural_decisions",
+    "description": "Every ADR has status, decision, and rationale fields populated",
+    "check_type": "field_presence",
+    "specification": {
+      "field_path": "adrs[*].decision",
+      "message": "ADR must have a decision field populated"
+    },
+    "severity": "blocking",
+    "phase_applies_to": ["4"]
+  },
+  {
+    "invariant_id": "ADR-002",
+    "artifact_type": "architectural_decisions",
+    "description": "Every ADR has a rationale",
+    "check_type": "field_presence",
+    "specification": {
+      "field_path": "adrs[*].rationale",
+      "message": "ADR must have a rationale field populated"
+    },
+    "severity": "blocking",
+    "phase_applies_to": ["4"]
+  }
+]

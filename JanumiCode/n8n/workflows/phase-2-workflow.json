@@ -1,0 +1,316 @@
+{
+  "id": "phase-2-workflow-001",
+  "name": "Phase 2 - Requirements Definition",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "phaseId": "2",
+        "subPhaseId": "requirements_decomposition",
+        "agentRole": "technical_expert",
+        "artifactRefs": "phase-1-product-description",
+        "governingConstraints": "{}",
+        "requiredOutput": "{}",
+        "summaryContext": "Product description from Phase 1"
+      },
+      "id": "context-builder-1",
+      "name": "Build Requirements Context",
+      "type": "n8n-nodes-base.contextBuilder",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $json.stdinText }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-1",
+      "name": "Requirements Decomposition",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "functional_requirements",
+        "content": "={{ $json.response }}",
+        "authorityLevel": 5,
+        "phaseId": "2",
+        "subPhaseId": "requirements_decomposition"
+      },
+      "id": "governed-stream-1",
+      "name": "Write Functional Requirements",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "Extract non-functional requirements from the product description"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-2",
+      "name": "Non-Functional Requirements",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "non_functional_requirements",
+        "content": "={{ $json.response }}",
+        "authorityLevel": 5,
+        "phaseId": "2",
+        "subPhaseId": "non_functional_requirements"
+      },
+      "id": "governed-stream-2",
+      "name": "Write Non-Functional Requirements",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "Prioritize and rank requirements by importance and dependencies"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-3",
+      "name": "Requirements Prioritization",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "requirements_prioritization",
+        "content": "={{ $json.response }}",
+        "authorityLevel": 5,
+        "phaseId": "2",
+        "subPhaseId": "requirements_prioritization"
+      },
+      "id": "governed-stream-3",
+      "name": "Write Requirements Prioritization",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "artifactType": "functional_requirements",
+        "artifactContent": "={{ $json.content }}",
+        "phaseId": "2"
+      },
+      "id": "invariant-checker-1",
+      "name": "Validate Functional Requirements",
+      "type": "n8n-nodes-base.invariantChecker",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "phaseId": "2",
+        "artifactIds": "phase-2-functional-requirements,phase-2-non-functional-requirements,phase-2-prioritization",
+        "schemaValid": true,
+        "invariantsPassed": true,
+        "reasoningReviewPassed": true,
+        "consistencyPassed": true,
+        "domainAttested": true,
+        "verificationEnsemblePassed": true,
+        "humanApproved": false
+      },
+      "id": "phase-gate-evaluator-1",
+      "name": "Phase 2 Gate",
+      "type": "n8n-nodes-base.phaseGateEvaluator",
+      "typeVersion": 1,
+      "position": [2050, 300]
+    },
+    {
+      "parameters": {
+        "content": "Phase 2 complete. Please review requirements and approve.",
+        "options": {}
+      },
+      "id": "chat-1",
+      "name": "Human Approval Gate",
+      "type": "n8n-nodes-base.chat",
+      "typeVersion": 1,
+      "position": [2250, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Requirements Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Requirements Context": {
+      "main": [
+        [
+          {
+            "node": "Requirements Decomposition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requirements Decomposition": {
+      "main": [
+        [
+          {
+            "node": "Write Functional Requirements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Functional Requirements": {
+      "main": [
+        [
+          {
+            "node": "Non-Functional Requirements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Non-Functional Requirements": {
+      "main": [
+        [
+          {
+            "node": "Write Non-Functional Requirements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Non-Functional Requirements": {
+      "main": [
+        [
+          {
+            "node": "Requirements Prioritization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requirements Prioritization": {
+      "main": [
+        [
+          {
+            "node": "Write Requirements Prioritization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Requirements Prioritization": {
+      "main": [
+        [
+          {
+            "node": "Validate Functional Requirements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Functional Requirements": {
+      "main": [
+        [
+          {
+            "node": "Phase 2 Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 2 Gate": {
+      "main": [
+        [
+          {
+            "node": "Human Approval Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}

@@ -400,19 +400,19 @@ export class LLMCaller {
       if (outContent.status !== 'success') { skipped++; continue; }
 
       const key = this.computeCacheKey({
-        provider: String(invContent.provider ?? ''),
-        model: String(invContent.model ?? ''),
-        responseFormat: String(invContent.response_format ?? 'text'),
+        provider: (invContent.provider as string | null) ?? '',
+        model: (invContent.model as string | null) ?? '',
+        responseFormat: (invContent.response_format as string | null) ?? 'text',
         temperature: (invContent.temperature as number | null) ?? null,
         maxTokens: (invContent.max_tokens as number | null) ?? null,
         system: (invContent.system as string | null) ?? null,
-        prompt: String(invContent.prompt ?? ''),
+        prompt: (invContent.prompt as string | null) ?? '',
         tools: (invContent.tools as ToolDefinition[] | undefined) ?? [],
         toolChoice: null,
       });
 
       let parsed: Record<string, unknown> | null = null;
-      const text = String(outContent.text ?? '');
+      const text = (outContent.text as string | null) ?? '';
       // The output record persists raw text; re-parse JSON responses on
       // load so callers that read result.parsed see the same value as
       // they would on a live call.
@@ -425,8 +425,8 @@ export class LLMCaller {
         parsed,
         thinking: (outContent.thinking as string | undefined) ?? undefined,
         toolCalls: [],
-        provider: String(outContent.provider ?? invContent.provider ?? ''),
-        model: String(outContent.model ?? invContent.model ?? ''),
+        provider: (outContent.provider as string | null) ?? (invContent.provider as string | null) ?? '',
+        model: (outContent.model as string | null) ?? (invContent.model as string | null) ?? '',
         inputTokens: (outContent.input_tokens as number | null) ?? null,
         outputTokens: (outContent.output_tokens as number | null) ?? null,
         sourceInvocationId: inv.id,

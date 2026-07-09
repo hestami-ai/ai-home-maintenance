@@ -256,7 +256,7 @@ Respond with JSON: { "passed": boolean, "evidence": string, "confidence": number
         passed,
         actualValue: evidence,
         expectedValue: criterion.description,
-        notes: `Confidence: ${confidence}`,
+        notes: `Confidence: ${typeof confidence === 'object' && confidence !== null ? JSON.stringify(confidence) : String(confidence as string | number | boolean)}`,
       };
     } catch (err) {
       return {
@@ -544,9 +544,14 @@ Respond with JSON: {
   private parseJsonResponse(result: LLMCallResult): Record<string, unknown> | null {
     const text = result.text ?? '';
     // Strip code fences if present
-    const codeFenceMatch = /```(?:json)?\s*([\s\S]*?)```/.exec(text);
-    const braceMatch = /\{[\s\S]*\}/.exec(text);
-    const jsonStr = codeFenceMatch?.[1] ?? braceMatch?.[0] ?? text;
+    const codeFenceMatch = /```(?:json)?([\s\S]*?)```/.exec(text);
+    // Linear brace extraction (first '{' to last '}') avoids backtracking regex.
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    const braceMatch = firstBrace !== -1 && lastBrace > firstBrace
+      ? text.slice(firstBrace, lastBrace + 1)
+      : null;
+    const jsonStr = codeFenceMatch?.[1] ?? braceMatch ?? text;
 
     try {
       return JSON.parse(jsonStr.trim());

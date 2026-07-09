@@ -303,8 +303,8 @@ export class IngestionPipelineRunner {
       const proposed = Array.isArray(parsed.proposed_edges) ? parsed.proposed_edges : [];
       const candidateIds = new Set(candidates.map(c => c.id));
       for (const raw of proposed as Array<Record<string, unknown>>) {
-        const edgeType = String(raw.edge_type ?? '');
-        const targetId = String(raw.target_record_id ?? '');
+        const edgeType = typeof raw.edge_type === 'string' ? raw.edge_type : '';
+        const targetId = typeof raw.target_record_id === 'string' ? raw.target_record_id : '';
         const confidence = typeof raw.confidence === 'number' ? raw.confidence : 0;
         const rationale = typeof raw.rationale === 'string' ? raw.rationale : '';
 

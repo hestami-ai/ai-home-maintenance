@@ -1,0 +1,42 @@
+{
+  "name": "n8n-janumicode-poc",
+  "version": "1.0.0",
+  "description": "JanumiCode v2 PoC - n8n workflow implementation with custom nodes",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start:n8n": "n8n start"
+  },
+  "keywords": [
+    "n8n",
+    "janumicode",
+    "workflow",
+    "custom-nodes"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "n8n": {
+    "nodes": [
+      "nodes/dist/GovernedStream/GovernedStream.node.js",
+      "nodes/dist/InvariantChecker/InvariantChecker.node.js",
+      "nodes/dist/PhaseGateEvaluator/PhaseGateEvaluator.node.js",
+      "nodes/dist/ConstitutionalInvariantChecker/ConstitutionalInvariantChecker.node.js",
+      "nodes/dist/ContextBuilder/ContextBuilder.node.js",
+      "nodes/dist/DeepMemoryResearch/DeepMemoryResearch.node.js",
+      "nodes/dist/RollbackManager/RollbackManager.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "n8n-nodes-starter": "0.1.0",
+    "ts-node": "10.9.2",
+    "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "n8n": "2.29.9"
+  }
+}

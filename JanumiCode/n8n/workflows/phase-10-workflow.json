@@ -1,0 +1,165 @@
+{
+  "id": "phase-10-workflow-001",
+  "name": "Phase 10 - Commit and Deployment",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "phaseId": "10",
+        "subPhaseId": "commit_deployment",
+        "agentRole": "technical_expert",
+        "artifactRefs": "phase-9-execution-results",
+        "governingConstraints": "{}",
+        "requiredOutput": "{}",
+        "summaryContext": "Execution results from Phase 9"
+      },
+      "id": "context-builder-1",
+      "name": "Build Deployment Context",
+      "type": "n8n-nodes-base.contextBuilder",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $json.stdinText }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-1",
+      "name": "Commit and Deployment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "deployment_record",
+        "content": "={{ $json.response }}",
+        "authorityLevel": 5,
+        "phaseId": "10",
+        "subPhaseId": "commit_deployment"
+      },
+      "id": "governed-stream-1",
+      "name": "Write Deployment Record",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "phaseId": "10",
+        "artifactIds": "={{ $json.recordId }}",
+        "schemaValid": true,
+        "invariantsPassed": true,
+        "reasoningReviewPassed": true,
+        "consistencyPassed": true,
+        "domainAttested": true,
+        "verificationEnsemblePassed": true,
+        "humanApproved": false
+      },
+      "id": "phase-gate-evaluator-1",
+      "name": "Phase 10 Gate",
+      "type": "n8n-nodes-base.phaseGateEvaluator",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "content": "Phase 10 complete. JanumiCode v2 workflow complete. Please review deployment record and approve.",
+        "options": {}
+      },
+      "id": "chat-1",
+      "name": "Human Approval Gate",
+      "type": "n8n-nodes-base.chat",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Deployment Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Deployment Context": {
+      "main": [
+        [
+          {
+            "node": "Commit and Deployment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Commit and Deployment": {
+      "main": [
+        [
+          {
+            "node": "Write Deployment Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Deployment Record": {
+      "main": [
+        [
+          {
+            "node": "Phase 10 Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 10 Gate": {
+      "main": [
+        [
+          {
+            "node": "Human Approval Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}

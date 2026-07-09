@@ -362,7 +362,7 @@ function summarizeComponentModel(c: Record<string, unknown>): string {
     const respList = resps.map(r => `    ${r.id}: ${r.statement}`).join('\n');
     const deps = (comp.dependencies as Array<Record<string, unknown>>) ?? [];
     const depList = deps.map(displayComponentDependency).join(', ');
-    return `  ${comp.id}: ${comp.name} (domain: ${comp.domain_id ?? 'unassigned'})\n    Responsibilities:\n${respList}\n    Dependencies: ${depList || 'none'}`;
+    return `  ${comp.id}: ${comp.name} (domain: ${displayCapability(comp.domain_id) || 'unassigned'})\n    Responsibilities:\n${respList}\n    Dependencies: ${depList || 'none'}`;
   });
   return `${components.length} Components:\n${lines.join('\n')}`;
 }
@@ -402,7 +402,7 @@ function summarizeApiDefinitions(c: Record<string, unknown>): string {
   const defs = (c.definitions as Array<Record<string, unknown>>) ?? [];
   const lines = defs.map(d => {
     const endpoints = (d.endpoints as Array<Record<string, unknown>>) ?? [];
-    const epList = endpoints.map(e => `    ${e.method} ${e.path} (auth: ${e.auth_requirement ?? 'none'})`).join('\n');
+    const epList = endpoints.map(e => `    ${e.method} ${e.path} (auth: ${displayCapability(e.auth_requirement) || 'none'})`).join('\n');
     return `  Component ${d.component_id}:\n${epList}`;
   });
   return `${defs.length} API Definitions:\n${lines.join('\n')}`;

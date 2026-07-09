@@ -20,7 +20,7 @@ const OSC = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g;
 // Alt-screen + erase-display detected before stripping (they change state).
 const ALT_ON = /\x1b\[\?(?:1049|47|1047)h/;
 const ALT_OFF = /\x1b\[\?(?:1049|47|1047)l/;
-const ERASE_DISPLAY = /\x1b\[(?:2|3)J/;
+const ERASE_DISPLAY = /\x1b\[[23]J/;
 const CURSOR_HOME = /\x1b\[(?:0;0|1;1)?[Hf]/;
 
 export class TerminalScreen {
@@ -76,7 +76,7 @@ export class TerminalScreen {
     const all = this.cur.length > 0 || this.col > 0 ? [...this.lines, this.cur] : [...this.lines];
     let end = all.length;
     while (end > 0 && all[end - 1].trim() === '') end -= 1;
-    const lines = all.slice(0, end).map((l) => l.replace(/\s+$/u, ''));
+    const lines = all.slice(0, end).map((l) => l.trimEnd());
     return { lines, text: lines.join('\n'), altScreen: this.alt };
   }
 

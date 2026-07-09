@@ -178,6 +178,13 @@ function usesPathAliases(language: ProjectProfile['language']): boolean {
 
 // ── Contract construction ───────────────────────────────────────────
 
+/** Linear trailing-slash strip (avoids the ReDoS-prone `/\/+$/` backtracking). */
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.codePointAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 const BASE_ALLOWED_TOP_LEVEL = ['src', 'node_modules', '.git', '.janumicode', 'dist', 'docs'];
 
 export function buildProjectLayoutContract(
@@ -187,7 +194,7 @@ export function buildProjectLayoutContract(
   extraAllowedTopLevel: string[] = [],
 ): ProjectLayoutContract {
   const srcRoot = 'src';
-  const sharedDir = profile.shared_dir.replaceAll('\\', '/').replace(/\/+$/, '');
+  const sharedDir = stripTrailingSlashes(profile.shared_dir.replaceAll('\\', '/'));
 
   const componentDirMap: Record<string, string> = {};
   for (const c of components) {

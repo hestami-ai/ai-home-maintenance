@@ -15,7 +15,7 @@ import type { PhaseId } from '../lib/types/records';
 // Format patterns
 const DOTTED_PATTERN = /^(\d+(?:\.\d+)?)\.(\d+)$/;      // "1.3", "0.5.1"
 const UNDERSCORE_PATTERN = /^(\d+)[_.](\d+)$/;           // "1_3", "1-3"
-const PADDED_PATTERN = /^0*(\d+)[_.]0*(\d+)$/;          // "01_03", "01_3"
+const PADDED_PATTERN = /^(\d+)[_.](\d+)$/;               // "01_03", "01_3" (parseInt strips leading zeros)
 
 /**
  * Normalizes various sub-phase ID formats to canonical dotted format.

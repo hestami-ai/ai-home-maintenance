@@ -1,0 +1,165 @@
+{
+  "id": "phase-8-workflow-001",
+  "name": "Phase 8 - Evaluation Planning",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "phaseId": "8",
+        "subPhaseId": "evaluation_planning",
+        "agentRole": "technical_expert",
+        "artifactRefs": "phase-7-test-plan",
+        "governingConstraints": "{}",
+        "requiredOutput": "{}",
+        "summaryContext": "Test plan from Phase 7"
+      },
+      "id": "context-builder-1",
+      "name": "Build Evaluation Context",
+      "type": "n8n-nodes-base.contextBuilder",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $json.stdinText }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-1",
+      "name": "Evaluation Planning",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "evaluation_plan",
+        "content": "={{ $json.response }}",
+        "authorityLevel": 5,
+        "phaseId": "8",
+        "subPhaseId": "evaluation_planning"
+      },
+      "id": "governed-stream-1",
+      "name": "Write Evaluation Plan",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "phaseId": "8",
+        "artifactIds": "={{ $json.recordId }}",
+        "schemaValid": true,
+        "invariantsPassed": true,
+        "reasoningReviewPassed": true,
+        "consistencyPassed": true,
+        "domainAttested": true,
+        "verificationEnsemblePassed": true,
+        "humanApproved": false
+      },
+      "id": "phase-gate-evaluator-1",
+      "name": "Phase 8 Gate",
+      "type": "n8n-nodes-base.phaseGateEvaluator",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "content": "Phase 8 complete. Please review evaluation plan and approve.",
+        "options": {}
+      },
+      "id": "chat-1",
+      "name": "Human Approval Gate",
+      "type": "n8n-nodes-base.chat",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Evaluation Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Evaluation Context": {
+      "main": [
+        [
+          {
+            "node": "Evaluation Planning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluation Planning": {
+      "main": [
+        [
+          {
+            "node": "Write Evaluation Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Evaluation Plan": {
+      "main": [
+        [
+          {
+            "node": "Phase 8 Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 8 Gate": {
+      "main": [
+        [
+          {
+            "node": "Human Approval Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}

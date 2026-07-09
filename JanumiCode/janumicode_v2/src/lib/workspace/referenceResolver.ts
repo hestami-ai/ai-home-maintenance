@@ -62,6 +62,24 @@ const DEFAULT_MAX_CONTENT = 256 * 1024;
 const DEFAULT_MAX_FILE = 5 * 1024 * 1024;
 
 /**
+ * Linear equivalent of `.replace(/[).,;:!?]+$/, '')` — strips a run of
+ * trailing punctuation characters ( ) . , ; : ! ? ) without regex backtracking.
+ */
+function stripTrailingPunctuation(s: string): string {
+  let end = s.length;
+  while (end > 0) {
+    const c = s.codePointAt(end - 1);
+    // ) . , ; : ! ?
+    if (c === 41 || c === 46 || c === 44 || c === 59 || c === 58 || c === 33 || c === 63) {
+      end--;
+    } else {
+      break;
+    }
+  }
+  return s.slice(0, end);
+}
+
+/**
  * Detect all file references in the given text.
  * Returns references in document order.
  */
@@ -119,7 +137,7 @@ export function resolveReference(
         : raw;
     } else {
       // Normalize Windows-style separators and strip any trailing punctuation
-      candidatePath = raw.replaceAll('\\', '/').replace(/[).,;:!?]+$/, '');
+      candidatePath = stripTrailingPunctuation(raw.replaceAll('\\', '/'));
     }
   } catch {
     return failure(ref, 'not_found', 'Could not parse reference as a path or URI');

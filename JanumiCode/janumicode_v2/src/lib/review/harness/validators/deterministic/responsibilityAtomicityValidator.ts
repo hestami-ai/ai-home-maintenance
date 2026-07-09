@@ -20,15 +20,23 @@ import type { ValidatorRuntimeParams, ValidatorFinding } from '../../validatorRe
 // Examples:
 //   "stores property records AND manages ownership history"
 //   "validates payments, generates invoices, and sends notifications"
-const CONJUNCTION_RE = /\b(and|AND)\b.*\b(and|AND)\b|\b\w+s?\s+(and|AND)\s+\w+s?\b/;
 const OXFORD_COMMA_RE = /,\s*\w+(?:s)?,\s+and\s+\w+/i;
+// Verb alternation reused on both sides of the conjunction. Built from a shared
+// string (compiled once at module load) so the verb list is not duplicated in
+// the pattern; the resulting regex is identical to the previous inline literal.
+const RESP_VERBS =
+  'manages?|handles?|stores?|processes?|validates?|generates?|tracks?|sends?|creates?|maintains?|provides?';
+const VERB_AND_VERB_RE = new RegExp(
+  String.raw`\b(${RESP_VERBS})\b.*\band\b.*\b(${RESP_VERBS})\b`,
+  'i',
+);
 
 function isCompound(statement: string): boolean {
   // Require the pattern to contain a verb-like word before and after the conjunction.
   // Simple check: "verb-word AND verb-word" or "noun, noun, and noun"
   if (OXFORD_COMMA_RE.test(statement)) return true;
   // "manages X and Y" or "handles A, B, and C"
-  if (/\b(manages?|handles?|stores?|processes?|validates?|generates?|tracks?|sends?|creates?|maintains?|provides?)\b.*\band\b.*\b(manages?|handles?|stores?|processes?|validates?|generates?|tracks?|sends?|creates?|maintains?|provides?)\b/i.test(statement)) {
+  if (VERB_AND_VERB_RE.test(statement)) {
     return true;
   }
   return false;

@@ -1,0 +1,14 @@
+[
+  {
+    "invariant_id": "API-001",
+    "artifact_type": "api_definitions",
+    "description": "Every endpoint has an explicit authentication requirement",
+    "check_type": "field_presence",
+    "specification": {
+      "field_path": "definitions[*].endpoints[*].auth_requirement",
+      "message": "API endpoint must have an explicit authentication requirement"
+    },
+    "severity": "blocking",
+    "phase_applies_to": ["5"]
+  }
+]

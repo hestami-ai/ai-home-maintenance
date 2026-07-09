@@ -283,7 +283,8 @@ export class CLIInvoker {
             // closes, invoke() resolves (timed-out), and the executor
             // quarantines that task and proceeds.
             if (proc.pid !== undefined) {
-              spawnSync('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true });
+              const taskkill = require('node:path').join(process.env.SystemRoot || 'C:/Windows', 'System32', 'taskkill.exe');
+              spawnSync(taskkill, ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true });
             } else {
               proc.kill();
             }

@@ -126,9 +126,17 @@ export function areaWriteScope(area: Phase9ReconPlan['areas'][number]): string[]
   return [...dirs];
 }
 
+/** Linear trailing-slash strip (byte-identical to `.replace(/\/+$/g, '')`,
+ *  without the regex backtracking). '/' is char code 47. */
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.codePointAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 export function areaRoot(sourceRoot: string): string {
   // 'services/billing/src' → 'services/billing'; 'src' → '.'
-  const norm = sourceRoot.replaceAll('\\', '/').replace(/\/+$/g, '');
+  const norm = stripTrailingSlashes(sourceRoot.replaceAll('\\', '/'));
   const segs = norm.split('/');
   return segs.length <= 1 ? '.' : segs.slice(0, -1).join('/');
 }
@@ -473,7 +481,7 @@ export interface CoherentAreaLayout {
 }
 
 function normLayoutPath(p: string): string {
-  const s = (p ?? '').trim().replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/+$/g, '');
+  const s = stripTrailingSlashes((p ?? '').trim().replaceAll('\\', '/').replace(/^\.\//, ''));
   return s === '.' ? '' : s; // a bare '.' is the repo root — the empty-string sentinel
 }
 

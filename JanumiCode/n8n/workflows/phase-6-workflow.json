@@ -1,0 +1,188 @@
+{
+  "id": "phase-6-workflow-001",
+  "name": "Phase 6 - Implementation Planning",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "phaseId": "6",
+        "subPhaseId": "implementation_planning",
+        "agentRole": "technical_expert",
+        "artifactRefs": "phase-5-technical-specification",
+        "governingConstraints": "{}",
+        "requiredOutput": "{}",
+        "summaryContext": "Technical specification from Phase 5"
+      },
+      "id": "context-builder-1",
+      "name": "Build Implementation Context",
+      "type": "n8n-nodes-base.contextBuilder",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $json.stdinText }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-1",
+      "name": "Implementation Planning",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "implementation_plan",
+        "content": "={{ $json.response }}",
+        "authorityLevel": 5,
+        "phaseId": "6",
+        "subPhaseId": "implementation_planning"
+      },
+      "id": "governed-stream-1",
+      "name": "Write Implementation Plan",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "artifactType": "implementation_plan",
+        "artifactContent": "={{ $json.content }}",
+        "phaseId": "6"
+      },
+      "id": "invariant-checker-1",
+      "name": "Validate Implementation Plan",
+      "type": "n8n-nodes-base.invariantChecker",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "phaseId": "6",
+        "artifactIds": "={{ $json.recordId }}",
+        "schemaValid": true,
+        "invariantsPassed": true,
+        "reasoningReviewPassed": true,
+        "consistencyPassed": true,
+        "domainAttested": true,
+        "verificationEnsemblePassed": true,
+        "humanApproved": false
+      },
+      "id": "phase-gate-evaluator-1",
+      "name": "Phase 6 Gate",
+      "type": "n8n-nodes-base.phaseGateEvaluator",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "content": "Phase 6 complete. Please review implementation plan and approve.",
+        "options": {}
+      },
+      "id": "chat-1",
+      "name": "Human Approval Gate",
+      "type": "n8n-nodes-base.chat",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Implementation Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Implementation Context": {
+      "main": [
+        [
+          {
+            "node": "Implementation Planning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Implementation Planning": {
+      "main": [
+        [
+          {
+            "node": "Write Implementation Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Implementation Plan": {
+      "main": [
+        [
+          {
+            "node": "Validate Implementation Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Implementation Plan": {
+      "main": [
+        [
+          {
+            "node": "Phase 6 Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6 Gate": {
+      "main": [
+        [
+          {
+            "node": "Human Approval Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}

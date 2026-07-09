@@ -1,0 +1,15 @@
+[
+  {
+    "invariant_id": "IC-001",
+    "artifact_type": "interface_contracts",
+    "description": "Every Interface Contract specifies at least one error response",
+    "check_type": "count_minimum",
+    "specification": {
+      "field_path": "contracts[*].error_responses[*]",
+      "minimum": 1,
+      "message": "Interface Contract must specify at least one error response"
+    },
+    "severity": "blocking",
+    "phase_applies_to": ["3"]
+  }
+]

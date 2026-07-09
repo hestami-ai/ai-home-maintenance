@@ -31,7 +31,7 @@ export function extractJsonObject(text: string): string | null {
     return trimmed;
   }
 
-  const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+  const fenceMatch = text.match(/```(?:json)?([\s\S]*?)```/);
   if (fenceMatch?.[1]?.trim().startsWith('{')) {
     return fenceMatch[1].trim();
   }

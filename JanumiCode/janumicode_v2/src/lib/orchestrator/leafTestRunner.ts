@@ -180,7 +180,7 @@ export class LeafTestRunner {
             // workspace-global gate). Leaves with neither (e.g. the
             // composition root) run the full suite — that global gate is the
             // composition root's / stabilization loop's job.
-            const norm = (p: string): string => p.replaceAll('\\', '/').replace(/\/+$/g, '');
+            const norm = (p: string): string => stripTrailingSlashes(p.replaceAll('\\', '/'));
             const exists = (p: string): boolean => fs.existsSync(path.join(input.workspacePath, p));
             const ownFiles = (input.ownTestFiles ?? []).map(norm).filter((p) => p && exists(p));
             const scopeDirs = (input.writeDirectoryPaths ?? []).map(norm).filter((p) => p && exists(p));
@@ -247,6 +247,13 @@ function splitCommand(s: string): string[] {
   return s.trim().split(/\s+/).filter(Boolean);
 }
 
+/** Strip trailing '/' characters in linear time (avoids the `/\/+$/` regex). */
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.codePointAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 /**
  * Parse pass/fail/skip counts from a runner's combined output. Handles
  * vitest, jest, npm-test-text-summary, node:test, mocha, pytest. Best-
@@ -261,12 +268,23 @@ export function parseTestCounts(stdout: string, stderr: string): {
   let failed = 0;
   let skipped = 0;
 
-  const vitestPassFail = /Tests\s+(?:(\d+)\s+failed[^|]*\|\s*)?(\d+)\s+passed(?:\s*\|\s*(\d+)\s+skipped)?/i.exec(text);
-  if (vitestPassFail) {
-    failed = vitestPassFail[1] ? Number.parseInt(vitestPassFail[1], 10) : 0;
-    passed = Number.parseInt(vitestPassFail[2], 10);
-    skipped = vitestPassFail[3] ? Number.parseInt(vitestPassFail[3], 10) : 0;
-    return { passed, failed, skipped };
+  // vitest summary line — e.g. "Tests  4 failed | 10 passed | 2 skipped (16)".
+  // Scan each "Tests…" line (the "Test Files" line's token is "Test", not
+  // "Tests", so it is never matched) and pull each count out with a small,
+  // independent regex. A "passed" count is required — mirroring the original
+  // pattern, so any earlier "Tests…" line without one is skipped. Line-scoping
+  // plus small regexes stays linear where the monolithic alternation backtracked.
+  for (const testsLine of text.matchAll(/Tests[^\n]*/gi)) {
+    const line = testsLine[0];
+    const vp = /(?<!\d)(\d+)\s+passed/i.exec(line);
+    if (!vp) continue;
+    const vf = /(?<!\d)(\d+)\s+failed/i.exec(line);
+    const vs = /(?<!\d)(\d+)\s+skipped/i.exec(line);
+    return {
+      passed: Number.parseInt(vp[1], 10),
+      failed: vf ? Number.parseInt(vf[1], 10) : 0,
+      skipped: vs ? Number.parseInt(vs[1], 10) : 0,
+    };
   }
 
   const jestSummary = /Tests:\s+(?:(\d+)\s+failed,\s*)?(?:(\d+)\s+skipped,\s*)?(\d+)\s+passed,\s+\d+\s+total/i.exec(text);
@@ -287,11 +305,21 @@ export function parseTestCounts(stdout: string, stderr: string): {
     return { passed, failed, skipped };
   }
 
-  const pytest = /=+\s*(?:(\d+)\s+failed,?\s*)?(?:(\d+)\s+passed,?\s*)?(?:(\d+)\s+skipped,?\s*)?[\w\s,.]*=+/i.exec(text);
-  if (pytest) {
-    failed = pytest[1] ? Number.parseInt(pytest[1], 10) : 0;
-    passed = pytest[2] ? Number.parseInt(pytest[2], 10) : 0;
-    skipped = pytest[3] ? Number.parseInt(pytest[3], 10) : 0;
+  // pytest banner — e.g. "===== 1 failed, 2 passed, 3 skipped in 0.1s =====".
+  // Match the first '='-fenced body with a class excluding '=' and newline
+  // (linear: the body cannot contain '=', so there is no backtracking against
+  // the trailing fence), then pull each count out with a small independent
+  // regex. As before, only the FIRST fenced region is inspected and counts are
+  // reported only when at least one is present.
+  const pytestBanner = /=+[^=\n]*=+/.exec(text);
+  if (pytestBanner) {
+    const banner = pytestBanner[0];
+    const pf = /(?<!\d)(\d+)\s+failed/i.exec(banner);
+    const pp = /(?<!\d)(\d+)\s+passed/i.exec(banner);
+    const ps = /(?<!\d)(\d+)\s+skipped/i.exec(banner);
+    failed = pf ? Number.parseInt(pf[1], 10) : 0;
+    passed = pp ? Number.parseInt(pp[1], 10) : 0;
+    skipped = ps ? Number.parseInt(ps[1], 10) : 0;
     if (passed + failed + skipped > 0) return { passed, failed, skipped };
   }
 

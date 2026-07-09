@@ -28,7 +28,7 @@
 import type { ValidatorRuntimeParams, ValidatorFinding } from '../../validatorRegistry';
 
 // Regex to extract "X references Y" or "X belongs to Y" from source context.
-const REF_PATTERN = /\b([A-Za-z]\w*)\s+(?:references?|belongs(?:\s+to)?|has(?:\s+a)?|contains)\s+(?:a\s+|an\s+|the\s+)?([A-Za-z]\w*)/gi;
+const REF_PATTERN = /\b([a-z]\w*)\s+(?:references?|belongs(?:\s+to)?|has(?:\s+a)?|contains)\s+(?:a\s+|an\s+|the\s+)?([a-z]\w*)/gi;
 
 interface AttestationEdge {
   holder: string;   // entity that HOLDS the FK (references the other)

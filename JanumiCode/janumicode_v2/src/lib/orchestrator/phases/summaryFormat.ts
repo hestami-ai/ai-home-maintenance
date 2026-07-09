@@ -30,7 +30,7 @@ export function displayCapability(x: unknown): string {
     const o = x as Record<string, unknown>;
     return pickString(o, ['capability', 'name', 'statement', 'item', 'title', 'description', 'id']) ?? JSON.stringify(o);
   }
-  return String(x);
+  return typeof x === 'number' || typeof x === 'boolean' || typeof x === 'bigint' ? String(x) : '';
 }
 
 /**
@@ -76,7 +76,7 @@ export function displayFieldType(v: unknown): string {
     const o = v as Record<string, unknown>;
     return pickString(o, ['type', 'name', 'sql_type', 'data_type', 'kind']) ?? JSON.stringify(o);
   }
-  return String(v);
+  return typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint' ? String(v) : '';
 }
 
 /**
@@ -93,8 +93,8 @@ export function displayFieldConstraint(v: unknown): string {
   }
   if (typeof v === 'object') {
     return Object.entries(v as Record<string, unknown>)
-      .map(([k, val]) => `${k}=${typeof val === 'object' ? JSON.stringify(val) : String(val)}`)
+      .map(([k, val]) => `${k}=${typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean' || typeof val === 'bigint' ? String(val) : JSON.stringify(val)}`)
       .join(', ');
   }
-  return String(v);
+  return typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint' ? String(v) : '';
 }

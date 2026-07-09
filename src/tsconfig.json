@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "moduleResolution": "node",
+    "strict": true,
+    "noImplicitAny": true,
+    "exactOptionalPropertyTypes": true,
+    "useDefineForClassFields": true,
+    "verbatimModuleSyntax": true,
+    "outDir": ".output/js/",
+    "allowImportingTsExtensions": false,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [
+    "./**/*.d.ts",
+    "./**/*.svelte"
+  ]
+}

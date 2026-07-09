@@ -1227,9 +1227,11 @@ export function renderComponentBlockForTask(component: Record<string, unknown>):
   const id = typeof component.id === 'string' ? component.id : '';
   const name = typeof component.name === 'string' ? component.name : id;
   const dk = typeof component._leaf_display_key === 'string' ? component._leaf_display_key : id;
-  const tier = component._leaf_tier != null ? String(component._leaf_tier) : '?';
+  const tierRaw = component._leaf_tier;
+  const tier = typeof tierRaw === 'number' || typeof tierRaw === 'string' ? String(tierRaw) : '?';
   const root = typeof component._leaf_root_display_key === 'string' ? component._leaf_root_display_key : '';
-  const release = component._leaf_release_ordinal != null ? `Release ${String(component._leaf_release_ordinal)}` : 'Backlog';
+  const releaseOrdinal = component._leaf_release_ordinal;
+  const release = typeof releaseOrdinal === 'number' || typeof releaseOrdinal === 'string' ? `Release ${String(releaseOrdinal)}` : 'Backlog';
   const resps = Array.isArray(component.responsibilities)
     ? (component.responsibilities as Array<Record<string, unknown>>)
         .map(r => {
@@ -1329,7 +1331,10 @@ function renderApiDefinitionsSlice(defs: Array<Record<string, unknown>>): string
   if (defs.length === 0) return '';
   const lines = defs.map((d) => {
     const endpoints = Array.isArray(d.endpoints) ? d.endpoints as Array<Record<string, unknown>> : [];
-    const epList = endpoints.map((e) => `    ${e.method} ${e.path} (auth: ${e.auth_requirement ?? 'none'})`).join('\n');
+    const epList = endpoints.map((e) => {
+      const auth = typeof e.auth_requirement === 'string' ? e.auth_requirement : 'none';
+      return `    ${e.method} ${e.path} (auth: ${auth})`;
+    }).join('\n');
     return `  Component ${d.component_id}:\n${epList}`;
   });
   return `${defs.length} API Definitions:\n${lines.join('\n')}`;

@@ -99,7 +99,7 @@ export class AnthropicProvider implements LLMProviderAdapter {
   private mapError(err: unknown): LLMError {
     if (err && typeof err === 'object' && 'status' in err) {
       const status = (err as { status: number }).status;
-      const message = (err as { message?: string }).message ?? String(err);
+      const message = (err as { message?: string }).message ?? JSON.stringify(err);
 
       if (status === 429) return new LLMError(message, 'rate_limit', status, true);
       if (status === 503 || status === 504) return new LLMError(message, 'service_unavailable', status, true);

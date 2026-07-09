@@ -16,6 +16,13 @@
 import * as http from 'node:http';
 import * as https from 'node:https';
 
+/** Linear trailing-slash strip (avoids the O(n^2) backtracking of `/\/+$/`). */
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.codePointAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 export interface EmbeddingClient {
   /**
    * Compute embeddings for one or more input strings. Returns a
@@ -152,7 +159,7 @@ export class LlamacppEmbeddingClient implements EmbeddingClient {
 
   async embed(inputs: string[], options?: { signal?: AbortSignal }): Promise<number[][]> {
     if (inputs.length === 0) return [];
-    const url = `${this.baseUrl.replace(/\/+$/, '')}/v1/embeddings`;
+    const url = `${stripTrailingSlashes(this.baseUrl)}/v1/embeddings`;
     const idleTimeoutMs = Number.parseInt(
       process.env.JANUMICODE_EMBEDDING_IDLE_TIMEOUT_MS ?? '180000', 10);
     // Some llama-server builds reject array `input` with model-load

@@ -135,7 +135,20 @@ export function coerceQualityAttribute(x: unknown): string {
     }
     return JSON.stringify(o);
   }
-  return x == null ? '' : String(x);
+  return coerceFieldToString(x);
+}
+
+/**
+ * Coerce an unknown record field to a meaningful display string: the string
+ * itself when it is one, `fallback` for null/undefined, and a JSON
+ * representation for objects/arrays — so a field a model drifted into an
+ * object surfaces its real content instead of the useless '[object Object]'.
+ */
+function coerceFieldToString(v: unknown, fallback = ''): string {
+  if (typeof v === 'string') return v;
+  if (v == null) return fallback;
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v as string | number | boolean);
 }
 
 /** A single journey→domain reference the oracle-resolution pass rewrote. */
@@ -547,9 +560,9 @@ export class Phase1Handler implements PhaseHandler {
       if (content.ingested_via !== 'explicit_reference') continue;
 
       ingested.push({
-        relativePath: String(content.relative_path ?? ''),
-        content: String(content.content ?? ''),
-        type: String(content.file_type ?? 'other'),
+        relativePath: coerceFieldToString(content.relative_path),
+        content: coerceFieldToString(content.content),
+        type: coerceFieldToString(content.file_type, 'other'),
         truncated: Boolean(content.truncated),
       });
     }
@@ -2451,19 +2464,19 @@ fabricates a new threshold is unsupported.`,
       vvRequirements: Array.isArray(vvd?.vvRequirements) ? vvd.vvRequirements as Array<{id?: string; target?: string; threshold?: string}> : undefined,
       scopeClassification: sc ? { breadth: sc.breadth as string, depth: sc.depth as string } : undefined,
       acceptedDomains: Array.isArray(bdb?.domains)
-        ? (bdb.domains as Array<Record<string, unknown>>).map(d => ({ id: String(d.id), name: String(d.name ?? ''), description: typeof d.description === 'string' ? d.description : undefined }))
+        ? (bdb.domains as Array<Record<string, unknown>>).map(d => ({ id: coerceFieldToString(d.id), name: coerceFieldToString(d.name), description: typeof d.description === 'string' ? d.description : undefined }))
         : undefined,
       acceptedPersonas: Array.isArray(bdb?.personas)
-        ? (bdb.personas as Array<Record<string, unknown>>).map(p => ({ id: String(p.id), name: String(p.name ?? ''), description: typeof p.description === 'string' ? p.description : undefined }))
+        ? (bdb.personas as Array<Record<string, unknown>>).map(p => ({ id: coerceFieldToString(p.id), name: coerceFieldToString(p.name), description: typeof p.description === 'string' ? p.description : undefined }))
         : undefined,
       acceptedJourneys: Array.isArray(ujb?.userJourneys)
-        ? (ujb.userJourneys as Array<Record<string, unknown>>).map(j => ({ id: String(j.id), title: String(j.title ?? j.name ?? ''), personaId: typeof j.personaId === 'string' ? j.personaId : undefined }))
+        ? (ujb.userJourneys as Array<Record<string, unknown>>).map(j => ({ id: coerceFieldToString(j.id), title: coerceFieldToString(j.title ?? j.name), personaId: typeof j.personaId === 'string' ? j.personaId : undefined }))
         : undefined,
       acceptedWorkflows: Array.isArray(swb?.workflows)
-        ? (swb.workflows as Array<Record<string, unknown>>).map(w => ({ id: String(w.id), name: String(w.name ?? ''), businessDomainId: typeof w.businessDomainId === 'string' ? w.businessDomainId : undefined }))
+        ? (swb.workflows as Array<Record<string, unknown>>).map(w => ({ id: coerceFieldToString(w.id), name: coerceFieldToString(w.name), businessDomainId: typeof w.businessDomainId === 'string' ? w.businessDomainId : undefined }))
         : undefined,
       acceptedEntities: Array.isArray(eb?.entities)
-        ? (eb.entities as Array<Record<string, unknown>>).map(e => ({ id: String(e.id), name: String(e.name ?? ''), businessDomainId: typeof e.businessDomainId === 'string' ? e.businessDomainId : undefined }))
+        ? (eb.entities as Array<Record<string, unknown>>).map(e => ({ id: coerceFieldToString(e.id), name: coerceFieldToString(e.name), businessDomainId: typeof e.businessDomainId === 'string' ? e.businessDomainId : undefined }))
         : undefined,
     };
     // Strip the accepted set(s) this gatekeeper's own bloom produced so

@@ -146,9 +146,16 @@ interface Demand {
   demandPaths: Set<string>;
 }
 
+/** Linear trailing-slash strip (avoids the ReDoS-prone `/\/+$/` regex). */
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.codePointAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 /** Split a workspace-relative read path into { category, basename }. */
 function splitReadPath(p: string): { category: string; basename: string } {
-  const clean = p.replaceAll('\\', '/').replace(/\.[a-z0-9]+$/i, '').replace(/\/+$/g, '');
+  const clean = stripTrailingSlashes(p.replaceAll('\\', '/').replace(/\.[a-z0-9]+$/i, ''));
   const segs = clean.split('/').filter(Boolean);
   const basename = segs.at(-1) ?? clean;
   // category = the parent segment when it is a recognized shared root.
@@ -205,8 +212,8 @@ function placeModule(
 }
 
 export function buildModuleOwnershipPlan(input: ModuleOwnershipPlannerInput): ModuleOwnershipPlan {
-  const srcRoot = (input.srcRoot ?? 'src').replaceAll('\\', '/').replace(/\/+$/g, '');
-  const sharedDir = (input.sharedDir ?? 'src/shared').replaceAll('\\', '/').replace(/\/+$/g, '');
+  const srcRoot = stripTrailingSlashes((input.srcRoot ?? 'src').replaceAll('\\', '/'));
+  const sharedDir = stripTrailingSlashes((input.sharedDir ?? 'src/shared').replaceAll('\\', '/'));
   const stack = input.stack || 'node';
 
   // Component lookup + the set of components each component DEPENDS ON. A

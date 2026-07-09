@@ -40,6 +40,13 @@ export type PermissionResponse = 'once' | 'always' | 'reject';
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
+/** Strip trailing `/` characters in linear time (ReDoS-safe replacement for `/\/+$/`). */
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.codePointAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 /**
  * A `compose` turn (research→plan→implement) can legitimately run for a long
  * time. Node's global `fetch` (undici) applies a default 300s
@@ -77,7 +84,7 @@ export class MimoClient {
     private readonly baseUrl: string,
     private readonly fetchImpl: FetchLike = fetch,
   ) {
-    this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.baseUrl = stripTrailingSlashes(baseUrl);
   }
 
   /**
@@ -129,7 +136,11 @@ export class MimoClient {
     if (!res.ok) throw new Error(`mimo sendMessage failed: ${res.status} ${await safeText(res)}`);
     const json = (await res.json()) as { info?: Record<string, unknown> };
     const info = json.info ?? {};
-    return { finish: String(info.finish ?? ''), info };
+    const finish =
+      typeof info.finish === 'object' && info.finish !== null
+        ? JSON.stringify(info.finish)
+        : String((info.finish ?? '') as string | number | boolean);
+    return { finish, info };
   }
 
   /** Cancel the running turn (used on timeout/idle-timeout). */

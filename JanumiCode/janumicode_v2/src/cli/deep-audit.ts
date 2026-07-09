@@ -370,7 +370,7 @@ function categoryB_emptyVars(steps: TransformStep[]): Finding[] {
         category: 'B',
         severity: isRequired ? 'BLOCK' : 'WARN',
         sub_phase_id: s.sub_phase_id,
-        ref: `template:${payload.template_key ?? '?'} var:${name}`,
+        ref: `template:${JSON.stringify(payload.template_key ?? '?')} var:${name}`,
         message: isRequired
           ? `Required variable {{${name}}} substituted with empty value`
           : `Optional variable {{${name}}} substituted with empty value`,
@@ -382,7 +382,7 @@ function categoryB_emptyVars(steps: TransformStep[]): Finding[] {
         category: 'B',
         severity: 'BLOCK',
         sub_phase_id: s.sub_phase_id,
-        ref: `template:${payload.template_key ?? '?'} var:${m}`,
+        ref: `template:${JSON.stringify(payload.template_key ?? '?')} var:${m}`,
         message: `Required variable {{${m}}} not provided to template`,
       });
     }
@@ -408,7 +408,7 @@ function categoryC_repair(steps: TransformStep[]): Finding[] {
       category: 'C',
       severity: payload.parsed ? 'WARN' : 'BLOCK',
       sub_phase_id: s.sub_phase_id,
-      ref: `invocation:${meta.invocation_id ?? '?'}`,
+      ref: `invocation:${JSON.stringify(meta.invocation_id ?? '?')}`,
       message: payload.parsed
         ? `JSON repair succeeded (operator should spot-check semantic fidelity)`
         : `JSON repair attempted but produced no parsed result`,
@@ -674,7 +674,7 @@ function categoryH_packets(artifacts: DbArtifact[]): Finding[] {
     if (!coherence.passed) {
       findings.push({
         category: 'H', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `packet:${c.packet_id ?? '?'}`,
+        ref: `packet:${JSON.stringify(c.packet_id ?? '?')}`,
         message: `Packet failed coherence: ${(coherence.blocking_failures ?? []).slice(0, 3).join('; ')}`,
         details: { blocking_failures: coherence.blocking_failures },
       });
@@ -682,14 +682,14 @@ function categoryH_packets(artifacts: DbArtifact[]): Finding[] {
     if (Array.isArray(c.user_stories) && c.user_stories.length === 0) {
       findings.push({
         category: 'H', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `packet:${c.packet_id ?? '?'}`,
+        ref: `packet:${JSON.stringify(c.packet_id ?? '?')}`,
         message: `Packet has user_stories=[] (no acceptance criteria reach executor)`,
       });
     }
     if (Array.isArray(c.nfrs) && c.nfrs.length === 0) {
       findings.push({
         category: 'H', severity: 'WARN', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `packet:${c.packet_id ?? '?'}`,
+        ref: `packet:${JSON.stringify(c.packet_id ?? '?')}`,
         message: `Packet has nfrs=[] (no quality bars reach executor)`,
       });
     }
@@ -734,13 +734,13 @@ function categoryI_executors(artifacts: DbArtifact[], lifecycle: LifecycleEvent[
     if (!hasOut && !reachedTerminal) {
       findings.push({
         category: 'I', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `task:${c.task_id ?? '?'}`,
+        ref: `task:${JSON.stringify(c.task_id ?? '?')}`,
         message: `Phase 9 executor invocation has neither agent_output nor terminal status_change (stuck or output-write failed)`,
       });
     } else if (!hasOut) {
       findings.push({
         category: 'I', severity: 'WARN', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `task:${c.task_id ?? '?'}`,
+        ref: `task:${JSON.stringify(c.task_id ?? '?')}`,
         message: `Phase 9 executor invocation has no agent_output (reached terminal status_change, but DB record-write may have failed)`,
       });
     }

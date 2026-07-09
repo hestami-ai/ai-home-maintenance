@@ -1,0 +1,165 @@
+{
+  "id": "phase-9-workflow-001",
+  "name": "Phase 9 - Execution",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "phaseId": "9",
+        "subPhaseId": "execution",
+        "agentRole": "technical_expert",
+        "artifactRefs": "phase-8-evaluation-plan",
+        "governingConstraints": "{}",
+        "requiredOutput": "{}",
+        "summaryContext": "Evaluation plan from Phase 8"
+      },
+      "id": "context-builder-1",
+      "name": "Build Execution Context",
+      "type": "n8n-nodes-base.contextBuilder",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $json.stdinText }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-1",
+      "name": "Execution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "execution_results",
+        "content": "={{ $json.response }}",
+        "authorityLevel": 5,
+        "phaseId": "9",
+        "subPhaseId": "execution"
+      },
+      "id": "governed-stream-1",
+      "name": "Write Execution Results",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "phaseId": "9",
+        "artifactIds": "={{ $json.recordId }}",
+        "schemaValid": true,
+        "invariantsPassed": true,
+        "reasoningReviewPassed": true,
+        "consistencyPassed": true,
+        "domainAttested": true,
+        "verificationEnsemblePassed": true,
+        "humanApproved": false
+      },
+      "id": "phase-gate-evaluator-1",
+      "name": "Phase 9 Gate",
+      "type": "n8n-nodes-base.phaseGateEvaluator",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "content": "Phase 9 complete. Please review execution results and approve.",
+        "options": {}
+      },
+      "id": "chat-1",
+      "name": "Human Approval Gate",
+      "type": "n8n-nodes-base.chat",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Execution Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Execution Context": {
+      "main": [
+        [
+          {
+            "node": "Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execution": {
+      "main": [
+        [
+          {
+            "node": "Write Execution Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Execution Results": {
+      "main": [
+        [
+          {
+            "node": "Phase 9 Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 9 Gate": {
+      "main": [
+        [
+          {
+            "node": "Human Approval Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}

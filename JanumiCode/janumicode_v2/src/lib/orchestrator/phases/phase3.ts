@@ -648,8 +648,10 @@ function srOneLine(v: unknown, cap = 160): string {
     t = v;
   } else if (v == null) {
     t = '';
+  } else if (typeof v === 'object') {
+    t = JSON.stringify(v);
   } else {
-    t = String(v);
+    t = String(v as string | number | boolean);
   }
   const firstLine = t.split('\n')[0]?.trim() ?? '';
   return firstLine.length > cap ? `${firstLine.slice(0, cap - 1)}…` : firstLine;
@@ -788,9 +790,13 @@ function parseSystemRequirements(parsed: Record<string, unknown> | null): System
   if (!items) return [];
   return items.map(it => {
     const rec = it as unknown as Record<string, unknown>;
+    let statement: string;
+    if (typeof rec.statement === 'string') statement = rec.statement;
+    else if (rec.statement == null) statement = '';
+    else statement = JSON.stringify(rec.statement);
     return {
       ...it,
-      statement: typeof rec.statement === 'string' ? rec.statement : String(rec.statement ?? ''),
+      statement,
       source_requirement_ids: srAsStringArray(rec.source_requirement_ids),
       priority: (rec.priority as SystemRequirementItem['priority']) ?? 'medium',
     };

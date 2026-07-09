@@ -19,6 +19,13 @@
 
 import type { ValidatorRuntimeParams, ValidatorFinding } from '../../validatorRegistry';
 
+/** Render a possibly-object field value for a diagnostic message (avoids '[object Object]'). */
+function displayField(v: unknown): string {
+  if (typeof v === 'string') return v;
+  if (v == null) return '';
+  return JSON.stringify(v);
+}
+
 interface StoryEcho {
   id: string;
   role?: string;
@@ -88,7 +95,7 @@ export function validateEnrichmentEchoInvariance(
             type: 'mutated_field',
             summary: `Story '${skel.id}' field '${field}' mutated between skeleton and enrichment`,
             location: `$.user_stories[id=${skel.id}].${field}`,
-            detail: `Skeleton: '${skel[field] ?? ''}'\nEnrichment: '${String(echoed[field] ?? '')}'`,
+            detail: `Skeleton: '${displayField(skel[field])}'\nEnrichment: '${displayField(echoed[field])}'`,
             recommendation: `Echo skeleton '${field}' verbatim; mutations require an explicit revision note.`,
           });
         }
@@ -120,7 +127,7 @@ export function validateEnrichmentEchoInvariance(
             type: 'mutated_field',
             summary: `NFR '${skel.id}' field '${field}' mutated`,
             location: `$.requirements[id=${skel.id}].${field}`,
-            detail: `Skeleton: '${skel[field] ?? ''}'\nEnrichment: '${String(echoed[field] ?? '')}'`,
+            detail: `Skeleton: '${displayField(skel[field])}'\nEnrichment: '${displayField(echoed[field])}'`,
             recommendation: `Echo skeleton '${field}' verbatim.`,
           });
         }

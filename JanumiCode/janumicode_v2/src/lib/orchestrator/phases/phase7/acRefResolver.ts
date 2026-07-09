@@ -249,12 +249,33 @@ function normalizeId(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-const TRAILING_NUMBER_RE = /(\d+)(?!.*\d)/;
-
 function extractTrailingNumber(s: string): number | null {
-  const m = TRAILING_NUMBER_RE.exec(s);
-  if (!m) return null;
-  const n = Number.parseInt(m[1], 10);
+  // Linear equivalent of /(\d+)(?!.*\d)/ (no `s` flag, so `.` stops at
+  // newlines): capture the last contiguous digit run on the first line
+  // that contains any digit. Byte-identical output, no backtracking.
+  const isDigit = (c: number | undefined): boolean => c !== undefined && c >= 48 && c <= 57;
+
+  // First digit anywhere in the string selects the matching line.
+  let firstDigit = -1;
+  for (let i = 0; i < s.length; i++) {
+    if (isDigit(s.codePointAt(i))) {
+      firstDigit = i;
+      break;
+    }
+  }
+  if (firstDigit === -1) return null;
+
+  // The regex match lives on that line only; bound the scan at its newline.
+  let lineEnd = s.indexOf('\n', firstDigit);
+  if (lineEnd === -1) lineEnd = s.length;
+
+  // Last digit run within [firstDigit, lineEnd).
+  let end = lineEnd;
+  while (end > firstDigit && !isDigit(s.codePointAt(end - 1))) end--;
+  let start = end;
+  while (start > firstDigit && isDigit(s.codePointAt(start - 1))) start--;
+
+  const n = Number.parseInt(s.slice(start, end), 10);
   return Number.isFinite(n) ? n : null;
 }
 

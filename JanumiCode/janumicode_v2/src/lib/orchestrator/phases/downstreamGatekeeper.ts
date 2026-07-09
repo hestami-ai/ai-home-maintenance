@@ -190,9 +190,12 @@ export function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext, su
           let personaId: string | undefined;
           if (typeof j.personaId === 'string') personaId = j.personaId;
           else if (typeof j.persona_id === 'string') personaId = j.persona_id;
+          let title = '';
+          if (typeof j.title === 'string') title = j.title;
+          else if (typeof j.name === 'string') title = j.name;
           return {
             id: String(j.id),
-            title: String(j.title ?? j.name ?? ''),
+            title,
             personaId,
           };
         })
@@ -202,7 +205,7 @@ export function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext, su
     acceptedUserStories: Array.isArray(fr?.user_stories)
       ? (fr.user_stories as Array<Record<string, unknown>>).map(s => ({
           id: String(s.id),
-          action: String(s.action ?? ''),
+          action: typeof s.action === 'string' ? s.action : '',
           role: typeof s.role === 'string' ? s.role : undefined,
           outcome: typeof s.outcome === 'string' ? s.outcome : undefined,
         }))
@@ -241,7 +244,7 @@ export function collectDownstreamGatekeeperUpstreamContext(ctx: PhaseContext, su
         else if (typeof c.domainId === 'string') domain_id = c.domainId;
         return {
           id: String(c.id),
-          name: String(c.name ?? ''),
+          name: typeof c.name === 'string' ? c.name : '',
           domain_id,
         };
       });
@@ -277,7 +280,7 @@ function asIdNameArray(v: unknown): Array<{ id: string; name: string; descriptio
   if (!Array.isArray(v)) return undefined;
   return (v as Array<Record<string, unknown>>).map(it => ({
     id: String(it.id),
-    name: String(it.name ?? ''),
+    name: typeof it.name === 'string' ? it.name : '',
     description: typeof it.description === 'string' ? it.description : undefined,
   }));
 }

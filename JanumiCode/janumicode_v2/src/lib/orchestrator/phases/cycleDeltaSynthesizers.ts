@@ -56,7 +56,7 @@ export interface PhaseSixSynthInput {
  * Slugify a US action for use in a synthetic task id.
  */
 function slugify(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'task';
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'task';
 }
 
 export function synthesizeDeltaTasks(input: PhaseSixSynthInput): PhaseSixTask[] {

@@ -1,0 +1,343 @@
+{
+  "id": "main-orchestrator-001",
+  "name": "Main Orchestrator - JanumiCode v2",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "chat-trigger-1",
+      "name": "Chat Trigger",
+      "type": "n8n-nodes-base.chatTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-0-workflow-001"
+      },
+      "id": "execute-workflow-1",
+      "name": "Execute Phase 0",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-1-workflow-001"
+      },
+      "id": "execute-workflow-2",
+      "name": "Execute Phase 1",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "phase-0-5-trigger",
+              "leftValue": "={{ $json.prior_decision_override }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-1",
+      "name": "Check Phase 0.5 Trigger",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-0-5-workflow-001"
+      },
+      "id": "execute-workflow-3",
+      "name": "Execute Phase 0.5",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-2-workflow-001"
+      },
+      "id": "execute-workflow-4",
+      "name": "Execute Phase 2",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-3-workflow-001"
+      },
+      "id": "execute-workflow-5",
+      "name": "Execute Phase 3",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-4-workflow-001"
+      },
+      "id": "execute-workflow-6",
+      "name": "Execute Phase 4",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-5-workflow-001"
+      },
+      "id": "execute-workflow-7",
+      "name": "Execute Phase 5",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-6-workflow-001"
+      },
+      "id": "execute-workflow-8",
+      "name": "Execute Phase 6",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [2050, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-7-workflow-001"
+      },
+      "id": "execute-workflow-9",
+      "name": "Execute Phase 7",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [2250, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-8-workflow-001"
+      },
+      "id": "execute-workflow-10",
+      "name": "Execute Phase 8",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [2450, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-9-workflow-001"
+      },
+      "id": "execute-workflow-11",
+      "name": "Execute Phase 9",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [2650, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "phase-10-workflow-001"
+      },
+      "id": "execute-workflow-12",
+      "name": "Execute Phase 10",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [2850, 300]
+    },
+    {
+      "parameters": {
+        "content": "JanumiCode v2 workflow complete. All phases executed successfully.",
+        "options": {}
+      },
+      "id": "chat-1",
+      "name": "Workflow Complete",
+      "type": "n8n-nodes-base.chat",
+      "typeVersion": 1,
+      "position": [3050, 300]
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 0",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 0": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 1": {
+      "main": [
+        [
+          {
+            "node": "Check Phase 0.5 Trigger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Phase 0.5 Trigger": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 0.5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Phase 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 0.5": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 2": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 3": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 4": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 5": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 6": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 7": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 8": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 9": {
+      "main": [
+        [
+          {
+            "node": "Execute Phase 10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Phase 10": {
+      "main": [
+        [
+          {
+            "node": "Workflow Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}

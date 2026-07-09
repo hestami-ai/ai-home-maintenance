@@ -55,20 +55,20 @@ function getLatestFailure(records: GovernedStreamRecord[]): PacketSynthesisFailu
 /** Parse P3 detail: `P3_AC_NO_TEST: US-001/AC-001 has no test case`. */
 function parseP3AcRef(detail: string): { usId: string; acId: string } | null {
   // Strip leading "P3_AC_NO_TEST: " then expect "US-XXX/AC-YYY ..."
-  const m = /P3_AC_NO_TEST:\s*([A-Za-z][\w-]*)\/([A-Za-z][\w-]*)/i.exec(detail);
+  const m = /P3_AC_NO_TEST:\s*([a-z][\w-]*)\/([a-z][\w-]*)/i.exec(detail);
   if (!m) return null;
   return { usId: m[1], acId: m[2] };
 }
 
 /** Parse P4: `P4_USER_STORY_NO_EVAL: US-001 has no evaluation criterion`. */
 function parseP4Target(detail: string): string | null {
-  const m = /P4_USER_STORY_NO_EVAL:\s*([A-Za-z][\w-]*)/i.exec(detail);
+  const m = /P4_USER_STORY_NO_EVAL:\s*([a-z][\w-]*)/i.exec(detail);
   return m ? m[1] : null;
 }
 
 /** Parse P5: `P5_NFR_NO_EVAL: NFR-001 has no evaluation criterion`. */
 function parseP5Target(detail: string): string | null {
-  const m = /P5_NFR_NO_EVAL:\s*([A-Za-z][\w-]*)/i.exec(detail);
+  const m = /P5_NFR_NO_EVAL:\s*([a-z][\w-]*)/i.exec(detail);
   return m ? m[1] : null;
 }
 

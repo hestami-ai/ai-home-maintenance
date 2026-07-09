@@ -347,10 +347,17 @@ export function buildProjectConfig(cfg: MimoConfig, env: NodeJS.ProcessEnv = pro
   return config;
 }
 
+/** Strip trailing `/` characters in linear time (avoids the `\/+$` ReDoS shape). */
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.codePointAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 /** Parse `mimocode server listening on http://127.0.0.1:PORT` from server stdout. */
 export function parseListeningUrl(text: string): string | null {
   const m = /listening on (https?:\/\/[^\s]+)/i.exec(text);
-  return m ? m[1].replace(/\/+$/, '') : null;
+  return m ? stripTrailingSlashes(m[1]) : null;
 }
 
 /** Add `projectRoot` (native form) to mimo's trusted-workspaces file, idempotently. */
@@ -463,7 +470,8 @@ class MimoServerManagerImpl {
       if (!s) continue;
       try {
         if (s.proc.pid && process.platform === 'win32') {
-          spawn('taskkill', ['/PID', String(s.proc.pid), '/T', '/F'], { stdio: 'ignore', shell: false });
+          const taskkill = path.join(process.env.SystemRoot || 'C:/Windows', 'System32', 'taskkill.exe');
+          spawn(taskkill, ['/PID', String(s.proc.pid), '/T', '/F'], { stdio: 'ignore', shell: false });
         } else {
           s.proc.kill('SIGTERM');
         }

@@ -228,7 +228,7 @@ export class Phase10Handler implements PhaseHandler {
     const intentRecord = engine.writer.getArtifactByKind(workflowRun.id, 'intent_statement');
     const intentContent = intentRecord?.content as Record<string, unknown> | undefined;
     const intentSummary = intentContent
-      ? `${(intentContent.product_concept as Record<string, unknown>)?.name ?? 'Unknown'}: ${(intentContent.product_concept as Record<string, unknown>)?.description ?? ''}`.slice(0, 300)
+      ? `${((intentContent.product_concept as Record<string, unknown>)?.name as string | undefined) ?? 'Unknown'}: ${((intentContent.product_concept as Record<string, unknown>)?.description as string | undefined) ?? ''}`.slice(0, 300)
       : 'Workflow run completed';
 
     const summaryRecord = engine.writer.writeRecord({

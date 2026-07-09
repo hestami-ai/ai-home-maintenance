@@ -1,0 +1,15 @@
+{
+  compilerOptions: {
+    target: 'ESNext',
+    moduleResolution: 'node',
+    strict: true,
+    noImplicitAny: true,
+    exactOptionalPropertyTypes: true,
+    declarations: false,            // we never emit; only verify types
+    outDir: '.output/esm/',         // unused dir — kept as stub for compatibility with existing build hook (if any)
+    useDefineForClassFields: true,  // matches svelte convention below src/
+    skipLibCheck: true,             // ignore .d.ts definitions of transitive deps not shipped here
+    types: ['node']               }
+}
+
+include: ['./src/**/*.svelte', './src/**/*.d.ts'], _comment: 'only typecheck the source tree; never emit'

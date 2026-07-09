@@ -224,9 +224,16 @@ const STACK_EXTENSIONS: Record<string, string[]> = {
   java: ['.java', '.kt'],
 };
 
+/** Strip trailing '/' characters in linear time (avoids ReDoS-prone `/\/+$/`). */
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.codePointAt(end - 1) === 47) end--;
+  return s.slice(0, end);
+}
+
 /** Normalize a path for comparison: strip leading/trailing slashes. */
 function normPath(p: string): string {
-  return (p ?? '').trim().replace(/^[./]+/, '').replace(/\/+$/, '');
+  return stripTrailingSlashes((p ?? '').trim().replace(/^[./]+/, ''));
 }
 
 /**
@@ -310,7 +317,7 @@ export function buildReconLayoutContract(plan: Phase9ReconPlan): ProjectLayoutCo
     if (a.source_roots[0]) componentDirMap[a.area_id] = a.source_roots[0];
     for (const al of a.import_aliases) aliases.set(al.alias, al.target);
     const sharedProtected = a.protected_paths.find(p => p.endsWith('/'));
-    if (sharedProtected) sharedDir = sharedProtected.replace(/\/+$/g, '');
+    if (sharedProtected) sharedDir = stripTrailingSlashes(sharedProtected);
   }
   return {
     kind: 'project_layout_contract',

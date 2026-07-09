@@ -1,0 +1,580 @@
+{
+  "id": "phase-1-workflow-001",
+  "name": "Phase 1 - Intent Capture and Convergence",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "phaseId": "1",
+        "subPhaseId": "intent_quality_check",
+        "agentRole": "technical_expert",
+        "artifactRefs": "phase-0-workspace-classification",
+        "governingConstraints": "{}",
+        "requiredOutput": "{}",
+        "summaryContext": "Raw intent from Phase 0"
+      },
+      "id": "context-builder-1",
+      "name": "Build Intent Context",
+      "type": "n8n-nodes-base.contextBuilder",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $json.stdinText }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            },
+            {
+              "name": "options",
+              "value": "={\"num_ctx\": 131072, \"temperature\": 0.6, \"top_k\": 20, \"top_p\": 0.95}"
+            }
+          ]
+        }
+      },
+      "id": "http-request-1",
+      "name": "Intent Quality Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "intent_quality_assessment",
+        "content": "={{ $json.response }}",
+        "authorityLevel": 5,
+        "phaseId": "1",
+        "subPhaseId": "intent_quality_check"
+      },
+      "id": "governed-stream-1",
+      "name": "Write Intent Quality Check",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "Classify the lens type (product, process, etc.) for this intent: {{ $json.rawIntent }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-2",
+      "name": "Intent Lens Classification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "lens-check",
+              "leftValue": "={{ $json.response }}",
+              "rightValue": "product",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-1",
+      "name": "Check Product Lens",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "content": "Error: PoC only supports product lens. Detected lens: {{ $json.response }}",
+        "options": {}
+      },
+      "id": "chat-1",
+      "name": "Hard Fail",
+      "type": "n8n-nodes-base.chat",
+      "typeVersion": 1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "Pass 1: Bloom business domains for this intent: {{ $json.rawIntent }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-3",
+      "name": "Intent Discovery Pass 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "Pass 2: Bloom user journeys for this intent: {{ $json.rawIntent }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-4",
+      "name": "Intent Discovery Pass 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1650, 400]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "Pass 3: Bloom system workflows for this intent: {{ $json.rawIntent }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-5",
+      "name": "Intent Discovery Pass 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1850, 400]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "Pass 4: Bloom entities for this intent: {{ $json.rawIntent }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-6",
+      "name": "Intent Discovery Pass 4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2050, 400]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "Pass 5: Bloom integrations and quality attributes for this intent: {{ $json.rawIntent }}"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-7",
+      "name": "Intent Discovery Pass 5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2250, 400]
+    },
+    {
+      "parameters": {
+        "resource": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "ornith:35b-q4_K_M"
+            },
+            {
+              "name": "prompt",
+              "value": "Composer: Synthesize product description from all discovery passes"
+            },
+            {
+              "name": "stream",
+              "value": "false"
+            }
+          ]
+        }
+      },
+      "id": "http-request-8",
+      "name": "Product Description Synthesis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2450, 400]
+    },
+    {
+      "parameters": {
+        "action": "write",
+        "recordType": "product_description",
+        "content": "={{ $json.response }}",
+        "authorityLevel": 5,
+        "phaseId": "1",
+        "subPhaseId": "product_description_synthesis"
+      },
+      "id": "governed-stream-2",
+      "name": "Write Product Description",
+      "type": "n8n-nodes-base.governedStream",
+      "typeVersion": 1,
+      "position": [2650, 400]
+    },
+    {
+      "parameters": {
+        "artifactType": "product_description",
+        "artifactContent": "={{ $json.content }}",
+        "phaseId": "1"
+      },
+      "id": "invariant-checker-1",
+      "name": "Validate Product Description",
+      "type": "n8n-nodes-base.invariantChecker",
+      "typeVersion": 1,
+      "position": [2850, 400]
+    },
+    {
+      "parameters": {
+        "phaseId": "1",
+        "artifactIds": "={{ $json.recordId }}",
+        "schemaValid": true,
+        "invariantsPassed": true,
+        "reasoningReviewPassed": true,
+        "consistencyPassed": true,
+        "domainAttested": true,
+        "verificationEnsemblePassed": true,
+        "humanApproved": false
+      },
+      "id": "phase-gate-evaluator-1",
+      "name": "Phase 1 Gate",
+      "type": "n8n-nodes-base.phaseGateEvaluator",
+      "typeVersion": 1,
+      "position": [3050, 400]
+    },
+    {
+      "parameters": {
+        "content": "Phase 1 complete. Please review product description and approve.",
+        "options": {}
+      },
+      "id": "chat-2",
+      "name": "Human Approval Gate",
+      "type": "n8n-nodes-base.chat",
+      "typeVersion": 1,
+      "position": [3250, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "phase-0-5-trigger",
+              "leftValue": "={{ $json.prior_decision_override }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-2",
+      "name": "Check Phase 0.5 Trigger",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3450, 400]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Intent Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Intent Context": {
+      "main": [
+        [
+          {
+            "node": "Intent Quality Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Quality Check": {
+      "main": [
+        [
+          {
+            "node": "Write Intent Quality Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Intent Quality Check": {
+      "main": [
+        [
+          {
+            "node": "Intent Lens Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Lens Classification": {
+      "main": [
+        [
+          {
+            "node": "Check Product Lens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Product Lens": {
+      "main": [
+        [
+          {
+            "node": "Hard Fail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Intent Discovery Pass 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Discovery Pass 1": {
+      "main": [
+        [
+          {
+            "node": "Intent Discovery Pass 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Discovery Pass 2": {
+      "main": [
+        [
+          {
+            "node": "Intent Discovery Pass 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Discovery Pass 3": {
+      "main": [
+        [
+          {
+            "node": "Intent Discovery Pass 4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Discovery Pass 4": {
+      "main": [
+        [
+          {
+            "node": "Intent Discovery Pass 5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Discovery Pass 5": {
+      "main": [
+        [
+          {
+            "node": "Product Description Synthesis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product Description Synthesis": {
+      "main": [
+        [
+          {
+            "node": "Write Product Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Product Description": {
+      "main": [
+        [
+          {
+            "node": "Validate Product Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Product Description": {
+      "main": [
+        [
+          {
+            "node": "Phase 1 Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 1 Gate": {
+      "main": [
+        [
+          {
+            "node": "Human Approval Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human Approval Gate": {
+      "main": [
+        [
+          {
+            "node": "Check Phase 0.5 Trigger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}

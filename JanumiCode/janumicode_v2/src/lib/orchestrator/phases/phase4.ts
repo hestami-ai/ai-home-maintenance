@@ -595,7 +595,7 @@ export class Phase4Handler implements PhaseHandler {
     // they stay consistent.
     const compItems = ((componentContent as unknown as { components?: Array<Record<string, unknown>> }).components ?? []).map(c => ({
       id: typeof c.id === 'string' ? c.id : '',
-      label: `${c.id}: ${c.name} [domain: ${(c as Record<string, unknown>).domain_id ?? '?'}]`,
+      label: `${c.id}: ${c.name} [domain: ${typeof c.domain_id === 'string' ? c.domain_id : '?'}]`,
       description: typeof c.description === 'string' ? c.description : undefined,
       tradeoffs: Array.isArray(c.traces_to) ? `traces_to: ${(c.traces_to as string[]).join(', ')}` : undefined,
     }));

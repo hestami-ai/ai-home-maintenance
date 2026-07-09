@@ -352,8 +352,15 @@ export class TestRunner {
     let failed = 0;
     let skipped = 0;
 
-    // Try to extract JSON from output (Vitest outputs JSON after the default reporter)
-    const jsonMatch = output.match(/\{[\s\S]*"testResults"[\s\S]*\}/);
+    // Try to extract JSON from output (Vitest outputs JSON after the default reporter).
+    // Linear scan for the first '{' .. last '}' span that contains "testResults";
+    // byte-identical to /\{[\s\S]*"testResults"[\s\S]*\}/ but without its
+    // super-linear backtracking on inputs that lack a closing brace.
+    const firstBrace = output.indexOf('{');
+    const lastBrace = output.lastIndexOf('}');
+    const jsonCandidate =
+      firstBrace !== -1 && lastBrace > firstBrace ? output.slice(firstBrace, lastBrace + 1) : null;
+    const jsonMatch = jsonCandidate?.includes('"testResults"') ? [jsonCandidate] : null;
     if (jsonMatch) {
       try {
         const json = JSON.parse(jsonMatch[0]);
@@ -388,9 +395,9 @@ export class TestRunner {
     // "ℹ pass N / ℹ fail N / ℹ skipped N", and pytest's
     // "N passed, M failed in...". Whichever matches first wins.
     if (testCases.length === 0) {
-      const passMatch = /(\d+) passed/.exec(output) ?? /[ℹi]\s*pass(?:ed)?\s+(\d+)/i.exec(output);
-      const failMatch = /(\d+) failed/.exec(output) ?? /[ℹi]\s*fail(?:ed)?\s+(\d+)/i.exec(output);
-      const skipMatch = /(\d+) skipped/.exec(output) ?? /[ℹi]\s*skipped\s+(\d+)/i.exec(output);
+      const passMatch = /(?<!\d)(\d+) passed/.exec(output) ?? /[ℹi]\s*pass(?:ed)?\s+(\d+)/i.exec(output);
+      const failMatch = /(?<!\d)(\d+) failed/.exec(output) ?? /[ℹi]\s*fail(?:ed)?\s+(\d+)/i.exec(output);
+      const skipMatch = /(?<!\d)(\d+) skipped/.exec(output) ?? /[ℹi]\s*skipped\s+(\d+)/i.exec(output);
 
       passed = passMatch ? Number.parseInt(passMatch[1], 10) : 0;
       failed = failMatch ? Number.parseInt(failMatch[1], 10) : 0;
